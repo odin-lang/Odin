@@ -5487,36 +5487,39 @@ gbFileTime gb_file_last_write_time(char const *filepath) {
 gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filename, b32 fail_if_exists) {
 #if defined(GB_SYSTEM_OSX)
 	return copyfile(existing_filename, new_filename, NULL, COPYFILE_DATA) == 0;
-#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD)
-	isize size;
-	int existing_fd = open(existing_filename, O_RDONLY, 0);
-	int new_fd      = open(new_filename, O_WRONLY|O_CREAT, 0666);
-
-	struct stat stat_existing;
-	fstat(existing_fd, &stat_existing);
-	size = sendfile(new_fd, existing_fd, 0, stat_existing.st_size);
-	
-	// set new handle to wanted size for safety
-	int i = ftruncate(new_fd, size);
-	GB_ASSERT(i == 0);
-
-	close(new_fd);
-	close(existing_fd);
-
-	return size == stat_existing.st_size;
 #else
-	int new_flags = O_WRONLY | O_CREAT;
-	if (fail_if_exists) {
-		new_flags |= O_EXCL;
-	}
+	isize size = 0;
 	int existing_fd = open(existing_filename, O_RDONLY, 0);
-	int new_fd      = open(new_filename, new_flags, 0666);
+	if (existing_fd == -1)
+		return 0;
+
+	int new_fd = open(new_filename, O_WRONLY|O_CREAT, 0666);
+	if (new_fd == -1) {
+		close(existing_fd);
+		return 0;
+	}
 
 	struct stat stat_existing;
 	if (fstat(existing_fd, &stat_existing) == -1) {
 		return 0;
 	}
 
+#if defined(GB_SYSTEM_LINUX)
+	size = sendfile(new_fd, existing_fd, 0, stat_existing.st_size);
+	if (size == -1) {
+		close(existing_fd);
+		close(new_fd);
+		return 0;
+	}
+
+	// set new handle to wanted size for safety
+	int truncate_result = ftruncate(new_fd, size);
+
+	close(new_fd);
+	close(existing_fd);
+
+	return truncate_result == 0 && size == stat_existing.st_size;
+#else
 	size_t bsize = stat_existing.st_blksize > BUFSIZ ? stat_existing.st_blksize : BUFSIZ;
 	char *buf = (char *)gb_malloc(bsize);
 	if (buf == NULL) {
@@ -5547,7 +5550,8 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 		return 0;
 	}
 	return size == stat_existing.st_size;
-#endif
+#endif // #if defined(GB_SYSTEM_LINUX)
+#endif // #if defined(GB_SYSTEM_OSX)
 }
 
 gb_inline b32 gb_file_move(char const *existing_filename, char const *new_filename) {
