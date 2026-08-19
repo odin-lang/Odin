@@ -174,14 +174,21 @@ gb_internal bool json_errors(void);
 gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
-gb_internal void warning(Token const &token, char const *fmt, ...);
-gb_internal void error(Token const &token, char const *fmt, ...);
-gb_internal void error(TokenPos pos, char const *fmt, ...);
-gb_internal void error_line(char const *fmt, ...);
-gb_internal void syntax_error(Token const &token, char const *fmt, ...);
-gb_internal void syntax_error(TokenPos pos, char const *fmt, ...);
-gb_internal void syntax_warning(Token const &token, char const *fmt, ...);
-gb_internal void compiler_error(char const *fmt, ...);
+// Let the compiler check these against their arguments. 
+#if defined(__GNUC__) || defined(__clang__)
+	#define ODIN_FMT_LIKE(fmt_idx, va_idx) __attribute__((format(printf, fmt_idx, va_idx)))
+#else
+	#define ODIN_FMT_LIKE(fmt_idx, va_idx)
+#endif
+
+gb_internal void warning(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error(TokenPos pos, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error_line(char const *fmt, ...) ODIN_FMT_LIKE(1, 2);
+gb_internal void syntax_error(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void syntax_error(TokenPos pos, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void syntax_warning(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void compiler_error(char const *fmt, ...) ODIN_FMT_LIKE(1, 2);
 gb_internal void print_all_errors(void);
 
 

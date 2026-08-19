@@ -1158,7 +1158,7 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 					error(e->token, "Imported Objective-C methods must use the \"c\" calling convention");
 					return;
 				} else if (tn->TypeName.objc_context_provider) {
-					error(e->token, "Imported Objective-C class '%.*s' must not declare context providers.", tn->type->Named.name);
+					error(e->token, "Imported Objective-C class '%.*s' must not declare context providers.", LIT(tn->type->Named.name));
 					return;
 				} else if (tn->TypeName.objc_is_implementation) {
 					error(e->token, "Imported Objective-C methods used in a class with @(objc_implement) is not allowed.");
