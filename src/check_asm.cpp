@@ -1131,7 +1131,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				      LIT(name), i,
 				      want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]), LIT(asm_operand_kind_strings[dst]),
 				      got_bits[i],  LIT(asm_reg_class_strings[src_reg_class]), LIT(asm_operand_kind_strings[src]));
-			} else if (dst) {
+			} else if (dst == AsmOperand_Immediate) {
+				error(operands[i].expr, "'%.*s' operand-%td must be an assemble-time constant or a $ immediate parameter, got a %.*s",
+				      LIT(name), i, LIT(asm_operand_kind_strings[src]));
+			}else if (dst) {
 				error(operands[i].expr, "'%.*s' operand-%td has an invalid kind, expected %.*s operand",
 				      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]));
 			} else {
