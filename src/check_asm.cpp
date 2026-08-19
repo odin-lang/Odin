@@ -940,6 +940,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory();
 		tmpl_entity->AsmTemplate.is_volatile    |= clobber.implies_side_effects();
 
+		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.implies_side_effects() != 0;
+		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem;
 
 		u16 pinned_mask = 0;
 		for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
@@ -1612,7 +1614,6 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		}
 	}
 
-
 	Array<Operand> operands = {};
 	operands.allocator = heap_allocator();
 	array_reserve(&operands, 16);
@@ -1765,6 +1766,28 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	}
 	if (previous_prefix != 0) {
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
+	}
+
+	for (auto const &ed : ate->decls) {
+		if (!(ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.pin.len != 0)) {
+			continue;
+		}
+		u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+		if (bit && (defined_regs & bit) == 0 && straight_line) {
+			error(ed.entity->token,
+			      "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
+			      LIT(ed.entity->token.string), LIT(ed.pin));
+		}
+	}
+
+	GB_ASSERT(entity->kind == Entity_AsmTemplate);
+	if (results->Tuple.variables.count == 0 && !entity->AsmTemplate.is_volatile &&
+	    !entity->AsmTemplate.clobber_memory &&
+	    entity->AsmTemplate.has_observable_side_effect) {
+		warning(entity->token,
+		        "This asm template has an observable effect but declares no outputs "
+		        "and does not #volatile in the specification block; it may be optimized away. "
+		        "Please add #volatile if the effect is intended.");
 	}
 }
 
