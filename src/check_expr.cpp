@@ -2655,7 +2655,7 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
 
 				if (size_changed) {
-					error_line("\tThe maximum value that can be represented with that bit_field's field of '%s | %u' is '%.*s'\n", b, bit_size, LIT(max_size_str));
+					error_line("\tThe maximum value that can be represented with that bit_field's field of '%s | %lld' is '%.*s'\n", b, cast(long long)bit_size, LIT(max_size_str));
 				} else {
 					error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
 				}
@@ -2677,7 +2677,7 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 			}
 
 			if (size_changed) {
-				error_line("\tThe maximum value that can be represented with that bit_field's field of '%s | %u' is '%.*s'\n", b, bit_size, LIT(max_size_str));
+				error_line("\tThe maximum value that can be represented with that bit_field's field of '%s | %lld' is '%.*s'\n", b, cast(long long)bit_size, LIT(max_size_str));
 			} else {
 				error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
 			}
@@ -2765,7 +2765,7 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 			i64 x = type_size_of(o->type);
 			i64 y = type_size_of(type);
 			if (x != y) {
-				error_line("\tNote: the type of expression and the type of the cast have a different size in bytes, %lld vs %lld\n", x, y);
+				error_line("\tNote: the type of expression and the type of the cast have a different size in bytes, %lld vs %lld\n", cast(long long)x, cast(long long)y);
 			}
 		}
 	} else if (is_type_integer(o->type) && is_type_pointer(type)) {
@@ -4111,7 +4111,7 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 	if (srcz != dstz) {
 		gbString expr_str = expr_to_string(o->expr);
 		gbString type_str = type_to_string(dst_t);
-		error(o->expr, "Cannot transmute '%s' to '%s', %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
+		error(o->expr, "Cannot transmute '%s' to '%s', %lld vs %lld bytes", expr_str, type_str, cast(long long)srcz, cast(long long)dstz);
 		gb_string_free(type_str);
 		gb_string_free(expr_str);
 		o->mode = Addressing_Invalid;
@@ -4571,7 +4571,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 					x->expr = node;
 					return;
 				} else {
-					error(x->expr, "key '%lld' out of range of bit set, %lld..%lld", key, lower, upper);
+					error(x->expr, "key '%lld' out of range of bit set, %lld..%lld", cast(long long)key, cast(long long)lower, cast(long long)upper);
 					x->mode = Addressing_Invalid;
 				}
 			}
@@ -5524,7 +5524,7 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 					String idx_str = big_int_to_string(temporary_allocator(), &i);
 					gbString expr_str = expr_to_string(operand.expr, temporary_allocator());
 					char range_type = open_range ? '=' : '<';
-					error(operand.expr, "Index '%s' is out of bounds range 0..%c%lld, got %.*s", expr_str, range_type, max_count, LIT(idx_str));
+					error(operand.expr, "Index '%s' is out of bounds range 0..%c%lld, got %.*s", expr_str, range_type, cast(long long)max_count, LIT(idx_str));
 					return false;
 				}
 
@@ -6158,7 +6158,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 					} else {
 						GB_PANIC("unknown swizzle kind");
 					}
-					error(selector->Ident.token, "Swizzle value is out of bounds, got %c, max count %lld", c, array_count);
+					error(selector->Ident.token, "Swizzle value is out of bounds, got %c, max count %lld", c, cast(long long)array_count);
 					break;
 				}
 			}
@@ -6772,10 +6772,10 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			defer (gb_string_free(proc_str));
 			if (param_count_excluding_defaults != pt->param_count) {
 				char const *err_fmt = "Too many arguments for '%s', expected %td..=%td arguments, got %td";
-				error(call, err_fmt, proc_str, param_count_excluding_defaults, pt->param_count, positional_operands.count);
+				error(call, err_fmt, proc_str, param_count_excluding_defaults, cast(isize)pt->param_count, positional_operands.count);
 			} else {
 				char const *err_fmt = "Too many arguments for '%s', expected %td arguments, got %td";
-				error(call, err_fmt, proc_str, pt->param_count, positional_operands.count);
+				error(call, err_fmt, proc_str, cast(isize)pt->param_count, positional_operands.count);
 			}
 		}
 		return err;
@@ -11049,17 +11049,17 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					bool new_range = range_cache_add_range(&rc, lo, hi);
 					if (!new_range) {
-						error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
+						error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", cast(long long)lo, LIT(op.string), cast(long long)hi, LIT(context_name));
 						continue;
 					}
 
 
 					if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
-						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", cast(long long)lo, cast(long long)max_type_count, LIT(context_name));
 						continue;
 					}
 					if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
-						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", cast(long long)hi, cast(long long)max_type_count, LIT(context_name));
 						continue;
 					}
 
@@ -11087,13 +11087,13 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					i64 index = exact_value_to_i64(op_index.value);
 
 					if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
-						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", cast(long long)index, cast(long long)max_type_count, LIT(context_name));
 						continue;
 					}
 
 					bool new_index = range_cache_add_index(&rc, index);
 					if (!new_index) {
-						error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
+						error(elem, "Duplicate field index %lld for %.*s", cast(long long)index, LIT(context_name));
 						continue;
 					}
 
@@ -11128,7 +11128,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 
 				if (0 <= max_type_count && max_type_count <= index) {
-					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", cast(long long)index, cast(long long)max_type_count, LIT(context_name));
 				}
 
 				Operand operand = {};
@@ -11405,7 +11405,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				}
 
 				if (0 <= max_type_count && max_type_count <= index) {
-					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", cast(long long)index, cast(long long)max_type_count, LIT(context_name));
 				}
 
 				Operand operand = {};
@@ -11657,7 +11657,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					// okay
 				} else {
 					gbString s = expr_to_string(o->expr);
-					error(elem, "Bit field value out of bounds, %s (%lld) not in the range %lld .. %lld", s, v, lower, upper);
+					error(elem, "Bit field value out of bounds, %s (%lld) not in the range %lld .. %lld", s, cast(long long)v, cast(long long)lower, cast(long long)upper);
 					gb_string_free(s);
 					continue;
 				}

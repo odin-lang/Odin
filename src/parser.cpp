@@ -564,6 +564,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 }
 
 
+gb_internal void error(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
@@ -617,6 +618,7 @@ gb_internal void syntax_error_with_verbose(Ast *node, char const *fmt, ...) {
 }
 
 
+gb_internal void error_no_newline(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void error_no_newline(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	if (node != nullptr) {
@@ -632,6 +634,7 @@ gb_internal void error_no_newline(Ast *node, char const *fmt, ...) {
 	}
 }
 
+gb_internal void warning(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void warning(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
@@ -645,6 +648,7 @@ gb_internal void warning(Ast *node, char const *fmt, ...) {
 	va_end(va);
 }
 
+gb_internal void syntax_error(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void syntax_error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
