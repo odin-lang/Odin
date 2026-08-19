@@ -1502,6 +1502,9 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			error(expr, "Undeclared asm label '.%.*s'", LIT(name->token.string));
 		}
 		name->entity = found;
+		if (found != nullptr) {
+			found->flags |= EntityFlag_Used;
+		}
 
 		add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
 		return;
@@ -1841,6 +1844,14 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			error(ed.entity->token,
 			      "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
 			      LIT(ed.entity->token.string), LIT(ed.pin));
+		}
+	}
+
+	for (auto const &entry : ate->label_scope->elements) {
+		Entity *le = entry.value;
+		GB_ASSERT(le != nullptr);
+		if ((le->flags & EntityFlag_Used) == 0) {
+			warning(le->token, "'asm' label '.%.*s' is declared but never reference by any instruction", LIT(le->token.string));
 		}
 	}
 
