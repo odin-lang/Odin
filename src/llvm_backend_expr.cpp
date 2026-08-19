@@ -4471,6 +4471,14 @@ gb_internal Type *lb_build_expr_original_const_type(Ast *expr) {
 				Type *res = lb_build_expr_original_const_type(expr->CallExpr.args[0]);
 				return res;
 			}
+		} else if (expr->kind == Ast_Ident || expr->kind == Ast_SelectorExpr) {
+			// a named constant carries the union as its type, so follow it to the declaration the
+			// checker resolved: `C :: U(3)` is the variant `int`, not `U`
+			Entity *e = entity_of_node(expr);
+			if (e != nullptr && e->kind == Entity_Constant &&
+			    e->decl_info != nullptr && e->decl_info->init_expr != nullptr) {
+				return lb_build_expr_original_const_type(e->decl_info->init_expr);
+			}
 		}
 	}
 	return type_of_expr(expr);
@@ -4850,7 +4858,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_Constant) {
 		Type *t = default_type(type_of_expr(expr));
-		lbValue v = lb_const_value(p->module, t, e->Constant.value, e->type, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
+		lbValue v = lb_const_value(p->module, t, e->Constant.value, lb_build_expr_original_const_type(expr), LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
 		if (LLVMIsConstant(v.value)) {
 			lbAddr g = lb_add_global_generated_from_procedure(p, t, v);
 			return g;
