@@ -177,6 +177,12 @@ struct Asm_amd64 {
 		ClobberReg_FPU_ST = 1<<12,
 		ClobberReg_FPU_SW = 1<<13,
 	};
+
+	static u16 const CLOBBER_REGS_NAMED =
+	    ClobberReg_RAX|ClobberReg_RBX|ClobberReg_RCX|ClobberReg_RDX|
+	    ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBP|ClobberReg_R11|
+	    ClobberReg_XMM0;
+
 	enum OperandSet : u8 {
 		OperandSet_OP0 = 1<<0,
 		OperandSet_OP1 = 1<<1,
@@ -297,12 +303,8 @@ struct Asm_amd64 {
 		}
 	};
 
-	void clobber_implicit_regs(StringSet *clobber_registers_set, ClobberRegs implicit_regs) {
-		u16 const NAMED =
-		    ClobberReg_RAX|ClobberReg_RBX|ClobberReg_RCX|ClobberReg_RDX|
-		    ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBP|ClobberReg_R11|
-		    ClobberReg_XMM0;
-		u16 regs = implicit_regs & NAMED;
+	void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
+		u16 regs = implicit_regs & CLOBBER_REGS_NAMED;
 
 		for (u16 bit = 1; bit != 0; bit <<= 1) {
 			if ((regs & bit) == 0) {

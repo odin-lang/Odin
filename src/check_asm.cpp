@@ -795,7 +795,8 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstr
 template <typename AsmCtx>
 gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
                                 u16 mnemonic, Slice<Operand> const &operands,
-                                u8 previous_prefix, Ast *previous_prefix_instr) {
+                                u8 previous_prefix, Ast *previous_prefix_instr,
+                                u16 *defined_regs, bool *straight_line) {
 	GB_ASSERT(mnemonic > 0);
 	auto forms = asm_ctx->encoding_forms(mnemonic);
 	String name = asm_ctx->mnemonic_strings[mnemonic];
@@ -935,11 +936,59 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		auto clobber_forms = asm_ctx->clobber_forms(mnemonic);
 		auto clobber = clobber_forms[valid_form_index];
 
-		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, clobber.implicit_wr);
-
 		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
 		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory();
 		tmpl_entity->AsmTemplate.is_volatile    |= clobber.implies_side_effects();
+
+
+		u16 pinned_mask = 0;
+		for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
+			if (ed.pin.len != 0) {
+				pinned_mask |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
+			}
+		}
+
+		if (*straight_line) {
+			u16 wants     = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
+			u16 undefined = wants & ~*defined_regs & ~pinned_mask;
+			for (u16 bit = 1; bit != 0; bit <<= 1) {
+			    if ((undefined & bit) == 0) {
+			        continue;
+			    }
+			    char const *rname = asm_ctx->clobber_reg_bit_name(bit);
+			    error(instr->name,
+			          "'%.*s' implicitly reads %%%s, but nothing in this template produces "
+			          "a value for it; pin an input parameter to %%%s, or write %%%s before "
+			          "this instruction",
+			          LIT(name), rname, rname, rname);
+			}
+		}
+
+		u16 produced = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
+
+		// Explicit destination operands that name a concrete register also produce it
+		// (e.g. `mov eax, $leaf` before CPUID). Only literal %reg operands pin a known
+		// physical register; parameter operands are register-allocated elsewhere, so they
+		// don't tell us which physical register was written.
+		u16 written_ops = cast(u16)clobber.written;
+		for_array(i, operands) {
+			if (i >= 4 || (written_ops & (1u << i)) == 0) {
+				continue;
+			}
+			Ast *e = operands[i].expr;
+			if (e && e->kind == Ast_AsmRegister) {
+				produced |= asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
+			}
+		}
+		*defined_regs |= produced;
+
+		// A branch/call inside the template means subsequent instructions may be reached
+		// out of textual order; stop trusting the linear def model past this point.
+		if (cast(u16)clobber.side_effects & asm_ctx->SideEffectFlag_CONTROL) {
+			*straight_line = false;
+		}
+		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
+
 		return;
 	}
 
@@ -1443,7 +1492,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
 	{ // check clobbers
-		bool clobber_flags     = false;
+		bool clobber_flags  = false;
 		bool clobber_memory = false;
 
 		for (Ast *clobber_ : at->clobbers) {
@@ -1507,6 +1556,37 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		entity->AsmTemplate.is_align_stack = is_align_stack;
 	}
 
+	// add normalizations for the reigsters too
+	for (String const &reg : *clobber_registers_set) {
+		u16 bit = asm_ctx->clobber_bit_for_reg_name(reg);
+		String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
+		if (rname != reg) {
+			string_set_update(clobber_registers_set, rname);
+		}
+	}
+
+	// Physical registers known to hold a defined value at the current point in the
+	// straight-line instruction stream. Seeded with input-pinned registers (they
+	// carry their argument at entry); grows as instructions write registers.
+	u16 defined_regs = 0;
+	for (auto const &ed : ate->decls) {
+		if (ed.pin.len == 0) {
+		    continue;
+		}
+		// Only inputs (and the input half of a tie, which is Input-group) hold a
+		// value at entry. Output/scratch pins start undefined and become defined
+		// when an instruction writes them.
+		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Input) {
+			defined_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
+		}
+	}
+
+	// Linear "written earlier in the text" is only a sound proxy for "produced at
+	// runtime" while control flow is straight-line. The first label is a potential
+	// jump target / back-edge, after which a read can precede its textual def; from
+	// there on we stop emitting the implicit-read diagnostic.
+	bool straight_line = true;
+
 	// collect label decls
 	for (Ast *instruction_ : at->instructions) {
 		switch (instruction_->kind) {
@@ -1566,7 +1646,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				previous_prefix = cast(u8)mnemonic;
 				previous_prefix_instr = instruction_;
 			} else if (res == CheckMnemomic_Mnemonic) {
-				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, slice_from_array(operands), previous_prefix, previous_prefix_instr);
+				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, slice_from_array(operands),
+				               previous_prefix, previous_prefix_instr,
+				               &defined_regs, &straight_line);
 				previous_prefix = 0;
 				previous_prefix_instr = nullptr;
 			} else {
@@ -1577,6 +1659,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		case_end;
 
 		case_ast_node(label, AsmLabelDecl, instruction_);
+			straight_line = false;
 			if (previous_prefix != 0) {
 				error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but a label declaration was found");
 				previous_prefix = 0;
