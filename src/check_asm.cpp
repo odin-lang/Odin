@@ -852,12 +852,29 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstr
 	return CheckMnemomic_Invalid;
 }
 
+struct AsmMnemonicAccumulator {
+	u16  defined_regs;
+
+	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
+	u16  implicit_clobbered_regs;
+
+	bool straight_line;
+
+	// Whether the most-recently-checked instruction terminates straight-line flow.
+	// Reset to false at every label (a label starts a fresh straight-line region whose
+	// tail we haven't seen yet). Consulted after the loop for #diverging templates.
+	bool last_is_terminal;
+
+	// Did the template contain any instructions at all? An empty diverging body can't diverge.
+	bool saw_any_instructions;
+};
+
 
 template <typename AsmCtx>
 gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
                                 u16 mnemonic, Slice<Operand> const &operands,
                                 u8 previous_prefix, Ast *previous_prefix_instr,
-                                u16 *defined_regs, bool *straight_line) {
+                                AsmMnemonicAccumulator *asm_acc) {
 	GB_ASSERT(mnemonic > 0);
 	auto forms = asm_ctx->encoding_forms(mnemonic);
 	String name = asm_ctx->mnemonic_strings[mnemonic];
@@ -1011,9 +1028,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 
-		if (*straight_line) {
+		if (asm_acc->straight_line) {
 			u16 wants     = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
-			u16 undefined = wants & ~*defined_regs & ~pinned_mask;
+			u16 undefined = wants & ~asm_acc->defined_regs & ~pinned_mask;
 			for (u16 bit = 1; bit != 0; bit <<= 1) {
 			    if ((undefined & bit) == 0) {
 			        continue;
@@ -1043,12 +1060,34 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				produced |= asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
 			}
 		}
-		*defined_regs |= produced;
+		asm_acc->defined_regs |= produced;
+
+		// Registers this form clobbers implicitly (RDTSC->RAX:RDX, etc.), for the
+		// redundant-#clobber hint. Union across the template; pinned regs excluded
+		// so a legitimate output pin is never called "redundant".
+		{
+			u16 implicit_wr = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
+			asm_acc->implicit_clobbered_regs |= implicit_wr & ~pinned_mask;
+		}
+
+		// Terminality for a #diverging template: this instruction ends straight-line
+		// flow off the end (jmp/ret/etc. -> CONTROL, hlt/ud2 -> HALT). A conditional
+		// branch does NOT terminate (it can fall through), so require that the form
+		// is not merely CONTROL-with-fallthrough. We approximate "unconditional" as
+		// CONTROL|HALT with no explicit label/operand fallthrough below.
+		{
+			u16 se = cast(u16)clobber.side_effects;
+			bool control = (se & asm_ctx->SideEffectFlag_CONTROL) != 0;
+			bool halt    = (se & asm_ctx->SideEffectFlag_HALT)    != 0;
+			// A conditional branch reads a flag and can fall through -> not terminal.
+			bool conditional = control && (cast(u16)clobber.flags_rd != 0);
+			asm_acc->last_is_terminal = halt || (control && !conditional);
+		}
 
 		// A branch/call inside the template means subsequent instructions may be reached
 		// out of textual order; stop trusting the linear def model past this point.
 		if (cast(u16)clobber.side_effects & asm_ctx->SideEffectFlag_CONTROL) {
-			*straight_line = false;
+			asm_acc->straight_line = false;
 		}
 		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
 
@@ -1504,9 +1543,8 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		name->entity = found;
 		if (found != nullptr) {
 			found->flags |= EntityFlag_Used;
+			add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
 		}
-
-		add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
 		return;
 	case_end;
 	}
@@ -1634,10 +1672,11 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		}
 	}
 
+	AsmMnemonicAccumulator asm_acc = {};
+
 	// Physical registers known to hold a defined value at the current point in the
 	// straight-line instruction stream. Seeded with input-pinned registers (they
 	// carry their argument at entry); grows as instructions write registers.
-	u16 defined_regs = 0;
 	for (auto const &ed : ate->decls) {
 		if (ed.pin.len == 0) {
 		    continue;
@@ -1646,7 +1685,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		// value at entry. Output/scratch pins start undefined and become defined
 		// when an instruction writes them.
 		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Input) {
-			defined_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
+			asm_acc.defined_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
 		}
 	}
 
@@ -1654,7 +1693,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	// runtime" while control flow is straight-line. The first label is a potential
 	// jump target / back-edge, after which a read can precede its textual def; from
 	// there on we stop emitting the implicit-read diagnostic.
-	bool straight_line = true;
+	asm_acc.straight_line = true;
 
 	// collect label decls
 	for (Ast *instruction_ : at->instructions) {
@@ -1716,7 +1755,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			} else if (res == CheckMnemomic_Mnemonic) {
 				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, slice_from_array(operands),
 				               previous_prefix, previous_prefix_instr,
-				               &defined_regs, &straight_line);
+				               &asm_acc);
+
+				asm_acc.saw_any_instructions = true;
+
 				previous_prefix = 0;
 				previous_prefix_instr = nullptr;
 			} else {
@@ -1727,7 +1769,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		case_end;
 
 		case_ast_node(label, AsmLabelDecl, instruction_);
-			straight_line = false;
+			asm_acc.straight_line = false;
+			// A new straight-line region begins here; its tail is unseen,
+			// so the previous instruction's terminality no longer describes the body's end.
+			asm_acc.last_is_terminal = false;
 			if (previous_prefix != 0) {
 				error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but a label declaration was found");
 				previous_prefix = 0;
@@ -1840,7 +1885,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			continue;
 		}
 		u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-		if (bit && (defined_regs & bit) == 0 && straight_line) {
+		if (bit && (asm_acc.defined_regs & bit) == 0 && asm_acc.straight_line) {
 			error(ed.entity->token,
 			      "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
 			      LIT(ed.entity->token.string), LIT(ed.pin));
@@ -1863,6 +1908,17 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		        "This asm template has an observable effect but declares no outputs "
 		        "and does not #volatile in the specification block; it may be optimized away. "
 		        "Please add #volatile if the effect is intended.");
+	}
+
+
+	if (type->Proc.diverging) {
+		if (!asm_acc.saw_any_instructions) {
+			error(entity->token, "This asm template is declared as diverging (-> !) but its body is empty and cannot diverge");
+		} else if (!asm_acc.last_is_terminal) {
+			error(entity->token,
+			      "This asm template is declared diverging (-> !) but its final instruction can fall through; "
+			      "end it with an unconditional jump, return, or halt");
+		}
 	}
 }
 
