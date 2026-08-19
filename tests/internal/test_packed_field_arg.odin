@@ -18,7 +18,7 @@ Vecs :: struct {
 
 Packed :: struct #packed {
 	_:    u8,
-	vecs: Vecs
+	vecs: Vecs,
 }
 
 @(export)
