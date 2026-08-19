@@ -185,6 +185,10 @@ struct lbAsmGenerate {
 	}
 
 	virtual char     instruction_size_suffix(AstAsmInstruction *instr) = 0;
+	// Some AT&T mnemonics encode BOTH operand widths and so cannot be spelled as a name plus one
+	// suffix: `movsx` from i8 to i32 is `movsbl`. Returns the complete mnemonic, or {} when the
+	// name-plus-suffix spelling is the right one
+	virtual String   instruction_att_mnemonic(AstAsmInstruction *instr) = 0;
 	virtual char     size_suffix_for_operand(Ast *op) = 0;
 	virtual gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
 	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
@@ -220,6 +224,50 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		return 0;
 	}
 
+
+	// The sign/zero-extend family is the only one whose two operands differ in width. Its AT&T
+	// mnemonic names both: `movsx` i8 -> i32 is `movsbl`, never `movsx` plus a suffix. `movsxd` is
+	// the same rule, movs + l + q
+	String instruction_att_mnemonic(AstAsmInstruction *instr) override {
+		bool sign_extend;
+		switch (instr->mnemonic) {
+		case Asm_amd64::M_MOVSX:
+		case Asm_amd64::M_MOVSXD:
+			sign_extend = true;
+			break;
+		case Asm_amd64::M_MOVZX:
+			sign_extend = false;
+			break;
+		default:
+			return {};
+		}
+
+		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
+		if (instr->valid_form_index < 0 || instr->valid_form_index >= forms.count) {
+			return {};
+		}
+		auto const &form = forms[instr->valid_form_index];
+
+		// Intel operand order: dst first
+		i32 dst = g_asm_amd64.operand_type_bit_width(form.ops[0]);
+		i32 src = g_asm_amd64.operand_type_bit_width(form.ops[1]);
+
+		if (sign_extend) {
+			if (src ==  8 && dst == 16) { return str_lit("movsbw"); }
+			if (src ==  8 && dst == 32) { return str_lit("movsbl"); }
+			if (src ==  8 && dst == 64) { return str_lit("movsbq"); }
+			if (src == 16 && dst == 32) { return str_lit("movswl"); }
+			if (src == 16 && dst == 64) { return str_lit("movswq"); }
+			if (src == 32 && dst == 64) { return str_lit("movslq"); }
+		} else {
+			if (src ==  8 && dst == 16) { return str_lit("movzbw"); }
+			if (src ==  8 && dst == 32) { return str_lit("movzbl"); }
+			if (src ==  8 && dst == 64) { return str_lit("movzbq"); }
+			if (src == 16 && dst == 32) { return str_lit("movzwl"); }
+			if (src == 16 && dst == 64) { return str_lit("movzwq"); }
+		}
+		return {};
+	}
 
 	// Scan an instruction's operands for an annotated memory operand and return its
 	// size suffix, or 0 if none. The checker has already verified the annotation
@@ -508,6 +556,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			case_ast_node(instr, AsmInstruction, instr_);
 				asm_string = gb_string_appendc(asm_string, "\t");
 				String name = instr->name->Ident.token.string;
+				String att = this->instruction_att_mnemonic(instr);
+				if (att.len != 0) {
+					name = att;
+				}
 				asm_string = gb_string_append_length(asm_string, name.text, name.len);
 
 				// If a memory operand carries an explicit size annotation ([p]:u8) and
@@ -515,8 +567,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				// encoded as a mnemonic suffix (crc32 -> crc32b). The checker has already
 				// verified the annotation agrees with the matched form, so an emitted
 				// suffix can never conflict with a register operand's implied width.
-				if (char suffix = this->instruction_size_suffix(instr)) {
-					asm_string = gb_string_append_length(asm_string, &suffix, 1);
+				if (att.len == 0) {
+					if (char suffix = this->instruction_size_suffix(instr)) {
+						asm_string = gb_string_append_length(asm_string, &suffix, 1);
+					}
 				}
 
 				asm_string = gb_string_appendc(asm_string, " ");
