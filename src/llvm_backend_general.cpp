@@ -1226,19 +1226,21 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 	return false;
 }
 
-gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value) {
-	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
-
-	// If it is not an instruction it isn't a GEP, so we don't need to track alignment in the metadata,
-	// which is not possible anyway (only LLVM instructions can have metadata).
-	if (LLVMIsAInstruction(value)) {
-		u64 is_packed = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_IS_PACKED);
+// adjust a load/store claimed alignment from what is known about its addr;
+// a ptr to a #packed's field may be less aligned than the field's
+// type alignment; GEP instructions carry this info as metadata;
+// a GEP on a global folds to ConstantExpr, which can't carry metadata,
+// so lb_try_get_alignment is used for these instead
+gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef access, LLVMValueRef addr_ptr) {
+	if (LLVMIsAInstruction(addr_ptr)) {
+		u64 is_packed = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_IS_PACKED);
 		if (is_packed != 0) {
-			LLVMSetAlignment(result, 1);
+			// lb_try_get_alignment may recover alignment > 1
+			LLVMSetAlignment(access, lb_try_get_alignment(m, addr_ptr, 1));
 		}
-		u64 align = LLVMGetAlignment(result);
-		u64 align_min = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_MIN_ALIGN);
-		u64 align_max = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_MAX_ALIGN);
+		u64 align = LLVMGetAlignment(access);
+		u64 align_min = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_MIN_ALIGN);
+		u64 align_max = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_MAX_ALIGN);
 		if (align_min != 0 && align < align_min) {
 			align = align_min;
 		}
@@ -1246,9 +1248,17 @@ gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLV
 			align = align_max;
 		}
 		GB_ASSERT(align <= UINT_MAX);
-		LLVMSetAlignment(result, (unsigned int)align);
+		LLVMSetAlignment(access, (unsigned int)align);
+	} else if (LLVMIsAConstantExpr(addr_ptr) && LLVMGetConstOpcode(addr_ptr) == LLVMGetElementPtr) {
+		// the result is the field's provable alignment, from the
+		// global's own alignment combined with the field offset
+		LLVMSetAlignment(access, lb_try_get_alignment(m, addr_ptr, LLVMGetAlignment(access)));
 	}
+}
 
+gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value) {
+	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
+	lb_adjust_access_alignment_from_addr(p->module, result, value);
 	return result;
 }
 
@@ -1260,8 +1270,10 @@ gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef ty
 	if (LLVMIsAInstruction(value)) {
 		u64 is_packed = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_IS_PACKED);
 		if (is_packed != 0) {
-			LLVMSetAlignment(result, 1);
+			LLVMSetAlignment(result, lb_try_get_alignment(p->module, value, 1));
 		}
+	} else if (LLVMIsAConstantExpr(value) && LLVMGetConstOpcode(value) == LLVMGetElementPtr) {
+		LLVMSetAlignment(result, lb_try_get_alignment(p->module, value, cast(unsigned)alignment));
 	}
 
 	return result;
@@ -1605,11 +1617,13 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		if (is_type_proc(a)) {
 			LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
 			LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
-			LLVMBuildStore(p->builder, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""));
+			LLVMValueRef instr = LLVMBuildStore(p->builder, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""));
+			lb_adjust_access_alignment_from_addr(p->module, instr, ptr.value);
 		} else if (is_type_bit_set(a)) {
 			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)type_align_of(a));
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
-			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+			LLVMValueRef instr = LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+			lb_adjust_access_alignment_from_addr(p->module, instr, ptr.value);
 		} else {
 			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)type_align_of(a));
 		}
@@ -1675,6 +1689,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
 	}
+	lb_adjust_access_alignment_from_addr(p->module, instr, ptr.value);
 	// LLVMSetVolatile(instr, p->in_multi_assignment);
 }
 

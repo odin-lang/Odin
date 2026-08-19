@@ -1352,7 +1352,8 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	lbValue gep = lb_emit_struct_ep_internal(p, s, index, result_type);
 
 	Type *bt = base_type(t);
-	if (bt->kind == Type_Struct) {
+	// metadata can only be attached to LLVM instructions
+	if (bt->kind == Type_Struct && LLVMIsAInstruction(gep.value)) {
 		if (bt->Struct.is_packed) {
 			lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED, 1);
 			GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED) == 1);
