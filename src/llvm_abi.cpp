@@ -204,6 +204,9 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	if (offset != 0 && ft->ret.kind == lbArg_Indirect && ft->ret.attribute != nullptr) {
 		LLVMAddAttributeAtIndex(fn, offset, ft->ret.attribute);
 		LLVMAddAttributeAtIndex(fn, offset, noalias_attr);
+		if (ft->ret.align_attribute != nullptr) {
+			LLVMAddAttributeAtIndex(fn, offset, ft->ret.align_attribute);
+		}
 	}
 
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
@@ -483,6 +486,73 @@ gb_internal Type *lb_abi_single_result_type(Type *proc_type) {
 		return proc_type->Proc.results->Tuple.variables[0]->type;
 	}
 	return nullptr;
+}
+
+// add the alignment of Odin controlled ptr args 
+// and of sret slots explicitly as align attributes
+// 1) for an indirect odin/contextless arg pointing to an lvalue of the source type,
+//    the call emitter enforces alignment with a copy to a
+//    type aligned temp when the lvalue can't be proven properly aligned
+//    (see lb_emit_call's indirect arg handling);
+//    and when pointing to constants, the constant is materialized
+//    into a private global with proper alignment
+// 2) the sret slot is allocated by the caller at the return type alignment
+//    for all calling conventions;
+//    for Odin callers an sret ptr is constructed as type aligned alloca,
+//    or from forwarding a ptr that already satisfies the req;
+//    and platform/C ABIs require caller provided aligned storage
+// byval args already carry their align (set from the source type),
+// so only indirect args with no attrib are handled here
+gb_internal void lb_abi_add_indirect_source_type_alignments(lbModule *m, lbFunctionType *ft, unsigned arg_count, Type *original_type, ProcCallingConvention calling_convention) {
+	LLVMContextRef c = m->ctx;
+	// ignore anything that's not Type_Proc
+	Type *bt = original_type != nullptr ? base_type(original_type) : nullptr;
+	if (bt != nullptr && bt->kind != Type_Proc) {
+		bt = nullptr;
+	}
+	// only add align attrib to indirect args in odin cc / contextless,
+	// if non-null, no attrib already present and align > 1
+	if (bt != nullptr && is_calling_convention_odin(calling_convention)) {
+		auto srcs = lb_abi_param_source_types(bt, arg_count);
+		for (unsigned i = 0; i < arg_count && cast(isize)i < ft->args.count; i++) {
+			lbArgType *arg = &ft->args[i];
+			if (arg->kind != lbArg_Indirect || arg->align_attribute != nullptr) {
+				continue;
+			}
+			if (srcs[i] == nullptr) {
+				continue;
+			}
+			i64 align = type_align_of(srcs[i]);
+			if (align > 1) {
+				arg->align_attribute = lb_create_enum_attribute(c, "align", align);
+			}
+		}
+	}
+	// sret 3 cases
+	//   1 return value (the sret only)
+	//   split multiple return (sret is the only)
+	//   unsplit multiple return (take alignment of the whole tuple)
+	if (bt != nullptr && ft->ret.kind == lbArg_Indirect && ft->ret.align_attribute == nullptr) {
+		Type *ret_src = lb_abi_single_result_type(bt);
+		if (ret_src == nullptr && bt->Proc.results != nullptr &&
+		    bt->Proc.results->Tuple.variables.count > 1) {
+			if (ft->multiple_return_original_type != nullptr) {
+				// split multi-return, the sret holds the last result only
+				auto const &vars = bt->Proc.results->Tuple.variables;
+				ret_src = vars[vars.count-1]->type;
+			} else {
+				// the sret holds the whole tuple
+				ret_src = bt->Proc.results;
+			}
+		}
+		// ret_src = nullptr  -> skip anything unkwnown
+		if (ret_src != nullptr) {
+			i64 align = type_align_of(ret_src);
+			if (align > 1) {
+				ft->ret.align_attribute = lb_create_enum_attribute(c, "align", align);
+			}
+		}
+	}
 }
 
 namespace lbAbi386 {
@@ -2767,12 +2837,16 @@ gb_internal LB_ABI_INFO(lb_get_abi_info) {
 		base_type(original_type)
 	);
 
+	lb_abi_add_indirect_source_type_alignments(m, ft, arg_count, original_type, calling_convention);
 
 	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`
 	// This is to make it consistent when and how it is handled
 	if (calling_convention == ProcCC_Odin) {
 		// append the `context` pointer
 		lbArgType context_param = lb_arg_type_direct(LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0));
+		if (t_context != nullptr) {
+			context_param.align_attribute = lb_create_enum_attribute(m->ctx, "align", type_align_of(t_context));
+		}
 		array_add(&ft->args, context_param);
 	}
 

@@ -491,6 +491,8 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type);
 
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value);
 gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value);
+#define LB_TRY_GET_ALIGNMENT_MAX_DEPTH 8
+gb_internal unsigned lb_try_get_alignment(lbModule *m, LLVMValueRef addr_ptr, unsigned default_alignment, isize depth = LB_TRY_GET_ALIGNMENT_MAX_DEPTH);
 gb_internal void    lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt);
 gb_internal lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init);
 
