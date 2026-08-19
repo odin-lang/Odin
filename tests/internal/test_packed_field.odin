@@ -94,7 +94,7 @@ test_packed_field_direct_access :: proc(t: ^testing.T) {
 	testing.expect(t, simd.to_array(y) == [4]f32{9, 10, 11, 12})
 	testing.expect(t, p2.n == -1)
 
-	p2.v = {}              // 16 bytes is memset on most targets
+	p2.v = {}              // zero vector store -> lb_mem_zero_ptr's direct store path on most targets
 	p2.n = 0               // zero small store path on every target
 	testing.expect(t, simd.to_array(p2.v) == [4]f32{})
 	testing.expect(t, p2.n == 0)
