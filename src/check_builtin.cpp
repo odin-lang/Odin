@@ -3604,7 +3604,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		default: GB_PANIC("Invalid type"); break;
 		}
 
-		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+		// Only a complex hint of the same element type, or context-typing an untyped constant.
+		// Castability is the rule for a conversion the programmer wrote; used here it adopted any
+		// castable hint, which silently narrowed f64 to f32 and left the value with no element type
+		// at all when the hint was `any` or a union
+		if (type_hint != nullptr && is_type_complex(type_hint) &&
+		    (is_type_untyped(operand->type) ||
+		     are_types_identical(core_type(operand->type), core_type(type_hint)))) {
 			operand->type = type_hint;
 		}
 
@@ -3803,7 +3809,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		default: GB_PANIC("Invalid type"); break;
 		}
 
-		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+		// see the note in BuiltinProc_complex
+		if (type_hint != nullptr && is_type_quaternion(type_hint) &&
+		    (is_type_untyped(operand->type) ||
+		     are_types_identical(core_type(operand->type), core_type(type_hint)))) {
 			operand->type = type_hint;
 		}
 
