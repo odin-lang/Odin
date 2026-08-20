@@ -850,7 +850,7 @@ enum CheckMnemomicResult {
 template <typename AsmCtx>
 gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstruction *instr, u16 *mnemonic_) {
 	Token token = instr->name->Ident.token;
-	GB_ASSERT_MSG(token.kind == Ast_Ident || token_is_keyword(token.kind), "got %.*s of kind %.*s", LIT(token.string), LIT(token_strings[token.kind]));
+	GB_ASSERT_MSG(token.kind == Token_Ident || token_is_keyword(token.kind), "got %.*s of kind %.*s", LIT(token.string), LIT(token_strings[token.kind]));
 	String name = token.string;
 	auto p = asm_ctx->prefix_lookup(name);
 	if (p) {
