@@ -317,6 +317,7 @@ enum VetFlags : u64 {
 	VetFlag_Tabs            = 1u<<9,
 	VetFlag_UnusedProcedures = 1u<<10,
 	VetFlag_ExplicitAllocators = 1u<<11,
+	VetFlag_PackedFieldAddr = 1u<<12,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -352,6 +353,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_UnusedProcedures;
 	} else if (name == "explicit-allocators") {
 		return VetFlag_ExplicitAllocators;
+	} else if (name == "packed-field-addr") {
+		return VetFlag_PackedFieldAddr;
 	}
 	return VetFlag_NONE;
 }

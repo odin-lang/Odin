@@ -1,5 +1,6 @@
 package test_internal
 
+import "base:runtime"
 import "core:simd"
 import "core:testing"
 
@@ -134,4 +135,32 @@ test_packed_field_array_element_access :: proc(t: ^testing.T) {
 
 	#force_no_inline write_elem(&p3, 0, {9, 10, 11, 12})
 	testing.expect(t, simd.to_array(p3.arr[0]) == [4]f32{9, 10, 11, 12})
+}
+
+
+// field access through ^runtime.Unaligned must compile to misalignment safe code
+
+@(export)
+p4: Packed_Small
+
+@(private="file")
+read_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32)) -> #simd[4]f32 {
+	return u.value
+}
+
+@(private="file")
+write_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32), x: #simd[4]f32) {
+	u.value = x
+}
+
+@(test)
+test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
+	p4.v = {1, 2, 3, 4}
+
+	u := (^runtime.Unaligned(#simd[4]f32))(&p4.v) // addr of field at offset 1
+	y := #force_no_inline read_wrapped(u)
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	#force_no_inline write_wrapped(u, {5, 6, 7, 8})
+	testing.expect(t, simd.to_array(p4.v) == [4]f32{5, 6, 7, 8})
 }
