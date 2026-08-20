@@ -113,7 +113,22 @@ emit_encode_tables :: proc() -> (total: int) {
 		fmt.sbprintfln(&sb, "\t// .%v", m)
 		for &form in forms {
 			f := &form.encoding
-			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.flags)
+			flags := f.flags
+
+			encoding_operand_count: u8 = 0
+			has_implicit := false
+			for op_type in f.ops {
+				if op_type == .NONE { break }
+				if lib.is_implicit_op_inline(op_type) {
+					has_implicit = true
+				} else {
+					encoding_operand_count += 1
+				}
+			}
+			flags.explicit_count = encoding_operand_count
+			flags.has_implicit   = has_implicit
+
+			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, flags)
 		}
 	}
 	strings.write_string(&sb, "}\n\n")

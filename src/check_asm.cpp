@@ -1080,8 +1080,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// aligned at the call boundary) or manipulates RSP directly. Plain memory access
 		// through a parameter pointer does NOT require stack realignment, so
 		// implies_clobber_memory() is intentionally NOT used here.
-		if ((cast(u16)clobber.side_effects & asm_ctx->SideEffectFlag_CONTROL) != 0 ||
-		    (cast(u16)clobber.implicit_wr & asm_ctx->ClobberReg_RSP) != 0) {
+		if (clobber.is_call_or_mem()) {
 			asm_acc->saw_call_or_mem = true;
 		}
 
@@ -1159,17 +1158,16 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// is not merely CONTROL-with-fallthrough. We approximate "unconditional" as
 		// CONTROL|HALT with no explicit label/operand fallthrough below.
 		{
-			u16 se = cast(u16)clobber.side_effects;
-			bool control = (se & asm_ctx->SideEffectFlag_CONTROL) != 0;
-			bool halt    = (se & asm_ctx->SideEffectFlag_HALT)    != 0;
+			bool control = clobber.has_control();
+			bool halt    = clobber.has_halt();
 			// A conditional branch reads a flag and can fall through -> not terminal.
-			bool conditional = control && (cast(u16)clobber.flags_rd != 0);
+			bool conditional = clobber.is_conditional();
 			asm_acc->last_is_terminal = halt || (control && !conditional);
 		}
 
 		// A branch/call inside the template means subsequent instructions may be reached
 		// out of textual order; stop trusting the linear def model past this point.
-		if (cast(u16)clobber.side_effects & asm_ctx->SideEffectFlag_CONTROL) {
+		if (clobber.has_control()) {
 			asm_acc->straight_line = false;
 		}
 		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
@@ -2126,6 +2124,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 gb_internal void check_asm_template_from_entity(CheckerContext *c, Entity *e, DeclInfo *d) {
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		check_asm_template(&g_asm_amd64, c, e, d);
+	} else if (build_context.metrics.arch == TargetArch_riscv64) {
+		check_asm_template(&g_asm_riscv, c, e, d);
 	} else {
 		error(e->token, "asm templates are not currently supported for this target");
 	}

@@ -455,6 +455,10 @@ resolve_relocation_inline :: #force_inline proc(
 	return true
 }
 
+is_implicit_op_inline :: #force_inline proc "contextless" (op: Operand_Type) -> bool {
+	return op == .GPR_SP
+}
+
 // =============================================================================
 // Scatter / gather helpers for B-type and J-type immediates
 // =============================================================================

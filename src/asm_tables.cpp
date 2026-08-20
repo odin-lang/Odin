@@ -54,7 +54,9 @@ gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
 };
 
 #include "asm_tables_amd64.cpp"
+#include "asm_tables_riscv.cpp"
 
-void init_asm_tables() {
-	g_asm_amd64.init();
+void init_asm_tables(i64 word_size) {
+	g_asm_amd64.init(word_size);
+	g_asm_riscv.init(word_size);
 }

@@ -309,6 +309,20 @@ main :: proc() {
 					// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
 				return ((side_effects & VOLATILE_SE) != 0);
 			}
+
+			u8 is_call_or_mem() const {
+				return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0 ||
+					(cast(u16)implicit_wr & ClobberReg_RSP) != 0;
+			}
+			bool has_control() const {
+				return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0;
+			}
+			bool has_halt() const {
+				return (cast(u16)side_effects & SideEffectFlag_HALT) != 0;
+			}
+			bool is_conditional() const {
+				return has_control() && (cast(u16)flags_rd != 0);
+			}
 		};
 
 		void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
@@ -382,13 +396,6 @@ main :: proc() {
 			strings.write_string(&sb, " }\n")
 		}
 		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "op_count")
-			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "op_count")
-			strings.write_string(&sb, "\t\tu8   op_count      () const { ")
-			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
-			strings.write_string(&sb, " }\n")
-		}
-		{
 			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
 			strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
 			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
@@ -421,7 +428,8 @@ main :: proc() {
 
 	strings.write_string(&sb, """
 
-		bool init() {
+		bool init(i64 word_size) {
+			gb_unused(word_size);
 			string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
 			for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
 				string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);

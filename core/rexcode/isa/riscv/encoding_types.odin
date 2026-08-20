@@ -52,11 +52,12 @@ Feature :: enum u8 {
 }
 
 Encoding_Flags :: bit_field u8 {
-	rv32_only: bool | 1,   // RV32 base only
-	rv64_only: bool | 1,   // RV64 base only (e.g. LD/SD/ADDIW/...)
-	branch:    bool | 1,   // changes PC
-	fp_round:  bool | 1,   // funct3 doubles as FP rounding-mode field
-	_:         u8   | 4,
+	rv32_only:      bool | 1, // RV32 base only
+	rv64_only:      bool | 1, // RV64 base only (e.g. LD/SD/ADDIW/...)
+	branch:         bool | 1, // changes PC
+	fp_round:       bool | 1, // funct3 doubles as FP rounding-mode field
+	explicit_count: u8   | 3,
+	has_implicit:   bool | 1,
 }
 
 // What the user passes in.
@@ -149,7 +150,7 @@ Encoding :: struct #packed {
 	enc:      [4]Operand_Encoding, // 4
 	bits:     u32,                 // 4 -- static bit pattern
 	mask:     u32,                 // 4 -- which bits are static
-	feature: Feature,                 // 1
+	feature:  Feature,             // 1
 	flags:    Encoding_Flags,      // 1
 }
 #assert(size_of(Encoding) == 20)

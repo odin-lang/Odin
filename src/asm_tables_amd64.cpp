@@ -312,6 +312,20 @@ struct Asm_amd64 {
 				// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
 			return ((side_effects & VOLATILE_SE) != 0);
 		}
+
+		u8 is_call_or_mem() const {
+			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0 ||
+				(cast(u16)implicit_wr & ClobberReg_RSP) != 0;
+		}
+		bool has_control() const {
+			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0;
+		}
+		bool has_halt() const {
+			return (cast(u16)side_effects & SideEffectFlag_HALT) != 0;
+		}
+		bool is_conditional() const {
+			return has_control() && (cast(u16)flags_rd != 0);
+		}
 	};
 
 	void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
@@ -424,7 +438,6 @@ struct Asm_amd64 {
 
 		bool has_implicit  () const { return ((flags>>21u)&1) != 0; }
 		u8   explicit_count() const { return cast(u8)((flags>>18u)&((1u<<3)-1)); }
-		u8   op_count      () const { return cast(u8)((flags>>22u)&((1u<<3)-1)); }
 		bool lock_ok       () const { return ((flags>>14u)&1) != 0; }
 		bool rep_ok        () const { return ((flags>>15u)&1) != 0; }
 	};
@@ -447,7 +460,8 @@ struct Asm_amd64 {
 	StringMap<Prefix>   prefix_map;
 	StringMap<Register> register_map;
 
-	bool init() {
+	bool init(i64 word_size) {
+		gb_unused(word_size);
 		string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
 		for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
 			string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);
