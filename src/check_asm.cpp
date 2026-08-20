@@ -963,6 +963,19 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		return pseudo_alias_arg_operand_index(asm_ctx, alias, user_i);
 	};
 
+	auto operand_slot_type = [&](AsmCtx::Encoding const &form, int user_index) -> AsmCtx::OperandType {
+		int raw_slot = -1;
+		if (is_pseudo) {
+			raw_slot = user_operand_target_index(user_index);
+		} else {
+			raw_slot = asm_ctx->form_explicit_slot(form, user_index);
+		}
+		if (0 <= raw_slot && raw_slot < cast(int)gb_count_of(form.ops)) {
+			return form.ops[raw_slot];
+		}
+		return asm_ctx->OP_NONE;
+	};
+
 	int min_count = I32_MAX;
 	int max_count = -1;
 
@@ -995,21 +1008,6 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			      "Asm prefix cannot be applied to '%.*s'", LIT(name));
 		}
 	}
-
-
-	auto operand_slot_type = [&](typename AsmCtx::Encoding const &form, int user_index) -> typename AsmCtx::OperandType {
-		int raw_slot = -1;
-		if (is_pseudo) {
-			raw_slot = user_operand_target_index(user_index);
-		} else {
-			raw_slot = asm_ctx->form_explicit_slot(form, user_index);
-		}
-		if (0 <= raw_slot && raw_slot < cast(int)gb_count_of(form.ops)) {
-			return form.ops[raw_slot];
-		}
-		return asm_ctx->OP_NONE;
-	};
-
 
 	auto valid_spots = slice_make<bool>(heap_allocator(), max_count);
 	defer (slice_free(&valid_spots, heap_allocator()));
