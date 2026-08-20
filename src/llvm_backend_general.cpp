@@ -1226,6 +1226,22 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 	return false;
 }
 
+// is_packed metadata is attached to a packed's field GEP;
+// a GEP derived from it (array element, nested struct field) doesn't
+// have it, so traverse the GEP chain up until metadata or non-GEP reached
+gb_internal u64 lb_get_is_packed_through_geps(lbModule *m, LLVMValueRef ptr) {
+	while (1) {
+		u64 is_packed = lb_get_metadata_custom_u64(m, ptr, ODIN_METADATA_IS_PACKED);
+		if (is_packed != 0 || !LLVMIsAGetElementPtrInst(ptr)) {
+			return is_packed;
+		}
+		ptr = LLVMGetOperand(ptr, 0);
+		if (!LLVMIsAInstruction(ptr)) {
+			return 0;
+		}
+	}
+}
+
 // adjust a load/store claimed alignment from what is known about its addr;
 // a ptr to a #packed's field may be less aligned than the field's
 // type alignment; GEP instructions carry this info as metadata;
@@ -1233,7 +1249,7 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 // so lb_try_get_alignment is used for these instead
 gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef access, LLVMValueRef addr_ptr) {
 	if (LLVMIsAInstruction(addr_ptr)) {
-		u64 is_packed = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_IS_PACKED);
+		u64 is_packed = lb_get_is_packed_through_geps(m, addr_ptr);
 		if (is_packed != 0) {
 			// lb_try_get_alignment may recover alignment > 1
 			LLVMSetAlignment(access, lb_try_get_alignment(m, addr_ptr, 1));
@@ -1268,7 +1284,7 @@ gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef ty
 	LLVMSetAlignment(result, cast(unsigned)alignment);
 
 	if (LLVMIsAInstruction(value)) {
-		u64 is_packed = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_IS_PACKED);
+		u64 is_packed = lb_get_is_packed_through_geps(p->module, value);
 		if (is_packed != 0) {
 			LLVMSetAlignment(result, lb_try_get_alignment(p->module, value, 1));
 		}

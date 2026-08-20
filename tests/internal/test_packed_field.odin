@@ -99,3 +99,39 @@ test_packed_field_direct_access :: proc(t: ^testing.T) {
 	testing.expect(t, simd.to_array(p2.v) == [4]f32{})
 	testing.expect(t, p2.n == 0)
 }
+
+
+// element access to an array field of a #packed
+
+Packed_Array :: struct #packed {
+	_:   u8,
+	arr: [2]#simd[4]f32, // elems at offsets 1 and 17
+}
+
+@(export)
+p3: Packed_Array
+
+@(private="file")
+read_elem :: proc(p: ^Packed_Array, i: int) -> #simd[4]f32 {
+	return p.arr[i]
+}
+
+@(private="file")
+write_elem :: proc(p: ^Packed_Array, i: int, x: #simd[4]f32) {
+	p.arr[i] = x
+}
+
+@(test)
+test_packed_field_array_element_access :: proc(t: ^testing.T) {
+	p3.arr[0] = {1, 2, 3, 4}
+	p3.arr[1] = {5, 6, 7, 8}
+
+	y := #force_no_inline read_elem(&p3, 0)
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	y = #force_no_inline read_elem(&p3, 1)
+	testing.expect(t, simd.to_array(y) == [4]f32{5, 6, 7, 8})
+
+	#force_no_inline write_elem(&p3, 0, {9, 10, 11, 12})
+	testing.expect(t, simd.to_array(p3.arr[0]) == [4]f32{9, 10, 11, 12})
+}
