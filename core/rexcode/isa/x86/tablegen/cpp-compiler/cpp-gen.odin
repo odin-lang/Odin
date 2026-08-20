@@ -338,6 +338,24 @@ main :: proc() {
 		}
 	""")
 	strings.write_string(&sb, "\n");
+	strings.write_string(&sb, "\n");
+	strings.write_string(&sb, """
+		struct PseudoAlias {
+			Mnemonic target;
+		};
+		enum PseudoMnemonic : u16 {
+			PM_INVALID,
+			PSEUDO_MNEMONIC_COUNT
+		};
+
+		PseudoMnemonic pseudo_mnemonic_lookup(String const &name) {
+			return PM_INVALID;
+		}
+
+		PseudoAlias pseudo_alias(PseudoMnemonic pm) {
+			return {};
+		}
+	""")
 
 
 	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")

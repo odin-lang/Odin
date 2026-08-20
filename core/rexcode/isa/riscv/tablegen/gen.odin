@@ -331,6 +331,10 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.rv64_only { append(&parts, "rv64_only=true") }
 	if f.branch    { append(&parts, "branch=true")    }
 	if f.fp_round  { append(&parts, "fp_round=true")  }
+	if f.explicit_count > 0 {
+		append(&parts, fmt.tprintf("explicit_count=%d", f.explicit_count))
+	}
+	if f.has_implicit { append(&parts, "has_implicit=true")  }
 	return strings.join(parts[:], ", ", context.temp_allocator)
 }
 
@@ -375,9 +379,9 @@ Decode_Entry :: struct #packed {
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
-	flags:    Encoding_Flags,      // 1
+	flags:    Encoding_Flags,      // 2
 }
-#assert(size_of(Decode_Entry) == 20)
+#assert(size_of(Decode_Entry) == 21)
 
 Decode_Index :: struct #packed {
 	start: u16,

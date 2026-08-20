@@ -687,4 +687,326 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	.C_FSWSP = {
 		{{.C_FSWSP, {.FPR, .MEM_C_SP_W, .NONE, .NONE}, {.C_RS2, .C_IMM_CSS_W, .NONE, .NONE}, 0xE002, 0xE003, .F, {rv32_only=true}},                            {read={0}, implicit_rd={.SP}, writes_mem=true}},
 	},
+
+	// =========================================================================
+	// §7 Zba — address generation. Pure dataflow, no flags, no traps.
+	// =========================================================================
+	.SH1ADD = {
+		{{.SH1ADD, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x20002033, MASK_R, .ZBA, {}},                                                              {written={0}, read={1, 2}}},
+	},
+	.SH2ADD = {
+		{{.SH2ADD, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x20004033, MASK_R, .ZBA, {}},                                                              {written={0}, read={1, 2}}},
+	},
+	.SH3ADD = {
+		{{.SH3ADD, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x20006033, MASK_R, .ZBA, {}},                                                              {written={0}, read={1, 2}}},
+	},
+
+	// *.UW forms zero-extend rs1's low word; RV64-only by construction.
+	.ADD_UW = {
+		{{.ADD_UW,    {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0800003B, MASK_R, .ZBA, {rv64_only=true}},                                             {written={0}, read={1, 2}}},
+	},
+	.SH1ADD_UW = {
+		{{.SH1ADD_UW, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x2000203B, MASK_R, .ZBA, {rv64_only=true}},                                             {written={0}, read={1, 2}}},
+	},
+	.SH2ADD_UW = {
+		{{.SH2ADD_UW, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x2000403B, MASK_R, .ZBA, {rv64_only=true}},                                             {written={0}, read={1, 2}}},
+	},
+	.SH3ADD_UW = {
+		{{.SH3ADD_UW, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x2000603B, MASK_R, .ZBA, {rv64_only=true}},                                             {written={0}, read={1, 2}}},
+	},
+
+	// SLLI.UW: OP-IMM-32 opcode but a 6-bit shamt (funct6 @31-26 = 000010).
+	.SLLI_UW = {
+		{{.SLLI_UW, {.GPR,.GPR,.IMM6,.NONE}, {.RD,.RS1,.SHAMT6,.NONE}, 0x0800101B, MASK_OPCODE | MASK_FUNCT3 | 0xFC000000, .ZBA, {rv64_only=true}},           {written={0}, read={1}}},
+	},
+
+	// =========================================================================
+	// §8 Zbb — basic bit-manipulation. All pure dataflow, no flags, no traps.
+	// =========================================================================
+
+	//  Logic with negated operand (R-type)
+	.ANDN = {
+		{{.ANDN, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x40007033, MASK_R, .ZBB, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.ORN = {
+		{{.ORN,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x40006033, MASK_R, .ZBB, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.XNOR = {
+		{{.XNOR, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x40004033, MASK_R, .ZBB, {}},                                                                {written={0}, read={1, 2}}},
+	},
+
+	//  Count leading/trailing zeros, popcount (unary; rs2 is a selector)
+	.CLZ = {
+		{{.CLZ,  {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x60001013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {}},                   {written={0}, read={1}}},
+	},
+	.CTZ = {
+		{{.CTZ,  {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x60101013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {}},                   {written={0}, read={1}}},
+	},
+	.CPOP = {
+		{{.CPOP, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x60201013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {}},                   {written={0}, read={1}}},
+	},
+
+	//  Sign/zero extend (unary)
+	.SEXT_B = {
+		{{.SEXT_B, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x60401013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {}},                 {written={0}, read={1}}},
+	},
+	.SEXT_H = {
+		{{.SEXT_H, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x60501013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {}},                 {written={0}, read={1}}},
+	},
+	// ZEXT.H differs by base: OP (0x33) on RV32, OP-32 (0x3B) on RV64.
+	// Two forms in one slice keeps the same mnemonic valid on both.
+	.ZEXT_H = {
+		{{.ZEXT_H, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x08004033, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {rv32_only=true}},   {written={0}, read={1}}},
+		{{.ZEXT_H, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x0800403B, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {rv64_only=true}},   {written={0}, read={1}}},
+	},
+
+	//  Min / max (R-type)
+	.MIN = {
+		{{.MIN,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0A004033, MASK_R, .ZBB, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.MINU = {
+		{{.MINU, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0A005033, MASK_R, .ZBB, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.MAX = {
+		{{.MAX,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0A006033, MASK_R, .ZBB, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.MAXU = {
+		{{.MAXU, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0A007033, MASK_R, .ZBB, {}},                                                                {written={0}, read={1, 2}}},
+	},
+
+	//  Rotate (R-type) + rotate-immediate (6-bit funct6 shift-imm)
+	.ROL = {
+		{{.ROL, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x60001033, MASK_R, .ZBB, {}},                                                                 {written={0}, read={1, 2}}},
+	},
+	.ROR = {
+		{{.ROR, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x60005033, MASK_R, .ZBB, {}},                                                                 {written={0}, read={1, 2}}},
+	},
+	.RORI = {
+		{{.RORI, {.GPR,.GPR,.IMM6,.NONE}, {.RD,.RS1,.SHAMT6,.NONE}, 0x60005013, MASK_OPCODE | MASK_FUNCT3 | 0xFC000000, .ZBB, {}},                             {written={0}, read={1}}},
+	},
+
+	//  Byte-granule ops (unary)
+	.ORC_B = {
+		{{.ORC_B, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x28705013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {}},                  {written={0}, read={1}}},
+	},
+	// REV8 byte-reverse: RV32 uses funct7=0110100, RV64 uses 0110101 (imm[11:0]
+	// widens with XLEN). Two forms cover both bases.
+	.REV8 = {
+		{{.REV8, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x69805013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {rv32_only=true}},     {written={0}, read={1}}},
+		{{.REV8, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x6B805013, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {rv64_only=true}},     {written={0}, read={1}}},
+	},
+
+	//  Word variants — RV64 only
+	.CLZW = {
+		{{.CLZW,  {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x6000101B, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {rv64_only=true}},    {written={0}, read={1}}},
+	},
+	.CTZW = {
+		{{.CTZW,  {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x6010101B, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {rv64_only=true}},    {written={0}, read={1}}},
+	},
+	.CPOPW = {
+		{{.CPOPW, {.GPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x6020101B, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RS2, .ZBB, {rv64_only=true}},    {written={0}, read={1}}},
+	},
+	.ROLW = {
+		{{.ROLW, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x6000103B, MASK_R, .ZBB, {rv64_only=true}},                                                  {written={0}, read={1, 2}}},
+	},
+	.RORW = {
+		{{.RORW, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x6000503B, MASK_R, .ZBB, {rv64_only=true}},                                                  {written={0}, read={1, 2}}},
+	},
+	// RORIW: OP-IMM-32 with a 5-bit shamt, so funct7 is fully fixed (MASK_R).
+	.RORIW = {
+		{{.RORIW, {.GPR,.GPR,.IMM5,.NONE}, {.RD,.RS1,.SHAMT5,.NONE}, 0x6000501B, MASK_R, .ZBB, {rv64_only=true}},                                             {written={0}, read={1}}},
+	},
+
+	// =========================================================================
+	// §9 Zbc — carry-less multiply. Pure dataflow.
+	// =========================================================================
+	.CLMUL = {
+		{{.CLMUL,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0A001033, MASK_R, .ZBC, {}},                                                              {written={0}, read={1, 2}}},
+	},
+	.CLMULH = {
+		{{.CLMULH, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0A003033, MASK_R, .ZBC, {}},                                                              {written={0}, read={1, 2}}},
+	},
+	.CLMULR = {
+		{{.CLMULR, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0A002033, MASK_R, .ZBC, {}},                                                              {written={0}, read={1, 2}}},
+	},
+
+	// =========================================================================
+	// §10 Zbs — single-bit ops. Register and 6-bit-immediate forms.
+	// =========================================================================
+	.BCLR = {
+		{{.BCLR, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x48001033, MASK_R, .ZBS, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.BCLRI = {
+		{{.BCLRI, {.GPR,.GPR,.IMM6,.NONE}, {.RD,.RS1,.SHAMT6,.NONE}, 0x48001013, MASK_OPCODE | MASK_FUNCT3 | 0xFC000000, .ZBS, {}},                            {written={0}, read={1}}},
+	},
+	.BEXT = {
+		{{.BEXT, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x48005033, MASK_R, .ZBS, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.BEXTI = {
+		{{.BEXTI, {.GPR,.GPR,.IMM6,.NONE}, {.RD,.RS1,.SHAMT6,.NONE}, 0x48005013, MASK_OPCODE | MASK_FUNCT3 | 0xFC000000, .ZBS, {}},                            {written={0}, read={1}}},
+	},
+	.BINV = {
+		{{.BINV, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x68001033, MASK_R, .ZBS, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.BINVI = {
+		{{.BINVI, {.GPR,.GPR,.IMM6,.NONE}, {.RD,.RS1,.SHAMT6,.NONE}, 0x68001013, MASK_OPCODE | MASK_FUNCT3 | 0xFC000000, .ZBS, {}},                            {written={0}, read={1}}},
+	},
+	.BSET = {
+		{{.BSET, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x28001033, MASK_R, .ZBS, {}},                                                                {written={0}, read={1, 2}}},
+	},
+	.BSETI = {
+		{{.BSETI, {.GPR,.GPR,.IMM6,.NONE}, {.RD,.RS1,.SHAMT6,.NONE}, 0x28001013, MASK_OPCODE | MASK_FUNCT3 | 0xFC000000, .ZBS, {}},                            {written={0}, read={1}}},
+	},
+
+	// =========================================================================
+	// §11 Zicond — conditional zero. rd = (cond on rs2) ? 0 : rs1.
+	// =========================================================================
+	.CZERO_EQZ = {
+		{{.CZERO_EQZ, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0E005033, MASK_R, .ZICOND, {}},                                                        {written={0}, read={1, 2}}},
+	},
+	.CZERO_NEZ = {
+		{{.CZERO_NEZ, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0E007033, MASK_R, .ZICOND, {}},                                                        {written={0}, read={1, 2}}},
+	},
+
+	// =========================================================================
+	// §12 Zfh (half-precision, binary16) — mirrors §5 with fmt=10 (bits 26-25).
+	// reads_frm == encoding fp_round, exactly as in the F/D sections.
+	// =========================================================================
+	.FLH = {
+		{{.FLH, {.FPR,.MEM,.NONE,.NONE}, {.RD,.OFFSET_BASE_I,.NONE,.NONE}, 0x00001007, MASK_I, .ZFH, {}},                                                     {written={0}, read={1}, reads_mem=true}},
+	},
+	.FSH = {
+		{{.FSH, {.FPR,.MEM,.NONE,.NONE}, {.RS2,.OFFSET_BASE_S,.NONE,.NONE}, 0x00001027, MASK_S, .ZFH, {}},                                                    {read={0, 1}, writes_mem=true}},
+	},
+
+	.FMADD_H = {
+		{{.FMADD_H,  {.FPR,.FPR,.FPR,.FPR}, {.RD,.RS1,.RS2,.RS3}, 0x04000043, 0x0600007F, .ZFH, {fp_round=true}},                                             {written={0}, read={1, 2, 3}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FMSUB_H = {
+		{{.FMSUB_H,  {.FPR,.FPR,.FPR,.FPR}, {.RD,.RS1,.RS2,.RS3}, 0x04000047, 0x0600007F, .ZFH, {fp_round=true}},                                             {written={0}, read={1, 2, 3}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FNMSUB_H = {
+		{{.FNMSUB_H, {.FPR,.FPR,.FPR,.FPR}, {.RD,.RS1,.RS2,.RS3}, 0x0400004B, 0x0600007F, .ZFH, {fp_round=true}},                                             {written={0}, read={1, 2, 3}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FNMADD_H = {
+		{{.FNMADD_H, {.FPR,.FPR,.FPR,.FPR}, {.RD,.RS1,.RS2,.RS3}, 0x0400004F, 0x0600007F, .ZFH, {fp_round=true}},                                             {written={0}, read={1, 2, 3}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+
+	.FADD_H = {
+		{{.FADD_H,  {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x04000053, MASK_OPCODE | MASK_FUNCT7, .ZFH, {fp_round=true}},                             {written={0}, read={1, 2}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FSUB_H = {
+		{{.FSUB_H,  {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x0C000053, MASK_OPCODE | MASK_FUNCT7, .ZFH, {fp_round=true}},                             {written={0}, read={1, 2}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FMUL_H = {
+		{{.FMUL_H,  {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x14000053, MASK_OPCODE | MASK_FUNCT7, .ZFH, {fp_round=true}},                             {written={0}, read={1, 2}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FDIV_H = {
+		{{.FDIV_H,  {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x1C000053, MASK_OPCODE | MASK_FUNCT7, .ZFH, {fp_round=true}},                             {written={0}, read={1, 2}, fflags_wr={.NV, .DZ, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FSQRT_H = {
+		{{.FSQRT_H, {.FPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x5C000053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},                {written={0}, read={1}, fflags_wr={.NV, .NX}, reads_frm=true}},
+	},
+
+	.FSGNJ_H = {
+		{{.FSGNJ_H,  {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x24000053, MASK_R, .ZFH, {}},                                                            {written={0}, read={1, 2}}},
+	},
+	.FSGNJN_H = {
+		{{.FSGNJN_H, {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x24001053, MASK_R, .ZFH, {}},                                                            {written={0}, read={1, 2}}},
+	},
+	.FSGNJX_H = {
+		{{.FSGNJX_H, {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x24002053, MASK_R, .ZFH, {}},                                                            {written={0}, read={1, 2}}},
+	},
+
+	.FMIN_H = {
+		{{.FMIN_H, {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x2C000053, MASK_R, .ZFH, {}},                                                              {written={0}, read={1, 2}, fflags_wr={.NV}}},
+	},
+	.FMAX_H = {
+		{{.FMAX_H, {.FPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0x2C001053, MASK_R, .ZFH, {}},                                                              {written={0}, read={1, 2}, fflags_wr={.NV}}},
+	},
+
+	//  Half <-> integer conversions. Int->half can overflow the narrow range,
+	//  so those carry OF alongside NX.
+	.FCVT_W_H = {
+		{{.FCVT_W_H,  {.GPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xC4000053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},              {written={0}, read={1}, fflags_wr={.NV, .NX}, reads_frm=true}},
+	},
+	.FCVT_WU_H = {
+		{{.FCVT_WU_H, {.GPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xC4100053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},              {written={0}, read={1}, fflags_wr={.NV, .NX}, reads_frm=true}},
+	},
+	.FCVT_L_H = {
+		{{.FCVT_L_H,  {.GPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xC4200053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true, rv64_only=true}}, {written={0}, read={1}, fflags_wr={.NV, .NX}, reads_frm=true}},
+	},
+	.FCVT_LU_H = {
+		{{.FCVT_LU_H, {.GPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xC4300053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true, rv64_only=true}}, {written={0}, read={1}, fflags_wr={.NV, .NX}, reads_frm=true}},
+	},
+	.FCVT_H_W = {
+		{{.FCVT_H_W,  {.FPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xD4000053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},              {written={0}, read={1}, fflags_wr={.OF, .NX}, reads_frm=true}},
+	},
+	.FCVT_H_WU = {
+		{{.FCVT_H_WU, {.FPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xD4100053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},              {written={0}, read={1}, fflags_wr={.OF, .NX}, reads_frm=true}},
+	},
+	.FCVT_H_L = {
+		{{.FCVT_H_L,  {.FPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xD4200053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true, rv64_only=true}}, {written={0}, read={1}, fflags_wr={.OF, .NX}, reads_frm=true}},
+	},
+	.FCVT_H_LU = {
+		{{.FCVT_H_LU, {.FPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xD4300053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true, rv64_only=true}}, {written={0}, read={1}, fflags_wr={.OF, .NX}, reads_frm=true}},
+	},
+
+	//  Half <-> single/double. Widening (H->S, H->D) is value-exact -> {.NV}
+	//  only; narrowing (S->H, D->H) can round -> full flag set. Requires F/D.
+	.FCVT_S_H = {
+		{{.FCVT_S_H, {.FPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x40200053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},               {written={0}, read={1}, fflags_wr={.NV}, reads_frm=true}},
+	},
+	.FCVT_H_S = {
+		{{.FCVT_H_S, {.FPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x44000053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},               {written={0}, read={1}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+	.FCVT_D_H = {
+		{{.FCVT_D_H, {.FPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x42200053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},               {written={0}, read={1}, fflags_wr={.NV}, reads_frm=true}},
+	},
+	.FCVT_H_D = {
+		{{.FCVT_H_D, {.FPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0x44100053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2, .ZFH, {fp_round=true}},               {written={0}, read={1}, fflags_wr={.NV, .OF, .UF, .NX}, reads_frm=true}},
+	},
+
+	//  Bit-pattern move / classify (no rounding, no flags)
+	.FMV_X_H = {
+		{{.FMV_X_H, {.GPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xE4000053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2 | MASK_FUNCT3, .ZFH, {}},               {written={0}, read={1}}},
+	},
+	.FMV_H_X = {
+		{{.FMV_H_X, {.FPR,.GPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xF4000053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2 | MASK_FUNCT3, .ZFH, {}},               {written={0}, read={1}}},
+	},
+	.FCLASS_H = {
+		{{.FCLASS_H, {.GPR,.FPR,.NONE,.NONE}, {.RD,.RS1,.NONE,.NONE}, 0xE4001053, MASK_OPCODE | MASK_FUNCT7 | MASK_RS2 | MASK_FUNCT3, .ZFH, {}},              {written={0}, read={1}}},
+	},
+
+	//  Comparisons -> GPR result; only NV possible.
+	.FEQ_H = {
+		{{.FEQ_H, {.GPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0xA4002053, MASK_R, .ZFH, {}},                                                               {written={0}, read={1, 2}, fflags_wr={.NV}}},
+	},
+	.FLT_H = {
+		{{.FLT_H, {.GPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0xA4001053, MASK_R, .ZFH, {}},                                                               {written={0}, read={1, 2}, fflags_wr={.NV}}},
+	},
+	.FLE_H = {
+		{{.FLE_H, {.GPR,.FPR,.FPR,.NONE}, {.RD,.RS1,.RS2,.NONE}, 0xA4000053, MASK_R, .ZFH, {}},                                                               {written={0}, read={1, 2}, fflags_wr={.NV}}},
+	},
+
+	// =========================================================================
+	// §13 Privileged — trap-return + TLB maintenance (SYSTEM opcode, 0x73).
+	// MRET/SRET/WFI are fully fixed 32-bit words (mask 0xFFFFFFFF, no operands).
+	// =========================================================================
+	.MRET = {
+		{{.MRET, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x30200073, 0xFFFFFFFF, .PRIV, {branch=true}},                                         {side_effects={.CONTROL}}},
+	},
+	.SRET = {
+		{{.SRET, {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x10200073, 0xFFFFFFFF, .PRIV, {branch=true}},                                         {side_effects={.CONTROL}}},
+	},
+	// WFI: wait-for-interrupt hint. No PC redirect and no register effects in the
+	// architectural sense; execution resumes after the wakeup event.
+	.WFI = {
+		{{.WFI,  {.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE}, 0x10500073, 0xFFFFFFFF, .PRIV, {}},                                                    {}},
+	},
+	// SFENCE.VMA rs1(vaddr), rs2(asid): both operands optional (x0 = "all").
+	// Reads rs1/rs2; acts as an address-translation ordering fence.
+	.SFENCE_VMA = {
+		{{.SFENCE_VMA, {.GPR,.GPR,.NONE,.NONE}, {.RS1,.RS2,.NONE,.NONE}, 0x12000073, MASK_OPCODE | MASK_FUNCT3 | MASK_FUNCT7 | MASK_RD, .PRIV, {}},           {read={0, 1}, side_effects={.FENCE}}},
+	},
 }

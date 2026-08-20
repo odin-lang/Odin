@@ -30,9 +30,9 @@ Decode_Entry :: struct #packed {
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
-	flags:    Encoding_Flags,      // 1
+	flags:    Encoding_Flags,      // 2
 }
-#assert(size_of(Decode_Entry) == 20)
+#assert(size_of(Decode_Entry) == 21)
 
 Decode_Index :: struct #packed {
 	start: u16,
