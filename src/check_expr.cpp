@@ -100,6 +100,7 @@ gb_internal Type *   check_init_variable            (CheckerContext *c, Entity *
 
 
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size=0);
+gb_internal char const *zero_value_suggestion(Operand *o, Type *type);
 gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type);
 gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key);
 
@@ -2697,6 +2698,35 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 	}
 	return false;
 }
+
+// Returns how the empty value of `type` should be spelled when a numeric zero was written,
+// or nullptr if there is nothing worth suggesting.
+gb_internal char const *zero_value_suggestion(Operand *o, Type *type) {
+	if (o->value.kind != ExactValue_Integer && o->value.kind != ExactValue_Float) {
+		return nullptr;
+	}
+	if (!is_exact_value_zero(o->value)) {
+		return nullptr;
+	}
+
+	char const *suggestion = nullptr;
+	if (is_type_string(type)) {
+		suggestion = "\"\"";
+	} else if (is_type_boolean(type)) {
+		suggestion = "false";
+	} else if (is_type_bit_set(type)) {
+		// A bit_set accepts both `nil` and `{}`. `{}` is a bit more idiomatic
+		// because `{.Something}` becomes `{}` when no bits are set.
+		suggestion = "{}";
+	} else if (type_has_nil(type)) {
+		suggestion = "nil";
+	} else {
+		suggestion = "{}";
+	}
+
+	return suggestion;
+}
+
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size) {
 	gbString a = expr_to_string(o->expr);
 	gbString b = type_to_string(type);
@@ -2832,7 +2862,14 @@ gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *typ
 				check_assignment_error_suggestion(ctx, o, type, max_bit_size);
 			}
 		} else {
-			error(o->expr, "Cannot convert '%s' to '%s' from '%s', got %s", a, b, c, s);
+			char suggestion_buf[64] = {};
+			char const *extra_text = "";
+			if (char const *suggestion = zero_value_suggestion(o, type)) {
+				gb_snprintf(suggestion_buf, gb_size_of(suggestion_buf), " - Did you want '%s'?", suggestion);
+				extra_text = suggestion_buf;
+			}
+
+			error(o->expr, "Cannot convert '%s' to '%s' from '%s', got %s%s", a, b, c, s, extra_text);
 			check_assignment_error_suggestion(ctx, o, type);
 		}
 		return false;
@@ -5058,20 +5095,14 @@ gb_internal void convert_untyped_error(CheckerContext *c, Operand *operand, Type
 	gbString expr_str = expr_to_string(operand->expr);
 	gbString type_str = type_to_string(target_type);
 	gbString from_type_str = type_to_string(operand->type);
+
+	char suggestion_buf[64] = {};
 	char const *extra_text = "";
-
-	if (operand->mode == Addressing_Constant && type_has_nil(target_type)) {
-		bool is_zero_int_or_float =
-			(operand->value.kind == ExactValue_Integer || operand->value.kind == ExactValue_Float) &&
-			is_exact_value_zero(operand->value);
-
-		if (is_zero_int_or_float) {
-			if (make_string_c(expr_str) != "nil") { // HACK NOTE(bill): Just in case
-				// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
-				extra_text = " - Did you want 'nil'?";
-			}
-		}
+	if (char const *suggestion = zero_value_suggestion(operand, target_type)) {
+		gb_snprintf(suggestion_buf, gb_size_of(suggestion_buf), " - Did you want '%s'?", suggestion);
+		extra_text = suggestion_buf;
 	}
+
 	if (!ignore_error_block) {
 		begin_error_block();
 	}
