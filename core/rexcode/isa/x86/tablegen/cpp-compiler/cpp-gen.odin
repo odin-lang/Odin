@@ -340,8 +340,16 @@ main :: proc() {
 	strings.write_string(&sb, "\n");
 	strings.write_string(&sb, "\n");
 	strings.write_string(&sb, """
+		enum AliasSrc : u8 {
+			AliasSrc_NONE, // slot unused
+		};
+
 		struct PseudoAlias {
-			Mnemonic target;
+			Mnemonic target;    // real instruction emitted
+			AliasSrc src[4];    // how to fill target's four operand slots
+			i16      lit;       // immediate when a src slot is AliasSrc_LIT
+			u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
+			u8       nargs;     // operands the user supplies (ARG0..<ARGn)
 		};
 		enum PseudoMnemonic : u16 {
 			PM_INVALID,
@@ -352,10 +360,13 @@ main :: proc() {
 			return PM_INVALID;
 		}
 
-		PseudoAlias pseudo_alias(PseudoMnemonic pm) {
+		PseudoAlias pseudo_alias(u16 pm) {
 			return {};
 		}
 	""")
+
+	strings.write_string(&sb, "\tstatic String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];\n")
+	strings.write_string(&sb, "\n")
 
 
 	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")
@@ -773,6 +784,8 @@ main :: proc() {
 		}
 		strings.write_string(&sb, "\n");
 	}
+
+	fmt.sbprintf(&sb, "String const Asm_{0:s}::pseudo_mnemonic_strings[Asm_{0:s}::PSEUDO_MNEMONIC_COUNT] {{}};\n", ISA_NAME)
 
 	{
 		fmt.sbprintf(&sb, "u16 const Asm_{0:s}::register_codes[Asm_{0:s}::REG_COUNT] {{\n", ISA_NAME)

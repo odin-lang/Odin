@@ -2805,8 +2805,11 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 		asm_instructions = slice_from_array(instructions);
 	}
 
-	if (build_context.metrics.arch != TargetArch_amd64) {
-		syntax_error(token, "asm templates are currently only supported on -target:amd64");
+	if (build_context.metrics.arch == TargetArch_amd64 ||
+	    build_context.metrics.arch == TargetArch_riscv64) {
+	    	// okay
+	} else {
+		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64");
 	}
 
 	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);

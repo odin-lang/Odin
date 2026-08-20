@@ -339,6 +339,31 @@ struct Asm_amd64 {
 			string_set_update(clobber_registers_set, make_string_c(rname));
 		}
 	}
+
+	enum AliasSrc : u8 {
+		AliasSrc_NONE, // slot unused
+	};
+
+	struct PseudoAlias {
+		Mnemonic target;    // real instruction emitted
+		AliasSrc src[4];    // how to fill target's four operand slots
+		i16      lit;       // immediate when a src slot is AliasSrc_LIT
+		u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
+		u8       nargs;     // operands the user supplies (ARG0..<ARGn)
+	};
+	enum PseudoMnemonic : u16 {
+		PM_INVALID,
+		PSEUDO_MNEMONIC_COUNT
+	};
+
+	PseudoMnemonic pseudo_mnemonic_lookup(String const &name) {
+		return PM_INVALID;
+	}
+
+	PseudoAlias pseudo_alias(u16 pm) {
+		return {};
+	}	static String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];
+
 	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
 
@@ -787,6 +812,7 @@ String const Asm_amd64::mnemonic_strings[Asm_amd64::MNEMONIC_COUNT] {
 String const Asm_amd64::prefix_strings[Asm_amd64::PREFIX_COUNT] {
 	str_lit(""), str_lit("es"), str_lit("cs"), str_lit("ss"), str_lit("ds"), str_lit("rex"), str_lit("evex"), str_lit("fs"), str_lit("gs"), str_lit("vex"), str_lit("lock"), str_lit("repne"), str_lit("rep"), 
 };
+String const Asm_amd64::pseudo_mnemonic_strings[Asm_amd64::PSEUDO_MNEMONIC_COUNT] {};
 u16 const Asm_amd64::register_codes[Asm_amd64::REG_COUNT] {
 	0, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 
 	271, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 

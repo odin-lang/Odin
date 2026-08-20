@@ -185,10 +185,6 @@ struct lbAsmGenerate {
 	}
 
 	virtual char     instruction_size_suffix(AstAsmInstruction *instr) = 0;
-	// Some AT&T mnemonics encode BOTH operand widths and so cannot be spelled as a name plus one
-	// suffix: `movsx` from i8 to i32 is `movsbl`. Returns the complete mnemonic, or {} when the
-	// name-plus-suffix spelling is the right one
-	virtual String   instruction_att_mnemonic(AstAsmInstruction *instr) = 0;
 	virtual char     size_suffix_for_operand(Ast *op) = 0;
 	virtual gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
 	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
@@ -225,10 +221,14 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	}
 
 
+	// Some AT&T mnemonics encode BOTH operand widths and so cannot be spelled as a name plus one
+	// suffix: `movsx` from i8 to i32 is `movsbl`. Returns the complete mnemonic, or {} when the
+	// name-plus-suffix spelling is the right one
+	//
 	// The sign/zero-extend family is the only one whose two operands differ in width. Its AT&T
 	// mnemonic names both: `movsx` i8 -> i32 is `movsbl`, never `movsx` plus a suffix. `movsxd` is
 	// the same rule, movs + l + q
-	String instruction_att_mnemonic(AstAsmInstruction *instr) override {
+	String instruction_att_mnemonic(AstAsmInstruction *instr) {
 		bool sign_extend;
 		switch (instr->mnemonic) {
 		case Asm_amd64::M_MOVSX:
@@ -826,7 +826,7 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		generator = &generator_amd64;
 	} else {
-		compiler_error("Architecture does not support asm templates");
+		compiler_error("Architecture does not support asm templates, yet");
 	}
 	GB_ASSERT(generator != nullptr);
 	generator->init(entity);

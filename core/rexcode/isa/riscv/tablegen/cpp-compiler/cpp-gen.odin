@@ -294,7 +294,7 @@ main :: proc() {
 				return found ? *found : PM_INVALID;
 			}
 
-			PseudoAlias pseudo_alias(PseudoMnemonic pm) {
+			PseudoAlias pseudo_alias(u16 pm) {
 				PseudoAlias *pa = (PseudoAlias *)raw_pseudo_aliases;
 				return pa[pm];
 			}
@@ -409,7 +409,7 @@ main :: proc() {
 	strings.write_string(&sb, "\n")
 	strings.write_string(&sb, "\tStringMap<Mnemonic> mnemonic_map;\n")
 	strings.write_string(&sb, "\tStringMap<Register> register_map;\n")
-	strings.write_string(&sb, "\tStringMap<PseudoMnemonic> pseudo_register_map;\n")
+	strings.write_string(&sb, "\tStringMap<PseudoMnemonic> pseudo_mnemonic_map;\n")
 
 	strings.write_string(&sb, """
 

@@ -844,6 +844,7 @@ gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegiste
 enum CheckMnemomicResult {
 	CheckMnemomic_Invalid,
 	CheckMnemomic_Mnemonic,
+	CheckMnemomic_PseudoMnemonic,
 	CheckMnemomic_Prefix,
 };
 
@@ -862,6 +863,12 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstr
 		if (mnemonic_) *mnemonic_ = cast(u16)m;
 		return CheckMnemomic_Mnemonic;
 	}
+	auto pm = asm_ctx->pseudo_mnemonic_lookup(name);
+	if (pm) {
+		if (mnemonic_) *mnemonic_ = pm;
+		return CheckMnemomic_PseudoMnemonic;
+	}
+
 
 	ERROR_BLOCK();
 	if (instr->operands.count == 0) {
@@ -913,12 +920,17 @@ struct AsmMnemonicAccumulator {
 
 template <typename AsmCtx>
 gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
-                                u16 mnemonic, Slice<Operand> const &operands,
+                                u16 mnemonic, u16 pseudo_mnemonic, Slice<Operand> const &operands,
                                 u8 previous_prefix, Ast *previous_prefix_instr,
                                 AsmMnemonicAccumulator *asm_acc) {
 	GB_ASSERT(mnemonic > 0);
 	auto forms = asm_ctx->encoding_forms(mnemonic);
 	String name = asm_ctx->mnemonic_strings[mnemonic];
+
+	auto alias = asm_ctx->pseudo_alias(cast(u16)pseudo_mnemonic);
+	if (pseudo_mnemonic) {
+		name = asm_ctx->pseudo_mnemonic_strings[pseudo_mnemonic];
+	}
 
 	int min_count = I32_MAX;
 	int max_count = -1;
@@ -930,6 +942,14 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	}
 	min_count = gb_max(min_count, 0);
 	max_count = gb_max(max_count, 0);
+
+	if (pseudo_mnemonic) {
+		int alias_count = alias.nargs;
+		GB_ASSERT_MSG(alias_count <= min_count, "%d <= %d", alias_count, min_count);
+		GB_ASSERT_MSG(alias_count <= max_count, "%d <= %d", alias_count, max_count);
+		min_count = gb_min(min_count, alias_count);
+		max_count = gb_min(max_count, alias_count);
+	}
 
 	// A prefix that none of this mnemonic's forms can take is unconditionally wrong,
 	// independent of whether the operands match — catch it even on a match failure.
@@ -1862,7 +1882,19 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				previous_prefix = cast(u8)mnemonic;
 				previous_prefix_instr = instruction_;
 			} else if (res == CheckMnemomic_Mnemonic) {
-				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, slice_from_array(operands),
+				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, 0, slice_from_array(operands),
+				               previous_prefix, previous_prefix_instr,
+				               &asm_acc);
+
+				asm_acc.saw_any_instructions = true;
+
+				previous_prefix = 0;
+				previous_prefix_instr = nullptr;
+			} else if (res == CheckMnemomic_PseudoMnemonic) {
+				u16 pseudo_mnemonic = cast(u16)mnemonic;
+				auto alias = asm_ctx->pseudo_alias(cast(u16)pseudo_mnemonic);
+				u16 target_mnemonic = cast(u16)alias.target;
+				check_mnemonic(asm_ctx, ctx, entity, instr, target_mnemonic, pseudo_mnemonic, slice_from_array(operands),
 				               previous_prefix, previous_prefix_instr,
 				               &asm_acc);
 
