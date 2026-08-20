@@ -284,7 +284,11 @@ end
 
 local function do_test(isa)
   local ok, out = run(odin_run(pkg(isa, "tests")))
-  local fails = out:match("([1-9]%d* failed)")
+  -- Match case-INSENSITIVELY: the x86 harness prints "5 FAILED" where the others print "5 failed",
+  -- so a lowercase-only pattern silently exempted the largest suite in the tree from its own gate.
+  -- (The harness now also exits non-zero, which is the check that should have been load-bearing all
+  -- along -- this one is the backstop for a suite that forgets to.)
+  local fails = out:lower():match("([1-9]%d* failed)")
   if not ok or fails then return false, (fails or "test run failed").."\n"..out:sub(-400) end
   local cases = out:match("(%d+ cases? validated)")
   if not cases then

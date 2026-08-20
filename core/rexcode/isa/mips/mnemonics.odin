@@ -138,7 +138,7 @@ Mnemonic :: enum u16 {
 	JIC, JIALC,
 
 	// R6 mul/div (replaces MULT/MULTU/DIV/DIVU; results in single GPR)
-	MUH, MULU, MUHU, MOD, MODU,
+	MUL_R6, MUH, MULU, MUHU, DIV_R6, MOD, DIVU_R6, MODU,
 	DMUL_R6, DMUH, DMULU, DMUHU,
 	DDIV_R6, DMOD, DDIVU_R6, DMODU,
 

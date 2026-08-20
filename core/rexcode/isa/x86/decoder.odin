@@ -437,49 +437,37 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		idx, mand_66 = resolve_66(DECODE_INDEX_ESC_0F3A, opcode, prefix, state)
 	}
 
-	// If not found, try +r encoding (opcode with register in low 3 bits)
-	if idx.count == 0 && esc == .NONE {
-		base_opcode := opcode & 0xF8  // Mask off low 3 bits
-		idx = didx(DECODE_INDEX_LEGACY, prefix, base_opcode)
+	/* NOTHING AT THIS OPCODE -- RETRY AT THE +r BASE, where the register rides in the opcode's low
+	   three bits (`50+rd`, `90+rd`, `B8+rd`, `0F C8+rd`, ...). The table stores ONE entry for the
+	   base and the shared +r handler below reads the register out of `opcode & 7`.
 
-		// Check if this is actually an Op_R encoding
-		if idx.count == 0 {
-			return nil, nil, .INVALID_OPCODE
+	   THIS IS NOT LEGACY-ONLY. Gating the retry on `esc == .NONE` is what made BSWAP undecodable:
+	   `0F C8+rd` is the one +r instruction that lives behind an escape byte, so every `bswap` except
+	   the one whose register happens to be 0 (`bswap rax` = `0F C8`, which lands on the entry
+	   exactly) came back INVALID_OPCODE. Emission was always correct -- only reading it back failed.
+
+	   The retry deliberately does NOT re-implement the +r decode; it only re-runs the LOOKUP and
+	   falls through to the one handler. There used to be a second copy of that handler here, and it
+	   had drifted from the original in three ways, each its own silent wrong answer: it tested only
+	   the FIRST entry for OP_R (so every `xchg rAX, r` was rejected, 0x90's run having NOP sorted
+	   ahead of XCHG), it passed `prefix` where the legacy row wants 0 (so `66 53`, `push bx`, was
+	   rejected), and it read the operand size off `ops[0]` (which for XCHG is the implicit
+	   accumulator, not the sized operand). All three had already been found and fixed once, in the
+	   handler below -- none of the fixes reached the copy, because nothing made them one thing. */
+	retried_plus_r := false
+	if idx.count == 0 {
+		base_opcode := opcode & 0xF8 // mask off the register bits
+		switch esc {
+		case .NONE:
+			idx = didx(DECODE_INDEX_LEGACY, 0, base_opcode) // prefix 0: see the primary lookup above
+		case ._0F:
+			idx, mand_66 = resolve_66(DECODE_INDEX_ESC_0F, base_opcode, prefix, state)
+		case ._0F38:
+			idx, mand_66 = resolve_66(DECODE_INDEX_ESC_0F38, base_opcode, prefix, state)
+		case ._0F3A:
+			idx, mand_66 = resolve_66(DECODE_INDEX_ESC_0F3A, base_opcode, prefix, state)
 		}
-		if first := &LEGACY_DECODE_ENTRIES[idx.start]; first.enc[0] == .OP_R {
-			// Store the register number for later operand decoding
-			state.opcode_reg = opcode & 0x07
-
-			// For Op_R with multiple entries (e.g., PUSH/POP with R64 and R16),
-			// select based on prefix_66 and default_64 flag
-			if idx.count > 1 {
-				for i in 0..<int(idx.count) {
-					e := &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
-					op0 := e.ops[0]
-
-					if state.prefix_66 {
-						if op0 == .R16 {
-							return e, nil, .NONE
-						}
-					} else {
-						is_64 := state.mode == ._64 && (e.flags.default_64 || (state.rex & 0x08 != 0))
-						if is_64 && op0 == .R64 {
-							return e, nil, .NONE
-						}
-						if !is_64 && op0 == .R32 {
-							return e, nil, .NONE
-						}
-						// i386: default_64 entries are the "default operand size" form,
-						// which is 32-bit; bytes encode the same as long-mode R64+default_64.
-						if state.mode == ._32 && op0 == .R64 && e.flags.default_64 {
-							return e, nil, .NONE
-						}
-					}
-				}
-			}
-			return first, nil, .NONE
-		}
-		return nil, nil, .INVALID_OPCODE
+		retried_plus_r = true
 	}
 
 	if idx.count == 0 {
@@ -497,6 +485,10 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 		for i in 0..<int(idx.count) {
 			if entry_has_opr(&LEGACY_DECODE_ENTRIES[int(idx.start) + i]) {
 				uses_op_r = true
+				// The DEFAULT answer for a +r opcode is the first +r entry, not the first entry
+				// outright: 0x90 sorts NOP ahead of XCHG, so should the size selection below ever
+				// fall through for an `xchg rAX, r`, `idx.start` would answer NOP.
+				first_entry = &LEGACY_DECODE_ENTRIES[int(idx.start) + i]
 				break
 			}
 		}
@@ -546,6 +538,14 @@ decode_opcode :: proc(state: ^Decoder_State) -> (entry: ^Decode_Entry, vex_entry
 			}
 		}
 		return first_entry, nil, .NONE
+	}
+
+	/* The base-opcode retry above is ONLY meaningful for a +r form, and we now know this is not one.
+	   Falling through with a masked opcode would decode some unrelated neighbour — 0x0E would come
+	   back as the 0x08 entry (OR) — which is a wrong instruction reported confidently, strictly worse
+	   than saying the byte is not one we know. */
+	if retried_plus_r {
+		return nil, nil, .INVALID_OPCODE
 	}
 
 	// Multi-entry opcode: disambiguate by the ModR/M byte (fixed byte / ST(i)

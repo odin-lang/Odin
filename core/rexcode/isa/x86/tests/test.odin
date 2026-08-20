@@ -2943,6 +2943,24 @@ run_decode_only_tests :: proc() {
 		{name = "decode: sse",                test_type = .Decode_Only, input_code = {0x0F, 0x57, 0xC0, 0x0F, 0x28, 0xC1, 0x0F, 0x58, 0xC2}},
 		{name = "decode: vex",                test_type = .Decode_Only, input_code = {0xC5, 0xF8, 0x57, 0xC0, 0xC5, 0xF8, 0x28, 0xC1}},
 		{name = "decode: call/jmp",           test_type = .Decode_Only, input_code = {0xE8, 0x00, 0x00, 0x00, 0x00, 0xEB, 0xF9}},
+
+		/* +r FORMS, where the register rides in the opcode's low three bits. The decoder finds these
+		   by retrying the lookup at `opcode & 0xF8`, and that retry had three holes, each of which
+		   made a perfectly ordinary instruction undecodable while emission stayed correct.
+
+		   BSWAP is `0F C8+rd` -- the ONE +r instruction behind an escape byte. The retry used to be
+		   gated on there being no escape byte, so only `bswap eax`/`bswap rax` (register 0, landing on
+		   the table entry exactly) decoded and the other seven registers were INVALID_OPCODE. */
+		{name = "decode: bswap +r (0F C8+rd)",  test_type = .Decode_Only, input_code = {0x0F, 0xC8, 0x0F, 0xC9, 0x0F, 0xCC, 0x0F, 0xCF}},
+		{name = "decode: bswap +r rex.w",       test_type = .Decode_Only, input_code = {0x48, 0x0F, 0xC8, 0x48, 0x0F, 0xCF}},
+		{name = "decode: bswap +r rex.b",       test_type = .Decode_Only, input_code = {0x41, 0x0F, 0xC8, 0x49, 0x0F, 0xCF}},
+		// XCHG rAX,r is `90+rd`, and 0x90's run has NOP sorted ahead of it -- the retry used to test
+		// only the FIRST entry for a +r form, so every `xchg rAX, r` was rejected.
+		{name = "decode: xchg rAX,r (90+rd)",   test_type = .Decode_Only, input_code = {0x90, 0x91, 0x97, 0x48, 0x91, 0x66, 0x91}},
+		// The legacy +r families under an operand-size prefix: the retry passed the 0x66 row, where
+		// the legacy table wants row 0 (for legacy opcodes 0x66 is operand size, not part of identity).
+		{name = "decode: +r with 66 prefix",    test_type = .Decode_Only, input_code = {0x66, 0x53, 0x66, 0x5B, 0x66, 0xB9, 0x00, 0x00}},
+		{name = "decode: push/pop/mov +r",      test_type = .Decode_Only, input_code = {0x53, 0x5B, 0x41, 0x54, 0x41, 0x5C, 0xB9, 0x00, 0x00, 0x00, 0x00}},
 	}
 	for t in tests { run_test(t) }
 }
@@ -3010,10 +3028,11 @@ run_label_map_tests :: proc() {
 
 	x86.decode(code_buf[:byte_count], nil, &decoded_insts, &decoded_info, &decoded_labels, &decode_errors)
 
-	// Print with named labels (printer wants id→name; Label_Map stores name→id).
-	id_to_name := make(map[u32]string, len(lm.names), context.temp_allocator)
-	for name, id in lm.names { id_to_name[id] = name }
-	output := x86.tprint(decoded_insts[:], decoded_info[:], lm.labels[:], label_names=&id_to_name)
+	// Print with named labels (printer wants BYTE OFFSET → name; Label_Map stores name → id, and
+	// after encode each id's Label_Definition holds its byte offset).
+	names := make(x86.Label_Names, len(lm.names), context.temp_allocator)
+	for name, id in lm.names { names[x86.Label_Offset(u32(lm.labels[id]))] = name }
+	output := x86.tprint(decoded_insts[:], decoded_info[:], lm.labels[:], label_names=&names)
 
 	// Verify output contains named labels
 	// Note: JNZ and JNE are the same instruction, decoder may output either
@@ -3581,4 +3600,13 @@ main :: proc() {
 	run_benchmarks()
 
 	print_summary()
+
+	/* FAIL THE PROCESS WHEN TESTS FAILED. Without this the binary exits 0 no matter what, and an exit
+	   code is the only thing a runner can rely on -- `build.lua` looked for the words "N failed" in the
+	   output instead, which the summary here prints as "N FAILED", so it never matched. Two independent
+	   holes, both open, meant the x86 suite could fail every case it has and the build still reported
+	   PASS. Found when five deliberately-broken decode cases came back green. */
+	if g_stats.failed > 0 {
+		os.exit(1)
+	}
 }
