@@ -5060,8 +5060,12 @@ gb_internal void convert_untyped_error(CheckerContext *c, Operand *operand, Type
 	gbString from_type_str = type_to_string(operand->type);
 	char const *extra_text = "";
 
-	if (operand->mode == Addressing_Constant) {
-		if (big_int_is_zero(&operand->value.value_integer)) {
+	if (operand->mode == Addressing_Constant && type_has_nil(target_type)) {
+		bool is_zero_int_or_float =
+			(operand->value.kind == ExactValue_Integer || operand->value.kind == ExactValue_Float) &&
+			is_exact_value_zero(operand->value);
+
+		if (is_zero_int_or_float) {
 			if (make_string_c(expr_str) != "nil") { // HACK NOTE(bill): Just in case
 				// NOTE(bill): Doesn't matter what the type is as it's still zero in the union
 				extra_text = " - Did you want 'nil'?";
@@ -5275,27 +5279,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		
 
 	case Type_Union:
-		// IMPORTANT NOTE HACK(bill): This is just to allow for comparisons against `0` with the `os.Error` type
-		// as a kind of transition period
-		if (!build_context.strict_style &&
-		    operand->mode == Addressing_Constant &&
-		    target_type->kind == Type_Named &&
-		    (c->pkg == nullptr || c->pkg->name != "os") &&
-		    target_type->Named.name == "Error") {
-			Entity *e = target_type->Named.type_name;
-			if (e->pkg && e->pkg->name == "os") {
-				if (is_exact_value_zero(operand->value) &&
-				    (operand->value.kind == ExactValue_Integer ||
-				     operand->value.kind == ExactValue_Float)) {
-					operand->mode = Addressing_Value;
-					// target_type = t_untyped_nil;
-				     	operand->value = empty_exact_value;
-					update_untyped_expr_value(c, operand->expr, operand->value);
-					break;
-				}
-			}
-		}
-		// "fallthrough"
 		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
 
@@ -5371,7 +5354,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 				ERROR_BLOCK();
 
-				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type, true);
 				if (count > 0) {
 					error_line("'%s' is a union which only accepts the following types:\n", type_str);
@@ -12369,7 +12351,7 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		for (isize j = i+1; j < gb_count_of(indices); j++) {
 			i64 b = indices[j];
 			if (a > b && b >= 0) {
-				error(se->close, "Invalid slice indices: [%td > %td]", a, b);
+				error(se->close, "Invalid slice indices: [%lld > %lld]", cast(long long)a, cast(long long)b);
 				invalid_indices = true;
 			}
 		}

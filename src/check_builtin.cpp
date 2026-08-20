@@ -1522,7 +1522,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 
 			if (arg_count > max_count) {
-				error(call, "Too many '%.*s' indices, %td > %td", LIT(builtin_name), arg_count, max_count);
+				error(call, "Too many '%.*s' indices, %lld > %lld", LIT(builtin_name), cast(long long)arg_count, cast(long long)max_count);
 				return false;
 			}
 
@@ -3508,7 +3508,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		// No upper bound on the index count
 		if (arg_count < 2) {
-			error(call, "Not enough 'swizzle' indices, %td < 2", arg_count);
+			error(call, "Not enough 'swizzle' indices, %lld < 2", cast(long long)arg_count);
 			return false;
 		}
 
