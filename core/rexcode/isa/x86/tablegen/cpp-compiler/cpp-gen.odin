@@ -341,7 +341,13 @@ main :: proc() {
 	strings.write_string(&sb, "\n");
 	strings.write_string(&sb, """
 		enum AliasSrc : u8 {
-			AliasSrc_NONE, // slot unused
+			AliasSrc_NONE,    // slot unused
+			AliasSrc_ARG0,    // user's 1st operand
+			AliasSrc_ARG1,    // user's 2nd operand
+			AliasSrc_ARG2,    // user's 3rd operand
+			AliasSrc_ZERO,    // hardwired zero
+			AliasSrc_LINK,    // link register
+			AliasSrc_LIT,
 		};
 
 		struct PseudoAlias {
@@ -519,6 +525,10 @@ main :: proc() {
 			case REG_CLASS_BND:   return 128;
 			}
 			return 0;
+		}
+
+		bool integer_reg_width_is_exact() const {
+			return true;
 		}
 	""")
 	strings.write_string(&sb, "\n\n")

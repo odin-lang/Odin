@@ -312,15 +312,21 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	// Width check.
 	if (want_w != 0 && got_w != 0) {
 		if (want_class == AsmRegClass_Vector && !is_memory) {
-			// A scalar float uses only the low lane, so it is valid in any vector
-			// register slot as long as it fits; a #simd vector must match exactly.
 			bool width_ok = (got_class == AsmRegClass_Float) ? (got_w <= want_w) : (got_w == want_w);
 			if (!width_ok) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
 			}
+		} else if (want_class == AsmRegClass_Integer && !is_memory &&
+		           !asm_ctx->integer_reg_width_is_exact()) {
+			// NOTE(bill): architectures such as RISC-V have registers which are
+			// always the architecture width
+			if (got_w > want_w) {
+				if (mismatch_) *mismatch_ = AsmMismatch_Size;
+				return false;
+			}
 		} else {
-			// Integer/mask registers, and all memory operands: exact width.
+			// Integer/mask registers on exact-width targets, and all memory operands.
 			if (want_w != got_w) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
@@ -912,8 +918,9 @@ struct AsmMnemonicAccumulator {
 	u16 explicitly_produced_regs;
 	u16 stale_outputs;
 
-	// #align_stack relevance: any call/branch (CONTROL) or memory effect that could
-	// require the stack to be realigned. If none occurred, #align_stack is redundant.
+	// Related to #align_stack
+	// any call/branch (CONTROL) or memory effect that could require the stack
+	//  to be realigned. If none occurred, #align_stack is redundant.
 	bool saw_call_or_mem;
 };
 
@@ -990,6 +997,20 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	}
 
 
+	auto operand_slot_type = [&](typename AsmCtx::Encoding const &form, int user_index) -> typename AsmCtx::OperandType {
+		int raw_slot = -1;
+		if (is_pseudo) {
+			raw_slot = user_operand_target_index(user_index);
+		} else {
+			raw_slot = asm_ctx->form_explicit_slot(form, user_index);
+		}
+		if (0 <= raw_slot && raw_slot < cast(int)gb_count_of(form.ops)) {
+			return form.ops[raw_slot];
+		}
+		return asm_ctx->OP_NONE;
+	};
+
+
 	auto valid_spots = slice_make<bool>(heap_allocator(), max_count);
 	defer (slice_free(&valid_spots, heap_allocator()));
 
@@ -1025,8 +1046,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		int width_pref = 0;
 
 		for_array(i, operands) {
-			int slot = asm_ctx->form_explicit_slot(form, cast(int)i);
-			auto type = (slot >= 0) ? form.ops[slot] : asm_ctx->OP_NONE;
+			auto type = operand_slot_type(form, cast(int)i);
 			Operand const *operand = &operands[i];
 			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(operand);
@@ -1248,9 +1268,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	if (best_form >= 0) {
 		auto &form = forms[best_form];
 		for_array(i, operands) {
-			int tei  = user_operand_target_index(cast(int)i);
-			int slot = (tei >= 0) ? asm_ctx->form_explicit_slot(form, tei) : -1;
-			auto type = (slot >= 0) ? form.ops[slot] : asm_ctx->OP_NONE;
+			auto type = operand_slot_type(form, cast(int)i);
 			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
 			possible_kinds[i] = dst;

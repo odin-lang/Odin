@@ -555,6 +555,10 @@ struct Asm_amd64 {
 		return 0;
 	}
 
+	bool integer_reg_width_is_exact() const {
+		return true;
+	}
+
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
 		case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
