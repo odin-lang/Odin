@@ -1278,6 +1278,24 @@ gb_internal u64 lb_get_is_packed_through_geps(lbModule *m, LLVMValueRef ptr) {
 	}
 }
 
+// like lb_get_is_packed_through_geps, but for max_align metadata
+gb_internal u64 lb_get_max_align_through_geps(lbModule *m, LLVMValueRef ptr) {
+	u64 cap = 0;
+	while (1) {
+		u64 align_max = lb_get_metadata_custom_u64(m, ptr, ODIN_METADATA_MAX_ALIGN);
+		if (align_max != 0 && (cap == 0 || align_max < cap)) {
+			cap = align_max;
+		}
+		if (!LLVMIsAGetElementPtrInst(ptr)) {
+			return cap;
+		}
+		ptr = LLVMGetOperand(ptr, 0);
+		if (!LLVMIsAInstruction(ptr)) {
+			return cap;
+		}
+	}
+}
+
 // adjust a load/store claimed alignment from what is known about its addr;
 // a ptr to a #packed's field may be less aligned than the field's
 // type alignment; GEP instructions carry this info as metadata;
@@ -1292,7 +1310,7 @@ gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef 
 		}
 		u64 align = LLVMGetAlignment(access);
 		u64 align_min = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_MIN_ALIGN);
-		u64 align_max = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_MAX_ALIGN);
+		u64 align_max = lb_get_max_align_through_geps(m, addr_ptr);
 		if (align_min != 0 && align < align_min) {
 			align = align_min;
 		}
@@ -1316,18 +1334,8 @@ gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLV
 
 gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value, i64 alignment) {
 	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
-
 	LLVMSetAlignment(result, cast(unsigned)alignment);
-
-	if (LLVMIsAInstruction(value)) {
-		u64 is_packed = lb_get_is_packed_through_geps(p->module, value);
-		if (is_packed != 0) {
-			LLVMSetAlignment(result, lb_try_get_alignment(p->module, value, 1));
-		}
-	} else if (LLVMIsAConstantExpr(value) && LLVMGetConstOpcode(value) == LLVMGetElementPtr) {
-		LLVMSetAlignment(result, lb_try_get_alignment(p->module, value, cast(unsigned)alignment));
-	}
-
+	lb_adjust_access_alignment_from_addr(p->module, result, value);
 	return result;
 }
 

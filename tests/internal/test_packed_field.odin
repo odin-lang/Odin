@@ -164,3 +164,86 @@ test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
 	#force_no_inline write_wrapped(u, {5, 6, 7, 8})
 	testing.expect(t, simd.to_array(p4.v) == [4]f32{5, 6, 7, 8})
 }
+
+
+// accesses derived from a '#max_field_align' struct's field
+// (array element, nested struct field) must not claim more than
+// the struct's field alignment cap
+
+Capped_Inner :: struct { x: i64 }
+
+Capped :: struct #max_field_align(4) {
+	a:     u16,
+	b:     u64,          // offset 4
+	arr:   [2]u64,       // elems at offs 12 and 20
+	inner: Capped_Inner, // x at offs 28
+}
+
+@(export)
+c1: Capped
+
+@(private="file")
+swap_elem :: proc(c: ^Capped, i: int, v: u64) -> u64 {
+	y := c.arr[i]
+	c.arr[i] = v
+	return y
+}
+
+@(private="file")
+swap_nested :: proc(c: ^Capped, v: i64) -> i64 {
+	y := c.inner.x
+	c.inner.x = v
+	return y
+}
+
+@(test)
+test_max_field_align_derived_access :: proc(t: ^testing.T) {
+	c1.b = 0xCAFECAFE_11223344
+	c1.arr[0] = 1
+	c1.arr[1] = 2
+	c1.inner.x = -1
+
+	y := #force_no_inline swap_elem(&c1, 1, 5)
+	testing.expect(t, y == 2)
+	testing.expect(t, c1.arr[0] == 1)
+	testing.expect(t, c1.arr[1] == 5)
+
+	z := #force_no_inline swap_nested(&c1, -2)
+	testing.expect(t, z == -1)
+	testing.expect(t, c1.inner.x == -2)
+	testing.expect(t, c1.b == 0xCAFECAFE_11223344)
+}
+
+
+// element type conversion of an array field of a #packed
+// goes through a vector load of the source array;
+// the load must not claim the element type alignment
+
+Packed_Conv :: struct #packed {
+	_:  u8,
+	a4: [4]f32, // offs 1
+}
+
+@(export)
+p5: Packed_Conv
+
+@(private="file")
+conv_float :: proc(p: ^Packed_Conv) -> [4]f64 {
+	return cast([4]f64)p.a4
+}
+
+@(private="file")
+conv_complex :: proc(p: ^Packed_Conv) -> [4]complex64 {
+	return cast([4]complex64)p.a4
+}
+
+@(test)
+test_packed_field_array_conv :: proc(t: ^testing.T) {
+	p5.a4 = {1.5, 2.5, 3.5, 4.5}
+
+	y := #force_no_inline conv_float(&p5)
+	testing.expect(t, y == [4]f64{1.5, 2.5, 3.5, 4.5})
+
+	z := #force_no_inline conv_complex(&p5)
+	testing.expect(t, z == [4]complex64{1.5, 2.5, 3.5, 4.5})
+}
