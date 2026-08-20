@@ -10246,15 +10246,21 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 			}
 		}
 	} else {
-		check_or_else_expr_no_value_error(c, name, x, type_hint);
+		if (right_type == nullptr || !y_is_diverging) {
+			check_or_else_expr_no_value_error(c, name, x, type_hint);
+		}
 	}
 
-	if (left_type == nullptr) {
-		left_type = t_invalid;
-	}
-	o->mode = Addressing_Value;
-	o->type = left_type;
 	o->expr = node;
+	o->type = left_type;
+	if (left_type != nullptr) {
+		o->mode = Addressing_Value;
+	} else if (y_is_diverging) {
+		o->mode = Addressing_NoValue;
+	} else {
+		o->mode = Addressing_Value;
+		o->type = t_invalid;
+	}
 	return Expr_Expr;
 }
 

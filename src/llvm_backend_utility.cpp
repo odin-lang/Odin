@@ -408,7 +408,9 @@ gb_internal void lb_emit_try_lhs_rhs(lbProcedure *p, Ast *arg, TypeAndValue cons
 	lbValue value = lb_build_expr(p, arg);
 	if (is_type_tuple(value.type)) {
 		i32 n = cast(i32)(value.type->Tuple.variables.count-1);
-		if (value.type->Tuple.variables.count == 2) {
+		if (value.type->Tuple.variables.count == 1) {
+			// No lhs
+		} else if (value.type->Tuple.variables.count == 2) {
 			lhs = lb_emit_tuple_ev(p, value, 0);
 		} else {
 			lbAddr lhs_addr = lb_add_local_generated(p, tv.type, false);
@@ -513,7 +515,10 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 		lb_emit_unreachable(p); // add just in case
 
 		lb_start_block(p, then);
-		return lb_emit_conv(p, lhs, type);
+		if (lhs.value != nullptr && type != nullptr) {
+			return lb_emit_conv(p, lhs, type);
+		}
+		return {};
 	} else {
 		if (lb_is_type_trivial(type) && lb_is_expr_trivial(else_expr)) {
 			lbValue has_value = lb_emit_try_has_value(p, rhs);
