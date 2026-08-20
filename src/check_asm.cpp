@@ -849,7 +849,9 @@ enum CheckMnemomicResult {
 
 template <typename AsmCtx>
 gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstruction *instr, u16 *mnemonic_) {
-	String name = instr->name->Ident.token.string;
+	Token token = instr->name->Ident.token;
+	GB_ASSERT(token.kind == Ast_Ident || token_is_keyword(token.kind));
+	String name = token.string;
 	auto p = asm_ctx->prefix_lookup(name);
 	if (p) {
 		if (mnemonic_) *mnemonic_ = cast(u16)p;
@@ -928,6 +930,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	}
 	min_count = gb_max(min_count, 0);
 	max_count = gb_max(max_count, 0);
+
+	if (mnemonic == asm_ctx->M_IN) {
+		GB_PANIC("in %d %d", min_count, max_count);
+	}
 
 	// A prefix that none of this mnemonic's forms can take is unconditionally wrong,
 	// independent of whether the operands match — catch it even on a match failure.

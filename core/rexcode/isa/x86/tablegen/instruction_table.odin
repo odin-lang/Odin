@@ -4911,6 +4911,22 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	.PREFETCH = {
 		{{.PREFETCH, {.M8, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0x0D, 0, {esc=._0F, modrm_reg_ext=true}}, {read={0}, reads_mem=true, side_effects={.HINT}}},
 	},
+	.IN = {
+		{{.IN, {.AL_IMPL,  .IMM8,    .NONE, .NONE}, {.IMPL, .IB,   .NONE, .NONE}, 0xE4, 0, {}},               {written={0}, read={1}, side_effects={.PRIVILEGED}}},
+		{{.IN, {.AX_IMPL,  .IMM8,    .NONE, .NONE}, {.IMPL, .IB,   .NONE, .NONE}, 0xE5, 0, {opsize_16=true}}, {written={0}, read={1}, side_effects={.PRIVILEGED}}},
+		{{.IN, {.EAX_IMPL, .IMM8,    .NONE, .NONE}, {.IMPL, .IB,   .NONE, .NONE}, 0xE5, 0, {}},               {written={0}, read={1}, side_effects={.PRIVILEGED}}},
+		{{.IN, {.AL_IMPL,  .DX_IMPL, .NONE, .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEC, 0, {}},               {written={0}, read={1}, side_effects={.PRIVILEGED}}},
+		{{.IN, {.AX_IMPL,  .DX_IMPL, .NONE, .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xED, 0, {opsize_16=true}}, {written={0}, read={1}, side_effects={.PRIVILEGED}}},
+		{{.IN, {.EAX_IMPL, .DX_IMPL, .NONE, .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xED, 0, {}},               {written={0}, read={1}, side_effects={.PRIVILEGED}}},
+	},
+	.OUT = {
+		{{.OUT, {.IMM8,    .AL_IMPL,  .NONE, .NONE}, {.IB,   .IMPL, .NONE, .NONE}, 0xE6, 0, {}},               {read={0, 1}, side_effects={.PRIVILEGED}}},
+		{{.OUT, {.IMM8,    .AX_IMPL,  .NONE, .NONE}, {.IB,   .IMPL, .NONE, .NONE}, 0xE7, 0, {opsize_16=true}}, {read={0, 1}, side_effects={.PRIVILEGED}}},
+		{{.OUT, {.IMM8,    .EAX_IMPL, .NONE, .NONE}, {.IB,   .IMPL, .NONE, .NONE}, 0xE7, 0, {}},               {read={0, 1}, side_effects={.PRIVILEGED}}},
+		{{.OUT, {.DX_IMPL, .AL_IMPL,  .NONE, .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEE, 0, {}},               {read={0, 1}, side_effects={.PRIVILEGED}}},
+		{{.OUT, {.DX_IMPL, .AX_IMPL,  .NONE, .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEF, 0, {opsize_16=true}}, {read={0, 1}, side_effects={.PRIVILEGED}}},
+		{{.OUT, {.DX_IMPL, .EAX_IMPL, .NONE, .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEF, 0, {}},               {read={0, 1}, side_effects={.PRIVILEGED}}},
+	},
 	.TPAUSE = {
 		{{.TPAUSE, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=PREFIX_66, modrm_reg_ext=true}}, {read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}}},
 	},

@@ -8,7 +8,7 @@ package rexcode_x86_generated
 import lib "../.."
 
 @(rodata)
-ENCODE_FORMS := [2454]lib.Encoding{
+ENCODE_FORMS := [2466]lib.Encoding{
 	// .MOV
 	{.MOV,              {.RM8,       .R8,        .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x88, 0, {explicit_count=2}},
 	{.MOV,              {.RM16,      .R16,       .NONE,      .NONE}, {.MR,   .REG,  .NONE, .NONE}, 0x89, 0, {explicit_count=2}},
@@ -3632,6 +3632,20 @@ ENCODE_FORMS := [2454]lib.Encoding{
 	{.SERIALIZE,        {.NONE,      .NONE,      .NONE,      .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 232, {esc=._0F}},
 	// .PREFETCH
 	{.PREFETCH,         {.M8,        .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0x0D, 0, {esc=._0F, modrm_reg_ext=true, explicit_count=1}},
+	// .IN
+	{.IN,               {.AL_IMPL,   .IMM8,      .NONE,      .NONE}, {.IMPL, .IB,   .NONE, .NONE}, 0xE4, 0, {explicit_count=1, has_implicit=true}},
+	{.IN,               {.AX_IMPL,   .IMM8,      .NONE,      .NONE}, {.IMPL, .IB,   .NONE, .NONE}, 0xE5, 0, {opsize_16=true, explicit_count=1, has_implicit=true}},
+	{.IN,               {.EAX_IMPL,  .IMM8,      .NONE,      .NONE}, {.IMPL, .IB,   .NONE, .NONE}, 0xE5, 0, {explicit_count=1, has_implicit=true}},
+	{.IN,               {.AL_IMPL,   .DX_IMPL,   .NONE,      .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEC, 0, {has_implicit=true}},
+	{.IN,               {.AX_IMPL,   .DX_IMPL,   .NONE,      .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xED, 0, {opsize_16=true, has_implicit=true}},
+	{.IN,               {.EAX_IMPL,  .DX_IMPL,   .NONE,      .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xED, 0, {has_implicit=true}},
+	// .OUT
+	{.OUT,              {.IMM8,      .AL_IMPL,   .NONE,      .NONE}, {.IB,   .IMPL, .NONE, .NONE}, 0xE6, 0, {explicit_count=1, has_implicit=true}},
+	{.OUT,              {.IMM8,      .AX_IMPL,   .NONE,      .NONE}, {.IB,   .IMPL, .NONE, .NONE}, 0xE7, 0, {opsize_16=true, explicit_count=1, has_implicit=true}},
+	{.OUT,              {.IMM8,      .EAX_IMPL,  .NONE,      .NONE}, {.IB,   .IMPL, .NONE, .NONE}, 0xE7, 0, {explicit_count=1, has_implicit=true}},
+	{.OUT,              {.DX_IMPL,   .AL_IMPL,   .NONE,      .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEE, 0, {has_implicit=true}},
+	{.OUT,              {.DX_IMPL,   .AX_IMPL,   .NONE,      .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEF, 0, {opsize_16=true, has_implicit=true}},
+	{.OUT,              {.DX_IMPL,   .EAX_IMPL,  .NONE,      .NONE}, {.IMPL, .IMPL, .NONE, .NONE}, 0xEF, 0, {has_implicit=true}},
 	// .TPAUSE
 	{.TPAUSE,           {.R32,       .NONE,      .NONE,      .NONE}, {.MR,   .NONE, .NONE, .NONE}, 0xAE, 6, {esc=._0F, prefix=1, modrm_reg_ext=true, explicit_count=1}},
 	// .UMONITOR
@@ -3704,7 +3718,7 @@ ENCODE_FORMS := [2454]lib.Encoding{
 }
 
 @(rodata)
-CLOBBER_FORMS := [2454]lib.Clobber{
+CLOBBER_FORMS := [2466]lib.Clobber{
 	// .MOV
 	{written={0}, read={1}, writes_mem=true, reads_mem=true},
 	{written={0}, read={1}, writes_mem=true, reads_mem=true},
@@ -7328,6 +7342,20 @@ CLOBBER_FORMS := [2454]lib.Clobber{
 	{side_effects={.SERIALIZING}},
 	// .PREFETCH
 	{read={0}, reads_mem=true, side_effects={.HINT}},
+	// .IN
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	// .OUT
+	{read={0, 1}, side_effects={.PRIVILEGED}},
+	{read={0, 1}, side_effects={.PRIVILEGED}},
+	{read={0, 1}, side_effects={.PRIVILEGED}},
+	{read={0, 1}, side_effects={.PRIVILEGED}},
+	{read={0, 1}, side_effects={.PRIVILEGED}},
+	{read={0, 1}, side_effects={.PRIVILEGED}},
 	// .TPAUSE
 	{read={0}, implicit_rd={.RAX, .RDX}, flags_wr={.CF}, side_effects={.HINT}},
 	// .UMONITOR
@@ -8608,42 +8636,44 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.WBNOINVD         = { 2414,   1},
 	.SERIALIZE        = { 2415,   1},
 	.PREFETCH         = { 2416,   1},
-	.TPAUSE           = { 2417,   1},
-	.UMONITOR         = { 2418,   1},
-	.UMWAIT           = { 2419,   1},
-	.MOVDIRI          = { 2420,   2},
-	.MOVDIR64B        = { 2422,   1},
-	.ENQCMD           = { 2423,   1},
-	.ENQCMDS          = { 2424,   1},
-	.AADD             = { 2425,   2},
-	.AAND             = { 2427,   2},
-	.AOR              = { 2429,   2},
-	.AXOR             = { 2431,   2},
-	.XEND             = { 2433,   1},
-	.XTEST            = { 2434,   1},
-	.VMRUN            = { 2435,   1},
-	.VMMCALL          = { 2436,   1},
-	.VMLOAD           = { 2437,   1},
-	.VMSAVE           = { 2438,   1},
-	.STGI             = { 2439,   1},
-	.CLGI             = { 2440,   1},
-	.SKINIT           = { 2441,   1},
-	.INVLPGA          = { 2442,   1},
-	.INVLPGB          = { 2443,   1},
-	.TLBSYNC          = { 2444,   1},
-	.PVALIDATE        = { 2445,   1},
-	.RMPADJUST        = { 2446,   1},
-	.RMPUPDATE        = { 2447,   1},
-	.PSMASH           = { 2448,   1},
-	.CLZERO           = { 2449,   1},
-	.MONITORX         = { 2450,   1},
-	.MWAITX           = { 2451,   1},
-	.RDPRU            = { 2452,   1},
-	.MCOMMIT          = { 2453,   1},
+	.IN               = { 2417,   6},
+	.OUT              = { 2423,   6},
+	.TPAUSE           = { 2429,   1},
+	.UMONITOR         = { 2430,   1},
+	.UMWAIT           = { 2431,   1},
+	.MOVDIRI          = { 2432,   2},
+	.MOVDIR64B        = { 2434,   1},
+	.ENQCMD           = { 2435,   1},
+	.ENQCMDS          = { 2436,   1},
+	.AADD             = { 2437,   2},
+	.AAND             = { 2439,   2},
+	.AOR              = { 2441,   2},
+	.AXOR             = { 2443,   2},
+	.XEND             = { 2445,   1},
+	.XTEST            = { 2446,   1},
+	.VMRUN            = { 2447,   1},
+	.VMMCALL          = { 2448,   1},
+	.VMLOAD           = { 2449,   1},
+	.VMSAVE           = { 2450,   1},
+	.STGI             = { 2451,   1},
+	.CLGI             = { 2452,   1},
+	.SKINIT           = { 2453,   1},
+	.INVLPGA          = { 2454,   1},
+	.INVLPGB          = { 2455,   1},
+	.TLBSYNC          = { 2456,   1},
+	.PVALIDATE        = { 2457,   1},
+	.RMPADJUST        = { 2458,   1},
+	.RMPUPDATE        = { 2459,   1},
+	.PSMASH           = { 2460,   1},
+	.CLZERO           = { 2461,   1},
+	.MONITORX         = { 2462,   1},
+	.MWAITX           = { 2463,   1},
+	.RDPRU            = { 2464,   1},
+	.MCOMMIT          = { 2465,   1},
 }
 
 // Emit descriptor per form (derived from ENCODE_FORMS via lib.form_to_recipe).
-ENCODE_RECIPES: [2454]lib.Form_Recipe
+ENCODE_RECIPES: [2466]lib.Form_Recipe
 @(init) _fill_recipes :: proc "contextless" () {
 	for i in 0 ..< len(ENCODE_FORMS) {
 		ENCODE_RECIPES[i] = lib.form_to_recipe(&ENCODE_FORMS[i])

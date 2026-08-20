@@ -1326,6 +1326,8 @@ Mnemonic :: enum u16 {
 	WBNOINVD,
 	SERIALIZE,
 	PREFETCH,
+	IN,
+	OUT,
 
 	// -------------------------------------------------------------------------
 	// SECTION: 4.29 WAITPKG Instructions
