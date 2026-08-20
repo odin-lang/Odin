@@ -4613,6 +4613,9 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		if (is_type_internally_pointer_like(type)) {
 			incoming_values[0] = LLVMBuildBitCast(p->builder, incoming_values[0], llvm_type, "");
 		}
+		// A union constant is built as an anonymous packed struct, which a phi cannot accept
+		// alongside the named type it results in, even though the two are laid out identically
+		incoming_values[0] = OdinLLVMBuildTransmute(p, incoming_values[0], llvm_type);
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, else_);
@@ -4622,6 +4625,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		if (is_type_internally_pointer_like(type)) {
 			incoming_values[1] = LLVMBuildBitCast(p->builder, incoming_values[1], llvm_type, "");
 		}
+		incoming_values[1] = OdinLLVMBuildTransmute(p, incoming_values[1], llvm_type);
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, done);
