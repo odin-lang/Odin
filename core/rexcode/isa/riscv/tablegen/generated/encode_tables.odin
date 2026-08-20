@@ -8,7 +8,7 @@ package rexcode_riscv_generated
 import lib "../.."
 
 @(rodata)
-ENCODE_FORMS := [194]lib.Encoding{
+ENCODE_FORMS := [198]lib.Encoding{
 	// .LUI
 	{ .LUI, {.GPR,.IMM20,.NONE,.NONE}, {.RD,.IMM_U,.NONE,.NONE}, 0x00000037, 0x0000007F, .I, {} },
 	// .AUIPC
@@ -335,6 +335,10 @@ ENCODE_FORMS := [194]lib.Encoding{
 	{ .C_SW, {.GPR_C,.MEM_C_W,.NONE,.NONE}, {.C_RS2_PRIMED,.C_OFFSET_BASE_W,.NONE,.NONE}, 0x0000C000, 0x0000E003, .C, {} },
 	// .C_SD
 	{ .C_SD, {.GPR_C,.MEM_C_D,.NONE,.NONE}, {.C_RS2_PRIMED,.C_OFFSET_BASE_D,.NONE,.NONE}, 0x0000E000, 0x0000E003, .C, {rv64_only=true} },
+	// .C_FLW
+	{ .C_FLW, {.FPR_C,.MEM_C_W,.NONE,.NONE}, {.C_RD_PRIMED,.C_OFFSET_BASE_W,.NONE,.NONE}, 0x00006000, 0x0000E003, .F, {rv32_only=true} },
+	// .C_FSW
+	{ .C_FSW, {.FPR_C,.MEM_C_W,.NONE,.NONE}, {.C_RS2_PRIMED,.C_OFFSET_BASE_W,.NONE,.NONE}, 0x0000E000, 0x0000E003, .F, {rv32_only=true} },
 	// .C_FLD
 	{ .C_FLD, {.FPR_C,.MEM_C_D,.NONE,.NONE}, {.C_RD_PRIMED,.C_OFFSET_BASE_D,.NONE,.NONE}, 0x00002000, 0x0000E003, .D, {} },
 	// .C_FSD
@@ -397,6 +401,10 @@ ENCODE_FORMS := [194]lib.Encoding{
 	{ .C_MV, {.GPR_NONZERO,.GPR_NONZERO,.NONE,.NONE}, {.C_RD_RS1,.C_RS2,.NONE,.NONE}, 0x00008002, 0x0000F003, .C, {} },
 	// .C_ADD
 	{ .C_ADD, {.GPR_NONZERO,.GPR_NONZERO,.NONE,.NONE}, {.C_RD_RS1,.C_RS2,.NONE,.NONE}, 0x00009002, 0x0000F003, .C, {} },
+	// .C_FLWSP
+	{ .C_FLWSP, {.FPR,.MEM_C_SP_W,.NONE,.NONE}, {.C_RD_RS1,.C_SP_OFFSET_W,.NONE,.NONE}, 0x00006002, 0x0000E003, .F, {rv32_only=true} },
+	// .C_FSWSP
+	{ .C_FSWSP, {.FPR,.MEM_C_SP_W,.NONE,.NONE}, {.C_RS2,.C_IMM_CSS_W,.NONE,.NONE}, 0x0000E002, 0x0000E003, .F, {rv32_only=true} },
 }
 
 @(rodata)
@@ -565,35 +573,39 @@ ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.C_LD       = {  160,   1},
 	.C_SW       = {  161,   1},
 	.C_SD       = {  162,   1},
-	.C_FLD      = {  163,   1},
-	.C_FSD      = {  164,   1},
-	.C_ADDI     = {  165,   1},
-	.C_ADDIW    = {  166,   1},
-	.C_LI       = {  167,   1},
-	.C_LUI      = {  168,   1},
-	.C_ADDI16SP = {  169,   1},
-	.C_SRLI     = {  170,   1},
-	.C_SRAI     = {  171,   1},
-	.C_ANDI     = {  172,   1},
-	.C_SUB      = {  173,   1},
-	.C_XOR      = {  174,   1},
-	.C_OR       = {  175,   1},
-	.C_AND      = {  176,   1},
-	.C_SUBW     = {  177,   1},
-	.C_ADDW     = {  178,   1},
-	.C_J        = {  179,   1},
-	.C_JAL      = {  180,   1},
-	.C_BEQZ     = {  181,   1},
-	.C_BNEZ     = {  182,   1},
-	.C_SLLI     = {  183,   1},
-	.C_LWSP     = {  184,   1},
-	.C_LDSP     = {  185,   1},
-	.C_SWSP     = {  186,   1},
-	.C_SDSP     = {  187,   1},
-	.C_FLDSP    = {  188,   1},
-	.C_FSDSP    = {  189,   1},
-	.C_JR       = {  190,   1},
-	.C_JALR     = {  191,   1},
-	.C_MV       = {  192,   1},
-	.C_ADD      = {  193,   1},
+	.C_FLW      = {  163,   1},
+	.C_FSW      = {  164,   1},
+	.C_FLD      = {  165,   1},
+	.C_FSD      = {  166,   1},
+	.C_ADDI     = {  167,   1},
+	.C_ADDIW    = {  168,   1},
+	.C_LI       = {  169,   1},
+	.C_LUI      = {  170,   1},
+	.C_ADDI16SP = {  171,   1},
+	.C_SRLI     = {  172,   1},
+	.C_SRAI     = {  173,   1},
+	.C_ANDI     = {  174,   1},
+	.C_SUB      = {  175,   1},
+	.C_XOR      = {  176,   1},
+	.C_OR       = {  177,   1},
+	.C_AND      = {  178,   1},
+	.C_SUBW     = {  179,   1},
+	.C_ADDW     = {  180,   1},
+	.C_J        = {  181,   1},
+	.C_JAL      = {  182,   1},
+	.C_BEQZ     = {  183,   1},
+	.C_BNEZ     = {  184,   1},
+	.C_SLLI     = {  185,   1},
+	.C_LWSP     = {  186,   1},
+	.C_LDSP     = {  187,   1},
+	.C_SWSP     = {  188,   1},
+	.C_SDSP     = {  189,   1},
+	.C_FLDSP    = {  190,   1},
+	.C_FSDSP    = {  191,   1},
+	.C_JR       = {  192,   1},
+	.C_JALR     = {  193,   1},
+	.C_MV       = {  194,   1},
+	.C_ADD      = {  195,   1},
+	.C_FLWSP    = {  196,   1},
+	.C_FSWSP    = {  197,   1},
 }
