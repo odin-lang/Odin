@@ -753,10 +753,13 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
     // R6 mul/div: reuse SPECIAL functs 0x18-0x1F (which were MULT/MULTU/
     // DIV/DIVU in pre-R6) with shamt distinguishing low half (0x02) from
     // high half (0x03). Results land in rd, not HI/LO.
+    .MUL_R6 = { {.MUL_R6, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x00000098, 0xFC0007FF, .MIPS32_R6, {}} },
     .MUH   = { {.MUH,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000D8, 0xFC0007FF, .MIPS32_R6, {}} },
     .MULU  = { {.MULU,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x00000099, 0xFC0007FF, .MIPS32_R6, {}} },
     .MUHU  = { {.MUHU,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000D9, 0xFC0007FF, .MIPS32_R6, {}} },
+    .DIV_R6  = { {.DIV_R6,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009A, 0xFC0007FF, .MIPS32_R6, {}} },
     .MOD   = { {.MOD,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DA, 0xFC0007FF, .MIPS32_R6, {}} },
+    .DIVU_R6 = { {.DIVU_R6, {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009B, 0xFC0007FF, .MIPS32_R6, {}} },
     .MODU  = { {.MODU,  {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x000000DB, 0xFC0007FF, .MIPS32_R6, {}} },
     // 64-bit R6 mul/div (functs 0x1C-0x1F).
     .DMUL_R6   = { {.DMUL_R6,   {.GPR,.GPR,.GPR,.NONE}, {.RD,.RS,.RT,.NONE}, 0x0000009C, 0xFC0007FF, .MIPS64_R6, {only_64=true}} },

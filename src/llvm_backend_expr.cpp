@@ -3207,7 +3207,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		Type *elem = base_array_type(dst);
 		lbValue e = lb_emit_conv(p, value, elem);
 		lbAddr v = lb_add_local_generated(p, t, false);
-		lbValue zero = lb_const_value(p->module, elem, exact_value_i64(0), elem, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
+		lbValue zero = lb_const_value(p->module, elem, exact_value_i64(0), LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 		for (i64 j = 0; j < dst->Matrix.column_count; j++) {
 			for (i64 i = 0; i < dst->Matrix.row_count; i++) {
 				lbValue ptr = lb_emit_matrix_epi(p, v.addr, i, j);
@@ -3244,7 +3244,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 						lb_emit_store(p, d, s);
 					} else if (i == j) {
 						lbValue d = lb_emit_matrix_epi(p, v.addr, i, j);
-						lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), dst->Matrix.elem, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
+						lbValue s = lb_const_value(p->module, dst->Matrix.elem, exact_value_i64(1), LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 						lb_emit_store(p, d, s);
 					}
 				}
@@ -3439,11 +3439,12 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 
 	if (are_types_identical(a, b)) {
 		// NOTE(bill): No need for a conversion
-	} else if ((lb_is_const(left) && !is_type_array(left.type)) || lb_is_const_nil(left)) {
+	} else if ((lb_is_const(left) && !is_type_array(left.type) && !is_type_union(left.type)) || lb_is_const_nil(left)) {
 		// NOTE(karl): !is_type_array(left.type) is there to avoid lb_emit_conv
 		// trying to convert a constant array into a non-array. In that case we
 		// want the `else` branch to happen, so it can try to convert the
 		// non-array into an array instead.
+		// NOTE(korvahkh): We also need !is_type_union(left.type).
 
 		if (lb_is_const_nil(left)) {
 			if (internal_check_is_assignable_to(right.type, left.type)) {
@@ -3454,7 +3455,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			}
 		}
 		left = lb_emit_conv(p, left, right.type);
-	} else if ((lb_is_const(right) && !is_type_array(right.type)) || lb_is_const_nil(right)) {
+	} else if ((lb_is_const(right) && !is_type_array(right.type) && !is_type_union(right.type)) || lb_is_const_nil(right)) {
 
 		if (lb_is_const_nil(right)) {
 			if (internal_check_is_assignable_to(left.type, right.type)) {
@@ -4462,20 +4463,6 @@ gb_internal lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 	return res;
 }
 
-gb_internal Type *lb_build_expr_original_const_type(Ast *expr) {
-	expr = unparen_expr(expr);
-	Type *type = type_of_expr(expr);
-	if (is_type_union(type)) {
-		if (expr->kind == Ast_CallExpr) {
-			if (expr->CallExpr.proc->tav.mode == Addressing_Type) {
-				Type *res = lb_build_expr_original_const_type(expr->CallExpr.args[0]);
-				return res;
-			}
-		}
-	}
-	return type_of_expr(expr);
-}
-
 gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -4488,9 +4475,8 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 
 
 	if (tv.value.kind != ExactValue_Invalid) {
-		Type *original_type = lb_build_expr_original_const_type(expr);
 		// NOTE(bill): Short on constant values
-		return lb_const_value(p->module, type, tv.value, original_type, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
+		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 	} else if (tv.mode == Addressing_Type) {
 		// NOTE(bill, 2023-01-16): is this correct? I hope so at least
 		return lb_typeid(m, tv.type);
@@ -4571,7 +4557,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		TypeAndValue tav = type_and_value_of_expr(expr);
 		GB_ASSERT(tav.mode == Addressing_Constant);
 
-		return lb_const_value(p->module, type, tv.value, tv.type, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
+		return lb_const_value(p->module, type, tv.value, LB_CONST_CONTEXT_DEFAULT_ALLOW_LOCAL);
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, expr);
@@ -4605,6 +4591,9 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		if (is_type_internally_pointer_like(type)) {
 			incoming_values[0] = LLVMBuildBitCast(p->builder, incoming_values[0], llvm_type, "");
 		}
+		// A union constant is built as an anonymous packed struct, which a phi cannot accept
+		// alongside the named type it results in, even though the two are laid out identically
+		incoming_values[0] = OdinLLVMBuildTransmute(p, incoming_values[0], llvm_type);
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, else_);
@@ -4614,6 +4603,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		if (is_type_internally_pointer_like(type)) {
 			incoming_values[1] = LLVMBuildBitCast(p->builder, incoming_values[1], llvm_type, "");
 		}
+		incoming_values[1] = OdinLLVMBuildTransmute(p, incoming_values[1], llvm_type);
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, done);
@@ -4850,7 +4840,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_Constant) {
 		Type *t = default_type(type_of_expr(expr));
-		lbValue v = lb_const_value(p->module, t, e->Constant.value, e->type, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
+		lbValue v = lb_const_value(p->module, t, e->Constant.value, LB_CONST_CONTEXT_DEFAULT_NO_LOCAL);
 		if (LLVMIsConstant(v.value)) {
 			lbAddr g = lb_add_global_generated_from_procedure(p, t, v);
 			return g;

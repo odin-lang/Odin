@@ -346,6 +346,9 @@ struct Entity {
 			bool is_volatile;
 			bool is_align_stack;
 
+			bool has_observable_side_effect;
+
+
 			bool      clobber_flags;
 			bool      clobber_memory;
 			StringSet clobber_registers_set;

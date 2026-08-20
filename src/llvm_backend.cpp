@@ -2003,7 +2003,8 @@ gb_internal void lb_verify_function(lbModule *m, lbProcedure *p, bool dump_ll=fa
 			}
 		}
 		LLVMVerifyFunction(p->value, LLVMPrintMessageAction);
-		exit_with_errors();
+		lb_record_worker_failure();
+		return;
 	}
 }
 
@@ -2023,11 +2024,11 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_verification_worker_proc) {
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
-				exit_with_errors();
-				return false;
+				lb_record_worker_failure();
+				return 1;
 			}
 		}
-		exit_with_errors();
+		lb_record_worker_failure();
 		return 1;
 	}
 	return 0;
@@ -2390,11 +2391,13 @@ gb_internal WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 	if (build_context.lto_kind != LTO_None) {
 		if (LLVMWriteBitcodeToFile(wd->m->mod, cast(char *)wd->filepath_obj.text)) {
 			gb_printf_err("Failed to write bitcode file: %.*s\n", LIT(wd->filepath_obj));
-			exit_with_errors();
+			lb_record_worker_failure();
+			return 1;
 		}
 	} else if (LLVMTargetMachineEmitToFile(wd->target_machine, wd->m->mod, cast(char *)wd->filepath_obj.text, wd->code_gen_file_type, &llvm_error)) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
-		exit_with_errors();
+		lb_record_worker_failure();
+		return 1;
 	}
 	debugf("Generated File: %.*s\n", LIT(wd->filepath_obj));
 	return 0;
@@ -2561,7 +2564,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 			}
 		}
-		exit_with_errors();
+		lb_record_worker_failure();
 		return 1;
 	}
 
@@ -2602,6 +2605,8 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 			lb_generate_procedures_worker_proc(m);
 		}
 	}
+
+	lb_exit_if_worker_failed();
 }
 
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
@@ -2674,6 +2679,8 @@ gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
 			lb_llvm_function_pass_per_module(m);
 		}
 	}
+
+	lb_exit_if_worker_failed();
 }
 
 
@@ -2699,6 +2706,8 @@ gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool d
 			lb_llvm_module_pass_worker_proc(wd);
 		}
 	}
+
+	lb_exit_if_worker_failed();
 }
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
@@ -2829,6 +2838,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 		}
 
 		thread_pool_wait(&global_thread_pool);
+		lb_exit_if_worker_failed();
 	} else {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
@@ -3429,7 +3439,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 						cc.link_section = e->Variable.link_section;
 
 						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, e->type, v, tav.type, cc);
+						lbValue init = lb_const_value(m, e->type, v, cc);
 
 
 						LLVMDeleteGlobal(g.value);

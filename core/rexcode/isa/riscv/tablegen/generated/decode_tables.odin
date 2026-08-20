@@ -8,7 +8,7 @@ package rexcode_riscv_generated
 import lib "../.."
 
 @(rodata)
-DECODE_ENTRIES := [194]lib.Decode_Entry{
+DECODE_ENTRIES := [198]lib.Decode_Entry{
 	{ .LB, {.GPR,.MEM,.NONE,.NONE}, {.RD,.OFFSET_BASE_I,.NONE,.NONE}, 0x00000003, 0x0000707F, .I, {} },
 	{ .LH, {.GPR,.MEM,.NONE,.NONE}, {.RD,.OFFSET_BASE_I,.NONE,.NONE}, 0x00001003, 0x0000707F, .I, {} },
 	{ .LW, {.GPR,.MEM,.NONE,.NONE}, {.RD,.OFFSET_BASE_I,.NONE,.NONE}, 0x00002003, 0x0000707F, .I, {} },
@@ -177,9 +177,11 @@ DECODE_ENTRIES := [194]lib.Decode_Entry{
 	{ .C_LI, {.GPR_NONZERO,.IMM_C6S,.NONE,.NONE}, {.C_RD_RS1,.C_IMM_CI_S,.NONE,.NONE}, 0x00004001, 0x0000E003, .C, {} },
 	{ .C_LWSP, {.GPR_NONZERO,.MEM_C_SP_W,.NONE,.NONE}, {.C_RD_RS1,.C_SP_OFFSET_W,.NONE,.NONE}, 0x00004002, 0x0000E003, .C, {} },
 	{ .C_LD, {.GPR_C,.MEM_C_D,.NONE,.NONE}, {.C_RD_PRIMED,.C_OFFSET_BASE_D,.NONE,.NONE}, 0x00006000, 0x0000E003, .C, {rv64_only=true} },
+	{ .C_FLW, {.FPR_C,.MEM_C_W,.NONE,.NONE}, {.C_RD_PRIMED,.C_OFFSET_BASE_W,.NONE,.NONE}, 0x00006000, 0x0000E003, .F, {rv32_only=true} },
 	{ .C_ADDI16SP, {.GPR_SP,.IMM_C10S,.NONE,.NONE}, {.NONE,.C_IMM_ADDI16SP,.NONE,.NONE}, 0x00006101, 0x0000EF83, .C, {} },
 	{ .C_LUI, {.GPR_NONZERO,.IMM_C18S,.NONE,.NONE}, {.C_RD_RS1,.C_IMM_LUI,.NONE,.NONE}, 0x00006001, 0x0000E003, .C, {} },
 	{ .C_LDSP, {.GPR_NONZERO,.MEM_C_SP_D,.NONE,.NONE}, {.C_RD_RS1,.C_SP_OFFSET_D,.NONE,.NONE}, 0x00006002, 0x0000E003, .C, {rv64_only=true} },
+	{ .C_FLWSP, {.FPR,.MEM_C_SP_W,.NONE,.NONE}, {.C_RD_RS1,.C_SP_OFFSET_W,.NONE,.NONE}, 0x00006002, 0x0000E003, .F, {rv32_only=true} },
 	{ .C_SUB, {.GPR_C,.GPR_C,.NONE,.NONE}, {.C_RD_RS1_PRIMED,.C_RS2_PRIMED,.NONE,.NONE}, 0x00008C01, 0x0000FC63, .C, {} },
 	{ .C_XOR, {.GPR_C,.GPR_C,.NONE,.NONE}, {.C_RD_RS1_PRIMED,.C_RS2_PRIMED,.NONE,.NONE}, 0x00008C21, 0x0000FC63, .C, {} },
 	{ .C_OR, {.GPR_C,.GPR_C,.NONE,.NONE}, {.C_RD_RS1_PRIMED,.C_RS2_PRIMED,.NONE,.NONE}, 0x00008C41, 0x0000FC63, .C, {} },
@@ -201,8 +203,10 @@ DECODE_ENTRIES := [194]lib.Decode_Entry{
 	{ .C_BEQZ, {.GPR_C,.REL9,.NONE,.NONE}, {.C_RS1_PRIMED,.C_BRANCH9,.NONE,.NONE}, 0x0000C001, 0x0000E003, .C, {branch=true} },
 	{ .C_SWSP, {.GPR,.MEM_C_SP_W,.NONE,.NONE}, {.C_RS2,.C_IMM_CSS_W,.NONE,.NONE}, 0x0000C002, 0x0000E003, .C, {} },
 	{ .C_SD, {.GPR_C,.MEM_C_D,.NONE,.NONE}, {.C_RS2_PRIMED,.C_OFFSET_BASE_D,.NONE,.NONE}, 0x0000E000, 0x0000E003, .C, {rv64_only=true} },
+	{ .C_FSW, {.FPR_C,.MEM_C_W,.NONE,.NONE}, {.C_RS2_PRIMED,.C_OFFSET_BASE_W,.NONE,.NONE}, 0x0000E000, 0x0000E003, .F, {rv32_only=true} },
 	{ .C_BNEZ, {.GPR_C,.REL9,.NONE,.NONE}, {.C_RS1_PRIMED,.C_BRANCH9,.NONE,.NONE}, 0x0000E001, 0x0000E003, .C, {branch=true} },
 	{ .C_SDSP, {.GPR,.MEM_C_SP_D,.NONE,.NONE}, {.C_RS2,.C_IMM_CSS_D,.NONE,.NONE}, 0x0000E002, 0x0000E003, .C, {rv64_only=true} },
+	{ .C_FSWSP, {.FPR,.MEM_C_SP_W,.NONE,.NONE}, {.C_RS2,.C_IMM_CSS_W,.NONE,.NONE}, 0x0000E002, 0x0000E003, .F, {rv32_only=true} },
 }
 
 @(rodata)
@@ -271,19 +275,19 @@ DECODE_INDEX_RVC := [32]lib.Decode_Index{
 	0x08 = { 164,   1},
 	0x09 = { 165,   1},
 	0x0A = { 166,   1},
-	0x0C = { 167,   1},
-	0x0D = { 168,   2},
-	0x0E = { 170,   1},
-	0x11 = { 171,   9},
-	0x12 = { 180,   5},
-	0x14 = { 185,   1},
-	0x15 = { 186,   1},
-	0x16 = { 187,   1},
-	0x18 = { 188,   1},
-	0x19 = { 189,   1},
-	0x1A = { 190,   1},
-	0x1C = { 191,   1},
-	0x1D = { 192,   1},
-	0x1E = { 193,   1},
+	0x0C = { 167,   2},
+	0x0D = { 169,   2},
+	0x0E = { 171,   2},
+	0x11 = { 173,   9},
+	0x12 = { 182,   5},
+	0x14 = { 187,   1},
+	0x15 = { 188,   1},
+	0x16 = { 189,   1},
+	0x18 = { 190,   1},
+	0x19 = { 191,   1},
+	0x1A = { 192,   1},
+	0x1C = { 193,   2},
+	0x1D = { 195,   1},
+	0x1E = { 196,   2},
 }
 

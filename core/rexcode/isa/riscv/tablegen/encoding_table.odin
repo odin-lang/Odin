@@ -328,6 +328,12 @@ ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 	// C.SD rs2', imm(rs1')   = 111 imm[5:3] rs1' imm[7:6] rs2' 00   (RV64-only)
 	.C_SD  = { {.C_SD,  {.GPR_C, .MEM_C_D, .NONE, .NONE}, {.C_RS2_PRIMED, .C_OFFSET_BASE_D, .NONE, .NONE}, 0xE000, 0xE003, .C, {rv64_only=true}} },
 
+	// C.FLW rd', imm(rs1')   = 011 imm[5:3] rs1' imm[2,6] rd' 00     (RV32-only)
+	.C_FLW  = { {.C_FLW,  {.FPR_C, .MEM_C_W, .NONE, .NONE}, {.C_RD_PRIMED,  .C_OFFSET_BASE_W, .NONE, .NONE}, 0x6000, 0xE003, .F, {rv32_only=true}} },
+
+	// C.FSW rs2', imm(rs1')  = 111 imm[5:3] rs1' imm[2,6] rs2' 00    (RV32-only)
+	.C_FSW  = { {.C_FSW,  {.FPR_C, .MEM_C_W, .NONE, .NONE}, {.C_RS2_PRIMED, .C_OFFSET_BASE_W, .NONE, .NONE}, 0xE000, 0xE003, .F, {rv32_only=true}} },
+
 	// ---- Quadrant 1 (op = 01) ----------------------------------------------
 
 	// C.NOP = 0x0001 = C.ADDI x0, 0 (fully fixed encoding).
@@ -417,4 +423,10 @@ ENCODING_TABLE:= #partial [Mnemonic][]Encoding{
 
 	// C.SDSP rs2, imm  = 111 imm[5:3,8:6] rs2 10   (RV64)
 	.C_SDSP = { {.C_SDSP, {.GPR, .MEM_C_SP_D, .NONE, .NONE}, {.C_RS2, .C_IMM_CSS_D, .NONE, .NONE}, 0xE002, 0xE003, .C, {rv64_only=true}} },
+
+	// C.FLWSP rd, imm  = 011 imm[5] rd imm[4:2,7:6] 10               (RV32-only)
+	.C_FLWSP = { {.C_FLWSP, {.FPR, .MEM_C_SP_W, .NONE, .NONE}, {.C_RD_RS1, .C_SP_OFFSET_W, .NONE, .NONE}, 0x6002, 0xE003, .F, {rv32_only=true}} },
+
+	// C.FSWSP rs2, imm = 111 imm[5:2,7:6] rs2 10                     (RV32-only)
+	.C_FSWSP = { {.C_FSWSP, {.FPR, .MEM_C_SP_W, .NONE, .NONE}, {.C_RS2, .C_IMM_CSS_W, .NONE, .NONE}, 0xE002, 0xE003, .F, {rv32_only=true}} },
 }

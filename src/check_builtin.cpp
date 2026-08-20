@@ -727,7 +727,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		Type *superclass = obj_type->Named.type_name->TypeName.objc_superclass;
 		if (superclass == nullptr) {
 			gbString t = type_to_string(obj_type);
-			error(operand->expr, "'%.*s' target object '%.*s' does not have an Objective-C superclass. One must be set via the @(objc_superclass) attribute", LIT(builtin_name), t);
+			error(operand->expr, "'%.*s' target object '%s' does not have an Objective-C superclass. One must be set via the @(objc_superclass) attribute", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
 		}
@@ -1522,7 +1522,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			}
 
 			if (arg_count > max_count) {
-				error(call, "Too many '%.*s' indices, %td > %td", LIT(builtin_name), arg_count, max_count);
+				error(call, "Too many '%.*s' indices, %lld > %lld", LIT(builtin_name), cast(long long)arg_count, cast(long long)max_count);
 				return false;
 			}
 
@@ -3305,7 +3305,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (sel.indirect) {
 			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
-			      "Field '%s' is embedded via a pointer in '%s'", field_name.string(), type_str);
+			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name.string()), type_str);
 			gb_string_free(type_str);
 			return false;
 		}
@@ -3508,7 +3508,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		// No upper bound on the index count
 		if (arg_count < 2) {
-			error(call, "Not enough 'swizzle' indices, %td < 2", arg_count);
+			error(call, "Not enough 'swizzle' indices, %lld < 2", cast(long long)arg_count);
 			return false;
 		}
 
@@ -3604,7 +3604,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		default: GB_PANIC("Invalid type"); break;
 		}
 
-		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+		// Only a complex hint of the same element type, or context-typing an untyped constant.
+		// Castability is the rule for a conversion the programmer wrote; used here it adopted any
+		// castable hint, which silently narrowed f64 to f32 and left the value with no element type
+		// at all when the hint was `any` or a union
+		if (type_hint != nullptr && is_type_complex(type_hint) &&
+		    (is_type_untyped(operand->type) ||
+		     are_types_identical(core_type(operand->type), core_type(type_hint)))) {
 			operand->type = type_hint;
 		}
 
@@ -3803,7 +3809,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		default: GB_PANIC("Invalid type"); break;
 		}
 
-		if (type_hint != nullptr && check_is_castable_to(c, operand, type_hint)) {
+		// see the note in BuiltinProc_complex
+		if (type_hint != nullptr && is_type_quaternion(type_hint) &&
+		    (is_type_untyped(operand->type) ||
+		     are_types_identical(core_type(operand->type), core_type(type_hint)))) {
 			operand->type = type_hint;
 		}
 
@@ -4932,11 +4941,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					gb_string_free(s);
 				} else if (elements > MATRIX_ELEMENT_COUNT_MAX) {
 					gbString s = type_to_string(x.type);
-					error(call, "'%.*s' expects a matrix or array with a maximum of %d elements, got %s with %lld elements", LIT(builtin_name), MATRIX_ELEMENT_COUNT_MAX, s, elements);
+					error(call, "'%.*s' expects a matrix or array with a maximum of %d elements, got %s with %lld elements", LIT(builtin_name), MATRIX_ELEMENT_COUNT_MAX, s, cast(long long)elements);
 					gb_string_free(s);
 				} else if (elements > MATRIX_ELEMENT_COUNT_MAX) {
 					gbString s = type_to_string(x.type);
-					error(call, "'%.*s' expects a matrix or array with non-zero elements, got %s", LIT(builtin_name), MATRIX_ELEMENT_COUNT_MAX, s);
+					error(call, "'%.*s' expects a matrix or array with non-zero elements, got %s", LIT(builtin_name), s);
 					gb_string_free(s);
 				} else if (size > MATRIX_ELEMENT_MAX_SIZE) {
 					gbString s = type_to_string(x.type);
@@ -5352,8 +5361,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 		if (!is_type_integer(offset.type)) {
-			gbString s = type_to_string(array_ptr.type);
-			error(array_ptr.expr, "Expected an integer as the offset for '%.*s', got %s", s, LIT(builtin_name));
+			gbString s = type_to_string(offset.type);
+			error(offset.expr, "Expected an integer as the offset for '%.*s', got %s", LIT(builtin_name), s);
 			gb_string_free(s);
 			return false;
 		}
@@ -5821,7 +5830,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			i64 sz = type_size_of(x.type);
 			if (sz < 2) {
 				gbString xts = type_to_string(x.type);
-				error(x.expr, "Type passed to '%.*s' must be at least 2 bytes, got %s with size of %lld", LIT(builtin_name), xts, sz);
+				error(x.expr, "Type passed to '%.*s' must be at least 2 bytes, got %s with size of %lld", LIT(builtin_name), xts, cast(long long)sz);
 				gb_string_free(xts);
 			}
 
@@ -6653,12 +6662,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 			i64 n = exact_value_to_i64(z.value);
 			if (n <= 0) {
-				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_name), n);
+				error(z.expr, "Scale parameter in '%.*s' must be positive, got %lld", LIT(builtin_name), cast(long long)n);
 				return false;
 			}
 			i64 sz = 8*type_size_of(x.type);
 			if (n > sz) {
-				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), n, sz);
+				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)sz);
 				return false;
 			}
 

@@ -2434,7 +2434,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			if (e->Variable.is_rodata) {
 				cc.is_rodata = true;
 			}
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, nullptr, cc);
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, cc);
 		}
 
 		String mangled_name = {};
@@ -3390,7 +3390,10 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 					// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
 					// compound literal, so reusing that variable should minimize the stack wastage
 					lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
-					if (comp_lit_addr) {
+					// Only when the variable IS the literal. `x: U = []int{0}` declares a union and
+					// the literal is one of its variants, so reusing that storage would bind the
+					// variable to a bare `[]int` and never build the union at all
+					if (comp_lit_addr && are_types_identical(lb_addr_type(*comp_lit_addr), type_of_expr(vd->names[lval_index]))) {
 						if (Entity *e = entity_of_node(vd->names[lval_index])) {
 							lbValue val = comp_lit_addr->addr;
 							lb_add_entity(p->module, e, val);

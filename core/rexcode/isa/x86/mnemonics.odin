@@ -1053,6 +1053,7 @@ Mnemonic :: enum u16 {
 	VDBPSADBW,
 	VPTERNLOGD,
 	VPTERNLOGQ,
+	VPDPWSSD,
 	VPMULTISHIFTQB,
 	KADDW,
 	KADDB,
@@ -1325,6 +1326,8 @@ Mnemonic :: enum u16 {
 	WBNOINVD,
 	SERIALIZE,
 	PREFETCH,
+	IN,
+	OUT,
 
 	// -------------------------------------------------------------------------
 	// SECTION: 4.29 WAITPKG Instructions

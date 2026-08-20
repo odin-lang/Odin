@@ -84,7 +84,7 @@ main :: proc() {
 // -----------------------------------------------------------------------------
 
 total_forms :: proc() -> (n: int) {
-	for m in Mnemonic { n += len(ENCODING_TABLE[m]) }
+	for m in Mnemonic { n += len(INSTRUCTION_TABLE[m]) }
 	return
 }
 
@@ -97,7 +97,7 @@ emit_encode_tables :: proc() {
 
 	max_name := 0
 	for m in Mnemonic {
-		if len(ENCODING_TABLE[m]) > 0 {
+		if len(INSTRUCTION_TABLE[m]) > 0 {
 			max_name = max(max_name, len(reflect.enum_string(m)))
 		}
 	}
@@ -105,21 +105,20 @@ emit_encode_tables :: proc() {
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total_forms())
 	for m in Mnemonic {
-		forms := ENCODING_TABLE[m]
+		forms := &INSTRUCTION_TABLE[m]
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
-		for f in forms { write_encoding(&sb, f, max_name) }
+		for f in forms { write_encoding(&sb, f.encoding, max_name) }
 	}
 	strings.write_string(&sb, "}\n\n")
 
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "CLOBBER_FORMS := [%d]lib.Clobber{{", total_forms())
 	for m in Mnemonic {
-		forms := CLOBBER_TABLE[m]
-		assert(len(forms) == len(ENCODING_TABLE[m]))
+		forms := &INSTRUCTION_TABLE[m]
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
-		for f in forms { write_clobber(&sb, f, max_name) }
+		for f in forms { write_clobber(&sb, f.clobber, max_name) }
 	}
 	strings.write_string(&sb, "}\n\n")
 
@@ -130,7 +129,7 @@ emit_encode_tables :: proc() {
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
-		n := len(ENCODING_TABLE[m])
+		n := len(INSTRUCTION_TABLE[m])
 		name := reflect.enum_string(m)
 		fmt.sbprintf(&sb, "\t.%s", name)
 		for _ in 0..<run_name-len(name) { strings.write_byte(&sb, ' ') }
@@ -243,7 +242,8 @@ Collected_Entry :: struct {
 emit_decode_tables :: proc() -> (n_legacy, n_vex, n_evex: int) {
 	legacy, vex, evex: [dynamic]Collected_Entry
 	for m in Mnemonic {
-		for enc in ENCODING_TABLE[m] {
+		for &form in INSTRUCTION_TABLE[m] {
+			enc := &form.encoding
 			e := Collected_Entry{
 				esc      = enc.flags.esc,
 				prefix   = enc.flags.prefix,

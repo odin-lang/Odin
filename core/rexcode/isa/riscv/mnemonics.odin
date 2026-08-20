@@ -125,6 +125,7 @@ Mnemonic :: enum u16 {
 	C_NOP, C_EBREAK,
 	C_ADDI4SPN,                                  // rd', sp, imm
 	C_LW, C_LD, C_SW, C_SD,                      // (RV64 LD/SD; RV32 has LW/SW)
+	C_FLW, C_FSW,
 	C_FLD, C_FSD,                                // double-precision FP load/store
 	C_ADDI, C_ADDIW, C_LI, C_LUI,
 	C_ADDI16SP,                                  // sp, imm
@@ -137,4 +138,5 @@ Mnemonic :: enum u16 {
 	C_LWSP, C_LDSP, C_SWSP, C_SDSP,
 	C_FLDSP, C_FSDSP,
 	C_JR, C_JALR, C_MV, C_ADD,
+	C_FLWSP, C_FSWSP,
 }

@@ -40,6 +40,8 @@ import "core:rexcode/isa"
 Error            :: isa.Error
 Error_Code       :: isa.Error_Code
 Label_Definition :: isa.Label_Definition
+Label_Offset     :: isa.Label_Offset
+Label_Names      :: isa.Label_Names
 LABEL_UNDEFINED  :: isa.LABEL_UNDEFINED
 Label_Map        :: isa.Label_Map
 

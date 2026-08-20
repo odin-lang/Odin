@@ -146,6 +146,17 @@ main :: proc() {
 			ClobberFlag_IF = 1<<7,
 			ClobberFlag_TF = 1<<8,
 		};
+		static u16 const CLOBBER_FLAGS_COND = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
+
+		char const *clobber_flag_bit_name(u16 bit) {
+			switch (bit) {
+			case ClobberFlag_CF: return \"c\"; case ClobberFlag_PF: return \"p\";
+			case ClobberFlag_AF: return \"a\"; case ClobberFlag_ZF: return \"z\";
+			case ClobberFlag_SF: return \"s\"; case ClobberFlag_OF: return \"o\";
+			}
+			return \"?\";
+		}
+
 		enum SideEffectFlags : u16 {
 			SideEffectFlag_FENCE       = 1<<0, // memory-ordering barrier (LFENCE/SFENCE/MFENCE, LOCK)
 			SideEffectFlag_SERIALIZING = 1<<1, // architecturally serializing (drains pipeline)
@@ -174,6 +185,12 @@ main :: proc() {
 			ClobberReg_FPU_ST = 1<<12,
 			ClobberReg_FPU_SW = 1<<13,
 		};
+
+		static u16 const CLOBBER_REGS_NAMED =
+		    ClobberReg_RAX|ClobberReg_RBX|ClobberReg_RCX|ClobberReg_RDX|
+		    ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBP|ClobberReg_R11|
+		    ClobberReg_XMM0;
+
 		enum OperandSet : u8 {
 			OperandSet_OP0 = 1<<0,
 			OperandSet_OP1 = 1<<1,
@@ -293,6 +310,18 @@ main :: proc() {
 				return ((side_effects & VOLATILE_SE) != 0);
 			}
 		};
+
+		void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
+			u16 regs = implicit_regs & CLOBBER_REGS_NAMED;
+
+			for (u16 bit = 1; bit != 0; bit <<= 1) {
+				if ((regs & bit) == 0) {
+					continue;
+				}
+				char const *rname = clobber_reg_bit_name(bit);
+				string_set_update(clobber_registers_set, make_string_c(rname));
+			}
+		}
 	""")
 	strings.write_string(&sb, "\n");
 

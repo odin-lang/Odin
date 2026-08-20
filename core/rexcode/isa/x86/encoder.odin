@@ -117,19 +117,26 @@ encode :: proc(
 				#partial switch op.kind {
 				case .REGISTER:
 					// R8-R15, XMM8-31, YMM8-31, ZMM8-31 require REX/VEX/EVEX extension.
-					if reg_needs_rex(op.reg) { invalid = true; break }
+					if reg_needs_rex(op.reg) {
+						invalid = true
+						break
+					}
 					// SPL/BPL/SIL/DIL (REG_GPR8 hw 4-7) don't exist in i386;
 					// those encodings decode as AH/CH/DH/BH there. Users
 					// wanting high-byte regs should use REG_GPR8H (AH..BH).
 					if reg_class(op.reg) == REG_GPR8 {
 						hw := reg_hw(op.reg)
-						if hw >= 4 && hw <= 7 { invalid = true; break }
+						if hw >= 4 && hw <= 7 {
+							invalid = true
+							break
+						}
 					}
 				case .MEMORY:
 					m := op.mem
 					if (mem_has_base(m)  && m.base_ext)  ||
 					   (mem_has_index(m) && m.index_ext) {
-						invalid = true; break
+						invalid = true
+						break
 					}
 				}
 			}
@@ -222,17 +229,26 @@ encode :: proc(
 			// only the explicit slots (skipping implicit). For non-implicit forms
 			// the two are identical (operand_count == total), so nothing changes.
 			total_form_ops := 0
-			for op in enc.ops { if op == .NONE { break }; total_form_ops += 1 }
+			for op in enc.ops {
+				if op == .NONE {
+					break
+				}
+				total_form_ops += 1
+			}
 			fully_explicit := int(inst.operand_count) == total_form_ops
 
 			user_idx := 0
 			for op, i in enc.ops {
-				if op == .NONE { break }
+				if op == .NONE {
+					break
+				}
 				uop: ^Operand
 				if fully_explicit {
 					uop = &inst.ops[i]
 				} else if !is_implicit_op_inline(op) {
-					if user_idx < int(inst.operand_count) { uop = &inst.ops[user_idx] }
+					if user_idx < int(inst.operand_count) {
+						uop = &inst.ops[user_idx]
+					}
 					user_idx += 1
 				}
 				if uop != nil {
@@ -309,8 +325,14 @@ encode :: proc(
 		#partial switch enc.flags.vex_type{
 		case .VEX:
 			// VEX prefix encoding
-			r: u8 = 1; x: u8 = 1; b: u8 = 1
-			vvvv: u8 = 0xF; l: u8 = 0; pp: u8 = 0; mmmmm: u8 = 1; w: u8 = 0
+			r:     u8 = 1
+			x:     u8 = 1
+			b:     u8 = 1
+			vvvv:  u8 = 0xF
+			l:     u8 = 0
+			pp:    u8 = 0
+			mmmmm: u8 = 1
+			w:     u8 = 0
 
 			#partial switch enc.flags.esc {
 			case ._0F:   mmmmm = 1
@@ -336,7 +358,9 @@ encode :: proc(
 			// contributions, gate by kind, clear the inverted bit via AND-mask).
 			for enc_type, i in enc.enc {
 				user_op := user_ops[i]
-				if user_op == nil { continue }
+				if user_op == nil {
+					continue
+				}
 
 				is_reg := user_op.kind == .REGISTER
 				is_mem := user_op.kind == .MEMORY
@@ -371,9 +395,19 @@ encode :: proc(
 
 		case .EVEX:
 			// EVEX prefix encoding (4 bytes)
-			r: u8 = 1; x: u8 = 1; b: u8 = 1; rr: u8 = 1
-			mm: u8 = 1; w: u8 = 0; vvvv: u8 = 0xF; pp: u8 = 0
-			z: u8 = 0; ll: u8 = 0; bb: u8 = 0; vvv: u8 = 1; aaa: u8 = 0
+			r:    u8 = 1
+			x:    u8 = 1
+			b:    u8 = 1
+			rr:   u8 = 1
+			mm:   u8 = 1
+			w:    u8 = 0
+			vvvv: u8 = 0xF
+			pp:   u8 = 0
+			z:    u8 = 0
+			ll:   u8 = 0
+			bb:   u8 = 0
+			vvv:  u8 = 1
+			aaa:  u8 = 0
 
 			#partial switch enc.flags.esc {
 			case ._0F:   mm = 1
@@ -398,7 +432,9 @@ encode :: proc(
 
 			for i in 0..<4 {
 				user_op := user_ops[i]
-				if user_op == nil { continue }
+				if user_op == nil {
+					continue
+				}
 
 				is_reg := user_op.kind == .REGISTER
 				is_mem := user_op.kind == .MEMORY
@@ -511,10 +547,12 @@ encode :: proc(
 				out[pos] = 0x0F
 				pos += 1
 			case ._0F38:
-				out[pos] = 0x0F; out[pos+1] = 0x38
+				out[pos+0] = 0x0F
+				out[pos+1] = 0x38
 				pos += 2
 			case ._0F3A:
-				out[pos] = 0x0F; out[pos+1] = 0x3A
+				out[pos+0] = 0x0F
+				out[pos+1] = 0x3A
 				pos += 2
 			}
 		}
@@ -653,7 +691,10 @@ encode :: proc(
 			// bytes are written past the real size.
 			if disp_is_label {
 				append(&pending_relocations, Relocation{byte_count + pos, disp_label_id, 0, .REL32, 4, u16(instruction_index)})
-				out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
+				out[pos+0] = 0
+				out[pos+1] = 0
+				out[pos+2] = 0
+				out[pos+3] = 0
 				pos += 4
 			} else {
 				for _ in 0..<displacement_size {
@@ -679,8 +720,10 @@ encode :: proc(
 		}
 
 		// --- Immediate(s), in operand-slot order (ENTER = C8 has two: IMM16 then IMM8). ---
-		for slot in 0 ..< 4 {
-			if user_ops[slot] == nil { continue }
+		for slot in 0..<4 {
+			if user_ops[slot] == nil {
+				continue
+			}
 			user_op := user_ops[slot]
 			#partial switch enc.enc[slot] {
 			case .IB:
@@ -697,19 +740,26 @@ encode :: proc(
 			case .IW:
 				if user_op.kind == .IMMEDIATE {
 					v := u16(user_op.immediate)
-					out[pos] = u8(v); out[pos+1] = u8(v >> 8)
+					out[pos+0] = u8(v)
+					out[pos+1] = u8(v >> 8)
 					pos += 2
 				}
 			case .ID:
 				#partial switch user_op.kind {
 				case .IMMEDIATE:
 					v := u32(user_op.immediate)
-					out[pos] = u8(v); out[pos+1] = u8(v >> 8); out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
+					out[pos+0] = u8(v)
+					out[pos+1] = u8(v >> 8)
+					out[pos+2] = u8(v >> 16)
+					out[pos+3] = u8(v >> 24)
 					pos += 4
 				case .RELATIVE:
 					label_id := u32(user_op.relative)
 					append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
-					out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
+					out[pos+0] = 0
+					out[pos+1] = 0
+					out[pos+2] = 0
+					out[pos+3] = 0
 					pos += 4
 				}
 			case .IQ:
@@ -718,13 +768,25 @@ encode :: proc(
 						// movabs reg, <label>: placeholder imm64 + ABS64 relocation.
 						label_id := u32(user_op.immediate)
 						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .ABS64, 8, u16(instruction_index)})
-						out[pos]   = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
-						out[pos+4] = 0; out[pos+5] = 0; out[pos+6] = 0; out[pos+7] = 0
+						out[pos+0] = 0
+						out[pos+1] = 0
+						out[pos+2] = 0
+						out[pos+3] = 0
+						out[pos+4] = 0
+						out[pos+5] = 0
+						out[pos+6] = 0
+						out[pos+7] = 0
 						pos += 8
 					} else {
 						v := u64(user_op.immediate)
-						out[pos]   = u8(v);       out[pos+1] = u8(v >> 8);  out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
-						out[pos+4] = u8(v >> 32); out[pos+5] = u8(v >> 40); out[pos+6] = u8(v >> 48); out[pos+7] = u8(v >> 56)
+						out[pos+0] = u8(v)
+						out[pos+1] = u8(v >> 8)
+						out[pos+2] = u8(v >> 16)
+						out[pos+3] = u8(v >> 24)
+						out[pos+4] = u8(v >> 32)
+						out[pos+5] = u8(v >> 40)
+						out[pos+6] = u8(v >> 48)
+						out[pos+7] = u8(v >> 56)
 						pos += 8
 					}
 				}
@@ -805,7 +867,9 @@ bmask :: #force_inline proc "contextless" (b: bool) -> u8 {
 encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encoding, mode: Mode) -> bool {
 	// Mode gate: skip i386-only encodings (short-form INC/DEC at 0x40-0x4F)
 	// when not in Mode._32.
-	if enc.flags.mode_32_only && mode != ._32 { return false }
+	if enc.flags.mode_32_only && mode != ._32 {
+		return false
+	}
 
 	// PUSH/POP FS/GS: the segment operand is fixed by the opcode (0F A0/A1 -> FS,
 	// 0F A8/A9 -> GS), so a form only matches when the user's segment agrees --
@@ -820,8 +884,10 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	explicit_count := enc.flags.explicit_count
 
 	if !enc.flags.has_implicit {
-		if inst.operand_count != explicit_count { return false }
-		for i in 0 ..< explicit_count {
+		if inst.operand_count != explicit_count {
+			return false
+		}
+		for i in 0..<explicit_count {
 			eff := mode_rewrite_op_type(enc.ops[i], mode, enc.flags.default_64)
 			operand_matches_inline(&inst.ops[i], eff) or_return
 		}
@@ -831,7 +897,9 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// Total operand slots (implicit + explicit) in this form.
 	total_ops: u8 = 0
 	for op_type in enc.ops {
-		if op_type == .NONE { break }
+		if op_type == .NONE {
+			break
+		}
 		total_ops += 1
 	}
 
@@ -845,9 +913,13 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// path maps slots positionally for this same operand_count == total_ops case.)
 	if inst.operand_count == total_ops {
 		for op_type, i in enc.ops {
-			if op_type == .NONE { break }
+			if op_type == .NONE {
+				break
+			}
 			if is_implicit_op_inline(op_type) {
-				if !implicit_operand_matches(&inst.ops[i], op_type) { return false }
+				if !implicit_operand_matches(&inst.ops[i], op_type) {
+					return false
+				}
 			} else {
 				eff := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
 				operand_matches_inline(&inst.ops[i], eff) or_return
@@ -858,13 +930,21 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 
 	// Implicit operand(s) omitted by the caller (hand-built `add imm`, `shl rm`):
 	// operand count must match the explicit-only count; match those in order.
-	if inst.operand_count != explicit_count { return false }
+	if inst.operand_count != explicit_count {
+		return false
+	}
 	user_idx: u8 = 0
 	for op_type in enc.ops {
-		if op_type == .NONE { break }
-		if is_implicit_op_inline(op_type) { continue }
+		if op_type == .NONE {
+			break
+		}
+		if is_implicit_op_inline(op_type) {
+			continue
+		}
 
-		if user_idx >= inst.operand_count { return false }
+		if user_idx >= inst.operand_count {
+			return false
+		}
 		effective_op_type := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
 		operand_matches_inline(&inst.ops[user_idx], effective_op_type) or_return
 		user_idx += 1
@@ -918,8 +998,10 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_typ
 	case .IMMEDIATE: return imm_matches_inline(op, op_type)
 	case .RELATIVE:
 		// Respect user's size preference: size=1 -> REL8, size=4 -> REL32
-		if op.size == 1 { return op_type == .REL8  }
-		if op.size == 4 { return op_type == .REL32 }
+		switch op.size {
+		case 1: return op_type == .REL8
+		case 4: return op_type == .REL32
+		}
 		// Default: accept either
 		return op_type == .REL8 || op_type == .REL32
 	}

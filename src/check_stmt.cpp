@@ -1147,9 +1147,9 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		if (ctx->inline_for_depth >= MAX_INLINE_FOR_DEPTH && prev_inline_for_depth < MAX_INLINE_FOR_DEPTH) {
 			ERROR_BLOCK();
 			if (prev_inline_for_depth > 0) {
-				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			} else {
-				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			}
 			error_line("\tUse a normal 'for' loop instead by removing the 'inline' prefix\n");
 			ctx->inline_for_depth = MAX_INLINE_FOR_DEPTH;
@@ -2511,7 +2511,7 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 			{
 				gbString lhs = expr_to_string(be->left);
 				gbString rhs = expr_to_string(be->right);
-				error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
+				error_line("\tSuggestion: Did you mean to do an assignment?\n");
 				error_line("\t            '%s = %s;'\n", lhs, rhs);
 				gb_string_free(rhs);
 				gb_string_free(lhs);

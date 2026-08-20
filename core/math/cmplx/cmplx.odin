@@ -253,7 +253,7 @@ exp_complex64 :: proc "contextless" (x: complex64) -> complex64 {
 			if re < 0 {
 				return complex(0, math.copy_sign(0, im))
 			} else {
-				return complex(math.inf_f64(1.0), math.nan_f64())
+				return complex(math.inf_f32(1.0), math.nan_f32())
 			}
 		}
 	case math.is_nan(re):
