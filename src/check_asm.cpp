@@ -931,10 +931,6 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	min_count = gb_max(min_count, 0);
 	max_count = gb_max(max_count, 0);
 
-	if (mnemonic == asm_ctx->M_IN) {
-		GB_PANIC("in %d %d", min_count, max_count);
-	}
-
 	// A prefix that none of this mnemonic's forms can take is unconditionally wrong,
 	// independent of whether the operands match — catch it even on a match failure.
 	if (previous_prefix > 0) {
