@@ -5133,7 +5133,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				update_untyped_expr_type(c, operand->expr, target_type, false);
 			}
 		} else if (x_kind != y_kind) {
-			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
@@ -5158,7 +5157,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		switch (operand->type->Basic.kind) {
 		case Basic_UntypedBool:
 			if (!is_type_boolean(target_type)) {
-				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type);
 				return;
 			}
@@ -5169,7 +5167,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		case Basic_UntypedQuaternion:
 		case Basic_UntypedRune:
 			if (!is_type_numeric(target_type)) {
-				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type);
 				return;
 			}
@@ -5183,7 +5180,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			} else if (is_type_cstring16(target_type)) {
 				// target_type = t_untyped_nil;
 			} else if (!type_has_nil(target_type)) {
-				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type);
 				return;
 			}
@@ -5233,7 +5229,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 					}
 				}
 			}
-			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
@@ -5247,7 +5242,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			operand->mode = Addressing_Value;
 			convert_to_typed(c, operand, elem, /*no_final_update*/true);
 		} else {
-			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
@@ -5259,7 +5253,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		Type *elem = base_array_type(t);
 		if (check_is_assignable_to(c, operand, elem)) {
 			if (t->Matrix.row_count != t->Matrix.column_count) {
-				operand->mode = Addressing_Invalid;
 				ERROR_BLOCK();
 				
 				convert_untyped_error(c, operand, target_type, true);
@@ -5270,7 +5263,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				convert_to_typed(c, operand, elem, /*no_final_update*/true);
 			}
 		} else {
-			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
@@ -5329,7 +5321,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				ERROR_BLOCK();
 
 				GB_ASSERT(first_success_index >= 0);
-				operand->mode = Addressing_Invalid;
 				convert_untyped_error(c, operand, target_type, true);
 
 				error_line("Ambiguous type conversion to '%s', which variant did you mean:\n\t", type_str);
@@ -5387,7 +5378,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		} else if (is_type_untyped_nil(operand->type) && type_has_nil(target_type)) {
 			target_type = t_untyped_nil;
 		} else {
-			operand->mode = Addressing_Invalid;
 			convert_untyped_error(c, operand, target_type);
 			return;
 		}
