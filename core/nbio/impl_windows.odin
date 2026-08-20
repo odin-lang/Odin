@@ -25,11 +25,6 @@ _Event_Loop :: struct {
 	thread:        win.HANDLE,
 	completed:     queue.Queue(^Operation),
 	completed_oob: Multi_Producer_Single_Consumer,
-	state: enum {
-		Working,
-		Waking,
-		Sleeping,
-	},
 }
 
 @(private="package")
@@ -176,12 +171,8 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 	}
 
 	if actual_timeout > 0 {
-		sync.atomic_store_explicit(&l.state, .Sleeping, .Release)
-
-		// There could be a race condition where we go sleeping at the same time as things get queued
-		// and a wakeup isn't done because the state is not .Sleeping yet.
-		// So after sleeping we first check our queues.
-
+		// Work may have been queued after the drain at the top of this tick,
+		// so check the queues once more before blocking.
 		for {
 			op := (^Operation)(mpsc_dequeue(&l.queue))
 			if op == nil { break }
@@ -209,8 +200,6 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 			}
 		}
 
-		sync.atomic_store_explicit(&l.state, .Working, .Relaxed)
-
 		if actual_timeout > 0 {
 			// We may have just waited some time, lets update the current time.
 			l.now = time.now()
@@ -228,7 +217,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 				handle_completed(op)
 			} else {
 				op_l := op.l
-				for !mpsc_enqueue(&op.l.completed_oob, op) {
+				for !mpsc_enqueue(&op_l.completed_oob, op) {
 					warn("oob queue filled up, QUEUE_SIZE may need increasing")
 					_wake_up(op_l)
 					win.SwitchToThread()
@@ -770,10 +759,10 @@ _associate_socket :: proc(socket: Any_Socket, l: ^Event_Loop) -> Association_Err
 
 @(private="package")
 _wake_up :: proc(l: ^Event_Loop) {
-	_, exchanged := sync.atomic_compare_exchange_strong(&l.state, .Sleeping, .Waking)
-	if exchanged {
-		win.QueueUserAPC(proc "system" (Parameter: win.ULONG_PTR) {}, l.thread, 0)
-	}
+	// Unconditional: an APC queued before the loop enters its alertable wait stays
+	// pending and is delivered as soon as that wait begins. Queueing it only once the
+	// loop is already asleep drops every wake sent while it is still awake.
+	win.QueueUserAPC(proc "system" (Parameter: win.ULONG_PTR) {}, l.thread, 0)
 }
 
 @(private="package")
