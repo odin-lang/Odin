@@ -4468,7 +4468,15 @@ gb_internal Type *lb_build_expr_original_const_type(Ast *expr) {
 	if (is_type_union(type)) {
 		if (expr->kind == Ast_CallExpr) {
 			if (expr->CallExpr.proc->tav.mode == Addressing_Type) {
-				Type *res = lb_build_expr_original_const_type(expr->CallExpr.args[0]);
+				Ast *arg = unparen_expr(expr->CallExpr.args[0]);
+				// Peel one conversion at a time: the argument's own type is the answer as soon as it
+				// is a variant of this union. Peeling further would walk through a variant that is
+				// itself a union, and look for that union's variant in this one
+				Type *arg_type = type_of_expr(arg);
+				if (arg_type != nullptr && union_is_variant_of(type, arg_type)) {
+					return arg_type;
+				}
+				Type *res = lb_build_expr_original_const_type(arg);
 				return res;
 			}
 		} else if (expr->kind == Ast_Ident || expr->kind == Ast_SelectorExpr) {

@@ -52,3 +52,32 @@ union_constant_as_a_global_initializer :: proc(t: ^testing.T) {
 	if v, ok := G.(int);     testing.expect(t, ok, "global lost its variant")        { testing.expect_value(t, v, 3) }
 	if v, ok := GS.(string); testing.expect(t, ok, "string global lost its variant") { testing.expect_value(t, v, "hello") }
 }
+
+// A union nested inside a union: peeling `Outer(Wrapper(int(42)))` all the way to `int` looked for
+// `int` among Outer's variants and panicked with "unfound variant". The peel stops at the level that
+// is a variant of the union being built, and the inner level is resolved from the value where the
+// variant is unambiguous
+@(test)
+union_constant_nested_in_a_union :: proc(t: ^testing.T) {
+	Base  :: union { int, f32 }
+	WA    :: distinct Base
+	WB    :: distinct Base
+	Outer :: union { WA, WB }
+
+	CI :: Outer(WA(int(42)))
+	CF :: Outer(WB(f32(1.5)))
+
+	ci := CI
+	cf := CF
+
+	if wa, ok := ci.(WA); testing.expect(t, ok, "outer variant lost") {
+		if v, ok2 := Base(wa).(int); testing.expect(t, ok2, "inner variant lost") {
+			testing.expect_value(t, v, 42)
+		}
+	}
+	if wb, ok := cf.(WB); testing.expect(t, ok, "outer variant lost (f32)") {
+		if v, ok2 := Base(wb).(f32); testing.expect(t, ok2, "inner variant lost (f32)") {
+			testing.expect_value(t, v, f32(1.5))
+		}
+	}
+}

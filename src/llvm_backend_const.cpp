@@ -791,6 +791,33 @@ gb_internal lbValue lb_const_value_bit_field(lbModule *m, Type *type, Ast *value
 }
 
 
+// The variant a scalar constant belongs to, when the value's kind names exactly one of them. Only
+// used where the expression is no longer available, eg nested unions, that the payload
+// lb_const_value builds from the value alone. Ambiguity is left to the caller
+gb_internal Type *lb_union_variant_from_value_kind(Type *bt, ExactValue const &value) {
+	GB_ASSERT(bt->kind == Type_Union);
+
+	Type *found = nullptr;
+	for (Type *vt : bt->Union.variants) {
+		bool matches = false;
+		switch (value.kind) {
+		case ExactValue_Integer:    matches = is_type_integer(vt);    break;
+		case ExactValue_Float:      matches = is_type_float(vt);      break;
+		case ExactValue_Bool:       matches = is_type_boolean(vt);    break;
+		case ExactValue_String:     matches = is_type_string(vt);     break;
+		case ExactValue_Complex:    matches = is_type_complex(vt);    break;
+		case ExactValue_Quaternion: matches = is_type_quaternion(vt); break;
+		}
+		if (matches) {
+			if (found != nullptr) {
+				return nullptr; // more than one candidate: do not guess
+			}
+			found = vt;
+		}
+	}
+	return found;
+}
+
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Type *value_type, lbConstContext cc) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
@@ -906,6 +933,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, Ty
 
 				} else if (value.kind == ExactValue_Invalid) {
 					return lb_const_nil(m, original_type);
+				}
+
+				if (Type *variant = lb_union_variant_from_value_kind(bt, value)) {
+					value_type = variant;
+					break;
 				}
 
 				GB_PANIC("(value.kind=%s) %s vs %s",
