@@ -932,6 +932,30 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		name = asm_ctx->pseudo_mnemonic_strings[pseudo_mnemonic];
 	}
 
+	bool is_pseudo = pseudo_mnemonic != 0;
+	int  target_explicit_count = is_pseudo ? alias.nargs : -1;
+
+
+	auto pseudo_alias_arg_operand_index = [](AsmCtx *asm_ctx, auto a, int arg_index) -> int {
+		if (arg_index < 0 || arg_index > 2) {
+			return -1;
+		}
+		auto want = cast(AsmCtx::AliasSrc)(asm_ctx->AliasSrc_ARG0 + arg_index);
+		for (int i = 0; i < gb_count_of(a.src); i++) {
+			if (a.src[i] == want) {
+				return i;
+			}
+		}
+		return -1;
+	};
+
+	auto user_operand_target_index = [&](int user_i) -> int {
+		if (!is_pseudo) {
+			return user_i;
+		}
+		return pseudo_alias_arg_operand_index(asm_ctx, alias, user_i);
+	};
+
 	int min_count = I32_MAX;
 	int max_count = -1;
 
@@ -943,12 +967,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	min_count = gb_max(min_count, 0);
 	max_count = gb_max(max_count, 0);
 
-	if (pseudo_mnemonic) {
-		int alias_count = alias.nargs;
-		GB_ASSERT_MSG(alias_count <= min_count, "%d <= %d", alias_count, min_count);
-		GB_ASSERT_MSG(alias_count <= max_count, "%d <= %d", alias_count, max_count);
-		min_count = gb_min(min_count, alias_count);
-		max_count = gb_min(max_count, alias_count);
+	if (is_pseudo) {
+		min_count = gb_min(min_count, target_explicit_count);
+		max_count = gb_min(max_count, target_explicit_count);
 	}
 
 	// A prefix that none of this mnemonic's forms can take is unconditionally wrong,
@@ -988,8 +1009,15 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 	for_array(form_index, forms) {
 		auto &form = forms[form_index];
-		if (operands.count != cast(int)form.explicit_count()) {
-			continue;
+
+		if (is_pseudo) {
+			if (cast(int)form.explicit_count() < target_explicit_count) {
+				continue;
+			}
+		} else {
+			if (operands.count != cast(int)form.explicit_count()) {
+				continue;
+			}
 		}
 
 		int score      = 0;
@@ -1141,7 +1169,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// don't tell us which physical register was written.
 		u16 written_ops = cast(u16)clobber.written;
 		for_array(i, operands) {
-			if (i >= 4 || (written_ops & (1u << i)) == 0) {
+			int tslot = user_operand_target_index(cast(int)i);
+			if (tslot < 0 || tslot >= 4 || (written_ops & (1u << tslot)) == 0) {
 				continue;
 			}
 			Ast *e = operands[i].expr;
@@ -1150,6 +1179,22 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				produced |= b;
 				explicit_writes |= b;
 			}
+		}
+		if (is_pseudo) {
+			// Synthesized register sources (e.g. ra in `jal off` -> `jal ra, off`) also
+			// write a physical register; record them so ra is treated as produced/clobbered.
+			u16 synth = 0;
+			for (int i = 0; i < gb_count_of(alias.src); i++) {
+				if ((written_ops & (1u << i)) == 0) {
+					continue;
+				}
+				if (alias.src[i] == asm_ctx->AliasSrc_LINK) {
+					GB_ASSERT(build_context.metrics.arch == TargetArch_riscv64);
+					synth |= 1<<0; // ClobberReg_RA
+				}
+			}
+			produced        |= synth;
+			explicit_writes |= synth;
 		}
 		asm_acc->defined_regs |= produced;
 
@@ -1203,7 +1248,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	if (best_form >= 0) {
 		auto &form = forms[best_form];
 		for_array(i, operands) {
-			int slot = asm_ctx->form_explicit_slot(form, cast(int)i);
+			int tei  = user_operand_target_index(cast(int)i);
+			int slot = (tei >= 0) ? asm_ctx->form_explicit_slot(form, tei) : -1;
 			auto type = (slot >= 0) ? form.ops[slot] : asm_ctx->OP_NONE;
 			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
@@ -1274,7 +1320,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			} else if (dst == AsmOperand_Immediate) {
 				error(operands[i].expr, "'%.*s' operand-%td must be an assemble-time constant or a $ immediate parameter, got a %.*s",
 				      LIT(name), i, LIT(asm_operand_kind_strings[src]));
-			}else if (dst) {
+			} else if (dst) {
 				error(operands[i].expr, "'%.*s' operand-%td has an invalid kind, expected %.*s operand",
 				      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]));
 			} else {

@@ -341,7 +341,13 @@ struct Asm_amd64 {
 	}
 
 	enum AliasSrc : u8 {
-		AliasSrc_NONE, // slot unused
+		AliasSrc_NONE,    // slot unused
+		AliasSrc_ARG0,    // user's 1st operand
+		AliasSrc_ARG1,    // user's 2nd operand
+		AliasSrc_ARG2,    // user's 3rd operand
+		AliasSrc_ZERO,    // hardwired zero
+		AliasSrc_LINK,    // link register
+		AliasSrc_LIT,
 	};
 
 	struct PseudoAlias {

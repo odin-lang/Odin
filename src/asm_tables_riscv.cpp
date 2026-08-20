@@ -203,8 +203,8 @@ struct Asm_riscv {
 		AliasSrc_ARG0,    // user's 1st operand
 		AliasSrc_ARG1,    // user's 2nd operand
 		AliasSrc_ARG2,    // user's 3rd operand
-		AliasSrc_X0,      // hardwired zero (x0)
-		AliasSrc_X1,      // link register (ra / x1)
+		AliasSrc_ZERO,    // hardwired zero (x0)
+		AliasSrc_LINK,    // link register (ra / x1)
 		AliasSrc_LIT,     // the `lit` field below (immediate literal)
 		AliasSrc_CSR_LIT, // the `csr` field below (fixed 12-bit CSR address)
 	};
@@ -395,7 +395,7 @@ struct Asm_riscv {
 			string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);
 		}
 
-		string_map_init(&mnemonic_map, PSEUDO_MNEMONIC_COUNT*2);
+		string_map_init(&pseudo_mnemonic_map, PSEUDO_MNEMONIC_COUNT*2);
 		for (u16 m = PM_INVALID+1; m < PSEUDO_MNEMONIC_COUNT; m++) {
 			string_map_set(&pseudo_mnemonic_map, pseudo_mnemonic_strings[m], cast(PseudoMnemonic)m);
 		}
