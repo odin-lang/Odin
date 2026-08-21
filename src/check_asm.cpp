@@ -27,7 +27,7 @@ gb_internal bool is_valid_asm_parameter_type(Type *type) {
 	if (is_type_boolean(type)) {
 		return true;
 	}
-	if (is_type_pointer(type) || is_type_multi_pointer(type)) {
+	if (is_type_internally_pointer_like(type)) {
 		return true;
 	}
 	if (is_type_simd_vector(type)) {
@@ -46,7 +46,7 @@ gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type) {
 	if (is_type_boolean(type)) {
 		return AsmRegClass_Integer;
 	}
-	if (is_type_pointer(type) || is_type_multi_pointer(type)) {
+	if (is_type_internally_pointer_like(type)) {
 		return AsmRegClass_Integer;
 	}
 	if (is_type_simd_vector(type)) {
@@ -1811,7 +1811,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		if (mem_op->type) {
 			Type *t = check_type(ctx, mem_op->type);
 			if (t != nullptr && t != t_invalid) {
-				if (is_valid_asm_parameter_type(t) && !is_type_pointer(t)) {
+				if (is_valid_asm_parameter_type(t) && !is_type_internally_pointer_like(t)) {
 					operand->type = alloc_type_pointer(t);
 				} else {
 					gbString s = type_to_string(t);
