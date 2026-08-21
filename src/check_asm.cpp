@@ -672,6 +672,10 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 						}
 					}
 
+					if (other_scratch == nullptr && check_asm_reg_class_from_type(type) != AsmRegClass_Unknown) {
+						ed.kind = AsmTemplateEntityDecl_Register;
+					}
+
 					array_add(asm_template_entity_decls, ed);
 				} else {
 					TokenPos pos = found->token.pos;
