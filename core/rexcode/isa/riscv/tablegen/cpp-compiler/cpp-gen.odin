@@ -554,6 +554,9 @@ main :: proc() {
 		bool float_reg_width_is_exact() const {
 			return false;
 		}
+		bool supports_memory_index_not_just_disp() const {
+			return false;
+		}
 	""")
 	strings.write_string(&sb, "\n\n")
 

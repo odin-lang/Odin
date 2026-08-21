@@ -819,12 +819,492 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	}
 };
 
+struct lbAsmGenerate_riscv64 : lbAsmGenerate {
+	// RISC-V has no AT&T-style operand-size suffixes; precision lives in the mnemonic
+	// (flw vs fld, .s vs .d), so nothing here ever contributes a b/w/l/q suffix.
+	char size_suffix_for_operand(Ast *op) override {
+		return 0;
+	}
+	char instruction_size_suffix(AstAsmInstruction *instr) override {
+		return 0;
+	}
+
+	// RISC-V has no architectural condition-flags register, so no output can be pinned
+	// to a flag / lowered to `=@cc<suffix>`.
+	String flag_output_cc_suffix(String const &pin_flag) override {
+		return {};
+	}
+
+	// LLVM inline-asm constraint class letters for RISC-V.
+	char const *class_letter(AsmRegClass rc) {
+		switch (rc) {
+		case AsmRegClass_Integer: return "r";  // GPR  (x-registers)
+		case AsmRegClass_Float:   return "f";  // FPR  (single/double share the FLEN file)
+		case AsmRegClass_Vector:  return "vr"; // RVV vector register (V extension)
+		case AsmRegClass_Mask:    return "vm"; // RVV mask register (v0)
+		default:
+			GB_PANIC("asm: unknown reg class");
+			return "r";
+		}
+	}
+
+	// RISC-V immediates are bare integers (no '$' prefix).
+	gbString write_constant_operand(gbString asm_string, Ast *op, u32 flags) {
+		GB_ASSERT(op->tav.mode == Addressing_Constant);
+		op->tav.value = exact_value_to_integer(op->tav.value);
+		ExactValue ev = op->tav.value;
+		GB_ASSERT(ev.kind != ExactValue_Invalid);
+		switch (ev.kind) {
+		case ExactValue_Integer: {
+			GB_ASSERT((flags & (WriteOperandFlag_IsScale|WriteOperandFlag_IsScaleLog2)) == 0);
+			i64 val = exact_value_to_i64(ev);
+			if (flags & WriteOperandFlag_Negate) {
+				val = -val;
+			}
+			asm_string = gb_string_append_fmt(asm_string, "%lld", cast(long long)val);
+			break;
+		}
+		case ExactValue_Float:
+			error(op, "Floating-point literals that cannot be represented as an integer are not supported within asm operands");
+			break;
+		default:
+			GB_PANIC("Unsupported asm immediate literal %s", expr_to_string(op));
+			break;
+		}
+		return asm_string;
+	}
+
+	// RISC-V operand syntax: bare registers (no '%'), bare immediates (no '$$'), and
+	// no x86 sub-register width modifiers.
+	gbString write_operand(gbString asm_string, Slice<i32> const &op_number, Ast *op, u32 flags) {
+		if (op->tav.mode == Addressing_Constant) {
+			return this->write_constant_operand(asm_string, op, flags);
+		}
+
+		if (flags & WriteOperandFlag_Negate) {
+			flags &= ~WriteOperandFlag_Negate;
+			asm_string = gb_string_appendc(asm_string, "-");
+		}
+
+		switch (op->kind) {
+		case_ast_node(i, Ident, op);
+			Entity *e = entity_of_node(op);
+			auto *ed = entity_op(e);
+			// A width-view resolves to its source's operand. RISC-V x-registers are
+			// always XLEN-wide with no named sub-registers, so a view is simply the
+			// same register: emit the source operand number, no width modifier.
+			i32 idx = (ed->view_of >= 0) ? op_number[ed->view_of] : op_number[ed->total_index];
+			GB_ASSERT(idx >= 0);
+			asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+		case_end;
+		case_ast_node(mem_op, AsmMemoryOperand, op);
+			asm_string = this->write_memory_operand(asm_string, op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
+		case_end;
+		case_ast_node(bl, BasicLit, op);
+			GB_PANIC("NOTE(bill): this should have been handled above");
+		case_end;
+		case_ast_node(label, AsmLabelDecl, op);
+			asm_string = write_label(asm_string, &label->name->Ident);
+		case_end;
+		case_ast_node(reg, AsmRegister, op);
+			// RISC-V names registers bare (zero, a0, fa0); no '%' prefix.
+			asm_string = gb_string_append_length(asm_string, reg->name.string.text, reg->name.string.len);
+		case_end;
+		default:
+			GB_PANIC("TODO(bill): write_operand for '%s'", expr_to_string(op));
+			break;
+		}
+		return asm_string;
+	}
+
+	// RISC-V addressing is `offset(base)`: a signed 12-bit displacement plus one base
+	// register. No index register, scale factor, or segment override exists.
+	gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
+		GB_ASSERT_MSG(mem_op->segment_override == nullptr, "asm: RISC-V has no segment overrides");
+		GB_ASSERT_MSG(mem_op->index == nullptr && mem_op->scale == nullptr, "asm: RISC-V memory operands have no index/scale");
+
+		if (mem_op->disp) {
+			u32 disp_flags = flags & ~WriteOperandFlag_PrintPrefixes;
+			if (mem_op->disp_op.kind == Token_Sub) {
+				disp_flags |= WriteOperandFlag_Negate;
+			}
+			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, disp_flags);
+		}
+		asm_string = gb_string_appendc(asm_string, "(");
+		if (mem_op->base != nullptr) {
+			asm_string = this->write_operand(asm_string, op_number, mem_op->base, flags&~WriteOperandFlag_PrintPrefixes);
+		}
+		asm_string = gb_string_appendc(asm_string, ")");
+		return asm_string;
+	}
+
+	// RISC-V mnemonics are spelled with '.' (fmadd.s, fmv.w.x, lr.w). Odin identifiers
+	// cannot contain '.', so they are written with '_' and translated back here. No
+	// real RISC-V mnemonic contains an underscore, so this mapping is unambiguous.
+	gbString append_riscv_mnemonic(gbString s, String name) {
+		for (isize i = 0; i < name.len; i++) {
+			char c = cast(char)name.text[i];
+			if (c == '_') {
+				c = '.';
+			}
+			s = gb_string_append_length(s, &c, 1);
+		}
+		return s;
+	}
+
+	lbValue emit_call(lbProcedure *p, Array<lbValue> const &args) override {
+		lbModule *m = p->module;
+		LLVMContextRef ctx = m->ctx;
+
+		gbString asm_string  = gb_string_make_reserve(heap_allocator(), 256);
+		gbString constraints = gb_string_make_reserve(heap_allocator(), 64);
+		defer ({
+			gb_string_free(constraints);
+			gb_string_free(asm_string);
+		});
+
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		auto param_types = array_make<LLVMTypeRef> (temporary_allocator(), 0, ops->count);
+		auto call_args   = array_make<LLVMValueRef>(temporary_allocator(), 0, ops->count);
+		auto ret_types   = array_make<LLVMTypeRef> (temporary_allocator(), 0, ops->count);
+
+		auto op_number = slice_make<i32>(temporary_allocator(), ops->count); // $N, or -1 for clobbers/views
+		auto ret_slot  = slice_make<i32>(temporary_allocator(), ops->count); // return-struct index, or -1
+		for_array(i, *ops) {
+			op_number[i] = -1;
+			ret_slot [i] = -1;
+		}
+
+		struct ElemAttr {
+			unsigned arg_pos;
+			LLVMTypeRef elem;
+		};
+		auto elem_attrs = array_make<ElemAttr>(temporary_allocator(), 0, ops->count);
+
+		auto sep = [&]() {
+			if (gb_string_length(constraints) != 0) {
+				constraints = gb_string_appendc(constraints, ",");
+			}
+		};
+		auto raw = [&](char const *s) {
+			constraints = gb_string_appendc(constraints, s);
+		};
+		auto clobber = [&](char const *start, String mid, char const *end) {
+			constraints = gb_string_appendc(constraints, start);
+			constraints = gb_string_append_length(constraints, mid.text, mid.len);
+			constraints = gb_string_appendc(constraints, end);
+		};
+
+		auto add_input_value = [](Array<LLVMTypeRef> *param_types, Array<LLVMValueRef> *call_args, LLVMValueRef v) {
+			array_add(param_types, LLVMTypeOf(v));
+			array_add(call_args, v);
+		};
+
+		i32 next_op = 0; // running $N counter (outputs first, then inputs)
+
+		// Pass 1: outputs (real outputs + unpinned register scratch modeled as
+		// discarded early-clobber outputs).
+		for_array(i, *ops) {
+			AsmTemplateEntityDecl const &e = (*ops)[i];
+
+			if (e.view_of >= 0) {
+				continue; // width-view: resolved to its source's operand, owns no slot
+			}
+
+			// A flag output cannot occur on RISC-V (no condition-flags register), but
+			// keep the branch for structural parity; flag_output_cc_suffix returns {}
+			// so it is never actually taken.
+			if (e.param_group == AsmTemplateEntityDeclParamGroup_Output && e.pin_flag.len != 0) {
+				GB_ASSERT_MSG(false, "asm: RISC-V has no flag outputs");
+			}
+
+			bool is_output        = e.param_group == AsmTemplateEntityDeclParamGroup_Output;
+			bool is_alloc_scratch = e.param_group == AsmTemplateEntityDeclParamGroup_Scratch
+			                     && e.kind == AsmTemplateEntityDecl_Register;
+			if (!is_output && !is_alloc_scratch) {
+				continue;
+			}
+
+			sep();
+
+			raw("=");
+			if (is_alloc_scratch || tmpl_node->instructions.count > 1) {
+				raw("&");
+			}
+			if (e.pin.len != 0) {
+				clobber("{", e.pin, "}");
+			} else {
+				raw(this->class_letter(e.reg_class));
+			}
+
+			LLVMTypeRef ty = is_alloc_scratch ? lb_type(m, e.entity->type) : this->output_llvm_type(m, e);
+
+			ret_slot[i] = cast(i32)ret_types.count;
+			array_add(&ret_types, ty);
+			op_number[i] = next_op++;
+		}
+
+		// Pass 2: inputs
+		for_array(i, *ops) {
+			AsmTemplateEntityDecl const &e = (*ops)[i];
+
+			if (e.view_of >= 0) {
+				continue; // width-view: not its own input
+			}
+			if (e.param_group != AsmTemplateEntityDeclParamGroup_Input) {
+				continue;
+			}
+
+			sep();
+			lbValue v = args[e.param_index];
+
+			if (e.tie >= 0) {
+				i32 n = op_number[e.tie];
+				GB_ASSERT(n >= 0);
+				constraints = gb_string_append_fmt(constraints, "%d", n);
+				add_input_value(&param_types, &call_args, v.value);
+			} else {
+				switch (e.kind) {
+				case AsmTemplateEntityDecl_Register:
+				case AsmTemplateEntityDecl_Memory:
+					if (e.pin.len != 0) {
+						clobber("{", e.pin, "}");
+					} else {
+						raw(this->class_letter(e.reg_class));
+					}
+					add_input_value(&param_types, &call_args, v.value);
+					break;
+				case AsmTemplateEntityDecl_Immediate:
+					raw("i");
+					add_input_value(&param_types, &call_args, v.value);
+					break;
+				default:
+					GB_PANIC("asm: invalid input operand kind");
+				}
+			}
+			op_number[i] = next_op++;
+		}
+
+		// Build the template text
+		for_array(i, tmpl_node->instructions) {
+			if (i > 0) {
+				asm_string = gb_string_appendc(asm_string, "\n");
+			}
+			Ast *instr_ = tmpl_node->instructions[i];
+			switch (instr_->kind) {
+			case_ast_node(instr, AsmInstruction, instr_);
+				asm_string = gb_string_appendc(asm_string, "\t");
+				String name = instr->name->Ident.token.string;
+				asm_string = this->append_riscv_mnemonic(asm_string, name);
+
+				asm_string = gb_string_appendc(asm_string, " ");
+				// RISC-V is destination-first natively; emit operands in written order.
+				for (isize j = 0; j < instr->operands.count; j += 1) {
+					Ast *op = instr->operands[j];
+					if (j > 0) {
+						asm_string = gb_string_appendc(asm_string, ", ");
+					}
+					asm_string = this->write_operand(asm_string, op_number, op, WriteOperandFlag_NONE);
+				}
+			case_end;
+			case_ast_node(label, AsmLabelDecl, instr_);
+				asm_string = this->write_label(asm_string, &label->name->Ident);
+				asm_string = gb_string_appendc(asm_string, ":");
+			case_end;
+			case_ast_node(dir, AsmDirective, instr_);
+				String name = dir->name.string;
+				if (name == "byte") {
+					asm_string = gb_string_appendc(asm_string, ".byte ");
+					isize op_index = 0;
+					for (auto const &op : dir->operands) {
+						if (op_index > 0) {
+							asm_string = gb_string_appendc(asm_string, ", ");
+						}
+						ExactValue ev = exact_value_to_integer(op->tav.value);
+						GB_ASSERT(ev.kind == ExactValue_Integer);
+						i64 v = exact_value_to_i64(ev);
+						asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)v);
+						op_index += 1;
+					}
+				} else if (name == "align") {
+					GB_ASSERT(dir->operands.count == 1);
+					auto const &op = dir->operands[0];
+					ExactValue ev = exact_value_to_integer(op->tav.value);
+					GB_ASSERT(ev.kind == ExactValue_Integer);
+					u64 v = exact_value_to_u64(ev);
+					u64 v_log2 = floor_log2(v);
+					asm_string = gb_string_append_fmt(asm_string, ".p2align %llu", cast(unsigned long long)v_log2);
+				} else if (name == "skip") {
+					GB_ASSERT(dir->operands.count == 1);
+					auto const &op = dir->operands[0];
+					ExactValue ev = exact_value_to_integer(op->tav.value);
+					GB_ASSERT(ev.kind == ExactValue_Integer);
+					u64 v = exact_value_to_u64(ev);
+					asm_string = gb_string_append_fmt(asm_string, ".skip %llu", cast(unsigned long long)v);
+				} else if (name == "nop") {
+					GB_ASSERT(dir->operands.count == 1);
+					auto const &op = dir->operands[0];
+					ExactValue ev = exact_value_to_integer(op->tav.value);
+					GB_ASSERT(ev.kind == ExactValue_Integer);
+					u64 v = exact_value_to_u64(ev);
+					asm_string = gb_string_append_fmt(asm_string, ".nops %llu", cast(unsigned long long)v);
+				} else {
+					GB_PANIC("Invalid asm directive: %.*s", LIT(name));
+				}
+			case_end;
+			default:
+				GB_PANIC("Invalid asm instruction");
+				break;
+			}
+		}
+
+		bool memory_clobbered_already = false;
+		// Pass 3: clobbers (Scratch group only; unpinned register scratch already
+		// emitted as an output in Pass 1).
+		StringSet emitted_reg_clobbers = {};
+		string_set_init(&emitted_reg_clobbers);
+		defer (string_set_destroy(&emitted_reg_clobbers));
+
+		for_array(i, *ops) {
+			AsmTemplateEntityDecl const &e = (*ops)[i];
+
+			if (e.view_of >= 0) {
+				continue; // width-view carries no clobber; its source owns the register
+			}
+			if (e.param_group != AsmTemplateEntityDeclParamGroup_Scratch) {
+				continue;
+			}
+			if (e.kind == AsmTemplateEntityDecl_Register && e.pin.len == 0) {
+				continue;
+			}
+
+			sep();
+			switch (e.kind) {
+			case AsmTemplateEntityDecl_Register:
+				GB_ASSERT(e.pin.len != 0);
+				clobber("~{", e.pin, "}");
+				string_set_update(&emitted_reg_clobbers, e.pin);
+				break;
+			case AsmTemplateEntityDecl_Memory:
+				raw("~{memory}");
+				memory_clobbered_already = true;
+				break;
+			default:
+				GB_PANIC("asm: invalid scratch operand kind");
+			}
+		}
+
+		for (String const &reg : tmpl_entity->AsmTemplate.clobber_registers_set) {
+			if (string_set_exists(&emitted_reg_clobbers, reg)) {
+				continue;
+			}
+			sep();
+			clobber("~{", reg, "}");
+			string_set_update(&emitted_reg_clobbers, reg);
+		}
+
+		// RISC-V has no condition-flags/cc register, so #clobber flags maps to nothing.
+		// (clobber_flags being set here is effectively a no-op.)
+
+		if (tmpl_entity->AsmTemplate.clobber_memory && !memory_clobbered_already) {
+			sep();
+			raw("~{memory}");
+		}
+
+		// Build the callee type
+		LLVMTypeRef ret_ty = nullptr;
+		if (ret_types.count == 0) {
+			ret_ty = LLVMVoidTypeInContext(ctx);
+		} else if (ret_types.count == 1) {
+			ret_ty = ret_types[0];
+		} else {
+			ret_ty = LLVMStructTypeInContext(ctx, ret_types.data, cast(unsigned)ret_types.count, /*packed*/false);
+		}
+
+		LLVMTypeRef fn_ty = LLVMFunctionType(ret_ty, param_types.data, cast(unsigned)param_types.count, /*vararg*/false);
+
+		LLVMValueRef ia = LLVMGetInlineAsm(
+			fn_ty,
+			asm_string,  cast(size_t)gb_string_length(asm_string),
+			constraints, cast(size_t)gb_string_length(constraints),
+			/*HasSideEffects*/ tmpl_entity->AsmTemplate.is_volatile,
+			/*IsAlignStack*/   tmpl_entity->AsmTemplate.is_align_stack,
+			LLVMInlineAsmDialectATT,
+			/*CanThrow*/       false);
+
+		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
+
+		if (LLVM_ASM_DEBUG_PRINT) {
+			gb_printf_err("%s\n", asm_string);
+			char *ir = LLVMPrintValueToString(call);
+			gb_printf_err("%s\n\n", ir);
+			LLVMDisposeMessage(ir);
+		}
+
+		unsigned et_kind = LLVMGetEnumAttributeKindForName("elementtype", 11);
+		for (auto const &elem_attr : elem_attrs) {
+			LLVMAttributeRef attr = LLVMCreateTypeAttribute(ctx, et_kind, elem_attr.elem);
+			LLVMAddCallSiteAttribute(call, cast(LLVMAttributeIndex)(elem_attr.arg_pos + 1), attr);
+		}
+
+		// Repackage results in Odin result order
+		Type *pt = base_type(tmpl_entity->type);
+		isize result_count = 0;
+		if (pt->Proc.results != nullptr) {
+			result_count = pt->Proc.results->Tuple.variables.count;
+		}
+		if (result_count == 0) {
+			return lbValue{};
+		}
+
+		auto result_vals = slice_make<LLVMValueRef>(temporary_allocator(), result_count);
+
+		for_array(i, *ops) {
+			AsmTemplateEntityDecl const &e = (*ops)[i];
+			if (e.view_of >= 0) {
+				continue;
+			}
+			if (e.param_group != AsmTemplateEntityDeclParamGroup_Output) {
+				continue;
+			}
+			if (e.result_index < 0) {
+				continue; // memory output: not a returned value
+			}
+			GB_ASSERT(ret_slot[i] >= 0);
+
+			LLVMValueRef v = call;
+			if (ret_types.count != 1) {
+				v = LLVMBuildExtractValue(p->builder, call, cast(unsigned)ret_slot[i], "");
+			}
+			result_vals[e.result_index] = v;
+		}
+
+		if (result_count == 1) {
+			Type *rt = pt->Proc.results->Tuple.variables[0]->type;
+			return lbValue{result_vals[0], rt};
+		}
+
+		Type *results_type = pt->Proc.results;
+		LLVMValueRef agg = LLVMGetUndef(lb_type(m, results_type));
+		for_array(i, result_vals) {
+			GB_ASSERT(result_vals[i] != nullptr);
+			agg = LLVMBuildInsertValue(p->builder, agg, result_vals[i], cast(unsigned)i, "");
+		}
+
+		return lbValue{agg, results_type};
+	}
+};
+
 
 gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Array<lbValue> const &args) {
-	lbAsmGenerate_amd64 generator_amd64 = {};
+	lbAsmGenerate_amd64   generator_amd64   = {};
+	lbAsmGenerate_riscv64 generator_riscv64 = {};
 	lbAsmGenerate *generator = nullptr;
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		generator = &generator_amd64;
+	} else if (build_context.metrics.arch == TargetArch_riscv64) {
+		generator = &generator_riscv64;
 	} else {
 		compiler_error("Architecture does not support asm templates, yet");
 	}

@@ -1786,6 +1786,17 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			gb_string_free(s);
 		}
 
+		if (index.expr != nullptr) {
+			if (!asm_ctx->supports_memory_index_not_just_disp()) {
+				error(index.expr, "The target platform does not support memory indexing within memory operands, only displacements");
+			}
+		}
+		if (scale.expr != nullptr) {
+			if (!asm_ctx->supports_memory_index_not_just_disp()) {
+				error(scale.expr, "The target platform does not support memory index scaling within memory operands");
+			}
+		}
+
 		if (mem_op->type) {
 			Type *t = check_type(ctx, mem_op->type);
 			if (t != nullptr && t != t_invalid) {

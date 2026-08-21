@@ -524,6 +524,9 @@ struct Asm_riscv {
 	bool float_reg_width_is_exact() const {
 		return false;
 	}
+	bool supports_memory_index_not_just_disp() const {
+		return false;
+	}
 
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
