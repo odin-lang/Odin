@@ -2484,6 +2484,16 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 	case Token_Float:
 	case Token_Rune:
 		return ast_basic_lit(f, advance_token(f));
+
+	case Token_Add:
+	case Token_Sub:
+	case Token_Xor:
+		{
+			Token token = advance_token(f);
+			Ast *op = parse_asm_operand(f, false);
+			return ast_unary_expr(f, token, op);
+		}
+
 	case Token_OpenParen:
 		return parse_expr(f, false);
 	case Token_OpenBracket:
@@ -2805,8 +2815,11 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 		asm_instructions = slice_from_array(instructions);
 	}
 
-	if (build_context.metrics.arch != TargetArch_amd64) {
-		syntax_error(token, "asm templates are currently only supported on -target:amd64");
+	if (build_context.metrics.arch == TargetArch_amd64 ||
+	    build_context.metrics.arch == TargetArch_riscv64) {
+	    	// okay
+	} else {
+		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64");
 	}
 
 	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);

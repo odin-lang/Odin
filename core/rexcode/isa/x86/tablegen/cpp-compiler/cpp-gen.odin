@@ -309,6 +309,20 @@ main :: proc() {
 					// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
 				return ((side_effects & VOLATILE_SE) != 0);
 			}
+
+			u8 is_call_or_mem() const {
+				return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0 ||
+					(cast(u16)implicit_wr & ClobberReg_RSP) != 0;
+			}
+			bool has_control() const {
+				return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0;
+			}
+			bool has_halt() const {
+				return (cast(u16)side_effects & SideEffectFlag_HALT) != 0;
+			}
+			bool is_conditional() const {
+				return has_control() && (cast(u16)flags_rd != 0);
+			}
 		};
 
 		void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
@@ -324,6 +338,41 @@ main :: proc() {
 		}
 	""")
 	strings.write_string(&sb, "\n");
+	strings.write_string(&sb, "\n");
+	strings.write_string(&sb, """
+		enum AliasSrc : u8 {
+			AliasSrc_NONE,    // slot unused
+			AliasSrc_ARG0,    // user's 1st operand
+			AliasSrc_ARG1,    // user's 2nd operand
+			AliasSrc_ARG2,    // user's 3rd operand
+			AliasSrc_ZERO,    // hardwired zero
+			AliasSrc_LINK,    // link register
+			AliasSrc_LIT,
+		};
+
+		struct PseudoAlias {
+			Mnemonic target;    // real instruction emitted
+			AliasSrc src[4];    // how to fill target's four operand slots
+			i16      lit;       // immediate when a src slot is AliasSrc_LIT
+			u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
+			u8       nargs;     // operands the user supplies (ARG0..<ARGn)
+		};
+		enum PseudoMnemonic : u16 {
+			PM_INVALID,
+			PSEUDO_MNEMONIC_COUNT
+		};
+
+		PseudoMnemonic pseudo_mnemonic_lookup(String const &name) {
+			return PM_INVALID;
+		}
+
+		PseudoAlias pseudo_alias(u16 pm) {
+			return {};
+		}
+	""")
+
+	strings.write_string(&sb, "\tstatic String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];\n")
+	strings.write_string(&sb, "\n")
 
 
 	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")
@@ -382,13 +431,6 @@ main :: proc() {
 			strings.write_string(&sb, " }\n")
 		}
 		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "op_count")
-			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "op_count")
-			strings.write_string(&sb, "\t\tu8   op_count      () const { ")
-			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
-			strings.write_string(&sb, " }\n")
-		}
-		{
 			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
 			strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
 			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
@@ -421,7 +463,8 @@ main :: proc() {
 
 	strings.write_string(&sb, """
 
-		bool init() {
+		bool init(i64 word_size) {
+			gb_unused(word_size);
 			string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
 			for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
 				string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);
@@ -435,6 +478,29 @@ main :: proc() {
 				string_map_set(&register_map, register_strings[r], cast(Register)r);
 			}
 			return true;
+		}
+
+
+		enum MnemonicSuffix : u8 {
+			MnemonicSuffix_None = 0,
+		};
+
+		bool mnemonic_accepts_suffix(u16 m) const {
+			return false;
+		}
+
+		Mnemonic mnemonic_lookup_ordered(String const &name, u8 *suffixes_) {
+			// NOTE(bill): Do any instructions need a suffix idea?
+			return M_INVALID;
+		}
+
+		enum PseudoMacroMnemonic : u8 {
+			PseudoMacroMnemonic_INVALID,
+			PseudoMacroMnemonic_COUNT
+		};
+
+		PseudoMacroMnemonic pseudo_macro_mnemonic_lookup(String const &name) {
+			return PseudoMacroMnemonic_INVALID;
 		}
 
 		Mnemonic mnemonic_lookup(String const &name) {
@@ -482,6 +548,16 @@ main :: proc() {
 			case REG_CLASS_BND:   return 128;
 			}
 			return 0;
+		}
+
+		bool integer_reg_width_is_exact() const {
+			return true;
+		}
+		bool float_reg_width_is_exact() const {
+			return true;
+		}
+		bool supports_memory_index_not_just_disp() const {
+			return true;
 		}
 	""")
 	strings.write_string(&sb, "\n\n")
@@ -747,6 +823,8 @@ main :: proc() {
 		}
 		strings.write_string(&sb, "\n");
 	}
+
+	fmt.sbprintf(&sb, "String const Asm_{0:s}::pseudo_mnemonic_strings[Asm_{0:s}::PSEUDO_MNEMONIC_COUNT] {{}};\n", ISA_NAME)
 
 	{
 		fmt.sbprintf(&sb, "u16 const Asm_{0:s}::register_codes[Asm_{0:s}::REG_COUNT] {{\n", ISA_NAME)

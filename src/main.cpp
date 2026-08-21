@@ -4321,7 +4321,7 @@ int main(int arg_count, char const **arg_ptr) {
 	bool failed_to_cache_parsing = false;
 
 	TIME_SECTION("init asm tables");
-	init_asm_tables();
+	init_asm_tables(build_context.metrics.ptr_size);
 
 	MAIN_TIME_SECTION("parse files");
 

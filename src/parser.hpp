@@ -507,6 +507,7 @@ struct AstSplitArgs {
 		Ast *        name;     \
 		Slice<Ast *> operands; \
 		u16 mnemonic;          \
+		u8  suffix_flags;      \
 		i32 valid_form_index;  \
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \

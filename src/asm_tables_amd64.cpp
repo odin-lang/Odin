@@ -312,6 +312,20 @@ struct Asm_amd64 {
 				// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
 			return ((side_effects & VOLATILE_SE) != 0);
 		}
+
+		u8 is_call_or_mem() const {
+			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0 ||
+				(cast(u16)implicit_wr & ClobberReg_RSP) != 0;
+		}
+		bool has_control() const {
+			return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0;
+		}
+		bool has_halt() const {
+			return (cast(u16)side_effects & SideEffectFlag_HALT) != 0;
+		}
+		bool is_conditional() const {
+			return has_control() && (cast(u16)flags_rd != 0);
+		}
 	};
 
 	void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
@@ -325,6 +339,37 @@ struct Asm_amd64 {
 			string_set_update(clobber_registers_set, make_string_c(rname));
 		}
 	}
+
+	enum AliasSrc : u8 {
+		AliasSrc_NONE,    // slot unused
+		AliasSrc_ARG0,    // user's 1st operand
+		AliasSrc_ARG1,    // user's 2nd operand
+		AliasSrc_ARG2,    // user's 3rd operand
+		AliasSrc_ZERO,    // hardwired zero
+		AliasSrc_LINK,    // link register
+		AliasSrc_LIT,
+	};
+
+	struct PseudoAlias {
+		Mnemonic target;    // real instruction emitted
+		AliasSrc src[4];    // how to fill target's four operand slots
+		i16      lit;       // immediate when a src slot is AliasSrc_LIT
+		u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
+		u8       nargs;     // operands the user supplies (ARG0..<ARGn)
+	};
+	enum PseudoMnemonic : u16 {
+		PM_INVALID,
+		PSEUDO_MNEMONIC_COUNT
+	};
+
+	PseudoMnemonic pseudo_mnemonic_lookup(String const &name) {
+		return PM_INVALID;
+	}
+
+	PseudoAlias pseudo_alias(u16 pm) {
+		return {};
+	}	static String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];
+
 	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
 
@@ -424,7 +469,6 @@ struct Asm_amd64 {
 
 		bool has_implicit  () const { return ((flags>>21u)&1) != 0; }
 		u8   explicit_count() const { return cast(u8)((flags>>18u)&((1u<<3)-1)); }
-		u8   op_count      () const { return cast(u8)((flags>>22u)&((1u<<3)-1)); }
 		bool lock_ok       () const { return ((flags>>14u)&1) != 0; }
 		bool rep_ok        () const { return ((flags>>15u)&1) != 0; }
 	};
@@ -447,7 +491,8 @@ struct Asm_amd64 {
 	StringMap<Prefix>   prefix_map;
 	StringMap<Register> register_map;
 
-	bool init() {
+	bool init(i64 word_size) {
+		gb_unused(word_size);
 		string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
 		for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
 			string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);
@@ -461,6 +506,29 @@ struct Asm_amd64 {
 			string_map_set(&register_map, register_strings[r], cast(Register)r);
 		}
 		return true;
+	}
+
+
+	enum MnemonicSuffix : u8 {
+		MnemonicSuffix_None = 0,
+	};
+
+	bool mnemonic_accepts_suffix(u16 m) const {
+		return false;
+	}
+
+	Mnemonic mnemonic_lookup_ordered(String const &name, u8 *suffixes_) {
+		// NOTE(bill): Do any instructions need a suffix idea?
+		return M_INVALID;
+	}
+
+	enum PseudoMacroMnemonic : u8 {
+		PseudoMacroMnemonic_INVALID,
+		PseudoMacroMnemonic_COUNT
+	};
+
+	PseudoMacroMnemonic pseudo_macro_mnemonic_lookup(String const &name) {
+		return PseudoMacroMnemonic_INVALID;
 	}
 
 	Mnemonic mnemonic_lookup(String const &name) {
@@ -508,6 +576,16 @@ struct Asm_amd64 {
 		case REG_CLASS_BND:   return 128;
 		}
 		return 0;
+	}
+
+	bool integer_reg_width_is_exact() const {
+		return true;
+	}
+	bool float_reg_width_is_exact() const {
+		return true;
+	}
+	bool supports_memory_index_not_just_disp() const {
+		return true;
 	}
 
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
@@ -773,6 +851,7 @@ String const Asm_amd64::mnemonic_strings[Asm_amd64::MNEMONIC_COUNT] {
 String const Asm_amd64::prefix_strings[Asm_amd64::PREFIX_COUNT] {
 	str_lit(""), str_lit("es"), str_lit("cs"), str_lit("ss"), str_lit("ds"), str_lit("rex"), str_lit("evex"), str_lit("fs"), str_lit("gs"), str_lit("vex"), str_lit("lock"), str_lit("repne"), str_lit("rep"), 
 };
+String const Asm_amd64::pseudo_mnemonic_strings[Asm_amd64::PSEUDO_MNEMONIC_COUNT] {};
 u16 const Asm_amd64::register_codes[Asm_amd64::REG_COUNT] {
 	0, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 
 	271, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 
