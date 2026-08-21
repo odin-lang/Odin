@@ -5,6 +5,14 @@ struct lbAsmGenerate {
 	AstAsmTemplate *              tmpl_node;
 	Array<AsmTemplateEntityDecl> *ops;
 
+	gbString asm_string;
+	gbString constraints;
+
+	struct ElemAttr {
+		unsigned arg_pos;
+		LLVMTypeRef elem;
+	};
+
 	enum WriteOperandFlags : u32 {
 		WriteOperandFlag_PrintPrefixes = 1<<0,
 		WriteOperandFlag_IsScale       = 1<<1,
@@ -24,18 +32,45 @@ struct lbAsmGenerate {
 		this->ops = &this->tmpl_entity->AsmTemplate.decls;
 		GB_ASSERT(this->tmpl_entity->AsmTemplate.node->kind == Ast_AsmTemplate);
 		this->tmpl_node = &this->tmpl_entity->AsmTemplate.node->AsmTemplate;
+
+		this->asm_string  = gb_string_make_reserve(heap_allocator(), 256);
+		this->constraints = gb_string_make_reserve(heap_allocator(), 64);
 	}
 
-	gbString write_label(gbString asm_string, AstIdent *label_ident) {
+	void destroy() {
+		gb_string_free(this->asm_string);
+		gb_string_free(this->constraints);
+	}
+
+	void write_cstr(char const *cstr) {
+		asm_string = gb_string_appendc(asm_string, cstr);
+	}
+	void write_char(char c) {
+		asm_string = gb_string_append_length(asm_string, &c, 1);
+	}
+	void write_string(String str) {
+		asm_string = gb_string_append_length(asm_string, str.text, str.len);
+	}
+	void write_int(int val) {
+		asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)val);
+	}
+	void write_u64(u64 val) {
+		asm_string = gb_string_append_fmt(asm_string, "%llu", cast(unsigned long long)val);
+	}
+	void write_i64(i64 val) {
+		asm_string = gb_string_append_fmt(asm_string, "%lld", cast(long long)val);
+	}
+
+
+	void write_label(AstIdent *label_ident) {
 		String name = label_ident->token.string;
-		asm_string = gb_string_appendc(asm_string, ".L_");
-		asm_string = gb_string_append_length(asm_string, tmpl_entity->token.string.text, tmpl_entity->token.string.len);
-		asm_string = gb_string_appendc(asm_string, "_");
-		asm_string = gb_string_append_length(asm_string, name.text, name.len);
+		write_cstr(".L_");
+		write_string(tmpl_entity->token.string);
+		write_cstr("_");
+		write_string(name);
 		// ${:uid} expands to a per-instantiation unique integer, so repeated
 		// inlining of the same template can't collide on the label symbol.
-		asm_string = gb_string_appendc(asm_string, "${:uid}");
-		return asm_string;
+		write_cstr("${:uid}");
 	}
 
 	AsmTemplateEntityDecl *entity_op(Entity *parameter) {
@@ -48,7 +83,7 @@ struct lbAsmGenerate {
 		return nullptr;
 	}
 
-	gbString write_constant_operand(gbString asm_string, Ast *op, u32 flags) {
+	void write_constant_operand(Ast *op, u32 flags) {
 		GB_ASSERT(op->tav.mode == Addressing_Constant);
 
 		op->tav.value = exact_value_to_integer(op->tav.value);
@@ -79,14 +114,14 @@ struct lbAsmGenerate {
 			}
 
 			if (flags & WriteOperandFlag_PrintPrefixes) {
-				asm_string = gb_string_appendc(asm_string, "$$");
+				write_cstr("$$");
 			}
 
 			if (flags & WriteOperandFlag_Negate) {
 				val = -val;
 			}
 
-			asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)val);
+			write_int(cast(int)val);
 			break;
 		}
 		case ExactValue_Float:
@@ -96,19 +131,18 @@ struct lbAsmGenerate {
 			GB_PANIC("Unsupported asm immediate literal %s", expr_to_string(op));
 			break;
 		}
-
-		return asm_string;
 	}
 
 
-	gbString write_operand(gbString asm_string, Slice<i32> const &op_number, Ast *op, u32 flags) {
+	void write_operand(Slice<i32> const &op_number, Ast *op, u32 flags) {
 		if (op->tav.mode == Addressing_Constant) {
-			return write_constant_operand(asm_string, op, flags);
+			this->write_constant_operand(op, flags);
+			return;
 		}
 
 		if (flags & WriteOperandFlag_Negate) {
 			flags &= ~WriteOperandFlag_Negate;
-			asm_string = gb_string_appendc(asm_string, "-");
+			write_cstr("-");
 		}
 
 		switch (op->kind) {
@@ -138,7 +172,7 @@ struct lbAsmGenerate {
 			}
 		case_end;
 		case_ast_node(mem_op, AsmMemoryOperand, op);
-			asm_string = this->write_memory_operand(asm_string, op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
+			this->write_memory_operand(op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
 		case_end;
 
 		case_ast_node(bl, BasicLit, op);
@@ -146,18 +180,18 @@ struct lbAsmGenerate {
 		case_end;
 
 		case_ast_node(label, AsmLabelDecl, op);
-			asm_string = write_label(asm_string, &label->name->Ident);
+			this->write_label(&label->name->Ident);
 		case_end;
 
 		case_ast_node(reg, AsmRegister, op);
-			asm_string = gb_string_appendc(asm_string, "%");
-			asm_string = gb_string_append_length(asm_string, reg->name.string.text, reg->name.string.len);
+			write_cstr("%");
+			write_string(reg->name.string);
 		case_end;
 		default:
 			GB_PANIC("TODO(bill): write_operand for '%s'", expr_to_string(op));
 			break;
 		}
-		return asm_string;
+		return;
 	}
 
 	char const *class_letter(AsmRegClass rc) {
@@ -184,11 +218,29 @@ struct lbAsmGenerate {
 		return pt->Proc.results->Tuple.variables[e.result_index]->type;
 	}
 
-	virtual char     instruction_size_suffix(AstAsmInstruction *instr) = 0;
-	virtual char     size_suffix_for_operand(Ast *op) = 0;
-	virtual gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
-	virtual lbValue  emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
-	virtual String   flag_output_cc_suffix(String const &pin_flag) = 0;
+	void sep() {
+		if (gb_string_length(this->constraints) != 0) {
+			this->constraints = gb_string_appendc(this->constraints, ",");
+		}
+	}
+	void raw(char const *s) {
+		this->constraints = gb_string_appendc(this->constraints, s);
+	}
+	void clobber(char const *start, String mid, char const *end) {
+		this->constraints = gb_string_appendc      (this->constraints, start);
+		this->constraints = gb_string_append_length(this->constraints, mid.text, mid.len);
+		this->constraints = gb_string_appendc      (this->constraints, end);
+	}
+	void add_input_value(Array<LLVMTypeRef> *param_types, Array<LLVMValueRef> *call_args, LLVMValueRef v) {
+		array_add(param_types, LLVMTypeOf(v));
+		array_add(call_args, v);
+	}
+
+	virtual char    instruction_size_suffix(AstAsmInstruction *instr) = 0;
+	virtual char    size_suffix_for_operand(Ast *op) = 0;
+	virtual void    write_memory_operand(Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
+	virtual lbValue emit_call(lbProcedure *p, Array<lbValue> const &args) = 0;
+	virtual String  flag_output_cc_suffix(String const &pin_flag) = 0;
 
 };
 
@@ -341,10 +393,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	}
 
 
-	gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
+	void write_memory_operand(Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		if (mem_op->segment_override != nullptr) {
-			asm_string = this->write_operand(asm_string, op_number, mem_op->segment_override, flags);
-			asm_string = gb_string_appendc(asm_string, ":");
+			this->write_operand(op_number, mem_op->segment_override, flags);
+			write_cstr(":");
 		}
 
 		if (mem_op->disp) {
@@ -354,51 +406,47 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				disp_flags |= WriteOperandFlag_Negate;
 			}
 
-			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, disp_flags);
+			this->write_operand(op_number, mem_op->disp, disp_flags);
 		}
 		if (mem_op->base == nullptr && mem_op->index == nullptr) {
 			GB_ASSERT(mem_op->scale == nullptr);
-			return asm_string;
+			return;
 		}
-		asm_string = gb_string_appendc(asm_string, "(");
+		write_cstr("(");
 		if (mem_op->base != nullptr) {
-			asm_string = this->write_operand(asm_string, op_number, mem_op->base, flags);
+			this->write_operand(op_number, mem_op->base, flags);
 		}
 		if (mem_op->index) {
 			u32 index_flags = flags;
 			if (mem_op->index_op.kind == Token_Sub) {
 				index_flags |= WriteOperandFlag_Negate;
 			}
-			asm_string = gb_string_appendc(asm_string, ",");
-			asm_string = this->write_operand(asm_string, op_number, mem_op->index, index_flags);
+			write_cstr(",");
+			this->write_operand(op_number, mem_op->index, index_flags);
 
 			if (mem_op->scale) {
-				asm_string = gb_string_appendc(asm_string, ",");
+				write_cstr(",");
 				switch (mem_op->scale_op.kind) {
 				case Token_Mul:
-					asm_string = this->write_operand(asm_string, op_number, mem_op->scale, (flags|WriteOperandFlag_IsScale)&~WriteOperandFlag_PrintPrefixes);
+					this->write_operand(op_number, mem_op->scale, (flags|WriteOperandFlag_IsScale)&~WriteOperandFlag_PrintPrefixes);
 					break;
 				case Token_Shl:
 				case Token_Shr:
-					asm_string = this->write_operand(asm_string, op_number, mem_op->scale, (flags|WriteOperandFlag_IsScaleLog2)&~WriteOperandFlag_PrintPrefixes);
+					this->write_operand(op_number, mem_op->scale, (flags|WriteOperandFlag_IsScaleLog2)&~WriteOperandFlag_PrintPrefixes);
 					break;
 				}
 			}
 		}
-		asm_string = gb_string_appendc(asm_string, ")");
-		return asm_string;
+		write_cstr(")");
+		return;
 	}
 
 	lbValue emit_call(lbProcedure *p, Array<lbValue> const &args) override {
 		lbModule *m = p->module;
 		LLVMContextRef ctx = m->ctx;
 
-		gbString asm_string  = gb_string_make_reserve(heap_allocator(), 256);
-		gbString constraints = gb_string_make_reserve(heap_allocator(), 64);
-		defer ({
-			gb_string_free(constraints);
-			gb_string_free(asm_string);
-		});
+		gb_string_clear(this->asm_string);
+		gb_string_clear(this->constraints);
 
 		TEMPORARY_ALLOCATOR_GUARD();
 
@@ -415,32 +463,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		}
 
 		// elementtype() attrs to attach after the call is built (indirect/memory operands).
-		struct ElemAttr {
-			unsigned arg_pos;
-			LLVMTypeRef elem;
-		};
 		auto elem_attrs = array_make<ElemAttr>(temporary_allocator(), 0, ops->count);
-
-
-		auto sep = [&]() {
-			if (gb_string_length(constraints) != 0) {
-				constraints = gb_string_appendc(constraints, ",");
-			}
-		};
-		auto raw = [&](char const *s) {
-			constraints = gb_string_appendc(constraints, s);
-		};
-		auto clobber = [&](char const *start, String mid, char const *end) {
-			constraints = gb_string_appendc(constraints, start);
-			constraints = gb_string_append_length(constraints, mid.text, mid.len);
-			constraints = gb_string_appendc(constraints, end);
-		};
-
-		auto add_input_value = [](Array<LLVMTypeRef> *param_types, Array<LLVMValueRef> *call_args, LLVMValueRef v) {
-			array_add(param_types, LLVMTypeOf(v));
-			array_add(call_args, v);
-		};
-
 
 		i32 next_op = 0; // running $N counter (outputs first, then inputs)
 
@@ -551,18 +574,18 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		// Build the template text
 		for_array(i, tmpl_node->instructions) {
 			if (i > 0) {
-				asm_string = gb_string_appendc(asm_string, "\n");
+				write_cstr("\n");
 			}
 			Ast *instr_ = tmpl_node->instructions[i];
 			switch (instr_->kind) {
 			case_ast_node(instr, AsmInstruction, instr_);
-				asm_string = gb_string_appendc(asm_string, "\t");
+				write_cstr("\t");
 				String name = instr->name->Ident.token.string;
 				String att = this->instruction_att_mnemonic(instr);
 				if (att.len != 0) {
 					name = att;
 				}
-				asm_string = gb_string_append_length(asm_string, name.text, name.len);
+				write_string(name);
 
 				// If a memory operand carries an explicit size annotation ([p]:u8) and
 				// no register operand pins the width, the AT&T assembler needs the size
@@ -571,37 +594,37 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				// suffix can never conflict with a register operand's implied width.
 				if (att.len == 0) {
 					if (char suffix = this->instruction_size_suffix(instr)) {
-						asm_string = gb_string_append_length(asm_string, &suffix, 1);
+						write_char(suffix);
 					}
 				}
 
-				asm_string = gb_string_appendc(asm_string, " ");
+				write_cstr(" ");
 				// Intel-source operand order reversed to AT&T (src, ..., dst).
 				for (isize j = instr->operands.count-1; j >= 0; j -= 1) {
 					Ast *op = instr->operands[j];
 					if (j < instr->operands.count-1) {
-						asm_string = gb_string_appendc(asm_string, ", ");
+						write_cstr(", ");
 					}
-					asm_string = this->write_operand(asm_string, op_number, op, WriteOperandFlag_DEFAULT);
+					this->write_operand(op_number, op, WriteOperandFlag_DEFAULT);
 				}
 			case_end;
 			case_ast_node(label, AsmLabelDecl, instr_);
-				asm_string = this->write_label(asm_string, &label->name->Ident);
-				asm_string = gb_string_appendc(asm_string, ":");
+				this->write_label(&label->name->Ident);
+				write_cstr(":");
 			case_end;
 			case_ast_node(dir, AsmDirective, instr_);
 				String name = dir->name.string;
 				if (name == "byte") {
-					asm_string = gb_string_appendc(asm_string, ".byte ");
+					write_cstr(".byte ");
 					isize op_index = 0;
 					for (auto const &op : dir->operands) {
 						if (op_index > 0) {
-							asm_string = gb_string_appendc(asm_string, ", ");
+							write_cstr(", ");
 						}
 						ExactValue ev = exact_value_to_integer(op->tav.value);
 						GB_ASSERT(ev.kind == ExactValue_Integer);
 						i64 i = exact_value_to_i64(ev);
-						asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)i);
+						write_int(cast(int)i);
 						op_index += 1;
 					}
 				} else if (name == "align") {
@@ -611,24 +634,24 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 					GB_ASSERT(ev.kind == ExactValue_Integer);
 					u64 i = exact_value_to_u64(ev);
 					u64 i_log2 = floor_log2(i);
-					asm_string = gb_string_appendc(asm_string, ".p2align ");
-					asm_string = gb_string_append_fmt(asm_string, "%llu", cast(unsigned long long)i_log2);
+					write_cstr(".p2align ");
+					write_u64(i_log2);
 				} else if (name == "skip") {
 					GB_ASSERT(dir->operands.count == 1);
 					auto const &op = dir->operands[0];
 					ExactValue ev = exact_value_to_integer(op->tav.value);
 					GB_ASSERT(ev.kind == ExactValue_Integer);
 					u64 i = exact_value_to_u64(ev);
-					asm_string = gb_string_appendc(asm_string, ".skip ");
-					asm_string = gb_string_append_fmt(asm_string, "%llu", cast(unsigned long long)i);
+					write_cstr(".skip ");
+					write_u64(i);
 				} else if (name == "nop") {
 					GB_ASSERT(dir->operands.count == 1);
 					auto const &op = dir->operands[0];
 					ExactValue ev = exact_value_to_integer(op->tav.value);
 					GB_ASSERT(ev.kind == ExactValue_Integer);
 					u64 i = exact_value_to_u64(ev);
-					asm_string = gb_string_appendc(asm_string, ".nops ");
-					asm_string = gb_string_append_fmt(asm_string, "%llu", cast(unsigned long long)i);
+					write_cstr(".nops ");
+					write_u64(i);
 				} else {
 					GB_PANIC("Invalid asm directive: %.*s", LIT(name));
 				}
@@ -849,7 +872,7 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 	}
 
 	// RISC-V immediates are bare integers (no '$' prefix).
-	gbString write_constant_operand(gbString asm_string, Ast *op, u32 flags) {
+	void write_constant_operand(Ast *op, u32 flags) {
 		GB_ASSERT(op->tav.mode == Addressing_Constant);
 		op->tav.value = exact_value_to_integer(op->tav.value);
 		ExactValue ev = op->tav.value;
@@ -861,7 +884,7 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			if (flags & WriteOperandFlag_Negate) {
 				val = -val;
 			}
-			asm_string = gb_string_append_fmt(asm_string, "%lld", cast(long long)val);
+			this->write_i64(val);
 			break;
 		}
 		case ExactValue_Float:
@@ -871,19 +894,19 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			GB_PANIC("Unsupported asm immediate literal %s", expr_to_string(op));
 			break;
 		}
-		return asm_string;
 	}
 
 	// RISC-V operand syntax: bare registers (no '%'), bare immediates (no '$$'), and
 	// no x86 sub-register width modifiers.
-	gbString write_operand(gbString asm_string, Slice<i32> const &op_number, Ast *op, u32 flags) {
+	void write_operand(Slice<i32> const &op_number, Ast *op, u32 flags) {
 		if (op->tav.mode == Addressing_Constant) {
-			return this->write_constant_operand(asm_string, op, flags);
+			this->write_constant_operand(op, flags);
+			return;
 		}
 
 		if (flags & WriteOperandFlag_Negate) {
 			flags &= ~WriteOperandFlag_Negate;
-			asm_string = gb_string_appendc(asm_string, "-");
+			write_cstr("-");
 		}
 
 		switch (op->kind) {
@@ -898,28 +921,27 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
 		case_end;
 		case_ast_node(mem_op, AsmMemoryOperand, op);
-			asm_string = this->write_memory_operand(asm_string, op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
+			this->write_memory_operand(op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
 		case_end;
 		case_ast_node(bl, BasicLit, op);
 			GB_PANIC("NOTE(bill): this should have been handled above");
 		case_end;
 		case_ast_node(label, AsmLabelDecl, op);
-			asm_string = write_label(asm_string, &label->name->Ident);
+			this->write_label(&label->name->Ident);
 		case_end;
 		case_ast_node(reg, AsmRegister, op);
 			// RISC-V names registers bare (zero, a0, fa0); no '%' prefix.
-			asm_string = gb_string_append_length(asm_string, reg->name.string.text, reg->name.string.len);
+			this->write_string(reg->name.string);
 		case_end;
 		default:
 			GB_PANIC("TODO(bill): write_operand for '%s'", expr_to_string(op));
 			break;
 		}
-		return asm_string;
 	}
 
 	// RISC-V addressing is `offset(base)`: a signed 12-bit displacement plus one base
 	// register. No index register, scale factor, or segment override exists.
-	gbString write_memory_operand(gbString asm_string, Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
+	void write_memory_operand(Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		GB_ASSERT_MSG(mem_op->segment_override == nullptr, "asm: RISC-V has no segment overrides");
 		GB_ASSERT_MSG(mem_op->index == nullptr && mem_op->scale == nullptr, "asm: RISC-V memory operands have no index/scale");
 
@@ -928,40 +950,35 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			if (mem_op->disp_op.kind == Token_Sub) {
 				disp_flags |= WriteOperandFlag_Negate;
 			}
-			asm_string = this->write_operand(asm_string, op_number, mem_op->disp, disp_flags);
+			this->write_operand(op_number, mem_op->disp, disp_flags);
 		}
-		asm_string = gb_string_appendc(asm_string, "(");
+		write_cstr("(");
 		if (mem_op->base != nullptr) {
-			asm_string = this->write_operand(asm_string, op_number, mem_op->base, flags&~WriteOperandFlag_PrintPrefixes);
+			this->write_operand(op_number, mem_op->base, flags&~WriteOperandFlag_PrintPrefixes);
 		}
-		asm_string = gb_string_appendc(asm_string, ")");
-		return asm_string;
+		write_cstr(")");
+		return;
 	}
 
 	// RISC-V mnemonics are spelled with '.' (fmadd.s, fmv.w.x, lr.w). Odin identifiers
 	// cannot contain '.', so they are written with '_' and translated back here. No
 	// real RISC-V mnemonic contains an underscore, so this mapping is unambiguous.
-	gbString append_riscv_mnemonic(gbString s, String name) {
+	void append_riscv_mnemonic(String name) {
 		for (isize i = 0; i < name.len; i++) {
 			char c = cast(char)name.text[i];
 			if (c == '_') {
 				c = '.';
 			}
-			s = gb_string_append_length(s, &c, 1);
+			write_char(c);
 		}
-		return s;
 	}
 
 	lbValue emit_call(lbProcedure *p, Array<lbValue> const &args) override {
 		lbModule *m = p->module;
 		LLVMContextRef ctx = m->ctx;
 
-		gbString asm_string  = gb_string_make_reserve(heap_allocator(), 256);
-		gbString constraints = gb_string_make_reserve(heap_allocator(), 64);
-		defer ({
-			gb_string_free(constraints);
-			gb_string_free(asm_string);
-		});
+		gb_string_clear(this->asm_string);
+		gb_string_clear(this->constraints);
 
 		TEMPORARY_ALLOCATOR_GUARD();
 
@@ -976,31 +993,7 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			ret_slot [i] = -1;
 		}
 
-		struct ElemAttr {
-			unsigned arg_pos;
-			LLVMTypeRef elem;
-		};
 		auto elem_attrs = array_make<ElemAttr>(temporary_allocator(), 0, ops->count);
-
-		auto sep = [&]() {
-			if (gb_string_length(constraints) != 0) {
-				constraints = gb_string_appendc(constraints, ",");
-			}
-		};
-		auto raw = [&](char const *s) {
-			constraints = gb_string_appendc(constraints, s);
-		};
-		auto clobber = [&](char const *start, String mid, char const *end) {
-			constraints = gb_string_appendc(constraints, start);
-			constraints = gb_string_append_length(constraints, mid.text, mid.len);
-			constraints = gb_string_appendc(constraints, end);
-		};
-
-		auto add_input_value = [](Array<LLVMTypeRef> *param_types, Array<LLVMValueRef> *call_args, LLVMValueRef v) {
-			array_add(param_types, LLVMTypeOf(v));
-			array_add(call_args, v);
-		};
-
 		i32 next_op = 0; // running $N counter (outputs first, then inputs)
 
 		// Pass 1: outputs (real outputs + unpinned register scratch modeled as
@@ -1012,11 +1005,10 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 				continue; // width-view: resolved to its source's operand, owns no slot
 			}
 
-			// A flag output cannot occur on RISC-V (no condition-flags register), but
-			// keep the branch for structural parity; flag_output_cc_suffix returns {}
-			// so it is never actually taken.
+			// NOTE(bill): A flag output cannot occur on RISC-V (no condition-flags register),
+			// but keep the branch for structural parity.
 			if (e.param_group == AsmTemplateEntityDeclParamGroup_Output && e.pin_flag.len != 0) {
-				GB_ASSERT_MSG(false, "asm: RISC-V has no flag outputs");
+				GB_PANIC("llvm_backend_asm.cpp: RISC-V has no flag outputs");
 			}
 
 			bool is_output        = e.param_group == AsmTemplateEntityDeclParamGroup_Output;
@@ -1089,42 +1081,41 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 		// Build the template text
 		for_array(i, tmpl_node->instructions) {
 			if (i > 0) {
-				asm_string = gb_string_appendc(asm_string, "\n");
+				write_cstr("\n");
 			}
 			Ast *instr_ = tmpl_node->instructions[i];
 			switch (instr_->kind) {
 			case_ast_node(instr, AsmInstruction, instr_);
-				asm_string = gb_string_appendc(asm_string, "\t");
+				write_cstr("\t");
 				String name = instr->name->Ident.token.string;
-				asm_string = this->append_riscv_mnemonic(asm_string, name);
+				this->append_riscv_mnemonic(name);
 
-				asm_string = gb_string_appendc(asm_string, " ");
-				// RISC-V is destination-first natively; emit operands in written order.
-				for (isize j = 0; j < instr->operands.count; j += 1) {
+				write_cstr(" ");
+				for_array(j, instr->operands) {
 					Ast *op = instr->operands[j];
 					if (j > 0) {
-						asm_string = gb_string_appendc(asm_string, ", ");
+						write_cstr(", ");
 					}
-					asm_string = this->write_operand(asm_string, op_number, op, WriteOperandFlag_NONE);
+					this->write_operand(op_number, op, WriteOperandFlag_NONE);
 				}
 			case_end;
 			case_ast_node(label, AsmLabelDecl, instr_);
-				asm_string = this->write_label(asm_string, &label->name->Ident);
-				asm_string = gb_string_appendc(asm_string, ":");
+				this->write_label(&label->name->Ident);
+				write_cstr(":");
 			case_end;
 			case_ast_node(dir, AsmDirective, instr_);
 				String name = dir->name.string;
 				if (name == "byte") {
-					asm_string = gb_string_appendc(asm_string, ".byte ");
+					write_cstr(".byte ");
 					isize op_index = 0;
 					for (auto const &op : dir->operands) {
 						if (op_index > 0) {
-							asm_string = gb_string_appendc(asm_string, ", ");
+							write_cstr(", ");
 						}
 						ExactValue ev = exact_value_to_integer(op->tav.value);
 						GB_ASSERT(ev.kind == ExactValue_Integer);
 						i64 v = exact_value_to_i64(ev);
-						asm_string = gb_string_append_fmt(asm_string, "%d", cast(int)v);
+						write_int(cast(int)v);
 						op_index += 1;
 					}
 				} else if (name == "align") {
@@ -1204,15 +1195,12 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			string_set_update(&emitted_reg_clobbers, reg);
 		}
 
-		// RISC-V has no condition-flags/cc register, so #clobber flags maps to nothing.
-		// (clobber_flags being set here is effectively a no-op.)
-
+		// NOTE(bill): RISC-V has no condition-flags/cc register, so #clobber flags maps to nothing.
 		if (tmpl_entity->AsmTemplate.clobber_memory && !memory_clobbered_already) {
 			sep();
 			raw("~{memory}");
 		}
 
-		// Build the callee type
 		LLVMTypeRef ret_ty = nullptr;
 		if (ret_types.count == 0) {
 			ret_ty = LLVMVoidTypeInContext(ctx);
@@ -1236,6 +1224,9 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 		LLVMValueRef call = LLVMBuildCall2(p->builder, fn_ty, ia, call_args.data, cast(unsigned)call_args.count, "");
 
 		if (LLVM_ASM_DEBUG_PRINT) {
+			// DEBUG PRINT!!!
+			// DEBUG PRINT!!!
+			// DEBUG PRINT!!!
 			gb_printf_err("%s\n", asm_string);
 			char *ir = LLVMPrintValueToString(call);
 			gb_printf_err("%s\n\n", ir);
@@ -1248,7 +1239,6 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			LLVMAddCallSiteAttribute(call, cast(LLVMAttributeIndex)(elem_attr.arg_pos + 1), attr);
 		}
 
-		// Repackage results in Odin result order
 		Type *pt = base_type(tmpl_entity->type);
 		isize result_count = 0;
 		if (pt->Proc.results != nullptr) {
@@ -1269,7 +1259,8 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 				continue;
 			}
 			if (e.result_index < 0) {
-				continue; // memory output: not a returned value
+				// NOTE(bill): memory output is not a returned value
+				continue;
 			}
 			GB_ASSERT(ret_slot[i] >= 0);
 
@@ -1310,5 +1301,6 @@ gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Ar
 	}
 	GB_ASSERT(generator != nullptr);
 	generator->init(entity);
+	defer (generator->destroy());
 	return generator->emit_call(p, args);
 }
