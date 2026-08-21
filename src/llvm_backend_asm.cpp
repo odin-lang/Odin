@@ -9,11 +9,13 @@ struct lbAsmGenerate {
 	gbString constraints;
 
 	enum WriteOperandFlags : u32 {
-		WriteOperandFlag_PrintPrefixes = 1<<0,
-		WriteOperandFlag_IsScale       = 1<<1,
-		WriteOperandFlag_IsScaleLog2   = 1<<2,
+		WriteOperandFlag_PrintPrefixes  = 1<<0,
+		WriteOperandFlag_IsScale        = 1<<1,
+		WriteOperandFlag_IsScaleLog2    = 1<<2,
 
-		WriteOperandFlag_Negate        = 1<<3,
+		WriteOperandFlag_Negate         = 1<<3,
+
+		WriteOperandFlag_IndirectBranch = 1<<4,
 
 		WriteOperandFlag_NONE = 0,
 		WriteOperandFlag_DEFAULT = WriteOperandFlag_PrintPrefixes,
@@ -237,13 +239,15 @@ struct lbAsmGenerate {
 				this->write_instruction_mnemonic(instr);
 				write_cstr(" ");
 
+				bool indirect = this->is_indirect_control_transfer(instr); // call/jmp with reg|mem target slot
+
 				isize n = instr->operands.count;
 				for (isize k = 0; k < n; k += 1) {
 					isize j = reverse ? (n-1-k) : k;
-					if (k > 0) {
-						write_cstr(", ");
-					}
-					this->write_operand(op_number, instr->operands[j], op_flags);
+					if (k > 0) { write_cstr(", "); }
+					u32 f = op_flags;
+					if (indirect) f |= WriteOperandFlag_IndirectBranch;
+					this->write_operand(op_number, instr->operands[j], f);
 				}
 			case_end;
 			case_ast_node(label, AsmLabelDecl, instr_);
@@ -468,13 +472,14 @@ struct lbAsmGenerate {
 	}
 
 
-	virtual char const *class_letter              (AsmRegClass rc)                                                      = 0;
-	virtual void        write_constant_operand    (Ast *op, u32 flags)                                                  = 0;
-	virtual void        write_operand             (Slice<i32> const &op_number, Ast *op, u32 flags)                     = 0;
-	virtual bool        reverse_operand_order     ()                                                                    = 0; // Intel dst-first -> AT&T src-first?
-	virtual void        write_instruction_mnemonic(AstAsmInstruction *instr)                                            = 0; // name (+ any suffix / spelling fixup)
-	virtual void        write_memory_operand      (Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
-	virtual String      flag_output_cc_suffix     (String const &pin_flag)                                              = 0;
+	virtual bool        is_indirect_control_transfer(AstAsmInstruction *instr)                                            = 0;
+	virtual char const *class_letter                (AsmRegClass rc)                                                      = 0;
+	virtual void        write_constant_operand      (Ast *op, u32 flags)                                                  = 0;
+	virtual void        write_operand               (Slice<i32> const &op_number, Ast *op, u32 flags)                     = 0;
+	virtual bool        reverse_operand_order       ()                                                                    = 0; // Intel dst-first -> AT&T src-first?
+	virtual void        write_instruction_mnemonic  (AstAsmInstruction *instr)                                            = 0; // name (+ any suffix / spelling fixup)
+	virtual void        write_memory_operand        (Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
+	virtual String      flag_output_cc_suffix       (String const &pin_flag)                                              = 0;
 
 };
 
@@ -505,6 +510,29 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			GB_PANIC("asm: unknown reg class");
 			return "r";
 		}
+	}
+
+	bool is_indirect_control_transfer(AstAsmInstruction *instr) override {
+		switch (instr->mnemonic) {
+			case Asm_amd64::M_CALL:
+			case Asm_amd64::M_JMP:
+				break;
+			default:
+			return false;
+		}
+		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
+		if (0 <= instr->valid_form_index && instr->valid_form_index < forms.count) {
+			auto const &form = forms[instr->valid_form_index];
+			// call/jmp take a single explicit target operand.
+			AsmOperandKind k = g_asm_amd64.kind_from_operand_type(form.ops[0]);
+			switch (k) {
+			case AsmOperand_Register:
+			case AsmOperand_Memory:
+			case AsmOperand_Register_Or_Memory:
+				return true;
+			}
+		}
+		return false;
 	}
 
 	void write_instruction_mnemonic(AstAsmInstruction *instr) override {
@@ -616,6 +644,11 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		if (op->tav.mode == Addressing_Constant) {
 			this->write_constant_operand(op, flags);
 			return;
+		}
+
+		if (flags & WriteOperandFlag_IndirectBranch) {
+			flags &= ~WriteOperandFlag_IndirectBranch;
+			write_cstr("*");
 		}
 
 		if (flags & WriteOperandFlag_Negate) {
@@ -809,6 +842,10 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 			GB_PANIC("asm: unknown reg class");
 			return "r";
 		}
+	}
+
+	bool is_indirect_control_transfer(AstAsmInstruction *instr) override {
+		return false;
 	}
 
 	// RISC-V immediates are bare integers (no '$' prefix); no scale/log2 forms exist.
