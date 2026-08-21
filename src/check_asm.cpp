@@ -1055,7 +1055,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		if (arg_index < 0 || arg_index > 2) {
 			return -1;
 		}
-		auto want = cast(AsmCtx::AliasSrc)(asm_ctx->AliasSrc_ARG0 + arg_index);
+		auto want = cast(typename AsmCtx::AliasSrc)(asm_ctx->AliasSrc_ARG0 + arg_index);
 		for (int i = 0; i < gb_count_of(a.src); i++) {
 			if (a.src[i] == want) {
 				return i;
@@ -1071,7 +1071,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		return pseudo_alias_arg_operand_index(asm_ctx, alias, user_i);
 	};
 
-	auto operand_slot_type = [&](AsmCtx::Encoding const &form, int user_index) -> AsmCtx::OperandType {
+	auto operand_slot_type = [&](typename AsmCtx::Encoding const &form, int user_index) -> typename AsmCtx::OperandType {
 		int raw_slot = -1;
 		if (is_pseudo) {
 			raw_slot = user_operand_target_index(user_index);
