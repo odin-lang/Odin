@@ -241,6 +241,20 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 		actual_timeout = 0
 	}
 
+	// A wake, or another loop routing a completion to us, can leave work queued.
+	// Handle it here instead of waiting for the caller to tick again.
+	for {
+		op := (^Operation)(mpsc_dequeue(&l.queue))
+		if op == nil { break }
+		_exec(op)
+	}
+
+	for {
+		op := (^Operation)(mpsc_dequeue(&l.completed_oob))
+		if op == nil { break }
+		handle_completed(op)
+	}
+
 	return nil
 
 	compute_timeout :: proc(l: ^Event_Loop, timeout: time.Duration, next_timeout: Maybe(time.Duration)) -> win.DWORD {
