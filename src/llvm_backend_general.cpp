@@ -2770,26 +2770,17 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
-			} else if (type->Union.variants.count == 1) {
-				LLVMTypeRef block_type = lb_type(m, type->Union.variants[0]);
-
-				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
-				array_add(&fields, block_type);
-				array_add(&fields, tag_type);
-				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
-				i64 padding = size - used_size;
-				if (padding > 0) {
-					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
-					array_add(&fields, padding_type);
-				}
-				is_packed = true;
 			} else {
 				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
 				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
 				array_add(&fields, tag_type);
-				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
+				i64 block_size = lb_sizeof(block_type);
+				if (block_size == 0) {
+					block_size = type_size_of(type->Union.variants[0]);
+				}
+				i64 used_size = block_size + lb_sizeof(tag_type);
 				i64 padding = size - used_size;
 				if (padding > 0) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
