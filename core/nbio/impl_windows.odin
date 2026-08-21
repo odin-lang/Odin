@@ -676,7 +676,7 @@ _remove :: proc(target: ^Operation) {
 
 	switch target.type {
 	case .Poll:
-		win.UnregisterWaitEx(target.poll._impl.wait_handle, nil)
+		win.UnregisterWaitEx(target.poll._impl.wait_handle, win.INVALID_HANDLE_VALUE)
 		target.poll._impl.wait_handle = nil
 
 		ok := win.PostQueuedCompletionStatus(
@@ -1500,9 +1500,14 @@ sendfile_callback :: proc(op: ^Operation) -> Op_Result {
 	return .Done
 }
 
+// Bit indices into `WSANETWORKEVENTS.iErrorCode`, corresponding to the `FD_*` masks.
+FD_READ_BIT  :: 0
+FD_WRITE_BIT :: 1
+
 @(require_results)
 poll_exec :: proc(op: ^Operation) -> Op_Result {
 	assert(op.type == .Poll)
+	op._impl.over = {} // Operations are recycled, clear stale state from a previous use.
 
 	events: i32 = win.FD_CLOSE
 	switch op.poll.event {
@@ -1565,12 +1570,40 @@ poll_exec :: proc(op: ^Operation) -> Op_Result {
 poll_callback :: proc(op: ^Operation) {
 	assert(op.type == .Poll)
 
+	// Clear the socket's internal network event record, and find out what actually
+	// fired. Without this the record stays set after an event is reported, so the next
+	// `WSAEventSelect` on that socket signals its event object immediately from the
+	// stale record. That completes a poll for a readiness that never happened, and the
+	// send/recv the caller then makes fails with WOULDBLOCK.
 	if op._impl.over.hEvent != nil {
-		win.WSACloseEvent(op._impl.over.hEvent)
+		nev: win.WSANETWORKEVENTS
+		sk := win.SOCKET(net.any_socket_to_socket(op.poll.socket))
+		if win.WSAEnumNetworkEvents(sk, op._impl.over.hEvent, &nev) == 0 {
+			bit: uint
+			switch op.poll.event {
+			case .Receive: bit = FD_READ_BIT
+			case .Send:    bit = FD_WRITE_BIT
+			}
+
+			// Only downgrade a result that is still `Ready`; `wait_callback` may have
+			// already set `.Timeout`.
+			if op.poll.result == nil && nev.lNetworkEvents & (i32(1) << bit) != 0 && nev.iErrorCode[bit] != 0 {
+				op.poll.result = .Error
+			}
+		}
 	}
 
+	// Tear down in the reverse order of `poll_exec`: stop `wait_callback` from running
+	// before the event it waits on goes away. `INVALID_HANDLE_VALUE` waits for an
+	// in-flight callback to return, so it can't touch `op` after it is recycled.
 	if op.poll._impl.wait_handle != nil {
-		win.UnregisterWaitEx(op.poll._impl.wait_handle, nil)
+		win.UnregisterWaitEx(op.poll._impl.wait_handle, win.INVALID_HANDLE_VALUE)
+		op.poll._impl.wait_handle = nil
+	}
+
+	if op._impl.over.hEvent != nil {
+		win.WSACloseEvent(op._impl.over.hEvent)
+		op._impl.over.hEvent = nil
 	}
 
 	if op.poll.result != nil {
