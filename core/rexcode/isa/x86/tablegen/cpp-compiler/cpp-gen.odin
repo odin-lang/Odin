@@ -494,6 +494,14 @@ main :: proc() {
 			return M_INVALID;
 		}
 
+		enum PseudoMacroMnemonic : u8 {
+			PseudoMacroMnemonic_INVALID,
+			PseudoMacroMnemonic_COUNT
+		};
+
+		PseudoMacroMnemonic pseudo_macro_mnemonic_lookup(String const &name) {
+			return PseudoMacroMnemonic_INVALID;
+		}
 
 		Mnemonic mnemonic_lookup(String const &name) {
 			Mnemonic *found = string_map_get(&mnemonic_map, name);

@@ -495,6 +495,14 @@ gb_internal AsmTemplateEntityDeclKind check_asm_find_kind(Entity *entity, Array<
 	return AsmTemplateEntityDecl_Invalid;
 };
 
+gb_internal bool check_asm_is_immediate_param(Entity *tmpl_entity, Operand const *o) {
+	Entity *pe = entity_of_node(o->expr);
+	if (pe != nullptr && pe->kind == Entity_Variable) {
+		return check_asm_find_kind(pe, tmpl_entity->AsmTemplate.decls) == AsmTemplateEntityDecl_Immediate;
+	}
+	return false;
+}
+
 
 template <typename AsmCtx>
 gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *scope, Slice<Ast *> const &specs, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
@@ -851,8 +859,80 @@ enum CheckMnemomicResult {
 	CheckMnemomic_Invalid,
 	CheckMnemomic_Mnemonic,
 	CheckMnemomic_PseudoMnemonic,
+	CheckMnemomic_PseudoMacroMnemonic,
 	CheckMnemomic_Prefix,
 };
+
+template <typename AsmCtx>
+gb_internal bool check_pseudo_macro_mnemonic(AsmCtx *asm_ctx, Entity *tmpl_entity,
+                                             AstAsmInstruction *instr, Slice<Operand> const &operands) {
+	if (build_context.metrics.arch != TargetArch_riscv64) {
+		return false;
+	}
+
+	/*
+		NOTE(bill): this is probably not even a complete list when it comes to
+		of the pseudo macro mnemonics, but this currently covers most of them.
+		It just handles those edge cases directly as the LLVM assembler will
+		handle them directly any way.
+	*/
+
+	int const XLEN = cast(int)(build_context.metrics.ptr_size*8);
+
+	String name = instr->name->Ident.token.string;
+
+	auto want_int_reg = [&](Operand const *o, char const *role) {
+		if (determine_asm_operand_kind(o) != AsmOperand_Register ||
+		    check_asm_reg_class_from_type(o->type) != AsmRegClass_Integer) {
+			error(o->expr, "'%.*s' %s must be an integer register", LIT(name), role);
+			return false;
+		}
+		int width = check_asm_operand_bit_width(o->type);
+		if (width > XLEN) {
+			error(o->expr, "'%.*s' %s is wider than the %d-bit register width, got %d-bits", LIT(name), role, XLEN, width);
+			return false;
+		}
+		return true;
+	};
+
+	if (name == "li") { // li rd, imm  — dest reg + assemble-time integer that fits XLEN (or a $-immediate)
+		if (operands.count != 2) {
+			error(instr->name, "'%.*s' expects 2 operands, got %td", LIT(name), operands.count);
+			return true; // it exists but incorrectly handled
+		}
+		want_int_reg(&operands[0], "destination");
+		Operand const *imm = &operands[1];
+		if (imm->mode == Addressing_Constant) {
+			ExactValue ev = exact_value_to_integer(imm->value);
+			if (ev.kind != ExactValue_Integer) {
+				error(imm->expr, "'%.*s' immediate must be an integer constant", LIT(name));
+				return true;
+			}
+			AsmMismatch m = AsmMismatch_None; i32 needed = 0;
+			if (!check_asm_immediate_value_fits(ev, XLEN, &needed, &m)) {
+				gbString vs = exact_value_to_string(ev);
+				error(imm->expr, "'%.*s' immediate %s does not fit in a %d-bit register (needs %d bits)", LIT(name), vs, XLEN, needed);
+				gb_string_free(vs);
+			}
+		} else if (!check_asm_is_immediate_param(tmpl_entity, imm)) {
+			error(imm->expr, "'li' source must be a constant integer or a $ immediate parameter");
+		}
+		return true;
+	} else if (name == "la" || name == "lla") { // la / lla rd, symbol  — dest reg + a label (or symbol, once representable)
+		if (operands.count != 2) {
+			error(instr->name, "'%.*s' expects 2 operands, got %td", LIT(name), operands.count);
+			// NOTE(bill): it exists but incorrectly handled
+			return true;
+		}
+		want_int_reg(&operands[0], "destination");
+		if (determine_asm_operand_kind(&operands[1]) != AsmOperand_Label) {
+			error(operands[1].expr, "'%.*s' source must be a label", LIT(name));
+		}
+		return true;
+	}
+
+	return false;
+}
 
 template <typename AsmCtx>
 gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstruction *instr, u16 *mnemonic_, u8 *suffix_flags_) {
@@ -883,6 +963,11 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstr
 		return CheckMnemomic_Mnemonic;
 	}
 
+	auto pmm = asm_ctx->pseudo_macro_mnemonic_lookup(name);
+	if (pmm) {
+		if (mnemonic_) *mnemonic_ = cast(u16)pmm;
+		return CheckMnemomic_PseudoMacroMnemonic;
+	}
 
 	ERROR_BLOCK();
 	if (instr->operands.count == 0) {
@@ -1971,6 +2056,14 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				check_mnemonic(asm_ctx, ctx, entity, instr, target_mnemonic, pseudo_mnemonic, slice_from_array(operands),
 				               previous_prefix, previous_prefix_instr,
 				               &asm_acc);
+
+				asm_acc.saw_any_instructions = true;
+
+				previous_prefix = 0;
+				previous_prefix_instr = nullptr;
+			} else if (res == CheckMnemomic_PseudoMacroMnemonic) {
+				instr->suffix_flags = suffix_flags;
+				check_pseudo_macro_mnemonic(asm_ctx, entity, instr, slice_from_array(operands));
 
 				asm_acc.saw_any_instructions = true;
 

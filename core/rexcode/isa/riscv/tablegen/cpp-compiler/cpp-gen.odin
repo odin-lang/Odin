@@ -485,6 +485,21 @@ main :: proc() {
 			return m;
 		}
 
+		enum PseudoMacroMnemonic : u8 {
+			PseudoMacroMnemonic_INVALID,
+			PseudoMacroMnemonic_LI,
+			PseudoMacroMnemonic_LA,
+			PseudoMacroMnemonic_LLA,
+			PseudoMacroMnemonic_COUNT
+		};
+
+		PseudoMacroMnemonic pseudo_macro_mnemonic_lookup(String const &name) {
+			if (name == \"li\")  { return PseudoMacroMnemonic_LI; }
+			if (name == \"la\")  { return PseudoMacroMnemonic_LA; }
+			if (name == \"lla\") { return PseudoMacroMnemonic_LLA; }
+			return PseudoMacroMnemonic_INVALID;
+		}
+
 		Mnemonic mnemonic_lookup(String const &name) {
 			Mnemonic *found = string_map_get(&mnemonic_map, name);
 			return found ? *found : M_INVALID;
