@@ -146,10 +146,19 @@ This is a dire bug and should be reported to the Odin developers.
 		intrinsics.atomic_store(&stop_test_passed, passed)
 		intrinsics.atomic_store(&stop_test_alert, 1)
 
+		for {
+			// Idle until this thread is terminated by the runner,
+			// otherwise we will crash after the base handler is run.
+			win32.SwitchToThread()
+		}
+
+		// As a fallback, we exit the thread.
+		// This should never be reached.
+		win32.ExitThread(1)
 	}
 
-	// Pass on the exeption to the next handler. As we don't wont to recover from it.
-	// This also allows debuggers handle it properly.
+	// Pass on the exeption to the next handler.
+	// This should never be reached.
 	return win32.EXCEPTION_CONTINUE_SEARCH
 }
 
