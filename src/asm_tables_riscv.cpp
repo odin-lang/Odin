@@ -407,6 +407,54 @@ struct Asm_riscv {
 		return true;
 	}
 
+
+	enum MnemonicSuffix : u8 {
+		MnemonicSuffix_None = 0,
+		MnemonicSuffix_AQ = 1<<0, // Acquire
+		MnemonicSuffix_RL = 1<<1, // Release
+	};
+
+	bool mnemonic_accepts_suffix(u16 m) const {
+		auto forms = encoding_forms(m);
+		for (auto const &form : forms) {
+			for (auto const &enc : form.enc)  {
+				if (enc == ENC_AQRL) {
+					return true;
+				}
+			}
+		}
+		auto clobbers = clobber_forms(m);
+		for (auto const &c : clobbers) {
+			if ((cast(u16)c.side_effects & (SideEffectFlag_ATOMIC | SideEffectFlag_RESERVATION)) != 0) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	Mnemonic mnemonic_lookup_ordered(String const &name, u8 *suffixes_) {
+		u8 suffixes = 0;
+		String base = {};
+		if (string_ends_with(name, str_lit("_aqrl"))) {
+			suffixes = MnemonicSuffix_AQ | MnemonicSuffix_RL;
+			base = substring(name, 0, name.len - 5);
+		} else if (string_ends_with(name, str_lit("_aq"))) {
+			suffixes = MnemonicSuffix_AQ;
+			base = substring(name, 0, name.len - 3);
+		} else if (string_ends_with(name, str_lit("_rl"))) {
+			suffixes = MnemonicSuffix_RL;
+			base = substring(name, 0, name.len - 3);
+		} else {
+			return M_INVALID;
+		}
+		Mnemonic m = mnemonic_lookup(base);
+		if (m == M_INVALID || !mnemonic_accepts_suffix(cast(u16)m)) {
+			return M_INVALID;
+		}
+		if (suffixes_) *suffixes_ = suffixes;
+		return m;
+	}
+
 	Mnemonic mnemonic_lookup(String const &name) {
 		Mnemonic *found = string_map_get(&mnemonic_map, name);
 		return found ? *found : M_INVALID;

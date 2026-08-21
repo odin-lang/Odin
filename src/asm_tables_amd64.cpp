@@ -508,6 +508,21 @@ struct Asm_amd64 {
 		return true;
 	}
 
+
+	enum MnemonicSuffix : u8 {
+		MnemonicSuffix_None = 0,
+	};
+
+	bool mnemonic_accepts_suffix(u16 m) const {
+		return false;
+	}
+
+	Mnemonic mnemonic_lookup_ordered(String const &name, u8 *suffixes_) {
+		// NOTE(bill): Do any instructions need a suffix idea?
+		return M_INVALID;
+	}
+
+
 	Mnemonic mnemonic_lookup(String const &name) {
 		Mnemonic *found = string_map_get(&mnemonic_map, name);
 		return found ? *found : M_INVALID;

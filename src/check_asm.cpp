@@ -855,7 +855,7 @@ enum CheckMnemomicResult {
 };
 
 template <typename AsmCtx>
-gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstruction *instr, u16 *mnemonic_) {
+gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstruction *instr, u16 *mnemonic_, u8 *suffix_flags_) {
 	Token token = instr->name->Ident.token;
 	GB_ASSERT_MSG(token.kind == Token_Ident || token_is_keyword(token.kind), "got %.*s of kind %.*s", LIT(token.string), LIT(token_strings[token.kind]));
 	String name = token.string;
@@ -873,6 +873,14 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstr
 	if (pm) {
 		if (mnemonic_) *mnemonic_ = pm;
 		return CheckMnemomic_PseudoMnemonic;
+	}
+
+	u8 suffix_flags = 0;
+	auto om = asm_ctx->mnemonic_lookup_ordered(name, &suffix_flags);
+	if (om) {
+		if (mnemonic_)     *mnemonic_     = cast(u16)om;
+		if (suffix_flags_) *suffix_flags_ = suffix_flags;
+		return CheckMnemomic_Mnemonic;
 	}
 
 
@@ -1924,8 +1932,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		case_ast_node(instr, AsmInstruction, instruction_);
 			GB_ASSERT(instr->name->kind == Ast_Ident);
 
-			u16 mnemonic = 0;
-			CheckMnemomicResult res = check_mnemonic_name(asm_ctx, instr, &mnemonic);
+			u16 mnemonic     = 0;
+			u8  suffix_flags = 0;
+			CheckMnemomicResult res = check_mnemonic_name(asm_ctx, instr, &mnemonic, &suffix_flags);
 
 			array_clear(&operands);
 			for (Ast *expr : instr->operands) {
@@ -1944,6 +1953,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				previous_prefix = cast(u8)mnemonic;
 				previous_prefix_instr = instruction_;
 			} else if (res == CheckMnemomic_Mnemonic) {
+				instr->suffix_flags = suffix_flags;
 				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, 0, slice_from_array(operands),
 				               previous_prefix, previous_prefix_instr,
 				               &asm_acc);
@@ -1953,6 +1963,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				previous_prefix = 0;
 				previous_prefix_instr = nullptr;
 			} else if (res == CheckMnemomic_PseudoMnemonic) {
+				instr->suffix_flags = suffix_flags;
+
 				u16 pseudo_mnemonic = cast(u16)mnemonic;
 				auto alias = asm_ctx->pseudo_alias(cast(u16)pseudo_mnemonic);
 				u16 target_mnemonic = cast(u16)alias.target;
