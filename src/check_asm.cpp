@@ -1476,6 +1476,13 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 	gb_unused(label_scope);
 
 	switch (expr->kind) {
+	case_ast_node(ue, UnaryExpr, expr);
+		check_expr(ctx, operand, expr);
+		if (operand->mode != Addressing_Constant) {
+			error(expr, "Asm operands within unary operands (+ - ~) can only compile time constants");
+		}
+		return;
+	case_end;
 	case_ast_node(pe, ParenExpr, expr);
 		check_expr(ctx, operand, expr);
 		if (operand->mode != Addressing_Constant) {

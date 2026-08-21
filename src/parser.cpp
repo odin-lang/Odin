@@ -2484,6 +2484,16 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 	case Token_Float:
 	case Token_Rune:
 		return ast_basic_lit(f, advance_token(f));
+
+	case Token_Add:
+	case Token_Sub:
+	case Token_Xor:
+		{
+			Token token = advance_token(f);
+			Ast *op = parse_asm_operand(f, false);
+			return ast_unary_expr(f, token, op);
+		}
+
 	case Token_OpenParen:
 		return parse_expr(f, false);
 	case Token_OpenBracket:
