@@ -58,7 +58,12 @@ immediate_remove_of_sendfile :: proc(t: ^testing.T) {
 			}
 
 			on_recv :: proc(op: ^nbio.Operation, t: ^testing.T) {
-				ev(t, op.recv.err, nil) 
+				// The server cancelled a sendfile that had already put bytes on the wire and
+				// then closed, which ends the connection with a reset rather than gracefully
+				// often enough that both have to be accepted here.
+				if op.recv.err != nil {
+					ev(t, op.recv.err, net.TCP_Recv_Error.Connection_Closed)
+				}
 
 				nbio.close(op.recv.socket.(net.TCP_Socket))
 			}
@@ -126,7 +131,12 @@ immediate_remove_of_sendfile_without_stat :: proc(t: ^testing.T) {
 			}
 
 			on_recv :: proc(op: ^nbio.Operation, t: ^testing.T) {
-				ev(t, op.recv.err, nil) 
+				// The server cancelled a sendfile that had already put bytes on the wire and
+				// then closed, which ends the connection with a reset rather than gracefully
+				// often enough that both have to be accepted here.
+				if op.recv.err != nil {
+					ev(t, op.recv.err, net.TCP_Recv_Error.Connection_Closed)
+				}
 
 				nbio.close(op.recv.socket.(net.TCP_Socket))
 			}
