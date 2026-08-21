@@ -8,11 +8,6 @@ struct lbAsmGenerate {
 	gbString asm_string;
 	gbString constraints;
 
-	struct ElemAttr {
-		unsigned arg_pos;
-		LLVMTypeRef elem;
-	};
-
 	enum WriteOperandFlags : u32 {
 		WriteOperandFlag_PrintPrefixes = 1<<0,
 		WriteOperandFlag_IsScale       = 1<<1,
@@ -123,9 +118,6 @@ struct lbAsmGenerate {
 			op_number[i] = -1;
 			ret_slot [i] = -1;
 		}
-
-		// elementtype() attrs to attach after the call is built (indirect/memory operands).
-		auto elem_attrs = array_make<ElemAttr>(temporary_allocator(), 0, ops->count);
 
 		i32 next_op = 0; // running $N counter (outputs first, then inputs)
 
@@ -392,13 +384,6 @@ struct lbAsmGenerate {
 			char *ir = LLVMPrintValueToString(call);
 			gb_printf_err("%s\n\n", ir);
 			LLVMDisposeMessage(ir);
-		}
-
-		// Attach elementtype() to every indirect operand's pointer arg (opaque-pointer requirement).
-		unsigned et_kind = LLVMGetEnumAttributeKindForName("elementtype", 11);
-		for (auto const &elem_attr : elem_attrs) {
-			LLVMAttributeRef attr = LLVMCreateTypeAttribute(ctx, et_kind, elem_attr.elem);
-			LLVMAddCallSiteAttribute(call, cast(LLVMAttributeIndex)(elem_attr.arg_pos + 1), attr);
 		}
 
 		// Repackage results in Odin result order
