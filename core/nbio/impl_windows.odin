@@ -923,6 +923,9 @@ accept_exec :: proc(op: ^Operation) -> Op_Result {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			op.accept.err = net._accept_error()
+		} else {
+			link_timeout(op, op.accept.expires)
+			return .Pending
 		}
 	}
 
@@ -1024,6 +1027,9 @@ dial_exec :: proc(op: ^Operation) -> (result: Op_Result) {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			op.dial.err = net._dial_error()
+		} else {
+			link_timeout(op, op.dial.expires)
+			return .Pending
 		}
 	}
 
@@ -1083,6 +1089,13 @@ read_exec :: proc(op: ^Operation) -> Op_Result {
 				return .Pending
 			}
 			op.read.err = FS_Error(err)
+		} else {
+			// The read completed synchronously with a failure status. `FILE_SKIP_COMPLETION_PORT_ON_SUCCESS`
+			// only suppresses the completion packet on success, so one is still queued for
+			// this. Returning `.Done` here would complete the operation a second time, on an
+			// Operation that has already been recycled into the pool.
+			link_timeout(op, op.read.expires)
+			return .Pending
 		}
 	}
 
@@ -1157,6 +1170,9 @@ write_exec :: proc(op: ^Operation) -> Op_Result {
 				return .Pending
 			}
 			op.write.err = FS_Error(err)
+		} else {
+			link_timeout(op, op.write.expires)
+			return .Pending
 		}
 	}
 
@@ -1250,6 +1266,9 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 			case TCP_Socket: op.recv.err = net._tcp_recv_error()
 			case UDP_Socket: op.recv.err = net._udp_recv_error()
 			}
+		} else {
+			link_timeout(op, op.recv.expires)
+			return .Pending
 		}
 	}
 
@@ -1368,6 +1387,9 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 			case TCP_Socket: op.send.err = net._tcp_send_error()
 			case UDP_Socket: op.send.err = net._udp_send_error()
 			}
+		} else {
+			link_timeout(op, op.send.expires)
+			return .Pending
 		}
 	}
 
@@ -1457,6 +1479,9 @@ sendfile_exec :: proc(op: ^Operation) -> Op_Result {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			op.sendfile.err = net._tcp_send_error()
+		} else {
+			link_timeout(op, op.sendfile.expires)
+			return .Pending
 		}
 	}
 
