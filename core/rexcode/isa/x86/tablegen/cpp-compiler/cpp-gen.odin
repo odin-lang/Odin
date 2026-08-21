@@ -553,6 +553,9 @@ main :: proc() {
 		bool integer_reg_width_is_exact() const {
 			return true;
 		}
+		bool float_reg_width_is_exact() const {
+			return true;
+		}
 	""")
 	strings.write_string(&sb, "\n\n")
 

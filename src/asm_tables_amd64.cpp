@@ -581,6 +581,9 @@ struct Asm_amd64 {
 	bool integer_reg_width_is_exact() const {
 		return true;
 	}
+	bool float_reg_width_is_exact() const {
+		return true;
+	}
 
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {

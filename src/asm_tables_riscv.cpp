@@ -521,6 +521,9 @@ struct Asm_riscv {
 	bool integer_reg_width_is_exact() const {
 		return false;
 	}
+	bool float_reg_width_is_exact() const {
+		return false;
+	}
 
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {

@@ -312,8 +312,19 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	// Width check.
 	if (want_w != 0 && got_w != 0) {
 		if (want_class == AsmRegClass_Vector && !is_memory) {
+			// A scalar float uses only the low lane, so it may be narrower than the
+			// slot; a #simd vector must match the vector width exactly.
 			bool width_ok = (got_class == AsmRegClass_Float) ? (got_w <= want_w) : (got_w == want_w);
 			if (!width_ok) {
+				if (mismatch_) *mismatch_ = AsmMismatch_Size;
+				return false;
+			}
+		} else if (want_class == AsmRegClass_Float &&
+		           got_class  == AsmRegClass_Float && !is_memory &&
+		           !asm_ctx->float_reg_width_is_exact()) {
+			// NOTE(bill): architectures such as RISC-V have registers which are
+			// always the architecture width
+			if (got_w > want_w) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
 			}
@@ -1419,8 +1430,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				error(operands[i].expr, "'%.*s' operand-%td: a floating-point constant cannot be used as an immediate",
 				      LIT(name), i);
 			} else if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
-				error(operands[i].expr, "'%.*s' operand-%td has the wrong size: expected a %u-bit operand, got %u-bit",
-				      LIT(name), i, cast(unsigned)want_bits[i], cast(unsigned)got_bits[i]);
+				error(operands[i].expr, "'%.*s' operand-%td has the wrong size: expected a %u-bit %.*s operand, got %u-bit",
+				      LIT(name), i,
+				      cast(unsigned)want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]),
+				      cast(unsigned)got_bits[i]);
 			} else if (m == AsmMismatch_Class) {
 				error(operands[i].expr, "'%.*s' operand-%td is in the wrong register class, expected %d-bit %.*s %.*s, got %d-bit %.*s %.*s",
 				      LIT(name), i,
