@@ -160,15 +160,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 
 	if pool.num_outstanding(&l.operation_pool) == 0 { return nil }
 
-	actual_timeout := win.INFINITE
-	if queue.len(l.completed) > 0 || mpsc_count(&l.completed_oob) > 0 {
-		actual_timeout = 0
-	} else if timeout >= 0 {
-		actual_timeout = win.DWORD(timeout / time.Millisecond)
-	}
-	if nt, ok := next_timeout.?; ok {
-		actual_timeout = min(actual_timeout, win.DWORD(nt / time.Millisecond))
-	}
+	actual_timeout := compute_timeout(l, timeout, next_timeout)
 
 	if actual_timeout > 0 {
 		// Work may have been queued after the drain at the top of this tick,
@@ -184,6 +176,10 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 			if op == nil { break }
 			handle_completed(op)
 		}
+
+		// The drains can add timeouts, and `timeout_exec` only puts those in
+		// `l.timeouts` without posting anything
+		actual_timeout = compute_timeout(l, timeout, check_timeouts(l))
 	}
 
 	for {
@@ -236,6 +232,19 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 	}
 
 	return nil
+
+	compute_timeout :: proc(l: ^Event_Loop, timeout: time.Duration, next_timeout: Maybe(time.Duration)) -> win.DWORD {
+		actual: win.DWORD = win.INFINITE
+		if queue.len(l.completed) > 0 || mpsc_count(&l.completed_oob) > 0 {
+			actual = 0
+		} else if timeout >= 0 {
+			actual = win.DWORD(timeout / time.Millisecond)
+		}
+		if nt, ok := next_timeout.?; ok {
+			actual = min(actual, win.DWORD(nt / time.Millisecond))
+		}
+		return actual
+	}
 
 	check_timeouts :: proc(l: ^Event_Loop) -> (expires: Maybe(time.Duration)) {
 		curr := l.now
