@@ -13035,6 +13035,48 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 
 
 
+struct IndexedCompoundLitElem {
+	i64  index;
+	Ast *elem;
+};
+
+gb_internal bool compound_lit_elem_index(Type *type, Ast *elem, isize positional_index, i64 *index) {
+	if (elem->kind != Ast_FieldValue) {
+		*index = cast(i64)positional_index;
+		return true;
+	}
+
+	ast_node(fv, FieldValue, elem);
+	if (is_ast_range(fv->field)) {
+		return false;
+	}
+
+	if (is_type_struct(type)) {
+		if (fv->field->kind != Ast_Ident) {
+			return false;
+		}
+		Selection sel = lookup_field(type, fv->field->Ident.interned, false);
+		if (sel.index.count != 1) {
+			return false;
+		}
+		*index = sel.index[0];
+		return true;
+	}
+
+	if (fv->field->tav.mode != Addressing_Constant) {
+		return false;
+	}
+	*index = exact_value_to_i64(fv->field->tav.value);
+	return true;
+}
+
+gb_internal ExactValue compound_lit_elem_value(Ast *elem) {
+	if (elem->kind == Ast_FieldValue) {
+		return elem->FieldValue.value->tav.value;
+	}
+	return elem->tav.value;
+}
+
 gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y) {
 	ast_node(x_cl, CompoundLit, x.value_compound);
 	ast_node(y_cl, CompoundLit, y.value_compound);
@@ -13044,6 +13086,45 @@ gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, E
 	}
 
 	bool test = op == Token_CmpEq;
+	bool has_field_values =
+		x_cl->elems.count > 0 && x_cl->elems[0]->kind == Ast_FieldValue ||
+		y_cl->elems.count > 0 && y_cl->elems[0]->kind == Ast_FieldValue;
+
+	if (has_field_values) {
+		auto lhs_elems = array_make<IndexedCompoundLitElem>(temporary_allocator(), x_cl->elems.count);
+		auto rhs_elems = array_make<IndexedCompoundLitElem>(temporary_allocator(), y_cl->elems.count);
+		bool indices_ok = true;
+
+		for (isize i = 0; i < x_cl->elems.count; i++) {
+			if (!compound_lit_elem_index(x.value_compound->tav.type, x_cl->elems[i], i, &lhs_elems[i].index) ||
+			    !compound_lit_elem_index(y.value_compound->tav.type, y_cl->elems[i], i, &rhs_elems[i].index)) {
+				indices_ok = false;
+				break;
+			}
+			lhs_elems[i].elem = x_cl->elems[i];
+			rhs_elems[i].elem = y_cl->elems[i];
+		}
+
+		if (indices_ok) {
+			auto compare_indices = [](void const *x, void const *y) -> int {
+				auto x_elem = cast(IndexedCompoundLitElem const *)x;
+				auto y_elem = cast(IndexedCompoundLitElem const *)y;
+				i64 x_index = x_elem->index;
+				i64 y_index = y_elem->index;
+				return (x_index > y_index) - (x_index < y_index);
+			};
+			array_sort(lhs_elems, compare_indices);
+			array_sort(rhs_elems, compare_indices);
+
+			for (isize i = 0; i < lhs_elems.count; i++) {
+				if (lhs_elems[i].index != rhs_elems[i].index ||
+				    compare_exact_values(op, compound_lit_elem_value(lhs_elems[i].elem), compound_lit_elem_value(rhs_elems[i].elem)) != test) {
+					return !test;
+				}
+			}
+			return test;
+		}
+	}
 
 	for (isize i = 0; i < x_cl->elems.count; i++) {
 		Ast *lhs = x_cl->elems[i];
