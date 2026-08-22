@@ -3660,7 +3660,10 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 		} else if (seen_ellipsis) {
 			syntax_error(arg, "Positional arguments are not allowed after '..'");
 		}
-		array_add(&args, arg);
+		if (arg != nullptr) {
+			// `parse_atom_expr` returns nothing when `allow_type` is set and there is no operand
+			array_add(&args, arg);
+		}
 
 		if (ellipsis.pos.line != 0) {
 			seen_ellipsis = true;
