@@ -885,10 +885,10 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 		    	if (x_base->Struct.is_raw_union) {
 		    		return true;
 		    	}
-		    	if (x->Struct.fields.count == y->Struct.fields.count) {
-		    		for (isize i = 0; i < x->Struct.fields.count; i++) {
-		    			Entity *a = x->Struct.fields[i];
-		    			Entity *b = y->Struct.fields[i];
+		    	if (x_base->Struct.fields.count == y_base->Struct.fields.count) {
+		    		for (isize i = 0; i < x_base->Struct.fields.count; i++) {
+		    			Entity *a = x_base->Struct.fields[i];
+		    			Entity *b = y_base->Struct.fields[i];
 		    			bool similar = signature_parameter_similar_enough(a->type, b->type);
 		    			if (!similar) {
 		    				// NOTE(bill): If the fields are not similar enough, then stop.
