@@ -42,6 +42,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_6979.odin -no-entry-point %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_7260.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration_mismatch.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b

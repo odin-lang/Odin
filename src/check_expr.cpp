@@ -8309,6 +8309,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	bool named_fields = false;
 	{
+		if (ce->ellipsis.pos.line != 0) {
+			error(ce->ellipsis, "Invalid use of '..' in a polymorphic type call");
+		}
+
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
 		auto prev_type_path = c->type_path;
 
@@ -8345,11 +8349,6 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 				}
 				check_expr_or_type(c, &operands[i], fv->value);
-			}
-
-			bool vari_expand = (ce->ellipsis.pos.line != 0);
-			if (vari_expand) {
-				error(ce->ellipsis, "Invalid use of '..' in a polymorphic type call'");
 			}
 
 		} else {
