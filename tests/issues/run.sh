@@ -88,6 +88,7 @@ else
 	exit 1
 fi
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
+$ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
 $ODIN test ../test_issue_7356.odin $COMMON
