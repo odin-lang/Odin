@@ -562,21 +562,38 @@ void b3JoinThread( b3Thread* t )
 
 #else
 
-uint64_t b3GetTicks( void )
+__attribute__( ( weak ) ) uint64_t b3PlatformTicks( void )
 {
 	return 0;
 }
 
+uint64_t b3GetTicks( void )
+{
+	return b3PlatformTicks();
+}
+
 float b3GetMilliseconds( uint64_t ticks )
 {
-	( (void)( ticks ) );
-	return 0.0f;
+	uint64_t ticksNow = b3PlatformTicks();
+	if ( ticksNow <= ticks )
+	{
+		return 0.0f;
+	}
+
+	return (float)( (double)( ticksNow - ticks ) * 0.001 );
 }
 
 float b3GetMillisecondsAndReset( uint64_t* ticks )
 {
-	( (void)( ticks ) );
-	return 0.0f;
+	uint64_t ticksNow = b3PlatformTicks();
+	uint64_t ticksThen = *ticks;
+	*ticks = ticksNow;
+	if ( ticksNow <= ticksThen )
+	{
+		return 0.0f;
+	}
+
+	return (float)( (double)( ticksNow - ticksThen ) * 0.001 );
 }
 
 void b3Yield( void )
@@ -590,13 +607,21 @@ void b3Sleep( int milliseconds )
 
 typedef struct b3Mutex
 {
+#if defined( __wasm_atomics__ )
+	int state;
+#else
 	int dummy;
+#endif
 } b3Mutex;
 
 b3Mutex* b3CreateMutex( void )
 {
 	b3Mutex* m = b3Alloc( sizeof( b3Mutex ) );
+#if defined( __wasm_atomics__ )
+	__atomic_store_n( &m->state, 0, __ATOMIC_RELAXED );
+#else
 	m->dummy = 42;
+#endif
 	return m;
 }
 
@@ -608,12 +633,22 @@ void b3DestroyMutex( b3Mutex* m )
 
 void b3LockMutex( b3Mutex* m )
 {
+#if defined( __wasm_atomics__ )
+	while ( __atomic_exchange_n( &m->state, 1, __ATOMIC_ACQUIRE ) != 0 )
+	{
+	}
+#else
 	(void)m;
+#endif
 }
 
 void b3UnlockMutex( b3Mutex* m )
 {
+#if defined( __wasm_atomics__ )
+	__atomic_store_n( &m->state, 0, __ATOMIC_RELEASE );
+#else
 	(void)m;
+#endif
 }
 
 typedef struct b3Semaphore
