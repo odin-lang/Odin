@@ -1211,7 +1211,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			implicit_wr &= ~implicit_rw;
 			implicit_rd &= ~implicit_rw;
 
-			print_set("read-writes", implicit_rw);
+			print_set("read/writes", implicit_rw);
 			print_set("writes",      implicit_wr);
 			print_set("reads",       implicit_rd);
 		}
@@ -1605,7 +1605,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	{
 		begin_error_block();
 
-		bool nearly = false && best_score >= gb_max(operands.count*2 - 2, 0);
+		bool nearly = best_score >= gb_max(operands.count*2 - 2, 0);
 		if (nearly) {
 			error(instr->name, "'%.*s' operands nearly matched the expected encoding forms", LIT(name));
 		} else {
