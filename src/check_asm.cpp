@@ -1040,6 +1040,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
                                 AsmMnemonicAccumulator *asm_acc) {
 	GB_ASSERT(mnemonic > 0);
 	auto forms = asm_ctx->encoding_forms(mnemonic);
+	auto clobber_forms = asm_ctx->clobber_forms(mnemonic);
 	String name = asm_ctx->mnemonic_strings[mnemonic];
 
 	auto alias = asm_ctx->pseudo_alias(cast(u16)pseudo_mnemonic);
@@ -1088,7 +1089,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		return asm_ctx->OP_NONE;
 	};
 
-	auto describe_form = [&](typename AsmCtx::Encoding const &form) -> gbString {
+	auto describe_form = [&](typename AsmCtx::Encoding const &form, typename AsmCtx::Clobber const &clobber) -> gbString {
 		gbString s = gb_string_make(heap_allocator(), "");
 		int count = form_user_operand_count(form);
 		for (int i = 0; i < count; i++) {
@@ -1105,10 +1106,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			} else {
 				char const *reg = "reg";
 				switch (c) {
-				case AsmRegClass_Integer: reg = "r"; break;
-				case AsmRegClass_Float:   reg = "f"; break;
-				case AsmRegClass_Vector:  reg = "v"; break;
-				case AsmRegClass_Mask:    reg = "k"; break;
+				case AsmRegClass_Integer: reg = "r";   break;
+				case AsmRegClass_Float:   reg = "f";   break;
+				case AsmRegClass_Vector:  reg = "v";   break;
+				case AsmRegClass_Mask:    reg = "k";   break;
 				default:                  reg = "reg"; break;
 				}
 				switch (k) {
@@ -1132,32 +1133,91 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 			if (i+1 < count) {
 				s = gb_string_appendc(s, ", ");
-
-				switch (k) {
-				case AsmOperand_Label: // 5 characters
-					break;
-				case AsmOperand_Immediate: // 3+ characters
-				case AsmOperand_Register_Or_Memory:
-					if (w == 0) {
-						s = gb_string_appendc(s, "  ");
-					} else if (w < 10) {
-						s = gb_string_appendc(s, " ");
-					}
-					break;
-				case AsmOperand_Register: // 1+ chacracters
-				case AsmOperand_Memory:
-					if (w == 0) {
-						s = gb_string_appendc(s, "    ");
-					} else if (w < 10) {
-						s = gb_string_appendc(s, "   ");
-					} else if (w < 100) {
-						s = gb_string_appendc(s, "  ");
-					}
-					break;
-				}
 			}
 
+			switch (k) {
+			case AsmOperand_Label: // 5 characters
+				break;
+			case AsmOperand_Immediate: // 3+ characters
+			case AsmOperand_Register_Or_Memory:
+				if (w == 0) {
+					s = gb_string_appendc(s, "  ");
+				} else if (w < 10) {
+					s = gb_string_appendc(s, " ");
+				}
+				break;
+			case AsmOperand_Register: // 1+ chacracters
+			case AsmOperand_Memory:
+				if (w == 0) {
+					s = gb_string_appendc(s, "    ");
+				} else if (w < 10) {
+					s = gb_string_appendc(s, "   ");
+				} else if (w < 100) {
+					s = gb_string_appendc(s, "  ");
+				}
+				break;
+			}
 		}
+		bool all_implicit = true;
+		for (int i = 0; i < count; i++) {
+			auto slot = operand_slot_type(form, i);
+			AsmOperandKind k = asm_ctx->kind_from_operand_type(slot);
+			switch (k) {
+			case AsmOperand_Label:
+			case AsmOperand_Register:
+			case AsmOperand_Memory:
+			case AsmOperand_Register_Or_Memory:
+				all_implicit = false;
+				break;
+			case AsmOperand_Immediate:
+				break;
+			}
+
+			if (!all_implicit) {
+				break;
+			}
+		}
+		if (all_implicit) {
+			u16 implicit_wr = clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
+			u16 implicit_rd = clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
+
+			if (implicit_wr != 0 || implicit_rd != 0) {
+				s = gb_string_appendc(s, "         //");
+			}
+
+			if (implicit_wr != 0) {
+				int count = 0;
+				s = gb_string_appendc(s, " writes={");
+				for (u16 bit = 1; bit != 0; bit <<= 1) {
+					if ((implicit_wr & bit) == 0) {
+						continue;
+					}
+					char const *rname = asm_ctx->clobber_reg_bit_name(bit);
+					if (count++ > 0) {
+						s = gb_string_appendc(s, ", ");
+					}
+					s = gb_string_appendc(s, rname);
+				}
+				s = gb_string_appendc(s, "}");
+			}
+			if (implicit_rd != 0) {
+				int count = 0;
+				s = gb_string_appendc(s, " reads={");
+				for (u16 bit = 1; bit != 0; bit <<= 1) {
+					if ((implicit_rd & bit) == 0) {
+						continue;
+					}
+					char const *rname = asm_ctx->clobber_reg_bit_name(bit);
+					if (count++ > 0) {
+						s = gb_string_appendc(s, ", ");
+					}
+					s = gb_string_appendc(s, rname);
+				}
+				s = gb_string_appendc(s, "}");
+			}
+		}
+
+
 		return s;
 	};
 
@@ -1165,7 +1225,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		if (form_index < 0) {
 			return;
 		}
-		gbString desc = describe_form(forms[form_index]);
+
+		gbString desc = describe_form(forms[form_index], clobber_forms[form_index]);
 		defer (gb_string_free(desc));
 		String line = make_string(cast(u8 const *)desc, gb_string_length(desc));
 		if (line.len == 0) {
@@ -1186,7 +1247,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		);
 
 		for_array(fi, forms) {
-			gbString desc = describe_form(forms[fi]);
+			gbString desc = describe_form(forms[fi], clobber_forms[fi]);
 			bool dup = false;
 			for (auto const &l : lines) {
 				if (gb_string_are_equal(l, desc)) {
@@ -1383,7 +1444,6 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		instr->valid_form_index = cast(i32)valid_form_index;
 
 		// Handle clobbering from mnemonic
-		auto clobber_forms = asm_ctx->clobber_forms(mnemonic);
 		auto clobber = clobber_forms[valid_form_index];
 
 		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
