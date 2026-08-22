@@ -283,3 +283,65 @@ test_crc16_ccitt_0x1021_vectors :: proc(t: ^testing.T) {
 		testing.expectf(t, crc16 == vector.h, "\n\t[CCITT CRC-16({0:q})] Expected: 0x{1:4x}, got: 0x{2:4x}", vector.s, vector.h, crc16)
 	}
 }
+
+@test
+test_murmur3_x86_32 :: proc(t: ^testing.T) {
+	vectors :: [?]struct{s: string, seed, h: u32}{
+		{"",                                            0x0,        0x00000000},
+		{"",                                            0x1,        0x514e28b7},
+		{"",                                            0xffffffff, 0x81f16f39},
+		{"test",                                        0x0,        0xba6bd213},
+		{"test",                                        0x9747b28c, 0x704b81dc},
+		{"Hello, world!",                               0x0,        0xc0363e43},
+		{"Hello, world!",                               0x9747b28c, 0x24884cba},
+		{"The quick brown fox jumps over the lazy dog", 0x0,        0x2e4ff723},
+		{"The quick brown fox jumps over the lazy dog", 0x9747b28c, 0x2fa826cd},
+	}
+  for vector in vectors {
+		b := transmute([]u8)vector.s
+    mm3 := hash.murmur3_x86_32(b, vector.seed)
+		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X86-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, mm3)
+  }
+}
+
+@test
+test_murmur3_x86_128 :: proc(t: ^testing.T) {
+	vectors :: [?]struct{s: string, seed: u32, h: u128}{
+		{"",                                            0x0,        0x0                               },
+		{"",                                            0x1,        0x88c4adec54d201b954d201b954d201b9},
+		{"",                                            0xffffffff, 0x051e08a9989d49f7989d49f7989d49f7},
+		{"test",                                        0x0,        0x6f02ef30550c7d68550c7d68550c7d68},
+		{"test",                                        0x9747b28c, 0x0bcc5d99d98130f9d98130f9d98130f9},
+		{"Hello, world!",                               0x0,        0x26acdba7f0638dfc402b42630afdd4c3},
+		{"Hello, world!",                               0x9747b28c, 0x756d5460bb872216b7d48b7c53c8c636},
+		{"The quick brown fox jumps over the lazy dog", 0x0,        0x2f1583c3ecee2c675d7bf66ce5e91d2c},
+		{"The quick brown fox jumps over the lazy dog", 0x9747b28c, 0x8ad4d55e4cb861718ea73a9ccdb6793e},
+	}
+
+  for vector in vectors {
+		b := transmute([]u8)vector.s
+    mm3 := hash.murmur3_x86_128(b, vector.seed)
+		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X86-128(%v)] Expected: 0x%32x, got: 0x%32x", vector.s, vector.h, mm3)
+  }
+}
+
+@test
+test_murmur3_x64_128 :: proc(t: ^testing.T) {
+	vectors :: [?]struct{s: string, seed: u32, h: u128}{
+		{"",                                            0x0,        0x0                               },
+		{"",                                            0x1,        0x4610abe56eff5cb551622daa78f83583},
+		{"",                                            0xffffffff, 0x6af1df4d9d3bc9ec857421121ee6446b},
+		{"test",                                        0x0,        0xac7d28cc74bde19d9a128231f9bd4d82},
+		{"test",                                        0x9747b28c, 0xa066a6b76c55301864a6e65666d07937},
+		{"Hello, world!",                               0x0,        0xf1512dd1d2d665df2c326650a8f3c564},
+		{"Hello, world!",                               0x9747b28c, 0xedc485d662a8392ef85e7e7631d576ba},
+		{"The quick brown fox jumps over the lazy dog", 0x0,        0xe34bbc7bbc071b6c7a433ca9c49a9347},
+		{"The quick brown fox jumps over the lazy dog", 0x9747b28c, 0x738a7f3bd2633121f94573727ec016e5},
+	}
+
+  for vector in vectors {
+		b := transmute([]u8)vector.s
+    mm3 := hash.murmur3_x64_128(b, vector.seed)
+		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X64-128(%v)] Expected: 0x%32x, got: 0x%32x", vector.s, vector.h, mm3)
+  }
+}
