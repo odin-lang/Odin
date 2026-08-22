@@ -216,12 +216,32 @@ struct lbAsmGenerate {
 					}
 					add_input_value(&param_types, &call_args, v.value);
 					break;
-				case AsmTemplateEntityDecl_Immediate:
-					raw("i"); // TODO: "n" if a known-constant integer is required
-					add_input_value(&param_types, &call_args, v.value);
+				case AsmTemplateEntityDecl_Immediate: {
+					Type *ct = core_type(v.type);
+					LLVMValueRef imm = v.value;
+					if (is_type_float(ct)) {
+						// NOTE(bill): No float-immediate constraint exists;
+						// reinterpret the float's bits as an integer of the same width so
+						// the 'i' (integer immediate) constraint applies. The bitcast of a
+						// constant folds to a ConstantInt.
+						Type *int_type = t_u32;
+						switch (type_size_of(ct)) {
+						case 2: int_type = t_u16; break;
+						case 4: int_type = t_u32; break;
+						case 8: int_type = t_u64; break;
+						}
+						imm = LLVMBuildBitCast(p->module->const_dummy_builder, v.value, lb_type(m, int_type), "");
+					} else if (!is_type_integer(ct) && !is_type_pointer(ct) && !is_type_boolean(ct)) {
+						error(e.entity->token, "asm immediate operand '%.*s' must be an integer-typed constant, got %s",
+						      LIT(e.entity->token.string), type_to_string(v.type));
+					}
+					raw("i");
+					add_input_value(&param_types, &call_args, imm);
 					break;
+				}
 				default:
 					GB_PANIC("asm: invalid input operand kind");
+					break;
 				}
 			}
 			op_number[i] = next_op++;
