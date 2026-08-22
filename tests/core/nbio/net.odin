@@ -245,7 +245,7 @@ And it tests big send/recv buffers being handled properly.
 @(test)
 poll :: proc(t: ^testing.T) {
 	if event_loop_guard(t) {
-//		testing.set_fail_timeout(t, time.Minute)
+		testing.set_fail_timeout(t, time.Minute)
 
 		can_recv: bool
 
