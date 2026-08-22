@@ -17,6 +17,8 @@ struct lbAsmGenerate {
 
 		WriteOperandFlag_IndirectBranch = 1<<4,
 
+		WriteOperandFlag_MemoryDisp     = 1<<5,
+
 		WriteOperandFlag_NONE = 0,
 		WriteOperandFlag_DEFAULT = WriteOperandFlag_PrintPrefixes,
 	};
@@ -602,7 +604,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		}
 
 		if (mem_op->disp) {
-			u32 disp_flags = flags & ~WriteOperandFlag_PrintPrefixes;
+			u32 disp_flags = (flags & ~WriteOperandFlag_PrintPrefixes) | WriteOperandFlag_MemoryDisp;
 			if (mem_op->disp_op.kind == Token_Sub) {
 				disp_flags |= WriteOperandFlag_Negate;
 			}
@@ -679,7 +681,12 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			} else {
 				i32 idx = op_number[ed->total_index];
 				GB_ASSERT(idx >= 0);
-				asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+				if (flags & WriteOperandFlag_MemoryDisp) {
+					GB_ASSERT(ed->kind == AsmTemplateEntityDecl_Immediate);
+					asm_string = gb_string_append_fmt(asm_string, "${%d:c}", idx);
+				} else {
+					asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+				}
 			}
 		case_end;
 		case_ast_node(mem_op, AsmMemoryOperand, op);
