@@ -1229,6 +1229,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		gbString desc = describe_form(forms[form_index], clobber_forms[form_index]);
 		defer (gb_string_free(desc));
 		String line = make_string(cast(u8 const *)desc, gb_string_length(desc));
+		line = string_trim_trailing_whitespace(line);
 		if (line.len == 0) {
 			error_line("\tClosest form: '%.*s'\n", LIT(name));
 		} else {
