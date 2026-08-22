@@ -6546,6 +6546,11 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 		return lb_build_addr_from_entity(p, e, expr);
 	case_end;
 
+	case_ast_node(bd, BasicDirective, expr);
+		lbValue ptr = lb_address_from_load_or_generate_local(p, lb_build_expr(p, expr));
+		return lb_addr(ptr);
+	case_end;
+
 	case_ast_node(se, SelectorExpr, expr);
 		Ast *sel_node = unparen_expr(se->selector);
 		if (sel_node->kind == Ast_Ident) {
