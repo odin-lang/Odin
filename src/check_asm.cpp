@@ -1169,9 +1169,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		defer (gb_string_free(desc));
 		String line = make_string(cast(u8 const *)desc, gb_string_length(desc));
 		if (line.len == 0) {
-			error_line("\tclosest form: '%.*s'\n", LIT(name));
+			error_line("\tClosest form: '%.*s'\n", LIT(name));
 		} else {
-			error_line("\tclosest form: '%.*s %.*s'\n", LIT(name), LIT(line));
+			error_line("\tClosest form: '%.*s %.*s'\n", LIT(name), LIT(line));
 		}
 	};
 
@@ -1204,7 +1204,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			return;
 		}
 
-		error_line("\tpossible forms for '%.*s':\n", LIT(name));
+		error_line("\tPossible forms for '%.*s':\n", LIT(name));
 		error_line("\t(r: int, v: vector, f: float, k: mask, m: memory,\n");
 		error_line("\t r/m: reg-or-mem, imm: immediate; number: bit=width)\n");
 
