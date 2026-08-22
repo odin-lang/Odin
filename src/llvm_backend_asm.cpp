@@ -786,7 +786,10 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 				return s;
 			}
 		}
-		GB_ASSERT(instr->mnemonic != 0);
+		if (instr->mnemonic == 0) {
+			// Ignore bare prefix lines
+			return 0;
+		}
 		GB_ASSERT(instr->valid_form_index >= 0);
 
 		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
