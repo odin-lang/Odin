@@ -801,6 +801,8 @@ recv_exec :: proc(op: ^Operation) {
 	switch socket in op.recv.socket {
 	case TCP_Socket:
 		sock = linux.Fd(socket)
+	case Unix_Socket:
+		sock = linux.Fd(socket)
 	case UDP_Socket:
 		sock = linux.Fd(socket)
 		op.recv._impl.msghdr.name    = &op.recv._impl.addr_out
@@ -831,6 +833,13 @@ recv_callback :: proc(op: ^Operation, res: i32) -> bool {
 			case:
 				op.recv.err = net._tcp_recv_error(errno)
 			}
+		case Unix_Socket:
+			#partial switch errno {
+			case .ECANCELED:
+				op.recv.err = Unix_Recv_Error.Timeout
+			case:
+				op.recv.err = net._unix_recv_error(errno)
+			}
 		case UDP_Socket:
 			#partial switch errno {
 			case .ECANCELED:
@@ -847,6 +856,23 @@ recv_callback :: proc(op: ^Operation, res: i32) -> bool {
 
 	switch sock in op.recv.socket {
 	case TCP_Socket:
+		if res == 0 {
+			// Connection closed.
+			return true
+		}
+
+		if op.recv.all {
+			total: int
+			for buf in op.recv.bufs {
+				total += len(buf)
+			}
+
+			if op.recv.received < total {
+				recv_exec(op)
+				return false
+			}
+		}
+	case Unix_Socket:
 		if res == 0 {
 			// Connection closed.
 			return true
@@ -886,6 +912,8 @@ send_exec :: proc(op: ^Operation) {
 	switch socket in op.send.socket {
 	case TCP_Socket:
 		sock = linux.Fd(socket)
+	case Unix_Socket:
+		sock = linux.Fd(socket)
 	case UDP_Socket:
 		sock = linux.Fd(socket)
 		op.send._impl.endpoint       = endpoint_to_sockaddr_ip(op.send.endpoint)
@@ -915,6 +943,13 @@ send_callback :: proc(op: ^Operation, res: i32) -> bool {
 				op.send.err = TCP_Send_Error.Timeout
 			case:
 				op.send.err = net._tcp_send_error(errno)
+			}
+		case Unix_Socket:
+			#partial switch errno {
+			case .ECANCELED:
+				op.send.err = Unix_Send_Error.Timeout
+			case:
+				op.send.err = net._unix_send_error(errno)
 			}
 		case UDP_Socket:
 			#partial switch errno {
@@ -1031,8 +1066,9 @@ poll_exec :: proc(op: ^Operation) {
 
 	fd: linux.Fd
 	switch sock in op.poll.socket {
-	case TCP_Socket: fd = linux.Fd(sock)
-	case UDP_Socket: fd = linux.Fd(sock)
+	case TCP_Socket:  fd = linux.Fd(sock)
+	case Unix_Socket: fd = linux.Fd(sock)
+	case UDP_Socket:  fd = linux.Fd(sock)
 	}
 
 	enqueue(op, uring.poll_add(

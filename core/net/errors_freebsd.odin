@@ -169,6 +169,28 @@ _tcp_recv_error :: proc(errno: freebsd.Errno) -> TCP_Recv_Error {
 	}
 }
 
+_unix_recv_error :: proc(errno: freebsd.Errno) -> Unix_Recv_Error {
+	assert(errno != nil)
+	_last_error = errno
+
+	#partial switch errno {
+	case .EBADF, .ENOTSOCK, .EFAULT:
+		return .Invalid_Argument
+	case .ENOTCONN:
+		return .Not_Connected
+	case .ECONNRESET:
+		return .Connection_Closed
+	case .ETIMEDOUT:
+		return .Timeout
+	case .EAGAIN:
+		return .Would_Block
+	case .EINTR:
+		return .Interrupted
+	case:
+		return .Unknown
+	}
+}
+
 _udp_recv_error :: proc(errno: freebsd.Errno) -> UDP_Recv_Error {
 	assert(errno != nil)
 	_last_error = errno
@@ -190,6 +212,34 @@ _udp_recv_error :: proc(errno: freebsd.Errno) -> UDP_Recv_Error {
 }
 
 _tcp_send_error :: proc(errno: freebsd.Errno) -> TCP_Send_Error {
+	assert(errno != nil)
+	_last_error = errno
+
+	#partial switch errno {
+	case .EBADF, .EACCES, .ENOTSOCK, .EFAULT, .EMSGSIZE:
+		return .Invalid_Argument
+	case .ENOBUFS:
+		return .Insufficient_Resources
+	case .ECONNRESET, .EPIPE:
+		return .Connection_Closed
+	case .ENOTCONN:
+		return .Not_Connected
+	case .EHOSTUNREACH:
+		return .Host_Unreachable
+	case .EHOSTDOWN:
+		return .Host_Unreachable
+	case .ENETDOWN:
+		return .Network_Unreachable
+	case .EAGAIN:
+		return .Would_Block
+	case .EINTR:
+		return .Interrupted
+	case:
+		return .Unknown
+	}
+}
+
+_unix_send_error :: proc(errno: freebsd.Errno) -> Unix_Send_Error {
 	assert(errno != nil)
 	_last_error = errno
 
