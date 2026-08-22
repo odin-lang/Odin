@@ -1178,43 +1178,42 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 		if (all_implicit) {
+			auto print_set = [&](char const *name, u16 bits) {
+				if (bits == 0) {
+					return;
+				}
+				int count = 0;
+				s = gb_string_appendc(s, " ");
+				s = gb_string_appendc(s, name);
+				s = gb_string_appendc(s, "={");
+				for (u16 bit = 1; bit != 0; bit <<= 1) {
+					if ((bits & bit) == 0) {
+						continue;
+					}
+					char const *rname = asm_ctx->clobber_reg_bit_name(bit);
+					if (count++ > 0) {
+						s = gb_string_appendc(s, ", ");
+					}
+					s = gb_string_appendc(s, rname);
+				}
+				s = gb_string_appendc(s, "}");
+			};
+
 			u16 implicit_wr = clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
 			u16 implicit_rd = clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
 
-			if (implicit_wr != 0 || implicit_rd != 0) {
+			u16 implicit_rw = implicit_wr | implicit_rd;
+
+			if (implicit_rw != 0) {
 				s = gb_string_appendc(s, "         //");
 			}
 
-			if (implicit_wr != 0) {
-				int count = 0;
-				s = gb_string_appendc(s, " writes={");
-				for (u16 bit = 1; bit != 0; bit <<= 1) {
-					if ((implicit_wr & bit) == 0) {
-						continue;
-					}
-					char const *rname = asm_ctx->clobber_reg_bit_name(bit);
-					if (count++ > 0) {
-						s = gb_string_appendc(s, ", ");
-					}
-					s = gb_string_appendc(s, rname);
-				}
-				s = gb_string_appendc(s, "}");
-			}
-			if (implicit_rd != 0) {
-				int count = 0;
-				s = gb_string_appendc(s, " reads={");
-				for (u16 bit = 1; bit != 0; bit <<= 1) {
-					if ((implicit_rd & bit) == 0) {
-						continue;
-					}
-					char const *rname = asm_ctx->clobber_reg_bit_name(bit);
-					if (count++ > 0) {
-						s = gb_string_appendc(s, ", ");
-					}
-					s = gb_string_appendc(s, rname);
-				}
-				s = gb_string_appendc(s, "}");
-			}
+			implicit_wr &= ~implicit_rw;
+			implicit_rd &= ~implicit_rw;
+
+			print_set("read-writes", implicit_rw);
+			print_set("writes",      implicit_wr);
+			print_set("reads",       implicit_rd);
 		}
 
 
@@ -1606,7 +1605,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	{
 		begin_error_block();
 
-		bool nearly = best_score >= gb_max(operands.count*2 - 2, 0);
+		bool nearly = false && best_score >= gb_max(operands.count*2 - 2, 0);
 		if (nearly) {
 			error(instr->name, "'%.*s' operands nearly matched the expected encoding forms", LIT(name));
 		} else {
