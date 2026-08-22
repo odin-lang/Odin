@@ -424,6 +424,7 @@ enum BuildFlagKind {
 	BuildFlag_VetStyle,
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
+	BuildFlag_VetPackedFieldAddr,
 	BuildFlag_VetTabs,
 	BuildFlag_VetPackages,
 
@@ -685,6 +686,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetStyle,                str_lit("vet-style"),                 BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetPackedFieldAddr,      str_lit("vet-packed-field-addr"),     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
@@ -1447,6 +1449,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetStyle:            build_context.vet_flags |= VetFlag_Style;            break;
 						case BuildFlag_VetSemicolon:        build_context.vet_flags |= VetFlag_Semicolon;        break;
 						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
+						case BuildFlag_VetPackedFieldAddr:  build_context.vet_flags |= VetFlag_PackedFieldAddr;  break;
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
@@ -3343,6 +3346,13 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet-packages:<comma-separated-strings>")) {
 			print_usage_line(2, "Sets which packages by name will be vetted.");
 			print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
+		}
+
+		if (print_flag("-vet-packed-field-addr")) {
+			print_usage_line(2, "Errs on taking the address of a field within a '#packed' or '#max_field_align' struct when the");
+			print_usage_line(2, "resulting pointer type claims more alignment than the containing struct guarantees for the field.");
+			print_usage_line(2, "Does not err when the address is directly cast to a pointer type claiming no more than the");
+			print_usage_line(2, "guaranteed alignment (e.g. 'rawptr', '^u8', or '^runtime.Unaligned(T)').");
 		}
 
 		if (print_flag("-vet-semicolon")) {

@@ -678,7 +678,7 @@ __renderGetTextureSize :: proc(uptr: rawptr, image: int, w, h: ^int) -> bool {
 	return true
 }
 
-__xformToMat3x4 :: proc(m3: ^[12]f32, t: [6]f32) {
+__xformToMat3x4 :: proc(t: [6]f32) -> (m3: [12]f32) {
 	m3[0] = t[0]
 	m3[1] = t[1]
 	m3[2] = 0
@@ -691,6 +691,7 @@ __xformToMat3x4 :: proc(m3: ^[12]f32, t: [6]f32) {
 	m3[9] = t[5]
 	m3[10] = 1
 	m3[11] = 0
+	return
 }
 
 __premulColor :: proc(c: Color) -> (res: Color) {
@@ -723,7 +724,7 @@ __convertPaint :: proc(
 		frag.scissorScale[1] = 1.0
 	} else {
 		nvg.TransformInverse(&invxform, scissor.xform)
-		__xformToMat3x4(&frag.scissorMat, invxform)
+		frag.scissorMat = __xformToMat3x4(invxform)
 		frag.scissorExt[0] = scissor.extent[0]
 		frag.scissorExt[1] = scissor.extent[1]
 		frag.scissorScale[0] = math.sqrt(scissor.xform[0]*scissor.xform[0] + scissor.xform[2]*scissor.xform[2]) / fringe
@@ -778,7 +779,7 @@ __convertPaint :: proc(
 		nvg.TransformInverse(&invxform, paint.xform)
 	}
 
-	__xformToMat3x4(&frag.paintMat, invxform)
+	frag.paintMat = __xformToMat3x4(invxform)
 
 	return true
 }

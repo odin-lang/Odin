@@ -2989,6 +2989,102 @@ gb_internal ExactValue exact_bit_set_all_set_mask(Type *type) {
 	return res;
 }
 
+gb_internal i64 check_field_align_cap_of_addr(Ast *expr, bool *from_packed) {
+	// traverse the selector/index chain of the addressed expression,
+	// and determine the smallest field alignment guarantee of the
+	// containing structs;
+	// 1 for #packed, N for #max_field_align(N)
+	i64 cap = I64_MAX;
+	for (Ast *node = unparen_expr(expr); node != nullptr;  ) {
+		Ast *base = nullptr;
+		switch (node->kind) {
+		case Ast_SelectorExpr:    base = node->SelectorExpr.expr;    break;
+		case Ast_IndexExpr:       base = node->IndexExpr.expr;       break;
+		case Ast_MatrixIndexExpr: base = node->MatrixIndexExpr.expr; break;
+		default:
+			return cap;
+		}
+		base = unparen_expr(base);
+		if (base == nullptr) {
+			return cap;
+		}
+		Type *bt = type_of_expr(base);
+		if (bt == nullptr) {
+			return cap;
+		}
+		bool through_ptr = is_type_pointer(bt) || is_type_multi_pointer(bt);
+		Type *t = base_type(type_deref(bt));
+		if (t->kind == Type_Struct) {
+			if (t->Struct.is_packed) {
+				if (from_packed) *from_packed = true;
+				return 1;
+			}
+			if (t->Struct.custom_max_field_align != 0 && t->Struct.custom_max_field_align < cap) {
+				cap = t->Struct.custom_max_field_align;
+			}
+		}
+		// stop if we are derefing a ptr field of the struct;
+		// it doesn't matter if the ptr itself is misaligned,
+		// e.g. &p.ptr.x stops the check at ptr,
+		// the address of x is not contained in the struct;
+		// also stop on &p.slice[i] or &p.dynarray[i], the slice/dynarray header
+		// is in the struct, but not the accessed element
+		if (through_ptr || is_type_slice(t) || is_type_dynamic_array(t)) {
+			return cap;
+		}
+		node = base;
+	}
+	return cap;
+}
+
+gb_internal void check_vet_packed_field_addr(CheckerContext *c, Operand *o, Ast *expr, Type *type_hint) {
+	if (c->curr_proc_sig != nullptr && is_type_polymorphic(c->curr_proc_sig)) {
+		return;
+	}
+	Type *pt = base_type(o->type);
+	if (pt == nullptr || pt->kind != Type_Pointer) {
+		return;
+	}
+	Type *elem = pt->Pointer.elem;
+	if (elem == nullptr || is_type_polymorphic(elem)) {
+		return;
+	}
+	i64 align = type_align_of(elem);
+	if (align <= 1) {
+		return;
+	}
+	bool from_packed = false;
+	i64 cap = check_field_align_cap_of_addr(expr, &from_packed);
+	if (align <= cap) {
+		return;
+	}
+	if (type_hint != nullptr) {
+		// taking the addr is fine if the direct user expects a ptr to data
+		// with alignment within the guarantee
+		Type *h = base_type(type_hint);
+		if (is_type_rawptr(h)) {
+			return;
+		}
+		if (h->kind == Type_Pointer || h->kind == Type_MultiPointer) {
+			Type *he = h->kind == Type_Pointer ? h->Pointer.elem : h->MultiPointer.elem;
+			if (type_align_of(he) <= cap) {
+				return;
+			}
+		}
+	}
+	ERROR_BLOCK();
+	gbString es = expr_to_string(expr);
+	gbString ts = type_to_string(elem);
+	if (from_packed) {
+		error(expr, "'&%s' has type '^%s' with data alignment %lld, but the address is of a #packed struct's field and may not be aligned", es, ts, cast(long long)align);
+	} else {
+		error(expr, "'&%s' has type '^%s' with data alignment %lld, but the address is of a field of a #max_field_align(%lld) struct and may not be aligned", es, ts, cast(long long)align, cast(long long)cap);
+	}
+	error_line("\tSuggestion: Cast the address directly to ^runtime.Unaligned(%s), or access the field by value\n", ts);
+	gb_string_free(ts);
+	gb_string_free(es);
+}
+
 gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
@@ -12731,6 +12827,11 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 		if (o->mode != Addressing_Invalid) {
 			check_unary_expr(c, o, ue->op, node);
+			if (ue->op.kind == Token_And &&
+			    o->mode != Addressing_Invalid &&
+			    (check_vet_flags(c) & VetFlag_PackedFieldAddr) != 0) {
+				check_vet_packed_field_addr(c, o, ue->expr, type_hint);
+			}
 		} else {
 			ERROR_BLOCK();
 			gbString s = expr_to_string(ue->expr);
