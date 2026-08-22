@@ -197,6 +197,13 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -target:openbsd_amd64
 
+      - name: Run shared-memory WASM fixture
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          ./odin build tests/wasm_threads_fixture -target:js_wasm32 -target-features:atomics -out:wasm_threads_fixture.wasm -extra-linker-flags:"--import-memory --shared-memory --initial-memory=16777216 --max-memory=67108864 --export=__stack_pointer"
+          node tests/wasm_threads_fixture/test.mjs wasm_threads_fixture.wasm
+          rm wasm_threads_fixture.wasm
+
       - name: Odin check examples/all for js_wasm32
         if: matrix.os == 'ubuntu-latest'
         run: ./odin check examples/all -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -no-entry-point -target:js_wasm32
