@@ -473,7 +473,11 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	check_type_path_pop(ctx);
 
 	Type *base = base_type(bt);
-	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+	if (base == nullptr) {
+		// `bt` is a named type that is still being checked, e.g. a cycle back through a
+		// pointer or slice, so chain to it and let it resolve when it does.
+		base = bt;
+	} else if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
 		base = clone_enum_type(ctx, base, named);
 	}
 	named->Named.base = base;
@@ -881,10 +885,10 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 		    	if (x_base->Struct.is_raw_union) {
 		    		return true;
 		    	}
-		    	if (x->Struct.fields.count == y->Struct.fields.count) {
-		    		for (isize i = 0; i < x->Struct.fields.count; i++) {
-		    			Entity *a = x->Struct.fields[i];
-		    			Entity *b = y->Struct.fields[i];
+		    	if (x_base->Struct.fields.count == y_base->Struct.fields.count) {
+		    		for (isize i = 0; i < x_base->Struct.fields.count; i++) {
+		    			Entity *a = x_base->Struct.fields[i];
+		    			Entity *b = y_base->Struct.fields[i];
 		    			bool similar = signature_parameter_similar_enough(a->type, b->type);
 		    			if (!similar) {
 		    				// NOTE(bill): If the fields are not similar enough, then stop.

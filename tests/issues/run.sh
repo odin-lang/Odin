@@ -94,6 +94,13 @@ $ODIN test ../test_issue_7356.odin $COMMON
 $ODIN build ../test_issue_7167.odin $COMMON
 $ODIN build ../test_issue_7188.odin $COMMON
 $ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
+$ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
+if [[ $($ODIN check ../test_issue_foreign_redeclaration_mismatch.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 if [[ $($ODIN check ../test_issue_ellipsis_type_call.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
 	echo "SUCCESSFUL 1/1"
