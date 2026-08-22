@@ -473,7 +473,11 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	check_type_path_pop(ctx);
 
 	Type *base = base_type(bt);
-	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+	if (base == nullptr) {
+		// `bt` is a named type that is still being checked, e.g. a cycle back through a
+		// pointer or slice, so chain to it and let it resolve when it does.
+		base = bt;
+	} else if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
 		base = clone_enum_type(ctx, base, named);
 	}
 	named->Named.base = base;

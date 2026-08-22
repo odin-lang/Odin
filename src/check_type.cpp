@@ -4139,7 +4139,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	}
 	#endif
 
-	if (type->kind == Type_Named && type->Named.base == nullptr || is_type_typed(type)) {
+	if (type->kind == Type_Named && base_type(type) == nullptr || is_type_typed(type)) {
 		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);
