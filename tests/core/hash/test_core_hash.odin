@@ -297,11 +297,11 @@ test_murmur3_x86_32 :: proc(t: ^testing.T) {
 		{"The quick brown fox jumps over the lazy dog", 0x0,        0x2e4ff723},
 		{"The quick brown fox jumps over the lazy dog", 0x9747b28c, 0x2fa826cd},
 	}
-  for vector in vectors {
+	for vector in vectors {
 		b := transmute([]u8)vector.s
-    mm3 := hash.murmur3_x86_32(b, vector.seed)
+		mm3 := hash.murmur3_x86_32(b, vector.seed)
 		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X86-32(%v)] Expected: 0x%08x, got: 0x%08x", vector.s, vector.h, mm3)
-  }
+	}
 }
 
 @test
@@ -318,11 +318,11 @@ test_murmur3_x86_128 :: proc(t: ^testing.T) {
 		{"The quick brown fox jumps over the lazy dog", 0x9747b28c, 0x8ad4d55e4cb861718ea73a9ccdb6793e},
 	}
 
-  for vector in vectors {
+	for vector in vectors {
 		b := transmute([]u8)vector.s
-    mm3 := hash.murmur3_x86_128(b, vector.seed)
+		mm3 := hash.murmur3_x86_128(b, vector.seed)
 		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X86-128(%v)] Expected: 0x%32x, got: 0x%32x", vector.s, vector.h, mm3)
-  }
+	}
 }
 
 @test
@@ -339,9 +339,9 @@ test_murmur3_x64_128 :: proc(t: ^testing.T) {
 		{"The quick brown fox jumps over the lazy dog", 0x9747b28c, 0x738a7f3bd2633121f94573727ec016e5},
 	}
 
-  for vector in vectors {
+	for vector in vectors {
 		b := transmute([]u8)vector.s
-    mm3 := hash.murmur3_x64_128(b, vector.seed)
+		mm3 := hash.murmur3_x64_128(b, vector.seed)
 		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X64-128(%v)] Expected: 0x%32x, got: 0x%32x", vector.s, vector.h, mm3)
-  }
+	}
 }
