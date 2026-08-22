@@ -1088,58 +1088,94 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		return asm_ctx->OP_NONE;
 	};
 
-	auto print_possible_forms = [&]() {
-		auto describe_form = [&](typename AsmCtx::Encoding const &form) -> gbString {
-			gbString s = gb_string_make(heap_allocator(), "");
-			int count = form_user_operand_count(form);
-			for (int i = 0; i < count; i++) {
-				if (i > 0) {
-					s = gb_string_appendc(s, ", ");
+	auto describe_form = [&](typename AsmCtx::Encoding const &form) -> gbString {
+		gbString s = gb_string_make(heap_allocator(), "");
+		int count = form_user_operand_count(form);
+		for (int i = 0; i < count; i++) {
+			auto slot = operand_slot_type(form, i);
+			AsmOperandKind k = asm_ctx->kind_from_operand_type(slot);
+			AsmRegClass    c = asm_ctx->operand_type_reg_class(slot);
+			i32            w = asm_ctx->operand_type_bit_width(slot);
+
+			if (k == AsmOperand_Label) {
+				s = gb_string_appendc(s, "label");
+			} else if (k == AsmOperand_Immediate) {
+				s = (w > 0) ? gb_string_append_fmt(s, "imm%d", cast(int)w)
+				            : gb_string_appendc(s, "imm");
+			} else {
+				char const *reg = "reg";
+				switch (c) {
+				case AsmRegClass_Integer: reg = "r"; break;
+				case AsmRegClass_Float:   reg = "f"; break;
+				case AsmRegClass_Vector:  reg = "v"; break;
+				case AsmRegClass_Mask:    reg = "k"; break;
+				default:                  reg = "reg"; break;
 				}
-
-				// NOTE(bill): describe the slot
-				auto slot = operand_slot_type(form, i);
-
-				AsmOperandKind k = asm_ctx->kind_from_operand_type(slot);
-				AsmRegClass    c = asm_ctx->operand_type_reg_class(slot);
-				i32            w = asm_ctx->operand_type_bit_width(slot);
-
-				if (k == AsmOperand_Label) {
-					s = gb_string_appendc(s, "label");
-				} else if (k == AsmOperand_Immediate) {
-					s = (w > 0) ? gb_string_append_fmt(s, "imm%d", cast(int)w)
-					            : gb_string_appendc(s, "imm");
-				} else {
-					char const *reg = "reg";
-					switch (c) {
-					case AsmRegClass_Integer: reg = "r"; break;
-					case AsmRegClass_Float:   reg = "f"; break;
-					case AsmRegClass_Vector:  reg = "v"; break;
-					case AsmRegClass_Mask:    reg = "k"; break;
-					default:                  reg = "reg"; break;
-					}
-					switch (k) {
-					case AsmOperand_Register:
-						s = (w > 0) ? gb_string_append_fmt(s, "%s%d", reg, cast(int)w)
-						            : gb_string_appendc(s, reg);
-						break;
-					case AsmOperand_Memory:
-						s = (w > 0) ? gb_string_append_fmt(s, "m%d", cast(int)w)
-						            : gb_string_appendc(s, "m");
-						break;
-					case AsmOperand_Register_Or_Memory:
-						s = (w > 0) ? gb_string_append_fmt(s, "%s/m%d", reg, cast(int)w)
-						            : gb_string_append_fmt(s, "%s/m", reg);
-						break;
-					default:
-						s = gb_string_appendc(s, "operand");
-						break;
-					}
+				switch (k) {
+				case AsmOperand_Register:
+					s = (w > 0) ? gb_string_append_fmt(s, "%s%d", reg, cast(int)w)
+					            : gb_string_appendc(s, reg);
+					break;
+				case AsmOperand_Memory:
+					s = (w > 0) ? gb_string_append_fmt(s, "m%d", cast(int)w)
+					            : gb_string_appendc(s, "m");
+					break;
+				case AsmOperand_Register_Or_Memory:
+					s = (w > 0) ? gb_string_append_fmt(s, "%s/m%d", reg, cast(int)w)
+					            : gb_string_append_fmt(s, "%s/m", reg);
+					break;
+				default:
+					s = gb_string_appendc(s, "operand");
+					break;
 				}
 			}
-			return s;
-		};
 
+			if (i+1 < count) {
+				s = gb_string_appendc(s, ", ");
+
+				switch (k) {
+				case AsmOperand_Label: // 5 characters
+					break;
+				case AsmOperand_Immediate: // 3+ characters
+				case AsmOperand_Register_Or_Memory:
+					if (w == 0) {
+						s = gb_string_appendc(s, "  ");
+					} else if (w < 10) {
+						s = gb_string_appendc(s, " ");
+					}
+					break;
+				case AsmOperand_Register: // 1+ chacracters
+				case AsmOperand_Memory:
+					if (w == 0) {
+						s = gb_string_appendc(s, "    ");
+					} else if (w < 10) {
+						s = gb_string_appendc(s, "   ");
+					} else if (w < 100) {
+						s = gb_string_appendc(s, "  ");
+					}
+					break;
+				}
+			}
+
+		}
+		return s;
+	};
+
+	auto print_closest_form = [&](isize form_index) {
+		if (form_index < 0) {
+			return;
+		}
+		gbString desc = describe_form(forms[form_index]);
+		defer (gb_string_free(desc));
+		String line = make_string(cast(u8 const *)desc, gb_string_length(desc));
+		if (line.len == 0) {
+			error_line("\tclosest form: '%.*s'\n", LIT(name));
+		} else {
+			error_line("\tclosest form: '%.*s %.*s'\n", LIT(name), LIT(line));
+		}
+	};
+
+	auto print_possible_forms = [&]() {
 		Array<gbString> lines = {};
 		lines.allocator = heap_allocator();
 		defer (array_free(&lines));
@@ -1168,17 +1204,23 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			return;
 		}
 
-		error_line("\tPossible forms for '%.*s':\n", LIT(name));
-		error_line("\t\t(r: int reg, v: vector reg, f: float reg, k: mask reg, m: memory,\n"
-		           "\t\t r/m: reg or memory, imm: immediate; trailing-number: bit-width)\n");
+		error_line("\tpossible forms for '%.*s':\n", LIT(name));
+		error_line("\t(r: int, v: vector, f: float, k: mask, m: memory,\n");
+		error_line("\t r/m: reg-or-mem, imm: immediate; number: bit=width)\n");
 
-		for (auto line_gb : lines) {
-			String line = make_string(cast(u8 const *)line_gb, gb_string_length(line_gb));
+		isize const MAX_SHOWN = 32;
+		isize shown = gb_min(lines.count, MAX_SHOWN);
+		for (isize i = 0; i < shown; i++) {
+			String line = make_string(cast(u8 const *)lines[i], gb_string_length(lines[i]));
 			if (line.len == 0) {
 				error_line("\t\t%.*s\n", LIT(name)); // zero-operand form
 			} else {
 				error_line("\t\t%.*s %.*s\n", LIT(name), LIT(line));
 			}
+		}
+		if (lines.count > shown) {
+			isize rest = lines.count - shown;
+			error_line("\t\t... and %td more form%s\n", rest, rest == 1 ? "" : "s");
 		}
 	};
 
@@ -1469,7 +1511,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 	// failure path
 	enum { MAX_VARIANT_COUNT = 32 };
-	AsmMismatch mismatch[MAX_VARIANT_COUNT] = {};
+	AsmMismatch mismatch[MAX_VARIANT_COUNT]  = {};
 	i32         want_bits[MAX_VARIANT_COUNT] = {};
 	i32         got_bits[MAX_VARIANT_COUNT]  = {};
 	if (best_form >= 0) {
@@ -1501,64 +1543,78 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	}
 
 	{
-		ERROR_BLOCK();
-		if (best_score >= gb_max(operands.count*2 - 2, 0)) {
+		bool nearly = best_score >= gb_max(operands.count*2 - 2, 0);
+		if (nearly) {
 			error(instr->name, "'%.*s' operands nearly matched the expected encoding forms", LIT(name));
 		} else {
 			error(instr->name, "'%.*s' operands matched none of the expected encoding forms", LIT(name));
 		}
-		if (false) {
-			// TODO(bill): figure out a way to make this print at the end of the operand errors first for the best match one,
-			// rather than splurge everything at the start
-			print_possible_forms();
-		}
-	}
-	for_array(i, valid_spots) {
-		if (valid_spots[i] || i >= operands.count) {
-			continue;
-		}
-		auto dst = possible_kinds[i];
-		AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
 
-		AsmRegClass dst_reg_class = possible_class_kinds[i];
-		AsmRegClass src_reg_class = check_asm_reg_class_from_type(operands[i].type);
+		bool block_was_latched = false;
 
-		AsmMismatch m = (i < MAX_VARIANT_COUNT) ? mismatch[i] : AsmMismatch_None;
-
-		if (m == AsmMismatch_ImmRange) {
-			ExactValue ev = operands[i].value;
-			gbString vs = exact_value_to_string(ev);
-			i32 bits_required = 0;
-			check_asm_immediate_value_fits(ev, want_bits[i], &bits_required, nullptr);
-			if (bits_required > 0) {
-				error(operands[i].expr, "'%.*s' operand-%td is a %d-bit immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
-				      LIT(name), i, bits_required, vs, cast(int)want_bits[i]);
-			} else {
-				error(operands[i].expr, "'%.*s' operand-%td is an immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
-				      LIT(name), i, vs, cast(int)want_bits[i]);
+		for_array(i, valid_spots) {
+			if (valid_spots[i] || i >= operands.count) {
+				continue;
 			}
-			gb_string_free(vs);
-		} else if (m == AsmMismatch_ImmType) {
-			error(operands[i].expr, "'%.*s' operand-%td: a floating-point constant cannot be used as an immediate",
-			      LIT(name), i);
-		} else if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
-			error(operands[i].expr, "'%.*s' operand-%td has the wrong size: expected a %u-bit %.*s operand, got %u-bit",
-			      LIT(name), i,
-			      cast(unsigned)want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]),
-			      cast(unsigned)got_bits[i]);
-		} else if (m == AsmMismatch_Class) {
-			error(operands[i].expr, "'%.*s' operand-%td is in the wrong register class, expected %d-bit %.*s %.*s, got %d-bit %.*s %.*s",
-			      LIT(name), i,
-			      want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]), LIT(asm_operand_kind_strings[dst]),
-			      got_bits[i],  LIT(asm_reg_class_strings[src_reg_class]), LIT(asm_operand_kind_strings[src]));
-		} else if (dst == AsmOperand_Immediate) {
-			error(operands[i].expr, "'%.*s' operand-%td must be an assemble-time constant or a $ immediate parameter, got a %.*s",
-			      LIT(name), i, LIT(asm_operand_kind_strings[src]));
-		} else if (dst) {
-			error(operands[i].expr, "'%.*s' operand-%td has an invalid kind, expected %.*s operand",
-			      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]));
-		} else {
-			error(operands[i].expr, "'%.*s' operand-%td has an invalid kind", LIT(name), i);
+			auto dst = possible_kinds[i];
+			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
+
+			AsmRegClass dst_reg_class = possible_class_kinds[i];
+			AsmRegClass src_reg_class = check_asm_reg_class_from_type(operands[i].type);
+
+			AsmMismatch m = (i < MAX_VARIANT_COUNT) ? mismatch[i] : AsmMismatch_None;
+
+			if (block_was_latched) {
+				end_error_block();
+			}
+			begin_error_block();
+			block_was_latched = true;
+
+			if (m == AsmMismatch_ImmRange) {
+
+				ExactValue ev = operands[i].value;
+				gbString vs = exact_value_to_string(ev);
+				i32 bits_required = 0;
+				check_asm_immediate_value_fits(ev, want_bits[i], &bits_required, nullptr);
+				if (bits_required > 0) {
+					error(operands[i].expr, "'%.*s' operand-%td is a %d-bit immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
+					      LIT(name), i, bits_required, vs, cast(int)want_bits[i]);
+				} else {
+					error(operands[i].expr, "'%.*s' operand-%td is an immediate value, but the value %s does not fit in the %d-bit immediate this form encodes",
+					      LIT(name), i, vs, cast(int)want_bits[i]);
+				}
+				gb_string_free(vs);
+			} else if (m == AsmMismatch_ImmType) {
+				error(operands[i].expr, "'%.*s' operand-%td: a floating-point constant cannot be used as an immediate",
+				      LIT(name), i);
+			} else if (m == AsmMismatch_Size && want_bits[i] && got_bits[i]) {
+				error(operands[i].expr, "'%.*s' operand-%td has the wrong size: expected a %u-bit %.*s operand, got %u-bit",
+				      LIT(name), i,
+				      cast(unsigned)want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]),
+				      cast(unsigned)got_bits[i]);
+			} else if (m == AsmMismatch_Class) {
+				error(operands[i].expr, "'%.*s' operand-%td is in the wrong register class, expected %d-bit %.*s %.*s, got %d-bit %.*s %.*s",
+				      LIT(name), i,
+				      want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]), LIT(asm_operand_kind_strings[dst]),
+				      got_bits[i],  LIT(asm_reg_class_strings[src_reg_class]), LIT(asm_operand_kind_strings[src]));
+			} else if (dst == AsmOperand_Immediate) {
+				error(operands[i].expr, "'%.*s' operand-%td must be an assemble-time constant or a $ immediate parameter, got a %.*s",
+				      LIT(name), i, LIT(asm_operand_kind_strings[src]));
+			} else if (dst) {
+				error(operands[i].expr, "'%.*s' operand-%td has an invalid kind, expected %.*s operand",
+				      LIT(name), i, LIT(asm_operand_kind_expected_strings[dst]));
+			} else {
+				error(operands[i].expr, "'%.*s' operand-%td has an invalid kind", LIT(name), i);
+			}
+		}
+
+		if (block_was_latched) {
+			if (nearly && best_form >= 0) {
+				print_closest_form(best_form);
+			} else {
+				print_possible_forms();
+			}
+			end_error_block();
 		}
 	}
 }
