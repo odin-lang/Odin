@@ -1543,14 +1543,14 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	}
 
 	{
-		bool nearly = best_score >= gb_max(operands.count*2 - 2, 0);
+		begin_error_block();
+
+		bool nearly = false && best_score >= gb_max(operands.count*2 - 2, 0);
 		if (nearly) {
 			error(instr->name, "'%.*s' operands nearly matched the expected encoding forms", LIT(name));
 		} else {
 			error(instr->name, "'%.*s' operands matched none of the expected encoding forms", LIT(name));
 		}
-
-		bool block_was_latched = false;
 
 		for_array(i, valid_spots) {
 			if (valid_spots[i] || i >= operands.count) {
@@ -1564,11 +1564,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 			AsmMismatch m = (i < MAX_VARIANT_COUNT) ? mismatch[i] : AsmMismatch_None;
 
-			if (block_was_latched) {
-				end_error_block();
-			}
+			end_error_block();
 			begin_error_block();
-			block_was_latched = true;
 
 			if (m == AsmMismatch_ImmRange) {
 
@@ -1608,14 +1605,12 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 
-		if (block_was_latched) {
-			if (nearly && best_form >= 0) {
-				print_closest_form(best_form);
-			} else {
-				print_possible_forms();
-			}
-			end_error_block();
+		if (nearly && best_form >= 0) {
+			print_closest_form(best_form);
+		} else {
+			print_possible_forms();
 		}
+		end_error_block();
 	}
 }
 
