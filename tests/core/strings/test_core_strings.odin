@@ -183,6 +183,70 @@ test_substring :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+test_substring_from :: proc(t: ^testing.T) {
+	Case :: struct {
+		s:     string,
+		start: int,
+		sub:   string,
+		ok:    bool,
+	}
+	cases := []Case {
+		{ok = true},
+		{s = "", start = -1, ok = false},
+		{s = "", start = 1, ok = false},
+		{s = "Hello", start = 0, sub = "Hello", ok = true},
+		{s = "Hello", start = 1, sub = "ello", ok = true},
+		// rune_start one past the last rune: valid, empty tail (not out of bounds).
+		{s = "Hello", start = len("Hello"), sub = "", ok = true},
+		// rune_start genuinely out of bounds.
+		{s = "Hello", start = len("Hello") + 1, ok = false},
+		{s = "小猫咪", start = 0, sub = "小猫咪", ok = true},
+		{s = "小猫咪", start = 1, sub = "猫咪", ok = true},
+		// Same boundary case as above, but with multi-byte runes: the byte
+		// length differs from the rune count, which is what used to trip
+		// this up.
+		{s = "小猫咪", start = 3, sub = "", ok = true},
+		{s = "小猫咪", start = 4, ok = false},
+		{s = "héllo", start = 5, sub = "", ok = true},
+	}
+
+	for tc in cases {
+		sub, ok := strings.substring_from(tc.s, tc.start)
+		testing.expectf(t, ok == tc.ok, "expected substring_from(%v, %v) to return ok: %v, got: %v", tc.s, tc.start, tc.ok, ok)
+		testing.expectf(t, sub == tc.sub, "expected substring_from(%v, %v) to return sub: %v, got: %v", tc.s, tc.start, tc.sub, sub)
+	}
+}
+
+@(test)
+test_substring_to :: proc(t: ^testing.T) {
+	Case :: struct {
+		s:   string,
+		end: int,
+		sub: string,
+		ok:  bool,
+	}
+	cases := []Case {
+		{ok = true},
+		{s = "", end = -1, ok = false},
+		{s = "Hello", end = 0, sub = "", ok = true},
+		{s = "Hello", end = 3, sub = "Hel", ok = true},
+		// rune_end one past the last rune: valid, whole string.
+		{s = "Hello", end = len("Hello"), sub = "Hello", ok = true},
+		// rune_end genuinely out of bounds: fails, but keeps the (untrimmed) string.
+		{s = "Hello", end = len("Hello") + 1, sub = "Hello", ok = false},
+		{s = "小猫咪", end = 1, sub = "小", ok = true},
+		{s = "小猫咪", end = 3, sub = "小猫咪", ok = true},
+		{s = "小猫咪", end = 4, sub = "小猫咪", ok = false},
+	}
+
+	for tc in cases {
+		sub, ok := strings.substring_to(tc.s, tc.end)
+		testing.expectf(t, ok == tc.ok, "expected substring_to(%v, %v) to return ok: %v, got: %v", tc.s, tc.end, tc.ok, ok)
+		testing.expectf(t, sub == tc.sub, "expected substring_to(%v, %v) to return sub: %v, got: %v", tc.s, tc.end, tc.sub, sub)
+	}
+}
+
 @test
 test_builder_to_cstring_with_nil_allocator :: proc(t: ^testing.T) {
 	b := strings.builder_make_none(mem.nil_allocator())
