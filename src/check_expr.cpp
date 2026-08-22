@@ -9117,6 +9117,11 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			gb_string_free(b);
 			gb_string_free(a);
 		}
+		// BlockStmt -> ProcType chain when call is at top level scope of proc
+		bool toplevel_proc_scope = c->scope->parent != nullptr && c->scope->parent->node->kind == Ast_ProcType;
+		if (!toplevel_proc_scope) {
+			error(call, "'#must_tail' can only be used at a top level procedure scope");
+		}
 		break;
 	}
 
