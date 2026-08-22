@@ -212,13 +212,18 @@ remove_multiple_poll :: proc(t: ^testing.T) {
 	if event_loop_guard(t) {
 		testing.set_fail_timeout(t, time.Minute)
 
-		sock, ep := open_next_available_local_port(t)
-		defer nbio.close(sock)
+		// Two sockets rather than two polls on one socket: only one poll per socket is
+		// delivered on Windows, and what this tests is removal, not that.
+		removed_sock, removed_ep := open_next_available_local_port(t)
+		defer nbio.close(removed_sock)
+
+		kept_sock, kept_ep := open_next_available_local_port(t)
+		defer nbio.close(kept_sock)
 
 		hit: bool
 
-		first := nbio.poll(sock, .Receive, on_poll)
-		nbio.poll_poly2(sock, .Receive, t, &hit, on_poll2)
+		first := nbio.poll(removed_sock, .Receive, on_poll)
+		nbio.poll_poly2(kept_sock, .Receive, t, &hit, on_poll2)
 
 		on_poll :: proc(op: ^nbio.Operation) {
 			log.error("shouldn't be called")
@@ -235,7 +240,9 @@ remove_multiple_poll :: proc(t: ^testing.T) {
 
 		ev(t, nbio.tick(0), nil)
 
-		nbio.dial_poly(ep, t, on_dial)
+		// Make both readable, the removed poll must still not fire.
+		nbio.dial_poly(removed_ep, t, on_dial)
+		nbio.dial_poly(kept_ep, t, on_dial)
 
 		on_dial :: proc(op: ^nbio.Operation, t: ^testing.T) {
 			ev(t, op.dial.err, nil)
