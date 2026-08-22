@@ -78,53 +78,86 @@ _mkdir_all :: proc(path: string, perm: Permissions) -> Error {
 }
 
 _remove_all :: proc(path: string) -> Error {
-	remove_all_dir :: proc(dfd: linux.Fd) -> Error {
-		n := 64
-		buf := make([]u8, n)
-		defer delete(buf)
+	Name_List :: struct {
+		backing: [dynamic]u8,
+		offsets: [dynamic]int,
+	}
+	// It is assumed that name is 0 terminated!
+	name_list_append :: proc(list: ^Name_List, name: string) {
+		append(&list.offsets, len(list.backing))
 
-		loop: for {
-			buflen, errno := linux.getdents(dfd, buf[:])
+		// Append the 0 as well!
+		insert_name := strings.string_from_ptr(raw_data(name), len(name) + 1)
+		append(&list.backing, insert_name)
+	}
+	name_list_cstring_iter :: proc(list: Name_List, idx: ^int) -> (cstring, bool) {
+		if idx^ >= len(list.offsets) {
+			return nil, false
+		}
+		name := cstring(&list.backing[list.offsets[idx^]])
+		idx^ += 1
+		return name, true
+	}
+
+	remove_all_dir :: proc(dfd: linux.Fd, file_names: ^Name_List, entries: ^[]u8) -> Error {
+		temp_allocator := TEMP_ALLOCATOR_GUARD({})
+
+		dir_names := Name_List {
+			backing = make([dynamic]u8, temp_allocator),
+			offsets = make([dynamic]int, temp_allocator),
+		}
+
+		entry_scan: for {
+			buflen, errno := linux.getdents(dfd, entries^[:])
 			#partial switch errno {
 			case .EINVAL:
-				delete(buf)
-				n *= 2
-				buf = make([]u8, n)
-				continue loop
+				new_sz := len(entries^) * 2
+				delete(entries^)
+				entries^ = make([]u8, new_sz)
+				continue entry_scan
 			case .NONE:
-				if buflen == 0 { break loop }
+				if buflen == 0 { break entry_scan }
 			case:
 				return _get_platform_error(errno)
 			}
 
 			offset: int
-			for d in linux.dirent_iterate_buf(buf[:buflen], &offset) {
+			for d in linux.dirent_iterate_buf(entries[:buflen], &offset) {
 				d_name_str := linux.dirent_name(d)
-				d_name_cstr := strings.unsafe_string_to_cstring(d_name_str)
-
-				/* check for current or parent directory (. or ..) */
 				if d_name_str == "." || d_name_str == ".." {
 					continue
 				}
 
 				#partial switch d.type {
 				case .DIR:
-					new_dfd: linux.Fd
-					new_dfd, errno = linux.openat(dfd, d_name_cstr, _OPENDIR_FLAGS)
-					if errno != .NONE {
-						return _get_platform_error(errno)
-					}
-					defer linux.close(new_dfd)
-					remove_all_dir(new_dfd) or_return
-					errno = linux.unlinkat(dfd, d_name_cstr, {.REMOVEDIR})
+					name_list_append(&dir_names, d_name_str)
 				case:
-					errno = linux.unlinkat(dfd, d_name_cstr, nil)
-				}
-
-				if errno != .NONE {
-					return _get_platform_error(errno)
+					name_list_append(file_names, d_name_str)
 				}
 			}
+		}
+
+		// remove files
+		i: int
+		for f in name_list_cstring_iter(file_names^, &i) {
+			errno := linux.unlinkat(dfd, f, nil)
+			if errno != .NONE {
+				return _get_platform_error(errno)
+			}
+		}
+		clear(&file_names.offsets)
+		clear(&file_names.backing)
+
+		// recurse into directories
+		i = 0
+		for d in name_list_cstring_iter(dir_names, &i) {
+			new_dfd, errno := linux.openat(dfd, d, _OPENDIR_FLAGS)
+			if errno != .NONE {
+				return _get_platform_error(errno)
+			}
+			defer linux.close(new_dfd)
+			remove_all_dir(new_dfd, file_names, entries) or_return
+			errno = linux.unlinkat(dfd, d, {.REMOVEDIR})
 		}
 		return nil
 	}
@@ -141,9 +174,18 @@ _remove_all :: proc(path: string) -> Error {
 	case:
 		return _get_platform_error(errno)
 	}
-
 	defer linux.close(fd)
-	remove_all_dir(fd) or_return
+
+	// The lifetimes of both the list of files and the entry backing end
+	// before descending each directory. So, we pass these buffers along
+	// and reuse them as scratch space.
+	file_names: Name_List
+	direntry_backing := make([]u8, 4096)
+	defer(delete(file_names.backing))
+	defer(delete(file_names.offsets))
+	defer(delete(direntry_backing))
+
+	remove_all_dir(fd, &file_names, &direntry_backing) or_return
 	return _get_platform_error(linux.rmdir(path_cstr))
 }
 
