@@ -160,7 +160,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 
 			if left < right {
 				loop(data, left, width, cmp, arg, 0)
-				data =data[(left + 1) * width:]
+				data = data[(left + 1) * width:]
 				length = right - 1
 				last_piv = -1
 			} else {
@@ -187,7 +187,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			gap := gaps[k]
 			for i := gap ; i < length; i += 1 {
 				j := i
-				for j >= gap && cmp(data[(j - gap) * width:], data[j * width:], arg) != .Less {
+				for j >= gap && cmp(data[(j - gap) * width:], data[j * width:], arg) == .Greater {
 					ptr_swap_non_overlapping(data[(j - gap) * width:], data[j * width:], width)
 					j -= gap
 				}
