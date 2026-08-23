@@ -130,39 +130,46 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 	loop(data, length, width, cmp, arg, 0)
 
 	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, last_piv: int) {
-		if length <= 64 {
-			shell_sort(data, length, width, cmp, arg)
-			return
-		}
+		data := data; length := length; last_piv := last_piv
 
-		log2 :: proc(n: int) -> (log: int) {
-			for n := n; n > 0; n >>= 1 {
-				log += 1
+		for {
+			if length <= 64 {
+				shell_sort(data, length, width, cmp, arg)
+				return
 			}
-			return log
-		}
-		depth := log2(length) / 5
-		pivot_index := median_3(data, 0, length, width, cmp, arg, depth)
 
-		if last_piv == -1 && cmp(data[pivot_index * width:], data[last_piv * width:], arg) == .Equal {
-			left := partition_lumoto_reverse(data, length, width, cmp, arg, pivot_index)
+			log2 :: proc(n: int) -> (log: int) {
+				for n := n; n > 0; n >>= 1 {
+					log += 1
+				}
+				return log
+			}
+			depth := log2(length) / 5
+			pivot_index := median_3(data, 0, length, width, cmp, arg, depth)
+
+			if last_piv == -1 && cmp(data[pivot_index * width:], data[last_piv * width:], arg) == .Equal {
+				left := partition_lumoto_reverse(data, length, width, cmp, arg, pivot_index)
+				data = data[left * width:]
+				length = length - left
+				last_piv = 0
+				continue
+			}
+
+			left := partition_lumoto_block(data, length, width, cmp, arg, pivot_index)
 			right := length - left
-			#must_tail loop(data[left * width:], right, width, cmp, arg, 0)
-			return
-		}
 
-		left := partition_lumoto_block(data, length, width, cmp, arg, pivot_index)
-		right := length - left
-
-		if left < right {
-			loop(data, left, width, cmp, arg, 0)
-			#must_tail loop(data[(left + 1) * width:], right - 1, width, cmp, arg, -1)
-			return
-		} else {
-			loop(data[(left + 1) * width:], right - 1, width, cmp, arg, -1)
-			#must_tail loop(data, left, width, cmp, arg, 0)
-			return
+			if left < right {
+				loop(data, left, width, cmp, arg, 0)
+				data =data[(left + 1) * width:]
+				length = right - 1
+				last_piv = -1
+			} else {
+				loop(data[(left + 1) * width:], right - 1, width, cmp, arg, -1)
+				length = left
+				last_piv = 0
+			}
 		}
+		
 	}
 
 	shell_sort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
