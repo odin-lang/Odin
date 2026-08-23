@@ -2630,12 +2630,13 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	if (build_context.no_crt && !build_context.no_thread_local) {
 		switch (build_context.metrics.os) {
+		case TargetOs_windows:
 		case TargetOs_linux:
 		case TargetOs_darwin:
 		case TargetOs_freebsd:
 		case TargetOs_openbsd:
 		case TargetOs_netbsd:
-			gb_printf_err("-no-crt on Unix systems requires the -no-thread-local flag to also be present, because the TLS is inaccessible without CRT\n");
+			gb_printf_err("-no-crt requires the -no-thread-local flag to also be present, because the TLS is inaccessible without CRT\n");
 			no_crt_checks_failed = true;
 		}
 	}
