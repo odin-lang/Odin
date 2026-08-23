@@ -153,7 +153,7 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		depth := log2(len(arr)) / 5
 		pivot_index := median_3(arr, data, 0, len(arr) - 1, depth)
 
-		if last_piv != 0 && !LESS(arr[last_piv], arr[pivot_index], data) {
+		if last_piv == -1 && !LESS(arr[last_piv], arr[pivot_index], data) {
 			left := partition_lumoto_reverse(arr, data, pivot_index)
 			#must_tail loop(arr[left + 1:], data, 0)
 			return
