@@ -141,7 +141,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			}
 			return
 		}
-		depth := log2(length + 16) / 5
+		depth := log2(length) / 5
 		pivot_index := median_3(data, 0, length, width, cmp, arg, depth)
 
 		if last_piv != 0 && cmp(data[pivot_index * width:], data[last_piv * width:], arg) == .Equal {
