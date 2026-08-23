@@ -130,8 +130,8 @@ _generic_quicksort :: proc(data: [^]byte, length, width: uint, cmp: Generic_Cmp,
 	loop(data, int(length), int(width), cmp, arg, 0)
 
 	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, last_piv: int) {
-		if length <= 16 {
-			insertion_sort(data, length, width, cmp, arg)
+		if length <= 64 {
+			shell_sort(data, length, width, cmp, arg)
 			return
 		}
 
@@ -149,8 +149,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: uint, cmp: Generic_Cmp,
 			right := length - left
 			#must_tail loop(data[left * width:], right, width, cmp, arg, 0)
 			return
-		} 
-
+		}
 
 		left := partition_lumoto_block(data, length, width, cmp, arg, pivot_index)
 		right := length - left
@@ -166,12 +165,25 @@ _generic_quicksort :: proc(data: [^]byte, length, width: uint, cmp: Generic_Cmp,
 		}
 	}
 
-	// the worst smallsort in the history of smallsorts
-	insertion_sort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) #no_bounds_check {
-		for i in 1..<length {
-			j := i
-			for ; j > 0 && cmp(data[j * width:], data[(j - 1) * width:], arg) == .Less; j -= 1 {
-				ptr_swap_non_overlapping(data[(j - 1) * width:], data[j * width:], width)
+	shell_sort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
+		if length < 2 {
+			return
+		}
+
+		gaps := []int{43, 17, 7, 3, 1};
+
+		k := 0
+		for gaps[k] > length {
+			k += 1
+		}
+		for ; k < 5; k += 1 {
+			gap := gaps[k]
+			for i := gap ; i < length; i += 1 {
+				j := i
+				for j >= gap && cmp(data[(j - gap) * width:], data[j * width:], arg) != .Less {
+					ptr_swap_non_overlapping(data[(j - gap) * width:], data[j * width:], width)
+					j -= gap
+				}
 			}
 		}
 	}
