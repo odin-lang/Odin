@@ -38,8 +38,8 @@ sort_inlined_with_indices :: proc(arr: $T/[]$E, allocator := context.allocator) 
 			}
 
 			base_type :: intrinsics.type_core_type(E)
-			arr := transmute([]base_type)arr
-			_quick_lumoto(indices, &arr, proc(l, r: int, user_data: rawptr) -> bool {
+			base := transmute([]base_type)arr
+			_quick_lumoto(indices, &base, proc(l, r: int, user_data: rawptr) -> bool {
 				data := (^T)(user_data)
 				return data[l] < data[r]
 			})
@@ -148,37 +148,43 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 	loop(arr, data, 0)
 	
 	loop :: proc(arr: T, data: rawptr, last_piv: int) #no_bounds_check {
-		if len(arr) <= 32 {
-			insertion_sort(arr, data)
-			return
-		}
-		
-		depth := log2(len(arr)) / 5
-		pivot_index := median_3(arr, data, 0, len(arr) - 1, depth)
+		arr := arr; last_piv := last_piv
 
-		if last_piv == -1 && !LESS(arr[last_piv], arr[pivot_index], data) {
-			left := partition_lumoto_reverse(arr, data, pivot_index)
-			#must_tail loop(arr[left + 1:], data, 0)
-			return
-		} 
+		for {
+			if len(arr) <= 32 {
+				insertion_sort(arr, data)
+				return
+			}
+			
+			depth := log2(len(arr)) / 5
+			pivot_index := median_3(arr, data, 0, len(arr) - 1, depth)
 
-		when size_of(E) > 80 {
-			left := prtition_hoare(arr, data, pivot_index)
-		} else {
-			left := partition_lumoto(arr, data, pivot_index)
-		}
-		
-		right := len(arr) - left
+			if last_piv == -1 && !LESS(arr[last_piv], arr[pivot_index], data) {
+				left := partition_lumoto_reverse(arr, data, pivot_index)
+				arr = arr[left + 1:]
+				last_piv = 0
+				continue
+			} 
 
-		if left < right {
-			loop(arr[:left], data, 0)
-			#must_tail loop(arr[left + 1:], data, -1)
-			return
-		} else {
-			loop(arr[left + 1:], data, -1)
-			#must_tail loop(arr[:left], data, 0)
-			return
+			when size_of(E) > 80 {
+				left := prtition_hoare(arr, data, pivot_index)
+			} else {
+				left := partition_lumoto(arr, data, pivot_index)
+			}
+			
+			right := len(arr) - left
+
+			if left < right {
+				loop(arr[:left], data, 0)
+				arr = arr[left + 1:]
+				last_piv = -1
+			} else {
+				loop(arr[left + 1:], data, -1)
+				arr = arr[:left]
+				last_piv = 0
+			}
 		}
+
 	}
 
 	log2 :: proc(n: int) -> (log: int) {
