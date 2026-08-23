@@ -168,12 +168,12 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		right := len(arr) - left
 
 		if left < right {
-			loop(arr[:left], data, left)
+			loop(arr[:left], data, 0)
 			#must_tail loop(arr[left + 1:], data, -1)
 			return
 		} else {
 			loop(arr[left + 1:], data, -1)
-			#must_tail loop(arr[:left], data, left)
+			#must_tail loop(arr[:left], data, 0)
 			return
 		}
 	}
