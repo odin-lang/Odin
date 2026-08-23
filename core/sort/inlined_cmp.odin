@@ -99,11 +99,14 @@ sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E
 				arr: T,
 				user_data: rawptr,
 			}
-			ctx := Context{arr, user_data}
+			arr := arr
+			ctx := &Context{arr, user_data}
 
-			_quick_lumoto(indices, &ctx, proc(l, r: int, user_data: rawptr) -> bool {
+			_quick_lumoto(indices, ctx, proc(l, r: int, user_data: rawptr) -> bool {
 				ctx := (^Context)(user_data)
-				return LESS(ctx.arr[l], ctx.arr[r], ctx.user_data)
+				left := ctx.arr[l]
+				right := ctx.arr[r]
+				return LESS(left , right, ctx.user_data)
 			})
 
 			slice.sort_from_permutation_indices(arr, indices)
@@ -150,7 +153,7 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		depth := log2(len(arr)) / 5
 		pivot_index := median_3(arr, data, 0, len(arr) - 1, depth)
 
-		if last_piv != 0 && arr[pivot_index] == arr[last_piv] {
+		if last_piv != 0 && !LESS(arr[last_piv], arr[pivot_index], data) {
 			left := partition_lumoto_reverse(arr, data, pivot_index)
 			#must_tail loop(arr[left + 1:], data, 0)
 			return
