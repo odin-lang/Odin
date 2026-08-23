@@ -139,7 +139,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 			for n := n; n > 0; n >>= 1 {
 				log += 1
 			}
-			return
+			return log
 		}
 		depth := log2(length) / 5
 		pivot_index := median_3(data, 0, length, width, cmp, arg, depth)
