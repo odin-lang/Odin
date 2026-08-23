@@ -24,18 +24,18 @@ test_sort_inlined :: proc(t: ^testing.T) {
 @(test)
 test_sort_inlined_by :: proc(t: ^testing.T) {
 	rand.reset(t.seed)
-	arr := make([][5]i32, 1_000)
+	arr := make([][25]i32, 1_000)
 	defer delete(arr)
 	
 	for &a in arr {
 		a[0] = cast(i32)rand.int_max(1_000)
 	}
 
-	sort.sort_inlined_by(arr, proc(l, r: [5]i32) -> bool {
+	sort.sort_inlined_by(arr, proc(l, r: [25]i32) -> bool {
 		return l[0] > r[0]
 	})
 
-	testing.expect(t, slice.is_sorted_by(arr, proc(l, r: [5]i32) -> bool {
+	testing.expect(t, slice.is_sorted_by(arr, proc(l, r: [25]i32) -> bool {
 		return l[0] > r[0]
 	}), "expected sort_inlined_by to sort")
 }

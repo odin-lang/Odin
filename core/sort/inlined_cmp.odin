@@ -3,7 +3,8 @@ package sort
 import "core:slice"
 import "base:intrinsics"
 
-
+// WARNING: each call generates a new quicksort, only use in performance critical path
+//
 // This sort is not guaranteed to be stable
 sort_inlined :: proc(arr: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
@@ -25,6 +26,8 @@ sort_inlined_by :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool) {
 	}
 }
 
+// WARNING: each call generates a new quicksort, only use in performance critical path
+//
 // This sort is not guaranteed to be stable
 sort_inlined_with_indices :: proc(arr: $T/[]$E, allocator := context.allocator) -> (indices: []int) where ORD(E) {
 	indices = make([]int, len(arr), allocator)
@@ -159,7 +162,7 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 			return
 		} 
 
-		when size_of(T) > 80 {
+		when size_of(E) > 80 {
 			left := prtition_hoare(arr, data, pivot_index)
 		} else {
 			left := partition_lumoto(arr, data, pivot_index)
