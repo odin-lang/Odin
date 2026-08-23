@@ -126,8 +126,8 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 }
 
 @(private)
-_generic_quicksort :: proc(data: [^]byte, length, width: uint, cmp: Generic_Cmp, arg: rawptr) {
-	loop(data, int(length), int(width), cmp, arg, 0)
+_generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
+	loop(data, length, width, cmp, arg, 0)
 
 	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, last_piv: int) {
 		if length <= 64 {
