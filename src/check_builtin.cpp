@@ -1302,7 +1302,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			Type *elem = base_array_type(x.type);
 			i64 max_count = x.type->SimdVector.count;
 			i64 value = -1;
-			if (!check_index_value(c, x.type, false, ce->args[1], max_count, &value)) {
+			if (!check_index_value(c, &x, x.type, false, ce->args[1], max_count, &value)) {
 				return false;
 			}
 
@@ -1323,7 +1323,7 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 			Type *elem = base_array_type(x.type);
 			i64 max_count = x.type->SimdVector.count;
 			i64 value = -1;
-			if (!check_index_value(c, x.type, false, ce->args[1], max_count, &value)) {
+			if (!check_index_value(c, &x, x.type, false, ce->args[1], max_count, &value)) {
 				return false;
 			}
 

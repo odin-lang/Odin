@@ -5429,7 +5429,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	operand->type = target_type;
 }
 
-gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast *index_value, i64 max_count, i64 *value, Type *type_hint=nullptr) {
+gb_internal bool check_index_value(CheckerContext *c, Operand *indexable_operand, Type *main_type, bool open_range, Ast *index_value, i64 max_count, i64 *value, Type *type_hint=nullptr) {
 	Operand operand = {Addressing_Invalid};
 	check_expr_with_type_hint(c, &operand, index_value, type_hint);
 	if (operand.mode == Addressing_Invalid) {
@@ -5469,7 +5469,9 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 	}
 
 	if (operand.mode == Addressing_Constant &&
-	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
+	    ((c->state_flags & StateFlag_no_bounds_check) == 0 ||
+	     indexable_operand->mode == Addressing_Constant)
+	    ) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
 		if (i.sign && !is_type_enum(index_type) && !is_type_multi_pointer(main_type)) {
 			TEMPORARY_ALLOCATOR_GUARD();
@@ -9692,8 +9694,8 @@ gb_internal void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *nod
 	
 	i64 row_index = 0;
 	i64 column_index = 0;
-	bool row_ok = check_index_value(c, t, false, ie->row_index, row_count, &row_index, nullptr);
-	bool column_ok = check_index_value(c, t, false, ie->column_index, column_count, &column_index, nullptr);
+	bool row_ok    = check_index_value(c, o, t, false, ie->row_index, row_count, &row_index, nullptr);
+	bool column_ok = check_index_value(c, o, t, false, ie->column_index, column_count, &column_index, nullptr);
 	if (is_const && (ie->row_index->tav.mode != Addressing_Constant || ie->column_index->tav.mode != Addressing_Constant)) {
 		error(o->expr, "Cannot index constant matrix with non-constant indices '%s'", expr_to_string(node));
 	}
@@ -12164,7 +12166,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 	}
 
 	i64 index = 0;
-	bool ok = check_index_value(c, t, false, ie->index, max_count, &index, index_type_hint);
+	bool ok = check_index_value(c, o, t, false, ie->index, max_count, &index, index_type_hint);
 	if (is_const) {
 		if (index < 0) {
 			ERROR_BLOCK();
@@ -12354,7 +12356,7 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 				capacity = max_count;
 			}
 			i64 j = 0;
-			if (check_index_value(c, t, true, nodes[i], capacity, &j)) {
+			if (check_index_value(c, o, t, true, nodes[i], capacity, &j)) {
 				index = j;
 			}
 
