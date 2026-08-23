@@ -155,12 +155,12 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 		right := length - left
 
 		if left < right {
-			loop(data, left, width, cmp, arg, left)
+			loop(data, left, width, cmp, arg, 0)
 			#must_tail loop(data[(left + 1) * width:], right - 1, width, cmp, arg, -1)
 			return
 		} else {
 			loop(data[(left + 1) * width:], right - 1, width, cmp, arg, -1)
-			#must_tail loop(data, left, width, cmp, arg, left)
+			#must_tail loop(data, left, width, cmp, arg, 0)
 			return
 		}
 	}
