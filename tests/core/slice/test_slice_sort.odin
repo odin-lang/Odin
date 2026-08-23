@@ -152,8 +152,8 @@ test_slice_sort_by_cmp :: proc(t: ^testing.T) {
 	slice.sort_by_cmp(
 		arr,
 		proc(l, r: f32) -> slice.Ordering {
-			if l < r do return .Less
-			if l > r do return .Greater
+			if l < r { return .Less }
+			if l > r { return .Greater }
 			return .Equal
 		},
 	)
