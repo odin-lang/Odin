@@ -38,7 +38,7 @@ sort :: proc(data: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			raw := ([^]byte)(raw_data(data))
-			min_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				x, y := (^E)(lhs)^, (^E)(rhs)^
 				if x < y {
 					return .Less
@@ -109,7 +109,7 @@ sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := 
 			}
 
 			raw := ([^]byte)(raw_data(indices))
-			min_quicksort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				data := ([^]E)(user_data)
 
 				xi, yi := (^int)(lhs)^, (^int)(rhs)^
@@ -135,7 +135,7 @@ sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			raw := ([^]byte)(raw_data(data))
-			min_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				x, y := (^E)(lhs)^, (^E)(rhs)^
 				less := (proc(E, E) -> bool)(user_data)
 				switch {
@@ -158,7 +158,7 @@ sort_by_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_data: rawptr) 
 			ctx := &Context{less, user_data}
 
 			raw := ([^]byte)(raw_data(data))
-			min_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				x, y := (^E)(lhs)^, (^E)(rhs)^
 				ctx := (^Context)(user_data)
 				switch {
@@ -188,7 +188,7 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 			ctx := &Context{less, data}
 
 			raw := ([^]byte)(raw_data(indices))
-			min_quicksort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				ctx := (^Context)(user_data)
 				xi, yi := (^int)(lhs)^, (^int)(rhs)^
 				x, y := ctx.data[xi], ctx.data[yi]
@@ -221,7 +221,7 @@ sort_by_with_indices_with_data :: proc(data: $T/[]$E, less: proc(i, j: E, user_d
 			ctx := &Context{less, data, user_data}
 
 			raw := ([^]byte)(raw_data(indices))
-			min_quicksort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(indices)), size_of(int), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				ctx := (^Context)(user_data)
 				xi, yi := (^int)(lhs)^, (^int)(rhs)^
 				x, y := ctx.data[xi], ctx.data[yi]
@@ -242,7 +242,7 @@ sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			raw := ([^]byte)(raw_data(data))
-			min_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				x, y := (^E)(lhs)^, (^E)(rhs)^
 				cmp := cast(proc(E, E) -> Ordering)(user_data)
 				return cmp(x, y)
@@ -262,7 +262,7 @@ sort_by_cmp_with_data :: proc(data: $T/[]$E, cmp: proc(i, j: E, user_data: rawpt
 			ctx := &Context{cmp, user_data}
 
 			raw := ([^]byte)(raw_data(data))
-			min_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
+			_generic_quicksort(raw, uint(len(data)), size_of(E), proc(lhs, rhs: rawptr, user_data: rawptr) -> Ordering {
 				x, y := (^E)(lhs)^, (^E)(rhs)^
 				ctx := (^Context)(user_data)
 				return ctx.cmp(x, y, ctx.user_data)
@@ -276,7 +276,7 @@ sort_by_generic_cmp :: proc(data: $T/[]$E, cmp: Generic_Cmp, user_data: rawptr) 
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			raw := ([^]byte)(raw_data(data))
-			min_quicksort(raw, uint(len(data)), size_of(E), cmp, user_data)
+			_generic_quicksort(raw, uint(len(data)), size_of(E), cmp, user_data)
 		}
 	}
 }
