@@ -185,7 +185,7 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		for n := n; n > 0; n >>= 1 {
 			log += 1
 		}
-		return
+		return log
 	}
 
 	median_3 :: proc(arr: T, data: rawptr, start, end, depth: int) -> int #no_bounds_check {
@@ -238,7 +238,7 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		arr[j] = arr[left]
 		arr[left] = pivot
 
-		return
+		return left
 	}
 
 	// [  ?  |  <=  |0|  >  ]
@@ -260,7 +260,7 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		arr[j] = arr[right]
 		arr[right] = pivot
 
-		return
+		return right
 	}
 
 	// only used for large types as it uses less data moves
@@ -285,7 +285,7 @@ _quick_lumoto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 			if left >= right {
 				arr[right] = pivot
 				left = right
-				return  
+				return left
 			}
 			arr[right] = arr[left]
 			right -= 1
