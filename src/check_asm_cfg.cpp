@@ -8,6 +8,9 @@ struct AsmBlock {
 	u16              in_flags;
 	u16              out_flags;
 
+	u16              live_in_regs;
+	u16              live_out_regs;
+
 	PtrSet<Entity *> in_params;
 	PtrSet<Entity *> out_params;
 
@@ -134,8 +137,18 @@ gb_internal void asm_cfg_populate_decls(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 		Entity *e = decls[i].entity;
 		cfg->decl_pin_bit[i] = asm_decl_resolve_pin_bit(asm_ctx, decls, cast(i32)i);
 		if (e != nullptr) {
-			map_set(&cfg->entity_to_index, e, cast(i32)i);
-			cfg->universe_pm |= (cast(u64)1 << i);
+			if (decls[i].view_of >= 0) {
+				// NOTE(bill): A view shares its source's lattice bit, as it is not an independent value.
+				i32 src_i = decls[i].view_of;
+				Entity *src_e = decls[src_i].entity;
+				if (src_e != nullptr) {
+					map_set(&cfg->entity_to_index, e, src_i);  // view entity -> source index
+				}
+				// NOTE(bill): No need to set a universe bit for the view as the source already has one
+			} else {
+				map_set(&cfg->entity_to_index, e, cast(i32)i);
+				cfg->universe_pm |= (cast(u64)1 << i);
+			}
 		}
 	}
 }
@@ -549,8 +562,14 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 					if (((run_pm >> *ix) & 1) == 0 && !ptr_set_exists(&reported_params, pe)) {
 						Ast *loc = instr->name;
 						for (Ast *op : instr->operands) {
-							if (entity_of_node(op) == pe) { loc = op; break; }
+							if (entity_of_node(op) == pe) {
+								loc = op;
+								break;
+							}
 						}
+						gb_printf_err("RBW-ERROR site=<label> pe='%.*s' run_pm-bit-defined=%d\n",
+						    LIT(pe->token.string),
+						    (map_get(&cfg->entity_to_index, pe) ? ((run_pm >> *map_get(&cfg->entity_to_index, pe)) & 1) : -1));
 						error(loc, "'%.*s' reads '%.*s' before it is assigned; its initial value is undefined", LIT(f->name), LIT(pe->token.string));
 						ptr_set_add(&reported_params, pe);
 					}
@@ -628,4 +647,119 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			      "end every path with an unconditional jump, return, or halt");
 		}
 	}
+}
+
+// Backward liveness: a value is live at a point if some path from there reads it before overwriting it.
+// Dual of the forward definite-assignment pass.
+// Used to find dead writes (a definition never read before being overwritten or before template exit).
+//
+// NOTE(bill): only set `emit_dead_writes` to be true when all instructions are "good".
+template <typename AsmCtx>
+gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *entity, bool emit_dead_writes) {
+	isize const n = cfg->blocks.count;
+	if (n == 0) {
+		return false;
+	}
+
+	u16 const REG_TOP = asm_ctx->CLOBBER_REGS_NAMED;
+
+	u16 exit_live = 0;
+	for_array(i, entity->AsmTemplate.decls) {
+		auto const &ed = entity->AsmTemplate.decls[i];
+		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output) {
+			exit_live |= cfg->decl_pin_bit[i]; // pinned/view-inherited output reg, if any
+		}
+	}
+	for (String const &reg : entity->AsmTemplate.clobber_registers_set) {
+		exit_live |= asm_ctx->clobber_bit_for_reg_name(reg);
+	}
+
+	auto live_in  = slice_make<u16>(heap_allocator(), n); defer (slice_free(&live_in,  heap_allocator()));
+	auto live_out = slice_make<u16>(heap_allocator(), n); defer (slice_free(&live_out, heap_allocator()));
+
+	bool changed = true;
+	while (changed) {
+		changed = false;
+		// Iterate in reverse for faster convergence
+		for (isize bi = n - 1; bi >= 0; bi--) {
+			if (!cfg->blocks[bi].reachable) {
+				continue;
+			}
+			AsmBlock const &b = cfg->blocks[bi];
+
+			// live_out = union of successors' live_in, plus exit_live if this block leaves.
+			u16 lo = 0;
+			for (i32 s : b.succs) {
+				if (0 <= s && s < cast(i32)n && cfg->blocks[s].reachable) {
+					lo |= live_in[s];
+				}
+			}
+			if (check_asm_cfg_block_leaves(cfg, cast(i32)bi)) {
+				lo |= exit_live;
+			}
+
+			u16 live = lo;
+			for (i32 ii = b.last; ii >= b.first; ii--) {
+				AsmInstructionFacts *f = cfg->insts[ii]->facts;
+				if (f == nullptr) {
+					continue;
+				}
+				live = (live & ~f->gen_regs) | (f->read_regs & REG_TOP);
+			}
+
+			if (lo != live_out[bi] || live != live_in[bi]) {
+				live_out[bi] = lo;
+				live_in[bi]  = live;
+				changed = true;
+			}
+		}
+	}
+
+	for_array(bi, cfg->blocks) {
+		cfg->blocks[bi].live_in_regs  = live_in[bi];
+		cfg->blocks[bi].live_out_regs = live_out[bi];
+	}
+
+	if (!emit_dead_writes) {
+		// Lattice has been computed but no diagnostic until the read facts are validated
+		return false;
+	}
+
+	// Dead-write detection: walk each block forward, tracking live-out per instruction.
+	// A written reg that is not live immediately after the write (and not re-read in
+	// this same instruction) is dead.
+	for_array(bi, cfg->blocks) {
+		AsmBlock const &b = cfg->blocks[bi];
+		if (!b.reachable) {
+			continue;
+		}
+		// recompute per-instruction live-out by replaying the transfer from block live_out
+		// (cheap: block is short). Build an array of live-after-each-instruction.
+		u16 live = live_out[bi];
+		if (check_asm_cfg_block_leaves(cfg, cast(i32)bi)) {
+			live |= exit_live; // already folded above, but harmless
+		}
+		for (i32 ii = b.last; ii >= b.first; ii--) {
+			AsmInstructionFacts *f = cfg->insts[ii]->facts;
+			if (f == nullptr) {
+				continue;
+			}
+			u16 live_after = live;
+			// A register this instruction writes but that is not live afterward,
+			// and that it does not itself read (self-use like `xor r,r` or `add r,x`),
+			// is a dead write.
+			u16 dead = f->gen_regs & ~live_after & ~f->read_regs;
+			for (u16 bit = 1; bit != 0; bit <<= 1) {
+				if ((dead & bit) == 0) {
+					continue;
+				}
+				warning(f->node->name,
+				        "'%.*s' writes %%%s but its value is never read before being overwritten or the template ends",
+				        LIT(f->name), asm_ctx->clobber_reg_bit_name(bit));
+			}
+			live = (live & ~f->gen_regs) | (f->read_regs & REG_TOP);
+		}
+	}
+
+	return true;
 }

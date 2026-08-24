@@ -1107,7 +1107,7 @@ gb_internal void check_operand_constraints(AsmCtx *asm_ctx, Slice<Operand> const
 }
 
 template <typename AsmCtx>
-gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
+gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
                                 u16 mnemonic, u16 pseudo_mnemonic, Slice<Operand> const &operands,
                                 u8 previous_prefix, Ast *previous_prefix_instr,
                                 AsmCfg *cfg) {
@@ -1514,7 +1514,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			error(instr->name, "The asm instruction '%.*s' expects %d..=%d operands, got %td", LIT(name), min_count, max_count, operands.count);
 		}
 		print_possible_forms();
-		return;
+		return false;
 	}
 
 	if (matched) {
@@ -1687,8 +1687,20 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 						// A read of the view is a read of the source
 						if (cast(u16)clobber.read & (1u << slot)) {
-							array_add(&facts->read_params, src_e);
+							i32 di = -1;
+							for_array(k, decls) {
+								if (decls[k].entity == pe) {
+									di = cast(i32)k;
+									break;
+								}
+							}
+							if (di >= 0 && decls[di].view_of >= 0 && decls[decls[di].view_of].entity != nullptr) {
+								array_add(&facts->read_params, decls[decls[di].view_of].entity);
+							} else {
+								array_add(&facts->read_params, pe);
+							}
 						}
+
 						// A write of the view defines the source only if it covers the parent
 						if (cast(u16)clobber.written & (1u << slot)) {
 							i32 parent_w = check_asm_operand_bit_width(src_e->type);
@@ -1766,8 +1778,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				cfg->impure_reason      = why;
 				cfg->impure_reason_node = instr->name;
 			}
+
+			// NOTE(bill): return true even on a purity test because the instruction is still good
 		}
-		return;
+		return true;
 	}
 
 	// NOTE(bill): Failure path
@@ -1878,6 +1892,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		print_possible_forms();
 	}
 	end_error_block();
+
+	return false;
 }
 
 
@@ -2461,6 +2477,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	u8 previous_prefix = 0;
 	Ast *previous_prefix_instr = nullptr; // for a good error location
+	bool all_instructions_good = true;
 
 	for (Ast *instruction_ : at->instructions) {
 		switch (instruction_->kind) {
@@ -2489,9 +2506,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				previous_prefix_instr = instruction_;
 			} else if (res == CheckMnemomic_Mnemonic) {
 				instr->suffix_flags = suffix_flags;
-				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, 0, slice_from_array(operands),
-				               previous_prefix, previous_prefix_instr,
-				               &cfg);
+				all_instructions_good &= check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, 0, slice_from_array(operands),
+				                                        previous_prefix, previous_prefix_instr,
+				                                        &cfg);
 
 				cfg.saw_any_instructions = true;
 
@@ -2503,9 +2520,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				u16 pseudo_mnemonic = cast(u16)mnemonic;
 				auto alias = asm_ctx->pseudo_alias(cast(u16)pseudo_mnemonic);
 				u16 target_mnemonic = cast(u16)alias.target;
-				check_mnemonic(asm_ctx, ctx, entity, instr, target_mnemonic, pseudo_mnemonic, slice_from_array(operands),
-				               previous_prefix, previous_prefix_instr,
-				               &cfg);
+				all_instructions_good &=check_mnemonic(asm_ctx, ctx, entity, instr, target_mnemonic, pseudo_mnemonic, slice_from_array(operands),
+				                                       previous_prefix, previous_prefix_instr,
+				                                       &cfg);
 
 				cfg.saw_any_instructions = true;
 
@@ -2513,7 +2530,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				previous_prefix_instr = nullptr;
 			} else if (res == CheckMnemomic_PseudoMacroMnemonic) {
 				instr->suffix_flags = suffix_flags;
-				check_pseudo_macro_mnemonic(asm_ctx, entity, instr, slice_from_array(operands));
+				all_instructions_good &= check_pseudo_macro_mnemonic(asm_ctx, entity, instr, slice_from_array(operands));
 
 				cfg.saw_any_instructions = true;
 
@@ -2627,6 +2644,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	check_asm_cfg_build(asm_ctx, &cfg, d->init_expr, entity);
 	check_asm_cfg_analyse(asm_ctx, &cfg, ctx, entity);
+	check_asm_cfg_liveness(asm_ctx, &cfg, entity, /*emit_dead_writes*/all_instructions_good);
 
 	bool vet_unused = false;
 	{
