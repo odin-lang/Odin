@@ -618,6 +618,17 @@ struct Asm_riscv {
 		return reg_class_from_operand_type(t);
 	}
 
+	// RISC-V has no slot that only one named hardware register can fill.
+	u16 operand_type_named_reg_class(OperandType t) const {
+		gb_unused(t);
+		return REG_CLASS_NONE;
+	}
+
+	String named_reg_class_string(u16 reg_class) const {
+		gb_unused(reg_class);
+		return str_lit("hardware");
+	}
+
 	u16 operand_type_bit_width(OperandType t) const {
 		switch (t) {
 		case OP_NONE:
