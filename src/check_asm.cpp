@@ -1503,7 +1503,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				has_rm_slot = true;
 			}
 		}
-		bool mem_is_real = has_mem_operand || !has_rm_slot;
+		bool mem_is_real = has_mem_operand || (!has_rm_slot && operands.count > 0) || clobber.has_implicit_mem();
 
 		bool internal_branch = clobber.has_control() && check_asm_instr_targets_internal_label(instr);
 
