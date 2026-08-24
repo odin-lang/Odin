@@ -1096,7 +1096,7 @@ gb_internal void check_operand_constraints(AsmCtx *asm_ctx, Slice<Operand> const
 			i64  count   = too_big ? 0 : exact_value_to_i64(ev);
 			if (mp_isneg(v) || too_big || count >= width) {
 				gbString vs = exact_value_to_string(ev);
-				error(op->expr, "'%.*s' shift count %s is out of range for a %d-bit operand (must be 0..<%d)",
+				error(op->expr, "'%.*s' shift count %s is out of range for the %d-bit operand (must be 0..<%d)",
 				      LIT(name), vs, cast(int)width, cast(int)width);
 				gb_string_free(vs);
 			}
