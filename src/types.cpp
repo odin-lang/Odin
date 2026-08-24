@@ -3722,14 +3722,6 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 		return ProcOverload_TargetFeatures;
 	}
 
-	if (px.params != nullptr && py.params != nullptr) {
-		Entity *ex = px.params->Tuple.variables[0];
-		Entity *ey = py.params->Tuple.variables[0];
-		bool ok = are_types_identical(ex->type, ey->type);
-		if (ok) {
-		}
-	}
-
 	return ProcOverload_Identical;
 }
 
