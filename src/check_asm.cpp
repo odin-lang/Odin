@@ -459,7 +459,7 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 			Token name_token = name->Ident.token;
 
 			Entity *entity = alloc_entity_param(scope, name_token, type, false, /*is_value*/true);
-			entity->flags |= EntityFlag_Used;
+			// entity->flags |= EntityFlag_Used;
 			if (is_poly_name) {
 				entity->flags |= EntityFlag_PolyConst;
 				if (is_type_internally_pointer_like(type)) {
@@ -552,6 +552,8 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 		GB_ASSERT(spec->name->kind == Ast_Ident);
 
 		Entity *input = scope_lookup_current(scope, spec->name->Ident.interned, spec->name->Ident.hash);
+		add_entity_use(ctx, spec->name, input);
+
 		Entity *other_scratch = nullptr;
 
 		String pin = {};
@@ -562,6 +564,7 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 			if (spec->value->kind == Ast_Ident) {
 				other_scratch = scope_lookup_current(scope, spec->value->Ident.interned, spec->value->Ident.hash);
 				if (other_scratch) {
+					add_entity_use(ctx, spec->value, other_scratch);
 					auto group = check_asm_find_group(other_scratch, *asm_template_entity_decls, nullptr);
 					if (!group) {
 						error(spec->value, "This must be another parameter, got %.*s", LIT(other_scratch->token.string));
@@ -1058,6 +1061,9 @@ struct AsmMnemonicAccumulator {
 	bool        can_be_pure;
 	char const *impure_reason;
 	Ast *       impure_reason_node;
+
+
+	PtrSet<Entity *> defined_params;
 };
 
 gb_internal bool check_asm_instr_targets_internal_label(AstAsmInstruction *instr) {
@@ -1644,6 +1650,40 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			explicit_writes |= synth;
 		}
 		asm_acc->defined_regs |= produced | pinned_param_writes;
+
+		// NOTE(bill): check for read-before-write (use of undefined value)
+		// Only really meaningful in straight-line code, so a label above means a branch
+		// could have defined the value out of the textual order
+		if (asm_acc->straight_line) {
+			for_array(i, operands) {
+				auto const &op = operands[i];
+				int slot = user_operand_target_index(cast(int)i);
+				if (slot < 0 || (cast(u16)clobber.read & (1u << slot)) == 0) {
+					continue; // not a read slot of this form
+				}
+				Entity *pe = entity_of_node(op.expr);
+				if (pe == nullptr || pe->kind != Entity_Variable) {
+					continue; // literal %reg / immediate / memory, not a tracked param
+				}
+				if (!ptr_set_exists(&asm_acc->defined_params, pe)) {
+					error(op.expr, "'%.*s' reads '%.*s' before it is assigned; its initial value is undefined",
+					        LIT(name), LIT(pe->token.string));
+					ptr_set_add(&asm_acc->defined_params, pe); // warn once per param
+				}
+			}
+		}
+
+		// NOTE(bill): record the instruction's parameter writes
+		for_array(i, operands) {
+			int slot = user_operand_target_index(cast(int)i);
+			if (slot < 0 || (cast(u16)clobber.written & (1u << slot)) == 0) {
+				continue;
+			}
+			Entity *pe = entity_of_node(operands[i].expr);
+			if (pe != nullptr && pe->kind == Entity_Variable) {
+				ptr_set_add(&asm_acc->defined_params, pe);
+			}
+		}
 
 		// Registers this form clobbers implicitly (RDTSC->RAX:RDX, etc.), for the
 		// redundant-#clobber hint. Union across the template; pinned regs excluded
@@ -2373,19 +2413,29 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	}
 
 	AsmMnemonicAccumulator asm_acc = {};
+	ptr_set_init(&asm_acc.defined_params);
+	defer (ptr_set_destroy(&asm_acc.defined_params));
+
 
 	// Physical registers known to hold a defined value at the current point in the
 	// straight-line instruction stream. Seeded with input-pinned registers (they
 	// carry their argument at entry); grows as instructions write registers.
 	for (auto const &ed : ate->decls) {
-		if (ed.pin.len == 0) {
-		    continue;
-		}
-		// Only inputs (and the input half of a tie, which is Input-group) hold a
-		// value at entry. Output/scratch pins start undefined and become defined
-		// when an instruction writes them.
-		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Input) {
-			asm_acc.defined_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
+		switch (ed.param_group) {
+		case AsmTemplateEntityDeclParamGroup_Input:
+			if (ed.pin.len != 0) {
+				// Only inputs (and the input half of a tie, which is Input-group) hold a
+				// value at entry. Output/scratch pins start undefined and become defined
+				// when an instruction writes them.
+				asm_acc.defined_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
+			}
+			ptr_set_add(&asm_acc.defined_params, ed.entity);
+			break;
+		case AsmTemplateEntityDeclParamGroup_Output:
+			if (ed.tie >= 0) {
+				ptr_set_add(&asm_acc.defined_params, ed.entity);
+			}
+			break;
 		}
 	}
 
@@ -2605,17 +2655,22 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 
-	// for (auto const &ed : ate->decls) {
-	// 	if (!(ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.pin.len != 0)) {
-	// 		continue;
-	// 	}
-	// 	u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-	// 	if (bit && (asm_acc.defined_regs & bit) == 0 && asm_acc.straight_line) {
-	// 		error(ed.entity->token,
-	// 		      "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
-	// 		      LIT(ed.entity->token.string), LIT(ed.pin));
-	// 	}
-	// }
+	// TODO(bill): Is this actually correct logic now that the written logic was fixed previously?
+	for (auto const &ed : ate->decls) {
+		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output) {
+			continue;
+		}
+		if (ed.pin.len != 0) {
+			u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
+			if (bit != 0 && (asm_acc.defined_regs & bit) == 0 && asm_acc.straight_line) {
+				error(ed.entity->token, "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
+				      LIT(ed.entity->token.string), LIT(ed.pin));
+			}
+		} else if ((ed.entity->flags & EntityFlag_Used) == 0) {
+			error(ed.entity->token, "Output '%.*s' is unpinned but nothing in this template uses it",
+			      LIT(ed.entity->token.string));
+		}
+	}
 
 
 	bool vet_unused = false;
@@ -2659,7 +2714,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		for (auto const &ed : ate->decls) {
 			bool is_scratch   = ed.param_group == AsmTemplateEntityDeclParamGroup_Scratch && ed.view_of < 0;
 			bool is_immediate = ed.kind == AsmTemplateEntityDecl_Immediate;
-			if ((!is_scratch && !is_immediate) || ed.entity == nullptr) {
+			bool is_input     = ed.param_group == AsmTemplateEntityDeclParamGroup_Input;
+			if ((!is_scratch && !is_immediate && !is_input) || ed.entity == nullptr) {
 				continue;
 			}
 			// Used if its identifier is referenced OR (for a pinned scratch) its pinned
@@ -2674,9 +2730,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 					continue;
 				}
 			}
-			error(ed.entity->token, "'asm' %s '%.*s' is declared but never used",
-			      is_immediate ? "immediate parameter" : "scratch parameter",
-			      LIT(ed.entity->token.string));
+			char const *what = is_immediate ? "immediate" :
+			                   is_input     ? "input" :
+			                                  "scratch";
+			error(ed.entity->token, "'asm' %s parameter '%.*s' is declared but never used", what, LIT(ed.entity->token.string));
 		}
 	}
 
