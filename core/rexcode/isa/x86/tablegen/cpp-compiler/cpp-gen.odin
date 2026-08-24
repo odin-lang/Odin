@@ -685,6 +685,36 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
+		// Slots only a specific named hardware register can fill. They carry no GPR/vector
+		// class and, apart from OP_MM, no width either. Nothing else in the size/class
+		// check constrains them and a template parameter would otherwise slip through.
+		u16 operand_type_named_reg_class(OperandType t) const {
+			switch (t) {
+			case OP_SREG: return REG_CLASS_SEG;
+			case OP_CR:   return REG_CLASS_CR;
+			case OP_DR:   return REG_CLASS_DR;
+			case OP_STI:  return REG_CLASS_ST;
+			case OP_MM:   return REG_CLASS_MM;
+			}
+			return REG_CLASS_NONE;
+		}
+
+		String named_reg_class_string(u16 reg_class) const {
+			switch (reg_class) {
+			case REG_CLASS_SEG: return str_lit("segment");
+			case REG_CLASS_CR:  return str_lit("control");
+			case REG_CLASS_DR:  return str_lit("debug");
+			case REG_CLASS_ST:  return str_lit("x87 stack");
+			case REG_CLASS_MM:  return str_lit("MMX");
+			}
+			return str_lit("hardware");
+		}
+	""")
+
+
+	strings.write_string(&sb, "\n\n")
+
+	strings.write_string(&sb, """
 		u16 operand_type_bit_width(OperandType t) const {
 			switch (t) {
 			case OP_R8:  case OP_RM8:  case OP_M8:  case OP_AL_IMPL:  case OP_CL_IMPL: case OP_K_M8:  return 8;

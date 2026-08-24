@@ -152,6 +152,7 @@ enum AsmMismatch : u8 {
 	AsmMismatch_Class,     // register class mismatch
 	AsmMismatch_ImmRange,  // constant immediate does not fit the slot width
 	AsmMismatch_ImmType,   // non-integer constant where an integer immediate is required
+	AsmMismatch_NamedReg,  // slot only a named hardware register can fill
 };
 
 // Does a constant immediate value fit a slot of `bits` width (0 == unconstrained)?
@@ -240,6 +241,23 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	// Register / memory-sized slots
 	AsmRegClass want_class = asm_ctx->operand_type_reg_class(slot);
 	i32         want_w     = asm_ctx->operand_type_bit_width(slot);
+
+	// A slot only a named hardware register can fill (segment/control/debug/x87/MMX)
+	// carries no class and, apart from MMX, no width either. Nothing below would
+	// reject a template parameter standing in for one.
+	u16 want_named = asm_ctx->operand_type_named_reg_class(slot);
+	if (want_named != 0) {
+		bool ok = false;
+		if (operand->expr != nullptr && operand->expr->kind == Ast_AsmRegister) {
+			auto r = asm_ctx->register_lookup(operand->expr->AsmRegister.name.string);
+			ok = r && asm_ctx->reg_class(asm_ctx->register_codes[r]) == want_named;
+		}
+		if (!ok) {
+			if (mismatch_) *mismatch_ = AsmMismatch_NamedReg;
+			return false;
+		}
+		return true;
+	}
 
 	// A pure-label / sizeless slot imposes no reg width/class.
 	if (want_class == AsmRegClass_Unknown && want_w == 0) {
@@ -1366,13 +1384,13 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			width_pref += cast(int)asm_ctx->operand_type_bit_width(type);
 
 			bool spot_ok = false;
+			AsmMismatch m = AsmMismatch_None;
 			if (kind_ok) {
 				bool mem_unsized = (src == AsmOperand_Memory) && are_types_identical(operand->type, t_rawptr);
 
 				if (dst == AsmOperand_Register_Or_Memory && src == AsmOperand_Memory && mem_unsized) {
 					spot_ok = true; // memory form accepts memory; no size check
 				} else {
-					AsmMismatch m = AsmMismatch_None;
 					i32 wb_ = 0, gb_ = 0;
 					spot_ok = check_asm_operand_size_class(asm_ctx, type, operand, &m, &wb_, &gb_);
 					if (!spot_ok && (m == AsmMismatch_Size || m == AsmMismatch_ImmRange) && wb_ > 0 && gb_ > 0) {
@@ -1385,7 +1403,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			if (spot_ok) {
 				score += 2;
 				valid_spots[i] = true;
-			} else if (kind_ok) {
+			} else if (kind_ok && m != AsmMismatch_NamedReg) {
+				// A slot wanting a named hardware register is not a near miss for anything
+				// else, so it must not outrank a form that merely has the widths wrong.
 				score += 1; // kind matched, only value/size/class failed
 			}
 		}
@@ -1654,6 +1674,12 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				      LIT(name), i,
 				      want_bits[i], LIT(asm_reg_class_strings[dst_reg_class]), LIT(asm_operand_kind_strings[dst]),
 				      got_bits[i],  LIT(asm_reg_class_strings[src_reg_class]), LIT(asm_operand_kind_strings[src]));
+			} else if (m == AsmMismatch_NamedReg) {
+				auto slot = operand_slot_type(forms[best_form], cast(int)i);
+				error(operands[i].expr, "'%.*s' operand-%td must be a named %.*s register, got a %.*s",
+				      LIT(name), i,
+				      LIT(asm_ctx->named_reg_class_string(asm_ctx->operand_type_named_reg_class(slot))),
+				      LIT(asm_operand_kind_strings[src]));
 			} else if (dst == AsmOperand_Immediate) {
 				error(operands[i].expr, "'%.*s' operand-%td must be an assemble-time constant or a $ immediate parameter, got a %.*s",
 				      LIT(name), i, LIT(asm_operand_kind_strings[src]));
