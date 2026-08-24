@@ -331,6 +331,13 @@ struct Asm_amd64 {
 		bool is_nondeterministic() const {
 			return (cast(u16)side_effects & SideEffectFlag_NONDETERMINISTIC) != 0;
 		}
+		bool has_implicit_mem() const {
+			if (!writes_mem && !reads_mem) {
+				return false;
+			}
+			u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
+			return (implicit & (ClobberReg_RSP|ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBX)) != 0;
+		}
 	};
 
 	void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {

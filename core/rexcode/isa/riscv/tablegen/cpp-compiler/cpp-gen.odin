@@ -239,6 +239,14 @@ main :: proc() {
 			bool is_nondeterministic() const {
 				return false;
 			}
+			bool has_implicit_mem() const {
+				if (!writes_mem && !reads_mem) {
+					return false;
+				}
+				u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
+				bool is_atomic = false; // TODO(bill): Add ATOMIC flag to SideEffectFlags in the original INSTRUCTION_TABLE
+				return (implicit & (ClobberReg_SP)) != 0 || is_atomic;
+			}
 		};
 
 		void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
