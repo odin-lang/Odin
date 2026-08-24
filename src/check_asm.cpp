@@ -2644,7 +2644,6 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	check_asm_cfg_build(asm_ctx, &cfg, d->init_expr, entity);
 	check_asm_cfg_analyse(asm_ctx, &cfg, ctx, entity);
-	check_asm_cfg_liveness(asm_ctx, &cfg, entity, /*emit_dead_writes*/all_instructions_good);
 
 	bool vet_unused = false;
 	{
