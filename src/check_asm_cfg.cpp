@@ -44,11 +44,8 @@ struct AsmCfg {
 	char const *impure_reason;
 	Ast *       impure_reason_node;
 
-	PtrMap<AstAsmInstruction *, AsmInstructionFacts> instruction_facts;
-
 	Array<AstAsmInstruction *> insts;       // program-order (only for fact-carrying instrs)
 	Array<AsmBlock>            blocks;
-	PtrMap<Entity *, i32>      label_block; // key: Entity_Label*
 
 	PtrMap<Entity *, i32> entity_to_index;
 	Array<u16>            decl_pin_bit;
@@ -56,7 +53,6 @@ struct AsmCfg {
 };
 
 gb_internal void asm_cfg_init(AsmCfg *cfg) {
-	map_init(&cfg->instruction_facts);
 	map_init(&cfg->entity_to_index);
 	cfg->decl_pin_bit.allocator = heap_allocator();
 	cfg->can_be_pure = true;
@@ -71,10 +67,22 @@ gb_internal void asm_cfg_destroy(AsmCfg *cfg) {
 	}
 	array_free(&cfg->blocks);
 	array_free(&cfg->insts);
-	map_destroy(&cfg->label_block);
-	map_destroy(&cfg->instruction_facts);
 	map_destroy(&cfg->entity_to_index);
 	array_free(&cfg->decl_pin_bit);
+}
+
+gb_internal i32 asm_cfg_label_block_index(Entity *entity) {
+	if (entity != nullptr && entity->kind == Entity_Label) {
+		return entity->Label.asm_block_index;
+	}
+	return -1;
+}
+gb_internal bool asm_cfg_label_block_index_set(Entity *entity, i32 index) {
+	if (entity != nullptr && entity->kind == Entity_Label) {
+		GB_ASSERT(entity->Label.asm_block_index < 0);
+		entity->Label.asm_block_index = index;
+	}
+	return false;
 }
 
 // The physical-register bit a decl is pinned to. A width-view carries no pin of
@@ -124,7 +132,6 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 
 	cfg->insts.allocator  = heap_allocator();
 	cfg->blocks.allocator = heap_allocator();
-	map_init(&cfg->label_block);
 
 	bool need_leader = true;
 
@@ -136,7 +143,7 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 			// opens; consecutive labels share it. A trailing label maps to blocks.count.
 			Entity *le = node->AsmLabelDecl.name->Ident.entity;
 			if (le != nullptr) {
-				map_set(&cfg->label_block, le, cast(i32)cfg->blocks.count);
+				asm_cfg_label_block_index_set(le, cast(i32)cfg->blocks.count);
 			}
 			need_leader = true;
 			continue;
@@ -146,7 +153,7 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 		}
 
 		AstAsmInstruction   *instr = &node->AsmInstruction;
-		AsmInstructionFacts *facts = map_get(&cfg->instruction_facts, instr);
+		AsmInstructionFacts *facts = instr->facts;
 		// Prefixes and pseudo-macro ops (li/la) carry no facts and never branch.
 
 		if (need_leader || cfg->blocks.count == 0) {
@@ -175,16 +182,16 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 		AsmBlock *b = &cfg->blocks[bi];
 
 		AstAsmInstruction   *last = cfg->insts[b->last];
-		AsmInstructionFacts *lf   = map_get(&cfg->instruction_facts, last);
+		AsmInstructionFacts *lf   = last->facts;
 
 		i32  branch_succ = -1;
 		bool fallthrough = true;
 
 		if (lf != nullptr && lf->is_control) {
 			if (lf->branch_target != nullptr) {
-				i32 *t = map_get(&cfg->label_block, lf->branch_target);
-				if (t != nullptr && *t < cast(i32)cfg->blocks.count) {
-					branch_succ = *t; // in-range internal target ('jmp .l' / 'jz .l')
+				i32 t = asm_cfg_label_block_index(lf->branch_target);
+				if (0 <= t && t < cast(i32)cfg->blocks.count) {
+					branch_succ = t; // in-range internal target ('jmp .l' / 'jz .l')
 				}
 				// For `t == blocks.count`, this implies a jump to the implicit end, and is handled as "leaves" below
 			}
@@ -228,11 +235,11 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 gb_internal bool check_asm_cfg_block_leaves(AsmCfg *cfg, i32 bi) {
 	AsmBlock const      *b    = &cfg->blocks[bi];
 	AstAsmInstruction   *last = cfg->insts[b->last];
-	AsmInstructionFacts *lf   = map_get(&cfg->instruction_facts, last);
+	AsmInstructionFacts *lf   = last->facts;
 
 	if (lf != nullptr && lf->branch_target != nullptr) {
-		i32 *t = map_get(&cfg->label_block, lf->branch_target);
-		if (t != nullptr && *t >= cast(i32)cfg->blocks.count) {
+		i32 t = asm_cfg_label_block_index(lf->branch_target);
+		if (t >= 0 && t >= cast(i32)cfg->blocks.count) {
 			return true; // 'jmp .end' — falls into the implicit return
 		}
 	}
@@ -367,7 +374,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 		u64 gp = 0;
 		AsmBlock const &b = cfg->blocks[bi];
 		for (i32 ii = b.first; ii <= b.last; ii++) {
-			AsmInstructionFacts *f = map_get(&cfg->instruction_facts, cfg->insts[ii]);
+			AsmInstructionFacts *f = cfg->insts[ii]->facts;
 			if (f == nullptr) {
 				continue;
 			}
@@ -484,7 +491,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 
 			for (i32 ii = b.first; ii <= b.last; ii++) {
 				AstAsmInstruction   *instr = cfg->insts[ii];
-				AsmInstructionFacts *f     = map_get(&cfg->instruction_facts, instr);
+				AsmInstructionFacts *f     = instr->facts;
 				if (f == nullptr) {
 					continue;
 				}

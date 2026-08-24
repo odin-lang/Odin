@@ -1121,11 +1121,11 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		name = asm_ctx->pseudo_mnemonic_strings[pseudo_mnemonic];
 	}
 
-	AsmInstructionFacts facts = {};
-	facts.node = instr;
-	facts.name = name;
-	facts.gen_params.allocator  = heap_allocator();
-	facts.read_params.allocator = heap_allocator();
+	AsmInstructionFacts *facts = gb_alloc_item(permanent_allocator(), AsmInstructionFacts);
+	facts->node = instr;
+	facts->name = name;
+	facts->gen_params.allocator  = heap_allocator();
+	facts->read_params.allocator = heap_allocator();
 
 	defer ({
 		for (auto const &op : operands) {
@@ -1136,11 +1136,11 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			if (e == nullptr || e->kind != Entity_Label) {
 				continue;
 			}
-			facts.branch_target = e;
+			facts->branch_target = e;
 			break;
 		}
 
-		map_set(&cfg->instruction_facts, instr, facts);
+		instr->facts = facts;
 	});
 
 
@@ -1541,7 +1541,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// Handle clobbering from mnemonic
 		auto clobber = clobber_forms[valid_form_index];
 
-		facts.read_regs = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
+		facts->read_regs = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
 
 		// NOTE(bill): reads_mem/writes_mem are per-FORM capability bits.
 		// A form with an r/m slot (e.g. add r/m32, imm32) carries them even
@@ -1630,7 +1630,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			explicit_writes |= synth;
 		}
 
-		facts.gen_regs = produced | pinned_param_writes;
+		facts->gen_regs = produced | pinned_param_writes;
 
 		// NOTE(bill): mnemonics such as `xor r, r` / `sub r, r` act as zeroing the destination
 		// independent of its prior value: the read is architecturally dead, so it must not count as a use.
@@ -1665,10 +1665,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 
 			if (!self_zeroing && (cast(u16)clobber.read & (1u << slot))) {
-				array_add(&facts.read_params, pe);
+				array_add(&facts->read_params, pe);
 			}
 			if (cast(u16)clobber.written & (1u << slot)) {
-				array_add(&facts.gen_params, pe);
+				array_add(&facts->gen_params, pe);
 			}
 		}
 
@@ -1700,9 +1700,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			// A conditional branch reads a flag and can fall through -> not terminal.
 			bool conditional = clobber.is_conditional();
 
-			facts.is_control = control;
-			facts.is_conditional = conditional;
-			facts.is_terminal = halt || (control && !conditional);
+			facts->is_control = control;
+			facts->is_conditional = conditional;
+			facts->is_terminal = halt || (control && !conditional);
 		}
 		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
 
