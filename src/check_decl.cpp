@@ -83,11 +83,7 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			}
 			t = default_type(t);
 		}
-		if (is_type_asm_proc(t)) {
-			error(e->token, "Invalid use of inline asm in %.*s", LIT(context_name));
-			e->type = t_invalid;
-			return nullptr;
-		} else if (is_type_polymorphic(t)) {
+		if (is_type_polymorphic(t)) {
 			Entity *e2 = entity_of_node(operand->expr);
 			if (e2 == nullptr) {
 				e->type = t_invalid;
