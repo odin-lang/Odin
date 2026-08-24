@@ -2024,11 +2024,14 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 			arg = arg->BinaryExpr.left;
 		}
 
+		Ast *prev_hint = ctx->asm_template_hint;
+		ctx->asm_template_hint = arg;
 		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
 		} else if (arg->kind == Ast_SelectorExpr) {
 			e = check_selector(ctx, &o, arg, nullptr);
 		}
+		ctx->asm_template_hint = prev_hint;
 		if (e == nullptr) {
 			error(arg, "Expected a valid entity name in asm template group, got %.*s", LIT(ast_strings[arg->kind]));
 			continue;

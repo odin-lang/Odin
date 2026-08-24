@@ -2097,6 +2097,12 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		break;
 
 	case Entity_AsmTemplate:
+		if (c->asm_template_hint != n) {
+			error(n, "'asm' templates must either be defined as a declaration or within a procedure call directly");
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			return e;
+		}
 		o->mode = Addressing_Value;
 		break;
 
@@ -6373,6 +6379,12 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		break;
 
 	case Entity_AsmTemplate:
+		if (c->asm_template_hint != node) {
+			error(node, "'asm' templates must either be defined as a declaration or within a procedure call directly");
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+			return entity;
+		}
 		operand->mode = Addressing_Value;
 		break;
 	}
@@ -8931,7 +8943,11 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				operand->expr  = proc;
 				add_type_and_value(c, proc, operand->mode, operand->type, operand->value);
 			} else {
+				// the callee is the one position where an asm template is allowed to produce a value
+				Ast *prev_hint = c->asm_template_hint;
+				c->asm_template_hint = unnested_proc;
 				check_expr_or_type(c, operand, proc);
+				c->asm_template_hint = prev_hint;
 			}
 		} else {
 			GB_ASSERT(operand->expr != nullptr);
