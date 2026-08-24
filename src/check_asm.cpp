@@ -793,6 +793,26 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 				error(spec->value, "Input parameters, and thus tied parameters, cannot be pinned to a flag style register");
 			}
 		}
+
+
+		for (Ast *dir_ : spec->directives) {
+			ast_node(dir, BasicDirective, dir_);
+			String name = dir->name.string;
+			if (name == "no_init") {
+				i32 input_index = -1;
+				check_asm_find_group(input, *asm_template_entity_decls, &input_index);
+				if (input_index >= 0) {
+					auto *i = &(*asm_template_entity_decls)[input_index];
+					i->no_init = true;
+					if (i->tie >= 0) {
+						auto *o = &(*asm_template_entity_decls)[i->tie];
+						o->no_init = true;
+					}
+				}
+			} else {
+				error(dir_, "Invalid directive for an asm specification, got '#%.*s'", LIT(name));
+			}
+		}
 	}
 }
 
@@ -2451,6 +2471,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	// straight-line instruction stream. Seeded with input-pinned registers (they
 	// carry their argument at entry); grows as instructions write registers.
 	for (auto const &ed : ate->decls) {
+		if (ed.no_init) {
+			ptr_set_add(&asm_acc.defined_params, ed.entity);
+		}
 		switch (ed.param_group) {
 		case AsmTemplateEntityDeclParamGroup_Input:
 			if (ed.pin.len != 0) {
@@ -2681,6 +2704,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			continue;
 		}
 		if (ed.tie >= 0) {
+			continue;
+		}
+		if (ed.no_init) {
 			continue;
 		}
 		if (!asm_acc.straight_line) {

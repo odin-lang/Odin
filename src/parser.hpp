@@ -489,10 +489,11 @@ struct AstSplitArgs {
 		Token flag;  \
 	}) \
 	AST_KIND(AsmSpec, "asm specification", struct { \
-		Ast *name;      \
-		Ast *tied_name; \
-		Ast *type;      \
-		Ast *value;     \
+		Ast *        name;       \
+		Ast *        tied_name;  \
+		Ast *        type;       \
+		Ast *        value;      \
+		Array<Ast *> directives; \
 	}) \
 	AST_KIND(AsmClobber, "asm clobber", struct { \
 		Token token; \

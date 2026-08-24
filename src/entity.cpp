@@ -196,6 +196,8 @@ struct AsmTemplateEntityDecl {
 
 	i32 view_of; // total_index of the source operand this is a width-view of, else -1
 	i32 view_bits; // the view width in bits, otherwise 0
+
+	bool no_init;
 };
 
 // An Entity is a named "thing" in the language
