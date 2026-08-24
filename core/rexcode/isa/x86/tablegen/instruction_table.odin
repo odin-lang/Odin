@@ -1166,19 +1166,19 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.UD2, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x0B, 0, {esc=._0F}}, {side_effects={.TRAP}}},
 	},
 	.CPUID = {
-		{{.CPUID, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA2, 0, {esc=._0F}}, {implicit_wr={.RAX, .RBX, .RCX, .RDX}, implicit_rd={.RAX, .RCX}, side_effects={.SERIALIZING}}},
+		{{.CPUID, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xA2, 0, {esc=._0F}}, {implicit_wr={.RAX, .RBX, .RCX, .RDX}, implicit_rd={.RAX, .RCX}, side_effects={.SERIALIZING, .NONDETERMINISTIC}}},
 	},
 	.RDTSC = {
-		{{.RDTSC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x31, 0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}}},
+		{{.RDTSC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x31, 0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}, side_effects={.NONDETERMINISTIC}}},
 	},
 	.RDTSCP = {
-		{{.RDTSCP, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xF9, {esc=._0F}}, {implicit_wr={.RAX, .RCX, .RDX}}},
+		{{.RDTSCP, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xF9, {esc=._0F}}, {implicit_wr={.RAX, .RCX, .RDX}, side_effects={.NONDETERMINISTIC}}},
 	},
 	.RDPMC = {
-		{{.RDPMC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x33, 0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}}},
+		{{.RDPMC, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x33, 0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.NONDETERMINISTIC}}},
 	},
 	.XGETBV = {
-		{{.XGETBV, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}}},
+		{{.XGETBV, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.NONDETERMINISTIC}}},
 	},
 	.XSETBV = {
 		{{.XSETBV, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xD1, {esc=._0F}}, {implicit_rd={.RAX, .RCX, .RDX}}},
@@ -4647,7 +4647,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.RSM, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xAA, 0, {esc=._0F}}, {side_effects={.SERIALIZING, .PRIVILEGED}}},
 	},
 	.RDMSR = {
-		{{.RDMSR, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x32, 0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.PRIVILEGED}}},
+		{{.RDMSR, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x32, 0, {esc=._0F}}, {implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.PRIVILEGED, .NONDETERMINISTIC}}},
 	},
 	.WRMSR = {
 		{{.WRMSR, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x30, 0, {esc=._0F}}, {implicit_rd={.RAX, .RCX, .RDX}, side_effects={.SERIALIZING, .PRIVILEGED}}},
@@ -4855,14 +4855,14 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.MOVBE, {.M64, .R64, .NONE, .NONE}, {.MR,  .REG, .NONE, .NONE}, 0xF1, 0, {esc=._0F38, force_rex_w=true}}, {written={0}, read={1}, writes_mem=true, reads_mem=true}},
 	},
 	.RDRAND = {
-		{{.RDRAND, {.R16, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 6, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}}},
-		{{.RDRAND, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 6, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}}},
-		{{.RDRAND, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 6, {esc=._0F, force_rex_w=true, modrm_reg_ext=true}}, {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}}},
+		{{.RDRAND, {.R16, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 6, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}}},
+		{{.RDRAND, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 6, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}}},
+		{{.RDRAND, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 6, {esc=._0F, force_rex_w=true, modrm_reg_ext=true}}, {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}}},
 	},
 	.RDSEED = {
-		{{.RDSEED, {.R16, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}}},
-		{{.RDSEED, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}}},
-		{{.RDSEED, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, force_rex_w=true, modrm_reg_ext=true}}, {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}}},
+		{{.RDSEED, {.R16, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}}},
+		{{.RDSEED, {.R32, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, modrm_reg_ext=true}},                   {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}}},
+		{{.RDSEED, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, force_rex_w=true, modrm_reg_ext=true}}, {written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}}},
 	},
 	.SWAPGS = {
 		{{.SWAPGS, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x01, 0xF8, {esc=._0F}}, {side_effects={.PRIVILEGED}}},
@@ -4900,7 +4900,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.PTWRITE, {.RM64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xAE, 4, {esc=._0F, prefix=PREFIX_F3, force_rex_w=true, modrm_reg_ext=true}}, {read={0}, reads_mem=true}},
 	},
 	.RDPID = {
-		{{.RDPID, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, prefix=PREFIX_F3, modrm_reg_ext=true}}, {written={0}}},
+		{{.RDPID, {.R64, .NONE, .NONE, .NONE}, {.MR, .NONE, .NONE, .NONE}, 0xC7, 7, {esc=._0F, prefix=PREFIX_F3, modrm_reg_ext=true}}, {written={0}, side_effects={.NONDETERMINISTIC}}},
 	},
 	.WBNOINVD = {
 		{{.WBNOINVD, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x09, 0, {esc=._0F, prefix=PREFIX_F3}}, {side_effects={.SERIALIZING, .PRIVILEGED}}},

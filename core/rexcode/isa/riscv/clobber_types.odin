@@ -32,6 +32,7 @@ Side_Effect :: enum u8 {
 	IFENCE,      // instruction-fetch synchronization (FENCE.I)
 	ATOMIC,      // indivisible memory RMW (AMO*, and the LR/SC pair)
 	RESERVATION, // sets or tests an LR/SC reservation
+	NONDETERMINISTIC,
 }
 
 Clobber :: struct {
