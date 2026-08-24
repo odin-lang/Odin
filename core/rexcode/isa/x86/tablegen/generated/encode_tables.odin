@@ -4603,15 +4603,15 @@ CLOBBER_FORMS := [2466]lib.Clobber{
 	// .UD2
 	{side_effects={.TRAP}},
 	// .CPUID
-	{implicit_wr={.RAX, .RBX, .RCX, .RDX}, implicit_rd={.RAX, .RCX}, side_effects={.SERIALIZING}},
+	{implicit_wr={.RAX, .RBX, .RCX, .RDX}, implicit_rd={.RAX, .RCX}, side_effects={.SERIALIZING, .NONDETERMINISTIC}},
 	// .RDTSC
-	{implicit_wr={.RAX, .RDX}},
+	{implicit_wr={.RAX, .RDX}, side_effects={.NONDETERMINISTIC}},
 	// .RDTSCP
-	{implicit_wr={.RAX, .RCX, .RDX}},
+	{implicit_wr={.RAX, .RCX, .RDX}, side_effects={.NONDETERMINISTIC}},
 	// .RDPMC
-	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.NONDETERMINISTIC}},
 	// .XGETBV
-	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}},
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.NONDETERMINISTIC}},
 	// .XSETBV
 	{implicit_rd={.RAX, .RCX, .RDX}},
 	// .CBW
@@ -7159,7 +7159,7 @@ CLOBBER_FORMS := [2466]lib.Clobber{
 	// .RSM
 	{side_effects={.SERIALIZING, .PRIVILEGED}},
 	// .RDMSR
-	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.PRIVILEGED}},
+	{implicit_wr={.RAX, .RDX}, implicit_rd={.RCX}, side_effects={.PRIVILEGED, .NONDETERMINISTIC}},
 	// .WRMSR
 	{implicit_rd={.RAX, .RCX, .RDX}, side_effects={.SERIALIZING, .PRIVILEGED}},
 	// .VMCALL
@@ -7302,13 +7302,13 @@ CLOBBER_FORMS := [2466]lib.Clobber{
 	{written={0}, read={1}, writes_mem=true, reads_mem=true},
 	{written={0}, read={1}, writes_mem=true, reads_mem=true},
 	// .RDRAND
-	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
-	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
-	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}},
 	// .RDSEED
-	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
-	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
-	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}},
+	{written={0}, flags_wr={.CF, .PF, .AF, .ZF, .SF, .OF}, side_effects={.NONDETERMINISTIC}},
 	// .SWAPGS
 	{side_effects={.PRIVILEGED}},
 	// .MONITOR
@@ -7335,7 +7335,7 @@ CLOBBER_FORMS := [2466]lib.Clobber{
 	{read={0}, reads_mem=true},
 	{read={0}, reads_mem=true},
 	// .RDPID
-	{written={0}},
+	{written={0}, side_effects={.NONDETERMINISTIC}},
 	// .WBNOINVD
 	{side_effects={.SERIALIZING, .PRIVILEGED}},
 	// .SERIALIZE
