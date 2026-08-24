@@ -2647,7 +2647,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		bool written = false;
 		if (ed.pin.len != 0) {
 			u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-			written = (bit != 0) && (asm_acc.defined_regs & bit) == 0;
+			written = (bit != 0) && (asm_acc.defined_regs & bit) != 0;
 		} else {
 			written = ptr_set_exists(&asm_acc.defined_params, ed.entity);
 		}
