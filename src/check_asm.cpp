@@ -1,3 +1,64 @@
+struct AsmBlock {
+	i32 first,       last;
+	Array<i32>       succs;
+	u16              in_defs;
+	u16              out_defs;
+	PtrSet<Entity *> in_params;
+	PtrSet<Entity *> out_params;
+	bool             reachable;
+};
+
+struct AsmInstructionFacts {
+	AstAsmInstruction *node;
+	String             name;
+
+	u16 gen_regs;
+	u16 read_regs;
+
+	Array<Entity *> gen_params;
+	Array<Entity *> read_params;
+
+	bool is_control;
+	bool is_conditional;
+	bool is_terminal;
+
+	Entity *branch_target;
+	i32 block_id;
+};
+
+
+struct AsmMnemonicAccumulator {
+	u16              defined_regs;
+	PtrSet<Entity *> defined_params;
+
+	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
+	u16 implicit_clobbered_regs;
+	u16 explicitly_produced_regs;
+	u16 stale_outputs;
+
+	bool straight_line;
+
+	// Whether the most-recently-checked instruction terminates straight-line flow.
+	// Reset to false at every label (a label starts a fresh straight-line region whose
+	// tail we haven't seen yet). Consulted after the loop for #diverging templates.
+	bool last_is_terminal;
+
+	// Did the template contain any instructions at all? An empty diverging body can't diverge.
+	bool saw_any_instructions;
+
+	// Related to #align_stack
+	// any call/branch (CONTROL) or memory effect that could require the stack
+	//  to be realigned. If none occurred, #align_stack is redundant.
+	bool saw_call_or_mem;
+
+	// Purity test
+	bool        can_be_pure;
+	char const *impure_reason;
+	Ast *       impure_reason_node;
+
+	PtrMap<AstAsmInstruction *, AsmInstructionFacts> instruction_facts;
+};
+
 // Bit-width the operand's Odin type occupies in a register/immediate slot.
 // Integers/floats/bools/pointers -> their size; #simd -> total vector width. 0 if unknown.
 gb_internal i32 check_asm_operand_bit_width(Type *type) {
@@ -1042,36 +1103,6 @@ gb_internal CheckMnemomicResult check_mnemonic_name(AsmCtx *asm_ctx, AstAsmInstr
 	return CheckMnemomic_Invalid;
 }
 
-struct AsmMnemonicAccumulator {
-	u16              defined_regs;
-	PtrSet<Entity *> defined_params;
-
-	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
-	u16 implicit_clobbered_regs;
-	u16 explicitly_produced_regs;
-	u16 stale_outputs;
-
-	bool straight_line;
-
-	// Whether the most-recently-checked instruction terminates straight-line flow.
-	// Reset to false at every label (a label starts a fresh straight-line region whose
-	// tail we haven't seen yet). Consulted after the loop for #diverging templates.
-	bool last_is_terminal;
-
-	// Did the template contain any instructions at all? An empty diverging body can't diverge.
-	bool saw_any_instructions;
-
-	// Related to #align_stack
-	// any call/branch (CONTROL) or memory effect that could require the stack
-	//  to be realigned. If none occurred, #align_stack is redundant.
-	bool saw_call_or_mem;
-
-	// Purity test
-	bool        can_be_pure;
-	char const *impure_reason;
-	Ast *       impure_reason_node;
-};
-
 gb_internal bool check_asm_instr_targets_internal_label(AstAsmInstruction *instr) {
 	bool saw_label = false;
 	for (Ast *op : instr->operands) {
@@ -1148,6 +1179,29 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	if (pseudo_mnemonic) {
 		name = asm_ctx->pseudo_mnemonic_strings[pseudo_mnemonic];
 	}
+
+	AsmInstructionFacts facts = {};
+	facts.node = instr;
+	facts.name = name;
+	facts.gen_params.allocator  = heap_allocator();
+	facts.read_params.allocator = heap_allocator();
+
+	defer ({
+		for (auto const &op : operands) {
+			if (op.expr->kind != Ast_AsmLabelDecl) {
+				continue;
+			}
+			Entity *e = op.expr->AsmLabelDecl.name->Ident.entity;
+			if (e == nullptr || e->kind != Entity_Label) {
+				continue;
+			}
+			facts.branch_target = e;
+			break;
+		}
+
+		map_set(&asm_acc->instruction_facts, instr, facts);
+	});
+
 
 	bool is_pseudo             = pseudo_mnemonic != 0;
 	int  target_explicit_count = is_pseudo ? alias.nargs : -1;
@@ -1546,6 +1600,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// Handle clobbering from mnemonic
 		auto clobber = clobber_forms[valid_form_index];
 
+		facts.read_regs = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
+
 		// NOTE(bill): reads_mem/writes_mem are per-FORM capability bits.
 		// A form with an r/m slot (e.g. add r/m32, imm32) carries them even
 		// when the operand resolved to a register, e.g. `add x, 123`.
@@ -1704,7 +1760,26 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			produced        |= synth;
 			explicit_writes |= synth;
 		}
-		asm_acc->defined_regs |= produced | pinned_param_writes;
+
+		facts.gen_regs = produced | pinned_param_writes;
+		asm_acc->defined_regs |= facts.gen_regs;
+
+		for_array(i, operands) {
+			int slot = user_operand_target_index(cast(int)i);
+			if (slot < 0) {
+				continue;
+			}
+			Entity *pe = entity_of_node(operands[i].expr);
+			if (pe == nullptr || pe->kind != Entity_Variable) {
+				continue;
+			}
+			if (cast(u16)clobber.read    & (1u << slot)) {
+				array_add(&facts.read_params, pe);
+			}
+			if (cast(u16)clobber.written & (1u << slot)) {
+				array_add(&facts.gen_params, pe);
+			}
+		}
 
 		if (asm_acc->straight_line) {
 			// NOTE(bill): check for read-before-write (use of undefined value)
@@ -1769,6 +1844,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			bool conditional = clobber.is_conditional();
 			asm_acc->last_is_terminal = halt || (control && !conditional);
 
+			facts.is_control = control;
+			facts.is_conditional = conditional;
+			facts.is_terminal = halt || (control && !conditional);
+
 			if (control) {
 				// A branch/call inside the template means subsequent instructions may be reached
 				// out of textual order; stop trusting the linear def model past this point.
@@ -1809,7 +1888,6 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				asm_acc->impure_reason_node = instr->name;
 			}
 		}
-
 		return;
 	}
 
@@ -2465,6 +2543,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	AsmMnemonicAccumulator asm_acc = {};
 	ptr_set_init(&asm_acc.defined_params);
 	defer (ptr_set_destroy(&asm_acc.defined_params));
+
+	map_init(&asm_acc.instruction_facts);
+	defer (map_destroy(&asm_acc.instruction_facts));
 
 
 	// Physical registers known to hold a defined value at the current point in the
