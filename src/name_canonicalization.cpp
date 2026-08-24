@@ -675,6 +675,17 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 			}
 
 			goto write_base_name;
+		} else if (s->decl_info != nullptr && s->decl_info->proc_lit != nullptr) {
+			Ast *proc_lit = s->decl_info->proc_lit;
+			String file_name = filename_without_directory(proc_lit->file()->fullpath);
+			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
+			type_writer_append_fmt(w, CANONICAL_NAME_SEPARATOR CANONICAL_ANON_PREFIX "_%.*s:%d" CANONICAL_NAME_SEPARATOR,
+			                       LIT(file_name), ast_token(proc_lit).pos.offset);
+			if (e->scope->index > 0) {
+				write_scope_index_suffix = true;
+			}
+
+			goto write_base_name;
 		} else if ((s->flags & ScopeFlag_File) && s->file != nullptr) {
 			String file_name = filename_without_directory(s->file->fullpath);
 			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
