@@ -1110,7 +1110,7 @@ template <typename AsmCtx>
 gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
                                 u16 mnemonic, u16 pseudo_mnemonic, Slice<Operand> const &operands,
                                 u8 previous_prefix, Ast *previous_prefix_instr,
-                                AsmMnemonicAccumulator *asm_acc) {
+                                AsmCfg *cfg) {
 	GB_ASSERT(mnemonic > 0);
 	auto   forms         = asm_ctx->encoding_forms(mnemonic);
 	auto   clobber_forms = asm_ctx->clobber_forms(mnemonic);
@@ -1140,7 +1140,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			break;
 		}
 
-		map_set(&asm_acc->instruction_facts, instr, facts);
+		map_set(&cfg->instruction_facts, instr, facts);
 	});
 
 
@@ -1578,14 +1578,12 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// through a parameter pointer does NOT require stack realignment, so
 		// implies_clobber_memory() is intentionally NOT used here.
 		if (clobber.is_call_or_mem()) {
-			asm_acc->saw_call_or_mem = true;
+			cfg->saw_call_or_mem = true;
 		}
 
 		u16 pinned_mask = 0;
-		for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
-			if (ed.pin.len != 0) {
-				pinned_mask |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
-			}
+		for_array(i, tmpl_entity->AsmTemplate.decls) {
+			pinned_mask |= asm_decl_resolve_pin_bit(asm_ctx, tmpl_entity->AsmTemplate.decls, cast(i32)i);
 		}
 
 		u16 produced = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
@@ -1593,50 +1591,25 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		u16 written_ops = cast(u16)clobber.written;
 		u16 pinned_param_writes = 0;
+		auto const &decls = tmpl_entity->AsmTemplate.decls;
 		for_array(i, operands) {
 			int tslot = user_operand_target_index(cast(int)i);
 			if (tslot < 0 || tslot >= 4 || (written_ops & (1u << tslot)) == 0) {
 				continue;
 			}
-			auto const &op = operands[i];
-
-			Ast *e = op.expr;
+			Ast *e = operands[i].expr;
 			if (e != nullptr && e->kind == Ast_AsmRegister) {
 				u16 b = asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
 				produced |= b;
 				explicit_writes |= b;
 				continue;
 			}
-
-			// NOTE(bill): A write through a pinned parameter (or a width-view of one)
-			// defines that parameter's physical register for the read-before-write check only
-			auto written_pinned_reg_bit = [&](Operand const &op) -> u16 {
-				Entity *pe = entity_of_node(op.expr);
-				if (pe == nullptr || pe->kind != Entity_Variable) {
-					return 0;
-				}
-				auto const &decls = tmpl_entity->AsmTemplate.decls;
-				for_array(di, decls) {
-					auto const &ed = decls[di];
-					if (ed.entity != pe) {
-						continue;
-					}
-					if (ed.pin.len != 0) {
-						return asm_ctx->clobber_bit_for_reg_name(ed.pin);
-					}
-					// NOTE(bill): A width-view carries no pin of its own and thus it aliases its source's register.
-					if (ed.view_of >= 0 && ed.view_of < cast(i32)decls.count) {
-						String src_pin = decls[ed.view_of].pin;
-						if (src_pin.len != 0) {
-							return asm_ctx->clobber_bit_for_reg_name(src_pin);
-						}
-					}
-					return 0;
-				}
-				return 0;
-			};
-
-			pinned_param_writes |= written_pinned_reg_bit(operands[i]);
+			Entity *pe = entity_of_node(operands[i].expr);
+			if (pe != nullptr && pe->kind == Entity_Variable) {
+				i32 di = -1;
+				check_asm_find_group(pe, decls, &di);         // reuse existing index finder
+				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, decls, di);
+			}
 		}
 
 		if (is_pseudo &&
@@ -1704,15 +1677,15 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			// redundant-#clobber hint. Union across the template; pinned regs excluded
 			// so a legitimate output pin is never called "redundant".
 			u16 implicit_wr = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
-			asm_acc->implicit_clobbered_regs |= implicit_wr & ~pinned_mask;
+			cfg->implicit_clobbered_regs |= implicit_wr & ~pinned_mask;
 
 			// Approximate staleness. An output that was explicitly produced (literal %reg write)
 			// and is later implicitly clobbered — without this same instruction re-producing it —
 			// is marked stale. Explicit re-production clears it. Implicitly-produced outputs
 			// (RDTSC->RDX) are never tracked, so they never false-fire.
-			asm_acc->explicitly_produced_regs |= explicit_writes;
-			asm_acc->stale_outputs            &= ~explicit_writes;
-			asm_acc->stale_outputs |= implicit_wr & asm_acc->explicitly_produced_regs & ~explicit_writes;
+			cfg->explicitly_produced_regs |= explicit_writes;
+			cfg->stale_outputs            &= ~explicit_writes;
+			cfg->stale_outputs |= implicit_wr & cfg->explicitly_produced_regs & ~explicit_writes;
 		}
 
 		{
@@ -1734,7 +1707,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
 
 		// Purity inference
-		if (asm_acc->can_be_pure) {
+		if (cfg->can_be_pure) {
 			// NOTE(bill): Only the first violating instruction is recorded
 			// The later ones don't overwrite the reason.
 			char const *why = nullptr;
@@ -1760,9 +1733,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 
 			if (why != nullptr) {
-				asm_acc->can_be_pure        = false;
-				asm_acc->impure_reason      = why;
-				asm_acc->impure_reason_node = instr->name;
+				cfg->can_be_pure        = false;
+				cfg->impure_reason      = why;
+				cfg->impure_reason_node = instr->name;
 			}
 		}
 		return;
@@ -2416,11 +2389,16 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		}
 	}
 
-	AsmMnemonicAccumulator asm_acc = {};
-	map_init(&asm_acc.instruction_facts);
-	defer (map_destroy(&asm_acc.instruction_facts));
+	// NOTE(bill, 2026-08-24): Construct a control-flow graph (CFG) from the instructions
+	// to do further analysis which is not possible with an conservative straight-line approximation
+	// Using a CFG is a much sounder approach for calculating:
+	// * reads before writes
+	// * divergence
+	// * unreachable code
 
-	asm_acc.can_be_pure = true;
+	AsmCfg cfg = {};
+	asm_cfg_init(&cfg);
+	defer (asm_cfg_destroy(&cfg));
 
 	// collect label decls
 	for (Ast *instruction_ : at->instructions) {
@@ -2484,9 +2462,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				instr->suffix_flags = suffix_flags;
 				check_mnemonic(asm_ctx, ctx, entity, instr, mnemonic, 0, slice_from_array(operands),
 				               previous_prefix, previous_prefix_instr,
-				               &asm_acc);
+				               &cfg);
 
-				asm_acc.saw_any_instructions = true;
+				cfg.saw_any_instructions = true;
 
 				previous_prefix = 0;
 				previous_prefix_instr = nullptr;
@@ -2498,9 +2476,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				u16 target_mnemonic = cast(u16)alias.target;
 				check_mnemonic(asm_ctx, ctx, entity, instr, target_mnemonic, pseudo_mnemonic, slice_from_array(operands),
 				               previous_prefix, previous_prefix_instr,
-				               &asm_acc);
+				               &cfg);
 
-				asm_acc.saw_any_instructions = true;
+				cfg.saw_any_instructions = true;
 
 				previous_prefix = 0;
 				previous_prefix_instr = nullptr;
@@ -2508,7 +2486,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				instr->suffix_flags = suffix_flags;
 				check_pseudo_macro_mnemonic(asm_ctx, entity, instr, slice_from_array(operands));
 
-				asm_acc.saw_any_instructions = true;
+				cfg.saw_any_instructions = true;
 
 				previous_prefix = 0;
 				previous_prefix_instr = nullptr;
@@ -2618,18 +2596,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 
-	// NOTE(bill, 2026-08-24): Construct a control-flow graph (CFG) from the instructions
-	// to do further analysis which is not possible with an conservative straight-line approximation
-	// Using a CFG is a much sounder approach for calculating:
-	// * reads before writes
-	// * divergence
-	// * unreachable code
-
-	AsmCfg cfg = {};
-	defer (asm_cfg_destroy(&cfg));
-	check_asm_cfg_build(d->init_expr, &asm_acc, &cfg);
-	check_asm_cfg_analyse(asm_ctx, ctx, entity, &cfg, &asm_acc);
-
+	check_asm_cfg_build(asm_ctx, &cfg, d->init_expr, entity);
+	check_asm_cfg_analyse(asm_ctx, &cfg, ctx, entity);
 
 	bool vet_unused = false;
 	{
@@ -2710,7 +2678,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		        "Please add #volatile if the effect is intended.");
 	}
 
-	if (entity->AsmTemplate.is_align_stack && !asm_acc.saw_call_or_mem) {
+	if (entity->AsmTemplate.is_align_stack && !cfg.saw_call_or_mem) {
 		warning(entity->token,
 		        "#align_stack is redundant; this template makes no call and touches no memory "
 		        "that would require the stack to be realigned");
@@ -2720,12 +2688,12 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		bool declared_effects = entity->AsmTemplate.is_volatile ||
 		                        entity->AsmTemplate.clobber_memory ||
 		                        entity->AsmTemplate.has_observable_side_effect;
-		bool is_pure = asm_acc.can_be_pure && !declared_effects && !type->Proc.diverging;
+		bool is_pure = cfg.can_be_pure && !declared_effects && !type->Proc.diverging;
 		entity->AsmTemplate.is_pure = is_pure;
 
 		if (is_pure_annotated && !is_pure) {
-			Ast *node = asm_acc.impure_reason_node;
-			char const *why = asm_acc.impure_reason;
+			Ast *node = cfg.impure_reason_node;
+			char const *why = cfg.impure_reason;
 			if (why == nullptr) {
 				if (type->Proc.diverging) {
 					why = "it is declared diverging (-> !) and computes no outputs";

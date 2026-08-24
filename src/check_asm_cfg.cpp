@@ -26,8 +26,7 @@ struct AsmInstructionFacts {
 	i32 block_id;
 };
 
-
-struct AsmMnemonicAccumulator {
+struct AsmCfg {
 	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
 	u16 implicit_clobbered_regs;
 	u16 explicitly_produced_regs;
@@ -46,13 +45,23 @@ struct AsmMnemonicAccumulator {
 	Ast *       impure_reason_node;
 
 	PtrMap<AstAsmInstruction *, AsmInstructionFacts> instruction_facts;
-};
 
-struct AsmCfg {
 	Array<AstAsmInstruction *> insts;       // program-order (only for fact-carrying instrs)
 	Array<AsmBlock>            blocks;
 	PtrMap<Entity *, i32>      label_block; // key: Entity_Label*
+
+	PtrMap<Entity *, i32> entity_to_index;
+	Array<u16>            decl_pin_bit;
+	u64                   universe_pm;
 };
+
+gb_internal void asm_cfg_init(AsmCfg *cfg) {
+	map_init(&cfg->instruction_facts);
+	map_init(&cfg->entity_to_index);
+	cfg->decl_pin_bit.allocator = heap_allocator();
+	cfg->can_be_pure = true;
+};
+
 
 gb_internal void asm_cfg_destroy(AsmCfg *cfg) {
 	for (auto &block : cfg->blocks) {
@@ -63,17 +72,61 @@ gb_internal void asm_cfg_destroy(AsmCfg *cfg) {
 	array_free(&cfg->blocks);
 	array_free(&cfg->insts);
 	map_destroy(&cfg->label_block);
+	map_destroy(&cfg->instruction_facts);
+	map_destroy(&cfg->entity_to_index);
+	array_free(&cfg->decl_pin_bit);
 }
 
-gb_internal void check_asm_cfg_build(Ast *at_node, AsmMnemonicAccumulator *acc, AsmCfg *cfg) {
+// The physical-register bit a decl is pinned to. A width-view carries no pin of
+// its own; it inherits its source decl's pin. Returns 0 for unpinned decls.
+template <typename AsmCtx>
+gb_internal u16 asm_decl_resolve_pin_bit(AsmCtx *asm_ctx, Array<AsmTemplateEntityDecl> const &decls, i32 di) {
+	if (di < 0 || di >= cast(i32)decls.count) {
+		return 0;
+	}
+	auto const &ed = decls[di];
+	if (ed.pin.len != 0) {
+		return asm_ctx->clobber_bit_for_reg_name(ed.pin);
+	}
+	if (ed.view_of >= 0 && ed.view_of < cast(i32)decls.count) {
+		String src_pin = decls[ed.view_of].pin;
+		if (src_pin.len != 0) {
+			return asm_ctx->clobber_bit_for_reg_name(src_pin);
+		}
+	}
+	return 0;
+}
+
+template <typename AsmCtx>
+gb_internal void asm_cfg_populate_decls(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *entity) {
+	auto const &decls = entity->AsmTemplate.decls;
+	cfg->universe_pm = 0;
+	if (decls.count > 64) {
+		// NOTE(bill): check_asm_cfg_analyse will err on this since this is exceed the maximum number of declarations
+		return;
+	}
+	array_resize(&cfg->decl_pin_bit, decls.count);
+	for_array(i, decls) {
+		Entity *e = decls[i].entity;
+		cfg->decl_pin_bit[i] = asm_decl_resolve_pin_bit(asm_ctx, decls, cast(i32)i);
+		if (e != nullptr) {
+			map_set(&cfg->entity_to_index, e, cast(i32)i);
+			cfg->universe_pm |= (cast(u64)1 << i);
+		}
+	}
+}
+
+template <typename AsmCtx>
+gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node, Entity *entity) {
 	ast_node(at, AsmTemplate, at_node);
+
+	asm_cfg_populate_decls(asm_ctx, cfg, entity);
 
 	cfg->insts.allocator  = heap_allocator();
 	cfg->blocks.allocator = heap_allocator();
 	map_init(&cfg->label_block);
 
 	bool need_leader = true;
-
 
 	// Build basic blocks over the template body. A leader is: the first instruction, any
 	// instruction preceded by a label, and any instruction following a control transfer.
@@ -93,7 +146,7 @@ gb_internal void check_asm_cfg_build(Ast *at_node, AsmMnemonicAccumulator *acc, 
 		}
 
 		AstAsmInstruction   *instr = &node->AsmInstruction;
-		AsmInstructionFacts *facts = map_get(&acc->instruction_facts, instr);
+		AsmInstructionFacts *facts = map_get(&cfg->instruction_facts, instr);
 		// Prefixes and pseudo-macro ops (li/la) carry no facts and never branch.
 
 		if (need_leader || cfg->blocks.count == 0) {
@@ -122,7 +175,7 @@ gb_internal void check_asm_cfg_build(Ast *at_node, AsmMnemonicAccumulator *acc, 
 		AsmBlock *b = &cfg->blocks[bi];
 
 		AstAsmInstruction   *last = cfg->insts[b->last];
-		AsmInstructionFacts *lf   = map_get(&acc->instruction_facts, last);
+		AsmInstructionFacts *lf   = map_get(&cfg->instruction_facts, last);
 
 		i32  branch_succ = -1;
 		bool fallthrough = true;
@@ -172,10 +225,10 @@ gb_internal void check_asm_cfg_build(Ast *at_node, AsmMnemonicAccumulator *acc, 
 	}
 }
 
-gb_internal bool check_asm_cfg_block_leaves(AsmCfg *cfg, AsmMnemonicAccumulator *acc, i32 bi) {
+gb_internal bool check_asm_cfg_block_leaves(AsmCfg *cfg, i32 bi) {
 	AsmBlock const      *b    = &cfg->blocks[bi];
 	AstAsmInstruction   *last = cfg->insts[b->last];
-	AsmInstructionFacts *lf   = map_get(&acc->instruction_facts, last);
+	AsmInstructionFacts *lf   = map_get(&cfg->instruction_facts, last);
 
 	if (lf != nullptr && lf->branch_target != nullptr) {
 		i32 *t = map_get(&cfg->label_block, lf->branch_target);
@@ -184,23 +237,23 @@ gb_internal bool check_asm_cfg_block_leaves(AsmCfg *cfg, AsmMnemonicAccumulator 
 		}
 	}
 	bool terminal = (lf != nullptr) && lf->is_terminal;
-	if (!terminal && bi > cast(i32)cfg->blocks.count) {
+	if (!terminal && (bi+1 >= cast(i32)cfg->blocks.count)) {
 		return true; // straight-line / conditional tail with nothing after it
 	}
 	return false;
 }
 
 template <typename AsmCtx>
-gb_internal void check_asm_cfg_report_undef_reg(AsmCtx *asm_ctx, Entity *tmpl_entity,
+gb_internal void check_asm_cfg_report_undef_reg(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *tmpl_entity,
                                                 AstAsmInstruction *instr, String name, u16 bit) {
 	char const *rname = asm_ctx->clobber_reg_bit_name(bit);
 	String      owner = {};
 	char const *role  = nullptr;
-	for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
-		if (ed.pin.len == 0 || ed.entity == nullptr) {
-			continue;
-		}
-		if (asm_ctx->clobber_bit_for_reg_name(ed.pin) != bit) {
+
+	auto const &decls = tmpl_entity->AsmTemplate.decls;
+	for_array(i, decls) {
+		auto const &ed = decls[i];
+		if (ed.entity == nullptr || cfg->decl_pin_bit[i] != bit) {
 			continue;
 		}
 		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.tie < 0) {
@@ -228,15 +281,14 @@ gb_internal void check_asm_cfg_report_undef_reg(AsmCtx *asm_ctx, Entity *tmpl_en
 }
 
 template <typename AsmCtx>
-gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, AsmCfg *cfg,
-                                       AsmMnemonicAccumulator *acc) {
+gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerContext *ctx, Entity *entity) {
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
 	auto const &decls     = entity->AsmTemplate.decls;
 	bool        diverging = entity->type->Proc.diverging;
 
 	if (cfg->blocks.count == 0) {
 		// With an empty body, the CFG cannot really do nothing
-		if (diverging && !acc->saw_any_instructions) {
+		if (diverging && !cfg->saw_any_instructions) {
 			error(entity->token, "This asm template is declared as diverging (-> !) but its body is empty and cannot diverge");
 		}
 		return;
@@ -248,40 +300,28 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 	}
 	u16 const REG_TOP = asm_ctx->CLOBBER_REGS_NAMED;
 
-	PtrMap<Entity *, i32> entity_to_index = {};
-	map_init(&entity_to_index);
-	defer (map_destroy(&entity_to_index));
-	u64 universe_pm = 0;
-	for_array(i, decls) {
-		if (decls[i].entity != nullptr) {
-			map_set(&entity_to_index, decls[i].entity, cast(i32)i);
-			universe_pm |= (cast(u64)1 << i);
-		}
-	}
+	u64 const universe_pm = cfg->universe_pm;
 	auto bit_of = [&](Entity *e) -> u64 {
-		i32 *ix = map_get(&entity_to_index, e);
+		i32 *ix = map_get(&cfg->entity_to_index, e);
 		return ix ? (cast(u64)1 << *ix) : cast(u64)0;
 	};
 
 	// NOTE(bill): entry seed intiailization which mirrors the linear seeding of defined_regs
 	u16 seed_regs = 0;
 	u64 seed_pm   = 0;
-	for (auto const &ed : decls) {
+	for_array(i, decls) {
+		auto const &ed = decls[i];
+		u16 pin_bit = cfg->decl_pin_bit[i];
 		if (ed.no_init) {
 			seed_pm |= bit_of(ed.entity);
-			if (ed.pin.len != 0) {
-				seed_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
-			}
+			seed_regs |= pin_bit;
 		}
 		switch (ed.param_group) {
 		case AsmTemplateEntityDeclParamGroup_Input:
 			seed_pm |= bit_of(ed.entity);
-			if (ed.pin.len != 0) {
-				seed_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
-			}
+			seed_regs |= pin_bit;
 			break;
 		case AsmTemplateEntityDeclParamGroup_Output:
-			// NOTE(bill): input provides the value
 			if (ed.tie >= 0) {
 				seed_pm |= bit_of(ed.entity);
 			}
@@ -327,7 +367,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 		u64 gp = 0;
 		AsmBlock const &b = cfg->blocks[bi];
 		for (i32 ii = b.first; ii <= b.last; ii++) {
-			AsmInstructionFacts *f = map_get(&acc->instruction_facts, cfg->insts[ii]);
+			AsmInstructionFacts *f = map_get(&cfg->instruction_facts, cfg->insts[ii]);
 			if (f == nullptr) {
 				continue;
 			}
@@ -444,7 +484,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 
 			for (i32 ii = b.first; ii <= b.last; ii++) {
 				AstAsmInstruction   *instr = cfg->insts[ii];
-				AsmInstructionFacts *f     = map_get(&acc->instruction_facts, instr);
+				AsmInstructionFacts *f     = map_get(&cfg->instruction_facts, instr);
 				if (f == nullptr) {
 					continue;
 				}
@@ -454,12 +494,12 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 					if ((undef & bit) == 0) {
 						continue;
 					}
-					check_asm_cfg_report_undef_reg(asm_ctx, entity, instr, f->name, bit);
+					check_asm_cfg_report_undef_reg(asm_ctx, cfg, entity, instr, f->name, bit);
 					reported_regs |= bit;
 				}
 
 				for (Entity *pe : f->read_params) {
-					i32 *ix = map_get(&entity_to_index, pe);
+					i32 *ix = map_get(&cfg->entity_to_index, pe);
 					if (ix == nullptr) {
 						continue;
 					}
@@ -489,7 +529,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 			if (!cfg->blocks[bi].reachable) {
 				continue;
 			}
-			if (!check_asm_cfg_block_leaves(cfg, acc, cast(i32)bi)) {
+			if (!check_asm_cfg_block_leaves(cfg, cast(i32)bi)) {
 				continue;
 			}
 			any_exit  = true;
@@ -499,7 +539,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 
 		// NOTE(bill): Outputs must be assigned on every path that returns
 		if (any_exit && !diverging) {
-			for (auto const &ed : decls) {
+			for_array(i, decls) {
+				auto const &ed = decls[i];
 				if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output) {
 					continue;
 				}
@@ -507,10 +548,10 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 					continue;
 				}
 
-				bool written;
-				if (ed.pin.len != 0) {
-					u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-					written = (bit != 0) && (exit_regs & bit) != 0;
+				bool written = false;
+				u16 bit = cfg->decl_pin_bit[i];
+				if (bit != 0) {
+					written = (exit_regs & bit) != 0;
 				} else {
 					written = (exit_pm & bit_of(ed.entity)) != 0;
 				}
@@ -527,7 +568,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, CheckerContext *ctx, Ent
 	if (diverging) { // No reachable path may return / fall off the end
 		bool any_leak = false;
 		for_array(bi, cfg->blocks) {
-			if (cfg->blocks[bi].reachable && check_asm_cfg_block_leaves(cfg, acc, cast(i32)bi)) {
+			if (cfg->blocks[bi].reachable && check_asm_cfg_block_leaves(cfg, cast(i32)bi)) {
 				any_leak = true;
 				break;
 			}
