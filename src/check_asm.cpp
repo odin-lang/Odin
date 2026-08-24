@@ -16,7 +16,8 @@ gb_internal i32 check_asm_operand_bit_width(Type *type) {
 
 gb_internal bool is_valid_asm_parameter_type(Type *type) {
 	if (is_type_integer(type)) {
-		return true;
+		// NOTE(bill): do not allow 128-bit integers
+		return type_size_of(type) <= 8;
 	}
 	if (is_type_float(type)) {
 		return true;
@@ -700,7 +701,6 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 			} else {
 				i32 index = -1;
 				auto group = check_asm_find_group(input, *asm_template_entity_decls, &index);
-				gb_unused(group);
 				GB_ASSERT(index >= 0);
 				auto *i = &(*asm_template_entity_decls)[index];
 				if (i->pin.len == 0) {
@@ -1175,7 +1175,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					s = gb_string_appendc(s, " ");
 				}
 				break;
-			case AsmOperand_Register: // 1+ chacracters
+			case AsmOperand_Register: // 1+ characters
 			case AsmOperand_Memory:
 				if (w == 0) {
 					s = gb_string_appendc(s, "    ");
@@ -1865,8 +1865,6 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 
 	Scope *param_scope = ate->param_scope;
 	Scope *label_scope = ate->label_scope;
-	gb_unused(param_scope);
-	gb_unused(label_scope);
 
 	switch (expr->kind) {
 	case_ast_node(ue, UnaryExpr, expr);
@@ -2673,7 +2671,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			Entity *le = entry.value;
 			GB_ASSERT(le != nullptr);
 			if ((le->flags & EntityFlag_Used) == 0) {
-				error(le->token, "'asm' label '.%.*s' is declared but never reference by any instruction", LIT(le->token.string));
+				error(le->token, "'asm' label '.%.*s' is declared but never referenced by any instruction", LIT(le->token.string));
 			}
 		}
 	}
