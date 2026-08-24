@@ -824,6 +824,45 @@ main :: proc() {
 		}
 	""")
 
+	strings.write_string(&sb, """
+		bool is_self_zeroing_idiom(u16 m) const {
+			switch (m) {
+			// integer xor / sub: x ^ x == 0, x - x == 0
+			case M_XOR:
+			case M_SUB:
+
+			// SSE/AVX bitwise xor of a register with itself
+			case M_PXOR:
+			case M_XORPS:
+			case M_XORPD:
+			case M_VPXOR:
+			case M_VXORPS:
+			case M_VXORPD:
+
+			// packed integer subtract: psub x, x == 0
+			case M_PSUBB:
+			case M_PSUBW:
+			case M_PSUBD:
+			case M_PSUBQ:
+			case M_VPSUBB:
+			case M_VPSUBW:
+			case M_VPSUBD:
+			case M_VPSUBQ:
+
+			// andnot of a value with itself: (~x) & x == 0
+			case M_ANDN: // BMI1 GPR: andn dst, a, a
+			case M_ANDNPS:
+			case M_ANDNPD:
+			case M_PANDN:
+			case M_VANDNPS:
+			case M_VANDNPD:
+			case M_VPANDN:
+				return true;
+			}
+			return false;
+		}
+	""")
+
 	strings.write_string(&sb, "\n};\n")
 
 	strings.write_string(&sb, "\n\n\n")

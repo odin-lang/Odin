@@ -755,6 +755,17 @@ struct Asm_riscv {
 			break;
 		}
 		return {AsmOperandConstraint_None, -1};
+	}	bool is_self_zeroing_idiom(u16 m) const {
+		switch (m) {
+		case M_XOR:
+		case M_SUB:
+		case M_SUBW:
+		case M_SLT:
+		case M_SLTU:
+		case M_ANDN:
+			return true;
+		}
+		return false;
 	}
 };
 

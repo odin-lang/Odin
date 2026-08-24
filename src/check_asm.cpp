@@ -1,63 +1,4 @@
-struct AsmBlock {
-	i32 first,       last;
-	Array<i32>       succs;
-	u16              in_defs;
-	u16              out_defs;
-	PtrSet<Entity *> in_params;
-	PtrSet<Entity *> out_params;
-	bool             reachable;
-};
-
-struct AsmInstructionFacts {
-	AstAsmInstruction *node;
-	String             name;
-
-	u16 gen_regs;
-	u16 read_regs;
-
-	Array<Entity *> gen_params;
-	Array<Entity *> read_params;
-
-	bool is_control;
-	bool is_conditional;
-	bool is_terminal;
-
-	Entity *branch_target;
-	i32 block_id;
-};
-
-
-struct AsmMnemonicAccumulator {
-	u16              defined_regs;
-	PtrSet<Entity *> defined_params;
-
-	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
-	u16 implicit_clobbered_regs;
-	u16 explicitly_produced_regs;
-	u16 stale_outputs;
-
-	bool straight_line;
-
-	// Whether the most-recently-checked instruction terminates straight-line flow.
-	// Reset to false at every label (a label starts a fresh straight-line region whose
-	// tail we haven't seen yet). Consulted after the loop for #diverging templates.
-	bool last_is_terminal;
-
-	// Did the template contain any instructions at all? An empty diverging body can't diverge.
-	bool saw_any_instructions;
-
-	// Related to #align_stack
-	// any call/branch (CONTROL) or memory effect that could require the stack
-	//  to be realigned. If none occurred, #align_stack is redundant.
-	bool saw_call_or_mem;
-
-	// Purity test
-	bool        can_be_pure;
-	char const *impure_reason;
-	Ast *       impure_reason_node;
-
-	PtrMap<AstAsmInstruction *, AsmInstructionFacts> instruction_facts;
-};
+#include "check_asm_cfg.cpp"
 
 // Bit-width the operand's Odin type occupies in a register/immediate slot.
 // Integers/floats/bools/pointers -> their size; #simd -> total vector width. 0 if unknown.
@@ -1647,51 +1588,6 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 
-		if (asm_acc->straight_line) {
-			u16 wants = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
-			u16 undefined = wants & ~asm_acc->defined_regs;
-
-			for (u16 bit = 1; bit != 0; bit <<= 1) {
-				if ((undefined & bit) == 0) {
-					continue;
-				}
-				char const *rname = asm_ctx->clobber_reg_bit_name(bit);
-
-				String owner = {};
-				char const *role  = nullptr;
-				for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
-					if (ed.pin.len == 0 || ed.entity == nullptr) {
-						continue;
-					}
-					if (asm_ctx->clobber_bit_for_reg_name(ed.pin) != bit) {
-						continue;
-					}
-					if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.tie < 0) {
-						owner = ed.entity->token.string;
-						role  = "output";
-						break;
-					}
-					if (ed.param_group == AsmTemplateEntityDeclParamGroup_Scratch && ed.view_of < 0) {
-						owner = ed.entity->token.string;
-						role  = "scratch";
-						break;
-					}
-				}
-
-				if (role != nullptr) {
-					error(instr->name,
-					      "'%.*s' implicitly reads %%%s, which is bound to the %s parameter '%.*s', "
-					      "but nothing has written %%%s yet; write to it (e.g. into '%.*s') before this instruction",
-					      LIT(name), rname, role, LIT(owner), rname, LIT(owner));
-				} else {
-					error(instr->name,
-					      "'%.*s' implicitly reads %%%s, but nothing in this template produces a value for it; "
-					      "pin an input parameter to %%%s, or write %%%s before this instruction",
-					      LIT(name), rname, rname, rname);
-				}
-			}
-		}
-
 		u16 produced = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
 		u16 explicit_writes = 0;
 
@@ -1762,7 +1658,28 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		facts.gen_regs = produced | pinned_param_writes;
-		asm_acc->defined_regs |= facts.gen_regs;
+
+		// NOTE(bill): mnemonics such as `xor r, r` / `sub r, r` act as zeroing the destination
+		// independent of its prior value: the read is architecturally dead, so it must not count as a use.
+		bool self_zeroing = false;
+		if (asm_ctx->is_self_zeroing_idiom(cast(u16)mnemonic) && operands.count >= 2) {
+			Entity *e0 = entity_of_node(operands[0].expr);
+			bool all_same = (e0 != nullptr);
+			for (isize k = 1; all_same && k < operands.count; k++) {
+				all_same = entity_of_node(operands[k].expr) == e0;
+			}
+			// also treat literal %reg == %reg as self-zeroing (no entity, compare reg bits)
+			if (!all_same && operands[0].expr->kind == Ast_AsmRegister) {
+				u16 b0 = asm_ctx->clobber_bit_for_reg_name(operands[0].expr->AsmRegister.name.string);
+				all_same = b0 != 0;
+				for (isize k = 1; all_same && k < operands.count; k++) {
+					all_same = operands[k].expr->kind == Ast_AsmRegister &&
+					           asm_ctx->clobber_bit_for_reg_name(operands[k].expr->AsmRegister.name.string) == b0;
+				}
+			}
+			self_zeroing = all_same;
+		}
+
 
 		for_array(i, operands) {
 			int slot = user_operand_target_index(cast(int)i);
@@ -1773,45 +1690,12 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			if (pe == nullptr || pe->kind != Entity_Variable) {
 				continue;
 			}
-			if (cast(u16)clobber.read    & (1u << slot)) {
+
+			if (!self_zeroing && (cast(u16)clobber.read & (1u << slot))) {
 				array_add(&facts.read_params, pe);
 			}
 			if (cast(u16)clobber.written & (1u << slot)) {
 				array_add(&facts.gen_params, pe);
-			}
-		}
-
-		if (asm_acc->straight_line) {
-			// NOTE(bill): check for read-before-write (use of undefined value)
-			// Only really meaningful in straight-line code, so a label above means a branch
-			// could have defined the value out of the textual order
-			for_array(i, operands) {
-				auto const &op = operands[i];
-				int slot = user_operand_target_index(cast(int)i);
-				if (slot < 0 || (cast(u16)clobber.read & (1u << slot)) == 0) {
-					continue; // not a read slot of this form
-				}
-				Entity *pe = entity_of_node(op.expr);
-				if (pe == nullptr || pe->kind != Entity_Variable) {
-					continue; // literal %reg / immediate / memory, not a tracked param
-				}
-				if (!ptr_set_exists(&asm_acc->defined_params, pe)) {
-					error(op.expr, "'%.*s' reads '%.*s' before it is assigned; its initial value is undefined",
-					        LIT(name), LIT(pe->token.string));
-					ptr_set_add(&asm_acc->defined_params, pe); // warn once per param
-				}
-			}
-		}
-
-		// NOTE(bill): record the instruction's parameter writes
-		for_array(i, operands) {
-			int slot = user_operand_target_index(cast(int)i);
-			if (slot < 0 || (cast(u16)clobber.written & (1u << slot)) == 0) {
-				continue;
-			}
-			Entity *pe = entity_of_node(operands[i].expr);
-			if (pe != nullptr && pe->kind == Entity_Variable) {
-				ptr_set_add(&asm_acc->defined_params, pe);
 			}
 		}
 
@@ -1842,17 +1726,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			bool halt    = clobber.has_halt();
 			// A conditional branch reads a flag and can fall through -> not terminal.
 			bool conditional = clobber.is_conditional();
-			asm_acc->last_is_terminal = halt || (control && !conditional);
 
 			facts.is_control = control;
 			facts.is_conditional = conditional;
 			facts.is_terminal = halt || (control && !conditional);
-
-			if (control) {
-				// A branch/call inside the template means subsequent instructions may be reached
-				// out of textual order; stop trusting the linear def model past this point.
-				asm_acc->straight_line = false;
-			}
 		}
 		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
 
@@ -2426,7 +2303,6 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	entity->type = type;
 
-
 	bool is_volatile       = false;
 	bool is_align_stack    = false;
 	bool is_pure_annotated = false;
@@ -2541,44 +2417,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	}
 
 	AsmMnemonicAccumulator asm_acc = {};
-	ptr_set_init(&asm_acc.defined_params);
-	defer (ptr_set_destroy(&asm_acc.defined_params));
-
 	map_init(&asm_acc.instruction_facts);
 	defer (map_destroy(&asm_acc.instruction_facts));
 
-
-	// Physical registers known to hold a defined value at the current point in the
-	// straight-line instruction stream. Seeded with input-pinned registers (they
-	// carry their argument at entry); grows as instructions write registers.
-	for (auto const &ed : ate->decls) {
-		if (ed.no_init) {
-			ptr_set_add(&asm_acc.defined_params, ed.entity);
-		}
-		switch (ed.param_group) {
-		case AsmTemplateEntityDeclParamGroup_Input:
-			if (ed.pin.len != 0) {
-				// Only inputs (and the input half of a tie, which is Input-group) hold a
-				// value at entry. Output/scratch pins start undefined and become defined
-				// when an instruction writes them.
-				asm_acc.defined_regs |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
-			}
-			ptr_set_add(&asm_acc.defined_params, ed.entity);
-			break;
-		case AsmTemplateEntityDeclParamGroup_Output:
-			if (ed.tie >= 0) {
-				ptr_set_add(&asm_acc.defined_params, ed.entity);
-			}
-			break;
-		}
-	}
-
-	// Linear "written earlier in the text" is only a sound proxy for "produced at
-	// runtime" while control flow is straight-line. The first label is a potential
-	// jump target / back-edge, after which a read can precede its textual def; from
-	// there on we stop emitting the implicit-read diagnostic.
-	asm_acc.straight_line = true;
-	asm_acc.can_be_pure   = true;
+	asm_acc.can_be_pure = true;
 
 	// collect label decls
 	for (Ast *instruction_ : at->instructions) {
@@ -2678,10 +2520,6 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		case_end;
 
 		case_ast_node(label, AsmLabelDecl, instruction_);
-			asm_acc.straight_line = false;
-			// A new straight-line region begins here; its tail is unseen,
-			// so the previous instruction's terminality no longer describes the body's end.
-			asm_acc.last_is_terminal = false;
 			if (previous_prefix != 0) {
 				error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but a label declaration was found");
 				previous_prefix = 0;
@@ -2780,32 +2618,17 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 
-	for (auto const &ed : ate->decls) {
-		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output) {
-			continue;
-		}
-		if (ed.tie >= 0) {
-			continue;
-		}
-		if (ed.no_init) {
-			continue;
-		}
-		if (!asm_acc.straight_line) {
-			continue;
-		}
+	// NOTE(bill, 2026-08-24): Construct a control-flow graph (CFG) from the instructions
+	// to do further analysis which is not possible with an conservative straight-line approximation
+	// Using a CFG is a much sounder approach for calculating:
+	// * reads before writes
+	// * divergence
+	// * unreachable code
 
-		bool written = false;
-		if (ed.pin.len != 0) {
-			u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-			written = (bit != 0) && (asm_acc.defined_regs & bit) != 0;
-		} else {
-			written = ptr_set_exists(&asm_acc.defined_params, ed.entity);
-		}
-
-		if (!written) {
-			error(ed.entity->token, "'asm' output parameter '%.*s' is never assigned to in this template, thus its value is undefined", LIT(ed.entity->token.string));
-		}
-	}
+	AsmCfg cfg = {};
+	defer (asm_cfg_destroy(&cfg));
+	check_asm_cfg_build(d->init_expr, &asm_acc, &cfg);
+	check_asm_cfg_analyse(asm_ctx, ctx, entity, &cfg, &asm_acc);
 
 
 	bool vet_unused = false;
@@ -2866,7 +2689,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				}
 			}
 			if (ed.tie > 0) {
-				// TODO(bill): Handle this edge case
+				// TODO(bill): Handle this edge case?
 				continue;
 			}
 
@@ -2891,16 +2714,6 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		warning(entity->token,
 		        "#align_stack is redundant; this template makes no call and touches no memory "
 		        "that would require the stack to be realigned");
-	}
-
-	if (type->Proc.diverging) {
-		if (!asm_acc.saw_any_instructions) {
-			error(entity->token, "This asm template is declared as diverging (-> !) but its body is empty and cannot diverge");
-		} else if (!asm_acc.last_is_terminal) {
-			error(entity->token,
-			      "This asm template is declared diverging (-> !) but its final instruction can fall through; "
-			      "end it with an unconditional jump, return, or halt");
-		}
 	}
 
 	{

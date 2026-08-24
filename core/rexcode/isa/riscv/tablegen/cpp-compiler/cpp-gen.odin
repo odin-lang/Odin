@@ -821,6 +821,21 @@ main :: proc() {
 		}
 	""")
 
+	strings.write_string(&sb, """
+		bool is_self_zeroing_idiom(u16 m) const {
+			switch (m) {
+			case M_XOR:
+			case M_SUB:
+			case M_SUBW:
+			case M_SLT:
+			case M_SLTU:
+			case M_ANDN:
+				return true;
+			}
+			return false;
+		}
+	""")
+
 	strings.write_string(&sb, "\n};\n")
 
 	strings.write_string(&sb, "\n\n\n")
