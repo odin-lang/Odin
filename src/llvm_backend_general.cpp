@@ -3033,6 +3033,10 @@ gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, 
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
 }
 
+gb_internal void lb_remove_attribute_from_proc(lbModule *m, LLVMValueRef proc_value, char const *name) {
+	LLVMRemoveEnumAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, LLVMGetEnumAttributeKindForName(name, gb_strlen(name)));
+}
+
 gb_internal bool lb_proc_has_attribute(lbModule *m, LLVMValueRef proc_value, char const *name) {
 	LLVMAttributeRef ref = LLVMGetEnumAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, LLVMGetEnumAttributeKindForName(name, gb_strlen(name)));
 	return ref != nullptr;
