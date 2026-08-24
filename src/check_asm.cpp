@@ -2655,20 +2655,27 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 
-	// TODO(bill): Is this actually correct logic now that the written logic was fixed previously?
 	for (auto const &ed : ate->decls) {
 		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output) {
 			continue;
 		}
+		if (ed.tie >= 0) {
+			continue;
+		}
+		if (!asm_acc.straight_line) {
+			continue;
+		}
+
+		bool written = false;
 		if (ed.pin.len != 0) {
 			u16 bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-			if (bit != 0 && (asm_acc.defined_regs & bit) == 0 && asm_acc.straight_line) {
-				error(ed.entity->token, "Output '%.*s' is pinned to %%%.*s but nothing in this template writes it",
-				      LIT(ed.entity->token.string), LIT(ed.pin));
-			}
-		} else if ((ed.entity->flags & EntityFlag_Used) == 0) {
-			error(ed.entity->token, "Output '%.*s' is unpinned but nothing in this template uses it",
-			      LIT(ed.entity->token.string));
+			written = (bit != 0) && (asm_acc.defined_regs & bit) == 0;
+		} else {
+			written = ptr_set_exists(&asm_acc.defined_params, ed.entity);
+		}
+
+		if (!written) {
+			error(ed.entity->token, "'asm' output parameter '%.*s' is never assigned to in this template, thus its value is undefined", LIT(ed.entity->token.string));
 		}
 	}
 
