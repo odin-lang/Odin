@@ -843,6 +843,11 @@ gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegiste
 
 		u16 width_in_bits = asm_ctx->reg_size(r);
 		switch (width_in_bits) {
+		case 0:
+			// a register whose class the width table cannot describe, `%rip` being the only one.
+			// anchored on the name rather than the operand, which clobbers and pins do not have
+			error(asm_reg->name, "Asm registers with no operand width are not supported: %%%.*s", LIT(name));
+			return false;
 		case 8:
 			operand->type = t_u8;
 			break;
@@ -856,7 +861,7 @@ gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegiste
 			operand->type = t_u64;
 			break;
 		case 80:
-			error(operand->expr, "80-bit width asm registers are not supported");
+			error(asm_reg->name, "80-bit width asm registers are not supported");
 			return false;
 		case 128:
 			operand->type = alloc_type_simd_vector(4, t_f32);

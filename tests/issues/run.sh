@@ -122,6 +122,12 @@ fi
 
 # `asm` templates are amd64-only, so this file is empty on every other architecture
 if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
+	if [[ $($ODIN check ../test_issue_asm_rip_register.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 6 ]]; then
+  	echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+	  exit 1
+  fi
 	if [[ $($ODIN check ../test_issue_asm_template_as_value.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
 		echo "SUCCESSFUL 1/1"
 	else
