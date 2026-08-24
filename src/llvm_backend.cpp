@@ -2438,6 +2438,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 			lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default;
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
 				pass_manager_kind = lbFunctionPassManager_default_without_memcpy;
+				lb_remove_attribute_from_proc(p->module, p->value, "optsize"); // incompatible with optnone
 				lb_add_attribute_to_proc(p->module, p->value, "optnone");
 				lb_add_attribute_to_proc(p->module, p->value, "noinline");
 			} else {

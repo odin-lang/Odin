@@ -464,6 +464,15 @@ enum IntegerDivisionByZeroKind : u8 {
 	IntegerDivisionByZero_AllBits,
 };
 
+// values of BuildContext.optimization_level;
+// matches Odin_Optimization_Mode in checker.cpp
+enum OptimizationLevel : i32 {
+	OptimizationLevel_None       = -1,
+	OptimizationLevel_Minimal    =  0,
+	OptimizationLevel_Size       =  1,
+	OptimizationLevel_Speed      =  2,
+	OptimizationLevel_Aggressive =  3,
+};
 
 // This stores the information for the specify architecture of this build
 struct BuildContext {
