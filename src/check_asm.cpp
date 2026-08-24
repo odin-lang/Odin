@@ -1505,11 +1505,15 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 		bool mem_is_real = has_mem_operand || !has_rm_slot;
 
+		bool internal_branch = clobber.has_control() && check_asm_instr_targets_internal_label(instr);
+
+		bool effective_side_effects = clobber.implies_side_effects() && !internal_branch;
+
 		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
 		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory() && mem_is_real;
-		tmpl_entity->AsmTemplate.is_volatile    |= clobber.implies_side_effects();
+		tmpl_entity->AsmTemplate.is_volatile    |= effective_side_effects;
 
-		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.implies_side_effects() != 0;
+		tmpl_entity->AsmTemplate.has_observable_side_effect |= effective_side_effects;
 		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem && mem_is_real;
 
 		// #align_stack only matters if the body makes a call (which requires the stack
@@ -1698,9 +1702,9 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				why = "it is nondeterministic";
 			} else if (clobber.implies_clobber_memory() && mem_is_real) {
 				why = "it accesses memory the compiler cannot see";
-			} else if (clobber.implies_side_effects()) {
+			} else if (effective_side_effects) {
 				why = "it has an observable side effect";
-			} else if (clobber.has_control() && !check_asm_instr_targets_internal_label(instr)) {
+			} else if (!internal_branch && clobber.has_control()) {
 				// Internal jmp/jcc/ret over the template's own labels stays pure; a call
 				// or an indirect/external transfer does not.
 				why = "it possibly transfers control outside the inline 'asm' template";
