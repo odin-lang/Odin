@@ -1487,53 +1487,108 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		u16 pinned_mask = 0;
-		u16 output_only_pin_mask = 0;
 		for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
 			if (ed.pin.len != 0) {
-				u16 b = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-				pinned_mask |= b;
-				if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.tie < 0) {
-					output_only_pin_mask |= b;
-				}
+				pinned_mask |= asm_ctx->clobber_bit_for_reg_name(ed.pin);
 			}
 		}
 
 		if (asm_acc->straight_line) {
-			u16 wants     = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
-			u16 undefined = wants & ~asm_acc->defined_regs & ~pinned_mask;
+			u16 wants = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
+			u16 undefined = wants & ~asm_acc->defined_regs;
+
 			for (u16 bit = 1; bit != 0; bit <<= 1) {
-			    if ((undefined & bit) == 0) {
-			        continue;
-			    }
-			    char const *rname = asm_ctx->clobber_reg_bit_name(bit);
-			    error(instr->name,
-			          "'%.*s' implicitly reads %%%s, but nothing in this template produces "
-			          "a value for it; pin an input parameter to %%%s, or write %%%s before "
-			          "this instruction",
-			          LIT(name), rname, rname, rname);
+				if ((undefined & bit) == 0) {
+					continue;
+				}
+				char const *rname = asm_ctx->clobber_reg_bit_name(bit);
+
+				String owner = {};
+				char const *role  = nullptr;
+				for (auto const &ed : tmpl_entity->AsmTemplate.decls) {
+					if (ed.pin.len == 0 || ed.entity == nullptr) {
+						continue;
+					}
+					if (asm_ctx->clobber_bit_for_reg_name(ed.pin) != bit) {
+						continue;
+					}
+					if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output && ed.tie < 0) {
+						owner = ed.entity->token.string;
+						role  = "output";
+						break;
+					}
+					if (ed.param_group == AsmTemplateEntityDeclParamGroup_Scratch && ed.view_of < 0) {
+						owner = ed.entity->token.string;
+						role  = "scratch";
+						break;
+					}
+				}
+
+				if (role != nullptr) {
+					error(instr->name,
+					      "'%.*s' implicitly reads %%%s, which is bound to the %s parameter '%.*s', "
+					      "but nothing has written %%%s yet; write to it (e.g. into '%.*s') before this instruction",
+					      LIT(name), rname, role, LIT(owner), rname, LIT(owner));
+				} else {
+					error(instr->name,
+					      "'%.*s' implicitly reads %%%s, but nothing in this template produces "
+					      "a value for it; pin an input parameter to %%%s, or write %%%s before "
+					      "this instruction",
+					      LIT(name), rname, rname, rname);
+				}
 			}
 		}
 
 		u16 produced = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
 		u16 explicit_writes = 0;
 
-		// Explicit destination operands that name a concrete register also produce it
-		// (e.g. `mov eax, $leaf` before CPUID). Only literal %reg operands pin a known
-		// physical register; parameter operands are register-allocated elsewhere, so they
-		// don't tell us which physical register was written.
 		u16 written_ops = cast(u16)clobber.written;
+		u16 pinned_param_writes = 0;
 		for_array(i, operands) {
 			int tslot = user_operand_target_index(cast(int)i);
 			if (tslot < 0 || tslot >= 4 || (written_ops & (1u << tslot)) == 0) {
 				continue;
 			}
-			Ast *e = operands[i].expr;
+			auto const &op = operands[i];
+
+			Ast *e = op.expr;
 			if (e && e->kind == Ast_AsmRegister) {
 				u16 b = asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
 				produced |= b;
 				explicit_writes |= b;
+			} else {
+				// NOTE(bill): A write through a pinned parameter (or a width-view of one)
+				//  defines that parameter's physical register for the read-before-write check only
+				auto written_pinned_reg_bit = [&](Operand const &op) -> u16 {
+					Entity *pe = entity_of_node(op.expr);
+					if (pe == nullptr || pe->kind != Entity_Variable) {
+						return 0;
+					}
+					auto const &decls = tmpl_entity->AsmTemplate.decls;
+					for_array(di, decls) {
+						auto const &ed = decls[di];
+						if (ed.entity != pe) {
+							continue;
+						}
+						if (ed.pin.len != 0) {
+							return asm_ctx->clobber_bit_for_reg_name(ed.pin);
+						}
+						// NOTE(bill): A width-view carries no pin of its own and thus it aliases its source's register.
+						if (ed.view_of >= 0 && ed.view_of < cast(i32)decls.count) {
+							String src_pin = decls[ed.view_of].pin;
+							if (src_pin.len != 0) {
+								return asm_ctx->clobber_bit_for_reg_name(src_pin);
+							}
+						}
+						return 0;
+					}
+					return 0;
+				};
+
+				pinned_param_writes |= written_pinned_reg_bit(operands[i]);
 			}
 		}
+
 		if (is_pseudo) {
 			// Synthesized register sources (e.g. ra in `jal off` -> `jal ra, off`) also
 			// write a physical register; record them so ra is treated as produced/clobbered.
@@ -1550,7 +1605,7 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			produced        |= synth;
 			explicit_writes |= synth;
 		}
-		asm_acc->defined_regs |= produced;
+		asm_acc->defined_regs |= produced | pinned_param_writes;
 
 		// Registers this form clobbers implicitly (RDTSC->RAX:RDX, etc.), for the
 		// redundant-#clobber hint. Union across the template; pinned regs excluded
