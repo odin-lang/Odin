@@ -110,6 +110,16 @@ else
 	exit 1
 fi
 
+# `asm` templates are amd64-only, so this file is empty on every other architecture
+if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
+	if [[ $($ODIN doc ../test_issue_asm_doc_category.odin -file 2>&1 | grep -c "asm templates") -eq 1 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+fi
+
 if [[ $($ODIN build ../test_issue_7108.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else

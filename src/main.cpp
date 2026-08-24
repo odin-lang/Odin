@@ -3463,6 +3463,7 @@ gb_internal void print_show_unused(Checker *c) {
 		case Entity_ProcGroup:
 		case Entity_ImportName:
 		case Entity_LibraryName:
+		case Entity_AsmTemplate:
 			// Fine
 			break;
 		}
