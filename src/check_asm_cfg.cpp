@@ -664,10 +664,12 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 	u16 const REG_TOP = asm_ctx->CLOBBER_REGS_NAMED;
 
 	u16 exit_live = 0;
+	u16 output_regs = 0;
 	for_array(i, entity->AsmTemplate.decls) {
 		auto const &ed = entity->AsmTemplate.decls[i];
 		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output) {
-			exit_live |= cfg->decl_pin_bit[i]; // pinned/view-inherited output reg, if any
+			exit_live   |= cfg->decl_pin_bit[i]; // pinned/view-inherited output reg, if any
+			output_regs |= cfg->decl_pin_bit[i];
 		}
 	}
 	for (String const &reg : entity->AsmTemplate.clobber_registers_set) {
@@ -753,9 +755,16 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 				if ((dead & bit) == 0) {
 					continue;
 				}
-				warning(f->node->name,
-				        "'%.*s' writes %%%s but its value is never read before being overwritten or the template ends",
-				        LIT(f->name), asm_ctx->clobber_reg_bit_name(bit));
+				if ((bit & output_regs) != 0) {
+					warning(f->node->name,
+					        "'%.*s' writes output register %%%s, but that value is overwritten before the template returns; "
+					        "the output's final value does not come from this instruction",
+					        LIT(f->name), asm_ctx->clobber_reg_bit_name(bit));
+				} else {
+					warning(f->node->name,
+					        "'%.*s' writes %%%s but its value is never read before being overwritten or the template ends",
+					        LIT(f->name), asm_ctx->clobber_reg_bit_name(bit));
+				}
 			}
 			live = (live & ~f->gen_regs) | (f->read_regs & REG_TOP);
 		}
