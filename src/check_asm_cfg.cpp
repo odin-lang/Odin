@@ -554,6 +554,9 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				if (ed.tie >= 0 || ed.no_init) {
 					continue;
 				}
+				if (ed.pin_flag.len != 0) {
+					continue; // flag-pinned output: defined by a flags side effect, not a reg/param write
+				}
 
 				bool written = false;
 				u16 bit = cfg->decl_pin_bit[i];
