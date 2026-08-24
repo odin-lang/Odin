@@ -43,10 +43,13 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_issue_7008.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_7260.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin check ..\test_issue_asm_named_register_slot.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "8" || exit /b
 ..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration_mismatch.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin check ..\test_issue_asm_group_empty_params.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+..\..\..\odin check ..\test_issue_asm_rip_register.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "6" || exit /b
+..\..\..\odin check ..\test_issue_asm_template_as_value.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
 ..\..\..\odin build ..\test_issue_7188.odin %COMMON%  || exit /b
 clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
