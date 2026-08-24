@@ -54,7 +54,7 @@ struct AsmCfg {
 	char const *impure_reason;
 	Ast *       impure_reason_node;
 
-	Array<AstAsmInstruction *> insts;       // program-order (only for fact-carrying instrs)
+	Array<AstAsmInstruction *> insts; // program-order (only for fact-carrying instrs)
 	Array<AsmBlock>            blocks;
 
 	PtrMap<Entity *, i32> entity_to_index;
@@ -142,7 +142,7 @@ gb_internal void asm_cfg_populate_decls(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 				i32 src_i = decls[i].view_of;
 				Entity *src_e = decls[src_i].entity;
 				if (src_e != nullptr) {
-					map_set(&cfg->entity_to_index, e, src_i);  // view entity -> source index
+					map_set(&cfg->entity_to_index, e, src_i);
 				}
 				// NOTE(bill): No need to set a universe bit for the view as the source already has one
 			} else {
@@ -202,7 +202,7 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 		if (facts != nullptr) {
 			facts->block_id = bi;
 			if (facts->is_control) {
-				need_leader = true; // the fall-through after a branch starts a new block
+				need_leader = true;
 			}
 		}
 	}
@@ -220,7 +220,7 @@ gb_internal void check_asm_cfg_build(AsmCtx *asm_ctx, AsmCfg *cfg, Ast *at_node,
 			if (lf->branch_target != nullptr) {
 				i32 t = asm_cfg_label_block_index(lf->branch_target);
 				if (0 <= t && t < cast(i32)cfg->blocks.count) {
-					branch_succ = t; // in-range internal target ('jmp .l' / 'jz .l')
+					branch_succ = t;
 				}
 				// For `t == blocks.count`, this implies a jump to the implicit end, and is handled as "leaves" below
 			}
@@ -274,7 +274,7 @@ gb_internal bool check_asm_cfg_block_leaves(AsmCfg *cfg, i32 bi) {
 	}
 	bool terminal = (lf != nullptr) && lf->is_terminal;
 	if (!terminal && (bi+1 >= cast(i32)cfg->blocks.count)) {
-		return true; // straight-line / conditional tail with nothing after it
+		return true; // straight-line/conditional-tail with nothing after it
 	}
 	return false;
 }
