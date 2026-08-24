@@ -120,12 +120,12 @@ main :: proc() {
 	strings.write_string(&sb, "\n")
 	strings.write_string(&sb, """
 
-		enum ClobberFFlags : u8 {
-			ClobberFFlag_NV = 1<<0, // invalid operation
-			ClobberFFlag_DZ = 1<<1, // divide by zero
-			ClobberFFlag_OF = 1<<2, // overflow
-			ClobberFFlag_UF = 1<<3, // underflow
-			ClobberFFlag_NX = 1<<4, // inexact
+		enum ClobberFlags : u8 {
+			ClobberFlag_NV = 1<<0, // invalid operation
+			ClobberFlag_DZ = 1<<1, // divide by zero
+			ClobberFlag_OF = 1<<2, // overflow
+			ClobberFlag_UF = 1<<3, // underflow
+			ClobberFlag_NX = 1<<4, // inexact
 		};
 
 		enum ClobberRegs : u8 {
@@ -174,9 +174,28 @@ main :: proc() {
 			return \"<reg>\";
 		}
 
+		u16 flags_from_name(String const &name) {
+			static const struct { String name; ClobberFlags flag; } table[] = {
+				// flags: accrued FP exception flags (fcsr[4:0])
+				{str_lit(\"nx\"),  ClobberFlag_NX}, // Inexact
+				{str_lit(\"uf\"),  ClobberFlag_UF}, // Underflow
+				{str_lit(\"of\"),  ClobberFlag_OF}, // Overflow
+				{str_lit(\"dz\"),  ClobberFlag_DZ}, // Divide by Zero
+				{str_lit(\"nv\"),  ClobberFlag_NV}, // Invalid Operation
+			};
+
+			for (auto const &t : table) {
+				if (name == t.name) {
+					return cast(u16)t.flag;
+				}
+			}
+			return 0;
+		}
+
+
 		i32 flag_bit_from_name(String const &name, i32 *width_) {
 			static const struct { String name; i32 bit; } table[] = {
-				// fflags: accrued FP exception flags (fcsr[4:0])
+				// flags: accrued FP exception flags (fcsr[4:0])
 				{str_lit(\"nx\"),  0}, // Inexact
 				{str_lit(\"uf\"),  1}, // Underflow
 				{str_lit(\"of\"),  2}, // Overflow
@@ -207,14 +226,14 @@ main :: proc() {
 			OperandSet         read;        // operand slots whose register/CSR/mem-base is read
 			ClobberRegs        implicit_wr; // implicit reg writes (ra on C.JAL/C.JALR)
 			ClobberRegs        implicit_rd; // implicit reg reads (sp on the *SP forms)
-			ClobberFFlags      fflags_wr;   // accrued exception flags this op may raise
+			ClobberFlags       flags_wr;   // accrued exception flags this op may raise
 			bool               reads_frm;   // consumes the dynamic rounding mode from fcsr
 			bool               writes_mem;
 			bool               reads_mem;
 			SideEffectFlags side_effects;
 
 			bool implies_clobber_flags() const {
-				return (fflags_wr != 0);
+				return (flags_wr != 0);
 			}
 			bool implies_clobber_memory() const {
 				return writes_mem || reads_mem ||

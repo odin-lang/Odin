@@ -1,10 +1,16 @@
 struct AsmBlock {
 	i32 first,       last;
 	Array<i32>       succs;
+
 	u16              in_defs;
 	u16              out_defs;
+
+	u16              in_flags;
+	u16              out_flags;
+
 	PtrSet<Entity *> in_params;
 	PtrSet<Entity *> out_params;
+
 	bool             reachable;
 };
 
@@ -12,6 +18,7 @@ struct AsmInstructionFacts {
 	AstAsmInstruction *node;
 	String             name;
 
+	u16 gen_flags; // flag bits this instruction defines
 	u16 gen_regs;
 	u16 read_regs;
 
@@ -103,6 +110,15 @@ gb_internal u16 asm_decl_resolve_pin_bit(AsmCtx *asm_ctx, Array<AsmTemplateEntit
 		}
 	}
 	return 0;
+}
+
+template <typename AsmCtx>
+gb_internal u16 asm_decl_resolve_flag_bit(AsmCtx *asm_ctx, AsmTemplateEntityDecl const &ed) {
+	if (ed.pin_flag.len == 0) {
+		return 0;
+	}
+	auto flags = asm_ctx->flag_from_name(ed.pin_flag);
+	return cast(u16)flags;
 }
 
 template <typename AsmCtx>
@@ -305,7 +321,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 		error(entity->token, "'asm' templates cannot have more than 64 total parameter declarations, got %td", decls.count);
 		return;
 	}
-	u16 const REG_TOP = asm_ctx->CLOBBER_REGS_NAMED;
+	u16 const REG_TOP  = asm_ctx->CLOBBER_REGS_NAMED;
+	u16 const FLAG_TOP = cast(u16)~cast(u16)0;
 
 	u64 const universe_pm = cfg->universe_pm;
 	auto bit_of = [&](Entity *e) -> u64 {
@@ -338,12 +355,15 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 
 	isize const n = cfg->blocks.count;
 
-	auto in_regs  = slice_make<u16>(heap_allocator(), n); defer (slice_free(&in_regs,  heap_allocator()));
-	auto out_regs = slice_make<u16>(heap_allocator(), n); defer (slice_free(&out_regs, heap_allocator()));
-	auto gen_regs = slice_make<u16>(heap_allocator(), n); defer (slice_free(&gen_regs, heap_allocator()));
-	auto in_pm    = slice_make<u64>(heap_allocator(), n); defer (slice_free(&in_pm,    heap_allocator()));
-	auto out_pm   = slice_make<u64>(heap_allocator(), n); defer (slice_free(&out_pm,   heap_allocator()));
-	auto gen_pm   = slice_make<u64>(heap_allocator(), n); defer (slice_free(&gen_pm,   heap_allocator()));
+	auto in_regs   = slice_make<u16>(heap_allocator(), n); defer (slice_free(&in_regs,   heap_allocator()));
+	auto out_regs  = slice_make<u16>(heap_allocator(), n); defer (slice_free(&out_regs,  heap_allocator()));
+	auto gen_regs  = slice_make<u16>(heap_allocator(), n); defer (slice_free(&gen_regs,  heap_allocator()));
+	auto in_flags  = slice_make<u16>(heap_allocator(), n); defer (slice_free(&in_flags,  heap_allocator()));
+	auto out_flags = slice_make<u16>(heap_allocator(), n); defer (slice_free(&out_flags, heap_allocator()));
+	auto gen_flags = slice_make<u16>(heap_allocator(), n); defer (slice_free(&gen_flags, heap_allocator()));
+	auto in_pm     = slice_make<u64>(heap_allocator(), n); defer (slice_free(&in_pm,     heap_allocator()));
+	auto out_pm    = slice_make<u64>(heap_allocator(), n); defer (slice_free(&out_pm,    heap_allocator()));
+	auto gen_pm    = slice_make<u64>(heap_allocator(), n); defer (slice_free(&gen_pm,    heap_allocator()));
 
 	// predecessors, restricted to reachable blocks
 	auto preds = slice_make<Array<i32>>(heap_allocator(), n);
@@ -371,6 +391,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 
 	for_array(bi, cfg->blocks) {
 		u16 gr = 0;
+		u16 gf = 0;
 		u64 gp = 0;
 		AsmBlock const &b = cfg->blocks[bi];
 		for (i32 ii = b.first; ii <= b.last; ii++) {
@@ -379,12 +400,14 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				continue;
 			}
 			gr |= f->gen_regs;
+			gf |= f->gen_flags;
 			for (Entity *pe : f->gen_params) {
 				gp |= bit_of(pe);
 			}
 		}
-		gen_regs[bi] = gr;
-		gen_pm[bi]   = gp;
+		gen_regs[bi]  = gr;
+		gen_flags[bi] = gf;
+		gen_pm[bi]    = gp;
 	}
 
 	// NOTE(bill): initialize the blocks
@@ -394,14 +417,17 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			continue;
 		}
 		if (bi == 0) {
-			in_regs[bi] = seed_regs;
-			in_pm[bi]   = seed_pm;
+			in_regs[bi]  = seed_regs;
+			in_pm[bi]    = seed_pm;
+			in_flags[bi] = 0; // no flag is defined at the template entry point
 		} else {
-			in_regs[bi] = REG_TOP;
-			in_pm[bi]   = universe_pm;
+			in_regs[bi]  = REG_TOP;
+			in_pm[bi]    = universe_pm;
+			in_flags[bi] = FLAG_TOP;
 		}
-		out_regs[bi] = in_regs[bi] | gen_regs[bi];
-		out_pm[bi]   = in_pm[bi]   | gen_pm[bi];
+		out_regs[bi]  = in_regs[bi]  | gen_regs[bi];
+		out_pm[bi]    = in_pm[bi]    | gen_pm[bi];
+		out_flags[bi] = in_flags[bi] | gen_flags[bi];
 	}
 
 	// forward must-analysis: in = AND(preds.out); out = in | gen. Iterate to fixpoint.
@@ -414,26 +440,34 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			}
 
 			u16 nin_r = seed_regs;
+			u16 nin_f = 0;
 			u64 nin_p = seed_pm;
 			if (bi != 0) {
 				nin_r = REG_TOP;
+				nin_f = FLAG_TOP;
 				nin_p = universe_pm;
 				for (i32 p : preds[bi]) {
-					 nin_r &= out_regs[p];
-					 nin_p &= out_pm[p];
+					nin_r &= out_regs[p];
+					nin_r &= out_flags[p];
+					nin_p &= out_pm[p];
 				}
 			}
 			u16 nout_r = nin_r | gen_regs[bi];
 			u64 nout_p = nin_p | gen_pm[bi];
+			u16 nout_f = nin_f | gen_flags[bi];
 
 			if (nin_r  != in_regs[bi]  ||
 			    nin_p  != in_pm[bi]    ||
+			    nin_f  != in_flags[bi] ||
 			    nout_r != out_regs[bi] ||
-			    nout_p != out_pm[bi]) {
-				in_regs[bi]  = nin_r;
-				in_pm[bi]    = nin_p;
-				out_regs[bi] = nout_r;
-				out_pm[bi]   = nout_p;
+			    nout_p != out_pm[bi]   ||
+			    nout_f != out_flags[bi]) {
+				in_regs[bi]   = nin_r;
+				in_pm[bi]     = nin_p;
+				in_flags[bi]  = nin_f;
+				out_regs[bi]  = nout_r;
+				out_pm[bi]    = nout_p;
+				out_flags[bi] = nout_f;
 				changed = true;
 			}
 		}
@@ -442,8 +476,10 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	// NOTE(bill): publish the register masks and materialise the parameter sets onto the blocks
 	for_array(bi, cfg->blocks) {
 		AsmBlock *b = &cfg->blocks[bi];
-		b->in_defs  = in_regs[bi];
-		b->out_defs = out_regs[bi];
+		b->in_defs   = in_regs[bi];
+		b->out_defs  = out_regs[bi];
+		b->in_flags  = in_flags[bi];
+		b->out_flags = out_flags[bi];
 		if (!b->reachable) {
 			continue;
 		}
@@ -529,8 +565,9 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	}
 
 	{ // NOTE(bill): Collect the template's return points reachable blocks that leave via the end
-		u16  exit_regs = REG_TOP;
-		u64  exit_pm   = universe_pm;
+		u16  exit_regs  = REG_TOP;
+		u64  exit_pm    = universe_pm;
+		u16  exit_flags = FLAG_TOP;
 		bool any_exit  = false;
 		for_array(bi, cfg->blocks) {
 			if (!cfg->blocks[bi].reachable) {
@@ -540,8 +577,9 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				continue;
 			}
 			any_exit  = true;
-			exit_regs &= out_regs[bi];
-			exit_pm   &= out_pm[bi];
+			exit_regs  &= out_regs[bi];
+			exit_pm    &= out_pm[bi];
+			exit_flags &= out_flags[bi];
 		}
 
 		// NOTE(bill): Outputs must be assigned on every path that returns
@@ -554,17 +592,18 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				if (ed.tie >= 0 || ed.no_init) {
 					continue;
 				}
-				if (ed.pin_flag.len != 0) {
-					continue; // flag-pinned output: defined by a flags side effect, not a reg/param write
-				}
 
 				bool written = false;
-				u16 bit = cfg->decl_pin_bit[i];
-				if (bit != 0) {
-					written = (exit_regs & bit) != 0;
+				u16 flag_bit = asm_decl_resolve_flag_bit(asm_ctx, ed);
+				u16 reg_bit  = cfg->decl_pin_bit[i];
+				if (flag_bit != 0) {
+					// Flag-pinned output: defined iff the pinned flag is set on every returning path.
+					written = (exit_flags & flag_bit) != 0;
+				} else if (reg_bit != 0) {
+					written = (exit_regs & reg_bit) != 0;
 				} else {
 					written = (exit_pm & bit_of(ed.entity)) != 0;
-				}
+ 				}
 				if (!written) {
 					error(ed.entity->token,
 					      "'asm' output parameter '%.*s' is not assigned on all paths through this template; "
