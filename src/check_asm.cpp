@@ -384,10 +384,13 @@ gb_internal bool check_asm_addr_register(Operand const *operand, AsmAddrRole rol
 		return false;
 	}
 	if (role == AsmAddr_Index && reg_name.len != 0) {
-		// rsp/esp cannot be encoded as an index register.
-		if (reg_name == "rsp" || reg_name == "esp") {
-			error(operand->expr, "%%%.*s cannot be used as an index register", LIT(reg_name));
-			return false;
+		if (build_context.metrics.arch == TargetArch_amd64) {
+			// TODO(bill): This is a complete bodge for AMD64, and I need to see if regnalize this further
+			// rsp/esp cannot be encoded as an index register.
+			if (reg_name == "rsp" || reg_name == "esp") {
+				error(operand->expr, "%%%.*s cannot be used as an index register", LIT(reg_name));
+				return false;
+			}
 		}
 	}
 	return true;
@@ -447,7 +450,6 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 			Token name_token = name->Ident.token;
 
 			Entity *entity = alloc_entity_param(scope, name_token, type, false, /*is_value*/true);
-			// entity->flags |= EntityFlag_Used;
 			if (is_poly_name) {
 				entity->flags |= EntityFlag_PolyConst;
 				if (is_type_internally_pointer_like(type)) {
@@ -456,33 +458,33 @@ gb_internal Type *check_asm_template_signature_params(CheckerContext *ctx, Scope
 			}
 
 			Entity *found = scope_insert(scope, entity);
-			if (found == nullptr) {
-				array_add(&variables, entity);
-
-				AsmTemplateEntityDecl ed = asm_template_entity_decl_default(entity);
-				if (is_poly_name) {
-					ed.kind = AsmTemplateEntityDecl_Immediate;
-				}
-				if (input_parameters) {
-					ed.param_group = AsmTemplateEntityDeclParamGroup_Input;
-					ed.param_index = param_index++;
-					ed.result_index = -1;
-				} else {
-					ed.param_group = AsmTemplateEntityDeclParamGroup_Output;
-					ed.param_index  = -1;
-					ed.result_index = param_index++;
-				}
-
-				ed.total_index = cast(i32)asm_template_entity_decls->count;
-				array_add(asm_template_entity_decls, ed);
-			} else {
+			if (found != nullptr) {
 				TokenPos pos = found->token.pos;
 				error(name_token,
 				      "Redeclaration of '%.*s' in this scope\n"
 				      "\tat %s",
 				      LIT(name_token.string), token_pos_to_string(pos));
 				entity = found;
+				continue;
 			}
+			array_add(&variables, entity);
+
+			AsmTemplateEntityDecl ed = asm_template_entity_decl_default(entity);
+			if (is_poly_name) {
+				ed.kind = AsmTemplateEntityDecl_Immediate;
+			}
+			if (input_parameters) {
+				ed.param_group = AsmTemplateEntityDeclParamGroup_Input;
+				ed.param_index = param_index++;
+				ed.result_index = -1;
+			} else {
+				ed.param_group = AsmTemplateEntityDeclParamGroup_Output;
+				ed.param_index  = -1;
+				ed.result_index = param_index++;
+			}
+
+			ed.total_index = cast(i32)asm_template_entity_decls->count;
+			array_add(asm_template_entity_decls, ed);
 		}
 	}
 
@@ -863,8 +865,8 @@ gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegiste
 			operand->type = alloc_type_simd_vector(16, t_f32);
 			break;
 		default:
-			GB_PANIC("Unhandled register width size: %d", width_in_bits);
-			break;
+			error(asm_reg->name, "%d-bit width asm registers are not supported", width_in_bits);
+			return false;
 		}
 
 		return true;
@@ -1025,7 +1027,9 @@ struct AsmMnemonicAccumulator {
 	PtrSet<Entity *> defined_params;
 
 	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
-	u16  implicit_clobbered_regs;
+	u16 implicit_clobbered_regs;
+	u16 explicitly_produced_regs;
+	u16 stale_outputs;
 
 	bool straight_line;
 
@@ -1036,9 +1040,6 @@ struct AsmMnemonicAccumulator {
 
 	// Did the template contain any instructions at all? An empty diverging body can't diverge.
 	bool saw_any_instructions;
-
-	u16 explicitly_produced_regs;
-	u16 stale_outputs;
 
 	// Related to #align_stack
 	// any call/branch (CONTROL) or memory effect that could require the stack
@@ -1555,9 +1556,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					      LIT(name), rname, role, LIT(owner), rname, LIT(owner));
 				} else {
 					error(instr->name,
-					      "'%.*s' implicitly reads %%%s, but nothing in this template produces "
-					      "a value for it; pin an input parameter to %%%s, or write %%%s before "
-					      "this instruction",
+					      "'%.*s' implicitly reads %%%s, but nothing in this template produces a value for it; "
+					      "pin an input parameter to %%%s, or write %%%s before this instruction",
 					      LIT(name), rname, rname, rname);
 				}
 			}
@@ -1576,44 +1576,46 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			auto const &op = operands[i];
 
 			Ast *e = op.expr;
-			if (e && e->kind == Ast_AsmRegister) {
+			if (e != nullptr && e->kind == Ast_AsmRegister) {
 				u16 b = asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
 				produced |= b;
 				explicit_writes |= b;
-			} else {
-				// NOTE(bill): A write through a pinned parameter (or a width-view of one)
-				//  defines that parameter's physical register for the read-before-write check only
-				auto written_pinned_reg_bit = [&](Operand const &op) -> u16 {
-					Entity *pe = entity_of_node(op.expr);
-					if (pe == nullptr || pe->kind != Entity_Variable) {
-						return 0;
+				continue;
+			}
+
+			// NOTE(bill): A write through a pinned parameter (or a width-view of one)
+			// defines that parameter's physical register for the read-before-write check only
+			auto written_pinned_reg_bit = [&](Operand const &op) -> u16 {
+				Entity *pe = entity_of_node(op.expr);
+				if (pe == nullptr || pe->kind != Entity_Variable) {
+					return 0;
+				}
+				auto const &decls = tmpl_entity->AsmTemplate.decls;
+				for_array(di, decls) {
+					auto const &ed = decls[di];
+					if (ed.entity != pe) {
+						continue;
 					}
-					auto const &decls = tmpl_entity->AsmTemplate.decls;
-					for_array(di, decls) {
-						auto const &ed = decls[di];
-						if (ed.entity != pe) {
-							continue;
+					if (ed.pin.len != 0) {
+						return asm_ctx->clobber_bit_for_reg_name(ed.pin);
+					}
+					// NOTE(bill): A width-view carries no pin of its own and thus it aliases its source's register.
+					if (ed.view_of >= 0 && ed.view_of < cast(i32)decls.count) {
+						String src_pin = decls[ed.view_of].pin;
+						if (src_pin.len != 0) {
+							return asm_ctx->clobber_bit_for_reg_name(src_pin);
 						}
-						if (ed.pin.len != 0) {
-							return asm_ctx->clobber_bit_for_reg_name(ed.pin);
-						}
-						// NOTE(bill): A width-view carries no pin of its own and thus it aliases its source's register.
-						if (ed.view_of >= 0 && ed.view_of < cast(i32)decls.count) {
-							String src_pin = decls[ed.view_of].pin;
-							if (src_pin.len != 0) {
-								return asm_ctx->clobber_bit_for_reg_name(src_pin);
-							}
-						}
-						return 0;
 					}
 					return 0;
-				};
+				}
+				return 0;
+			};
 
-				pinned_param_writes |= written_pinned_reg_bit(operands[i]);
-			}
+			pinned_param_writes |= written_pinned_reg_bit(operands[i]);
 		}
 
-		if (is_pseudo) {
+		if (is_pseudo &&
+		    build_context.metrics.arch == TargetArch_riscv64) {
 			// Synthesized register sources (e.g. ra in `jal off` -> `jal ra, off`) also
 			// write a physical register; record them so ra is treated as produced/clobbered.
 			u16 synth = 0;
@@ -1631,10 +1633,10 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 		asm_acc->defined_regs |= produced | pinned_param_writes;
 
-		// NOTE(bill): check for read-before-write (use of undefined value)
-		// Only really meaningful in straight-line code, so a label above means a branch
-		// could have defined the value out of the textual order
 		if (asm_acc->straight_line) {
+			// NOTE(bill): check for read-before-write (use of undefined value)
+			// Only really meaningful in straight-line code, so a label above means a branch
+			// could have defined the value out of the textual order
 			for_array(i, operands) {
 				auto const &op = operands[i];
 				int slot = user_operand_target_index(cast(int)i);
@@ -1665,42 +1667,40 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 
-		// Registers this form clobbers implicitly (RDTSC->RAX:RDX, etc.), for the
-		// redundant-#clobber hint. Union across the template; pinned regs excluded
-		// so a legitimate output pin is never called "redundant".
 		{
+			// Registers this form clobbers implicitly (RDTSC->RAX:RDX, etc.), for the
+			// redundant-#clobber hint. Union across the template; pinned regs excluded
+			// so a legitimate output pin is never called "redundant".
 			u16 implicit_wr = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
 			asm_acc->implicit_clobbered_regs |= implicit_wr & ~pinned_mask;
-		}
 
-		// Approximate staleness. An output that was explicitly produced (literal %reg write)
-		// and is later implicitly clobbered — without this same instruction re-producing it —
-		// is marked stale. Explicit re-production clears it. Implicitly-produced outputs
-		// (RDTSC->RDX) are never tracked, so they never false-fire.
-		{
-			u16 implicit_clobber = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
+			// Approximate staleness. An output that was explicitly produced (literal %reg write)
+			// and is later implicitly clobbered — without this same instruction re-producing it —
+			// is marked stale. Explicit re-production clears it. Implicitly-produced outputs
+			// (RDTSC->RDX) are never tracked, so they never false-fire.
 			asm_acc->explicitly_produced_regs |= explicit_writes;
 			asm_acc->stale_outputs            &= ~explicit_writes;
-			asm_acc->stale_outputs |= implicit_clobber & asm_acc->explicitly_produced_regs & ~explicit_writes;
+			asm_acc->stale_outputs |= implicit_wr & asm_acc->explicitly_produced_regs & ~explicit_writes;
 		}
 
-		// Terminality for a #diverging template: this instruction ends straight-line
-		// flow off the end (jmp/ret/etc. -> CONTROL, hlt/ud2 -> HALT). A conditional
-		// branch does NOT terminate (it can fall through), so require that the form
-		// is not merely CONTROL-with-fallthrough. We approximate "unconditional" as
-		// CONTROL|HALT with no explicit label/operand fallthrough below.
 		{
+			// Terminality for a #diverging template: this instruction ends straight-line
+			// flow off the end (jmp/ret/etc. -> CONTROL, hlt/ud2 -> HALT). A conditional
+			// branch does NOT terminate (it can fall through), so require that the form
+			// is not merely CONTROL-with-fallthrough. We approximate "unconditional" as
+			// CONTROL|HALT with no explicit label/operand fallthrough below.
+
 			bool control = clobber.has_control();
 			bool halt    = clobber.has_halt();
 			// A conditional branch reads a flag and can fall through -> not terminal.
 			bool conditional = clobber.is_conditional();
 			asm_acc->last_is_terminal = halt || (control && !conditional);
-		}
 
-		// A branch/call inside the template means subsequent instructions may be reached
-		// out of textual order; stop trusting the linear def model past this point.
-		if (clobber.has_control()) {
-			asm_acc->straight_line = false;
+			if (control) {
+				// A branch/call inside the template means subsequent instructions may be reached
+				// out of textual order; stop trusting the linear def model past this point.
+				asm_acc->straight_line = false;
+			}
 		}
 		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
 
@@ -1751,11 +1751,13 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			auto type = operand_slot_type(form, cast(int)i);
 			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(&operands[i]);
-			possible_kinds[i] = dst;
+
+			possible_kinds      [i] = dst;
 			possible_class_kinds[i] = asm_ctx->reg_class_from_operand_type(type);
 
 			bool kind_ok = (dst == src) ||
-			               (dst == AsmOperand_Register_Or_Memory && (src == AsmOperand_Register || src == AsmOperand_Memory));
+			               (dst == AsmOperand_Register_Or_Memory
+			                && (src == AsmOperand_Register || src == AsmOperand_Memory));
 			if (!kind_ok) {
 				valid_spots[i] = false;
 			} else {
@@ -1798,7 +1800,6 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		begin_error_block();
 
 		if (m == AsmMismatch_ImmRange) {
-
 			ExactValue ev = operands[i].value;
 			gbString vs = exact_value_to_string(ev);
 			i32 bits_required = 0;
@@ -1893,20 +1894,22 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			return;
 		}
 		found = scope_lookup(param_scope->parent, i->interned, i->hash);
-		if (found != nullptr) {
-			if (found->kind == Entity_Constant) {
-				i->entity = found;
-				operand->mode  = Addressing_Constant;
-				operand->value = found->Constant.value;
-				operand->type  = found->type;
-
-				add_type_and_value(ctx, expr, operand->mode, operand->type, operand->value);
-			} else {
-				error(expr, "Only asm parameters or constants are allowed to be used within an 'asm' template");
-			}
-		} else {
+		if (found == nullptr) {
 			error(expr, "Undeclared asm parameter or constant '%.*s'", LIT(i->token.string));
+			return;
 		}
+
+		if (found->kind != Entity_Constant) {
+			error(expr, "Only asm parameters or constants are allowed to be used within an 'asm' template");
+			return;
+		}
+
+		add_entity_use(ctx, expr, entity);
+		operand->mode  = Addressing_Constant;
+		operand->value = found->Constant.value;
+		operand->type  = found->type;
+
+		add_type_and_value(ctx, expr, operand->mode, operand->type, operand->value);
 		return;
 	case_end;
 	case_ast_node(bl, BasicLit, expr);
@@ -2221,12 +2224,10 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		Entity *found = scope_lookup_current(label_scope, name->interned, name->hash);
 		if (found == nullptr) {
 			error(expr, "Undeclared asm label '.%.*s'", LIT(name->token.string));
+			return;
 		}
-		name->entity = found;
-		if (found != nullptr) {
-			found->flags |= EntityFlag_Used;
-			add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
-		}
+		add_entity_use(ctx, label->name, found);
+		add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
 		return;
 	case_end;
 	}
@@ -2544,21 +2545,12 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 					check_asm_instruction_operand(asm_ctx, ctx, entity, &operand, expr, /*allow_memory_operands*/true);
 					array_add(&operands, operand);
 				}
-				for (auto const &op : operands) {
+				for (auto &op : operands) {
 					if (op.mode != Addressing_Constant) {
 						error(op.expr, "Expected an integer for the asm directive #%.*s", LIT(name));
 						continue;
 					}
-					ExactValue ev = exact_value_to_integer(op.value);
-					if (ev.kind != ExactValue_Integer) {
-						error(op.expr, "Expected an integer for the asm directive #%.*s", LIT(name));
-						continue;
-					}
-					i64 i = exact_value_to_i64(ev);
-					if (i < 0 || i > 255) {
-						error(op.expr, "Expected an integer within 0..<256 for the asm directive #%.*s, got %lld", LIT(name), cast(long long)i);
-						continue;
-					}
+					check_assignment(ctx, &op, t_u8, str_lit("asm '#byte' directive"));
 				}
 			} else if (name == "align") {
 				if (dir->operands.count != 1) {
