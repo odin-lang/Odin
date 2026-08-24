@@ -83,11 +83,7 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			}
 			t = default_type(t);
 		}
-		if (is_type_asm_proc(t)) {
-			error(e->token, "Invalid use of inline asm in %.*s", LIT(context_name));
-			e->type = t_invalid;
-			return nullptr;
-		} else if (is_type_polymorphic(t)) {
+		if (is_type_polymorphic(t)) {
 			Entity *e2 = entity_of_node(operand->expr);
 			if (e2 == nullptr) {
 				e->type = t_invalid;
@@ -2024,11 +2020,14 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 			arg = arg->BinaryExpr.left;
 		}
 
+		Ast *prev_hint = ctx->asm_template_hint;
+		ctx->asm_template_hint = arg;
 		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
 		} else if (arg->kind == Ast_SelectorExpr) {
 			e = check_selector(ctx, &o, arg, nullptr);
 		}
+		ctx->asm_template_hint = prev_hint;
 		if (e == nullptr) {
 			error(arg, "Expected a valid entity name in asm template group, got %.*s", LIT(ast_strings[arg->kind]));
 			continue;
