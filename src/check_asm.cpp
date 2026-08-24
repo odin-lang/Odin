@@ -1671,6 +1671,34 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			if (cast(u16)clobber.written & (1u << slot)) {
 				array_add(&facts->gen_params, pe);
 			}
+
+
+			{ // View aliasing: a view decl shares its source's physical register.
+				auto const &decls = tmpl_entity->AsmTemplate.decls;
+				i32 di = -1;
+				check_asm_find_group(pe, decls, &di);
+				if (di >= 0 && decls[di].view_of >= 0) {
+					i32 src_i = decls[di].view_of;
+					Entity *src_e = decls[src_i].entity;
+					if (src_e != nullptr) {
+						GB_ASSERT_MSG(asm_decl_resolve_pin_bit(asm_ctx, decls, cast(i32)di) == 0 &&
+						              asm_decl_resolve_pin_bit(asm_ctx, decls, src_i)      == 0,
+						              "view/source share a reg bit; fix the width gate on the reg-bit path, not gen_params");
+
+						// A read of the view is a read of the source
+						if (cast(u16)clobber.read & (1u << slot)) {
+							array_add(&facts->read_params, src_e);
+						}
+						// A write of the view defines the source only if it covers the parent
+						if (cast(u16)clobber.written & (1u << slot)) {
+							i32 parent_w = check_asm_operand_bit_width(src_e->type);
+							if (decls[di].view_bits == 32 || decls[di].view_bits == parent_w) {
+								array_add(&facts->gen_params, src_e);
+							}
+						}
+					}
+				}
+			}
 		}
 
 		{
