@@ -509,17 +509,34 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			}
 		}
 	}
+	{
+		auto block_is_targeted = slice_make<bool>(heap_allocator(), cfg->blocks.count);
+		defer (slice_free(&block_is_targeted, heap_allocator()));
 
-	// NOTE(bill): unreachable code
-	for (AsmBlock &block : cfg->blocks) {
-		if (block.reachable) {
-			continue;
+		for_array(bi, cfg->blocks) {
+			AstAsmInstruction   *last = cfg->insts[cfg->blocks[bi].last];
+			AsmInstructionFacts *lf   = last->facts;
+			if (lf != nullptr && lf->branch_target != nullptr) {
+				i32 t = asm_cfg_label_block_index(lf->branch_target);
+				if (0 <= t && t < cast(i32)cfg->blocks.count) {
+					block_is_targeted[t] = true;
+				}
+			}
 		}
-		AstAsmInstruction *first = cfg->insts[block.first];
-		if (block.first == block.last) {
-			warning(first->name, "The asm instruction is unreachable within this block");
-		} else {
-			warning(first->name, "The asm instructions are unreachable within this block");
+
+		// NOTE(bill): unreachable code
+		for_array(bi, cfg->blocks) {
+			AsmBlock const &block = cfg->blocks[bi];
+			if (block.reachable) {
+				continue;
+			}
+			AstAsmInstruction *first = cfg->insts[block.first];
+			char const *plural = (block.first == block.last) ? "instruction is" : "instructions are";
+			if (block_is_targeted[bi]) {
+				warning(first->name, "The asm %s unreachable: this block is only reached from code that is itself unreachable", plural);
+			} else {
+				warning(first->name, "The asm %s unreachable: no branch targets it and control cannot fall through from above (e.g. it follows an unconditional jump, return, or halt)", plural);
+			}
 		}
 	}
 
