@@ -53,6 +53,20 @@ gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
 	str_lit("a label"),
 };
 
+enum AsmOperandConstraintKind : u32 {
+	AsmOperandConstraint_None = 0,
+	AsmOperandConstraint_ShiftCount,     // integer const must satisfy 0 <= v < width
+	AsmOperandConstraint_NonZeroDivisor, // integer const must be != 0
+
+	AsmOperandConstraint_COUNT
+};
+
+
+struct AsmOperandConstraint {
+	AsmOperandConstraintKind kind;
+	i32 width_operand; // ShiftCount
+};
+
 #include "asm_tables_amd64.cpp"
 #include "asm_tables_riscv.cpp"
 

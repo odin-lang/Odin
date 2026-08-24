@@ -107,7 +107,7 @@ gb_internal void check_asm_pin_type_compat(AsmRegClass reg_class, i32 reg_w, Typ
 	AsmRegClass got_class = check_asm_reg_class_from_type(decl_type);
 	i32         got_w     = check_asm_operand_bit_width(decl_type);
 
-	if (!!asm_reg_class_compatible(reg_class, got_class)) {
+	if (!asm_reg_class_compatible(reg_class, got_class)) {
 		error(at, "Parameter '%.*s' is pinned to %%%.*s, but its type is in the wrong register class for that register",
 		      LIT(param_name), LIT(pin_name));
 		return;
@@ -575,7 +575,7 @@ gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *sc
 				if (pin.len != 0) {
 					Operand op = {};
 					if (check_register(asm_ctx, &op, reg)) {
-						if (reg->flag.string.len) {
+						if (reg->flag.string.len != 0) {
 							GB_ASSERT(pin == "flags");
 							pin_flag = reg->flag.string;
 							if (string_set_update(&pin_flag_set, pin_flag)) {
@@ -1064,6 +1064,57 @@ gb_internal bool check_asm_instr_targets_internal_label(AstAsmInstruction *instr
 
 
 template <typename AsmCtx>
+gb_internal void check_operand_constraints(AsmCtx *asm_ctx, Slice<Operand> const &operands, u16 mnemonic, String const &name) {
+	i32 word_bits = cast(i32)(build_context.metrics.ptr_size * 8);
+
+	// Value-range constraints (shift-count in range, non-zero divisor). Every mnemonic
+	// decision lives in asm_ctx->operand_value_constraint; the logic below names none.
+	for_array(i, operands) {
+		Operand const *op = &operands[i];
+		if (op->mode != Addressing_Constant) {
+			continue; // register count (cl/rs2) or $-immediate: not knowable here
+		}
+		ExactValue ev = exact_value_to_integer(op->value);
+		if (ev.kind != ExactValue_Integer) {
+			continue;
+		}
+
+		AsmOperandConstraint c = asm_ctx->operand_value_constraint(mnemonic, cast(int)i);
+		switch (c.kind) {
+		case AsmOperandConstraint_ShiftCount: {
+			i32 width = 0;
+			if (c.width_operand < 0) {
+				width = word_bits;
+			} else if (c.width_operand < operands.count) {
+				width = check_asm_operand_bit_width(operands[c.width_operand].type);
+			}
+			if (width <= 0) {
+				break; // unknown target width; nothing to compare against
+			}
+			mp_int const *v = &ev.value_integer;
+			bool too_big = mp_count_bits(v) > 63;
+			i64  count   = too_big ? 0 : exact_value_to_i64(ev);
+			if (mp_isneg(v) || too_big || count >= width) {
+				gbString vs = exact_value_to_string(ev);
+				error(op->expr, "'%.*s' shift count %s is out of range for a %d-bit operand (must be 0..<%d)",
+				      LIT(name), vs, cast(int)width, cast(int)width);
+				gb_string_free(vs);
+			}
+		} break;
+
+		case AsmOperandConstraint_NonZeroDivisor:
+			if (mp_iszero(&ev.value_integer)) {
+				error(op->expr, "'%.*s' divides by a constant zero", LIT(name));
+			}
+			break;
+
+		case AsmOperandConstraint_None:
+			break;
+		}
+	}
+}
+
+template <typename AsmCtx>
 gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tmpl_entity, AstAsmInstruction *instr,
                                 u16 mnemonic, u16 pseudo_mnemonic, Slice<Operand> const &operands,
                                 u8 previous_prefix, Ast *previous_prefix_instr,
@@ -1469,6 +1520,8 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		GB_ASSERT(valid_form_index >= 0);
 		instr->mnemonic = mnemonic;
 		instr->valid_form_index = cast(i32)valid_form_index;
+
+		check_operand_constraints(asm_ctx, operands, mnemonic, name);
 
 		// Handle clobbering from mnemonic
 		auto clobber = clobber_forms[valid_form_index];
@@ -2705,6 +2758,11 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 					continue;
 				}
 			}
+			if (ed.tie > 0) {
+				// TODO(bill): Handle this edge case
+				continue;
+			}
+
 			char const *what = is_immediate ? "immediate" :
 			                   is_input     ? "input" :
 			                                  "scratch";

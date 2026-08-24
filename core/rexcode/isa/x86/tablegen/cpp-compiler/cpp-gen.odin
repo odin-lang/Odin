@@ -807,6 +807,23 @@ main :: proc() {
 		}
 	""")
 
+	strings.write_string(&sb, "\n")
+
+	strings.write_string(&sb, """
+		AsmOperandConstraint operand_value_constraint(u16 m, int op) const {
+			switch (m) {
+			case M_SHL: case M_SHR: case M_SAR: case M_SAL:
+			case M_ROL: case M_ROR: case M_RCL: case M_RCR:
+				if (op == 1) return {AsmOperandConstraint_ShiftCount, /*width_operand*/0};
+				break;
+			case M_DIV: case M_IDIV:
+				if (op == 0) return {AsmOperandConstraint_NonZeroDivisor, -1};
+				break;
+			}
+			return {AsmOperandConstraint_None, -1};
+		}
+	""")
+
 	strings.write_string(&sb, "\n};\n")
 
 	strings.write_string(&sb, "\n\n\n")
