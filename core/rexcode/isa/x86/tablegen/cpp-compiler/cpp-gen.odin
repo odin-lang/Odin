@@ -168,6 +168,7 @@ main :: proc() {
 			SideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state
 			SideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns
 			SideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops
+			SideEffectFlag_NONDETERMINISTIC = 1<<10,
 		};
 		enum ClobberRegs : u16 {
 			ClobberReg_RAX    = 1<<0,
@@ -305,7 +306,8 @@ main :: proc() {
 					SideEffectFlag_HALT        |
 					SideEffectFlag_PRIVILEGED  |
 					SideEffectFlag_CONTROL     |
-					SideEffectFlag_CET;
+					SideEffectFlag_CET         |
+					SideEffectFlag_NONDETERMINISTIC;
 					// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
 				return ((side_effects & VOLATILE_SE) != 0);
 			}
@@ -322,6 +324,9 @@ main :: proc() {
 			}
 			bool is_conditional() const {
 				return has_control() && (cast(u16)flags_rd != 0);
+			}
+			bool is_nondeterministic() const {
+				return (cast(u16)side_effects & SideEffectFlag_NONDETERMINISTIC) != 0;
 			}
 		};
 
@@ -350,12 +355,17 @@ main :: proc() {
 			AliasSrc_LIT,
 		};
 
+		// NOTE(bill): These are completely dummy things as it is only needed by RISC-V and not x86
 		struct PseudoAlias {
-			Mnemonic target;    // real instruction emitted
-			AliasSrc src[4];    // how to fill target's four operand slots
-			i16      lit;       // immediate when a src slot is AliasSrc_LIT
-			u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
-			u8       nargs;     // operands the user supplies (ARG0..<ARGn)
+			Mnemonic target; // real instruction emitted
+			AliasSrc src[4]; // how to fill target's four operand slots
+			i16      lit;    // immediate when a src slot is AliasSrc_LIT
+			u16      csr;    // CSR address when a src slot is AliasSrc_CSR_LIT
+			u8       nargs;  // operands the user supplies (ARG0..<ARGn)
+
+			bool is_nondeterministic() const {
+				return false;
+			}
 		};
 		enum PseudoMnemonic : u16 {
 			PM_INVALID,

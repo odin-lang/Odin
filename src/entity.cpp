@@ -345,6 +345,7 @@ struct Entity {
 			Ast *node;
 			bool is_volatile;
 			bool is_align_stack;
+			bool is_pure;
 
 			bool has_observable_side_effect;
 

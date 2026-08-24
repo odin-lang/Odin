@@ -236,6 +236,9 @@ main :: proc() {
 			bool is_conditional() const {
 				return has_control();
 			}
+			bool is_nondeterministic() const {
+				return false;
+			}
 		};
 
 		void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
@@ -273,6 +276,17 @@ main :: proc() {
 				u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
 				u8       nargs;     // operands the user supplies (ARG0..<ARGn)
 				bool     rv32_only; // base gate (the *h counter reads)
+
+
+				// Nondeterministic iff this is a CSR access whose CSR operand names a counter/timer/entropy register (extension-gated; absent CSRs never match)
+				bool is_nondeterministic() const {
+					if (csr == 0x015) return true;                 // seed (Zkr)
+					if (0xC00 <= csr && csr <= 0xC1F) return true; // cycle/time/instret + hpm (unpriv)
+					if (0xC80 <= csr && csr <= 0xC9F) return true; // rv32 high halves (unpriv)
+					if (0xB00 <= csr && csr <= 0xB1F) return true; // mcycle/minstret + mhpm
+					if (0xB80 <= csr && csr <= 0xB9F) return true; // rv32 high halves (machine)
+					return false;
+				}
 			};
 
 			enum PseudoMnemonic : u16 {
@@ -298,10 +312,10 @@ main :: proc() {
 				PseudoAlias *pa = (PseudoAlias *)raw_pseudo_aliases;
 				return pa[pm];
 			}
-		""")
 
-		strings.write_string(&sb, "\tstatic String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];\n")
-		strings.write_string(&sb, "\n")
+			static String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];
+			\n\n
+		""")
 	}
 
 

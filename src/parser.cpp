@@ -2758,7 +2758,8 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 				Token name = expect_token(f, Token_Ident);
 
 				if (name.string == "volatile" ||
-				    name.string == "align_stack") {
+				    name.string == "align_stack" ||
+				    name.string == "pure") {
 					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
 					clobber->AsmClobber.token = hash;
 					clobber->AsmClobber.name  = name;

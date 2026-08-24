@@ -1053,7 +1053,22 @@ struct AsmMnemonicAccumulator {
 	// any call/branch (CONTROL) or memory effect that could require the stack
 	//  to be realigned. If none occurred, #align_stack is redundant.
 	bool saw_call_or_mem;
+
+	// Purity test
+	bool        can_be_pure;
+	char const *impure_reason;
+	Ast *       impure_reason_node;
 };
+
+gb_internal bool check_asm_instr_targets_internal_label(AstAsmInstruction *instr) {
+	bool saw_label = false;
+	for (Ast *op : instr->operands) {
+		if (op->kind == Ast_AsmLabelDecl) {
+			saw_label = true; // resolved against label_scope during operand checking
+		}
+	}
+	return saw_label;
+}
 
 
 template <typename AsmCtx>
@@ -1471,12 +1486,31 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// Handle clobbering from mnemonic
 		auto clobber = clobber_forms[valid_form_index];
 
+		// NOTE(bill): reads_mem/writes_mem are per-FORM capability bits.
+		// A form with an r/m slot (e.g. add r/m32, imm32) carries them even
+		// when the operand resolved to a register, e.g. `add x, 123`.
+		// Count a real access only when an operand actually resolved to memory,
+		// or the access is implicit (no r/m slot exists to carry the bit: movs/stos/...).
+		bool has_mem_operand = false;
+		bool has_rm_slot     = false;
+		auto const &valid_form = forms[valid_form_index];
+		for_array(i, operands) {
+			if (determine_asm_operand_kind(&operands[i]) == AsmOperand_Memory) {
+				has_mem_operand = true;
+			}
+			AsmOperandKind op_kind = asm_ctx->kind_from_operand_type(operand_slot_type(valid_form, cast(int)i));
+			if (op_kind == AsmOperand_Memory || op_kind == AsmOperand_Register_Or_Memory) {
+				has_rm_slot = true;
+			}
+		}
+		bool mem_is_real = has_mem_operand || !has_rm_slot;
+
 		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
-		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory();
+		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory() && mem_is_real;
 		tmpl_entity->AsmTemplate.is_volatile    |= clobber.implies_side_effects();
 
 		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.implies_side_effects() != 0;
-		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem;
+		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem && mem_is_real;
 
 		// #align_stack only matters if the body makes a call (which requires the stack
 		// aligned at the call boundary) or manipulates RSP directly. Plain memory access
@@ -1645,6 +1679,39 @@ gb_internal void check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			asm_acc->straight_line = false;
 		}
 		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
+
+		// Purity inference
+		if (asm_acc->can_be_pure) {
+			// NOTE(bill): Only the first violating instruction is recorded
+			// The later ones don't overwrite the reason.
+			char const *why = nullptr;
+
+			if (clobber.writes_mem && mem_is_real) {
+				why = "it writes to memory";
+			} else if (clobber.reads_mem && mem_is_real) {
+				// A load's result depends on memory, which is not a value input.
+				why = "it reads from memory";
+			} else if (clobber.is_nondeterministic() ||
+			           (pseudo_mnemonic > 0 && alias.is_nondeterministic())) {
+				// rdtsc / rdrand / cpuid on x86
+				// counter/entropy CSR reads on RISC-V.
+				why = "it is nondeterministic";
+			} else if (clobber.implies_clobber_memory() && mem_is_real) {
+				why = "it accesses memory the compiler cannot see";
+			} else if (clobber.implies_side_effects()) {
+				why = "it has an observable side effect";
+			} else if (clobber.has_control() && !check_asm_instr_targets_internal_label(instr)) {
+				// Internal jmp/jcc/ret over the template's own labels stays pure; a call
+				// or an indirect/external transfer does not.
+				why = "it possibly transfers control outside the inline 'asm' template";
+			}
+
+			if (why != nullptr) {
+				asm_acc->can_be_pure        = false;
+				asm_acc->impure_reason      = why;
+				asm_acc->impure_reason_node = instr->name;
+			}
+		}
 
 		return;
 	}
@@ -2188,8 +2255,9 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	entity->type = type;
 
 
-	bool is_volatile            = false;
-	bool is_align_stack         = false;
+	bool is_volatile       = false;
+	bool is_align_stack    = false;
+	bool is_pure_annotated = false;
 	auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
@@ -2211,6 +2279,11 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 						error(clobber->name, "#align_stack has already been defined as an asm specification");
 					}
 					is_align_stack = true;
+				} else if (clobber->name.string == "pure") {
+					if (is_pure_annotated) {
+						error(clobber->name, "#pure has already been defined as an asm specification");
+					}
+					is_pure_annotated = true;
 				} else {
 					error(clobber->name, "Unknown clobber directive '#%.*s'", LIT(clobber->name.string));
 				}
@@ -2317,6 +2390,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	// jump target / back-edge, after which a read can precede its textual def; from
 	// there on we stop emitting the implicit-read diagnostic.
 	asm_acc.straight_line = true;
+	asm_acc.can_be_pure   = true;
 
 	// collect label decls
 	for (Ast *instruction_ : at->instructions) {
@@ -2655,6 +2729,32 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			error(entity->token,
 			      "This asm template is declared diverging (-> !) but its final instruction can fall through; "
 			      "end it with an unconditional jump, return, or halt");
+		}
+	}
+
+	{
+		bool declared_effects = entity->AsmTemplate.is_volatile ||
+		                        entity->AsmTemplate.clobber_memory ||
+		                        entity->AsmTemplate.has_observable_side_effect;
+		bool is_pure = asm_acc.can_be_pure && !declared_effects && !type->Proc.diverging;
+		entity->AsmTemplate.is_pure = is_pure;
+
+		if (is_pure_annotated && !is_pure) {
+			Ast *node = asm_acc.impure_reason_node;
+			char const *why = asm_acc.impure_reason;
+			if (why == nullptr) {
+				if (type->Proc.diverging) {
+					why = "it is declared diverging (-> !) and computes no outputs";
+				} else if (entity->AsmTemplate.clobber_memory) {
+					why = "it declares '#clobber memory'";
+				} else if (entity->AsmTemplate.is_volatile) {
+					why = "it is declared '#volatile'";
+				} else {
+					why = "it declares an observable effect";
+				}
+			}
+			Token tok = node ? ast_token(node): entity->token;
+			error(tok, "'asm' template is marked #pure but it is not pure: %s", why);
 		}
 	}
 }
