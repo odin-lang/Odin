@@ -561,7 +561,7 @@ uint_max :: proc(n: uint, gen := context.random_generator) -> (val: uint) {
 Generates a random unsigned 32 bit value in the range `[lo, hi)` using the provided random number generator. If no generator is provided the global random number generator will be used.
 
 Inputs:
-- lo: The lower bound of the generated number, this value is inclusice
+- lo: The lower bound of the generated number, this value is inclusive
 - hi: The upper bound of the generated number, this value is exclusive
 
 Returns:
