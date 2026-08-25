@@ -2407,6 +2407,13 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	// boolean -> boolean/integer
 	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
 		LLVMValueRef b = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(lb_type(m, value.type)), "");
+		if (type_size_of(default_type(dst)) > 1 && is_type_different_to_arch_endianness(dst)) {
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			lbValue res = {};
+			res.value = LLVMBuildIntCast2(p->builder, b, lb_type(m, platform_dst_type), false, "");
+			res.type = t;
+			return lb_emit_byte_swap(p, res, t);
+		}
 		lbValue res = {};
 		res.value = LLVMBuildIntCast2(p->builder, b, lb_type(m, t), false, "");
 		res.type = t;
