@@ -127,10 +127,10 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 
 @(private)
 _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
-	loop(data, length, width, cmp, arg, 0)
+	loop(data, length, width, cmp, arg, true)
 
-	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, last_piv: int) {
-		data := data; length := length; last_piv := last_piv
+	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, leftmost: bool) {
+		data := data; length := length; leftmost := leftmost
 
 		for {
 			if length <= 64 {
@@ -144,29 +144,32 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 				}
 				return log
 			}
-			depth := log2(length) / 5
-			pivot_index := median_3(data, 0, length, width, cmp, arg, depth)
 
-			if last_piv == -1 && cmp(data[pivot_index * width:], data[last_piv * width:], arg) == .Equal {
-				left := partition_lumoto_reverse(data, length, width, cmp, arg, pivot_index)
-				data = data[left * width:]
-				length = length - left
-				last_piv = 0
-				continue
+			median_3_depth := log2(length) / 5
+			pivot_index := median_3(data, 0, length, width, cmp, arg, median_3_depth)
+
+			if !leftmost {
+				if cmp(data[pivot_index * width:], data[-width:], arg) == .Equal {
+					left := partition_lomuto_reverse(data, length, width, cmp, arg, pivot_index)
+					data = data[left * width:]
+					length = length - left
+					leftmost = false
+					continue
+				}
 			}
 
-			left := partition_lumoto_block(data, length, width, cmp, arg, pivot_index)
+
+			left := partition_lomuto_block(data, length, width, cmp, arg, pivot_index)
 			right := length - left
 
 			if left < right {
-				loop(data, left, width, cmp, arg, 0)
+				loop(data, left, width, cmp, arg, leftmost)
 				data = data[(left + 1) * width:]
 				length = right - 1
-				last_piv = -1
+				leftmost = false
 			} else {
-				loop(data[(left + 1) * width:], right - 1, width, cmp, arg, -1)
+				loop(data[(left + 1) * width:], right - 1, width, cmp, arg, false)
 				length = left
-				last_piv = 0
 			}
 		}
 		
@@ -178,6 +181,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 		}
 
 		gaps := []int{43, 17, 7, 3, 1}
+		// gaps := []int{57, 23, 10, 4, 1}
 
 		k := 0
 		for gaps[k] > length {
@@ -215,7 +219,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 		return swap[(int)(x == y) + (int)(y ~ z)]
 	}
 
-	partition_lumoto_block :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) #no_bounds_check {
+	partition_lomuto_block :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) #no_bounds_check {
 		if pivot_index != 0 {
 			ptr_swap_non_overlapping(data[0:], data[pivot_index * width:], width)
 		}
@@ -258,7 +262,7 @@ _generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, 
 		return left
 	}
 
-	partition_lumoto_reverse :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (right: int) #no_bounds_check {
+	partition_lomuto_reverse :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (right: int) #no_bounds_check {
 		if pivot_index != length - 1 {
 			ptr_swap_non_overlapping(data[(length - 1) * width:], data[pivot_index * width:], width)
 		}
