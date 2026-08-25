@@ -90,24 +90,36 @@ Linux)
 	;;
 esac
 
-echo "Building Box3D for wasm32"
-mkdir -p build/wasm
-for src in src/*.c; do
-	obj="build/wasm/$(basename "${src%.c}.o")"
+build_wasm() {
+	name=$1
+	shift
+	build_dir="build/$name"
+	mkdir -p "$build_dir"
+	for src in src/*.c; do
+		obj="$build_dir/$(basename "${src%.c}.o")"
+		"$wasm_cc" -c -O3 -std=gnu17 --target=wasm32 \
+			--sysroot="$ODIN_ROOT/vendor/libc-shim" \
+			-Iinclude \
+			-include wasm_compat.h \
+			-DBOX3D_DISABLE_SIMD \
+			-DNDEBUG \
+			"$@" \
+			"$src" -o "$obj"
+	done
 	"$wasm_cc" -c -O3 -std=gnu17 --target=wasm32 \
 		--sysroot="$ODIN_ROOT/vendor/libc-shim" \
 		-Iinclude \
 		-include wasm_compat.h \
 		-DBOX3D_DISABLE_SIMD \
 		-DNDEBUG \
-		"$src" -o "$obj"
-done
-"$wasm_cc" -c -O3 -std=gnu17 --target=wasm32 \
-	--sysroot="$ODIN_ROOT/vendor/libc-shim" \
-	-Iinclude \
-	-include wasm_compat.h \
-	-DBOX3D_DISABLE_SIMD \
-	-DNDEBUG \
-	wasm_compat.c -o build/wasm/wasm_compat.o
-"$wasm_ld" -r -o ../lib/box3d_wasm.o build/wasm/*.o
-rm -rf build/wasm
+		"$@" \
+		wasm_compat.c -o "$build_dir/wasm_compat.o"
+	"$wasm_ld" -r -o "../lib/$name.o" "$build_dir"/*.o
+	rm -rf "$build_dir"
+}
+
+echo "Building Box3D for wasm32"
+build_wasm box3d_wasm
+
+echo "Building Box3D for wasm32 threads"
+build_wasm box3d_wasm_threads -matomics -mbulk-memory

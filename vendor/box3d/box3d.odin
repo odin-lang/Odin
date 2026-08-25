@@ -10,8 +10,18 @@ ENABLE_VALIDATION :: false
 BOX3D_SHARED :: #config(BOX3D_SHARED, false)
 
 @(private)
+BOX3D_WASM_THREADS :: #config(BOX3D_WASM_THREADS, true)
+
+@(private)
+BOX3D_USE_WASM_THREADS ::
+	BOX3D_WASM_THREADS &&
+	(ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32) &&
+	intrinsics.has_target_feature("atomics")
+
+@(private)
 LIB_PATH :: (
-	     "lib/box3d_wasm.o"           when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+	     "lib/box3d_wasm_threads.o"   when BOX3D_USE_WASM_THREADS
+	else "lib/box3d_wasm.o"           when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 	else "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
 	else "lib/linux-arm64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED
 	else "lib/darwin/libbox3d.a"      when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED
