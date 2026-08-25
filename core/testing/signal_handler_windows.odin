@@ -48,7 +48,7 @@ when ODIN_ARCH == .i386 {
 
 @(private="file")
 stop_runner_callback :: proc "system" (ctrl_type: win32.DWORD) -> win32.BOOL  {
-	if ctrl_type == win32.CTRL_C_EVENT {
+	if ctrl_type == win32.CTRL_C_EVENT || ctrl_type == win32.CTRL_BREAK_EVENT || ctrl_type == win32.CTRL_CLOSE_EVENT {
 		prev := intrinsics.atomic_add(&stop_runner_flag, 1)
 
 		// If the flag was already set (if this is the second signal sent for example),
