@@ -1,6 +1,8 @@
 struct AsmBlock {
-	i32 first,       last;
-	Array<i32>       succs;
+	i32        first; // instruction index
+	i32        last;
+
+	Array<i32> succs;
 
 	u16              in_defs;
 	u16              out_defs;
@@ -33,7 +35,7 @@ struct AsmInstructionFacts {
 	bool is_terminal;
 
 	Entity *branch_target;
-	i32 block_id;
+	i32     block_id;
 };
 
 struct AsmCfg {
@@ -325,7 +327,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	if (cfg->blocks.count == 0) {
 		// With an empty body, the CFG cannot really do nothing
 		if (diverging && !cfg->saw_any_instructions) {
-			error(entity->token, "This asm template is declared as diverging (-> !) but its body is empty and cannot diverge");
+			error(entity->token, "This 'asm' template is declared as diverging (-> !) but its body is empty and cannot diverge");
 		}
 		return;
 	}
@@ -584,9 +586,6 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 								break;
 							}
 						}
-						gb_printf_err("RBW-ERROR site=<label> pe='%.*s' run_pm-bit-defined=%d\n",
-						    LIT(pe->token.string),
-						    (map_get(&cfg->entity_to_index, pe) ? ((run_pm >> *map_get(&cfg->entity_to_index, pe)) & 1) : -1));
 						error(loc, "'%.*s' reads '%.*s' before it is assigned; its initial value is undefined", LIT(f->name), LIT(pe->token.string));
 						ptr_set_add(&reported_params, pe);
 					}
@@ -660,10 +659,53 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 		}
 		if (any_leak) {
 			error(entity->token,
-			      "This asm template is declared diverging (-> !) but a reachable path can fall through the end; "
+			      "This 'asm' template is declared diverging (-> !) but a reachable path can fall through the end; "
 			      "end every path with an unconditional jump, return, or halt");
 		}
-	}
+	} else {
+		// Not declared diverging: no reachable block leaves => control never returns
+		bool any_exit = false;
+		for_array(bi, cfg->blocks) {
+			auto const &block = cfg->blocks[bi];
+			if (block.reachable && check_asm_cfg_block_leaves(cfg, cast(i32)bi)) {
+				any_exit = true;
+				break;
+			}
+		}
+		if (!any_exit) {
+			// Distinguish an unconditional self-loop (jmp to own block, no other exit edge)
+			// from the general no-returning-path case.
+			i32 self_loop_bi = -1;
+			for_array(bi, cfg->blocks) {
+				AsmBlock const &b = cfg->blocks[bi];
+				if (!b.reachable) {
+					continue;
+				}
+				bool loops_to_self = false;
+				for (i32 s : b.succs) {
+					if (s == cast(i32)bi) {
+						loops_to_self = true;
+						break;
+					}
+				}
+				if (loops_to_self && b.succs.count == 1) {
+					self_loop_bi = cast(i32)bi;
+					break;
+				}
+			}
+
+			if (self_loop_bi >= 0) {
+				AstAsmInstruction *first = cfg->insts[cfg->blocks[self_loop_bi].first];
+				error(first->name,
+				      "This asm instruction forms an unconditional self-loop and can never exit; "
+				      "if the template is meant never to return, declare it diverging (-> !)");
+			} else {
+				error(entity->token,
+				      "This 'asm' template has no reachable path that returns or falls through the end; "
+				      "if this is intended, declare it diverging (-> !)");
+			}
+		}
+ 	}
 }
 
 // Backward liveness: a value is live at a point if some path from there reads it before overwriting it.
