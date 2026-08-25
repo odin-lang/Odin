@@ -322,6 +322,21 @@ gb_internal IntegerDivisionByZeroKind lb_check_for_integer_division_by_zero_beha
 }
 
 
+// LLVM has srem(min(Integer_Type), -1) as UB and it raises an FP exception on a hardware
+// divide, yet `x % -1` is 0 for every x; `x srem 1` is 0 too and cannot trap, so a runtime
+// -1 divisor can be swapped for 1. Vectorizable.
+gb_internal LLVMValueRef lb_srem_safe_divisor(lbProcedure *p, LLVMValueRef rhs) {
+	LLVMValueRef minus_one = LLVMConstAllOnes(LLVMTypeOf(rhs));
+	// build 1 as neg(-1), this folds for both scalars and vectors
+	LLVMValueRef one = LLVMBuildNeg(p->builder, minus_one, "");
+	if (LLVMIsAConstantInt(rhs)) {
+		return rhs == minus_one ? one : rhs;
+	}
+	LLVMValueRef is_minus_one = LLVMBuildICmp(p->builder, LLVMIntEQ, rhs, minus_one, "");
+	return LLVMBuildSelect(p->builder, is_minus_one, one, rhs, "");
+}
+
+
 // implements %% (the remainder/floored mod operator) on signed integers;
 // this is branchless and vectorizable, so it also covers vectors
 gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs) {	
@@ -329,24 +344,11 @@ gb_internal LLVMValueRef lb_emit_signed_floor_mod(lbProcedure *p, LLVMValueRef l
 	// and works for arbitrary precision integers, but the add can wrap at finite precision
 
 	// the Odin spec mandates min(Integer_Type) %% -1 must be 0,
-	// but LLVM has srem(min(Integer_Type), -1) as UB and results in FP exception;
-	// since x %% -1 == 0 for every x, a constant rhs = -1 can fold,
-	// and a runtime -1 can be swapped with 1 (x srem 1 is 0 for every x, no exceptions)	
-	LLVMValueRef minus_one = LLVMConstAllOnes(LLVMTypeOf(rhs));
-	LLVMValueRef safe_rhs = rhs;
-	if (LLVMIsAConstantInt(rhs)) {
-		if (rhs == minus_one) {
-			return LLVMConstNull(LLVMTypeOf(rhs)); // the entire %% op folds to 0
-		}
-	} else {
-		// safe_rhs = (rhs == -1) ? 1 : rhs 
-		// vectorizable construction,
-		// build 1 as neg(-1), this folds for both scalars and vectors
-		LLVMValueRef one = LLVMBuildNeg(p->builder, minus_one, "");
-		LLVMValueRef is_minus_one = LLVMBuildICmp(p->builder, LLVMIntEQ, rhs, minus_one, "");
-		safe_rhs = LLVMBuildSelect(p->builder, is_minus_one, one, rhs, "");
+	// a constant rhs = -1 can fold the whole operation, a runtime one is handled by the swap
+	if (LLVMIsAConstantInt(rhs) && rhs == LLVMConstAllOnes(LLVMTypeOf(rhs))) {
+		return LLVMConstNull(LLVMTypeOf(rhs)); // the entire %% op folds to 0
 	}
-	LLVMValueRef r = LLVMBuildSRem(p->builder, lhs, safe_rhs, "");
+	LLVMValueRef r = LLVMBuildSRem(p->builder, lhs, lb_srem_safe_divisor(p, rhs), "");
 	// srem truncs to 0, so r needs a +rhs correction when the operands signs differ (and r != 0)
 	// so we implement
 	// r = lhs % rhs
@@ -498,9 +500,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				}
 				break;
 			case Token_Mod:
-				{
-					auto *call = is_type_unsigned(integral_type) ? LLVMBuildURem : LLVMBuildSRem;
-					z = call(p->builder, x, y, "");
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildURem(p->builder, x, y, "");
+				} else {
+					z = LLVMBuildSRem(p->builder, x, lb_srem_safe_divisor(p, y), "");
 				}
 				break;
 			case Token_ModMod:
@@ -610,9 +613,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 				}
 				break;
 			case Token_Mod:
-				{
-					auto *call = is_type_unsigned(integral_type) ? LLVMBuildURem : LLVMBuildSRem;
-					z = call(p->builder, x, y, "");
+				if (is_type_unsigned(integral_type)) {
+					z = LLVMBuildURem(p->builder, x, y, "");
+				} else {
+					z = LLVMBuildSRem(p->builder, x, lb_srem_safe_divisor(p, y), "");
 				}
 				break;
 			case Token_ModMod:
@@ -1684,7 +1688,8 @@ gb_internal LLVMValueRef lb_integer_modulo(lbProcedure *p, LLVMValueRef lhs, LLV
 			if (is_unsigned) {
 				return LLVMBuildURem(p->builder, lhs, rhs, "");
 			} else {
-				return LLVMBuildSRem(p->builder, lhs, rhs, "");
+				// min(Integer_Type) % -1 is 0, matching the constant folder, and must not trap
+				return LLVMBuildSRem(p->builder, lhs, lb_srem_safe_divisor(p, rhs), "");
 			}
 		}
 	};
