@@ -3872,6 +3872,24 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 			rhs = lb_emit_byte_swap(p, {rhs, pt}, pt).value;
 		}
 
+		if (is_type_boolean(a) && is_type_boolean(b) && (op_kind == Token_CmpEq || op_kind == Token_NotEq)) {
+			// anything not 0 is true, which is what control flow already tests for
+			bool lhs_is_const = LLVMIsAConstantInt(lhs) != nullptr;
+			bool rhs_is_const = LLVMIsAConstantInt(rhs) != nullptr;
+			if (lhs_is_const != rhs_is_const) {
+				// against a literal, the truthiness test is the whole comparison
+				LLVMValueRef v = rhs_is_const ? lhs : rhs;
+				LLVMValueRef c = rhs_is_const ? rhs : lhs;
+				bool is_true = LLVMConstIntGetZExtValue(c) != 0;
+				pred = ((op_kind == Token_CmpEq) == is_true) ? LLVMIntNE : LLVMIntEQ;
+				lhs = v;
+				rhs = LLVMConstNull(LLVMTypeOf(v));
+			} else {
+				lhs = LLVMBuildICmp(p->builder, LLVMIntNE, lhs, LLVMConstNull(LLVMTypeOf(lhs)), "");
+				rhs = LLVMBuildICmp(p->builder, LLVMIntNE, rhs, LLVMConstNull(LLVMTypeOf(rhs)), "");
+			}
+		}
+
 		res.value = LLVMBuildICmp(p->builder, pred, lhs, rhs, "");
 	} else if (is_type_float(a)) {
 		LLVMRealPredicate pred = {};
