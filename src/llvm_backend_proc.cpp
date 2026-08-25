@@ -226,10 +226,9 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		gbString feature_str = gb_string_make(temporary_allocator(), "");
 
 		String_Iterator it = {pt->Proc.enable_target_feature, 0};
+		String str = {};
 		bool first = true;
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		while (string_split_iterator_next(&it, ',', &str)) {
 			bool add_prefix = !(string_starts_with(str, '+') || string_starts_with(str, '-'));
 			if (!first) {
 				feature_str = gb_string_appendc(feature_str, ",");
