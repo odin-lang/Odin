@@ -7008,6 +7008,18 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			}
 		}
 
+		// an `asm` template's `$` parameter is encoded as an immediate, so only a constant can reach it
+		if (e && e->kind == Entity_Variable && (e->flags & EntityFlag_PolyConst)) {
+			if (o->mode != Addressing_Constant) {
+				if (show_error) {
+					gbString str = expr_to_string(o->expr);
+					error(o->expr, "Expected a constant value for the '$' immediate '%.*s', got %s", LIT(e->token.string), str);
+					gb_string_free(str);
+				}
+				err = CallArgumentError_NoneConstantParameter;
+			}
+		}
+
 		if (e && e->kind == Entity_Constant && is_type_proc(e->type)) {
 			bool ok = false;
 			if (o->mode == Addressing_Constant) {
