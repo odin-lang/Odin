@@ -1656,6 +1656,42 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 
+		for_array(i, operands) { // Sub-register widths for explicit named-register operands
+			auto const &op = operands[i];
+			Ast *e = op.expr;
+			if (e == nullptr || e->kind != Ast_AsmRegister) {
+				continue;
+			}
+			u16 bit = asm_ctx->clobber_bit_for_reg_name(e->AsmRegister.name.string);
+			i32 idx = asm_reg_index_from_bit(bit);
+			if (idx < 0) {
+				continue;
+			}
+			i32 w = check_asm_operand_bit_width(op.type);
+			if (w <= 0) {
+				w = 0;
+				// Fallback to the register's intrinsic width for a bare %reg.
+				auto r = asm_ctx->register_lookup(e->AsmRegister.name.string);
+				if (r) {
+					w = asm_ctx->reg_size(r);
+				}
+			}
+			if (w == 0) {
+				continue;
+			}
+			int tslot = user_operand_target_index(cast(int)i);
+			if (0 <= tslot && tslot < 4) {
+				if (!self_zeroing && cast(u16)clobber.read & (1u << tslot)) {
+					facts->read_reg_w.e[idx] = cast(u8)w;
+					facts->read_regs |= bit; // NOTE(bill): let liveness + coarse rbw see the explicit read
+				}
+				if (cast(u16)clobber.written & (1u << tslot)) {
+					facts->gen_reg_w.e [idx] = cast(u8)w;
+				}
+			}
+		}
+
+
 		for_array(i, operands) {
 			int slot = user_operand_target_index(cast(int)i);
 			if (slot < 0) {

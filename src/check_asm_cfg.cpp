@@ -1,3 +1,32 @@
+
+enum {
+	ASM_WIDTH_REG_COUNT = 16
+};
+
+// Sub-register width tracking
+// 0 means "this instruction does not read/write that named register"
+struct AsmRegW {
+	u8 e[ASM_WIDTH_REG_COUNT];
+};
+
+gb_internal u8 asm_reg_def_width_after(u8 prev, u8 w) {
+	bool x86 = build_context.metrics.arch == TargetArch_amd64 ||
+	           build_context.metrics.arch == TargetArch_i386; // TODO(bill): actually support x86 32-bit :P
+	if (x86 && w == 32) {
+		return 64;
+	}
+	return gb_max(prev, w);
+}
+
+gb_internal i32 asm_reg_index_from_bit(u16 bit) {
+	for (i32 i = 0; i < ASM_WIDTH_REG_COUNT; i++) {
+		if (bit == cast(u16)(1u << i)) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 struct AsmBlock {
 	i32        first; // instruction index
 	i32        last;
@@ -28,6 +57,10 @@ struct AsmInstructionFacts {
 	u16 gen_regs;
 	u16 read_regs;
 
+	// Sub-register widths, indexed by reg bit-index.
+	AsmRegW read_reg_w;
+	AsmRegW gen_reg_w;
+
 	Array<Entity *> gen_params;
 	Array<Entity *> read_params;
 
@@ -38,6 +71,25 @@ struct AsmInstructionFacts {
 	Entity *branch_target;
 	i32     block_id;
 };
+
+gb_internal u16 asm_full_kill_mask(AsmInstructionFacts *f) {
+	u16 full = cast(u16)(build_context.metrics.ptr_size*8);
+	u16 kill = 0;
+	for (u16 bit = 1; bit != 0; bit <<= 1) {
+		if ((f->gen_regs & bit) == 0) {
+			continue;
+		}
+		i32 idx = asm_reg_index_from_bit(bit);
+		u8  w = 0;
+		if (idx >= 0) {
+			w = f->gen_reg_w.e[idx];
+		}
+		if (w == 0 || asm_reg_def_width_after(0, w) >= full) {
+			kill |= bit;
+		}
+	}
+	return kill;
+}
 
 struct AsmCfg {
 	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
@@ -381,6 +433,11 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	auto out_pm    = slice_make<u64>(heap_allocator(), n); defer (slice_free(&out_pm,    heap_allocator()));
 	auto gen_pm    = slice_make<u64>(heap_allocator(), n); defer (slice_free(&gen_pm,    heap_allocator()));
 
+	// Sub-register width lattice
+	auto in_w      = slice_make<AsmRegW>(heap_allocator(), n); defer (slice_free(&in_w,  heap_allocator()));
+	auto out_w     = slice_make<AsmRegW>(heap_allocator(), n); defer (slice_free(&out_w, heap_allocator()));
+	auto gen_w     = slice_make<AsmRegW>(heap_allocator(), n); defer (slice_free(&gen_w, heap_allocator()));
+
 	// predecessors, restricted to reachable blocks
 	auto preds = slice_make<Array<i32>>(heap_allocator(), n);
 	for_array(i, preds) {
@@ -409,6 +466,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 		u16 gr = 0;
 		u16 gf = 0;
 		u64 gp = 0;
+		AsmRegW gw = {};
+
 		AsmBlock const &b = cfg->blocks[bi];
 		for (i32 ii = b.first; ii <= b.last; ii++) {
 			AsmInstructionFacts *f = cfg->insts[ii]->facts;
@@ -420,10 +479,17 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			for (Entity *pe : f->gen_params) {
 				gp |= bit_of(pe);
 			}
+			for (int w_idx = 0; w_idx < ASM_WIDTH_REG_COUNT; w_idx++) {
+				u8 w = f->gen_reg_w.e[w_idx];
+				if (w != 0) {
+					gw.e[w_idx] = asm_reg_def_width_after(gw.e[w_idx], w);
+				}
+			}
 		}
 		gen_regs[bi]  = gr;
 		gen_flags[bi] = gf;
 		gen_pm[bi]    = gp;
+		gen_w[bi]     = gw;
 	}
 
 	// NOTE(bill): initialize the blocks
@@ -485,6 +551,54 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				out_pm[bi]    = nout_p;
 				out_flags[bi] = nout_f;
 				changed = true;
+			}
+		}
+	}
+
+	for_array(bi, cfg->blocks) {
+		if (!cfg->blocks[bi].reachable) {
+			continue;
+		}
+		in_w[bi] = {};
+		for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
+			out_w[bi].e[idx] = gb_max(in_w[bi].e[idx], gen_w[bi].e[idx]);
+		}
+	}
+	changed = true;
+	while (changed) {
+		changed = false;
+		for_array(bi, cfg->blocks) {
+			if (!cfg->blocks[bi].reachable) {
+				continue;
+			}
+			AsmRegW nin = {};
+			AsmRegW nout = {};
+
+			auto const &pred = preds[bi];
+
+			if (bi != 0) {
+				for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
+					nin.e[idx] = 64;
+				}
+				if (pred.count == 0) {
+					// unreachable-by-preds guard
+					// just zero it out
+					nin = {};
+				}
+				for (i32 p : pred) {
+					for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
+						nin.e[idx] = gb_min(nin.e[idx], out_w[p].e[idx]);
+					}
+				}
+			}
+			for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
+				nout.e[idx] = gb_max(nin.e[idx], gen_w[bi].e[idx]);
+			}
+			if (gb_memcompare(&nin,  &in_w [bi], gb_size_of(AsmRegW)) != 0 ||
+			    gb_memcompare(&nout, &out_w[bi], gb_size_of(AsmRegW)) != 0) {
+				in_w [bi] = nin;
+				out_w[bi] = nout;
+				changed   = true;
 			}
 		}
 	}
@@ -556,9 +670,11 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				continue;
 			}
 
-			u16 run_regs  = in_regs[bi];
-			u16 run_flags = in_flags[bi];
-			u64 run_pm    = in_pm[bi];
+			u16     run_regs  = in_regs[bi];
+			u16     run_flags = in_flags[bi];
+			u64     run_pm    = in_pm[bi];
+			AsmRegW run_w     = in_w[bi];
+
 
 			for (i32 ii = b.first; ii <= b.last; ii++) {
 				AstAsmInstruction   *instr = cfg->insts[ii];
@@ -572,8 +688,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 					if ((undef & bit) == 0) {
 						continue;
 					}
-					check_asm_cfg_report_undef_reg(asm_ctx, cfg, entity, instr, f->name, bit);
 					reported_regs |= bit;
+					check_asm_cfg_report_undef_reg(asm_ctx, cfg, entity, instr, f->name, bit);
 				}
 
 				u16 undef_flags = f->read_flags & ~run_flags & ~reported_flags;
@@ -606,6 +722,27 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 					      LIT(f->name), plural, flag_strs);
 				}
 
+				// Sub-register width
+				for (i32 w_idx = 0; w_idx < ASM_WIDTH_REG_COUNT; w_idx++) {
+					u8 rw = f->read_reg_w.e[w_idx];
+					if (rw == 0) {
+						continue;
+					}
+					u16 bit = cast(u16)(1u << w_idx);
+					if ((reported_regs & bit) != 0) {
+						continue;
+					}
+					if (run_w.e[w_idx] < rw) {
+						reported_regs |= bit;
+
+						char const *rname = asm_ctx->clobber_reg_bit_name(bit);
+						error(instr->name,
+						      "'%.*s' reads %s at %u-bit width but only its low %u bits are defined on all paths here; "
+						      "write the full register first (e.g. zero-extend, or a full-width or 32-bit-zeroing write)",
+						      LIT(f->name), rname, cast(unsigned)rw, cast(unsigned)run_w.e[w_idx]);
+					}
+				}
+
 				for (Entity *pe : f->read_params) {
 					i32 *ix = map_get(&cfg->entity_to_index, pe);
 					if (ix == nullptr) {
@@ -626,9 +763,16 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 
 				run_regs  |= f->gen_regs;
 				run_flags |= f->gen_flags;
+				for (i32 w_idx = 0; w_idx < ASM_WIDTH_REG_COUNT; w_idx++) {
+					u8 gw = f->gen_reg_w.e[w_idx];
+					if (gw != 0) {
+						run_w.e[w_idx] = asm_reg_def_width_after(run_w.e[w_idx], gw);
+					}
+				}
 				for (Entity *pe : f->gen_params) {
 					run_pm |= bit_of(pe);
 				}
+
 			}
 		}
 	}
@@ -799,7 +943,7 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 				if (f == nullptr) {
 					continue;
 				}
-				live = (live & ~f->gen_regs) | (f->read_regs & REG_TOP);
+				live = (live & ~asm_full_kill_mask(f)) | (f->read_regs & REG_TOP);
 			}
 
 			if (lo != live_out[bi] || live != live_in[bi]) {
@@ -841,9 +985,9 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 			}
 			u16 live_after = live;
 			// A register this instruction writes but that is not live afterward,
-			// and that it does not itself read (self-use like `xor r,r` or `add r,x`),
-			// is a dead write.
-			u16 dead = f->gen_regs & ~live_after & ~f->read_regs;
+			// and that it does not itself read (self-use like `xor r,r` or `add r,x`) is a dead write.
+			u16 kill = asm_full_kill_mask(f);
+			u16 dead = kill & ~live_after & ~f->read_regs;
 			for (u16 bit = 1; bit != 0; bit <<= 1) {
 				if ((dead & bit) == 0) {
 					continue;
@@ -859,7 +1003,7 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 					        LIT(f->name), asm_ctx->clobber_reg_bit_name(bit));
 				}
 			}
-			live = (live & ~f->gen_regs) | (f->read_regs & REG_TOP);
+			live = (live & ~kill) | (f->read_regs & REG_TOP);
 		}
 	}
 
