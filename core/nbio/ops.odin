@@ -1626,6 +1626,9 @@ Poll a socket for readiness.
 NOTE: this is provided to help with "legacy" APIs that require polling behavior.
 If you can avoid it and use the other procs in this package, do so.
 
+NOTE: on Windows only one poll per socket is delivered, a second poll on the same
+socket does not complete.
+
 Any user data can be set on the returned operation's `user_data` field.
 Polymorphic variants for type safe user data are available under `poll_poly`, `poll_poly2`, and `poll_poly3`.
 
@@ -1655,6 +1658,9 @@ Poll a socket for readiness.
 
 NOTE: this is provided to help with "legacy" APIs that require polling behavior.
 If you can avoid it and use the other procs in this package, do so.
+
+NOTE: on Windows only one poll per socket is delivered, a second poll on the same
+socket does not complete.
 
 This procedure uses polymorphism for type safe user data up to a certain size.
 
@@ -1690,6 +1696,9 @@ Poll a socket for readiness.
 NOTE: this is provided to help with "legacy" APIs that require polling behavior.
 If you can avoid it and use the other procs in this package, do so.
 
+NOTE: on Windows only one poll per socket is delivered, a second poll on the same
+socket does not complete.
+
 This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
@@ -1724,6 +1733,9 @@ Poll a socket for readiness.
 
 NOTE: this is provided to help with "legacy" APIs that require polling behavior.
 If you can avoid it and use the other procs in this package, do so.
+
+NOTE: on Windows only one poll per socket is delivered, a second poll on the same
+socket does not complete.
 
 This procedure uses polymorphism for type safe user data up to a certain size.
 
