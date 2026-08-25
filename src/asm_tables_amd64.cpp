@@ -240,6 +240,27 @@ struct Asm_amd64 {
 		return "<reg>";
 	}
 
+	u16 flag_from_name(String const &name) {
+		static const struct {String name; ClobberFlags flag; } table[] = {
+			{str_lit("c"),  ClobberFlag_CF}, // Carry
+			{str_lit("p"),  ClobberFlag_PF}, // Parity
+			{str_lit("a"),  ClobberFlag_AF}, // Auxiliary Carry
+			{str_lit("z"),  ClobberFlag_ZF}, // Zero
+			{str_lit("s"),  ClobberFlag_SF}, // Sign
+			{str_lit("t"),  ClobberFlag_TF}, // Trap
+			{str_lit("i"),  ClobberFlag_IF}, // Interrupt Enable
+			{str_lit("d"),  ClobberFlag_DF}, // Direction
+			{str_lit("o"),  ClobberFlag_OF}, // Overflow
+		};
+
+		for (auto const &t : table) {
+			if (name == t.name) {
+				return cast(u16)t.flag;
+			}
+		}
+		return 0;
+	}
+
 	i32 flag_bit_from_name(String const &name, i32 *width_) {
 		static const struct {String name; i32 bit; } table[] = {
 			{str_lit("c"),    0}, // Carry
@@ -813,6 +834,41 @@ struct Asm_amd64 {
 			break;
 		}
 		return {AsmOperandConstraint_None, -1};
+	}	bool is_self_zeroing_idiom(u16 m) const {
+		switch (m) {
+		// integer xor / sub: x ^ x == 0, x - x == 0
+		case M_XOR:
+		case M_SUB:
+
+		// SSE/AVX bitwise xor of a register with itself
+		case M_PXOR:
+		case M_XORPS:
+		case M_XORPD:
+		case M_VPXOR:
+		case M_VXORPS:
+		case M_VXORPD:
+
+		// packed integer subtract: psub x, x == 0
+		case M_PSUBB:
+		case M_PSUBW:
+		case M_PSUBD:
+		case M_PSUBQ:
+		case M_VPSUBB:
+		case M_VPSUBW:
+		case M_VPSUBD:
+		case M_VPSUBQ:
+
+		// andnot of a value with itself: (~x) & x == 0
+		case M_ANDN: // BMI1 GPR: andn dst, a, a
+		case M_ANDNPS:
+		case M_ANDNPD:
+		case M_PANDN:
+		case M_VANDNPS:
+		case M_VANDNPD:
+		case M_VPANDN:
+			return true;
+		}
+		return false;
 	}
 };
 
