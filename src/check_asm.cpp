@@ -1630,8 +1630,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			explicit_writes |= synth;
 		}
 
-		facts->gen_regs  = produced | pinned_param_writes;
-		facts->gen_flags = cast(u16)clobber.flags_wr;
+		facts->gen_regs   = produced | pinned_param_writes;
+		facts->gen_flags  = cast(u16)clobber.flags_wr;
+		facts->read_flags = cast(u16)clobber.flags_rd;
 
 		// NOTE(bill): mnemonics such as `xor r, r` / `sub r, r` act as zeroing the destination
 		// independent of its prior value: the read is architecturally dead, so it must not count as a use.

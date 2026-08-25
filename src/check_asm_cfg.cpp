@@ -24,6 +24,7 @@ struct AsmInstructionFacts {
 	String             name;
 
 	u16 gen_flags; // flag bits this instruction defines
+	u16 read_flags;
 	u16 gen_regs;
 	u16 read_regs;
 
@@ -463,7 +464,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				nin_p = universe_pm;
 				for (i32 p : preds[bi]) {
 					nin_r &= out_regs[p];
-					nin_r &= out_flags[p];
+					nin_f &= out_flags[p];
 					nin_p &= out_pm[p];
 				}
 			}
@@ -546,7 +547,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 		PtrSet<Entity *> reported_params = {};
 		defer (ptr_set_destroy(&reported_params));
 
-		u16 reported_regs = 0;
+		u16 reported_regs  = 0;
+		u16 reported_flags = 0;
 
 		for_array(bi, cfg->blocks) {
 			AsmBlock const &b = cfg->blocks[bi];
@@ -554,8 +556,9 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				continue;
 			}
 
-			u16 run_regs = in_regs[bi];
-			u64 run_pm   = in_pm[bi];
+			u16 run_regs  = in_regs[bi];
+			u16 run_flags = in_flags[bi];
+			u64 run_pm    = in_pm[bi];
 
 			for (i32 ii = b.first; ii <= b.last; ii++) {
 				AstAsmInstruction   *instr = cfg->insts[ii];
@@ -571,6 +574,15 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 					}
 					check_asm_cfg_report_undef_reg(asm_ctx, cfg, entity, instr, f->name, bit);
 					reported_regs |= bit;
+				}
+
+				u16 undef_flags = f->read_flags & ~run_flags & ~reported_flags;
+				if (undef_flags != 0) {
+					error(instr->name,
+					      "'%.*s' reads a status flag that is not set on all paths reaching here; "
+					      "a flag-setting instruction (e.g. 'cmp', 'test') must precede it on every path",
+					      LIT(f->name));
+					reported_flags |= undef_flags;
 				}
 
 				for (Entity *pe : f->read_params) {
@@ -591,7 +603,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 					}
 				}
 
-				run_regs |= f->gen_regs;
+				run_regs  |= f->gen_regs;
+				run_flags |= f->gen_flags;
 				for (Entity *pe : f->gen_params) {
 					run_pm |= bit_of(pe);
 				}
