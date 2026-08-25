@@ -68,12 +68,12 @@ struct Asm_riscv {
 	};
 
 
-	enum ClobberFFlags : u8 {
-		ClobberFFlag_NV = 1<<0, // invalid operation
-		ClobberFFlag_DZ = 1<<1, // divide by zero
-		ClobberFFlag_OF = 1<<2, // overflow
-		ClobberFFlag_UF = 1<<3, // underflow
-		ClobberFFlag_NX = 1<<4, // inexact
+	enum ClobberFlags : u8 {
+		ClobberFlag_NV = 1<<0, // invalid operation
+		ClobberFlag_DZ = 1<<1, // divide by zero
+		ClobberFlag_OF = 1<<2, // overflow
+		ClobberFlag_UF = 1<<3, // underflow
+		ClobberFlag_NX = 1<<4, // inexact
 	};
 
 	enum ClobberRegs : u8 {
@@ -122,9 +122,28 @@ struct Asm_riscv {
 		return "<reg>";
 	}
 
+	u16 flags_from_name(String const &name) {
+		static const struct { String name; ClobberFlags flag; } table[] = {
+			// flags: accrued FP exception flags (fcsr[4:0])
+			{str_lit("nx"),  ClobberFlag_NX}, // Inexact
+			{str_lit("uf"),  ClobberFlag_UF}, // Underflow
+			{str_lit("of"),  ClobberFlag_OF}, // Overflow
+			{str_lit("dz"),  ClobberFlag_DZ}, // Divide by Zero
+			{str_lit("nv"),  ClobberFlag_NV}, // Invalid Operation
+		};
+
+		for (auto const &t : table) {
+			if (name == t.name) {
+				return cast(u16)t.flag;
+			}
+		}
+		return 0;
+	}
+
+
 	i32 flag_bit_from_name(String const &name, i32 *width_) {
 		static const struct { String name; i32 bit; } table[] = {
-			// fflags: accrued FP exception flags (fcsr[4:0])
+			// flags: accrued FP exception flags (fcsr[4:0])
 			{str_lit("nx"),  0}, // Inexact
 			{str_lit("uf"),  1}, // Underflow
 			{str_lit("of"),  2}, // Overflow
@@ -155,14 +174,14 @@ struct Asm_riscv {
 		OperandSet         read;        // operand slots whose register/CSR/mem-base is read
 		ClobberRegs        implicit_wr; // implicit reg writes (ra on C.JAL/C.JALR)
 		ClobberRegs        implicit_rd; // implicit reg reads (sp on the *SP forms)
-		ClobberFFlags      fflags_wr;   // accrued exception flags this op may raise
+		ClobberFlags       flags_wr;   // accrued exception flags this op may raise
 		bool               reads_frm;   // consumes the dynamic rounding mode from fcsr
 		bool               writes_mem;
 		bool               reads_mem;
 		SideEffectFlags side_effects;
 
 		bool implies_clobber_flags() const {
-			return (fflags_wr != 0);
+			return (flags_wr != 0);
 		}
 		bool implies_clobber_memory() const {
 			return writes_mem || reads_mem ||
@@ -183,6 +202,17 @@ struct Asm_riscv {
 		}
 		bool is_conditional() const {
 			return has_control();
+		}
+		bool is_nondeterministic() const {
+			return false;
+		}
+		bool has_implicit_mem() const {
+			if (!writes_mem && !reads_mem) {
+				return false;
+			}
+			u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
+			bool is_atomic = false; // TODO(bill): Add ATOMIC flag to SideEffectFlags in the original INSTRUCTION_TABLE
+			return (implicit & (ClobberReg_SP)) != 0 || is_atomic;
 		}
 	};
 
@@ -216,6 +246,17 @@ struct Asm_riscv {
 		u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
 		u8       nargs;     // operands the user supplies (ARG0..<ARGn)
 		bool     rv32_only; // base gate (the *h counter reads)
+
+
+		// Nondeterministic iff this is a CSR access whose CSR operand names a counter/timer/entropy register (extension-gated; absent CSRs never match)
+		bool is_nondeterministic() const {
+			if (csr == 0x015) return true;                 // seed (Zkr)
+			if (0xC00 <= csr && csr <= 0xC1F) return true; // cycle/time/instret + hpm (unpriv)
+			if (0xC80 <= csr && csr <= 0xC9F) return true; // rv32 high halves (unpriv)
+			if (0xB00 <= csr && csr <= 0xB1F) return true; // mcycle/minstret + mhpm
+			if (0xB80 <= csr && csr <= 0xB9F) return true; // rv32 high halves (machine)
+			return false;
+		}
 	};
 
 	enum PseudoMnemonic : u16 {
@@ -244,7 +285,10 @@ struct Asm_riscv {
 	PseudoAlias pseudo_alias(u16 pm) {
 		PseudoAlias *pa = (PseudoAlias *)raw_pseudo_aliases;
 		return pa[pm];
-	}	static String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];
+	}
+
+	static String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];
+	
 
 	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
@@ -718,6 +762,28 @@ struct Asm_riscv {
 
 	bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) const {
 		// RISC-V does not have prefixes
+		return false;
+	}
+	AsmOperandConstraint operand_value_constraint(u16 m, int op) const {
+		switch (m) {
+		case M_SLLI: case M_SRLI: case M_SRAI:
+			if (op == 2) return {AsmOperandConstraint_ShiftCount, /*XLEN*/-1};
+			break;
+		case M_DIV: case M_DIVU: case M_REM: case M_REMU:
+			if (op == 2) return {AsmOperandConstraint_NonZeroDivisor, -1};
+			break;
+		}
+		return {AsmOperandConstraint_None, -1};
+	}	bool is_self_zeroing_idiom(u16 m) const {
+		switch (m) {
+		case M_XOR:
+		case M_SUB:
+		case M_SUBW:
+		case M_SLT:
+		case M_SLTU:
+		case M_ANDN:
+			return true;
+		}
 		return false;
 	}
 };

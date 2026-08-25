@@ -2438,6 +2438,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 			lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default;
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
 				pass_manager_kind = lbFunctionPassManager_default_without_memcpy;
+				lb_remove_attribute_from_proc(p->module, p->value, "optsize"); // incompatible with optnone
 				lb_add_attribute_to_proc(p->module, p->value, "optnone");
 				lb_add_attribute_to_proc(p->module, p->value, "noinline");
 			} else {
@@ -3163,10 +3164,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	gbString llvm_features = gb_string_make(temporary_allocator(), "");
 	String_Iterator it = {build_context.target_features_string, 0};
+	String str = {};
 	bool first = true;
-	for (;;) {
-		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
+	while (string_split_iterator_next(&it, ',', &str)) {
 		if (!first) {
 			llvm_features = gb_string_appendc(llvm_features, ",");
 		}

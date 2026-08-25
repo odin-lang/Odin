@@ -13906,6 +13906,10 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 			str = gb_string_appendc(str, " = ");
 			str = write_expr_to_string(str, spec->value, shorthand);
 		}
+		for (Ast *dir : spec->directives) {
+			str = gb_string_appendc(str, " ");
+			str = write_expr_to_string(str, dir, shorthand);
+		}
 	case_end;
 
 	case_ast_node(clobber, AsmClobber, node);
