@@ -3163,10 +3163,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	gbString llvm_features = gb_string_make(temporary_allocator(), "");
 	String_Iterator it = {build_context.target_features_string, 0};
+	String str = {};
 	bool first = true;
-	for (;;) {
-		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
+	while (string_split_iterator_next(&it, ',', &str)) {
 		if (!first) {
 			llvm_features = gb_string_appendc(llvm_features, ",");
 		}
