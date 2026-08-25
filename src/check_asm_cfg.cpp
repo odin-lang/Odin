@@ -463,9 +463,9 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	}
 
 	for_array(bi, cfg->blocks) {
-		u16 gr = 0;
-		u16 gf = 0;
-		u64 gp = 0;
+		u16     gr = 0;
+		u16     gf = 0;
+		u64     gp = 0;
 		AsmRegW gw = {};
 
 		AsmBlock const &b = cfg->blocks[bi];
@@ -486,10 +486,10 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				}
 			}
 		}
-		gen_regs[bi]  = gr;
+		gen_regs [bi] = gr;
 		gen_flags[bi] = gf;
-		gen_pm[bi]    = gp;
-		gen_w[bi]     = gw;
+		gen_pm   [bi] = gp;
+		gen_w    [bi] = gw;
 	}
 
 	// NOTE(bill): initialize the blocks
@@ -499,16 +499,16 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			continue;
 		}
 		if (bi == 0) {
-			in_regs[bi]  = seed_regs;
-			in_pm[bi]    = seed_pm;
+			in_regs [bi] = seed_regs;
+			in_pm   [bi] = seed_pm;
 			in_flags[bi] = 0; // no flag is defined at the template entry point
 		} else {
-			in_regs[bi]  = REG_TOP;
-			in_pm[bi]    = universe_pm;
+			in_regs [bi] = REG_TOP;
+			in_pm   [bi] = universe_pm;
 			in_flags[bi] = FLAG_TOP;
 		}
-		out_regs[bi]  = in_regs[bi]  | gen_regs[bi];
-		out_pm[bi]    = in_pm[bi]    | gen_pm[bi];
+		out_regs [bi] = in_regs [bi] | gen_regs [bi];
+		out_pm   [bi] = in_pm   [bi] | gen_pm   [bi];
 		out_flags[bi] = in_flags[bi] | gen_flags[bi];
 	}
 
@@ -538,17 +538,17 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			u64 nout_p = nin_p | gen_pm[bi];
 			u16 nout_f = nin_f | gen_flags[bi];
 
-			if (nin_r  != in_regs[bi]  ||
-			    nin_p  != in_pm[bi]    ||
-			    nin_f  != in_flags[bi] ||
-			    nout_r != out_regs[bi] ||
-			    nout_p != out_pm[bi]   ||
+			if (nin_r  != in_regs  [bi] ||
+			    nin_p  != in_pm    [bi] ||
+			    nin_f  != in_flags [bi] ||
+			    nout_r != out_regs [bi] ||
+			    nout_p != out_pm   [bi] ||
 			    nout_f != out_flags[bi]) {
-				in_regs[bi]   = nin_r;
-				in_pm[bi]     = nin_p;
-				in_flags[bi]  = nin_f;
-				out_regs[bi]  = nout_r;
-				out_pm[bi]    = nout_p;
+				in_regs  [bi] = nin_r;
+				in_pm    [bi] = nin_p;
+				in_flags [bi] = nin_f;
+				out_regs [bi] = nout_r;
+				out_pm   [bi] = nout_p;
 				out_flags[bi] = nout_f;
 				changed = true;
 			}
@@ -606,9 +606,9 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	// NOTE(bill): publish the register masks and materialise the parameter sets onto the blocks
 	for_array(bi, cfg->blocks) {
 		AsmBlock *b = &cfg->blocks[bi];
-		b->in_defs   = in_regs[bi];
-		b->out_defs  = out_regs[bi];
-		b->in_flags  = in_flags[bi];
+		b->in_defs   = in_regs  [bi];
+		b->out_defs  = out_regs [bi];
+		b->in_flags  = in_flags [bi];
 		b->out_flags = out_flags[bi];
 		if (!b->reachable) {
 			continue;
@@ -670,10 +670,10 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				continue;
 			}
 
-			u16     run_regs  = in_regs[bi];
+			u16     run_regs  = in_regs [bi];
 			u16     run_flags = in_flags[bi];
-			u64     run_pm    = in_pm[bi];
-			AsmRegW run_w     = in_w[bi];
+			u64     run_pm    = in_pm   [bi];
+			AsmRegW run_w     = in_w    [bi];
 
 
 			for (i32 ii = b.first; ii <= b.last; ii++) {
@@ -790,8 +790,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 				continue;
 			}
 			any_exit  = true;
-			exit_regs  &= out_regs[bi];
-			exit_pm    &= out_pm[bi];
+			exit_regs  &= out_regs [bi];
+			exit_pm    &= out_pm   [bi];
 			exit_flags &= out_flags[bi];
 		}
 

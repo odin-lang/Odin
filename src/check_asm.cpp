@@ -2358,13 +2358,14 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 	entity->type = type;
 
-	bool is_volatile       = false;
-	bool is_align_stack    = false;
-	bool is_pure_annotated = false;
-	auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
-
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
+
+	bool is_pure_annotated = false;
 	{ // check clobbers
+		bool is_volatile       = false;
+		bool is_align_stack    = false;
+		auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
+
 		bool clobber_flags  = false;
 		bool clobber_memory = false;
 
@@ -2432,16 +2433,17 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		entity->AsmTemplate.clobber_memory = clobber_memory;
 		entity->AsmTemplate.is_volatile    = is_volatile;
 		entity->AsmTemplate.is_align_stack = is_align_stack;
-	}
 
-	// add normalizations for the reigsters too
-	for (String const &reg : *clobber_registers_set) {
-		u16 bit = asm_ctx->clobber_bit_for_reg_name(reg);
-		String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
-		if (rname != reg) {
-			string_set_update(clobber_registers_set, rname);
+		// add normalizations for the registers too
+		for (String const &reg : *clobber_registers_set) {
+			u16 bit = asm_ctx->clobber_bit_for_reg_name(reg);
+			String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
+			if (rname != reg) {
+				string_set_update(clobber_registers_set, rname);
+			}
 		}
 	}
+
 
 	// Two distinct operands pinned to the same physical register only makes sense when
 	// they are tied (they intentionally share one register). Compared by bit so %eax
@@ -2471,16 +2473,6 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		}
 	}
 
-	// NOTE(bill, 2026-08-24): Construct a control-flow graph (CFG) from the instructions
-	// to do further analysis which is not possible with an conservative straight-line approximation
-	// Using a CFG is a much sounder approach for calculating:
-	// * reads before writes
-	// * divergence
-	// * unreachable code
-
-	AsmCfg cfg = {};
-	asm_cfg_init(&cfg);
-	defer (asm_cfg_destroy(&cfg));
 
 	// collect label decls
 	for (Ast *instruction_ : at->instructions) {
@@ -2506,6 +2498,24 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		case_end;
 		}
 	}
+
+	// NOTE(bill, 2026-08-24): Construct a control-flow graph (CFG) from the instructions
+	// to do further analysis which is not possible with an conservative straight-line approximation
+	// Using a CFG is a much sounder approach for calculating:
+	// * read-before-writes
+	//   * sub-register width checks
+	//   * `%flags` checks
+	// * divergence
+	// * unreachable code
+	// * liveness checks (forward and backwards)
+
+	// NOTE(bill): the AsmCfg structure also hold information which is used to in the linear pass
+	// mainly because it will be used later on by it, so it makes sense to keep them together as
+	// one unit rather than two separate structures.
+
+	AsmCfg cfg = {};
+	asm_cfg_init(&cfg);
+	defer (asm_cfg_destroy(&cfg));
 
 	Array<Operand> operands = {};
 	operands.allocator = heap_allocator();
@@ -2679,9 +2689,13 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 
+	// NOTE(bill): After the linear collection pass of the mnemonics,
+	// now do the CFG building, analysis, and liveness checks (only if everything was correct)
+
 	check_asm_cfg_build(asm_ctx, &cfg, d->init_expr, entity);
 	check_asm_cfg_analyse(asm_ctx, &cfg, ctx, entity);
 	check_asm_cfg_liveness(asm_ctx, &cfg, entity, /*emit_dead_writes*/all_instructions_good);
+
 
 	bool vet_unused = false;
 	{
@@ -2740,7 +2754,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 					continue;
 				}
 			}
-			if (ed.tie > 0) {
+			if (ed.tie >= 0) {
 				// TODO(bill): Handle this edge case?
 				continue;
 			}
