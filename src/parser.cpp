@@ -548,6 +548,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_AsmInstruction:
 		n->AsmInstruction.name     = clone_ast(n->AsmInstruction.name, f);
 		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
+		n->AsmInstruction.facts    = nullptr;
 		break;
 	case Ast_AsmMemoryOperand:
 		n->AsmMemoryOperand.segment_override = clone_ast(n->AsmMemoryOperand.segment_override, f);

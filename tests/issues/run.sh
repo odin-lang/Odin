@@ -91,11 +91,12 @@ $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
+$ODIN check ../test_issue_7429.odin $COMMON_CHECK
 $ODIN test ../test_issue_7356.odin $COMMON
 $ODIN build ../test_issue_7167.odin $COMMON
 $ODIN build ../test_issue_7188.odin $COMMON
 $ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
-$ODIN test ../test_issue_bool_comparison_truthiness.odin $COMMON
+$ODIN test ../test_issue_bool_to_be_conversion.odin $COMMON
 
 $ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
 if [[ $($ODIN check ../test_issue_foreign_redeclaration_mismatch.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then

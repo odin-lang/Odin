@@ -510,6 +510,7 @@ struct AstSplitArgs {
 		u16 mnemonic;          \
 		u8  suffix_flags;      \
 		i32 valid_form_index;  \
+		struct AsmInstructionFacts *facts; \
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
 		Token open;     \

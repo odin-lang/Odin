@@ -342,6 +342,8 @@ struct Entity {
 			String name;
 			Ast *node;
 			Ast *parent;
+
+			i32 asm_block_index;
 		} Label;
 		struct {
 			Ast *node;
@@ -577,6 +579,7 @@ gb_internal Entity *alloc_entity_label(Scope *scope, Token token, Type *type, As
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
 	entity->Label.parent = parent;
+	entity->Label.asm_block_index = -1;
 	entity->state = EntityState_Resolved;
 	return entity;
 }
