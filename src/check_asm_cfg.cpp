@@ -578,11 +578,32 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 
 				u16 undef_flags = f->read_flags & ~run_flags & ~reported_flags;
 				if (undef_flags != 0) {
-					error(instr->name,
-					      "'%.*s' reads a status flag that is not set on all paths reaching here; "
-					      "a flag-setting instruction (e.g. 'cmp', 'test') must precede it on every path",
-					      LIT(f->name));
 					reported_flags |= undef_flags;
+
+					gbString flag_strs = gb_string_make(heap_allocator(), "");
+					defer (gb_string_free(flag_strs));
+
+					isize count = 0;
+					for (u16 bit = 1; bit != 0; bit <<= 1) {
+						if (bit & undef_flags) {
+							if (count++ > 0) {
+							flag_strs = gb_string_appendc(flag_strs, ", ");
+							}
+							char const *f = asm_ctx->clobber_flag_bit_name(bit);
+							flag_strs = gb_string_appendc(flag_strs, "%flags.");
+							flag_strs = gb_string_appendc(flag_strs, f);
+						}
+					}
+
+					char const *plural = "a status flag";
+					if (count > 0) {
+						plural = "status flags";
+					}
+
+					error(instr->name,
+					      "'%.*s' reads %s (%s) that is not set on all paths reaching here; "
+					      "a flag-setting instruction (e.g. 'cmp', 'test') must precede it on every path",
+					      LIT(f->name), plural, flag_strs);
 				}
 
 				for (Entity *pe : f->read_params) {
