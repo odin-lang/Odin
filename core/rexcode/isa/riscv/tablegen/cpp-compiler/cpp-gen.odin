@@ -128,6 +128,17 @@ main :: proc() {
 			ClobberFlag_NX = 1<<4, // inexact
 		};
 
+		char const *clobber_flag_bit_name(u16 bit) {
+			switch (bit) {
+			case ClobberFlag_NV: return "nv";
+			case ClobberFlag_DZ: return "dz";
+			case ClobberFlag_OF: return "of";
+			case ClobberFlag_UF: return "uf";
+			case ClobberFlag_NX: return "nx";
+			}
+			return "?";
+		}
+
 		enum ClobberRegs : u8 {
 			ClobberReg_RA = 1<<0, // x1, implicit link on C.JAL / C.JALR
 			ClobberReg_SP = 1<<1, // x2, implicit base on the *SP compressed forms
@@ -172,6 +183,24 @@ main :: proc() {
 			case ClobberReg_SP: return \"sp\";
 			}
 			return \"<reg>\";
+		}
+
+
+		u16 flag_from_name(String const &name) {
+			static const struct {String name; ClobberFlags flag; } table[] = {
+				{str_lit("nv"), ClobberFlag_NV},
+				{str_lit("dz"), ClobberFlag_DZ},
+				{str_lit("of"), ClobberFlag_OF},
+				{str_lit("uf"), ClobberFlag_UF},
+				{str_lit("nx"), ClobberFlag_NX},
+			};
+
+			for (auto const &t : table) {
+				if (name == t.name) {
+					return cast(u16)t.flag;
+				}
+			}
+			return 0;
 		}
 
 		u16 flags_from_name(String const &name) {
@@ -231,6 +260,10 @@ main :: proc() {
 			bool               writes_mem;
 			bool               reads_mem;
 			SideEffectFlags side_effects;
+
+			ClobberFlags flags_rd_call() const {
+				return {};
+			}
 
 			bool implies_clobber_flags() const {
 				return (flags_wr != 0);

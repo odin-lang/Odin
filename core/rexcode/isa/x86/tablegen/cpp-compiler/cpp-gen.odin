@@ -306,6 +306,10 @@ main :: proc() {
 			bool            reads_mem;
 			SideEffectFlags side_effects;
 
+			ClobberFlags flags_rd_call() const {
+				return flags_rd;
+			}
+
 			bool implies_clobber_flags() const {
 				u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
 				                       ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
