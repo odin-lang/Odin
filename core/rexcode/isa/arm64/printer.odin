@@ -273,17 +273,19 @@ wprintln :: proc(
 // Internal writers
 // =============================================================================
 
-// write_full_mnemonic handles a few special cases that need transformation:
-//   * Suffix family mnemonics (ADD_IMM/ADD_SR/ADD_ER) collapse to `add`.
-//   * B_COND prints as `b.<cond>` using the first operand's cond payload.
-//   * Mov-wide / shifted/extended/imm variants all share the canonical
-//     ARM ARM mnemonic; the suffix is for our internal disambiguation.
+// write_full_mnemonic handles the two mnemonics whose printed spelling is not
+// just the enum name: B_COND / BC_COND carry the condition in the mnemonic
+// itself (`b.eq`, `bc.ne`) rather than as a printed operand.
 
 @(private="file")
 write_full_mnemonic :: proc(sb: ^strings.Builder, inst: ^Instruction, uppercase: bool) {
-	// B_COND -> `b.<cond>` based on the first operand.
-	if inst.mnemonic == .B_COND && inst.operand_count >= 1 && inst.ops[0].kind == .COND {
-		strings.write_string(sb, uppercase ? "B." : "b.")
+	// B_COND / BC_COND -> `b.<cond>` / `bc.<cond>` from the first operand.
+	if (inst.mnemonic == .B_COND || inst.mnemonic == .BC_COND) && inst.operand_count >= 1 && inst.ops[0].kind == .COND {
+		if inst.mnemonic == .BC_COND {
+			strings.write_string(sb, uppercase ? "BC." : "bc.")
+		} else {
+			strings.write_string(sb, uppercase ? "B." : "b.")
+		}
 		c := inst.ops[0].cond & 0xF
 		cn := COND_NAMES[c]
 		if uppercase {
@@ -305,25 +307,26 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 	name, ok := reflect.enum_name_from_value(m)
 	if !ok { strings.write_string(sb, "<?>"); return }
 
-	// Strip internal disambiguator suffixes -- the user-facing mnemonic
-	// is just the base name (ADD_IMM -> add, ADD_SR -> add, LDR_LIT -> ldr,
-	// CCMP_REG -> ccmp, MSR_REG -> msr, FMOV_GEN -> fmov, ...).
-	n := len(name)
-	suffixes := []string{ "_IMM", "_SR", "_ER", "_LIT", "_REG", "_COND", "_GEN" }
-	for s in suffixes {
-		if n > len(s) {
-			tail := name[n - len(s):]
-			if tail == s {
-				n -= len(s)
-				break
-			}
+	// Enum names are the assembler mnemonics, so this is a straight
+	// transliteration -- with one exception. The system instructions below
+	// are written by assemblers as a mnemonic plus an op-name token
+	// (`dc zva`, `tlbi vae1`, `bti j`), which we store as one enum member,
+	// so for those the first underscore prints as a space. Every other
+	// underscore is kept: AMX_LDX is an undocumented Apple coprocessor op
+	// with no assembler spelling at all, and printing it `amx ldx` would
+	// imply a two-token syntax that does not exist.
+	split := -1
+	for prefix in ([]string{"DC_", "IC_", "AT_", "TLBI_", "BTI_", "PSB_", "TSB_"}) {
+		if len(name) > len(prefix) && name[:len(prefix)] == prefix {
+			split = len(prefix) - 1
+			break
 		}
 	}
 
-	for i in 0..<n {
+	for i in 0..<len(name) {
 		c := name[i]
-		if c == '_' {
-			strings.write_byte(sb, '.')
+		if i == split {
+			strings.write_byte(sb, ' ')
 		} else if !uppercase && c >= 'A' && c <= 'Z' {
 			strings.write_byte(sb, c + 32)
 		} else {

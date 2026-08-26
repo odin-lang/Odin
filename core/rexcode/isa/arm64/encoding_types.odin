@@ -162,7 +162,27 @@ Operand_Type :: enum u8 {
 	REL_PG21,      // ADR / ADRP (signed 21-bit; ADRP scales by 4096)
 
 	// ---- Memory ----
-	MEM,           // memory operand with addressing mode
+	//
+	// One operand type per addressing mode. The mode has to be part of the
+	// operand TYPE, not just the operand encoding, because it is a matching
+	// criterion: `LDR Xt, [Xn, #imm]`, `[Xn, #imm]!`, `[Xn], #imm` and
+	// `[Xn, Xm]` are all the mnemonic LDR, and the matcher picks between
+	// their forms on the addressing mode alone. (Same reason W_REG /
+	// W_SHIFTED / W_EXTENDED are distinct types over one register class.)
+	// Each maps to exactly one Address_Mode; the form's Operand_Encoding
+	// then says how the fields are packed.
+	MEM_OFFSET,    // [Xn{, #imm}]                    -> Address_Mode.OFFSET
+	MEM_PRE,       // [Xn, #imm]!                     -> PRE_INDEXED
+	MEM_POST,      // [Xn], #imm                      -> POST_INDEXED
+	MEM_REG,       // [Xn, Rm{, LSL #s}]              -> REG_OFFSET
+	MEM_EXT,       // [Xn, Wm, SXTW|UXTW|SXTX #s]     -> EXT_REG_OFFSET
+	// SVE addressing. Kept distinct from the plain modes above: a gather
+	// load has both a scalar+scalar and a scalar+vector form under the one
+	// mnemonic, and those two differ only in the index register's class.
+	MEM_SVE_SS,    // [Xn, Xm, LSL #s]                -> REG_OFFSET, X index
+	MEM_SVE_SI,    // [Xn, #imm, MUL VL]              -> OFFSET
+	MEM_SVE_VEC,   // [Xn, Zm.S/D, UXTW|SXTW|LSL #s]  -> REG_OFFSET, Z index
+	MEM_SVE_VB,    // [Zn.S/D, #imm5]                 -> OFFSET, Z base
 
 	// ---- Condition code ----
 	COND,

@@ -283,8 +283,30 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .IMMEDIATE && is_valid_bitmask_imm(u64(op.immediate), form.flags.is_64)
 	case .REL_26, .REL_19, .REL_14, .REL_PG21:
 		return op.kind == .RELATIVE
-	case .MEM:
-		return op.kind == .MEMORY
+	// Memory: the addressing mode is what selects between the forms of one
+	// mnemonic (LDR [Xn,#i] / [Xn,#i]! / [Xn],#i / [Xn,Xm]), so it has to
+	// be matched, not just packed.
+	case .MEM_OFFSET:
+		return op.kind == .MEMORY && op.mem.mode == .OFFSET
+	case .MEM_PRE:
+		return op.kind == .MEMORY && op.mem.mode == .PRE_INDEXED
+	case .MEM_POST:
+		return op.kind == .MEMORY && op.mem.mode == .POST_INDEXED
+	case .MEM_REG:
+		return op.kind == .MEMORY && op.mem.mode == .REG_OFFSET
+	case .MEM_EXT:
+		return op.kind == .MEMORY && op.mem.mode == .EXT_REG_OFFSET
+	// SVE: the plain mode is not enough -- a gather's scalar+scalar and
+	// scalar+vector forms are both REG_OFFSET and differ only in whether
+	// the index (or base) is a Z register.
+	case .MEM_SVE_SS:
+		return op.kind == .MEMORY && op.mem.mode == .REG_OFFSET && reg_class(op.mem.index) != REG_Z
+	case .MEM_SVE_SI:
+		return op.kind == .MEMORY && op.mem.mode == .OFFSET && reg_class(op.mem.base) != REG_Z
+	case .MEM_SVE_VEC:
+		return op.kind == .MEMORY && op.mem.mode == .REG_OFFSET && reg_class(op.mem.index) == REG_Z
+	case .MEM_SVE_VB:
+		return op.kind == .MEMORY && op.mem.mode == .OFFSET && reg_class(op.mem.base) == REG_Z
 	case .COND:
 		return op.kind == .COND
 	}

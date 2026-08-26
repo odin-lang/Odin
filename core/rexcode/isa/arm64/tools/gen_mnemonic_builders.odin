@@ -89,6 +89,27 @@ mnemonic_to_lower :: proc(m: a.Mnemonic) -> string {
 	return strings.to_lower(name)
 }
 
+// The parameter TYPES of a form's builder, joined -- the key Odin actually
+// overloads on. Distinct operand categories can share a type: a Z register
+// and a P register are both passed as `u8`, so `inst_trn2_z_z_z` and
+// `inst_trn2_p_p_p` have different names but the same signature. Both are
+// still emitted as standalone procedures; only the first of a colliding set
+// may join the overload group, since Odin rejects a group holding two
+// procedures of identical type.
+odin_type_key :: proc(sig: Operand_Signature) -> string {
+	params := param_list(sig)
+	defer delete(params)
+	sb: strings.Builder
+	strings.builder_init(&sb)
+	for p in params {
+		if i := strings.index(p.decl, ": "); i >= 0 {
+			strings.write_string(&sb, p.decl[i+2:])
+		}
+		strings.write_byte(&sb, ',')
+	}
+	return strings.to_string(sb)
+}
+
 // Every operand type now maps to a category -- nothing is unsupported, so no
 // form is ever skipped.
 operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
@@ -105,7 +126,10 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 		return .PREG
 	case .REL_26, .REL_19, .REL_14, .REL_PG21:
 		return .REL
-	case .MEM:
+	case .MEM_OFFSET, .MEM_PRE, .MEM_POST, .MEM_REG, .MEM_EXT,
+	     .MEM_SVE_SS, .MEM_SVE_SI, .MEM_SVE_VEC, .MEM_SVE_VB:
+		// All addressing modes take one `Memory` parameter, so they share a
+		// builder signature: the encoder picks the form from mem.mode.
 		return .MEM
 	case .COND:
 		return .COND
@@ -620,8 +644,26 @@ main :: proc() {
 
 `)
 	for m in mnemonic_list {
-		procs := procs_by_mnemonic[m]
-		if len(procs) == 0 { continue }
+		all_procs := procs_by_mnemonic[m]
+		if len(all_procs) == 0 { continue }
+
+		// Only type-distinct forms can be group members (see odin_type_key).
+		procs: [dynamic]Proc_Entry
+		defer delete(procs)
+		{
+			seen: map[string]bool
+			defer delete(seen)
+			for e in all_procs {
+				key := odin_type_key(e.sig)
+				if seen[key] {
+					delete(key)
+					continue
+				}
+				seen[key] = true
+				append(&procs, e)
+			}
+		}
+
 		mlow := mnemonic_to_lower(m)
 
 		// inst_ group
@@ -659,21 +701,10 @@ main :: proc() {
 		}
 	}
 
-	// Builder aliases for redundant SME enum names that were removed from the
-	// Mnemonic enum: they are the same instructions as the canonical *_TILE /
-	// MOVA_*_FROM_* forms, so the convenient *_za / *_to_* names delegate to them.
-	sme_aliases := [][2]string{
-		{"sme_ld1b_za", "sme_ld1b_tile"}, {"sme_ld1h_za", "sme_ld1h_tile"},
-		{"sme_ld1w_za", "sme_ld1w_tile"}, {"sme_ld1d_za", "sme_ld1d_tile"},
-		{"sme_ld1q_za", "sme_ld1q_tile"}, {"sme_st1b_za", "sme_st1b_tile"},
-		{"sme_st1h_za", "sme_st1h_tile"}, {"sme_st1w_za", "sme_st1w_tile"},
-		{"sme_st1d_za", "sme_st1d_tile"}, {"sme_st1q_za", "sme_st1q_tile"},
-		{"sme_mova_to_z", "sme_mova_z_from_tile"}, {"sme_mova_to_za", "sme_mova_tile_from_z"},
-	}
-	strings.write_string(&sb, "\n// Aliases: redundant SME names -> canonical tile/MOVA builders.\n")
-	for al in sme_aliases {
-		fmt.sbprintf(&sb, "inst_%s :: inst_%s\nemit_%s :: emit_%s\n", al[0], al[1], al[0], al[1])
-	}
+	// (The SME *_za / *_to_* builder aliases that used to be appended here are
+	// gone: SME_LD1B_TILE, SME_MOVA_Z_FROM_TILE and friends now carry their
+	// assembler names -- LD1B, MOVA -- so inst_ld1b / inst_mova already are
+	// the canonical builders and no delegating alias is needed.)
 
 	output := strings.to_string(sb)
 	err := os.write_entire_file(#directory + "/../mnemonic_builders.odin", transmute([]u8)strings.concatenate({GEN_ATTRIB, output}))
