@@ -1,15 +1,7 @@
 package rexcode_arm64
 
-// Operand slots (indices into the Encoding operand list) that are read/written.
-// Max 4 operands (R4-style FMA: FMADD rd, rn, rm, ra). Register lists on the
-// LD1-4/ST1-4 structure forms count as a single operand slot.
 Operand_Set :: distinct bit_set[0..<4; u8]
 
-// The NZCV condition flags — the ONLY application-visible flag state in AArch64.
-// There is no parity/aux-carry/direction flag as on x86. The other PSTATE bits
-// (DAIF interrupt masks, PAN, UAO, SSBS, SP-select, ...) are system state
-// reached only through MSR/MRS, and are modelled via the PRIVILEGED side effect
-// rather than here.
 NZCV_Flags :: distinct bit_set[NZCV_Flag; u8]
 NZCV_Flag :: enum u8 {
 	N, // negative result
@@ -18,9 +10,6 @@ NZCV_Flag :: enum u8 {
 	V, // signed overflow
 }
 
-// FPSR cumulative exception + saturation flags — the AArch64 analogue of RISC-V
-// fflags / x86 MXCSR status. The rounding mode lives separately in FPCR (see
-// reads_fpcr below), so there is no EFLAGS-style triad for FP either.
 FPSR_Flags :: distinct bit_set[FPSR_Flag; u8]
 FPSR_Flag :: enum u8 {
 	IOC, // invalid operation
@@ -32,13 +21,6 @@ FPSR_Flag :: enum u8 {
 	QC,  // cumulative saturation (Advanced SIMD saturating ops)
 }
 
-// Implicitly-touched GPRs that are NOT distinct operands. Like RISC-V, AArch64
-// has very few of these: the SIMD/FP register file is always addressed through
-// explicit operands, so there is no x86-style VECTOR/XMM0 implicit clobber.
-//
-// X16/X17 are here for the pointer-authentication *1716 hint forms
-// (PACIA1716/AUTIA1716/...), which implicitly read X16 (modifier) and
-// read-modify-write X17 (the pointer) without naming either as an operand.
 Clobber_Regs :: distinct bit_set[Clobber_Reg; u8]
 Clobber_Reg :: enum u8 {
 	LR,  // x30, implicit link written by BL/BLR, implicitly read by RET
