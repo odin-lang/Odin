@@ -234,7 +234,7 @@ main :: proc() {
 	// ---- SME ----------------------------------------------------------------
 	check("SME_SMSTART",    .SMSTART, 0, 0xD503477F, 0xFFFFFFFF)
 	check("SME_SMSTOP",     .SMSTOP,  0, 0xD503467F, 0xFFFFFFFF)
-	check("SME_RDSVL",      .RDSVL,   0, 0x04BF5800, 0xFFFFFC00)
+	check("SME_RDSVL",      .RDSVL,   0, 0x04BF5800, 0xFFFFF800)
 	check("FMOPA S",    .FMOPA,   0, 0x80800000, 0xFFE08010)
 	check("SME_BFMOPA",     .BFMOPA,  0, 0x81800000, 0xFFE08010)
 	check("SMOPA S",    .SMOPA,   0, 0xA0800000, 0xFFE08010)
@@ -333,10 +333,10 @@ main :: proc() {
 	check("SME_MOVA_TILE_FROM_Z", .MOVA, 1, 0xC0000000, 0xFFE08010)
 
 	// ---- NEON FCMLA / FCADD (v8.3-A FCMA) -- verified vs LLVM golden -----
-	check("FCMLA_4H", .FCMLA, 0, 0x2E40C400, 0xFFA0CC00)
-	check("FCMLA_8H", .FCMLA, 1, 0x6E40C400, 0xFFA0CC00)
-	check("FCMLA_4S", .FCMLA, 2, 0x6E80C400, 0xFFA0CC00)
-	check("FCMLA_2D", .FCMLA, 3, 0x6EC0C400, 0xFFA0CC00)
+	check("FCMLA_4H", .FCMLA, 0, 0x2E40C400, 0xFFE0CC00)
+	check("FCMLA_8H", .FCMLA, 1, 0x6E40C400, 0xFFE0CC00)
+	check("FCMLA_4S", .FCMLA, 2, 0x6E80C400, 0xFFE0CC00)
+	check("FCMLA_2D", .FCMLA, 3, 0x6EC0C400, 0xFFE0CC00)
 	check("FCADD_4H", .FCADD, 0, 0x2E40E400, 0xFFA0EC00)
 	check("FCADD_4S", .FCADD, 2, 0x6E80E400, 0xFFA0EC00)
 
@@ -363,8 +363,8 @@ main :: proc() {
 	check("SVE_BSL1N",   .BSL1N,  0, 0x04603C00, 0xFFE0FC00)
 	check("SVE_NBSL",    .NBSL,   0, 0x04E03C00, 0xFFE0FC00)
 	check("SVE_PMUL_VEC",.PMUL,0,0x04206400, 0xFFE0FC00)
-	check("SVE_PMULLB",  .PMULLB, 0, 0x45006800, 0xFFE0FC00)
-	check("SVE_PMULLT",  .PMULLT, 0, 0x45006C00, 0xFFE0FC00)
+	check("SVE_PMULLB",  .PMULLB, 0, 0x45C06800, 0xFFE0FC00)
+	check("SVE_PMULLT",  .PMULLT, 0, 0x45C06C00, 0xFFE0FC00)
 
 	// ---- SVE BF16 conversions -------------------------------------------
 	check("SVE_BFCVT",   .BFCVT,   1, 0x658AA000, 0xFFFFE000)
@@ -426,8 +426,8 @@ main :: proc() {
 	check("DGH",       .DGH,       0, 0xD50320DF, 0xFFFFFFFF)
 	check("PSB CSYNC", .PSB_CSYNC, 0, 0xD503223F, 0xFFFFFFFF)
 	check("TSB CSYNC", .TSB_CSYNC, 0, 0xD503225F, 0xFFFFFFFF)
-	check("BTI j",     .BTI_J,     0, 0xD503245F, 0xFFFFFFFF)
-	check("BTI c",     .BTI_C,     0, 0xD503249F, 0xFFFFFFFF)
+	check("BTI j",     .BTI_J,     0, 0xD503249F, 0xFFFFFFFF)
+	check("BTI c",     .BTI_C,     0, 0xD503245F, 0xFFFFFFFF)
 	check("BTI jc",    .BTI_JC,    0, 0xD50324DF, 0xFFFFFFFF)
 
 	// ---- NEON aliases ---------------------------------------------------
@@ -466,8 +466,8 @@ main :: proc() {
 	// ---- RME (Realm Management Extension) -------------------------------
 	check("TLBI RPALOS",  .TLBI_RPALOS,  0, 0xD5084EE0, 0xFFFFFFE0)
 	check("TLBI RPAOS",   .TLBI_RPAOS,   0, 0xD5084EA0, 0xFFFFFFE0)
-	check("TLBI PAALL",   .TLBI_PAALL,   0, 0xD508E89F, 0xFFFFFFFF)
-	check("TLBI PAALLOS", .TLBI_PAALLOS, 0, 0xD508E81F, 0xFFFFFFFF)
+	check("TLBI PAALL",   .TLBI_PAALL,   0, 0xD50E879F, 0xFFFFFFFF)
+	check("TLBI PAALLOS", .TLBI_PAALLOS, 0, 0xD50E819F, 0xFFFFFFFF)
 	check("AT S1E1A",     .AT_S1E1A,     0, 0xD5079140, 0xFFFFFFE0)
 	check("DC CIPAPA",    .DC_CIPAPA,    0, 0xD50E7CE0, 0xFFFFFFE0)
 	check("DC CIGDPAPA",  .DC_CIGDPAPA,  0, 0xD50E7DE0, 0xFFFFFFE0)

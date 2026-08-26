@@ -115,21 +115,35 @@ sbprint :: proc(
 
 		write_full_mnemonic(sb, inst, opts.uppercase)
 
-		// B.cond's condition is encoded into the mnemonic suffix (b.eq),
-		// so when printing we skip the first operand (it IS the cond).
+		// B.cond / BC.cond fold the condition into the mnemonic (b.eq), so the
+		// operand carrying it must not be printed a second time.
 		start_slot := 0
-		if inst.mnemonic == .B_COND && inst.operand_count >= 1 && inst.ops[0].kind == .COND {
+		if (inst.mnemonic == .B_COND || inst.mnemonic == .BC_COND) &&
+		   inst.operand_count >= 1 && inst.ops[0].kind == .COND {
 			start_slot = 1
 		}
 
-		if int(inst.operand_count) > start_slot {
+		// MOVZ/MOVN/MOVK store the shift as an hw index (0..3 = LSL #0/16/32/48),
+		// which assemblers write as `lsl #16` and omit entirely when it is zero.
+		mov_wide := inst.mnemonic == .MOVZ || inst.mnemonic == .MOVN || inst.mnemonic == .MOVK
+		end_slot := int(inst.operand_count)
+		if mov_wide && end_slot == 3 && inst.ops[2].kind == .IMMEDIATE && inst.ops[2].immediate == 0 {
+			end_slot = 2
+		}
+
+		if end_slot > start_slot {
 			strings.write_byte(sb, ' ')
-			for slot in start_slot..<int(inst.operand_count) {
+			for slot in start_slot..<end_slot {
 				if slot > start_slot {
 					strings.write_byte(sb, ',')
 					if opts.space_after_comma { strings.write_byte(sb, ' ') }
 				}
-				write_operand(sb, &inst.ops[slot], &display, opts)
+				if mov_wide && slot == 2 {
+					strings.write_string(sb, opts.uppercase ? "LSL #" : "lsl #")
+					write_decimal_u32(sb, u32(inst.ops[slot].immediate) * 16)
+				} else {
+					write_operand(sb, &inst.ops[slot], &display, opts)
+				}
 			}
 		}
 		strings.write_string(sb, opts.separator)
@@ -335,6 +349,56 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 	}
 }
 
+// NEON arrangement (`.4s`), element view (`.d`) or SVE element width (`.s`)
+// suffix. Vector operands carry the shape in op.size using the codes
+// op_v_*/op_z_* produce and the decoder restores (see operands.odin);
+// arrangements are multiples of 8, element views are odd, and the neutral 4
+// that every scalar class uses prints nothing.
+//
+// NOTE: an element-indexed operand still prints as `v0.s` -- the lane index
+// rides in a separate immediate operand, so `v0.s[2]` needs the printer to
+// fold that operand into this one, which it does not yet do.
+@(private="file")
+write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercase: bool) {
+	shape := ""
+	switch reg_class(r) {
+	case REG_V:
+		switch size {
+		case 8:  shape = "8b"
+		case 16: shape = "16b"
+		case 24: shape = "4h"
+		case 32: shape = "8h"
+		case 40: shape = "2s"
+		case 48: shape = "4s"
+		case 56: shape = "1d"
+		case 64: shape = "2d"
+		case 1:  shape = "b"
+		case 3:  shape = "h"
+		case 5:  shape = "s"
+		case 7:  shape = "d"
+		}
+	case REG_Z:
+		switch size {
+		case 1: shape = "b"
+		case 2: shape = "h"
+		case 4: shape = "s"
+		case 8: shape = "d"
+		}
+	}
+	if shape == "" {
+		return
+	}
+	strings.write_byte(sb, '.')
+	for i in 0..<len(shape) {
+		c := shape[i]
+		if uppercase && c >= 'a' && c <= 'z' {
+			strings.write_byte(sb, c - 32)
+		} else {
+			strings.write_byte(sb, c)
+		}
+	}
+}
+
 @(private="file")
 write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 	if r == NONE { strings.write_string(sb, "<none>"); return }
@@ -402,6 +466,7 @@ write_operand :: proc(
 
 	case .REGISTER:
 		write_register(sb, op.reg, opts.uppercase)
+		write_vector_shape(sb, op.reg, op.size, opts.uppercase)
 
 	case .IMMEDIATE:
 		strings.write_byte(sb, '#')

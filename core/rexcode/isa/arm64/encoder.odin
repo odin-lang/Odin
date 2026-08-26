@@ -231,14 +231,16 @@ operand_matches_inline :: #force_inline proc "contextless" (
 	// Element-indexed V views: element size carried in op.size (B=1,H=2,S=4,
 	// D=8) so DUP/INS forms disambiguate. .S also accepts size 0 so a plain
 	// op_reg (as the hand-written SM3TT forms pass) still matches the .S slot.
+	// Element-view sizes are odd (1/3/5/7) so they can never be confused with
+	// an arrangement, which is always a multiple of 8 (see op_v_elem_*).
 	case .V_ELEM_B:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 1
 	case .V_ELEM_H:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 2
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 3
 	case .V_ELEM_S:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 4 || op.size == 0)
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 5 || op.size == 0)
 	case .V_ELEM_D:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 8
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && op.size == 7
 
 	// SVE Z registers. Element size carried in op.size: B=1, H=2, S=4, D=8.
 	// op.size==0 (legacy / default-constructed) accepts any width.
@@ -440,6 +442,19 @@ pack_operand_inline :: #force_inline proc(
 		// Atomic addressing: [Xn] only -- no displacement, no shift.
 		// Used by load/store exclusives, acquire/release, LSE atomics.
 		return (u32(reg_hw(op.mem.base)) & 0x1F) << 5
+	case .OFFSET_PAIR_4, .OFFSET_PAIR_8, .OFFSET_PAIR_16:
+		// LDP/STP: signed imm7, scaled by the transfer size, at bits 21:15.
+		// The pre/post marker is already in the form's bits, so nothing is
+		// ORed into bits 11:10 -- those belong to Rt2.
+		scale := i32(4)
+		if enc == .OFFSET_PAIR_8 {
+			scale = 8
+		} else if enc == .OFFSET_PAIR_16 {
+			scale = 16
+		}
+		base_bits := (u32(reg_hw(op.mem.base)) & 0x1F) << 5
+		imm_bits  := u32((i32(op.mem.disp) / scale) & 0x7F)
+		return base_bits | (imm_bits << 15)
 	case .OFFSET_REG:
 		// [Xn, Xm{, LSL #s}]: option=011, S = shift!=0.
 		base_bits := (u32(reg_hw(op.mem.base))  & 0x1F) << 5
@@ -777,6 +792,16 @@ pack_operand_inline :: #force_inline proc(
 		immr := ((~imm + 1) & 0x3F)
 		imms := (63 - imm) & 0x3F
 		return (immr << 16) | (imms << 10)
+	case .ENC_IMM6_LO:
+		// Signed 6-bit at bits 10:5 (RDSVL); range -32..31.
+		return (u32(op.immediate) & 0x3F) << 5
+	case .ENC_SHIFT_IMMR:
+		// LSR/ASR by immediate: immr = shift at bits 21:16. imms is the
+		// constant 31 / 63 already present in the form's bits, so unlike
+		// ENC_LSL_IMM_* there is nothing to compute for it. Mask to the
+		// register width so a W-form shift cannot spill into bit 21.
+		width := form.flags.is_64 ? u32(0x3F) : u32(0x1F)
+		return (u32(op.immediate) & width) << 16
 	case .ENC_DUAL_RN_RM:
 		// Pack the register at both Rn (9:5) AND Rm (20:16) slots
 		// (for ROR Rd, Rn, #imm = EXTR Rd, Rn, Rn, #imm).

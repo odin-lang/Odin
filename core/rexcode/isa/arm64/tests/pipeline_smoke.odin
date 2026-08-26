@@ -997,7 +997,7 @@ run_pipeline_tests :: proc() {
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("barriers/BTI: encode", success)
 		eq_word("SB",        load_le(code[:], 0), 0xD50330FF)
-		eq_word("BTI j",     load_le(code[:], 4), 0xD503245F)
+		eq_word("BTI j",     load_le(code[:], 4), 0xD503249F)
 		eq_word("PSB CSYNC", load_le(code[:], 8), 0xD503223F)
 	}
 

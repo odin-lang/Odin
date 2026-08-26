@@ -213,7 +213,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 
 	// ---- NEON copy/permute index fields ------------------------------------
 	case .VN_VM_DUP:
-		return Operand{reg = Register(REG_V | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_V | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	case .NEON_IDX5:
 		// imm5 = index << (markerbit+1) | (1 << markerbit); marker = lowest set bit.
 		imm5 := (word >> 16) & 0x1F
@@ -246,7 +246,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .PN_PM_DUP, .PN_PG_PM_DUP:
 		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
 	case .ZD_ZM_DUP:
-		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	case .SVE_EXT_IMM:
 		v := ((word >> 16) & 0x1F) << 3 | ((word >> 10) & 0x7)
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
@@ -338,6 +338,35 @@ extract_operand_inline :: #force_inline proc "contextless" (
 			},
 			kind = .MEMORY, size = 4,
 		}
+	case .OFFSET_PAIR_4, .OFFSET_PAIR_8, .OFFSET_PAIR_16:
+		// LDP/STP: signed imm7 at 21:15, scaled by the transfer size. The
+		// addressing mode is bits[24:23] of the word (01 post, 11 pre,
+		// 10 signed offset / 00 no-allocate), not part of the encoding.
+		base_hw := u8((word >> 5) & 0x1F)
+		imm7    := i32((word >> 15) & 0x7F)
+		if imm7 & (1 << 6) != 0 {
+			imm7 |= ~i32(0x7F)
+		}
+		scale := i32(4)
+		if en == .OFFSET_PAIR_8 {
+			scale = 8
+		} else if en == .OFFSET_PAIR_16 {
+			scale = 16
+		}
+		mode := Address_Mode.OFFSET
+		switch (word >> 23) & 0x3 {
+		case 0b01: mode = .POST_INDEXED
+		case 0b11: mode = .PRE_INDEXED
+		}
+		return Operand{
+			mem = Memory{
+				base = Register(REG_X | u16(base_hw)),
+				index = NONE,
+				disp = imm7 * scale,
+				mode = mode,
+			},
+			kind = .MEMORY, size = 4,
+		}
 	case .OFFSET_REG, .OFFSET_EXT:
 		base_hw := u8((word >> 5) & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
@@ -406,18 +435,17 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(value), kind = .IMMEDIATE, size = is_64 ? 8 : 4}
 
 	// ---- NEON / SIMD register slots ----
+	// The class comes from the operand TYPE, not from the encoding: SVE forms
+	// use these same Vd/Vn/Vm slots with Z_REG_* operands, so hardcoding
+	// REG_V here decoded `add z0.d, z0.d, z0.d` as a V register.
 	case .VD:
-		hw := u16(word & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 0, ot)
 	case .VN:
-		hw := u16((word >> 5) & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 5, ot)
 	case .VM:
-		hw := u16((word >> 16) & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 16, ot)
 	case .VA:
-		hw := u16((word >> 10) & 0x1F)
-		return Operand{reg = Register(REG_V | hw), kind = .REGISTER, size = 4}
+		return reg_from_field(word, 10, ot)
 
 	// ---- NEON / SVE indexed/immediate fields ----
 	case .NEON_IMM8_FMOV:
@@ -607,17 +635,24 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .ENC_LSL_IMM_X:
 		imms := (word >> 10) & 0x3F
 		return Operand{immediate = i64((63 - imms) & 0x3F), kind = .IMMEDIATE, size = 1}
+	case .ENC_IMM6_LO:
+		v := i32((word >> 5) & 0x3F)
+		if v & (1 << 5) != 0 { v |= ~i32(0x3F) }   // sign-extend from bit 5
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .ENC_SHIFT_IMMR:
+		// LSR/ASR immediate: the shift is immr verbatim (bits 21:16).
+		return Operand{immediate = i64((word >> 16) & 0x3F), kind = .IMMEDIATE, size = 1}
 	case .ENC_DUAL_RN_RM:
 		// Take the Rn slot (9:5) as the source register.
 		return Operand{reg = Register(REG_X | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
 	case .ENC_ROR_SHIFT:
 		return Operand{immediate = i64((word >> 10) & 0x3F), kind = .IMMEDIATE, size = 1}
 	case .ENC_Z_PAIR_VD, .ENC_Z_QUAD_VD:
-		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	case .ENC_Z_PAIR_VN, .ENC_Z_QUAD_VN:
-		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	case .ENC_Z_PAIR_VM, .ENC_Z_QUAD_VM:
-		return Operand{reg = Register(REG_Z | u16((word >> 16) & 0x1F)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_Z | u16((word >> 16) & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	}
 	return {}
 }
@@ -656,7 +691,37 @@ reg_from_field :: #force_inline proc "contextless" (
 	if (ot == .WSP_REG && hw == 31) || (ot == .XSP_REG && hw == 31) {
 		return Operand{reg = Register(cls | 31), kind = .REGISTER, size = 4}
 	}
-	return Operand{reg = Register(cls | hw), kind = .REGISTER, size = 4}
+	// Vector operands carry their arrangement / element view in `size`, using
+	// the same codes op_v_*/op_z_* produce (see operands.odin). Without this a
+	// decoded V register would come back as a bare `v0` with no `.4s`, so a
+	// disassembly could not be fed back to an assembler.
+	return Operand{reg = Register(cls | hw), kind = .REGISTER, size = reg_size_for_type(ot)}
+}
+
+// The `size` marker an operand of this type carries: the NEON arrangement
+// (multiples of 8), an element view (odd), or an SVE element width. 4 is the
+// neutral "no vector shape" value used by every scalar class.
+@(private="file", require_results)
+reg_size_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .V_8B:                 return 8
+	case .V_16B:                return 16
+	case .V_4H, .V_4H_FP16:     return 24
+	case .V_8H, .V_8H_FP16:     return 32
+	case .V_2S:                 return 40
+	case .V_4S:                 return 48
+	case .V_1D:                 return 56
+	case .V_2D:                 return 64
+	case .V_ELEM_B:             return 1
+	case .V_ELEM_H:             return 3
+	case .V_ELEM_S:             return 5
+	case .V_ELEM_D:             return 7
+	case .Z_REG_B:              return 1
+	case .Z_REG_H:              return 2
+	case .Z_REG_S:              return 4
+	case .Z_REG_D:              return 8
+	}
+	return 4
 }
 
 // -----------------------------------------------------------------------------

@@ -215,6 +215,13 @@ Operand_Encoding :: enum u8 {
 	IMM6,             // bits 10-15  (shift amount; SHAMT)
 	IMM9,             // bits 12-20  (signed 9-bit; LDUR/pre/post)
 	IMM_HW,           // bits 21-22  (MOVZ/MOVN/MOVK hw field; value is shift/16)
+	// LSR/ASR by immediate are UBFM/SBFM Rd, Rn, #shift, #(31|63): the shift
+	// goes to immr and imms is a constant already fixed in the form's bits,
+	// so unlike LSL (ENC_LSL_IMM_*) only one field is operand-driven.
+	ENC_SHIFT_IMMR,   // bits 16-21  (immr; LSR/ASR immediate aliases)
+	// RDSVL / the RDVL family put their signed 6-bit immediate at bits 10:5,
+	// not where IMM6 (bits 15:10) writes it.
+	ENC_IMM6_LO,      // bits  5-10  (signed 6-bit; RDSVL)
 	IMM_SH12,         // bit  22     (ADD/SUB imm: LSL #12 flag)
 	SHIFT_TYPE,       // bits 22-23  (LSL/LSR/ASR/ROR for shifted-register)
 	EXT_OPT,          // bits 13-15  (extend type for extended-register)
@@ -232,6 +239,19 @@ Operand_Encoding :: enum u8 {
 	OFFSET_BASE_PRE,  // [Xn, #imm]!   signed-9 pre-index
 	OFFSET_BASE_POST, // [Xn], #imm    signed-9 post-index
 	OFFSET_BASE_A,    // [Xn]          no displacement (exclusives, acquire/release, LSE)
+	// LDP/STP family. Nothing like the single-register modes above: the
+	// displacement is a signed 7-bit value SCALED by the transfer size at
+	// bits 21:15 (single-register forms use an unscaled 9-bit at 20:12), and
+	// bits 11:10 are part of Rt2 here, so the pre/post markers the
+	// single-register encodings OR in would corrupt the second register.
+	// The scale cannot be read off the register type -- LDPSW pairs X
+	// registers but loads words (scale 4), STGP pairs X registers and scales
+	// by 16 -- so it is spelled out per encoding. The addressing mode lives
+	// in the form's bits[24:23] (01 post, 10 signed offset, 11 pre), which
+	// is where the decoder reads it back from.
+	OFFSET_PAIR_4,    // [Xn{, #imm}] / [Xn, #imm]! / [Xn], #imm -- imm7 x 4
+	OFFSET_PAIR_8,    //                                            imm7 x 8
+	OFFSET_PAIR_16,   //                                            imm7 x 16
 	OFFSET_REG,       // [Xn, Rm{, LSL #s}] register offset
 	OFFSET_EXT,       // [Xn, Wm, SXTW|UXTW|SXTX #s]
 

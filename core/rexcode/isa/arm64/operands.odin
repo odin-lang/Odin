@@ -211,23 +211,28 @@ op_v_2d  :: #force_inline proc "contextless" (n: u8) -> Operand {
 }
 
 // Element-indexed V views (V0.B[i]/.H[i]/.S[i]/.D[i]). The element size rides
-// in op.size (1/2/4/8) so the matcher can disambiguate DUP/INS forms; the lane
-// index is a separate immediate operand.
+// in op.size so the matcher can disambiguate DUP/INS forms; the lane index is
+// a separate immediate operand.
+//
+// The codes are ODD (1/3/5/7) on purpose: arrangement operands above use
+// multiples of 8, so a size can never mean both. They used to be 1/2/4/8,
+// which made an element-D view indistinguishable from an 8B arrangement --
+// the printer cannot tell `.d` from `.8b` if both are size 8.
 @(require_results)
 op_v_elem_b :: #force_inline proc "contextless" (n: u8) -> Operand {
 	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 1}
 }
 @(require_results)
 op_v_elem_h :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 2}
+	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 3}
 }
 @(require_results)
 op_v_elem_s :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 4}
+	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 5}
 }
 @(require_results)
 op_v_elem_d :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 8}
+	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 7}
 }
 
 // -----------------------------------------------------------------------------
