@@ -219,7 +219,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		return swap[(int)(x == y) + (int)(y ~ z)]
 	}
 
-	insertion_sort :: #force_inline proc(arr: T, data: rawptr) #no_bounds_check {
+	insertion_sort :: proc(arr: T, data: rawptr) #no_bounds_check {
 		for i in 1..<len(arr) {
 			current := arr[i]
 			j := i
@@ -286,8 +286,8 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 	}
 
 	// only used for large types as it uses less data moves
-	// [  <=  |0|   ?   |  >  ]
-	//	  ->  left    right <-
+	// [  <  |0|   ?   |  >=  ]
+	//	 ->  left    right <-
 	partition_hoare :: proc(arr: T, data: rawptr, pivot_index: int) -> (left: int) #no_bounds_check {
 		right := len(arr) - 1
 
