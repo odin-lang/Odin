@@ -402,7 +402,8 @@ test_fmt_left_justified_padding :: proc(t: ^testing.T) {
 	check(t, "3.0e+02   ",     "%-10.1e", 300.0)
 	check(t, "3.000000e+00  ", "%-14e",   3.0)
 	check(t, "1tib    ",       "%-8.0m",  mem.Terabyte)
-	check(t, "     ",          "%-5.0d",  0)
+	check(t, "0    ",          "%-5.0d",  0)
+	check(t, "0    ",          "%-5d",    0)
 	check(t, "ab   ",          "%-5s",    "ab")
 	check(t, "true ",          "%-5t",    true)
 	check(t, "42   ",          "%- 5d",   42)
@@ -415,6 +416,12 @@ test_fmt_left_justified_padding :: proc(t: ^testing.T) {
 	check(t, "-00042", "%6d",   -42)
 	check(t, "01tib",  "%5.0m", mem.Terabyte)
 	check(t, "   ab",  "%5s",   "ab")
+	check(t, "    0",  "% 5.0d", 0)
+	check(t, "    0",  "% 5d",   0)
+	check(t, "00000",  "%5.0d",  0)
+	check(t, "00000",  "%5d",    0)
+	check(t, "   42",  "% 5.0d", 42)
+	check(t, "   42",  "{: 5d}", 42)
 }
 
 @(private)
