@@ -213,16 +213,22 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	case ProcedureOptimizationMode_FavorSize:
 		lb_add_attribute_to_proc(m, p->value, "optsize");
 		break;
+	default:
+		// need optsize per proc for -o:size;
+		// (inliner, unroller, vectorizer, etc check it) 
+		if (build_context.optimization_level == OptimizationLevel_Size) {
+			lb_add_attribute_to_proc(m, p->value, "optsize");
+		}
+		break;
 	}
 
 	if (pt->Proc.enable_target_feature.len != 0) {
 		gbString feature_str = gb_string_make(temporary_allocator(), "");
 
 		String_Iterator it = {pt->Proc.enable_target_feature, 0};
+		String str = {};
 		bool first = true;
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		while (string_split_iterator_next(&it, ',', &str)) {
 			bool add_prefix = !(string_starts_with(str, '+') || string_starts_with(str, '-'));
 			if (!first) {
 				feature_str = gb_string_appendc(feature_str, ",");

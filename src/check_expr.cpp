@@ -2097,6 +2097,12 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		break;
 
 	case Entity_AsmTemplate:
+		if (c->asm_template_hint != n) {
+			error(n, "'asm' templates must either be defined as a declaration or within a procedure call directly");
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			return e;
+		}
 		o->mode = Addressing_Value;
 		break;
 
@@ -6373,6 +6379,12 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		break;
 
 	case Entity_AsmTemplate:
+		if (c->asm_template_hint != node) {
+			error(node, "'asm' templates must either be defined as a declaration or within a procedure call directly");
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
+			return entity;
+		}
 		operand->mode = Addressing_Value;
 		break;
 	}
@@ -6991,6 +7003,18 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			if (o->mode != Addressing_Constant) {
 				if (show_error) {
 					error(o->expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
+				}
+				err = CallArgumentError_NoneConstantParameter;
+			}
+		}
+
+		// an `asm` template's `$` parameter is encoded as an immediate, so only a constant can reach it
+		if (e && e->kind == Entity_Variable && (e->flags & EntityFlag_PolyConst)) {
+			if (o->mode != Addressing_Constant) {
+				if (show_error) {
+					gbString str = expr_to_string(o->expr);
+					error(o->expr, "Expected a constant value for the '$' immediate '%.*s', got %s", LIT(e->token.string), str);
+					gb_string_free(str);
 				}
 				err = CallArgumentError_NoneConstantParameter;
 			}
@@ -8931,7 +8955,11 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				operand->expr  = proc;
 				add_type_and_value(c, proc, operand->mode, operand->type, operand->value);
 			} else {
+				// the callee is the one position where an asm template is allowed to produce a value
+				Ast *prev_hint = c->asm_template_hint;
+				c->asm_template_hint = unnested_proc;
 				check_expr_or_type(c, operand, proc);
+				c->asm_template_hint = prev_hint;
 			}
 		} else {
 			GB_ASSERT(operand->expr != nullptr);
@@ -13877,6 +13905,10 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		if (spec->value) {
 			str = gb_string_appendc(str, " = ");
 			str = write_expr_to_string(str, spec->value, shorthand);
+		}
+		for (Ast *dir : spec->directives) {
+			str = gb_string_appendc(str, " ");
+			str = write_expr_to_string(str, dir, shorthand);
 		}
 	case_end;
 
