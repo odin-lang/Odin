@@ -1120,6 +1120,13 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			gb_string_free(s);
 		}
 
+		if (o.mode == Addressing_Constant) {
+			convert_to_typed(ctx, &o, t_int);
+			if (o.mode == Addressing_Invalid) {
+				o.value = exact_value_i64(1);
+			}
+		}
+
 		ExactValue bit_size = o.value;
 
 		if (bit_size.kind != ExactValue_Integer) {

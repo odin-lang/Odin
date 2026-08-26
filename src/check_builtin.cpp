@@ -5230,6 +5230,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = t_invalid;
 			return false;
 		}
+		convert_to_typed(c, &x, t_int);
+		if (x.mode == Addressing_Invalid) {
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
 		i64 count = big_int_to_i64(&x.value.value_integer);
 
 		check_expr_or_type(c, &y, ce->args[1]);
@@ -7710,6 +7716,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 			
+			convert_to_typed(c, &x, t_int);
+			if (x.mode == Addressing_Invalid) {
+				operand->mode = Addressing_Type;
+				operand->type = t_invalid;
+				return false;
+			}
 			i64 index = big_int_to_i64(&x.value.value_integer);
 			if (index < 0 || index >= u->Union.variants.count) {
 				error(call, "Variant tag out of bounds index for '%.*s", LIT(builtin_name));

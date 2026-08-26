@@ -389,6 +389,34 @@ leaking_struct_tag :: proc(t: ^testing.T) {
 	check(t, "My_Struct{names = [\"hello?\"], name_count = 1}", "%v", foo)
 }
 
+@(test)
+test_fmt_left_justified_padding :: proc(t: ^testing.T) {
+	// a left-justified field pads to the right of the digits, so the fill has to be a space;
+	// a '0' there is read back as part of the number
+	check(t, "42   ",          "%-5d",    42)
+	check(t, "42   ",          "%-5v",    42)
+	check(t, "-42   ",         "%-6d",    -42)
+	check(t, "ff      ",       "%-8x",    255)
+	check(t, "101       ",     "%-10b",   5)
+	check(t, "3.140   ",       "%-8f",    3.14)
+	check(t, "3.0e+02   ",     "%-10.1e", 300.0)
+	check(t, "3.000000e+00  ", "%-14e",   3.0)
+	check(t, "1tib    ",       "%-8.0m",  mem.Terabyte)
+	check(t, "     ",          "%-5.0d",  0)
+	check(t, "ab   ",          "%-5s",    "ab")
+	check(t, "true ",          "%-5t",    true)
+	check(t, "42   ",          "%- 5d",   42)
+	check(t, "42   ",          "{:-5d}",  42)
+
+	// right-justified fields still zero fill, which is Odin's own convention
+	check(t, "00042",  "%5d",   42)
+	check(t, "00042",  "%05d",  42)
+	check(t, "03.140", "%6f",   3.14)
+	check(t, "-00042", "%6d",   -42)
+	check(t, "01tib",  "%5.0m", mem.Terabyte)
+	check(t, "   ab",  "%5s",   "ab")
+}
+
 @(private)
 check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)

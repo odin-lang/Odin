@@ -2156,6 +2156,7 @@ gb_internal bool is_type_endian_specific(Type *t) {
 		case Basic_u32le:
 		case Basic_i64le:
 		case Basic_u64le:
+		case Basic_i128le:
 		case Basic_u128le:
 			return true;
 
@@ -2165,6 +2166,7 @@ gb_internal bool is_type_endian_specific(Type *t) {
 		case Basic_u32be:
 		case Basic_i64be:
 		case Basic_u64be:
+		case Basic_i128be:
 		case Basic_u128be:
 			return true;
 
@@ -3719,14 +3721,6 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 
 	if (matched_target_features(&px) != matched_target_features(&py)) {
 		return ProcOverload_TargetFeatures;
-	}
-
-	if (px.params != nullptr && py.params != nullptr) {
-		Entity *ex = px.params->Tuple.variables[0];
-		Entity *ey = py.params->Tuple.variables[0];
-		bool ok = are_types_identical(ex->type, ey->type);
-		if (ok) {
-		}
 	}
 
 	return ProcOverload_Identical;
