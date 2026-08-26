@@ -46,7 +46,6 @@ Grapheme_Iterator :: struct {
 	last_rune:                  rune,
 	last_rune_breaks_forward:   bool,
 
-	last_width:                 int,
 	last_grapheme_count:        int,
 
 	bypass_next_rune:           bool,
@@ -58,6 +57,9 @@ Grapheme_Iterator :: struct {
 
 	current_grapheme:           Grapheme,
 	continue_grapheme:          bool,
+
+	current_cluster_width:      int,
+	current_cluster_ri_count:   int,
 }
 
 
@@ -141,28 +143,45 @@ decode_grapheme_iterate :: proc(it: ^Grapheme_Iterator) -> (text: string, graphe
 		it.curr_offset += this_rune_width
 
 		defer {
-			// "Break at the start and end of text, unless the text is empty."
-			//
-			// GB1: sot  ÷  Any
-			// GB2: Any  ÷  eot
+
 			if it.rune_count == 0 && it.grapheme_count == 0 {
 				it.grapheme_count += 1
 			}
 
+			this_rune_width = normalized_east_asian_width(this_rune)
+
 			if it.grapheme_count > it.last_grapheme_count {
-				it.width += normalized_east_asian_width(this_rune)
+				// new cluster is starting: close out the previous one first.
 				if it.continue_grapheme {
+					//  completd regional indicator pair rendered as one
+					// 2-cell flag in terminals, even though each RI letter
+					// is individually EAW Neutral
+					if it.current_cluster_ri_count == 2 {
+						it.current_cluster_width = max(it.current_cluster_width, 2)
+					}
+					it.width += it.current_cluster_width
 					grapheme = it.current_grapheme
 					grapheme.text = it.str[it.current_grapheme.byte_index:byte_index]
+					grapheme.width = it.current_cluster_width
 					text = grapheme.text
 					ok = true
 				}
-				it.current_grapheme = Grapheme{byte_index = byte_index, rune_index = it.rune_count, width = it.width - it.last_width}
+
+				it.current_grapheme = Grapheme {
+					byte_index = byte_index,
+					rune_index = it.rune_count,
+				}
 				it.continue_grapheme = true
-
-
 				it.last_grapheme_count = it.grapheme_count
-				it.last_width = it.width
+
+				it.current_cluster_width = this_rune_width
+				it.current_cluster_ri_count = is_regional_indicator(this_rune) ? 1 : 0
+			} else {
+				// Continuation rune: fold its width in instead of dropping it.
+				it.current_cluster_width = max(it.current_cluster_width, this_rune_width)
+				if is_regional_indicator(this_rune) {
+					it.current_cluster_ri_count += 1
+				}
 			}
 
 			it.last_rune = this_rune
@@ -393,8 +412,13 @@ decode_grapheme_iterate :: proc(it: ^Grapheme_Iterator) -> (text: string, graphe
 	// Flush the remaining grapheme - the loop only flushes when
 	// a new grapheme is encountered.
 	if !ok && it.continue_grapheme {
+		if it.current_cluster_ri_count == 2 {
+			it.current_cluster_width = max(it.current_cluster_width, 2)
+		}
+		it.width += it.current_cluster_width
 		grapheme = it.current_grapheme
 		grapheme.text = it.str[it.current_grapheme.byte_index:]
+		grapheme.width = it.current_cluster_width
 		text = grapheme.text
 		ok = true
 		it.continue_grapheme = false
