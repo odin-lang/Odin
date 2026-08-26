@@ -28,6 +28,7 @@ import lib "../"
 // Package-scope aliases so the moved SoT resolves Mnemonic/Encoding unqualified.
 Encoding :: lib.Encoding
 Mnemonic :: lib.Mnemonic
+Clobber  :: lib.Clobber
 
 Blob :: struct { global, file, typ: string }
 BLOBS := [?]Blob{
