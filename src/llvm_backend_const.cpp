@@ -791,6 +791,20 @@ gb_internal lbValue lb_const_value_bit_field(lbModule *m, Type *type, Ast *value
 }
 
 
+// A value assigned to an array is broadcast to every element, and the checker peels every array
+// level before matching it, so the literal may be for a type below the immediate element type.
+gb_internal bool lb_const_value_is_broadcast(Type *elem_type, Type *lit_type) {
+	if (are_types_identical(lit_type, elem_type)) {
+		return true;
+	}
+	// `[4][8]Item = Item{...}`, one level is consumed per recursion
+	if (are_types_identical(lit_type, core_broadcastable_elem_type(elem_type))) {
+		return true;
+	}
+	// `[8]U = U(Item{...})`, a union element takes the value as one of its variants
+	return type_conversion_is_variant(elem_type, lit_type);
+}
+
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc) {
 	if (cc.allow_local) {
 		cc.is_rodata = false;
@@ -1504,7 +1518,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			if (elem_count == 0 || !elem_type_can_be_constant(elem_type)) {
 				return lb_const_nil(m, original_type);
 			}
-			if (are_types_identical(value.value_compound->tav.type, elem_type)) {
+			if (lb_const_value_is_broadcast(elem_type, value.value_compound->tav.type)) {
 				// Compound is of array item type; expand its value to all items in array.
 				LLVMValueRef* values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)type->Array.count);
 

@@ -97,6 +97,8 @@ $ODIN build ../test_issue_7167.odin $COMMON
 $ODIN build ../test_issue_7188.odin $COMMON
 $ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_bool_to_be_conversion.odin $COMMON
+$ODIN test ../test_issue_bool_comparison_truthiness.odin $COMMON
+$ODIN test ../test_issue_const_array_broadcast.odin $COMMON
 
 $ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
 if [[ $($ODIN check ../test_issue_foreign_redeclaration_mismatch.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
