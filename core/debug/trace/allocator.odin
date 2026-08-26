@@ -291,8 +291,8 @@ tracking_allocator_print_results :: proc(t: ^Tracking_Allocator, temp_allocator 
 	for _, leak in t.allocation_map {
 		runtime.print_caller_location(leak.location)
 		runtime.print_string(" leaked ")
-		runtime.print_int(leak.size)
-		runtime.print_string(" bytes\n")
+		_print_memory(leak.size)
+		runtime.print_byte('\n')
 
 		defer i += 1
 		if i > ALLOCATOR_MAX_BACKTRACES {
@@ -338,4 +338,38 @@ tracking_allocator_print_results :: proc(t: ^Tracking_Allocator, temp_allocator 
 
 		print(trace)
 	}
+}
+
+@(rodata)
+_MEMORY_UNITS := [?]string{"b", "kib", "mib", "gib", "tib", "pib", "eib"}
+
+_print_memory :: proc(size: int) {
+	assert(size >= 0)
+
+	u := u64(size)
+	unit_idx := 0
+	div: u64 = 1
+	for u / div >= mem.Kilobyte && unit_idx < len(_MEMORY_UNITS) - 1 {
+		div *= mem.Kilobyte
+		unit_idx += 1
+	}
+
+	whole := u / div
+	rem   := u % div
+	frac  := (rem * 10 + div / 2) / div
+	if frac == 10 {
+		frac = 0
+		whole += 1
+		if whole == mem.Kilobyte && unit_idx < len(_MEMORY_UNITS) - 1 {
+			whole = 1
+			unit_idx += 1
+		}
+	}
+
+	runtime.print_u64(whole)
+	if frac != 0 {
+		runtime.print_byte('.')
+		runtime.print_byte(byte('0' + frac))
+	}
+	runtime.print_string(_MEMORY_UNITS[unit_idx])
 }
