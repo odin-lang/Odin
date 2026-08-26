@@ -168,6 +168,7 @@ main :: proc() {
 			SideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state
 			SideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns
 			SideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops
+			SideEffectFlag_NONDETERMINISTIC = 1<<10,
 		};
 		enum ClobberRegs : u16 {
 			ClobberReg_RAX    = 1<<0,
@@ -236,6 +237,27 @@ main :: proc() {
 			return \"<reg>\";
 		}
 
+		u16 flag_from_name(String const &name) {
+			static const struct {String name; ClobberFlags flag; } table[] = {
+				{str_lit(\"c\"),  ClobberFlag_CF}, // Carry
+				{str_lit(\"p\"),  ClobberFlag_PF}, // Parity
+				{str_lit(\"a\"),  ClobberFlag_AF}, // Auxiliary Carry
+				{str_lit(\"z\"),  ClobberFlag_ZF}, // Zero
+				{str_lit(\"s\"),  ClobberFlag_SF}, // Sign
+				{str_lit(\"t\"),  ClobberFlag_TF}, // Trap
+				{str_lit(\"i\"),  ClobberFlag_IF}, // Interrupt Enable
+				{str_lit(\"d\"),  ClobberFlag_DF}, // Direction
+				{str_lit(\"o\"),  ClobberFlag_OF}, // Overflow
+			};
+
+			for (auto const &t : table) {
+				if (name == t.name) {
+					return cast(u16)t.flag;
+				}
+			}
+			return 0;
+		}
+
 		i32 flag_bit_from_name(String const &name, i32 *width_) {
 			static const struct {String name; i32 bit; } table[] = {
 				{str_lit(\"c\"),    0}, // Carry
@@ -284,6 +306,10 @@ main :: proc() {
 			bool            reads_mem;
 			SideEffectFlags side_effects;
 
+			ClobberFlags flags_rd_call() const {
+				return flags_rd;
+			}
+
 			bool implies_clobber_flags() const {
 				u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
 				                       ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
@@ -305,7 +331,8 @@ main :: proc() {
 					SideEffectFlag_HALT        |
 					SideEffectFlag_PRIVILEGED  |
 					SideEffectFlag_CONTROL     |
-					SideEffectFlag_CET;
+					SideEffectFlag_CET         |
+					SideEffectFlag_NONDETERMINISTIC;
 					// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
 				return ((side_effects & VOLATILE_SE) != 0);
 			}
@@ -322,6 +349,16 @@ main :: proc() {
 			}
 			bool is_conditional() const {
 				return has_control() && (cast(u16)flags_rd != 0);
+			}
+			bool is_nondeterministic() const {
+				return (cast(u16)side_effects & SideEffectFlag_NONDETERMINISTIC) != 0;
+			}
+			bool has_implicit_mem() const {
+				if (!writes_mem && !reads_mem) {
+					return false;
+				}
+				u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
+				return (implicit & (ClobberReg_RSP|ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBX)) != 0;
 			}
 		};
 
@@ -350,12 +387,17 @@ main :: proc() {
 			AliasSrc_LIT,
 		};
 
+		// NOTE(bill): These are completely dummy things as it is only needed by RISC-V and not x86
 		struct PseudoAlias {
-			Mnemonic target;    // real instruction emitted
-			AliasSrc src[4];    // how to fill target's four operand slots
-			i16      lit;       // immediate when a src slot is AliasSrc_LIT
-			u16      csr;       // CSR address when a src slot is AliasSrc_CSR_LIT
-			u8       nargs;     // operands the user supplies (ARG0..<ARGn)
+			Mnemonic target; // real instruction emitted
+			AliasSrc src[4]; // how to fill target's four operand slots
+			i16      lit;    // immediate when a src slot is AliasSrc_LIT
+			u16      csr;    // CSR address when a src slot is AliasSrc_CSR_LIT
+			u8       nargs;  // operands the user supplies (ARG0..<ARGn)
+
+			bool is_nondeterministic() const {
+				return false;
+			}
 		};
 		enum PseudoMnemonic : u16 {
 			PM_INVALID,
@@ -787,6 +829,62 @@ main :: proc() {
 				return true;
 			}
 			return true;
+		}
+	""")
+
+	strings.write_string(&sb, "\n")
+
+	strings.write_string(&sb, """
+		AsmOperandConstraint operand_value_constraint(u16 m, int op) const {
+			switch (m) {
+			case M_SHL: case M_SHR: case M_SAR: case M_SAL:
+			case M_ROL: case M_ROR: case M_RCL: case M_RCR:
+				if (op == 1) return {AsmOperandConstraint_ShiftCount, /*width_operand*/0};
+				break;
+			case M_DIV: case M_IDIV:
+				if (op == 0) return {AsmOperandConstraint_NonZeroDivisor, -1};
+				break;
+			}
+			return {AsmOperandConstraint_None, -1};
+		}
+	""")
+
+	strings.write_string(&sb, """
+		bool is_self_zeroing_idiom(u16 m) const {
+			switch (m) {
+			// integer xor / sub: x ^ x == 0, x - x == 0
+			case M_XOR:
+			case M_SUB:
+
+			// SSE/AVX bitwise xor of a register with itself
+			case M_PXOR:
+			case M_XORPS:
+			case M_XORPD:
+			case M_VPXOR:
+			case M_VXORPS:
+			case M_VXORPD:
+
+			// packed integer subtract: psub x, x == 0
+			case M_PSUBB:
+			case M_PSUBW:
+			case M_PSUBD:
+			case M_PSUBQ:
+			case M_VPSUBB:
+			case M_VPSUBW:
+			case M_VPSUBD:
+			case M_VPSUBQ:
+
+			// andnot of a value with itself: (~x) & x == 0
+			case M_ANDN: // BMI1 GPR: andn dst, a, a
+			case M_ANDNPS:
+			case M_ANDNPD:
+			case M_PANDN:
+			case M_VANDNPS:
+			case M_VANDNPD:
+			case M_VPANDN:
+				return true;
+			}
+			return false;
 		}
 	""")
 

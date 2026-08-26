@@ -3640,9 +3640,8 @@ gb_internal int matched_target_features(TypeProc *t) {
 
 	int matches = 0;
 	String_Iterator it = {t->require_target_feature, 0};
-	for (;;) {
-		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
 		if (check_target_feature_is_valid_for_target_arch(str, nullptr)) {
 			matches += 1;
 		}
