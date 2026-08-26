@@ -40,7 +40,7 @@ LABEL_UNDEFINED  :: isa.LABEL_UNDEFINED
 Label_Map        :: isa.Label_Map
 
 // Extension this entry belongs to (metadata, not used by the matcher).
-Feature :: enum u8 {
+Feature :: enum u16 {
 	I,           // RV32I / RV64I base integer
 	M,           // multiply / divide
 	A,           // atomics
@@ -49,14 +49,22 @@ Feature :: enum u8 {
 	ZICSR,       // CSR access (CSRRW/S/C + immediate forms)
 	ZIFENCEI,    // FENCE.I (instruction-fetch fence)
 	C,           // 16-bit compressed instructions
+	ZBA,         // address-generation bit-manip
+	ZBB,         // basic bit-manip
+	ZBC,         // carry-less multiply
+	ZBS,         // single-bit bit-manip
+	ZICOND,      // conditional zeroing
+	ZFH,         // half-precision (binary16) FP
+	PRIV,        // privileged trap-return / TLB maintenance
 }
 
 Encoding_Flags :: bit_field u8 {
-	rv32_only: bool | 1,   // RV32 base only
-	rv64_only: bool | 1,   // RV64 base only (e.g. LD/SD/ADDIW/...)
-	branch:    bool | 1,   // changes PC
-	fp_round:  bool | 1,   // funct3 doubles as FP rounding-mode field
-	_:         u8   | 4,
+	rv32_only:      bool | 1, // RV32 base only
+	rv64_only:      bool | 1, // RV64 base only (e.g. LD/SD/ADDIW/...)
+	branch:         bool | 1, // changes PC
+	fp_round:       bool | 1, // funct3 doubles as FP rounding-mode field
+	explicit_count: u8   | 3,
+	has_implicit:   bool | 1,
 }
 
 // What the user passes in.
@@ -149,10 +157,10 @@ Encoding :: struct #packed {
 	enc:      [4]Operand_Encoding, // 4
 	bits:     u32,                 // 4 -- static bit pattern
 	mask:     u32,                 // 4 -- which bits are static
-	feature: Feature,                 // 1
+	feature:  Feature,             // 2
 	flags:    Encoding_Flags,      // 1
 }
-#assert(size_of(Encoding) == 20)
+#assert(size_of(Encoding) == 21)
 
 // inst_size_from_bits returns 2 for compressed (RVC) instructions, 4 for the
 // standard 32-bit base ISA. RISC-V uses a length-encoding convention where

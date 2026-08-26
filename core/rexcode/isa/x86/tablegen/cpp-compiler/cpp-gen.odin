@@ -168,6 +168,7 @@ main :: proc() {
 			SideEffectFlag_PRIVILEGED  = 1<<7, // requires CPL0 / reads-writes supervisor machine state
 			SideEffectFlag_CONTROL     = 1<<8, // alters control flow (writes RIP): branches, calls, returns
 			SideEffectFlag_CET         = 1<<9, // control-flow-enforcement: landing pads, shadow-stack ops
+			SideEffectFlag_NONDETERMINISTIC = 1<<10,
 		};
 		enum ClobberRegs : u16 {
 			ClobberReg_RAX    = 1<<0,
@@ -236,6 +237,27 @@ main :: proc() {
 			return \"<reg>\";
 		}
 
+		u16 flag_from_name(String const &name) {
+			static const struct {String name; ClobberFlags flag; } table[] = {
+				{str_lit(\"c\"),  ClobberFlag_CF}, // Carry
+				{str_lit(\"p\"),  ClobberFlag_PF}, // Parity
+				{str_lit(\"a\"),  ClobberFlag_AF}, // Auxiliary Carry
+				{str_lit(\"z\"),  ClobberFlag_ZF}, // Zero
+				{str_lit(\"s\"),  ClobberFlag_SF}, // Sign
+				{str_lit(\"t\"),  ClobberFlag_TF}, // Trap
+				{str_lit(\"i\"),  ClobberFlag_IF}, // Interrupt Enable
+				{str_lit(\"d\"),  ClobberFlag_DF}, // Direction
+				{str_lit(\"o\"),  ClobberFlag_OF}, // Overflow
+			};
+
+			for (auto const &t : table) {
+				if (name == t.name) {
+					return cast(u16)t.flag;
+				}
+			}
+			return 0;
+		}
+
 		i32 flag_bit_from_name(String const &name, i32 *width_) {
 			static const struct {String name; i32 bit; } table[] = {
 				{str_lit(\"c\"),    0}, // Carry
@@ -284,6 +306,10 @@ main :: proc() {
 			bool            reads_mem;
 			SideEffectFlags side_effects;
 
+			ClobberFlags flags_rd_call() const {
+				return flags_rd;
+			}
+
 			bool implies_clobber_flags() const {
 				u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
 				                       ClobberFlag_ZF|ClobberFlag_SF|ClobberFlag_OF;
@@ -305,9 +331,34 @@ main :: proc() {
 					SideEffectFlag_HALT        |
 					SideEffectFlag_PRIVILEGED  |
 					SideEffectFlag_CONTROL     |
-					SideEffectFlag_CET;
+					SideEffectFlag_CET         |
+					SideEffectFlag_NONDETERMINISTIC;
 					// NOTE: SideEffectFlag_HINT deliberately excluded — inert, may be DCE'd.
 				return ((side_effects & VOLATILE_SE) != 0);
+			}
+
+			u8 is_call_or_mem() const {
+				return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0 ||
+					(cast(u16)implicit_wr & ClobberReg_RSP) != 0;
+			}
+			bool has_control() const {
+				return (cast(u16)side_effects & SideEffectFlag_CONTROL) != 0;
+			}
+			bool has_halt() const {
+				return (cast(u16)side_effects & SideEffectFlag_HALT) != 0;
+			}
+			bool is_conditional() const {
+				return has_control() && (cast(u16)flags_rd != 0);
+			}
+			bool is_nondeterministic() const {
+				return (cast(u16)side_effects & SideEffectFlag_NONDETERMINISTIC) != 0;
+			}
+			bool has_implicit_mem() const {
+				if (!writes_mem && !reads_mem) {
+					return false;
+				}
+				u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
+				return (implicit & (ClobberReg_RSP|ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBX)) != 0;
 			}
 		};
 
@@ -324,6 +375,46 @@ main :: proc() {
 		}
 	""")
 	strings.write_string(&sb, "\n");
+	strings.write_string(&sb, "\n");
+	strings.write_string(&sb, """
+		enum AliasSrc : u8 {
+			AliasSrc_NONE,    // slot unused
+			AliasSrc_ARG0,    // user's 1st operand
+			AliasSrc_ARG1,    // user's 2nd operand
+			AliasSrc_ARG2,    // user's 3rd operand
+			AliasSrc_ZERO,    // hardwired zero
+			AliasSrc_LINK,    // link register
+			AliasSrc_LIT,
+		};
+
+		// NOTE(bill): These are completely dummy things as it is only needed by RISC-V and not x86
+		struct PseudoAlias {
+			Mnemonic target; // real instruction emitted
+			AliasSrc src[4]; // how to fill target's four operand slots
+			i16      lit;    // immediate when a src slot is AliasSrc_LIT
+			u16      csr;    // CSR address when a src slot is AliasSrc_CSR_LIT
+			u8       nargs;  // operands the user supplies (ARG0..<ARGn)
+
+			bool is_nondeterministic() const {
+				return false;
+			}
+		};
+		enum PseudoMnemonic : u16 {
+			PM_INVALID,
+			PSEUDO_MNEMONIC_COUNT
+		};
+
+		PseudoMnemonic pseudo_mnemonic_lookup(String const &name) {
+			return PM_INVALID;
+		}
+
+		PseudoAlias pseudo_alias(u16 pm) {
+			return {};
+		}
+	""")
+
+	strings.write_string(&sb, "\tstatic String const pseudo_mnemonic_strings[PSEUDO_MNEMONIC_COUNT];\n")
+	strings.write_string(&sb, "\n")
 
 
 	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")
@@ -382,13 +473,6 @@ main :: proc() {
 			strings.write_string(&sb, " }\n")
 		}
 		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "op_count")
-			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "op_count")
-			strings.write_string(&sb, "\t\tu8   op_count      () const { ")
-			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
-			strings.write_string(&sb, " }\n")
-		}
-		{
 			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
 			strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
 			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
@@ -421,7 +505,8 @@ main :: proc() {
 
 	strings.write_string(&sb, """
 
-		bool init() {
+		bool init(i64 word_size) {
+			gb_unused(word_size);
 			string_map_init(&mnemonic_map, MNEMONIC_COUNT*2);
 			for (u16 m = M_INVALID+1; m < MNEMONIC_COUNT; m++) {
 				string_map_set(&mnemonic_map, mnemonic_strings[m], cast(Mnemonic)m);
@@ -435,6 +520,29 @@ main :: proc() {
 				string_map_set(&register_map, register_strings[r], cast(Register)r);
 			}
 			return true;
+		}
+
+
+		enum MnemonicSuffix : u8 {
+			MnemonicSuffix_None = 0,
+		};
+
+		bool mnemonic_accepts_suffix(u16 m) const {
+			return false;
+		}
+
+		Mnemonic mnemonic_lookup_ordered(String const &name, u8 *suffixes_) {
+			// NOTE(bill): Do any instructions need a suffix idea?
+			return M_INVALID;
+		}
+
+		enum PseudoMacroMnemonic : u8 {
+			PseudoMacroMnemonic_INVALID,
+			PseudoMacroMnemonic_COUNT
+		};
+
+		PseudoMacroMnemonic pseudo_macro_mnemonic_lookup(String const &name) {
+			return PseudoMacroMnemonic_INVALID;
 		}
 
 		Mnemonic mnemonic_lookup(String const &name) {
@@ -482,6 +590,16 @@ main :: proc() {
 			case REG_CLASS_BND:   return 128;
 			}
 			return 0;
+		}
+
+		bool integer_reg_width_is_exact() const {
+			return true;
+		}
+		bool float_reg_width_is_exact() const {
+			return true;
+		}
+		bool supports_memory_index_not_just_disp() const {
+			return true;
 		}
 	""")
 	strings.write_string(&sb, "\n\n")
@@ -609,6 +727,36 @@ main :: proc() {
 	strings.write_string(&sb, "\n\n")
 
 	strings.write_string(&sb, """
+		// Slots only a specific named hardware register can fill. They carry no GPR/vector
+		// class and, apart from OP_MM, no width either. Nothing else in the size/class
+		// check constrains them and a template parameter would otherwise slip through.
+		u16 operand_type_named_reg_class(OperandType t) const {
+			switch (t) {
+			case OP_SREG: return REG_CLASS_SEG;
+			case OP_CR:   return REG_CLASS_CR;
+			case OP_DR:   return REG_CLASS_DR;
+			case OP_STI:  return REG_CLASS_ST;
+			case OP_MM:   return REG_CLASS_MM;
+			}
+			return REG_CLASS_NONE;
+		}
+
+		String named_reg_class_string(u16 reg_class) const {
+			switch (reg_class) {
+			case REG_CLASS_SEG: return str_lit("segment");
+			case REG_CLASS_CR:  return str_lit("control");
+			case REG_CLASS_DR:  return str_lit("debug");
+			case REG_CLASS_ST:  return str_lit("x87 stack");
+			case REG_CLASS_MM:  return str_lit("MMX");
+			}
+			return str_lit("hardware");
+		}
+	""")
+
+
+	strings.write_string(&sb, "\n\n")
+
+	strings.write_string(&sb, """
 		u16 operand_type_bit_width(OperandType t) const {
 			switch (t) {
 			case OP_R8:  case OP_RM8:  case OP_M8:  case OP_AL_IMPL:  case OP_CL_IMPL: case OP_K_M8:  return 8;
@@ -684,6 +832,62 @@ main :: proc() {
 		}
 	""")
 
+	strings.write_string(&sb, "\n")
+
+	strings.write_string(&sb, """
+		AsmOperandConstraint operand_value_constraint(u16 m, int op) const {
+			switch (m) {
+			case M_SHL: case M_SHR: case M_SAR: case M_SAL:
+			case M_ROL: case M_ROR: case M_RCL: case M_RCR:
+				if (op == 1) return {AsmOperandConstraint_ShiftCount, /*width_operand*/0};
+				break;
+			case M_DIV: case M_IDIV:
+				if (op == 0) return {AsmOperandConstraint_NonZeroDivisor, -1};
+				break;
+			}
+			return {AsmOperandConstraint_None, -1};
+		}
+	""")
+
+	strings.write_string(&sb, """
+		bool is_self_zeroing_idiom(u16 m) const {
+			switch (m) {
+			// integer xor / sub: x ^ x == 0, x - x == 0
+			case M_XOR:
+			case M_SUB:
+
+			// SSE/AVX bitwise xor of a register with itself
+			case M_PXOR:
+			case M_XORPS:
+			case M_XORPD:
+			case M_VPXOR:
+			case M_VXORPS:
+			case M_VXORPD:
+
+			// packed integer subtract: psub x, x == 0
+			case M_PSUBB:
+			case M_PSUBW:
+			case M_PSUBD:
+			case M_PSUBQ:
+			case M_VPSUBB:
+			case M_VPSUBW:
+			case M_VPSUBD:
+			case M_VPSUBQ:
+
+			// andnot of a value with itself: (~x) & x == 0
+			case M_ANDN: // BMI1 GPR: andn dst, a, a
+			case M_ANDNPS:
+			case M_ANDNPD:
+			case M_PANDN:
+			case M_VANDNPS:
+			case M_VANDNPD:
+			case M_VPANDN:
+				return true;
+			}
+			return false;
+		}
+	""")
+
 	strings.write_string(&sb, "\n};\n")
 
 	strings.write_string(&sb, "\n\n\n")
@@ -747,6 +951,8 @@ main :: proc() {
 		}
 		strings.write_string(&sb, "\n");
 	}
+
+	fmt.sbprintf(&sb, "String const Asm_{0:s}::pseudo_mnemonic_strings[Asm_{0:s}::PSEUDO_MNEMONIC_COUNT] {{}};\n", ISA_NAME)
 
 	{
 		fmt.sbprintf(&sb, "u16 const Asm_{0:s}::register_codes[Asm_{0:s}::REG_COUNT] {{\n", ISA_NAME)

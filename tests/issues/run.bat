@@ -40,12 +40,23 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_issue_6753.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_6874.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin check ..\test_issue_6979.odin -no-entry-point %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_7008.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin check ..\test_issue_7260.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin test ..\test_issue_bool_to_be_conversion.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_bool_comparison_truthiness.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_const_array_broadcast.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_7336.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
+..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin check ..\test_issue_foreign_redeclaration_mismatch.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+..\..\..\odin doc ..\test_issue_asm_doc_category.odin -file 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
 ..\..\..\odin build ..\test_issue_7188.odin %COMMON%  || exit /b
 clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_sysv_abi.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_7073-1.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+..\..\..\odin test ..\test_issue_swizzle_multi_assign.odin %COMMON%  || exit /b
 
 @echo off
 

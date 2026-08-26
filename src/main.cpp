@@ -1458,12 +1458,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								GB_ASSERT(value.kind == ExactValue_String);
 								String val = value.value_string;
 								String_Iterator it = {val, 0};
-								for (;;) {
-									String pkg = string_split_iterator(&it, ',');
-									if (pkg.len == 0) {
-										break;
-									}
-
+								String pkg = {};
+								while (string_split_iterator_next(&it, ',', &pkg)) {
 									pkg = string_trim_whitespace(pkg);
 									if (!string_is_valid_identifier(pkg)) {
 										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
@@ -1481,12 +1477,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								GB_ASSERT(value.kind == ExactValue_String);
 								String val = value.value_string;
 								String_Iterator it = {val, 0};
-								for (;;) {
-									String attr = string_split_iterator(&it, ',');
-									if (attr.len == 0) {
-										break;
-									}
-
+								String attr = {};
+								while (string_split_iterator_next(&it, ',', &attr)) {
 									attr = string_trim_whitespace(attr);
 									if (!string_is_valid_identifier(attr)) {
 										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(attr));
@@ -3473,6 +3465,7 @@ gb_internal void print_show_unused(Checker *c) {
 		case Entity_ProcGroup:
 		case Entity_ImportName:
 		case Entity_LibraryName:
+		case Entity_AsmTemplate:
 			// Fine
 			break;
 		}
@@ -4176,9 +4169,8 @@ int main(int arg_count, char const **arg_ptr) {
 	} else {
 		String march_list = target_microarch_list[build_context.metrics.arch];
 		String_Iterator it = {march_list, 0};
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		String str = {};
+		while (string_split_iterator_next(&it, ',', &str)) {
 			if (str == build_context.microarch) {
 				// Found matching microarch
 				print_microarch_list = false;
@@ -4203,9 +4195,8 @@ int main(int arg_count, char const **arg_ptr) {
 		String march_list  = target_microarch_list[build_context.metrics.arch];
 		String_Iterator it = {march_list, 0};
 
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		String str = {};
+		while (string_split_iterator_next(&it, ',', &str)) {
 			if (str == default_march) {
 				gb_printf("\t%.*s (default)\n", LIT(str));
 			} else {
@@ -4219,9 +4210,8 @@ int main(int arg_count, char const **arg_ptr) {
 	String default_features = get_default_features();
 	{
 		String_Iterator it = {default_features, 0};
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		String str = {};
+		while (string_split_iterator_next(&it, ',', &str)) {
 			string_set_add(&build_context.target_features_set, str);
 		}
 	}
@@ -4241,10 +4231,8 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.target_features_string.len != 0) {
 		String_Iterator target_it = {build_context.target_features_string, 0};
-		for (;;) {
-			String item = string_split_iterator(&target_it, ',');
-			if (item == "") break;
-			
+		String item = {};
+		while (string_split_iterator_next(&target_it, ',', &item)) {
 			String stripped_item = item;
 			if (*stripped_item.text == '+' || *stripped_item.text == '-') {
 				stripped_item.text++;
@@ -4261,9 +4249,8 @@ int main(int arg_count, char const **arg_ptr) {
 
 				String feature_list = target_features_list[build_context.metrics.arch];
 				String_Iterator it = {feature_list, 0};
-				for (;;) {
-					String str = string_split_iterator(&it, ',');
-					if (str == "") break;
+				String str = {};
+				while (string_split_iterator_next(&it, ',', &str)) {
 					if (check_single_target_feature_is_valid(default_features, str)) {
 						if (has_ansi_terminal_colours()) {
 							gb_printf("\t%.*s\x1b[38;5;244m (implied by target microarch %.*s)\x1b[0m\n", LIT(str), LIT(march));
@@ -4331,7 +4318,7 @@ int main(int arg_count, char const **arg_ptr) {
 	bool failed_to_cache_parsing = false;
 
 	TIME_SECTION("init asm tables");
-	init_asm_tables();
+	init_asm_tables(build_context.metrics.ptr_size);
 
 	MAIN_TIME_SECTION("parse files");
 

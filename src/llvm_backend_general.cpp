@@ -2953,26 +2953,17 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			if (is_type_union_maybe_pointer(type)) {
 				LLVMTypeRef variant = lb_type(m, type->Union.variants[0]);
 				array_add(&fields, variant);
-			} else if (type->Union.variants.count == 1) {
-				LLVMTypeRef block_type = lb_type(m, type->Union.variants[0]);
-
-				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
-				array_add(&fields, block_type);
-				array_add(&fields, tag_type);
-				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
-				i64 padding = size - used_size;
-				if (padding > 0) {
-					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
-					array_add(&fields, padding_type);
-				}
-				is_packed = true;
 			} else {
 				LLVMTypeRef block_type = lb_type_internal_union_block_type(m, type);
 
 				LLVMTypeRef tag_type = lb_type(m, union_tag_type(type));
 				array_add(&fields, block_type);
 				array_add(&fields, tag_type);
-				i64 used_size = lb_sizeof(block_type) + lb_sizeof(tag_type);
+				i64 block_size = lb_sizeof(block_type);
+				if (block_size == 0) {
+					block_size = type_size_of(type->Union.variants[0]);
+				}
+				i64 used_size = block_size + lb_sizeof(tag_type);
 				i64 padding = size - used_size;
 				if (padding > 0) {
 					LLVMTypeRef padding_type = lb_type_padding_filler(m, padding, align);
@@ -3223,6 +3214,10 @@ gb_internal void lb_add_nocapture_proc_attribute_at_index(lbProcedure *p, isize 
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
+}
+
+gb_internal void lb_remove_attribute_from_proc(lbModule *m, LLVMValueRef proc_value, char const *name) {
+	LLVMRemoveEnumAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, LLVMGetEnumAttributeKindForName(name, gb_strlen(name)));
 }
 
 gb_internal bool lb_proc_has_attribute(lbModule *m, LLVMValueRef proc_value, char const *name) {

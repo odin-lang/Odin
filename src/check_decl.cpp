@@ -83,11 +83,7 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			}
 			t = default_type(t);
 		}
-		if (is_type_asm_proc(t)) {
-			error(e->token, "Invalid use of inline asm in %.*s", LIT(context_name));
-			e->type = t_invalid;
-			return nullptr;
-		} else if (is_type_polymorphic(t)) {
+		if (is_type_polymorphic(t)) {
 			Entity *e2 = entity_of_node(operand->expr);
 			if (e2 == nullptr) {
 				e->type = t_invalid;
@@ -473,7 +469,11 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	check_type_path_pop(ctx);
 
 	Type *base = base_type(bt);
-	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+	if (base == nullptr) {
+		// `bt` is a named type that is still being checked, e.g. a cycle back through a
+		// pointer or slice, so chain to it and let it resolve when it does.
+		base = bt;
+	} else if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
 		base = clone_enum_type(ctx, base, named);
 	}
 	named->Named.base = base;
@@ -881,10 +881,10 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 		    	if (x_base->Struct.is_raw_union) {
 		    		return true;
 		    	}
-		    	if (x->Struct.fields.count == y->Struct.fields.count) {
-		    		for (isize i = 0; i < x->Struct.fields.count; i++) {
-		    			Entity *a = x->Struct.fields[i];
-		    			Entity *b = y->Struct.fields[i];
+		    	if (x_base->Struct.fields.count == y_base->Struct.fields.count) {
+		    		for (isize i = 0; i < x_base->Struct.fields.count; i++) {
+		    			Entity *a = x_base->Struct.fields[i];
+		    			Entity *b = y_base->Struct.fields[i];
 		    			bool similar = signature_parameter_similar_enough(a->type, b->type);
 		    			if (!similar) {
 		    				// NOTE(bill): If the fields are not similar enough, then stop.
@@ -2020,11 +2020,14 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 			arg = arg->BinaryExpr.left;
 		}
 
+		Ast *prev_hint = ctx->asm_template_hint;
+		ctx->asm_template_hint = arg;
 		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
 		} else if (arg->kind == Ast_SelectorExpr) {
 			e = check_selector(ctx, &o, arg, nullptr);
 		}
+		ctx->asm_template_hint = prev_hint;
 		if (e == nullptr) {
 			error(arg, "Expected a valid entity name in asm template group, got %.*s", LIT(ast_strings[arg->kind]));
 			continue;

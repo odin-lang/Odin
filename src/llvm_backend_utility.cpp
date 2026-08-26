@@ -1000,7 +1000,7 @@ gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 }
 
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
-	if (LLVMIsALoadInst(value.value)) {
+	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
 		lbValue res = {};
 		res.value = LLVMGetOperand(value.value, 0);
 		res.type = alloc_type_pointer(value.type);

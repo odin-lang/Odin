@@ -533,10 +533,11 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_AsmRegister:
 		break;
 	case Ast_AsmSpec:
-		n->AsmSpec.name      = clone_ast(n->AsmSpec.name,      f);
-		n->AsmSpec.tied_name = clone_ast(n->AsmSpec.tied_name, f);
-		n->AsmSpec.type      = clone_ast(n->AsmSpec.type,      f);
-		n->AsmSpec.value     = clone_ast(n->AsmSpec.value,     f);
+		n->AsmSpec.name       = clone_ast(n->AsmSpec.name,      f);
+		n->AsmSpec.tied_name  = clone_ast(n->AsmSpec.tied_name, f);
+		n->AsmSpec.type       = clone_ast(n->AsmSpec.type,      f);
+		n->AsmSpec.value      = clone_ast(n->AsmSpec.value,     f);
+		n->AsmSpec.directives = clone_ast_array(n->AsmSpec.directives, f);
 		break;
 	case Ast_AsmClobber:
 		n->AsmClobber.value = clone_ast(n->AsmClobber.value, f);
@@ -547,6 +548,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_AsmInstruction:
 		n->AsmInstruction.name     = clone_ast(n->AsmInstruction.name, f);
 		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
+		n->AsmInstruction.facts    = nullptr;
 		break;
 	case Ast_AsmMemoryOperand:
 		n->AsmMemoryOperand.segment_override = clone_ast(n->AsmMemoryOperand.segment_override, f);
@@ -2484,6 +2486,16 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 	case Token_Float:
 	case Token_Rune:
 		return ast_basic_lit(f, advance_token(f));
+
+	case Token_Add:
+	case Token_Sub:
+	case Token_Xor:
+		{
+			Token token = advance_token(f);
+			Ast *op = parse_asm_operand(f, false);
+			return ast_unary_expr(f, token, op);
+		}
+
 	case Token_OpenParen:
 		return parse_expr(f, false);
 	case Token_OpenBracket:
@@ -2684,6 +2696,60 @@ gb_internal Ast *parse_asm_signature(AstFile *f, Token asm_token) {
 	return ast_proc_type(f, asm_token, params, results, tags, cc, is_generic, diverging);
 }
 
+gb_internal Ast *parse_asm_spec(AstFile *f) {
+	Ast *name      = parse_ident(f);
+	Ast *tied_name = nullptr;
+	Ast *type      = nullptr;
+	Ast *value     = nullptr;
+	if (allow_token(f, Token_ArrowRight)) {
+		tied_name = parse_ident(f);
+	}
+	if (allow_token(f, Token_Colon)) {
+		type = parse_type(f);
+	}
+	if (allow_token(f, Token_Eq)) {
+		if (f->curr_token.kind == Token_Ident) {
+			value = parse_ident(f);
+		} else if (f->curr_token.kind == Token_Mod) {
+			value = parse_asm_register(f);
+		} else {
+			error(f->curr_token, "Expected a register or scratch parameter");
+			Ast *dummy = parse_expr(f, true);
+			gb_unused(dummy);
+		}
+	}
+
+	if (tied_name != nullptr) {
+		if (type != nullptr) {
+			syntax_error(f->curr_token, "An asm specification for tied values cannot declare a type");
+		}
+	} else if (type == nullptr && value == nullptr) {
+		syntax_error(f->curr_token, "An asm specification must specify at least either a type or a value if the value is not tied");
+	}
+
+	Array<Ast *> directives = {};
+	directives.allocator = heap_allocator();
+
+	while (f->curr_token.kind == Token_Hash) {
+		Token token = expect_token(f, Token_Hash);
+		Token name = expect_token_after(f, Token_Ident, "hash for directive");
+		if (name.kind == Token_Ident) {
+			Ast *directive = ast_basic_directive(f, token, name);
+			array_add(&directives, directive);
+		}
+	}
+
+
+	Ast *spec = alloc_ast_node(f, Ast_AsmSpec);
+	spec->AsmSpec.name       = name;
+	spec->AsmSpec.tied_name  = tied_name;
+	spec->AsmSpec.type       = type;
+	spec->AsmSpec.value      = value;
+	spec->AsmSpec.directives = directives;
+	return spec;
+}
+
+
 gb_internal Ast *parse_asm_template(AstFile *f) {
 	Token token = expect_token(f, Token_asm);
 
@@ -2708,47 +2774,14 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 		       f->curr_token.kind != Token_EOF) {
 			Ast *spec = nullptr;
 			if (f->curr_token.kind == Token_Ident) {
-				Ast *name      = parse_ident(f);
-				Ast *tied_name = nullptr;
-				Ast *type      = nullptr;
-				Ast *value     = nullptr;
-				if (allow_token(f, Token_ArrowRight)) {
-					tied_name = parse_ident(f);
-				}
-				if (allow_token(f, Token_Colon)) {
-					type = parse_type(f);
-				}
-				if (allow_token(f, Token_Eq)) {
-					if (f->curr_token.kind == Token_Ident) {
-						value = parse_ident(f);
-					} else if (f->curr_token.kind == Token_Mod) {
-						value = parse_asm_register(f);
-					} else {
-						error(f->curr_token, "Expected a register or scratch parameter");
-						Ast *dummy = parse_expr(f, true);
-						gb_unused(dummy);
-					}
-				}
-
-				if (tied_name != nullptr) {
-					if (type != nullptr) {
-						syntax_error(f->curr_token, "An asm specification for tied values cannot declare a type");
-					}
-				} else if (type == nullptr && value == nullptr) {
-					syntax_error(f->curr_token, "An asm specification must specify at least either a type or a value if the value is not tied");
-				}
-
-				spec = alloc_ast_node(f, Ast_AsmSpec);
-				spec->AsmSpec.name      = name;
-				spec->AsmSpec.tied_name = tied_name;
-				spec->AsmSpec.type      = type;
-				spec->AsmSpec.value     = value;
+				spec = parse_asm_spec(f);
 			} else if (f->curr_token.kind == Token_Hash) {
 				Token hash = expect_token(f, Token_Hash);
 				Token name = expect_token(f, Token_Ident);
 
 				if (name.string == "volatile" ||
-				    name.string == "align_stack") {
+				    name.string == "align_stack" ||
+				    name.string == "pure") {
 					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
 					clobber->AsmClobber.token = hash;
 					clobber->AsmClobber.name  = name;
@@ -2805,8 +2838,11 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 		asm_instructions = slice_from_array(instructions);
 	}
 
-	if (build_context.metrics.arch != TargetArch_amd64) {
-		syntax_error(token, "asm templates are currently only supported on -target:amd64");
+	if (build_context.metrics.arch == TargetArch_amd64 ||
+	    build_context.metrics.arch == TargetArch_riscv64) {
+	    	// okay
+	} else {
+		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64");
 	}
 
 	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);
@@ -3647,7 +3683,10 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 		} else if (seen_ellipsis) {
 			syntax_error(arg, "Positional arguments are not allowed after '..'");
 		}
-		array_add(&args, arg);
+		if (arg != nullptr) {
+			// `parse_atom_expr` returns nothing when `allow_type` is set and there is no operand
+			array_add(&args, arg);
+		}
 
 		if (ellipsis.pos.line != 0) {
 			seen_ellipsis = true;

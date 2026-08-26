@@ -954,14 +954,17 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			error(x.expr, "Expected a constant integer for #unroll, got '%s'", s);
 			gb_string_free(s);
 		} else {
-			ExactValue value = exact_value_to_integer(x.value);
-			i64 v = exact_value_to_i64(value);
-			if (v < 1) {
-				error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
-			} else {
-				unroll_count = v;
-				if (v > 1024) {
-					error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+			convert_to_typed(ctx, &x, t_int);
+			if (x.mode != Addressing_Invalid) {
+				ExactValue value = exact_value_to_integer(x.value);
+				i64 v = exact_value_to_i64(value);
+				if (v < 1) {
+					error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
+				} else {
+					unroll_count = v;
+					if (v > 1024) {
+						error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+					}
 				}
 			}
 
