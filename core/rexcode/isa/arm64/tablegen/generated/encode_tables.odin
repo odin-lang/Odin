@@ -3555,6 +3555,3553 @@ ENCODE_FORMS := [2440]lib.Encoding{
 }
 
 @(rodata)
+CLOBBER_FORMS := [2440]lib.Clobber{
+	// .ADD_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .ADDS_IMM
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SUB_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SUBS_IMM
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .MOVZ
+	{written={0}},
+	{written={0}},
+	// .MOVN
+	{written={0}},
+	{written={0}},
+	// .MOVK
+	{written={0}},
+	{written={0}},
+	// .ADR
+	{written={0}},
+	// .ADRP
+	{written={0}},
+	// .ADD_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ADDS_SR
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SUB_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SUBS_SR
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .AND_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ANDS_SR
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .ORR_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .EOR_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .BIC_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .BICS_SR
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .ORN_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .EON_SR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ADD_ER
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ADDS_ER
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SUB_ER
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SUBS_ER
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .LSLV
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .LSRV
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ASRV
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .RORV
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UDIV
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SDIV
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .MADD
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .MSUB
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SMADDL
+	{written={0}, read={1, 2, 3}},
+	// .SMSUBL
+	{written={0}, read={1, 2, 3}},
+	// .UMADDL
+	{written={0}, read={1, 2, 3}},
+	// .UMSUBL
+	{written={0}, read={1, 2, 3}},
+	// .SMULH
+	{written={0}, read={1, 2}},
+	// .UMULH
+	{written={0}, read={1, 2}},
+	// .CLZ
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .CLS
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .RBIT
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .REV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .REV16
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .REV32
+	{written={0}, read={1}},
+	// .CSEL
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	// .CSINC
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	// .CSINV
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	// .CSNEG
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	// .CCMP_REG
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	// .CCMP_IMM
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	// .CCMN_REG
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	// .CCMN_IMM
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}},
+	// .EXTR
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .B
+	{side_effects={.CONTROL}},
+	// .BL
+	{implicit_wr={.LR}, side_effects={.CONTROL}},
+	// .BR
+	{read={0}, side_effects={.CONTROL}},
+	// .BLR
+	{read={0}, implicit_wr={.LR}, side_effects={.CONTROL}},
+	// .RET
+	{read={0}, side_effects={.CONTROL}},
+	{implicit_rd={.LR}, side_effects={.CONTROL}},
+	// .B_COND
+	{nzcv_rd={.N, .Z, .C, .V}, side_effects={.CONTROL}},
+	// .CBZ
+	{read={0}, side_effects={.CONTROL}},
+	{read={0}, side_effects={.CONTROL}},
+	// .CBNZ
+	{read={0}, side_effects={.CONTROL}},
+	{read={0}, side_effects={.CONTROL}},
+	// .TBZ
+	{read={0}, side_effects={.CONTROL}},
+	// .TBNZ
+	{read={0}, side_effects={.CONTROL}},
+	// .LDR
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .STR
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .LDRB
+	{written={0}, read={1}, reads_mem=true},
+	// .STRB
+	{read={0, 1}, writes_mem=true},
+	// .LDRSB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .LDRH
+	{written={0}, read={1}, reads_mem=true},
+	// .STRH
+	{read={0, 1}, writes_mem=true},
+	// .LDRSH
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .LDRSW
+	{written={0}, read={1}, reads_mem=true},
+	// .LDP
+	{written={0, 1}, read={2}, reads_mem=true},
+	{written={0, 1}, read={2}, reads_mem=true},
+	// .STP
+	{read={0, 1, 2}, writes_mem=true},
+	{read={0, 1, 2}, writes_mem=true},
+	// .LDPSW
+	{written={0, 1}, read={2}, reads_mem=true},
+	// .LDR_LIT
+	{written={0}},
+	{written={0}},
+	// .LDAR
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .STLR
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	// .LDARB
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .STLRB
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	// .LDARH
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .STLRH
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	// .LDXR
+	{written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	{written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .STXR
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .LDAXR
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .STLXR
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .NOP
+	{side_effects={.HINT}},
+	// .YIELD
+	{side_effects={.HINT}},
+	// .WFE
+	{side_effects={.WAIT}},
+	// .WFI
+	{side_effects={.WAIT}},
+	// .SEV
+	{side_effects={.HINT}},
+	// .SEVL
+	{side_effects={.HINT}},
+	// .HINT
+	{side_effects={.HINT}},
+	// .MRS
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	// .MSR_IMM
+	{side_effects={.PRIVILEGED}},
+	// .MSR_REG
+	{written={0}, read={1}, side_effects={.PRIVILEGED}},
+	// .ISB
+	{side_effects={.ISYNC}},
+	// .DSB
+	{side_effects={.FENCE}},
+	// .DMB
+	{side_effects={.FENCE}},
+	// .SVC
+	{side_effects={.CONTROL, .EXCEPTION}},
+	// .HVC
+	{side_effects={.CONTROL, .EXCEPTION, .PRIVILEGED}},
+	// .SMC
+	{side_effects={.CONTROL, .EXCEPTION, .PRIVILEGED}},
+	// .BRK
+	{side_effects={.CONTROL, .TRAP}},
+	// .HLT
+	{side_effects={.CONTROL, .TRAP}},
+	// .ERET
+	{side_effects={.CONTROL, .PRIVILEGED}},
+	// .FMOV_REG
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .FMOV_IMM
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	// .FMOV_GEN
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .FABS
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .FNEG
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .FSQRT
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	// .FADD
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FSUB
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMUL
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FDIV
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FNMUL
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMADD
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMSUB
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FNMADD
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FNMSUB
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCMP
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, fpsr_wr={.IOC}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, fpsr_wr={.IOC}},
+	// .FCMPE
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, fpsr_wr={.IOC}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, fpsr_wr={.IOC}},
+	// .FCSEL
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	// .FMAX
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMIN
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMAXNM
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMINNM
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FCVT
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SCVTF
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	// .UCVTF
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	// .FCVTZS
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTZU
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTAS
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTAU
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTNS
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTNU
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTPS
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTPU
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTMS
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTMU
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FRINTA
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTI
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	// .FRINTM
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTN
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTP
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTX
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	// .FRINTZ
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .AND_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .ANDS_IMM
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .ORR_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .EOR_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .TST_IMM
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}},
+	// .LDUR
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .STUR
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .LDURB
+	{written={0}, read={1}, reads_mem=true},
+	// .STURB
+	{read={0, 1}, writes_mem=true},
+	// .LDURSB
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .LDURH
+	{written={0}, read={1}, reads_mem=true},
+	// .STURH
+	{read={0, 1}, writes_mem=true},
+	// .LDURSH
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .LDURSW
+	{written={0}, read={1}, reads_mem=true},
+	// .LDR_PRE
+	{written={0, 1}, read={1}, reads_mem=true},
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .STR_PRE
+	{written={1}, read={0, 1}, writes_mem=true},
+	{written={1}, read={0, 1}, writes_mem=true},
+	// .LDR_POST
+	{written={0, 1}, read={1}, reads_mem=true},
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .STR_POST
+	{written={1}, read={0, 1}, writes_mem=true},
+	{written={1}, read={0, 1}, writes_mem=true},
+	// .LDRB_PRE
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .STRB_PRE
+	{written={1}, read={0, 1}, writes_mem=true},
+	// .LDRB_POST
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .STRB_POST
+	{written={1}, read={0, 1}, writes_mem=true},
+	// .LDRH_PRE
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .STRH_PRE
+	{written={1}, read={0, 1}, writes_mem=true},
+	// .LDRH_POST
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .STRH_POST
+	{written={1}, read={0, 1}, writes_mem=true},
+	// .LDR_REG
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .STR_REG
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .LDRB_REG
+	{written={0}, read={1}, reads_mem=true},
+	// .STRB_REG
+	{read={0, 1}, writes_mem=true},
+	// .LDRH_REG
+	{written={0}, read={1}, reads_mem=true},
+	// .STRH_REG
+	{read={0, 1}, writes_mem=true},
+	// .LDRSB_REG
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .LDRSH_REG
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .LDRSW_REG
+	{written={0}, read={1}, reads_mem=true},
+	// .LDP_PRE
+	{written={0, 1, 2}, read={2}, reads_mem=true},
+	{written={0, 1, 2}, read={2}, reads_mem=true},
+	// .STP_PRE
+	{written={2}, read={0, 1, 2}, writes_mem=true},
+	{written={2}, read={0, 1, 2}, writes_mem=true},
+	// .LDP_POST
+	{written={0, 1, 2}, read={2}, reads_mem=true},
+	{written={0, 1, 2}, read={2}, reads_mem=true},
+	// .STP_POST
+	{written={2}, read={0, 1, 2}, writes_mem=true},
+	{written={2}, read={0, 1, 2}, writes_mem=true},
+	// .LDPSW_PRE
+	{written={0, 1, 2}, read={2}, reads_mem=true},
+	// .LDPSW_POST
+	{written={0, 1, 2}, read={2}, reads_mem=true},
+	// .LDNP
+	{written={0, 1}, read={2}, reads_mem=true},
+	{written={0, 1}, read={2}, reads_mem=true},
+	// .STNP
+	{read={0, 1, 2}, writes_mem=true},
+	{read={0, 1, 2}, writes_mem=true},
+	// .LDXP
+	{written={0, 1}, read={2}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	{written={0, 1}, read={2}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .STXP
+	{written={0}, read={1, 2, 3}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	{written={0}, read={1, 2, 3}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .LDAXP
+	{written={0, 1}, read={2}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	{written={0, 1}, read={2}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .STLXP
+	{written={0}, read={1, 2, 3}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	{written={0}, read={1, 2, 3}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .LDXRB
+	{written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .STXRB
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .LDAXRB
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .STLXRB
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .LDXRH
+	{written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .STXRH
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}},
+	// .LDAXRH
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .STLXRH
+	{written={0}, read={1, 2}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}},
+	// .LDAPR
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .LDAPRB
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .LDAPRH
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .LDADD
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDADDA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDADDL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDADDAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDCLR
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDCLRA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDCLRL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDCLRAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDEOR
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDEORA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDEORL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDEORAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSET
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDSETA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSETL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSETAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSMAX
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDSMAXA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSMAXL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSMAXAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSMIN
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDSMINA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSMINL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDSMINAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDUMAX
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDUMAXA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDUMAXL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDUMAXAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDUMIN
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .LDUMINA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDUMINL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .LDUMINAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .SWP
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .SWPA
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .SWPL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .SWPAL
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={1}, read={0, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CAS
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .CASA
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASL
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASAL
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASB
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .CASAB
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASLB
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASALB
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASH
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .CASAH
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASLH
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASALH
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASP
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.ATOMIC}},
+	// .CASPA
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASPL
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .CASPAL
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	{written={0}, read={0, 1, 2}, writes_mem=true, reads_mem=true, side_effects={.FENCE, .ATOMIC}},
+	// .PACIA
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .PACIB
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .PACDA
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .PACDB
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .PACIZA
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .PACIZB
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .PACDZA
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .PACDZB
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .AUTIA
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .AUTIB
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .AUTDA
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .AUTDB
+	{written={0}, read={0, 1}, side_effects={.PAC}},
+	// .AUTIZA
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .AUTIZB
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .AUTDZA
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .AUTDZB
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .PACIASP
+	{implicit_wr={.LR}, implicit_rd={.LR, .SP}, side_effects={.PAC}},
+	// .PACIBSP
+	{implicit_wr={.LR}, implicit_rd={.LR, .SP}, side_effects={.PAC}},
+	// .AUTIASP
+	{implicit_wr={.LR}, implicit_rd={.LR, .SP}, side_effects={.PAC}},
+	// .AUTIBSP
+	{implicit_wr={.LR}, implicit_rd={.LR, .SP}, side_effects={.PAC}},
+	// .PACIA1716
+	{implicit_wr={.X17}, implicit_rd={.X16, .X17}, side_effects={.PAC}},
+	// .PACIB1716
+	{implicit_wr={.X17}, implicit_rd={.X16, .X17}, side_effects={.PAC}},
+	// .AUTIA1716
+	{implicit_wr={.X17}, implicit_rd={.X16, .X17}, side_effects={.PAC}},
+	// .AUTIB1716
+	{implicit_wr={.X17}, implicit_rd={.X16, .X17}, side_effects={.PAC}},
+	// .PACGA
+	{written={0}, read={0, 1, 2}, side_effects={.PAC}},
+	// .XPACI
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .XPACD
+	{written={0}, read={0}, side_effects={.PAC}},
+	// .XPACLRI
+	{implicit_wr={.LR}, implicit_rd={.LR}, side_effects={.PAC}},
+	// .RETAA
+	{implicit_rd={.LR, .SP}, side_effects={.CONTROL, .PAC}},
+	// .RETAB
+	{implicit_rd={.LR, .SP}, side_effects={.CONTROL, .PAC}},
+	// .BRAA
+	{read={0, 1}, side_effects={.CONTROL, .PAC}},
+	// .BRAB
+	{read={0, 1}, side_effects={.CONTROL, .PAC}},
+	// .BRAAZ
+	{read={0}, side_effects={.CONTROL, .PAC}},
+	// .BRABZ
+	{read={0}, side_effects={.CONTROL, .PAC}},
+	// .BLRAA
+	{read={0, 1}, implicit_wr={.LR}, side_effects={.CONTROL, .PAC}},
+	// .BLRAB
+	{read={0, 1}, implicit_wr={.LR}, side_effects={.CONTROL, .PAC}},
+	// .BLRAAZ
+	{read={0}, implicit_wr={.LR}, side_effects={.CONTROL, .PAC}},
+	// .BLRABZ
+	{read={0}, implicit_wr={.LR}, side_effects={.CONTROL, .PAC}},
+	// .ERETAA
+	{side_effects={.CONTROL, .PAC, .PRIVILEGED}},
+	// .ERETAB
+	{side_effects={.CONTROL, .PAC, .PRIVILEGED}},
+	// .BTI
+	{side_effects={.BTI}},
+	// .IRG
+	{written={0}, read={1, 2}},
+	// .ADDG
+	{written={0}, read={1}},
+	// .SUBG
+	{written={0}, read={1}},
+	// .GMI
+	{written={0}, read={1, 2}},
+	// .SUBP
+	{written={0}, read={1, 2}},
+	// .SUBPS
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .LDG
+	{written={0}, read={1}, reads_mem=true},
+	// .STG
+	{read={0, 1}, writes_mem=true},
+	// .ST2G
+	{read={0, 1}, writes_mem=true},
+	// .STZG
+	{read={0, 1}, writes_mem=true},
+	// .STZ2G
+	{read={0, 1}, writes_mem=true},
+	// .STGP
+	{read={0, 1, 2}, writes_mem=true},
+	// .LDGM
+	{written={0}, read={1}, reads_mem=true},
+	// .STGM
+	{read={0, 1}, writes_mem=true},
+	// .STZGM
+	{read={0, 1}, writes_mem=true},
+	// .CRC32B
+	{written={0}, read={1, 2}},
+	// .CRC32H
+	{written={0}, read={1, 2}},
+	// .CRC32W
+	{written={0}, read={1, 2}},
+	// .CRC32X
+	{written={0}, read={1, 2}},
+	// .CRC32CB
+	{written={0}, read={1, 2}},
+	// .CRC32CH
+	{written={0}, read={1, 2}},
+	// .CRC32CW
+	{written={0}, read={1, 2}},
+	// .CRC32CX
+	{written={0}, read={1, 2}},
+	// .AESE
+	{written={0}, read={0, 1}},
+	// .AESD
+	{written={0}, read={0, 1}},
+	// .AESMC
+	{written={0}, read={0, 1}},
+	// .AESIMC
+	{written={0}, read={0, 1}},
+	// .SHA1H
+	{written={0}, read={1}},
+	// .SHA1C
+	{written={0}, read={0, 1, 2}},
+	// .SHA1P
+	{written={0}, read={0, 1, 2}},
+	// .SHA1M
+	{written={0}, read={0, 1, 2}},
+	// .SHA1SU0
+	{written={0}, read={0, 1, 2}},
+	// .SHA1SU1
+	{written={0}, read={0, 1}},
+	// .SHA256H
+	{written={0}, read={0, 1, 2}},
+	// .SHA256H2
+	{written={0}, read={0, 1, 2}},
+	// .SHA256SU0
+	{written={0}, read={0, 1}},
+	// .SHA256SU1
+	{written={0}, read={0, 1, 2}},
+	// .SHA512H
+	{written={0}, read={0, 1, 2}},
+	// .SHA512H2
+	{written={0}, read={0, 1, 2}},
+	// .SHA512SU0
+	{written={0}, read={0, 1}},
+	// .SHA512SU1
+	{written={0}, read={0, 1, 2}},
+	// .EOR3
+	{written={0}, read={1, 2, 3}},
+	// .BCAX
+	{written={0}, read={1, 2, 3}},
+	// .RAX1
+	{written={0}, read={1, 2}},
+	// .XAR
+	{written={0}, read={1, 2}},
+	// .SM3PARTW1
+	{written={0}, read={0, 1, 2}},
+	// .SM3PARTW2
+	{written={0}, read={0, 1, 2}},
+	// .SM3SS1
+	{written={0}, read={1, 2, 3}},
+	// .SM3TT1A
+	{written={0}, read={0, 1, 2}},
+	// .SM3TT1B
+	{written={0}, read={0, 1, 2}},
+	// .SM3TT2A
+	{written={0}, read={0, 1, 2}},
+	// .SM3TT2B
+	{written={0}, read={0, 1, 2}},
+	// .SM4E
+	{written={0}, read={0, 1}},
+	// .SM4EKEY
+	{written={0}, read={1, 2}},
+	// .PMULL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .PMULL2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .FABS_H
+	{written={0}, read={1}},
+	// .FNEG_H
+	{written={0}, read={1}},
+	// .FSQRT_H
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	// .FADD_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FSUB_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMUL_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FDIV_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FNMUL_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMADD_H
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMSUB_H
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FNMADD_H
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FNMSUB_H
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCMP_H
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, fpsr_wr={.IOC}},
+	// .FCMPE_H
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, fpsr_wr={.IOC}},
+	// .FCSEL_H
+	{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}},
+	// .FMAX_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMIN_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMAXNM_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMINNM_H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FCVT_H_S
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCVT_H_D
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCVT_S_H
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCVT_D_H
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMOV_H
+	{written={0}, read={1}},
+	// .SCVTF_H
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	// .UCVTF_H
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	// .FCVTZS_H
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTZU_H
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .BFCVT
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .BFDOT
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .BFMMLA
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .BFMLALB
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .BFMLALT
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .BFCVTN
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .BFCVTN2
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .ADD_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SUB_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .MUL_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .MLA_V
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .MLS_V
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .NEG_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .ABS_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SHADD
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UHADD
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SHSUB
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UHSUB
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SRHADD
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .URHADD
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SQADD
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .UQADD
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SQSUB
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .UQSUB
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SMAX
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UMAX
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SMIN
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UMIN
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SABD
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UABD
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SABA
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .UABA
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .ADDP_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ADDV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SADDLP
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .UADDLP
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SADALP
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .UADALP
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .SADDLV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .UADDLV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SMAXV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .UMAXV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SMINV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .UMINV
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SMAXP
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UMAXP
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SMINP
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UMINP
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SADDL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SADDL2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UADDL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UADDL2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SSUBL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SSUBL2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .USUBL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .USUBL2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SADDW
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SADDW2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UADDW
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UADDW2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SSUBW
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SSUBW2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .USUBW
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .USUBW2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .RADDHN
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .RADDHN2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .RSUBHN
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .RSUBHN2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ADDHN
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ADDHN2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SUBHN
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SUBHN2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .XTN
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .XTN2
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SQXTN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQXTN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .UQXTN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .UQXTN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQXTUN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQXTUN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SMULL_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SMULL2_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UMULL_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UMULL2_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SMLAL
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .SMLAL2
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .UMLAL
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .UMLAL2
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .SMLSL
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .SMLSL2
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .UMLSL
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .UMLSL2
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .SQDMULL
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SQDMULL2
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SQDMLAL
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	// .SQDMLAL2
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	// .SQDMLSL
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	// .SQDMLSL2
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	// .SQDMULH
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SQRDMULH
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SDOT
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .UDOT
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .USDOT
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .FADD_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FSUB_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMUL_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FDIV_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FNEG_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .FABS_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .FSQRT_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMLA_V
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMLS_V
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMULX
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FMAX_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMIN_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMAXNM_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMINNM_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMAXP_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMINP_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMAXNMP
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMINNMP
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMAXV_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMINV_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMAXNMV
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FMINNMV
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .FRECPE
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	// .FRSQRTE
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	// .FRECPS
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FRSQRTS
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FRECPX
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	{written={0}, read={1}, reads_fpcr=true},
+	// .FADDP_V
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FRINTA_V
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTI_V
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC}, reads_fpcr=true},
+	// .FRINTM_V
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTN_V
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTP_V
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FRINTX_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	// .FRINTZ_V
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .SCVTF_V
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	// .UCVTF_V
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IXC}, reads_fpcr=true},
+	// .FCVTAS_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTAU_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTMS_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTMU_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTNS_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTNU_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTPS_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTPU_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTZS_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTZU_V
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTL
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCVTL2
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCVTN
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCVTN2
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCVTXN
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCVTXN2
+	{written={0}, read={1}, fpsr_wr={.IOC, .IXC}},
+	// .FCMEQ
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .FCMGE
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .FCMGT
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .FCMLE
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FCMLT
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	{written={0}, read={1}, fpsr_wr={.IOC}},
+	// .FACGE
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .FACGT
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .CMEQ
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .CMGE
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .CMGT
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .CMHI
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .CMHS
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .CMLE
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .CMLT
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .CMTST
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .AND_V
+	{written={0}, read={1, 2}},
+	// .ORR_V
+	{written={0}, read={1, 2}},
+	// .EOR_V
+	{written={0}, read={1, 2}},
+	// .BIC_V
+	{written={0}, read={1, 2}},
+	// .ORN_V
+	{written={0}, read={1, 2}},
+	// .MVN_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .BIT
+	{written={0}, read={0, 1, 2}},
+	// .BIF
+	{written={0}, read={0, 1, 2}},
+	// .BSL
+	{written={0}, read={0, 1, 2}},
+	// .SHL_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SQSHL_V
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQSHLU
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SRSHL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .URSHL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SSHR
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .USHR
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SSRA
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .USRA
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .SRSHR
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .URSHR
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SRSRA
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .URSRA
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .SSHL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .USHL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SLI
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .SRI
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	{written={0}, read={0, 1}},
+	// .SSHLL
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SSHLL2
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .USHLL
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .USHLL2
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SXTL
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SXTL2
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .UXTL
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .UXTL2
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SHRN
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SHRN2
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .RSHRN
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .RSHRN2
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SQSHRN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQSHRN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .UQSHRN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .UQSHRN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQRSHRN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQRSHRN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .UQRSHRN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .UQRSHRN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQSHRUN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQSHRUN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQRSHRUN
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .SQRSHRUN2
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	{written={0}, read={1}, fpsr_wr={.QC}},
+	// .DUP_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .INS
+	{written={0}, read={0, 2}},
+	{written={0}, read={0, 2}},
+	{written={0}, read={0, 2}},
+	{written={0}, read={0, 2}},
+	{written={0}, read={0, 2}},
+	{written={0}, read={0, 2}},
+	{written={0}, read={0, 2}},
+	{written={0}, read={0, 2}},
+	// .MOV_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .EXT_V
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .TBL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .TBX
+	{written={0}, read={0, 1, 2}},
+	{written={0}, read={0, 1, 2}},
+	// .ZIP1
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .ZIP2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UZP1
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .UZP2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .TRN1
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .TRN2
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .NOT_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .RBIT_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .REV16_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .REV32_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .REV64
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .CLS_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .CLZ_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .CNT
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .URECPE_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .URSQRTE_V
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .MOVI
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	// .MVNI
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	// .FMOV_V_IMM
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	{written={0}},
+	// .LD1
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .LD2
+	{written={0}, read={1}, reads_mem=true},
+	// .LD3
+	{written={0}, read={1}, reads_mem=true},
+	// .LD4
+	{written={0}, read={1}, reads_mem=true},
+	// .ST1
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .ST2
+	{read={0, 1}, writes_mem=true},
+	// .ST3
+	{read={0, 1}, writes_mem=true},
+	// .ST4
+	{read={0, 1}, writes_mem=true},
+	// .LD1R
+	{written={0}, read={1}, reads_mem=true},
+	// .LD2R
+	{written={0}, read={1}, reads_mem=true},
+	// .LD3R
+	{written={0}, read={1}, reads_mem=true},
+	// .LD4R
+	{written={0}, read={1}, reads_mem=true},
+	// .LD1_LANE
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	// .LD2_LANE
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	// .LD3_LANE
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	// .LD4_LANE
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	{written={0}, read={2}, reads_mem=true},
+	// .ST1_LANE
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	// .ST2_LANE
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	// .ST3_LANE
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	// .ST4_LANE
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	{read={0, 2}, writes_mem=true},
+	// .LDR_V
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .STR_V
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .LDP_V
+	{written={0, 1}, read={2}, reads_mem=true},
+	{written={0, 1}, read={2}, reads_mem=true},
+	{written={0, 1}, read={2}, reads_mem=true},
+	// .STP_V
+	{read={0, 1, 2}, writes_mem=true},
+	{read={0, 1, 2}, writes_mem=true},
+	{read={0, 1, 2}, writes_mem=true},
+	// .LDUR_V
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	{written={0}, read={1}, reads_mem=true},
+	// .STUR_V
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	{read={0, 1}, writes_mem=true},
+	// .SVE_ADD_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_SUB_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_SQADD_Z
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SVE_UQADD_Z
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SVE_SQSUB_Z
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SVE_UQSUB_Z
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={1, 2}, fpsr_wr={.QC}},
+	// .SVE_ADD_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SUB_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SUBR_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_MUL_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SMULH_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_UMULH_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SDIV_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_UDIV_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SMAX_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_UMAX_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SMIN_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_UMIN_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SABD_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_UABD_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_AND_PRED
+	{written={0}, read={1, 2, 3}},
+	// .SVE_ORR_PRED
+	{written={0}, read={1, 2, 3}},
+	// .SVE_EOR_PRED
+	{written={0}, read={1, 2, 3}},
+	// .SVE_BIC_PRED
+	{written={0}, read={1, 2, 3}},
+	// .SVE_ASR_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_LSL_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_LSR_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_ASRR_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_LSLR_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_LSRR_PRED
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_ABS_PRED
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_NEG_PRED
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_CLS_PRED
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_CLZ_PRED
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_CNT_PRED
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_MOV_PRED
+	{read={0, 1, 2}},
+	{read={0, 1, 2}},
+	{read={0, 1, 2}},
+	{read={0, 1, 2}},
+	// .SVE_FADD_Z
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FSUB_Z
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMUL_Z
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FRECPS
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FRSQRTS
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FTSMUL
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FADD_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FSUB_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FSUBR_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMUL_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FDIV_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FDIVR_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .DZC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMAX_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .SVE_FMIN_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .SVE_FMAXNM_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .SVE_FMINNM_PRED
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .IDC}, reads_fpcr=true},
+	// .SVE_FABS_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_FNEG_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_FSQRT_Z
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FRECPX_Z
+	{written={0}, read={1, 2}, reads_fpcr=true},
+	{written={0}, read={1, 2}, reads_fpcr=true},
+	{written={0}, read={1, 2}, reads_fpcr=true},
+	// .SVE_FRINTN
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .SVE_FRINTP
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .SVE_FRINTM
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .SVE_FRINTZ
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .SVE_FRINTA
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .SVE_FRINTX
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC}, reads_fpcr=true},
+	// .SVE_FRINTI
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}, reads_fpcr=true},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}, reads_fpcr=true},
+	// .SVE_FMLA
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMLS
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FNMLA
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	// .SVE_FNMLS
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	// .SVE_AND_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_BIC_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_ORR_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_EOR_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_NAND_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_NOR_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_ORN_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_SEL_P
+	{written={0}, read={1, 2, 3}},
+	// .SVE_ANDS_P
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_BICS_P
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_ORRS_P
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_EORS_P
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_NANDS_P
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_NORS_P
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_ORNS_P
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_NOT_P
+	{written={0}, read={1, 2}},
+	// .SVE_MOV_P
+	{written={0}, read={1, 2}},
+	{written={0}, read={1}},
+	// .SVE_MOVS_P
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_PTRUE
+	{written={0}},
+	// .SVE_PTRUES
+	{written={0}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_PFALSE
+	{written={0}},
+	// .SVE_PFIRST
+	{written={0}, read={1, 2}},
+	// .SVE_PNEXT
+	{written={0}, read={1, 2}},
+	// .SVE_BRKA
+	{written={0}, read={1, 2}},
+	// .SVE_BRKB
+	{written={0}, read={1, 2}},
+	// .SVE_BRKAS
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_BRKBS
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_BRKPA
+	{written={0}, read={1, 2, 3}},
+	// .SVE_BRKPB
+	{written={0}, read={1, 2, 3}},
+	// .SVE_BRKN
+	{written={0}, read={1, 2, 3}},
+	// .SVE_RDFFR
+	{written={0}, side_effects={.FFR}},
+	// .SVE_WRFFR
+	{read={0}, side_effects={.FFR}},
+	// .SVE_SETFFR
+	{side_effects={.FFR}},
+	// .SVE_CMPEQ
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPNE
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPGE
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPGT
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPLE
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPLT
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPHI
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPHS
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPLO
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_CMPLS
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_FCMEQ
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	// .SVE_FCMNE
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	// .SVE_FCMGE
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	// .SVE_FCMGT
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	// .SVE_FCMLE
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .SVE_FCMLT
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2}, fpsr_wr={.IOC}},
+	// .SVE_FCMUO
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC}},
+	// .SVE_DUP_Z
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SVE_INSR
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SVE_REV_Z
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SVE_REV_P
+	{written={0}, read={1}},
+	// .SVE_TBL
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_ZIP1_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_ZIP2_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_UZP1_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_UZP2_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_TRN1_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_TRN2_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_ZIP1_P
+	{written={0}, read={1, 2}},
+	// .SVE_ZIP2_P
+	{written={0}, read={1, 2}},
+	// .SVE_UZP1_P
+	{written={0}, read={1, 2}},
+	// .SVE_UZP2_P
+	{written={0}, read={1, 2}},
+	// .SVE_TRN1_P
+	{written={0}, read={1, 2}},
+	// .SVE_TRN2_P
+	{written={0}, read={1, 2}},
+	// .SVE_CPY_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_COMPACT
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_EXT_Z
+	{written={0}, read={1, 2}},
+	// .SVE_LD1B
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1H
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1W
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SB
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SH
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SW
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_ST1B
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1H
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1W
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1D
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_LDR_Z
+	{written={0}, read={1}, reads_mem=true},
+	// .SVE_STR_Z
+	{read={0, 1}, writes_mem=true},
+	// .SVE_LDR_P
+	{written={0}, read={1}, reads_mem=true},
+	// .SVE_STR_P
+	{read={0, 1}, writes_mem=true},
+	// .SVE_LDFF1B
+	{written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}},
+	// .SVE_LDFF1H
+	{written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}},
+	// .SVE_LDFF1W
+	{written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}},
+	// .SVE_LDFF1D
+	{written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}},
+	// .SVE_WHILEGE
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_WHILEGT
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_WHILELE
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_WHILELT
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_WHILEHI
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_WHILEHS
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_WHILELO
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_WHILELS
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_SQRDMLAH
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	// .SVE_SQRDMLSH
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	{written={0}, read={0, 1, 2}, fpsr_wr={.QC}},
+	// .SVE_ADCLB
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_ADCLT
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_SBCLB
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_SBCLT
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_TBL2
+	{written={0}, read={1, 2}},
+	// .SVE_TBX
+	{written={0}, read={0, 1, 2}},
+	// .SVE_AESE
+	{written={0}, read={0, 1}},
+	// .SVE_AESD
+	{written={0}, read={0, 1}},
+	// .SVE_AESMC
+	{written={0}, read={0}},
+	// .SVE_AESIMC
+	{written={0}, read={0}},
+	// .SVE_BCAX_Z
+	{written={0}, read={1, 2, 3}},
+	// .SVE_XAR_Z
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	{written={0}, read={1, 2}},
+	// .SVE_EOR3_Z
+	{written={0}, read={1, 2, 3}},
+	// .SVE_MATCH
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_NMATCH
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}},
+	// .SVE_HISTCNT
+	{written={0}, read={1, 2, 3}},
+	{written={0}, read={1, 2, 3}},
+	// .SVE_HISTSEG
+	{written={0}, read={1, 2}},
+	// .SME_SMSTART
+	{},
+	// .SME_SMSTOP
+	{},
+	// .SME_RDSVL
+	{written={0}},
+	// .SME_ADDHA
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_ADDVA
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_ZERO
+	{},
+	// .SME_FMOPA
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SME_FMOPS
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SME_BFMOPA
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SME_BFMOPS
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SME_SMOPA
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_SMOPS
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_UMOPA
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_UMOPS
+	{written={0}, read={0, 1, 2, 3}},
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_USMOPA
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_SUMOPA
+	{written={0}, read={0, 1, 2, 3}},
+	// .SME_LDR_ZA
+	{read={1}, reads_mem=true},
+	// .SME_STR_ZA
+	{read={1}, writes_mem=true},
+	// .SVE_FMLA_IDX_H
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMLA_IDX_S
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMLA_IDX_D
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMLS_IDX_H
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMLS_IDX_S
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_FMLS_IDX_D
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_LD1B_GATHER_S
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1B_GATHER_D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1H_GATHER_S
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1H_GATHER_D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1W_GATHER_S
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1W_GATHER_D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1D_GATHER_D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SB_GATHER_S
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SB_GATHER_D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SH_GATHER_S
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SH_GATHER_D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LD1SW_GATHER_D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_ST1B_SCATTER_S
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1B_SCATTER_D
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1H_SCATTER_S
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1H_SCATTER_D
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1W_SCATTER_S
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1W_SCATTER_D
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_ST1D_SCATTER_D
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME_LD1B_TILE
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME_LD1H_TILE
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME_LD1W_TILE
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME_LD1D_TILE
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME_LD1Q_TILE
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME_ST1B_TILE
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME_ST1H_TILE
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME_ST1W_TILE
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME_ST1D_TILE
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME_ST1Q_TILE
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME_MOVA_Z_FROM_TILE
+	{written={0}, read={1, 2}},
+	// .SME_MOVA_TILE_FROM_Z
+	{written={0}, read={1, 2}},
+	// .FCMLA_4H
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCMLA_8H
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCMLA_4S
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCMLA_2D
+	{written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCADD_4H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCADD_8H
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCADD_4S
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .FCADD_2D
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_PRFB
+	{read={1, 2}, side_effects={.HINT}},
+	// .SVE_PRFH
+	{read={1, 2}, side_effects={.HINT}},
+	// .SVE_PRFW
+	{read={1, 2}, side_effects={.HINT}},
+	// .SVE_PRFD
+	{read={1, 2}, side_effects={.HINT}},
+	// .SVE_LDNT1B
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LDNT1H
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LDNT1W
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_LDNT1D
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SVE_STNT1B
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_STNT1H
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_STNT1W
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_STNT1D
+	{read={0, 1, 2}, writes_mem=true},
+	// .SVE_EXT
+	{written={0}, read={1, 2}},
+	// .SVE_SPLICE
+	{written={0}, read={1, 2, 3}},
+	// .SVE_INDEX_II
+	{written={0}},
+	// .SVE_INDEX_IR
+	{written={0}, read={2}},
+	// .SVE_INDEX_RI
+	{written={0}, read={1}},
+	// .SVE_INDEX_RR
+	{written={0}, read={1, 2}},
+	// .SVE_BSL
+	{written={0}, read={0, 1, 2, 3}},
+	// .SVE_BSL1N
+	{written={0}, read={1, 2, 3}},
+	// .SVE_BSL2N
+	{written={0}, read={1, 2, 3}},
+	// .SVE_NBSL
+	{written={0}, read={1, 2, 3}},
+	// .SVE_PMUL_VEC
+	{written={0}, read={1, 2}},
+	// .SVE_PMULLB
+	{written={0}, read={1, 2}},
+	// .SVE_PMULLT
+	{written={0}, read={1, 2}},
+	// .SVE_BFCVT
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFCVTNT
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .LDRAA
+	{written={0}, read={1}, reads_mem=true},
+	// .LDRAB
+	{written={0}, read={1}, reads_mem=true},
+	// .LDRAA_PRE
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .LDRAB_PRE
+	{written={0, 1}, read={1}, reads_mem=true},
+	// .TSTART
+	{written={0}, side_effects={.NONDETERMINISTIC}},
+	// .TCOMMIT
+	{},
+	// .TCANCEL
+	{side_effects={.CONTROL}},
+	// .TTEST
+	{written={0}},
+	// .WFET
+	{read={0}, side_effects={.WAIT}},
+	// .WFIT
+	{read={0}, side_effects={.WAIT}},
+	// .BC_COND
+	{nzcv_rd={.N, .Z, .C, .V}, side_effects={.CONTROL}},
+	// .UXTB
+	{written={0}, read={1}},
+	// .UXTH
+	{written={0}, read={1}},
+	// .UXTW
+	{written={0}, read={1}},
+	// .SXTB
+	{written={0}, read={1}},
+	// .SXTH
+	{written={0}, read={1}},
+	// .SXTW
+	{written={0}, read={1}},
+	// .ADC
+	{written={0}, read={1, 2}, nzcv_rd={.C}},
+	{written={0}, read={1, 2}, nzcv_rd={.C}},
+	// .ADCS
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.C}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.C}},
+	// .SBC
+	{written={0}, read={1, 2}, nzcv_rd={.C}},
+	{written={0}, read={1, 2}, nzcv_rd={.C}},
+	// .SBCS
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.C}},
+	{written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.C}},
+	// .NGC
+	{written={0}, read={1}, nzcv_rd={.C}},
+	{written={0}, read={1}, nzcv_rd={.C}},
+	// .NGCS
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.C}},
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.C}},
+	// .LDAPUR
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .STLUR
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	// .LDAPURB
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .STLURB
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	// .LDAPURH
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .STLURH
+	{read={0, 1}, writes_mem=true, side_effects={.FENCE}},
+	// .LDAPURSB
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .LDAPURSH
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .LDAPURSW
+	{written={0}, read={1}, reads_mem=true, side_effects={.FENCE}},
+	// .SVE_BFADD
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFSUB
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFMUL
+	{written={0}, read={1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFMLA
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFMLS
+	{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SB
+	{side_effects={.FENCE}},
+	// .CSDB
+	{side_effects={.FENCE}},
+	// .DGH
+	{side_effects={.HINT}},
+	// .PSB_CSYNC
+	{side_effects={.HINT}},
+	// .TSB_CSYNC
+	{side_effects={.HINT}},
+	// .BTI_J
+	{side_effects={.BTI}},
+	// .BTI_C
+	{side_effects={.BTI}},
+	// .BTI_JC
+	{side_effects={.BTI}},
+	// .MOV_V_ALIAS
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .NOT_V_ALIAS
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .LSL_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .LSR_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .ASR_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .ROR_IMM
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .SVE_BFADD_UNPRED
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFSUB_UNPRED
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFMUL_UNPRED
+	{written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true},
+	// .SVE_BFCLAMP
+	{written={0}, read={1, 2}},
+	// .SVE_BFMAXNM
+	{written={0}, read={1, 2, 3}},
+	// .SVE_BFMINNM
+	{written={0}, read={1, 2, 3}},
+	// .SME2_LUTI2_B
+	{written={0}, read={1}},
+	// .SME2_LUTI4_B
+	{written={0}, read={1}},
+	// .SME2_LD1B_X2
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_LD1H_X2
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_LD1W_X2
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_LD1D_X2
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_LD1B_X4
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_LD1H_X4
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_LD1W_X4
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_LD1D_X4
+	{written={0}, read={1, 2}, reads_mem=true},
+	// .SME2_ST1B_X2
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ST1H_X2
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ST1W_X2
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ST1D_X2
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ST1B_X4
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ST1H_X4
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ST1W_X4
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ST1D_X4
+	{read={0, 1, 2}, writes_mem=true},
+	// .SME2_ZIP_3
+	{written={0}, read={1, 2}},
+	// .SME2_ZIP_4
+	{written={0}, read={1, 2}},
+	// .SME2_UZP_3
+	{written={0}, read={1, 2}},
+	// .SME2_UZP_4
+	{written={0}, read={1, 2}},
+	// .TLBI_RPALOS
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_RPAOS
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E1A
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .DC_CIPAPA
+	{read={0}, side_effects={.CACHE}},
+	// .DC_CIGDPAPA
+	{read={0}, side_effects={.CACHE}},
+	// .TLBI_PAALL
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_PAALLOS
+	{side_effects={.PRIVILEGED}},
+	// .AMX_LDX
+	{read={0}},
+	// .AMX_LDY
+	{read={0}},
+	// .AMX_STX
+	{read={0}},
+	// .AMX_STY
+	{read={0}},
+	// .AMX_LDZ
+	{read={0}},
+	// .AMX_STZ
+	{read={0}},
+	// .AMX_LDZI
+	{read={0}},
+	// .AMX_STZI
+	{read={0}},
+	// .AMX_EXTRX
+	{read={0}},
+	// .AMX_EXTRY
+	{read={0}},
+	// .AMX_FMA64
+	{read={0}},
+	// .AMX_FMS64
+	{read={0}},
+	// .AMX_FMA32
+	{read={0}},
+	// .AMX_FMS32
+	{read={0}},
+	// .AMX_MAC16
+	{read={0}},
+	// .AMX_FMA16
+	{read={0}},
+	// .AMX_FMS16
+	{read={0}},
+	// .AMX_SET
+	{},
+	// .AMX_CLR
+	{},
+	// .AMX_VECINT
+	{read={0}},
+	// .AMX_VECFP
+	{read={0}},
+	// .AMX_MATINT
+	{read={0}},
+	// .AMX_MATFP
+	{read={0}},
+	// .AMX_GENLUT
+	{read={0}},
+	// .CPYP
+	{written={0, 1, 2}, read={0, 1, 2}, writes_mem=true, reads_mem=true},
+	// .CPYM
+	{written={0, 1, 2}, read={0, 1, 2}, writes_mem=true, reads_mem=true},
+	// .CPYE
+	{written={0, 1, 2}, read={0, 1, 2}, writes_mem=true, reads_mem=true},
+	// .CPYFP
+	{written={0, 1, 2}, read={0, 1, 2}, writes_mem=true, reads_mem=true},
+	// .CPYFM
+	{written={0, 1, 2}, read={0, 1, 2}, writes_mem=true, reads_mem=true},
+	// .CPYFE
+	{written={0, 1, 2}, read={0, 1, 2}, writes_mem=true, reads_mem=true},
+	// .SETP
+	{written={0, 1}, read={0, 1, 2}, writes_mem=true},
+	// .SETM
+	{written={0, 1}, read={0, 1, 2}, writes_mem=true},
+	// .SETE
+	{written={0, 1}, read={0, 1, 2}, writes_mem=true},
+	// .DC_IVAC
+	{read={0}, side_effects={.CACHE, .PRIVILEGED}},
+	// .DC_ISW
+	{read={0}, side_effects={.CACHE, .PRIVILEGED}},
+	// .DC_CSW
+	{read={0}, side_effects={.CACHE, .PRIVILEGED}},
+	// .DC_CISW
+	{read={0}, side_effects={.CACHE, .PRIVILEGED}},
+	// .DC_ZVA
+	{read={0}, writes_mem=true, side_effects={.CACHE}},
+	// .DC_CVAC
+	{read={0}, side_effects={.CACHE}},
+	// .DC_CVAU
+	{read={0}, side_effects={.CACHE}},
+	// .DC_CIVAC
+	{read={0}, side_effects={.CACHE}},
+	// .IC_IALLUIS
+	{side_effects={.CACHE, .PRIVILEGED}},
+	// .IC_IALLU
+	{side_effects={.CACHE, .PRIVILEGED}},
+	// .IC_IVAU
+	{read={0}, side_effects={.CACHE}},
+	// .AT_S1E1R
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E1W
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E0R
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E0W
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E2R
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E2W
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E3R
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S1E3W
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S12E1R
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S12E1W
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S12E0R
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .AT_S12E0W
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VMALLE1
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_VMALLE1IS
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_VAE1
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VAE1IS
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_ASIDE1
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_ASIDE1IS
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VAAE1
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VAAE1IS
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VALE1
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VALE1IS
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VAALE1
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_VAALE1IS
+	{read={0}, side_effects={.PRIVILEGED}},
+	// .TLBI_ALLE1
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_ALLE1IS
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_ALLE2
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_ALLE2IS
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_ALLE3
+	{side_effects={.PRIVILEGED}},
+	// .TLBI_ALLE3IS
+	{side_effects={.PRIVILEGED}},
+	// .PRFM
+	{read={1}, side_effects={.HINT}},
+	// .PRFUM
+	{read={1}, side_effects={.HINT}},
+	// .PRFM_LIT
+	{side_effects={.HINT}},
+	// .MOV_REG
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .MOV_BITMASK
+	{written={0}},
+	{written={0}},
+	// .MVN
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .NEG_SR
+	{written={0}, read={1}},
+	{written={0}, read={1}},
+	// .NEGS
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	{written={0}, read={1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .CMP_SR
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .CMP_ER
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .CMP_IMM
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}},
+	// .CMN_SR
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .CMN_ER
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	// .CMN_IMM
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0}, nzcv_wr={.N, .Z, .C, .V}},
+	// .TST_SR
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+	{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}},
+}
+
+@(rodata)
 ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{
 	.INVALID              = {    0,   0},
 	.ADD_IMM              = {    0,   2},

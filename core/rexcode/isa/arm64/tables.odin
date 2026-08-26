@@ -44,10 +44,11 @@ Decode_Index :: struct #packed {
 // Loaded tables (rodata, embedded from tables/*.bin at compile time)
 // -----------------------------------------------------------------------------
 
-@(rodata) ENCODE_FORMS     := #load("tables/arm64.encode_forms.bin", []Encoding)
-@(rodata) ENCODE_RUNS      := #load("tables/arm64.encode_runs.bin",  []Encode_Run)
-@(rodata) DECODE_ENTRIES   := #load("tables/arm64.entries.bin",      []Decode_Entry)
-@(rodata) DECODE_INDEX_OP0 := #load("tables/arm64.idx_op0.bin",      []Decode_Index)
+@(rodata) ENCODE_FORMS     := #load("tables/arm64.encode_forms.bin",  []Encoding)
+@(rodata) CLOBBER_FORMS    := #load("tables/arm64.clobber_forms.bin", []Clobber)
+@(rodata) ENCODE_RUNS      := #load("tables/arm64.encode_runs.bin",   []Encode_Run)
+@(rodata) DECODE_ENTRIES   := #load("tables/arm64.entries.bin",       []Decode_Entry)
+@(rodata) DECODE_INDEX_OP0 := #load("tables/arm64.idx_op0.bin",       []Decode_Index)
 
 // -----------------------------------------------------------------------------
 // Accessors

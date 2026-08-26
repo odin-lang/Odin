@@ -1,5 +1,91 @@
 package rexcode_arm64_tablegen
 
+// =============================================================================
+// rexcode  ·  AArch64 INSTRUCTION_TABLE (v1: base integer + FP scalar)
+// =============================================================================
+//
+// One []Form per Mnemonic. A Form fuses an instruction form's Encoding with its
+// Clobber, so INSTRUCTION_TABLE[m][i] carries both the bit pattern and the
+// read/write + side-effect summary for form i of mnemonic m. This replaces the
+// old pair of index-aligned tables (ENCODING_TABLE[m][i] / CLOBBER_TABLE[m][i]);
+// co-locating the two in one struct removes the alignment invariant, so a form's
+// encoding and clobber can no longer drift out of sync.
+//
+//
+// --- Encoding: (bits, mask) model --------------------------------------------
+//
+// Same shape as MIPS/RISC-V. `bits` carries the static opcode pattern; `mask`
+// covers exactly the bits that are fixed by the form. Operand-driven fields
+// (Rd/Rn/Rm/imm*/sh/cond/...) land in zero positions of `bits` and are ORed in
+// by the encoder.
+//
+// Sections (each follows the ARM ARM "C4.1.x Data-processing /" division):
+//   §1  Data-processing -- immediate     (Add/Sub imm, Mov-wide, PC-rel)
+//   §2  Data-processing -- shifted reg   (Add/Sub/AND/ORR/EOR/BIC/ORN/EON)
+//   §3  Data-processing -- extended reg  (Add/Sub extended)
+//   §4  Data-processing -- 2-source      (LSLV/LSRV/ASRV/RORV, UDIV/SDIV)
+//   §5  Data-processing -- 3-source      (MADD/MSUB/SMADDL/.../UMULH)
+//   §6  Data-processing -- 1-source      (CLZ/CLS/RBIT/REV/REV16/REV32)
+//   §7  Conditional                      (CSEL/CSINC/CSINV/CSNEG)
+//   §8  Branches                         (B/BL/BR/BLR/RET, B.cond, CBZ, TBZ)
+//   §9  Loads / stores                   (LDR/STR families, LDP/STP, LDUR)
+//   §10 System                           (NOP/HINT/ISB/MSR/MRS/SVC/...)
+//   §11 FP scalar                        (FMOV/FADD/FCVT/FCMP/FCSEL/...)
+//
+// Logical-immediate forms (AND/ORR/EOR/ANDS imm) use the bitmask-immediate
+// encoding (N:imms:immr); they're deferred to a follow-up turn that adds the
+// bitmask encoder helper.
+//
+//
+// --- Clobber: read/write + side-effect summary -------------------------------
+//
+// One Clobber per Form -- a read/write + side-effect summary for every form of
+// every mnemonic. Derivation (from each form's operand TYPES, operand ROLES,
+// and Encoding_Flags):
+//
+//   written / read  -- operand slots (0..3) whose register / memory base is a
+//                      def / use. A slot counts only if its TYPE is register-
+//                      or memory-like; immediate slots never appear. Direction
+//                      comes from the ROLE, refined by instruction class:
+//                        * RD/VD/PD/RT/RT2/ZA_TILE* are destinations, EXCEPT
+//                          the data operand of a store (RT/VD on ST*), which is
+//                          a source; and the status result of STXR/STXP (RD),
+//                          which stays a def while RT/RT2 become sources.
+//                        * A pre/post-index base (OFFSET_BASE_PRE/POST) is both
+//                          read and written (address write-back).
+//                        * A destination register re-listed as a later source
+//                          slot (SVE destructive Zdn, accumulate) is read.
+//                        * Branches define no GPR operand; targets/modifiers
+//                          are reads.
+//   implicit_wr/rd  -- LR on BL/BLR/RET, LR+SP on PAC*SP / RETAA, X16/X17 on
+//                      PAC*1716, etc.
+//   nzcv_wr         -- set for sets_flags forms (ADDS/SUBS/ANDS/CMP/CCMP/FCMP,
+//                      SVE compares, WHILE*, PTRUES, ...).
+//   nzcv_rd         -- any COND operand (CSEL/FCSEL/B.cond/CCMP), plus the
+//                      carry readers ADC/ADCS/SBC/SBCS/NGC/NGCS; CCMP/CCMN both.
+//   fpsr_wr/reads_fpcr -- per FP-op family (see notes); saturating integer ops
+//                      (SQ*/UQ*/SUQ*/USQ*/SQRDML*) set QC.
+//   reads_mem/writes_mem -- loads / stores / RMW atomics / MOPS.
+//   side_effects    -- control flow, barriers, atomics, cache/TLB, PAC, BTI,
+//                      wait, privileged system access, FFR, etc.
+//
+// Heuristic / best-effort fields (structurally faithful, semantically approximate):
+//   * FPSR exception-bit sets and reads_fpcr are assigned per mnemonic family,
+//     not per-corner-case; treat them as "flags this class may raise".
+//   * Accumulate detection (destination is read-modified) is name-driven for
+//     the families that fold the accumulator into the destination (MLA/MLS/DOT/
+//     FMLA/FCMLA/SQRDML*/MOPA, shift-accumulate, bit-insert, AES/SHA/SM3/SM4,
+//     PAC in-place). Multiply-adds with a separate Ra/Va operand (MADD/FMADD/...)
+//     are correctly NOT dest-reads.
+//   * LD1-4/ST1-4 register lists occupy a single operand slot, so max operand
+//     count stays at 4 (matches Operand_Set / the encoder's model).
+//   * Acquire/release accesses carry the FENCE side effect to model their
+//     one-way ordering (distinct from the register/memory read/write sets).
+//   * Requires the companion clobber_types.odin (adds X16/X17 to Clobber_Reg
+//     and FFR to Side_Effect).
+// =============================================================================
+
+
 Form :: struct {
 	using encoding: Encoding,
 	clobber: Clobber,

@@ -32,10 +32,11 @@ Clobber  :: lib.Clobber
 
 Blob :: struct { global, file, typ: string }
 BLOBS := [?]Blob{
-	{"ENCODE_FORMS",     "arm64.encode_forms.bin", "Encoding"},
-	{"ENCODE_RUNS",      "arm64.encode_runs.bin",  "Encode_Run"},
-	{"DECODE_ENTRIES",   "arm64.entries.bin",      "Decode_Entry"},
-	{"DECODE_INDEX_OP0", "arm64.idx_op0.bin",      "Decode_Index"},
+	{"ENCODE_FORMS",     "arm64.encode_forms.bin",  "Encoding"},
+	{"CLOBBER_FORMS",    "arm64.clobber_forms.bin", "Clobber"},
+	{"ENCODE_RUNS",      "arm64.encode_runs.bin",   "Encode_Run"},
+	{"DECODE_ENTRIES",   "arm64.entries.bin",       "Decode_Entry"},
+	{"DECODE_INDEX_OP0", "arm64.idx_op0.bin",       "Decode_Index"},
 }
 
 DIR_GEN     :: #directory + "/generated/"
@@ -73,16 +74,29 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "// Flattened encode forms + per-mnemonic run index (source: ENCODING_TABLE).\n\n")
 	strings.write_string(&sb, "import lib \"../..\"\n\n")
 
-	for m in Mnemonic { total += len(ENCODING_TABLE[m]) }
+	for m in Mnemonic { total += len(INSTRUCTION_TABLE[m]) }
 
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total)
 	for m in Mnemonic {
-		forms := ENCODING_TABLE[m]
+		forms := INSTRUCTION_TABLE[m]
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
 		for f in forms {
-			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.flags)
+			e := f.encoding
+			write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.flags)
+		}
+	}
+	strings.write_string(&sb, "}\n\n")
+
+	strings.write_string(&sb, "@(rodata)\n")
+	fmt.sbprintfln(&sb, "CLOBBER_FORMS := [%d]lib.Clobber{{", total)
+	for m in Mnemonic {
+		forms := INSTRUCTION_TABLE[m]
+		if len(forms) == 0 { continue }
+		fmt.sbprintfln(&sb, "\t// .%v", m)
+		for f in forms {
+			write_clobber(&sb, f.clobber)
 		}
 	}
 	strings.write_string(&sb, "}\n\n")
@@ -93,7 +107,7 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
-		c := len(ENCODING_TABLE[m])
+		c := len(INSTRUCTION_TABLE[m])
 		name := reflect.enum_string(m)
 		fmt.sbprintf(&sb, "\t.%s", name)
 		for _ in 0..<run_w-len(name) { strings.write_byte(&sb, ' ') }
@@ -103,6 +117,72 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "}\n")
 	emit_file(DIR_GEN + "encode_tables.odin", &sb)
 	return
+}
+
+write_clobber :: proc(sb: ^strings.Builder, clobber: lib.Clobber) {
+	strings.write_string(sb, "\t{")
+	defer strings.write_string(sb, "},\n")
+
+	n := 0
+	for field in reflect.struct_fields_zipped(lib.Clobber) {
+		value := reflect.struct_field_value(clobber, field)
+		if reflect.is_bit_set(field.type) {
+			if !reflect.is_nil(value) {
+				if n > 0 { strings.write_string(sb, ", ") }
+				defer n += 1
+
+				value_int := value
+				switch type_info_of(value.id).size {
+				case 1: value_int.id = u8
+				case 2: value_int.id = u16
+				case 4: value_int.id = u32
+				case 8: value_int.id = u64
+				}
+				bits := reflect.as_u64(value_int) or_else panic("cannot get bits")
+
+				bs := reflect.type_info_base(field.type).variant.(reflect.Type_Info_Bit_Set)
+				et := reflect.type_info_base(bs.elem)
+				lower := bs.lower
+				upper := bs.upper
+
+				strings.write_string(sb, field.name)
+				strings.write_string(sb, "={")
+				defer strings.write_byte(sb, '}')
+
+				e, is_enum := et.variant.(reflect.Type_Info_Enum)
+
+				commas := 0
+				loop: for i in transmute(bit_set[0..<64])bits {
+					elem := i64(i) + lower
+					if commas > 0 { strings.write_string(sb, ", ") }
+
+					if is_enum {
+						for ev, evi in e.values {
+							v := u64(ev)
+							if v == u64(elem) {
+								strings.write_string(sb, ".")
+								strings.write_string(sb, e.names[evi])
+								commas += 1
+								continue loop
+							}
+						}
+					} else {
+						fmt.sbprintf(sb, "%d", elem)
+						commas += 1
+					}
+				}
+			}
+		} else if reflect.is_boolean(field.type) {
+			if reflect.as_bool(value) or_else false {
+				if n > 0 { strings.write_string(sb, ", ") }
+				defer n += 1
+				strings.write_string(sb, field.name)
+				strings.write_string(sb, "=true")
+			}
+		} else {
+			panic("unhandled type")
+		}
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -119,13 +199,14 @@ emit_decode_tables :: proc() -> (total: int) {
 	all: [dynamic]Entry
 	defer delete(all)
 	for mn in Mnemonic {
-		for f in ENCODING_TABLE[mn] {
-			op0_static := u8((f.bits >> 25) & 0xF)
-			op0_mask   := u8((f.mask >> 25) & 0xF)
+		for form in INSTRUCTION_TABLE[mn] {
+			e := form.encoding
+			op0_static := u8((e.bits >> 25) & 0xF)
+			op0_mask   := u8((e.mask >> 25) & 0xF)
 			// Enumerate every 4-bit bucket B such that (B & op0_mask) == op0_static.
 			for b: u8 = 0; b < 16; b += 1 {
 				if (b & op0_mask) != op0_static { continue }
-				append(&all, Entry{f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.flags, b})
+				append(&all, Entry{e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.flags, b})
 			}
 		}
 	}
