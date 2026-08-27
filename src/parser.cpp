@@ -104,7 +104,7 @@ gb_internal bool ast_file_vet_explicit_allocators(AstFile *f) {
 }
 
 gb_internal bool file_allow_newline(AstFile *f) {
-	bool is_strict = is_strict_style(f) || ast_file_vet_style(f)
+	bool is_strict = is_strict_style(f) || ast_file_vet_style(f);
 	return !is_strict;
 }
 
