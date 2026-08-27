@@ -1743,9 +1743,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// Integer Q-form .I16/.I32 (bit 24 = 1)
 		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// FP .F32 D-form / Q-form (F=1, size=10)
-		{.VMUL, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	// ---- VMLA / VMLS (integer + F32) ----
 	.VMLA = {
@@ -1769,9 +1766,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// FP .F32 (F=1)
-		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	.VMLS = {
 		{.VMLS, {.SPR, .SPR, .SPR, .NONE}, {.VD_S, .VN_S, .VM_S, .NONE}, 0x0E000A40, 0x0FB00B50, .VFPV2, .A32, {}, {.F32, .NONE}},
@@ -1791,9 +1785,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2900440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// FP .F32
-		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	// ---- VAND / VBIC / VORR / VORN / VEOR (bitwise, no size variants) ----
@@ -2089,16 +2080,11 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.VSHR = {
 		{.VSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800010, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800050, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// unsigned
-		{.VSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800010, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800050, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		// MVE imm form (imm6 at bits 21:16)
 		{.VSHR, {.QPR, .QPR, .IMM5, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xEF800050, 0xEF800F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.I32, .NONE}},
 	},
 	// VSRA imm
 	.VSRA = {
-		{.VSRA, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800110, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VSRA, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800150, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VSRA, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800110, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VSRA, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800150, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		// MVE (imm6 at bits 21:16)
@@ -2129,8 +2115,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 	// VRSHR (rounding shift right immediate)
 	.VRSHR = {
-		{.VRSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800210, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VRSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800250, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VRSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800210, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VRSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800250, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		// MVE
@@ -2536,7 +2520,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// VSHLL.S<sz> Q, D, #imm: 1111 0010 1 D imm6 Vd 1010 0 0 M 1 Vm
 		//   imm6 encodes sh + size: 001sss for sh<8, 01sss for sh<16, 1sss for sh<32
 		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800A10, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800A10, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},   // U=1
 		// VSHLL by max (#size) variant: 1111 0011 1 D 11 size 10 Vd 0011 0 0 M 0 Vm
 		{.VSHLL, {.QPR, .DPR, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3B20300, 0xFFB30FD0, .NEON, .A32, {cond_in_28=false}, {.I8, .NONE}},
 		{.VSHLL, {.QPR, .DPR, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3B60300, 0xFFB30FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
@@ -2553,11 +2536,9 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.VQSHRN = {
 		// signed: 1111 0010 1 D imm6 Vd 1001 0 0 M 1 Vm; unsigned: U=1
 		{.VQSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800910, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VQSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800910, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 	},
 	.VQRSHRN = {
 		// 1111 0010 1 D imm6 Vd 1001 0 1 M 1 Vm
-		{.VQRSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800950, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VQRSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800950, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 	},
 	.VQSHRUN = {
