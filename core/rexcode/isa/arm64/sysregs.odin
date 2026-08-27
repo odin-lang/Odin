@@ -60,9 +60,9 @@ ELR_EL1      :: i64(0x4201)  // 3   0   4   0   1
 ELR_EL2      :: i64(0x6201)  // 3   4   4   0   1
 SPSR_EL1     :: i64(0x4200)  // 3   0   4   0   0
 SPSR_EL2     :: i64(0x6200)  // 3   4   4   0   0
-ESR_EL1      :: i64(0x5290)  // 3   0   5   2   0
+ESR_EL1      :: i64(0x4290)  // 3   0   5   2   0
 ESR_EL2      :: i64(0x6290)  // 3   4   5   2   0
-FAR_EL1      :: i64(0x5300)  // 3   0   6   0   0
+FAR_EL1      :: i64(0x4300)  // 3   0   6   0   0
 FAR_EL2      :: i64(0x6300)  // 3   4   6   0   0
 TPIDR_EL0    :: i64(0x5E82)  // 3   3  13   0   2
 TPIDRRO_EL0  :: i64(0x5E83)  // 3   3  13   0   3
@@ -76,7 +76,7 @@ MIDR_EL1     :: i64(0x4000)  // 3   0   0   0   0
 MPIDR_EL1    :: i64(0x4005)  // 3   0   0   0   5
 DCZID_EL0    :: i64(0x5807)  // 3   3   0   0   7  (used by __sve_max_vl-style probes too)
 CTR_EL0      :: i64(0x5801)  // 3   3   0   0   1
-TCR_EL1      :: i64(0x4282)  // 3   0   2   0   2
+TCR_EL1      :: i64(0x4102)  // 3   0   2   0   2
 SCTLR_EL1    :: i64(0x4080)  // 3   0   1   0   0
 VBAR_EL1     :: i64(0x4600)  // 3   0  12   0   0
 HCR_EL2      :: i64(0x6088)  // 3   4   1   1   0
@@ -153,7 +153,7 @@ SCTLR_EL2        :: i64(0x6080)  // 3   4   1   0   0
 SCTLR_EL3        :: i64(0x7080)  // 3   6   1   0   0
 SPSR_EL3         :: i64(0x7200)  // 3   6   4   0   0
 ELR_EL3          :: i64(0x7201)  // 3   6   4   0   1
-TPIDR_EL2        :: i64(0x6E82)  // 3   4  13   0   2
+TPIDR_EL2        :: i64(0x6682)  // 3   4  13   0   2
 TPIDR_EL3        :: i64(0x7682)  // 3   6  13   0   2  -- err, EL3 needs op1=6
 HSTR_EL2         :: i64(0x608B)  // 3   4   1   1   3
 MDCR_EL2         :: i64(0x6089)  // 3   4   1   1   1
@@ -176,36 +176,36 @@ OSLSR_EL1        :: i64(0x008C)  // 2   0   1   1   4
 // -----------------------------------------------------------------------------
 // Cache / Memory feature extras
 // -----------------------------------------------------------------------------
-RGSR_EL1         :: i64(0x4288)  // 3   0   5   1   0 (FEAT_MTE)
-GCR_EL1          :: i64(0x4289)  // 3   0   5   1   2 (FEAT_MTE)
-TFSR_EL1         :: i64(0x4300)  // 3   0   6   0   0 (FEAT_MTE)
-TFSRE0_EL1       :: i64(0x4301)  // 3   0   6   0   1 (FEAT_MTE)
+RGSR_EL1         :: i64(0x4085)  // 3   0   1   0   5 (FEAT_MTE)
+GCR_EL1          :: i64(0x4086)  // 3   0   1   0   6 (FEAT_MTE)
+TFSR_EL1         :: i64(0x42B0)  // 3   0   5   6   0 (FEAT_MTE)
+TFSRE0_EL1       :: i64(0x42B1)  // 3   0   5   6   1 (FEAT_MTE)
 GMID_EL1         :: i64(0x4804)  // 3   1   0   0   4 (FEAT_MTE)
 
 // -----------------------------------------------------------------------------
 // SME / SVE configuration
 // -----------------------------------------------------------------------------
-SVCR             :: i64(0x5A22)  // 3   3   4   2   2 (FEAT_SME: SM + ZA bits)
-SMCR_EL1         :: i64(0x4296)  // 3   0   1   2   6 (FEAT_SME)
-SMCR_EL2         :: i64(0x6296)  // 3   4   1   2   6
-ZCR_EL1          :: i64(0x4290)  // 3   0   1   2   0 (FEAT_SVE)
-ZCR_EL2          :: i64(0x6290)  // 3   4   1   2   0
-ZCR_EL3          :: i64(0x7290)  // 3   6   1   2   0
+SVCR             :: i64(0x5A12)  // 3   3   4   2   2 (FEAT_SME: SM + ZA bits)
+SMCR_EL1         :: i64(0x4096)  // 3   0   1   2   6 (FEAT_SME)
+SMCR_EL2         :: i64(0x6096)  // 3   4   1   2   6
+ZCR_EL1          :: i64(0x4090)  // 3   0   1   2   0 (FEAT_SVE)
+ZCR_EL2          :: i64(0x6090)  // 3   4   1   2   0
+ZCR_EL3          :: i64(0x7090)  // 3   6   1   2   0
 
 // -----------------------------------------------------------------------------
 // Cache / data prefetch hint controls
 // -----------------------------------------------------------------------------
-PRSELR_EL1       :: i64(0x4288)  // ... (collision with RGSR_EL1; keep historic)
-APIAKEYLO_EL1    :: i64(0x4318)  // 3   0   2   1   0 (FEAT_PAuth)
-APIAKEYHI_EL1    :: i64(0x4319)  // 3   0   2   1   1
-APIBKEYLO_EL1    :: i64(0x431A)  // 3   0   2   1   2
-APIBKEYHI_EL1    :: i64(0x431B)  // 3   0   2   1   3
-APDAKEYLO_EL1    :: i64(0x4320)  // 3   0   2   2   0
-APDAKEYHI_EL1    :: i64(0x4321)  // 3   0   2   2   1
-APDBKEYLO_EL1    :: i64(0x4322)  // 3   0   2   2   2
-APDBKEYHI_EL1    :: i64(0x4323)  // 3   0   2   2   3
-APGAKEYLO_EL1    :: i64(0x4328)  // 3   0   2   3   0
-APGAKEYHI_EL1    :: i64(0x4329)  // 3   0   2   3   1
+PRSELR_EL1       :: i64(0x4311) // 3   0   6   2   1
+APIAKEYLO_EL1    :: i64(0x4108)  // 3   0   2   1   0 (FEAT_PAuth)
+APIAKEYHI_EL1    :: i64(0x4109)  // 3   0   2   1   1
+APIBKEYLO_EL1    :: i64(0x410A)  // 3   0   2   1   2
+APIBKEYHI_EL1    :: i64(0x410B)  // 3   0   2   1   3
+APDAKEYLO_EL1    :: i64(0x4110)  // 3   0   2   2   0
+APDAKEYHI_EL1    :: i64(0x4111)  // 3   0   2   2   1
+APDBKEYLO_EL1    :: i64(0x4112)  // 3   0   2   2   2
+APDBKEYHI_EL1    :: i64(0x4113)  // 3   0   2   2   3
+APGAKEYLO_EL1    :: i64(0x4118)  // 3   0   2   3   0
+APGAKEYHI_EL1    :: i64(0x4119)  // 3   0   2   3   1
 
 // =============================================================================
 // Batch 5: comprehensive sysreg sweep
@@ -222,8 +222,8 @@ ID_MMFR0_EL1     :: i64(0x400C)  // 3 0 0 1 4
 ID_MMFR1_EL1     :: i64(0x400D)  // 3 0 0 1 5
 ID_MMFR2_EL1     :: i64(0x400E)  // 3 0 0 1 6
 ID_MMFR3_EL1     :: i64(0x400F)  // 3 0 0 1 7
-ID_MMFR4_EL1     :: i64(0x4036)  // 3 0 0 6 6
-ID_MMFR5_EL1     :: i64(0x402E)  // 3 0 0 5 6
+ID_MMFR4_EL1     :: i64(0x4016)  // 3   0   0   2   6
+ID_MMFR5_EL1     :: i64(0x401E)  // 3   0   0   3   6
 ID_ISAR0_EL1     :: i64(0x4010)  // 3 0 0 2 0
 ID_ISAR1_EL1     :: i64(0x4011)  // 3 0 0 2 1
 ID_ISAR2_EL1     :: i64(0x4012)  // 3 0 0 2 2
@@ -231,7 +231,7 @@ ID_ISAR3_EL1     :: i64(0x4013)  // 3 0 0 2 3
 ID_ISAR4_EL1     :: i64(0x4014)  // 3 0 0 2 4
 ID_ISAR5_EL1     :: i64(0x4015)  // 3 0 0 2 5
 ID_ISAR6_EL1     :: i64(0x4017)  // 3 0 0 2 7
-ID_PFR2_EL1      :: i64(0x402C)  // (overlap historic; check if collision)
+ID_PFR2_EL1      :: i64(0x401C) // 3   0   0   3   4
 MVFR0_EL1        :: i64(0x4018)  // 3 0 0 3 0
 MVFR1_EL1        :: i64(0x4019)  // 3 0 0 3 1
 MVFR2_EL1        :: i64(0x401A)  // 3 0 0 3 2
@@ -253,7 +253,7 @@ CNTHV_CVAL_EL2   :: i64(0x671A)  // 3 4 14 3 2
 CNTPS_TVAL_EL1   :: i64(0x7F10)  // 3 7 14 2 0
 CNTPS_CTL_EL1    :: i64(0x7F11)  // 3 7 14 2 1
 CNTPS_CVAL_EL1   :: i64(0x7F12)  // 3 7 14 2 2
-CNTVOFF_EL2      :: i64(0x671B)  // 3 4 14 0 3
+CNTVOFF_EL2      :: i64(0x6703)  // 3 4 14 0 3
 
 // ---- Debug breakpoints (DBGB*) and watchpoints (DBGW*), numbered ----
 //
@@ -278,15 +278,15 @@ sysreg_debug_watchpoint_control :: #force_inline proc "contextless" (n: u32) -> 
 }
 
 // Other debug registers
-DBGDTR_EL0       :: i64(0x1A20)  // 2 3 0 4 0
-DBGDTRRX_EL0     :: i64(0x1A28)  // 2 3 0 5 0
-DBGDTRTX_EL0     :: i64(0x1A28)
-DBGPRCR_EL1      :: i64(0x0084)  // (collision flag; treat as canonical from doc)
-DBGCLAIMSET_EL1  :: i64(0x1BC6)  // 2 0 7 8 6
-DBGCLAIMCLR_EL1  :: i64(0x1BCE)  // 2 0 7 9 6
-DBGAUTHSTATUS_EL1:: i64(0x1BF6)  // 2 0 7 14 6
+DBGDTR_EL0       :: i64(0x1820)  // 2 3 0 4 0
+DBGDTRRX_EL0     :: i64(0x1828)  // 2 3 0 5 0
+DBGDTRTX_EL0     :: i64(0x1828) // 2   3   0   5   0 (write view of DBGDTRRX_EL0)
+DBGPRCR_EL1      :: i64(0x00A4) // 2   0   1   4   4
+DBGCLAIMSET_EL1  :: i64(0x03C6)  // 2 0 7 8 6
+DBGCLAIMCLR_EL1  :: i64(0x03CE)  // 2 0 7 9 6
+DBGAUTHSTATUS_EL1:: i64(0x03F6)  // 2 0 7 14 6
 MDCCINT_EL1      :: i64(0x0010)  // 2 0 0 2 0
-MDRAR_EL1        :: i64(0x1080)  // 2 0 1 0 0
+MDRAR_EL1        :: i64(0x0080)  // 2 0 1 0 0
 
 // PMU event counters (PMEVCNTRn_EL0 / PMEVTYPERn_EL0). Up to n=30.
 //   PMEVCNTRn_EL0  = sysreg(3, 3, 14, 8+(n>>3), n & 7)
@@ -299,40 +299,40 @@ sysreg_pmu_event_typer :: #force_inline proc "contextless" (n: u32) -> i64 {
 	return sysreg_field(3, 3, 14, 12 + ((n >> 3) & 0x3), n & 0x7)
 }
 
-PMINTENSET_EL1   :: i64(0x4CE1)  // 3 0 9 14 1
-PMINTENCLR_EL1   :: i64(0x4CE2)  // 3 0 9 14 2
+PMINTENSET_EL1   :: i64(0x44F1)  // 3 0 9 14 1
+PMINTENCLR_EL1   :: i64(0x44F2)  // 3 0 9 14 2
 
 // ---- GICv3 (ICC_*) -- CPU interface ----
-ICC_IAR0_EL1     :: i64(0x4C40)  // 3 0 12 8 0
-ICC_IAR1_EL1     :: i64(0x4C60)  // 3 0 12 12 0
-ICC_EOIR0_EL1    :: i64(0x4C41)  // 3 0 12 8 1
-ICC_EOIR1_EL1    :: i64(0x4C61)  // 3 0 12 12 1
-ICC_HPPIR0_EL1   :: i64(0x4C42)  // 3 0 12 8 2
-ICC_HPPIR1_EL1   :: i64(0x4C62)  // 3 0 12 12 2
-ICC_BPR0_EL1     :: i64(0x4C43)  // 3 0 12 8 3
-ICC_BPR1_EL1     :: i64(0x4C63)  // 3 0 12 12 3
-ICC_DIR_EL1      :: i64(0x4C59)  // 3 0 12 11 1
-ICC_PMR_EL1      :: i64(0x4630)  // 3 0 4 6 0
-ICC_RPR_EL1      :: i64(0x4C5B)  // 3 0 12 11 3
-ICC_SGI0R_EL1    :: i64(0x5CDF)  // 3 3 12 11 7
-ICC_SGI1R_EL1    :: i64(0x5CDD)  // 3 3 12 11 5
-ICC_ASGI1R_EL1   :: i64(0x5CDE)  // 3 3 12 11 6
-ICC_SRE_EL1      :: i64(0x4C65)  // 3 0 12 12 5
-ICC_SRE_EL2      :: i64(0x6C65)  // 3 4 12 9 5
-ICC_SRE_EL3      :: i64(0x7C65)  // 3 6 12 12 5
-ICC_CTLR_EL1     :: i64(0x4C64)  // 3 0 12 12 4
-ICC_CTLR_EL3     :: i64(0x7C64)  // 3 6 12 12 4
-ICC_IGRPEN0_EL1  :: i64(0x4C66)  // 3 0 12 12 6
-ICC_IGRPEN1_EL1  :: i64(0x4C67)  // 3 0 12 12 7
-ICC_IGRPEN1_EL3  :: i64(0x7C67)  // 3 6 12 12 7
+ICC_IAR0_EL1     :: i64(0x4640)  // 3 0 12 8 0
+ICC_IAR1_EL1     :: i64(0x4660)  // 3 0 12 12 0
+ICC_EOIR0_EL1    :: i64(0x4641)  // 3 0 12 8 1
+ICC_EOIR1_EL1    :: i64(0x4661)  // 3 0 12 12 1
+ICC_HPPIR0_EL1   :: i64(0x4642)  // 3 0 12 8 2
+ICC_HPPIR1_EL1   :: i64(0x4662)  // 3 0 12 12 2
+ICC_BPR0_EL1     :: i64(0x4643)  // 3 0 12 8 3
+ICC_BPR1_EL1     :: i64(0x4663)  // 3 0 12 12 3
+ICC_DIR_EL1      :: i64(0x4659)  // 3 0 12 11 1
+ICC_PMR_EL1      :: i64(0x4230)  // 3 0 4 6 0
+ICC_RPR_EL1      :: i64(0x465B)  // 3 0 12 11 3
+ICC_SGI0R_EL1    :: i64(0x465F)  // 3   0   12  11  7
+ICC_SGI1R_EL1    :: i64(0x465D)  // 3   0   12  11  5
+ICC_ASGI1R_EL1   :: i64(0x465E)  // 3   0   12  11  6
+ICC_SRE_EL1      :: i64(0x4665)  // 3 0 12 12 5
+ICC_SRE_EL2      :: i64(0x664D)  // 3 4 12 9 5
+ICC_SRE_EL3      :: i64(0x7665)  // 3 6 12 12 5
+ICC_CTLR_EL1     :: i64(0x4664)  // 3 0 12 12 4
+ICC_CTLR_EL3     :: i64(0x7664)  // 3 6 12 12 4
+ICC_IGRPEN0_EL1  :: i64(0x4666)  // 3 0 12 12 6
+ICC_IGRPEN1_EL1  :: i64(0x4667)  // 3 0 12 12 7
+ICC_IGRPEN1_EL3  :: i64(0x7667)  // 3 6 12 12 7
 
 // ---- GICv3 hypervisor (ICH_*) ----
-ICH_HCR_EL2      :: i64(0x6CD8)  // 3 4 12 11 0
-ICH_VTR_EL2      :: i64(0x6CD9)  // 3 4 12 11 1
-ICH_MISR_EL2     :: i64(0x6CDA)  // 3 4 12 11 2
-ICH_EISR_EL2     :: i64(0x6CDB)  // 3 4 12 11 3
-ICH_ELRSR_EL2    :: i64(0x6CDD)  // 3 4 12 11 5
-ICH_VMCR_EL2     :: i64(0x6CDF)  // 3 4 12 11 7
+ICH_HCR_EL2      :: i64(0x6658)  // 3 4 12 11 0
+ICH_VTR_EL2      :: i64(0x6659)  // 3 4 12 11 1
+ICH_MISR_EL2     :: i64(0x665A)  // 3 4 12 11 2
+ICH_EISR_EL2     :: i64(0x665B)  // 3 4 12 11 3
+ICH_ELRSR_EL2    :: i64(0x665D)  // 3 4 12 11 5
+ICH_VMCR_EL2     :: i64(0x665F)  // 3 4 12 11 7
 
 // ICH_LR0_EL2 .. ICH_LR15_EL2  = sysreg(3, 4, 12, 12+(n>>3), n & 7)
 sysreg_ich_lr :: #force_inline proc "contextless" (n: u32) -> i64 {
@@ -348,26 +348,26 @@ sysreg_ich_ap1r :: #force_inline proc "contextless" (n: u32) -> i64 {
 }
 
 // ---- TRBE (Trace Buffer Extension, FEAT_TRBE) ----
-TRBLIMITR_EL1    :: i64(0x4B90)  // 3 0 9 11 0
-TRBPTR_EL1       :: i64(0x4B91)  // 3 0 9 11 1
-TRBBASER_EL1     :: i64(0x4B92)  // 3 0 9 11 2
-TRBSR_EL1        :: i64(0x4B93)  // 3 0 9 11 3
-TRBMAR_EL1       :: i64(0x4B94)  // 3 0 9 11 4
-TRBTRG_EL1       :: i64(0x4B96)  // 3 0 9 11 6
-TRBIDR_EL1       :: i64(0x4B97)  // 3 0 9 11 7
+TRBLIMITR_EL1    :: i64(0x44D8)  // 3 0 9 11 0
+TRBPTR_EL1       :: i64(0x44D9)  // 3 0 9 11 1
+TRBBASER_EL1     :: i64(0x44DA)  // 3 0 9 11 2
+TRBSR_EL1        :: i64(0x44DB)  // 3 0 9 11 3
+TRBMAR_EL1       :: i64(0x44DC)  // 3 0 9 11 4
+TRBTRG_EL1       :: i64(0x44DE)  // 3 0 9 11 6
+TRBIDR_EL1       :: i64(0x44DF)  // 3 0 9 11 7
 
 // ---- SPE (Statistical Profiling Extension, FEAT_SPE) ----
-PMSCR_EL1        :: i64(0x4948)  // 3 0 9 9 0
-PMSICR_EL1       :: i64(0x494A)  // 3 0 9 9 2
-PMSIRR_EL1       :: i64(0x494B)  // 3 0 9 9 3
-PMSFCR_EL1       :: i64(0x494C)  // 3 0 9 9 4
-PMSEVFR_EL1      :: i64(0x494D)  // 3 0 9 9 5
-PMSLATFR_EL1     :: i64(0x494E)  // 3 0 9 9 6
-PMSIDR_EL1       :: i64(0x494F)  // 3 0 9 9 7
-PMBLIMITR_EL1    :: i64(0x4950)  // 3 0 9 10 0
-PMBPTR_EL1       :: i64(0x4951)  // 3 0 9 10 1
-PMBSR_EL1        :: i64(0x4953)  // 3 0 9 10 3
-PMBIDR_EL1       :: i64(0x4957)  // 3 0 9 10 7
+PMSCR_EL1        :: i64(0x44C8)  // 3 0 9 9 0
+PMSICR_EL1       :: i64(0x44CA)  // 3 0 9 9 2
+PMSIRR_EL1       :: i64(0x44CB)  // 3 0 9 9 3
+PMSFCR_EL1       :: i64(0x44CC)  // 3 0 9 9 4
+PMSEVFR_EL1      :: i64(0x44CD)  // 3 0 9 9 5
+PMSLATFR_EL1     :: i64(0x44CE)  // 3 0 9 9 6
+PMSIDR_EL1       :: i64(0x44CF)  // 3 0 9 9 7
+PMBLIMITR_EL1    :: i64(0x44D0)  // 3 0 9 10 0
+PMBPTR_EL1       :: i64(0x44D1)  // 3 0 9 10 1
+PMBSR_EL1        :: i64(0x44D3)  // 3 0 9 10 3
+PMBIDR_EL1       :: i64(0x44D7)  // 3 0 9 10 7
 
 // ---- RAS (Reliability, Availability, Serviceability) ----
 ERRSELR_EL1      :: i64(0x4299)  // 3 0 5 3 1
@@ -382,7 +382,7 @@ ERXMISC2_EL1     :: i64(0x42AA)  // 3 0 5 5 2
 ERXMISC3_EL1     :: i64(0x42AB)  // 3 0 5 5 3
 DISR_EL1         :: i64(0x4609)  // 3 0 12 1 1
 VDISR_EL2        :: i64(0x6609)  // 3 4 12 1 1
-VSESR_EL2        :: i64(0x628B)  // 3 4 5 2 3
+VSESR_EL2        :: i64(0x6293)  // 3 4 5 2 3
 
 // ---- LOR (Limited Ordering Region) ----
 LORC_EL1         :: i64(0x4523)  // 3 0 10 4 3
@@ -392,11 +392,11 @@ LORN_EL1         :: i64(0x4522)  // 3 0 10 4 2
 LORSA_EL1        :: i64(0x4520)  // 3 0 10 4 0
 
 // ---- Translation result (returned by AT) ----
-PAR_EL1          :: i64(0x4380)  // 3 0 7 4 0
+PAR_EL1          :: i64(0x43A0)  // 3 0 7 4 0
 
 // ---- RME (Realm Management Extension) sysregs ----
-GPCCR_EL3        :: i64(0x70B6)  // 3 6 2 1 6 (Granule Protection Control)
-GPTBR_EL3        :: i64(0x70B4)  // 3 6 2 1 4 (Granule Protection Table Base)
+GPCCR_EL3        :: i64(0x710E)  // 3 6 2 1 6 (Granule Protection Control)
+GPTBR_EL3        :: i64(0x710C)  // 3 6 2 1 4 (Granule Protection Table Base)
 MFAR_EL3         :: i64(0x7305)  // 3 6 6 0 5 (Multiple FAR)
 
 // ---- TPIDRRO_EL0 alias / extra thread pointers ----
@@ -413,9 +413,10 @@ PMUSERENR_EL0_REPEAT :: PMUSERENR_EL0  // re-export alias placeholder
 // MRS/MSR carry the system register as a packed 15-bit field, so a disassembly
 // has a number where an assembler wants a name. Sorted by value; binary search.
 //
-// Six encodings have two names (a read view and a write view, or an alias
-// added by a later extension); the first by source order wins, so a round-trip
-// can come back spelled as the sibling.
+// 1 encodings carry two names. Where the pair is a read view and a write
+// view of one register (DBGDTRRX/DBGDTRTX) the read name wins, since MRS is
+// the direction that has to print; the rest are genuine aliases and either
+// name assembles, so a round-trip can come back spelled as the sibling.
 
 Sysreg_Name :: struct {
 	value: u16,
@@ -426,14 +427,15 @@ Sysreg_Name :: struct {
 SYSREG_NAMES := [?]Sysreg_Name{
 	{0x0010, "mdccint_el1"},
 	{0x0012, "mdscr_el1"},
+	{0x0080, "mdrar_el1"},
 	{0x0084, "oslar_el1"},
 	{0x008C, "oslsr_el1"},
-	{0x1080, "mdrar_el1"},
-	{0x1A20, "dbgdtr_el0"},
-	{0x1A28, "dbgdtrrx_el0"},
-	{0x1BC6, "dbgclaimset_el1"},
-	{0x1BCE, "dbgclaimclr_el1"},
-	{0x1BF6, "dbgauthstatus_el1"},
+	{0x00A4, "dbgprcr_el1"},
+	{0x03C6, "dbgclaimset_el1"},
+	{0x03CE, "dbgclaimclr_el1"},
+	{0x03F6, "dbgauthstatus_el1"},
+	{0x1820, "dbgdtr_el0"},
+	{0x1828, "dbgdtrrx_el0"},
 	{0x4000, "midr_el1"},
 	{0x4005, "mpidr_el1"},
 	{0x4008, "id_pfr0_el1"},
@@ -450,10 +452,13 @@ SYSREG_NAMES := [?]Sysreg_Name{
 	{0x4013, "id_isar3_el1"},
 	{0x4014, "id_isar4_el1"},
 	{0x4015, "id_isar5_el1"},
+	{0x4016, "id_mmfr4_el1"},
 	{0x4017, "id_isar6_el1"},
 	{0x4018, "mvfr0_el1"},
 	{0x4019, "mvfr1_el1"},
 	{0x401A, "mvfr2_el1"},
+	{0x401C, "id_pfr2_el1"},
+	{0x401E, "id_mmfr5_el1"},
 	{0x4020, "id_aa64pfr0_el1"},
 	{0x4021, "id_aa64pfr1_el1"},
 	{0x4024, "id_aa64zfr0_el1"},
@@ -463,29 +468,41 @@ SYSREG_NAMES := [?]Sysreg_Name{
 	{0x402A, "id_aa64dfr2_el1"},
 	{0x402C, "id_aa64afr0_el1"},
 	{0x402D, "id_aa64afr1_el1"},
-	{0x402E, "id_mmfr5_el1"},
 	{0x4030, "id_aa64isar0_el1"},
 	{0x4031, "id_aa64isar1_el1"},
 	{0x4032, "id_aa64isar2_el1"},
 	{0x4033, "id_aa64isar3_el1"},
-	{0x4036, "id_mmfr4_el1"},
 	{0x4038, "id_aa64mmfr0_el1"},
 	{0x4039, "id_aa64mmfr1_el1"},
 	{0x403A, "id_aa64mmfr2_el1"},
 	{0x4080, "sctlr_el1"},
 	{0x4081, "actlr_el1"},
 	{0x4082, "cpacr_el1"},
+	{0x4085, "rgsr_el1"},
+	{0x4086, "gcr_el1"},
+	{0x4090, "zcr_el1"},
+	{0x4096, "smcr_el1"},
 	{0x4100, "ttbr0_el1"},
 	{0x4101, "ttbr1_el1"},
+	{0x4102, "tcr_el1"},
+	{0x4108, "apiakeylo_el1"},
+	{0x4109, "apiakeyhi_el1"},
+	{0x410A, "apibkeylo_el1"},
+	{0x410B, "apibkeyhi_el1"},
+	{0x4110, "apdakeylo_el1"},
+	{0x4111, "apdakeyhi_el1"},
+	{0x4112, "apdbkeylo_el1"},
+	{0x4113, "apdbkeyhi_el1"},
+	{0x4118, "apgakeylo_el1"},
+	{0x4119, "apgakeyhi_el1"},
 	{0x4200, "spsr_el1"},
 	{0x4201, "elr_el1"},
 	{0x4208, "sp_el0"},
-	{0x4212, "current_el"},
-	{0x4282, "tcr_el1"},
+	{0x4212, "currentel"},
+	{0x4230, "icc_pmr_el1"},
 	{0x4288, "afsr0_el1"},
 	{0x4289, "afsr1_el1"},
-	{0x4290, "zcr_el1"},
-	{0x4296, "smcr_el1"},
+	{0x4290, "esr_el1"},
 	{0x4298, "erridr_el1"},
 	{0x4299, "errselr_el1"},
 	{0x42A0, "erxfr_el1"},
@@ -496,19 +513,31 @@ SYSREG_NAMES := [?]Sysreg_Name{
 	{0x42A9, "erxmisc1_el1"},
 	{0x42AA, "erxmisc2_el1"},
 	{0x42AB, "erxmisc3_el1"},
-	{0x4300, "tfsr_el1"},
-	{0x4301, "tfsre0_el1"},
-	{0x4318, "apiakeylo_el1"},
-	{0x4319, "apiakeyhi_el1"},
-	{0x431A, "apibkeylo_el1"},
-	{0x431B, "apibkeyhi_el1"},
-	{0x4320, "apdakeylo_el1"},
-	{0x4321, "apdakeyhi_el1"},
-	{0x4322, "apdbkeylo_el1"},
-	{0x4323, "apdbkeyhi_el1"},
-	{0x4328, "apgakeylo_el1"},
-	{0x4329, "apgakeyhi_el1"},
-	{0x4380, "par_el1"},
+	{0x42B0, "tfsr_el1"},
+	{0x42B1, "tfsre0_el1"},
+	{0x4300, "far_el1"},
+	{0x4311, "prselr_el1"},
+	{0x43A0, "par_el1"},
+	{0x44C8, "pmscr_el1"},
+	{0x44CA, "pmsicr_el1"},
+	{0x44CB, "pmsirr_el1"},
+	{0x44CC, "pmsfcr_el1"},
+	{0x44CD, "pmsevfr_el1"},
+	{0x44CE, "pmslatfr_el1"},
+	{0x44CF, "pmsidr_el1"},
+	{0x44D0, "pmblimitr_el1"},
+	{0x44D1, "pmbptr_el1"},
+	{0x44D3, "pmbsr_el1"},
+	{0x44D7, "pmbidr_el1"},
+	{0x44D8, "trblimitr_el1"},
+	{0x44D9, "trbptr_el1"},
+	{0x44DA, "trbbaser_el1"},
+	{0x44DB, "trbsr_el1"},
+	{0x44DC, "trbmar_el1"},
+	{0x44DE, "trbtrg_el1"},
+	{0x44DF, "trbidr_el1"},
+	{0x44F1, "pmintenset_el1"},
+	{0x44F2, "pmintenclr_el1"},
 	{0x4510, "mair_el1"},
 	{0x4518, "amair_el1"},
 	{0x4520, "lorsa_el1"},
@@ -519,64 +548,41 @@ SYSREG_NAMES := [?]Sysreg_Name{
 	{0x4600, "vbar_el1"},
 	{0x4608, "isr_el1"},
 	{0x4609, "disr_el1"},
-	{0x4630, "icc_pmr_el1"},
+	{0x4640, "icc_iar0_el1"},
+	{0x4641, "icc_eoir0_el1"},
+	{0x4642, "icc_hppir0_el1"},
+	{0x4643, "icc_bpr0_el1"},
+	{0x4659, "icc_dir_el1"},
+	{0x465B, "icc_rpr_el1"},
+	{0x465D, "icc_sgi1r_el1"},
+	{0x465E, "icc_asgi1r_el1"},
+	{0x465F, "icc_sgi0r_el1"},
+	{0x4660, "icc_iar1_el1"},
+	{0x4661, "icc_eoir1_el1"},
+	{0x4662, "icc_hppir1_el1"},
+	{0x4663, "icc_bpr1_el1"},
+	{0x4664, "icc_ctlr_el1"},
+	{0x4665, "icc_sre_el1"},
+	{0x4666, "icc_igrpen0_el1"},
+	{0x4667, "icc_igrpen1_el1"},
 	{0x4681, "contextidr_el1"},
 	{0x4684, "tpidr_el1"},
 	{0x4708, "cntkctl_el1"},
 	{0x4800, "ccsidr_el1"},
 	{0x4801, "clidr_el1"},
 	{0x4804, "gmid_el1"},
-	{0x4948, "pmscr_el1"},
-	{0x494A, "pmsicr_el1"},
-	{0x494B, "pmsirr_el1"},
-	{0x494C, "pmsfcr_el1"},
-	{0x494D, "pmsevfr_el1"},
-	{0x494E, "pmslatfr_el1"},
-	{0x494F, "pmsidr_el1"},
-	{0x4950, "pmblimitr_el1"},
-	{0x4951, "pmbptr_el1"},
-	{0x4953, "pmbsr_el1"},
-	{0x4957, "pmbidr_el1"},
-	{0x4B90, "trblimitr_el1"},
-	{0x4B91, "trbptr_el1"},
-	{0x4B92, "trbbaser_el1"},
-	{0x4B93, "trbsr_el1"},
-	{0x4B94, "trbmar_el1"},
-	{0x4B96, "trbtrg_el1"},
-	{0x4B97, "trbidr_el1"},
-	{0x4C40, "icc_iar0_el1"},
-	{0x4C41, "icc_eoir0_el1"},
-	{0x4C42, "icc_hppir0_el1"},
-	{0x4C43, "icc_bpr0_el1"},
-	{0x4C59, "icc_dir_el1"},
-	{0x4C5B, "icc_rpr_el1"},
-	{0x4C60, "icc_iar1_el1"},
-	{0x4C61, "icc_eoir1_el1"},
-	{0x4C62, "icc_hppir1_el1"},
-	{0x4C63, "icc_bpr1_el1"},
-	{0x4C64, "icc_ctlr_el1"},
-	{0x4C65, "icc_sre_el1"},
-	{0x4C66, "icc_igrpen0_el1"},
-	{0x4C67, "icc_igrpen1_el1"},
-	{0x4CE1, "pmintenset_el1"},
-	{0x4CE2, "pmintenclr_el1"},
 	{0x5000, "csselr_el1"},
-	{0x5290, "esr_el1"},
-	{0x5300, "far_el1"},
 	{0x5801, "ctr_el0"},
 	{0x5807, "dczid_el0"},
 	{0x5920, "rndr"},
 	{0x5921, "rndrrs"},
 	{0x5A10, "nzcv"},
 	{0x5A11, "daif"},
+	{0x5A12, "svcr"},
 	{0x5A20, "fpcr"},
 	{0x5A21, "fpsr"},
-	{0x5A22, "svcr"},
 	{0x5A28, "dspsr_el0"},
 	{0x5A29, "dlr_el0"},
-	{0x5CDD, "icc_sgi1r_el1"},
-	{0x5CDE, "icc_asgi1r_el1"},
-	{0x5CDF, "icc_sgi0r_el1"},
 	{0x5CE0, "pmcr_el0"},
 	{0x5CE1, "pmcntenset_el0"},
 	{0x5CE2, "pmcntenclr_el0"},
@@ -604,19 +610,29 @@ SYSREG_NAMES := [?]Sysreg_Name{
 	{0x6088, "hcr_el2"},
 	{0x6089, "mdcr_el2"},
 	{0x608B, "hstr_el2"},
+	{0x6090, "zcr_el2"},
+	{0x6096, "smcr_el2"},
 	{0x6108, "vttbr_el2"},
 	{0x610A, "vtcr_el2"},
 	{0x6180, "dacr32_el2"},
 	{0x6200, "spsr_el2"},
 	{0x6201, "elr_el2"},
 	{0x6208, "sp_el1"},
-	{0x628B, "vsesr_el2"},
 	{0x6290, "esr_el2"},
-	{0x6296, "smcr_el2"},
+	{0x6293, "vsesr_el2"},
 	{0x6298, "fpexc32_el2"},
 	{0x6300, "far_el2"},
 	{0x6600, "vbar_el2"},
 	{0x6609, "vdisr_el2"},
+	{0x664D, "icc_sre_el2"},
+	{0x6658, "ich_hcr_el2"},
+	{0x6659, "ich_vtr_el2"},
+	{0x665A, "ich_misr_el2"},
+	{0x665B, "ich_eisr_el2"},
+	{0x665D, "ich_elrsr_el2"},
+	{0x665F, "ich_vmcr_el2"},
+	{0x6682, "tpidr_el2"},
+	{0x6703, "cntvoff_el2"},
 	{0x6708, "cnthctl_el2"},
 	{0x6710, "cnthp_tval_el2"},
 	{0x6711, "cnthp_ctl_el2"},
@@ -624,27 +640,18 @@ SYSREG_NAMES := [?]Sysreg_Name{
 	{0x6718, "cnthv_tval_el2"},
 	{0x6719, "cnthv_ctl_el2"},
 	{0x671A, "cnthv_cval_el2"},
-	{0x671B, "cntvoff_el2"},
-	{0x6C65, "icc_sre_el2"},
-	{0x6CD8, "ich_hcr_el2"},
-	{0x6CD9, "ich_vtr_el2"},
-	{0x6CDA, "ich_misr_el2"},
-	{0x6CDB, "ich_eisr_el2"},
-	{0x6CDD, "ich_elrsr_el2"},
-	{0x6CDF, "ich_vmcr_el2"},
-	{0x6E82, "tpidr_el2"},
 	{0x7080, "sctlr_el3"},
-	{0x70B4, "gptbr_el3"},
-	{0x70B6, "gpccr_el3"},
+	{0x7090, "zcr_el3"},
+	{0x710C, "gptbr_el3"},
+	{0x710E, "gpccr_el3"},
 	{0x7200, "spsr_el3"},
 	{0x7201, "elr_el3"},
-	{0x7290, "zcr_el3"},
 	{0x7305, "mfar_el3"},
 	{0x7600, "vbar_el3"},
+	{0x7664, "icc_ctlr_el3"},
+	{0x7665, "icc_sre_el3"},
+	{0x7667, "icc_igrpen1_el3"},
 	{0x7682, "tpidr_el3"},
-	{0x7C64, "icc_ctlr_el3"},
-	{0x7C65, "icc_sre_el3"},
-	{0x7C67, "icc_igrpen1_el3"},
 	{0x7F10, "cntps_tval_el1"},
 	{0x7F11, "cntps_ctl_el1"},
 	{0x7F12, "cntps_cval_el1"},
