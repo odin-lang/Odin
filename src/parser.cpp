@@ -2468,6 +2468,7 @@ gb_internal Ast *parse_asm_register(AstFile *f) {
 	return reg;
 }
 gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
+	Ast *operand = nullptr;
 	switch (f->curr_token.kind) {
 	case Token_Period:
 		{
@@ -2479,9 +2480,11 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			return label_decl;
 		}
 	case Token_Ident:
-		return parse_ident(f);
+		operand = parse_ident(f);
+		break;
 	case Token_Mod:
-		return parse_asm_register(f);
+		operand = parse_asm_register(f);
+		break;
 	case Token_Integer:
 	case Token_Float:
 	case Token_Rune:
@@ -2572,9 +2575,18 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 		break;
 	}
 
-	syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
-	advance_token(f);
-	return nullptr;
+	if (operand == nullptr) {
+		syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
+		advance_token(f);
+	} else if (f->curr_token.kind == Token_OpenBracket) {
+		f->expr_level++;
+		Token open = expect_token(f, Token_OpenBracket);
+		Ast *index = parse_asm_operand(f, false);
+		Token close = expect_token(f, Token_CloseBracket);
+		f->expr_level--;
+		operand = ast_index_expr(f, operand, index, open, close);
+	}
+	return operand;
 }
 
 gb_internal Slice<Ast *> parse_asm_operands(AstFile *f) {
@@ -2839,10 +2851,11 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 	}
 
 	if (build_context.metrics.arch == TargetArch_amd64 ||
-	    build_context.metrics.arch == TargetArch_riscv64) {
+	    build_context.metrics.arch == TargetArch_riscv64 ||
+	    build_context.metrics.arch == TargetArch_arm64) {
 	    	// okay
 	} else {
-		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64");
+		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64 or -target:*_arm64");
 	}
 
 	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);
