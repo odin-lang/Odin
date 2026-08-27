@@ -290,7 +290,7 @@ Mnemonic :: enum u16 {
 	VSHLL,                                 // shift-left long
 
 	VCLS,   VCLZ,   VCNT,
-	VPADD_F, VRECPE_F, VRSQRTE_F,          // (placeholders; canonical via operand types)
+	// (placeholders; canonical via operand types)
 
 	VREV16, VREV32, VREV64,
 	VEXT,                                  // vector extract

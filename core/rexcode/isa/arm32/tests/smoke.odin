@@ -389,7 +389,7 @@ run_smoke :: proc() {
 	check("VFMSL Q",         .VFMSL, 1, 0xFCA00850, 0xFFB00F50)
 	check("VCVT BF16",       .VCVT, 10, 0xF3B60600, 0xFFBF0FD0)
 	check("VDOT BF16 D",     .VDOT, 0, 0xFC000D00, 0xFFB00F10)
-	check("VFMA BF16 Q",     .VFMA, 9, 0xFC300850, 0xFFB00F50)
+	check("VFMA BF16 Q",     .VFMA, 7, 0xFC300850, 0xFFB00F50)
 	check("VMMLA BF16 Q",    .VMMLA, 0, 0xFC000C40, 0xFFB00F50)
 
 	// ---- Barriers / hints: ESB, PSB CSYNC, TSB CSYNC, CSDB, SB ----
@@ -513,8 +513,6 @@ run_smoke :: proc() {
 	check("VQDMULL lane .S16",.VQDMULL, 2, 0xF2900B40, 0xFFB00F50)
 	check("VQDMLAL lane .S32",.VQDMLAL, 3, 0xF2A00340, 0xFFB00F50)
 	check("VQDMLSL lane",     .VQDMLSL, 2, 0xF2900740, 0xFFB00F50)
-	check("VFMA lane D",      .VFMA,  7, 0xF2A00040, 0xFFB00F50)
-	check("VFMS lane Q",      .VFMS,  7, 0xF3A00440, 0xFFB00F50)
 	check("VQRDMLAH lane",    .VQRDMLAH, 4, 0xF2900E40, 0xFFB00F50)
 	check("VQRDMLSH lane",    .VQRDMLSH, 4, 0xF2900F40, 0xFFB00F50)
 	check("VCMLA lane D",     .VCMLA, 2, 0xFE000800, 0xFFB00F10)
