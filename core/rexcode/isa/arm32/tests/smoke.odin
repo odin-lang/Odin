@@ -387,10 +387,10 @@ run_smoke :: proc() {
 	check("VCADD Q",         .VCADD, 1, 0xFC800840, 0xFE800F50)
 	check("VFMAL D",         .VFMAL, 0, 0xFC200810, 0xFFB00F10)
 	check("VFMSL Q",         .VFMSL, 1, 0xFCA00850, 0xFFB00F50)
-	check("VCVT BF16",       .VCVT_BF16, 0, 0xF3B60600, 0xFFBF0FD0)
-	check("VDOT BF16 D",     .VDOT_BF16, 0, 0xFC000D00, 0xFFB00F10)
-	check("VFMA BF16 Q",     .VFMA_BF16, 0, 0xFC300850, 0xFFB00F50)
-	check("VMMLA BF16 Q",    .VMMLA_BF16, 0, 0xFC000C40, 0xFFB00F50)
+	check("VCVT BF16",       .VCVT, 10, 0xF3B60600, 0xFFBF0FD0)
+	check("VDOT BF16 D",     .VDOT, 0, 0xFC000D00, 0xFFB00F10)
+	check("VFMA BF16 Q",     .VFMA, 9, 0xFC300850, 0xFFB00F50)
+	check("VMMLA BF16 Q",    .VMMLA, 0, 0xFC000C40, 0xFFB00F50)
 
 	// ---- Barriers / hints: ESB, PSB CSYNC, TSB CSYNC, CSDB, SB ----
 	check("ESB A32",         .ESB, 0, 0x0320F010, 0x0FFFFFFF)
@@ -526,25 +526,25 @@ run_smoke :: proc() {
 	check("VINS",            .VINS,   0, 0xFEB00AC0, 0xFFBF0FD0)
 
 	// ---- MVE gather/scatter (LLVM-verified) ----
-	check("VLDRW_GATHER",    .VLDRW_GATHER, 0, 0xFC900F40, 0xFEF00FF1)
-	check("VLDRD_GATHER",    .VLDRD_GATHER, 0, 0xFC900FD0, 0xFEF00FF1)
-	check("VSTRW_SCATTER",   .VSTRW_SCATTER, 0, 0xEC600F40, 0xFEF00FF1)
-	check("VSTRB_SCATTER",   .VSTRB_SCATTER, 0, 0xEC600E00, 0xFEF00FD1)
+	check("VLDRW",    .VLDRW, 1, 0xFC900F40, 0xFEF00FF1)
+	check("VLDRD",    .VLDRD, 1, 0xFC900FD0, 0xFEF00FF1)
+	check("VSTRW",   .VSTRW, 1, 0xEC600F40, 0xFEF00FF1)
+	check("VSTRB",   .VSTRB, 1, 0xEC600E00, 0xFEF00FD1)
 
 	// ---- VFP fixed-point conversions (VCVT with #fbits) ----
-	check("VCVT_FIXED S32.F32", .VCVT_FIXED, 0, 0x0EBE0A40, 0x0FBF0FD0)
-	check("VCVT_FIXED U32.F32", .VCVT_FIXED, 1, 0x0EBF0A40, 0x0FBF0FD0)
-	check("VCVT_FIXED F32.S32", .VCVT_FIXED, 2, 0x0EBA0A40, 0x0FBF0FD0)
-	check("VCVT_FIXED F64",     .VCVT_FIXED, 6, 0x0EBE0B40, 0x0FBF0FD0)
-	check("VCVT_FIXED F16",     .VCVT_FIXED, 8, 0x0EBE0940, 0x0FBF0FD0)
+	check("VCVT S32.F32", .VCVT, 11, 0x0EBE0A40, 0x0FBF0FD0)
+	check("VCVT U32.F32", .VCVT, 12, 0x0EBF0A40, 0x0FBF0FD0)
+	check("VCVT F32.S32", .VCVT, 13, 0x0EBA0A40, 0x0FBF0FD0)
+	check("VCVT F64",     .VCVT, 17, 0x0EBE0B40, 0x0FBF0FD0)
+	check("VCVT F16",     .VCVT, 19, 0x0EBE0940, 0x0FBF0FD0)
 
 	// ---- NEON compare-with-zero ----
-	check("VCEQ_Z D .I8",    .VCEQ_Z, 0, 0xF3B10100, 0xFFB30FD0)
-	check("VCEQ_Z Q .F32",   .VCEQ_Z, 3, 0xF3B90540, 0xFFB30FD0)
-	check("VCGE_Z D",        .VCGE_Z, 0, 0xF3B10080, 0xFFB30FD0)
-	check("VCGT_Z D",        .VCGT_Z, 0, 0xF3B10000, 0xFFB30FD0)
-	check("VCLE_Z D",        .VCLE_Z, 0, 0xF3B10180, 0xFFB30FD0)
-	check("VCLT_Z D",        .VCLT_Z, 0, 0xF3B10200, 0xFFB30FD0)
+	check("VCEQ D .I8",    .VCEQ, 10, 0xF3B10100, 0xFFB30FD0)
+	check("VCEQ Q .F32",   .VCEQ, 13, 0xF3B90540, 0xFFB30FD0)
+	check("VCGE D",        .VCGE, 12, 0xF3B10080, 0xFFB30FD0)
+	check("VCGT D",        .VCGT, 12, 0xF3B10000, 0xFFB30FD0)
+	check("VCLE D",        .VCLE, 14, 0xF3B10180, 0xFFB30FD0)
+	check("VCLT D",        .VCLT, 14, 0xF3B10200, 0xFFB30FD0)
 
 	// ---- NEON replicate loads ----
 	check("VLD2R",           .VLD2R, 0, 0xF4A00D0F, 0xFFB00F0F)

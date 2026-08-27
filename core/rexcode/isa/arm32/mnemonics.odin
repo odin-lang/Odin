@@ -311,10 +311,9 @@ Mnemonic :: enum u16 {
 	// -- Dot Product (FEAT_DotProd) ------------------------------------------
 	VSDOT,   VUDOT,
 	// -- BF16 (FEAT_BF16) ----------------------------------------------------
-	VCVT_BF16,                             // BF16<->F32
-	VDOT_BF16,
-	VFMA_BF16,
-	VMMLA_BF16,
+	// BF16<->F32
+	VDOT,
+	VMMLA,
 
 	// -- FHM (FEAT_FHM) FP16 matrix mul/acc ----------------------------------
 	VFMAL,   VFMSL,                        // F16 fused multiply-add long
@@ -338,12 +337,7 @@ Mnemonic :: enum u16 {
 	VINS,                                  // insert F16 into high lane of S-reg
 
 	// -- MVE gather/scatter (vector offset addressing) ----------------------
-	VLDRB_GATHER, VLDRH_GATHER, VLDRW_GATHER, VLDRD_GATHER,
-	VSTRB_SCATTER, VSTRH_SCATTER, VSTRW_SCATTER, VSTRD_SCATTER,
-
 	// -- NEON compare-with-zero (distinct encodings from reg-vs-reg) --------
-	VCEQ_Z,    VCGE_Z,    VCGT_Z,    VCLE_Z,    VCLT_Z,
-
 	// -- NEON replicate loads (broadcast one element to all lanes) ----------
 	//    VLD1R already covered in VLD1; these are the 2/3/4 variants.
 	VLD2R,    VLD3R,    VLD4R,
@@ -353,7 +347,7 @@ Mnemonic :: enum u16 {
 	VST1_LANE, VST2_LANE, VST3_LANE, VST4_LANE,
 
 	// -- VFP fixed-point conversions (with #fbits operand) ------------------
-	VCVT_FIXED,                            // VCVT.<dt> Sd, Sd, #fbits family
+	// VCVT.<dt> Sd, Sd, #fbits family
 
 	// -------------------------------------------------------------------------
 	// Thumb-only mnemonics (extra ones not shared with A32)
@@ -400,7 +394,7 @@ Mnemonic :: enum u16 {
 	// use a register target Rm at hw0[3:0]; BFCSEL adds a 4-bit condition at
 	// hw0[5:2] (its else-target is the implicit fall-through). Byte-exact vs llvm-mc.
 	BF,                                    // branch future
-	BFI_BR,                                // branch future indirect (bfx)
+	BFX,                                // branch future indirect (bfx)
 	BFL,                                   // branch future and link
 	BFLX,                                  // branch future link and exchange
 	BFCSEL,                                // branch future conditional select
@@ -483,9 +477,9 @@ Mnemonic :: enum u16 {
 	VQRSHRUNB, VQRSHRUNT,
 
 	// Move between Qd-lane and GPR (MVE-specific 4-element split forms)
-	VMOV_Q_R,                              // VMOV Qd[i], Rt  -- single lane to GPR
-	VMOV_R_Q,                              // VMOV Rt, Qd[i]
-	VMOV_2GPR_Q,                           // VMOV Qd[2*i], Qd[2*i+1], Rt, Rt2 -- pair
+	// VMOV Qd[i], Rt  -- single lane to GPR
+	// VMOV Rt, Qd[i]
+	// VMOV Qd[2*i], Qd[2*i+1], Rt, Rt2 -- pair
 
 	// Saturating doubling MAC reductions
 	VQDMLADH,   VQDMLADHX,
@@ -494,8 +488,8 @@ Mnemonic :: enum u16 {
 	VQRDMLSDH,  VQRDMLSDHX,
 
 	// Misc
-	VHCADD_SAT,                            // (rarely used)
-	VCMLA_MVE,                             // (MVE form; VCMLA already exists)
+	// (rarely used)
+	// (MVE form; VCMLA already exists)
 
 	// MVE load/store (mostly reuses VLDR/VSTR but distinct forms exist):
 	VLDRB,   VLDRH,   VLDRW,   VLDRD,      // MVE contiguous load (B/H/W/D)

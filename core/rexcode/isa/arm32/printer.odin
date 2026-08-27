@@ -394,12 +394,21 @@ wprintln :: proc(
 @(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, cond: u8, sets_flags: bool, uppercase: bool) {
 	name, _ := reflect.enum_name_from_value(m)
-	if uppercase {
-		strings.write_string(sb, name)
-	} else {
-		for r in name {
-			if r >= 'A' && r <= 'Z' { strings.write_byte(sb, u8(r - 'A' + 'a')) }
-			else                    { strings.write_rune(sb, r) }
+	// PSB_CSYNC / TSB_CSYNC are the only names left holding an underscore:
+	// assemblers write them as a mnemonic plus an operand token, `psb csync`,
+	// so that underscore is a space. No other mnemonic has one.
+	split := -1
+	if len(name) > 4 && (name[:4] == "PSB_" || name[:4] == "TSB_") {
+		split = 3
+	}
+	for i in 0..<len(name) {
+		c := name[i]
+		if i == split {
+			strings.write_byte(sb, ' ')
+		} else if !uppercase && c >= 'A' && c <= 'Z' {
+			strings.write_byte(sb, c - 'A' + 'a')
+		} else {
+			strings.write_byte(sb, c)
 		}
 	}
 	if sets_flags {
