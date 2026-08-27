@@ -163,7 +163,7 @@ encode_one_inline :: #force_inline proc(
 		   (inst.dt[0] == .NONE || f.dt == inst.dt) &&
 		   (want_len == 0 || inst_size_from_bits(f.bits, f.mode) == want_len) &&
 		   encoding_matches_inline(inst, f) &&
-		   inst.flags.sets_flags == f.flags.sets_flags &&
+		   inst.sets_flags == f.flags.sets_flags &&
 		   mem_mode_matches(inst, f) {
 			form = f
 		}
@@ -178,8 +178,8 @@ encode_one_inline :: #force_inline proc(
 			if inst.dt[0] != .NONE && f.dt != inst.dt { continue }
 			if want_len > 0 && inst_size_from_bits(f.bits, f.mode) != want_len { continue }
 			if !encoding_matches_inline(inst, &f) { continue }
-			if inst.flags.sets_flags && !f.flags.sets_flags { continue }
-			if !inst.flags.sets_flags && f.flags.sets_flags { continue }
+			if inst.sets_flags && !f.flags.sets_flags { continue }
+			if !inst.sets_flags && f.flags.sets_flags { continue }
 			if !mem_mode_matches(inst, &f) { continue }
 			form = &f
 			break

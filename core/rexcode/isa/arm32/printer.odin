@@ -124,7 +124,7 @@ sbprint :: proc(
 			dt_suffix = infer_dt_suffix_from_inst(inst)
 		}
 
-		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.flags.sets_flags, opts.uppercase)
+		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.sets_flags, opts.uppercase)
 		if dt[0] != .NONE {
 			write_data_type(sb, dt, opts.uppercase)
 		} else if dt_suffix != "" {

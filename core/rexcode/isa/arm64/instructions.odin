@@ -18,7 +18,7 @@ Instruction :: struct #packed {
 	length:        u8,                                 // 1 -- always 4
 	_:             [3]u8,
 }
-#assert(size_of(Instruction) == 64)
+#assert(size_of(Instruction) == 48)
 
 // =============================================================================
 // Builders -- the most common shapes; less-common forms can be built

@@ -21,29 +21,36 @@ Instruction_Flags :: bit_field u8 {
 }
 
 Instruction :: struct #packed {
-	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 18 = 68
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 10 = 40
 	mnemonic:      Mnemonic,                           // 2
-	cond:          u8,                                 // 0..15 (AL=14)
-	operand_count: u8,                                 // 0..4
-	flags:         Instruction_Flags,                  // 1
-	mode:          Mode,                               // 1 (A32 or T32)
-	length:        u8,                                 // 2 or 4 bytes
+	// cond, operand_count, mode, length and the two flag bits share one
+	// 16-bit word -- together they need 13 bits, and spending six bytes on
+	// them was what pushed Instruction over 48. `using` keeps inst.cond,
+	// inst.operand_count, inst.mode, inst.length, inst.sets_flags and
+	// inst.wide reading and writing exactly as they did as plain fields.
+	using _: bit_field u16 {
+		cond:          u8   | 4,   // 0..15 (AL = 14)
+		operand_count: u8   | 3,   // 0..4
+		mode:          Mode | 1,   // A32 / T32
+		length:        u8   | 3,   // 2 or 4 bytes on the wire
+		sets_flags:    bool | 1,   // S bit (writes APSR.NZCV)
+		wide:          bool | 1,   // force the T32 wide form when both exist
+		// 3 bits spare
+	},
 	// Form-id hint: when non-zero, this is (1 + the index into
 	// ENCODING_TABLE[mnemonic]) of the form the decoder produced. The encoder
-	// uses it as a tie-breaker for shape-ambiguous entries (NEON size variants
-	// share an operand shape but live in distinct entries with different fixed
-	// bits). User-constructed instructions leave it at 0; the encoder then
-	// falls back to first-shape-match. Stored as u16 over the two padding bytes.
+	// uses it as a tie-breaker for the shape-ambiguous entries the data type
+	// does not separate on its own -- register lists, LDM/STM addressing
+	// modes. User-constructed instructions leave it at 0 and take the
+	// first shape match.
 	form_id:       u16,
 	// The `.i32` / `.s32.f32` suffix. Zero (.NONE) means "unspecified": the
 	// encoder then takes the first form of the matching shape, which is what
 	// every instruction did before this field existed. Set it and the encoder
-	// picks the encoding for that type. Fits in what was already padding, so
-	// Instruction does not grow.
+	// picks the encoding for that type.
 	dt:            Data_Types,
-	_:             [5]u8,
 }
-#assert(size_of(Instruction) == 88)
+#assert(size_of(Instruction) == 48)
 
 // =============================================================================
 // Builders
@@ -141,6 +148,6 @@ inst_set_cond :: #force_inline proc "contextless" (inst: Instruction, cond: u8) 
 @(require_results)
 inst_set_flags :: #force_inline proc "contextless" (inst: Instruction) -> Instruction {
 	out := inst
-	out.flags.sets_flags = true
+	out.sets_flags = true
 	return out
 }

@@ -163,7 +163,7 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 			inst.cond = 14    // AL / unconditional
 		}
 		if e.flags.sets_flags {
-			inst.flags.sets_flags = true
+			inst.sets_flags = true
 		}
 
 		for _, k in e.enc {
@@ -254,7 +254,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 			st  := Shift_Type(u8(st_bits) + u8(Shift_Type.LSL_REG))
 			rs  := u8((word >> 8) & 0xF)
 			return Operand{reg = reg, kind = .REGISTER, size = 4,
-						   shift_type = st, shift_amt = rs, cond = 14}
+						   shift_type = st, shift_amt = rs}
 		case .GPR_SHIFTED:
 			// Imm-shift: amount in bits 11..7, type in 6..5, bit 4 = 0.
 			st  := Shift_Type((word >> 5) & 0x3)

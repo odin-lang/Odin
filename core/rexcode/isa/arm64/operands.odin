@@ -57,21 +57,28 @@ Address_Mode :: enum u8 {
 	LITERAL,          // PC-rel target (LDR literal)
 }
 
-// 16-byte memory operand: base + optional index + signed disp + addressing
-// metadata. Index is `NONE` for non-register-offset modes.
-Memory :: struct #packed {
-	base:    Register,     // 2
-	index:   Register,     // 2  (NONE for OFFSET/PRE/POST/LITERAL)
-	disp:    i32,          // 4  (signed; pre/post can be -256..255 unscaled,
-	                       //     OFFSET supports 0..32760 scaled via imm12*size)
-	extend:  Extend,       // 1  (for EXT_REG_OFFSET; UXTX otherwise)
-	shift:   u8,           // 1  (0..4 for register-offset / extended; or
-	                       //     shift amount for shifted-register operands
-	                       //     when reused there)
-	mode:    Address_Mode, // 1
-	_:       u8,           // 1
+// Memory operand packed into one word: base + optional index + signed disp +
+// addressing metadata. Index is `NONE` for non-register-offset modes.
+//
+// A bit_field rather than a struct because this sits in every Operand, so its
+// width is multiplied by four in every Instruction. Field syntax is unchanged
+// (`m.base`, `m.disp`) and composite literals still work, so this is invisible
+// to callers.
+//
+// Widths: registers get the full 16 bits because the NONE sentinel is 0xFFFF.
+// That leaves 23 bits for `disp` (+/-4.19M) against a worst case of 65,520 --
+// LDR Q, [Xn, #imm12*16] -- the largest displacement any A64 addressing mode
+// can encode, so there is ~64x headroom.
+Memory :: bit_field u64 {
+	base:    Register     | 16,
+	index:   Register     | 16,  // NONE for OFFSET/PRE/POST/LITERAL
+	disp:    i32          | 23,
+	extend:  Extend       | 3,   // for EXT_REG_OFFSET; UXTX otherwise
+	shift:   u8           | 3,   // 0..4 for register-offset / extended
+	mode:    Address_Mode | 3,
+	// 1 bit spare
 }
-#assert(size_of(Memory) == 12)
+#assert(size_of(Memory) == 8)
 
 Shifted_Reg :: struct #packed {
 	reg:    Register,    // 2
@@ -91,7 +98,7 @@ Extended_Reg :: struct #packed {
 Operand :: struct #packed {
 	using _: struct #raw_union #packed {
 		reg:       Register,        // 2
-		mem:       Memory,          // 12
+		mem:       Memory,          // 8
 		immediate: i64,             // 8
 		relative:  i64,             // 8
 		shifted:   Shifted_Reg,     // 8
@@ -101,7 +108,7 @@ Operand :: struct #packed {
 	kind: Operand_Kind,                 // 1
 	size: u8,                           // 1 -- carried width info; meaning varies
 }
-#assert(size_of(Operand) == 14)
+#assert(size_of(Operand) == 10)
 
 // -----------------------------------------------------------------------------
 // Constructors -- generic
