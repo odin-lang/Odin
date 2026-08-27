@@ -345,12 +345,12 @@ inst_sevl_none           :: #force_inline proc "contextless" () -> Instruction {
 emit_sevl_none           :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_sevl_none()) }
 inst_hint_i              :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .HINT, operand_count = 1, length = 4, ops = {op_imm(imm, 1), {}, {}, {}}} }
 emit_hint_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_hint_i(imm)) }
-inst_mrs_r_i             :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return inst_r_i(.MRS, dst, imm) }
-emit_mrs_r_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_mrs_r_i(dst, imm)) }
+inst_mrs_r_s             :: #force_inline proc "contextless" (dst: Register, sysreg: System_Register) -> Instruction { return Instruction{mnemonic = .MRS, operand_count = 2, length = 4, ops = {op_reg(dst), op_sysreg(sysreg), {}, {}}} }
+emit_mrs_r_s             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, sysreg: System_Register) { append(instructions, inst_mrs_r_s(dst, sysreg)) }
 inst_msr_i_i             :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .MSR, operand_count = 2, length = 4, ops = {op_imm(imm, 4), op_imm(imm2, 1), {}, {}}} }
-inst_msr_i_r             :: #force_inline proc "contextless" (imm: i64, src: Register) -> Instruction { return Instruction{mnemonic = .MSR, operand_count = 2, length = 4, ops = {op_imm(imm, 4), op_reg(src), {}, {}}} }
+inst_msr_s_r             :: #force_inline proc "contextless" (sysreg: System_Register, src: Register) -> Instruction { return Instruction{mnemonic = .MSR, operand_count = 2, length = 4, ops = {op_sysreg(sysreg), op_reg(src), {}, {}}} }
 emit_msr_i_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_msr_i_i(imm, imm2)) }
-emit_msr_i_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, src: Register) { append(instructions, inst_msr_i_r(imm, src)) }
+emit_msr_s_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, sysreg: System_Register, src: Register) { append(instructions, inst_msr_s_r(sysreg, src)) }
 inst_isb_i               :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .ISB, operand_count = 1, length = 4, ops = {op_imm(imm, 1), {}, {}, {}}} }
 emit_isb_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_isb_i(imm)) }
 inst_dsb_i               :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .DSB, operand_count = 1, length = 4, ops = {op_imm(imm, 1), {}, {}, {}}} }
@@ -2216,10 +2216,10 @@ inst_sevl                     :: inst_sevl_none
 emit_sevl                     :: emit_sevl_none
 inst_hint                     :: inst_hint_i
 emit_hint                     :: emit_hint_i
-inst_mrs                      :: inst_mrs_r_i
-emit_mrs                      :: emit_mrs_r_i
-inst_msr                      :: proc{ inst_msr_i_i, inst_msr_i_r }
-emit_msr                      :: proc{ emit_msr_i_i, emit_msr_i_r }
+inst_mrs                      :: inst_mrs_r_s
+emit_mrs                      :: emit_mrs_r_s
+inst_msr                      :: proc{ inst_msr_i_i, inst_msr_s_r }
+emit_msr                      :: proc{ emit_msr_i_i, emit_msr_s_r }
 inst_isb                      :: inst_isb_i
 emit_isb                      :: emit_isb_i
 inst_dsb                      :: inst_dsb_i

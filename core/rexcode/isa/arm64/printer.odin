@@ -118,20 +118,6 @@ sbprint :: proc(
 
 		// MOVZ/MOVN/MOVK store the shift as an hw index (0..3 = LSL #0/16/32/48),
 		// which assemblers write as `lsl #16` and omit entirely when it is zero.
-		// MRS/MSR carry the system register as a packed field, so it has to be
-		// printed by name -- a bare number is not something an assembler takes.
-		// MSR's other form takes a PSTATE field selector in the same slot,
-		// which is a different namespace; it is the one whose second operand
-		// is an immediate rather than a register.
-		sysreg_slot, sysreg_ok := -1, false
-		#partial switch inst.mnemonic {
-		case .MRS:
-			sysreg_slot, sysreg_ok = 1, inst.operand_count >= 2
-		case .MSR:
-			sysreg_slot = 0
-			sysreg_ok   = inst.operand_count >= 2 && inst.ops[1].kind == .REGISTER
-		}
-
 		mov_wide := inst.mnemonic == .MOVZ || inst.mnemonic == .MOVN || inst.mnemonic == .MOVK
 		end_slot := int(inst.operand_count)
 		if mov_wide && end_slot == 3 && inst.ops[2].kind == .IMMEDIATE && inst.ops[2].immediate == 0 {
@@ -148,8 +134,6 @@ sbprint :: proc(
 				if mov_wide && slot == 2 {
 					strings.write_string(sb, opts.uppercase ? "LSL #" : "lsl #")
 					write_decimal_u32(sb, u32(inst.ops[slot].immediate) * 16)
-				} else if slot == sysreg_slot && sysreg_ok {
-					write_sysreg(sb, inst.ops[slot].immediate, opts.uppercase)
 				} else {
 					write_operand(sb, &inst.ops[slot], &display, opts)
 				}
@@ -359,11 +343,11 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 // A system register by name (`cntvct_el0`), falling back to the raw field
 // when it is not one we know.
 @(private="file")
-write_sysreg :: proc(sb: ^strings.Builder, value: i64, uppercase: bool) {
-	name, ok := sysreg_name(value)
+write_sysreg :: proc(sb: ^strings.Builder, sr: System_Register, uppercase: bool) {
+	name, ok := sysreg_name(sr)
 	if !ok {
 		strings.write_byte(sb, '#')
-		write_signed_decimal(sb, value)
+		write_signed_decimal(sb, i64(sr))
 		return
 	}
 	for i in 0 ..< len(name) {
@@ -489,6 +473,9 @@ write_operand :: proc(
 	case .IMMEDIATE:
 		strings.write_byte(sb, '#')
 		write_signed_decimal(sb, op.immediate)
+
+	case .SYSTEM_REGISTER:
+		write_sysreg(sb, op.sysreg, opts.uppercase)
 
 	case .COND:
 		c := op.cond & 0xF

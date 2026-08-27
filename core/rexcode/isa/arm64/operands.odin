@@ -28,6 +28,7 @@ Operand_Kind :: enum u8 {
 	SHIFTED_REG,      // X reg + shift type + shift amount
 	EXTENDED_REG,     // X/W reg + extend + amount
 	COND,             // 4-bit condition code (EQ/NE/.../AL/NV)
+	SYSTEM_REGISTER,  // MRS/MSR target, as a packed 15-bit field
 }
 
 Shift_Type :: enum u8 {
@@ -104,6 +105,7 @@ Operand :: struct #packed {
 		shifted:   Shifted_Reg,     // 8
 		extended:  Extended_Reg,    // 8
 		cond:      u8,              // 1
+		sysreg:    System_Register, // 2
 	}, // 12 total because of alignment
 	kind: Operand_Kind,                 // 1
 	size: u8,                           // 1 -- carried width info; meaning varies
@@ -149,6 +151,10 @@ op_extended :: #force_inline proc "contextless" (r: Register, ext: Extend, amoun
 @(require_results)
 op_cond :: #force_inline proc "contextless" (c: Cond) -> Operand {
 	return Operand{cond = u8(c), kind = .COND, size = 1}
+}
+
+op_sysreg :: #force_inline proc "contextless" (sr: System_Register) -> Operand {
+	return Operand{sysreg = sr, kind = .SYSTEM_REGISTER, size = 2}
 }
 
 // -----------------------------------------------------------------------------

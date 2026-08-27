@@ -150,7 +150,9 @@ Operand_Type :: enum u8 {
 	IMM_4,         // 4-bit (HINT, DMB/DSB barrier types, NZCV flags)
 	IMM_2,         // 2-bit (FP rounding mode / NEON cmode bits 14:13 etc.)
 	NZCV_IMM,      // 4-bit NZCV for CCMP/CCMN immediate forms
-	SYS_REG,       // 16-bit system register encoding (MSR/MRS)
+	SYS_REG,       // MRS/MSR target system register
+	PSTATE_FIELD,  // MSR immediate form: a PSTATE field selector,
+	               // a different namespace from the system registers
 	HW_SHIFT,      // 2-bit LSL hw (0/16/32/48) for MOV-immediate
 	BITMASK_IMM,   // Logical immediate (bitmask-encoded N:imms:immr)
 	LSE_SIZE,      // 2-bit size selector for LSE atomics (00=B 01=H 10=W 11=X)

@@ -312,7 +312,7 @@ run_pipeline_tests :: proc() {
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X0), a.op_imm(0xDA10, 2), {}, {}},
+				ops = {a.op_reg(a.X0), a.op_sysreg(a.NZCV), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -698,19 +698,19 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X0), a.op_imm(a.NZCV, 2), {}, {}},
+				ops = {a.op_reg(a.X0), a.op_sysreg(a.NZCV), {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X1), a.op_imm(a.TPIDR_EL0, 2), {}, {}},
+				ops = {a.op_reg(a.X1), a.op_sysreg(a.TPIDR_EL0), {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X2), a.op_imm(a.CNTVCT_EL0, 2), {}, {}},
+				ops = {a.op_reg(a.X2), a.op_sysreg(a.CNTVCT_EL0), {}, {}},
 			},
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X3), a.op_imm(a.DCZID_EL0, 2), {}, {}},
+				ops = {a.op_reg(a.X3), a.op_sysreg(a.DCZID_EL0), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -958,7 +958,7 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .MRS, operand_count = 2, length = 4,
-				ops = {a.op_reg(a.X7), a.op_imm(a.RNDR, 2), {}, {}},
+				ops = {a.op_reg(a.X7), a.op_sysreg(a.RNDR), {}, {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)

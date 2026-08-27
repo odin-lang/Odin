@@ -691,7 +691,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.MRS,            {.X_REG, .SYS_REG, .NONE, .NONE}, {.RT, .SYS_FIELD, .NONE, .NONE}, 0xD5300000, 0xFFF00000, .BASE, {}},                                             {written={0}, read={1}, side_effects={.PRIVILEGED}}},
 	},
 	.MSR = {
-		{{.MSR,            {.SYS_REG, .IMM_4, .NONE, .NONE}, {.MSR_PSTATE, .BARRIER_FIELD, .NONE, .NONE}, 0xD500401F, 0xFFF8F01F, .BASE, {}},                                 {side_effects={.PRIVILEGED}}},
+		{{.MSR,            {.PSTATE_FIELD, .IMM_4, .NONE, .NONE}, {.MSR_PSTATE, .BARRIER_FIELD, .NONE, .NONE}, 0xD500401F, 0xFFF8F01F, .BASE, {}},                                 {side_effects={.PRIVILEGED}}},
 		{{.MSR,            {.SYS_REG, .X_REG, .NONE, .NONE}, {.SYS_FIELD,  .RT,            .NONE, .NONE}, 0xD5100000, 0xFFF00000, .BASE, {}},                                 {written={0}, read={1}, side_effects={.PRIVILEGED}}},
 	},
 	.ISB = {

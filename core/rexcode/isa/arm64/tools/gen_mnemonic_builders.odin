@@ -12,7 +12,7 @@ package main
 // with per-mnemonic overload groups.
 //
 // AArch64 has ~50 operand types, many exotic (SVE/SME/NEON-arrangement/
-// shifted/extended/bitmask/sysreg). EVERY operand type is now mapped to a
+// shifted/extended/bitmask/system-register). EVERY operand type is mapped to a
 // concrete Odin parameter (or parameters) and a constructor expression, so
 // NO form is skipped: every mnemonic that has at least one encode form gets
 // an inst_<mnem> / emit_<mnem> overload group.
@@ -26,7 +26,8 @@ package main
 //     SVE Z register / Z pair / Z quad           -> u8       / op_z_*           (suffix z)
 //     SVE predicate (P_REG / merge / zero / gov) -> u8       / Register(REG_P|..) (suffix p)
 //     all immediates (incl ZA tile, SME slice,   -> i64      / op_imm           (suffix i)
-//       patterns, bitmask, sysreg, HW, NZCV, ...)
+//       patterns, bitmask, HW, NZCV, ...)
+//     MRS/MSR system register        -> System_Register / op_sysreg         (suffix s)
 //     PC-relative label                          -> u32      / op_label         (suffix l)
 //     memory                                     -> Memory   / op_mem           (suffix m)
 //     condition code                             -> Cond     / op_cond          (suffix c)
@@ -69,6 +70,7 @@ Operand_Category :: enum {
 	REL,       // u32 label  -> op_label               (1 param, suffix l)
 	MEM,       // Memory     -> op_mem                 (1 param, suffix m)
 	COND,      // Cond       -> op_cond                (1 param, suffix c)
+	SYSREG,    // System_Register -> op_sysreg         (1 param, suffix s)
 	SHIFTED,   // Register + Shift_Type + u8 -> op_shifted   (3 params, suffix sh)
 	EXTENDED,  // Register + Extend + u8     -> op_extended  (3 params, suffix ex)
 }
@@ -133,6 +135,8 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 		return .MEM
 	case .COND, .COND_NOT_AL:
 		return .COND
+	case .SYS_REG:
+		return .SYSREG
 	case .W_SHIFTED, .X_SHIFTED:
 		return .SHIFTED
 	case .W_EXTENDED, .X_EXTENDED:
@@ -177,6 +181,7 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 	case .REL:      return "l"
 	case .MEM:      return "m"
 	case .COND:     return "c"
+	case .SYSREG:   return "s"
 	case .SHIFTED:  return "sh"
 	case .EXTENDED: return "ex"
 	}
@@ -255,6 +260,8 @@ operand_primary_names :: proc(sig: Operand_Signature) -> [4][3]string {
 			result[i][0] = "mem"
 		case .COND:
 			result[i][0] = "cond"
+		case .SYSREG:
+			result[i][0] = "sysreg"
 		case .SHIFTED:
 			rn := reg_name(i, &reg_count)
 			result[i][0] = rn
@@ -290,6 +297,8 @@ param_list :: proc(sig: Operand_Signature) -> [dynamic]Param {
 			append(&params, Param{decl = fmt.tprintf("%s: Memory", names[i][0]), name = names[i][0]})
 		case .COND:
 			append(&params, Param{decl = fmt.tprintf("%s: Cond", names[i][0]), name = names[i][0]})
+		case .SYSREG:
+			append(&params, Param{decl = fmt.tprintf("%s: System_Register", names[i][0]), name = names[i][0]})
 		case .SHIFTED:
 			append(&params, Param{decl = fmt.tprintf("%s: Register",    names[i][0]), name = names[i][0]})
 			append(&params, Param{decl = fmt.tprintf("%s: Shift_Type", names[i][1]), name = names[i][1]})
@@ -363,6 +372,8 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]st
 		fmt.sbprintf(sb, "op_mem(%s)", names[0])
 	case .COND:
 		fmt.sbprintf(sb, "op_cond(%s)", names[0])
+	case .SYSREG:
+		fmt.sbprintf(sb, "op_sysreg(%s)", names[0])
 	case .SHIFTED:
 		fmt.sbprintf(sb, "op_shifted(%s, %s, %s)", names[0], names[1], names[2])
 	case .EXTENDED:
@@ -398,7 +409,7 @@ uses_plain_constructors :: proc(sig: Operand_Signature) -> bool {
 			     .V_4H_FP16, .V_8H_FP16:
 				return false   // needs op_v_*
 			}
-		case .IMM, .REL, .MEM, .COND:
+		case .IMM, .REL, .MEM, .COND, .SYSREG:
 			// fine
 		case:
 			return false       // ZREG / PREG / SHIFTED / EXTENDED

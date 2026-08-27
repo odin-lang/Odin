@@ -1955,7 +1955,7 @@ DECODE_ENTRIES := [2498]lib.Decode_Entry{
 	{ .TLBI_VAALE1, {.X_REG,.NONE,.NONE,.NONE}, {.RT,.NONE,.NONE,.NONE}, 0xD50887E0, 0xFFFFFFE0, .BASE, {is_64=true, explicit_count=1} },
 	{ .TLBI_VAALE1IS, {.X_REG,.NONE,.NONE,.NONE}, {.RT,.NONE,.NONE,.NONE}, 0xD50883E0, 0xFFFFFFE0, .BASE, {is_64=true, explicit_count=1} },
 	{ .HINT, {.IMM_8,.NONE,.NONE,.NONE}, {.HINT_FIELD,.NONE,.NONE,.NONE}, 0xD503201F, 0xFFFFF01F, .BASE, {explicit_count=1} },
-	{ .MSR, {.SYS_REG,.IMM_4,.NONE,.NONE}, {.MSR_PSTATE,.BARRIER_FIELD,.NONE,.NONE}, 0xD500401F, 0xFFF8F01F, .BASE, {explicit_count=2} },
+	{ .MSR, {.PSTATE_FIELD,.IMM_4,.NONE,.NONE}, {.MSR_PSTATE,.BARRIER_FIELD,.NONE,.NONE}, 0xD500401F, 0xFFF8F01F, .BASE, {explicit_count=2} },
 	{ .SVC, {.IMM_16,.NONE,.NONE,.NONE}, {.IMM16,.NONE,.NONE,.NONE}, 0xD4000001, 0xFFE0001F, .BASE, {branch=true, explicit_count=1} },
 	{ .HVC, {.IMM_16,.NONE,.NONE,.NONE}, {.IMM16,.NONE,.NONE,.NONE}, 0xD4000002, 0xFFE0001F, .BASE, {branch=true, explicit_count=1} },
 	{ .SMC, {.IMM_16,.NONE,.NONE,.NONE}, {.IMM16,.NONE,.NONE,.NONE}, 0xD4000003, 0xFFE0001F, .BASE, {branch=true, explicit_count=1} },
