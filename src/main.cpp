@@ -447,6 +447,7 @@ enum BuildFlagKind {
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_DefaultToPanicAllocator,
 	BuildFlag_StrictStyle,
+	BuildFlag_StrictStylePackages,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
@@ -707,6 +708,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToPanicAllocator, str_lit("default-to-panic-allocator"),BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_StrictStylePackages,     str_lit("strict-style-packages"),     BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
@@ -1623,6 +1625,24 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_StrictStyle:
 							build_context.strict_style = true;
+							break;
+						case BuildFlag_StrictStylePackages:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = value.value_string;
+								String_Iterator it = {val, 0};
+								String pkg = {};
+								while (string_split_iterator_next(&it, ',', &pkg)) {
+									pkg = string_trim_whitespace(pkg);
+									if (!string_is_valid_identifier(pkg)) {
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
+										bad_flags = true;
+										continue;
+									}
+
+									string_set_add(&build_context.strict_style_packages, pkg);
+								}
+							}
 							break;
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
@@ -3241,6 +3261,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Errs on deprecated syntax.");
 			print_usage_line(2, "Errs when the attached-brace style is not adhered to (also known as 1TBS).");
 			print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
+		}
+		if (print_flag("-strict-style-packages:<comma-separated-strings>")) {
+			print_usage_line(2, "Sets which packages by name will be checked against with '-strict-style'.");
+			print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
 		}
 	}
 

@@ -1387,7 +1387,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(ast_file(node))) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1663,7 +1663,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(ast_file(node))) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];

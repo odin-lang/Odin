@@ -2,6 +2,43 @@
 
 gb_global std::atomic<bool> g_parsing_done;
 
+
+gb_internal bool in_strict_style_packages(AstFile *file) {
+	if (file == nullptr) {
+		return true;
+	}
+
+	if (file->pkg == nullptr) {
+		return true;
+	}
+
+	if (file->pkg_decl == nullptr) {
+		return true;
+	}
+
+	if (build_context.strict_style_packages.entries.count == 0) {
+		return true;
+	}
+
+	String pkg_name = {};
+
+	if (file->pkg->name.len > 0) {
+		pkg_name = file->pkg->name;
+	} else if (file->pkg_decl->kind == Ast_PackageDecl) {
+		Token name_token = file->pkg_decl->PackageDecl.name;
+		if (name_token.kind == Token_Ident) {
+			pkg_name = name_token.string;
+		}
+	}
+
+	if (pkg_name.len == 0) {
+		return true;
+	}
+
+	return string_set_exists(&build_context.strict_style_packages, pkg_name);
+}
+
+
 gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
@@ -37,6 +74,11 @@ gb_internal bool in_vet_packages(AstFile *file) {
 	return string_set_exists(&build_context.vet_packages, pkg_name);
 }
 
+gb_internal bool is_strict_style(AstFile *file) {
+	return build_context.strict_style && in_strict_style_packages(file);
+}
+
+
 gb_internal u64 ast_file_vet_flags(AstFile *f) {
 	if (f != nullptr && f->vet_flags_set) {
 		return f->vet_flags;
@@ -62,7 +104,7 @@ gb_internal bool ast_file_vet_explicit_allocators(AstFile *f) {
 }
 
 gb_internal bool file_allow_newline(AstFile *f) {
-	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
+	bool is_strict = is_strict_style(f) || ast_file_vet_style(f)
 	return !is_strict;
 }
 
@@ -1683,7 +1725,7 @@ gb_internal bool skip_possible_newline_for_literal(AstFile *f, bool ignore_stric
 			switch (next.kind) {
 			case Token_OpenBrace:
 			case Token_else:
-				if (build_context.strict_style && !ignore_strict_style) {
+				if (is_strict_style(f) && !ignore_strict_style) {
 					syntax_error(next, "With '-strict-style' the attached brace style (1TBS) is enforced");
 				}
 				/*fallthrough*/
@@ -1936,7 +1978,7 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 		return;
 	}
 
-	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
+	if (is_strict_style(f) || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
 		syntax_error(*prev_token, "Found unneeded semicolon");
 	}
 	prev_token->flags |= TokenFlag_Remove;

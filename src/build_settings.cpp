@@ -518,6 +518,7 @@ struct BuildContext {
 	u64 vet_flags;
 	u32 sanitizer_flags;
 	StringSet vet_packages;
+	StringSet strict_style_packages;
 
 	bool   has_resource;
 	String link_flags;
