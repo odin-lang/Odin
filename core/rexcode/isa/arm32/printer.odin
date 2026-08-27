@@ -108,21 +108,26 @@ sbprint :: proc(
 
 		strings.write_string(sb, "    ")
 
-		// Compute the .<dt> suffix from the matched decoder entry (if any)
-		// and from the operand kinds when no entry is available.
+		// The `.<dt>` suffix. It is data on the instruction now, so there is
+		// nothing to reconstruct: read it straight off. This is also what
+		// makes the convert family print correctly -- `vcvt.s32.f32` names
+		// both ends, and the old bit-pattern inference only ever produced one.
 		dt_suffix := ""
-		if i < len(inst_info) {
+		dt := inst.dt
+		if dt[0] == .NONE && i < len(inst_info) {
 			de_idx := int(inst_info[i].decode_entry)
 			if de_idx < len(DECODE_ENTRIES) {
-				dt_suffix = infer_dt_suffix(&DECODE_ENTRIES[de_idx], inst)
+				dt = DECODE_ENTRIES[de_idx].dt
 			}
 		}
-		if dt_suffix == "" {
+		if dt[0] == .NONE {
 			dt_suffix = infer_dt_suffix_from_inst(inst)
 		}
 
 		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.flags.sets_flags, opts.uppercase)
-		if dt_suffix != "" {
+		if dt[0] != .NONE {
+			write_data_type(sb, dt, opts.uppercase)
+		} else if dt_suffix != "" {
 			strings.write_string(sb, dt_suffix)
 		}
 
@@ -390,6 +395,35 @@ wprintln :: proc(
 // =============================================================================
 // Writers
 // =============================================================================
+
+// `.i32`, `.s32.f32`, `.8`. Both slots print when the second is set.
+@(private="file")
+write_data_type :: proc(sb: ^strings.Builder, dt: Data_Types, uppercase: bool) {
+	for d in dt {
+		if d == .NONE { continue }
+		strings.write_byte(sb, '.')
+		name := DATA_TYPE_NAMES[d]
+		for i in 0 ..< len(name) {
+			c := name[i]
+			if uppercase && c >= 'a' && c <= 'z' {
+				strings.write_byte(sb, c - 'a' + 'A')
+			} else {
+				strings.write_byte(sb, c)
+			}
+		}
+	}
+}
+
+@(rodata, private="file")
+DATA_TYPE_NAMES := [Data_Type]string{
+	.NONE = "",
+	.S8 = "s8", .S16 = "s16", .S32 = "s32", .S64 = "s64",
+	.U8 = "u8", .U16 = "u16", .U32 = "u32", .U64 = "u64",
+	.I8 = "i8", .I16 = "i16", .I32 = "i32", .I64 = "i64",
+	.F16 = "f16", .F32 = "f32", .F64 = "f64",
+	.P8 = "p8", .P16 = "p16", .BF16 = "bf16",
+	.SZ8 = "8", .SZ16 = "16", .SZ32 = "32", .SZ64 = "64",
+}
 
 @(private="file")
 write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, cond: u8, sets_flags: bool, uppercase: bool) {

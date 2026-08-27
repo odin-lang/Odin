@@ -397,6 +397,30 @@ Operand_Encoding :: enum u8 {
 
 // ---- Encoding struct -------------------------------------------------------
 
+// The data type an A32 mnemonic carries as a suffix: `vadd.i32`, `vcvt.s32.f32`,
+// `vstrb.8`. Unlike A64 -- where the arrangement belongs to each operand
+// (`add v0.4s, v1.4s, v2.4s`) -- in A32 it belongs to the INSTRUCTION, which is
+// why it lives here and on Instruction rather than on Operand.
+//
+// It is not decoration: NEON reuses one operand shape across every element
+// width, so `vadd.i8` and `vadd.f32` are both DPR,DPR,DPR and the type is the
+// only thing that separates their encodings. Without it the encoder can only
+// ever reach the first form of each shape.
+Data_Type :: enum u8 {
+	NONE,
+	S8, S16, S32, S64,     // signed integer
+	U8, U16, U32, U64,     // unsigned integer
+	I8, I16, I32, I64,     // sign-agnostic integer
+	F16, F32, F64,         // floating point
+	P8, P16,               // polynomial
+	BF16,                  // bfloat16
+	SZ8, SZ16, SZ32, SZ64, // bare element size (`vmov.32`, `vstrb.8`)
+}
+
+// Two slots because the convert family names both ends: `vcvt.s32.f32`.
+// Everything else leaves dt[1] as .NONE.
+Data_Types :: [2]Data_Type
+
 Encoding :: struct #packed {
 	mnemonic: Mnemonic,            // 2
 	ops:      [4]Operand_Type,     // 4
@@ -406,8 +430,9 @@ Encoding :: struct #packed {
 	feature:  Feature,             // 1
 	mode:     Mode,                // 1
 	flags:    Encoding_Flags,      // 1
+	dt:       Data_Types,          // 2
 }
-#assert(size_of(Encoding) == 21)
+#assert(size_of(Encoding) == 23)
 
 // ---- Length introspection --------------------------------------------------
 //

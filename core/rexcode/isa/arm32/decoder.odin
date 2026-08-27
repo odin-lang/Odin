@@ -152,6 +152,9 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		// back to the index within ENCODING_TABLE[mnemonic]. Stored as
 		// (form_idx + 1) so a zero hint means "not set".
 		inst.form_id = DECODE_FORM_IDX[entry_idx] + 1
+		// Carry the `.i32` suffix out with the instruction, so a decoded
+		// instruction re-encodes to the same form without needing form_id.
+		inst.dt = e.dt
 
 		// Cond: A32 entries with bits[31:28] variable in mask take cond from word
 		if mode == .A32 && (e.mask >> 28) == 0 {

@@ -65,6 +65,7 @@ Entry :: struct {
 	feature:    lib.Feature,
 	mode:       lib.Mode,
 	flags:      lib.Encoding_Flags,
+	dt:         lib.Data_Types,
 	is_thumb32: bool,
 	key:        u16,   // primary dispatch key (8 bits A32, 7 bits T32, 6 bits T16)
 	ilen:       u8,
@@ -101,7 +102,7 @@ emit_encode_tables :: proc() -> (total: int) {
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
 		for f in forms {
-			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.mode, f.flags)
+			write_row(&sb, f.mnemonic, f.ops, f.enc, f.bits, f.mask, f.feature, f.mode, f.flags, f.dt)
 		}
 	}
 	strings.write_string(&sb, "}\n\n")
@@ -170,6 +171,7 @@ emit_decode_tables :: proc() -> (total: int) {
 				feature    = f.feature,
 				mode       = f.mode,
 				flags      = f.flags,
+				dt         = f.dt,
 				is_thumb32 = f.flags.thumb32,
 				ilen       = ilen,
 				form_idx   = u16(fi),
@@ -301,7 +303,7 @@ emit_decode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "DECODE_ENTRIES := [%d]lib.Decode_Entry{{", len(all))
 	for e in all {
-		write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.mode, e.flags)
+		write_row(&sb, e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.mode, e.flags, e.dt)
 	}
 	strings.write_string(&sb, "}\n\n")
 
@@ -351,10 +353,11 @@ emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 
 write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [4]lib.Operand_Type,
                   enc: [4]lib.Operand_Encoding, bits, mask: u32,
-                  feature: lib.Feature, mode: lib.Mode, flags: lib.Encoding_Flags) {
-	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}} }},\n",
+                  feature: lib.Feature, mode: lib.Mode, flags: lib.Encoding_Flags,
+                  dt: lib.Data_Types) {
+	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}}, {{.%v,.%v}} }},\n",
 		mn, ops[0], ops[1], ops[2], ops[3], enc[0], enc[1], enc[2], enc[3],
-		bits, mask, feature, mode, flags_lit(flags))
+		bits, mask, feature, mode, flags_lit(flags), dt[0], dt[1])
 }
 
 flags_lit :: proc(f: lib.Encoding_Flags) -> string {
@@ -412,8 +415,9 @@ Decode_Entry :: struct #packed {
 	feature:  Feature,             // 1
 	mode:     Mode,                // 1
 	flags:    Encoding_Flags,      // 1
+	dt:       Data_Types,          // 2 -- see Data_Type in encoding_types.odin
 }
-#assert(size_of(Decode_Entry) == 21)
+#assert(size_of(Decode_Entry) == 23)
 
 Decode_Index :: struct #packed {
 	start: u16,

@@ -35,7 +35,13 @@ Instruction :: struct #packed {
 	// bits). User-constructed instructions leave it at 0; the encoder then
 	// falls back to first-shape-match. Stored as u16 over the two padding bytes.
 	form_id:       u16,
-	_:             [7]u8,
+	// The `.i32` / `.s32.f32` suffix. Zero (.NONE) means "unspecified": the
+	// encoder then takes the first form of the matching shape, which is what
+	// every instruction did before this field existed. Set it and the encoder
+	// picks the encoding for that type. Fits in what was already padding, so
+	// Instruction does not grow.
+	dt:            Data_Types,
+	_:             [5]u8,
 }
 #assert(size_of(Instruction) == 88)
 

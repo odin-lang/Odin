@@ -160,6 +160,7 @@ encode_one_inline :: #force_inline proc(
 	if inst.form_id != 0 && int(inst.form_id) - 1 < len(forms) {
 		f := &forms[inst.form_id - 1]
 		if f.mode == inst.mode &&
+		   (inst.dt[0] == .NONE || f.dt == inst.dt) &&
 		   (want_len == 0 || inst_size_from_bits(f.bits, f.mode) == want_len) &&
 		   encoding_matches_inline(inst, f) &&
 		   inst.flags.sets_flags == f.flags.sets_flags &&
@@ -170,6 +171,11 @@ encode_one_inline :: #force_inline proc(
 	if form == nil {
 		for &f in forms {
 			if f.mode != inst.mode { continue }
+			// The `.i32` / `.s32.f32` suffix. NEON reuses one operand shape
+			// across every element width, so without this the scan can only
+			// ever reach the first form of a shape. .NONE means the caller did
+			// not say, and every form of the shape stays eligible.
+			if inst.dt[0] != .NONE && f.dt != inst.dt { continue }
 			if want_len > 0 && inst_size_from_bits(f.bits, f.mode) != want_len { continue }
 			if !encoding_matches_inline(inst, &f) { continue }
 			if inst.flags.sets_flags && !f.flags.sets_flags { continue }
