@@ -97,7 +97,8 @@ main :: proc() {
 	// ---- Branches -----------------------------------------------------------
 	check("B",              .B,        0, 0x14000000, 0xFC000000)
 	check("BL",             .BL,       0, 0x94000000, 0xFC000000)
-	check("B.cond",         .B_COND,   0, 0x54000000, 0xFF000010)
+	check("B.eq",           .B_EQ,     0, 0x54000000, 0xFF00001F)
+	check("B.le",           .B_LE,     0, 0x5400000D, 0xFF00001F)
 	check("CBZ 64",         .CBZ,      1, 0xB4000000, 0xFF000000)
 	check("CBNZ 64",        .CBNZ,     1, 0xB5000000, 0xFF000000)
 	check("TBZ",            .TBZ,      0, 0x36000000, 0x7F000000)
@@ -387,7 +388,8 @@ main :: proc() {
 	check("WFIT",    .WFIT, 0, 0xD5031020, 0xFFFFFFE0)
 
 	// ---- BC.cond (v8.8-A) ------------------------------------------------
-	check("BC.cond", .BC_COND, 0, 0x54000010, 0xFF000010)
+	check("BC.eq",   .BC_EQ,   0, 0x54000010, 0xFF00001F)
+	check("BC.le",   .BC_LE,   0, 0x5400001D, 0xFF00001F)
 
 	// ---- Sign/zero-extend aliases ---------------------------------------
 	check("UXTB", .UXTB, 0, 0x53001C00, 0xFFFFFC00)

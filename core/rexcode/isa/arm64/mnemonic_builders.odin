@@ -223,8 +223,38 @@ inst_ret_r               :: #force_inline proc "contextless" (dst: Register) -> 
 inst_ret_none            :: #force_inline proc "contextless" () -> Instruction { return inst_none(.RET) }
 emit_ret_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register) { append(instructions, inst_ret_r(dst)) }
 emit_ret_none            :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_ret_none()) }
-inst_b_cond_c_l          :: #force_inline proc "contextless" (cond: Cond, label: u32) -> Instruction { return Instruction{mnemonic = .B_COND, operand_count = 2, length = 4, ops = {op_cond(cond), op_label(label, 4), {}, {}}} }
-emit_b_cond_c_l          :: #force_inline proc(instructions: ^[dynamic]Instruction, cond: Cond, label: u32) { append(instructions, inst_b_cond_c_l(cond, label)) }
+inst_b_eq_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_EQ, label) }
+emit_b_eq_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_eq_l(label)) }
+inst_b_ne_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_NE, label) }
+emit_b_ne_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_ne_l(label)) }
+inst_b_cs_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_CS, label) }
+emit_b_cs_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_cs_l(label)) }
+inst_b_cc_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_CC, label) }
+emit_b_cc_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_cc_l(label)) }
+inst_b_mi_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_MI, label) }
+emit_b_mi_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_mi_l(label)) }
+inst_b_pl_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_PL, label) }
+emit_b_pl_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_pl_l(label)) }
+inst_b_vs_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_VS, label) }
+emit_b_vs_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_vs_l(label)) }
+inst_b_vc_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_VC, label) }
+emit_b_vc_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_vc_l(label)) }
+inst_b_hi_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_HI, label) }
+emit_b_hi_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_hi_l(label)) }
+inst_b_ls_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_LS, label) }
+emit_b_ls_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_ls_l(label)) }
+inst_b_ge_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_GE, label) }
+emit_b_ge_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_ge_l(label)) }
+inst_b_lt_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_LT, label) }
+emit_b_lt_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_lt_l(label)) }
+inst_b_gt_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_GT, label) }
+emit_b_gt_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_gt_l(label)) }
+inst_b_le_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_LE, label) }
+emit_b_le_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_le_l(label)) }
+inst_b_al_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_AL, label) }
+emit_b_al_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_al_l(label)) }
+inst_b_nv_l              :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B_NV, label) }
+emit_b_nv_l              :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_b_nv_l(label)) }
 inst_cbz_r_l             :: #force_inline proc "contextless" (dst: Register, label: u32) -> Instruction { return Instruction{mnemonic = .CBZ, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(label, 4), {}, {}}} }
 emit_cbz_r_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, label: u32) { append(instructions, inst_cbz_r_l(dst, label)) }
 inst_cbnz_r_l            :: #force_inline proc "contextless" (dst: Register, label: u32) -> Instruction { return Instruction{mnemonic = .CBNZ, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(label, 4), {}, {}}} }
@@ -1659,8 +1689,38 @@ inst_wfet_r              :: #force_inline proc "contextless" (dst: Register) -> 
 emit_wfet_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register) { append(instructions, inst_wfet_r(dst)) }
 inst_wfit_r              :: #force_inline proc "contextless" (dst: Register) -> Instruction { return inst_r(.WFIT, dst) }
 emit_wfit_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register) { append(instructions, inst_wfit_r(dst)) }
-inst_bc_cond_c_l         :: #force_inline proc "contextless" (cond: Cond, label: u32) -> Instruction { return Instruction{mnemonic = .BC_COND, operand_count = 2, length = 4, ops = {op_cond(cond), op_label(label, 4), {}, {}}} }
-emit_bc_cond_c_l         :: #force_inline proc(instructions: ^[dynamic]Instruction, cond: Cond, label: u32) { append(instructions, inst_bc_cond_c_l(cond, label)) }
+inst_bc_eq_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_EQ, label) }
+emit_bc_eq_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_eq_l(label)) }
+inst_bc_ne_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_NE, label) }
+emit_bc_ne_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_ne_l(label)) }
+inst_bc_cs_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_CS, label) }
+emit_bc_cs_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_cs_l(label)) }
+inst_bc_cc_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_CC, label) }
+emit_bc_cc_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_cc_l(label)) }
+inst_bc_mi_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_MI, label) }
+emit_bc_mi_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_mi_l(label)) }
+inst_bc_pl_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_PL, label) }
+emit_bc_pl_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_pl_l(label)) }
+inst_bc_vs_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_VS, label) }
+emit_bc_vs_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_vs_l(label)) }
+inst_bc_vc_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_VC, label) }
+emit_bc_vc_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_vc_l(label)) }
+inst_bc_hi_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_HI, label) }
+emit_bc_hi_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_hi_l(label)) }
+inst_bc_ls_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_LS, label) }
+emit_bc_ls_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_ls_l(label)) }
+inst_bc_ge_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_GE, label) }
+emit_bc_ge_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_ge_l(label)) }
+inst_bc_lt_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_LT, label) }
+emit_bc_lt_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_lt_l(label)) }
+inst_bc_gt_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_GT, label) }
+emit_bc_gt_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_gt_l(label)) }
+inst_bc_le_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_LE, label) }
+emit_bc_le_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_le_l(label)) }
+inst_bc_al_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_AL, label) }
+emit_bc_al_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_al_l(label)) }
+inst_bc_nv_l             :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.BC_NV, label) }
+emit_bc_nv_l             :: #force_inline proc(instructions: ^[dynamic]Instruction, label: u32) { append(instructions, inst_bc_nv_l(label)) }
 inst_uxtb_r_r            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.UXTB, dst, src) }
 emit_uxtb_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_uxtb_r_r(dst, src)) }
 inst_uxth_r_r            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.UXTH, dst, src) }
@@ -2038,8 +2098,38 @@ inst_blr                      :: inst_blr_r
 emit_blr                      :: emit_blr_r
 inst_ret                      :: proc{ inst_ret_r, inst_ret_none }
 emit_ret                      :: proc{ emit_ret_r, emit_ret_none }
-inst_b_cond                   :: inst_b_cond_c_l
-emit_b_cond                   :: emit_b_cond_c_l
+inst_b_eq                     :: inst_b_eq_l
+emit_b_eq                     :: emit_b_eq_l
+inst_b_ne                     :: inst_b_ne_l
+emit_b_ne                     :: emit_b_ne_l
+inst_b_cs                     :: inst_b_cs_l
+emit_b_cs                     :: emit_b_cs_l
+inst_b_cc                     :: inst_b_cc_l
+emit_b_cc                     :: emit_b_cc_l
+inst_b_mi                     :: inst_b_mi_l
+emit_b_mi                     :: emit_b_mi_l
+inst_b_pl                     :: inst_b_pl_l
+emit_b_pl                     :: emit_b_pl_l
+inst_b_vs                     :: inst_b_vs_l
+emit_b_vs                     :: emit_b_vs_l
+inst_b_vc                     :: inst_b_vc_l
+emit_b_vc                     :: emit_b_vc_l
+inst_b_hi                     :: inst_b_hi_l
+emit_b_hi                     :: emit_b_hi_l
+inst_b_ls                     :: inst_b_ls_l
+emit_b_ls                     :: emit_b_ls_l
+inst_b_ge                     :: inst_b_ge_l
+emit_b_ge                     :: emit_b_ge_l
+inst_b_lt                     :: inst_b_lt_l
+emit_b_lt                     :: emit_b_lt_l
+inst_b_gt                     :: inst_b_gt_l
+emit_b_gt                     :: emit_b_gt_l
+inst_b_le                     :: inst_b_le_l
+emit_b_le                     :: emit_b_le_l
+inst_b_al                     :: inst_b_al_l
+emit_b_al                     :: emit_b_al_l
+inst_b_nv                     :: inst_b_nv_l
+emit_b_nv                     :: emit_b_nv_l
 inst_cbz                      :: inst_cbz_r_l
 emit_cbz                      :: emit_cbz_r_l
 inst_cbnz                     :: inst_cbnz_r_l
@@ -3254,8 +3344,38 @@ inst_wfet                     :: inst_wfet_r
 emit_wfet                     :: emit_wfet_r
 inst_wfit                     :: inst_wfit_r
 emit_wfit                     :: emit_wfit_r
-inst_bc_cond                  :: inst_bc_cond_c_l
-emit_bc_cond                  :: emit_bc_cond_c_l
+inst_bc_eq                    :: inst_bc_eq_l
+emit_bc_eq                    :: emit_bc_eq_l
+inst_bc_ne                    :: inst_bc_ne_l
+emit_bc_ne                    :: emit_bc_ne_l
+inst_bc_cs                    :: inst_bc_cs_l
+emit_bc_cs                    :: emit_bc_cs_l
+inst_bc_cc                    :: inst_bc_cc_l
+emit_bc_cc                    :: emit_bc_cc_l
+inst_bc_mi                    :: inst_bc_mi_l
+emit_bc_mi                    :: emit_bc_mi_l
+inst_bc_pl                    :: inst_bc_pl_l
+emit_bc_pl                    :: emit_bc_pl_l
+inst_bc_vs                    :: inst_bc_vs_l
+emit_bc_vs                    :: emit_bc_vs_l
+inst_bc_vc                    :: inst_bc_vc_l
+emit_bc_vc                    :: emit_bc_vc_l
+inst_bc_hi                    :: inst_bc_hi_l
+emit_bc_hi                    :: emit_bc_hi_l
+inst_bc_ls                    :: inst_bc_ls_l
+emit_bc_ls                    :: emit_bc_ls_l
+inst_bc_ge                    :: inst_bc_ge_l
+emit_bc_ge                    :: emit_bc_ge_l
+inst_bc_lt                    :: inst_bc_lt_l
+emit_bc_lt                    :: emit_bc_lt_l
+inst_bc_gt                    :: inst_bc_gt_l
+emit_bc_gt                    :: emit_bc_gt_l
+inst_bc_le                    :: inst_bc_le_l
+emit_bc_le                    :: emit_bc_le_l
+inst_bc_al                    :: inst_bc_al_l
+emit_bc_al                    :: emit_bc_al_l
+inst_bc_nv                    :: inst_bc_nv_l
+emit_bc_nv                    :: emit_bc_nv_l
 inst_uxtb                     :: inst_uxtb_r_r
 emit_uxtb                     :: emit_uxtb_r_r
 inst_uxth                     :: inst_uxth_r_r

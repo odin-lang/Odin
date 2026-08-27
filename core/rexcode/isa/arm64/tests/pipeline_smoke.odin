@@ -382,7 +382,7 @@ run_pipeline_tests :: proc() {
 
 		src := []a.Instruction{
 			a.inst_r_r_i(.SUBS, a.X0, a.X1, 0),
-			a.inst_b_cond(.EQ, 0),
+			a.inst_b_eq(0),
 			a.inst_none(.RET),
 		}
 		byte_count, success := a.encode(src, ld[:], code[:], &relocs, &errors)
@@ -646,7 +646,7 @@ run_pipeline_tests :: proc() {
 		append(&insts, a.inst_r_r_i(.ADD, a.X0, a.X0, 1))      // [0] byte  0: ADD X0,X0,#1
 		append(&insts, a.inst_r_r_i(.SUBS, a.XZR, a.X0, 5))    // [1] byte  4: SUBS XZR,X0,#5
 		fwd  := isa.label_forward(&labels)                          //    reserve .L1
-		append(&insts, a.inst_b_cond(.LT, fwd))                    // [2] byte  8: B.LT .L1
+		append(&insts, a.inst_b_lt(fwd))                    // [2] byte  8: B.LT .L1
 		append(&insts, a.inst_branch(.B, back))                    // [3] byte 12: B .L0
 		isa.label_set_at(&labels, fwd, &insts)                     //    .L1: at instruction 4
 		append(&insts, a.inst_none(.RET))                          // [4] byte 16: RET

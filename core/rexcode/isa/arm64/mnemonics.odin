@@ -13,11 +13,12 @@ package rexcode_arm64
 // between them by matching the operands against that mnemonic's run of
 // forms in INSTRUCTION_TABLE (see tablegen/instruction_table.odin).
 //
-// The only names holding an underscore are the system instructions an
-// assembler writes as two tokens -- `dc zva`, `tlbi vae1`, `at s1e1r`,
-// `bti j`, `psb csync` -- plus B_COND / BC_COND, whose condition lives in
-// an operand and prints as `b.eq` / `bc.eq`, and the AMX_* pseudo-ops for
-// Apple's undocumented coprocessor, which has no assembler spelling.
+// Names holding an underscore are the ones an assembler writes with a
+// separator: the two-token system instructions -- `dc zva`, `tlbi vae1`,
+// `at s1e1r`, `bti j`, `psb csync` -- and the conditional branches, where
+// the underscore is a dot: B_LE prints `b.le`, BC_NE prints `bc.ne`. The
+// AMX_* pseudo-ops keep theirs literally; Apple's undocumented coprocessor
+// has no assembler spelling at all.
 //
 // Architectural aliases that share an encoding (MOV/MVN of ORR/ORN, NEG of
 // SUB, CMP of SUBS, TST of ANDS, ...) are listed as the mnemonics they are:
@@ -81,7 +82,15 @@ Mnemonic :: enum u16 {
 
 	B, BL,                                     // 26-bit PC-rel
 	BR, BLR, RET,                              // register indirect
-	B_COND,                                    // B.cond -- 19-bit PC-rel
+	// One member per condition, the way an assembler spells them and the way
+	// x86 does its Jcc. The condition is not an operand: it is four bits of
+	// the opcode, and splitting it lets each entry record the flags it
+	// actually reads -- b.eq consults Z alone, b.le consults N, Z and V --
+	// where a single B_COND had to claim all four for every condition.
+	B_EQ, B_NE, B_CS, B_CC,                    // B.cond -- 19-bit PC-rel
+	B_MI, B_PL, B_VS, B_VC,
+	B_HI, B_LS, B_GE, B_LT,
+	B_GT, B_LE, B_AL, B_NV,
 	CBZ, CBNZ,                                 // 19-bit PC-rel + Rt
 	TBZ, TBNZ,                                 // 14-bit PC-rel + bit position
 
@@ -433,7 +442,11 @@ Mnemonic :: enum u16 {
 	// -------------------------------------------------------------------------
 	// Branch consistency hint (v8.8-A BC.cond)
 	// -------------------------------------------------------------------------
-	BC_COND,
+	// BC.cond: the consistent-branch form, same 16 conditions.
+	BC_EQ, BC_NE, BC_CS, BC_CC,
+	BC_MI, BC_PL, BC_VS, BC_VC,
+	BC_HI, BC_LS, BC_GE, BC_LT,
+	BC_GT, BC_LE, BC_AL, BC_NV,
 
 	// -------------------------------------------------------------------------
 	// Sign/zero extend aliases (canonical names for SBFM/UBFM specific cases)
