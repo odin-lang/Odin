@@ -96,6 +96,14 @@ decode_one_inline :: #force_inline proc "contextless" (
 	for i in 0..<cnt {
 		e := &DECODE_ENTRIES[base + i]
 		if (word & e.mask) == e.bits {
+			// RN_RM is one operand filling both source slots, which is what
+			// makes cinc/cinv/cneg an alias at all -- the encoding is only
+			// theirs when the two register fields actually agree. No mask can
+			// say that, so it is checked here; the branch costs nothing,
+			// since it is only reached on a match.
+			if e.enc[1] == .RN_RM && ((word >> 16) & 0x1F) != ((word >> 5) & 0x1F) {
+				continue
+			}
 			matched_idx = base + i
 			break
 		}
@@ -142,7 +150,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	// ---- Register slots ----------------------------------------------------
 	case .RD, .RT:
 		return reg_from_field(word, 0, ot)
-	case .RN:
+	case .RN, .RN_RM:
 		return reg_from_field(word, 5, ot)
 	case .RT2, .RA:
 		return reg_from_field(word, 10, ot)
@@ -188,6 +196,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .EXT_IMM3: return Operand{immediate = i64((word >> 10) & 0x7),     kind = .IMMEDIATE, size = 1}
 	case .COND_HI:
 		return Operand{cond = u8((word >> 12) & 0xF), kind = .COND, size = 1}
+	case .COND_HI_INV:
+		return Operand{cond = u8(((word >> 12) & 0xF) ~ 1), kind = .COND, size = 1}
 	case .COND_LO:
 		return Operand{cond = u8(word & 0xF), kind = .COND, size = 1}
 	case .NZCV_FIELD:

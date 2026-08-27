@@ -186,6 +186,10 @@ Operand_Type :: enum u8 {
 
 	// ---- Condition code ----
 	COND,
+	// Condition with AL/NV excluded. The cset/cinc alias family is only the
+	// preferred spelling when cond != 111x -- with AL or NV the underlying
+	// CSINC/CSINV/CSNEG is what an assembler writes.
+	COND_NOT_AL,
 
 	// ---- NEON shift-by-immediate amount (encoded into immh:immb together
 	//      with the element size: left = esize+shift, right = 2*esize-shift) ----
@@ -208,6 +212,8 @@ Operand_Encoding :: enum u8 {
 	RT2,              // bits 10-14
 	RA,               // bits 10-14 (alias of RT2 used in MADD/MSUB)
 	RM,               // bits 16-20
+	RN_RM,            // bits 5-9 AND 16-20 -- one register into both source
+	                  // slots (cinc/cinv/cneg, whose alias condition is Rn==Rm)
 
 	// ---- Immediates ----
 	IMM12,            // bits 10-21
@@ -227,6 +233,8 @@ Operand_Encoding :: enum u8 {
 	EXT_OPT,          // bits 13-15  (extend type for extended-register)
 	EXT_IMM3,         // bits 10-12  (extend amount)
 	COND_HI,          // bits 12-15  (CSEL/CSINC/CSINV/CSNEG, FCSEL, CCMP)
+	COND_HI_INV,      // bits 12-15, stored inverted -- the cset/cinc aliases
+	                  // read as `cset Wd, eq` but encode CSINC's cond as NE
 	COND_LO,          // bits  0-3   (B.cond)
 	NZCV_FIELD,       // bits  0-3   (CCMP/CCMN immediate NZCV)
 	SYS_FIELD,        // bits 5-19   (MRS/MSR: op0/op1/CRn/CRm/op2)

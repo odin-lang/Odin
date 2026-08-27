@@ -209,6 +209,16 @@ inst_ccmn_r_r_i_c        :: #force_inline proc "contextless" (dst: Register, src
 inst_ccmn_r_i_i_c        :: #force_inline proc "contextless" (dst: Register, imm: i64, imm2: i64, cond: Cond) -> Instruction { return Instruction{mnemonic = .CCMN, operand_count = 4, length = 4, ops = {op_reg(dst), op_imm(imm, 1), op_imm(imm2, 1), op_cond(cond)}} }
 emit_ccmn_r_r_i_c        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64, cond: Cond) { append(instructions, inst_ccmn_r_r_i_c(dst, src, imm, cond)) }
 emit_ccmn_r_i_i_c        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, imm2: i64, cond: Cond) { append(instructions, inst_ccmn_r_i_i_c(dst, imm, imm2, cond)) }
+inst_cset_r_c            :: #force_inline proc "contextless" (dst: Register, cond: Cond) -> Instruction { return Instruction{mnemonic = .CSET, operand_count = 2, length = 4, ops = {op_reg(dst), op_cond(cond), {}, {}}} }
+emit_cset_r_c            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, cond: Cond) { append(instructions, inst_cset_r_c(dst, cond)) }
+inst_csetm_r_c           :: #force_inline proc "contextless" (dst: Register, cond: Cond) -> Instruction { return Instruction{mnemonic = .CSETM, operand_count = 2, length = 4, ops = {op_reg(dst), op_cond(cond), {}, {}}} }
+emit_csetm_r_c           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, cond: Cond) { append(instructions, inst_csetm_r_c(dst, cond)) }
+inst_cinc_r_r_c          :: #force_inline proc "contextless" (dst: Register, src: Register, cond: Cond) -> Instruction { return Instruction{mnemonic = .CINC, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_cond(cond), {}}} }
+emit_cinc_r_r_c          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, cond: Cond) { append(instructions, inst_cinc_r_r_c(dst, src, cond)) }
+inst_cinv_r_r_c          :: #force_inline proc "contextless" (dst: Register, src: Register, cond: Cond) -> Instruction { return Instruction{mnemonic = .CINV, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_cond(cond), {}}} }
+emit_cinv_r_r_c          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, cond: Cond) { append(instructions, inst_cinv_r_r_c(dst, src, cond)) }
+inst_cneg_r_r_c          :: #force_inline proc "contextless" (dst: Register, src: Register, cond: Cond) -> Instruction { return Instruction{mnemonic = .CNEG, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_cond(cond), {}}} }
+emit_cneg_r_r_c          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, cond: Cond) { append(instructions, inst_cneg_r_r_c(dst, src, cond)) }
 inst_extr_r_r_r_i        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .EXTR, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_imm(imm, 1)}} }
 emit_extr_r_r_r_i        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_extr_r_r_r_i(dst, src, src2, imm)) }
 inst_b_l                 :: #force_inline proc "contextless" (label: u32) -> Instruction { return inst_branch(.B, label) }
@@ -2086,6 +2096,16 @@ inst_ccmp                     :: proc{ inst_ccmp_r_r_i_c, inst_ccmp_r_i_i_c }
 emit_ccmp                     :: proc{ emit_ccmp_r_r_i_c, emit_ccmp_r_i_i_c }
 inst_ccmn                     :: proc{ inst_ccmn_r_r_i_c, inst_ccmn_r_i_i_c }
 emit_ccmn                     :: proc{ emit_ccmn_r_r_i_c, emit_ccmn_r_i_i_c }
+inst_cset                     :: inst_cset_r_c
+emit_cset                     :: emit_cset_r_c
+inst_csetm                    :: inst_csetm_r_c
+emit_csetm                    :: emit_csetm_r_c
+inst_cinc                     :: inst_cinc_r_r_c
+emit_cinc                     :: emit_cinc_r_r_c
+inst_cinv                     :: inst_cinv_r_r_c
+emit_cinv                     :: emit_cinv_r_r_c
+inst_cneg                     :: inst_cneg_r_r_c
+emit_cneg                     :: emit_cneg_r_r_c
 inst_extr                     :: inst_extr_r_r_r_i
 emit_extr                     :: emit_extr_r_r_r_i
 inst_b                        :: inst_b_l

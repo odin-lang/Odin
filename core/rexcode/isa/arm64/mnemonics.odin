@@ -69,6 +69,10 @@ Mnemonic :: enum u16 {
 
 	CSEL, CSINC, CSINV, CSNEG,
 	CCMP, CCMN,
+	// Aliases of the above with the condition inverted; every assembler both
+	// accepts and prefers these spellings.
+	CSET, CSETM,                               // CSINC/CSINV with Rn = Rm = ZR
+	CINC, CINV, CNEG,                          // CSINC/CSINV/CSNEG with Rn = Rm
 
 	// -------------------------------------------------------------------------
 	// Extract
