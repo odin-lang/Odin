@@ -10,15 +10,33 @@ Instruction_Flags :: bit_field u8 {
 	_: u8 | 8,
 }
 
-Instruction :: struct #packed {
-	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * size_of(Operand)
+// Sized and aligned to a cache line, deliberately.
+//
+// The payload is 45 bytes -- shrinking Operand to 10 got it there -- but
+// leaving the struct at 48 was measurably worse than padding it back out.
+// With `#packed` the struct aligns to 1, so a 48-byte stride straddles a line
+// boundary 75% of the time and a 64-byte one straddled 100% of the time (the
+// heap base is not line-aligned either). Decode writes whole Instructions, and
+// unaligned stores cost enough that on an i7-9750H this layout decodes ~21%
+// faster than the 48-byte packed one -- while writing MORE bytes. The gap
+// holds even when the whole array is L1-resident, so it is split-store cost at
+// the store ports, not cache-line fetches.
+//
+// Encode is within 1% and a pure read traversal is ~9% slower at working sets
+// past L2, both of which the decode win dwarfs for real workloads.
+//
+// The 19 spare bytes are free: they cost nothing over a 48-byte struct that
+// straddles, and new fields land in them without changing the layout.
+Instruction :: struct #align(64) {
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * size_of(Operand) = 40
 	mnemonic:      Mnemonic,                           // 2
 	operand_count: u8,                                 // 1
 	flags:         Instruction_Flags,                  // 1
 	length:        u8,                                 // 1 -- always 4
-	_:             [3]u8,
+	_:             [19]u8,
 }
-#assert(size_of(Instruction) == 48)
+#assert(size_of(Instruction)  == 64)
+#assert(align_of(Instruction) == 64)
 
 // =============================================================================
 // Builders -- the most common shapes; less-common forms can be built

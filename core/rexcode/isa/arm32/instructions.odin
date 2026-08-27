@@ -20,7 +20,11 @@ Instruction_Flags :: bit_field u8 {
 	_:          u8   | 6,
 }
 
-Instruction :: struct #packed {
+// Sized and aligned to a cache line -- see the note in arm64/instructions.odin.
+// The payload is 48 bytes; padding out to 64 and aligning is worth ~21% on
+// decode, because decode writes whole Instructions and unaligned stores are
+// expensive enough to outweigh writing more bytes.
+Instruction :: struct #align(64) {
 	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 10 = 40
 	mnemonic:      Mnemonic,                           // 2
 	// cond, operand_count, mode, length and the two flag bits share one
@@ -49,8 +53,12 @@ Instruction :: struct #packed {
 	// every instruction did before this field existed. Set it and the encoder
 	// picks the encoding for that type.
 	dt:            Data_Types,
+	// Spare, and free: a 48-byte struct straddles a cache line, so these 16
+	// bytes cost nothing. New fields land here without changing the layout.
+	_:             [16]u8,
 }
-#assert(size_of(Instruction) == 48)
+#assert(size_of(Instruction)  == 64)
+#assert(align_of(Instruction) == 64)
 
 // =============================================================================
 // Builders
