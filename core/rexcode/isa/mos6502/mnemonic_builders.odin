@@ -172,8 +172,6 @@ inst_nop_none    :: #force_inline proc "contextless" () -> Instruction { return 
 emit_nop_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.NOP)) }
 inst_lax_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.LAX, m) }
 emit_lax_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.LAX, m)) }
-inst_sax_nmos_m  :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SAX_NMOS, m) }
-emit_sax_nmos_m  :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SAX_NMOS, m)) }
 inst_dcp_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.DCP, m) }
 emit_dcp_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.DCP, m)) }
 inst_isc_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.ISC, m) }
@@ -309,7 +307,9 @@ emit_bbs7_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: 
 inst_sxy_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SXY) }
 emit_sxy_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SXY)) }
 inst_sax_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SAX) }
+inst_sax_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SAX, m) }
 emit_sax_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SAX)) }
+emit_sax_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SAX, m)) }
 inst_say_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SAY) }
 emit_say_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SAY)) }
 inst_cla_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLA) }
@@ -467,8 +467,6 @@ inst_nop              :: inst_nop_none
 emit_nop              :: emit_nop_none
 inst_lax              :: inst_lax_m
 emit_lax              :: emit_lax_m
-inst_sax_nmos         :: inst_sax_nmos_m
-emit_sax_nmos         :: emit_sax_nmos_m
 inst_dcp              :: inst_dcp_m
 emit_dcp              :: emit_dcp_m
 inst_isc              :: inst_isc_m
@@ -601,8 +599,8 @@ inst_bbs7             :: inst_bbs7_zp_rel
 emit_bbs7             :: emit_bbs7_zp_rel
 inst_sxy              :: inst_sxy_none
 emit_sxy              :: emit_sxy_none
-inst_sax              :: inst_sax_none
-emit_sax              :: emit_sax_none
+inst_sax              :: proc{ inst_sax_none, inst_sax_m }
+emit_sax              :: proc{ emit_sax_none, emit_sax_m }
 inst_say              :: inst_say_none
 emit_say              :: emit_say_none
 inst_cla              :: inst_cla_none

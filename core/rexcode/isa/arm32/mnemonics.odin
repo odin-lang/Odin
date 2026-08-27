@@ -251,7 +251,7 @@ Mnemonic :: enum u16 {
 	VMULL,  VMLAL,  VMLSL,
 	VQDMULL,VQDMLAL,VQDMLSL,
 	VQDMULH,VQRDMULH,
-	VQDMULH_LANE, VQRDMULH_LANE,           // indexed variants
+	// indexed variants
 
 	// ARMv8.1 FEAT_RDM: rounding doubling multiply-accumulate
 	VQRDMLAH, VQRDMLSH,
@@ -310,8 +310,6 @@ Mnemonic :: enum u16 {
 
 	// -- Dot Product (FEAT_DotProd) ------------------------------------------
 	VSDOT,   VUDOT,
-	VSDOT_LANE, VUDOT_LANE,
-
 	// -- BF16 (FEAT_BF16) ----------------------------------------------------
 	VCVT_BF16,                             // BF16<->F32
 	VDOT_BF16,
@@ -323,7 +321,7 @@ Mnemonic :: enum u16 {
 
 	// -- ComplexNum (FEAT_FCMA) ----------------------------------------------
 	VCMLA,   VCADD,
-	VCMLA_LANE,                            // VCMLA by indexed scalar
+	// VCMLA by indexed scalar
 
 	// -- I8MM (FEAT_I8MM, ARMv8.6) integer matrix multiply + mixed-sign dot --
 	VSMMLA,                                // signed-signed 8x8 matrix mul
@@ -331,16 +329,7 @@ Mnemonic :: enum u16 {
 	VUSMMLA,                               // unsigned-signed
 	VSUDOT,                                // signed-unsigned dot product
 	VUSDOT,                                // unsigned-signed dot product
-	VSUDOT_LANE,
-	VUSDOT_LANE,
-
 	// -- Lane-indexed NEON multiply / MAC forms (heavily used in DSP/codec) --
-	VMUL_LANE,   VMLA_LANE,   VMLS_LANE,
-	VMULL_LANE,  VMLAL_LANE,  VMLSL_LANE,
-	VQDMULL_LANE, VQDMLAL_LANE, VQDMLSL_LANE,
-	VFMA_LANE,   VFMS_LANE,
-	VQRDMLAH_LANE, VQRDMLSH_LANE,
-
 	// -- MVE saturating unary -----------------------------------------------
 	VQABS,    VQNEG,
 

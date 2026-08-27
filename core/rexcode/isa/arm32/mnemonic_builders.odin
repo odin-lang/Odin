@@ -661,13 +661,19 @@ emit_vadd_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]I
 inst_vsub_s_s_s                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VSUB, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vsub_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vsub_s_s_s(dst, src, src2)) }
 inst_vmul_s_s_s                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMUL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vmul_d_d_dlane              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMUL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vmul_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmul_s_s_s(dst, src, src2)) }
+emit_vmul_d_d_dlane              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmul_d_d_dlane(dst, src, src2, lane)) }
 inst_vdiv_s_s_s                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VDIV, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vdiv_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vdiv_s_s_s(dst, src, src2)) }
 inst_vmla_s_s_s                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMLA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vmla_d_d_dlane              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vmla_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmla_s_s_s(dst, src, src2)) }
+emit_vmla_d_d_dlane              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmla_d_d_dlane(dst, src, src2, lane)) }
 inst_vmls_s_s_s                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMLS, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vmls_d_d_dlane              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLS, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vmls_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmls_s_s_s(dst, src, src2)) }
+emit_vmls_d_d_dlane              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmls_d_d_dlane(dst, src, src2, lane)) }
 inst_vnmul_s_s_s                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VNMUL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vnmul_s_s_s                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vnmul_s_s_s(dst, src, src2)) }
 inst_vnmla_s_s_s                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VNMLA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
@@ -675,9 +681,13 @@ emit_vnmla_s_s_s                 :: #force_inline proc(instructions: ^[dynamic]I
 inst_vnmls_s_s_s                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VNMLS, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vnmls_s_s_s                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vnmls_s_s_s(dst, src, src2)) }
 inst_vfma_s_s_s                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFMA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vfma_d_d_dlane              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VFMA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vfma_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfma_s_s_s(dst, src, src2)) }
+emit_vfma_d_d_dlane              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vfma_d_d_dlane(dst, src, src2, lane)) }
 inst_vfms_s_s_s                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFMS, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vfms_d_d_dlane              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VFMS, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vfms_s_s_s                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfms_s_s_s(dst, src, src2)) }
+emit_vfms_d_d_dlane              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vfms_d_d_dlane(dst, src, src2, lane)) }
 inst_vfnma_s_s_s                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFNMA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vfnma_s_s_s                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfnma_s_s_s(dst, src, src2)) }
 inst_vfnms_s_s_s                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFNMS, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
@@ -779,29 +789,45 @@ emit_vqadd_d_d_d                 :: #force_inline proc(instructions: ^[dynamic]I
 inst_vqsub_d_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQSUB, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vqsub_d_d_d                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqsub_d_d_d(dst, src, src2)) }
 inst_vmull_q_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMULL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vmull_q_d_dlane             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMULL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vmull_q_d_d                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmull_q_d_d(dst, src, src2)) }
+emit_vmull_q_d_dlane             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmull_q_d_dlane(dst, src, src2, lane)) }
 inst_vmlal_q_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMLAL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vmlal_q_d_dlane             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLAL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vmlal_q_d_d                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmlal_q_d_d(dst, src, src2)) }
+emit_vmlal_q_d_dlane             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmlal_q_d_dlane(dst, src, src2, lane)) }
 inst_vmlsl_q_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMLSL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vmlsl_q_d_dlane             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLSL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vmlsl_q_d_d                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmlsl_q_d_d(dst, src, src2)) }
+emit_vmlsl_q_d_dlane             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmlsl_q_d_dlane(dst, src, src2, lane)) }
 inst_vqdmull_q_d_d               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQDMULL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vqdmull_q_d_dlane           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMULL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vqdmull_q_d_d               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqdmull_q_d_d(dst, src, src2)) }
+emit_vqdmull_q_d_dlane           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmull_q_d_dlane(dst, src, src2, lane)) }
 inst_vqdmlal_q_d_d               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQDMLAL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vqdmlal_q_d_dlane           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMLAL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vqdmlal_q_d_d               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqdmlal_q_d_d(dst, src, src2)) }
+emit_vqdmlal_q_d_dlane           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmlal_q_d_dlane(dst, src, src2, lane)) }
 inst_vqdmlsl_q_d_d               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQDMLSL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vqdmlsl_q_d_dlane           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMLSL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vqdmlsl_q_d_d               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqdmlsl_q_d_d(dst, src, src2)) }
+emit_vqdmlsl_q_d_dlane           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmlsl_q_d_dlane(dst, src, src2, lane)) }
 inst_vqdmulh_d_d_d               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQDMULH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vqdmulh_d_d_dlane           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMULH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vqdmulh_d_d_d               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqdmulh_d_d_d(dst, src, src2)) }
+emit_vqdmulh_d_d_dlane           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmulh_d_d_dlane(dst, src, src2, lane)) }
 inst_vqrdmulh_d_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQRDMULH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vqrdmulh_d_d_dlane          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQRDMULH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vqrdmulh_d_d_d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqrdmulh_d_d_d(dst, src, src2)) }
-inst_vqdmulh_lane_d_d_dlane      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMULH_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vqdmulh_lane_d_d_dlane      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmulh_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vqrdmulh_lane_d_d_dlane     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQRDMULH_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vqrdmulh_lane_d_d_dlane     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqrdmulh_lane_d_d_dlane(dst, src, src2, lane)) }
+emit_vqrdmulh_d_d_dlane          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqrdmulh_d_d_dlane(dst, src, src2, lane)) }
 inst_vqrdmlah_d_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQRDMLAH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vqrdmlah_d_d_dlane          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQRDMLAH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vqrdmlah_d_d_d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqrdmlah_d_d_d(dst, src, src2)) }
+emit_vqrdmlah_d_d_dlane          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqrdmlah_d_d_dlane(dst, src, src2, lane)) }
 inst_vqrdmlsh_d_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VQRDMLSH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vqrdmlsh_d_d_dlane          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQRDMLSH, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vqrdmlsh_d_d_d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vqrdmlsh_d_d_d(dst, src, src2)) }
+emit_vqrdmlsh_d_d_dlane          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqrdmlsh_d_d_dlane(dst, src, src2, lane)) }
 inst_vaba_d_d_d                  :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VABA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vaba_d_d_d                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vaba_d_d_d(dst, src, src2)) }
 inst_vabal_q_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VABAL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
@@ -1011,13 +1037,13 @@ emit_sha256su1_q_q_q             :: #force_inline proc(instructions: ^[dynamic]I
 inst_vjcvt_s_d                   :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VJCVT, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vjcvt_s_d                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vjcvt_s_d(dst, src)) }
 inst_vsdot_d_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VSDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vsdot_d_d_dlane             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VSDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vsdot_d_d_d                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vsdot_d_d_d(dst, src, src2)) }
+emit_vsdot_d_d_dlane             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vsdot_d_d_dlane(dst, src, src2, lane)) }
 inst_vudot_d_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VUDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vudot_d_d_dlane             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VUDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vudot_d_d_d                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vudot_d_d_d(dst, src, src2)) }
-inst_vsdot_lane_d_d_dlane        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VSDOT_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vsdot_lane_d_d_dlane        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vsdot_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vudot_lane_d_d_dlane        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VUDOT_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vudot_lane_d_d_dlane        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vudot_lane_d_d_dlane(dst, src, src2, lane)) }
+emit_vudot_d_d_dlane             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vudot_d_d_dlane(dst, src, src2, lane)) }
 inst_vcvt_bf16_d_q               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VCVT_BF16, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vcvt_bf16_d_q               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vcvt_bf16_d_q(dst, src)) }
 inst_vdot_bf16_d_d_d             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VDOT_BF16, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
@@ -1031,11 +1057,11 @@ emit_vfmal_d_d_d                 :: #force_inline proc(instructions: ^[dynamic]I
 inst_vfmsl_d_d_d                 :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFMSL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vfmsl_d_d_d                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfmsl_d_d_d(dst, src, src2)) }
 inst_vcmla_d_d_d_imm             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .VCMLA, operand_count = 4, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_imm(imm)}} }
+inst_vcmla_d_d_dlane_imm         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .VCMLA, operand_count = 4, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), op_imm(imm)}} }
 emit_vcmla_d_d_d_imm             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_vcmla_d_d_d_imm(dst, src, src2, imm)) }
+emit_vcmla_d_d_dlane_imm         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8, imm: i64) { append(instructions, inst_vcmla_d_d_dlane_imm(dst, src, src2, lane, imm)) }
 inst_vcadd_d_d_d_imm             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .VCADD, operand_count = 4, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_imm(imm)}} }
 emit_vcadd_d_d_d_imm             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_vcadd_d_d_d_imm(dst, src, src2, imm)) }
-inst_vcmla_lane_d_d_dlane_imm    :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .VCMLA_LANE, operand_count = 4, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), op_imm(imm)}} }
-emit_vcmla_lane_d_d_dlane_imm    :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8, imm: i64) { append(instructions, inst_vcmla_lane_d_d_dlane_imm(dst, src, src2, lane, imm)) }
 inst_vsmmla_q_q_q                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VSMMLA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vsmmla_q_q_q                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vsmmla_q_q_q(dst, src, src2)) }
 inst_vummla_q_q_q                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VUMMLA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
@@ -1043,39 +1069,13 @@ emit_vummla_q_q_q                :: #force_inline proc(instructions: ^[dynamic]I
 inst_vusmmla_q_q_q               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VUSMMLA, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vusmmla_q_q_q               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vusmmla_q_q_q(dst, src, src2)) }
 inst_vsudot_q_q_q                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VSUDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vsudot_q_q_dlane            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VSUDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vsudot_q_q_q                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vsudot_q_q_q(dst, src, src2)) }
+emit_vsudot_q_q_dlane            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vsudot_q_q_dlane(dst, src, src2, lane)) }
 inst_vusdot_d_d_d                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VUSDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+inst_vusdot_d_d_dlane            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VUSDOT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
 emit_vusdot_d_d_d                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vusdot_d_d_d(dst, src, src2)) }
-inst_vsudot_lane_q_q_dlane       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VSUDOT_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vsudot_lane_q_q_dlane       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vsudot_lane_q_q_dlane(dst, src, src2, lane)) }
-inst_vusdot_lane_d_d_dlane       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VUSDOT_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vusdot_lane_d_d_dlane       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vusdot_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vmul_lane_d_d_dlane         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMUL_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vmul_lane_d_d_dlane         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmul_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vmla_lane_d_d_dlane         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLA_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vmla_lane_d_d_dlane         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmla_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vmls_lane_d_d_dlane         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLS_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vmls_lane_d_d_dlane         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmls_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vmull_lane_q_d_dlane        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMULL_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vmull_lane_q_d_dlane        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmull_lane_q_d_dlane(dst, src, src2, lane)) }
-inst_vmlal_lane_q_d_dlane        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLAL_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vmlal_lane_q_d_dlane        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmlal_lane_q_d_dlane(dst, src, src2, lane)) }
-inst_vmlsl_lane_q_d_dlane        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMLSL_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vmlsl_lane_q_d_dlane        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vmlsl_lane_q_d_dlane(dst, src, src2, lane)) }
-inst_vqdmull_lane_q_d_dlane      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMULL_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vqdmull_lane_q_d_dlane      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmull_lane_q_d_dlane(dst, src, src2, lane)) }
-inst_vqdmlal_lane_q_d_dlane      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMLAL_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vqdmlal_lane_q_d_dlane      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmlal_lane_q_d_dlane(dst, src, src2, lane)) }
-inst_vqdmlsl_lane_q_d_dlane      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQDMLSL_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vqdmlsl_lane_q_d_dlane      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqdmlsl_lane_q_d_dlane(dst, src, src2, lane)) }
-inst_vfma_lane_d_d_dlane         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VFMA_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vfma_lane_d_d_dlane         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vfma_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vfms_lane_d_d_dlane         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VFMS_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vfms_lane_d_d_dlane         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vfms_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vqrdmlah_lane_d_d_dlane     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQRDMLAH_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vqrdmlah_lane_d_d_dlane     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqrdmlah_lane_d_d_dlane(dst, src, src2, lane)) }
-inst_vqrdmlsh_lane_d_d_dlane     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VQRDMLSH_LANE, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_dpr_lane(src2, lane), {}}} }
-emit_vqrdmlsh_lane_d_d_dlane     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vqrdmlsh_lane_d_d_dlane(dst, src, src2, lane)) }
+emit_vusdot_d_d_dlane            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, lane: u8) { append(instructions, inst_vusdot_d_d_dlane(dst, src, src2, lane)) }
 inst_vqabs_q_q                   :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VQABS, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vqabs_q_q                   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vqabs_q_q(dst, src)) }
 inst_vqneg_q_q                   :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VQNEG, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
@@ -1957,24 +1957,24 @@ inst_vadd                             :: inst_vadd_s_s_s
 emit_vadd                             :: emit_vadd_s_s_s
 inst_vsub                             :: inst_vsub_s_s_s
 emit_vsub                             :: emit_vsub_s_s_s
-inst_vmul                             :: inst_vmul_s_s_s
-emit_vmul                             :: emit_vmul_s_s_s
+inst_vmul                             :: proc{ inst_vmul_s_s_s, inst_vmul_d_d_dlane }
+emit_vmul                             :: proc{ emit_vmul_s_s_s, emit_vmul_d_d_dlane }
 inst_vdiv                             :: inst_vdiv_s_s_s
 emit_vdiv                             :: emit_vdiv_s_s_s
-inst_vmla                             :: inst_vmla_s_s_s
-emit_vmla                             :: emit_vmla_s_s_s
-inst_vmls                             :: inst_vmls_s_s_s
-emit_vmls                             :: emit_vmls_s_s_s
+inst_vmla                             :: proc{ inst_vmla_s_s_s, inst_vmla_d_d_dlane }
+emit_vmla                             :: proc{ emit_vmla_s_s_s, emit_vmla_d_d_dlane }
+inst_vmls                             :: proc{ inst_vmls_s_s_s, inst_vmls_d_d_dlane }
+emit_vmls                             :: proc{ emit_vmls_s_s_s, emit_vmls_d_d_dlane }
 inst_vnmul                            :: inst_vnmul_s_s_s
 emit_vnmul                            :: emit_vnmul_s_s_s
 inst_vnmla                            :: inst_vnmla_s_s_s
 emit_vnmla                            :: emit_vnmla_s_s_s
 inst_vnmls                            :: inst_vnmls_s_s_s
 emit_vnmls                            :: emit_vnmls_s_s_s
-inst_vfma                             :: inst_vfma_s_s_s
-emit_vfma                             :: emit_vfma_s_s_s
-inst_vfms                             :: inst_vfms_s_s_s
-emit_vfms                             :: emit_vfms_s_s_s
+inst_vfma                             :: proc{ inst_vfma_s_s_s, inst_vfma_d_d_dlane }
+emit_vfma                             :: proc{ emit_vfma_s_s_s, emit_vfma_d_d_dlane }
+inst_vfms                             :: proc{ inst_vfms_s_s_s, inst_vfms_d_d_dlane }
+emit_vfms                             :: proc{ emit_vfms_s_s_s, emit_vfms_d_d_dlane }
 inst_vfnma                            :: inst_vfnma_s_s_s
 emit_vfnma                            :: emit_vfnma_s_s_s
 inst_vfnms                            :: inst_vfnms_s_s_s
@@ -2061,30 +2061,26 @@ inst_vqadd                            :: inst_vqadd_d_d_d
 emit_vqadd                            :: emit_vqadd_d_d_d
 inst_vqsub                            :: inst_vqsub_d_d_d
 emit_vqsub                            :: emit_vqsub_d_d_d
-inst_vmull                            :: inst_vmull_q_d_d
-emit_vmull                            :: emit_vmull_q_d_d
-inst_vmlal                            :: inst_vmlal_q_d_d
-emit_vmlal                            :: emit_vmlal_q_d_d
-inst_vmlsl                            :: inst_vmlsl_q_d_d
-emit_vmlsl                            :: emit_vmlsl_q_d_d
-inst_vqdmull                          :: inst_vqdmull_q_d_d
-emit_vqdmull                          :: emit_vqdmull_q_d_d
-inst_vqdmlal                          :: inst_vqdmlal_q_d_d
-emit_vqdmlal                          :: emit_vqdmlal_q_d_d
-inst_vqdmlsl                          :: inst_vqdmlsl_q_d_d
-emit_vqdmlsl                          :: emit_vqdmlsl_q_d_d
-inst_vqdmulh                          :: inst_vqdmulh_d_d_d
-emit_vqdmulh                          :: emit_vqdmulh_d_d_d
-inst_vqrdmulh                         :: inst_vqrdmulh_d_d_d
-emit_vqrdmulh                         :: emit_vqrdmulh_d_d_d
-inst_vqdmulh_lane                     :: inst_vqdmulh_lane_d_d_dlane
-emit_vqdmulh_lane                     :: emit_vqdmulh_lane_d_d_dlane
-inst_vqrdmulh_lane                    :: inst_vqrdmulh_lane_d_d_dlane
-emit_vqrdmulh_lane                    :: emit_vqrdmulh_lane_d_d_dlane
-inst_vqrdmlah                         :: inst_vqrdmlah_d_d_d
-emit_vqrdmlah                         :: emit_vqrdmlah_d_d_d
-inst_vqrdmlsh                         :: inst_vqrdmlsh_d_d_d
-emit_vqrdmlsh                         :: emit_vqrdmlsh_d_d_d
+inst_vmull                            :: proc{ inst_vmull_q_d_d, inst_vmull_q_d_dlane }
+emit_vmull                            :: proc{ emit_vmull_q_d_d, emit_vmull_q_d_dlane }
+inst_vmlal                            :: proc{ inst_vmlal_q_d_d, inst_vmlal_q_d_dlane }
+emit_vmlal                            :: proc{ emit_vmlal_q_d_d, emit_vmlal_q_d_dlane }
+inst_vmlsl                            :: proc{ inst_vmlsl_q_d_d, inst_vmlsl_q_d_dlane }
+emit_vmlsl                            :: proc{ emit_vmlsl_q_d_d, emit_vmlsl_q_d_dlane }
+inst_vqdmull                          :: proc{ inst_vqdmull_q_d_d, inst_vqdmull_q_d_dlane }
+emit_vqdmull                          :: proc{ emit_vqdmull_q_d_d, emit_vqdmull_q_d_dlane }
+inst_vqdmlal                          :: proc{ inst_vqdmlal_q_d_d, inst_vqdmlal_q_d_dlane }
+emit_vqdmlal                          :: proc{ emit_vqdmlal_q_d_d, emit_vqdmlal_q_d_dlane }
+inst_vqdmlsl                          :: proc{ inst_vqdmlsl_q_d_d, inst_vqdmlsl_q_d_dlane }
+emit_vqdmlsl                          :: proc{ emit_vqdmlsl_q_d_d, emit_vqdmlsl_q_d_dlane }
+inst_vqdmulh                          :: proc{ inst_vqdmulh_d_d_d, inst_vqdmulh_d_d_dlane }
+emit_vqdmulh                          :: proc{ emit_vqdmulh_d_d_d, emit_vqdmulh_d_d_dlane }
+inst_vqrdmulh                         :: proc{ inst_vqrdmulh_d_d_d, inst_vqrdmulh_d_d_dlane }
+emit_vqrdmulh                         :: proc{ emit_vqrdmulh_d_d_d, emit_vqrdmulh_d_d_dlane }
+inst_vqrdmlah                         :: proc{ inst_vqrdmlah_d_d_d, inst_vqrdmlah_d_d_dlane }
+emit_vqrdmlah                         :: proc{ emit_vqrdmlah_d_d_d, emit_vqrdmlah_d_d_dlane }
+inst_vqrdmlsh                         :: proc{ inst_vqrdmlsh_d_d_d, inst_vqrdmlsh_d_d_dlane }
+emit_vqrdmlsh                         :: proc{ emit_vqrdmlsh_d_d_d, emit_vqrdmlsh_d_d_dlane }
 inst_vaba                             :: inst_vaba_d_d_d
 emit_vaba                             :: emit_vaba_d_d_d
 inst_vabal                            :: inst_vabal_q_d_d
@@ -2277,14 +2273,10 @@ inst_sha256su1                        :: inst_sha256su1_q_q_q
 emit_sha256su1                        :: emit_sha256su1_q_q_q
 inst_vjcvt                            :: inst_vjcvt_s_d
 emit_vjcvt                            :: emit_vjcvt_s_d
-inst_vsdot                            :: inst_vsdot_d_d_d
-emit_vsdot                            :: emit_vsdot_d_d_d
-inst_vudot                            :: inst_vudot_d_d_d
-emit_vudot                            :: emit_vudot_d_d_d
-inst_vsdot_lane                       :: inst_vsdot_lane_d_d_dlane
-emit_vsdot_lane                       :: emit_vsdot_lane_d_d_dlane
-inst_vudot_lane                       :: inst_vudot_lane_d_d_dlane
-emit_vudot_lane                       :: emit_vudot_lane_d_d_dlane
+inst_vsdot                            :: proc{ inst_vsdot_d_d_d, inst_vsdot_d_d_dlane }
+emit_vsdot                            :: proc{ emit_vsdot_d_d_d, emit_vsdot_d_d_dlane }
+inst_vudot                            :: proc{ inst_vudot_d_d_d, inst_vudot_d_d_dlane }
+emit_vudot                            :: proc{ emit_vudot_d_d_d, emit_vudot_d_d_dlane }
 inst_vcvt_bf16                        :: inst_vcvt_bf16_d_q
 emit_vcvt_bf16                        :: emit_vcvt_bf16_d_q
 inst_vdot_bf16                        :: inst_vdot_bf16_d_d_d
@@ -2297,52 +2289,20 @@ inst_vfmal                            :: inst_vfmal_d_d_d
 emit_vfmal                            :: emit_vfmal_d_d_d
 inst_vfmsl                            :: inst_vfmsl_d_d_d
 emit_vfmsl                            :: emit_vfmsl_d_d_d
-inst_vcmla                            :: inst_vcmla_d_d_d_imm
-emit_vcmla                            :: emit_vcmla_d_d_d_imm
+inst_vcmla                            :: proc{ inst_vcmla_d_d_d_imm, inst_vcmla_d_d_dlane_imm }
+emit_vcmla                            :: proc{ emit_vcmla_d_d_d_imm, emit_vcmla_d_d_dlane_imm }
 inst_vcadd                            :: inst_vcadd_d_d_d_imm
 emit_vcadd                            :: emit_vcadd_d_d_d_imm
-inst_vcmla_lane                       :: inst_vcmla_lane_d_d_dlane_imm
-emit_vcmla_lane                       :: emit_vcmla_lane_d_d_dlane_imm
 inst_vsmmla                           :: inst_vsmmla_q_q_q
 emit_vsmmla                           :: emit_vsmmla_q_q_q
 inst_vummla                           :: inst_vummla_q_q_q
 emit_vummla                           :: emit_vummla_q_q_q
 inst_vusmmla                          :: inst_vusmmla_q_q_q
 emit_vusmmla                          :: emit_vusmmla_q_q_q
-inst_vsudot                           :: inst_vsudot_q_q_q
-emit_vsudot                           :: emit_vsudot_q_q_q
-inst_vusdot                           :: inst_vusdot_d_d_d
-emit_vusdot                           :: emit_vusdot_d_d_d
-inst_vsudot_lane                      :: inst_vsudot_lane_q_q_dlane
-emit_vsudot_lane                      :: emit_vsudot_lane_q_q_dlane
-inst_vusdot_lane                      :: inst_vusdot_lane_d_d_dlane
-emit_vusdot_lane                      :: emit_vusdot_lane_d_d_dlane
-inst_vmul_lane                        :: inst_vmul_lane_d_d_dlane
-emit_vmul_lane                        :: emit_vmul_lane_d_d_dlane
-inst_vmla_lane                        :: inst_vmla_lane_d_d_dlane
-emit_vmla_lane                        :: emit_vmla_lane_d_d_dlane
-inst_vmls_lane                        :: inst_vmls_lane_d_d_dlane
-emit_vmls_lane                        :: emit_vmls_lane_d_d_dlane
-inst_vmull_lane                       :: inst_vmull_lane_q_d_dlane
-emit_vmull_lane                       :: emit_vmull_lane_q_d_dlane
-inst_vmlal_lane                       :: inst_vmlal_lane_q_d_dlane
-emit_vmlal_lane                       :: emit_vmlal_lane_q_d_dlane
-inst_vmlsl_lane                       :: inst_vmlsl_lane_q_d_dlane
-emit_vmlsl_lane                       :: emit_vmlsl_lane_q_d_dlane
-inst_vqdmull_lane                     :: inst_vqdmull_lane_q_d_dlane
-emit_vqdmull_lane                     :: emit_vqdmull_lane_q_d_dlane
-inst_vqdmlal_lane                     :: inst_vqdmlal_lane_q_d_dlane
-emit_vqdmlal_lane                     :: emit_vqdmlal_lane_q_d_dlane
-inst_vqdmlsl_lane                     :: inst_vqdmlsl_lane_q_d_dlane
-emit_vqdmlsl_lane                     :: emit_vqdmlsl_lane_q_d_dlane
-inst_vfma_lane                        :: inst_vfma_lane_d_d_dlane
-emit_vfma_lane                        :: emit_vfma_lane_d_d_dlane
-inst_vfms_lane                        :: inst_vfms_lane_d_d_dlane
-emit_vfms_lane                        :: emit_vfms_lane_d_d_dlane
-inst_vqrdmlah_lane                    :: inst_vqrdmlah_lane_d_d_dlane
-emit_vqrdmlah_lane                    :: emit_vqrdmlah_lane_d_d_dlane
-inst_vqrdmlsh_lane                    :: inst_vqrdmlsh_lane_d_d_dlane
-emit_vqrdmlsh_lane                    :: emit_vqrdmlsh_lane_d_d_dlane
+inst_vsudot                           :: proc{ inst_vsudot_q_q_q, inst_vsudot_q_q_dlane }
+emit_vsudot                           :: proc{ emit_vsudot_q_q_q, emit_vsudot_q_q_dlane }
+inst_vusdot                           :: proc{ inst_vusdot_d_d_d, inst_vusdot_d_d_dlane }
+emit_vusdot                           :: proc{ emit_vusdot_d_d_d, emit_vusdot_d_d_dlane }
 inst_vqabs                            :: inst_vqabs_q_q
 emit_vqabs                            :: emit_vqabs_q_q
 inst_vqneg                            :: inst_vqneg_q_q
