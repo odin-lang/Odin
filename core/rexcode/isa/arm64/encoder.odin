@@ -311,6 +311,8 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .MEMORY && op.mem.mode == .OFFSET && reg_class(op.mem.base) == REG_Z
 	case .COND:
 		return op.kind == .COND
+	case .COND_NOT_AL:
+		return op.kind == .COND && (op.cond & 0xE) != 0xE
 	}
 	return false
 }
@@ -367,6 +369,9 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0x1F) << 0
 	case .RN:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 5
+	case .RN_RM:
+		r := u32(reg_hw(op.reg)) & 0x1F
+		return (r << 5) | (r << 16)
 	case .RT2, .RA:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 10
 	case .RM:
@@ -403,6 +408,9 @@ pack_operand_inline :: #force_inline proc(
 		// Condition payload may arrive as IMMEDIATE (raw) or COND kind.
 		c := u32(op.cond) if op.kind == .COND else u32(op.immediate)
 		return (c & 0xF) << 12
+	case .COND_HI_INV:
+		c := u32(op.cond) if op.kind == .COND else u32(op.immediate)
+		return ((c ~ 1) & 0xF) << 12
 	case .COND_LO:
 		c := u32(op.cond) if op.kind == .COND else u32(op.immediate)
 		return (c & 0xF) << 0

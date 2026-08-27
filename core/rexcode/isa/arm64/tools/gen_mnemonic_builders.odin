@@ -131,7 +131,7 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 		// All addressing modes take one `Memory` parameter, so they share a
 		// builder signature: the encoder picks the form from mem.mode.
 		return .MEM
-	case .COND:
+	case .COND, .COND_NOT_AL:
 		return .COND
 	case .W_SHIFTED, .X_SHIFTED:
 		return .SHIFTED
