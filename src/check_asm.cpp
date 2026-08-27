@@ -2352,6 +2352,10 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			gb_string_free(s);
 		}
 
+		if (build_context.metrics.arch != TargetArch_arm64) {
+			error(expr, "The target platform does not support vector element extraction syntax");
+		}
+
 
 		operand->mode = Addressing_Value;
 		operand->type = base_array_type(lhs.type);
