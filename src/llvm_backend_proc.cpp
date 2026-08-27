@@ -985,7 +985,7 @@ gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgT
 		GB_ASSERT(arg->coerce_offsets.count == 1);
 		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[0], false);
 		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, base.value, &index, 1, "");
-		return LLVMBuildLoad2(p->builder, arg->cast_type, ptr, "");
+		return OdinLLVMBuildLoad(p, arg->cast_type, ptr);
 	}
 
 	unsigned count = LLVMCountStructElementTypes(arg->cast_type);
@@ -995,7 +995,7 @@ gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgT
 		LLVMTypeRef elem_type = LLVMStructGetTypeAtIndex(arg->cast_type, i);
 		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[i], false);
 		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, base.value, &index, 1, "");
-		LLVMValueRef elem  = LLVMBuildLoad2(p->builder, elem_type, ptr, "");
+		LLVMValueRef elem  = OdinLLVMBuildLoad(p, elem_type, ptr);
 		result = LLVMBuildInsertValue(p->builder, result, elem, i, "");
 	}
 	return result;
@@ -1019,7 +1019,7 @@ gb_internal LLVMValueRef lb_coerce_fields_store(lbProcedure *p, LLVMValueRef coe
 		LLVMValueRef elem  = is_struct ? LLVMBuildExtractValue(p->builder, coerced, i, "") : coerced;
 		LLVMValueRef index = LLVMConstInt(i64t, cast(unsigned long long)arg->coerce_offsets[i], false);
 		LLVMValueRef ptr   = LLVMBuildInBoundsGEP2(p->builder, i8, slot.addr.value, &index, 1, "");
-		LLVMBuildStore(p->builder, elem, ptr);
+		OdinLLVMBuildStore(p, elem, ptr);
 	}
 	return lb_addr_load(p, slot).value;
 }

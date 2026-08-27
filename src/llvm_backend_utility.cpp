@@ -142,8 +142,10 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 		}
 		break;
 	default:
-		LLVMValueRef instr = LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
-		lb_adjust_access_alignment_from_addr(p->module, instr, ptr);
+		// claim at most the caller's alignment;
+		// note that it can be below lb_alignof of the stored type
+		// (e.g. lb_emit_store zeroing through a union variant ptr)
+		OdinLLVMBuildStoreAligned(p, LLVMConstNull(llvm_type), ptr, gb_min(cast(i64)alignment, lb_alignof(llvm_type)));
 		break;
 	}
 }
@@ -821,7 +823,11 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
 		// just do a bit cast of the data at the front
 		lbValue ptr = lb_emit_conv(p, value_, alloc_type_pointer(type));
-		return lb_emit_load(p, ptr);
+		lbValue loaded = lb_emit_load(p, ptr);
+		// union #align(N) can lower alignment below
+		// the variant type's alignment
+		lb_cap_access_alignment(loaded.value, type_align_of(src));
+		return loaded;
 	}
 
 	lbValue tag = {};
@@ -834,6 +840,9 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 	if (is_type_union_maybe_pointer(src)) {
 		data = lb_emit_load(p, lb_emit_conv(p, value_, gep0.type));
+		// union #align(N) can lower alignment below
+		// the variant type's alignment
+		lb_cap_access_alignment(data.value, type_align_of(src));
 	} else {
 		tag     = lb_emit_load(p, lb_emit_union_tag_ptr(p, value_));
 		dst_tag = lb_const_union_tag(m, src, dst);
@@ -856,6 +865,9 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 	if (data.value == nullptr) {
 		data = lb_emit_load(p, lb_emit_conv(p, value_, gep0.type));
+		// union #align(N) can lower alignment below
+		// the variant type's alignment
+		lb_cap_access_alignment(data.value, type_align_of(src));
 	}
 	lb_emit_store(p, gep0, data);
 	lb_emit_store(p, gep1, lb_const_bool(m, t_bool, true));
@@ -1369,6 +1381,12 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 			GB_ASSERT(lb_get_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_IS_PACKED) == 1);
 		}
 		u64 align_max = bt->Struct.custom_max_field_align;
+		if (bt->Struct.custom_align > 0) {
+			// #align(N) can lower the whole struct below its fields natural
+			// alignment; a field ptr then guarantees no more than N,
+			// so it caps like #max_field_align
+			align_max = align_max ? gb_min(align_max, cast(u64)bt->Struct.custom_align) : cast(u64)bt->Struct.custom_align;
+		}
 		u64 align_min = bt->Struct.custom_min_field_align;
 		GB_ASSERT(align_min == 0 || align_max == 0 || align_min <= align_max);
 		if (align_max) {
@@ -1590,8 +1608,8 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_raw_union(type)) {
 			type = get_struct_field_type(type, index);
-			GB_ASSERT(is_type_pointer(e.type));
-			e = lb_emit_transmute(p, e, alloc_type_pointer(type));
+			// a zero-offset GEP; allows #align metadata
+			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_struct(type)) {
 			type = get_struct_field_type(type, index);
 			e = lb_emit_struct_ep(p, e, index);
@@ -2578,7 +2596,7 @@ gb_internal void lb_create_objc_block_helper_procs(
 				dst_value.value = dst_field;
 
 				src_value.type  = field_type;
-				src_value.value = LLVMBuildLoad2(copy_proc->builder, field_raw_type, src_field, "");
+				src_value.value = OdinLLVMBuildLoad(copy_proc, field_raw_type, src_field);
 
 				copy_args[0] = dst_value;
 				copy_args[1] = src_value;
@@ -2592,7 +2610,7 @@ gb_internal void lb_create_objc_block_helper_procs(
 				LLVMValueRef src_field = LLVMBuildStructGEP2(dispose_proc->builder, block_lit_type, dispose_proc->raw_input_parameters[0], field_offset, "");
 				lbValue src_value = {};
 				src_value.type  = field_type;
-				src_value.value = LLVMBuildLoad2(dispose_proc->builder, field_raw_type, src_field, "");
+				src_value.value = OdinLLVMBuildLoad(dispose_proc, field_raw_type, src_field);
 
 				dispose_args[0] = src_value;
 				dispose_args[1] = lb_const_int(m, t_i32, u64(is_block_obj ? BLOCK_FIELD_IS_BLOCK : BLOCK_FIELD_IS_OBJECT));
@@ -2882,11 +2900,11 @@ gb_internal lbValue lb_handle_objc_block(lbProcedure *p, Ast *expr) {
 		LLVMValueRef f_invoke     = LLVMBuildStructGEP2(p->builder, block_lit_type, p_block_lit, 3, "invoke");
 		LLVMValueRef f_descriptor = LLVMBuildStructGEP2(p->builder, block_lit_type, p_block_lit, 4, "descriptor");
 
-		LLVMBuildStore(p->builder, isa_val.value,       f_isa);
-		LLVMBuildStore(p->builder, flags_val.value,     f_flags);
-		LLVMBuildStore(p->builder, reserved_val.value,  f_reserved);
-		LLVMBuildStore(p->builder, invoker_proc->value, f_invoke);
-		LLVMBuildStore(p->builder, p_descriptor,        f_descriptor);
+		OdinLLVMBuildStore(p, isa_val.value,       f_isa);
+		OdinLLVMBuildStore(p, flags_val.value,     f_flags);
+		OdinLLVMBuildStore(p, reserved_val.value,  f_reserved);
+		OdinLLVMBuildStore(p, invoker_proc->value, f_invoke);
+		OdinLLVMBuildStore(p, p_descriptor,        f_descriptor);
 
 		// Store current context, if there is one
 		if (user_proc.calling_convention == ProcCC_Odin) {

@@ -1208,7 +1208,7 @@ gb_internal unsigned lb_try_get_alignment(lbModule *m, LLVMValueRef addr_ptr, un
 }
 
 gb_internal bool lb_try_update_alignment(LLVMValueRef addr_ptr, unsigned alignment) {
-	if (LLVMIsAGlobalValue(addr_ptr) || LLVMIsAAllocaInst(addr_ptr) || LLVMIsALoadInst(addr_ptr)) {
+	if (LLVMIsAGlobalValue(addr_ptr) || LLVMIsAAllocaInst(addr_ptr)) {
 		if (LLVMGetAlignment(addr_ptr) < alignment) {
 			if (LLVMIsAAllocaInst(addr_ptr)) {
 				LLVMSetAlignment(addr_ptr, alignment);
@@ -1247,9 +1247,10 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 		LLVMValueRef addr_ptr = ptr.value;
 		if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
 			possible = lb_try_update_alignment(addr_ptr, vector_alignment);
-		} else if (LLVMIsALoadInst(addr_ptr)) {
-			unsigned alignment = LLVMGetAlignment(addr_ptr);
-			possible = alignment >= vector_alignment;
+		} else {
+			// the lowered alignment when visible, else the Odin type alignment
+			unsigned ptr_alignment = lb_try_get_alignment(m, addr_ptr, cast(unsigned)type_align_of(type_deref(ptr.type)));
+			possible = ptr_alignment >= vector_alignment;
 		}
 
 		// NOTE: Due to alignment requirements, if the pointer is not correctly aligned
@@ -1303,11 +1304,6 @@ gb_internal u64 lb_get_max_align_through_geps(lbModule *m, LLVMValueRef ptr) {
 // so lb_try_get_alignment is used for these instead
 gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef access, LLVMValueRef addr_ptr) {
 	if (LLVMIsAInstruction(addr_ptr)) {
-		u64 is_packed = lb_get_is_packed_through_geps(m, addr_ptr);
-		if (is_packed != 0) {
-			// lb_try_get_alignment may recover alignment > 1
-			LLVMSetAlignment(access, lb_try_get_alignment(m, addr_ptr, 1));
-		}
 		u64 align = LLVMGetAlignment(access);
 		u64 align_min = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_MIN_ALIGN);
 		u64 align_max = lb_get_max_align_through_geps(m, addr_ptr);
@@ -1316,6 +1312,16 @@ gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef 
 		}
 		if (align_max != 0 && align > align_max) {
 			align = align_max;
+		}
+		// #packed caps the alignment,
+		// and lb_try_get_alignment overrides any min_field_align increase
+		if (lb_get_is_packed_through_geps(m, addr_ptr) != 0) {
+			// lb_try_get_alignment may recover alignment > 1
+			unsigned addr_align = lb_try_get_alignment(m, addr_ptr, 1);
+			// 0 = unknown
+			if (addr_align > 0 && align > addr_align) {
+				align = addr_align;
+			}
 		}
 		GB_ASSERT(align <= UINT_MAX);
 		LLVMSetAlignment(access, (unsigned int)align);
@@ -1326,8 +1332,25 @@ gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef 
 	}
 }
 
+// cap a load/store alignment to max_align if over that;
+// for callers that have a limit on the addr alignment
+// but the metadata approach can't be used
+// (e.g. addr is not a GEP, so metadata can't attach)
+gb_internal void lb_cap_access_alignment(LLVMValueRef access, i64 max_align) {
+	GB_ASSERT(max_align > 0);
+	if ((LLVMIsALoadInst(access) || LLVMIsAStoreInst(access)) &&
+	    cast(i64)LLVMGetAlignment(access) > max_align) {
+		LLVMSetAlignment(access, cast(unsigned)max_align);
+	}
+}
+
 gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value) {
 	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
+	// LLVMBuildLoad2 set the type's ABI alignment according to LLVM,
+	// but that ignores max_simd_align; a 32-byte vector is 32-aligned
+	// to LLVM but only 16-aligned on darwin (amd64/arm64) and other arm64 targets;
+	// lb_alignof applies the max_simd_align cap
+	LLVMSetAlignment(result, cast(unsigned)lb_alignof(type));
 	lb_adjust_access_alignment_from_addr(p->module, result, value);
 	return result;
 }
@@ -1336,6 +1359,24 @@ gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef ty
 	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
 	LLVMSetAlignment(result, cast(unsigned)alignment);
 	lb_adjust_access_alignment_from_addr(p->module, result, value);
+	return result;
+}
+
+gb_internal LLVMValueRef OdinLLVMBuildStore(lbProcedure *p, LLVMValueRef value, LLVMValueRef ptr) {
+	LLVMValueRef result = LLVMBuildStore(p->builder, value, ptr);
+	// LLVMBuildStore set the type's ABI alignment according to LLVM,
+	// but that ignores max_simd_align; a 32-byte vector is 32-aligned
+	// to LLVM but only 16-aligned on darwin (amd64/arm64) and other arm64 targets;
+	// lb_alignof applies the max_simd_align cap
+	LLVMSetAlignment(result, cast(unsigned)lb_alignof(LLVMTypeOf(value)));
+	lb_adjust_access_alignment_from_addr(p->module, result, ptr);
+	return result;
+}
+
+gb_internal LLVMValueRef OdinLLVMBuildStoreAligned(lbProcedure *p, LLVMValueRef value, LLVMValueRef ptr, i64 alignment) {
+	LLVMValueRef result = LLVMBuildStore(p->builder, value, ptr);
+	LLVMSetAlignment(result, cast(unsigned)alignment);
+	lb_adjust_access_alignment_from_addr(p->module, result, ptr);
 	return result;
 }
 
@@ -1662,7 +1703,7 @@ gb_internal bool lb_is_type_proc_recursive(Type *t) {
 	}
 }
 
-gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
+gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbValue value, i64 max_align) {
 	GB_ASSERT(value.value != nullptr);
 
 	if (LLVMIsUndef(value.value)) {
@@ -1670,6 +1711,15 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	}
 
 	Type *a = type_deref(ptr.type, true);
+	// claim the alignment Odin allocates and places a value of the stored type at;
+	// the LLVM lowered type alignment ignores #align (up) and max_simd_align (down);
+	// max_align caps it when the caller knows the addr is less aligned than this
+	// and lb_adjust_access_alignment_from_addr can't recover the fact
+	// (e.g. a union variant ptr)
+	i64 dst_align = type_align_of(a);
+	if (max_align > 0) {
+		dst_align = gb_min(dst_align, max_align);
+	}
 	if (LLVMIsNull(value.value)) {
 		// used to be llvm_addr_type: for a multi-pointer typed ptr the latter is `ptr`,
 		// and ConstNull of it would store 8 bytes over an element of any size
@@ -1677,15 +1727,13 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		if (is_type_proc(a)) {
 			LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
 			LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
-			LLVMValueRef instr = LLVMBuildStore(p->builder, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""));
-			lb_adjust_access_alignment_from_addr(p->module, instr, ptr.value);
+			OdinLLVMBuildStoreAligned(p, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""), dst_align);
 		} else if (is_type_bit_set(a)) {
-			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)type_align_of(a));
+			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)dst_align);
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
-			LLVMValueRef instr = LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
-			lb_adjust_access_alignment_from_addr(p->module, instr, ptr.value);
+			OdinLLVMBuildStoreAligned(p, LLVMConstNull(src_t), ptr.value, dst_align);
 		} else {
-			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)type_align_of(a));
+			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)dst_align);
 		}
 		return;
 	}
@@ -1706,7 +1754,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
-			unsigned type_align = cast(unsigned)type_align_of(a);
+			unsigned type_align = cast(unsigned)dst_align;
 			LLVMBuildMemMove(p->builder,
 			                 dst_ptr, lb_try_get_alignment(p->module, dst_ptr, type_align),
 			                 src_ptr, lb_try_get_alignment(p->module, src_ptr_original, type_align),
@@ -1720,7 +1768,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMValueRef src_ptr = addr.addr.value;
 			src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
 
-			unsigned type_align = cast(unsigned)type_align_of(a);
+			unsigned type_align = cast(unsigned)dst_align;
 			LLVMBuildMemMove(p->builder,
 			                 dst_ptr, lb_try_get_alignment(p->module, dst_ptr, type_align),
 			                 src_ptr, lb_try_get_alignment(p->module, src_ptr, type_align),
@@ -1729,16 +1777,16 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		}
 	}
 
-	LLVMValueRef instr = nullptr;
 	if (lb_is_type_proc_recursive(a)) {
 		// NOTE(bill, 2020-11-11): Because of certain LLVM rules, a procedure value may be
 		// stored as regular pointer with no procedure information
 
  		LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
  		LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
-		instr = LLVMBuildStore(p->builder,
-		                       LLVMBuildPointerCast(p->builder, value.value, rawptr_type, ""),
-		                       LLVMBuildPointerCast(p->builder, ptr.value, rawptr_ptr_type, ""));
+		OdinLLVMBuildStoreAligned(p,
+		                          LLVMBuildPointerCast(p->builder, value.value, rawptr_type, ""),
+		                          LLVMBuildPointerCast(p->builder, ptr.value, rawptr_ptr_type, ""),
+		                          dst_align);
 	} else {
 		Type *ca = core_type(a);
 		if (ca->kind == Type_Basic || ca->kind == Type_Proc) {
@@ -1747,10 +1795,13 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			GB_ASSERT_MSG(are_types_identical(a, value.type), "%s != %s", type_to_string(a), type_to_string(value.type));
 		}
 
-		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
+		OdinLLVMBuildStoreAligned(p, value.value, ptr.value, dst_align);
 	}
-	lb_adjust_access_alignment_from_addr(p->module, instr, ptr.value);
 	// LLVMSetVolatile(instr, p->in_multi_assignment);
+}
+
+gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
+	lb_emit_store_with_max_align(p, ptr, value, 0);
 }
 
 gb_internal LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val) {
@@ -1763,7 +1814,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		Type *vt = base_type(value.type);
 		GB_ASSERT(vt->kind == Type_MultiPointer);
 		Type *t = vt->MultiPointer.elem;
-		LLVMValueRef v = OdinLLVMBuildLoad(p, lb_type(p->module, t), value.value);
+		LLVMValueRef v = OdinLLVMBuildLoadAligned(p, lb_type(p->module, t), value.value, type_align_of(t));
 		return lbValue{v, t};
 	} else if (is_type_soa_pointer(value.type)) {
 		return lb_addr_load(p, lb_addr_soa_variable_from_soa_ptr(p, value));
@@ -1771,7 +1822,7 @@ gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 
 	GB_ASSERT_MSG(is_type_pointer(value.type), "%s", type_to_string(value.type));
 	Type *t = type_deref(value.type);
-	LLVMValueRef v = OdinLLVMBuildLoad(p, lb_type(p->module, t), value.value);
+	LLVMValueRef v = OdinLLVMBuildLoadAligned(p, lb_type(p->module, t), value.value, type_align_of(t));
 
 	return lbValue{v, t};
 }
@@ -1991,7 +2042,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			LLVMSetAlignment(res.addr.value, cast(unsigned)lb_alignof(LLVMTypeOf(sv)));
 
 			LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(LLVMTypeOf(sv), 0), "");
-			LLVMBuildStore(p->builder, sv, dst);
+			OdinLLVMBuildStore(p, sv, dst);
 		} else {
 			for (u8 i = 0; i < addr.swizzle.count; i++) {
 				u8 index = addr.swizzle.indices[i];
@@ -2066,6 +2117,11 @@ gb_internal lbValue lb_emit_union_tag_ptr(lbProcedure *p, lbValue u) {
 	lbValue tag_ptr = {};
 	tag_ptr.value = LLVMBuildStructGEP2(p->builder, uvt, ptr, 1, "");
 	tag_ptr.type = alloc_type_pointer(tag_type);
+	// union #align(N) may guarantee less than the tag offset suggests;
+	// the tag ptr is a GEP, so the max-align metadata chain check will cap it
+	if (base_type(ut)->Union.custom_align > 0 && LLVMIsAInstruction(tag_ptr.value)) {
+		lb_set_metadata_custom_u64(p->module, tag_ptr.value, ODIN_METADATA_MAX_ALIGN, cast(u64)type_align_of(ut));
+	}
 	tag_ptr.value = LLVMBuildPointerCast(p->builder, tag_ptr.value, lb_type(p->module, tag_ptr.type), "");
 	return tag_ptr;
 }
@@ -2112,7 +2168,8 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 
 		lb_start_block(p, if_not_nil);
 		lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
-		lb_emit_store(p, underlying, variant);
+		// union #align(N) can lower alignment below the variant type alignment
+		lb_emit_store_with_max_align(p, underlying, variant, type_align_of(pt));
 		lb_emit_store_union_variant_tag(p, parent, variant_type);
 		lb_emit_jump(p, done);
 
@@ -2125,7 +2182,8 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 			lb_mem_zero_ptr_internal(p, parent.value, pt->Union.variant_block_size, alignment, false);
 		} else {
 			lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
-			lb_emit_store(p, underlying, variant);
+			// union #align(N) can lower alignment below the variant type alignment
+			lb_emit_store_with_max_align(p, underlying, variant, type_align_of(pt));
 		}
 		lb_emit_store_union_variant_tag(p, parent, variant_type);
 	}
@@ -3427,7 +3485,7 @@ general_end:;
 			// NOTE(laytan): we need a pointer to memcpy from.
 			LLVMValueRef val_copy = llvm_alloca(p, src_type, src_align);
 			val_ptr = LLVMBuildPointerCast(p->builder, val_copy, llvm_src_type, "");
-			LLVMBuildStore(p->builder, val, val_ptr);
+			OdinLLVMBuildStore(p, val, val_ptr);
 		}
 
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
@@ -3469,7 +3527,7 @@ general_end:;
 		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
 
 		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-		LLVMBuildStore(p->builder, val, nptr);
+		OdinLLVMBuildStore(p, val, nptr);
 
 		return OdinLLVMBuildLoad(p, dst_type, ptr);
 	}

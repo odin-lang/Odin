@@ -430,6 +430,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value);
 gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
 gb_internal lbValue lb_emit_load(lbProcedure *p, lbValue v);
 gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value);
+gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbValue value, i64 max_align);
 
 
 gb_internal void    lb_build_stmt(lbProcedure *p, Ast *stmt);

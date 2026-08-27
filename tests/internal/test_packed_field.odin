@@ -166,9 +166,9 @@ test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
 }
 
 
-// accesses derived from a '#max_field_align' struct's field
-// (array element, nested struct field) must not claim more than
-// the struct's field alignment cap
+// accesses derived from a #max_field_align struct's field
+// (array element, nested struct field) must not assume more
+// than the max_field_align cap
 
 Capped_Inner :: struct { x: i64 }
 
@@ -246,4 +246,84 @@ test_packed_field_array_conv :: proc(t: ^testing.T) {
 
 	z := #force_no_inline conv_complex(&p5)
 	testing.expect(t, z == [4]complex64{1.5, 2.5, 3.5, 4.5})
+}
+
+
+// a #min_field_align inner struct placed in a #packed outer struct;
+// the outer's #packed provides only align 1;
+// accesses must not assume the #min_field_align
+
+Raised_Inner :: struct #min_field_align(16) {
+	v: #simd[4]f32,
+}
+
+Packed_Raised :: struct #packed {
+	_:     u8,
+	inner: Raised_Inner, // offs 1
+}
+
+@(export)
+p6: Packed_Raised
+
+@(private="file")
+swap_raised :: proc(p: ^Packed_Raised, x: #simd[4]f32) -> #simd[4]f32 {
+	y := p.inner.v
+	p.inner.v = x
+	return y
+}
+
+@(test)
+test_packed_field_min_align :: proc(t: ^testing.T) {
+	p6.inner.v = {1, 2, 3, 4}
+
+	y := #force_no_inline swap_raised(&p6, {5, 6, 7, 8})
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+	testing.expect(t, simd.to_array(p6.inner.v) == [4]f32{5, 6, 7, 8})
+}
+
+
+// by-reference type switch on a union field of a #packed struct;
+// the bound case variable inherits the field GEP's is-packed metadata;
+// accesses through it must not assume the variant type alignment
+
+Packed_Union :: union {
+	#simd[4]f32,
+	u8,
+}
+
+Packed_With_Union :: struct #packed {
+	_: u8,
+	u: Packed_Union, // offset 1
+}
+
+Packed_Union_Helper :: struct {
+	force: #simd[4]f32,       // force align to 16
+	_:     u8,
+	p:     Packed_With_Union, // offset 17, union at 18
+}
+
+@(export)
+p7: Packed_Union_Helper
+
+@(private="file")
+swap_variant_ref :: proc(p: ^Packed_With_Union, x: #simd[4]f32) -> #simd[4]f32 {
+	#partial switch &v in p.u {
+	case #simd[4]f32:
+		y := v
+		v = x
+		return y
+	}
+	return {}
+}
+
+@(test)
+test_packed_field_union_type_switch_ref :: proc(t: ^testing.T) {
+	p7.p.u = #simd[4]f32{1, 2, 3, 4}
+
+	y := #force_no_inline swap_variant_ref(&p7.p, {5, 6, 7, 8})
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	v, ok := p7.p.u.(#simd[4]f32)
+	testing.expect(t, ok)
+	testing.expect(t, simd.to_array(v) == [4]f32{5, 6, 7, 8})
 }
