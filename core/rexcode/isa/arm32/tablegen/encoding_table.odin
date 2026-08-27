@@ -1119,31 +1119,18 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08900000, 0x0FD00000, .BASE, .A32, {}, {}},
 		// LDMIA writeback (LDM Rn!, {reglist}): W=1
 		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08B00000, 0x0FD00000, .BASE, .A32, {}, {}},
-		// LDMIB
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09900000, 0x0FD00000, .BASE, .A32, {}, {}},
-		// LDMDA
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08100000, 0x0FD00000, .BASE, .A32, {}, {}},
-		// LDMDB
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09100000, 0x0FD00000, .BASE, .A32, {}, {}},
 		// T16 Format 15 LDMIA: 11001 Rb reg_list8
 		{.LDM, {.GPR_LOW, .GPR_LIST, .NONE, .NONE}, {.RD_T16_HI, .A32_REG_LIST, .NONE, .NONE}, 0x0000C800, 0x0000F800, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T32 LDMIA: high=11101000 1001 Rn  low=PM 0 reg_list14
 		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE8900000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
-		// T32 LDMDB: high=11101001 0001 Rn  low=PM 0 reg_list14
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9100000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.STM = {
 		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08800000, 0x0FD00000, .BASE, .A32, {}, {}},
 		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08A00000, 0x0FD00000, .BASE, .A32, {}, {}},
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09800000, 0x0FD00000, .BASE, .A32, {}, {}},
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08000000, 0x0FD00000, .BASE, .A32, {}, {}},
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09000000, 0x0FD00000, .BASE, .A32, {}, {}},
 		// T16 Format 15 STMIA: 11000 Rb reg_list8
 		{.STM, {.GPR_LOW, .GPR_LIST, .NONE, .NONE}, {.RD_T16_HI, .A32_REG_LIST, .NONE, .NONE}, 0x0000C000, 0x0000F800, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T32 STMIA: 0xE8800000
 		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE8800000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
-		// T32 STMDB: 0xE9000000
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9000000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 
 	// PUSH / POP are conventional aliases for STMDB SP! / LDMIA SP!
@@ -3748,5 +3735,25 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VQRSHL, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VM_Q, .VN_Q, .NONE}, 0xF3300550, 0xFFB11F51, .NEON, .A32, {cond_in_28=false}, {.U64, .NONE}},
 	},
 	// SPECGEN:END
+	.LDMIB = {
+		{.LDMIB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09900000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.LDMDA = {
+		{.LDMDA, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08100000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.LDMDB = {
+		{.LDMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09100000, 0x0FD00000, .BASE, .A32, {}, {}},
+		{.LDMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9100000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+	},
+	.STMIB = {
+		{.STMIB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09800000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.STMDA = {
+		{.STMDA, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08000000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.STMDB = {
+		{.STMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09000000, 0x0FD00000, .BASE, .A32, {}, {}},
+		{.STMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9000000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+	},
 }
 
