@@ -199,6 +199,9 @@ struct Asm_riscv {
 		ClobberFlags flags_rd_call() const {
 			return {};
 		}
+		ClobberFlags flags_wr_call() const {
+			return flags_wr;
+		}
 
 		bool implies_clobber_flags() const {
 			return (flags_wr != 0);

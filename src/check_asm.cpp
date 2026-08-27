@@ -1624,7 +1624,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		facts->gen_regs   = produced | pinned_param_writes;
-		facts->gen_flags  = cast(u16)clobber.flags_wr;
+		facts->gen_flags  = cast(u16)clobber.flags_wr_call();
 		facts->read_flags = cast(u16)clobber.flags_rd_call();
 
 		// NOTE(bill): mnemonics such as `xor r, r` / `sub r, r` act as zeroing the destination
@@ -2806,6 +2806,8 @@ gb_internal void check_asm_template_from_entity(CheckerContext *c, Entity *e, De
 		check_asm_template(&g_asm_amd64, c, e, d);
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		check_asm_template(&g_asm_riscv, c, e, d);
+	} else if (build_context.metrics.arch == TargetArch_arm64) {
+		check_asm_template(&g_asm_arm64, c, e, d);
 	} else {
 		error(e->token, "asm templates are not currently supported for this target");
 	}

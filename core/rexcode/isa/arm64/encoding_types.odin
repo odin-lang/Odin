@@ -77,12 +77,12 @@ Endianness :: enum u8 {
 }
 
 Encoding_Flags :: bit_field u8 {
-	branch:      bool | 1,   // unconditional change of control flow
-	cond_branch: bool | 1,   // PC-relative conditional
-	writes_pc:   bool | 1,   // any PC mutation (RET/BR/BLR/etc.)
-	sets_flags:  bool | 1,   // updates NZCV (ADDS/SUBS/ANDS/CMP/CMN/TST/CCMP)
-	is_64:       bool | 1,   // 64-bit variant (SF=1 for data-proc)
-	_:           u8   | 3,
+	branch:         bool | 1, // unconditional change of control flow
+	cond_branch:    bool | 1, // PC-relative conditional
+	writes_pc:      bool | 1, // any PC mutation (RET/BR/BLR/etc.)
+	sets_flags:     bool | 1, // updates NZCV (ADDS/SUBS/ANDS/CMP/CMN/TST/CCMP)
+	is_64:          bool | 1, // 64-bit variant (SF=1 for data-proc)
+	explicit_count: u8   | 3,
 }
 
 // What the user passes in. Most operand types describe a register class

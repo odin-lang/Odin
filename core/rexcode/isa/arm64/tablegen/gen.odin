@@ -258,10 +258,10 @@ emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [4]lib.Operand_Type,
                   enc: [4]lib.Operand_Encoding, bits, mask: u32, feature: lib.Feature, flags: lib.Encoding_Flags) {
 	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, {{%s}} }},\n",
-		mn, ops[0], ops[1], ops[2], ops[3], enc[0], enc[1], enc[2], enc[3], bits, mask, feature, flags_lit(flags))
+		mn, ops[0], ops[1], ops[2], ops[3], enc[0], enc[1], enc[2], enc[3], bits, mask, feature, flags_lit(flags, ops))
 }
 
-flags_lit :: proc(f: lib.Encoding_Flags) -> string {
+flags_lit :: proc(f: lib.Encoding_Flags, ops: [4]lib.Operand_Type) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 	if f.branch      { append(&parts, "branch=true")      }
@@ -269,6 +269,15 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.writes_pc   { append(&parts, "writes_pc=true")   }
 	if f.sets_flags  { append(&parts, "sets_flags=true")  }
 	if f.is_64       { append(&parts, "is_64=true")       }
+	encoding_operand_count: u8 = 0
+	for op_type in ops {
+		if op_type == .NONE { break }
+		encoding_operand_count += 1
+	}
+	if encoding_operand_count > 0 {
+		append(&parts, fmt.tprintf("explicit_count=%d", encoding_operand_count))
+	}
+
 	return strings.join(parts[:], ", ", context.temp_allocator)
 }
 

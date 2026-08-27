@@ -312,6 +312,9 @@ struct Asm_amd64 {
 		ClobberFlags flags_rd_call() const {
 			return flags_rd;
 		}
+		ClobberFlags flags_wr_call() const {
+			return flags_wr;
+		}
 
 		bool implies_clobber_flags() const {
 			u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
