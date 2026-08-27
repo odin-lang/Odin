@@ -81,6 +81,11 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 		}
 		return AsmOperand_Register;
 	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		// TODO(bill): Is this correct?
+		return AsmOperand_Register;
+	case_end;
 	}
 	return AsmOperand_Invalid;
 }
@@ -151,6 +156,10 @@ gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs,
 		check_asm_collect_refs(asm_ctx, refs, m->disp,             touched_regs_);
 		return;
 	}
+	case Ast_IndexExpr:
+		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.expr,  touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.index, touched_regs_);
+		return;
 	}
 }
 enum AsmMismatch : u8 {
@@ -1142,6 +1151,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 	auto form_user_operand_count = [&](typename AsmCtx::Encoding const &form) -> int {
 		int count = is_pseudo ? target_explicit_count : cast(int)form.explicit_count();
+		GB_ASSERT_MSG(count <= 4, "%d", count);
 		return gb_max(count, 0);
 	};
 
@@ -1178,7 +1188,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		return asm_ctx->OP_NONE;
 	};
 
-	auto describe_form = [&](typename AsmCtx::Encoding const &form, typename AsmCtx::Clobber const &clobber) -> gbString {
+	auto describe_form = [&](typename AsmCtx::Encoding const &form, typename AsmCtx::Clobber const &clobber, isize max_count) -> gbString {
 		gbString s = gb_string_make(heap_allocator(), "");
 		int count = form_user_operand_count(form);
 		for (int i = 0; i < count; i++) {
@@ -1224,27 +1234,33 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				s = gb_string_appendc(s, ", ");
 			}
 
-			switch (k) {
-			case AsmOperand_Label: // 5 characters
-				break;
-			case AsmOperand_Immediate: // 3+ characters
-			case AsmOperand_Register_Or_Memory:
-				if (w == 0) {
-					s = gb_string_appendc(s, "  ");
-				} else if (w < 10) {
-					s = gb_string_appendc(s, " ");
+			if (max_count > 1) {
+				switch (k) {
+				case AsmOperand_Label: // 5 characters
+					break;
+				case AsmOperand_Immediate: // 3+ characters
+				case AsmOperand_Register_Or_Memory:
+					if (w == 0) {
+						s = gb_string_appendc(s, "   ");
+					} else if (w < 10) {
+						s = gb_string_appendc(s, "  ");
+					} else if (w < 100) {
+						s = gb_string_appendc(s, " ");
+					}
+					break;
+				case AsmOperand_Register: // 1+ characters
+				case AsmOperand_Memory:
+					if (w == 0) {
+						s = gb_string_appendc(s, "    ");
+					} else if (w < 10) {
+						s = gb_string_appendc(s, "   ");
+					} else if (w < 100) {
+						s = gb_string_appendc(s, "  ");
+					} else {
+						s = gb_string_appendc(s, " ");
+					}
+					break;
 				}
-				break;
-			case AsmOperand_Register: // 1+ characters
-			case AsmOperand_Memory:
-				if (w == 0) {
-					s = gb_string_appendc(s, "    ");
-				} else if (w < 10) {
-					s = gb_string_appendc(s, "   ");
-				} else if (w < 100) {
-					s = gb_string_appendc(s, "  ");
-				}
-				break;
 			}
 		}
 		bool all_implicit = true;
@@ -1314,7 +1330,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			return;
 		}
 
-		gbString desc = describe_form(forms[form_index], clobber_forms[form_index]);
+		gbString desc = describe_form(forms[form_index], clobber_forms[form_index], 1);
 		defer (gb_string_free(desc));
 		String line = make_string(cast(u8 const *)desc, gb_string_length(desc));
 		line = string_trim_trailing_whitespace(line);
@@ -1336,7 +1352,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		);
 
 		for_array(fi, forms) {
-			gbString desc = describe_form(forms[fi], clobber_forms[fi]);
+			gbString desc = describe_form(forms[fi], clobber_forms[fi], forms.count);
 			bool dup = false;
 			for (auto const &l : lines) {
 				if (gb_string_are_equal(l, desc)) {
@@ -2303,6 +2319,45 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		}
 		add_entity_use(ctx, label->name, found);
 		add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
+		return;
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		Operand lhs = {};
+		Operand rhs = {};
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &lhs, ie->expr, false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &rhs, ie->index, false);
+
+		auto lhs_kind = determine_asm_operand_kind(&lhs);
+		if (lhs_kind != AsmOperand_Register) {
+			gbString s = expr_to_string(lhs.expr);
+			error(lhs.expr, "Expected a vector register, got '%s' which is %.*s",
+			      s, LIT(asm_operand_kind_expected_strings[lhs_kind]));
+			gb_string_free(s);
+		} else if (!is_type_simd_vector(lhs.type)) {
+			gbString s = type_to_string(lhs.type);
+			error(lhs.expr, "Expected a vector register, got %s", s);
+			gb_string_free(s);
+		}
+
+		auto rhs_kind = determine_asm_operand_kind(&rhs);
+		if (rhs_kind != AsmOperand_Immediate) {
+			gbString s = expr_to_string(rhs.expr);
+			error(rhs.expr, "Expected an integer immediate as an index, got '%s' which is %.*s",
+			      s, LIT(asm_operand_kind_expected_strings[rhs_kind]));
+			gb_string_free(s);
+		} else if (!is_type_integer(rhs.type)) {
+			gbString s = type_to_string(rhs.type);
+			error(rhs.expr, "Expected an integer immediate as an index, got %s", s);
+			gb_string_free(s);
+		}
+
+
+		operand->mode = Addressing_Value;
+		operand->type = base_array_type(lhs.type);
+		operand->value = {};
+
+		add_type_and_value(ctx, expr, Addressing_Value, operand->type, {});
 		return;
 	case_end;
 	}

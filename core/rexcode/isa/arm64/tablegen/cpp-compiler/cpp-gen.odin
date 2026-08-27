@@ -439,7 +439,7 @@ main :: proc() {
 	}
 	strings.write_string(&sb, "\n\n")
 	{
-		strings.write_string(&sb, "\tenum Feature : u16 {\n")
+		strings.write_string(&sb, "\tenum Feature : u8 {\n")
 		defer strings.write_string(&sb, "\t};\n")
 		for op in Feature {
 			fmt.sbprintf(&sb, "\t\tF_%s,\n", op)
@@ -450,7 +450,7 @@ main :: proc() {
 	strings.write_string(&sb, "\ttypedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
 	strings.write_string(&sb, "\n")
 	{
-		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 21);\n")
+		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 20);\n")
 
 		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
 		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
@@ -636,6 +636,7 @@ main :: proc() {
 			// SME ZA tiles (ZA0.B .. ZAn.Q) — register-like tile operands.
 			case OP_ZA_TILE_B: case OP_ZA_TILE_H: case OP_ZA_TILE_S:
 			case OP_ZA_TILE_D: case OP_ZA_TILE_Q:
+			case OP_SYS_REG:     // MRS/MSR system-register name -> 16-bit field (cf. riscv CSR)
 				return AsmOperand_Register;
 
 			// ---- Immediates (numeric literals and immediate-encoded selectors) ----
@@ -651,7 +652,6 @@ main :: proc() {
 			case OP_VEC_SHIFT:   case OP_VEC_INDEX:
 			// Enum-like tokens that encode into an immediate field:
 			case OP_COND:        // condition code (EQ/NE/...) -> 4-bit field
-			case OP_SYS_REG:     // MRS/MSR system-register name -> 16-bit field (cf. riscv CSR)
 			case OP_SME_PATTERN: case OP_SVE_PATTERN: // pattern / tile-list selectors
 			// JUDGMENT CALL: the following are register/tile-slice constructs
 			// syntactically, but this table models each as a single packed immediate
