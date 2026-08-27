@@ -592,6 +592,11 @@ main :: proc() {
 			return 0;
 		}
 
+		bool reg_is_segment(/*Register*/ u16 r) {
+			auto c = reg_class(register_codes[r]);
+			return c == REG_CLASS_SEG;
+		}
+
 		bool integer_reg_width_is_exact() const {
 			return true;
 		}

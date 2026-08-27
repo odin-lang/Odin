@@ -848,13 +848,6 @@ gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegiste
 	if (r) {
 		operand->mode = Addressing_Value;
 
-		u16 reg_class = asm_ctx->reg_class(r);
-		if (reg_class == asm_ctx->REG_CLASS_K) {
-			// Opmask register: classify as a mask, not a 64-bit integer.
-			// operand->type = t_asm_mask; // see note if this type does not yet exist
-			// return true;
-		}
-
 		u16 width_in_bits = asm_ctx->reg_size(r);
 		switch (width_in_bits) {
 		case 0:
@@ -2019,8 +2012,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		} else if (segment_override.expr->kind == Ast_AsmRegister) {
 			String reg_name = segment_override.expr->AsmRegister.name.string;
 			auto reg = asm_ctx->register_lookup(reg_name);
-			auto reg_class = asm_ctx->reg_class(asm_ctx->register_codes[reg]);
-			if (reg_class != asm_ctx->REG_CLASS_SEG) {
+			if (!asm_ctx->reg_is_segment(cast(u16)reg)) {
 				gbString s = expr_to_string(segment_override.expr);
 				error(segment_override.expr, "A segment override must be a selector register parameter, got %s", s);
 				gb_string_free(s);
