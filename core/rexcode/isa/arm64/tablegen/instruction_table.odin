@@ -423,8 +423,53 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.RET,            {.X_REG, .NONE, .NONE, .NONE}, {.RN,   .NONE, .NONE, .NONE}, 0xD65F0000, 0xFFFFFC1F, .BASE, {branch=true, writes_pc=true}},                        {read={0}, side_effects={.CONTROL}}},
 		{{.RET,            {.NONE,  .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xD65F03C0, 0xFFFFFFFF, .BASE, {branch=true, writes_pc=true}},                        {implicit_rd={.LR}, side_effects={.CONTROL}}},
 	},
-	.B_COND = {
-		{{.B_COND,         {.COND, .REL_19, .NONE, .NONE}, {.COND_LO, .BRANCH_19, .NONE, .NONE}, 0x54000000, 0xFF000010, .BASE, {cond_branch=true}},                          {nzcv_rd={.N, .Z, .C, .V}, side_effects={.CONTROL}}},
+	.B_EQ = {
+		{{.B_EQ,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000000, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z}, side_effects={.CONTROL}}},
+	},
+	.B_NE = {
+		{{.B_NE,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000001, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z}, side_effects={.CONTROL}}},
+	},
+	.B_CS = {
+		{{.B_CS,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000002, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.C}, side_effects={.CONTROL}}},
+	},
+	.B_CC = {
+		{{.B_CC,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000003, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.C}, side_effects={.CONTROL}}},
+	},
+	.B_MI = {
+		{{.B_MI,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000004, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N}, side_effects={.CONTROL}}},
+	},
+	.B_PL = {
+		{{.B_PL,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000005, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N}, side_effects={.CONTROL}}},
+	},
+	.B_VS = {
+		{{.B_VS,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000006, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.V}, side_effects={.CONTROL}}},
+	},
+	.B_VC = {
+		{{.B_VC,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000007, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.V}, side_effects={.CONTROL}}},
+	},
+	.B_HI = {
+		{{.B_HI,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000008, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z, .C}, side_effects={.CONTROL}}},
+	},
+	.B_LS = {
+		{{.B_LS,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000009, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z, .C}, side_effects={.CONTROL}}},
+	},
+	.B_GE = {
+		{{.B_GE,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400000A, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .V}, side_effects={.CONTROL}}},
+	},
+	.B_LT = {
+		{{.B_LT,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400000B, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .V}, side_effects={.CONTROL}}},
+	},
+	.B_GT = {
+		{{.B_GT,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400000C, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .Z, .V}, side_effects={.CONTROL}}},
+	},
+	.B_LE = {
+		{{.B_LE,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400000D, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .Z, .V}, side_effects={.CONTROL}}},
+	},
+	.B_AL = {
+		{{.B_AL,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400000E, 0xFF00001F, .BASE, {cond_branch=true}},                              {side_effects={.CONTROL}}},
+	},
+	.B_NV = {
+		{{.B_NV,           {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400000F, 0xFF00001F, .BASE, {cond_branch=true}},                              {side_effects={.CONTROL}}},
 	},
 	.CBZ = {
 		{{.CBZ,            {.W_REG, .REL_19, .NONE, .NONE}, {.RT, .BRANCH_19, .NONE, .NONE}, 0x34000000, 0xFF000000, .BASE, {cond_branch=true}},                              {read={0}, side_effects={.CONTROL}}},
@@ -3699,8 +3744,53 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	.WFIT = {
 		{{.WFIT,           {.X_REG, .NONE, .NONE, .NONE}, {.RT, .NONE, .NONE, .NONE}, 0xD5031020, 0xFFFFFFE0, .BASE, {is_64=true}},                                           {read={0}, side_effects={.WAIT}}},
 	},
-	.BC_COND = {
-		{{.BC_COND,        {.COND, .REL_19, .NONE, .NONE}, {.COND_LO, .BRANCH_19, .NONE, .NONE}, 0x54000010, 0xFF000010, .BASE, {cond_branch=true}},                          {nzcv_rd={.N, .Z, .C, .V}, side_effects={.CONTROL}}},
+	.BC_EQ = {
+		{{.BC_EQ,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000010, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z}, side_effects={.CONTROL}}},
+	},
+	.BC_NE = {
+		{{.BC_NE,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000011, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z}, side_effects={.CONTROL}}},
+	},
+	.BC_CS = {
+		{{.BC_CS,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000012, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.C}, side_effects={.CONTROL}}},
+	},
+	.BC_CC = {
+		{{.BC_CC,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000013, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.C}, side_effects={.CONTROL}}},
+	},
+	.BC_MI = {
+		{{.BC_MI,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000014, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N}, side_effects={.CONTROL}}},
+	},
+	.BC_PL = {
+		{{.BC_PL,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000015, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N}, side_effects={.CONTROL}}},
+	},
+	.BC_VS = {
+		{{.BC_VS,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000016, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.V}, side_effects={.CONTROL}}},
+	},
+	.BC_VC = {
+		{{.BC_VC,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000017, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.V}, side_effects={.CONTROL}}},
+	},
+	.BC_HI = {
+		{{.BC_HI,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000018, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z, .C}, side_effects={.CONTROL}}},
+	},
+	.BC_LS = {
+		{{.BC_LS,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x54000019, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.Z, .C}, side_effects={.CONTROL}}},
+	},
+	.BC_GE = {
+		{{.BC_GE,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400001A, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .V}, side_effects={.CONTROL}}},
+	},
+	.BC_LT = {
+		{{.BC_LT,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400001B, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .V}, side_effects={.CONTROL}}},
+	},
+	.BC_GT = {
+		{{.BC_GT,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400001C, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .Z, .V}, side_effects={.CONTROL}}},
+	},
+	.BC_LE = {
+		{{.BC_LE,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400001D, 0xFF00001F, .BASE, {cond_branch=true}},                              {nzcv_rd={.N, .Z, .V}, side_effects={.CONTROL}}},
+	},
+	.BC_AL = {
+		{{.BC_AL,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400001E, 0xFF00001F, .BASE, {cond_branch=true}},                              {side_effects={.CONTROL}}},
+	},
+	.BC_NV = {
+		{{.BC_NV,          {.REL_19, .NONE, .NONE, .NONE}, {.BRANCH_19, .NONE, .NONE, .NONE}, 0x5400001F, 0xFF00001F, .BASE, {cond_branch=true}},                              {side_effects={.CONTROL}}},
 	},
 	.UXTB = {
 		{{.UXTB,           {.W_REG, .W_REG, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x53001C00, 0xFFFFFC00, .BASE, {}},                                                      {written={0}, read={1}}},

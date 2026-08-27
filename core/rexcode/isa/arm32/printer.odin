@@ -397,6 +397,31 @@ wprintln :: proc(
 // =============================================================================
 
 // `.i32`, `.s32.f32`, `.8`. Both slots print when the second is set.
+// A shift suffix on a register operand. Three spellings, and the enum covers
+// all of them: `, lsl #3` for an immediate amount, `, lsl r3` when the count
+// comes from a register (Shift_Type.LSL_REG..ROR_REG keep the Rs index in
+// shift_amt), and a bare `, rrx`, which takes no amount at all.
+//
+// SHIFT_NAMES only holds LSL..RRX, so the register-shifted variants have to be
+// folded back onto it. Indexing it with the raw enum value ran off the end --
+// LSL_REG is 6 against a 5-entry table -- and crashed the printer outright.
+@(private="file")
+write_shift :: proc(sb: ^strings.Builder, st: Shift_Type, amt: u8) {
+	switch st {
+	case .LSL, .LSR, .ASR, .ROR:
+		if amt == 0 {
+			return
+		}
+		fmt.sbprintf(sb, ", %s #%d", SHIFT_NAMES[int(st)], amt)
+	case .RRX:
+		strings.write_string(sb, ", rrx")
+	case .NONE:
+		// no shift to print
+	case .LSL_REG, .LSR_REG, .ASR_REG, .ROR_REG:
+		fmt.sbprintf(sb, ", %s %s", SHIFT_NAMES[int(st) - int(Shift_Type.LSL_REG)], GPR_NAMES[amt & 0xF])
+	}
+}
+
 @(private="file")
 write_data_type :: proc(sb: ^strings.Builder, dt: Data_Types, uppercase: bool) {
 	for d in dt {
@@ -503,9 +528,7 @@ write_operand :: proc(
 		return
 	case .REGISTER:
 		write_register(sb, op.reg)
-		if op.shift_type != .NONE && op.shift_type != .RRX && op.shift_amt > 0 {
-			fmt.sbprintf(sb, ", %s #%d", SHIFT_NAMES[int(op.shift_type)], op.shift_amt)
-		}
+		write_shift(sb, op.shift_type, op.shift_amt)
 		if op.lane != 0 {
 			fmt.sbprintf(sb, "[%d]", op.lane)
 		}
@@ -538,9 +561,7 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 			strings.write_string(sb, ", ")
 			if m.sign < 0 { strings.write_string(sb, "-") }
 			write_register(sb, m.index)
-			if m.shift_type != .NONE && m.shift_amt > 0 {
-				fmt.sbprintf(sb, ", %s #%d", SHIFT_NAMES[int(m.shift_type)], m.shift_amt)
-			}
+			write_shift(sb, m.shift_type, m.shift_amt)
 			strings.write_string(sb, "]")
 		case .PRE_INDEX:
 			strings.write_string(sb, ", ")

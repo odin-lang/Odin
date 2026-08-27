@@ -956,7 +956,7 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.PLDW, {.MEM, .NONE, .NONE, .NONE}, {.MEM_IMM12_OFFSET, .NONE, .NONE, .NONE}, 0xF830F000, 0xFFF0F000, .V7, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.PLI = {
-		{.PLI, {.MEM, .NONE, .NONE, .NONE}, {.MEM_IMM12_OFFSET, .NONE, .NONE, .NONE}, 0xF4D0F000, 0xFF70F000, .V7, .A32, {cond_in_28=false}, {}},
+		{.PLI, {.MEM, .NONE, .NONE, .NONE}, {.MEM_IMM12_OFFSET, .NONE, .NONE, .NONE}, 0xF450F000, 0xFF70F000, .V7, .A32, {cond_in_28=false}, {}},
 		// T32 PLI imm12: 0xF990F000
 		{.PLI, {.MEM, .NONE, .NONE, .NONE}, {.MEM_IMM12_OFFSET, .NONE, .NONE, .NONE}, 0xF990F000, 0xFFF0F000, .V7, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
@@ -973,13 +973,13 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	// We split into three variants per direction: imm-offset, pre-index, post-index.
 	.LDR = {
 		// LDR imm12 offset: P=1 W=0
-		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05900000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05100000, 0x0F700000, .BASE, .A32, {}, {}},
 		// LDR imm12 pre-index: P=1 W=1
-		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05B00000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05300000, 0x0F700000, .BASE, .A32, {}, {}},
 		// LDR imm12 post-index: P=0 W=0
-		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04900000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04100000, 0x0F700000, .BASE, .A32, {}, {}},
 		// LDR reg offset: cond 011 P U 0 W 1 Rn Rt shift_imm shift_type 0 Rm
-		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07900000, 0x0F700010, .BASE, .A32, {}, {}},
+		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07100000, 0x0F700010, .BASE, .A32, {}, {}},
 		// T16 Format 6 LDR PC-relative: 01001 Rd imm8 (LDR Rd, [PC, #imm8 << 2])
 		{.LDR, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_HI, .MEM_LITERAL, .NONE, .NONE}, 0x00004800, 0x0000F800, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T16 Format 7 LDR reg-offset: 0101 100 Rm Rb Rd
@@ -996,10 +996,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LDR, {.GPR, .MEM, .NONE, .NONE}, {.RT_T32, .MEM_LITERAL, .NONE, .NONE}, 0xF85F0000, 0xFF7F0000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.STR = {
-		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05800000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05A00000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04800000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07800000, 0x0F700010, .BASE, .A32, {}, {}},
+		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05000000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05200000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04000000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07000000, 0x0F700010, .BASE, .A32, {}, {}},
 		// T16 Format 7 STR reg-offset: 0101 000 Rm Rb Rd
 		{.STR, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_LO, .MEM_REG_OFFSET, .NONE, .NONE}, 0x00005000, 0x0000FE00, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T16 Format 9 STR imm5: 01100 imm5 Rb Rd  (offset = imm5 << 2)
@@ -1012,10 +1012,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.STR, {.GPR, .MEM, .NONE, .NONE}, {.RT_T32, .MEM_REG_OFFSET, .NONE, .NONE}, 0xF8400000, 0xFFF00FC0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.LDRB = {
-		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05D00000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05F00000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04D00000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07D00000, 0x0F700010, .BASE, .A32, {}, {}},
+		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05500000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05700000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04500000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07500000, 0x0F700010, .BASE, .A32, {}, {}},
 		// T16 Format 7 LDRB reg-offset: 0101 110 Rm Rb Rd
 		{.LDRB, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_LO, .MEM_REG_OFFSET, .NONE, .NONE}, 0x00005C00, 0x0000FE00, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T16 Format 9 LDRB imm5: 01111 imm5 Rb Rd
@@ -1025,10 +1025,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LDRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_T32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0xF8100000, 0xFFF00FC0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.STRB = {
-		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05C00000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05E00000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04C00000, 0x0F700000, .BASE, .A32, {}, {}},
-		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07C00000, 0x0F700010, .BASE, .A32, {}, {}},
+		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM12_OFFSET, .NONE, .NONE}, 0x05400000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,    .NONE, .NONE}, 0x05600000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,   .NONE, .NONE}, 0x04400000, 0x0F700000, .BASE, .A32, {}, {}},
+		{.STRB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0x07400000, 0x0F700010, .BASE, .A32, {}, {}},
 		// T16 Format 7 STRB reg-offset: 0101 010 Rm Rb Rd
 		{.STRB, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_LO, .MEM_REG_OFFSET, .NONE, .NONE}, 0x00005400, 0x0000FE00, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T16 Format 9 STRB imm5: 01110 imm5 Rb Rd
@@ -1042,11 +1042,11 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	//   where op2 = 01 (halfword), 10 (signed byte), 11 (signed half / doubleword)
 	.LDRH = {
 		// LDRH imm offset (P=1 W=0): cond 000 1 U 1 0 1 Rn Rt imm4H 1011 imm4L
-		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x01D000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x01F000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x00D000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x015000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x017000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x005000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
 		// LDRH reg offset: cond 000 1 U 0 0 1 Rn Rt 0000 1011 Rm
-		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x019000B0, 0x0F700FF0, .BASE, .A32, {}, {}},
+		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x011000B0, 0x0F700FF0, .BASE, .A32, {}, {}},
 		// T16 Format 7 LDRH reg-offset: 0101 101 Rm Rb Rd
 		{.LDRH, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_LO, .MEM_REG_OFFSET, .NONE, .NONE}, 0x00005A00, 0x0000FE00, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T16 Format 10 LDRH imm5: 10001 imm5 Rb Rd (offset = imm5 << 1)
@@ -1056,10 +1056,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LDRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_T32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0xF8300000, 0xFFF00FC0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.STRH = {
-		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x01C000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x01E000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x00C000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x018000B0, 0x0F700FF0, .BASE, .A32, {}, {}},
+		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x014000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x016000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x004000B0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x010000B0, 0x0F700FF0, .BASE, .A32, {}, {}},
 		// T16 Format 7 STRH reg-offset: 0101 001 Rm Rb Rd
 		{.STRH, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_LO, .MEM_REG_OFFSET, .NONE, .NONE}, 0x00005200, 0x0000FE00, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T16 Format 10 STRH imm5: 10000 imm5 Rb Rd
@@ -1069,10 +1069,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.STRH, {.GPR, .MEM, .NONE, .NONE}, {.RT_T32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0xF8200000, 0xFFF00FC0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.LDRSB = {
-		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x01D000D0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x01F000D0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x00D000D0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x019000D0, 0x0F700FF0, .BASE, .A32, {}, {}},
+		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x015000D0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x017000D0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x005000D0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x011000D0, 0x0F700FF0, .BASE, .A32, {}, {}},
 		// T16 Format 7 LDRSB reg-offset: 0101 011 Rm Rb Rd
 		{.LDRSB, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_LO, .MEM_REG_OFFSET, .NONE, .NONE}, 0x00005600, 0x0000FE00, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T32 LDRSB imm12 / reg
@@ -1080,10 +1080,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LDRSB, {.GPR, .MEM, .NONE, .NONE}, {.RT_T32, .MEM_REG_OFFSET,   .NONE, .NONE}, 0xF9100000, 0xFFF00FC0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.LDRSH = {
-		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x01D000F0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x01F000F0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x00D000F0, 0x0F7000F0, .BASE, .A32, {}, {}},
-		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x019000F0, 0x0F700FF0, .BASE, .A32, {}, {}},
+		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x015000F0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x017000F0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x005000F0, 0x0F7000F0, .BASE, .A32, {}, {}},
+		{.LDRSH, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x011000F0, 0x0F700FF0, .BASE, .A32, {}, {}},
 		// T16 Format 7 LDRSH reg-offset: 0101 111 Rm Rb Rd
 		{.LDRSH, {.GPR_LOW, .MEM, .NONE, .NONE}, {.RD_T16_LO, .MEM_REG_OFFSET, .NONE, .NONE}, 0x00005E00, 0x0000FE00, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T32 LDRSH imm12 / reg
@@ -1092,18 +1092,18 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 	.LDRD = {
 		// LDRD imm offset (ARMv5TE+): cond 000 P U 1 W 0 Rn Rt imm4H 1101 imm4L
-		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x01C000D0, 0x0F7000F0, .V5TE, .A32, {}, {}},
-		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x01E000D0, 0x0F7000F0, .V5TE, .A32, {}, {}},
-		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x00C000D0, 0x0F7000F0, .V5TE, .A32, {}, {}},
-		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x018000D0, 0x0F700FF0, .V5TE, .A32, {}, {}},
+		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x014000D0, 0x0F7000F0, .V5TE, .A32, {}, {}},
+		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x016000D0, 0x0F7000F0, .V5TE, .A32, {}, {}},
+		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x004000D0, 0x0F7000F0, .V5TE, .A32, {}, {}},
+		{.LDRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x010000D0, 0x0F700FF0, .V5TE, .A32, {}, {}},
 		// T32 LDRD imm8: high=11101001 X101 Rn  low=Rt Rt2 imm8
 		{.LDRD, {.GPR, .GPR, .MEM, .NONE}, {.RT_T32, .RT2_T32, .RN_T32, .NONE}, 0xE9500000, 0xFE500000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.STRD = {
-		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x01C000F0, 0x0F7000F0, .V5TE, .A32, {}, {}},
-		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x01E000F0, 0x0F7000F0, .V5TE, .A32, {}, {}},
-		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x00C000F0, 0x0F7000F0, .V5TE, .A32, {}, {}},
-		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x018000F0, 0x0F700FF0, .V5TE, .A32, {}, {}},
+		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_IMM8_OFFSET, .NONE, .NONE}, 0x014000F0, 0x0F7000F0, .V5TE, .A32, {}, {}},
+		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_PRE_INDEX,   .NONE, .NONE}, 0x016000F0, 0x0F7000F0, .V5TE, .A32, {}, {}},
+		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX,  .NONE, .NONE}, 0x004000F0, 0x0F7000F0, .V5TE, .A32, {}, {}},
+		{.STRD, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_REG_OFFSET,  .NONE, .NONE}, 0x010000F0, 0x0F700FF0, .V5TE, .A32, {}, {}},
 		// T32 STRD imm8: high=11101001 X100 Rn  low=Rt Rt2 imm8
 		{.STRD, {.GPR, .GPR, .MEM, .NONE}, {.RT_T32, .RT2_T32, .RN_T32, .NONE}, 0xE9400000, 0xFE500000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
@@ -1119,31 +1119,18 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08900000, 0x0FD00000, .BASE, .A32, {}, {}},
 		// LDMIA writeback (LDM Rn!, {reglist}): W=1
 		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08B00000, 0x0FD00000, .BASE, .A32, {}, {}},
-		// LDMIB
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09900000, 0x0FD00000, .BASE, .A32, {}, {}},
-		// LDMDA
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08100000, 0x0FD00000, .BASE, .A32, {}, {}},
-		// LDMDB
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09100000, 0x0FD00000, .BASE, .A32, {}, {}},
 		// T16 Format 15 LDMIA: 11001 Rb reg_list8
 		{.LDM, {.GPR_LOW, .GPR_LIST, .NONE, .NONE}, {.RD_T16_HI, .A32_REG_LIST, .NONE, .NONE}, 0x0000C800, 0x0000F800, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T32 LDMIA: high=11101000 1001 Rn  low=PM 0 reg_list14
 		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE8900000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
-		// T32 LDMDB: high=11101001 0001 Rn  low=PM 0 reg_list14
-		{.LDM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9100000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.STM = {
 		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08800000, 0x0FD00000, .BASE, .A32, {}, {}},
 		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08A00000, 0x0FD00000, .BASE, .A32, {}, {}},
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09800000, 0x0FD00000, .BASE, .A32, {}, {}},
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08000000, 0x0FD00000, .BASE, .A32, {}, {}},
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09000000, 0x0FD00000, .BASE, .A32, {}, {}},
 		// T16 Format 15 STMIA: 11000 Rb reg_list8
 		{.STM, {.GPR_LOW, .GPR_LIST, .NONE, .NONE}, {.RD_T16_HI, .A32_REG_LIST, .NONE, .NONE}, 0x0000C000, 0x0000F800, .THUMB, .T32, {cond_in_28=false}, {}},
 		// T32 STMIA: 0xE8800000
 		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE8800000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
-		// T32 STMDB: 0xE9000000
-		{.STM, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9000000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 
 	// PUSH / POP are conventional aliases for STMDB SP! / LDMIA SP!
@@ -1389,8 +1376,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// MVE FP vector + scalar
 		{.VFMA, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xEF000C50, 0xEFA10F51, .MVE_FP, .T32, {thumb32=true, cond_in_28=false}, {.F32, .NONE}},
 		{.VFMA, {.QPR, .QPR, .GPR, .NONE}, {.VD_Q, .VN_Q, .RM_T32, .NONE}, 0xEE310E40, 0xEFB10F51, .MVE_FP, .T32, {thumb32=true, cond_in_28=false}, {.F32, .NONE}},
-		{.VFMA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A000C0, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VFMA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A000C0, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VFMA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00040, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VFMA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00040, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VFMA, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFC300850, 0xFFB00F50, .BF16, .A32, {cond_in_28=false}, {.BF16, .NONE}},
 	},
 	.VFMS = {
@@ -1403,8 +1390,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VFMS, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2200C50, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.F32, .NONE}},
 		// MVE FP vector
 		{.VFMS, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xEF200C50, 0xEFA10F51, .MVE_FP, .T32, {thumb32=true, cond_in_28=false}, {.F32, .NONE}},
-		{.VFMS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A004C0, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VFMS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A004C0, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VFMS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00440, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VFMS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00440, 0xFFB00F50, .VFPV4, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	.VFNMS = {
 		{.VFNMS, {.SPR, .SPR, .SPR, .NONE}, {.VD_S, .VN_S, .VM_S, .NONE}, 0x0E900A00, 0x0FB00B50, .VFPV4, .A32, {}, {.F32, .NONE}},
@@ -1756,9 +1743,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// Integer Q-form .I16/.I32 (bit 24 = 1)
 		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// FP .F32 D-form / Q-form (F=1, size=10)
-		{.VMUL, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A008C0, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A008C0, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	// ---- VMLA / VMLS (integer + F32) ----
 	.VMLA = {
@@ -1782,9 +1766,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// FP .F32 (F=1)
-		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A000C0, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A000C0, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	.VMLS = {
 		{.VMLS, {.SPR, .SPR, .SPR, .NONE}, {.VD_S, .VN_S, .VM_S, .NONE}, 0x0E000A40, 0x0FB00B50, .VFPV2, .A32, {}, {.F32, .NONE}},
@@ -1805,9 +1786,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// FP .F32
-		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A004C0, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A004C0, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	// ---- VAND / VBIC / VORR / VORN / VEOR (bitwise, no size variants) ----
 	.VAND = {
@@ -2102,9 +2080,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.VSHR = {
 		{.VSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800010, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800050, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		// unsigned
-		{.VSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF3800010, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF3800050, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		// MVE imm form (imm6 at bits 21:16)
 		{.VSHR, {.QPR, .QPR, .IMM5, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xEF800050, 0xEF800F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.I32, .NONE}},
 	},
@@ -2112,8 +2087,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.VSRA = {
 		{.VSRA, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800110, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VSRA, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800150, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VSRA, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF3800110, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VSRA, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF3800150, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		// MVE (imm6 at bits 21:16)
 		{.VSRA, {.QPR, .QPR, .IMM5, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xEF800150, 0xEF800F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.I32, .NONE}},
 	},
@@ -2144,19 +2117,17 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.VRSHR = {
 		{.VRSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800210, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		{.VRSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800250, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VRSHR, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF3800210, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VRSHR, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF3800250, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		// MVE
 		{.VRSHR, {.QPR, .QPR, .IMM5, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xEF800250, 0xEF800F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.I32, .NONE}},
 	},
 	// VSLI / VSRI (shift left/right and insert)
 	.VSLI = {
-		{.VSLI, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF3800510, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VSLI, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF3800550, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VSLI, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800510, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VSLI, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800550, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	.VSRI = {
-		{.VSRI, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF3800410, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VSRI, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF3800450, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VSRI, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800410, 0xFE800F10, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VSRI, {.QPR, .QPR, .IMM, .NONE}, {.VD_Q, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800450, 0xFE800F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 
 	// ---- VABS / VNEG / VMVN / VCNT / VCLZ / VCLS (NEON unary) ----
@@ -2549,7 +2520,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// VSHLL.S<sz> Q, D, #imm: 1111 0010 1 D imm6 Vd 1010 0 0 M 1 Vm
 		//   imm6 encodes sh + size: 001sss for sh<8, 01sss for sh<16, 1sss for sh<32
 		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800A10, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF3800A10, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},   // U=1
 		// VSHLL by max (#size) variant: 1111 0011 1 D 11 size 10 Vd 0011 0 0 M 0 Vm
 		{.VSHLL, {.QPR, .DPR, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3B20300, 0xFFB30FD0, .NEON, .A32, {cond_in_28=false}, {.I8, .NONE}},
 		{.VSHLL, {.QPR, .DPR, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3B60300, 0xFFB30FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
@@ -2566,12 +2536,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.VQSHRN = {
 		// signed: 1111 0010 1 D imm6 Vd 1001 0 0 M 1 Vm; unsigned: U=1
 		{.VQSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800910, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VQSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF3800910, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 	},
 	.VQRSHRN = {
 		// 1111 0010 1 D imm6 Vd 1001 0 1 M 1 Vm
 		{.VQRSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF2800950, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VQRSHRN, {.DPR, .QPR, .IMM, .NONE}, {.VD_D, .VM_Q, .NEON_SHIFT_IMM6, .NONE}, 0xF3800950, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 	},
 	.VQSHRUN = {
 		// signed input, unsigned saturating shift right narrow:
@@ -3573,14 +3541,14 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 
 	// Unprivileged (translate) post-indexed loads/stores: the post-index form
 	// with the W bit (21) set. Word/byte use imm12, half/signed use imm8 split.
-	.LDRT   = { {.LDRT,   {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04B00000, 0x0F700000, .BASE, .A32, {}, {}} },
-	.LDRBT  = { {.LDRBT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04F00000, 0x0F700000, .BASE, .A32, {}, {}} },
-	.STRT   = { {.STRT,   {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04A00000, 0x0F700000, .BASE, .A32, {}, {}} },
-	.STRBT  = { {.STRBT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04E00000, 0x0F700000, .BASE, .A32, {}, {}} },
-	.LDRHT  = { {.LDRHT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000B0, 0x0F7000F0, .BASE, .A32, {}, {}} },
-	.STRHT  = { {.STRHT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00E000B0, 0x0F7000F0, .BASE, .A32, {}, {}} },
-	.LDRSBT = { {.LDRSBT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000D0, 0x0F7000F0, .BASE, .A32, {}, {}} },
-	.LDRSHT = { {.LDRSHT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x00F000F0, 0x0F7000F0, .BASE, .A32, {}, {}} },
+	.LDRT   = { {.LDRT,   {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04300000, 0x0F700000, .BASE, .A32, {}, {}} },
+	.LDRBT  = { {.LDRBT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04700000, 0x0F700000, .BASE, .A32, {}, {}} },
+	.STRT   = { {.STRT,   {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04200000, 0x0F700000, .BASE, .A32, {}, {}} },
+	.STRBT  = { {.STRBT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x04600000, 0x0F700000, .BASE, .A32, {}, {}} },
+	.LDRHT  = { {.LDRHT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x007000B0, 0x0F7000F0, .BASE, .A32, {}, {}} },
+	.STRHT  = { {.STRHT,  {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x006000B0, 0x0F7000F0, .BASE, .A32, {}, {}} },
+	.LDRSBT = { {.LDRSBT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x007000D0, 0x0F7000F0, .BASE, .A32, {}, {}} },
+	.LDRSHT = { {.LDRSHT, {.GPR, .MEM, .NONE, .NONE}, {.RT_A32, .MEM_POST_INDEX, .NONE, .NONE}, 0x007000F0, 0x0F7000F0, .BASE, .A32, {}, {}} },
 
 	// NEON rounding shift-right-accumulate (imm); FP reciprocal/rsqrt estimate;
 	// FP pairwise add; VFP convert-to-integer using the FPSCR rounding mode.
@@ -3748,5 +3716,25 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VQRSHL, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VM_Q, .VN_Q, .NONE}, 0xF3300550, 0xFFB11F51, .NEON, .A32, {cond_in_28=false}, {.U64, .NONE}},
 	},
 	// SPECGEN:END
+	.LDMIB = {
+		{.LDMIB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09900000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.LDMDA = {
+		{.LDMDA, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08100000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.LDMDB = {
+		{.LDMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09100000, 0x0FD00000, .BASE, .A32, {}, {}},
+		{.LDMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9100000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+	},
+	.STMIB = {
+		{.STMIB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09800000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.STMDA = {
+		{.STMDA, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x08000000, 0x0FD00000, .BASE, .A32, {}, {}},
+	},
+	.STMDB = {
+		{.STMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_A32, .A32_REG_LIST, .NONE, .NONE}, 0x09000000, 0x0FD00000, .BASE, .A32, {}, {}},
+		{.STMDB, {.GPR, .GPR_LIST, .NONE, .NONE}, {.RN_T32, .A32_REG_LIST, .NONE, .NONE}, 0xE9000000, 0xFFD00000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+	},
 }
 

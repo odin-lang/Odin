@@ -604,6 +604,18 @@ inst_ldm_r_list            :: #force_inline proc "contextless" (dst: Register, r
 emit_ldm_r_list            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_ldm_r_list(dst, regs)) }
 inst_stm_r_list            :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .STM, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
 emit_stm_r_list            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_stm_r_list(dst, regs)) }
+inst_ldmib_r_list          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .LDMIB, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_ldmib_r_list          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_ldmib_r_list(dst, regs)) }
+inst_ldmda_r_list          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .LDMDA, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_ldmda_r_list          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_ldmda_r_list(dst, regs)) }
+inst_ldmdb_r_list          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .LDMDB, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_ldmdb_r_list          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_ldmdb_r_list(dst, regs)) }
+inst_stmib_r_list          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .STMIB, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_stmib_r_list          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_stmib_r_list(dst, regs)) }
+inst_stmda_r_list          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .STMDA, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_stmda_r_list          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_stmda_r_list(dst, regs)) }
+inst_stmdb_r_list          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .STMDB, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_stmdb_r_list          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_stmdb_r_list(dst, regs)) }
 inst_push_list             :: #force_inline proc "contextless" (regs: u16) -> Instruction { return Instruction{mnemonic = .PUSH, operand_count = 1, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), {}, {}, {}}} }
 emit_push_list             :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16) { append(instructions, inst_push_list(regs)) }
 inst_pop_list              :: #force_inline proc "contextless" (regs: u16) -> Instruction { return Instruction{mnemonic = .POP, operand_count = 1, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), {}, {}, {}}} }
@@ -1891,6 +1903,18 @@ inst_ldm                        :: inst_ldm_r_list
 emit_ldm                        :: emit_ldm_r_list
 inst_stm                        :: inst_stm_r_list
 emit_stm                        :: emit_stm_r_list
+inst_ldmib                      :: inst_ldmib_r_list
+emit_ldmib                      :: emit_ldmib_r_list
+inst_ldmda                      :: inst_ldmda_r_list
+emit_ldmda                      :: emit_ldmda_r_list
+inst_ldmdb                      :: inst_ldmdb_r_list
+emit_ldmdb                      :: emit_ldmdb_r_list
+inst_stmib                      :: inst_stmib_r_list
+emit_stmib                      :: emit_stmib_r_list
+inst_stmda                      :: inst_stmda_r_list
+emit_stmda                      :: emit_stmda_r_list
+inst_stmdb                      :: inst_stmdb_r_list
+emit_stmdb                      :: emit_stmdb_r_list
 inst_push                       :: inst_push_list
 emit_push                       :: emit_push_list
 inst_pop                        :: inst_pop_list

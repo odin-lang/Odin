@@ -71,10 +71,13 @@ local CANON_SUF = {
 	"_II","_IR","_RI","_RR","_X2","_X4","_SR","_ER","_ZA",
 	"_Z","_P","_V","_H","_S","_D","_B","_3","_4",
 }
-local CANON_KEEP = { B_COND=true, BC_COND=true }
+-- A conditional branch is one mnemonic per condition (B_LE -> `b.le`), so
+-- nothing about those names should be canonicalized away.
+local function is_cond_branch(name) return name:match("^BC?_%u%u$") ~= nil end
+local CANON_KEEP = {}
 local CANON_RENAME = { LSLV="LSL", LSRV="LSR", ASRV="ASR", RORV="ROR" }
 local function canon(name)
-	if CANON_KEEP[name] then return name end
+	if CANON_KEEP[name] or is_cond_branch(name) then return name end
 	for _, k in ipairs({"DC_","IC_","AT_","TLBI_","BTI_","PSB_","TSB_"}) do
 		if name:sub(1, #k) == k then return name end
 	end

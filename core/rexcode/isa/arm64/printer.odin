@@ -115,13 +115,6 @@ sbprint :: proc(
 
 		write_full_mnemonic(sb, inst, opts.uppercase)
 
-		// B.cond / BC.cond fold the condition into the mnemonic (b.eq), so the
-		// operand carrying it must not be printed a second time.
-		start_slot := 0
-		if (inst.mnemonic == .B_COND || inst.mnemonic == .BC_COND) &&
-		   inst.operand_count >= 1 && inst.ops[0].kind == .COND {
-			start_slot = 1
-		}
 
 		// MOVZ/MOVN/MOVK store the shift as an hw index (0..3 = LSL #0/16/32/48),
 		// which assemblers write as `lsl #16` and omit entirely when it is zero.
@@ -131,10 +124,10 @@ sbprint :: proc(
 			end_slot = 2
 		}
 
-		if end_slot > start_slot {
+		if end_slot > 0 {
 			strings.write_byte(sb, ' ')
-			for slot in start_slot..<end_slot {
-				if slot > start_slot {
+			for slot in 0..<end_slot {
+				if slot > 0 {
 					strings.write_byte(sb, ',')
 					if opts.space_after_comma { strings.write_byte(sb, ' ') }
 				}
@@ -287,32 +280,11 @@ wprintln :: proc(
 // Internal writers
 // =============================================================================
 
-// write_full_mnemonic handles the two mnemonics whose printed spelling is not
-// just the enum name: B_COND / BC_COND carry the condition in the mnemonic
-// itself (`b.eq`, `bc.ne`) rather than as a printed operand.
-
+// Every mnemonic now prints straight from its name -- the conditional
+// branches carry their condition in the name (B_LE -> `b.le`), so there is
+// no operand to fold in.
 @(private="file")
 write_full_mnemonic :: proc(sb: ^strings.Builder, inst: ^Instruction, uppercase: bool) {
-	// B_COND / BC_COND -> `b.<cond>` / `bc.<cond>` from the first operand.
-	if (inst.mnemonic == .B_COND || inst.mnemonic == .BC_COND) && inst.operand_count >= 1 && inst.ops[0].kind == .COND {
-		if inst.mnemonic == .BC_COND {
-			strings.write_string(sb, uppercase ? "BC." : "bc.")
-		} else {
-			strings.write_string(sb, uppercase ? "B." : "b.")
-		}
-		c := inst.ops[0].cond & 0xF
-		cn := COND_NAMES[c]
-		if uppercase {
-			for i in 0..<len(cn) {
-				ch := cn[i]
-				if ch >= 'a' && ch <= 'z' { strings.write_byte(sb, ch - 32) } else { strings.write_byte(sb, ch) }
-			}
-		} else {
-			strings.write_string(sb, cn)
-		}
-		return
-	}
-
 	write_mnemonic(sb, inst.mnemonic, uppercase)
 }
 
@@ -329,18 +301,28 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 	// underscore is kept: AMX_LDX is an undocumented Apple coprocessor op
 	// with no assembler spelling at all, and printing it `amx ldx` would
 	// imply a two-token syntax that does not exist.
-	split := -1
+	split, sep := -1, byte(' ')
 	for prefix in ([]string{"DC_", "IC_", "AT_", "TLBI_", "BTI_", "PSB_", "TSB_"}) {
 		if len(name) > len(prefix) && name[:len(prefix)] == prefix {
 			split = len(prefix) - 1
 			break
 		}
 	}
+	// Conditional branches spell the separator as a dot: B_LE -> `b.le`.
+	// BC_ is checked first, since it also starts with B.
+	if split < 0 {
+		for prefix in ([]string{"BC_", "B_"}) {
+			if len(name) > len(prefix) && name[:len(prefix)] == prefix {
+				split, sep = len(prefix) - 1, '.'
+				break
+			}
+		}
+	}
 
 	for i in 0..<len(name) {
 		c := name[i]
 		if i == split {
-			strings.write_byte(sb, ' ')
+			strings.write_byte(sb, sep)
 		} else if !uppercase && c >= 'A' && c <= 'Z' {
 			strings.write_byte(sb, c + 32)
 		} else {

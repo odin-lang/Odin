@@ -118,8 +118,10 @@ inst_branch :: #force_inline proc "contextless" (m: Mnemonic, label_id: u32) -> 
 					   ops = {op_label(label_id, 4), {}, {}, {}}}
 }
 
-// NOTE: inst_b_cond / inst_cbz (+cbnz) / inst_tbz (+tbnz) /
-// inst_csel (+csinc/csinv/csneg) are now generated per-mnemonic in
-// mnemonic_builders.odin (e.g. inst_cbz(rt, label), inst_cbnz(rt, label),
-// inst_csinc(rd, rn, rm, cond)). They are no longer hand-written here so the
-// generator can own those names for full mnemonic coverage.
+// NOTE: the conditional branches, inst_cbz (+cbnz), inst_tbz (+tbnz) and
+// inst_csel (+csinc/csinv/csneg) are generated per-mnemonic in
+// mnemonic_builders.odin, so the generator owns those names. A conditional
+// branch is one builder per condition -- inst_b_le(label), inst_bc_ne(label)
+// -- because the condition is part of the mnemonic, not an operand; the
+// condition-operand builders are the select/compare family, which really do
+// take one (inst_csinc(rd, rn, rm, cond)).

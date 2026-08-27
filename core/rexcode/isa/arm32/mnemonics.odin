@@ -190,7 +190,13 @@ Mnemonic :: enum u16 {
 	LDAEXD, STLEXD,
 
 	// Block move
-	LDM,    STM,                           // base mnemonic w/ IA/IB/DA/DB suffix flag
+	LDM,    STM,                           // IA order (the default spelling)
+	// The other three increment/decrement orders are their own mnemonics --
+	// that is how an assembler spells them, and it is the only way to reach
+	// their encodings: all four share one operand shape, so nothing else
+	// tells them apart.
+	LDMIB,  LDMDA,  LDMDB,
+	STMIB,  STMDA,  STMDB,
 
 	// Stack convenience aliases
 	PUSH,   POP,
