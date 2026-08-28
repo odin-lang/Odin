@@ -1372,9 +1372,15 @@ emit_bcax_zd_zd_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Inst
 inst_rax1_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .RAX1, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}, {}}} }
 emit_rax1_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_rax1_v2d_v2d_v2d(dst, src, src2)) }
 inst_xar_v2d_v2d_v2d_i        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), op_imm(imm, 1), {}}} }
-inst_xar_z_z_z_i              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_reg(Register(REG_Z | (u16(rz3) & 0x1F))), op_imm(imm, 4), {}}} }
+inst_xar_zd_zd_zd_i           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_imm(imm, 4), {}}} }
+inst_xar_zs_zs_zs_i           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), op_imm(imm, 4), {}}} }
+inst_xar_zh_zh_zh_i           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), op_imm(imm, 4), {}}} }
+inst_xar_zb_zb_zb_i           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 4), {}}} }
 emit_xar_v2d_v2d_v2d_i        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_xar_v2d_v2d_v2d_i(dst, src, src2, imm)) }
-emit_xar_z_z_z_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_xar_z_z_z_i(rz, rz2, rz3, imm)) }
+emit_xar_zd_zd_zd_i           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_xar_zd_zd_zd_i(rz, rz2, rz3, imm)) }
+emit_xar_zs_zs_zs_i           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_xar_zs_zs_zs_i(rz, rz2, rz3, imm)) }
+emit_xar_zh_zh_zh_i           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_xar_zh_zh_zh_i(rz, rz2, rz3, imm)) }
+emit_xar_zb_zb_zb_i           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_xar_zb_zb_zb_i(rz, rz2, rz3, imm)) }
 inst_sm3partw1_v4s_v4s_v4s    :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SM3PARTW1, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}, {}}} }
 emit_sm3partw1_v4s_v4s_v4s    :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sm3partw1_v4s_v4s_v4s(dst, src, src2)) }
 inst_sm3partw2_v4s_v4s_v4s    :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SM3PARTW2, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}, {}}} }
@@ -5240,8 +5246,8 @@ inst_bcax                          :: proc{ inst_bcax_v16b_v16b_v16b_v16b, inst_
 emit_bcax                          :: proc{ emit_bcax_v16b_v16b_v16b_v16b, emit_bcax_zd_zd_zd_zd }
 inst_rax1                          :: inst_rax1_v2d_v2d_v2d
 emit_rax1                          :: emit_rax1_v2d_v2d_v2d
-inst_xar                           :: proc{ inst_xar_v2d_v2d_v2d_i, inst_xar_z_z_z_i }
-emit_xar                           :: proc{ emit_xar_v2d_v2d_v2d_i, emit_xar_z_z_z_i }
+inst_xar                           :: proc{ inst_xar_v2d_v2d_v2d_i, inst_xar_zd_zd_zd_i }
+emit_xar                           :: proc{ emit_xar_v2d_v2d_v2d_i, emit_xar_zd_zd_zd_i }
 inst_sm3partw1                     :: inst_sm3partw1_v4s_v4s_v4s
 emit_sm3partw1                     :: emit_sm3partw1_v4s_v4s_v4s
 inst_sm3partw2                     :: inst_sm3partw2_v4s_v4s_v4s

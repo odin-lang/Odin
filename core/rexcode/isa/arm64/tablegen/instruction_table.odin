@@ -1749,7 +1749,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	},
 	.XAR = {
 		{{.XAR,            {.V_2D,    .V_2D,    .V_2D,    .IMM_6, .NONE},     {.VD, .VN, .VM, .IMM6, .NONE},          0xCE800000, 0xFFE00000, .CRYPTO, {}},      Clobber{written={0}, read={1, 2}}},
-		{{.XAR,            {.Z_REG_ANY, .Z_REG_ANY, .Z_REG_ANY, .VEC_SHIFT, .NONE}, {.VD_TSZ, .VD_TSZ, .VN_TSZ, .SVE_XAR_SHIFT, .NONE}, 0x04203400, 0xFF20FC00, .SVE2,   {}}, Clobber{written={0}, read={1, 2}}},
+		{{.XAR,            {.Z_REG_D, .Z_REG_D, .Z_REG_D, .VEC_SHIFT, .NONE}, {.VD_TSZ, .VD_TSZ, .VN_TSZ, .SVE_XAR_SHIFT, .NONE}, 0x04A03400, 0xFFA0FC00, .SVE2,   {}}, Clobber{written={0}, read={1, 2}}},
+		{{.XAR,            {.Z_REG_S, .Z_REG_S, .Z_REG_S, .VEC_SHIFT, .NONE}, {.VD_TSZ, .VD_TSZ, .VN_TSZ, .SVE_XAR_SHIFT, .NONE}, 0x04603400, 0xFFE0FC00, .SVE2,   {}}, Clobber{written={0}, read={1, 2}}},
+		{{.XAR,            {.Z_REG_H, .Z_REG_H, .Z_REG_H, .VEC_SHIFT, .NONE}, {.VD_TSZ, .VD_TSZ, .VN_TSZ, .SVE_XAR_SHIFT, .NONE}, 0x04303400, 0xFFF0FC00, .SVE2,   {}}, Clobber{written={0}, read={1, 2}}},
+		{{.XAR,            {.Z_REG_B, .Z_REG_B, .Z_REG_B, .VEC_SHIFT, .NONE}, {.VD_TSZ, .VD_TSZ, .VN_TSZ, .SVE_XAR_SHIFT, .NONE}, 0x04283400, 0xFFF8FC00, .SVE2,   {}}, Clobber{written={0}, read={1, 2}}},
 	},
 	.SM3PARTW1 = {
 		{{.SM3PARTW1,      {.V_4S, .V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0xCE60C000, 0xFFE0FC00, .CRYPTO, {}}, Clobber{written={0}, read={0, 1, 2}}},
