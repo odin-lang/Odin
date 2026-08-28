@@ -592,15 +592,19 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 			if m.sign < 0 { strings.write_string(sb, "-") }
 			write_register(sb, m.index)
 		}
-	} else if m.disp != 0 {
-		// Immediate offset
+	} else {
+		// An indexed form writes its displacement even when it is zero: the
+		// writeback is the point, and `[r0]` alone is the plain offset form.
 		switch m.mode {
-		case .OFFSET:    fmt.sbprintf(sb, ", #%d]", m.disp)
-		case .PRE_INDEX: fmt.sbprintf(sb, ", #%d]!", m.disp)
+		case .OFFSET:
+			if m.disp != 0 {
+				fmt.sbprintf(sb, ", #%d]", m.disp)
+			} else {
+				strings.write_string(sb, "]")
+			}
+		case .PRE_INDEX:  fmt.sbprintf(sb, ", #%d]!", m.disp)
 		case .POST_INDEX: fmt.sbprintf(sb, "], #%d", m.disp)
 		}
-	} else {
-		strings.write_string(sb, "]")
 	}
 }
 

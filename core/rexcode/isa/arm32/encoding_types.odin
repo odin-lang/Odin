@@ -352,6 +352,13 @@ Operand_Encoding :: enum u8 {
 
 	// ---- Memory addressing composites ----
 	MEM_IMM12_OFFSET,      // [Rn, #±imm12]
+	// The halfword and dual load/stores split their 8-bit offset around the
+	// opcode at bits 7:4, so they cannot use the 12-bit forms below.
+	// LDRD/STRD name a register pair, and the second is always the first plus
+	// one, so it occupies no bits of its own.
+	RT2_A32_PAIR,
+	MEM_IMM8_PRE_INDEX,
+	MEM_IMM8_POST_INDEX,
 	MEM_IMM8_OFFSET,       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
 	MEM_REG_OFFSET,        // [Rn, ±Rm{, shift}]
 	MEM_PRE_INDEX,         // [Rn, #imm]! / [Rn, ±Rm]!

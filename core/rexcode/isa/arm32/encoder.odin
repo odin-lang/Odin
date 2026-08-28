@@ -519,7 +519,9 @@ pack_operand_inline :: #force_inline proc(
 		u_bit: u32 = m.disp >= 0 ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
-	case .MEM_IMM8_OFFSET:
+	case .RT2_A32_PAIR:
+		return 0
+	case .MEM_IMM8_PRE_INDEX, .MEM_IMM8_POST_INDEX, .MEM_IMM8_OFFSET:
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
 		u_bit: u32 = m.disp >= 0 ? 1 : 0

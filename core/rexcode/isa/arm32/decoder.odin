@@ -560,6 +560,18 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	// PRE_INDEX and POST_INDEX wrap MEM_IMM12_OFFSET: same field layout but the
 	// addressing mode flag is set differently. We reconstruct the full Memory
 	// operand here (base, disp, sign, mode).
+	case .RT2_A32_PAIR:
+		return op_reg(Register(REG_GPR | u16(((word >> 12) + 1) & 0xF)))
+	case .MEM_IMM8_PRE_INDEX:
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
+		if (word >> 23) & 1 == 0 { disp = -disp }
+		return op_mem(mem_imm_pre(base, disp))
+	case .MEM_IMM8_POST_INDEX:
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
+		if (word >> 23) & 1 == 0 { disp = -disp }
+		return op_mem(mem_imm_post(base, disp))
 	case .MEM_PRE_INDEX:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
