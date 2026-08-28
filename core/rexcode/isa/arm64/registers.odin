@@ -36,6 +36,7 @@ REG_Z    :: 0x0B00   // Z0..Z31 SVE scalable vector (low 128 aliased with V)
 REG_P    :: 0x0C00   // P0..P15 SVE predicate
 REG_PN   :: 0x0D00   // PN8..PN15 SME2 predicate-as-counter
 REG_ZT   :: 0x0E00   // ZT0, the SME2 lookup table
+REG_ZA   :: 0x0F00   // ZA0..ZA15, SME's accumulator tiles
 
 NONE :: Register(0xFFFF)
 

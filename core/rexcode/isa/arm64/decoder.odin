@@ -261,7 +261,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		v := ((word >> 16) & 0x1F) << 3 | ((word >> 10) & 0x7)
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
 	case .ZA_TILE_LOW:
-		return Operand{immediate = i64(word & 0x7), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16(word & 0x7)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .NEON_LANE_B:
 		i := ((word >> 30) & 0x1) << 3 | ((word >> 12) & 0x1) << 2 | ((word >> 10) & 0x3)
 		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = LANE_INDEX}
@@ -532,7 +533,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64((word >> 5) & 0x1F), kind = .IMMEDIATE, size = 1}
 
 	// ---- SVE memory operands ----
-	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3:
+	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3,
+	     .SVE_OFFSET_BASE_SS4:
 		base_hw := u8((word >> 5) & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
 		shift: u8 = 0
@@ -540,6 +542,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		case .SVE_OFFSET_BASE_SS1: shift = 1
 		case .SVE_OFFSET_BASE_SS2: shift = 2
 		case .SVE_OFFSET_BASE_SS3: shift = 3
+		case .SVE_OFFSET_BASE_SS4: shift = 4
 		}
 		return Operand{
 			mem = Memory{
@@ -566,13 +569,17 @@ extract_operand_inline :: #force_inline proc "contextless" (
 
 	// ---- SME ZA tile fields ----
 	case .ZA_TILE_NUM_B:
-		return Operand{immediate = 0, kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | 0), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_H:
-		return Operand{immediate = i64((word >> 22) & 0x1), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16((word >> 22) & 0x1)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_S:
-		return Operand{immediate = i64((word >> 22) & 0x3), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16((word >> 22) & 0x3)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_D:
-		return Operand{immediate = i64((word >> 21) & 0x7), kind = .IMMEDIATE, size = 1}
+		return Operand{reg = Register(REG_ZA | u16((word >> 21) & 0x7)), kind = .REGISTER,
+		               size = za_elem_for_type(ot)}
 	case .SME_PATTERN_FIELD:
 		return Operand{immediate = i64((word >> 5) & 0xF), kind = .IMMEDIATE, size = 1}
 
@@ -630,40 +637,30 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	// instruction bits 3:0 (packed per element size), Ws at bits 14:13,
 	// V flag at bit 15.
 	case .SME_SLICE_B:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0xF
-		v := imm | (vflag << 4) | (ws << 5)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 4) & 0x0), u8((word >> 13) & 0x3),
+		                   u8(word & 0xF), ZSHAPE_B, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_H:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0x7
-		tile  := (word >> 3) & 0x1
-		v := imm | (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 3) & 0x1), u8((word >> 13) & 0x3),
+		                   u8(word & 0x7), ZSHAPE_H, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_W:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0x3
-		tile  := (word >> 2) & 0x3
-		v := imm | (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 2) & 0x3), u8((word >> 13) & 0x3),
+		                   u8(word & 0x3), ZSHAPE_S, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_D:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		imm   := word & 0x1
-		tile  := (word >> 1) & 0x7
-		v := imm | (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 1) & 0x7), u8((word >> 13) & 0x3),
+		                   u8(word & 0x1), ZSHAPE_D, (word >> 15) & 0x1 != 0)
 	case .SME_SLICE_Q:
-		vflag := (word >> 15) & 0x1
-		ws    := (word >> 13) & 0x3
-		tile  := word & 0xF
-		v := (vflag << 4) | (ws << 5) | (tile << 7)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
-
-	// ---- Batch 3 misc immediates ----
+		// The tile number and the offset share the low nibble; how it
+		// splits follows the element size.
+		return op_za_slice(u8((word >> 0) & 0xF), u8((word >> 13) & 0x3),
+		                   u8(word & 0x0), ZSHAPE_Q, (word >> 15) & 0x1 != 0)
 	case .NEON_IDX2:
 		return Operand{immediate = i64((word >> 12) & 0x3), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .ENC_FCMLA_ROT:
@@ -841,4 +838,15 @@ decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic
 @(private="file", require_results)
 sve_tsz_field :: #force_inline proc "contextless" (word: u32) -> u32 {
 	return ((word >> 22) & 0x3) << 5 | ((word >> 19) & 0x3) << 3 | ((word >> 16) & 0x7)
+}
+
+// The element width a ZA tile operand is viewed at.
+@(private="file", require_results)
+za_elem_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .ZA_TILE_H: return ZSHAPE_H
+	case .ZA_TILE_S: return ZSHAPE_S
+	case .ZA_TILE_D: return ZSHAPE_D
+	}
+	return ZSHAPE_B
 }

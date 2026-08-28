@@ -29,6 +29,17 @@ Operand_Kind :: enum u8 {
 	EXTENDED_REG,     // X/W reg + extend + amount
 	COND,             // 4-bit condition code (EQ/NE/.../AL/NV)
 	SYSTEM_REGISTER,  // MRS/MSR target, as a packed 15-bit field
+	ZA_SLICE,         // `za0h.b[w12, 0]` -- a row or column of an SME tile
+}
+
+// One slice of an SME accumulator tile: which tile, taken along the rows (h)
+// or the columns (v), addressed by one of W12..W15 plus a fixed offset.
+ZA_Slice :: bit_field u32 {
+	tile:     u8   | 4,
+	vertical: bool | 1,
+	ws:       u8   | 2,   // 0..3, meaning W12..W15
+	offset:   u8   | 4,
+	elem:     u8   | 5,   // the ZSHAPE_* code the tile is viewed at
 }
 
 Shift_Type :: enum u8 {
@@ -106,6 +117,7 @@ Operand :: struct #packed {
 		extended:  Extended_Reg,    // 8
 		cond:      u8,              // 1
 		sysreg:    System_Register, // 2
+		za:        ZA_Slice,        // 4
 	}, // 12 total because of alignment
 	kind: Operand_Kind,                 // 1
 	size: u8,                           // 1 -- carried width info; meaning varies
@@ -171,6 +183,14 @@ op_lane_index :: #force_inline proc "contextless" (index: i64) -> Operand {
 
 op_sysreg :: #force_inline proc "contextless" (sr: System_Register) -> Operand {
 	return Operand{sysreg = sr, kind = .SYSTEM_REGISTER, size = 2}
+}
+
+@(require_results)
+op_za_slice :: #force_inline proc "contextless" (tile, ws, offset, elem: u8, vertical := false) -> Operand {
+	return Operand{
+		za   = ZA_Slice{tile = tile, vertical = vertical, ws = ws, offset = offset, elem = elem},
+		kind = .ZA_SLICE, size = elem,
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -276,6 +296,7 @@ ZSHAPE_B :: u8(1)
 ZSHAPE_H :: u8(2)
 ZSHAPE_S :: u8(4)
 ZSHAPE_D :: u8(8)
+ZSHAPE_Q :: u8(16)
 
 // -----------------------------------------------------------------------------
 // NEON V-register arrangement builders. These take the register the caller

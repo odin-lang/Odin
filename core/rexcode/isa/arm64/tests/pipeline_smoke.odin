@@ -845,14 +845,12 @@ run_pipeline_tests :: proc() {
 	//   ld1b { za0v.b[w14, 5] }, p5/z, [x10, x21]  =  0xE015D545
 	//
 	//   Per LLVM MC test for AArch64 SME (file: test/MC/AArch64/SME/ld1b.s).
-	//   Slice descriptor (packed): imm=5, V=1 (vertical), Ws=W14 (idx=2),
-	//   tile=0 (ZA0.B is implicit for byte tile)
-	//     packed = 5 | (1<<4) | (2<<5) | (0<<7) = 0x55
+	//   Slice: tile 0 (ZA0.B is the only byte tile), taken vertically, indexed
+	//   by W14 with an offset of 5.
 	{
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
 		p5 := a.Register(a.REG_P | 5)
-		slice_packed := i64(5 | (1 << 4) | (2 << 5))
 		mem := a.Memory{
 			base  = a.X10,
 			index = a.X21,
@@ -861,7 +859,7 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .LD1B, operand_count = 3, length = 4,
-				ops = {a.op_imm(slice_packed, 2), a.op_reg(p5), a.op_mem(mem), {}},
+				ops = {a.op_za_slice(0, 2, 5, a.ZSHAPE_B, true), a.op_reg(p5), a.op_mem(mem), {}},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
@@ -877,7 +875,9 @@ run_pipeline_tests :: proc() {
 		ok("SME LD1B tile: decode 1 inst", len(d_insts) == 1)
 		ok("SME LD1B tile: mnemonic",      len(d_insts) == 1 && d_insts[0].mnemonic == .LD1B)
 		ok("SME LD1B tile: slice roundtrip",
-		   len(d_insts) == 1 && d_insts[0].ops[0].immediate == slice_packed)
+		   len(d_insts) == 1 && d_insts[0].ops[0].kind == .ZA_SLICE &&
+		   d_insts[0].ops[0].za.tile == 0 && d_insts[0].ops[0].za.vertical &&
+		   d_insts[0].ops[0].za.ws == 2 && d_insts[0].ops[0].za.offset == 5)
 	}
 
 	// ---- 32. FCMLA v0.4s, v1.4s, v2.4s, #0 (LLVM golden) ----------------

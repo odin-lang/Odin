@@ -3705,10 +3705,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.SUMOPA,         {.ZA_TILE_S, .P_REG_MERGE, .P_REG_MERGE, .Z_REG_B}, {.ZA_TILE_NUM_S, .PG, .PM3, .VN}, 0xA0A00000, 0xFFE08010, .SME, {}},                           {written={0}, read={0, 1, 2, 3}}},
 	},
 	.LD1Q = {
-		{{.LD1Q,           {.SME_SLICE_Q, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.SME_SLICE_Q, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE1C00000, 0xFFE00010, .SME, {}},               {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1Q,           {.SME_SLICE_Q, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.SME_SLICE_Q, .PG, .SVE_OFFSET_BASE_SS4, .NONE}, 0xE1C00000, 0xFFE00010, .SME, {}},               {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.ST1Q = {
-		{{.ST1Q,           {.SME_SLICE_Q, .P_REG, .MEM_SVE_SS, .NONE}, {.SME_SLICE_Q, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE1E00000, 0xFFE00010, .SME, {}},                    {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1Q,           {.SME_SLICE_Q, .P_REG, .MEM_SVE_SS, .NONE}, {.SME_SLICE_Q, .PG, .SVE_OFFSET_BASE_SS4, .NONE}, 0xE1E00000, 0xFFE00010, .SME, {}},                    {read={0, 1, 2}, writes_mem=true}},
 	},
 	.MOVA = {
 		{{.MOVA,           {.Z_REG_B,     .P_REG_MERGE, .SME_SLICE_B, .NONE}, {.VD,          .PG, .SME_SLICE_B, .NONE}, 0xC0020000, 0xFFE28010, .SME, {}},                    {written={0}, read={1, 2}}},

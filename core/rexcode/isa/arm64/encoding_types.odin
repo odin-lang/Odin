@@ -413,7 +413,7 @@ Operand_Encoding :: enum u8 {
 	// SVE scalar+scalar addressing scales the index by the access size, and the
 	// assembler wants that written out (`[x0, x0, lsl #2]`). The amount is a
 	// property of the form, so it rides on the encoding.
-	SVE_OFFSET_BASE_SS1, SVE_OFFSET_BASE_SS2, SVE_OFFSET_BASE_SS3,
+	SVE_OFFSET_BASE_SS1, SVE_OFFSET_BASE_SS2, SVE_OFFSET_BASE_SS3, SVE_OFFSET_BASE_SS4,
 	// SVE gather/scatter: the index is a vector, and the syntax names its
 	// element size and how the base extends it. A 32-bit index is written
 	// `uxtw`/`sxtw` (bit 22 says which); a 64-bit one needs neither.

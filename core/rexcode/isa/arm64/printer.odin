@@ -416,12 +416,13 @@ write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercas
 		case 5:  shape = "s"
 		case 7:  shape = "d"
 		}
-	case REG_Z:
+	case REG_Z, REG_ZA:
 		switch size {
-		case 1: shape = "b"
-		case 2: shape = "h"
-		case 4: shape = "s"
-		case 8: shape = "d"
+		case 1:  shape = "b"
+		case 2:  shape = "h"
+		case 4:  shape = "s"
+		case 8:  shape = "d"
+		case 16: shape = "q"
 		}
 	// A predicate's suffix is its governing qualifier, and it hangs off a
 	// slash rather than a dot.
@@ -507,6 +508,9 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 	case REG_ZT:
 		strings.write_string(sb, uppercase ? "ZT" : "zt")
 		write_decimal_u32(sb, u32(hw))
+	case REG_ZA:
+		strings.write_string(sb, uppercase ? "ZA" : "za")
+		write_decimal_u32(sb, u32(hw))
 	}
 }
 
@@ -530,6 +534,19 @@ write_operand :: proc(
 
 	case .SYSTEM_REGISTER:
 		write_sysreg(sb, op.sysreg, opts.uppercase)
+
+	case .ZA_SLICE:
+		// `za0h.b[w12, 0]`
+		strings.write_string(sb, opts.uppercase ? "ZA" : "za")
+		write_decimal_u32(sb, u32(op.za.tile))
+		strings.write_byte(sb, op.za.vertical ? (opts.uppercase ? 'V' : 'v') : (opts.uppercase ? 'H' : 'h'))
+		write_vector_shape(sb, Register(REG_Z), op.za.elem, opts.uppercase)
+		strings.write_byte(sb, '[')
+		strings.write_string(sb, opts.uppercase ? "W" : "w")
+		write_decimal_u32(sb, 12 + u32(op.za.ws))
+		strings.write_string(sb, opts.space_after_comma ? ", " : ",")
+		write_decimal_u32(sb, u32(op.za.offset))
+		strings.write_byte(sb, ']')
 
 	case .COND:
 		c := op.cond & 0xF

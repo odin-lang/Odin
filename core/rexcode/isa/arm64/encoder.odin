@@ -274,6 +274,7 @@ operand_matches_inline :: #force_inline proc "contextless" (
 	// SME tile state (immediate-encoded tile number; user supplies the
 	// tile index as an immediate, e.g. 0 for ZA0.S, 3 for ZA3.S).
 	case .ZA_TILE_B, .ZA_TILE_H, .ZA_TILE_S, .ZA_TILE_D, .ZA_TILE_Q:
+		if op.kind == .REGISTER { return reg_class(op.reg) == REG_ZA }
 		return op.kind == .IMMEDIATE
 	// Misc immediate sub-types added in batch 3
 	case .FCMLA_ROT, .FCADD_ROT, .SVE_PRFOP, .LDRAA_IMM10:
@@ -284,7 +285,7 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .IMMEDIATE
 	// SME tile slice (packed immediate descriptor; see encoding_types.odin)
 	case .SME_SLICE_B, .SME_SLICE_H, .SME_SLICE_W, .SME_SLICE_D, .SME_SLICE_Q:
-		return op.kind == .IMMEDIATE
+		return op.kind == .ZA_SLICE
 
 	case .IMM_12, .IMM_16, .IMM_8, .IMM_6, .IMM_5, .IMM_4, .IMM_3, .IMM_2,
 		 .NZCV_IMM, .PSTATE_FIELD, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT, .VEC_INDEX:
@@ -406,7 +407,7 @@ pack_operand_inline :: #force_inline proc(
 			return (u32(reg_hw(op.extended.reg)) & 0x1F) << 16 |
 				   (u32(op.extended.extend)      & 0x7)  << 13 |
 				   (u32(op.extended.amount)      & 0x7)  << 10
-		case .NONE, .IMMEDIATE, .MEMORY, .RELATIVE, .COND, .SYSTEM_REGISTER:
+		case .NONE, .IMMEDIATE, .MEMORY, .RELATIVE, .COND, .SYSTEM_REGISTER, .ZA_SLICE:
 			return 0
 		}
 
@@ -693,7 +694,8 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0x1F) << 5
 
 	// SVE memory operands
-	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3:
+	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3,
+	     .SVE_OFFSET_BASE_SS4:
 		// [Xn, Xm, LSL #s] scalar+scalar. Base at 9:5, index at 20:16;
 		// shift is implicit in the encoding's static bits (per ESize).
 		base_bits := (u32(reg_hw(op.mem.base))  & 0x1F) << 5
@@ -769,40 +771,20 @@ pack_operand_inline :: #force_inline proc(
 	//     .D : tile[2:0]<<1 | imm[0]     (8 tiles, 2 slices each)
 	//     .Q : tile[3:0]                 (16 tiles, no imm)
 	case .SME_SLICE_B:
-		v     := u32(op.immediate)
-		imm   := v & 0xF
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		return (vflag << 15) | (ws << 13) | imm
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 4) & 0xF) | (u32(op.za.offset) & 0xF)
 	case .SME_SLICE_H:
-		v     := u32(op.immediate)
-		imm   := v & 0x7
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0x1
-		return (vflag << 15) | (ws << 13) | imm | (tile << 3)
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 3) & 0xF) | (u32(op.za.offset) & 0x7)
 	case .SME_SLICE_W:
-		v     := u32(op.immediate)
-		imm   := v & 0x3
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0x3
-		return (vflag << 15) | (ws << 13) | imm | (tile << 2)
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 2) & 0xF) | (u32(op.za.offset) & 0x3)
 	case .SME_SLICE_D:
-		v     := u32(op.immediate)
-		imm   := v & 0x1
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0x7
-		return (vflag << 15) | (ws << 13) | imm | (tile << 1)
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 1) & 0xF) | (u32(op.za.offset) & 0x1)
 	case .SME_SLICE_Q:
-		v     := u32(op.immediate)
-		vflag := (v >> 4) & 0x1
-		ws    := (v >> 5) & 0x3
-		tile  := (v >> 7) & 0xF
-		return (vflag << 15) | (ws << 13) | tile
-
-	// ---- Batch 3 misc immediate encodings ----
+		return (u32(op.za.vertical ? 1 : 0) << 15) | ((u32(op.za.ws) & 0x3) << 13) |
+		       ((u32(op.za.tile) << 0) & 0xF) | (u32(op.za.offset) & 0x0)
 	case .NEON_IDX2:
 		return (u32(op.immediate) & 0x3) << 12
 	case .ENC_FCMLA_ROT:
