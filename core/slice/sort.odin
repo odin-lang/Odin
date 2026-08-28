@@ -98,35 +98,6 @@ sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 	}
 }
 
-sort_from_permutation_indices2 :: proc(data: $T/[]$E, indices: []int) {
-	assert(len(data) == len(indices))
-	if len(indices) <= 1 {
-		return
-	}
-
-	for i in 0..<len(indices) {
-		next_index := indices[i]
-
-		if next_index < 0 {
-			indices[i] *= -1
-			continue
-		}
-		
-		if next_index <= i {
-			continue
-		}
-
-		cur_index := i
-		for next_index != i {
-			indices[cur_index] *= -1
-			ptr_swap_non_overlapping(&data[cur_index], &data[next_index], size_of(E))
-			cur_index = next_index
-			next_index = indices[cur_index]
-		}
-		indices[i] *= -1
-	}
-}
-
 // sort sorts a slice and returns a slice of the original indices
 // This sort is not guaranteed to be stable
 sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> (indices: []int) where ORD(E) {
