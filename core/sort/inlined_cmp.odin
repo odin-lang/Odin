@@ -72,7 +72,6 @@ sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool,
 	return indices
 }
 
-
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
 // This sort is not guaranteed to be stable
@@ -89,7 +88,7 @@ sort_inlined_by_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: 
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
 // This sort is not guaranteed to be stable
-sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: rawptr) -> bool, user_data: rawptr, allocator := context.allocator) -> (indices: []int) {
+sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: rawptr) -> bool, user_data: ^$D, allocator := context.allocator) -> (indices: []int) {
 	indices = make([]int, len(arr), allocator)
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -99,16 +98,14 @@ sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E
 			
 			Context :: struct {
 				arr: T,
-				user_data: rawptr,
+				user_data: ^D,
 			}
 			arr := arr
 			ctx := &Context{arr, user_data}
 
 			_quick_lomuto(indices, ctx, proc(l, r: int, user_data: rawptr) -> bool {
 				ctx := (^Context)(user_data)
-				left := ctx.arr[l]
-				right := ctx.arr[r]
-				return LESS(left , right, ctx.user_data)
+				return LESS(ctx.arr[l] , ctx.arr[r], ctx.user_data)
 			})
 
 			sort_from_permutation_indices(arr, indices)
@@ -163,7 +160,9 @@ sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 		cur_index := i
 		for next_index != i {
 			indices[cur_index] *= -1
+
 			data[cur_index], data[next_index] = data[next_index], data[cur_index]
+			
 			cur_index = next_index
 			next_index = indices[cur_index]
 		}
