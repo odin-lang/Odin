@@ -1,7 +1,5 @@
 package sort
 
-import "core:fmt"
-import "core:time"
 import "core:slice"
 import "base:intrinsics"
 
@@ -143,6 +141,7 @@ sort_inlined_by_cmp_with_data :: proc(arr: $T/[]$E, $CMP: proc(l, r: E, user_dat
 	}
 }
 
+@private
 sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 	assert(len(data) == len(indices))
 	if len(indices) <= 1 {
@@ -270,7 +269,6 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: $D, $LESS: $P) #no_bounds_check {
 		}
 	}
 
-
 	// branchless partitioning
 	// [  <  |0|  >=  |  ?  ]
 	//	    left    right ->
@@ -279,7 +277,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: $D, $LESS: $P) #no_bounds_check {
 		arr[pivot_index] = arr[0]
 
 		j := 0
-		#unroll(8) for _ in arr[:len(arr) - 1] {
+		for _ in arr[:len(arr) - 1] {
 			arr[j] = arr[left]
 			j += 1
 			arr[left] = arr[j]
