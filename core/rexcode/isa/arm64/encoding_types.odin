@@ -137,8 +137,6 @@ Operand_Type :: enum u8 {
 	LSL_SHIFT_W,       // shift amount 0..31 for LSL Wd, Wn, #imm (32-bit)
 	LSL_SHIFT_X,       // shift amount 0..63 for LSL Xd, Xn, #imm (64-bit)
 	ROR_SHIFT,         // shift amount for ROR (alias of EXTR), goes to imms
-	Z_PAIR,            // SME2 vector pair {Zn, Zn+1} — register number must be even
-	Z_QUAD,            // SME2 vector quad {Zn, Zn+1, Zn+2, Zn+3} — number multiple of 4
 
 	// ---- Immediates ----
 	IMM_12,        // 12-bit unsigned (ADD/SUB imm; carries optional LSL #12 in size byte)
@@ -195,11 +193,17 @@ Operand_Type :: enum u8 {
 	// SME2 vector pairs and quads. The element size cannot come from the
 	// encoding the way the list length does, because the operand is written
 	// with it (`{z0.b, z1.b}`) and it is what separates LD1B from LD1H.
+	// A Z register of any element size, for the forms where the size is not in
+	// the static pattern and so cannot select between forms (SVE2 XAR).
+	Z_REG_ANY,
 	Z_PAIR_B, Z_PAIR_H, Z_PAIR_S, Z_PAIR_D,
 	Z_QUAD_B, Z_QUAD_H, Z_QUAD_S, Z_QUAD_D,
 	// SME2 predicate-as-counter (PN8..PN15). `_ZERO` prints the `/z` a load
 	// needs; a store writes it bare.
 	PN_REG, PN_REG_ZERO,
+	// A predicate that is written with an element size because it is the
+	// instruction's destination (`cmpge p0.b, p1/z, ...`).
+	P_REG_B, P_REG_H, P_REG_S, P_REG_D,
 
 	// ---- NEON shift-by-immediate amount (encoded into immh:immb together
 	//      with the element size: left = esize+shift, right = 2*esize-shift) ----
@@ -403,6 +407,11 @@ Operand_Encoding :: enum u8 {
 	// type -- otherwise every count would need its own type per arrangement.
 	VD_LIST1, VD_LIST2, VD_LIST3, VD_LIST4,
 	PNG,              // bits 10-12, predicate-as-counter (SME2)
+	// A Z register whose element size is not in the static pattern but in the
+	// instruction's own tsz field, so decode has to read it out of the word
+	// rather than take it from the form (SVE2 XAR).
+	VD_TSZ,           // bits 0-4
+	VN_TSZ,           // bits 5-9
 	VN_LIST1, VN_LIST2, VN_LIST3, VN_LIST4,
 	ENC_FCADD_ROT,     // 1-bit rotation at bit 12 (FCADD)
 	ENC_SVE_PRFOP,     // 4-bit prefetch op at bits 3:0 (SVE PRFB/H/W/D)

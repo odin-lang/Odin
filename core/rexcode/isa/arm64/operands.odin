@@ -196,6 +196,47 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 	return Operand{reg = Register(REG_Z | u16(n & 0x1F)), kind = .REGISTER, size = 8}
 }
 
+// SVE packs an element size and a shift amount into one field, `tszh:tszl:imm3`,
+// as `V = 2*esize - shift`. Because the shift is in [1, esize], V lands in
+// [esize, 2*esize), so the four element sizes occupy disjoint ranges and the
+// position of the highest set bit names the size:
+//
+//   .b  V in [ 8,  15]     .s  V in [32,  63]
+//   .h  V in [16,  31]     .d  V in [64, 127]
+//
+// Encoder and decoder both need this, and it is written once here so the two
+// cannot drift apart.
+
+// The element width, in bits, that a packed tsz value names.
+@(require_results)
+sve_tsz_esize :: #force_inline proc "contextless" (v: u32) -> u32 {
+	switch {
+	case v >= 64: return 64
+	case v >= 32: return 32
+	case v >= 16: return 16
+	}
+	return 8
+}
+
+// The shift amount a packed tsz value names.
+@(require_results)
+sve_tsz_shift :: #force_inline proc "contextless" (v: u32) -> u32 {
+	return 2 * sve_tsz_esize(v) - v
+}
+
+// The packed tsz value for an element width and shift.
+@(require_results)
+sve_tsz_pack :: #force_inline proc "contextless" (esize, shift: u32) -> u32 {
+	return (2 * esize - shift) & 0x7F
+}
+
+// The SVE element-width code (the `size` an operand carries) for a width in
+// bits: .b = 1, .h = 2, .s = 4, .d = 8.
+@(require_results)
+sve_esize_code :: #force_inline proc "contextless" (esize: u32) -> u8 {
+	return u8(esize / 8)
+}
+
 // A predicate register's governing qualifier, carried in Operand.size and read
 // only when the register's class is REG_P. SVE writes it as a suffix -- `p0/z`
 // zeroes the inactive lanes, `p0/m` leaves them alone -- and an assembler will
@@ -203,6 +244,14 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 PQUAL_ZERO  :: u8(1)
 PQUAL_MERGE :: u8(2)
 PQUAL_NONE  :: u8(4)
+
+// A predicate that is an instruction's DESTINATION is written with an element
+// size instead -- `cmpge p0.b, p1/z, ...` -- so those codes have to live apart
+// from the qualifiers above, and apart from the neutral 4 a plain op_reg gives.
+PSHAPE_B :: u8(20)
+PSHAPE_H :: u8(21)
+PSHAPE_S :: u8(22)
+PSHAPE_D :: u8(23)
 
 // Arrangement codes carried in Operand.size. Element views are odd and
 // arrangements are multiples of 8, so the two can never be confused; 4 is the
@@ -221,6 +270,12 @@ VSHAPE_ELEM_B :: u8(1)
 VSHAPE_ELEM_H :: u8(3)
 VSHAPE_ELEM_S :: u8(5)
 VSHAPE_ELEM_D :: u8(7)
+
+// SVE element-width codes carried in Operand.size for a Z register.
+ZSHAPE_B :: u8(1)
+ZSHAPE_H :: u8(2)
+ZSHAPE_S :: u8(4)
+ZSHAPE_D :: u8(8)
 
 // -----------------------------------------------------------------------------
 // NEON V-register arrangement builders. These take the register the caller

@@ -127,9 +127,12 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 	     .V_4H_FP16, .V_8H_FP16, .V_1Q,
 	     .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		return .REG
-	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_PAIR, .Z_QUAD:
+	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_REG_ANY,
+	     .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D,
+	     .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
 		return .ZREG
-	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV:
+	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV, .PN_REG, .PN_REG_ZERO,
+	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
 		return .PREG
 	case .REL_26, .REL_19, .REL_14, .REL_PG21:
 		return .REL
@@ -172,6 +175,16 @@ list_count :: proc(e: a.Operand_Encoding) -> int {
 	return 0
 }
 
+// The ZSHAPE_* constant naming this operand type's SVE element width.
+zshape_const :: proc(t: a.Operand_Type) -> string {
+	#partial switch t {
+	case .Z_REG_H, .Z_PAIR_H, .Z_QUAD_H: return "ZSHAPE_H"
+	case .Z_REG_S, .Z_PAIR_S, .Z_QUAD_S: return "ZSHAPE_S"
+	case .Z_REG_D, .Z_PAIR_D, .Z_QUAD_D: return "ZSHAPE_D"
+	}
+	return "ZSHAPE_B"
+}
+
 // The VSHAPE_* constant naming this operand type's arrangement.
 vshape_const :: proc(t: a.Operand_Type) -> string {
 	#partial switch t {
@@ -198,7 +211,8 @@ vshape_const :: proc(t: a.Operand_Type) -> string {
 is_lane_index :: proc(e: a.Operand_Encoding) -> bool {
 	#partial switch e {
 	case .NEON_IDX5, .NEON_IDX4, .NEON_IDX2,
-	     .NEON_LANE_B, .NEON_LANE_H, .NEON_LANE_S, .NEON_LANE_D:
+	     .NEON_LANE_B, .NEON_LANE_H, .NEON_LANE_S, .NEON_LANE_D,
+	     .SVE_FMLA_IDX_H, .SVE_FMLA_IDX_S, .SVE_FMLA_IDX_D:
 		return true
 	}
 	return false
@@ -227,7 +241,28 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 	// one builder and only the first is reachable. FP16 variants share a token
 	// with their non-FP16 twin because they build an identical operand -- the
 	// encoder tells those two apart by the form, not the operand.
+	// An SVE element size is not recoverable from the u8 a Z operand is passed
+	// as, so it has to live in the name -- otherwise every size of a mnemonic
+	// collapses onto one builder and only the first is reachable.
 	#partial switch t {
+	case .Z_REG_B:  return "zb"
+	case .Z_REG_H:  return "zh"
+	case .Z_REG_S:  return "zs"
+	case .Z_REG_D:  return "zd"
+	case .Z_PAIR_B: return "zpb"
+	case .Z_PAIR_H: return "zph"
+	case .Z_PAIR_S: return "zps"
+	case .Z_PAIR_D: return "zpd"
+	case .Z_QUAD_B: return "zqb"
+	case .Z_QUAD_H: return "zqh"
+	case .Z_QUAD_S: return "zqs"
+	case .Z_QUAD_D: return "zqd"
+	case .P_REG_B: return "pb"
+	case .P_REG_H: return "ph"
+	case .P_REG_S: return "ps"
+	case .P_REG_D: return "pd"
+	case .PN_REG:      return "pn"
+	case .PN_REG_ZERO: return "pnz"
 	case .V_8B:             return "v8b"
 	case .V_16B:            return "v16b"
 	case .V_4H, .V_4H_FP16: return "v4h"
@@ -410,7 +445,14 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, enc: a.Opera
 	// A register the syntax writes as a list carries how many, which is a
 	// property of the form rather than of the operand type.
 	if n := list_count(enc); n > 0 {
-		fmt.sbprintf(sb, "op_v_list(%s, %s, %d)", names[0], vshape_const(t), n)
+		// A Z operand arrives as a bare register number, so it has to be given
+		// its class before it can head a list.
+		if operand_category(t) == .ZREG {
+			fmt.sbprintf(sb, "op_v_list(Register(REG_Z | (u16(%s) & 0x1F)), %s, %d)",
+			             names[0], zshape_const(t), n)
+		} else {
+			fmt.sbprintf(sb, "op_v_list(%s, %s, %d)", names[0], vshape_const(t), n)
+		}
 		return
 	}
 	#partial switch operand_category(t) {
@@ -437,10 +479,19 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, enc: a.Opera
 		case .Z_REG_H: fmt.sbprintf(sb, "op_z_h(%s)", names[0])
 		case .Z_REG_S: fmt.sbprintf(sb, "op_z_s(%s)", names[0])
 		case .Z_REG_D: fmt.sbprintf(sb, "op_z_d(%s)", names[0])
-		case:          fmt.sbprintf(sb, "op_reg(Register(REG_Z | (u16(%s) & 0x1F)))", names[0])  // Z_PAIR / Z_QUAD
+		case .Z_PAIR_B, .Z_QUAD_B: fmt.sbprintf(sb, "op_z_b(%s)", names[0])
+		case .Z_PAIR_H, .Z_QUAD_H: fmt.sbprintf(sb, "op_z_h(%s)", names[0])
+		case .Z_PAIR_S, .Z_QUAD_S: fmt.sbprintf(sb, "op_z_s(%s)", names[0])
+		case .Z_PAIR_D, .Z_QUAD_D: fmt.sbprintf(sb, "op_z_d(%s)", names[0])
+		case:          fmt.sbprintf(sb, "op_reg(Register(REG_Z | (u16(%s) & 0x1F)))", names[0])  // Z_REG_ANY
 		}
 	case .PREG:
-		fmt.sbprintf(sb, "op_reg(Register(REG_P | (u16(%s) & 0xF)))", names[0])
+		if t == .PN_REG || t == .PN_REG_ZERO {
+			// SME2 numbers its predicate-as-counter registers from 8.
+			fmt.sbprintf(sb, "op_reg(Register(REG_PN | (8 + (u16(%s) & 0x7))))", names[0])
+		} else {
+			fmt.sbprintf(sb, "op_reg(Register(REG_P | (u16(%s) & 0xF)))", names[0])
+		}
 	case .IMM:
 		if is_lane_index(enc) {
 			fmt.sbprintf(sb, "op_lane_index(%s)", names[0])

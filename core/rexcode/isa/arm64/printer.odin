@@ -426,10 +426,13 @@ write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercas
 	// A predicate's suffix is its governing qualifier, and it hangs off a
 	// slash rather than a dot.
 	case REG_P, REG_PN:
-		sep = '/'
 		switch size {
-		case PQUAL_ZERO:  shape = "z"
-		case PQUAL_MERGE: shape = "m"
+		case PQUAL_ZERO:  sep = '/'; shape = "z"
+		case PQUAL_MERGE: sep = '/'; shape = "m"
+		case PSHAPE_B:    shape = "b"
+		case PSHAPE_H:    shape = "h"
+		case PSHAPE_S:    shape = "s"
+		case PSHAPE_D:    shape = "d"
 		}
 	}
 	if shape == "" {

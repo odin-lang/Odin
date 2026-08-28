@@ -141,10 +141,10 @@ encode_one_inline :: #force_inline proc(
 	}
 
 	word = form.bits
-	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], form, pc, inst_idx, relocs) }
-	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], form, pc, inst_idx, relocs) }
-	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], form, pc, inst_idx, relocs) }
-	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], form, pc, inst_idx, relocs) }
+	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], form, pc, inst_idx, relocs, inst) }
+	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], form, pc, inst_idx, relocs, inst) }
+	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], form, pc, inst_idx, relocs, inst) }
+	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], form, pc, inst_idx, relocs, inst) }
 	return word, true
 }
 
@@ -254,11 +254,14 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (op.size == 0 || op.size == 4)
 	case .Z_REG_D:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (op.size == 0 || op.size == 8)
-	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV:
+	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV,
+	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_P
 	case .PN_REG, .PN_REG_ZERO:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_PN
 	// The first register of a pair must be even, of a quad a multiple of four.
+	case .Z_REG_ANY:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z
 	case .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x1) == 0 &&
 		       (op.size == 0 || op.size == z_elem_size(ot))
@@ -275,12 +278,6 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .IMMEDIATE
 	case .LSL_SHIFT_W, .LSL_SHIFT_X, .ROR_SHIFT:
 		return op.kind == .IMMEDIATE
-	case .Z_PAIR:
-		// SME2 vector pair: first reg must be even (Z0, Z2, ..., Z30).
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x1) == 0
-	case .Z_QUAD:
-		// SME2 vector quad: first reg must be multiple of 4.
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x3) == 0
 	case .SME_PATTERN, .SVE_PATTERN:
 		return op.kind == .IMMEDIATE
 	// SME tile slice (packed immediate descriptor; see encoding_types.odin)
@@ -372,6 +369,10 @@ pack_operand_inline :: #force_inline proc(
 	pc:       u32,
 	inst_idx: u16,
 	relocs:   ^[dynamic]Relocation,
+	// Most encodings pack one operand in isolation. SVE's tsz field does not:
+	// it holds an element size and a shift together, and the size belongs to a
+	// different operand than the shift.
+	inst:     ^Instruction,
 ) -> u32 {
 	switch enc {
 	case .NONE, .IMPL:
@@ -529,9 +530,9 @@ pack_operand_inline :: #force_inline proc(
 		return ((bit >> 5) & 1) << 31 | (bit & 0x1F) << 19
 
 	// ---- NEON / SIMD register slots (alias of RD/RN/RM/RA bit positions) --
-	case .VD, .VD_LIST1, .VD_LIST2, .VD_LIST3, .VD_LIST4:
+	case .VD, .VD_TSZ, .VD_LIST1, .VD_LIST2, .VD_LIST3, .VD_LIST4:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 0
-	case .VN, .VN_LIST1, .VN_LIST2, .VN_LIST3, .VN_LIST4:
+	case .VN, .VN_TSZ, .VN_LIST1, .VN_LIST2, .VN_LIST3, .VN_LIST4:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 5
 	case .VM:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 16
@@ -602,8 +603,12 @@ pack_operand_inline :: #force_inline proc(
 
 	// SVE2 XAR rotate amount: V = 2*esize - amount, split tszh:tszl:imm3.
 	case .SVE_XAR_SHIFT:
-		esize := vec_esize(form.ops[0])
-		v := (2 * esize - u32(op.immediate)) & 0x7F
+		// The element size shares this field with the shift, so it cannot also
+		// select between forms -- there is one form, and the size comes from
+		// the register the caller passed.
+		esize := u32(inst.ops[0].size) * 8
+		if esize == 0 || esize > 64 { esize = vec_esize(form.ops[0]) }
+		v := sve_tsz_pack(esize, u32(op.immediate))
 		return ((v >> 5) & 0x3) << 22 | ((v >> 3) & 0x3) << 19 | (v & 0x7) << 16
 
 	// NEON MOVI/FMOV immediate split: abc at bits 18-16, defgh at bits 9-5.

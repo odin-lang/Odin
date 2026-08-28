@@ -51,6 +51,10 @@ Entry :: struct {
 	feature:  lib.Feature,
 	flags:    lib.Encoding_Flags,
 	op0:      u8,    // bits[28:25]
+	// Table order, so the sort is a total one. Without it, entries that tie on
+	// every other key come out in whatever order the sort leaves -- and which
+	// of them decode picks would vary between builds.
+	seq:      u32,
 }
 
 Range :: struct { start: u16, count: u16 }
@@ -206,7 +210,7 @@ emit_decode_tables :: proc() -> (total: int) {
 			// Enumerate every 4-bit bucket B such that (B & op0_mask) == op0_static.
 			for b: u8 = 0; b < 16; b += 1 {
 				if (b & op0_mask) != op0_static { continue }
-				append(&all, Entry{e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.flags, b})
+				append(&all, Entry{e.mnemonic, e.ops, e.enc, e.bits, e.mask, e.feature, e.flags, b, u32(len(all))})
 			}
 		}
 	}
@@ -214,7 +218,8 @@ emit_decode_tables :: proc() -> (total: int) {
 		if a.op0 != b.op0 { return a.op0 < b.op0 }
 		ac := bits.count_ones(a.mask); bc := bits.count_ones(b.mask)
 		if ac != bc { return ac > bc }
-		return u16(a.mnemonic) < u16(b.mnemonic)
+		if a.mnemonic != b.mnemonic { return u16(a.mnemonic) < u16(b.mnemonic) }
+		return a.seq < b.seq
 	})
 
 	op0_idx: [16]Range

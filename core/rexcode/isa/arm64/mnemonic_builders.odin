@@ -31,8 +31,14 @@ inst_add_v2d_v2d_v2d          :: #force_inline proc "contextless" (dst: Register
 inst_add_v8b_v8b_v8b          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_add_v4h_v4h_v4h          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_add_v2s_v2s_v2s          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
-inst_add_z_z_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_add_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_add_zb_zb_zb             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_add_zh_zh_zh             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_add_zs_zs_zs             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_add_zd_zd_zd             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_add_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_add_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_add_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_add_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ADD, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_add_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_add_r_r_i(dst, src, imm)) }
 emit_add_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_add_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_add_r_r_ex               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_ext: Extend, src2_amount: u8) { append(instructions, inst_add_r_r_ex(dst, src, src2, src2_ext, src2_amount)) }
@@ -43,8 +49,14 @@ emit_add_v2d_v2d_v2d          :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_add_v8b_v8b_v8b          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_add_v8b_v8b_v8b(dst, src, src2)) }
 emit_add_v4h_v4h_v4h          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_add_v4h_v4h_v4h(dst, src, src2)) }
 emit_add_v2s_v2s_v2s          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_add_v2s_v2s_v2s(dst, src, src2)) }
-emit_add_z_z_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_add_z_z_z(rz, rz2, rz3)) }
-emit_add_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_add_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_add_zb_zb_zb             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_add_zb_zb_zb(rz, rz2, rz3)) }
+emit_add_zh_zh_zh             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_add_zh_zh_zh(rz, rz2, rz3)) }
+emit_add_zs_zs_zs             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_add_zs_zs_zs(rz, rz2, rz3)) }
+emit_add_zd_zd_zd             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_add_zd_zd_zd(rz, rz2, rz3)) }
+emit_add_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_add_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_add_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_add_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_add_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_add_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_add_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_add_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_adds_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.ADDS, dst, src, imm) }
 inst_adds_r_r_sh              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .ADDS, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_adds_r_r_ex              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_ext: Extend, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .ADDS, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_extended(src2, src2_ext, src2_amount), {}}} }
@@ -58,8 +70,14 @@ inst_sub_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register
 inst_sub_v8h_v8h_v8h          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_sub_v4s_v4s_v4s          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_sub_v2d_v2d_v2d          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_sub_z_z_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_sub_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_sub_zb_zb_zb             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_sub_zh_zh_zh             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_sub_zs_zs_zs             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_sub_zd_zd_zd             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_sub_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_sub_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_sub_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_sub_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUB, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_sub_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_sub_r_r_i(dst, src, imm)) }
 emit_sub_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_sub_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_sub_r_r_ex               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_ext: Extend, src2_amount: u8) { append(instructions, inst_sub_r_r_ex(dst, src, src2, src2_ext, src2_amount)) }
@@ -67,8 +85,14 @@ emit_sub_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_sub_v8h_v8h_v8h          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sub_v8h_v8h_v8h(dst, src, src2)) }
 emit_sub_v4s_v4s_v4s          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sub_v4s_v4s_v4s(dst, src, src2)) }
 emit_sub_v2d_v2d_v2d          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sub_v2d_v2d_v2d(dst, src, src2)) }
-emit_sub_z_z_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sub_z_z_z(rz, rz2, rz3)) }
-emit_sub_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sub_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_sub_zb_zb_zb             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sub_zb_zb_zb(rz, rz2, rz3)) }
+emit_sub_zh_zh_zh             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sub_zh_zh_zh(rz, rz2, rz3)) }
+emit_sub_zs_zs_zs             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sub_zs_zs_zs(rz, rz2, rz3)) }
+emit_sub_zd_zd_zd             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sub_zd_zd_zd(rz, rz2, rz3)) }
+emit_sub_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sub_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_sub_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sub_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_sub_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sub_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_sub_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sub_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_subs_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.SUBS, dst, src, imm) }
 inst_subs_r_r_sh              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .SUBS, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_subs_r_r_ex              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_ext: Extend, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .SUBS, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_extended(src2, src2_ext, src2_amount), {}}} }
@@ -88,89 +112,135 @@ emit_adrp_r_l                 :: #force_inline proc(instructions: ^[dynamic]Inst
 inst_and_r_r_sh               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_and_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.AND, dst, src, imm) }
 inst_and_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
-inst_and_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
-inst_and_p_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+inst_and_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_and_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_and_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_and_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+inst_and_pb_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .AND, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_and_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_and_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_and_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_and_r_r_i(dst, src, imm)) }
 emit_and_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_and_v16b_v16b_v16b(dst, src, src2)) }
-emit_and_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_and_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_and_p_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_and_p_p_p_p(rz, rz2, rz3, rz4)) }
+emit_and_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_and_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_and_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_and_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_and_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_and_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_and_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_and_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+emit_and_pb_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_and_pb_p_p_p(rz, rz2, rz3, rz4)) }
 inst_ands_r_r_sh              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .ANDS, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_ands_r_r_i               :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.ANDS, dst, src, imm) }
-inst_ands_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ANDS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+inst_ands_ph_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ANDS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_ands_r_r_sh              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_ands_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_ands_r_r_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_ands_r_r_i(dst, src, imm)) }
-emit_ands_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_ands_p_p_p_p(rz, rz2, rz3, rz4)) }
+emit_ands_ph_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_ands_ph_p_p_p(rz, rz2, rz3, rz4)) }
 inst_orr_r_r_sh               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_orr_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.ORR, dst, src, imm) }
 inst_orr_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
-inst_orr_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
-inst_orr_p_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+inst_orr_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_orr_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_orr_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_orr_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+inst_orr_ps_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_orr_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_orr_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_orr_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_orr_r_r_i(dst, src, imm)) }
 emit_orr_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_orr_v16b_v16b_v16b(dst, src, src2)) }
-emit_orr_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orr_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_orr_p_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orr_p_p_p_p(rz, rz2, rz3, rz4)) }
+emit_orr_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orr_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_orr_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_orr_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_orr_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+emit_orr_ps_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orr_ps_p_p_p(rz, rz2, rz3, rz4)) }
 inst_eor_r_r_sh               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_eor_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.EOR, dst, src, imm) }
 inst_eor_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
-inst_eor_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
-inst_eor_p_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+inst_eor_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_eor_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_eor_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_eor_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+inst_eor_pb_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_eor_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_eor_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_eor_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_eor_r_r_i(dst, src, imm)) }
 emit_eor_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_eor_v16b_v16b_v16b(dst, src, src2)) }
-emit_eor_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_eor_p_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor_p_p_p_p(rz, rz2, rz3, rz4)) }
+emit_eor_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_eor_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_eor_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_eor_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+emit_eor_pb_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor_pb_p_p_p(rz, rz2, rz3, rz4)) }
 inst_bic_r_r_sh               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_bic_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
-inst_bic_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
-inst_bic_p_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+inst_bic_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_bic_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_bic_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_bic_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+inst_bic_pb_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BIC, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_bic_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_bic_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_bic_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_bic_v16b_v16b_v16b(dst, src, src2)) }
-emit_bic_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bic_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_bic_p_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bic_p_p_p_p(rz, rz2, rz3, rz4)) }
+emit_bic_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bic_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_bic_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bic_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_bic_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bic_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_bic_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bic_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+emit_bic_pb_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bic_pb_p_p_p(rz, rz2, rz3, rz4)) }
 inst_bics_r_r_sh              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .BICS, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
-inst_bics_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BICS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+inst_bics_ph_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BICS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_bics_r_r_sh              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_bics_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
-emit_bics_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bics_p_p_p_p(rz, rz2, rz3, rz4)) }
+emit_bics_ph_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bics_ph_p_p_p(rz, rz2, rz3, rz4)) }
 inst_orn_r_r_sh               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .ORN, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 inst_orn_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ORN, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
-inst_orn_p_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORN, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+inst_orn_ps_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORN, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
 emit_orn_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_orn_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 emit_orn_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_orn_v16b_v16b_v16b(dst, src, src2)) }
-emit_orn_p_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orn_p_p_p_p(rz, rz2, rz3, rz4)) }
+emit_orn_ps_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orn_ps_p_p_p(rz, rz2, rz3, rz4)) }
 inst_eon_r_r_sh               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) -> Instruction { return Instruction{mnemonic = .EON, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_shifted(src2, src2_shift, src2_amount), {}}} }
 emit_eon_r_r_sh               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src2_shift: Shift_Type, src2_amount: u8) { append(instructions, inst_eon_r_r_sh(dst, src, src2, src2_shift, src2_amount)) }
 inst_lsl_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.LSL, dst, src, src2) }
-inst_lsl_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSL, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_lsl_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSL, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_lsl_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSL, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_lsl_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSL, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_lsl_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSL, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 inst_lsl_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.LSL, dst, src, imm) }
 emit_lsl_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_lsl_r_r_r(dst, src, src2)) }
-emit_lsl_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsl_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_lsl_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsl_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_lsl_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsl_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_lsl_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsl_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_lsl_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsl_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 emit_lsl_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_lsl_r_r_i(dst, src, imm)) }
 inst_lsr_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.LSR, dst, src, src2) }
-inst_lsr_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_lsr_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_lsr_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_lsr_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_lsr_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 inst_lsr_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.LSR, dst, src, imm) }
 emit_lsr_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_lsr_r_r_r(dst, src, src2)) }
-emit_lsr_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsr_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_lsr_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsr_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_lsr_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_lsr_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_lsr_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 emit_lsr_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_lsr_r_r_i(dst, src, imm)) }
 inst_asr_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.ASR, dst, src, src2) }
-inst_asr_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_asr_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_asr_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_asr_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_asr_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 inst_asr_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.ASR, dst, src, imm) }
 emit_asr_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_asr_r_r_r(dst, src, src2)) }
-emit_asr_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asr_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_asr_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asr_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_asr_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_asr_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_asr_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 emit_asr_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_asr_r_r_i(dst, src, imm)) }
 inst_ror_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.ROR, dst, src, src2) }
 inst_ror_r_r_i                :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return inst_r_r_i(.ROR, dst, src, imm) }
 emit_ror_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_ror_r_r_r(dst, src, src2)) }
 emit_ror_r_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_ror_r_r_i(dst, src, imm)) }
 inst_udiv_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.UDIV, dst, src, src2) }
-inst_udiv_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UDIV, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_udiv_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UDIV, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_udiv_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UDIV, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_udiv_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_udiv_r_r_r(dst, src, src2)) }
-emit_udiv_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_udiv_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_udiv_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_udiv_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_udiv_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_udiv_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_sdiv_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.SDIV, dst, src, src2) }
-inst_sdiv_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SDIV, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_sdiv_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SDIV, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_sdiv_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SDIV, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_sdiv_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sdiv_r_r_r(dst, src, src2)) }
-emit_sdiv_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sdiv_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_sdiv_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sdiv_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_sdiv_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sdiv_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_madd_r_r_r_r             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src3: Register) -> Instruction { return inst_r_r_r_r(.MADD, dst, src, src2, src3) }
 emit_madd_r_r_r_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src3: Register) { append(instructions, inst_madd_r_r_r_r(dst, src, src2, src3)) }
 inst_msub_r_r_r_r             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src3: Register) -> Instruction { return inst_r_r_r_r(.MSUB, dst, src, src2, src3) }
@@ -184,13 +254,25 @@ emit_umaddl_r_r_r_r           :: #force_inline proc(instructions: ^[dynamic]Inst
 inst_umsubl_r_r_r_r           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src3: Register) -> Instruction { return inst_r_r_r_r(.UMSUBL, dst, src, src2, src3) }
 emit_umsubl_r_r_r_r           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src3: Register) { append(instructions, inst_umsubl_r_r_r_r(dst, src, src2, src3)) }
 inst_smulh_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.SMULH, dst, src, src2) }
-inst_smulh_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMULH, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_smulh_zb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMULH, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_smulh_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMULH, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_smulh_zs_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMULH, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_smulh_zd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMULH, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_smulh_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smulh_r_r_r(dst, src, src2)) }
-emit_smulh_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smulh_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_smulh_zb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smulh_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_smulh_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smulh_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_smulh_zs_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smulh_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_smulh_zd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smulh_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_umulh_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.UMULH, dst, src, src2) }
-inst_umulh_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMULH, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_umulh_zb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMULH, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_umulh_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMULH, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_umulh_zs_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMULH, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_umulh_zd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMULH, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_umulh_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umulh_r_r_r(dst, src, src2)) }
-emit_umulh_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umulh_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_umulh_zb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umulh_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_umulh_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umulh_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_umulh_zs_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umulh_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_umulh_zd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umulh_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_clz_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.CLZ, dst, src) }
 inst_clz_v8b_v8b              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_clz_v16b_v16b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
@@ -198,7 +280,10 @@ inst_clz_v4h_v4h              :: #force_inline proc "contextless" (dst: Register
 inst_clz_v8h_v8h              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
 inst_clz_v2s_v2s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_clz_v4s_v4s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
-inst_clz_z_p_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_clz_zb_p_zb              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_clz_zh_p_zh              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_clz_zs_p_zs              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_clz_zd_p_zd              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLZ, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_clz_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_clz_r_r(dst, src)) }
 emit_clz_v8b_v8b              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_clz_v8b_v8b(dst, src)) }
 emit_clz_v16b_v16b            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_clz_v16b_v16b(dst, src)) }
@@ -206,7 +291,10 @@ emit_clz_v4h_v4h              :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_clz_v8h_v8h              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_clz_v8h_v8h(dst, src)) }
 emit_clz_v2s_v2s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_clz_v2s_v2s(dst, src)) }
 emit_clz_v4s_v4s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_clz_v4s_v4s(dst, src)) }
-emit_clz_z_p_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_clz_z_p_z(rz, rz2, rz3)) }
+emit_clz_zb_p_zb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_clz_zb_p_zb(rz, rz2, rz3)) }
+emit_clz_zh_p_zh              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_clz_zh_p_zh(rz, rz2, rz3)) }
+emit_clz_zs_p_zs              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_clz_zs_p_zs(rz, rz2, rz3)) }
+emit_clz_zd_p_zd              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_clz_zd_p_zd(rz, rz2, rz3)) }
 inst_cls_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.CLS, dst, src) }
 inst_cls_v8b_v8b              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_cls_v16b_v16b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
@@ -214,7 +302,10 @@ inst_cls_v4h_v4h              :: #force_inline proc "contextless" (dst: Register
 inst_cls_v8h_v8h              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
 inst_cls_v2s_v2s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_cls_v4s_v4s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
-inst_cls_z_p_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_cls_zb_p_zb              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_cls_zh_p_zh              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_cls_zs_p_zs              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_cls_zd_p_zd              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CLS, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_cls_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cls_r_r(dst, src)) }
 emit_cls_v8b_v8b              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cls_v8b_v8b(dst, src)) }
 emit_cls_v16b_v16b            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cls_v16b_v16b(dst, src)) }
@@ -222,7 +313,10 @@ emit_cls_v4h_v4h              :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_cls_v8h_v8h              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cls_v8h_v8h(dst, src)) }
 emit_cls_v2s_v2s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cls_v2s_v2s(dst, src)) }
 emit_cls_v4s_v4s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cls_v4s_v4s(dst, src)) }
-emit_cls_z_p_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cls_z_p_z(rz, rz2, rz3)) }
+emit_cls_zb_p_zb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cls_zb_p_zb(rz, rz2, rz3)) }
+emit_cls_zh_p_zh              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cls_zh_p_zh(rz, rz2, rz3)) }
+emit_cls_zs_p_zs              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cls_zs_p_zs(rz, rz2, rz3)) }
+emit_cls_zd_p_zd              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cls_zd_p_zd(rz, rz2, rz3)) }
 inst_rbit_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.RBIT, dst, src) }
 inst_rbit_v8b_v8b             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .RBIT, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_rbit_v16b_v16b           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .RBIT, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
@@ -230,11 +324,17 @@ emit_rbit_r_r                 :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_rbit_v8b_v8b             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_rbit_v8b_v8b(dst, src)) }
 emit_rbit_v16b_v16b           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_rbit_v16b_v16b(dst, src)) }
 inst_rev_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.REV, dst, src) }
-inst_rev_z_z                  :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .REV, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
-inst_rev_p_p                  :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .REV, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), {}, {}}} }
+inst_rev_zb_zb                :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .REV, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
+inst_rev_zh_zh                :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .REV, operand_count = 2, length = 4, ops = {op_z_h(rz), op_z_h(rz2), {}, {}}} }
+inst_rev_zs_zs                :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .REV, operand_count = 2, length = 4, ops = {op_z_s(rz), op_z_s(rz2), {}, {}}} }
+inst_rev_zd_zd                :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .REV, operand_count = 2, length = 4, ops = {op_z_d(rz), op_z_d(rz2), {}, {}}} }
+inst_rev_pb_p                 :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .REV, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), {}, {}}} }
 emit_rev_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_rev_r_r(dst, src)) }
-emit_rev_z_z                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_rev_z_z(rz, rz2)) }
-emit_rev_p_p                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_rev_p_p(rz, rz2)) }
+emit_rev_zb_zb                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_rev_zb_zb(rz, rz2)) }
+emit_rev_zh_zh                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_rev_zh_zh(rz, rz2)) }
+emit_rev_zs_zs                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_rev_zs_zs(rz, rz2)) }
+emit_rev_zd_zd                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_rev_zd_zd(rz, rz2)) }
+emit_rev_pb_p                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_rev_pb_p(rz, rz2)) }
 inst_rev16_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.REV16, dst, src) }
 inst_rev16_v8b_v8b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .REV16, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_rev16_v16b_v16b          :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .REV16, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
@@ -333,21 +433,21 @@ inst_tbnz_r_i_l               :: #force_inline proc "contextless" (dst: Register
 emit_tbnz_r_i_l               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, label: u32) { append(instructions, inst_tbnz_r_i_l(dst, imm, label)) }
 inst_ldr_r_m                  :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDR, dst, mem) }
 inst_ldr_r_l                  :: #force_inline proc "contextless" (dst: Register, label: u32) -> Instruction { return Instruction{mnemonic = .LDR, operand_count = 2, length = 4, ops = {op_reg(dst), op_label(label, 4), {}, {}}} }
-inst_ldr_z_m                  :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDR, operand_count = 2, length = 4, ops = {op_z_b(rz), op_mem(mem), {}, {}}} }
-inst_ldr_p_m                  :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDR, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_mem(mem), {}, {}}} }
+inst_ldr_zb_m                 :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDR, operand_count = 2, length = 4, ops = {op_z_b(rz), op_mem(mem), {}, {}}} }
+inst_ldr_ps_m                 :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDR, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_mem(mem), {}, {}}} }
 inst_ldr_i_m                  :: #force_inline proc "contextless" (imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDR, operand_count = 2, length = 4, ops = {op_imm(imm, 1), op_mem(mem), {}, {}}} }
 emit_ldr_r_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldr_r_m(dst, mem)) }
 emit_ldr_r_l                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, label: u32) { append(instructions, inst_ldr_r_l(dst, label)) }
-emit_ldr_z_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_ldr_z_m(rz, mem)) }
-emit_ldr_p_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_ldr_p_m(rz, mem)) }
+emit_ldr_zb_m                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_ldr_zb_m(rz, mem)) }
+emit_ldr_ps_m                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_ldr_ps_m(rz, mem)) }
 emit_ldr_i_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, mem: Memory) { append(instructions, inst_ldr_i_m(imm, mem)) }
 inst_str_r_m                  :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.STR, dst, mem) }
-inst_str_z_m                  :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STR, operand_count = 2, length = 4, ops = {op_z_b(rz), op_mem(mem), {}, {}}} }
-inst_str_p_m                  :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STR, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_mem(mem), {}, {}}} }
+inst_str_zb_m                 :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STR, operand_count = 2, length = 4, ops = {op_z_b(rz), op_mem(mem), {}, {}}} }
+inst_str_ps_m                 :: #force_inline proc "contextless" (rz: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STR, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_mem(mem), {}, {}}} }
 inst_str_i_m                  :: #force_inline proc "contextless" (imm: i64, mem: Memory) -> Instruction { return Instruction{mnemonic = .STR, operand_count = 2, length = 4, ops = {op_imm(imm, 1), op_mem(mem), {}, {}}} }
 emit_str_r_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_str_r_m(dst, mem)) }
-emit_str_z_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_str_z_m(rz, mem)) }
-emit_str_p_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_str_p_m(rz, mem)) }
+emit_str_zb_m                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_str_zb_m(rz, mem)) }
+emit_str_ps_m                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, mem: Memory) { append(instructions, inst_str_ps_m(rz, mem)) }
 emit_str_i_m                  :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, mem: Memory) { append(instructions, inst_str_i_m(imm, mem)) }
 inst_ldrb_r_m                 :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRB, dst, mem) }
 emit_ldrb_r_m                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldrb_r_m(dst, mem)) }
@@ -447,88 +547,128 @@ inst_fabs_v4s_v4s             :: #force_inline proc "contextless" (dst: Register
 inst_fabs_v2d_v2d             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FABS, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_fabs_v4h_v4h             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FABS, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_fabs_v8h_v8h             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FABS, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_fabs_z_p_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FABS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fabs_zh_p_zh             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FABS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fabs_zs_p_zs             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FABS, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_fabs_zd_p_zd             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FABS, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_fabs_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fabs_r_r(dst, src)) }
 emit_fabs_v2s_v2s             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fabs_v2s_v2s(dst, src)) }
 emit_fabs_v4s_v4s             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fabs_v4s_v4s(dst, src)) }
 emit_fabs_v2d_v2d             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fabs_v2d_v2d(dst, src)) }
 emit_fabs_v4h_v4h             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fabs_v4h_v4h(dst, src)) }
 emit_fabs_v8h_v8h             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fabs_v8h_v8h(dst, src)) }
-emit_fabs_z_p_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fabs_z_p_z(rz, rz2, rz3)) }
+emit_fabs_zh_p_zh             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fabs_zh_p_zh(rz, rz2, rz3)) }
+emit_fabs_zs_p_zs             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fabs_zs_p_zs(rz, rz2, rz3)) }
+emit_fabs_zd_p_zd             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fabs_zd_p_zd(rz, rz2, rz3)) }
 inst_fneg_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FNEG, dst, src) }
 inst_fneg_v2s_v2s             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_fneg_v4s_v4s             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_fneg_v2d_v2d             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_fneg_v4h_v4h             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_fneg_v8h_v8h             :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_fneg_z_p_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fneg_zh_p_zh             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fneg_zs_p_zs             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_fneg_zd_p_zd             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FNEG, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_fneg_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fneg_r_r(dst, src)) }
 emit_fneg_v2s_v2s             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fneg_v2s_v2s(dst, src)) }
 emit_fneg_v4s_v4s             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fneg_v4s_v4s(dst, src)) }
 emit_fneg_v2d_v2d             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fneg_v2d_v2d(dst, src)) }
 emit_fneg_v4h_v4h             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fneg_v4h_v4h(dst, src)) }
 emit_fneg_v8h_v8h             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fneg_v8h_v8h(dst, src)) }
-emit_fneg_z_p_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fneg_z_p_z(rz, rz2, rz3)) }
+emit_fneg_zh_p_zh             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fneg_zh_p_zh(rz, rz2, rz3)) }
+emit_fneg_zs_p_zs             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fneg_zs_p_zs(rz, rz2, rz3)) }
+emit_fneg_zd_p_zd             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fneg_zd_p_zd(rz, rz2, rz3)) }
 inst_fsqrt_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FSQRT, dst, src) }
 inst_fsqrt_v2s_v2s            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_fsqrt_v4s_v4s            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_fsqrt_v2d_v2d            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_fsqrt_v4h_v4h            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_fsqrt_v8h_v8h            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_fsqrt_z_p_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fsqrt_zh_p_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fsqrt_zs_p_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_fsqrt_zd_p_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSQRT, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_fsqrt_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fsqrt_r_r(dst, src)) }
 emit_fsqrt_v2s_v2s            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fsqrt_v2s_v2s(dst, src)) }
 emit_fsqrt_v4s_v4s            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fsqrt_v4s_v4s(dst, src)) }
 emit_fsqrt_v2d_v2d            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fsqrt_v2d_v2d(dst, src)) }
 emit_fsqrt_v4h_v4h            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fsqrt_v4h_v4h(dst, src)) }
 emit_fsqrt_v8h_v8h            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fsqrt_v8h_v8h(dst, src)) }
-emit_fsqrt_z_p_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsqrt_z_p_z(rz, rz2, rz3)) }
+emit_fsqrt_zh_p_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsqrt_zh_p_zh(rz, rz2, rz3)) }
+emit_fsqrt_zs_p_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsqrt_zs_p_zs(rz, rz2, rz3)) }
+emit_fsqrt_zd_p_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsqrt_zd_p_zd(rz, rz2, rz3)) }
 inst_fadd_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FADD, dst, src, src2) }
 inst_fadd_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fadd_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fadd_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_fadd_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-inst_fadd_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fadd_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_fadd_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_fadd_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_fadd_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fadd_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fadd_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FADD, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fadd_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fadd_r_r_r(dst, src, src2)) }
 emit_fadd_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fadd_v2s_v2s_v2s(dst, src, src2)) }
 emit_fadd_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fadd_v4s_v4s_v4s(dst, src, src2)) }
 emit_fadd_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fadd_v2d_v2d_v2d(dst, src, src2)) }
-emit_fadd_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fadd_z_z_z(rz, rz2, rz3)) }
-emit_fadd_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fadd_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fadd_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fadd_zh_zh_zh(rz, rz2, rz3)) }
+emit_fadd_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fadd_zs_zs_zs(rz, rz2, rz3)) }
+emit_fadd_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fadd_zd_zd_zd(rz, rz2, rz3)) }
+emit_fadd_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fadd_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fadd_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fadd_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fadd_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fadd_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fsub_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FSUB, dst, src, src2) }
 inst_fsub_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fsub_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fsub_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_fsub_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-inst_fsub_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fsub_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_fsub_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_fsub_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_fsub_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fsub_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fsub_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUB, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fsub_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fsub_r_r_r(dst, src, src2)) }
 emit_fsub_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fsub_v2s_v2s_v2s(dst, src, src2)) }
 emit_fsub_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fsub_v4s_v4s_v4s(dst, src, src2)) }
 emit_fsub_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fsub_v2d_v2d_v2d(dst, src, src2)) }
-emit_fsub_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsub_z_z_z(rz, rz2, rz3)) }
-emit_fsub_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsub_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fsub_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsub_zh_zh_zh(rz, rz2, rz3)) }
+emit_fsub_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsub_zs_zs_zs(rz, rz2, rz3)) }
+emit_fsub_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fsub_zd_zd_zd(rz, rz2, rz3)) }
+emit_fsub_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsub_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fsub_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsub_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fsub_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsub_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fmul_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FMUL, dst, src, src2) }
 inst_fmul_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fmul_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fmul_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_fmul_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-inst_fmul_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmul_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_fmul_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_fmul_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_fmul_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmul_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fmul_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMUL, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fmul_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmul_r_r_r(dst, src, src2)) }
 emit_fmul_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmul_v2s_v2s_v2s(dst, src, src2)) }
 emit_fmul_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmul_v4s_v4s_v4s(dst, src, src2)) }
 emit_fmul_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmul_v2d_v2d_v2d(dst, src, src2)) }
-emit_fmul_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmul_z_z_z(rz, rz2, rz3)) }
-emit_fmul_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmul_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fmul_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmul_zh_zh_zh(rz, rz2, rz3)) }
+emit_fmul_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmul_zs_zs_zs(rz, rz2, rz3)) }
+emit_fmul_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmul_zd_zd_zd(rz, rz2, rz3)) }
+emit_fmul_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmul_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fmul_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmul_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fmul_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmul_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fdiv_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FDIV, dst, src, src2) }
 inst_fdiv_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FDIV, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fdiv_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FDIV, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fdiv_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FDIV, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_fdiv_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIV, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fdiv_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIV, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fdiv_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIV, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fdiv_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIV, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fdiv_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fdiv_r_r_r(dst, src, src2)) }
 emit_fdiv_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fdiv_v2s_v2s_v2s(dst, src, src2)) }
 emit_fdiv_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fdiv_v4s_v4s_v4s(dst, src, src2)) }
 emit_fdiv_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fdiv_v2d_v2d_v2d(dst, src, src2)) }
-emit_fdiv_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdiv_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fdiv_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdiv_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fdiv_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdiv_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fdiv_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdiv_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fnmul_r_r_r              :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FNMUL, dst, src, src2) }
 emit_fnmul_r_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fnmul_r_r_r(dst, src, src2)) }
 inst_fmadd_r_r_r_r            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src3: Register) -> Instruction { return inst_r_r_r_r(.FMADD, dst, src, src2, src3) }
@@ -551,56 +691,72 @@ inst_fmax_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register
 inst_fmax_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAX, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_fmax_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAX, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_fmax_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAX, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_fmax_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAX, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmax_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAX, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmax_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAX, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fmax_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAX, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fmax_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmax_r_r_r(dst, src, src2)) }
 emit_fmax_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmax_v2s_v2s_v2s(dst, src, src2)) }
 emit_fmax_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmax_v4s_v4s_v4s(dst, src, src2)) }
 emit_fmax_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmax_v2d_v2d_v2d(dst, src, src2)) }
 emit_fmax_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmax_v4h_v4h_v4h(dst, src, src2)) }
 emit_fmax_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmax_v8h_v8h_v8h(dst, src, src2)) }
-emit_fmax_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmax_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fmax_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmax_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fmax_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmax_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fmax_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmax_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fmin_r_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FMIN, dst, src, src2) }
 inst_fmin_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fmin_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fmin_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_fmin_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_fmin_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_fmin_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmin_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmin_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fmin_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMIN, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fmin_r_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmin_r_r_r(dst, src, src2)) }
 emit_fmin_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmin_v2s_v2s_v2s(dst, src, src2)) }
 emit_fmin_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmin_v4s_v4s_v4s(dst, src, src2)) }
 emit_fmin_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmin_v2d_v2d_v2d(dst, src, src2)) }
 emit_fmin_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmin_v4h_v4h_v4h(dst, src, src2)) }
 emit_fmin_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmin_v8h_v8h_v8h(dst, src, src2)) }
-emit_fmin_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmin_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fmin_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmin_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fmin_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmin_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fmin_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmin_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fmaxnm_r_r_r             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FMAXNM, dst, src, src2) }
 inst_fmaxnm_v2s_v2s_v2s       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fmaxnm_v4s_v4s_v4s       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fmaxnm_v2d_v2d_v2d       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_fmaxnm_v4h_v4h_v4h       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_fmaxnm_v8h_v8h_v8h       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_fmaxnm_z_p_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmaxnm_zh_p_zh_zh        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmaxnm_zs_p_zs_zs        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fmaxnm_zd_p_zd_zd        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMAXNM, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fmaxnm_r_r_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnm_r_r_r(dst, src, src2)) }
 emit_fmaxnm_v2s_v2s_v2s       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnm_v2s_v2s_v2s(dst, src, src2)) }
 emit_fmaxnm_v4s_v4s_v4s       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnm_v4s_v4s_v4s(dst, src, src2)) }
 emit_fmaxnm_v2d_v2d_v2d       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnm_v2d_v2d_v2d(dst, src, src2)) }
 emit_fmaxnm_v4h_v4h_v4h       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnm_v4h_v4h_v4h(dst, src, src2)) }
 emit_fmaxnm_v8h_v8h_v8h       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmaxnm_v8h_v8h_v8h(dst, src, src2)) }
-emit_fmaxnm_z_p_z_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmaxnm_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fmaxnm_zh_p_zh_zh        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmaxnm_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fmaxnm_zs_p_zs_zs        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmaxnm_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fmaxnm_zd_p_zd_zd        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmaxnm_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fminnm_r_r_r             :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.FMINNM, dst, src, src2) }
 inst_fminnm_v2s_v2s_v2s       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fminnm_v4s_v4s_v4s       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fminnm_v2d_v2d_v2d       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_fminnm_v4h_v4h_v4h       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_fminnm_v8h_v8h_v8h       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_fminnm_z_p_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fminnm_zh_p_zh_zh        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fminnm_zs_p_zs_zs        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fminnm_zd_p_zd_zd        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMINNM, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fminnm_r_r_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnm_r_r_r(dst, src, src2)) }
 emit_fminnm_v2s_v2s_v2s       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnm_v2s_v2s_v2s(dst, src, src2)) }
 emit_fminnm_v4s_v4s_v4s       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnm_v4s_v4s_v4s(dst, src, src2)) }
 emit_fminnm_v2d_v2d_v2d       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnm_v2d_v2d_v2d(dst, src, src2)) }
 emit_fminnm_v4h_v4h_v4h       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnm_v4h_v4h_v4h(dst, src, src2)) }
 emit_fminnm_v8h_v8h_v8h       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fminnm_v8h_v8h_v8h(dst, src, src2)) }
-emit_fminnm_z_p_z_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fminnm_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fminnm_zh_p_zh_zh        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fminnm_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fminnm_zs_p_zs_zs        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fminnm_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fminnm_zd_p_zd_zd        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fminnm_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fcvt_r_r                 :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FCVT, dst, src) }
 emit_fcvt_r_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcvt_r_r(dst, src)) }
 inst_scvtf_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.SCVTF, dst, src) }
@@ -753,98 +909,126 @@ inst_frinta_v4s_v4s           :: #force_inline proc "contextless" (dst: Register
 inst_frinta_v2d_v2d           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTA, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_frinta_v4h_v4h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTA, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_frinta_v8h_v8h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTA, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_frinta_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTA, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frinta_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTA, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frinta_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTA, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frinta_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTA, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frinta_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinta_r_r(dst, src)) }
 emit_frinta_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinta_v2s_v2s(dst, src)) }
 emit_frinta_v4s_v4s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinta_v4s_v4s(dst, src)) }
 emit_frinta_v2d_v2d           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinta_v2d_v2d(dst, src)) }
 emit_frinta_v4h_v4h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinta_v4h_v4h(dst, src)) }
 emit_frinta_v8h_v8h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinta_v8h_v8h(dst, src)) }
-emit_frinta_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinta_z_p_z(rz, rz2, rz3)) }
+emit_frinta_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinta_zh_p_zh(rz, rz2, rz3)) }
+emit_frinta_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinta_zs_p_zs(rz, rz2, rz3)) }
+emit_frinta_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinta_zd_p_zd(rz, rz2, rz3)) }
 inst_frinti_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTI, dst, src) }
 inst_frinti_v2s_v2s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_frinti_v4s_v4s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_frinti_v2d_v2d           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_frinti_v4h_v4h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_frinti_v8h_v8h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_frinti_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frinti_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frinti_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frinti_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTI, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frinti_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinti_r_r(dst, src)) }
 emit_frinti_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinti_v2s_v2s(dst, src)) }
 emit_frinti_v4s_v4s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinti_v4s_v4s(dst, src)) }
 emit_frinti_v2d_v2d           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinti_v2d_v2d(dst, src)) }
 emit_frinti_v4h_v4h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinti_v4h_v4h(dst, src)) }
 emit_frinti_v8h_v8h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frinti_v8h_v8h(dst, src)) }
-emit_frinti_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinti_z_p_z(rz, rz2, rz3)) }
+emit_frinti_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinti_zh_p_zh(rz, rz2, rz3)) }
+emit_frinti_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinti_zs_p_zs(rz, rz2, rz3)) }
+emit_frinti_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frinti_zd_p_zd(rz, rz2, rz3)) }
 inst_frintm_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTM, dst, src) }
 inst_frintm_v2s_v2s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_frintm_v4s_v4s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_frintm_v2d_v2d           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_frintm_v4h_v4h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_frintm_v8h_v8h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_frintm_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintm_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintm_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frintm_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTM, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frintm_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintm_r_r(dst, src)) }
 emit_frintm_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintm_v2s_v2s(dst, src)) }
 emit_frintm_v4s_v4s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintm_v4s_v4s(dst, src)) }
 emit_frintm_v2d_v2d           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintm_v2d_v2d(dst, src)) }
 emit_frintm_v4h_v4h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintm_v4h_v4h(dst, src)) }
 emit_frintm_v8h_v8h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintm_v8h_v8h(dst, src)) }
-emit_frintm_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintm_z_p_z(rz, rz2, rz3)) }
+emit_frintm_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintm_zh_p_zh(rz, rz2, rz3)) }
+emit_frintm_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintm_zs_p_zs(rz, rz2, rz3)) }
+emit_frintm_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintm_zd_p_zd(rz, rz2, rz3)) }
 inst_frintn_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTN, dst, src) }
 inst_frintn_v2s_v2s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_frintn_v4s_v4s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_frintn_v2d_v2d           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_frintn_v4h_v4h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_frintn_v8h_v8h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_frintn_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintn_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintn_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frintn_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTN, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frintn_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintn_r_r(dst, src)) }
 emit_frintn_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintn_v2s_v2s(dst, src)) }
 emit_frintn_v4s_v4s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintn_v4s_v4s(dst, src)) }
 emit_frintn_v2d_v2d           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintn_v2d_v2d(dst, src)) }
 emit_frintn_v4h_v4h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintn_v4h_v4h(dst, src)) }
 emit_frintn_v8h_v8h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintn_v8h_v8h(dst, src)) }
-emit_frintn_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintn_z_p_z(rz, rz2, rz3)) }
+emit_frintn_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintn_zh_p_zh(rz, rz2, rz3)) }
+emit_frintn_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintn_zs_p_zs(rz, rz2, rz3)) }
+emit_frintn_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintn_zd_p_zd(rz, rz2, rz3)) }
 inst_frintp_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTP, dst, src) }
 inst_frintp_v2s_v2s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_frintp_v4s_v4s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_frintp_v2d_v2d           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_frintp_v4h_v4h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_frintp_v8h_v8h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_frintp_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintp_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintp_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frintp_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTP, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frintp_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintp_r_r(dst, src)) }
 emit_frintp_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintp_v2s_v2s(dst, src)) }
 emit_frintp_v4s_v4s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintp_v4s_v4s(dst, src)) }
 emit_frintp_v2d_v2d           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintp_v2d_v2d(dst, src)) }
 emit_frintp_v4h_v4h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintp_v4h_v4h(dst, src)) }
 emit_frintp_v8h_v8h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintp_v8h_v8h(dst, src)) }
-emit_frintp_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintp_z_p_z(rz, rz2, rz3)) }
+emit_frintp_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintp_zh_p_zh(rz, rz2, rz3)) }
+emit_frintp_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintp_zs_p_zs(rz, rz2, rz3)) }
+emit_frintp_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintp_zd_p_zd(rz, rz2, rz3)) }
 inst_frintx_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTX, dst, src) }
 inst_frintx_v2s_v2s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_frintx_v4s_v4s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_frintx_v2d_v2d           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_frintx_v4h_v4h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_frintx_v8h_v8h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_frintx_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintx_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintx_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frintx_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTX, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frintx_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintx_r_r(dst, src)) }
 emit_frintx_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintx_v2s_v2s(dst, src)) }
 emit_frintx_v4s_v4s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintx_v4s_v4s(dst, src)) }
 emit_frintx_v2d_v2d           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintx_v2d_v2d(dst, src)) }
 emit_frintx_v4h_v4h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintx_v4h_v4h(dst, src)) }
 emit_frintx_v8h_v8h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintx_v8h_v8h(dst, src)) }
-emit_frintx_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintx_z_p_z(rz, rz2, rz3)) }
+emit_frintx_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintx_zh_p_zh(rz, rz2, rz3)) }
+emit_frintx_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintx_zs_p_zs(rz, rz2, rz3)) }
+emit_frintx_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintx_zd_p_zd(rz, rz2, rz3)) }
 inst_frintz_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRINTZ, dst, src) }
 inst_frintz_v2s_v2s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_frintz_v4s_v4s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_frintz_v2d_v2d           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_frintz_v4h_v4h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_frintz_v8h_v8h           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_frintz_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintz_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frintz_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frintz_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRINTZ, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frintz_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintz_r_r(dst, src)) }
 emit_frintz_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintz_v2s_v2s(dst, src)) }
 emit_frintz_v4s_v4s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintz_v4s_v4s(dst, src)) }
 emit_frintz_v2d_v2d           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintz_v2d_v2d(dst, src)) }
 emit_frintz_v4h_v4h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintz_v4h_v4h(dst, src)) }
 emit_frintz_v8h_v8h           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frintz_v8h_v8h(dst, src)) }
-emit_frintz_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintz_z_p_z(rz, rz2, rz3)) }
+emit_frintz_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintz_zh_p_zh(rz, rz2, rz3)) }
+emit_frintz_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintz_zs_p_zs(rz, rz2, rz3)) }
+emit_frintz_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frintz_zd_p_zd(rz, rz2, rz3)) }
 inst_tst_r_i                  :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return inst_r_i(.TST, dst, imm) }
 inst_tst_r_sh                 :: #force_inline proc "contextless" (dst: Register, src: Register, src_shift: Shift_Type, src_amount: u8) -> Instruction { return Instruction{mnemonic = .TST, operand_count = 2, length = 4, ops = {op_reg(dst), op_shifted(src, src_shift, src_amount), {}, {}}} }
 emit_tst_r_i                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_tst_r_i(dst, imm)) }
@@ -1134,21 +1318,21 @@ emit_crc32cw_r_r_r            :: #force_inline proc(instructions: ^[dynamic]Inst
 inst_crc32cx_r_r_r            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.CRC32CX, dst, src, src2) }
 emit_crc32cx_r_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_crc32cx_r_r_r(dst, src, src2)) }
 inst_aese_v16b_v16b           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .AESE, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
-inst_aese_z_z                 :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .AESE, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
+inst_aese_zb_zb               :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .AESE, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
 emit_aese_v16b_v16b           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_aese_v16b_v16b(dst, src)) }
-emit_aese_z_z                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_aese_z_z(rz, rz2)) }
+emit_aese_zb_zb               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_aese_zb_zb(rz, rz2)) }
 inst_aesd_v16b_v16b           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .AESD, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
-inst_aesd_z_z                 :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .AESD, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
+inst_aesd_zb_zb               :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .AESD, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
 emit_aesd_v16b_v16b           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_aesd_v16b_v16b(dst, src)) }
-emit_aesd_z_z                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_aesd_z_z(rz, rz2)) }
+emit_aesd_zb_zb               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_aesd_zb_zb(rz, rz2)) }
 inst_aesmc_v16b_v16b          :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .AESMC, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
-inst_aesmc_z                  :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .AESMC, operand_count = 1, length = 4, ops = {op_z_b(rz), {}, {}, {}}} }
+inst_aesmc_zb                 :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .AESMC, operand_count = 1, length = 4, ops = {op_z_b(rz), {}, {}, {}}} }
 emit_aesmc_v16b_v16b          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_aesmc_v16b_v16b(dst, src)) }
-emit_aesmc_z                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_aesmc_z(rz)) }
+emit_aesmc_zb                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_aesmc_zb(rz)) }
 inst_aesimc_v16b_v16b         :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .AESIMC, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
-inst_aesimc_z                 :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .AESIMC, operand_count = 1, length = 4, ops = {op_z_b(rz), {}, {}, {}}} }
+inst_aesimc_zb                :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .AESIMC, operand_count = 1, length = 4, ops = {op_z_b(rz), {}, {}, {}}} }
 emit_aesimc_v16b_v16b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_aesimc_v16b_v16b(dst, src)) }
-emit_aesimc_z                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_aesimc_z(rz)) }
+emit_aesimc_zb                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_aesimc_zb(rz)) }
 inst_sha1h_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.SHA1H, dst, src) }
 emit_sha1h_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_sha1h_r_r(dst, src)) }
 inst_sha1c_r_r_v4s            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SHA1C, operand_count = 3, length = 4, ops = {op_reg(dst), op_reg(src), op_v_4s(src2), {}}} }
@@ -1178,17 +1362,17 @@ emit_sha512su0_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Inst
 inst_sha512su1_v2d_v2d_v2d    :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SHA512SU1, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 emit_sha512su1_v2d_v2d_v2d    :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sha512su1_v2d_v2d_v2d(dst, src, src2)) }
 inst_eor3_v16b_v16b_v16b_v16b :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src3: Register) -> Instruction { return Instruction{mnemonic = .EOR3, operand_count = 4, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), op_v_16b(src3)}} }
-inst_eor3_z_z_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR3, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
+inst_eor3_zd_zd_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EOR3, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
 emit_eor3_v16b_v16b_v16b_v16b :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src3: Register) { append(instructions, inst_eor3_v16b_v16b_v16b_v16b(dst, src, src2, src3)) }
-emit_eor3_z_z_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor3_z_z_z_z(rz, rz2, rz3, rz4)) }
+emit_eor3_zd_zd_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eor3_zd_zd_zd_zd(rz, rz2, rz3, rz4)) }
 inst_bcax_v16b_v16b_v16b_v16b :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src3: Register) -> Instruction { return Instruction{mnemonic = .BCAX, operand_count = 4, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), op_v_16b(src3)}} }
-inst_bcax_z_z_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BCAX, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
+inst_bcax_zd_zd_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BCAX, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
 emit_bcax_v16b_v16b_v16b_v16b :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src3: Register) { append(instructions, inst_bcax_v16b_v16b_v16b_v16b(dst, src, src2, src3)) }
-emit_bcax_z_z_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bcax_z_z_z_z(rz, rz2, rz3, rz4)) }
+emit_bcax_zd_zd_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bcax_zd_zd_zd_zd(rz, rz2, rz3, rz4)) }
 inst_rax1_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .RAX1, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 emit_rax1_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_rax1_v2d_v2d_v2d(dst, src, src2)) }
 inst_xar_v2d_v2d_v2d_i        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), op_imm(imm, 1)}} }
-inst_xar_z_z_z_i              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 4)}} }
+inst_xar_z_z_z_i              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .XAR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_reg(Register(REG_Z | (u16(rz3) & 0x1F))), op_imm(imm, 4)}} }
 emit_xar_v2d_v2d_v2d_i        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_xar_v2d_v2d_v2d_i(dst, src, src2, imm)) }
 emit_xar_z_z_z_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_xar_z_z_z_i(rz, rz2, rz3, imm)) }
 inst_sm3partw1_v4s_v4s_v4s    :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SM3PARTW1, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
@@ -1218,9 +1402,9 @@ inst_pmull2_v1q_v2d_v2d       :: #force_inline proc "contextless" (dst: Register
 emit_pmull2_v8h_v16b_v16b     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_pmull2_v8h_v16b_v16b(dst, src, src2)) }
 emit_pmull2_v1q_v2d_v2d       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_pmull2_v1q_v2d_v2d(dst, src, src2)) }
 inst_bfcvt_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.BFCVT, dst, src) }
-inst_bfcvt_z_p_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFCVT, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_bfcvt_zh_p_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFCVT, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
 emit_bfcvt_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_bfcvt_r_r(dst, src)) }
-emit_bfcvt_z_p_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfcvt_z_p_z(rz, rz2, rz3)) }
+emit_bfcvt_zh_p_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfcvt_zh_p_zs(rz, rz2, rz3)) }
 inst_bfdot_v4s_v8h_v8h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .BFDOT, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 emit_bfdot_v4s_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_bfdot_v4s_v8h_v8h(dst, src, src2)) }
 inst_bfmmla_v4s_v8h_v8h       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .BFMMLA, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_8h(src), op_v_8h(src2), {}}} }
@@ -1236,11 +1420,17 @@ emit_bfcvtn2_v8h_v4s          :: #force_inline proc(instructions: ^[dynamic]Inst
 inst_mul_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_mul_v8h_v8h_v8h          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_mul_v4s_v4s_v4s          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
-inst_mul_z_p_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_mul_zb_p_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_mul_zh_p_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_mul_zs_p_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_mul_zd_p_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MUL, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_mul_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_mul_v16b_v16b_v16b(dst, src, src2)) }
 emit_mul_v8h_v8h_v8h          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_mul_v8h_v8h_v8h(dst, src, src2)) }
 emit_mul_v4s_v4s_v4s          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_mul_v4s_v4s_v4s(dst, src, src2)) }
-emit_mul_z_p_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_mul_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_mul_zb_p_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_mul_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_mul_zh_p_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_mul_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_mul_zs_p_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_mul_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_mul_zd_p_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_mul_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_mla_v8b_v8b_v8b          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .MLA, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_mla_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .MLA, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_mla_v4h_v4h_v4h          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .MLA, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -1272,7 +1462,10 @@ inst_neg_v8h_v8h              :: #force_inline proc "contextless" (dst: Register
 inst_neg_v2s_v2s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_neg_v4s_v4s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_neg_v2d_v2d              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
-inst_neg_z_p_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_neg_zb_p_zb              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_neg_zh_p_zh              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_neg_zs_p_zs              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_neg_zd_p_zd              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 inst_neg_r_sh                 :: #force_inline proc "contextless" (dst: Register, src: Register, src_shift: Shift_Type, src_amount: u8) -> Instruction { return Instruction{mnemonic = .NEG, operand_count = 2, length = 4, ops = {op_reg(dst), op_shifted(src, src_shift, src_amount), {}, {}}} }
 emit_neg_v8b_v8b              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_neg_v8b_v8b(dst, src)) }
 emit_neg_v16b_v16b            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_neg_v16b_v16b(dst, src)) }
@@ -1281,7 +1474,10 @@ emit_neg_v8h_v8h              :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_neg_v2s_v2s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_neg_v2s_v2s(dst, src)) }
 emit_neg_v4s_v4s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_neg_v4s_v4s(dst, src)) }
 emit_neg_v2d_v2d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_neg_v2d_v2d(dst, src)) }
-emit_neg_z_p_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_neg_z_p_z(rz, rz2, rz3)) }
+emit_neg_zb_p_zb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_neg_zb_p_zb(rz, rz2, rz3)) }
+emit_neg_zh_p_zh              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_neg_zh_p_zh(rz, rz2, rz3)) }
+emit_neg_zs_p_zs              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_neg_zs_p_zs(rz, rz2, rz3)) }
+emit_neg_zd_p_zd              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_neg_zd_p_zd(rz, rz2, rz3)) }
 emit_neg_r_sh                 :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src_shift: Shift_Type, src_amount: u8) { append(instructions, inst_neg_r_sh(dst, src, src_shift, src_amount)) }
 inst_abs_v8b_v8b              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_abs_v16b_v16b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
@@ -1290,7 +1486,10 @@ inst_abs_v8h_v8h              :: #force_inline proc "contextless" (dst: Register
 inst_abs_v2s_v2s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_abs_v4s_v4s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_abs_v2d_v2d              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
-inst_abs_z_p_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_abs_zb_p_zb              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_abs_zh_p_zh              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_abs_zs_p_zs              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_abs_zd_p_zd              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ABS, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_abs_v8b_v8b              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_abs_v8b_v8b(dst, src)) }
 emit_abs_v16b_v16b            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_abs_v16b_v16b(dst, src)) }
 emit_abs_v4h_v4h              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_abs_v4h_v4h(dst, src)) }
@@ -1298,7 +1497,10 @@ emit_abs_v8h_v8h              :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_abs_v2s_v2s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_abs_v2s_v2s(dst, src)) }
 emit_abs_v4s_v4s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_abs_v4s_v4s(dst, src)) }
 emit_abs_v2d_v2d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_abs_v2d_v2d(dst, src)) }
-emit_abs_z_p_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_abs_z_p_z(rz, rz2, rz3)) }
+emit_abs_zb_p_zb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_abs_zb_p_zb(rz, rz2, rz3)) }
+emit_abs_zh_p_zh              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_abs_zh_p_zh(rz, rz2, rz3)) }
+emit_abs_zs_p_zs              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_abs_zs_p_zs(rz, rz2, rz3)) }
+emit_abs_zd_p_zd              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_abs_zd_p_zd(rz, rz2, rz3)) }
 inst_shadd_v8b_v8b_v8b        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SHADD, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_shadd_v16b_v16b_v16b     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SHADD, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_shadd_v4h_v4h_v4h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SHADD, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -1378,7 +1580,10 @@ inst_sqadd_v8h_v8h_v8h        :: #force_inline proc "contextless" (dst: Register
 inst_sqadd_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_sqadd_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_sqadd_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_sqadd_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_sqadd_zb_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_sqadd_zh_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_sqadd_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_sqadd_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQADD, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
 emit_sqadd_v8b_v8b_v8b        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqadd_v8b_v8b_v8b(dst, src, src2)) }
 emit_sqadd_v16b_v16b_v16b     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqadd_v16b_v16b_v16b(dst, src, src2)) }
 emit_sqadd_v4h_v4h_v4h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqadd_v4h_v4h_v4h(dst, src, src2)) }
@@ -1386,7 +1591,10 @@ emit_sqadd_v8h_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_sqadd_v2s_v2s_v2s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqadd_v2s_v2s_v2s(dst, src, src2)) }
 emit_sqadd_v4s_v4s_v4s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqadd_v4s_v4s_v4s(dst, src, src2)) }
 emit_sqadd_v2d_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqadd_v2d_v2d_v2d(dst, src, src2)) }
-emit_sqadd_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqadd_z_z_z(rz, rz2, rz3)) }
+emit_sqadd_zb_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqadd_zb_zb_zb(rz, rz2, rz3)) }
+emit_sqadd_zh_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqadd_zh_zh_zh(rz, rz2, rz3)) }
+emit_sqadd_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqadd_zs_zs_zs(rz, rz2, rz3)) }
+emit_sqadd_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqadd_zd_zd_zd(rz, rz2, rz3)) }
 inst_uqadd_v8b_v8b_v8b        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_uqadd_v16b_v16b_v16b     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_uqadd_v4h_v4h_v4h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -1394,7 +1602,10 @@ inst_uqadd_v8h_v8h_v8h        :: #force_inline proc "contextless" (dst: Register
 inst_uqadd_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_uqadd_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_uqadd_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_uqadd_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_uqadd_zb_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_uqadd_zh_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_uqadd_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_uqadd_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQADD, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
 emit_uqadd_v8b_v8b_v8b        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqadd_v8b_v8b_v8b(dst, src, src2)) }
 emit_uqadd_v16b_v16b_v16b     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqadd_v16b_v16b_v16b(dst, src, src2)) }
 emit_uqadd_v4h_v4h_v4h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqadd_v4h_v4h_v4h(dst, src, src2)) }
@@ -1402,7 +1613,10 @@ emit_uqadd_v8h_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_uqadd_v2s_v2s_v2s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqadd_v2s_v2s_v2s(dst, src, src2)) }
 emit_uqadd_v4s_v4s_v4s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqadd_v4s_v4s_v4s(dst, src, src2)) }
 emit_uqadd_v2d_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqadd_v2d_v2d_v2d(dst, src, src2)) }
-emit_uqadd_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqadd_z_z_z(rz, rz2, rz3)) }
+emit_uqadd_zb_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqadd_zb_zb_zb(rz, rz2, rz3)) }
+emit_uqadd_zh_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqadd_zh_zh_zh(rz, rz2, rz3)) }
+emit_uqadd_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqadd_zs_zs_zs(rz, rz2, rz3)) }
+emit_uqadd_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqadd_zd_zd_zd(rz, rz2, rz3)) }
 inst_sqsub_v8b_v8b_v8b        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_sqsub_v16b_v16b_v16b     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_sqsub_v4h_v4h_v4h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -1410,7 +1624,10 @@ inst_sqsub_v8h_v8h_v8h        :: #force_inline proc "contextless" (dst: Register
 inst_sqsub_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_sqsub_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_sqsub_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_sqsub_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_sqsub_zb_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_sqsub_zh_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_sqsub_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_sqsub_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQSUB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
 emit_sqsub_v8b_v8b_v8b        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqsub_v8b_v8b_v8b(dst, src, src2)) }
 emit_sqsub_v16b_v16b_v16b     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqsub_v16b_v16b_v16b(dst, src, src2)) }
 emit_sqsub_v4h_v4h_v4h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqsub_v4h_v4h_v4h(dst, src, src2)) }
@@ -1418,7 +1635,10 @@ emit_sqsub_v8h_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_sqsub_v2s_v2s_v2s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqsub_v2s_v2s_v2s(dst, src, src2)) }
 emit_sqsub_v4s_v4s_v4s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqsub_v4s_v4s_v4s(dst, src, src2)) }
 emit_sqsub_v2d_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sqsub_v2d_v2d_v2d(dst, src, src2)) }
-emit_sqsub_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqsub_z_z_z(rz, rz2, rz3)) }
+emit_sqsub_zb_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqsub_zb_zb_zb(rz, rz2, rz3)) }
+emit_sqsub_zh_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqsub_zh_zh_zh(rz, rz2, rz3)) }
+emit_sqsub_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqsub_zs_zs_zs(rz, rz2, rz3)) }
+emit_sqsub_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqsub_zd_zd_zd(rz, rz2, rz3)) }
 inst_uqsub_v8b_v8b_v8b        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_uqsub_v16b_v16b_v16b     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_uqsub_v4h_v4h_v4h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -1426,7 +1646,10 @@ inst_uqsub_v8h_v8h_v8h        :: #force_inline proc "contextless" (dst: Register
 inst_uqsub_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_uqsub_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_uqsub_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_uqsub_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_uqsub_zb_zb_zb           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_uqsub_zh_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_uqsub_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_uqsub_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UQSUB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
 emit_uqsub_v8b_v8b_v8b        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqsub_v8b_v8b_v8b(dst, src, src2)) }
 emit_uqsub_v16b_v16b_v16b     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqsub_v16b_v16b_v16b(dst, src, src2)) }
 emit_uqsub_v4h_v4h_v4h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqsub_v4h_v4h_v4h(dst, src, src2)) }
@@ -1434,91 +1657,130 @@ emit_uqsub_v8h_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_uqsub_v2s_v2s_v2s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqsub_v2s_v2s_v2s(dst, src, src2)) }
 emit_uqsub_v4s_v4s_v4s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqsub_v4s_v4s_v4s(dst, src, src2)) }
 emit_uqsub_v2d_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uqsub_v2d_v2d_v2d(dst, src, src2)) }
-emit_uqsub_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqsub_z_z_z(rz, rz2, rz3)) }
+emit_uqsub_zb_zb_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqsub_zb_zb_zb(rz, rz2, rz3)) }
+emit_uqsub_zh_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqsub_zh_zh_zh(rz, rz2, rz3)) }
+emit_uqsub_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqsub_zs_zs_zs(rz, rz2, rz3)) }
+emit_uqsub_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uqsub_zd_zd_zd(rz, rz2, rz3)) }
 inst_smax_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_smax_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_smax_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_smax_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_smax_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_smax_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
-inst_smax_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_smax_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_smax_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_smax_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_smax_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMAX, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_smax_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smax_v8b_v8b_v8b(dst, src, src2)) }
 emit_smax_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smax_v16b_v16b_v16b(dst, src, src2)) }
 emit_smax_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smax_v4h_v4h_v4h(dst, src, src2)) }
 emit_smax_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smax_v8h_v8h_v8h(dst, src, src2)) }
 emit_smax_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smax_v2s_v2s_v2s(dst, src, src2)) }
 emit_smax_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smax_v4s_v4s_v4s(dst, src, src2)) }
-emit_smax_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smax_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_smax_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smax_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_smax_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smax_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_smax_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smax_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_smax_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smax_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_umax_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_umax_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_umax_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_umax_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_umax_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_umax_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
-inst_umax_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_umax_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_umax_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_umax_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_umax_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMAX, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_umax_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umax_v8b_v8b_v8b(dst, src, src2)) }
 emit_umax_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umax_v16b_v16b_v16b(dst, src, src2)) }
 emit_umax_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umax_v4h_v4h_v4h(dst, src, src2)) }
 emit_umax_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umax_v8h_v8h_v8h(dst, src, src2)) }
 emit_umax_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umax_v2s_v2s_v2s(dst, src, src2)) }
 emit_umax_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umax_v4s_v4s_v4s(dst, src, src2)) }
-emit_umax_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umax_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_umax_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umax_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_umax_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umax_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_umax_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umax_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_umax_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umax_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_smin_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_smin_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_smin_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_smin_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_smin_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_smin_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
-inst_smin_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_smin_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_smin_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_smin_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_smin_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SMIN, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_smin_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smin_v8b_v8b_v8b(dst, src, src2)) }
 emit_smin_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smin_v16b_v16b_v16b(dst, src, src2)) }
 emit_smin_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smin_v4h_v4h_v4h(dst, src, src2)) }
 emit_smin_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smin_v8h_v8h_v8h(dst, src, src2)) }
 emit_smin_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smin_v2s_v2s_v2s(dst, src, src2)) }
 emit_smin_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_smin_v4s_v4s_v4s(dst, src, src2)) }
-emit_smin_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smin_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_smin_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smin_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_smin_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smin_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_smin_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smin_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_smin_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_smin_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_umin_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_umin_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_umin_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_umin_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_umin_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_umin_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
-inst_umin_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_umin_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_umin_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_umin_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_umin_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UMIN, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_umin_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umin_v8b_v8b_v8b(dst, src, src2)) }
 emit_umin_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umin_v16b_v16b_v16b(dst, src, src2)) }
 emit_umin_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umin_v4h_v4h_v4h(dst, src, src2)) }
 emit_umin_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umin_v8h_v8h_v8h(dst, src, src2)) }
 emit_umin_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umin_v2s_v2s_v2s(dst, src, src2)) }
 emit_umin_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_umin_v4s_v4s_v4s(dst, src, src2)) }
-emit_umin_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umin_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_umin_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umin_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_umin_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umin_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_umin_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umin_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_umin_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_umin_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_sabd_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_sabd_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_sabd_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_sabd_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_sabd_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_sabd_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
-inst_sabd_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_sabd_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_sabd_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_sabd_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_sabd_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SABD, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_sabd_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sabd_v8b_v8b_v8b(dst, src, src2)) }
 emit_sabd_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sabd_v16b_v16b_v16b(dst, src, src2)) }
 emit_sabd_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sabd_v4h_v4h_v4h(dst, src, src2)) }
 emit_sabd_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sabd_v8h_v8h_v8h(dst, src, src2)) }
 emit_sabd_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sabd_v2s_v2s_v2s(dst, src, src2)) }
 emit_sabd_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_sabd_v4s_v4s_v4s(dst, src, src2)) }
-emit_sabd_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sabd_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_sabd_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sabd_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_sabd_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sabd_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_sabd_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sabd_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_sabd_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sabd_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_uabd_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_uabd_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_uabd_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_uabd_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
 inst_uabd_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_uabd_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
-inst_uabd_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_uabd_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_uabd_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_uabd_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_uabd_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .UABD, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_uabd_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uabd_v8b_v8b_v8b(dst, src, src2)) }
 emit_uabd_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uabd_v16b_v16b_v16b(dst, src, src2)) }
 emit_uabd_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uabd_v4h_v4h_v4h(dst, src, src2)) }
 emit_uabd_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uabd_v8h_v8h_v8h(dst, src, src2)) }
 emit_uabd_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uabd_v2s_v2s_v2s(dst, src, src2)) }
 emit_uabd_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uabd_v4s_v4s_v4s(dst, src, src2)) }
-emit_uabd_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_uabd_z_p_z_z(rz, rz2, rz3, rz4)) }
+emit_uabd_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_uabd_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_uabd_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_uabd_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_uabd_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_uabd_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_uabd_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_uabd_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_saba_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABA, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_saba_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABA, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_saba_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .SABA, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -2041,20 +2303,36 @@ emit_usdot_v2s_v8b_v8b        :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_usdot_v4s_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_usdot_v4s_v16b_v16b(dst, src, src2)) }
 inst_fmla_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fmla_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_fmla_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-inst_fmla_z_z_z_i             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), op_imm(imm, 1)}} }
+inst_fmla_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmla_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fmla_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+inst_fmla_zh_zh_zh_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), op_lane_index(imm)}} }
+inst_fmla_zs_zs_zs_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), op_lane_index(imm)}} }
+inst_fmla_zd_zd_zd_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLA, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_lane_index(imm)}} }
 emit_fmla_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmla_v4s_v4s_v4s(dst, src, src2)) }
 emit_fmla_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmla_v2d_v2d_v2d(dst, src, src2)) }
-emit_fmla_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmla_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_fmla_z_z_z_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmla_z_z_z_i(rz, rz2, rz3, imm)) }
+emit_fmla_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmla_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fmla_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmla_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fmla_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmla_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+emit_fmla_zh_zh_zh_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmla_zh_zh_zh_i(rz, rz2, rz3, imm)) }
+emit_fmla_zs_zs_zs_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmla_zs_zs_zs_i(rz, rz2, rz3, imm)) }
+emit_fmla_zd_zd_zd_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmla_zd_zd_zd_i(rz, rz2, rz3, imm)) }
 inst_fmls_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fmls_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_fmls_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-inst_fmls_z_z_z_i             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), op_imm(imm, 1)}} }
+inst_fmls_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fmls_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fmls_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+inst_fmls_zh_zh_zh_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), op_lane_index(imm)}} }
+inst_fmls_zs_zs_zs_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), op_lane_index(imm)}} }
+inst_fmls_zd_zd_zd_i          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .FMLS, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_lane_index(imm)}} }
 emit_fmls_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmls_v4s_v4s_v4s(dst, src, src2)) }
 emit_fmls_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fmls_v2d_v2d_v2d(dst, src, src2)) }
-emit_fmls_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmls_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_fmls_z_z_z_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmls_z_z_z_i(rz, rz2, rz3, imm)) }
+emit_fmls_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmls_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fmls_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmls_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fmls_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fmls_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+emit_fmls_zh_zh_zh_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmls_zh_zh_zh_i(rz, rz2, rz3, imm)) }
+emit_fmls_zs_zs_zs_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmls_zs_zs_zs_i(rz, rz2, rz3, imm)) }
+emit_fmls_zd_zd_zd_i          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_fmls_zd_zd_zd_i(rz, rz2, rz3, imm)) }
 inst_fmulx_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMULX, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fmulx_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMULX, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fmulx_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FMULX, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
@@ -2154,29 +2432,41 @@ inst_frecps_v4s_v4s_v4s       :: #force_inline proc "contextless" (dst: Register
 inst_frecps_v2d_v2d_v2d       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_frecps_v4h_v4h_v4h       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_frecps_v8h_v8h_v8h       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_frecps_z_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_frecps_zh_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_frecps_zs_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_frecps_zd_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPS, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
 emit_frecps_v2s_v2s_v2s       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frecps_v2s_v2s_v2s(dst, src, src2)) }
 emit_frecps_v4s_v4s_v4s       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frecps_v4s_v4s_v4s(dst, src, src2)) }
 emit_frecps_v2d_v2d_v2d       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frecps_v2d_v2d_v2d(dst, src, src2)) }
 emit_frecps_v4h_v4h_v4h       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frecps_v4h_v4h_v4h(dst, src, src2)) }
 emit_frecps_v8h_v8h_v8h       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frecps_v8h_v8h_v8h(dst, src, src2)) }
-emit_frecps_z_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecps_z_z_z(rz, rz2, rz3)) }
+emit_frecps_zh_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecps_zh_zh_zh(rz, rz2, rz3)) }
+emit_frecps_zs_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecps_zs_zs_zs(rz, rz2, rz3)) }
+emit_frecps_zd_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecps_zd_zd_zd(rz, rz2, rz3)) }
 inst_frsqrts_v2s_v2s_v2s      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_frsqrts_v4s_v4s_v4s      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_frsqrts_v2d_v2d_v2d      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_frsqrts_v4h_v4h_v4h      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_frsqrts_v8h_v8h_v8h      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_frsqrts_z_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_frsqrts_zh_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_frsqrts_zs_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_frsqrts_zd_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRSQRTS, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
 emit_frsqrts_v2s_v2s_v2s      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frsqrts_v2s_v2s_v2s(dst, src, src2)) }
 emit_frsqrts_v4s_v4s_v4s      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frsqrts_v4s_v4s_v4s(dst, src, src2)) }
 emit_frsqrts_v2d_v2d_v2d      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frsqrts_v2d_v2d_v2d(dst, src, src2)) }
 emit_frsqrts_v4h_v4h_v4h      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frsqrts_v4h_v4h_v4h(dst, src, src2)) }
 emit_frsqrts_v8h_v8h_v8h      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_frsqrts_v8h_v8h_v8h(dst, src, src2)) }
-emit_frsqrts_z_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frsqrts_z_z_z(rz, rz2, rz3)) }
+emit_frsqrts_zh_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frsqrts_zh_zh_zh(rz, rz2, rz3)) }
+emit_frsqrts_zs_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frsqrts_zs_zs_zs(rz, rz2, rz3)) }
+emit_frsqrts_zd_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frsqrts_zd_zd_zd(rz, rz2, rz3)) }
 inst_frecpx_r_r               :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.FRECPX, dst, src) }
-inst_frecpx_z_p_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPX, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frecpx_zh_p_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPX, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_frecpx_zs_p_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPX, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_frecpx_zd_p_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FRECPX, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_frecpx_r_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_frecpx_r_r(dst, src)) }
-emit_frecpx_z_p_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecpx_z_p_z(rz, rz2, rz3)) }
+emit_frecpx_zh_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecpx_zh_p_zh(rz, rz2, rz3)) }
+emit_frecpx_zs_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecpx_zs_p_zs(rz, rz2, rz3)) }
+emit_frecpx_zd_p_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_frecpx_zd_p_zd(rz, rz2, rz3)) }
 inst_faddp_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADDP, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_faddp_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADDP, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_faddp_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FADDP, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
@@ -2212,61 +2502,81 @@ inst_fcmeq_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register
 inst_fcmeq_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_fcmeq_v4h_v4h_v4h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_fcmeq_v8h_v8h_v8h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_fcmeq_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmeq_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmeq_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fcmeq_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fcmeq_v2s_v2s_v2s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmeq_v2s_v2s_v2s(dst, src, src2)) }
 emit_fcmeq_v4s_v4s_v4s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmeq_v4s_v4s_v4s(dst, src, src2)) }
 emit_fcmeq_v2d_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmeq_v2d_v2d_v2d(dst, src, src2)) }
 emit_fcmeq_v4h_v4h_v4h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmeq_v4h_v4h_v4h(dst, src, src2)) }
 emit_fcmeq_v8h_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmeq_v8h_v8h_v8h(dst, src, src2)) }
-emit_fcmeq_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmeq_p_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fcmeq_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmeq_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fcmeq_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmeq_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fcmeq_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmeq_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fcmge_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fcmge_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fcmge_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_fcmge_v4h_v4h_v4h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_fcmge_v8h_v8h_v8h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_fcmge_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmge_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmge_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fcmge_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fcmge_v2s_v2s_v2s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmge_v2s_v2s_v2s(dst, src, src2)) }
 emit_fcmge_v4s_v4s_v4s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmge_v4s_v4s_v4s(dst, src, src2)) }
 emit_fcmge_v2d_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmge_v2d_v2d_v2d(dst, src, src2)) }
 emit_fcmge_v4h_v4h_v4h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmge_v4h_v4h_v4h(dst, src, src2)) }
 emit_fcmge_v8h_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmge_v8h_v8h_v8h(dst, src, src2)) }
-emit_fcmge_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmge_p_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fcmge_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmge_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fcmge_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmge_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fcmge_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmge_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fcmgt_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_fcmgt_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_fcmgt_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
 inst_fcmgt_v4h_v4h_v4h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
 inst_fcmgt_v8h_v8h_v8h        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 3, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), {}}} }
-inst_fcmgt_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmgt_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmgt_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fcmgt_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
 emit_fcmgt_v2s_v2s_v2s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmgt_v2s_v2s_v2s(dst, src, src2)) }
 emit_fcmgt_v4s_v4s_v4s        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmgt_v4s_v4s_v4s(dst, src, src2)) }
 emit_fcmgt_v2d_v2d_v2d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmgt_v2d_v2d_v2d(dst, src, src2)) }
 emit_fcmgt_v4h_v4h_v4h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmgt_v4h_v4h_v4h(dst, src, src2)) }
 emit_fcmgt_v8h_v8h_v8h        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_fcmgt_v8h_v8h_v8h(dst, src, src2)) }
-emit_fcmgt_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmgt_p_p_z_z(rz, rz2, rz3, rz4)) }
+emit_fcmgt_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmgt_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fcmgt_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmgt_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fcmgt_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmgt_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
 inst_fcmle_v2s_v2s            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_fcmle_v4s_v4s            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_fcmle_v2d_v2d            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_fcmle_v4h_v4h            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_fcmle_v8h_v8h            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_fcmle_p_p_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fcmle_ph_p_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fcmle_ps_p_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_fcmle_pd_p_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLE, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_fcmle_v2s_v2s            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmle_v2s_v2s(dst, src)) }
 emit_fcmle_v4s_v4s            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmle_v4s_v4s(dst, src)) }
 emit_fcmle_v2d_v2d            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmle_v2d_v2d(dst, src)) }
 emit_fcmle_v4h_v4h            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmle_v4h_v4h(dst, src)) }
 emit_fcmle_v8h_v8h            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmle_v8h_v8h(dst, src)) }
-emit_fcmle_p_p_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmle_p_p_z(rz, rz2, rz3)) }
+emit_fcmle_ph_p_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmle_ph_p_zh(rz, rz2, rz3)) }
+emit_fcmle_ps_p_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmle_ps_p_zs(rz, rz2, rz3)) }
+emit_fcmle_pd_p_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmle_pd_p_zd(rz, rz2, rz3)) }
 inst_fcmlt_v2s_v2s            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_fcmlt_v4s_v4s            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 inst_fcmlt_v2d_v2d            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_v_2d(src), {}, {}}} }
 inst_fcmlt_v4h_v4h            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
 inst_fcmlt_v8h_v8h            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 2, length = 4, ops = {op_v_8h(dst), op_v_8h(src), {}, {}}} }
-inst_fcmlt_p_p_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fcmlt_ph_p_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_fcmlt_ps_p_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_fcmlt_pd_p_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FCMLT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_fcmlt_v2s_v2s            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmlt_v2s_v2s(dst, src)) }
 emit_fcmlt_v4s_v4s            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmlt_v4s_v4s(dst, src)) }
 emit_fcmlt_v2d_v2d            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmlt_v2d_v2d(dst, src)) }
 emit_fcmlt_v4h_v4h            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmlt_v4h_v4h(dst, src)) }
 emit_fcmlt_v8h_v8h            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_fcmlt_v8h_v8h(dst, src)) }
-emit_fcmlt_p_p_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmlt_p_p_z(rz, rz2, rz3)) }
+emit_fcmlt_ph_p_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmlt_ph_p_zh(rz, rz2, rz3)) }
+emit_fcmlt_ps_p_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmlt_ps_p_zs(rz, rz2, rz3)) }
+emit_fcmlt_pd_p_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_fcmlt_pd_p_zd(rz, rz2, rz3)) }
 inst_facge_v2s_v2s_v2s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FACGE, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_facge_v4s_v4s_v4s        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FACGE, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_facge_v2d_v2d_v2d        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .FACGE, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
@@ -2384,9 +2694,9 @@ emit_bit_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Inst
 inst_bif_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .BIF, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 emit_bif_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_bif_v16b_v16b_v16b(dst, src, src2)) }
 inst_bsl_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .BSL, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
-inst_bsl_z_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BSL, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
+inst_bsl_zd_zd_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BSL, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
 emit_bsl_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_bsl_v16b_v16b_v16b(dst, src, src2)) }
-emit_bsl_z_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bsl_z_z_z_z(rz, rz2, rz3, rz4)) }
+emit_bsl_zd_zd_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bsl_zd_zd_zd_zd(rz, rz2, rz3, rz4)) }
 inst_shl_v8b_v8b_i            :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SHL, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_imm(imm, 4), {}}} }
 inst_shl_v16b_v16b_i          :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SHL, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_imm(imm, 4), {}}} }
 inst_shl_v4h_v4h_i            :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .SHL, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_imm(imm, 4), {}}} }
@@ -2783,7 +3093,10 @@ inst_dup_v8h_r                :: #force_inline proc "contextless" (dst: Register
 inst_dup_v2s_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_reg(src), {}, {}}} }
 inst_dup_v4s_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_reg(src), {}, {}}} }
 inst_dup_v2d_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_v_2d(dst), op_reg(src), {}, {}}} }
-inst_dup_z_r                  :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_z_b(rz), op_reg(src), {}, {}}} }
+inst_dup_zb_r                 :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_z_b(rz), op_reg(src), {}, {}}} }
+inst_dup_zh_r                 :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_z_h(rz), op_reg(src), {}, {}}} }
+inst_dup_zs_r                 :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_z_s(rz), op_reg(src), {}, {}}} }
+inst_dup_zd_r                 :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .DUP, operand_count = 2, length = 4, ops = {op_z_d(rz), op_reg(src), {}, {}}} }
 emit_dup_v8b_veb_i            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_dup_v8b_veb_i(dst, src, imm)) }
 emit_dup_v16b_veb_i           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_dup_v16b_veb_i(dst, src, imm)) }
 emit_dup_v4h_veh_i            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, imm: i64) { append(instructions, inst_dup_v4h_veh_i(dst, src, imm)) }
@@ -2798,7 +3111,10 @@ emit_dup_v8h_r                :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_dup_v2s_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_dup_v2s_r(dst, src)) }
 emit_dup_v4s_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_dup_v4s_r(dst, src)) }
 emit_dup_v2d_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_dup_v2d_r(dst, src)) }
-emit_dup_z_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_dup_z_r(rz, src)) }
+emit_dup_zb_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_dup_zb_r(rz, src)) }
+emit_dup_zh_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_dup_zh_r(rz, src)) }
+emit_dup_zs_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_dup_zs_r(rz, src)) }
+emit_dup_zd_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_dup_zd_r(rz, src)) }
 inst_ins_veb_i_veb_i          :: #force_inline proc "contextless" (dst: Register, imm: i64, src: Register, imm2: i64) -> Instruction { return Instruction{mnemonic = .INS, operand_count = 4, length = 4, ops = {op_v_elem_b(dst), op_lane_index(imm), op_v_elem_b(src), op_lane_index(imm2)}} }
 inst_ins_veh_i_veh_i          :: #force_inline proc "contextless" (dst: Register, imm: i64, src: Register, imm2: i64) -> Instruction { return Instruction{mnemonic = .INS, operand_count = 4, length = 4, ops = {op_v_elem_h(dst), op_lane_index(imm), op_v_elem_h(src), op_lane_index(imm2)}} }
 inst_ins_ves_i_ves_i          :: #force_inline proc "contextless" (dst: Register, imm: i64, src: Register, imm2: i64) -> Instruction { return Instruction{mnemonic = .INS, operand_count = 4, length = 4, ops = {op_v_elem_s(dst), op_lane_index(imm), op_v_elem_s(src), op_lane_index(imm2)}} }
@@ -2817,36 +3133,48 @@ emit_ins_ves_i_r              :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_ins_ved_i_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64, src: Register) { append(instructions, inst_ins_ved_i_r(dst, imm, src)) }
 inst_mov_v8b_v8b              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_mov_v16b_v16b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
-inst_mov_z_p_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
-inst_mov_p_p_p                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-inst_mov_p_p                  :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), {}, {}}} }
+inst_mov_zb_p_zb              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_mov_zh_p_zh              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_mov_zs_p_zs              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_mov_zd_p_zd              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
+inst_mov_pb_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_mov_ps_p                 :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .MOV, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), {}, {}}} }
 inst_mov_r_r                  :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return inst_r_r(.MOV, dst, src) }
 inst_mov_r_i                  :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return inst_r_i(.MOV, dst, imm) }
 emit_mov_v8b_v8b              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_mov_v8b_v8b(dst, src)) }
 emit_mov_v16b_v16b            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_mov_v16b_v16b(dst, src)) }
-emit_mov_z_p_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_mov_z_p_z(rz, rz2, rz3)) }
-emit_mov_p_p_p                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_mov_p_p_p(rz, rz2, rz3)) }
-emit_mov_p_p                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_mov_p_p(rz, rz2)) }
+emit_mov_zb_p_zb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_mov_zb_p_zb(rz, rz2, rz3)) }
+emit_mov_zh_p_zh              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_mov_zh_p_zh(rz, rz2, rz3)) }
+emit_mov_zs_p_zs              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_mov_zs_p_zs(rz, rz2, rz3)) }
+emit_mov_zd_p_zd              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_mov_zd_p_zd(rz, rz2, rz3)) }
+emit_mov_pb_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_mov_pb_p_p(rz, rz2, rz3)) }
+emit_mov_ps_p                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_mov_ps_p(rz, rz2)) }
 emit_mov_r_r                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_mov_r_r(dst, src)) }
 emit_mov_r_i                  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_mov_r_i(dst, imm)) }
 inst_ext_v8b_v8b_v8b_i        :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .EXT, operand_count = 4, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), op_imm(imm, 4)}} }
 inst_ext_v16b_v16b_v16b_i     :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .EXT, operand_count = 4, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), op_imm(imm, 4)}} }
-inst_ext_z_z_z_i              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .EXT, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 4)}} }
+inst_ext_zb_zb_zb_i           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .EXT, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 4)}} }
 emit_ext_v8b_v8b_v8b_i        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_ext_v8b_v8b_v8b_i(dst, src, src2, imm)) }
 emit_ext_v16b_v16b_v16b_i     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_ext_v16b_v16b_v16b_i(dst, src, src2, imm)) }
-emit_ext_z_z_z_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_ext_z_z_z_i(rz, rz2, rz3, imm)) }
+emit_ext_zb_zb_zb_i           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_ext_zb_zb_zb_i(rz, rz2, rz3, imm)) }
 inst_tbl_v8b_v16b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TBL, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_list(src, VSHAPE_16B, 1), op_v_8b(src2), {}}} }
 inst_tbl_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TBL, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_list(src, VSHAPE_16B, 1), op_v_16b(src2), {}}} }
-inst_tbl_z_z_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBL, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_tbl_zb_zb_zb             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBL, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_tbl_zh_zh_zh             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBL, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_tbl_zs_zs_zs             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBL, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_tbl_zd_zd_zd             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBL, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
 emit_tbl_v8b_v16b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_tbl_v8b_v16b_v8b(dst, src, src2)) }
 emit_tbl_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_tbl_v16b_v16b_v16b(dst, src, src2)) }
-emit_tbl_z_z_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbl_z_z_z(rz, rz2, rz3)) }
+emit_tbl_zb_zb_zb             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbl_zb_zb_zb(rz, rz2, rz3)) }
+emit_tbl_zh_zh_zh             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbl_zh_zh_zh(rz, rz2, rz3)) }
+emit_tbl_zs_zs_zs             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbl_zs_zs_zs(rz, rz2, rz3)) }
+emit_tbl_zd_zd_zd             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbl_zd_zd_zd(rz, rz2, rz3)) }
 inst_tbx_v8b_v16b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TBX, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_list(src, VSHAPE_16B, 1), op_v_8b(src2), {}}} }
 inst_tbx_v16b_v16b_v16b       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TBX, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_list(src, VSHAPE_16B, 1), op_v_16b(src2), {}}} }
-inst_tbx_z_z_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_tbx_zb_zb_zb             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
 emit_tbx_v8b_v16b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_tbx_v8b_v16b_v8b(dst, src, src2)) }
 emit_tbx_v16b_v16b_v16b       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_tbx_v16b_v16b_v16b(dst, src, src2)) }
-emit_tbx_z_z_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbx_z_z_z(rz, rz2, rz3)) }
+emit_tbx_zb_zb_zb             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbx_zb_zb_zb(rz, rz2, rz3)) }
 inst_zip1_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_zip1_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_zip1_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -2854,8 +3182,11 @@ inst_zip1_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register
 inst_zip1_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_zip1_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_zip1_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_zip1_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_zip1_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_zip1_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_zip1_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_zip1_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_zip1_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_zip1_pb_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP1, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_zip1_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip1_v8b_v8b_v8b(dst, src, src2)) }
 emit_zip1_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip1_v16b_v16b_v16b(dst, src, src2)) }
 emit_zip1_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip1_v4h_v4h_v4h(dst, src, src2)) }
@@ -2863,8 +3194,11 @@ emit_zip1_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_zip1_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip1_v2s_v2s_v2s(dst, src, src2)) }
 emit_zip1_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip1_v4s_v4s_v4s(dst, src, src2)) }
 emit_zip1_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip1_v2d_v2d_v2d(dst, src, src2)) }
-emit_zip1_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip1_z_z_z(rz, rz2, rz3)) }
-emit_zip1_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip1_p_p_p(rz, rz2, rz3)) }
+emit_zip1_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip1_zb_zb_zb(rz, rz2, rz3)) }
+emit_zip1_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip1_zh_zh_zh(rz, rz2, rz3)) }
+emit_zip1_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip1_zs_zs_zs(rz, rz2, rz3)) }
+emit_zip1_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip1_zd_zd_zd(rz, rz2, rz3)) }
+emit_zip1_pb_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip1_pb_p_p(rz, rz2, rz3)) }
 inst_zip2_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_zip2_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_zip2_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -2872,8 +3206,11 @@ inst_zip2_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register
 inst_zip2_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_zip2_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_zip2_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_zip2_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_zip2_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_zip2_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_zip2_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_zip2_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_zip2_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_zip2_pb_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP2, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_zip2_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip2_v8b_v8b_v8b(dst, src, src2)) }
 emit_zip2_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip2_v16b_v16b_v16b(dst, src, src2)) }
 emit_zip2_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip2_v4h_v4h_v4h(dst, src, src2)) }
@@ -2881,8 +3218,11 @@ emit_zip2_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_zip2_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip2_v2s_v2s_v2s(dst, src, src2)) }
 emit_zip2_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip2_v4s_v4s_v4s(dst, src, src2)) }
 emit_zip2_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_zip2_v2d_v2d_v2d(dst, src, src2)) }
-emit_zip2_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip2_z_z_z(rz, rz2, rz3)) }
-emit_zip2_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip2_p_p_p(rz, rz2, rz3)) }
+emit_zip2_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip2_zb_zb_zb(rz, rz2, rz3)) }
+emit_zip2_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip2_zh_zh_zh(rz, rz2, rz3)) }
+emit_zip2_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip2_zs_zs_zs(rz, rz2, rz3)) }
+emit_zip2_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip2_zd_zd_zd(rz, rz2, rz3)) }
+emit_zip2_pb_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip2_pb_p_p(rz, rz2, rz3)) }
 inst_uzp1_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_uzp1_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_uzp1_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -2890,8 +3230,11 @@ inst_uzp1_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register
 inst_uzp1_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_uzp1_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_uzp1_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_uzp1_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_uzp1_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_uzp1_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_uzp1_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_uzp1_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_uzp1_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_uzp1_pb_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP1, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_uzp1_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp1_v8b_v8b_v8b(dst, src, src2)) }
 emit_uzp1_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp1_v16b_v16b_v16b(dst, src, src2)) }
 emit_uzp1_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp1_v4h_v4h_v4h(dst, src, src2)) }
@@ -2899,8 +3242,11 @@ emit_uzp1_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_uzp1_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp1_v2s_v2s_v2s(dst, src, src2)) }
 emit_uzp1_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp1_v4s_v4s_v4s(dst, src, src2)) }
 emit_uzp1_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp1_v2d_v2d_v2d(dst, src, src2)) }
-emit_uzp1_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp1_z_z_z(rz, rz2, rz3)) }
-emit_uzp1_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp1_p_p_p(rz, rz2, rz3)) }
+emit_uzp1_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp1_zb_zb_zb(rz, rz2, rz3)) }
+emit_uzp1_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp1_zh_zh_zh(rz, rz2, rz3)) }
+emit_uzp1_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp1_zs_zs_zs(rz, rz2, rz3)) }
+emit_uzp1_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp1_zd_zd_zd(rz, rz2, rz3)) }
+emit_uzp1_pb_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp1_pb_p_p(rz, rz2, rz3)) }
 inst_uzp2_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_uzp2_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_uzp2_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -2908,8 +3254,11 @@ inst_uzp2_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register
 inst_uzp2_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_uzp2_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_uzp2_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_uzp2_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_uzp2_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_uzp2_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_uzp2_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_uzp2_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_uzp2_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_uzp2_pb_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP2, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_uzp2_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp2_v8b_v8b_v8b(dst, src, src2)) }
 emit_uzp2_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp2_v16b_v16b_v16b(dst, src, src2)) }
 emit_uzp2_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp2_v4h_v4h_v4h(dst, src, src2)) }
@@ -2917,8 +3266,11 @@ emit_uzp2_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_uzp2_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp2_v2s_v2s_v2s(dst, src, src2)) }
 emit_uzp2_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp2_v4s_v4s_v4s(dst, src, src2)) }
 emit_uzp2_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_uzp2_v2d_v2d_v2d(dst, src, src2)) }
-emit_uzp2_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp2_z_z_z(rz, rz2, rz3)) }
-emit_uzp2_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp2_p_p_p(rz, rz2, rz3)) }
+emit_uzp2_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp2_zb_zb_zb(rz, rz2, rz3)) }
+emit_uzp2_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp2_zh_zh_zh(rz, rz2, rz3)) }
+emit_uzp2_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp2_zs_zs_zs(rz, rz2, rz3)) }
+emit_uzp2_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp2_zd_zd_zd(rz, rz2, rz3)) }
+emit_uzp2_pb_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp2_pb_p_p(rz, rz2, rz3)) }
 inst_trn1_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_trn1_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_trn1_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -2926,8 +3278,11 @@ inst_trn1_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register
 inst_trn1_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_trn1_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_trn1_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_trn1_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_trn1_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_trn1_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_trn1_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_trn1_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_trn1_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_trn1_pb_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN1, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_trn1_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn1_v8b_v8b_v8b(dst, src, src2)) }
 emit_trn1_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn1_v16b_v16b_v16b(dst, src, src2)) }
 emit_trn1_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn1_v4h_v4h_v4h(dst, src, src2)) }
@@ -2935,8 +3290,11 @@ emit_trn1_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_trn1_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn1_v2s_v2s_v2s(dst, src, src2)) }
 emit_trn1_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn1_v4s_v4s_v4s(dst, src, src2)) }
 emit_trn1_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn1_v2d_v2d_v2d(dst, src, src2)) }
-emit_trn1_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn1_z_z_z(rz, rz2, rz3)) }
-emit_trn1_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn1_p_p_p(rz, rz2, rz3)) }
+emit_trn1_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn1_zb_zb_zb(rz, rz2, rz3)) }
+emit_trn1_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn1_zh_zh_zh(rz, rz2, rz3)) }
+emit_trn1_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn1_zs_zs_zs(rz, rz2, rz3)) }
+emit_trn1_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn1_zd_zd_zd(rz, rz2, rz3)) }
+emit_trn1_pb_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn1_pb_p_p(rz, rz2, rz3)) }
 inst_trn2_v8b_v8b_v8b         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_v_8b(dst), op_v_8b(src), op_v_8b(src2), {}}} }
 inst_trn2_v16b_v16b_v16b      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_v_16b(dst), op_v_16b(src), op_v_16b(src2), {}}} }
 inst_trn2_v4h_v4h_v4h         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), {}}} }
@@ -2944,8 +3302,11 @@ inst_trn2_v8h_v8h_v8h         :: #force_inline proc "contextless" (dst: Register
 inst_trn2_v2s_v2s_v2s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_v_2s(dst), op_v_2s(src), op_v_2s(src2), {}}} }
 inst_trn2_v4s_v4s_v4s         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), {}}} }
 inst_trn2_v2d_v2d_v2d         :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_v_2d(dst), op_v_2d(src), op_v_2d(src2), {}}} }
-inst_trn2_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_trn2_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_trn2_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_trn2_zh_zh_zh            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_trn2_zs_zs_zs            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_trn2_zd_zd_zd            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+inst_trn2_pb_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TRN2, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_trn2_v8b_v8b_v8b         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn2_v8b_v8b_v8b(dst, src, src2)) }
 emit_trn2_v16b_v16b_v16b      :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn2_v16b_v16b_v16b(dst, src, src2)) }
 emit_trn2_v4h_v4h_v4h         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn2_v4h_v4h_v4h(dst, src, src2)) }
@@ -2953,14 +3314,17 @@ emit_trn2_v8h_v8h_v8h         :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_trn2_v2s_v2s_v2s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn2_v2s_v2s_v2s(dst, src, src2)) }
 emit_trn2_v4s_v4s_v4s         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn2_v4s_v4s_v4s(dst, src, src2)) }
 emit_trn2_v2d_v2d_v2d         :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_trn2_v2d_v2d_v2d(dst, src, src2)) }
-emit_trn2_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn2_z_z_z(rz, rz2, rz3)) }
-emit_trn2_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn2_p_p_p(rz, rz2, rz3)) }
+emit_trn2_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn2_zb_zb_zb(rz, rz2, rz3)) }
+emit_trn2_zh_zh_zh            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn2_zh_zh_zh(rz, rz2, rz3)) }
+emit_trn2_zs_zs_zs            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn2_zs_zs_zs(rz, rz2, rz3)) }
+emit_trn2_zd_zd_zd            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn2_zd_zd_zd(rz, rz2, rz3)) }
+emit_trn2_pb_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_trn2_pb_p_p(rz, rz2, rz3)) }
 inst_not_v8b_v8b              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NOT, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_not_v16b_v16b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .NOT, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
-inst_not_p_p_p                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .NOT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+inst_not_pb_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .NOT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
 emit_not_v8b_v8b              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_not_v8b_v8b(dst, src)) }
 emit_not_v16b_v16b            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_not_v16b_v16b(dst, src)) }
-emit_not_p_p_p                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_not_p_p_p(rz, rz2, rz3)) }
+emit_not_pb_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_not_pb_p_p(rz, rz2, rz3)) }
 inst_rev64_v8b_v8b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .REV64, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_rev64_v16b_v16b          :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .REV64, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
 inst_rev64_v4h_v4h            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .REV64, operand_count = 2, length = 4, ops = {op_v_4h(dst), op_v_4h(src), {}, {}}} }
@@ -2975,10 +3339,16 @@ emit_rev64_v2s_v2s            :: #force_inline proc(instructions: ^[dynamic]Inst
 emit_rev64_v4s_v4s            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_rev64_v4s_v4s(dst, src)) }
 inst_cnt_v8b_v8b              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CNT, operand_count = 2, length = 4, ops = {op_v_8b(dst), op_v_8b(src), {}, {}}} }
 inst_cnt_v16b_v16b            :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .CNT, operand_count = 2, length = 4, ops = {op_v_16b(dst), op_v_16b(src), {}, {}}} }
-inst_cnt_z_p_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CNT, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_cnt_zb_p_zb              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CNT, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), {}}} }
+inst_cnt_zh_p_zh              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CNT, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), {}}} }
+inst_cnt_zs_p_zs              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CNT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_cnt_zd_p_zd              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .CNT, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
 emit_cnt_v8b_v8b              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cnt_v8b_v8b(dst, src)) }
 emit_cnt_v16b_v16b            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_cnt_v16b_v16b(dst, src)) }
-emit_cnt_z_p_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cnt_z_p_z(rz, rz2, rz3)) }
+emit_cnt_zb_p_zb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cnt_zb_p_zb(rz, rz2, rz3)) }
+emit_cnt_zh_p_zh              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cnt_zh_p_zh(rz, rz2, rz3)) }
+emit_cnt_zs_p_zs              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cnt_zs_p_zs(rz, rz2, rz3)) }
+emit_cnt_zd_p_zd              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_cnt_zd_p_zd(rz, rz2, rz3)) }
 inst_urecpe_v2s_v2s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .URECPE, operand_count = 2, length = 4, ops = {op_v_2s(dst), op_v_2s(src), {}, {}}} }
 inst_urecpe_v4s_v4s           :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .URECPE, operand_count = 2, length = 4, ops = {op_v_4s(dst), op_v_4s(src), {}, {}}} }
 emit_urecpe_v2s_v2s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_urecpe_v2s_v2s(dst, src)) }
@@ -3109,148 +3479,332 @@ inst_ld3r_v16b_m              :: #force_inline proc "contextless" (dst: Register
 emit_ld3r_v16b_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ld3r_v16b_m(dst, mem)) }
 inst_ld4r_v16b_m              :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD4R, operand_count = 2, length = 4, ops = {op_v_list(dst, VSHAPE_16B, 4), op_mem(mem), {}, {}}} }
 emit_ld4r_v16b_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ld4r_v16b_m(dst, mem)) }
-inst_subr_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUBR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_subr_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_subr_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_asrr_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASRR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_asrr_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asrr_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_lslr_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSLR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_lslr_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lslr_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_lsrr_z_p_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSRR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_lsrr_z_p_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsrr_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_ftsmul_z_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FTSMUL, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-emit_ftsmul_z_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_ftsmul_z_z_z(rz, rz2, rz3)) }
-inst_fsubr_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUBR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_fsubr_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsubr_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_fdivr_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIVR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_fdivr_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdivr_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_fnmla_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_fnmla_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmla_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_fnmls_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_fnmls_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmls_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_nand_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NAND, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_nand_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nand_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_nor_p_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NOR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_nor_p_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nor_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_sel_p_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SEL, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_sel_p_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sel_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_orrs_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORRS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_orrs_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orrs_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_eors_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EORS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_eors_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eors_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_nands_p_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NANDS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_nands_p_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nands_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_nors_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NORS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_nors_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nors_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_orns_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORNS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_orns_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orns_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_movs_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOVS, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-emit_movs_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_movs_p_p_p(rz, rz2, rz3)) }
-inst_ptrue_p_i                :: #force_inline proc "contextless" (rz: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .PTRUE, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_imm(imm, 4), {}, {}}} }
-emit_ptrue_p_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64) { append(instructions, inst_ptrue_p_i(rz, imm)) }
-inst_ptrues_p_i               :: #force_inline proc "contextless" (rz: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .PTRUES, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_imm(imm, 4), {}, {}}} }
-emit_ptrues_p_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64) { append(instructions, inst_ptrues_p_i(rz, imm)) }
-inst_pfalse_p                 :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .PFALSE, operand_count = 1, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), {}, {}, {}}} }
-emit_pfalse_p                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_pfalse_p(rz)) }
-inst_pfirst_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PFIRST, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-emit_pfirst_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pfirst_p_p_p(rz, rz2, rz3)) }
-inst_pnext_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PNEXT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-emit_pnext_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pnext_p_p_p(rz, rz2, rz3)) }
-inst_brka_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKA, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-emit_brka_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brka_p_p_p(rz, rz2, rz3)) }
-inst_brkb_p_p_p               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKB, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-emit_brkb_p_p_p               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brkb_p_p_p(rz, rz2, rz3)) }
-inst_brkas_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKAS, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-emit_brkas_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brkas_p_p_p(rz, rz2, rz3)) }
-inst_brkbs_p_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKBS, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
-emit_brkbs_p_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brkbs_p_p_p(rz, rz2, rz3)) }
-inst_brkpa_p_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BRKPA, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_brkpa_p_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_brkpa_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_brkpb_p_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BRKPB, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_brkpb_p_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_brkpb_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_brkn_p_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BRKN, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
-emit_brkn_p_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_brkn_p_p_p_p(rz, rz2, rz3, rz4)) }
-inst_rdffr_p                  :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .RDFFR, operand_count = 1, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), {}, {}, {}}} }
-emit_rdffr_p                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_rdffr_p(rz)) }
+inst_subr_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUBR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_subr_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUBR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_subr_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUBR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_subr_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SUBR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_subr_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_subr_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_subr_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_subr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_subr_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_subr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_subr_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_subr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_asrr_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASRR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_asrr_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASRR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_asrr_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASRR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_asrr_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ASRR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_asrr_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asrr_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_asrr_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asrr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_asrr_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asrr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_asrr_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_asrr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_lslr_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSLR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_lslr_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSLR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_lslr_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSLR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_lslr_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSLR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_lslr_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lslr_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_lslr_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lslr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_lslr_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lslr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_lslr_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lslr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_lsrr_zb_p_zb_zb          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSRR, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_lsrr_zh_p_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSRR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_lsrr_zs_p_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSRR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_lsrr_zd_p_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .LSRR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_lsrr_zb_p_zb_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsrr_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_lsrr_zh_p_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsrr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_lsrr_zs_p_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsrr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_lsrr_zd_p_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_lsrr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_ftsmul_zh_zh_zh          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FTSMUL, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_ftsmul_zs_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FTSMUL, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_ftsmul_zd_zd_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FTSMUL, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+emit_ftsmul_zh_zh_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_ftsmul_zh_zh_zh(rz, rz2, rz3)) }
+emit_ftsmul_zs_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_ftsmul_zs_zs_zs(rz, rz2, rz3)) }
+emit_ftsmul_zd_zd_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_ftsmul_zd_zd_zd(rz, rz2, rz3)) }
+inst_fsubr_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUBR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fsubr_zs_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUBR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fsubr_zd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FSUBR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_fsubr_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsubr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fsubr_zs_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsubr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fsubr_zd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fsubr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_fdivr_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIVR, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fdivr_zs_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIVR, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fdivr_zd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FDIVR, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_fdivr_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdivr_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fdivr_zs_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdivr_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fdivr_zd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fdivr_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_fnmla_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fnmla_zs_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLA, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fnmla_zd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLA, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_fnmla_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmla_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fnmla_zs_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmla_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fnmla_zd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmla_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_fnmls_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fnmls_zs_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLS, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fnmls_zd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FNMLS, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_fnmls_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmls_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fnmls_zs_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmls_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fnmls_zd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fnmls_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_nand_ps_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NAND, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_nand_ps_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nand_ps_p_p_p(rz, rz2, rz3, rz4)) }
+inst_nor_ps_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NOR, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_nor_ps_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nor_ps_p_p_p(rz, rz2, rz3, rz4)) }
+inst_sel_pb_p_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SEL, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_sel_pb_p_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_sel_pb_p_p_p(rz, rz2, rz3, rz4)) }
+inst_orrs_pd_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORRS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_orrs_pd_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orrs_pd_p_p_p(rz, rz2, rz3, rz4)) }
+inst_eors_ph_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .EORS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_eors_ph_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_eors_ph_p_p_p(rz, rz2, rz3, rz4)) }
+inst_nands_pd_p_p_p           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NANDS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_nands_pd_p_p_p           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nands_pd_p_p_p(rz, rz2, rz3, rz4)) }
+inst_nors_pd_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NORS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_nors_pd_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nors_pd_p_p_p(rz, rz2, rz3, rz4)) }
+inst_orns_pd_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .ORNS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_orns_pd_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_orns_pd_p_p_p(rz, rz2, rz3, rz4)) }
+inst_movs_ph_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .MOVS, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_movs_ph_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_movs_ph_p_p(rz, rz2, rz3)) }
+inst_ptrue_pb_i               :: #force_inline proc "contextless" (rz: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .PTRUE, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_imm(imm, 4), {}, {}}} }
+emit_ptrue_pb_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64) { append(instructions, inst_ptrue_pb_i(rz, imm)) }
+inst_ptrues_pb_i              :: #force_inline proc "contextless" (rz: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .PTRUES, operand_count = 2, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_imm(imm, 4), {}, {}}} }
+emit_ptrues_pb_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64) { append(instructions, inst_ptrues_pb_i(rz, imm)) }
+inst_pfalse_pb                :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .PFALSE, operand_count = 1, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), {}, {}, {}}} }
+emit_pfalse_pb                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_pfalse_pb(rz)) }
+inst_pfirst_ph_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PFIRST, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_pfirst_ph_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pfirst_ph_p_p(rz, rz2, rz3)) }
+inst_pnext_pb_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PNEXT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_pnext_pb_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pnext_pb_p_p(rz, rz2, rz3)) }
+inst_brka_pb_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKA, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_brka_pb_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brka_pb_p_p(rz, rz2, rz3)) }
+inst_brkb_ps_p_p              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKB, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_brkb_ps_p_p              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brkb_ps_p_p(rz, rz2, rz3)) }
+inst_brkas_ph_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKAS, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_brkas_ph_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brkas_ph_p_p(rz, rz2, rz3)) }
+inst_brkbs_pd_p_p             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BRKBS, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), {}}} }
+emit_brkbs_pd_p_p             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_brkbs_pd_p_p(rz, rz2, rz3)) }
+inst_brkpa_pb_p_p_p           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BRKPA, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_brkpa_pb_p_p_p           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_brkpa_pb_p_p_p(rz, rz2, rz3, rz4)) }
+inst_brkpb_pb_p_p_p           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BRKPB, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_brkpb_pb_p_p_p           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_brkpb_pb_p_p_p(rz, rz2, rz3, rz4)) }
+inst_brkn_pb_p_p_p            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BRKN, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(Register(REG_P | (u16(rz3) & 0xF))), op_reg(Register(REG_P | (u16(rz4) & 0xF)))}} }
+emit_brkn_pb_p_p_p            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_brkn_pb_p_p_p(rz, rz2, rz3, rz4)) }
+inst_rdffr_pb                 :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .RDFFR, operand_count = 1, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), {}, {}, {}}} }
+emit_rdffr_pb                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_rdffr_pb(rz)) }
 inst_wrffr_p                  :: #force_inline proc "contextless" (rz: u8) -> Instruction { return Instruction{mnemonic = .WRFFR, operand_count = 1, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), {}, {}, {}}} }
 emit_wrffr_p                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8) { append(instructions, inst_wrffr_p(rz)) }
 inst_setffr_none              :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SETFFR) }
 emit_setffr_none              :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_setffr_none()) }
-inst_cmpeq_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmpeq_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpeq_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmpne_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmpne_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpne_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmpge_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmpge_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpge_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmpgt_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmpgt_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpgt_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmple_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmple_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmple_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmplt_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmplt_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplt_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmphi_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHI, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmphi_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphi_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmphs_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmphs_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphs_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmplo_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmplo_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplo_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_cmpls_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_cmpls_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpls_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_fcmne_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_fcmne_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmne_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_fcmuo_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMUO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_fcmuo_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmuo_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_insr_z_r                 :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .INSR, operand_count = 2, length = 4, ops = {op_z_b(rz), op_reg(src), {}, {}}} }
-emit_insr_z_r                 :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_insr_z_r(rz, src)) }
-inst_cpy_z_p_r                :: #force_inline proc "contextless" (rz: u8, rz2: u8, src: Register) -> Instruction { return Instruction{mnemonic = .CPY, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(src), {}}} }
-emit_cpy_z_p_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, src: Register) { append(instructions, inst_cpy_z_p_r(rz, rz2, src)) }
-inst_compact_z_p_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .COMPACT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
-emit_compact_z_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_compact_z_p_z(rz, rz2, rz3)) }
-inst_ld1b_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_cmpeq_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmpeq_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmpeq_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmpeq_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPEQ, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmpeq_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpeq_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmpeq_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpeq_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmpeq_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpeq_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmpeq_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpeq_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmpne_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmpne_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmpne_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmpne_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmpne_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpne_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmpne_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpne_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmpne_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpne_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmpne_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpne_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmpge_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmpge_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmpge_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmpge_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmpge_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpge_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmpge_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpge_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmpge_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpge_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmpge_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpge_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmpgt_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmpgt_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmpgt_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmpgt_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPGT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmpgt_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpgt_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmpgt_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpgt_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmpgt_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpgt_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmpgt_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpgt_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmple_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmple_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmple_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmple_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmple_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmple_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmple_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmple_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmple_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmple_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmple_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmple_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmplt_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmplt_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmplt_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmplt_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLT, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmplt_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplt_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmplt_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplt_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmplt_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplt_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmplt_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplt_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmphi_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHI, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmphi_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHI, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmphi_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHI, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmphi_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHI, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmphi_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphi_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmphi_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphi_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmphi_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphi_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmphi_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphi_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmphs_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmphs_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmphs_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmphs_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPHS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmphs_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphs_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmphs_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphs_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmphs_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphs_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmphs_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmphs_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmplo_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmplo_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmplo_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmplo_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmplo_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplo_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmplo_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplo_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmplo_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplo_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmplo_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmplo_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_cmpls_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_cmpls_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_cmpls_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_cmpls_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .CMPLS, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_cmpls_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpls_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_cmpls_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpls_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_cmpls_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpls_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_cmpls_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_cmpls_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_fcmne_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmne_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fcmne_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMNE, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_fcmne_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmne_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fcmne_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmne_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fcmne_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmne_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_fcmuo_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMUO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_fcmuo_ps_p_zs_zs         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMUO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_fcmuo_pd_p_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .FCMUO, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_fcmuo_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmuo_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_fcmuo_ps_p_zs_zs         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmuo_ps_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_fcmuo_pd_p_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_fcmuo_pd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_insr_zb_r                :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .INSR, operand_count = 2, length = 4, ops = {op_z_b(rz), op_reg(src), {}, {}}} }
+inst_insr_zh_r                :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .INSR, operand_count = 2, length = 4, ops = {op_z_h(rz), op_reg(src), {}, {}}} }
+inst_insr_zs_r                :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .INSR, operand_count = 2, length = 4, ops = {op_z_s(rz), op_reg(src), {}, {}}} }
+inst_insr_zd_r                :: #force_inline proc "contextless" (rz: u8, src: Register) -> Instruction { return Instruction{mnemonic = .INSR, operand_count = 2, length = 4, ops = {op_z_d(rz), op_reg(src), {}, {}}} }
+emit_insr_zb_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_insr_zb_r(rz, src)) }
+emit_insr_zh_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_insr_zh_r(rz, src)) }
+emit_insr_zs_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_insr_zs_r(rz, src)) }
+emit_insr_zd_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register) { append(instructions, inst_insr_zd_r(rz, src)) }
+inst_cpy_zb_p_r               :: #force_inline proc "contextless" (rz: u8, rz2: u8, src: Register) -> Instruction { return Instruction{mnemonic = .CPY, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(src), {}}} }
+inst_cpy_zh_p_r               :: #force_inline proc "contextless" (rz: u8, rz2: u8, src: Register) -> Instruction { return Instruction{mnemonic = .CPY, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(src), {}}} }
+inst_cpy_zs_p_r               :: #force_inline proc "contextless" (rz: u8, rz2: u8, src: Register) -> Instruction { return Instruction{mnemonic = .CPY, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(src), {}}} }
+inst_cpy_zd_p_r               :: #force_inline proc "contextless" (rz: u8, rz2: u8, src: Register) -> Instruction { return Instruction{mnemonic = .CPY, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_reg(src), {}}} }
+emit_cpy_zb_p_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, src: Register) { append(instructions, inst_cpy_zb_p_r(rz, rz2, src)) }
+emit_cpy_zh_p_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, src: Register) { append(instructions, inst_cpy_zh_p_r(rz, rz2, src)) }
+emit_cpy_zs_p_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, src: Register) { append(instructions, inst_cpy_zs_p_r(rz, rz2, src)) }
+emit_cpy_zd_p_r               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, src: Register) { append(instructions, inst_cpy_zd_p_r(rz, rz2, src)) }
+inst_compact_zs_p_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .COMPACT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+inst_compact_zd_p_zd          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .COMPACT, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), {}}} }
+emit_compact_zs_p_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_compact_zs_p_zs(rz, rz2, rz3)) }
+emit_compact_zd_p_zd          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_compact_zd_p_zd(rz, rz2, rz3)) }
+inst_ld1b_zb_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_B, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1b_zs_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1b_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_ld1b_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1B, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_ld1b_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1b_z_p_m(rz, rz2, mem)) }
+inst_ld1b_zpb_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_ld1b_zqb_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_ld1b_zb_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1b_zb_p_m(rz, rz2, mem)) }
+emit_ld1b_zs_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1b_zs_p_m(rz, rz2, mem)) }
+emit_ld1b_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1b_zd_p_m(rz, rz2, mem)) }
 emit_ld1b_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_ld1b_i_p_m(imm, rz1, mem)) }
-inst_ld1h_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ld1b_zpb_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1b_zpb_pnz_m(rz, rz2, mem)) }
+emit_ld1b_zqb_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1b_zqb_pnz_m(rz, rz2, mem)) }
+inst_ld1h_zh_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_H, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1h_zs_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1h_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_ld1h_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1H, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_ld1h_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1h_z_p_m(rz, rz2, mem)) }
+inst_ld1h_zph_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_ld1h_zqh_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_ld1h_zh_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1h_zh_p_m(rz, rz2, mem)) }
+emit_ld1h_zs_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1h_zs_p_m(rz, rz2, mem)) }
+emit_ld1h_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1h_zd_p_m(rz, rz2, mem)) }
 emit_ld1h_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_ld1h_i_p_m(imm, rz1, mem)) }
-inst_ld1w_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ld1h_zph_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1h_zph_pnz_m(rz, rz2, mem)) }
+emit_ld1h_zqh_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1h_zqh_pnz_m(rz, rz2, mem)) }
+inst_ld1w_zs_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1W, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1w_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1W, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_ld1w_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1W, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_ld1w_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1w_z_p_m(rz, rz2, mem)) }
+inst_ld1w_zps_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_ld1w_zqs_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_ld1w_zs_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1w_zs_p_m(rz, rz2, mem)) }
+emit_ld1w_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1w_zd_p_m(rz, rz2, mem)) }
 emit_ld1w_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_ld1w_i_p_m(imm, rz1, mem)) }
-inst_ld1d_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ld1w_zps_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1w_zps_pnz_m(rz, rz2, mem)) }
+emit_ld1w_zqs_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1w_zqs_pnz_m(rz, rz2, mem)) }
+inst_ld1d_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1D, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_ld1d_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1D, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_ld1d_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1d_z_p_m(rz, rz2, mem)) }
+inst_ld1d_zpd_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_ld1d_zqd_pnz_m           :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_ld1d_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1d_zd_p_m(rz, rz2, mem)) }
 emit_ld1d_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_ld1d_i_p_m(imm, rz1, mem)) }
-inst_ld1sb_z_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ld1sb_z_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sb_z_p_m(rz, rz2, mem)) }
-inst_ld1sh_z_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SH, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ld1sh_z_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sh_z_p_m(rz, rz2, mem)) }
-inst_ld1sw_z_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SW, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ld1sw_z_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sw_z_p_m(rz, rz2, mem)) }
-inst_st1b_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ld1d_zpd_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1d_zpd_pnz_m(rz, rz2, mem)) }
+emit_ld1d_zqd_pnz_m           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1d_zqd_pnz_m(rz, rz2, mem)) }
+inst_ld1sb_zh_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SB, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_H, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1sb_zs_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SB, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1sb_zd_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SB, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ld1sb_zh_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sb_zh_p_m(rz, rz2, mem)) }
+emit_ld1sb_zs_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sb_zs_p_m(rz, rz2, mem)) }
+emit_ld1sb_zd_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sb_zd_p_m(rz, rz2, mem)) }
+inst_ld1sh_zs_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SH, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_ld1sh_zd_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SH, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ld1sh_zs_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sh_zs_p_m(rz, rz2, mem)) }
+emit_ld1sh_zd_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sh_zd_p_m(rz, rz2, mem)) }
+inst_ld1sw_zd_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1SW, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ld1sw_zd_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ld1sw_zd_p_m(rz, rz2, mem)) }
+inst_st1b_zb_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_B, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_st1b_zs_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_st1b_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_st1b_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1B, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_st1b_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1b_z_p_m(rz, rz2, mem)) }
+inst_st1b_zpb_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_st1b_zqb_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_st1b_zb_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1b_zb_p_m(rz, rz2, mem)) }
+emit_st1b_zs_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1b_zs_p_m(rz, rz2, mem)) }
+emit_st1b_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1b_zd_p_m(rz, rz2, mem)) }
 emit_st1b_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_st1b_i_p_m(imm, rz1, mem)) }
-inst_st1h_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_st1b_zpb_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1b_zpb_pn_m(rz, rz2, mem)) }
+emit_st1b_zqb_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1b_zqb_pn_m(rz, rz2, mem)) }
+inst_st1h_zh_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_H, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_st1h_zs_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_st1h_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_st1h_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1H, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_st1h_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1h_z_p_m(rz, rz2, mem)) }
+inst_st1h_zph_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_st1h_zqh_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_st1h_zh_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1h_zh_p_m(rz, rz2, mem)) }
+emit_st1h_zs_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1h_zs_p_m(rz, rz2, mem)) }
+emit_st1h_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1h_zd_p_m(rz, rz2, mem)) }
 emit_st1h_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_st1h_i_p_m(imm, rz1, mem)) }
-inst_st1w_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_st1h_zph_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1h_zph_pn_m(rz, rz2, mem)) }
+emit_st1h_zqh_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1h_zqh_pn_m(rz, rz2, mem)) }
+inst_st1w_zs_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1W, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+inst_st1w_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1W, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_st1w_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1W, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_st1w_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1w_z_p_m(rz, rz2, mem)) }
+inst_st1w_zps_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_st1w_zqs_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_st1w_zs_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1w_zs_p_m(rz, rz2, mem)) }
+emit_st1w_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1w_zd_p_m(rz, rz2, mem)) }
 emit_st1w_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_st1w_i_p_m(imm, rz1, mem)) }
-inst_st1d_z_p_m               :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_st1w_zps_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1w_zps_pn_m(rz, rz2, mem)) }
+emit_st1w_zqs_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1w_zqs_pn_m(rz, rz2, mem)) }
+inst_st1d_zd_p_m              :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1D, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
 inst_st1d_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1D, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
-emit_st1d_z_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1d_z_p_m(rz, rz2, mem)) }
+inst_st1d_zpd_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+inst_st1d_zqd_pn_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_PN | (8 + (u16(rz2) & 0x7)))), op_mem(mem), {}}} }
+emit_st1d_zd_p_m              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1d_zd_p_m(rz, rz2, mem)) }
 emit_st1d_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_st1d_i_p_m(imm, rz1, mem)) }
-inst_ldff1b_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldff1b_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1b_z_p_m(rz, rz2, mem)) }
-inst_ldff1h_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldff1h_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1h_z_p_m(rz, rz2, mem)) }
-inst_ldff1w_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldff1w_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1w_z_p_m(rz, rz2, mem)) }
-inst_ldff1d_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldff1d_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1d_z_p_m(rz, rz2, mem)) }
+emit_st1d_zpd_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1d_zpd_pn_m(rz, rz2, mem)) }
+emit_st1d_zqd_pn_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_st1d_zqd_pn_m(rz, rz2, mem)) }
+inst_ldff1b_zb_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_B, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldff1b_zb_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1b_zb_p_m(rz, rz2, mem)) }
+inst_ldff1h_zh_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_H, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldff1h_zh_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1h_zh_p_m(rz, rz2, mem)) }
+inst_ldff1w_zs_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1W, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldff1w_zs_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1w_zs_p_m(rz, rz2, mem)) }
+inst_ldff1d_zd_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDFF1D, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldff1d_zd_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldff1d_zd_p_m(rz, rz2, mem)) }
 inst_whilege_p_r_r            :: #force_inline proc "contextless" (rz: u8, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .WHILEGE, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(src), op_reg(src2), {}}} }
 emit_whilege_p_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register, src2: Register) { append(instructions, inst_whilege_p_r_r(rz, src, src2)) }
 inst_whilegt_p_r_r            :: #force_inline proc "contextless" (rz: u8, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .WHILEGT, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(src), op_reg(src2), {}}} }
@@ -3267,68 +3821,102 @@ inst_whilelo_p_r_r            :: #force_inline proc "contextless" (rz: u8, src: 
 emit_whilelo_p_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register, src2: Register) { append(instructions, inst_whilelo_p_r_r(rz, src, src2)) }
 inst_whilels_p_r_r            :: #force_inline proc "contextless" (rz: u8, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .WHILELS, operand_count = 3, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(src), op_reg(src2), {}}} }
 emit_whilels_p_r_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register, src2: Register) { append(instructions, inst_whilels_p_r_r(rz, src, src2)) }
-inst_sqrdmlah_z_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLAH, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-emit_sqrdmlah_z_z_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlah_z_z_z(rz, rz2, rz3)) }
-inst_sqrdmlsh_z_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLSH, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-emit_sqrdmlsh_z_z_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlsh_z_z_z(rz, rz2, rz3)) }
-inst_adclb_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADCLB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
-emit_adclb_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_adclb_z_z_z(rz, rz2, rz3)) }
-inst_adclt_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADCLT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
-emit_adclt_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_adclt_z_z_z(rz, rz2, rz3)) }
-inst_sbclb_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SBCLB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
-emit_sbclb_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sbclb_z_z_z(rz, rz2, rz3)) }
-inst_sbclt_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SBCLT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
-emit_sbclt_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sbclt_z_z_z(rz, rz2, rz3)) }
-inst_tbl2_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBL2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-emit_tbl2_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbl2_z_z_z(rz, rz2, rz3)) }
-inst_match_p_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MATCH, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_match_p_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_match_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_nmatch_p_p_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NMATCH, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_nmatch_p_p_z_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nmatch_p_p_z_z(rz, rz2, rz3, rz4)) }
-inst_histcnt_z_p_z_z          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .HISTCNT, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
-emit_histcnt_z_p_z_z          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_histcnt_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_histseg_z_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .HISTSEG, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-emit_histseg_z_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_histseg_z_z_z(rz, rz2, rz3)) }
+inst_sqrdmlah_zb_zb_zb        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLAH, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_sqrdmlah_zh_zh_zh        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLAH, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_sqrdmlah_zs_zs_zs        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLAH, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_sqrdmlah_zd_zd_zd        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLAH, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+emit_sqrdmlah_zb_zb_zb        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlah_zb_zb_zb(rz, rz2, rz3)) }
+emit_sqrdmlah_zh_zh_zh        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlah_zh_zh_zh(rz, rz2, rz3)) }
+emit_sqrdmlah_zs_zs_zs        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlah_zs_zs_zs(rz, rz2, rz3)) }
+emit_sqrdmlah_zd_zd_zd        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlah_zd_zd_zd(rz, rz2, rz3)) }
+inst_sqrdmlsh_zb_zb_zb        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLSH, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_sqrdmlsh_zh_zh_zh        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLSH, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+inst_sqrdmlsh_zs_zs_zs        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLSH, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_sqrdmlsh_zd_zd_zd        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SQRDMLSH, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+emit_sqrdmlsh_zb_zb_zb        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlsh_zb_zb_zb(rz, rz2, rz3)) }
+emit_sqrdmlsh_zh_zh_zh        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlsh_zh_zh_zh(rz, rz2, rz3)) }
+emit_sqrdmlsh_zs_zs_zs        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlsh_zs_zs_zs(rz, rz2, rz3)) }
+emit_sqrdmlsh_zd_zd_zd        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sqrdmlsh_zd_zd_zd(rz, rz2, rz3)) }
+inst_adclb_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADCLB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_adclb_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADCLB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+emit_adclb_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_adclb_zs_zs_zs(rz, rz2, rz3)) }
+emit_adclb_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_adclb_zd_zd_zd(rz, rz2, rz3)) }
+inst_adclt_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADCLT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_adclt_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADCLT, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+emit_adclt_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_adclt_zs_zs_zs(rz, rz2, rz3)) }
+emit_adclt_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_adclt_zd_zd_zd(rz, rz2, rz3)) }
+inst_sbclb_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SBCLB, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_sbclb_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SBCLB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+emit_sbclb_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sbclb_zs_zs_zs(rz, rz2, rz3)) }
+emit_sbclb_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sbclb_zd_zd_zd(rz, rz2, rz3)) }
+inst_sbclt_zs_zs_zs           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SBCLT, operand_count = 3, length = 4, ops = {op_z_s(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+inst_sbclt_zd_zd_zd           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SBCLT, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), {}}} }
+emit_sbclt_zs_zs_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sbclt_zs_zs_zs(rz, rz2, rz3)) }
+emit_sbclt_zd_zd_zd           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_sbclt_zd_zd_zd(rz, rz2, rz3)) }
+inst_tbl2_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .TBL2, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+emit_tbl2_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_tbl2_zb_zb_zb(rz, rz2, rz3)) }
+inst_match_pb_p_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MATCH, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_match_ph_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .MATCH, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+emit_match_pb_p_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_match_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_match_ph_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_match_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+inst_nmatch_pb_p_zb_zb        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NMATCH, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+inst_nmatch_ph_p_zh_zh        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NMATCH, operand_count = 4, length = 4, ops = {op_reg(Register(REG_P | (u16(rz) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+emit_nmatch_pb_p_zb_zb        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nmatch_pb_p_zb_zb(rz, rz2, rz3, rz4)) }
+emit_nmatch_ph_p_zh_zh        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nmatch_ph_p_zh_zh(rz, rz2, rz3, rz4)) }
+inst_histcnt_zs_p_zs_zs       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .HISTCNT, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), op_z_s(rz4)}} }
+inst_histcnt_zd_p_zd_zd       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .HISTCNT, operand_count = 4, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_d(rz3), op_z_d(rz4)}} }
+emit_histcnt_zs_p_zs_zs       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_histcnt_zs_p_zs_zs(rz, rz2, rz3, rz4)) }
+emit_histcnt_zd_p_zd_zd       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_histcnt_zd_p_zd_zd(rz, rz2, rz3, rz4)) }
+inst_histseg_zb_zb_zb         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .HISTSEG, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+emit_histseg_zb_zb_zb         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_histseg_zb_zb_zb(rz, rz2, rz3)) }
 inst_smstart_none             :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SMSTART) }
 emit_smstart_none             :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_smstart_none()) }
 inst_smstop_none              :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SMSTOP) }
 emit_smstop_none              :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_smstop_none()) }
 inst_rdsvl_r_i                :: #force_inline proc "contextless" (dst: Register, imm: i64) -> Instruction { return inst_r_i(.RDSVL, dst, imm) }
 emit_rdsvl_r_i                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_rdsvl_r_i(dst, imm)) }
-inst_addha_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADDHA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
-emit_addha_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_addha_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_addva_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADDVA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
-emit_addva_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_addva_i_p_p_z(imm, rz1, rz2, rz3)) }
+inst_addha_i_p_p_zs           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADDHA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
+emit_addha_i_p_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_addha_i_p_p_zs(imm, rz1, rz2, rz3)) }
+inst_addva_i_p_p_zs           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ADDVA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
+emit_addva_i_p_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_addva_i_p_p_zs(imm, rz1, rz2, rz3)) }
 inst_zero_i                   :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .ZERO, operand_count = 1, length = 4, ops = {op_imm(imm, 4), {}, {}, {}}} }
 emit_zero_i                   :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_zero_i(imm)) }
-inst_fmopa_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
-emit_fmopa_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmopa_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_fmops_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
-emit_fmops_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmops_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_bfmopa_i_p_p_z           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
-emit_bfmopa_i_p_p_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfmopa_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_bfmops_i_p_p_z           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
-emit_bfmops_i_p_p_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfmops_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_smopa_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
-emit_smopa_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_smopa_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_smops_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
-emit_smops_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_smops_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_umopa_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
-emit_umopa_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_umopa_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_umops_i_p_p_z            :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
-emit_umops_i_p_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_umops_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_usmopa_i_p_p_z           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .USMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
-emit_usmopa_i_p_p_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_usmopa_i_p_p_z(imm, rz1, rz2, rz3)) }
-inst_sumopa_i_p_p_z           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SUMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
-emit_sumopa_i_p_p_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_sumopa_i_p_p_z(imm, rz1, rz2, rz3)) }
+inst_fmopa_i_p_p_zs           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
+emit_fmopa_i_p_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmopa_i_p_p_zs(imm, rz1, rz2, rz3)) }
+inst_fmops_i_p_p_zs           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .FMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3)}} }
+emit_fmops_i_p_p_zs           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_fmops_i_p_p_zs(imm, rz1, rz2, rz3)) }
+inst_bfmopa_i_p_p_zh          :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
+emit_bfmopa_i_p_p_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfmopa_i_p_p_zh(imm, rz1, rz2, rz3)) }
+inst_bfmops_i_p_p_zh          :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
+emit_bfmops_i_p_p_zh          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfmops_i_p_p_zh(imm, rz1, rz2, rz3)) }
+inst_smopa_i_p_p_zb           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
+inst_smopa_i_p_p_zh           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
+emit_smopa_i_p_p_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_smopa_i_p_p_zb(imm, rz1, rz2, rz3)) }
+emit_smopa_i_p_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_smopa_i_p_p_zh(imm, rz1, rz2, rz3)) }
+inst_smops_i_p_p_zb           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
+inst_smops_i_p_p_zh           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
+emit_smops_i_p_p_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_smops_i_p_p_zb(imm, rz1, rz2, rz3)) }
+emit_smops_i_p_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_smops_i_p_p_zh(imm, rz1, rz2, rz3)) }
+inst_umopa_i_p_p_zb           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
+inst_umopa_i_p_p_zh           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
+emit_umopa_i_p_p_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_umopa_i_p_p_zb(imm, rz1, rz2, rz3)) }
+emit_umopa_i_p_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_umopa_i_p_p_zh(imm, rz1, rz2, rz3)) }
+inst_umops_i_p_p_zb           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
+inst_umops_i_p_p_zh           :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UMOPS, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3)}} }
+emit_umops_i_p_p_zb           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_umops_i_p_p_zb(imm, rz1, rz2, rz3)) }
+emit_umops_i_p_p_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_umops_i_p_p_zh(imm, rz1, rz2, rz3)) }
+inst_usmopa_i_p_p_zb          :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .USMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
+emit_usmopa_i_p_p_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_usmopa_i_p_p_zb(imm, rz1, rz2, rz3)) }
+inst_sumopa_i_p_p_zb          :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .SUMOPA, operand_count = 4, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3)}} }
+emit_sumopa_i_p_p_zb          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8, rz3: u8) { append(instructions, inst_sumopa_i_p_p_zb(imm, rz1, rz2, rz3)) }
 inst_ld1q_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LD1Q, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
 emit_ld1q_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_ld1q_i_p_m(imm, rz1, mem)) }
 inst_st1q_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .ST1Q, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
 emit_st1q_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_st1q_i_p_m(imm, rz1, mem)) }
-inst_mova_z_p_i               :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .MOVA, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_imm(imm, 4), {}}} }
-inst_mova_i_p_z               :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .MOVA, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_z_b(rz2), {}}} }
-emit_mova_z_p_i               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_mova_z_p_i(rz, rz2, imm)) }
-emit_mova_i_p_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8) { append(instructions, inst_mova_i_p_z(imm, rz1, rz2)) }
+inst_mova_zb_p_i              :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .MOVA, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_imm(imm, 4), {}}} }
+inst_mova_i_p_zb              :: #force_inline proc "contextless" (imm: i64, rz1: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .MOVA, operand_count = 3, length = 4, ops = {op_imm(imm, 4), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_z_b(rz2), {}}} }
+emit_mova_zb_p_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_mova_zb_p_i(rz, rz2, imm)) }
+emit_mova_i_p_zb              :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, rz2: u8) { append(instructions, inst_mova_i_p_zb(imm, rz1, rz2)) }
 inst_fcmla_v4h_v4h_v4h_i      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .FCMLA, operand_count = 4, length = 4, ops = {op_v_4h(dst), op_v_4h(src), op_v_4h(src2), op_imm(imm, 1)}} }
 inst_fcmla_v8h_v8h_v8h_i      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .FCMLA, operand_count = 4, length = 4, ops = {op_v_8h(dst), op_v_8h(src), op_v_8h(src2), op_imm(imm, 1)}} }
 inst_fcmla_v4s_v4s_v4s_i      :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .FCMLA, operand_count = 4, length = 4, ops = {op_v_4s(dst), op_v_4s(src), op_v_4s(src2), op_imm(imm, 1)}} }
@@ -3353,46 +3941,46 @@ inst_prfw_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1
 emit_prfw_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_prfw_i_p_m(imm, rz1, mem)) }
 inst_prfd_i_p_m               :: #force_inline proc "contextless" (imm: i64, rz1: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .PRFD, operand_count = 3, length = 4, ops = {op_imm(imm, 1), op_reg(Register(REG_P | (u16(rz1) & 0xF))), op_mem(mem), {}}} }
 emit_prfd_i_p_m               :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, rz1: u8, mem: Memory) { append(instructions, inst_prfd_i_p_m(imm, rz1, mem)) }
-inst_ldnt1b_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldnt1b_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1b_z_p_m(rz, rz2, mem)) }
-inst_ldnt1h_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldnt1h_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1h_z_p_m(rz, rz2, mem)) }
-inst_ldnt1w_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldnt1w_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1w_z_p_m(rz, rz2, mem)) }
-inst_ldnt1d_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_ldnt1d_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1d_z_p_m(rz, rz2, mem)) }
-inst_stnt1b_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1B, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_stnt1b_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1b_z_p_m(rz, rz2, mem)) }
-inst_stnt1h_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1H, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_stnt1h_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1h_z_p_m(rz, rz2, mem)) }
-inst_stnt1w_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1W, operand_count = 3, length = 4, ops = {op_z_s(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_stnt1w_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1w_z_p_m(rz, rz2, mem)) }
-inst_stnt1d_z_p_m             :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1D, operand_count = 3, length = 4, ops = {op_z_d(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
-emit_stnt1d_z_p_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1d_z_p_m(rz, rz2, mem)) }
-inst_splice_z_p_z_z           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SPLICE, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
-emit_splice_z_p_z_z           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_splice_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_index_z_i_i              :: #force_inline proc "contextless" (rz: u8, imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_imm(imm, 1), op_imm(imm2, 1), {}}} }
-inst_index_z_i_r              :: #force_inline proc "contextless" (rz: u8, imm: i64, src: Register) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_imm(imm, 1), op_reg(src), {}}} }
-inst_index_z_r_i              :: #force_inline proc "contextless" (rz: u8, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(src), op_imm(imm, 1), {}}} }
-inst_index_z_r_r              :: #force_inline proc "contextless" (rz: u8, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(src), op_reg(src2), {}}} }
-emit_index_z_i_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64, imm2: i64) { append(instructions, inst_index_z_i_i(rz, imm, imm2)) }
-emit_index_z_i_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64, src: Register) { append(instructions, inst_index_z_i_r(rz, imm, src)) }
-emit_index_z_r_i              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register, imm: i64) { append(instructions, inst_index_z_r_i(rz, src, imm)) }
-emit_index_z_r_r              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register, src2: Register) { append(instructions, inst_index_z_r_r(rz, src, src2)) }
-inst_bsl1n_z_z_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BSL1N, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
-emit_bsl1n_z_z_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bsl1n_z_z_z_z(rz, rz2, rz3, rz4)) }
-inst_bsl2n_z_z_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BSL2N, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
-emit_bsl2n_z_z_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bsl2n_z_z_z_z(rz, rz2, rz3, rz4)) }
-inst_nbsl_z_z_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NBSL, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
-emit_nbsl_z_z_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nbsl_z_z_z_z(rz, rz2, rz3, rz4)) }
-inst_pmul_z_z_z               :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PMUL, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
-emit_pmul_z_z_z               :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pmul_z_z_z(rz, rz2, rz3)) }
-inst_pmullb_z_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PMULLB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
-emit_pmullb_z_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pmullb_z_z_z(rz, rz2, rz3)) }
-inst_pmullt_z_z_z             :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PMULLT, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
-emit_pmullt_z_z_z             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pmullt_z_z_z(rz, rz2, rz3)) }
-inst_bfcvtnt_z_p_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFCVTNT, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
-emit_bfcvtnt_z_p_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfcvtnt_z_p_z(rz, rz2, rz3)) }
+inst_ldnt1b_zb_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_B, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldnt1b_zb_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1b_zb_p_m(rz, rz2, mem)) }
+inst_ldnt1h_zh_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_H, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldnt1h_zh_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1h_zh_p_m(rz, rz2, mem)) }
+inst_ldnt1w_zs_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1W, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldnt1w_zs_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1w_zs_p_m(rz, rz2, mem)) }
+inst_ldnt1d_zd_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .LDNT1D, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_ldnt1d_zd_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_ldnt1d_zd_p_m(rz, rz2, mem)) }
+inst_stnt1b_zb_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1B, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_B, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_stnt1b_zb_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1b_zb_p_m(rz, rz2, mem)) }
+inst_stnt1h_zh_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1H, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_H, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_stnt1h_zh_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1h_zh_p_m(rz, rz2, mem)) }
+inst_stnt1w_zs_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1W, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_S, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_stnt1w_zs_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1w_zs_p_m(rz, rz2, mem)) }
+inst_stnt1d_zd_p_m            :: #force_inline proc "contextless" (rz: u8, rz2: u8, mem: Memory) -> Instruction { return Instruction{mnemonic = .STNT1D, operand_count = 3, length = 4, ops = {op_v_list(Register(REG_Z | (u16(rz) & 0x1F)), ZSHAPE_D, 1), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_mem(mem), {}}} }
+emit_stnt1d_zd_p_m            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, mem: Memory) { append(instructions, inst_stnt1d_zd_p_m(rz, rz2, mem)) }
+inst_splice_zb_p_zb_zb        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .SPLICE, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_b(rz3), op_z_b(rz4)}} }
+emit_splice_zb_p_zb_zb        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_splice_zb_p_zb_zb(rz, rz2, rz3, rz4)) }
+inst_index_zb_i_i             :: #force_inline proc "contextless" (rz: u8, imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_imm(imm, 1), op_imm(imm2, 1), {}}} }
+inst_index_zb_i_r             :: #force_inline proc "contextless" (rz: u8, imm: i64, src: Register) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_imm(imm, 1), op_reg(src), {}}} }
+inst_index_zb_r_i             :: #force_inline proc "contextless" (rz: u8, src: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(src), op_imm(imm, 1), {}}} }
+inst_index_zb_r_r             :: #force_inline proc "contextless" (rz: u8, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .INDEX, operand_count = 3, length = 4, ops = {op_z_b(rz), op_reg(src), op_reg(src2), {}}} }
+emit_index_zb_i_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64, imm2: i64) { append(instructions, inst_index_zb_i_i(rz, imm, imm2)) }
+emit_index_zb_i_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, imm: i64, src: Register) { append(instructions, inst_index_zb_i_r(rz, imm, src)) }
+emit_index_zb_r_i             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register, imm: i64) { append(instructions, inst_index_zb_r_i(rz, src, imm)) }
+emit_index_zb_r_r             :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, src: Register, src2: Register) { append(instructions, inst_index_zb_r_r(rz, src, src2)) }
+inst_bsl1n_zd_zd_zd_zd        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BSL1N, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
+emit_bsl1n_zd_zd_zd_zd        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bsl1n_zd_zd_zd_zd(rz, rz2, rz3, rz4)) }
+inst_bsl2n_zd_zd_zd_zd        :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BSL2N, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
+emit_bsl2n_zd_zd_zd_zd        :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bsl2n_zd_zd_zd_zd(rz, rz2, rz3, rz4)) }
+inst_nbsl_zd_zd_zd_zd         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .NBSL, operand_count = 4, length = 4, ops = {op_z_d(rz), op_z_d(rz2), op_z_d(rz3), op_z_d(rz4)}} }
+emit_nbsl_zd_zd_zd_zd         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_nbsl_zd_zd_zd_zd(rz, rz2, rz3, rz4)) }
+inst_pmul_zb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PMUL, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+emit_pmul_zb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pmul_zb_zb_zb(rz, rz2, rz3)) }
+inst_pmullb_zd_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PMULLB, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+emit_pmullb_zd_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pmullb_zd_zs_zs(rz, rz2, rz3)) }
+inst_pmullt_zd_zs_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .PMULLT, operand_count = 3, length = 4, ops = {op_z_d(rz), op_z_s(rz2), op_z_s(rz3), {}}} }
+emit_pmullt_zd_zs_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_pmullt_zd_zs_zs(rz, rz2, rz3)) }
+inst_bfcvtnt_zh_p_zs          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFCVTNT, operand_count = 3, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_s(rz3), {}}} }
+emit_bfcvtnt_zh_p_zs          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfcvtnt_zh_p_zs(rz, rz2, rz3)) }
 inst_ldraa_r_m                :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRAA, dst, mem) }
 emit_ldraa_r_m                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldraa_r_m(dst, mem)) }
 inst_ldrab_r_m                :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDRAB, dst, mem) }
@@ -3483,22 +4071,22 @@ inst_ldapursh_r_m             :: #force_inline proc "contextless" (dst: Register
 emit_ldapursh_r_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldapursh_r_m(dst, mem)) }
 inst_ldapursw_r_m             :: #force_inline proc "contextless" (dst: Register, mem: Memory) -> Instruction { return inst_ldst(.LDAPURSW, dst, mem) }
 emit_ldapursw_r_m             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, mem: Memory) { append(instructions, inst_ldapursw_r_m(dst, mem)) }
-inst_bfadd_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFADD, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-inst_bfadd_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFADD, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-emit_bfadd_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfadd_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_bfadd_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfadd_z_z_z(rz, rz2, rz3)) }
-inst_bfsub_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFSUB, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-inst_bfsub_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFSUB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-emit_bfsub_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfsub_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_bfsub_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfsub_z_z_z(rz, rz2, rz3)) }
-inst_bfmul_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMUL, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-inst_bfmul_z_z_z              :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFMUL, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-emit_bfmul_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmul_z_p_z_z(rz, rz2, rz3, rz4)) }
-emit_bfmul_z_z_z              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfmul_z_z_z(rz, rz2, rz3)) }
-inst_bfmla_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_bfmla_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmla_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_bfmls_z_p_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_bfmls_z_p_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmls_z_p_z_z(rz, rz2, rz3, rz4)) }
+inst_bfadd_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFADD, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_bfadd_zh_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFADD, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+emit_bfadd_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfadd_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_bfadd_zh_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfadd_zh_zh_zh(rz, rz2, rz3)) }
+inst_bfsub_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFSUB, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_bfsub_zh_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFSUB, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+emit_bfsub_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfsub_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_bfsub_zh_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfsub_zh_zh_zh(rz, rz2, rz3)) }
+inst_bfmul_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMUL, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+inst_bfmul_zh_zh_zh           :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFMUL, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+emit_bfmul_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmul_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+emit_bfmul_zh_zh_zh           :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfmul_zh_zh_zh(rz, rz2, rz3)) }
+inst_bfmla_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMLA, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+emit_bfmla_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmla_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+inst_bfmls_zh_p_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMLS, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+emit_bfmls_zh_p_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmls_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
 inst_sb_none                  :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SB) }
 emit_sb_none                  :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_sb_none()) }
 inst_csdb_none                :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CSDB) }
@@ -3515,24 +4103,24 @@ inst_bti_c_none               :: #force_inline proc "contextless" () -> Instruct
 emit_bti_c_none               :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_bti_c_none()) }
 inst_bti_jc_none              :: #force_inline proc "contextless" () -> Instruction { return inst_none(.BTI_JC) }
 emit_bti_jc_none              :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_bti_jc_none()) }
-inst_bfclamp_z_z_z            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFCLAMP, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
-emit_bfclamp_z_z_z            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfclamp_z_z_z(rz, rz2, rz3)) }
-inst_bfmaxnm_z_p_z_z          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMAXNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_bfmaxnm_z_p_z_z          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmaxnm_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_bfminnm_z_p_z_z          :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMINNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
-emit_bfminnm_z_p_z_z          :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfminnm_z_p_z_z(rz, rz2, rz3, rz4)) }
-inst_luti2_z_z_z_i            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI2, operand_count = 4, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_z_b(rz3), op_imm(imm, 1)}} }
-emit_luti2_z_z_z_i            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_luti2_z_z_z_i(rz, rz2, rz3, imm)) }
-inst_luti4_z_z_z_i            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI4, operand_count = 4, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_z_b(rz3), op_imm(imm, 1)}} }
-emit_luti4_z_z_z_i            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_luti4_z_z_z_i(rz, rz2, rz3, imm)) }
-inst_zip_z_z_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP, operand_count = 3, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_zip_z_z                  :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .ZIP, operand_count = 2, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), {}, {}}} }
-emit_zip_z_z_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip_z_z_z(rz, rz2, rz3)) }
-emit_zip_z_z                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_zip_z_z(rz, rz2)) }
-inst_uzp_z_z_z                :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP, operand_count = 3, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_z_b(rz2), op_z_b(rz3), {}}} }
-inst_uzp_z_z                  :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .UZP, operand_count = 2, length = 4, ops = {op_reg(Register(REG_Z | (u16(rz) & 0x1F))), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), {}, {}}} }
-emit_uzp_z_z_z                :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp_z_z_z(rz, rz2, rz3)) }
-emit_uzp_z_z                  :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_uzp_z_z(rz, rz2)) }
+inst_bfclamp_zh_zh_zh         :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .BFCLAMP, operand_count = 3, length = 4, ops = {op_z_h(rz), op_z_h(rz2), op_z_h(rz3), {}}} }
+emit_bfclamp_zh_zh_zh         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_bfclamp_zh_zh_zh(rz, rz2, rz3)) }
+inst_bfmaxnm_zh_p_zh_zh       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMAXNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+emit_bfmaxnm_zh_p_zh_zh       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmaxnm_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+inst_bfminnm_zh_p_zh_zh       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMINNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
+emit_bfminnm_zh_p_zh_zh       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfminnm_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
+inst_luti2_zpb_zpb_zb_i       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI2, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 1)}} }
+emit_luti2_zpb_zpb_zb_i       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_luti2_zpb_zpb_zb_i(rz, rz2, rz3, imm)) }
+inst_luti4_zpb_zpb_zb_i       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI4, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 1)}} }
+emit_luti4_zpb_zpb_zb_i       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_luti4_zpb_zpb_zb_i(rz, rz2, rz3, imm)) }
+inst_zip_zpb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_zip_zqb_zqb              :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .ZIP, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
+emit_zip_zpb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip_zpb_zb_zb(rz, rz2, rz3)) }
+emit_zip_zqb_zqb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_zip_zqb_zqb(rz, rz2)) }
+inst_uzp_zpb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .UZP, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
+inst_uzp_zqb_zqb              :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .UZP, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
+emit_uzp_zpb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_uzp_zpb_zb_zb(rz, rz2, rz3)) }
+emit_uzp_zqb_zqb              :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8) { append(instructions, inst_uzp_zqb_zqb(rz, rz2)) }
 inst_tlbi_rpalos_r            :: #force_inline proc "contextless" (dst: Register) -> Instruction { return inst_r(.TLBI_RPALOS, dst) }
 emit_tlbi_rpalos_r            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register) { append(instructions, inst_tlbi_rpalos_r(dst)) }
 inst_tlbi_rpaos_r             :: #force_inline proc "contextless" (dst: Register) -> Instruction { return inst_r(.TLBI_RPAOS, dst) }
@@ -3720,12 +4308,12 @@ emit_cmn_r_i                  :: #force_inline proc(instructions: ^[dynamic]Inst
 // Overload Groups
 // =============================================================================
 
-inst_add                           :: proc{ inst_add_r_r_i, inst_add_r_r_sh, inst_add_r_r_ex, inst_add_v16b_v16b_v16b, inst_add_z_z_z, inst_add_z_p_z_z }
-emit_add                           :: proc{ emit_add_r_r_i, emit_add_r_r_sh, emit_add_r_r_ex, emit_add_v16b_v16b_v16b, emit_add_z_z_z, emit_add_z_p_z_z }
+inst_add                           :: proc{ inst_add_r_r_i, inst_add_r_r_sh, inst_add_r_r_ex, inst_add_v16b_v16b_v16b, inst_add_zb_zb_zb, inst_add_zb_p_zb_zb }
+emit_add                           :: proc{ emit_add_r_r_i, emit_add_r_r_sh, emit_add_r_r_ex, emit_add_v16b_v16b_v16b, emit_add_zb_zb_zb, emit_add_zb_p_zb_zb }
 inst_adds                          :: proc{ inst_adds_r_r_i, inst_adds_r_r_sh, inst_adds_r_r_ex }
 emit_adds                          :: proc{ emit_adds_r_r_i, emit_adds_r_r_sh, emit_adds_r_r_ex }
-inst_sub                           :: proc{ inst_sub_r_r_i, inst_sub_r_r_sh, inst_sub_r_r_ex, inst_sub_v16b_v16b_v16b, inst_sub_z_z_z, inst_sub_z_p_z_z }
-emit_sub                           :: proc{ emit_sub_r_r_i, emit_sub_r_r_sh, emit_sub_r_r_ex, emit_sub_v16b_v16b_v16b, emit_sub_z_z_z, emit_sub_z_p_z_z }
+inst_sub                           :: proc{ inst_sub_r_r_i, inst_sub_r_r_sh, inst_sub_r_r_ex, inst_sub_v16b_v16b_v16b, inst_sub_zb_zb_zb, inst_sub_zb_p_zb_zb }
+emit_sub                           :: proc{ emit_sub_r_r_i, emit_sub_r_r_sh, emit_sub_r_r_ex, emit_sub_v16b_v16b_v16b, emit_sub_zb_zb_zb, emit_sub_zb_p_zb_zb }
 inst_subs                          :: proc{ inst_subs_r_r_i, inst_subs_r_r_sh, inst_subs_r_r_ex }
 emit_subs                          :: proc{ emit_subs_r_r_i, emit_subs_r_r_sh, emit_subs_r_r_ex }
 inst_movz                          :: inst_movz_r_i_i
@@ -3738,34 +4326,34 @@ inst_adr                           :: inst_adr_r_l
 emit_adr                           :: emit_adr_r_l
 inst_adrp                          :: inst_adrp_r_l
 emit_adrp                          :: emit_adrp_r_l
-inst_and                           :: proc{ inst_and_r_r_sh, inst_and_r_r_i, inst_and_v16b_v16b_v16b, inst_and_z_p_z_z }
-emit_and                           :: proc{ emit_and_r_r_sh, emit_and_r_r_i, emit_and_v16b_v16b_v16b, emit_and_z_p_z_z }
-inst_ands                          :: proc{ inst_ands_r_r_sh, inst_ands_r_r_i, inst_ands_p_p_p_p }
-emit_ands                          :: proc{ emit_ands_r_r_sh, emit_ands_r_r_i, emit_ands_p_p_p_p }
-inst_orr                           :: proc{ inst_orr_r_r_sh, inst_orr_r_r_i, inst_orr_v16b_v16b_v16b, inst_orr_z_p_z_z }
-emit_orr                           :: proc{ emit_orr_r_r_sh, emit_orr_r_r_i, emit_orr_v16b_v16b_v16b, emit_orr_z_p_z_z }
-inst_eor                           :: proc{ inst_eor_r_r_sh, inst_eor_r_r_i, inst_eor_v16b_v16b_v16b, inst_eor_z_p_z_z }
-emit_eor                           :: proc{ emit_eor_r_r_sh, emit_eor_r_r_i, emit_eor_v16b_v16b_v16b, emit_eor_z_p_z_z }
-inst_bic                           :: proc{ inst_bic_r_r_sh, inst_bic_v16b_v16b_v16b, inst_bic_z_p_z_z }
-emit_bic                           :: proc{ emit_bic_r_r_sh, emit_bic_v16b_v16b_v16b, emit_bic_z_p_z_z }
-inst_bics                          :: proc{ inst_bics_r_r_sh, inst_bics_p_p_p_p }
-emit_bics                          :: proc{ emit_bics_r_r_sh, emit_bics_p_p_p_p }
-inst_orn                           :: proc{ inst_orn_r_r_sh, inst_orn_v16b_v16b_v16b, inst_orn_p_p_p_p }
-emit_orn                           :: proc{ emit_orn_r_r_sh, emit_orn_v16b_v16b_v16b, emit_orn_p_p_p_p }
+inst_and                           :: proc{ inst_and_r_r_sh, inst_and_r_r_i, inst_and_v16b_v16b_v16b, inst_and_zb_p_zb_zb }
+emit_and                           :: proc{ emit_and_r_r_sh, emit_and_r_r_i, emit_and_v16b_v16b_v16b, emit_and_zb_p_zb_zb }
+inst_ands                          :: proc{ inst_ands_r_r_sh, inst_ands_r_r_i, inst_ands_ph_p_p_p }
+emit_ands                          :: proc{ emit_ands_r_r_sh, emit_ands_r_r_i, emit_ands_ph_p_p_p }
+inst_orr                           :: proc{ inst_orr_r_r_sh, inst_orr_r_r_i, inst_orr_v16b_v16b_v16b, inst_orr_zb_p_zb_zb }
+emit_orr                           :: proc{ emit_orr_r_r_sh, emit_orr_r_r_i, emit_orr_v16b_v16b_v16b, emit_orr_zb_p_zb_zb }
+inst_eor                           :: proc{ inst_eor_r_r_sh, inst_eor_r_r_i, inst_eor_v16b_v16b_v16b, inst_eor_zb_p_zb_zb }
+emit_eor                           :: proc{ emit_eor_r_r_sh, emit_eor_r_r_i, emit_eor_v16b_v16b_v16b, emit_eor_zb_p_zb_zb }
+inst_bic                           :: proc{ inst_bic_r_r_sh, inst_bic_v16b_v16b_v16b, inst_bic_zb_p_zb_zb }
+emit_bic                           :: proc{ emit_bic_r_r_sh, emit_bic_v16b_v16b_v16b, emit_bic_zb_p_zb_zb }
+inst_bics                          :: proc{ inst_bics_r_r_sh, inst_bics_ph_p_p_p }
+emit_bics                          :: proc{ emit_bics_r_r_sh, emit_bics_ph_p_p_p }
+inst_orn                           :: proc{ inst_orn_r_r_sh, inst_orn_v16b_v16b_v16b, inst_orn_ps_p_p_p }
+emit_orn                           :: proc{ emit_orn_r_r_sh, emit_orn_v16b_v16b_v16b, emit_orn_ps_p_p_p }
 inst_eon                           :: inst_eon_r_r_sh
 emit_eon                           :: emit_eon_r_r_sh
-inst_lsl                           :: proc{ inst_lsl_r_r_r, inst_lsl_z_p_z_z, inst_lsl_r_r_i }
-emit_lsl                           :: proc{ emit_lsl_r_r_r, emit_lsl_z_p_z_z, emit_lsl_r_r_i }
-inst_lsr                           :: proc{ inst_lsr_r_r_r, inst_lsr_z_p_z_z, inst_lsr_r_r_i }
-emit_lsr                           :: proc{ emit_lsr_r_r_r, emit_lsr_z_p_z_z, emit_lsr_r_r_i }
-inst_asr                           :: proc{ inst_asr_r_r_r, inst_asr_z_p_z_z, inst_asr_r_r_i }
-emit_asr                           :: proc{ emit_asr_r_r_r, emit_asr_z_p_z_z, emit_asr_r_r_i }
+inst_lsl                           :: proc{ inst_lsl_r_r_r, inst_lsl_zb_p_zb_zb, inst_lsl_r_r_i }
+emit_lsl                           :: proc{ emit_lsl_r_r_r, emit_lsl_zb_p_zb_zb, emit_lsl_r_r_i }
+inst_lsr                           :: proc{ inst_lsr_r_r_r, inst_lsr_zb_p_zb_zb, inst_lsr_r_r_i }
+emit_lsr                           :: proc{ emit_lsr_r_r_r, emit_lsr_zb_p_zb_zb, emit_lsr_r_r_i }
+inst_asr                           :: proc{ inst_asr_r_r_r, inst_asr_zb_p_zb_zb, inst_asr_r_r_i }
+emit_asr                           :: proc{ emit_asr_r_r_r, emit_asr_zb_p_zb_zb, emit_asr_r_r_i }
 inst_ror                           :: proc{ inst_ror_r_r_r, inst_ror_r_r_i }
 emit_ror                           :: proc{ emit_ror_r_r_r, emit_ror_r_r_i }
-inst_udiv                          :: proc{ inst_udiv_r_r_r, inst_udiv_z_p_z_z }
-emit_udiv                          :: proc{ emit_udiv_r_r_r, emit_udiv_z_p_z_z }
-inst_sdiv                          :: proc{ inst_sdiv_r_r_r, inst_sdiv_z_p_z_z }
-emit_sdiv                          :: proc{ emit_sdiv_r_r_r, emit_sdiv_z_p_z_z }
+inst_udiv                          :: proc{ inst_udiv_r_r_r, inst_udiv_zs_p_zs_zs }
+emit_udiv                          :: proc{ emit_udiv_r_r_r, emit_udiv_zs_p_zs_zs }
+inst_sdiv                          :: proc{ inst_sdiv_r_r_r, inst_sdiv_zs_p_zs_zs }
+emit_sdiv                          :: proc{ emit_sdiv_r_r_r, emit_sdiv_zs_p_zs_zs }
 inst_madd                          :: inst_madd_r_r_r_r
 emit_madd                          :: emit_madd_r_r_r_r
 inst_msub                          :: inst_msub_r_r_r_r
@@ -3778,18 +4366,18 @@ inst_umaddl                        :: inst_umaddl_r_r_r_r
 emit_umaddl                        :: emit_umaddl_r_r_r_r
 inst_umsubl                        :: inst_umsubl_r_r_r_r
 emit_umsubl                        :: emit_umsubl_r_r_r_r
-inst_smulh                         :: proc{ inst_smulh_r_r_r, inst_smulh_z_p_z_z }
-emit_smulh                         :: proc{ emit_smulh_r_r_r, emit_smulh_z_p_z_z }
-inst_umulh                         :: proc{ inst_umulh_r_r_r, inst_umulh_z_p_z_z }
-emit_umulh                         :: proc{ emit_umulh_r_r_r, emit_umulh_z_p_z_z }
-inst_clz                           :: proc{ inst_clz_r_r, inst_clz_z_p_z }
-emit_clz                           :: proc{ emit_clz_r_r, emit_clz_z_p_z }
-inst_cls                           :: proc{ inst_cls_r_r, inst_cls_z_p_z }
-emit_cls                           :: proc{ emit_cls_r_r, emit_cls_z_p_z }
+inst_smulh                         :: proc{ inst_smulh_r_r_r, inst_smulh_zb_p_zb_zb }
+emit_smulh                         :: proc{ emit_smulh_r_r_r, emit_smulh_zb_p_zb_zb }
+inst_umulh                         :: proc{ inst_umulh_r_r_r, inst_umulh_zb_p_zb_zb }
+emit_umulh                         :: proc{ emit_umulh_r_r_r, emit_umulh_zb_p_zb_zb }
+inst_clz                           :: proc{ inst_clz_r_r, inst_clz_zb_p_zb }
+emit_clz                           :: proc{ emit_clz_r_r, emit_clz_zb_p_zb }
+inst_cls                           :: proc{ inst_cls_r_r, inst_cls_zb_p_zb }
+emit_cls                           :: proc{ emit_cls_r_r, emit_cls_zb_p_zb }
 inst_rbit                          :: inst_rbit_r_r
 emit_rbit                          :: emit_rbit_r_r
-inst_rev                           :: proc{ inst_rev_r_r, inst_rev_z_z }
-emit_rev                           :: proc{ emit_rev_r_r, emit_rev_z_z }
+inst_rev                           :: proc{ inst_rev_r_r, inst_rev_zb_zb }
+emit_rev                           :: proc{ emit_rev_r_r, emit_rev_zb_zb }
 inst_rev16                         :: inst_rev16_r_r
 emit_rev16                         :: emit_rev16_r_r
 inst_rev32                         :: inst_rev32_r_r
@@ -3868,10 +4456,10 @@ inst_tbz                           :: inst_tbz_r_i_l
 emit_tbz                           :: emit_tbz_r_i_l
 inst_tbnz                          :: inst_tbnz_r_i_l
 emit_tbnz                          :: emit_tbnz_r_i_l
-inst_ldr                           :: proc{ inst_ldr_r_m, inst_ldr_r_l, inst_ldr_z_m, inst_ldr_i_m }
-emit_ldr                           :: proc{ emit_ldr_r_m, emit_ldr_r_l, emit_ldr_z_m, emit_ldr_i_m }
-inst_str                           :: proc{ inst_str_r_m, inst_str_z_m, inst_str_i_m }
-emit_str                           :: proc{ emit_str_r_m, emit_str_z_m, emit_str_i_m }
+inst_ldr                           :: proc{ inst_ldr_r_m, inst_ldr_r_l, inst_ldr_zb_m, inst_ldr_i_m }
+emit_ldr                           :: proc{ emit_ldr_r_m, emit_ldr_r_l, emit_ldr_zb_m, emit_ldr_i_m }
+inst_str                           :: proc{ inst_str_r_m, inst_str_zb_m, inst_str_i_m }
+emit_str                           :: proc{ emit_str_r_m, emit_str_zb_m, emit_str_i_m }
 inst_ldrb                          :: inst_ldrb_r_m
 emit_ldrb                          :: emit_ldrb_r_m
 inst_strb                          :: inst_strb_r_m
@@ -3950,20 +4538,20 @@ inst_eret                          :: inst_eret_none
 emit_eret                          :: emit_eret_none
 inst_fmov                          :: proc{ inst_fmov_r_r, inst_fmov_r_i }
 emit_fmov                          :: proc{ emit_fmov_r_r, emit_fmov_r_i }
-inst_fabs                          :: proc{ inst_fabs_r_r, inst_fabs_z_p_z }
-emit_fabs                          :: proc{ emit_fabs_r_r, emit_fabs_z_p_z }
-inst_fneg                          :: proc{ inst_fneg_r_r, inst_fneg_z_p_z }
-emit_fneg                          :: proc{ emit_fneg_r_r, emit_fneg_z_p_z }
-inst_fsqrt                         :: proc{ inst_fsqrt_r_r, inst_fsqrt_z_p_z }
-emit_fsqrt                         :: proc{ emit_fsqrt_r_r, emit_fsqrt_z_p_z }
-inst_fadd                          :: proc{ inst_fadd_r_r_r, inst_fadd_z_z_z, inst_fadd_z_p_z_z }
-emit_fadd                          :: proc{ emit_fadd_r_r_r, emit_fadd_z_z_z, emit_fadd_z_p_z_z }
-inst_fsub                          :: proc{ inst_fsub_r_r_r, inst_fsub_z_z_z, inst_fsub_z_p_z_z }
-emit_fsub                          :: proc{ emit_fsub_r_r_r, emit_fsub_z_z_z, emit_fsub_z_p_z_z }
-inst_fmul                          :: proc{ inst_fmul_r_r_r, inst_fmul_z_z_z, inst_fmul_z_p_z_z }
-emit_fmul                          :: proc{ emit_fmul_r_r_r, emit_fmul_z_z_z, emit_fmul_z_p_z_z }
-inst_fdiv                          :: proc{ inst_fdiv_r_r_r, inst_fdiv_z_p_z_z }
-emit_fdiv                          :: proc{ emit_fdiv_r_r_r, emit_fdiv_z_p_z_z }
+inst_fabs                          :: proc{ inst_fabs_r_r, inst_fabs_zh_p_zh }
+emit_fabs                          :: proc{ emit_fabs_r_r, emit_fabs_zh_p_zh }
+inst_fneg                          :: proc{ inst_fneg_r_r, inst_fneg_zh_p_zh }
+emit_fneg                          :: proc{ emit_fneg_r_r, emit_fneg_zh_p_zh }
+inst_fsqrt                         :: proc{ inst_fsqrt_r_r, inst_fsqrt_zh_p_zh }
+emit_fsqrt                         :: proc{ emit_fsqrt_r_r, emit_fsqrt_zh_p_zh }
+inst_fadd                          :: proc{ inst_fadd_r_r_r, inst_fadd_zh_zh_zh, inst_fadd_zh_p_zh_zh }
+emit_fadd                          :: proc{ emit_fadd_r_r_r, emit_fadd_zh_zh_zh, emit_fadd_zh_p_zh_zh }
+inst_fsub                          :: proc{ inst_fsub_r_r_r, inst_fsub_zh_zh_zh, inst_fsub_zh_p_zh_zh }
+emit_fsub                          :: proc{ emit_fsub_r_r_r, emit_fsub_zh_zh_zh, emit_fsub_zh_p_zh_zh }
+inst_fmul                          :: proc{ inst_fmul_r_r_r, inst_fmul_zh_zh_zh, inst_fmul_zh_p_zh_zh }
+emit_fmul                          :: proc{ emit_fmul_r_r_r, emit_fmul_zh_zh_zh, emit_fmul_zh_p_zh_zh }
+inst_fdiv                          :: proc{ inst_fdiv_r_r_r, inst_fdiv_zh_p_zh_zh }
+emit_fdiv                          :: proc{ emit_fdiv_r_r_r, emit_fdiv_zh_p_zh_zh }
 inst_fnmul                         :: inst_fnmul_r_r_r
 emit_fnmul                         :: emit_fnmul_r_r_r
 inst_fmadd                         :: inst_fmadd_r_r_r_r
@@ -3980,14 +4568,14 @@ inst_fcmpe                         :: inst_fcmpe_r_r
 emit_fcmpe                         :: emit_fcmpe_r_r
 inst_fcsel                         :: inst_fcsel_r_r_r_c
 emit_fcsel                         :: emit_fcsel_r_r_r_c
-inst_fmax                          :: proc{ inst_fmax_r_r_r, inst_fmax_z_p_z_z }
-emit_fmax                          :: proc{ emit_fmax_r_r_r, emit_fmax_z_p_z_z }
-inst_fmin                          :: proc{ inst_fmin_r_r_r, inst_fmin_z_p_z_z }
-emit_fmin                          :: proc{ emit_fmin_r_r_r, emit_fmin_z_p_z_z }
-inst_fmaxnm                        :: proc{ inst_fmaxnm_r_r_r, inst_fmaxnm_z_p_z_z }
-emit_fmaxnm                        :: proc{ emit_fmaxnm_r_r_r, emit_fmaxnm_z_p_z_z }
-inst_fminnm                        :: proc{ inst_fminnm_r_r_r, inst_fminnm_z_p_z_z }
-emit_fminnm                        :: proc{ emit_fminnm_r_r_r, emit_fminnm_z_p_z_z }
+inst_fmax                          :: proc{ inst_fmax_r_r_r, inst_fmax_zh_p_zh_zh }
+emit_fmax                          :: proc{ emit_fmax_r_r_r, emit_fmax_zh_p_zh_zh }
+inst_fmin                          :: proc{ inst_fmin_r_r_r, inst_fmin_zh_p_zh_zh }
+emit_fmin                          :: proc{ emit_fmin_r_r_r, emit_fmin_zh_p_zh_zh }
+inst_fmaxnm                        :: proc{ inst_fmaxnm_r_r_r, inst_fmaxnm_zh_p_zh_zh }
+emit_fmaxnm                        :: proc{ emit_fmaxnm_r_r_r, emit_fmaxnm_zh_p_zh_zh }
+inst_fminnm                        :: proc{ inst_fminnm_r_r_r, inst_fminnm_zh_p_zh_zh }
+emit_fminnm                        :: proc{ emit_fminnm_r_r_r, emit_fminnm_zh_p_zh_zh }
 inst_fcvt                          :: inst_fcvt_r_r
 emit_fcvt                          :: emit_fcvt_r_r
 inst_scvtf                         :: inst_scvtf_r_r
@@ -4014,20 +4602,20 @@ inst_fcvtms                        :: inst_fcvtms_r_r
 emit_fcvtms                        :: emit_fcvtms_r_r
 inst_fcvtmu                        :: inst_fcvtmu_r_r
 emit_fcvtmu                        :: emit_fcvtmu_r_r
-inst_frinta                        :: proc{ inst_frinta_r_r, inst_frinta_z_p_z }
-emit_frinta                        :: proc{ emit_frinta_r_r, emit_frinta_z_p_z }
-inst_frinti                        :: proc{ inst_frinti_r_r, inst_frinti_z_p_z }
-emit_frinti                        :: proc{ emit_frinti_r_r, emit_frinti_z_p_z }
-inst_frintm                        :: proc{ inst_frintm_r_r, inst_frintm_z_p_z }
-emit_frintm                        :: proc{ emit_frintm_r_r, emit_frintm_z_p_z }
-inst_frintn                        :: proc{ inst_frintn_r_r, inst_frintn_z_p_z }
-emit_frintn                        :: proc{ emit_frintn_r_r, emit_frintn_z_p_z }
-inst_frintp                        :: proc{ inst_frintp_r_r, inst_frintp_z_p_z }
-emit_frintp                        :: proc{ emit_frintp_r_r, emit_frintp_z_p_z }
-inst_frintx                        :: proc{ inst_frintx_r_r, inst_frintx_z_p_z }
-emit_frintx                        :: proc{ emit_frintx_r_r, emit_frintx_z_p_z }
-inst_frintz                        :: proc{ inst_frintz_r_r, inst_frintz_z_p_z }
-emit_frintz                        :: proc{ emit_frintz_r_r, emit_frintz_z_p_z }
+inst_frinta                        :: proc{ inst_frinta_r_r, inst_frinta_zh_p_zh }
+emit_frinta                        :: proc{ emit_frinta_r_r, emit_frinta_zh_p_zh }
+inst_frinti                        :: proc{ inst_frinti_r_r, inst_frinti_zh_p_zh }
+emit_frinti                        :: proc{ emit_frinti_r_r, emit_frinti_zh_p_zh }
+inst_frintm                        :: proc{ inst_frintm_r_r, inst_frintm_zh_p_zh }
+emit_frintm                        :: proc{ emit_frintm_r_r, emit_frintm_zh_p_zh }
+inst_frintn                        :: proc{ inst_frintn_r_r, inst_frintn_zh_p_zh }
+emit_frintn                        :: proc{ emit_frintn_r_r, emit_frintn_zh_p_zh }
+inst_frintp                        :: proc{ inst_frintp_r_r, inst_frintp_zh_p_zh }
+emit_frintp                        :: proc{ emit_frintp_r_r, emit_frintp_zh_p_zh }
+inst_frintx                        :: proc{ inst_frintx_r_r, inst_frintx_zh_p_zh }
+emit_frintx                        :: proc{ emit_frintx_r_r, emit_frintx_zh_p_zh }
+inst_frintz                        :: proc{ inst_frintz_r_r, inst_frintz_zh_p_zh }
+emit_frintz                        :: proc{ emit_frintz_r_r, emit_frintz_zh_p_zh }
 inst_tst                           :: proc{ inst_tst_r_i, inst_tst_r_sh }
 emit_tst                           :: proc{ emit_tst_r_i, emit_tst_r_sh }
 inst_ldur                          :: inst_ldur_r_m
@@ -4314,14 +4902,14 @@ inst_crc32cw                       :: inst_crc32cw_r_r_r
 emit_crc32cw                       :: emit_crc32cw_r_r_r
 inst_crc32cx                       :: inst_crc32cx_r_r_r
 emit_crc32cx                       :: emit_crc32cx_r_r_r
-inst_aese                          :: proc{ inst_aese_v16b_v16b, inst_aese_z_z }
-emit_aese                          :: proc{ emit_aese_v16b_v16b, emit_aese_z_z }
-inst_aesd                          :: proc{ inst_aesd_v16b_v16b, inst_aesd_z_z }
-emit_aesd                          :: proc{ emit_aesd_v16b_v16b, emit_aesd_z_z }
-inst_aesmc                         :: proc{ inst_aesmc_v16b_v16b, inst_aesmc_z }
-emit_aesmc                         :: proc{ emit_aesmc_v16b_v16b, emit_aesmc_z }
-inst_aesimc                        :: proc{ inst_aesimc_v16b_v16b, inst_aesimc_z }
-emit_aesimc                        :: proc{ emit_aesimc_v16b_v16b, emit_aesimc_z }
+inst_aese                          :: proc{ inst_aese_v16b_v16b, inst_aese_zb_zb }
+emit_aese                          :: proc{ emit_aese_v16b_v16b, emit_aese_zb_zb }
+inst_aesd                          :: proc{ inst_aesd_v16b_v16b, inst_aesd_zb_zb }
+emit_aesd                          :: proc{ emit_aesd_v16b_v16b, emit_aesd_zb_zb }
+inst_aesmc                         :: proc{ inst_aesmc_v16b_v16b, inst_aesmc_zb }
+emit_aesmc                         :: proc{ emit_aesmc_v16b_v16b, emit_aesmc_zb }
+inst_aesimc                        :: proc{ inst_aesimc_v16b_v16b, inst_aesimc_zb }
+emit_aesimc                        :: proc{ emit_aesimc_v16b_v16b, emit_aesimc_zb }
 inst_sha1h                         :: inst_sha1h_r_r
 emit_sha1h                         :: emit_sha1h_r_r
 inst_sha1c                         :: inst_sha1c_r_r_v4s
@@ -4350,10 +4938,10 @@ inst_sha512su0                     :: inst_sha512su0_v2d_v2d
 emit_sha512su0                     :: emit_sha512su0_v2d_v2d
 inst_sha512su1                     :: inst_sha512su1_v2d_v2d_v2d
 emit_sha512su1                     :: emit_sha512su1_v2d_v2d_v2d
-inst_eor3                          :: proc{ inst_eor3_v16b_v16b_v16b_v16b, inst_eor3_z_z_z_z }
-emit_eor3                          :: proc{ emit_eor3_v16b_v16b_v16b_v16b, emit_eor3_z_z_z_z }
-inst_bcax                          :: proc{ inst_bcax_v16b_v16b_v16b_v16b, inst_bcax_z_z_z_z }
-emit_bcax                          :: proc{ emit_bcax_v16b_v16b_v16b_v16b, emit_bcax_z_z_z_z }
+inst_eor3                          :: proc{ inst_eor3_v16b_v16b_v16b_v16b, inst_eor3_zd_zd_zd_zd }
+emit_eor3                          :: proc{ emit_eor3_v16b_v16b_v16b_v16b, emit_eor3_zd_zd_zd_zd }
+inst_bcax                          :: proc{ inst_bcax_v16b_v16b_v16b_v16b, inst_bcax_zd_zd_zd_zd }
+emit_bcax                          :: proc{ emit_bcax_v16b_v16b_v16b_v16b, emit_bcax_zd_zd_zd_zd }
 inst_rax1                          :: inst_rax1_v2d_v2d_v2d
 emit_rax1                          :: emit_rax1_v2d_v2d_v2d
 inst_xar                           :: proc{ inst_xar_v2d_v2d_v2d_i, inst_xar_z_z_z_i }
@@ -4380,8 +4968,8 @@ inst_pmull                         :: inst_pmull_v8h_v8b_v8b
 emit_pmull                         :: emit_pmull_v8h_v8b_v8b
 inst_pmull2                        :: inst_pmull2_v8h_v16b_v16b
 emit_pmull2                        :: emit_pmull2_v8h_v16b_v16b
-inst_bfcvt                         :: proc{ inst_bfcvt_r_r, inst_bfcvt_z_p_z }
-emit_bfcvt                         :: proc{ emit_bfcvt_r_r, emit_bfcvt_z_p_z }
+inst_bfcvt                         :: proc{ inst_bfcvt_r_r, inst_bfcvt_zh_p_zs }
+emit_bfcvt                         :: proc{ emit_bfcvt_r_r, emit_bfcvt_zh_p_zs }
 inst_bfdot                         :: inst_bfdot_v4s_v8h_v8h
 emit_bfdot                         :: emit_bfdot_v4s_v8h_v8h
 inst_bfmmla                        :: inst_bfmmla_v4s_v8h_v8h
@@ -4394,16 +4982,16 @@ inst_bfcvtn                        :: inst_bfcvtn_v4h_v4s
 emit_bfcvtn                        :: emit_bfcvtn_v4h_v4s
 inst_bfcvtn2                       :: inst_bfcvtn2_v8h_v4s
 emit_bfcvtn2                       :: emit_bfcvtn2_v8h_v4s
-inst_mul                           :: proc{ inst_mul_v16b_v16b_v16b, inst_mul_z_p_z_z }
-emit_mul                           :: proc{ emit_mul_v16b_v16b_v16b, emit_mul_z_p_z_z }
+inst_mul                           :: proc{ inst_mul_v16b_v16b_v16b, inst_mul_zb_p_zb_zb }
+emit_mul                           :: proc{ emit_mul_v16b_v16b_v16b, emit_mul_zb_p_zb_zb }
 inst_mla                           :: inst_mla_v8b_v8b_v8b
 emit_mla                           :: emit_mla_v8b_v8b_v8b
 inst_mls                           :: inst_mls_v8b_v8b_v8b
 emit_mls                           :: emit_mls_v8b_v8b_v8b
-inst_neg                           :: proc{ inst_neg_v8b_v8b, inst_neg_z_p_z, inst_neg_r_sh }
-emit_neg                           :: proc{ emit_neg_v8b_v8b, emit_neg_z_p_z, emit_neg_r_sh }
-inst_abs                           :: proc{ inst_abs_v8b_v8b, inst_abs_z_p_z }
-emit_abs                           :: proc{ emit_abs_v8b_v8b, emit_abs_z_p_z }
+inst_neg                           :: proc{ inst_neg_v8b_v8b, inst_neg_zb_p_zb, inst_neg_r_sh }
+emit_neg                           :: proc{ emit_neg_v8b_v8b, emit_neg_zb_p_zb, emit_neg_r_sh }
+inst_abs                           :: proc{ inst_abs_v8b_v8b, inst_abs_zb_p_zb }
+emit_abs                           :: proc{ emit_abs_v8b_v8b, emit_abs_zb_p_zb }
 inst_shadd                         :: inst_shadd_v8b_v8b_v8b
 emit_shadd                         :: emit_shadd_v8b_v8b_v8b
 inst_uhadd                         :: inst_uhadd_v8b_v8b_v8b
@@ -4416,26 +5004,26 @@ inst_srhadd                        :: inst_srhadd_v8b_v8b_v8b
 emit_srhadd                        :: emit_srhadd_v8b_v8b_v8b
 inst_urhadd                        :: inst_urhadd_v8b_v8b_v8b
 emit_urhadd                        :: emit_urhadd_v8b_v8b_v8b
-inst_sqadd                         :: proc{ inst_sqadd_v8b_v8b_v8b, inst_sqadd_z_z_z }
-emit_sqadd                         :: proc{ emit_sqadd_v8b_v8b_v8b, emit_sqadd_z_z_z }
-inst_uqadd                         :: proc{ inst_uqadd_v8b_v8b_v8b, inst_uqadd_z_z_z }
-emit_uqadd                         :: proc{ emit_uqadd_v8b_v8b_v8b, emit_uqadd_z_z_z }
-inst_sqsub                         :: proc{ inst_sqsub_v8b_v8b_v8b, inst_sqsub_z_z_z }
-emit_sqsub                         :: proc{ emit_sqsub_v8b_v8b_v8b, emit_sqsub_z_z_z }
-inst_uqsub                         :: proc{ inst_uqsub_v8b_v8b_v8b, inst_uqsub_z_z_z }
-emit_uqsub                         :: proc{ emit_uqsub_v8b_v8b_v8b, emit_uqsub_z_z_z }
-inst_smax                          :: proc{ inst_smax_v8b_v8b_v8b, inst_smax_z_p_z_z }
-emit_smax                          :: proc{ emit_smax_v8b_v8b_v8b, emit_smax_z_p_z_z }
-inst_umax                          :: proc{ inst_umax_v8b_v8b_v8b, inst_umax_z_p_z_z }
-emit_umax                          :: proc{ emit_umax_v8b_v8b_v8b, emit_umax_z_p_z_z }
-inst_smin                          :: proc{ inst_smin_v8b_v8b_v8b, inst_smin_z_p_z_z }
-emit_smin                          :: proc{ emit_smin_v8b_v8b_v8b, emit_smin_z_p_z_z }
-inst_umin                          :: proc{ inst_umin_v8b_v8b_v8b, inst_umin_z_p_z_z }
-emit_umin                          :: proc{ emit_umin_v8b_v8b_v8b, emit_umin_z_p_z_z }
-inst_sabd                          :: proc{ inst_sabd_v8b_v8b_v8b, inst_sabd_z_p_z_z }
-emit_sabd                          :: proc{ emit_sabd_v8b_v8b_v8b, emit_sabd_z_p_z_z }
-inst_uabd                          :: proc{ inst_uabd_v8b_v8b_v8b, inst_uabd_z_p_z_z }
-emit_uabd                          :: proc{ emit_uabd_v8b_v8b_v8b, emit_uabd_z_p_z_z }
+inst_sqadd                         :: proc{ inst_sqadd_v8b_v8b_v8b, inst_sqadd_zb_zb_zb }
+emit_sqadd                         :: proc{ emit_sqadd_v8b_v8b_v8b, emit_sqadd_zb_zb_zb }
+inst_uqadd                         :: proc{ inst_uqadd_v8b_v8b_v8b, inst_uqadd_zb_zb_zb }
+emit_uqadd                         :: proc{ emit_uqadd_v8b_v8b_v8b, emit_uqadd_zb_zb_zb }
+inst_sqsub                         :: proc{ inst_sqsub_v8b_v8b_v8b, inst_sqsub_zb_zb_zb }
+emit_sqsub                         :: proc{ emit_sqsub_v8b_v8b_v8b, emit_sqsub_zb_zb_zb }
+inst_uqsub                         :: proc{ inst_uqsub_v8b_v8b_v8b, inst_uqsub_zb_zb_zb }
+emit_uqsub                         :: proc{ emit_uqsub_v8b_v8b_v8b, emit_uqsub_zb_zb_zb }
+inst_smax                          :: proc{ inst_smax_v8b_v8b_v8b, inst_smax_zb_p_zb_zb }
+emit_smax                          :: proc{ emit_smax_v8b_v8b_v8b, emit_smax_zb_p_zb_zb }
+inst_umax                          :: proc{ inst_umax_v8b_v8b_v8b, inst_umax_zb_p_zb_zb }
+emit_umax                          :: proc{ emit_umax_v8b_v8b_v8b, emit_umax_zb_p_zb_zb }
+inst_smin                          :: proc{ inst_smin_v8b_v8b_v8b, inst_smin_zb_p_zb_zb }
+emit_smin                          :: proc{ emit_smin_v8b_v8b_v8b, emit_smin_zb_p_zb_zb }
+inst_umin                          :: proc{ inst_umin_v8b_v8b_v8b, inst_umin_zb_p_zb_zb }
+emit_umin                          :: proc{ emit_umin_v8b_v8b_v8b, emit_umin_zb_p_zb_zb }
+inst_sabd                          :: proc{ inst_sabd_v8b_v8b_v8b, inst_sabd_zb_p_zb_zb }
+emit_sabd                          :: proc{ emit_sabd_v8b_v8b_v8b, emit_sabd_zb_p_zb_zb }
+inst_uabd                          :: proc{ inst_uabd_v8b_v8b_v8b, inst_uabd_zb_p_zb_zb }
+emit_uabd                          :: proc{ emit_uabd_v8b_v8b_v8b, emit_uabd_zb_p_zb_zb }
 inst_saba                          :: inst_saba_v8b_v8b_v8b
 emit_saba                          :: emit_saba_v8b_v8b_v8b
 inst_uaba                          :: inst_uaba_v8b_v8b_v8b
@@ -4582,10 +5170,10 @@ inst_udot                          :: inst_udot_v2s_v8b_v8b
 emit_udot                          :: emit_udot_v2s_v8b_v8b
 inst_usdot                         :: inst_usdot_v2s_v8b_v8b
 emit_usdot                         :: emit_usdot_v2s_v8b_v8b
-inst_fmla                          :: proc{ inst_fmla_v4s_v4s_v4s, inst_fmla_z_p_z_z, inst_fmla_z_z_z_i }
-emit_fmla                          :: proc{ emit_fmla_v4s_v4s_v4s, emit_fmla_z_p_z_z, emit_fmla_z_z_z_i }
-inst_fmls                          :: proc{ inst_fmls_v4s_v4s_v4s, inst_fmls_z_p_z_z, inst_fmls_z_z_z_i }
-emit_fmls                          :: proc{ emit_fmls_v4s_v4s_v4s, emit_fmls_z_p_z_z, emit_fmls_z_z_z_i }
+inst_fmla                          :: proc{ inst_fmla_v4s_v4s_v4s, inst_fmla_zh_p_zh_zh, inst_fmla_zh_zh_zh_i }
+emit_fmla                          :: proc{ emit_fmla_v4s_v4s_v4s, emit_fmla_zh_p_zh_zh, emit_fmla_zh_zh_zh_i }
+inst_fmls                          :: proc{ inst_fmls_v4s_v4s_v4s, inst_fmls_zh_p_zh_zh, inst_fmls_zh_zh_zh_i }
+emit_fmls                          :: proc{ emit_fmls_v4s_v4s_v4s, emit_fmls_zh_p_zh_zh, emit_fmls_zh_zh_zh_i }
 inst_fmulx                         :: inst_fmulx_v2s_v2s_v2s
 emit_fmulx                         :: emit_fmulx_v2s_v2s_v2s
 inst_fmaxp                         :: inst_fmaxp_v2s_v2s_v2s
@@ -4608,12 +5196,12 @@ inst_frecpe                        :: inst_frecpe_v2s_v2s
 emit_frecpe                        :: emit_frecpe_v2s_v2s
 inst_frsqrte                       :: inst_frsqrte_v2s_v2s
 emit_frsqrte                       :: emit_frsqrte_v2s_v2s
-inst_frecps                        :: proc{ inst_frecps_v2s_v2s_v2s, inst_frecps_z_z_z }
-emit_frecps                        :: proc{ emit_frecps_v2s_v2s_v2s, emit_frecps_z_z_z }
-inst_frsqrts                       :: proc{ inst_frsqrts_v2s_v2s_v2s, inst_frsqrts_z_z_z }
-emit_frsqrts                       :: proc{ emit_frsqrts_v2s_v2s_v2s, emit_frsqrts_z_z_z }
-inst_frecpx                        :: proc{ inst_frecpx_r_r, inst_frecpx_z_p_z }
-emit_frecpx                        :: proc{ emit_frecpx_r_r, emit_frecpx_z_p_z }
+inst_frecps                        :: proc{ inst_frecps_v2s_v2s_v2s, inst_frecps_zh_zh_zh }
+emit_frecps                        :: proc{ emit_frecps_v2s_v2s_v2s, emit_frecps_zh_zh_zh }
+inst_frsqrts                       :: proc{ inst_frsqrts_v2s_v2s_v2s, inst_frsqrts_zh_zh_zh }
+emit_frsqrts                       :: proc{ emit_frsqrts_v2s_v2s_v2s, emit_frsqrts_zh_zh_zh }
+inst_frecpx                        :: proc{ inst_frecpx_r_r, inst_frecpx_zh_p_zh }
+emit_frecpx                        :: proc{ emit_frecpx_r_r, emit_frecpx_zh_p_zh }
 inst_faddp                         :: inst_faddp_v2s_v2s_v2s
 emit_faddp                         :: emit_faddp_v2s_v2s_v2s
 inst_fcvtl                         :: inst_fcvtl_v4s_v4h
@@ -4628,16 +5216,16 @@ inst_fcvtxn                        :: inst_fcvtxn_v2s_v2d
 emit_fcvtxn                        :: emit_fcvtxn_v2s_v2d
 inst_fcvtxn2                       :: inst_fcvtxn2_v4s_v2d
 emit_fcvtxn2                       :: emit_fcvtxn2_v4s_v2d
-inst_fcmeq                         :: proc{ inst_fcmeq_v2s_v2s_v2s, inst_fcmeq_p_p_z_z }
-emit_fcmeq                         :: proc{ emit_fcmeq_v2s_v2s_v2s, emit_fcmeq_p_p_z_z }
-inst_fcmge                         :: proc{ inst_fcmge_v2s_v2s_v2s, inst_fcmge_p_p_z_z }
-emit_fcmge                         :: proc{ emit_fcmge_v2s_v2s_v2s, emit_fcmge_p_p_z_z }
-inst_fcmgt                         :: proc{ inst_fcmgt_v2s_v2s_v2s, inst_fcmgt_p_p_z_z }
-emit_fcmgt                         :: proc{ emit_fcmgt_v2s_v2s_v2s, emit_fcmgt_p_p_z_z }
-inst_fcmle                         :: proc{ inst_fcmle_v2s_v2s, inst_fcmle_p_p_z }
-emit_fcmle                         :: proc{ emit_fcmle_v2s_v2s, emit_fcmle_p_p_z }
-inst_fcmlt                         :: proc{ inst_fcmlt_v2s_v2s, inst_fcmlt_p_p_z }
-emit_fcmlt                         :: proc{ emit_fcmlt_v2s_v2s, emit_fcmlt_p_p_z }
+inst_fcmeq                         :: proc{ inst_fcmeq_v2s_v2s_v2s, inst_fcmeq_ph_p_zh_zh }
+emit_fcmeq                         :: proc{ emit_fcmeq_v2s_v2s_v2s, emit_fcmeq_ph_p_zh_zh }
+inst_fcmge                         :: proc{ inst_fcmge_v2s_v2s_v2s, inst_fcmge_ph_p_zh_zh }
+emit_fcmge                         :: proc{ emit_fcmge_v2s_v2s_v2s, emit_fcmge_ph_p_zh_zh }
+inst_fcmgt                         :: proc{ inst_fcmgt_v2s_v2s_v2s, inst_fcmgt_ph_p_zh_zh }
+emit_fcmgt                         :: proc{ emit_fcmgt_v2s_v2s_v2s, emit_fcmgt_ph_p_zh_zh }
+inst_fcmle                         :: proc{ inst_fcmle_v2s_v2s, inst_fcmle_ph_p_zh }
+emit_fcmle                         :: proc{ emit_fcmle_v2s_v2s, emit_fcmle_ph_p_zh }
+inst_fcmlt                         :: proc{ inst_fcmlt_v2s_v2s, inst_fcmlt_ph_p_zh }
+emit_fcmlt                         :: proc{ emit_fcmlt_v2s_v2s, emit_fcmlt_ph_p_zh }
 inst_facge                         :: inst_facge_v2s_v2s_v2s
 emit_facge                         :: emit_facge_v2s_v2s_v2s
 inst_facgt                         :: inst_facgt_v2s_v2s_v2s
@@ -4664,8 +5252,8 @@ inst_bit                           :: inst_bit_v16b_v16b_v16b
 emit_bit                           :: emit_bit_v16b_v16b_v16b
 inst_bif                           :: inst_bif_v16b_v16b_v16b
 emit_bif                           :: emit_bif_v16b_v16b_v16b
-inst_bsl                           :: proc{ inst_bsl_v16b_v16b_v16b, inst_bsl_z_z_z_z }
-emit_bsl                           :: proc{ emit_bsl_v16b_v16b_v16b, emit_bsl_z_z_z_z }
+inst_bsl                           :: proc{ inst_bsl_v16b_v16b_v16b, inst_bsl_zd_zd_zd_zd }
+emit_bsl                           :: proc{ emit_bsl_v16b_v16b_v16b, emit_bsl_zd_zd_zd_zd }
 inst_shl                           :: inst_shl_v8b_v8b_i
 emit_shl                           :: emit_shl_v8b_v8b_i
 inst_sqshl                         :: inst_sqshl_v8b_v8b_i
@@ -4748,36 +5336,36 @@ inst_sqrshrun                      :: inst_sqrshrun_v8b_v8h_i
 emit_sqrshrun                      :: emit_sqrshrun_v8b_v8h_i
 inst_sqrshrun2                     :: inst_sqrshrun2_v16b_v8h_i
 emit_sqrshrun2                     :: emit_sqrshrun2_v16b_v8h_i
-inst_dup                           :: proc{ inst_dup_v8b_veb_i, inst_dup_v8b_r, inst_dup_z_r }
-emit_dup                           :: proc{ emit_dup_v8b_veb_i, emit_dup_v8b_r, emit_dup_z_r }
+inst_dup                           :: proc{ inst_dup_v8b_veb_i, inst_dup_v8b_r, inst_dup_zb_r }
+emit_dup                           :: proc{ emit_dup_v8b_veb_i, emit_dup_v8b_r, emit_dup_zb_r }
 inst_ins                           :: proc{ inst_ins_veb_i_veb_i, inst_ins_veb_i_r }
 emit_ins                           :: proc{ emit_ins_veb_i_veb_i, emit_ins_veb_i_r }
-inst_mov                           :: proc{ inst_mov_v8b_v8b, inst_mov_z_p_z, inst_mov_p_p, inst_mov_r_i }
-emit_mov                           :: proc{ emit_mov_v8b_v8b, emit_mov_z_p_z, emit_mov_p_p, emit_mov_r_i }
-inst_ext                           :: proc{ inst_ext_v8b_v8b_v8b_i, inst_ext_z_z_z_i }
-emit_ext                           :: proc{ emit_ext_v8b_v8b_v8b_i, emit_ext_z_z_z_i }
-inst_tbl                           :: proc{ inst_tbl_v8b_v16b_v8b, inst_tbl_z_z_z }
-emit_tbl                           :: proc{ emit_tbl_v8b_v16b_v8b, emit_tbl_z_z_z }
-inst_tbx                           :: proc{ inst_tbx_v8b_v16b_v8b, inst_tbx_z_z_z }
-emit_tbx                           :: proc{ emit_tbx_v8b_v16b_v8b, emit_tbx_z_z_z }
-inst_zip1                          :: proc{ inst_zip1_v8b_v8b_v8b, inst_zip1_z_z_z }
-emit_zip1                          :: proc{ emit_zip1_v8b_v8b_v8b, emit_zip1_z_z_z }
-inst_zip2                          :: proc{ inst_zip2_v8b_v8b_v8b, inst_zip2_z_z_z }
-emit_zip2                          :: proc{ emit_zip2_v8b_v8b_v8b, emit_zip2_z_z_z }
-inst_uzp1                          :: proc{ inst_uzp1_v8b_v8b_v8b, inst_uzp1_z_z_z }
-emit_uzp1                          :: proc{ emit_uzp1_v8b_v8b_v8b, emit_uzp1_z_z_z }
-inst_uzp2                          :: proc{ inst_uzp2_v8b_v8b_v8b, inst_uzp2_z_z_z }
-emit_uzp2                          :: proc{ emit_uzp2_v8b_v8b_v8b, emit_uzp2_z_z_z }
-inst_trn1                          :: proc{ inst_trn1_v8b_v8b_v8b, inst_trn1_z_z_z }
-emit_trn1                          :: proc{ emit_trn1_v8b_v8b_v8b, emit_trn1_z_z_z }
-inst_trn2                          :: proc{ inst_trn2_v8b_v8b_v8b, inst_trn2_z_z_z }
-emit_trn2                          :: proc{ emit_trn2_v8b_v8b_v8b, emit_trn2_z_z_z }
-inst_not                           :: proc{ inst_not_v8b_v8b, inst_not_p_p_p }
-emit_not                           :: proc{ emit_not_v8b_v8b, emit_not_p_p_p }
+inst_mov                           :: proc{ inst_mov_v8b_v8b, inst_mov_zb_p_zb, inst_mov_ps_p, inst_mov_r_i }
+emit_mov                           :: proc{ emit_mov_v8b_v8b, emit_mov_zb_p_zb, emit_mov_ps_p, emit_mov_r_i }
+inst_ext                           :: proc{ inst_ext_v8b_v8b_v8b_i, inst_ext_zb_zb_zb_i }
+emit_ext                           :: proc{ emit_ext_v8b_v8b_v8b_i, emit_ext_zb_zb_zb_i }
+inst_tbl                           :: proc{ inst_tbl_v8b_v16b_v8b, inst_tbl_zb_zb_zb }
+emit_tbl                           :: proc{ emit_tbl_v8b_v16b_v8b, emit_tbl_zb_zb_zb }
+inst_tbx                           :: proc{ inst_tbx_v8b_v16b_v8b, inst_tbx_zb_zb_zb }
+emit_tbx                           :: proc{ emit_tbx_v8b_v16b_v8b, emit_tbx_zb_zb_zb }
+inst_zip1                          :: proc{ inst_zip1_v8b_v8b_v8b, inst_zip1_zb_zb_zb }
+emit_zip1                          :: proc{ emit_zip1_v8b_v8b_v8b, emit_zip1_zb_zb_zb }
+inst_zip2                          :: proc{ inst_zip2_v8b_v8b_v8b, inst_zip2_zb_zb_zb }
+emit_zip2                          :: proc{ emit_zip2_v8b_v8b_v8b, emit_zip2_zb_zb_zb }
+inst_uzp1                          :: proc{ inst_uzp1_v8b_v8b_v8b, inst_uzp1_zb_zb_zb }
+emit_uzp1                          :: proc{ emit_uzp1_v8b_v8b_v8b, emit_uzp1_zb_zb_zb }
+inst_uzp2                          :: proc{ inst_uzp2_v8b_v8b_v8b, inst_uzp2_zb_zb_zb }
+emit_uzp2                          :: proc{ emit_uzp2_v8b_v8b_v8b, emit_uzp2_zb_zb_zb }
+inst_trn1                          :: proc{ inst_trn1_v8b_v8b_v8b, inst_trn1_zb_zb_zb }
+emit_trn1                          :: proc{ emit_trn1_v8b_v8b_v8b, emit_trn1_zb_zb_zb }
+inst_trn2                          :: proc{ inst_trn2_v8b_v8b_v8b, inst_trn2_zb_zb_zb }
+emit_trn2                          :: proc{ emit_trn2_v8b_v8b_v8b, emit_trn2_zb_zb_zb }
+inst_not                           :: proc{ inst_not_v8b_v8b, inst_not_pb_p_p }
+emit_not                           :: proc{ emit_not_v8b_v8b, emit_not_pb_p_p }
 inst_rev64                         :: inst_rev64_v8b_v8b
 emit_rev64                         :: emit_rev64_v8b_v8b
-inst_cnt                           :: proc{ inst_cnt_v8b_v8b, inst_cnt_z_p_z }
-emit_cnt                           :: proc{ emit_cnt_v8b_v8b, emit_cnt_z_p_z }
+inst_cnt                           :: proc{ inst_cnt_v8b_v8b, inst_cnt_zb_p_zb }
+emit_cnt                           :: proc{ emit_cnt_v8b_v8b, emit_cnt_zb_p_zb }
 inst_urecpe                        :: inst_urecpe_v2s_v2s
 emit_urecpe                        :: emit_urecpe_v2s_v2s
 inst_ursqrte                       :: inst_ursqrte_v2s_v2s
@@ -4810,132 +5398,132 @@ inst_ld3r                          :: inst_ld3r_v16b_m
 emit_ld3r                          :: emit_ld3r_v16b_m
 inst_ld4r                          :: inst_ld4r_v16b_m
 emit_ld4r                          :: emit_ld4r_v16b_m
-inst_subr                          :: inst_subr_z_p_z_z
-emit_subr                          :: emit_subr_z_p_z_z
-inst_asrr                          :: inst_asrr_z_p_z_z
-emit_asrr                          :: emit_asrr_z_p_z_z
-inst_lslr                          :: inst_lslr_z_p_z_z
-emit_lslr                          :: emit_lslr_z_p_z_z
-inst_lsrr                          :: inst_lsrr_z_p_z_z
-emit_lsrr                          :: emit_lsrr_z_p_z_z
-inst_ftsmul                        :: inst_ftsmul_z_z_z
-emit_ftsmul                        :: emit_ftsmul_z_z_z
-inst_fsubr                         :: inst_fsubr_z_p_z_z
-emit_fsubr                         :: emit_fsubr_z_p_z_z
-inst_fdivr                         :: inst_fdivr_z_p_z_z
-emit_fdivr                         :: emit_fdivr_z_p_z_z
-inst_fnmla                         :: inst_fnmla_z_p_z_z
-emit_fnmla                         :: emit_fnmla_z_p_z_z
-inst_fnmls                         :: inst_fnmls_z_p_z_z
-emit_fnmls                         :: emit_fnmls_z_p_z_z
-inst_nand                          :: inst_nand_p_p_p_p
-emit_nand                          :: emit_nand_p_p_p_p
-inst_nor                           :: inst_nor_p_p_p_p
-emit_nor                           :: emit_nor_p_p_p_p
-inst_sel                           :: inst_sel_p_p_p_p
-emit_sel                           :: emit_sel_p_p_p_p
-inst_orrs                          :: inst_orrs_p_p_p_p
-emit_orrs                          :: emit_orrs_p_p_p_p
-inst_eors                          :: inst_eors_p_p_p_p
-emit_eors                          :: emit_eors_p_p_p_p
-inst_nands                         :: inst_nands_p_p_p_p
-emit_nands                         :: emit_nands_p_p_p_p
-inst_nors                          :: inst_nors_p_p_p_p
-emit_nors                          :: emit_nors_p_p_p_p
-inst_orns                          :: inst_orns_p_p_p_p
-emit_orns                          :: emit_orns_p_p_p_p
-inst_movs                          :: inst_movs_p_p_p
-emit_movs                          :: emit_movs_p_p_p
-inst_ptrue                         :: inst_ptrue_p_i
-emit_ptrue                         :: emit_ptrue_p_i
-inst_ptrues                        :: inst_ptrues_p_i
-emit_ptrues                        :: emit_ptrues_p_i
-inst_pfalse                        :: inst_pfalse_p
-emit_pfalse                        :: emit_pfalse_p
-inst_pfirst                        :: inst_pfirst_p_p_p
-emit_pfirst                        :: emit_pfirst_p_p_p
-inst_pnext                         :: inst_pnext_p_p_p
-emit_pnext                         :: emit_pnext_p_p_p
-inst_brka                          :: inst_brka_p_p_p
-emit_brka                          :: emit_brka_p_p_p
-inst_brkb                          :: inst_brkb_p_p_p
-emit_brkb                          :: emit_brkb_p_p_p
-inst_brkas                         :: inst_brkas_p_p_p
-emit_brkas                         :: emit_brkas_p_p_p
-inst_brkbs                         :: inst_brkbs_p_p_p
-emit_brkbs                         :: emit_brkbs_p_p_p
-inst_brkpa                         :: inst_brkpa_p_p_p_p
-emit_brkpa                         :: emit_brkpa_p_p_p_p
-inst_brkpb                         :: inst_brkpb_p_p_p_p
-emit_brkpb                         :: emit_brkpb_p_p_p_p
-inst_brkn                          :: inst_brkn_p_p_p_p
-emit_brkn                          :: emit_brkn_p_p_p_p
-inst_rdffr                         :: inst_rdffr_p
-emit_rdffr                         :: emit_rdffr_p
+inst_subr                          :: inst_subr_zb_p_zb_zb
+emit_subr                          :: emit_subr_zb_p_zb_zb
+inst_asrr                          :: inst_asrr_zb_p_zb_zb
+emit_asrr                          :: emit_asrr_zb_p_zb_zb
+inst_lslr                          :: inst_lslr_zb_p_zb_zb
+emit_lslr                          :: emit_lslr_zb_p_zb_zb
+inst_lsrr                          :: inst_lsrr_zb_p_zb_zb
+emit_lsrr                          :: emit_lsrr_zb_p_zb_zb
+inst_ftsmul                        :: inst_ftsmul_zh_zh_zh
+emit_ftsmul                        :: emit_ftsmul_zh_zh_zh
+inst_fsubr                         :: inst_fsubr_zh_p_zh_zh
+emit_fsubr                         :: emit_fsubr_zh_p_zh_zh
+inst_fdivr                         :: inst_fdivr_zh_p_zh_zh
+emit_fdivr                         :: emit_fdivr_zh_p_zh_zh
+inst_fnmla                         :: inst_fnmla_zh_p_zh_zh
+emit_fnmla                         :: emit_fnmla_zh_p_zh_zh
+inst_fnmls                         :: inst_fnmls_zh_p_zh_zh
+emit_fnmls                         :: emit_fnmls_zh_p_zh_zh
+inst_nand                          :: inst_nand_ps_p_p_p
+emit_nand                          :: emit_nand_ps_p_p_p
+inst_nor                           :: inst_nor_ps_p_p_p
+emit_nor                           :: emit_nor_ps_p_p_p
+inst_sel                           :: inst_sel_pb_p_p_p
+emit_sel                           :: emit_sel_pb_p_p_p
+inst_orrs                          :: inst_orrs_pd_p_p_p
+emit_orrs                          :: emit_orrs_pd_p_p_p
+inst_eors                          :: inst_eors_ph_p_p_p
+emit_eors                          :: emit_eors_ph_p_p_p
+inst_nands                         :: inst_nands_pd_p_p_p
+emit_nands                         :: emit_nands_pd_p_p_p
+inst_nors                          :: inst_nors_pd_p_p_p
+emit_nors                          :: emit_nors_pd_p_p_p
+inst_orns                          :: inst_orns_pd_p_p_p
+emit_orns                          :: emit_orns_pd_p_p_p
+inst_movs                          :: inst_movs_ph_p_p
+emit_movs                          :: emit_movs_ph_p_p
+inst_ptrue                         :: inst_ptrue_pb_i
+emit_ptrue                         :: emit_ptrue_pb_i
+inst_ptrues                        :: inst_ptrues_pb_i
+emit_ptrues                        :: emit_ptrues_pb_i
+inst_pfalse                        :: inst_pfalse_pb
+emit_pfalse                        :: emit_pfalse_pb
+inst_pfirst                        :: inst_pfirst_ph_p_p
+emit_pfirst                        :: emit_pfirst_ph_p_p
+inst_pnext                         :: inst_pnext_pb_p_p
+emit_pnext                         :: emit_pnext_pb_p_p
+inst_brka                          :: inst_brka_pb_p_p
+emit_brka                          :: emit_brka_pb_p_p
+inst_brkb                          :: inst_brkb_ps_p_p
+emit_brkb                          :: emit_brkb_ps_p_p
+inst_brkas                         :: inst_brkas_ph_p_p
+emit_brkas                         :: emit_brkas_ph_p_p
+inst_brkbs                         :: inst_brkbs_pd_p_p
+emit_brkbs                         :: emit_brkbs_pd_p_p
+inst_brkpa                         :: inst_brkpa_pb_p_p_p
+emit_brkpa                         :: emit_brkpa_pb_p_p_p
+inst_brkpb                         :: inst_brkpb_pb_p_p_p
+emit_brkpb                         :: emit_brkpb_pb_p_p_p
+inst_brkn                          :: inst_brkn_pb_p_p_p
+emit_brkn                          :: emit_brkn_pb_p_p_p
+inst_rdffr                         :: inst_rdffr_pb
+emit_rdffr                         :: emit_rdffr_pb
 inst_wrffr                         :: inst_wrffr_p
 emit_wrffr                         :: emit_wrffr_p
 inst_setffr                        :: inst_setffr_none
 emit_setffr                        :: emit_setffr_none
-inst_cmpeq                         :: inst_cmpeq_p_p_z_z
-emit_cmpeq                         :: emit_cmpeq_p_p_z_z
-inst_cmpne                         :: inst_cmpne_p_p_z_z
-emit_cmpne                         :: emit_cmpne_p_p_z_z
-inst_cmpge                         :: inst_cmpge_p_p_z_z
-emit_cmpge                         :: emit_cmpge_p_p_z_z
-inst_cmpgt                         :: inst_cmpgt_p_p_z_z
-emit_cmpgt                         :: emit_cmpgt_p_p_z_z
-inst_cmple                         :: inst_cmple_p_p_z_z
-emit_cmple                         :: emit_cmple_p_p_z_z
-inst_cmplt                         :: inst_cmplt_p_p_z_z
-emit_cmplt                         :: emit_cmplt_p_p_z_z
-inst_cmphi                         :: inst_cmphi_p_p_z_z
-emit_cmphi                         :: emit_cmphi_p_p_z_z
-inst_cmphs                         :: inst_cmphs_p_p_z_z
-emit_cmphs                         :: emit_cmphs_p_p_z_z
-inst_cmplo                         :: inst_cmplo_p_p_z_z
-emit_cmplo                         :: emit_cmplo_p_p_z_z
-inst_cmpls                         :: inst_cmpls_p_p_z_z
-emit_cmpls                         :: emit_cmpls_p_p_z_z
-inst_fcmne                         :: inst_fcmne_p_p_z_z
-emit_fcmne                         :: emit_fcmne_p_p_z_z
-inst_fcmuo                         :: inst_fcmuo_p_p_z_z
-emit_fcmuo                         :: emit_fcmuo_p_p_z_z
-inst_insr                          :: inst_insr_z_r
-emit_insr                          :: emit_insr_z_r
-inst_cpy                           :: inst_cpy_z_p_r
-emit_cpy                           :: emit_cpy_z_p_r
-inst_compact                       :: inst_compact_z_p_z
-emit_compact                       :: emit_compact_z_p_z
-inst_ld1b                          :: proc{ inst_ld1b_z_p_m, inst_ld1b_i_p_m }
-emit_ld1b                          :: proc{ emit_ld1b_z_p_m, emit_ld1b_i_p_m }
-inst_ld1h                          :: proc{ inst_ld1h_z_p_m, inst_ld1h_i_p_m }
-emit_ld1h                          :: proc{ emit_ld1h_z_p_m, emit_ld1h_i_p_m }
-inst_ld1w                          :: proc{ inst_ld1w_z_p_m, inst_ld1w_i_p_m }
-emit_ld1w                          :: proc{ emit_ld1w_z_p_m, emit_ld1w_i_p_m }
-inst_ld1d                          :: proc{ inst_ld1d_z_p_m, inst_ld1d_i_p_m }
-emit_ld1d                          :: proc{ emit_ld1d_z_p_m, emit_ld1d_i_p_m }
-inst_ld1sb                         :: inst_ld1sb_z_p_m
-emit_ld1sb                         :: emit_ld1sb_z_p_m
-inst_ld1sh                         :: inst_ld1sh_z_p_m
-emit_ld1sh                         :: emit_ld1sh_z_p_m
-inst_ld1sw                         :: inst_ld1sw_z_p_m
-emit_ld1sw                         :: emit_ld1sw_z_p_m
-inst_st1b                          :: proc{ inst_st1b_z_p_m, inst_st1b_i_p_m }
-emit_st1b                          :: proc{ emit_st1b_z_p_m, emit_st1b_i_p_m }
-inst_st1h                          :: proc{ inst_st1h_z_p_m, inst_st1h_i_p_m }
-emit_st1h                          :: proc{ emit_st1h_z_p_m, emit_st1h_i_p_m }
-inst_st1w                          :: proc{ inst_st1w_z_p_m, inst_st1w_i_p_m }
-emit_st1w                          :: proc{ emit_st1w_z_p_m, emit_st1w_i_p_m }
-inst_st1d                          :: proc{ inst_st1d_z_p_m, inst_st1d_i_p_m }
-emit_st1d                          :: proc{ emit_st1d_z_p_m, emit_st1d_i_p_m }
-inst_ldff1b                        :: inst_ldff1b_z_p_m
-emit_ldff1b                        :: emit_ldff1b_z_p_m
-inst_ldff1h                        :: inst_ldff1h_z_p_m
-emit_ldff1h                        :: emit_ldff1h_z_p_m
-inst_ldff1w                        :: inst_ldff1w_z_p_m
-emit_ldff1w                        :: emit_ldff1w_z_p_m
-inst_ldff1d                        :: inst_ldff1d_z_p_m
-emit_ldff1d                        :: emit_ldff1d_z_p_m
+inst_cmpeq                         :: inst_cmpeq_pb_p_zb_zb
+emit_cmpeq                         :: emit_cmpeq_pb_p_zb_zb
+inst_cmpne                         :: inst_cmpne_pb_p_zb_zb
+emit_cmpne                         :: emit_cmpne_pb_p_zb_zb
+inst_cmpge                         :: inst_cmpge_pb_p_zb_zb
+emit_cmpge                         :: emit_cmpge_pb_p_zb_zb
+inst_cmpgt                         :: inst_cmpgt_pb_p_zb_zb
+emit_cmpgt                         :: emit_cmpgt_pb_p_zb_zb
+inst_cmple                         :: inst_cmple_pb_p_zb_zb
+emit_cmple                         :: emit_cmple_pb_p_zb_zb
+inst_cmplt                         :: inst_cmplt_pb_p_zb_zb
+emit_cmplt                         :: emit_cmplt_pb_p_zb_zb
+inst_cmphi                         :: inst_cmphi_pb_p_zb_zb
+emit_cmphi                         :: emit_cmphi_pb_p_zb_zb
+inst_cmphs                         :: inst_cmphs_pb_p_zb_zb
+emit_cmphs                         :: emit_cmphs_pb_p_zb_zb
+inst_cmplo                         :: inst_cmplo_pb_p_zb_zb
+emit_cmplo                         :: emit_cmplo_pb_p_zb_zb
+inst_cmpls                         :: inst_cmpls_pb_p_zb_zb
+emit_cmpls                         :: emit_cmpls_pb_p_zb_zb
+inst_fcmne                         :: inst_fcmne_ph_p_zh_zh
+emit_fcmne                         :: emit_fcmne_ph_p_zh_zh
+inst_fcmuo                         :: inst_fcmuo_ph_p_zh_zh
+emit_fcmuo                         :: emit_fcmuo_ph_p_zh_zh
+inst_insr                          :: inst_insr_zb_r
+emit_insr                          :: emit_insr_zb_r
+inst_cpy                           :: inst_cpy_zb_p_r
+emit_cpy                           :: emit_cpy_zb_p_r
+inst_compact                       :: inst_compact_zs_p_zs
+emit_compact                       :: emit_compact_zs_p_zs
+inst_ld1b                          :: proc{ inst_ld1b_zb_p_m, inst_ld1b_i_p_m }
+emit_ld1b                          :: proc{ emit_ld1b_zb_p_m, emit_ld1b_i_p_m }
+inst_ld1h                          :: proc{ inst_ld1h_zh_p_m, inst_ld1h_i_p_m }
+emit_ld1h                          :: proc{ emit_ld1h_zh_p_m, emit_ld1h_i_p_m }
+inst_ld1w                          :: proc{ inst_ld1w_zs_p_m, inst_ld1w_i_p_m }
+emit_ld1w                          :: proc{ emit_ld1w_zs_p_m, emit_ld1w_i_p_m }
+inst_ld1d                          :: proc{ inst_ld1d_zd_p_m, inst_ld1d_i_p_m }
+emit_ld1d                          :: proc{ emit_ld1d_zd_p_m, emit_ld1d_i_p_m }
+inst_ld1sb                         :: inst_ld1sb_zh_p_m
+emit_ld1sb                         :: emit_ld1sb_zh_p_m
+inst_ld1sh                         :: inst_ld1sh_zs_p_m
+emit_ld1sh                         :: emit_ld1sh_zs_p_m
+inst_ld1sw                         :: inst_ld1sw_zd_p_m
+emit_ld1sw                         :: emit_ld1sw_zd_p_m
+inst_st1b                          :: proc{ inst_st1b_zb_p_m, inst_st1b_i_p_m }
+emit_st1b                          :: proc{ emit_st1b_zb_p_m, emit_st1b_i_p_m }
+inst_st1h                          :: proc{ inst_st1h_zh_p_m, inst_st1h_i_p_m }
+emit_st1h                          :: proc{ emit_st1h_zh_p_m, emit_st1h_i_p_m }
+inst_st1w                          :: proc{ inst_st1w_zs_p_m, inst_st1w_i_p_m }
+emit_st1w                          :: proc{ emit_st1w_zs_p_m, emit_st1w_i_p_m }
+inst_st1d                          :: proc{ inst_st1d_zd_p_m, inst_st1d_i_p_m }
+emit_st1d                          :: proc{ emit_st1d_zd_p_m, emit_st1d_i_p_m }
+inst_ldff1b                        :: inst_ldff1b_zb_p_m
+emit_ldff1b                        :: emit_ldff1b_zb_p_m
+inst_ldff1h                        :: inst_ldff1h_zh_p_m
+emit_ldff1h                        :: emit_ldff1h_zh_p_m
+inst_ldff1w                        :: inst_ldff1w_zs_p_m
+emit_ldff1w                        :: emit_ldff1w_zs_p_m
+inst_ldff1d                        :: inst_ldff1d_zd_p_m
+emit_ldff1d                        :: emit_ldff1d_zd_p_m
 inst_whilege                       :: inst_whilege_p_r_r
 emit_whilege                       :: emit_whilege_p_r_r
 inst_whilegt                       :: inst_whilegt_p_r_r
@@ -4952,66 +5540,66 @@ inst_whilelo                       :: inst_whilelo_p_r_r
 emit_whilelo                       :: emit_whilelo_p_r_r
 inst_whilels                       :: inst_whilels_p_r_r
 emit_whilels                       :: emit_whilels_p_r_r
-inst_sqrdmlah                      :: inst_sqrdmlah_z_z_z
-emit_sqrdmlah                      :: emit_sqrdmlah_z_z_z
-inst_sqrdmlsh                      :: inst_sqrdmlsh_z_z_z
-emit_sqrdmlsh                      :: emit_sqrdmlsh_z_z_z
-inst_adclb                         :: inst_adclb_z_z_z
-emit_adclb                         :: emit_adclb_z_z_z
-inst_adclt                         :: inst_adclt_z_z_z
-emit_adclt                         :: emit_adclt_z_z_z
-inst_sbclb                         :: inst_sbclb_z_z_z
-emit_sbclb                         :: emit_sbclb_z_z_z
-inst_sbclt                         :: inst_sbclt_z_z_z
-emit_sbclt                         :: emit_sbclt_z_z_z
-inst_tbl2                          :: inst_tbl2_z_z_z
-emit_tbl2                          :: emit_tbl2_z_z_z
-inst_match                         :: inst_match_p_p_z_z
-emit_match                         :: emit_match_p_p_z_z
-inst_nmatch                        :: inst_nmatch_p_p_z_z
-emit_nmatch                        :: emit_nmatch_p_p_z_z
-inst_histcnt                       :: inst_histcnt_z_p_z_z
-emit_histcnt                       :: emit_histcnt_z_p_z_z
-inst_histseg                       :: inst_histseg_z_z_z
-emit_histseg                       :: emit_histseg_z_z_z
+inst_sqrdmlah                      :: inst_sqrdmlah_zb_zb_zb
+emit_sqrdmlah                      :: emit_sqrdmlah_zb_zb_zb
+inst_sqrdmlsh                      :: inst_sqrdmlsh_zb_zb_zb
+emit_sqrdmlsh                      :: emit_sqrdmlsh_zb_zb_zb
+inst_adclb                         :: inst_adclb_zs_zs_zs
+emit_adclb                         :: emit_adclb_zs_zs_zs
+inst_adclt                         :: inst_adclt_zs_zs_zs
+emit_adclt                         :: emit_adclt_zs_zs_zs
+inst_sbclb                         :: inst_sbclb_zs_zs_zs
+emit_sbclb                         :: emit_sbclb_zs_zs_zs
+inst_sbclt                         :: inst_sbclt_zs_zs_zs
+emit_sbclt                         :: emit_sbclt_zs_zs_zs
+inst_tbl2                          :: inst_tbl2_zb_zb_zb
+emit_tbl2                          :: emit_tbl2_zb_zb_zb
+inst_match                         :: inst_match_pb_p_zb_zb
+emit_match                         :: emit_match_pb_p_zb_zb
+inst_nmatch                        :: inst_nmatch_pb_p_zb_zb
+emit_nmatch                        :: emit_nmatch_pb_p_zb_zb
+inst_histcnt                       :: inst_histcnt_zs_p_zs_zs
+emit_histcnt                       :: emit_histcnt_zs_p_zs_zs
+inst_histseg                       :: inst_histseg_zb_zb_zb
+emit_histseg                       :: emit_histseg_zb_zb_zb
 inst_smstart                       :: inst_smstart_none
 emit_smstart                       :: emit_smstart_none
 inst_smstop                        :: inst_smstop_none
 emit_smstop                        :: emit_smstop_none
 inst_rdsvl                         :: inst_rdsvl_r_i
 emit_rdsvl                         :: emit_rdsvl_r_i
-inst_addha                         :: inst_addha_i_p_p_z
-emit_addha                         :: emit_addha_i_p_p_z
-inst_addva                         :: inst_addva_i_p_p_z
-emit_addva                         :: emit_addva_i_p_p_z
+inst_addha                         :: inst_addha_i_p_p_zs
+emit_addha                         :: emit_addha_i_p_p_zs
+inst_addva                         :: inst_addva_i_p_p_zs
+emit_addva                         :: emit_addva_i_p_p_zs
 inst_zero                          :: inst_zero_i
 emit_zero                          :: emit_zero_i
-inst_fmopa                         :: inst_fmopa_i_p_p_z
-emit_fmopa                         :: emit_fmopa_i_p_p_z
-inst_fmops                         :: inst_fmops_i_p_p_z
-emit_fmops                         :: emit_fmops_i_p_p_z
-inst_bfmopa                        :: inst_bfmopa_i_p_p_z
-emit_bfmopa                        :: emit_bfmopa_i_p_p_z
-inst_bfmops                        :: inst_bfmops_i_p_p_z
-emit_bfmops                        :: emit_bfmops_i_p_p_z
-inst_smopa                         :: inst_smopa_i_p_p_z
-emit_smopa                         :: emit_smopa_i_p_p_z
-inst_smops                         :: inst_smops_i_p_p_z
-emit_smops                         :: emit_smops_i_p_p_z
-inst_umopa                         :: inst_umopa_i_p_p_z
-emit_umopa                         :: emit_umopa_i_p_p_z
-inst_umops                         :: inst_umops_i_p_p_z
-emit_umops                         :: emit_umops_i_p_p_z
-inst_usmopa                        :: inst_usmopa_i_p_p_z
-emit_usmopa                        :: emit_usmopa_i_p_p_z
-inst_sumopa                        :: inst_sumopa_i_p_p_z
-emit_sumopa                        :: emit_sumopa_i_p_p_z
+inst_fmopa                         :: inst_fmopa_i_p_p_zs
+emit_fmopa                         :: emit_fmopa_i_p_p_zs
+inst_fmops                         :: inst_fmops_i_p_p_zs
+emit_fmops                         :: emit_fmops_i_p_p_zs
+inst_bfmopa                        :: inst_bfmopa_i_p_p_zh
+emit_bfmopa                        :: emit_bfmopa_i_p_p_zh
+inst_bfmops                        :: inst_bfmops_i_p_p_zh
+emit_bfmops                        :: emit_bfmops_i_p_p_zh
+inst_smopa                         :: inst_smopa_i_p_p_zb
+emit_smopa                         :: emit_smopa_i_p_p_zb
+inst_smops                         :: inst_smops_i_p_p_zb
+emit_smops                         :: emit_smops_i_p_p_zb
+inst_umopa                         :: inst_umopa_i_p_p_zb
+emit_umopa                         :: emit_umopa_i_p_p_zb
+inst_umops                         :: inst_umops_i_p_p_zb
+emit_umops                         :: emit_umops_i_p_p_zb
+inst_usmopa                        :: inst_usmopa_i_p_p_zb
+emit_usmopa                        :: emit_usmopa_i_p_p_zb
+inst_sumopa                        :: inst_sumopa_i_p_p_zb
+emit_sumopa                        :: emit_sumopa_i_p_p_zb
 inst_ld1q                          :: inst_ld1q_i_p_m
 emit_ld1q                          :: emit_ld1q_i_p_m
 inst_st1q                          :: inst_st1q_i_p_m
 emit_st1q                          :: emit_st1q_i_p_m
-inst_mova                          :: proc{ inst_mova_z_p_i, inst_mova_i_p_z }
-emit_mova                          :: proc{ emit_mova_z_p_i, emit_mova_i_p_z }
+inst_mova                          :: proc{ inst_mova_zb_p_i, inst_mova_i_p_zb }
+emit_mova                          :: proc{ emit_mova_zb_p_i, emit_mova_i_p_zb }
 inst_fcmla                         :: inst_fcmla_v4h_v4h_v4h_i
 emit_fcmla                         :: emit_fcmla_v4h_v4h_v4h_i
 inst_fcadd                         :: inst_fcadd_v4h_v4h_v4h_i
@@ -5024,40 +5612,40 @@ inst_prfw                          :: inst_prfw_i_p_m
 emit_prfw                          :: emit_prfw_i_p_m
 inst_prfd                          :: inst_prfd_i_p_m
 emit_prfd                          :: emit_prfd_i_p_m
-inst_ldnt1b                        :: inst_ldnt1b_z_p_m
-emit_ldnt1b                        :: emit_ldnt1b_z_p_m
-inst_ldnt1h                        :: inst_ldnt1h_z_p_m
-emit_ldnt1h                        :: emit_ldnt1h_z_p_m
-inst_ldnt1w                        :: inst_ldnt1w_z_p_m
-emit_ldnt1w                        :: emit_ldnt1w_z_p_m
-inst_ldnt1d                        :: inst_ldnt1d_z_p_m
-emit_ldnt1d                        :: emit_ldnt1d_z_p_m
-inst_stnt1b                        :: inst_stnt1b_z_p_m
-emit_stnt1b                        :: emit_stnt1b_z_p_m
-inst_stnt1h                        :: inst_stnt1h_z_p_m
-emit_stnt1h                        :: emit_stnt1h_z_p_m
-inst_stnt1w                        :: inst_stnt1w_z_p_m
-emit_stnt1w                        :: emit_stnt1w_z_p_m
-inst_stnt1d                        :: inst_stnt1d_z_p_m
-emit_stnt1d                        :: emit_stnt1d_z_p_m
-inst_splice                        :: inst_splice_z_p_z_z
-emit_splice                        :: emit_splice_z_p_z_z
-inst_index                         :: proc{ inst_index_z_i_i, inst_index_z_i_r, inst_index_z_r_i, inst_index_z_r_r }
-emit_index                         :: proc{ emit_index_z_i_i, emit_index_z_i_r, emit_index_z_r_i, emit_index_z_r_r }
-inst_bsl1n                         :: inst_bsl1n_z_z_z_z
-emit_bsl1n                         :: emit_bsl1n_z_z_z_z
-inst_bsl2n                         :: inst_bsl2n_z_z_z_z
-emit_bsl2n                         :: emit_bsl2n_z_z_z_z
-inst_nbsl                          :: inst_nbsl_z_z_z_z
-emit_nbsl                          :: emit_nbsl_z_z_z_z
-inst_pmul                          :: inst_pmul_z_z_z
-emit_pmul                          :: emit_pmul_z_z_z
-inst_pmullb                        :: inst_pmullb_z_z_z
-emit_pmullb                        :: emit_pmullb_z_z_z
-inst_pmullt                        :: inst_pmullt_z_z_z
-emit_pmullt                        :: emit_pmullt_z_z_z
-inst_bfcvtnt                       :: inst_bfcvtnt_z_p_z
-emit_bfcvtnt                       :: emit_bfcvtnt_z_p_z
+inst_ldnt1b                        :: inst_ldnt1b_zb_p_m
+emit_ldnt1b                        :: emit_ldnt1b_zb_p_m
+inst_ldnt1h                        :: inst_ldnt1h_zh_p_m
+emit_ldnt1h                        :: emit_ldnt1h_zh_p_m
+inst_ldnt1w                        :: inst_ldnt1w_zs_p_m
+emit_ldnt1w                        :: emit_ldnt1w_zs_p_m
+inst_ldnt1d                        :: inst_ldnt1d_zd_p_m
+emit_ldnt1d                        :: emit_ldnt1d_zd_p_m
+inst_stnt1b                        :: inst_stnt1b_zb_p_m
+emit_stnt1b                        :: emit_stnt1b_zb_p_m
+inst_stnt1h                        :: inst_stnt1h_zh_p_m
+emit_stnt1h                        :: emit_stnt1h_zh_p_m
+inst_stnt1w                        :: inst_stnt1w_zs_p_m
+emit_stnt1w                        :: emit_stnt1w_zs_p_m
+inst_stnt1d                        :: inst_stnt1d_zd_p_m
+emit_stnt1d                        :: emit_stnt1d_zd_p_m
+inst_splice                        :: inst_splice_zb_p_zb_zb
+emit_splice                        :: emit_splice_zb_p_zb_zb
+inst_index                         :: proc{ inst_index_zb_i_i, inst_index_zb_i_r, inst_index_zb_r_i, inst_index_zb_r_r }
+emit_index                         :: proc{ emit_index_zb_i_i, emit_index_zb_i_r, emit_index_zb_r_i, emit_index_zb_r_r }
+inst_bsl1n                         :: inst_bsl1n_zd_zd_zd_zd
+emit_bsl1n                         :: emit_bsl1n_zd_zd_zd_zd
+inst_bsl2n                         :: inst_bsl2n_zd_zd_zd_zd
+emit_bsl2n                         :: emit_bsl2n_zd_zd_zd_zd
+inst_nbsl                          :: inst_nbsl_zd_zd_zd_zd
+emit_nbsl                          :: emit_nbsl_zd_zd_zd_zd
+inst_pmul                          :: inst_pmul_zb_zb_zb
+emit_pmul                          :: emit_pmul_zb_zb_zb
+inst_pmullb                        :: inst_pmullb_zd_zs_zs
+emit_pmullb                        :: emit_pmullb_zd_zs_zs
+inst_pmullt                        :: inst_pmullt_zd_zs_zs
+emit_pmullt                        :: emit_pmullt_zd_zs_zs
+inst_bfcvtnt                       :: inst_bfcvtnt_zh_p_zs
+emit_bfcvtnt                       :: emit_bfcvtnt_zh_p_zs
 inst_ldraa                         :: inst_ldraa_r_m
 emit_ldraa                         :: emit_ldraa_r_m
 inst_ldrab                         :: inst_ldrab_r_m
@@ -5148,16 +5736,16 @@ inst_ldapursh                      :: inst_ldapursh_r_m
 emit_ldapursh                      :: emit_ldapursh_r_m
 inst_ldapursw                      :: inst_ldapursw_r_m
 emit_ldapursw                      :: emit_ldapursw_r_m
-inst_bfadd                         :: proc{ inst_bfadd_z_p_z_z, inst_bfadd_z_z_z }
-emit_bfadd                         :: proc{ emit_bfadd_z_p_z_z, emit_bfadd_z_z_z }
-inst_bfsub                         :: proc{ inst_bfsub_z_p_z_z, inst_bfsub_z_z_z }
-emit_bfsub                         :: proc{ emit_bfsub_z_p_z_z, emit_bfsub_z_z_z }
-inst_bfmul                         :: proc{ inst_bfmul_z_p_z_z, inst_bfmul_z_z_z }
-emit_bfmul                         :: proc{ emit_bfmul_z_p_z_z, emit_bfmul_z_z_z }
-inst_bfmla                         :: inst_bfmla_z_p_z_z
-emit_bfmla                         :: emit_bfmla_z_p_z_z
-inst_bfmls                         :: inst_bfmls_z_p_z_z
-emit_bfmls                         :: emit_bfmls_z_p_z_z
+inst_bfadd                         :: proc{ inst_bfadd_zh_p_zh_zh, inst_bfadd_zh_zh_zh }
+emit_bfadd                         :: proc{ emit_bfadd_zh_p_zh_zh, emit_bfadd_zh_zh_zh }
+inst_bfsub                         :: proc{ inst_bfsub_zh_p_zh_zh, inst_bfsub_zh_zh_zh }
+emit_bfsub                         :: proc{ emit_bfsub_zh_p_zh_zh, emit_bfsub_zh_zh_zh }
+inst_bfmul                         :: proc{ inst_bfmul_zh_p_zh_zh, inst_bfmul_zh_zh_zh }
+emit_bfmul                         :: proc{ emit_bfmul_zh_p_zh_zh, emit_bfmul_zh_zh_zh }
+inst_bfmla                         :: inst_bfmla_zh_p_zh_zh
+emit_bfmla                         :: emit_bfmla_zh_p_zh_zh
+inst_bfmls                         :: inst_bfmls_zh_p_zh_zh
+emit_bfmls                         :: emit_bfmls_zh_p_zh_zh
 inst_sb                            :: inst_sb_none
 emit_sb                            :: emit_sb_none
 inst_csdb                          :: inst_csdb_none
@@ -5174,20 +5762,20 @@ inst_bti_c                         :: inst_bti_c_none
 emit_bti_c                         :: emit_bti_c_none
 inst_bti_jc                        :: inst_bti_jc_none
 emit_bti_jc                        :: emit_bti_jc_none
-inst_bfclamp                       :: inst_bfclamp_z_z_z
-emit_bfclamp                       :: emit_bfclamp_z_z_z
-inst_bfmaxnm                       :: inst_bfmaxnm_z_p_z_z
-emit_bfmaxnm                       :: emit_bfmaxnm_z_p_z_z
-inst_bfminnm                       :: inst_bfminnm_z_p_z_z
-emit_bfminnm                       :: emit_bfminnm_z_p_z_z
-inst_luti2                         :: inst_luti2_z_z_z_i
-emit_luti2                         :: emit_luti2_z_z_z_i
-inst_luti4                         :: inst_luti4_z_z_z_i
-emit_luti4                         :: emit_luti4_z_z_z_i
-inst_zip                           :: proc{ inst_zip_z_z_z, inst_zip_z_z }
-emit_zip                           :: proc{ emit_zip_z_z_z, emit_zip_z_z }
-inst_uzp                           :: proc{ inst_uzp_z_z_z, inst_uzp_z_z }
-emit_uzp                           :: proc{ emit_uzp_z_z_z, emit_uzp_z_z }
+inst_bfclamp                       :: inst_bfclamp_zh_zh_zh
+emit_bfclamp                       :: emit_bfclamp_zh_zh_zh
+inst_bfmaxnm                       :: inst_bfmaxnm_zh_p_zh_zh
+emit_bfmaxnm                       :: emit_bfmaxnm_zh_p_zh_zh
+inst_bfminnm                       :: inst_bfminnm_zh_p_zh_zh
+emit_bfminnm                       :: emit_bfminnm_zh_p_zh_zh
+inst_luti2                         :: inst_luti2_zpb_zpb_zb_i
+emit_luti2                         :: emit_luti2_zpb_zpb_zb_i
+inst_luti4                         :: inst_luti4_zpb_zpb_zb_i
+emit_luti4                         :: emit_luti4_zpb_zpb_zb_i
+inst_zip                           :: proc{ inst_zip_zpb_zb_zb, inst_zip_zqb_zqb }
+emit_zip                           :: proc{ emit_zip_zpb_zb_zb, emit_zip_zqb_zqb }
+inst_uzp                           :: proc{ inst_uzp_zpb_zb_zb, inst_uzp_zqb_zqb }
+emit_uzp                           :: proc{ emit_uzp_zpb_zb_zb, emit_uzp_zqb_zqb }
 inst_tlbi_rpalos                   :: inst_tlbi_rpalos_r
 emit_tlbi_rpalos                   :: emit_tlbi_rpalos_r
 inst_tlbi_rpaos                    :: inst_tlbi_rpaos_r

@@ -274,15 +274,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .NEON_LANE_D:
 		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .SVE_XAR_SHIFT:
-		tszh := (word >> 22) & 0x3
-		tszl := (word >> 19) & 0x3
-		v    := i64((tszh << 5) | (tszl << 3) | ((word >> 16) & 0x7))
-		tsize := (tszh << 2) | tszl
-		esize: i64 = 8
-		if      tsize >= 8 { esize = 64 }
-		else if tsize >= 4 { esize = 32 }
-		else if tsize >= 2 { esize = 16 }
-		return Operand{immediate = 2 * esize - v, kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(sve_tsz_shift(sve_tsz_field(word))), kind = .IMMEDIATE, size = 1}
 
 	// ---- Memory operand variants ------------------------------------------
 	case .OFFSET_BASE_U12:
@@ -450,6 +442,14 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	// REG_V here decoded `add z0.d, z0.d, z0.d` as a V register.
 	case .VD:
 		return reg_from_field(word, 0, ot)
+	// The element size is not in the static pattern -- it shares the tsz field
+	// with the shift -- so it has to be read out of the word.
+	case .VD_TSZ:
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER,
+		               size = sve_esize_code(sve_tsz_esize(sve_tsz_field(word)))}
+	case .VN_TSZ:
+		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER,
+		               size = sve_esize_code(sve_tsz_esize(sve_tsz_field(word)))}
 	case .VN:
 		return reg_from_field(word, 5, ot)
 	case .VD_LIST1, .VD_LIST2, .VD_LIST3, .VD_LIST4:
@@ -497,7 +497,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 
 	// ---- SVE predicate slots ----
 	case .PD:
-		return Operand{reg = Register(REG_P | u16(word & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16(word & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PN:
 		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
 	case .PM:
@@ -588,13 +588,13 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	// ---- SVE indexed lane field ----
 	case .SVE_FMLA_IDX_H:
 		v := ((word >> 22) & 0x1) << 2 | ((word >> 19) & 0x3)
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .SVE_FMLA_IDX_S:
 		v := (word >> 19) & 0x3
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .SVE_FMLA_IDX_D:
 		v := (word >> 20) & 0x1
-		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = LANE_INDEX}
 
 	// ---- SME tile slice descriptor (round-trip back to the packed form) ----
 	//
@@ -705,9 +705,10 @@ reg_from_field :: #force_inline proc "contextless" (
 		 .V_4H_FP16, .V_8H_FP16, .V_1Q,
 		 .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		cls = REG_V
-	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D:
+	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_REG_ANY:
 		cls = REG_Z
-	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV:
+	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV,
+	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
 		cls = REG_P
 	case .PN_REG, .PN_REG_ZERO:
 		cls = REG_PN
@@ -752,6 +753,10 @@ reg_size_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
 	case .Z_REG_D:              return 8
 	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
 	case .P_REG_MERGE:          return PQUAL_MERGE
+	case .P_REG_B:              return PSHAPE_B
+	case .P_REG_H:              return PSHAPE_H
+	case .P_REG_S:              return PSHAPE_S
+	case .P_REG_D:              return PSHAPE_D
 	case .Z_PAIR_B, .Z_QUAD_B:  return 1
 	case .Z_PAIR_H, .Z_QUAD_H:  return 2
 	case .Z_PAIR_S, .Z_QUAD_S:  return 4
@@ -767,6 +772,10 @@ pqual_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
 	#partial switch ot {
 	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
 	case .P_REG_MERGE: return PQUAL_MERGE
+	case .P_REG_B:     return PSHAPE_B
+	case .P_REG_H:     return PSHAPE_H
+	case .P_REG_S:     return PSHAPE_S
+	case .P_REG_D:     return PSHAPE_D
 	}
 	return PQUAL_NONE
 }
@@ -795,4 +804,10 @@ decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic
 	if instructions != nil { reserve(instructions, len(instructions) + n) }
 	if inst_info    != nil { reserve(inst_info,    len(inst_info)    + n) }
 	if label_defs   != nil { reserve(label_defs,   len(label_defs)   + n) }
+}
+
+// The packed tszh:tszl:imm3 value an SVE shift-by-immediate carries.
+@(private="file", require_results)
+sve_tsz_field :: #force_inline proc "contextless" (word: u32) -> u32 {
+	return ((word >> 22) & 0x3) << 5 | ((word >> 19) & 0x3) << 3 | ((word >> 16) & 0x7)
 }
