@@ -25,15 +25,15 @@ Instruction_Flags :: bit_field u8 {
 // Encode is within 1% and a pure read traversal is ~9% slower at working sets
 // past L2, both of which the decode win dwarfs for real workloads.
 //
-// The 19 spare bytes are free: they cost nothing over a 48-byte struct that
+// The spare bytes are free: they cost nothing over a 48-byte struct that
 // straddles, and new fields land in them without changing the layout.
 Instruction :: struct #align(64) {
-	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * size_of(Operand) = 40
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * size_of(Operand) = 44
 	mnemonic:      Mnemonic,                           // 2
 	operand_count: u8,                                 // 1
 	flags:         Instruction_Flags,                  // 1
 	length:        u8,                                 // 1 -- always 4
-	_:             [19]u8,
+	_:             [15]u8,
 }
 #assert(size_of(Instruction)  == 64)
 #assert(align_of(Instruction) == 64)

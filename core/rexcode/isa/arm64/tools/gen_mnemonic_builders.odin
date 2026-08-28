@@ -124,7 +124,7 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 	case .W_REG, .X_REG, .WSP_REG, .XSP_REG,
 	     .B_REG, .H_REG, .S_REG, .D_REG, .Q_REG, .V_REG,
 	     .V_8B, .V_16B, .V_4H, .V_8H, .V_2S, .V_4S, .V_1D, .V_2D,
-	     .V_4H_FP16, .V_8H_FP16, .V_1Q, .V_LIST_16B,
+	     .V_4H_FP16, .V_8H_FP16, .V_1Q,
 	     .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		return .REG
 	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_PAIR, .Z_QUAD:
@@ -158,6 +158,38 @@ operand_param_count :: proc(t: a.Operand_Type) -> int {
 		return 3
 	}
 	return 1
+}
+
+// How many consecutive registers this encoding's operand is written as, or 0
+// when it is a plain register.
+list_count :: proc(e: a.Operand_Encoding) -> int {
+	#partial switch e {
+	case .VD_LIST1, .VN_LIST1: return 1
+	case .VD_LIST2, .VN_LIST2: return 2
+	case .VD_LIST3, .VN_LIST3: return 3
+	case .VD_LIST4, .VN_LIST4: return 4
+	}
+	return 0
+}
+
+// The VSHAPE_* constant naming this operand type's arrangement.
+vshape_const :: proc(t: a.Operand_Type) -> string {
+	#partial switch t {
+	case .V_8B:             return "VSHAPE_8B"
+	case .V_16B:            return "VSHAPE_16B"
+	case .V_4H, .V_4H_FP16: return "VSHAPE_4H"
+	case .V_8H, .V_8H_FP16: return "VSHAPE_8H"
+	case .V_2S:             return "VSHAPE_2S"
+	case .V_4S:             return "VSHAPE_4S"
+	case .V_1D:             return "VSHAPE_1D"
+	case .V_2D:             return "VSHAPE_2D"
+	case .V_1Q:             return "VSHAPE_1Q"
+	case .V_ELEM_B:         return "VSHAPE_ELEM_B"
+	case .V_ELEM_H:         return "VSHAPE_ELEM_H"
+	case .V_ELEM_S:         return "VSHAPE_ELEM_S"
+	case .V_ELEM_D:         return "VSHAPE_ELEM_D"
+	}
+	return "VSHAPE_NONE"
 }
 
 // A lane index prints glued to the register it indexes, so it is built with
@@ -205,7 +237,6 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 	case .V_1D:             return "v1d"
 	case .V_2D:             return "v2d"
 	case .V_1Q:             return "v1q"
-	case .V_LIST_16B:       return "vl16b"
 	case .V_ELEM_B:         return "veb"
 	case .V_ELEM_H:         return "veh"
 	case .V_ELEM_S:         return "ves"
@@ -376,6 +407,12 @@ generate_proc_name :: proc(mnemonic: a.Mnemonic, sig: Operand_Signature) -> stri
 // -----------------------------------------------------------------------------
 
 write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, enc: a.Operand_Encoding, names: [3]string) {
+	// A register the syntax writes as a list carries how many, which is a
+	// property of the form rather than of the operand type.
+	if n := list_count(enc); n > 0 {
+		fmt.sbprintf(sb, "op_v_list(%s, %s, %d)", names[0], vshape_const(t), n)
+		return
+	}
 	#partial switch operand_category(t) {
 	case .REG:
 		#partial switch t {
@@ -388,7 +425,6 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, enc: a.Opera
 		case .V_1D:  fmt.sbprintf(sb, "op_v_1d(%s)",  names[0])
 		case .V_2D:  fmt.sbprintf(sb, "op_v_2d(%s)",  names[0])
 		case .V_1Q:  fmt.sbprintf(sb, "op_v_1q(%s)",  names[0])
-		case .V_LIST_16B: fmt.sbprintf(sb, "op_v_list_16b(%s)", names[0])
 		case .V_ELEM_B: fmt.sbprintf(sb, "op_v_elem_b(%s)", names[0])
 		case .V_ELEM_H: fmt.sbprintf(sb, "op_v_elem_h(%s)", names[0])
 		case .V_ELEM_S: fmt.sbprintf(sb, "op_v_elem_s(%s)", names[0])

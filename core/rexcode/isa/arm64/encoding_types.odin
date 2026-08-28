@@ -203,8 +203,6 @@ Operand_Type :: enum u8 {
 	V_1Q,          // NEON .1q -- one 128-bit lane (PMULL's destination). Not
 	               // expressible as lanes*elem-bytes, which is how the other
 	               // arrangements are coded, since 1*16 collides with 16B.
-	V_LIST_16B,    // a .16b register written as a list, `{v1.16b}` (TBL/TBX).
-	               // Only one-register lists are modelled so far.
 }
 
 // Where each operand's bits land in the 32-bit word.
@@ -391,6 +389,12 @@ Operand_Encoding :: enum u8 {
 	// ---- Misc new operand-encoding values (batch 3) ----
 	ENC_FCMLA_ROT,     // 2-bit rotation at bits 13:12 (FCMLA)
 	NEON_IDX2,         // 2-bit lane index at bits 13:12 (SM3TT)
+	// A register the syntax writes as a list of N consecutive registers,
+	// `{v0.16b, v1.16b}`. Same bits as VD / VN; N is fixed by the form (LD2
+	// always names two), so it rides on the encoding rather than the operand
+	// type -- otherwise every count would need its own type per arrangement.
+	VD_LIST1, VD_LIST2, VD_LIST3, VD_LIST4,
+	VN_LIST1, VN_LIST2, VN_LIST3, VN_LIST4,
 	ENC_FCADD_ROT,     // 1-bit rotation at bit 12 (FCADD)
 	ENC_SVE_PRFOP,     // 4-bit prefetch op at bits 3:0 (SVE PRFB/H/W/D)
 	ENC_LDRAA_IMM10,   // signed 10-bit imm10 at bits 21:12, scaled by 8 (LDRAA/B)

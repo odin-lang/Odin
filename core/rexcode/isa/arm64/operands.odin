@@ -109,8 +109,13 @@ Operand :: struct #packed {
 	}, // 12 total because of alignment
 	kind: Operand_Kind,                 // 1
 	size: u8,                           // 1 -- carried width info; meaning varies
+	// How many consecutive registers the syntax writes as a list, starting at
+	// `reg`: `{v0.16b, v1.16b}` is 2. Zero means the operand is a plain
+	// register. The count belongs to the instruction form rather than to the
+	// caller -- LD2 always names two -- so it comes from the encoding.
+	list_count: u8,                     // 1
 }
-#assert(size_of(Operand) == 10)
+#assert(size_of(Operand) == 11)
 
 // -----------------------------------------------------------------------------
 // Constructors -- generic
@@ -191,6 +196,24 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 	return Operand{reg = Register(REG_Z | u16(n & 0x1F)), kind = .REGISTER, size = 8}
 }
 
+// Arrangement codes carried in Operand.size. Element views are odd and
+// arrangements are multiples of 8, so the two can never be confused; 4 is the
+// neutral "no vector shape" value every scalar class uses.
+VSHAPE_NONE :: u8(4)
+VSHAPE_8B   :: u8(8)
+VSHAPE_16B  :: u8(16)
+VSHAPE_4H   :: u8(24)
+VSHAPE_8H   :: u8(32)
+VSHAPE_2S   :: u8(40)
+VSHAPE_4S   :: u8(48)
+VSHAPE_1D   :: u8(56)
+VSHAPE_2D   :: u8(64)
+VSHAPE_1Q   :: u8(72)
+VSHAPE_ELEM_B :: u8(1)
+VSHAPE_ELEM_H :: u8(3)
+VSHAPE_ELEM_S :: u8(5)
+VSHAPE_ELEM_D :: u8(7)
+
 // -----------------------------------------------------------------------------
 // NEON V-register arrangement builders. These take the register the caller
 // actually has, not its number: rebuilding one from `reg_hw` would relabel an
@@ -245,10 +268,11 @@ op_v_2d  :: #force_inline proc "contextless" (r: Register) -> Operand {
 op_v_1q  :: #force_inline proc "contextless" (r: Register) -> Operand {
 	return Operand{reg = r, kind = .REGISTER, size = 72}
 }
-// A .16b register written as a one-element list, `{v1.16b}` (TBL/TBX).
+// A run of `count` consecutive registers written as a list, `{v0.16b, v1.16b}`.
+// `shape` is one of the VSHAPE_* codes.
 @(require_results)
-op_v_list_16b :: #force_inline proc "contextless" (r: Register) -> Operand {
-	return Operand{reg = r, kind = .REGISTER, size = 80}
+op_v_list :: #force_inline proc "contextless" (first: Register, shape, count: u8) -> Operand {
+	return Operand{reg = first, kind = .REGISTER, size = shape, list_count = count}
 }
 
 // Element-indexed V views (V0.B[i]/.H[i]/.S[i]/.D[i]). The element size rides

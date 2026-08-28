@@ -228,8 +228,6 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 64)
 	case .V_1Q:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 72)
-	case .V_LIST_16B:
-		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 80)
 	case .V_4H_FP16:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 24)
 	// Element-indexed V views: element size carried in op.size (B=1,H=2,S=4,
@@ -522,9 +520,9 @@ pack_operand_inline :: #force_inline proc(
 		return ((bit >> 5) & 1) << 31 | (bit & 0x1F) << 19
 
 	// ---- NEON / SIMD register slots (alias of RD/RN/RM/RA bit positions) --
-	case .VD:
+	case .VD, .VD_LIST1, .VD_LIST2, .VD_LIST3, .VD_LIST4:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 0
-	case .VN:
+	case .VN, .VN_LIST1, .VN_LIST2, .VN_LIST3, .VN_LIST4:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 5
 	case .VM:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 16

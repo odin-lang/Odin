@@ -135,8 +135,9 @@ sbprint :: proc(
 					strings.write_byte(sb, ',')
 					if opts.space_after_comma { strings.write_byte(sb, ' ') }
 				}
-				// A register the syntax writes as a list keeps its braces.
-				list := op.kind == .REGISTER && op.size == 80
+				// A register the syntax writes as a list keeps its braces, and
+				// names every register in the run.
+				list := op.kind == .REGISTER && op.list_count > 0
 				switch {
 				case lane_index:
 					strings.write_byte(sb, '[')
@@ -148,7 +149,16 @@ sbprint :: proc(
 				case list:
 					strings.write_byte(sb, '{')
 					if opts.space_after_comma { strings.write_byte(sb, ' ') }
-					write_operand(sb, op, &display, opts)
+					for n in 0 ..< op.list_count {
+						if n > 0 {
+							strings.write_byte(sb, ',')
+							if opts.space_after_comma { strings.write_byte(sb, ' ') }
+						}
+						// The run is consecutive and wraps at v31.
+						member := op^
+						member.reg = Register(reg_class(op.reg) | u16((reg_hw(op.reg) + n) & 0x1F))
+						write_operand(sb, &member, &display, opts)
+					}
 					if opts.space_after_comma { strings.write_byte(sb, ' ') }
 					strings.write_byte(sb, '}')
 				case:
@@ -400,7 +410,6 @@ write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercas
 		case 56: shape = "1d"
 		case 64: shape = "2d"
 		case 72: shape = "1q"
-		case 80: shape = "16b"   // written as a list; the braces are added by the caller
 		case 1:  shape = "b"
 		case 3:  shape = "h"
 		case 5:  shape = "s"
