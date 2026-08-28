@@ -156,6 +156,7 @@ Operand_Type :: enum u8 {
 	HW_SHIFT,      // 2-bit LSL hw (0/16/32/48) for MOV-immediate
 	BITMASK_IMM,   // Logical immediate (bitmask-encoded N:imms:immr)
 	LSE_SIZE,      // 2-bit size selector for LSE atomics (00=B 01=H 10=W 11=X)
+	IMM_MUL4,
 
 	// ---- PC-relative ----
 	REL_26,        // B / BL (signed 26-bit << 2)
@@ -349,6 +350,7 @@ Operand_Encoding :: enum u8 {
 	SVE_IMM5,             // 5-bit at bits 20-16 (INDEX imm, etc.)
 	SVE_SHIFT_TSZ_IMM,    // tsz:imm3 at bits 22:16, encodes element-size + shift amount
 	SVE_PATTERN,          // 5-bit pattern (POW2/VL1.../ALL) at bits 9-5 (PTRUE)
+	IMM_MUL4,
 
 	// ---- SVE memory operands ---------------------------------------------
 	SVE_OFFSET_BASE_SS,   // [Xn, Xm, LSL #s] -- scalar+scalar contiguous
