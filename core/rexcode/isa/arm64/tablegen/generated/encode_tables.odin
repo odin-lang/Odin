@@ -2822,7 +2822,7 @@ ENCODE_FORMS := [2634]lib.Encoding{
 	{ .LD1SW, {.Z_REG_D,.P_REG_ZERO,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xC5000000, 0xFFA0E000, .SVE, {is_64=true, explicit_count=3} },
 	// .ST1B
 	{ .ST1B, {.Z_REG_B,.P_REG,.MEM_SVE_SS,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_SS,.NONE}, 0xE4004000, 0xFFE0E000, .SVE, {explicit_count=3} },
-	{ .ST1B, {.Z_REG_S,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE4008000, 0xFFA0E000, .SVE, {explicit_count=3} },
+	{ .ST1B, {.Z_REG_S,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE4408000, 0xFFE0A000, .SVE, {explicit_count=3} },
 	{ .ST1B, {.Z_REG_D,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE4008000, 0xFFA0E000, .SVE, {is_64=true, explicit_count=3} },
 	{ .ST1B, {.SME_SLICE_B,.P_REG,.MEM_SVE_SS,.NONE}, {.SME_SLICE_B,.PG,.SVE_OFFSET_BASE_SS,.NONE}, 0xE0200000, 0xFFE00010, .SME, {explicit_count=3} },
 	{ .ST1B, {.Z_PAIR_B,.PN_REG,.MEM_SVE_SS,.NONE}, {.ENC_Z_PAIR_VD,.PNG,.SVE_OFFSET_BASE_SS,.NONE}, 0xA0200000, 0xFFE0E000, .SME, {explicit_count=3} },
@@ -2836,14 +2836,14 @@ ENCODE_FORMS := [2634]lib.Encoding{
 	{ .ST1H, {.Z_QUAD_H,.PN_REG,.MEM_SVE_SS,.NONE}, {.ENC_Z_QUAD_VD,.PNG,.SVE_OFFSET_BASE_SS1,.NONE}, 0xA020A000, 0xFFE0E000, .SME, {explicit_count=3} },
 	// .ST1W
 	{ .ST1W, {.Z_REG_S,.P_REG,.MEM_SVE_SS,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_SS2,.NONE}, 0xE5404000, 0xFFE0E000, .SVE, {explicit_count=3} },
-	{ .ST1W, {.Z_REG_S,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE5008000, 0xFFA0E000, .SVE, {explicit_count=3} },
+	{ .ST1W, {.Z_REG_S,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE5408000, 0xFFE0A000, .SVE, {explicit_count=3} },
 	{ .ST1W, {.Z_REG_D,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE5008000, 0xFFA0E000, .SVE, {is_64=true, explicit_count=3} },
 	{ .ST1W, {.SME_SLICE_W,.P_REG,.MEM_SVE_SS,.NONE}, {.SME_SLICE_W,.PG,.SVE_OFFSET_BASE_SS2,.NONE}, 0xE0A00000, 0xFFE00010, .SME, {explicit_count=3} },
 	{ .ST1W, {.Z_PAIR_S,.PN_REG,.MEM_SVE_SS,.NONE}, {.ENC_Z_PAIR_VD,.PNG,.SVE_OFFSET_BASE_SS2,.NONE}, 0xA0204000, 0xFFE0E000, .SME, {explicit_count=3} },
 	{ .ST1W, {.Z_QUAD_S,.PN_REG,.MEM_SVE_SS,.NONE}, {.ENC_Z_QUAD_VD,.PNG,.SVE_OFFSET_BASE_SS2,.NONE}, 0xA020C000, 0xFFE0E000, .SME, {explicit_count=3} },
 	// .ST1D
 	{ .ST1D, {.Z_REG_D,.P_REG,.MEM_SVE_SS,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_SS3,.NONE}, 0xE5E04000, 0xFFE0E000, .SVE, {is_64=true, explicit_count=3} },
-	{ .ST1D, {.Z_REG_D,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE5808000, 0xFFA0E000, .SVE, {is_64=true, explicit_count=3} },
+	{ .ST1D, {.Z_REG_D,.P_REG,.MEM_SVE_VEC,.NONE}, {.VD_LIST1,.PG,.SVE_OFFSET_BASE_VEC,.NONE}, 0xE5808000, 0xFFE0A000, .SVE, {is_64=true, explicit_count=3} },
 	{ .ST1D, {.SME_SLICE_D,.P_REG,.MEM_SVE_SS,.NONE}, {.SME_SLICE_D,.PG,.SVE_OFFSET_BASE_SS3,.NONE}, 0xE0E00000, 0xFFE00010, .SME, {is_64=true, explicit_count=3} },
 	{ .ST1D, {.Z_PAIR_D,.PN_REG,.MEM_SVE_SS,.NONE}, {.ENC_Z_PAIR_VD,.PNG,.SVE_OFFSET_BASE_SS3,.NONE}, 0xA0206000, 0xFFE0E000, .SME, {is_64=true, explicit_count=3} },
 	{ .ST1D, {.Z_QUAD_D,.PN_REG,.MEM_SVE_SS,.NONE}, {.ENC_Z_QUAD_VD,.PNG,.SVE_OFFSET_BASE_SS3,.NONE}, 0xA020E000, 0xFFE0E000, .SME, {is_64=true, explicit_count=3} },
@@ -2862,7 +2862,7 @@ ENCODE_FORMS := [2634]lib.Encoding{
 	// .WHILELE
 	{ .WHILELE, {.P_REG,.X_REG,.X_REG,.NONE}, {.PD,.RN,.RM,.NONE}, 0x25201410, 0xFF20FC10, .SVE2, {sets_flags=true, is_64=true, explicit_count=3} },
 	// .WHILELT
-	{ .WHILELT, {.P_REG,.X_REG,.X_REG,.NONE}, {.PD,.RN,.RM,.NONE}, 0x25201400, 0xFF20FC10, .SVE2, {sets_flags=true, is_64=true, explicit_count=3} },
+	{ .WHILELT, {.P_REG,.X_REG,.X_REG,.NONE}, {.PD,.RN,.RM,.NONE}, 0x25201400, 0xFFE0FC10, .SVE2, {sets_flags=true, is_64=true, explicit_count=3} },
 	// .WHILEHI
 	{ .WHILEHI, {.P_REG,.X_REG,.X_REG,.NONE}, {.PD,.RN,.RM,.NONE}, 0x25201810, 0xFF20FC10, .SVE2, {sets_flags=true, is_64=true, explicit_count=3} },
 	// .WHILEHS
