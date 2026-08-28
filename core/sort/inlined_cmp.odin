@@ -1,5 +1,7 @@
 package sort
 
+import "core:fmt"
+import "core:time"
 import "core:slice"
 import "base:intrinsics"
 
@@ -10,7 +12,7 @@ sort_inlined :: proc(arr: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
 			base_type :: intrinsics.type_core_type(E)
-			_quick_lomuto(transmute([]base_type)arr, nil, proc(l, r: base_type, data: rawptr) -> bool { return l < r })
+			_quick_lomuto(transmute([]base_type)arr, rawptr(nil), proc(l, r: base_type, data: rawptr) -> bool { return l < r })
 		}
 	}
 }
@@ -21,7 +23,7 @@ sort_inlined :: proc(arr: $T/[]$E) where ORD(E) {
 sort_inlined_by :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
-			_quick_lomuto(arr, nil, proc(l, r: E, data: rawptr) -> bool { return LESS(l, r) })
+			_quick_lomuto(arr, rawptr(nil), proc(l, r: E, data: rawptr) -> bool { return LESS(l, r) })
 		}
 	}
 }
@@ -39,12 +41,11 @@ sort_inlined_with_indices :: proc(arr: $T/[]$E, allocator := context.allocator) 
 
 			base_type :: intrinsics.type_core_type(E)
 			base := transmute([]base_type)arr
-			_quick_lomuto(indices, &base, proc(l, r: int, user_data: rawptr) -> bool {
-				data := (^T)(user_data)
-				return data[l] < data[r]
+			_quick_lomuto(indices, &base, proc(l, r: int, user_data: ^T) -> bool {
+				return user_data[l] < user_data[r]
 			})
-
-			slice.sort_from_permutation_indices(arr, indices)
+			
+			sort_from_permutation_indices(arr, indices)
 		}
 	}
 	return indices
@@ -63,24 +64,24 @@ sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool,
 			}
 
 			arr := arr
-			_quick_lomuto(indices, &arr, proc(l, r: int, user_data: rawptr) -> bool {
-				data := (^T)(user_data)
-				return LESS(data[l], data[r])
+			_quick_lomuto(indices, &arr, proc(l, r: int, user_data: ^T) -> bool {
+				return LESS(user_data[l], user_data[r])
 			})
 
-			slice.sort_from_permutation_indices(arr, indices)
+			sort_from_permutation_indices(arr, indices)
 		}
 	}
 	return indices
 }
 
+
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
 // This sort is not guaranteed to be stable
-sort_inlined_by_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: rawptr) -> bool, user_data: rawptr) {
+sort_inlined_by_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: ^$D) -> bool, user_data: ^D) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
-			_quick_lomuto(arr, user_data, proc(l, r: E, user_data: rawptr) -> bool {
+			_quick_lomuto(arr, user_data, proc(l, r: E, user_data: ^D) -> bool {
 				return LESS(l, r, user_data)
 			})
 		}
@@ -112,7 +113,7 @@ sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E
 				return LESS(left , right, ctx.user_data)
 			})
 
-			slice.sort_from_permutation_indices(arr, indices)
+			sort_from_permutation_indices(arr, indices)
 		}
 	}
 	return indices
@@ -124,7 +125,7 @@ sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E
 sort_inlined_by_cmp :: proc(arr: $T/[]$E, $CMP: proc(l, r: E) -> slice.Ordering) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
-			_quick_lomuto(arr, nil, proc(l, r: E, user_data: rawptr) -> bool { return CMP(l, r) == .Less })
+			_quick_lomuto(arr, rawptr(nil), proc(l, r: E, user_data: rawptr) -> bool { return CMP(l, r) == .Less })
 		}
 	}
 }
@@ -132,22 +133,50 @@ sort_inlined_by_cmp :: proc(arr: $T/[]$E, $CMP: proc(l, r: E) -> slice.Ordering)
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
 // This sort is not guaranteed to be stable
-sort_inlined_by_cmp_with_data :: proc(arr: $T/[]$E, $CMP: proc(l, r: E, user_data: rawptr) -> slice.Ordering, user_data: rawptr) {
+sort_inlined_by_cmp_with_data :: proc(arr: $T/[]$E, $CMP: proc(l, r: E, user_data: ^$D) -> slice.Ordering, user_data: ^D) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
-			_quick_lomuto(arr, user_data, proc(l, r: E, user_data: rawptr) -> bool {
+			_quick_lomuto(arr, user_data, proc(l, r: E, user_data: ^D) -> bool {
 				return CMP(l, r, user_data) == .Less
 			})
 		}
 	}
 }
 
+sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
+	assert(len(data) == len(indices))
+	if len(indices) <= 1 {
+		return
+	}
+
+	for i in 0..<len(indices) {
+		next_index := indices[i]
+
+		if next_index < 0 {
+			indices[i] *= -1
+			continue
+		}
+		
+		if next_index <= i {
+			continue
+		}
+
+		cur_index := i
+		for next_index != i {
+			indices[cur_index] *= -1
+			data[cur_index], data[next_index] = data[next_index], data[cur_index]
+			cur_index = next_index
+			next_index = indices[cur_index]
+		}
+		indices[i] *= -1
+	}
+}
 
 @private
-_quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
+_quick_lomuto :: proc(arr: $T/[]$E, data: $D, $LESS: $P) #no_bounds_check {
 	loop(arr, data, true)
 	
-	loop :: proc(arr: T, data: rawptr, leftmost: bool) #no_bounds_check {
+	loop :: proc(arr: T, data: D, leftmost: bool) #no_bounds_check {
 		arr := arr; leftmost := leftmost
 
 		for {
@@ -199,7 +228,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		return log
 	}
 
-	median_3 :: proc(arr: T, data: rawptr, start, end, depth: int) -> int #no_bounds_check {
+	median_3 :: proc(arr: T, data: D, start, end, depth: int) -> int #no_bounds_check {
 		if depth == 0 {
 			return start
 		}
@@ -219,7 +248,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		return swap[(int)(x == y) + (int)(y ~ z)]
 	}
 
-	insertion_sort :: proc(arr: T, data: rawptr) #no_bounds_check {
+	insertion_sort :: proc(arr: T, data: D) #no_bounds_check {
 		for i in 1..<len(arr) {
 			current := arr[i]
 			j := i
@@ -230,7 +259,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 		}
 	}
 
-	unguarded_insertion_sort :: #force_inline proc(arr: T, data: rawptr) #no_bounds_check {
+	unguarded_insertion_sort :: #force_inline proc(arr: T, data: D) #no_bounds_check {
 		for i in 1..<len(arr) {
 			current := arr[i]
 			j := i
@@ -245,7 +274,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 	// branchless partitioning
 	// [  <  |0|  >=  |  ?  ]
 	//	    left    right ->
-	partition_lomuto :: #force_inline proc(arr: T, data: rawptr, pivot_index: int) -> (left: int) #no_bounds_check {
+	partition_lomuto :: #force_inline proc(arr: T, data: D, pivot_index: int) -> (left: int) #no_bounds_check {
 		pivot := arr[pivot_index]
 		arr[pivot_index] = arr[0]
 
@@ -265,7 +294,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 
 	// [  ?  |  <=  |0|  >  ]
 	//   <- left   right
-	partition_lomuto_reverse :: proc(arr: T, data: rawptr, pivot_index: int) -> (right: int) #no_bounds_check {
+	partition_lomuto_reverse :: proc(arr: T, data: D, pivot_index: int) -> (right: int) #no_bounds_check {
 		right = len(arr) - 1
 
 		pivot := arr[pivot_index]
@@ -288,7 +317,7 @@ _quick_lomuto :: proc(arr: $T/[]$E, data: rawptr, $LESS: $P) {
 	// only used for large types as it uses less data moves
 	// [  <  |0|   ?   |  >=  ]
 	//	 ->  left    right <-
-	partition_hoare :: proc(arr: T, data: rawptr, pivot_index: int) -> (left: int) #no_bounds_check {
+	partition_hoare :: proc(arr: T, data: D, pivot_index: int) -> (left: int) #no_bounds_check {
 		right := len(arr) - 1
 
 		pivot := arr[pivot_index]
