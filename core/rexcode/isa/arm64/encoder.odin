@@ -259,6 +259,8 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_P
 	case .PN_REG, .PN_REG_ZERO:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_PN
+	case .ZT_REG:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_ZT
 	// The first register of a pair must be even, of a quad a multiple of four.
 	case .Z_REG_ANY:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z
@@ -655,6 +657,10 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0xF) << 5
 	case .PM:
 		return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .ENC_ZT0:
+		return 0
+	case .LUTI_IDX:
+		return (u32(op.immediate) & 0x3) << 15
 	case .PNG:
 		// The field holds pn - 8.
 		return ((u32(reg_hw(op.reg)) - 8) & 0x7) << 10
@@ -684,7 +690,7 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0x1F) << 5
 
 	// SVE memory operands
-	case .SVE_OFFSET_BASE_SS:
+	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3:
 		// [Xn, Xm, LSL #s] scalar+scalar. Base at 9:5, index at 20:16;
 		// shift is implicit in the encoding's static bits (per ESize).
 		base_bits := (u32(reg_hw(op.mem.base))  & 0x1F) << 5

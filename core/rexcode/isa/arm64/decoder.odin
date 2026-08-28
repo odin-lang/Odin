@@ -502,6 +502,10 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
 	case .PM:
 		return Operand{reg = Register(REG_P | u16((word >> 16) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
+	case .ENC_ZT0:
+		return Operand{reg = ZT0, kind = .REGISTER, size = 0}
+	case .LUTI_IDX:
+		return Operand{immediate = i64((word >> 15) & 0x3), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .PNG:
 		return Operand{reg = Register(REG_PN | u16(8 + ((word >> 10) & 0x7))), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PG:
@@ -524,13 +528,20 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64((word >> 5) & 0x1F), kind = .IMMEDIATE, size = 1}
 
 	// ---- SVE memory operands ----
-	case .SVE_OFFSET_BASE_SS:
+	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3:
 		base_hw := u8((word >> 5) & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
+		shift: u8 = 0
+		#partial switch en {
+		case .SVE_OFFSET_BASE_SS1: shift = 1
+		case .SVE_OFFSET_BASE_SS2: shift = 2
+		case .SVE_OFFSET_BASE_SS3: shift = 3
+		}
 		return Operand{
 			mem = Memory{
 				base = Register(REG_X | u16(base_hw)),
 				index = Register(REG_X | u16(idx_hw)),
+				shift = shift,
 				mode = .REG_OFFSET,
 			},
 			kind = .MEMORY, size = 4,
@@ -712,6 +723,8 @@ reg_from_field :: #force_inline proc "contextless" (
 		cls = REG_P
 	case .PN_REG, .PN_REG_ZERO:
 		cls = REG_PN
+	case .ZT_REG:
+		cls = REG_ZT
 	case .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D,
 	     .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
 		cls = REG_Z
@@ -751,6 +764,7 @@ reg_size_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
 	case .Z_REG_H:              return 2
 	case .Z_REG_S:              return 4
 	case .Z_REG_D:              return 8
+	case .Z_REG_ANY:            return 0   // no element size in the syntax
 	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
 	case .P_REG_MERGE:          return PQUAL_MERGE
 	case .P_REG_B:              return PSHAPE_B

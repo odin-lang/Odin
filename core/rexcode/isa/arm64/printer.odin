@@ -504,6 +504,9 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 	case REG_PN:
 		strings.write_string(sb, uppercase ? "PN" : "pn")
 		write_decimal_u32(sb, u32(hw))
+	case REG_ZT:
+		strings.write_string(sb, uppercase ? "ZT" : "zt")
+		write_decimal_u32(sb, u32(hw))
 	}
 }
 

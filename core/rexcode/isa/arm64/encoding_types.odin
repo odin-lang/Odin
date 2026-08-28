@@ -201,6 +201,7 @@ Operand_Type :: enum u8 {
 	// SME2 predicate-as-counter (PN8..PN15). `_ZERO` prints the `/z` a load
 	// needs; a store writes it bare.
 	PN_REG, PN_REG_ZERO,
+	ZT_REG,        // ZT0 -- SME2's lookup table, and the only one of its kind
 	// A predicate that is written with an element size because it is the
 	// instruction's destination (`cmpge p0.b, p1/z, ...`).
 	P_REG_B, P_REG_H, P_REG_S, P_REG_D,
@@ -407,6 +408,12 @@ Operand_Encoding :: enum u8 {
 	// type -- otherwise every count would need its own type per arrangement.
 	VD_LIST1, VD_LIST2, VD_LIST3, VD_LIST4,
 	PNG,              // bits 10-12, predicate-as-counter (SME2)
+	ENC_ZT0,          // no bits at all; there is only one ZT register
+	LUTI_IDX,         // bits 15-16, LUTI2/LUTI4 table index
+	// SVE scalar+scalar addressing scales the index by the access size, and the
+	// assembler wants that written out (`[x0, x0, lsl #2]`). The amount is a
+	// property of the form, so it rides on the encoding.
+	SVE_OFFSET_BASE_SS1, SVE_OFFSET_BASE_SS2, SVE_OFFSET_BASE_SS3,
 	// A Z register whose element size is not in the static pattern but in the
 	// instruction's own tsz field, so decode has to read it out of the word
 	// rather than take it from the form (SVE2 XAR).

@@ -71,6 +71,7 @@ Operand_Category :: enum {
 	MEM,       // Memory     -> op_mem                 (1 param, suffix m)
 	COND,      // Cond       -> op_cond                (1 param, suffix c)
 	SYSREG,    // System_Register -> op_sysreg         (1 param, suffix s)
+	IMPLICIT,  // no parameter -- the operand names the only register it can
 	SHIFTED,   // Register + Shift_Type + u8 -> op_shifted   (3 params, suffix sh)
 	EXTENDED,  // Register + Extend + u8     -> op_extended  (3 params, suffix ex)
 }
@@ -134,6 +135,9 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV, .PN_REG, .PN_REG_ZERO,
 	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
 		return .PREG
+	case .ZT_REG:
+		// There is only one ZT register, so it takes no parameter at all.
+		return .IMPLICIT
 	case .REL_26, .REL_19, .REL_14, .REL_PG21:
 		return .REL
 	case .MEM_OFFSET, .MEM_PRE, .MEM_POST, .MEM_REG, .MEM_EXT,
@@ -212,7 +216,7 @@ is_lane_index :: proc(e: a.Operand_Encoding) -> bool {
 	#partial switch e {
 	case .NEON_IDX5, .NEON_IDX4, .NEON_IDX2,
 	     .NEON_LANE_B, .NEON_LANE_H, .NEON_LANE_S, .NEON_LANE_D,
-	     .SVE_FMLA_IDX_H, .SVE_FMLA_IDX_S, .SVE_FMLA_IDX_D:
+	     .SVE_FMLA_IDX_H, .SVE_FMLA_IDX_S, .SVE_FMLA_IDX_D, .LUTI_IDX:
 		return true
 	}
 	return false
@@ -286,6 +290,7 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 	case .MEM:      return "m"
 	case .COND:     return "c"
 	case .SYSREG:   return "s"
+	case .IMPLICIT: return "zt"
 	case .SHIFTED:  return "sh"
 	case .EXTENDED: return "ex"
 	}
@@ -367,6 +372,8 @@ operand_primary_names :: proc(sig: Operand_Signature) -> [4][3]string {
 			result[i][0] = "cond"
 		case .SYSREG:
 			result[i][0] = "sysreg"
+		case .IMPLICIT:
+			result[i][0] = ""
 		case .SHIFTED:
 			rn := reg_name(i, &reg_count)
 			result[i][0] = rn
@@ -394,6 +401,8 @@ param_list :: proc(sig: Operand_Signature) -> [dynamic]Param {
 			append(&params, Param{decl = fmt.tprintf("%s: Register", names[i][0]), name = names[i][0]})
 		case .ZREG, .PREG:
 			append(&params, Param{decl = fmt.tprintf("%s: u8", names[i][0]), name = names[i][0]})
+		case .IMPLICIT:
+			// no parameter
 		case .IMM:
 			append(&params, Param{decl = fmt.tprintf("%s: i64", names[i][0]), name = names[i][0]})
 		case .REL:
@@ -506,6 +515,8 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, enc: a.Opera
 		fmt.sbprintf(sb, "op_cond(%s)", names[0])
 	case .SYSREG:
 		fmt.sbprintf(sb, "op_sysreg(%s)", names[0])
+	case .IMPLICIT:
+		strings.write_string(sb, "op_reg(ZT0)")
 	case .SHIFTED:
 		fmt.sbprintf(sb, "op_shifted(%s, %s, %s)", names[0], names[1], names[2])
 	case .EXTENDED:

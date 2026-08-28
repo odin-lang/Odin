@@ -190,7 +190,7 @@ main :: proc() {
 	check("MUL S", .MUL, 5, 0x04900000, 0xFFFFE000)
 	check("SVE_SDIV S",     .SDIV, 2, 0x04940000, 0xFFFFE000)
 	check("ASR D", .ASR, 5, 0x04D08000, 0xFFFFE000)
-	check("NEG D", .NEG, 10, 0x04D7A000, 0xFFE0E000)
+	check("NEG D", .NEG, 10, 0x04D7A000, 0xFFF7E000)
 
 	// ---- SVE -- bitwise predicated ------------------------------------------
 	check("AND D", .AND, 5, 0x041A0000, 0xFFFFE000)
@@ -261,8 +261,8 @@ main :: proc() {
 	check("CPYFM",      .CPYFM,    0, 0x19400400, 0xFFE03C00)
 	check("CPYFE",      .CPYFE,    0, 0x19800400, 0xFFE03C00)
 	check("SETP",       .SETP,     0, 0x19C00400, 0xFFE03C00)
-	check("SETM",       .SETM,     0, 0x19C04400, 0xFFE03C00)
-	check("SETE",       .SETE,     0, 0x19C08400, 0xFFE03C00)
+	check("SETM",       .SETM,     0, 0x19C04400, 0xFFE07C00)
+	check("SETE",       .SETE,     0, 0x19C08400, 0xFFE0BC00)
 
 	// ---- Cache management ---------------------------------------------------
 	check("DC IVAC",    .DC_IVAC,    0, 0xD5087620, 0xFFFFFFE0)
@@ -330,7 +330,7 @@ main :: proc() {
 	check("SME_LD1Q_TILE", .LD1Q, 0, 0xE1C00000, 0xFFE00010)
 	check("SME_ST1B_TILE", .ST1B, 3, 0xE0200000, 0xFFE00010)
 	check("SME_ST1W_TILE", .ST1W, 3, 0xE0A00000, 0xFFE00010)
-	check("SME_MOVA_Z_FROM_TILE", .MOVA, 0, 0xC0020000, 0xFFE08010)
+	check("SME_MOVA_Z_FROM_TILE", .MOVA, 0, 0xC0020000, 0xFFE28010)
 	check("SME_MOVA_TILE_FROM_Z", .MOVA, 1, 0xC0000000, 0xFFE08010)
 
 	// ---- NEON FCMLA / FCADD (v8.3-A FCMA) -- verified vs LLVM golden -----
@@ -338,7 +338,7 @@ main :: proc() {
 	check("FCMLA_8H", .FCMLA, 1, 0x6E40C400, 0xFFE0CC00)
 	check("FCMLA_4S", .FCMLA, 2, 0x6E80C400, 0xFFE0CC00)
 	check("FCMLA_2D", .FCMLA, 3, 0x6EC0C400, 0xFFE0CC00)
-	check("FCADD_4H", .FCADD, 0, 0x2E40E400, 0xFFA0EC00)
+	check("FCADD_4H", .FCADD, 0, 0x2E40E400, 0xFFE0EC00)
 	check("FCADD_4S", .FCADD, 2, 0x6E80E400, 0xFFA0EC00)
 
 	// ---- SVE prefetch ----------------------------------------------------
@@ -457,13 +457,13 @@ main :: proc() {
 	check("BFMINNM",      .BFMINNM,      0, 0x65058000, 0xFFFFE000)
 
 	// ---- SME2 multi-vector ----------------------------------------------
-	check("SME2 LUTI2.B", .LUTI2, 0, 0xC08C4000, 0xFFE0F000)
-	check("SME2 LUTI4.B", .LUTI4, 0, 0xC08A4000, 0xFFE0F000)
+	check("SME2 LUTI2.B", .LUTI2, 0, 0xC08C4000, 0xFFFE7C00)
+	check("SME2 LUTI4.B", .LUTI4, 0, 0xC08A4000, 0xFFFE7C00)
 	check("SME2 LD1B x2", .LD1B, 4, 0xA0000000, 0xFFE0E000)
 	check("SME2 LD1W x4", .LD1W, 5, 0xA000C000, 0xFFE0E000)
 	check("SME2 ST1D x2", .ST1D, 3, 0xA0206000, 0xFFE0E000)
 	check("SME2 ZIP_4",   .ZIP,   1, 0xC136E000, 0xFFFFFC00)
-	check("SME2 UZP_3",   .UZP,   0, 0xC120D001, 0xFFE0FC00)
+	check("SME2 UZP_3",   .UZP,   0, 0xC120D001, 0xFFE0FC01)
 
 	// ---- RME (Realm Management Extension) -------------------------------
 	check("TLBI RPALOS",  .TLBI_RPALOS,  0, 0xD5084EE0, 0xFFFFFFE0)

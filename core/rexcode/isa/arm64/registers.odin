@@ -35,6 +35,7 @@ REG_Q    :: 0x0A00   // Q0..Q31 (quad view)
 REG_Z    :: 0x0B00   // Z0..Z31 SVE scalable vector (low 128 aliased with V)
 REG_P    :: 0x0C00   // P0..P15 SVE predicate
 REG_PN   :: 0x0D00   // PN8..PN15 SME2 predicate-as-counter
+REG_ZT   :: 0x0E00   // ZT0, the SME2 lookup table
 
 NONE :: Register(0xFFFF)
 
@@ -52,6 +53,9 @@ PN8  :: Register(REG_PN |  8); PN9  :: Register(REG_PN |  9)
 PN10 :: Register(REG_PN | 10); PN11 :: Register(REG_PN | 11)
 PN12 :: Register(REG_PN | 12); PN13 :: Register(REG_PN | 13)
 PN14 :: Register(REG_PN | 14); PN15 :: Register(REG_PN | 15)
+
+// SME2's lookup table. There is exactly one, so it takes no bits.
+ZT0 :: Register(REG_ZT | 0)
 
 // -----------------------------------------------------------------------------
 // 64-bit GPRs (X0..X30, XZR, SP)

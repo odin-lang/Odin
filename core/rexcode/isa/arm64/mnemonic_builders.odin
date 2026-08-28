@@ -1269,8 +1269,8 @@ inst_eretaa_none              :: #force_inline proc "contextless" () -> Instruct
 emit_eretaa_none              :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_eretaa_none()) }
 inst_eretab_none              :: #force_inline proc "contextless" () -> Instruction { return inst_none(.ERETAB) }
 emit_eretab_none              :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_eretab_none()) }
-inst_bti_i                    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return Instruction{mnemonic = .BTI, operand_count = 1, length = 4, ops = {op_imm(imm, 1), {}, {}, {}}} }
-emit_bti_i                    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_bti_i(imm)) }
+inst_bti_none                 :: #force_inline proc "contextless" () -> Instruction { return inst_none(.BTI) }
+emit_bti_none                 :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_bti_none()) }
 inst_irg_r_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return inst_r_r_r(.IRG, dst, src, src2) }
 emit_irg_r_r_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_irg_r_r_r(dst, src, src2)) }
 inst_addg_r_r_i_i             :: #force_inline proc "contextless" (dst: Register, src: Register, imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .ADDG, operand_count = 4, length = 4, ops = {op_reg(dst), op_reg(src), op_imm(imm, 1), op_imm(imm2, 1)}} }
@@ -4109,10 +4109,18 @@ inst_bfmaxnm_zh_p_zh_zh       :: #force_inline proc "contextless" (rz: u8, rz2: 
 emit_bfmaxnm_zh_p_zh_zh       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfmaxnm_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
 inst_bfminnm_zh_p_zh_zh       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, rz4: u8) -> Instruction { return Instruction{mnemonic = .BFMINNM, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(Register(REG_P | (u16(rz2) & 0xF))), op_z_h(rz3), op_z_h(rz4)}} }
 emit_bfminnm_zh_p_zh_zh       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, rz4: u8) { append(instructions, inst_bfminnm_zh_p_zh_zh(rz, rz2, rz3, rz4)) }
-inst_luti2_zpb_zpb_zb_i       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI2, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 1)}} }
-emit_luti2_zpb_zpb_zb_i       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_luti2_zpb_zpb_zb_i(rz, rz2, rz3, imm)) }
-inst_luti4_zpb_zpb_zb_i       :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI4, operand_count = 4, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), op_imm(imm, 1)}} }
-emit_luti4_zpb_zpb_zb_i       :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8, imm: i64) { append(instructions, inst_luti4_zpb_zpb_zb_i(rz, rz2, rz3, imm)) }
+inst_luti2_zpb_zt_z_i         :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI2, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(ZT0), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_lane_index(imm)}} }
+inst_luti2_zph_zt_z_i         :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI2, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(ZT0), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_lane_index(imm)}} }
+inst_luti2_zps_zt_z_i         :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI2, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(ZT0), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_lane_index(imm)}} }
+emit_luti2_zpb_zt_z_i         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_luti2_zpb_zt_z_i(rz, rz2, imm)) }
+emit_luti2_zph_zt_z_i         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_luti2_zph_zt_z_i(rz, rz2, imm)) }
+emit_luti2_zps_zt_z_i         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_luti2_zps_zt_z_i(rz, rz2, imm)) }
+inst_luti4_zpb_zt_z_i         :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI4, operand_count = 4, length = 4, ops = {op_z_b(rz), op_reg(ZT0), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_lane_index(imm)}} }
+inst_luti4_zph_zt_z_i         :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI4, operand_count = 4, length = 4, ops = {op_z_h(rz), op_reg(ZT0), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_lane_index(imm)}} }
+inst_luti4_zps_zt_z_i         :: #force_inline proc "contextless" (rz: u8, rz2: u8, imm: i64) -> Instruction { return Instruction{mnemonic = .LUTI4, operand_count = 4, length = 4, ops = {op_z_s(rz), op_reg(ZT0), op_reg(Register(REG_Z | (u16(rz2) & 0x1F))), op_lane_index(imm)}} }
+emit_luti4_zpb_zt_z_i         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_luti4_zpb_zt_z_i(rz, rz2, imm)) }
+emit_luti4_zph_zt_z_i         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_luti4_zph_zt_z_i(rz, rz2, imm)) }
+emit_luti4_zps_zt_z_i         :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, imm: i64) { append(instructions, inst_luti4_zps_zt_z_i(rz, rz2, imm)) }
 inst_zip_zpb_zb_zb            :: #force_inline proc "contextless" (rz: u8, rz2: u8, rz3: u8) -> Instruction { return Instruction{mnemonic = .ZIP, operand_count = 3, length = 4, ops = {op_z_b(rz), op_z_b(rz2), op_z_b(rz3), {}}} }
 inst_zip_zqb_zqb              :: #force_inline proc "contextless" (rz: u8, rz2: u8) -> Instruction { return Instruction{mnemonic = .ZIP, operand_count = 2, length = 4, ops = {op_z_b(rz), op_z_b(rz2), {}, {}}} }
 emit_zip_zpb_zb_zb            :: #force_inline proc(instructions: ^[dynamic]Instruction, rz: u8, rz2: u8, rz3: u8) { append(instructions, inst_zip_zpb_zb_zb(rz, rz2, rz3)) }
@@ -4854,8 +4862,8 @@ inst_eretaa                        :: inst_eretaa_none
 emit_eretaa                        :: emit_eretaa_none
 inst_eretab                        :: inst_eretab_none
 emit_eretab                        :: emit_eretab_none
-inst_bti                           :: inst_bti_i
-emit_bti                           :: emit_bti_i
+inst_bti                           :: inst_bti_none
+emit_bti                           :: emit_bti_none
 inst_irg                           :: inst_irg_r_r_r
 emit_irg                           :: emit_irg_r_r_r
 inst_addg                          :: inst_addg_r_r_i_i
@@ -5768,10 +5776,10 @@ inst_bfmaxnm                       :: inst_bfmaxnm_zh_p_zh_zh
 emit_bfmaxnm                       :: emit_bfmaxnm_zh_p_zh_zh
 inst_bfminnm                       :: inst_bfminnm_zh_p_zh_zh
 emit_bfminnm                       :: emit_bfminnm_zh_p_zh_zh
-inst_luti2                         :: inst_luti2_zpb_zpb_zb_i
-emit_luti2                         :: emit_luti2_zpb_zpb_zb_i
-inst_luti4                         :: inst_luti4_zpb_zpb_zb_i
-emit_luti4                         :: emit_luti4_zpb_zpb_zb_i
+inst_luti2                         :: inst_luti2_zpb_zt_z_i
+emit_luti2                         :: emit_luti2_zpb_zt_z_i
+inst_luti4                         :: inst_luti4_zpb_zt_z_i
+emit_luti4                         :: emit_luti4_zpb_zt_z_i
 inst_zip                           :: proc{ inst_zip_zpb_zb_zb, inst_zip_zqb_zqb }
 emit_zip                           :: proc{ emit_zip_zpb_zb_zb, emit_zip_zqb_zqb }
 inst_uzp                           :: proc{ inst_uzp_zpb_zb_zb, inst_uzp_zqb_zqb }

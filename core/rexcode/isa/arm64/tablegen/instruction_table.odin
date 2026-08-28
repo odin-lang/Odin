@@ -340,10 +340,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.CLZ,            {.V_8H,    .V_8H,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6E604800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.CLZ,            {.V_2S,    .V_2S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EA04800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.CLZ,            {.V_4S,    .V_4S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EA04800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
-		{{.CLZ,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0419A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CLZ,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0459A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CLZ,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0499A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CLZ,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D9A000, 0xFFE0E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
+		{{.CLZ,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0419A000, 0xFFF9E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CLZ,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0459A000, 0xFFF9E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CLZ,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0499A000, 0xFFF9E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CLZ,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D9A000, 0xFFF9E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
 	},
 	.CLS = {
 		{{.CLS,            {.W_REG,   .W_REG,       .NONE,    .NONE}, {.RD, .RN, .NONE, .NONE}, 0x5AC01400, 0xFFFFFC00, .BASE, {}},                                           {written={0}, read={1}}},
@@ -354,10 +354,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.CLS,            {.V_8H,    .V_8H,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E604800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.CLS,            {.V_2S,    .V_2S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA04800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.CLS,            {.V_4S,    .V_4S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA04800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
-		{{.CLS,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0418A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CLS,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0458A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CLS,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0498A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CLS,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D8A000, 0xFFE0E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
+		{{.CLS,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0418A000, 0xFFF8E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CLS,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0458A000, 0xFFF8E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CLS,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0498A000, 0xFFF8E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CLS,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D8A000, 0xFFF8E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
 	},
 	.RBIT = {
 		{{.RBIT,           {.W_REG, .W_REG, .NONE, .NONE}, {.RD, .RN, .NONE, .NONE}, 0x5AC00000, 0xFFFFFC00, .BASE, {}},                                                      {written={0}, read={1}}},
@@ -663,16 +663,16 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.STLRH,          {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x489FFC00, 0xFFFFFC00, .BASE, {}},                                      {read={0, 1}, writes_mem=true, side_effects={.FENCE}}},
 	},
 	.LDXR = {
-		{{.LDXR,           {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x885F7C00, 0xFFE0FC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
-		{{.LDXR,           {.X_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0xC85F7C00, 0xFFE0FC00, .BASE, {is_64=true}},                            {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
+		{{.LDXR,           {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x885F7C00, 0xFFFFFC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
+		{{.LDXR,           {.X_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0xC85F7C00, 0xFFFFFC00, .BASE, {is_64=true}},                            {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
 	},
 	.STXR = {
 		{{.STXR,           {.W_REG, .W_REG, .MEM_OFFSET, .NONE}, {.RD, .RT, .OFFSET_BASE_A, .NONE}, 0x88007C00, 0xFFE0FC00, .BASE, {}},                                       {written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
 		{{.STXR,           {.W_REG, .X_REG, .MEM_OFFSET, .NONE}, {.RD, .RT, .OFFSET_BASE_A, .NONE}, 0xC8007C00, 0xFFE0FC00, .BASE, {is_64=true}},                             {written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
 	},
 	.LDAXR = {
-		{{.LDAXR,          {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x885FFC00, 0xFFE0FC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
-		{{.LDAXR,          {.X_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0xC85FFC00, 0xFFE0FC00, .BASE, {is_64=true}},                            {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
+		{{.LDAXR,          {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x885FFC00, 0xFFFFFC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
+		{{.LDAXR,          {.X_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0xC85FFC00, 0xFFFFFC00, .BASE, {is_64=true}},                            {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
 	},
 	.STLXR = {
 		{{.STLXR,          {.W_REG, .W_REG, .MEM_OFFSET, .NONE}, {.RD, .RT, .OFFSET_BASE_A, .NONE}, 0x8800FC00, 0xFFE0FC00, .BASE, {}},                                       {written={0}, read={1, 2}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
@@ -759,9 +759,9 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.FABS,           {.V_2D,      .V_2D,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EE0F800, 0xFFFFFC00, .NEON, {}},                                         {written={0}, read={1}}},
 		{{.FABS,           {.V_4H_FP16, .V_4H_FP16,   .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EF8F800, 0xFFFFFC00, .FP16, {}},                                         {written={0}, read={1}}},
 		{{.FABS,           {.V_8H_FP16, .V_8H_FP16,   .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EF8F800, 0xFFFFFC00, .FP16, {}},                                         {written={0}, read={1}}},
-		{{.FABS,           {.Z_REG_H,   .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x045CA000, 0xFFE0E000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
-		{{.FABS,           {.Z_REG_S,   .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x049CA000, 0xFFE0E000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
-		{{.FABS,           {.Z_REG_D,   .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04DCA000, 0xFFE0E000, .SVE,  {is_64=true}},                               {written={0}, read={1, 2}}},
+		{{.FABS,           {.Z_REG_H,   .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x045CA000, 0xFFFCE000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
+		{{.FABS,           {.Z_REG_S,   .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x049CA000, 0xFFFCE000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
+		{{.FABS,           {.Z_REG_D,   .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04DCA000, 0xFFFCE000, .SVE,  {is_64=true}},                               {written={0}, read={1, 2}}},
 	},
 	.FNEG = {
 		{{.FNEG,           {.S_REG,     .S_REG,       .NONE,    .NONE}, {.RD, .RN, .NONE, .NONE}, 0x1E214000, 0xFFFFFC00, .FP,   {}},                                         {written={0}, read={1}}},
@@ -772,9 +772,9 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.FNEG,           {.V_2D,      .V_2D,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EE0F800, 0xFFFFFC00, .NEON, {}},                                         {written={0}, read={1}}},
 		{{.FNEG,           {.V_4H_FP16, .V_4H_FP16,   .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EF8F800, 0xFFFFFC00, .FP16, {}},                                         {written={0}, read={1}}},
 		{{.FNEG,           {.V_8H_FP16, .V_8H_FP16,   .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EF8F800, 0xFFFFFC00, .FP16, {}},                                         {written={0}, read={1}}},
-		{{.FNEG,           {.Z_REG_H,   .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x045DA000, 0xFFE0E000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
-		{{.FNEG,           {.Z_REG_S,   .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x049DA000, 0xFFE0E000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
-		{{.FNEG,           {.Z_REG_D,   .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04DDA000, 0xFFE0E000, .SVE,  {is_64=true}},                               {written={0}, read={1, 2}}},
+		{{.FNEG,           {.Z_REG_H,   .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x045DA000, 0xFFFDE000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
+		{{.FNEG,           {.Z_REG_S,   .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x049DA000, 0xFFFDE000, .SVE,  {}},                                         {written={0}, read={1, 2}}},
+		{{.FNEG,           {.Z_REG_D,   .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04DDA000, 0xFFFDE000, .SVE,  {is_64=true}},                               {written={0}, read={1, 2}}},
 	},
 	.FSQRT = {
 		{{.FSQRT,          {.S_REG,     .S_REG,       .NONE,    .NONE}, {.RD, .RN, .NONE, .NONE}, 0x1E21C000, 0xFFFFFC00, .FP,   {}},                                         {written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
@@ -785,9 +785,9 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.FSQRT,          {.V_2D,      .V_2D,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EE1F800, 0xFFFFFC00, .NEON, {}},                                         {written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
 		{{.FSQRT,          {.V_4H_FP16, .V_4H_FP16,   .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EF9F800, 0xFFFFFC00, .FP16, {}},                                         {written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
 		{{.FSQRT,          {.V_8H_FP16, .V_8H_FP16,   .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EF9F800, 0xFFFFFC00, .FP16, {}},                                         {written={0}, read={1}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
-		{{.FSQRT,          {.Z_REG_H,   .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x654DA000, 0xFFE0E000, .SVE,  {}},                                         {written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
-		{{.FSQRT,          {.Z_REG_S,   .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x658DA000, 0xFFE0E000, .SVE,  {}},                                         {written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
-		{{.FSQRT,          {.Z_REG_D,   .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x65CDA000, 0xFFE0E000, .SVE,  {is_64=true}},                               {written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
+		{{.FSQRT,          {.Z_REG_H,   .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x654DA000, 0xFFEDE000, .SVE,  {}},                                         {written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
+		{{.FSQRT,          {.Z_REG_S,   .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x658DA000, 0xFFEDE000, .SVE,  {}},                                         {written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
+		{{.FSQRT,          {.Z_REG_D,   .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x65CDA000, 0xFFEDE000, .SVE,  {is_64=true}},                               {written={0}, read={1, 2}, fpsr_wr={.IOC, .IXC, .IDC}, reads_fpcr=true}},
 	},
 	.FADD = {
 		{{.FADD,           {.S_REG,   .S_REG,       .S_REG,   .NONE},    {.RD, .RN, .RM, .NONE}, 0x1E202800, 0xFFE0FC00, .FP,   {}},                                          {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
@@ -1253,25 +1253,25 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.STLXP,          {.W_REG, .X_REG, .X_REG, .MEM_OFFSET}, {.RD, .RT, .RT2, .OFFSET_BASE_A}, 0xC8208000, 0xFFE08000, .BASE, {is_64=true}},                             {written={0}, read={1, 2, 3}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
 	},
 	.LDXRB = {
-		{{.LDXRB,          {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x085F7C00, 0xFFE0FC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
+		{{.LDXRB,          {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x085F7C00, 0xFFFFFC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
 	},
 	.STXRB = {
 		{{.STXRB,          {.W_REG, .W_REG, .MEM_OFFSET, .NONE}, {.RD, .RT, .OFFSET_BASE_A, .NONE}, 0x08007C00, 0xFFE0FC00, .BASE, {}},                                       {written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
 	},
 	.LDAXRB = {
-		{{.LDAXRB,         {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x085FFC00, 0xFFE0FC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
+		{{.LDAXRB,         {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x085FFC00, 0xFFFFFC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
 	},
 	.STLXRB = {
 		{{.STLXRB,         {.W_REG, .W_REG, .MEM_OFFSET, .NONE}, {.RD, .RT, .OFFSET_BASE_A, .NONE}, 0x0800FC00, 0xFFE0FC00, .BASE, {}},                                       {written={0}, read={1, 2}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
 	},
 	.LDXRH = {
-		{{.LDXRH,          {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x485F7C00, 0xFFE0FC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
+		{{.LDXRH,          {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x485F7C00, 0xFFFFFC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
 	},
 	.STXRH = {
 		{{.STXRH,          {.W_REG, .W_REG, .MEM_OFFSET, .NONE}, {.RD, .RT, .OFFSET_BASE_A, .NONE}, 0x48007C00, 0xFFE0FC00, .BASE, {}},                                       {written={0}, read={1, 2}, writes_mem=true, side_effects={.ATOMIC, .RESERVATION}}},
 	},
 	.LDAXRH = {
-		{{.LDAXRH,         {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x485FFC00, 0xFFE0FC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
+		{{.LDAXRH,         {.W_REG, .MEM_OFFSET, .NONE, .NONE}, {.RT, .OFFSET_BASE_A, .NONE, .NONE}, 0x485FFC00, 0xFFFFFC00, .BASE, {}},                                      {written={0}, read={1}, reads_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
 	},
 	.STLXRH = {
 		{{.STLXRH,         {.W_REG, .W_REG, .MEM_OFFSET, .NONE}, {.RD, .RT, .OFFSET_BASE_A, .NONE}, 0x4800FC00, 0xFFE0FC00, .BASE, {}},                                       {written={0}, read={1, 2}, writes_mem=true, side_effects={.FENCE, .ATOMIC, .RESERVATION}}},
@@ -1607,7 +1607,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.ERETAB,         {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xD69F0FFF, 0xFFFFFFFF, .PAC, {branch=true, writes_pc=true}},                          {side_effects={.CONTROL, .PAC, .PRIVILEGED}}},
 	},
 	.BTI = {
-		{{.BTI,            {.IMM_2, .NONE, .NONE, .NONE}, {.HINT_FIELD, .NONE, .NONE, .NONE}, 0xD503241F, 0xFFFFF8FF, .BTI, {}},                                              {side_effects={.BTI}}},
+		{{.BTI,            {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xD503241F, 0xFFFFFFFF, .BTI, {}},                                              {side_effects={.BTI}}},
 	},
 	.IRG = {
 		{{.IRG,            {.XSP_REG, .XSP_REG, .X_REG, .NONE}, {.RD, .RN, .RM, .NONE}, 0x9AC01000, 0xFFE0FC00, .MTE, {is_64=true}},                                          {written={0}, read={1, 2}}},
@@ -1841,10 +1841,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.NEG,            {.V_2S,    .V_2S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x2EA0B800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.NEG,            {.V_4S,    .V_4S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EA0B800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.NEG,            {.V_2D,    .V_2D,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x6EE0B800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
-		{{.NEG,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0417A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.NEG,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0457A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.NEG,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0497A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.NEG,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D7A000, 0xFFE0E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
+		{{.NEG,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0417A000, 0xFFF7E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.NEG,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0457A000, 0xFFF7E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.NEG,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0497A000, 0xFFF7E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.NEG,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D7A000, 0xFFF7E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
 		{{.NEG,            {.W_REG,   .W_SHIFTED,   .NONE,    .NONE}, {.RD, .RM, .NONE, .NONE}, 0x4B0003E0, 0xFF2003E0, .BASE, {}},                                           {written={0}, read={1}}},
 		{{.NEG,            {.X_REG,   .X_SHIFTED,   .NONE,    .NONE}, {.RD, .RM, .NONE, .NONE}, 0xCB0003E0, 0xFF2003E0, .BASE, {is_64=true}},                                 {written={0}, read={1}}},
 	},
@@ -1856,10 +1856,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.ABS,            {.V_2S,    .V_2S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA0B800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.ABS,            {.V_4S,    .V_4S,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA0B800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.ABS,            {.V_2D,    .V_2D,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EE0B800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
-		{{.ABS,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0416A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.ABS,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0456A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.ABS,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0496A000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.ABS,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D6A000, 0xFFE0E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
+		{{.ABS,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0416A000, 0xFFF6E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.ABS,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0456A000, 0xFFF6E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.ABS,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x0496A000, 0xFFF6E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.ABS,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04D6A000, 0xFFF6E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
 	},
 	.SHADD = {
 		{{.SHADD,          {.V_8B,  .V_8B,  .V_8B,  .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E200400, 0xFFE0FC00, .NEON, {}},                                                       {written={0}, read={1, 2}}},
@@ -3160,10 +3160,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	.CNT = {
 		{{.CNT,            {.V_8B,    .V_8B,        .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0E205800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
 		{{.CNT,            {.V_16B,   .V_16B,       .NONE,    .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4E205800, 0xFFFFFC00, .NEON, {}},                                           {written={0}, read={1}}},
-		{{.CNT,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x041AA000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CNT,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x045AA000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CNT,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x049AA000, 0xFFE0E000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
-		{{.CNT,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04DAA000, 0xFFE0E000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
+		{{.CNT,            {.Z_REG_B, .P_REG_MERGE, .Z_REG_B, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x041AA000, 0xFFFAE000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CNT,            {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x045AA000, 0xFFFAE000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CNT,            {.Z_REG_S, .P_REG_MERGE, .Z_REG_S, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x049AA000, 0xFFFAE000, .SVE,  {}},                                           {written={0}, read={1, 2}}},
+		{{.CNT,            {.Z_REG_D, .P_REG_MERGE, .Z_REG_D, .NONE}, {.VD, .PG, .VN,   .NONE}, 0x04DAA000, 0xFFFAE000, .SVE,  {is_64=true}},                                 {written={0}, read={1, 2}}},
 	},
 	.URECPE = {
 		{{.URECPE,         {.V_2S, .V_2S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA1C800, 0xFFFFFC00, .NEON, {}},                                                        {written={0}, read={1}}},
@@ -3478,27 +3478,27 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.LD1B,           {.Z_QUAD_B,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0008000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LD1H = {
-		{{.LD1H,           {.Z_REG_H,     .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA4A04000, 0xFFE0E000, .SVE, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1H,           {.Z_REG_H,     .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xA4A04000, 0xFFE0E000, .SVE, {}},           {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1H,           {.Z_REG_S,     .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0x84804000, 0xFFA0E000, .SVE, {}},           {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1H,           {.Z_REG_D,     .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xC4804000, 0xFFA0E000, .SVE, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1H,           {.SME_SLICE_H, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_H,   .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE0400000, 0xFFE00010, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1H,           {.Z_PAIR_H,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0002000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1H,           {.Z_QUAD_H,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA000A000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1H,           {.SME_SLICE_H, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_H,   .PG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xE0400000, 0xFFE00010, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1H,           {.Z_PAIR_H,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xA0002000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1H,           {.Z_QUAD_H,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xA000A000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LD1W = {
-		{{.LD1W,           {.Z_REG_S,     .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA5404000, 0xFFE0E000, .SVE, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1W,           {.Z_REG_S,     .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xA5404000, 0xFFE0E000, .SVE, {}},           {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1W,           {.Z_REG_S,     .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0x85004000, 0xFFA0E000, .SVE, {}},           {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1W,           {.Z_REG_D,     .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xC5004000, 0xFFA0E000, .SVE, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1W,           {.SME_SLICE_W, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_W,   .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE0800000, 0xFFE00010, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1W,           {.Z_PAIR_S,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0004000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1W,           {.Z_QUAD_S,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA000C000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1W,           {.SME_SLICE_W, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_W,   .PG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xE0800000, 0xFFE00010, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1W,           {.Z_PAIR_S,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xA0004000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1W,           {.Z_QUAD_S,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xA000C000, 0xFFE0E000, .SME, {}},           {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LD1D = {
-		{{.LD1D,           {.Z_REG_D,     .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA5E04000, 0xFFE0E000, .SVE, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1D,           {.Z_REG_D,     .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xA5E04000, 0xFFE0E000, .SVE, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1D,           {.Z_REG_D,     .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xC5804000, 0xFFA0E000, .SVE, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1D,           {.SME_SLICE_D, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_D,   .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE0C00000, 0xFFE00010, .SME, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1D,           {.Z_PAIR_D,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0006000, 0xFFE0E000, .SME, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
-		{{.LD1D,           {.Z_QUAD_D,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA000E000, 0xFFE0E000, .SME, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1D,           {.SME_SLICE_D, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_D,   .PG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xE0C00000, 0xFFE00010, .SME, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1D,           {.Z_PAIR_D,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xA0006000, 0xFFE0E000, .SME, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1D,           {.Z_QUAD_D,      .PN_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xA000E000, 0xFFE0E000, .SME, {is_64=true}}, {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LD1SB = {
 		{{.LD1SB,          {.Z_REG_H, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA5C04000, 0xFFE0E000, .SVE, {}},                          {written={0}, read={1, 2}, reads_mem=true}},
@@ -3506,12 +3506,13 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.LD1SB,          {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xC4000000, 0xFFA0E000, .SVE, {is_64=true}},                {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LD1SH = {
-		{{.LD1SH,          {.Z_REG_S, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA5004000, 0xFFE0E000, .SVE, {}},                          {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1SH,          {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xA5004000, 0xFFE0E000, .SVE, {}},                          {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1SH,          {.Z_REG_S, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xA5204000, 0xFFE0E000, .SVE, {}},                          {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1SH,          {.Z_REG_S, .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0x84800000, 0xFFA0E000, .SVE, {}},                          {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1SH,          {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xC4800000, 0xFFA0E000, .SVE, {is_64=true}},                {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LD1SW = {
-		{{.LD1SW,          {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA4804000, 0xFFE0E000, .SVE, {is_64=true}},                {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LD1SW,          {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_SS,  .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xA4804000, 0xFFE0E000, .SVE, {is_64=true}},                {written={0}, read={1, 2}, reads_mem=true}},
 		{{.LD1SW,          {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_VEC, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xC5000000, 0xFFA0E000, .SVE, {is_64=true}},                {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.ST1B = {
@@ -3523,39 +3524,39 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.ST1B,           {.Z_QUAD_B,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0208000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
 	},
 	.ST1H = {
-		{{.ST1H,           {.Z_REG_H,     .P_REG, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE4A04000, 0xFFE0E000, .SVE, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1H,           {.Z_REG_H,     .P_REG, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xE4A04000, 0xFFE0E000, .SVE, {}},                {read={0, 1, 2}, writes_mem=true}},
 		{{.ST1H,           {.Z_REG_S,     .P_REG, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xE4808000, 0xFFA0E000, .SVE, {}},                {read={0, 1, 2}, writes_mem=true}},
 		{{.ST1H,           {.Z_REG_D,     .P_REG, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xE4808000, 0xFFA0E000, .SVE, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1H,           {.SME_SLICE_H, .P_REG, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_H,   .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE0600000, 0xFFE00010, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1H,           {.Z_PAIR_H,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0202000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1H,           {.Z_QUAD_H,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA020A000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1H,           {.SME_SLICE_H, .P_REG, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_H,   .PG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xE0600000, 0xFFE00010, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1H,           {.Z_PAIR_H,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xA0202000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1H,           {.Z_QUAD_H,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS1,  .NONE}, 0xA020A000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
 	},
 	.ST1W = {
-		{{.ST1W,           {.Z_REG_S,     .P_REG, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE5404000, 0xFFE0E000, .SVE, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1W,           {.Z_REG_S,     .P_REG, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xE5404000, 0xFFE0E000, .SVE, {}},                {read={0, 1, 2}, writes_mem=true}},
 		{{.ST1W,           {.Z_REG_S,     .P_REG, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xE5008000, 0xFFA0E000, .SVE, {}},                {read={0, 1, 2}, writes_mem=true}},
 		{{.ST1W,           {.Z_REG_D,     .P_REG, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xE5008000, 0xFFA0E000, .SVE, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1W,           {.SME_SLICE_W, .P_REG, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_W,   .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE0A00000, 0xFFE00010, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1W,           {.Z_PAIR_S,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0204000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1W,           {.Z_QUAD_S,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA020C000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1W,           {.SME_SLICE_W, .P_REG, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_W,   .PG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xE0A00000, 0xFFE00010, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1W,           {.Z_PAIR_S,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xA0204000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1W,           {.Z_QUAD_S,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS2,  .NONE}, 0xA020C000, 0xFFE0E000, .SME, {}},                {read={0, 1, 2}, writes_mem=true}},
 	},
 	.ST1D = {
-		{{.ST1D,           {.Z_REG_D,     .P_REG, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE5C04000, 0xFFE0E000, .SVE, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1D,           {.Z_REG_D,     .P_REG, .MEM_SVE_SS,  .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xE5E04000, 0xFFE0E000, .SVE, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
 		{{.ST1D,           {.Z_REG_D,     .P_REG, .MEM_SVE_VEC, .NONE}, {.VD_LIST1,            .PG, .SVE_OFFSET_BASE_VEC, .NONE}, 0xE5808000, 0xFFA0E000, .SVE, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1D,           {.SME_SLICE_D, .P_REG, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_D,   .PG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xE0E00000, 0xFFE00010, .SME, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1D,           {.Z_PAIR_D,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA0206000, 0xFFE0E000, .SME, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
-		{{.ST1D,           {.Z_QUAD_D,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS,  .NONE}, 0xA020E000, 0xFFE0E000, .SME, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1D,           {.SME_SLICE_D, .P_REG, .MEM_SVE_SS,  .NONE}, {.SME_SLICE_D,   .PG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xE0E00000, 0xFFE00010, .SME, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1D,           {.Z_PAIR_D,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_PAIR_VD, .PNG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xA0206000, 0xFFE0E000, .SME, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
+		{{.ST1D,           {.Z_QUAD_D,      .PN_REG, .MEM_SVE_SS,  .NONE}, {.ENC_Z_QUAD_VD, .PNG, .SVE_OFFSET_BASE_SS3,  .NONE}, 0xA020E000, 0xFFE0E000, .SME, {is_64=true}},      {read={0, 1, 2}, writes_mem=true}},
 	},
 	.LDFF1B = {
 		{{.LDFF1B,         {.Z_REG_B, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA4006000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}}},
 	},
 	.LDFF1H = {
-		{{.LDFF1H,         {.Z_REG_H, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA4A06000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}}},
+		{{.LDFF1H,         {.Z_REG_H, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS1, .NONE}, 0xA4A06000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}}},
 	},
 	.LDFF1W = {
-		{{.LDFF1W,         {.Z_REG_S, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA5406000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}}},
+		{{.LDFF1W,         {.Z_REG_S, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS2, .NONE}, 0xA5406000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}}},
 	},
 	.LDFF1D = {
-		{{.LDFF1D,         {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA5E06000, 0xFFE0E000, .SVE, {is_64=true}},                  {written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}}},
+		{{.LDFF1D,         {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS3, .NONE}, 0xA5E06000, 0xFFE0E000, .SVE, {is_64=true}},                  {written={0}, read={1, 2}, reads_mem=true, side_effects={.FFR}}},
 	},
 	.WHILEGE = {
 		{{.WHILEGE,        {.P_REG, .X_REG, .X_REG, .NONE}, {.PD, .RN, .RM, .NONE}, 0x25201000, 0xFF20FC10, .SVE2, {sets_flags=true, is_64=true}},                            {written={0}, read={1, 2}, nzcv_wr={.N, .Z, .C, .V}}},
@@ -3686,7 +3687,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.ST1Q,           {.SME_SLICE_Q, .P_REG, .MEM_SVE_SS, .NONE}, {.SME_SLICE_Q, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE1E00000, 0xFFE00010, .SME, {}},                    {read={0, 1, 2}, writes_mem=true}},
 	},
 	.MOVA = {
-		{{.MOVA,           {.Z_REG_B,     .P_REG_MERGE, .SME_SLICE_B, .NONE}, {.VD,          .PG, .SME_SLICE_B, .NONE}, 0xC0020000, 0xFFE08010, .SME, {}},                    {written={0}, read={1, 2}}},
+		{{.MOVA,           {.Z_REG_B,     .P_REG_MERGE, .SME_SLICE_B, .NONE}, {.VD,          .PG, .SME_SLICE_B, .NONE}, 0xC0020000, 0xFFE28010, .SME, {}},                    {written={0}, read={1, 2}}},
 		{{.MOVA,           {.SME_SLICE_B, .P_REG_MERGE, .Z_REG_B,     .NONE}, {.SME_SLICE_B, .PG, .VN,          .NONE}, 0xC0000000, 0xFFE08010, .SME, {}},                    {written={0}, read={1, 2}}},
 	},
 	.FCMLA = {
@@ -3696,46 +3697,46 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.FCMLA,          {.V_2D, .V_2D, .V_2D, .IMM_2}, {.VD, .VN, .VM, .ENC_FCMLA_ROT}, 0x6EC0C400, 0xFFE0CC00, .NEON, {}},                                                {written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
 	},
 	.FCADD = {
-		{{.FCADD,          {.V_4H, .V_4H, .V_4H, .IMM_2}, {.VD, .VN, .VM, .ENC_FCADD_ROT}, 0x2E40E400, 0xFFA0EC00, .NEON, {}},                                                {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
-		{{.FCADD,          {.V_8H, .V_8H, .V_8H, .IMM_2}, {.VD, .VN, .VM, .ENC_FCADD_ROT}, 0x6E40E400, 0xFFA0EC00, .NEON, {}},                                                {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
+		{{.FCADD,          {.V_4H, .V_4H, .V_4H, .IMM_2}, {.VD, .VN, .VM, .ENC_FCADD_ROT}, 0x2E40E400, 0xFFE0EC00, .NEON, {}},                                                {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
+		{{.FCADD,          {.V_8H, .V_8H, .V_8H, .IMM_2}, {.VD, .VN, .VM, .ENC_FCADD_ROT}, 0x6E40E400, 0xFFE0EC00, .NEON, {}},                                                {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
 		{{.FCADD,          {.V_4S, .V_4S, .V_4S, .IMM_2}, {.VD, .VN, .VM, .ENC_FCADD_ROT}, 0x6E80E400, 0xFFA0EC00, .NEON, {}},                                                {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
-		{{.FCADD,          {.V_2D, .V_2D, .V_2D, .IMM_2}, {.VD, .VN, .VM, .ENC_FCADD_ROT}, 0x6EC0E400, 0xFFA0EC00, .NEON, {}},                                                {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
+		{{.FCADD,          {.V_2D, .V_2D, .V_2D, .IMM_2}, {.VD, .VN, .VM, .ENC_FCADD_ROT}, 0x6EC0E400, 0xFFE0EC00, .NEON, {}},                                                {written={0}, read={1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
 	},
 	.PRFB = {
 		{{.PRFB,           {.IMM_4, .P_REG_GOV, .MEM_SVE_SS, .NONE}, {.ENC_SVE_PRFOP, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0x8400C000, 0xFFE0E000, .SVE, {}},                    {read={1, 2}, side_effects={.HINT}}},
 	},
 	.PRFH = {
-		{{.PRFH,           {.IMM_4, .P_REG_GOV, .MEM_SVE_SS, .NONE}, {.ENC_SVE_PRFOP, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0x8480C000, 0xFFE0E000, .SVE, {}},                    {read={1, 2}, side_effects={.HINT}}},
+		{{.PRFH,           {.IMM_4, .P_REG_GOV, .MEM_SVE_SS, .NONE}, {.ENC_SVE_PRFOP, .PG, .SVE_OFFSET_BASE_SS1, .NONE}, 0x8480C000, 0xFFE0E000, .SVE, {}},                    {read={1, 2}, side_effects={.HINT}}},
 	},
 	.PRFW = {
-		{{.PRFW,           {.IMM_4, .P_REG_GOV, .MEM_SVE_SS, .NONE}, {.ENC_SVE_PRFOP, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0x8500C000, 0xFFE0E000, .SVE, {}},                    {read={1, 2}, side_effects={.HINT}}},
+		{{.PRFW,           {.IMM_4, .P_REG_GOV, .MEM_SVE_SS, .NONE}, {.ENC_SVE_PRFOP, .PG, .SVE_OFFSET_BASE_SS2, .NONE}, 0x8500C000, 0xFFE0E000, .SVE, {}},                    {read={1, 2}, side_effects={.HINT}}},
 	},
 	.PRFD = {
-		{{.PRFD,           {.IMM_4, .P_REG_GOV, .MEM_SVE_SS, .NONE}, {.ENC_SVE_PRFOP, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0x8580C000, 0xFFE0E000, .SVE, {}},                    {read={1, 2}, side_effects={.HINT}}},
+		{{.PRFD,           {.IMM_4, .P_REG_GOV, .MEM_SVE_SS, .NONE}, {.ENC_SVE_PRFOP, .PG, .SVE_OFFSET_BASE_SS3, .NONE}, 0x8580C000, 0xFFE0E000, .SVE, {}},                    {read={1, 2}, side_effects={.HINT}}},
 	},
 	.LDNT1B = {
 		{{.LDNT1B,         {.Z_REG_B, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA400C000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LDNT1H = {
-		{{.LDNT1H,         {.Z_REG_H, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA480C000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LDNT1H,         {.Z_REG_H, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS1, .NONE}, 0xA480C000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LDNT1W = {
-		{{.LDNT1W,         {.Z_REG_S, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA500C000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LDNT1W,         {.Z_REG_S, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS2, .NONE}, 0xA500C000, 0xFFE0E000, .SVE, {}},                            {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.LDNT1D = {
-		{{.LDNT1D,         {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xA580C000, 0xFFE0E000, .SVE, {is_64=true}},                  {written={0}, read={1, 2}, reads_mem=true}},
+		{{.LDNT1D,         {.Z_REG_D, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS3, .NONE}, 0xA580C000, 0xFFE0E000, .SVE, {is_64=true}},                  {written={0}, read={1, 2}, reads_mem=true}},
 	},
 	.STNT1B = {
 		{{.STNT1B,         {.Z_REG_B, .P_REG, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE4006000, 0xFFE0E000, .SVE, {}},                                 {read={0, 1, 2}, writes_mem=true}},
 	},
 	.STNT1H = {
-		{{.STNT1H,         {.Z_REG_H, .P_REG, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE4806000, 0xFFE0E000, .SVE, {}},                                 {read={0, 1, 2}, writes_mem=true}},
+		{{.STNT1H,         {.Z_REG_H, .P_REG, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS1, .NONE}, 0xE4806000, 0xFFE0E000, .SVE, {}},                                 {read={0, 1, 2}, writes_mem=true}},
 	},
 	.STNT1W = {
-		{{.STNT1W,         {.Z_REG_S, .P_REG, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE5006000, 0xFFE0E000, .SVE, {}},                                 {read={0, 1, 2}, writes_mem=true}},
+		{{.STNT1W,         {.Z_REG_S, .P_REG, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS2, .NONE}, 0xE5006000, 0xFFE0E000, .SVE, {}},                                 {read={0, 1, 2}, writes_mem=true}},
 	},
 	.STNT1D = {
-		{{.STNT1D,         {.Z_REG_D, .P_REG, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE5806000, 0xFFE0E000, .SVE, {is_64=true}},                       {read={0, 1, 2}, writes_mem=true}},
+		{{.STNT1D,         {.Z_REG_D, .P_REG, .MEM_SVE_SS, .NONE}, {.VD_LIST1, .PG, .SVE_OFFSET_BASE_SS3, .NONE}, 0xE5806000, 0xFFE0E000, .SVE, {is_64=true}},                       {read={0, 1, 2}, writes_mem=true}},
 	},
 	.SPLICE = {
 		{{.SPLICE,         {.Z_REG_B, .P_REG_GOV, .Z_REG_B, .Z_REG_B}, {.VD, .PG, .VD, .VN}, 0x052C8000, 0xFFFFE000, .SVE, {}},                                               {written={0}, read={1, 2, 3}}},
@@ -3966,18 +3967,22 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.BFMINNM,        {.Z_REG_H, .P_REG_MERGE, .Z_REG_H, .Z_REG_H}, {.VD, .PG, .VD, .VN}, 0x65058000, 0xFFFFE000, .SVE2, {}},                                            {written={0}, read={1, 2, 3}}},
 	},
 	.LUTI2 = {
-		{{.LUTI2,          {.Z_PAIR_B, .Z_PAIR_B, .Z_REG_B, .IMM_3}, {.ENC_Z_PAIR_VD, .ENC_Z_PAIR_VN, .VM, .IMM12}, 0xC08C4000, 0xFFE0F000, .SME, {}},                            {written={0}, read={1}}},
+		{{.LUTI2,         {.Z_PAIR_B, .ZT_REG, .Z_REG_ANY, .VEC_INDEX}, {.ENC_Z_PAIR_VD, .ENC_ZT0, .VN, .LUTI_IDX}, 0xC08C4000, 0xFFFE7C00, .SME, {}}, {written={0}, read={2}}},
+		{{.LUTI2,         {.Z_PAIR_H, .ZT_REG, .Z_REG_ANY, .VEC_INDEX}, {.ENC_Z_PAIR_VD, .ENC_ZT0, .VN, .LUTI_IDX}, 0xC08C5000, 0xFFFE7C00, .SME, {}}, {written={0}, read={2}}},
+		{{.LUTI2,         {.Z_PAIR_S, .ZT_REG, .Z_REG_ANY, .VEC_INDEX}, {.ENC_Z_PAIR_VD, .ENC_ZT0, .VN, .LUTI_IDX}, 0xC08C6000, 0xFFFE7C00, .SME, {}}, {written={0}, read={2}}},
 	},
 	.LUTI4 = {
-		{{.LUTI4,          {.Z_PAIR_B, .Z_PAIR_B, .Z_REG_B, .IMM_2}, {.ENC_Z_PAIR_VD, .ENC_Z_PAIR_VN, .VM, .IMM12}, 0xC08A4000, 0xFFE0F000, .SME, {}},                            {written={0}, read={1}}},
+		{{.LUTI4,         {.Z_PAIR_B, .ZT_REG, .Z_REG_ANY, .VEC_INDEX}, {.ENC_Z_PAIR_VD, .ENC_ZT0, .VN, .LUTI_IDX}, 0xC08A4000, 0xFFFE7C00, .SME, {}}, {written={0}, read={2}}},
+		{{.LUTI4,         {.Z_PAIR_H, .ZT_REG, .Z_REG_ANY, .VEC_INDEX}, {.ENC_Z_PAIR_VD, .ENC_ZT0, .VN, .LUTI_IDX}, 0xC08A5000, 0xFFFE7C00, .SME, {}}, {written={0}, read={2}}},
+		{{.LUTI4,         {.Z_PAIR_S, .ZT_REG, .Z_REG_ANY, .VEC_INDEX}, {.ENC_Z_PAIR_VD, .ENC_ZT0, .VN, .LUTI_IDX}, 0xC08A6000, 0xFFFE7C00, .SME, {}}, {written={0}, read={2}}},
 	},
 	.ZIP = {
 		{{.ZIP,            {.Z_PAIR_B, .Z_REG_B, .Z_REG_B, .NONE}, {.ENC_Z_PAIR_VD, .VN,            .VM,   .NONE}, 0xC120D000, 0xFFE0FC00, .SME, {}},                           {written={0}, read={1, 2}}},
 		{{.ZIP,            {.Z_QUAD_B, .Z_QUAD_B,  .NONE,    .NONE}, {.ENC_Z_QUAD_VD, .ENC_Z_QUAD_VN, .NONE, .NONE}, 0xC136E000, 0xFFFFFC00, .SME, {}},                           {written={0}, read={1, 2}}},
 	},
 	.UZP = {
-		{{.UZP,            {.Z_PAIR_B, .Z_REG_B, .Z_REG_B, .NONE}, {.ENC_Z_PAIR_VD, .VN,            .VM,   .NONE}, 0xC120D001, 0xFFE0FC00, .SME, {}},                           {written={0}, read={1, 2}}},
-		{{.UZP,            {.Z_QUAD_B, .Z_QUAD_B,  .NONE,    .NONE}, {.ENC_Z_QUAD_VD, .ENC_Z_QUAD_VN, .NONE, .NONE}, 0xC136E002, 0xFFFFFC00, .SME, {}},                           {written={0}, read={1, 2}}},
+		{{.UZP,            {.Z_PAIR_B, .Z_REG_B, .Z_REG_B, .NONE}, {.ENC_Z_PAIR_VD, .VN,            .VM,   .NONE}, 0xC120D001, 0xFFE0FC01, .SME, {}},                           {written={0}, read={1, 2}}},
+		{{.UZP,            {.Z_QUAD_B, .Z_QUAD_B,  .NONE,    .NONE}, {.ENC_Z_QUAD_VD, .ENC_Z_QUAD_VN, .NONE, .NONE}, 0xC136E002, 0xFFFFFC02, .SME, {}},                           {written={0}, read={1, 2}}},
 	},
 	.TLBI_RPALOS = {
 		{{.TLBI_RPALOS,    {.X_REG, .NONE, .NONE, .NONE}, {.RT, .NONE, .NONE, .NONE}, 0xD5084EE0, 0xFFFFFFE0, .BASE, {is_64=true}},                                           {read={0}, side_effects={.PRIVILEGED}}},
@@ -4094,10 +4099,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.SETP,           {.XSP_REG, .X_REG, .X_REG, .NONE}, {.RD, .RN, .RM, .NONE}, 0x19C00400, 0xFFE03C00, .BASE, {is_64=true}},                                           {written={0, 1}, read={0, 1, 2}, writes_mem=true}},
 	},
 	.SETM = {
-		{{.SETM,           {.XSP_REG, .X_REG, .X_REG, .NONE}, {.RD, .RN, .RM, .NONE}, 0x19C04400, 0xFFE03C00, .BASE, {is_64=true}},                                           {written={0, 1}, read={0, 1, 2}, writes_mem=true}},
+		{{.SETM,           {.XSP_REG, .X_REG, .X_REG, .NONE}, {.RD, .RN, .RM, .NONE}, 0x19C04400, 0xFFE07C00, .BASE, {is_64=true}},                                           {written={0, 1}, read={0, 1, 2}, writes_mem=true}},
 	},
 	.SETE = {
-		{{.SETE,           {.XSP_REG, .X_REG, .X_REG, .NONE}, {.RD, .RN, .RM, .NONE}, 0x19C08400, 0xFFE03C00, .BASE, {is_64=true}},                                           {written={0, 1}, read={0, 1, 2}, writes_mem=true}},
+		{{.SETE,           {.XSP_REG, .X_REG, .X_REG, .NONE}, {.RD, .RN, .RM, .NONE}, 0x19C08400, 0xFFE0BC00, .BASE, {is_64=true}},                                           {written={0, 1}, read={0, 1, 2}, writes_mem=true}},
 	},
 	.DC_IVAC = {
 		{{.DC_IVAC,        {.X_REG, .NONE, .NONE, .NONE}, {.RT, .NONE, .NONE, .NONE}, 0xD5087620, 0xFFFFFFE0, .BASE, {is_64=true}},                                           {read={0}, side_effects={.CACHE, .PRIVILEGED}}},
