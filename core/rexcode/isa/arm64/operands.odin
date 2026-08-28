@@ -181,7 +181,13 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 }
 
 // -----------------------------------------------------------------------------
-// NEON V-register arrangement builders -- op.size encodes lanes*elem-bytes:
+// NEON V-register arrangement builders. These take the register the caller
+// actually has, not its number: rebuilding one from `reg_hw` would relabel an
+// X register as a V register, and the matcher -- which checks reg_class --
+// would never get to reject it. Passing a non-V register here now simply
+// matches no form, and encode reports it.
+//
+// op.size encodes lanes*elem-bytes:
 //   .8B  = 8     .16B = 16
 //   .4H  = 24    .8H  = 32
 //   .2S  = 40    .4S  = 48
@@ -191,36 +197,36 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 // -----------------------------------------------------------------------------
 
 @(require_results)
-op_v_8b  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 8}
+op_v_8b  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 8}
 }
 @(require_results)
-op_v_16b :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 16}
+op_v_16b :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 16}
 }
 @(require_results)
-op_v_4h  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 24}
+op_v_4h  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 24}
 }
 @(require_results)
-op_v_8h  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 32}
+op_v_8h  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 32}
 }
 @(require_results)
-op_v_2s  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 40}
+op_v_2s  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 40}
 }
 @(require_results)
-op_v_4s  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 48}
+op_v_4s  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 48}
 }
 @(require_results)
-op_v_1d  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 56}
+op_v_1d  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 56}
 }
 @(require_results)
-op_v_2d  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 64}
+op_v_2d  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 64}
 }
 
 // Element-indexed V views (V0.B[i]/.H[i]/.S[i]/.D[i]). The element size rides
@@ -232,20 +238,20 @@ op_v_2d  :: #force_inline proc "contextless" (n: u8) -> Operand {
 // which made an element-D view indistinguishable from an 8B arrangement --
 // the printer cannot tell `.d` from `.8b` if both are size 8.
 @(require_results)
-op_v_elem_b :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 1}
+op_v_elem_b :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 1}
 }
 @(require_results)
-op_v_elem_h :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 3}
+op_v_elem_h :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 3}
 }
 @(require_results)
-op_v_elem_s :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 5}
+op_v_elem_s :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 5}
 }
 @(require_results)
-op_v_elem_d :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 7}
+op_v_elem_d :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 7}
 }
 
 // -----------------------------------------------------------------------------

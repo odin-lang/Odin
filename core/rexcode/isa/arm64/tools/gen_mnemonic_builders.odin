@@ -173,6 +173,25 @@ operand_imm_size :: proc(t: a.Operand_Type) -> u8 {
 // Odin-type dedup: two forms producing the same name also produce the same
 // proc signature (which Odin forbids twice in one overload group).
 operand_suffix :: proc(t: a.Operand_Type) -> string {
+	// A NEON arrangement is not recoverable from a Register, so it has to live
+	// in the name: without this every arrangement of a mnemonic collapses onto
+	// one builder and only the first is reachable. FP16 variants share a token
+	// with their non-FP16 twin because they build an identical operand -- the
+	// encoder tells those two apart by the form, not the operand.
+	#partial switch t {
+	case .V_8B:             return "v8b"
+	case .V_16B:            return "v16b"
+	case .V_4H, .V_4H_FP16: return "v4h"
+	case .V_8H, .V_8H_FP16: return "v8h"
+	case .V_2S:             return "v2s"
+	case .V_4S:             return "v4s"
+	case .V_1D:             return "v1d"
+	case .V_2D:             return "v2d"
+	case .V_ELEM_B:         return "veb"
+	case .V_ELEM_H:         return "veh"
+	case .V_ELEM_S:         return "ves"
+	case .V_ELEM_D:         return "ved"
+	}
 	switch operand_category(t) {
 	case .REG:      return "r"
 	case .ZREG:     return "z"
@@ -340,18 +359,18 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]st
 	#partial switch operand_category(t) {
 	case .REG:
 		#partial switch t {
-		case .V_8B:  fmt.sbprintf(sb, "op_v_8b(u8(reg_hw(%s)))",  names[0])
-		case .V_16B: fmt.sbprintf(sb, "op_v_16b(u8(reg_hw(%s)))", names[0])
-		case .V_4H, .V_4H_FP16: fmt.sbprintf(sb, "op_v_4h(u8(reg_hw(%s)))", names[0])
-		case .V_8H, .V_8H_FP16: fmt.sbprintf(sb, "op_v_8h(u8(reg_hw(%s)))", names[0])
-		case .V_2S:  fmt.sbprintf(sb, "op_v_2s(u8(reg_hw(%s)))",  names[0])
-		case .V_4S:  fmt.sbprintf(sb, "op_v_4s(u8(reg_hw(%s)))",  names[0])
-		case .V_1D:  fmt.sbprintf(sb, "op_v_1d(u8(reg_hw(%s)))",  names[0])
-		case .V_2D:  fmt.sbprintf(sb, "op_v_2d(u8(reg_hw(%s)))",  names[0])
-		case .V_ELEM_B: fmt.sbprintf(sb, "op_v_elem_b(u8(reg_hw(%s)))", names[0])
-		case .V_ELEM_H: fmt.sbprintf(sb, "op_v_elem_h(u8(reg_hw(%s)))", names[0])
-		case .V_ELEM_S: fmt.sbprintf(sb, "op_v_elem_s(u8(reg_hw(%s)))", names[0])
-		case .V_ELEM_D: fmt.sbprintf(sb, "op_v_elem_d(u8(reg_hw(%s)))", names[0])
+		case .V_8B:  fmt.sbprintf(sb, "op_v_8b(%s)",  names[0])
+		case .V_16B: fmt.sbprintf(sb, "op_v_16b(%s)", names[0])
+		case .V_4H, .V_4H_FP16: fmt.sbprintf(sb, "op_v_4h(%s)", names[0])
+		case .V_8H, .V_8H_FP16: fmt.sbprintf(sb, "op_v_8h(%s)", names[0])
+		case .V_2S:  fmt.sbprintf(sb, "op_v_2s(%s)",  names[0])
+		case .V_4S:  fmt.sbprintf(sb, "op_v_4s(%s)",  names[0])
+		case .V_1D:  fmt.sbprintf(sb, "op_v_1d(%s)",  names[0])
+		case .V_2D:  fmt.sbprintf(sb, "op_v_2d(%s)",  names[0])
+		case .V_ELEM_B: fmt.sbprintf(sb, "op_v_elem_b(%s)", names[0])
+		case .V_ELEM_H: fmt.sbprintf(sb, "op_v_elem_h(%s)", names[0])
+		case .V_ELEM_S: fmt.sbprintf(sb, "op_v_elem_s(%s)", names[0])
+		case .V_ELEM_D: fmt.sbprintf(sb, "op_v_elem_d(%s)", names[0])
 		case:        fmt.sbprintf(sb, "op_reg(%s)", names[0])
 		}
 	case .ZREG:

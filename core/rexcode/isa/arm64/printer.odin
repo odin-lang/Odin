@@ -138,6 +138,14 @@ sbprint :: proc(
 					write_operand(sb, &inst.ops[slot], &display, opts)
 				}
 			}
+			// CMLE/CMLT/FCMLE/FCMLT only ever compare against zero, and the
+			// zero is part of the syntax rather than an encoded operand -- an
+			// assembler will not take the instruction without it.
+			if inst.mnemonic == .CMLE || inst.mnemonic == .CMLT {
+				strings.write_string(sb, opts.space_after_comma ? ", #0" : ",#0")
+			} else if inst.mnemonic == .FCMLE || inst.mnemonic == .FCMLT {
+				strings.write_string(sb, opts.space_after_comma ? ", #0.0" : ",#0.0")
+			}
 		}
 		strings.write_string(sb, opts.separator)
 	}

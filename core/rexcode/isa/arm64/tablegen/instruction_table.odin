@@ -1794,7 +1794,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.BFMLALT,        {.V_4S, .V_8H, .V_8H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x6EC0FC00, 0xFFE0FC00, .BF16, {}},                                                          {written={0}, read={0, 1, 2}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
 	},
 	.BFCVTN = {
-		{{.BFCVTN,         {.V_8H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA16800, 0xFFFFFC00, .BF16, {}},                                                        {written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
+		{{.BFCVTN,         {.V_4H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x0EA16800, 0xFFFFFC00, .BF16, {}},                                                        {written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
 	},
 	.BFCVTN2 = {
 		{{.BFCVTN2,        {.V_8H, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0x4EA16800, 0xFFFFFC00, .BF16, {}},                                                        {written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},

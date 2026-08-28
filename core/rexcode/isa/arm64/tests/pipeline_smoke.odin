@@ -888,7 +888,7 @@ run_pipeline_tests :: proc() {
 		insts := []a.Instruction{
 			a.Instruction{
 				mnemonic = .FCMLA, operand_count = 4, length = 4,
-				ops = {a.op_v_4s(0), a.op_v_4s(1), a.op_v_4s(2), a.op_imm(0, 1)},
+				ops = {a.op_v_4s(a.V0), a.op_v_4s(a.V1), a.op_v_4s(a.V2), a.op_imm(0, 1)},
 			},
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)

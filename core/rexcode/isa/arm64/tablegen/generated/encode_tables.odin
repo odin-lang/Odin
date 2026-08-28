@@ -1364,7 +1364,7 @@ ENCODE_FORMS := [2496]lib.Encoding{
 	// .BFMLALT
 	{ .BFMLALT, {.V_4S,.V_8H,.V_8H,.NONE}, {.VD,.VN,.VM,.NONE}, 0x6EC0FC00, 0xFFE0FC00, .BF16, {explicit_count=3} },
 	// .BFCVTN
-	{ .BFCVTN, {.V_8H,.V_4S,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x0EA16800, 0xFFFFFC00, .BF16, {explicit_count=2} },
+	{ .BFCVTN, {.V_4H,.V_4S,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x0EA16800, 0xFFFFFC00, .BF16, {explicit_count=2} },
 	// .BFCVTN2
 	{ .BFCVTN2, {.V_8H,.V_4S,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x4EA16800, 0xFFFFFC00, .BF16, {explicit_count=2} },
 	// .MUL
