@@ -93,7 +93,7 @@ ENCODE_FORMS := [2546]lib.Encoding{
 	{ .ANDS, {.X_REG,.X_REG,.X_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0xEA000000, 0xFF200000, .BASE, {sets_flags=true, is_64=true, explicit_count=3} },
 	{ .ANDS, {.W_REG,.W_REG,.BITMASK_IMM,.NONE}, {.RD,.RN,.BITMASK_FIELD,.NONE}, 0x72000000, 0xFFC00000, .BASE, {sets_flags=true, explicit_count=3} },
 	{ .ANDS, {.X_REG,.X_REG,.BITMASK_IMM,.NONE}, {.RD,.RN,.BITMASK_FIELD,.NONE}, 0xF2000000, 0xFF800000, .BASE, {sets_flags=true, is_64=true, explicit_count=3} },
-	{ .ANDS, {.P_REG_H,.P_REG_ZERO,.P_REG_H,.P_REG_H}, {.PD,.PG4,.PN,.PM}, 0x25404000, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
+	{ .ANDS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25404000, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
 	// .ORR
 	{ .ORR, {.W_REG,.W_REG,.W_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0x2A000000, 0xFF200000, .BASE, {explicit_count=3} },
 	{ .ORR, {.X_REG,.X_REG,.X_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0xAA000000, 0xFF200000, .BASE, {is_64=true, explicit_count=3} },
@@ -104,7 +104,7 @@ ENCODE_FORMS := [2546]lib.Encoding{
 	{ .ORR, {.Z_REG_H,.P_REG_MERGE,.Z_REG_H,.Z_REG_H}, {.VD,.PG,.VD,.VN}, 0x04580000, 0xFFFFE000, .SVE, {explicit_count=4} },
 	{ .ORR, {.Z_REG_S,.P_REG_MERGE,.Z_REG_S,.Z_REG_S}, {.VD,.PG,.VD,.VN}, 0x04980000, 0xFFFFE000, .SVE, {explicit_count=4} },
 	{ .ORR, {.Z_REG_D,.P_REG_MERGE,.Z_REG_D,.Z_REG_D}, {.VD,.PG,.VD,.VN}, 0x04D80000, 0xFFFFE000, .SVE, {is_64=true, explicit_count=4} },
-	{ .ORR, {.P_REG_S,.P_REG_ZERO,.P_REG_S,.P_REG_S}, {.PD,.PG4,.PN,.PM}, 0x25804000, 0xFFE0C210, .SVE, {explicit_count=4} },
+	{ .ORR, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25804000, 0xFFE0C210, .SVE, {explicit_count=4} },
 	// .EOR
 	{ .EOR, {.W_REG,.W_REG,.W_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0x4A000000, 0xFF200000, .BASE, {explicit_count=3} },
 	{ .EOR, {.X_REG,.X_REG,.X_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0xCA000000, 0xFF200000, .BASE, {is_64=true, explicit_count=3} },
@@ -128,12 +128,12 @@ ENCODE_FORMS := [2546]lib.Encoding{
 	// .BICS
 	{ .BICS, {.W_REG,.W_REG,.W_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0x6A200000, 0xFF200000, .BASE, {sets_flags=true, explicit_count=3} },
 	{ .BICS, {.X_REG,.X_REG,.X_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0xEA200000, 0xFF200000, .BASE, {sets_flags=true, is_64=true, explicit_count=3} },
-	{ .BICS, {.P_REG_H,.P_REG_ZERO,.P_REG_H,.P_REG_H}, {.PD,.PG4,.PN,.PM}, 0x25404010, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
+	{ .BICS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25404010, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
 	// .ORN
 	{ .ORN, {.W_REG,.W_REG,.W_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0x2A200000, 0xFF200000, .BASE, {explicit_count=3} },
 	{ .ORN, {.X_REG,.X_REG,.X_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0xAA200000, 0xFF200000, .BASE, {is_64=true, explicit_count=3} },
 	{ .ORN, {.V_16B,.V_16B,.V_16B,.NONE}, {.VD,.VN,.VM,.NONE}, 0x4EE01C00, 0xFFE0FC00, .NEON, {explicit_count=3} },
-	{ .ORN, {.P_REG_S,.P_REG_ZERO,.P_REG_S,.P_REG_S}, {.PD,.PG4,.PN,.PM}, 0x25804010, 0xFFE0C210, .SVE, {explicit_count=4} },
+	{ .ORN, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25804010, 0xFFE0C210, .SVE, {explicit_count=4} },
 	// .EON
 	{ .EON, {.W_REG,.W_REG,.W_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0x4A200000, 0xFF200000, .BASE, {explicit_count=3} },
 	{ .EON, {.X_REG,.X_REG,.X_SHIFTED,.NONE}, {.RD,.RN,.RM,.NONE}, 0xCA200000, 0xFF200000, .BASE, {is_64=true, explicit_count=3} },
@@ -1288,16 +1288,16 @@ ENCODE_FORMS := [2546]lib.Encoding{
 	{ .CRC32CX, {.W_REG,.W_REG,.X_REG,.NONE}, {.RD,.RN,.RM,.NONE}, 0x9AC05C00, 0xFFE0FC00, .CRC32, {is_64=true, explicit_count=3} },
 	// .AESE
 	{ .AESE, {.V_16B,.V_16B,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x4E284800, 0xFFFFFC00, .CRYPTO, {explicit_count=2} },
-	{ .AESE, {.Z_REG_B,.Z_REG_B,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x4522E000, 0xFFFFFC00, .SVE2, {explicit_count=2} },
+	{ .AESE, {.Z_REG_B,.Z_REG_B,.Z_REG_B,.NONE}, {.VD,.VD,.VN,.NONE}, 0x4522E000, 0xFFFFFC00, .SVE2, {explicit_count=3} },
 	// .AESD
 	{ .AESD, {.V_16B,.V_16B,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x4E285800, 0xFFFFFC00, .CRYPTO, {explicit_count=2} },
-	{ .AESD, {.Z_REG_B,.Z_REG_B,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x4522E400, 0xFFFFFC00, .SVE2, {explicit_count=2} },
+	{ .AESD, {.Z_REG_B,.Z_REG_B,.Z_REG_B,.NONE}, {.VD,.VD,.VN,.NONE}, 0x4522E400, 0xFFFFFC00, .SVE2, {explicit_count=3} },
 	// .AESMC
 	{ .AESMC, {.V_16B,.V_16B,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x4E286800, 0xFFFFFC00, .CRYPTO, {explicit_count=2} },
-	{ .AESMC, {.Z_REG_B,.NONE,.NONE,.NONE}, {.VD,.NONE,.NONE,.NONE}, 0x4520E000, 0xFFFFFFE0, .SVE2, {explicit_count=1} },
+	{ .AESMC, {.Z_REG_B,.Z_REG_B,.NONE,.NONE}, {.VD,.VD,.NONE,.NONE}, 0x4520E000, 0xFFFFFFE0, .SVE2, {explicit_count=2} },
 	// .AESIMC
 	{ .AESIMC, {.V_16B,.V_16B,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x4E287800, 0xFFFFFC00, .CRYPTO, {explicit_count=2} },
-	{ .AESIMC, {.Z_REG_B,.NONE,.NONE,.NONE}, {.VD,.NONE,.NONE,.NONE}, 0x4520E400, 0xFFFFFFE0, .SVE2, {explicit_count=1} },
+	{ .AESIMC, {.Z_REG_B,.Z_REG_B,.NONE,.NONE}, {.VD,.VD,.NONE,.NONE}, 0x4520E400, 0xFFFFFFE0, .SVE2, {explicit_count=2} },
 	// .SHA1H
 	{ .SHA1H, {.S_REG,.S_REG,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE}, 0x5E280800, 0xFFFFFC00, .CRYPTO, {explicit_count=2} },
 	// .SHA1C
@@ -2424,7 +2424,7 @@ ENCODE_FORMS := [2546]lib.Encoding{
 	{ .MOV, {.Z_REG_S,.P_REG_MERGE,.Z_REG_S,.NONE}, {.ZD_ZM_DUP,.PG,.VN,.NONE}, 0x05A0C000, 0xFFE0E000, .SVE, {explicit_count=3} },
 	{ .MOV, {.Z_REG_D,.P_REG_MERGE,.Z_REG_D,.NONE}, {.ZD_ZM_DUP,.PG,.VN,.NONE}, 0x05E0C000, 0xFFE0E000, .SVE, {is_64=true, explicit_count=3} },
 	{ .MOV, {.P_REG_B,.P_REG_ZERO,.P_REG,.NONE}, {.PD,.PG4,.PN_PM_DUP,.NONE}, 0x25004000, 0xFFE0C210, .SVE, {explicit_count=3} },
-	{ .MOV, {.P_REG_S,.P_REG,.NONE,.NONE}, {.PD,.PN_PG_PM_DUP,.NONE,.NONE}, 0x25804000, 0xFFE0C210, .SVE, {explicit_count=2} },
+	{ .MOV, {.P_REG_B,.P_REG,.NONE,.NONE}, {.PD,.PN_PG_PM_DUP,.NONE,.NONE}, 0x25804000, 0xFFE0C210, .SVE, {explicit_count=2} },
 	{ .MOV, {.W_REG,.W_REG,.NONE,.NONE}, {.RD,.RM,.NONE,.NONE}, 0x2A0003E0, 0xFFE0FFE0, .BASE, {explicit_count=2} },
 	{ .MOV, {.X_REG,.X_REG,.NONE,.NONE}, {.RD,.RM,.NONE,.NONE}, 0xAA0003E0, 0xFFE0FFE0, .BASE, {is_64=true, explicit_count=2} },
 	{ .MOV, {.W_REG,.BITMASK_IMM,.NONE,.NONE}, {.RD,.BITMASK_FIELD,.NONE,.NONE}, 0x320003E0, 0xFFC003E0, .BASE, {explicit_count=2} },
@@ -2663,23 +2663,23 @@ ENCODE_FORMS := [2546]lib.Encoding{
 	{ .FNMLS, {.Z_REG_S,.P_REG_MERGE,.Z_REG_S,.Z_REG_S}, {.VD,.PG,.VN,.VM}, 0x65A06000, 0xFFE0E000, .SVE, {explicit_count=4} },
 	{ .FNMLS, {.Z_REG_D,.P_REG_MERGE,.Z_REG_D,.Z_REG_D}, {.VD,.PG,.VN,.VM}, 0x65E06000, 0xFFE0E000, .SVE, {is_64=true, explicit_count=4} },
 	// .NAND
-	{ .NAND, {.P_REG_S,.P_REG_ZERO,.P_REG_S,.P_REG_S}, {.PD,.PG4,.PN,.PM}, 0x25804210, 0xFFE0C210, .SVE, {explicit_count=4} },
+	{ .NAND, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25804210, 0xFFE0C210, .SVE, {explicit_count=4} },
 	// .NOR
-	{ .NOR, {.P_REG_S,.P_REG_ZERO,.P_REG_S,.P_REG_S}, {.PD,.PG4,.PN,.PM}, 0x25804200, 0xFFE0C210, .SVE, {explicit_count=4} },
+	{ .NOR, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25804200, 0xFFE0C210, .SVE, {explicit_count=4} },
 	// .SEL
 	{ .SEL, {.P_REG_B,.P_REG,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25004210, 0xFFE0C210, .SVE, {explicit_count=4} },
 	// .ORRS
-	{ .ORRS, {.P_REG_D,.P_REG_ZERO,.P_REG_D,.P_REG_D}, {.PD,.PG4,.PN,.PM}, 0x25C04000, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
+	{ .ORRS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25C04000, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
 	// .EORS
-	{ .EORS, {.P_REG_H,.P_REG_ZERO,.P_REG_H,.P_REG_H}, {.PD,.PG4,.PN,.PM}, 0x25404200, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
+	{ .EORS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25404200, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=4} },
 	// .NANDS
-	{ .NANDS, {.P_REG_D,.P_REG_ZERO,.P_REG_D,.P_REG_D}, {.PD,.PG4,.PN,.PM}, 0x25C04210, 0xFFF0C210, .SVE, {sets_flags=true, explicit_count=4} },
+	{ .NANDS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25C04210, 0xFFF0C210, .SVE, {sets_flags=true, explicit_count=4} },
 	// .NORS
-	{ .NORS, {.P_REG_D,.P_REG_ZERO,.P_REG_D,.P_REG_D}, {.PD,.PG4,.PN,.PM}, 0x25C04200, 0xFFF0C210, .SVE, {sets_flags=true, explicit_count=4} },
+	{ .NORS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25C04200, 0xFFF0C210, .SVE, {sets_flags=true, explicit_count=4} },
 	// .ORNS
-	{ .ORNS, {.P_REG_D,.P_REG_ZERO,.P_REG_D,.P_REG_D}, {.PD,.PG4,.PN,.PM}, 0x25C04010, 0xFFF0C210, .SVE, {sets_flags=true, explicit_count=4} },
+	{ .ORNS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x25C04010, 0xFFF0C210, .SVE, {sets_flags=true, explicit_count=4} },
 	// .MOVS
-	{ .MOVS, {.P_REG_H,.P_REG_ZERO,.P_REG,.NONE}, {.PD,.PG4,.PN_PM_DUP,.NONE}, 0x25404000, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=3} },
+	{ .MOVS, {.P_REG_B,.P_REG_ZERO,.P_REG,.NONE}, {.PD,.PG4,.PN_PM_DUP,.NONE}, 0x25404000, 0xFFE0C210, .SVE, {sets_flags=true, explicit_count=3} },
 	// .PTRUE
 	{ .PTRUE, {.P_REG_B,.SVE_PATTERN,.NONE,.NONE}, {.PD,.SVE_PATTERN,.NONE,.NONE}, 0x2518E000, 0xFFFFFC10, .SVE, {explicit_count=2} },
 	// .PTRUES
@@ -2687,17 +2687,17 @@ ENCODE_FORMS := [2546]lib.Encoding{
 	// .PFALSE
 	{ .PFALSE, {.P_REG_B,.NONE,.NONE,.NONE}, {.PD,.NONE,.NONE,.NONE}, 0x2518E400, 0xFFFFFFF0, .SVE, {explicit_count=1} },
 	// .PFIRST
-	{ .PFIRST, {.P_REG_H,.P_REG_H,.P_REG_H,.NONE}, {.PD,.PN,.PD,.NONE}, 0x2558C000, 0xFFFFFE10, .SVE, {explicit_count=3} },
+	{ .PFIRST, {.P_REG_B,.P_REG,.P_REG_B,.NONE}, {.PD,.PN,.PD,.NONE}, 0x2558C000, 0xFFFFFE10, .SVE, {explicit_count=3} },
 	// .PNEXT
-	{ .PNEXT, {.P_REG_B,.P_REG_B,.P_REG_B,.NONE}, {.PD,.PN,.PD,.NONE}, 0x2519C400, 0xFFFFFE10, .SVE, {explicit_count=3} },
+	{ .PNEXT, {.P_REG_B,.P_REG,.P_REG_B,.NONE}, {.PD,.PN,.PD,.NONE}, 0x2519C400, 0xFFFFFE10, .SVE, {explicit_count=3} },
 	// .BRKA
 	{ .BRKA, {.P_REG_B,.P_REG_MERGE,.P_REG_B,.NONE}, {.PD,.PG4,.PN,.NONE}, 0x25104010, 0xFFFFC210, .SVE, {explicit_count=3} },
 	// .BRKB
-	{ .BRKB, {.P_REG_S,.P_REG_MERGE,.P_REG_S,.NONE}, {.PD,.PG4,.PN,.NONE}, 0x25904010, 0xFFFFC210, .SVE, {explicit_count=3} },
+	{ .BRKB, {.P_REG_B,.P_REG_MERGE,.P_REG_B,.NONE}, {.PD,.PG4,.PN,.NONE}, 0x25904010, 0xFFFFC210, .SVE, {explicit_count=3} },
 	// .BRKAS
-	{ .BRKAS, {.P_REG_H,.P_REG_ZERO,.P_REG_H,.NONE}, {.PD,.PG4,.PN,.NONE}, 0x25504000, 0xFFFFC210, .SVE, {sets_flags=true, explicit_count=3} },
+	{ .BRKAS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.NONE}, {.PD,.PG4,.PN,.NONE}, 0x25504000, 0xFFFFC210, .SVE, {sets_flags=true, explicit_count=3} },
 	// .BRKBS
-	{ .BRKBS, {.P_REG_D,.P_REG_ZERO,.P_REG_D,.NONE}, {.PD,.PG4,.PN,.NONE}, 0x25D04000, 0xFFFFC210, .SVE, {sets_flags=true, explicit_count=3} },
+	{ .BRKBS, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.NONE}, {.PD,.PG4,.PN,.NONE}, 0x25D04000, 0xFFFFC210, .SVE, {sets_flags=true, explicit_count=3} },
 	// .BRKPA
 	{ .BRKPA, {.P_REG_B,.P_REG_ZERO,.P_REG_B,.P_REG_B}, {.PD,.PG4,.PN,.PM}, 0x2500C000, 0xFFF0C210, .SVE, {explicit_count=4} },
 	// .BRKPB
