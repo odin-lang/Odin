@@ -459,11 +459,11 @@ Operand_Encoding :: enum u8 {
 
 Encoding :: struct #packed {
 	mnemonic: Mnemonic,             // 2
-	ops:      [4]Operand_Type,      // 4
-	enc:      [4]Operand_Encoding,  // 4
+	ops:      [5]Operand_Type,      // 4
+	enc:      [5]Operand_Encoding,  // 4
 	bits:     u32,                  // 4 -- static field pattern
 	mask:     u32,                  // 4 -- which bits are static
 	feature:  Feature,              // 1
 	flags:    Encoding_Flags,       // 1
 }
-#assert(size_of(Encoding) == 20)
+#assert(size_of(Encoding) == 22)

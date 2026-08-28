@@ -28,12 +28,13 @@ Instruction_Flags :: bit_field u8 {
 // The spare bytes are free: they cost nothing over a 48-byte struct that
 // straddles, and new fields land in them without changing the layout.
 Instruction :: struct #align(64) {
-	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * size_of(Operand) = 44
+	ops:           [5]Operand `fmt:"v,operand_count"`, // 5 * size_of(Operand) = 55
 	mnemonic:      Mnemonic,                           // 2
 	operand_count: u8,                                 // 1
 	flags:         Instruction_Flags,                  // 1
 	length:        u8,                                 // 1 -- always 4
-	_:             [15]u8,
+	// 55 is odd, so mnemonic's alignment costs a byte here; 3 more reach 64.
+	_:             [3]u8,
 }
 #assert(size_of(Instruction)  == 64)
 #assert(align_of(Instruction) == 64)
@@ -52,70 +53,70 @@ inst_none :: #force_inline proc "contextless" (m: Mnemonic) -> Instruction {
 @(require_results)
 inst_r :: #force_inline proc "contextless" (m: Mnemonic, r: Register) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 4,
-					   ops = {op_reg(r), {}, {}, {}}}
+					   ops = {op_reg(r), {}, {}, {}, {}}}
 }
 
 // 2-register (e.g. CLZ, RBIT).
 @(require_results)
 inst_r_r :: #force_inline proc "contextless" (m: Mnemonic, rd, rn: Register) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 2, length = 4,
-					   ops = {op_reg(rd), op_reg(rn), {}, {}}}
+					   ops = {op_reg(rd), op_reg(rn), {}, {}, {}}}
 }
 
 // 3-register (e.g. ADD shifted, MUL, UDIV, ASRV).
 @(require_results)
 inst_r_r_r :: #force_inline proc "contextless" (m: Mnemonic, rd, rn, rm: Register) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 3, length = 4,
-					   ops = {op_reg(rd), op_reg(rn), op_reg(rm), {}}}
+					   ops = {op_reg(rd), op_reg(rn), op_reg(rm), {}, {}}}
 }
 
 // 4-register R4-type (MADD, MSUB, SMADDL, ...).
 @(require_results)
 inst_r_r_r_r :: #force_inline proc "contextless" (m: Mnemonic, rd, rn, rm, ra: Register) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 4, length = 4,
-					   ops = {op_reg(rd), op_reg(rn), op_reg(rm), op_reg(ra)}}
+					   ops = {op_reg(rd), op_reg(rn), op_reg(rm), op_reg(ra), {}}}
 }
 
 // 2-register + immediate (e.g. ADD imm).
 @(require_results)
 inst_r_r_i :: #force_inline proc "contextless" (m: Mnemonic, rd, rn: Register, imm: i64) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 3, length = 4,
-					   ops = {op_reg(rd), op_reg(rn), op_imm(imm), {}}}
+					   ops = {op_reg(rd), op_reg(rn), op_imm(imm), {}, {}}}
 }
 
 // 1-register + immediate (e.g. MOVZ).
 @(require_results)
 inst_r_i :: #force_inline proc "contextless" (m: Mnemonic, rd: Register, imm: i64) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 2, length = 4,
-					   ops = {op_reg(rd), op_imm(imm), {}, {}}}
+					   ops = {op_reg(rd), op_imm(imm), {}, {}, {}}}
 }
 
 // MOVZ/MOVN/MOVK with explicit hw shift (0/16/32/48).
 @(require_results)
 inst_mov_imm :: #force_inline proc "contextless" (m: Mnemonic, rd: Register, imm: i64, hw: u8) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 3, length = 4,
-					   ops = {op_reg(rd), op_imm(imm), op_imm(i64(hw), 1), {}}}
+					   ops = {op_reg(rd), op_imm(imm), op_imm(i64(hw), 1), {}, {}}}
 }
 
 // Load/store register: Rt + memory.
 @(require_results)
 inst_ldst :: #force_inline proc "contextless" (m: Mnemonic, rt: Register, mm: Memory) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 2, length = 4,
-					   ops = {op_reg(rt), op_mem(mm), {}, {}}}
+					   ops = {op_reg(rt), op_mem(mm), {}, {}, {}}}
 }
 
 // Load/store pair: Rt, Rt2, memory.
 @(require_results)
 inst_ldp_stp :: #force_inline proc "contextless" (m: Mnemonic, rt, rt2: Register, mm: Memory) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 3, length = 4,
-					   ops = {op_reg(rt), op_reg(rt2), op_mem(mm), {}}}
+					   ops = {op_reg(rt), op_reg(rt2), op_mem(mm), {}, {}}}
 }
 
 // PC-relative branch (B, BL).
 @(require_results)
 inst_branch :: #force_inline proc "contextless" (m: Mnemonic, label_id: u32) -> Instruction {
 	return Instruction{mnemonic = m, operand_count = 1, length = 4,
-					   ops = {op_label(label_id, 4), {}, {}, {}}}
+					   ops = {op_label(label_id, 4), {}, {}, {}, {}}}
 }
 
 // NOTE: the conditional branches, inst_cbz (+cbnz), inst_tbz (+tbnz) and

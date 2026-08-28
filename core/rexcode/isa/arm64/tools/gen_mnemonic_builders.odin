@@ -77,12 +77,12 @@ Operand_Category :: enum {
 }
 
 Operand_Signature :: struct {
-	types: [4]a.Operand_Type,
+	types: [5]a.Operand_Type,
 	// The encoding each operand uses. Needed because the operand TYPE is not
 	// always enough: .VEC_INDEX is a lane index under NEON_IDX*/NEON_LANE_*,
 	// which prints glued to its register, but EXT's byte index shares the type
 	// and prints as a plain `#3`.
-	encs:  [4]a.Operand_Encoding,
+	encs:  [5]a.Operand_Encoding,
 	count: int,
 }
 
@@ -305,7 +305,7 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 // included; only truly implicit operands (enc == .IMPL, which AArch64's tables
 // never actually use) carry no param.
 build_signature :: proc(form: a.Encoding) -> (sig: Operand_Signature, ok: bool) {
-	for i in 0..<4 {
+	for i in 0..<5 {
 		op := form.ops[i]
 		if op == .NONE { continue }
 
@@ -333,8 +333,8 @@ Param :: struct {
 // the shift/extend kind and amount. This is the single source of truth for
 // parameter names; param_list derives the typed declarations from it so the
 // declared params always match the expressions that reference them.
-operand_primary_names :: proc(sig: Operand_Signature) -> [4][3]string {
-	result: [4][3]string
+operand_primary_names :: proc(sig: Operand_Signature) -> [5][3]string {
+	result: [5][3]string
 	reg_count := 0
 	imm_count := 0
 	zp_count  := 0
@@ -620,7 +620,7 @@ write_inst_fallback :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 	defer delete(mstr)
 
 	fmt.sbprintf(sb, "Instruction{{mnemonic = .%s, operand_count = %d, length = 4, ops = {{", mstr, sig.count)
-	for i in 0..<4 {
+	for i in 0..<5 {
 		if i > 0 { strings.write_string(sb, ", ") }
 		if i < sig.count {
 			write_operand_expr(sb, sig.types[i], sig.encs[i], pnames[i])

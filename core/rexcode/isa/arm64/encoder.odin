@@ -145,6 +145,7 @@ encode_one_inline :: #force_inline proc(
 	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], form, pc, inst_idx, relocs, inst) }
 	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], form, pc, inst_idx, relocs, inst) }
 	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], form, pc, inst_idx, relocs, inst) }
+	if form.enc[4] != .NONE { word |= pack_operand_inline(&inst.ops[4], form.enc[4], form, pc, inst_idx, relocs, inst) }
 	return word, true
 }
 
@@ -155,7 +156,8 @@ encoding_matches_inline :: #force_inline proc "contextless" (
 	return  operand_matches_inline(&inst.ops[0], form.ops[0], form) &&
 			operand_matches_inline(&inst.ops[1], form.ops[1], form) &&
 			operand_matches_inline(&inst.ops[2], form.ops[2], form) &&
-			operand_matches_inline(&inst.ops[3], form.ops[3], form)
+			operand_matches_inline(&inst.ops[3], form.ops[3], form) &&
+			operand_matches_inline(&inst.ops[4], form.ops[4], form)
 }
 
 @(private="file")
@@ -721,17 +723,21 @@ pack_operand_inline :: #force_inline proc(
 
 	// SME ZA tile number fields (position depends on element size).
 	case .ZA_TILE_NUM_B:
-		// ZA0.B only -- nothing to encode (single tile of byte form).
-		return 0
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x0
 	case .ZA_TILE_NUM_H:
-		// ZA0.H..ZA1.H -- 1-bit tile number at bit 22.
-		return (u32(op.immediate) & 0x1) << 22
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x1
 	case .ZA_TILE_NUM_S:
-		// ZA0.S..ZA3.S -- 2-bit tile number at bits 23:22.
-		return (u32(op.immediate) & 0x3) << 22
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x3
 	case .ZA_TILE_NUM_D:
-		// ZA0.D..ZA7.D -- 3-bit tile number at bits 23:21.
-		return (u32(op.immediate) & 0x7) << 21
+		// The tile number sits in the low bits, as wide as the element
+		// size leaves room for.
+		return u32(reg_hw(op.reg)) & 0x7
 	case .SME_PATTERN_FIELD:
 		// 4-bit SME pattern/list at bits 8:5 (ZERO instruction list mask).
 		return (u32(op.immediate) & 0xF) << 5

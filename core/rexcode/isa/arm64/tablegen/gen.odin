@@ -44,8 +44,8 @@ PATH_LOADER :: #directory + "/../tables.odin"
 
 Entry :: struct {
 	mnemonic: lib.Mnemonic,
-	ops:      [4]lib.Operand_Type,
-	enc:      [4]lib.Operand_Encoding,
+	ops:      [5]lib.Operand_Type,
+	enc:      [5]lib.Operand_Encoding,
 	bits:     u32,
 	mask:     u32,
 	feature:  lib.Feature,
@@ -260,13 +260,13 @@ emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 // Shared row + flags formatting (compact, matching arm64's original generator)
 // -----------------------------------------------------------------------------
 
-write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [4]lib.Operand_Type,
-                  enc: [4]lib.Operand_Encoding, bits, mask: u32, feature: lib.Feature, flags: lib.Encoding_Flags) {
-	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, {{%s}} }},\n",
-		mn, ops[0], ops[1], ops[2], ops[3], enc[0], enc[1], enc[2], enc[3], bits, mask, feature, flags_lit(flags, ops))
+write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [5]lib.Operand_Type,
+                  enc: [5]lib.Operand_Encoding, bits, mask: u32, feature: lib.Feature, flags: lib.Encoding_Flags) {
+	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, {{%s}} }},\n",
+		mn, ops[0], ops[1], ops[2], ops[3], ops[4], enc[0], enc[1], enc[2], enc[3], enc[4], bits, mask, feature, flags_lit(flags, ops))
 }
 
-flags_lit :: proc(f: lib.Encoding_Flags, ops: [4]lib.Operand_Type) -> string {
+flags_lit :: proc(f: lib.Encoding_Flags, ops: [5]lib.Operand_Type) -> string {
 	parts: [dynamic]string
 	defer delete(parts)
 	if f.branch      { append(&parts, "branch=true")      }
@@ -321,14 +321,14 @@ Encode_Run :: struct {
 
 Decode_Entry :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [5]Operand_Type,     // 4
+	enc:      [5]Operand_Encoding, // 4
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
 	flags:    Encoding_Flags,      // 1
 }
-#assert(size_of(Decode_Entry) == 20)
+#assert(size_of(Decode_Entry) == 22)
 
 Decode_Index :: struct #packed {
 	start: u16,

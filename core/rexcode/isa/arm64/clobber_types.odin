@@ -1,6 +1,6 @@
 package rexcode_arm64
 
-Operand_Set :: distinct bit_set[0..<4; u8]
+Operand_Set :: distinct bit_set[0..<5; u8]
 
 NZCV_Flags :: distinct bit_set[NZCV_Flag; u8]
 NZCV_Flag :: enum u8 {

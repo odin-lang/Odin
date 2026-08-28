@@ -128,6 +128,10 @@ decode_one_inline :: #force_inline proc "contextless" (
 				if entry.ops[3] != .NONE {
 					inst.ops[3] = extract_operand_inline(word, pc, entry.ops[3], entry.enc[3])
 					cnt_used = 4
+					if entry.ops[4] != .NONE {
+						inst.ops[4] = extract_operand_inline(word, pc, entry.ops[4], entry.enc[4])
+						cnt_used = 5
+					}
 				}
 			}
 		}
@@ -572,16 +576,16 @@ extract_operand_inline :: #force_inline proc "contextless" (
 
 	// ---- SME ZA tile fields ----
 	case .ZA_TILE_NUM_B:
-		return Operand{reg = Register(REG_ZA | 0), kind = .REGISTER,
+		return Operand{reg = Register(REG_ZA | u16(word & 0x0)), kind = .REGISTER,
 		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_H:
-		return Operand{reg = Register(REG_ZA | u16((word >> 22) & 0x1)), kind = .REGISTER,
+		return Operand{reg = Register(REG_ZA | u16(word & 0x1)), kind = .REGISTER,
 		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_S:
-		return Operand{reg = Register(REG_ZA | u16((word >> 22) & 0x3)), kind = .REGISTER,
+		return Operand{reg = Register(REG_ZA | u16(word & 0x3)), kind = .REGISTER,
 		               size = za_elem_for_type(ot)}
 	case .ZA_TILE_NUM_D:
-		return Operand{reg = Register(REG_ZA | u16((word >> 21) & 0x7)), kind = .REGISTER,
+		return Operand{reg = Register(REG_ZA | u16(word & 0x7)), kind = .REGISTER,
 		               size = za_elem_for_type(ot)}
 	case .SME_PATTERN_FIELD:
 		return Operand{immediate = i64((word >> 5) & 0xF), kind = .IMMEDIATE, size = 1}
