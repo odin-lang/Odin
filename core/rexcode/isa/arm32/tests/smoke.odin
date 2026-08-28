@@ -188,11 +188,11 @@ run_smoke :: proc() {
 	check("VZIP.I8 D",       .VZIP, 0, 0xF3B20180, 0xFFB30FD0)
 	check("VTBL",            .VTBL, 0, 0xF3B00800, 0xFFB00F70)
 	check("VRECPE F32 D",    .VRECPE, 2, 0xF3BB0500, 0xFFBF0FD0)
-	check("VLD1 1-reg",      .VLD1, 0, 0xF4200700, 0xFFF00F00)
-	check("VST1 1-reg",      .VST1, 0, 0xF4000700, 0xFFF00F00)
-	check("VLD2 2-reg",      .VLD2, 0, 0xF4200800, 0xFFF00F00)
-	check("VLD3 3-reg",      .VLD3, 0, 0xF4200400, 0xFFF00F00)
-	check("VLD4 4-reg",      .VLD4, 0, 0xF4200000, 0xFFF00F00)
+	check("VLD1 1-reg",      .VLD1, 0, 0xF420070F, 0xFFF00F0F)
+	check("VST1 1-reg",      .VST1, 0, 0xF400070F, 0xFFF00F0F)
+	check("VLD2 2-reg",      .VLD2, 0, 0xF420080F, 0xFFF00F0F)
+	check("VLD3 3-reg",      .VLD3, 0, 0xF420040F, 0xFFF00F0F)
+	check("VLD4 4-reg",      .VLD4, 0, 0xF420000F, 0xFFF00F0F)
 	check("VMULL.S8",        .VMULL, 0, 0xF2800C00, 0xFFB00F50)
 
 	// ---- Thumb-2 ----
@@ -550,15 +550,15 @@ run_smoke :: proc() {
 	check("VLD4R",           .VLD4R, 0, 0xF4A00F0F, 0xFFB00F0F)
 
 	// ---- NEON single-element lane loads/stores ----
-	check("VLD1_LANE .8",    .VLD1_LANE, 0, 0xF4A00000, 0xFFB00C00)
-	check("VLD1_LANE .16",   .VLD1_LANE, 1, 0xF4A00400, 0xFFB00C00)
-	check("VLD1_LANE .32",   .VLD1_LANE, 2, 0xF4A00800, 0xFFB00C00)
-	check("VLD2_LANE .8",    .VLD2_LANE, 0, 0xF4A00100, 0xFFB00D00)
-	check("VLD3_LANE .16",   .VLD3_LANE, 1, 0xF4A00600, 0xFFB00D00)
-	check("VLD4_LANE .32",   .VLD4_LANE, 2, 0xF4A00B00, 0xFFB00D00)
-	check("VST1_LANE .8",    .VST1_LANE, 0, 0xF4800000, 0xFFB00C00)
-	check("VST3_LANE .32",   .VST3_LANE, 2, 0xF4800A00, 0xFFB00D00)
-	check("VST4_LANE .16",   .VST4_LANE, 1, 0xF4800700, 0xFFB00D00)
+	check("VLD1 lane .8",     .VLD1, 5, 0xF4A0000F, 0xFFB00F1F)
+	check("VLD1 lane .16",    .VLD1, 6, 0xF4A0040F, 0xFFB00F3F)
+	check("VLD1 lane .32",    .VLD1, 7, 0xF4A0080F, 0xFFB00F7F)
+	check("VLD2 lane .8",     .VLD2, 3, 0xF4A0010F, 0xFFB00F1F)
+	check("VLD3 lane .16",    .VLD3, 3, 0xF4A0060F, 0xFFB00F3F)
+	check("VLD4 lane .32",    .VLD4, 4, 0xF4A00B0F, 0xFFB00F7F)
+	check("VST1 lane .8",     .VST1, 4, 0xF480000F, 0xFFB00F1F)
+	check("VST3 lane .32",    .VST3, 4, 0xF4800A0F, 0xFFB00F7F)
+	check("VST4 lane .16",    .VST4, 3, 0xF480070F, 0xFFB00F3F)
 
 	// ---- MVE rounding-to-int (VPADD/VPMAX/VPMIN MVE forms removed - don't exist) ----
 	check("VRINTA MVE",      .VRINTA, 2, 0xFFBA0540, 0xFFBB0FD1)

@@ -737,14 +737,14 @@ inst_vmov_s_imm8           :: #force_inline proc "contextless" (dst: Register, i
 inst_vmov_r_r_d            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VMOV, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 inst_vmov_r_r_s_s          :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, src3: Register) -> Instruction { return Instruction{mnemonic = .VMOV, operand_count = 4, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_reg(src3)}} }
 inst_vmov_r_dlane          :: #force_inline proc "contextless" (dst: Register, src: Register, lane: u8) -> Instruction { return Instruction{mnemonic = .VMOV, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_dpr_lane(src, lane), {}, {}}} }
-inst_vmov_dlane_r          :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Register) -> Instruction { return Instruction{mnemonic = .VMOV, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_dpr_lane(dst, lane), op_reg(src), {}, {}}} }
+inst_vmov_qlane_r          :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Register) -> Instruction { return Instruction{mnemonic = .VMOV, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_qpr_lane(dst, lane), op_reg(src), {}, {}}} }
 inst_vmov_qlane_qlane_r_r  :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Register, lane2: u8, src2: Register, src3: Register) -> Instruction { return Instruction{mnemonic = .VMOV, operand_count = 4, mode = .T32, cond = 14, length = 4, ops = {op_qpr_lane(dst, lane), op_qpr_lane(src, lane2), op_reg(src2), op_reg(src3)}} }
 emit_vmov_s_s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vmov_s_s(dst, src)) }
 emit_vmov_s_imm8           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, imm: i64) { append(instructions, inst_vmov_s_imm8(dst, imm)) }
 emit_vmov_r_r_d            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vmov_r_r_d(dst, src, src2)) }
 emit_vmov_r_r_s_s          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, src3: Register) { append(instructions, inst_vmov_r_r_s_s(dst, src, src2, src3)) }
 emit_vmov_r_dlane          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, lane: u8) { append(instructions, inst_vmov_r_dlane(dst, src, lane)) }
-emit_vmov_dlane_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, lane: u8, src: Register) { append(instructions, inst_vmov_dlane_r(dst, lane, src)) }
+emit_vmov_qlane_r          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, lane: u8, src: Register) { append(instructions, inst_vmov_qlane_r(dst, lane, src)) }
 emit_vmov_qlane_qlane_r_r  :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, lane: u8, src: Register, lane2: u8, src2: Register, src3: Register) { append(instructions, inst_vmov_qlane_qlane_r_r(dst, lane, src, lane2, src2, src3)) }
 inst_vmrs_r                :: #force_inline proc "contextless" (dst: Register) -> Instruction { return Instruction{mnemonic = .VMRS, operand_count = 1, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), {}, {}, {}}} }
 emit_vmrs_r                :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register) { append(instructions, inst_vmrs_r(dst)) }
@@ -1000,8 +1000,6 @@ emit_vdup_d_r              :: #force_inline proc(instructions: ^[dynamic]Instruc
 emit_vdup_d_dlane          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, lane: u8) { append(instructions, inst_vdup_d_dlane(dst, src, lane)) }
 inst_vswp_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VSWP, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vswp_d_d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vswp_d_d(dst, src)) }
-inst_vmov_lane_dlane_r     :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Register) -> Instruction { return Instruction{mnemonic = .VMOV_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_dpr_lane(dst, lane), op_reg(src), {}, {}}} }
-emit_vmov_lane_dlane_r     :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, lane: u8, src: Register) { append(instructions, inst_vmov_lane_dlane_r(dst, lane, src)) }
 inst_vld1_dlist_mem        :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD1, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
 inst_vld1_dlane_mem        :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD1, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_dpr_lane(dst, lane), op_mem(src), {}, {}}} }
 emit_vld1_dlist_mem        :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld1_dlist_mem(regs, src)) }
@@ -1102,22 +1100,6 @@ inst_vld3r_dlist_mem       :: #force_inline proc "contextless" (regs: u16, src: 
 emit_vld3r_dlist_mem       :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld3r_dlist_mem(regs, src)) }
 inst_vld4r_dlist_mem       :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD4R, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
 emit_vld4r_dlist_mem       :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld4r_dlist_mem(regs, src)) }
-inst_vld1_lane_dlane_mem   :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD1_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_dpr_lane(dst, lane), op_mem(src), {}, {}}} }
-emit_vld1_lane_dlane_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, lane: u8, src: Memory) { append(instructions, inst_vld1_lane_dlane_mem(dst, lane, src)) }
-inst_vld2_lane_dlist_mem   :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD2_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vld2_lane_dlist_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld2_lane_dlist_mem(regs, src)) }
-inst_vld3_lane_dlist_mem   :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD3_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vld3_lane_dlist_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld3_lane_dlist_mem(regs, src)) }
-inst_vld4_lane_dlist_mem   :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD4_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vld4_lane_dlist_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld4_lane_dlist_mem(regs, src)) }
-inst_vst1_lane_dlane_mem   :: #force_inline proc "contextless" (dst: Register, lane: u8, src: Memory) -> Instruction { return Instruction{mnemonic = .VST1_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_dpr_lane(dst, lane), op_mem(src), {}, {}}} }
-emit_vst1_lane_dlane_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, lane: u8, src: Memory) { append(instructions, inst_vst1_lane_dlane_mem(dst, lane, src)) }
-inst_vst2_lane_dlist_mem   :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VST2_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vst2_lane_dlist_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vst2_lane_dlist_mem(regs, src)) }
-inst_vst3_lane_dlist_mem   :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VST3_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vst3_lane_dlist_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vst3_lane_dlist_mem(regs, src)) }
-inst_vst4_lane_dlist_mem   :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VST4_LANE, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vst4_lane_dlist_mem   :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vst4_lane_dlist_mem(regs, src)) }
 inst_it_cond_imm4          :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .IT, operand_count = 2, mode = .T32, cond = 14, length = 2, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
 emit_it_cond_imm4          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_it_cond_imm4(imm, imm2)) }
 inst_tt_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .TT, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
@@ -2009,8 +1991,8 @@ inst_vcvtm                      :: inst_vcvtm_s_s
 emit_vcvtm                      :: emit_vcvtm_s_s
 inst_vcvtr                      :: inst_vcvtr_s_s
 emit_vcvtr                      :: emit_vcvtr_s_s
-inst_vmov                       :: proc{ inst_vmov_s_s, inst_vmov_s_imm8, inst_vmov_r_r_d, inst_vmov_r_r_s_s, inst_vmov_r_dlane, inst_vmov_dlane_r, inst_vmov_qlane_qlane_r_r }
-emit_vmov                       :: proc{ emit_vmov_s_s, emit_vmov_s_imm8, emit_vmov_r_r_d, emit_vmov_r_r_s_s, emit_vmov_r_dlane, emit_vmov_dlane_r, emit_vmov_qlane_qlane_r_r }
+inst_vmov                       :: proc{ inst_vmov_s_s, inst_vmov_s_imm8, inst_vmov_r_r_d, inst_vmov_r_r_s_s, inst_vmov_r_dlane, inst_vmov_qlane_r, inst_vmov_qlane_qlane_r_r }
+emit_vmov                       :: proc{ emit_vmov_s_s, emit_vmov_s_imm8, emit_vmov_r_r_d, emit_vmov_r_r_s_s, emit_vmov_r_dlane, emit_vmov_qlane_r, emit_vmov_qlane_qlane_r_r }
 inst_vmrs                       :: inst_vmrs_r
 emit_vmrs                       :: emit_vmrs_r
 inst_vmsr                       :: inst_vmsr_r
@@ -2223,8 +2205,6 @@ inst_vdup                       :: proc{ inst_vdup_d_r, inst_vdup_d_dlane }
 emit_vdup                       :: proc{ emit_vdup_d_r, emit_vdup_d_dlane }
 inst_vswp                       :: inst_vswp_d_d
 emit_vswp                       :: emit_vswp_d_d
-inst_vmov_lane                  :: inst_vmov_lane_dlane_r
-emit_vmov_lane                  :: emit_vmov_lane_dlane_r
 inst_vld1                       :: proc{ inst_vld1_dlist_mem, inst_vld1_dlane_mem }
 emit_vld1                       :: proc{ emit_vld1_dlist_mem, emit_vld1_dlane_mem }
 inst_vld2                       :: inst_vld2_dlist_mem
@@ -2311,22 +2291,6 @@ inst_vld3r                      :: inst_vld3r_dlist_mem
 emit_vld3r                      :: emit_vld3r_dlist_mem
 inst_vld4r                      :: inst_vld4r_dlist_mem
 emit_vld4r                      :: emit_vld4r_dlist_mem
-inst_vld1_lane                  :: inst_vld1_lane_dlane_mem
-emit_vld1_lane                  :: emit_vld1_lane_dlane_mem
-inst_vld2_lane                  :: inst_vld2_lane_dlist_mem
-emit_vld2_lane                  :: emit_vld2_lane_dlist_mem
-inst_vld3_lane                  :: inst_vld3_lane_dlist_mem
-emit_vld3_lane                  :: emit_vld3_lane_dlist_mem
-inst_vld4_lane                  :: inst_vld4_lane_dlist_mem
-emit_vld4_lane                  :: emit_vld4_lane_dlist_mem
-inst_vst1_lane                  :: inst_vst1_lane_dlane_mem
-emit_vst1_lane                  :: emit_vst1_lane_dlane_mem
-inst_vst2_lane                  :: inst_vst2_lane_dlist_mem
-emit_vst2_lane                  :: emit_vst2_lane_dlist_mem
-inst_vst3_lane                  :: inst_vst3_lane_dlist_mem
-emit_vst3_lane                  :: emit_vst3_lane_dlist_mem
-inst_vst4_lane                  :: inst_vst4_lane_dlist_mem
-emit_vst4_lane                  :: emit_vst4_lane_dlist_mem
 inst_it                         :: inst_it_cond_imm4
 emit_it                         :: emit_it_cond_imm4
 inst_tt                         :: inst_tt_r_r

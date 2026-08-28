@@ -300,7 +300,7 @@ Mnemonic :: enum u16 {
 	VSWP,                                  // swap
 
 	// Lane access
-	VMOV_LANE,                             // VMOV.<dt> R, D[i] / VMOV.<dt> D[i], R
+	// VMOV.<dt> R, D[i] / VMOV.<dt> D[i], R
 
 	// Load/Store structures (NEON)
 	VLD1, VLD2, VLD3, VLD4,
@@ -349,9 +349,6 @@ Mnemonic :: enum u16 {
 	VLD2R,    VLD3R,    VLD4R,
 
 	// -- NEON single-element-lane load/store (lane form, not multi-vec) -----
-	VLD1_LANE, VLD2_LANE, VLD3_LANE, VLD4_LANE,
-	VST1_LANE, VST2_LANE, VST3_LANE, VST4_LANE,
-
 	// -- VFP fixed-point conversions (with #fbits operand) ------------------
 	// VCVT.<dt> Sd, Sd, #fbits family
 

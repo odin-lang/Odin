@@ -341,6 +341,14 @@ Operand_Encoding :: enum u8 {
 	NEON_D_LIST_3X,        // {d2, d4, d6}      -- spaced
 	NEON_D_LIST_4X,        // {d2, d4, d6, d8}  -- spaced
 	NEON_D_LIST_ALL,       // {d2[]}            -- to all lanes
+	// VLD1/VST1 single-lane: Vd plus the lane index, whose width and position
+	// follow the element size -- bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
+	// Verified against llvm-mc.
+	// ..._N is how many registers the list holds: VLD2 writes `{d0[1], d1[1]}`.
+	NEON_LANE_D_8,    NEON_LANE_D_16,    NEON_LANE_D_32,
+	NEON_LANE_D_8_2,  NEON_LANE_D_16_2,  NEON_LANE_D_32_2,
+	NEON_LANE_D_8_3,  NEON_LANE_D_16_3,  NEON_LANE_D_32_3,
+	NEON_LANE_D_8_4,  NEON_LANE_D_16_4,  NEON_LANE_D_32_4,
 
 	// ---- Memory addressing composites ----
 	MEM_IMM12_OFFSET,      // [Rn, #±imm12]

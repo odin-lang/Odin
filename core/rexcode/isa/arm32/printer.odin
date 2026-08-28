@@ -535,14 +535,20 @@ write_operand :: proc(
 			for n in 0 ..< u16(op.list.count) {
 				if n > 0 { strings.write_string(sb, ", ") }
 				write_register(sb, Register(reg_class(op.reg) | ((reg_hw(op.reg) + n * step) & 0x1F)))
-				if op.list.all_lanes { strings.write_string(sb, "[]") }
+				// Every member of a single-lane list carries the index:
+				// `{d0[1], d1[1]}`. `{d0[]}` is the to-all-lanes form.
+				if op.list.all_lanes {
+					strings.write_string(sb, "[]")
+				} else if op.has_lane {
+					fmt.sbprintf(sb, "[%d]", op.lane)
+				}
 			}
 			strings.write_string(sb, "}")
 			return
 		}
 		write_register(sb, op.reg)
 		write_shift(sb, op.shift_type, op.shift_amt)
-		if op.lane != 0 {
+		if op.has_lane {
 			fmt.sbprintf(sb, "[%d]", op.lane)
 		}
 	case .IMMEDIATE:

@@ -114,7 +114,10 @@ Operand :: struct #packed {
 			shift_type: Shift_Type | 4,   // GPR_SHIFTED; .LSL/0 when plain
 			shift_amt:  u8         | 5,   // 0..31, or the Rs index for RSR
 			lane:       u8         | 5,   // SIMD lane for DPR_ELEM / QPR_ELEM
-			// 3 bits spare
+			// Whether `lane` means anything. Lane 0 is a real index -- `d0[0]`
+			// is not `d0` -- so it cannot be spelled by lane == 0.
+			has_lane:   bool       | 1,
+			// 2 bits spare
 		},
 		mem:       Memory,
 		immediate: i64,
@@ -178,9 +181,9 @@ op_reg_run :: #force_inline proc "contextless" (first: Register, count: u8, stri
 }
 @(require_results)
 op_dpr_lane :: #force_inline proc "contextless" (d: Register, idx: u8) -> Operand {
-	return Operand{reg = d, kind = .REGISTER, size = 4, lane = idx}
+	return Operand{reg = d, kind = .REGISTER, size = 4, lane = idx, has_lane = true}
 }
 @(require_results)
 op_qpr_lane :: #force_inline proc "contextless" (q: Register, idx: u8) -> Operand {
-	return Operand{reg = q, kind = .REGISTER, size = 4, lane = idx}
+	return Operand{reg = q, kind = .REGISTER, size = 4, lane = idx, has_lane = true}
 }

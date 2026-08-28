@@ -445,6 +445,12 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .NEON_D_LIST_ALL:
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
 		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, true)
+	case .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		shift, mask, count := neon_lane_shape(enc)
+		op := op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> shift) & mask))
+		op.list = {count = count, stride = 1}
+		return op
 	case .VFP_S_LIST:
 		// {S<Vd>, ...} -- imm8 counts the registers, and the run starts at Vd.
 		// Both halves matter: keeping only the count printed the wrong bank
@@ -603,4 +609,25 @@ decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic
 	if instructions != nil { reserve(instructions, len(instructions) + n) }
 	if inst_info    != nil { reserve(inst_info,    len(inst_info)    + n) }
 	if label_defs   != nil { reserve(label_defs,   len(label_defs)   + n) }
+}
+
+// The lane field's position and the list length for a NEON single-lane
+// load/store. The lane sits just above the alignment bits, and how far above
+// follows the element size: bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
+@(private="file", require_results)
+neon_lane_shape :: #force_inline proc "contextless" (e: Operand_Encoding) -> (shift, mask: u32, count: u8) {
+	#partial switch e {
+	case .NEON_LANE_D_8:    return 5, 0x7, 1
+	case .NEON_LANE_D_16:   return 6, 0x3, 1
+	case .NEON_LANE_D_32:   return 7, 0x1, 1
+	case .NEON_LANE_D_8_2:  return 5, 0x7, 2
+	case .NEON_LANE_D_16_2: return 6, 0x3, 2
+	case .NEON_LANE_D_32_2: return 7, 0x1, 2
+	case .NEON_LANE_D_8_3:  return 5, 0x7, 3
+	case .NEON_LANE_D_16_3: return 6, 0x3, 3
+	case .NEON_LANE_D_32_3: return 7, 0x1, 3
+	case .NEON_LANE_D_8_4:  return 5, 0x7, 4
+	case .NEON_LANE_D_16_4: return 6, 0x3, 4
+	case:                   return 7, 0x1, 4
+	}
 }
