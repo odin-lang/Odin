@@ -499,7 +499,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .PD:
 		return Operand{reg = Register(REG_P | u16(word & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PN:
-		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PM:
 		return Operand{reg = Register(REG_P | u16((word >> 16) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .ENC_ZT0:
@@ -520,6 +520,10 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		v := i32((word >> 5) & 0xFF)
 		if v & 0x80 != 0 { v |= ~i32(0xFF) }
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 1}
+	case .SVE_IMM5A:
+		v := i64((word >> 5) & 0x1F)
+		if v & 0x10 != 0 { v |= ~i64(0x1F) }
+		return Operand{immediate = v, kind = .IMMEDIATE, size = 1}
 	case .SVE_IMM5:
 		return Operand{immediate = i64((word >> 16) & 0x1F), kind = .IMMEDIATE, size = 1}
 	case .SVE_SHIFT_TSZ_IMM:
@@ -573,17 +577,30 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64((word >> 5) & 0xF), kind = .IMMEDIATE, size = 1}
 
 	// ---- SVE gather/scatter + vector-base memory ----
-	case .SVE_OFFSET_BASE_VEC:
+	case .SVE_OFFSET_BASE_VEC, .SVE_OFFSET_BASE_VEC_S, .SVE_OFFSET_BASE_VEC_D,
+	     .SVE_OFFSET_BASE_VECST_S, .SVE_OFFSET_BASE_VECST_D:
 		base_hw := u8((word >> 5)  & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
-		return Operand{
-			mem = Memory{
-				base  = Register(REG_X | u16(base_hw)),
-				index = Register(REG_Z | u16(idx_hw)),
-				mode  = .REG_OFFSET,
-			},
-			kind = .MEMORY, size = 4,
+		m := Memory{
+			base  = Register(REG_X | u16(base_hw)),
+			index = Register(REG_Z | u16(idx_hw)),
+			mode  = .REG_OFFSET,
 		}
+		// These forms all extend a 32-bit-wide index, and bit 22 says which way.
+		// The index's own element size is not derivable from the word, so it
+		// travels in the operand's size -- Memory has no bits left.
+		shape := u8(4)
+		#partial switch en {
+		case .SVE_OFFSET_BASE_VEC_S, .SVE_OFFSET_BASE_VEC_D:
+			m.mode   = .EXT_REG_OFFSET
+			m.extend = (word >> 22) & 1 != 0 ? .SXTW : .UXTW
+			shape    = en == .SVE_OFFSET_BASE_VEC_D ? ZSHAPE_D : ZSHAPE_S
+		case .SVE_OFFSET_BASE_VECST_S, .SVE_OFFSET_BASE_VECST_D:
+			m.mode   = .EXT_REG_OFFSET
+			m.extend = (word >> 14) & 1 != 0 ? .SXTW : .UXTW
+			shape    = en == .SVE_OFFSET_BASE_VECST_D ? ZSHAPE_D : ZSHAPE_S
+		}
+		return Operand{mem = m, kind = .MEMORY, size = shape}
 	case .SVE_OFFSET_VEC_BASE:
 		base_hw := u8((word >> 5) & 0x1F)
 		imm     := i32((word >> 16) & 0x1F)

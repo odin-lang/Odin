@@ -679,6 +679,9 @@ pack_operand_inline :: #force_inline proc(
 	case .SVE_IMM8:
 		// Signed 8-bit at bits 12-5 (DUP/CPY/ADD imm).
 		return (u32(op.immediate) & 0xFF) << 5
+	case .SVE_IMM5A:
+		// INDEX's first operand; SVE_IMM5 is the second, at bits 20:16.
+		return (u32(op.immediate) & 0x1F) << 5
 	case .SVE_IMM5:
 		// 5-bit at bits 20-16 (INDEX imm, etc.).
 		return (u32(op.immediate) & 0x1F) << 16
@@ -721,7 +724,8 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0xF) << 5
 
 	// ---- SVE gather/scatter + vector-base memory --------------------------
-	case .SVE_OFFSET_BASE_VEC:
+	case .SVE_OFFSET_BASE_VEC, .SVE_OFFSET_BASE_VEC_S, .SVE_OFFSET_BASE_VEC_D,
+	     .SVE_OFFSET_BASE_VECST_S, .SVE_OFFSET_BASE_VECST_D:
 		// [Xn, Zm.S/D, extend] -- base GPR at 9:5, Zm at 20:16.
 		base := (u32(reg_hw(op.mem.base))  & 0x1F) << 5
 		idx  := (u32(reg_hw(op.mem.index)) & 0x1F) << 16

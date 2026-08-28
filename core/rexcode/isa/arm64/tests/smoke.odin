@@ -227,7 +227,7 @@ main :: proc() {
 	check("TBL B",      .TBL,    2, 0x05203000, 0xFFE0FC00)
 
 	// ---- SVE2 ---------------------------------------------------------------
-	check("WHILELT 64", .WHILELT,  0, 0x25201400, 0xFF20FC10)
+	check("WHILELT 64", .WHILELT,  0, 0x25201400, 0xFFE0FC10)
 	check("SQRDMLAH B", .SQRDMLAH, 0, 0x44007000, 0xFFE0FC00)
 	check("SVE_AESE",       .AESE,     1, 0x4522E000, 0xFFFFFC00)
 	check("MATCH B",    .MATCH,    0, 0x45208000, 0xFFE0E010)
@@ -318,9 +318,9 @@ main :: proc() {
 	check("SVE_LD1SW_GATHER_D",.LD1SW,1, 0xC5000000, 0xFFA0E000)
 
 	// ---- SVE scatter stores --------------------------------------------
-	check("SVE_ST1B_SCATTER_S",.ST1B,1, 0xE4008000, 0xFFA0E000)
-	check("SVE_ST1W_SCATTER_S",.ST1W,1, 0xE5008000, 0xFFA0E000)
-	check("SVE_ST1D_SCATTER_D",.ST1D,1, 0xE5808000, 0xFFA0E000)
+	check("SVE_ST1B_SCATTER_S",.ST1B,1, 0xE4408000, 0xFFE0A000)
+	check("SVE_ST1W_SCATTER_S",.ST1W,1, 0xE5408000, 0xFFE0A000)
+	check("SVE_ST1D_SCATTER_D",.ST1D,1, 0xE5808000, 0xFFE0A000)
 
 	// ---- SME tile slice memory -----------------------------------------
 	check("SME_LD1B_TILE", .LD1B, 3, 0xE0000000, 0xFFE00010)

@@ -77,7 +77,7 @@ Memory :: bit_field u64 {
 	extend:  Extend       | 3,   // for EXT_REG_OFFSET; UXTX otherwise
 	shift:   u8           | 3,   // 0..4 for register-offset / extended
 	mode:    Address_Mode | 3,
-	// 1 bit spare
+	// Full: 16 + 16 + 23 + 3 + 3 + 3 = 64.
 }
 #assert(size_of(Memory) == 8)
 

@@ -570,7 +570,7 @@ write_operand :: proc(
 		}
 
 	case .MEMORY:
-		write_memory(sb, op.mem, opts)
+		write_memory(sb, op.mem, op.size, opts)
 
 	case .RELATIVE:
 		target := u32(op.relative)
@@ -583,7 +583,9 @@ write_operand :: proc(
 }
 
 @(private="file")
-write_memory :: proc(sb: ^strings.Builder, m: Memory, opts: ^Print_Options) {
+// `index_shape` names the element size of a vector index (SVE gather), which
+// Memory has no room left to carry; it is 0 for every ordinary addressing mode.
+write_memory :: proc(sb: ^strings.Builder, m: Memory, index_shape: u8, opts: ^Print_Options) {
 	strings.write_byte(sb, '[')
 	write_register(sb, m.base, opts.uppercase)
 
@@ -615,6 +617,9 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory, opts: ^Print_Options) {
 	case .REG_OFFSET:
 		strings.write_string(sb, ", ")
 		write_register(sb, m.index, opts.uppercase)
+		if reg_class(m.index) == REG_Z {
+			write_vector_shape(sb, m.index, index_shape, opts.uppercase)
+		}
 		if m.shift != 0 {
 			strings.write_string(sb, ", lsl #")
 			write_decimal_u32(sb, u32(m.shift))
@@ -624,6 +629,9 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory, opts: ^Print_Options) {
 	case .EXT_REG_OFFSET:
 		strings.write_string(sb, ", ")
 		write_register(sb, m.index, opts.uppercase)
+		if reg_class(m.index) == REG_Z {
+			write_vector_shape(sb, m.index, index_shape, opts.uppercase)
+		}
 		strings.write_string(sb, ", ")
 		strings.write_string(sb, EXTEND_NAMES[u8(m.extend) & 0x7])
 		if m.shift != 0 {
