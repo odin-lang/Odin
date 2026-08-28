@@ -503,7 +503,7 @@ run_pipeline_tests :: proc() {
 
 	// ---- 19. SVE predicated: ADD Z0.S, P0/M, Z0.S, Z1.S --------------------
 	//   bits = 0x04800000 | (Pg=0<<10) | (Zm=1<<16) | Zdn=0
-	//        = 0x04810000
+	//        = 0x04800020
 	{
 		clear(&relocs); clear(&errors)
 		for i in 0..<len(code) { code[i] = 0 }
@@ -516,7 +516,7 @@ run_pipeline_tests :: proc() {
 		}
 		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
 		ok("SVE ADD_PRED: encode", success)
-		eq_word("SVE ADD Z0.S,P0/M,Z0.S,Z1.S", load_le(code[:], 0), 0x04810000)
+		eq_word("SVE ADD Z0.S,P0/M,Z0.S,Z1.S", load_le(code[:], 0), 0x04800020)
 	}
 
 	// ---- 20. SVE PTRUE P0.B, ALL --------------------------------------------

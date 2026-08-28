@@ -256,6 +256,15 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (op.size == 0 || op.size == 8)
 	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_P
+	case .PN_REG, .PN_REG_ZERO:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_PN
+	// The first register of a pair must be even, of a quad a multiple of four.
+	case .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x1) == 0 &&
+		       (op.size == 0 || op.size == z_elem_size(ot))
+	case .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && (reg_hw(op.reg) & 0x3) == 0 &&
+		       (op.size == 0 || op.size == z_elem_size(ot))
 
 	// SME tile state (immediate-encoded tile number; user supplies the
 	// tile index as an immediate, e.g. 0 for ZA0.S, 3 for ZA3.S).
@@ -641,6 +650,9 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0xF) << 5
 	case .PM:
 		return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .PNG:
+		// The field holds pn - 8.
+		return ((u32(reg_hw(op.reg)) - 8) & 0x7) << 10
 	case .PG:
 		// Governing predicate (3-bit slot, P0..P7 only).
 		return (u32(reg_hw(op.reg)) & 0x7) << 10
@@ -971,4 +983,15 @@ read_u32 :: #force_inline proc "contextless" (
 			(u32(code[offset+1]) << 16) |
 			(u32(code[offset+2]) <<  8) |
 			 u32(code[offset+3])
+}
+
+// The SVE element-width code an SME2 pair/quad operand type carries.
+@(private="file", require_results)
+z_elem_size :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .Z_PAIR_B, .Z_QUAD_B: return 1
+	case .Z_PAIR_H, .Z_QUAD_H: return 2
+	case .Z_PAIR_S, .Z_QUAD_S: return 4
+	}
+	return 8
 }

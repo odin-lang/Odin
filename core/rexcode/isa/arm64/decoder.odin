@@ -501,13 +501,15 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .PN:
 		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = 4}
 	case .PM:
-		return Operand{reg = Register(REG_P | u16((word >> 16) & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 16) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
+	case .PNG:
+		return Operand{reg = Register(REG_PN | u16(8 + ((word >> 10) & 0x7))), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PG:
-		return Operand{reg = Register(REG_P | u16((word >> 10) & 0x7)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 10) & 0x7)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PG4:
-		return Operand{reg = Register(REG_P | u16((word >> 10) & 0xF)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 10) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PM3:
-		return Operand{reg = Register(REG_P | u16((word >> 13) & 0x7)), kind = .REGISTER, size = 4}
+		return Operand{reg = Register(REG_P | u16((word >> 13) & 0x7)), kind = .REGISTER, size = pqual_for_type(ot)}
 
 	// ---- SVE immediates ----
 	case .SVE_IMM8:
@@ -668,9 +670,11 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .ENC_ROR_SHIFT:
 		return Operand{immediate = i64((word >> 10) & 0x3F), kind = .IMMEDIATE, size = 1}
 	case .ENC_Z_PAIR_VD, .ENC_Z_QUAD_VD:
-		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
+		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER,
+		               size = reg_size_for_type(ot), list_count = en == .ENC_Z_PAIR_VD ? 2 : 4}
 	case .ENC_Z_PAIR_VN, .ENC_Z_QUAD_VN:
-		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
+		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER,
+		               size = reg_size_for_type(ot), list_count = en == .ENC_Z_PAIR_VN ? 2 : 4}
 	case .ENC_Z_PAIR_VM, .ENC_Z_QUAD_VM:
 		return Operand{reg = Register(REG_Z | u16((word >> 16) & 0x1F)), kind = .REGISTER, size = reg_size_for_type(ot)}
 	}
@@ -703,8 +707,13 @@ reg_from_field :: #force_inline proc "contextless" (
 		cls = REG_V
 	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D:
 		cls = REG_Z
-	case .P_REG, .P_REG_MERGE, .P_REG_ZERO:
+	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV:
 		cls = REG_P
+	case .PN_REG, .PN_REG_ZERO:
+		cls = REG_PN
+	case .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D,
+	     .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
+		cls = REG_Z
 	}
 	// SP class needs the special hw=31 marker; everything else uses the
 	// raw hw with the chosen class.
@@ -741,8 +750,25 @@ reg_size_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
 	case .Z_REG_H:              return 2
 	case .Z_REG_S:              return 4
 	case .Z_REG_D:              return 8
+	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
+	case .P_REG_MERGE:          return PQUAL_MERGE
+	case .Z_PAIR_B, .Z_QUAD_B:  return 1
+	case .Z_PAIR_H, .Z_QUAD_H:  return 2
+	case .Z_PAIR_S, .Z_QUAD_S:  return 4
+	case .Z_PAIR_D, .Z_QUAD_D:  return 8
 	}
 	return 4
+}
+
+// A predicate operand's governing qualifier, which the form -- not the caller
+// -- decides: an SVE load zeroes, a predicated add merges.
+@(private="file", require_results)
+pqual_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
+	#partial switch ot {
+	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
+	case .P_REG_MERGE: return PQUAL_MERGE
+	}
+	return PQUAL_NONE
 }
 
 // -----------------------------------------------------------------------------

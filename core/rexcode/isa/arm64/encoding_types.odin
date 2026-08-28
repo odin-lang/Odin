@@ -192,6 +192,14 @@ Operand_Type :: enum u8 {
 	// preferred spelling when cond != 111x -- with AL or NV the underlying
 	// CSINC/CSINV/CSNEG is what an assembler writes.
 	COND_NOT_AL,
+	// SME2 vector pairs and quads. The element size cannot come from the
+	// encoding the way the list length does, because the operand is written
+	// with it (`{z0.b, z1.b}`) and it is what separates LD1B from LD1H.
+	Z_PAIR_B, Z_PAIR_H, Z_PAIR_S, Z_PAIR_D,
+	Z_QUAD_B, Z_QUAD_H, Z_QUAD_S, Z_QUAD_D,
+	// SME2 predicate-as-counter (PN8..PN15). `_ZERO` prints the `/z` a load
+	// needs; a store writes it bare.
+	PN_REG, PN_REG_ZERO,
 
 	// ---- NEON shift-by-immediate amount (encoded into immh:immb together
 	//      with the element size: left = esize+shift, right = 2*esize-shift) ----
@@ -394,6 +402,7 @@ Operand_Encoding :: enum u8 {
 	// always names two), so it rides on the encoding rather than the operand
 	// type -- otherwise every count would need its own type per arrangement.
 	VD_LIST1, VD_LIST2, VD_LIST3, VD_LIST4,
+	PNG,              // bits 10-12, predicate-as-counter (SME2)
 	VN_LIST1, VN_LIST2, VN_LIST3, VN_LIST4,
 	ENC_FCADD_ROT,     // 1-bit rotation at bit 12 (FCADD)
 	ENC_SVE_PRFOP,     // 4-bit prefetch op at bits 3:0 (SVE PRFB/H/W/D)

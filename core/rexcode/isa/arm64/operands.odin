@@ -196,6 +196,14 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 	return Operand{reg = Register(REG_Z | u16(n & 0x1F)), kind = .REGISTER, size = 8}
 }
 
+// A predicate register's governing qualifier, carried in Operand.size and read
+// only when the register's class is REG_P. SVE writes it as a suffix -- `p0/z`
+// zeroes the inactive lanes, `p0/m` leaves them alone -- and an assembler will
+// not take the instruction without it where the form calls for one.
+PQUAL_ZERO  :: u8(1)
+PQUAL_MERGE :: u8(2)
+PQUAL_NONE  :: u8(4)
+
 // Arrangement codes carried in Operand.size. Element views are odd and
 // arrangements are multiples of 8, so the two can never be confused; 4 is the
 // neutral "no vector shape" value every scalar class uses.

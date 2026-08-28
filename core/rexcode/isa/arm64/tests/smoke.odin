@@ -186,10 +186,10 @@ main :: proc() {
 	check("SQADD H",  .SQADD,8, 0x04601000, 0xFFE0FC00)
 
 	// ---- SVE -- vectors predicated ------------------------------------------
-	check("ADD B", .ADD, 17, 0x04000000, 0xFFE0E000)
-	check("MUL S", .MUL, 5, 0x04900000, 0xFFE0E000)
-	check("SVE_SDIV S",     .SDIV, 2, 0x04940000, 0xFFE0E000)
-	check("ASR D", .ASR, 5, 0x04D08000, 0xFFE0E000)
+	check("ADD B", .ADD, 17, 0x04000000, 0xFFFFE000)
+	check("MUL S", .MUL, 5, 0x04900000, 0xFFFFE000)
+	check("SVE_SDIV S",     .SDIV, 2, 0x04940000, 0xFFFFE000)
+	check("ASR D", .ASR, 5, 0x04D08000, 0xFFFFE000)
 	check("NEG D", .NEG, 10, 0x04D7A000, 0xFFE0E000)
 
 	// ---- SVE -- bitwise predicated ------------------------------------------
@@ -201,12 +201,12 @@ main :: proc() {
 	check("FMUL D",   .FMUL, 8, 0x65C00800, 0xFFE0FC00)
 
 	// ---- SVE -- FP predicated -----------------------------------------------
-	check("FADD S",.FADD, 10, 0x65808000, 0xFFE0E000)
+	check("FADD S",.FADD, 10, 0x65808000, 0xFFFFE000)
 	check("FMLA S",     .FMLA,      3, 0x65A00000, 0xFFE0E000)
 
 	// ---- SVE -- predicate logical -------------------------------------------
-	check("SVE_AND_P",      .AND,   6, 0x25004000, 0xFFE0C210)
-	check("SVE_ORR_P",      .ORR,   6, 0x25804000, 0xFFE0C210)
+	check("SVE_AND_P",      .AND,   9, 0x25004000, 0xFFE0C210)
+	check("SVE_ORR_P",      .ORR,   9, 0x25804000, 0xFFE0C210)
 	check("SVE_SEL_P",      .SEL,   0, 0x25004210, 0xFFE0C210)
 	check("SVE_PTRUE",      .PTRUE,   0, 0x2518E000, 0xFFFFFC10)
 	check("SVE_PFALSE",     .PFALSE,  0, 0x2518E400, 0xFFFFFFF0)
@@ -418,8 +418,8 @@ main :: proc() {
 	check("LDAPURSW",  .LDAPURSW, 0, 0x99800000, 0xFFE00C00)
 
 	// ---- SVE BF16 predicated arithmetic ---------------------------------
-	check("SVE_BFADD", .BFADD, 0, 0x65008000, 0xFFE0E000)
-	check("SVE_BFMUL", .BFMUL, 0, 0x65028000, 0xFFE0E000)
+	check("SVE_BFADD", .BFADD, 0, 0x65008000, 0xFFFFE000)
+	check("SVE_BFMUL", .BFMUL, 0, 0x65028000, 0xFFFFE000)
 	check("SVE_BFMLA", .BFMLA, 0, 0x65200000, 0xFFE0E000)
 
 	// ---- Speculation / profiling barriers + BTI variants ----------------
@@ -453,8 +453,8 @@ main :: proc() {
 	check("BFSUB unpred", .BFSUB, 1, 0x65000400, 0xFFE0FC00)
 	check("BFMUL unpred", .BFMUL, 1, 0x65000800, 0xFFE0FC00)
 	check("BFCLAMP",      .BFCLAMP,      0, 0x64202400, 0xFFE0FC00)
-	check("BFMAXNM",      .BFMAXNM,      0, 0x65048000, 0xFFE0E000)
-	check("BFMINNM",      .BFMINNM,      0, 0x65058000, 0xFFE0E000)
+	check("BFMAXNM",      .BFMAXNM,      0, 0x65048000, 0xFFFFE000)
+	check("BFMINNM",      .BFMINNM,      0, 0x65058000, 0xFFFFE000)
 
 	// ---- SME2 multi-vector ----------------------------------------------
 	check("SME2 LUTI2.B", .LUTI2, 0, 0xC08C4000, 0xFFE0F000)

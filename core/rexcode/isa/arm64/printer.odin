@@ -398,6 +398,7 @@ write_sysreg :: proc(sb: ^strings.Builder, sr: System_Register, uppercase: bool)
 @(private="file")
 write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercase: bool) {
 	shape := ""
+	sep := byte('.')
 	switch reg_class(r) {
 	case REG_V:
 		switch size {
@@ -422,11 +423,19 @@ write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercas
 		case 4: shape = "s"
 		case 8: shape = "d"
 		}
+	// A predicate's suffix is its governing qualifier, and it hangs off a
+	// slash rather than a dot.
+	case REG_P, REG_PN:
+		sep = '/'
+		switch size {
+		case PQUAL_ZERO:  shape = "z"
+		case PQUAL_MERGE: shape = "m"
+		}
 	}
 	if shape == "" {
 		return
 	}
-	strings.write_byte(sb, '.')
+	strings.write_byte(sb, sep)
 	for i in 0..<len(shape) {
 		c := shape[i]
 		if uppercase && c >= 'a' && c <= 'z' {
@@ -488,6 +497,9 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 		write_decimal_u32(sb, u32(hw))
 	case REG_P:
 		strings.write_byte(sb, uppercase ? 'P' : 'p')
+		write_decimal_u32(sb, u32(hw))
+	case REG_PN:
+		strings.write_string(sb, uppercase ? "PN" : "pn")
 		write_decimal_u32(sb, u32(hw))
 	}
 }
