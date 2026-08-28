@@ -421,11 +421,40 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .VFP_IMM8:
 		a := ((word >> 16) & 0xF) << 4 | (word & 0xF)
 		return op_imm(i64(decode_vfp_imm8_f32(a)))
-	case .VFP_S_LIST, .VFP_D_LIST:
-		// Register count is encoded in bits 7..0 (count, not bitmask). Wrap
-		// as a REG_LIST so the encoder's shape_match for SPR_LIST/DPR_LIST
-		// accepts it; the encoder packs the same 8-bit count back out.
-		return op_reg_list(u16(word & 0xFF))
+	case .NEON_D_LIST_1:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, false)
+	case .NEON_D_LIST_2:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 2, 1, false)
+	case .NEON_D_LIST_3:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 3, 1, false)
+	case .NEON_D_LIST_4:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 4, 1, false)
+	case .NEON_D_LIST_2X:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 2, 2, false)
+	case .NEON_D_LIST_3X:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 3, 2, false)
+	case .NEON_D_LIST_4X:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 4, 2, false)
+	case .NEON_D_LIST_ALL:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, true)
+	case .VFP_S_LIST:
+		// {S<Vd>, ...} -- imm8 counts the registers, and the run starts at Vd.
+		// Both halves matter: keeping only the count printed the wrong bank
+		// and the wrong registers.
+		n := ((word >> 12) & 0xF) << 1 | ((word >> 22) & 1)
+		return op_reg_run(Register(REG_SPR | u16(n)), u8(word & 0xFF))
+	case .VFP_D_LIST:
+		// {D<Vd>, ...} -- imm8 counts half-words here, two per D register.
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), u8((word & 0xFF) / 2))
 
 	// ---- Branch fields (decoded into RELATIVE) ----
 	case .BRANCH_24:

@@ -527,6 +527,19 @@ write_operand :: proc(
 	case .NONE:
 		return
 	case .REGISTER:
+		// A VFP/NEON list is a contiguous run written in braces, and every
+		// register is named -- `{d1, d2, d3}`, not a range.
+		if op.list.count > 0 {
+			strings.write_string(sb, "{")
+			step := u16(max(op.list.stride, 1))
+			for n in 0 ..< u16(op.list.count) {
+				if n > 0 { strings.write_string(sb, ", ") }
+				write_register(sb, Register(reg_class(op.reg) | ((reg_hw(op.reg) + n * step) & 0x1F)))
+				if op.list.all_lanes { strings.write_string(sb, "[]") }
+			}
+			strings.write_string(sb, "}")
+			return
+		}
 		write_register(sb, op.reg)
 		write_shift(sb, op.shift_type, op.shift_amt)
 		if op.lane != 0 {

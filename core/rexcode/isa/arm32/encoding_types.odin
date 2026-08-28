@@ -329,6 +329,18 @@ Operand_Encoding :: enum u8 {
 	// ---- VFP / NEON list ----
 	VFP_S_LIST,            // VLDM/VSTM single-prec list (8-bit count, start in Vd_S)
 	VFP_D_LIST,            // VLDM/VSTM double-prec list (8-bit count, start in Vd_D)
+	// NEON structure load/store lists (VLD1-4 / VST1-4). Unlike VLDM's list,
+	// the register count is part of the form's type field at bits 11:8, so the
+	// encoding writes only Vd; how many registers -- and whether the run steps
+	// by one or by two -- comes from the form. Verified against llvm-mc.
+	NEON_D_LIST_1,         // {d2}
+	NEON_D_LIST_2,         // {d2, d3}
+	NEON_D_LIST_3,         // {d2, d3, d4}
+	NEON_D_LIST_4,         // {d2, d3, d4, d5}
+	NEON_D_LIST_2X,        // {d2, d4}          -- spaced
+	NEON_D_LIST_3X,        // {d2, d4, d6}      -- spaced
+	NEON_D_LIST_4X,        // {d2, d4, d6, d8}  -- spaced
+	NEON_D_LIST_ALL,       // {d2[]}            -- to all lanes
 
 	// ---- Memory addressing composites ----
 	MEM_IMM12_OFFSET,      // [Rn, #±imm12]

@@ -122,8 +122,20 @@ Operand :: struct #packed {
 	},
 	kind:       Operand_Kind,
 	size:       u8,
+	// How the syntax writes this register as a list. `count` 0 means a plain
+	// register. NEON structure loads also come in a spaced form that steps two
+	// registers at a time -- `{d2, d4}` -- and a to-all-lanes form written
+	// `{d2[]}`. A GPR list (`{r4, lr}`) is not a run at all and stays a
+	// bitmask under REG_LIST.
+	list: List_Shape,
 }
-#assert(size_of(Operand) == 10)
+
+List_Shape :: bit_field u8 {
+	count:     u8   | 3,   // 0 = not a list, else 1..4
+	stride:    u8   | 3,   // 1 for {d2, d3}, 2 for {d2, d4}
+	all_lanes: bool | 1,   // `{d2[]}` -- loaded to every lane
+}
+#assert(size_of(Operand) == 11)
 
 // ---- Operand builders ------------------------------------------------------
 
@@ -156,6 +168,13 @@ op_rel_offset :: #force_inline proc "contextless" (off: i64) -> Operand {
 @(require_results)
 op_reg_list :: #force_inline proc "contextless" (mask: u16) -> Operand {
 	return Operand{immediate = i64(mask), kind = .REG_LIST, size = 2}
+}
+
+// The head of a register list, written `{d1, d2, d3}` (stride 1) or
+// `{d2, d4}` (stride 2).
+@(require_results)
+op_reg_run :: #force_inline proc "contextless" (first: Register, count: u8, stride: u8 = 1, all_lanes := false) -> Operand {
+	return Operand{reg = first, kind = .REGISTER, list = {count = count, stride = stride, all_lanes = all_lanes}}
 }
 @(require_results)
 op_dpr_lane :: #force_inline proc "contextless" (d: Register, idx: u8) -> Operand {

@@ -25,7 +25,7 @@ Instruction_Flags :: bit_field u8 {
 // decode, because decode writes whole Instructions and unaligned stores are
 // expensive enough to outweigh writing more bytes.
 Instruction :: struct #align(64) {
-	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 10 = 40
+	ops:           [4]Operand `fmt:"v,operand_count"`, // 4 * 11 = 44
 	mnemonic:      Mnemonic,                           // 2
 	// cond, operand_count, mode, length and the two flag bits share one
 	// 16-bit word -- together they need 13 bits, and spending six bytes on
@@ -53,9 +53,9 @@ Instruction :: struct #align(64) {
 	// every instruction did before this field existed. Set it and the encoder
 	// picks the encoding for that type.
 	dt:            Data_Types,
-	// Spare, and free: a 48-byte struct straddles a cache line, so these 16
+	// Spare, and free: a 48-byte struct straddles a cache line, so these
 	// bytes cost nothing. New fields land here without changing the layout.
-	_:             [16]u8,
+	_:             [12]u8,
 }
 #assert(size_of(Instruction)  == 64)
 #assert(align_of(Instruction) == 64)

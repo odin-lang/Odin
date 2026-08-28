@@ -2307,16 +2307,16 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	//   have distinct opcode bits; included as separate entries.
 	.VLD1 = {
 		// VLD1 multiple (1-reg list, type=0111, size=00/01/10/11, D form)
-		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200700, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_1, .RN_A32, .NONE, .NONE}, 0xF420070F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 		// VLD1 multiple (2-reg list, type=1010)
-		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200A00, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_2, .RN_A32, .NONE, .NONE}, 0xF4200A0F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 		// VLD1 multiple (3-reg list, type=0110)
-		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200600, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_3, .RN_A32, .NONE, .NONE}, 0xF420060F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 		// VLD1 multiple (4-reg list, type=0010)
-		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200200, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4, .RN_A32, .NONE, .NONE}, 0xF420020F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 		// VLD1 single lane to all lanes (VLD1R): 1111 0100 1 D 10 Rn Vd 1100 size T a Rm
 		//   size 00 .8 / 01 .16 / 10 .32; T=0 single, T=1 pair
-		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4A00C00, 0xFFB00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_ALL, .RN_A32, .NONE, .NONE}, 0xF4A00C0F, 0xFFB00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 		// VLD1 single lane:  1111 0100 1 D 10 Rn Vd 0X00 size idx_align Rm  (X = 8/16/32 size selector)
 		{.VLD1, {.DPR_ELEM, .MEM, .NONE, .NONE}, {.VD_D, .RN_A32, .NONE, .NONE}, 0xF4A00000, 0xFFB00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},   // .8
 		{.VLD1, {.DPR_ELEM, .MEM, .NONE, .NONE}, {.VD_D, .RN_A32, .NONE, .NONE}, 0xF4A00400, 0xFFB00F00, .NEON, .A32, {cond_in_28=false}, {.SZ16, .NONE}},   // .16
@@ -2324,10 +2324,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 	.VST1 = {
 		// VST1 multiple (1-reg list)
-		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000700, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000A00, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000600, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000200, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_1, .RN_A32, .NONE, .NONE}, 0xF400070F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_2, .RN_A32, .NONE, .NONE}, 0xF4000A0F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_3, .RN_A32, .NONE, .NONE}, 0xF400060F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST1, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4, .RN_A32, .NONE, .NONE}, 0xF400020F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 		// VST1 single lane: 1111 0100 1 D 00 Rn Vd 0X00 size idx_align Rm
 		{.VST1, {.DPR_ELEM, .MEM, .NONE, .NONE}, {.VD_D, .RN_A32, .NONE, .NONE}, 0xF4800000, 0xFFB00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},   // .8
 		{.VST1, {.DPR_ELEM, .MEM, .NONE, .NONE}, {.VD_D, .RN_A32, .NONE, .NONE}, 0xF4800400, 0xFFB00F00, .NEON, .A32, {cond_in_28=false}, {.SZ16, .NONE}},   // .16
@@ -2335,30 +2335,30 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 	// VLD2 / VST2 / VLD3 / VST3 / VLD4 / VST4 - similar pattern with different "type" bits
 	.VLD2 = {
-		{.VLD2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200800, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VLD2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200900, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VLD2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200300, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_2, .RN_A32, .NONE, .NONE}, 0xF420080F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_2X, .RN_A32, .NONE, .NONE}, 0xF420090F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4, .RN_A32, .NONE, .NONE}, 0xF420030F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 	},
 	.VST2 = {
-		{.VST2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000800, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VST2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000900, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VST2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000300, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_2, .RN_A32, .NONE, .NONE}, 0xF400080F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_2X, .RN_A32, .NONE, .NONE}, 0xF400090F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST2, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4, .RN_A32, .NONE, .NONE}, 0xF400030F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 	},
 	.VLD3 = {
-		{.VLD3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200400, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VLD3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200500, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_3, .RN_A32, .NONE, .NONE}, 0xF420040F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_3X, .RN_A32, .NONE, .NONE}, 0xF420050F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 	},
 	.VST3 = {
-		{.VST3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000400, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VST3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000500, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_3, .RN_A32, .NONE, .NONE}, 0xF400040F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST3, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_3X, .RN_A32, .NONE, .NONE}, 0xF400050F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 	},
 	.VLD4 = {
-		{.VLD4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200000, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VLD4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4200100, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4, .RN_A32, .NONE, .NONE}, 0xF420000F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VLD4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4X, .RN_A32, .NONE, .NONE}, 0xF420010F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 	},
 	.VST4 = {
-		{.VST4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000000, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
-		{.VST4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.VFP_D_LIST, .RN_A32, .NONE, .NONE}, 0xF4000100, 0xFFF00F00, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4, .RN_A32, .NONE, .NONE}, 0xF400000F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VST4, {.DPR_LIST, .MEM, .NONE, .NONE}, {.NEON_D_LIST_4X, .RN_A32, .NONE, .NONE}, 0xF400010F, 0xFFF00F0F, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
 	},
 
 	// ---- VMULL / VMLAL / VMLSL (widening multiplies) ----

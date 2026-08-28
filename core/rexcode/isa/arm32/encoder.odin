@@ -287,8 +287,10 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	case .DPR_ELEM: return op.kind == .REGISTER && is_dpr(op.reg)
 	case .QPR_ELEM: return op.kind == .REGISTER && is_qpr(op.reg)
 	case .SPR_ELEM: return op.kind == .REGISTER && is_spr(op.reg)
-	case .SPR_LIST, .DPR_LIST:
-		return op.kind == .REG_LIST || (op.kind == .REGISTER && (is_spr(op.reg) || is_dpr(op.reg)))
+	case .SPR_LIST:
+		return op.kind == .REGISTER && is_spr(op.reg)
+	case .DPR_LIST:
+		return op.kind == .REGISTER && is_dpr(op.reg)
 	case .IMM, .IMM_MOD, .IMM_T32_MOD, .IMM12, .IMM5, .IMM5_W,
 	     .IMM4, .IMM4_SAT, .IMM8, .IMM3, .IMM_HINT, .IMM_BARRIER,
 	     .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
@@ -495,8 +497,16 @@ pack_operand_inline :: #force_inline proc(
 	case .NEON_OP_BIT:      return (u32(op.immediate) & 1) << 5
 
 	// ---- VFP/NEON register lists (LDM/STM/PUSH/POP for FP regs) ------------
-	case .VFP_S_LIST, .VFP_D_LIST:
-		return u32(op.immediate) & 0xFF
+	case .NEON_D_LIST_1, .NEON_D_LIST_2, .NEON_D_LIST_3, .NEON_D_LIST_4, .NEON_D_LIST_2X, .NEON_D_LIST_3X, .NEON_D_LIST_4X, .NEON_D_LIST_ALL:
+		// Only Vd; the count lives in the form's type field.
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12
+	case .VFP_S_LIST:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 1) & 0xF) << 12 | (n & 1) << 22 | (u32(op.list.count) & 0xFF)
+	case .VFP_D_LIST:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | ((u32(op.list.count) * 2) & 0xFF)
 
 	// ---- Memory addressing composites --------------------------------------
 	case .MEM_IMM12_OFFSET:
