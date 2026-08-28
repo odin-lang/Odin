@@ -203,6 +203,12 @@ Operand_Type :: enum u8 {
 	// needs; a store writes it bare.
 	PN_REG, PN_REG_ZERO,
 	ZT_REG,        // ZT0 -- SME2's lookup table, and the only one of its kind
+	ZA_ARRAY,      // a ZA array vector, addressed by Wn plus an offset
+	// A Z register written as a table list. SVE's TBL takes one table or two,
+	// and unlike LD2 the caller chooses which, so the count has to be in the
+	// operand type for the matcher to tell the two forms apart.
+	Z_LIST1_B, Z_LIST1_H, Z_LIST1_S, Z_LIST1_D,
+	Z_LIST2_B,
 	// A predicate that is written with an element size because it is the
 	// instruction's destination (`cmpge p0.b, p1/z, ...`).
 	P_REG_B, P_REG_H, P_REG_S, P_REG_D,
@@ -412,6 +418,8 @@ Operand_Encoding :: enum u8 {
 	PNG,              // bits 10-12, predicate-as-counter (SME2)
 	ENC_ZT0,          // no bits at all; there is only one ZT register
 	LUTI_IDX,         // bits 15-16, LUTI2/LUTI4 table index
+	SME_ZA_ARRAY,     // `za[w12, 0]` -- a vector of the ZA array, not a tile
+	SME_ZA_MASK,      // bits 0-7, ZERO's per-tile mask
 	// SVE scalar+scalar addressing scales the index by the access size, and the
 	// assembler wants that written out (`[x0, x0, lsl #2]`). The amount is a
 	// property of the form, so it rides on the encoding.

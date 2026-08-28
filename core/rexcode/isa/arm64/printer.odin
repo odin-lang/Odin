@@ -395,6 +395,46 @@ write_sysreg :: proc(sb: ^strings.Builder, sr: System_Register, uppercase: bool)
 	}
 }
 
+// ZERO's tile list: the largest tiles that exactly cover the mask, biggest
+// first, so a mask of every bit reads `{za}` rather than eight .d tiles.
+@(private="file")
+write_za_tile_mask :: proc(sb: ^strings.Builder, mask: u8, opts: ^Print_Options) {
+	strings.write_byte(sb, '{')
+	rest  := mask
+	first := true
+	emit :: proc(sb: ^strings.Builder, first: ^bool, opts: ^Print_Options, n: int, suffix: string) {
+		if !first^ {
+			strings.write_byte(sb, ',')
+			if opts.space_after_comma { strings.write_byte(sb, ' ') }
+		}
+		first^ = false
+		strings.write_string(sb, opts.uppercase ? "ZA" : "za")
+		write_decimal_u32(sb, u32(n))
+		if suffix != "" {
+			strings.write_byte(sb, '.')
+			strings.write_string(sb, suffix)
+		}
+	}
+	if rest == 0xFF {
+		strings.write_string(sb, opts.uppercase ? "ZA" : "za")
+		strings.write_byte(sb, '}')
+		return
+	}
+	for n in 0 ..< 2 {
+		bit := u8(0x55) << u8(n)
+		if rest & bit == bit { emit(sb, &first, opts, n, opts.uppercase ? "H" : "h"); rest &~= bit }
+	}
+	for n in 0 ..< 4 {
+		bit := u8(0x11) << u8(n)
+		if rest & bit == bit { emit(sb, &first, opts, n, opts.uppercase ? "S" : "s"); rest &~= bit }
+	}
+	for n in 0 ..< 8 {
+		bit := u8(1) << u8(n)
+		if rest & bit == bit { emit(sb, &first, opts, n, opts.uppercase ? "D" : "d"); rest &~= bit }
+	}
+	strings.write_byte(sb, '}')
+}
+
 @(private="file")
 write_lowercase :: proc(sb: ^strings.Builder, s: string, uppercase: bool) {
 	for i in 0 ..< len(s) {
@@ -549,6 +589,9 @@ write_operand :: proc(
 				write_lowercase(sb, name, opts.uppercase)
 				return
 			}
+		} else if op.size == ZA_TILE_MASK {
+			write_za_tile_mask(sb, u8(op.immediate), opts)
+			return
 		} else if op.size == SVE_MUL_IMM {
 			strings.write_string(sb, opts.uppercase ? "MUL #" : "mul #")
 			write_signed_decimal(sb, op.immediate)
@@ -561,11 +604,13 @@ write_operand :: proc(
 		write_sysreg(sb, op.sysreg, opts.uppercase)
 
 	case .ZA_SLICE:
-		// `za0h.b[w12, 0]`
+		// `za0h.b[w12, 0]`, or plain `za[w12, 0]` for a whole array vector
 		strings.write_string(sb, opts.uppercase ? "ZA" : "za")
-		write_decimal_u32(sb, u32(op.za.tile))
-		strings.write_byte(sb, op.za.vertical ? (opts.uppercase ? 'V' : 'v') : (opts.uppercase ? 'H' : 'h'))
-		write_vector_shape(sb, Register(REG_Z), op.za.elem, opts.uppercase)
+		if op.za.elem != 0 {
+			write_decimal_u32(sb, u32(op.za.tile))
+			strings.write_byte(sb, op.za.vertical ? (opts.uppercase ? 'V' : 'v') : (opts.uppercase ? 'H' : 'h'))
+			write_vector_shape(sb, Register(REG_Z), op.za.elem, opts.uppercase)
+		}
 		strings.write_byte(sb, '[')
 		strings.write_string(sb, opts.uppercase ? "W" : "w")
 		write_decimal_u32(sb, 12 + u32(op.za.ws))

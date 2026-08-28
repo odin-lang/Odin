@@ -263,6 +263,12 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_PN
 	case .ZT_REG:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_ZT
+	case .ZA_ARRAY:
+		return op.kind == .ZA_SLICE
+	case .Z_LIST1_B, .Z_LIST1_H, .Z_LIST1_S, .Z_LIST1_D:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && op.list_count <= 1
+	case .Z_LIST2_B:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z && op.list_count == 2
 	// The first register of a pair must be even, of a quad a multiple of four.
 	case .Z_REG_ANY:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_Z
@@ -661,6 +667,10 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0xF) << 5
 	case .PM:
 		return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .SME_ZA_MASK:
+		return u32(op.immediate) & 0xFF
+	case .SME_ZA_ARRAY:
+		return ((u32(op.za.ws) & 0x3) << 13) | (u32(op.za.offset) & 0xF)
 	case .ENC_ZT0:
 		return 0
 	case .LUTI_IDX:
@@ -852,8 +862,7 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0x3F) << 10
 
 	case .ENC_Z_PAIR_VD, .ENC_Z_QUAD_VD:
-		// Pack first Z reg into Vd slot (bits 4:0).
-		return (u32(reg_hw(op.reg)) & 0x1F) << 0
+		return u32(reg_hw(op.reg)) & (enc == .ENC_Z_PAIR_VD ? 0x1E : 0x1C)
 	case .ENC_Z_PAIR_VN, .ENC_Z_QUAD_VN:
 		return (u32(reg_hw(op.reg)) & 0x1F) << 5
 	case .ENC_Z_PAIR_VM, .ENC_Z_QUAD_VM:

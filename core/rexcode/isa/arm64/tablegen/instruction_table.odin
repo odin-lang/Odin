@@ -555,7 +555,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.LDR,            {.Q_REG,   .MEM_OFFSET, .NONE, .NONE, .NONE}, {.RT,       .OFFSET_BASE_U12,    .NONE, .NONE, .NONE}, 0x3DC00000, 0xFFC00000, .FP,   {}},      Clobber{written={0}, read={1}, reads_mem=true}},
 		{{.LDR,            {.Z_REG_ANY, .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.VD,       .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0x85804000, 0xFFE0E000, .SVE,  {}},      Clobber{written={0}, read={1}, reads_mem=true}},
 		{{.LDR,            {.P_REG,     .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.PD,       .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0x85800000, 0xFFE0E010, .SVE,  {}},    Clobber{written={0}, read={1}, reads_mem=true}},
-		{{.LDR,            {.IMM_5,   .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.SVE_IMM5, .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0xE1000000, 0xFFE08000, .SME,  {}},      Clobber{read={1}, reads_mem=true}},
+		{{.LDR,            {.ZA_ARRAY, .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.SME_ZA_ARRAY, .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0xE1000000, 0xFFE08000, .SME,  {}},      Clobber{read={1}, reads_mem=true}},
 	},
 	.STR = {
 		{{.STR,            {.W_REG,   .MEM_OFFSET, .NONE, .NONE, .NONE}, {.RT,       .OFFSET_BASE_U12,    .NONE, .NONE, .NONE}, 0xB9000000, 0xFFC00000, .BASE, {}},      Clobber{read={0, 1}, writes_mem=true}},
@@ -573,7 +573,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.STR,            {.Q_REG,   .MEM_OFFSET, .NONE, .NONE, .NONE}, {.RT,       .OFFSET_BASE_U12,    .NONE, .NONE, .NONE}, 0x3D800000, 0xFFC00000, .FP,   {}},      Clobber{read={0, 1}, writes_mem=true}},
 		{{.STR,            {.Z_REG_ANY, .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.VD,       .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0xE5804000, 0xFFE0E000, .SVE,  {}},      Clobber{read={0, 1}, writes_mem=true}},
 		{{.STR,            {.P_REG,     .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.PD,       .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0xE5800000, 0xFFE0E010, .SVE,  {}},    Clobber{read={0, 1}, writes_mem=true}},
-		{{.STR,            {.IMM_5,   .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.SVE_IMM5, .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0xE1200000, 0xFFE08000, .SME,  {}},      Clobber{read={1}, writes_mem=true}},
+		{{.STR,            {.ZA_ARRAY, .MEM_SVE_SI, .NONE, .NONE, .NONE}, {.SME_ZA_ARRAY, .SVE_OFFSET_BASE_SI, .NONE, .NONE, .NONE}, 0xE1200000, 0xFFE08000, .SME,  {}},      Clobber{read={1}, writes_mem=true}},
 	},
 	.LDRB = {
 		{{.LDRB,           {.W_REG, .MEM_OFFSET, .NONE, .NONE, .NONE}, {.RT, .OFFSET_BASE_U12,  .NONE, .NONE, .NONE}, 0x39400000, 0xFFC00000, .BASE, {}}, Clobber{written={0}, read={1}, reads_mem=true}},
@@ -3050,10 +3050,11 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	.TBL = {
 		{{.TBL,            {.V_8B,    .V_16B,        .V_8B,    .NONE, .NONE}, {.VD, .VN_LIST1, .VM, .NONE, .NONE}, 0x0E000000, 0xFFE0FC00, .NEON, {}}, Clobber{written={0}, read={1, 2}}},
 		{{.TBL,            {.V_16B,   .V_16B,        .V_16B,   .NONE, .NONE}, {.VD, .VN_LIST1, .VM, .NONE, .NONE}, 0x4E000000, 0xFFE0FC00, .NEON, {}}, Clobber{written={0}, read={1, 2}}},
-		{{.TBL,            {.Z_REG_B, .Z_REG_B, .Z_REG_B, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0x05203000, 0xFFE0FC00, .SVE,  {}},      Clobber{written={0}, read={1, 2}}},
-		{{.TBL,            {.Z_REG_H, .Z_REG_H, .Z_REG_H, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0x05603000, 0xFFE0FC00, .SVE,  {}},      Clobber{written={0}, read={1, 2}}},
-		{{.TBL,            {.Z_REG_S, .Z_REG_S, .Z_REG_S, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0x05A03000, 0xFFE0FC00, .SVE,  {}},      Clobber{written={0}, read={1, 2}}},
-		{{.TBL,            {.Z_REG_D, .Z_REG_D, .Z_REG_D, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0x05E03000, 0xFFE0FC00, .SVE,  {is_64=true}}, Clobber{written={0}, read={1, 2}}},
+		{{.TBL,            {.Z_REG_B, .Z_LIST1_B, .Z_REG_B, .NONE, .NONE}, {.VD, .VN_LIST1, .VM, .NONE, .NONE}, 0x05203000, 0xFFE0FC00, .SVE,  {}},      Clobber{written={0}, read={1, 2}}},
+		{{.TBL,            {.Z_REG_H, .Z_LIST1_H, .Z_REG_H, .NONE, .NONE}, {.VD, .VN_LIST1, .VM, .NONE, .NONE}, 0x05603000, 0xFFE0FC00, .SVE,  {}},      Clobber{written={0}, read={1, 2}}},
+		{{.TBL,            {.Z_REG_S, .Z_LIST1_S, .Z_REG_S, .NONE, .NONE}, {.VD, .VN_LIST1, .VM, .NONE, .NONE}, 0x05A03000, 0xFFE0FC00, .SVE,  {}},      Clobber{written={0}, read={1, 2}}},
+		{{.TBL,            {.Z_REG_D, .Z_LIST1_D, .Z_REG_D, .NONE, .NONE}, {.VD, .VN_LIST1, .VM, .NONE, .NONE}, 0x05E03000, 0xFFE0FC00, .SVE,  {is_64=true}}, Clobber{written={0}, read={1, 2}}},
+		{{.TBL,            {.Z_REG_B, .Z_LIST2_B, .Z_REG_B, .NONE, .NONE}, {.VD, .VN_LIST2, .VM, .NONE, .NONE}, 0x05202800, 0xFFE0FC00, .SVE2, {}}, Clobber{written={0}, read={1, 2}}},
 	},
 	.TBX = {
 		{{.TBX,            {.V_8B,    .V_16B,        .V_8B,    .NONE, .NONE}, {.VD, .VN_LIST1, .VM, .NONE, .NONE}, 0x0E001000, 0xFFE0FC00, .NEON, {}}, Clobber{written={0}, read={0, 1, 2}}},
@@ -3635,9 +3636,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.SBCLT,          {.Z_REG_S, .Z_REG_S, .Z_REG_S, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0x4580D400, 0xFFE0FC00, .SVE2, {}},      Clobber{written={0}, read={1, 2}}},
 		{{.SBCLT,          {.Z_REG_D, .Z_REG_D, .Z_REG_D, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0x45C0D400, 0xFFE0FC00, .SVE2, {is_64=true}}, Clobber{written={0}, read={1, 2}}},
 	},
-	.TBL2 = {
-		{{.TBL2,           {.Z_REG_B, .Z_REG_B, .Z_REG_B, .NONE, .NONE}, {.VD, .VN, .VM, .NONE, .NONE}, 0x05202800, 0xFFE0FC00, .SVE2, {}}, Clobber{written={0}, read={1, 2}}},
-	},
+
 	.MATCH = {
 		{{.MATCH,          {.P_REG_B, .P_REG_ZERO, .Z_REG_B, .Z_REG_B, .NONE}, {.PD, .PG, .VN, .VM, .NONE}, 0x45208000, 0xFFE0E010, .SVE2, {sets_flags=true}}, Clobber{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}}},
 		{{.MATCH,          {.P_REG_H, .P_REG_ZERO, .Z_REG_H, .Z_REG_H, .NONE}, {.PD, .PG, .VN, .VM, .NONE}, 0x45608000, 0xFFE0E010, .SVE2, {sets_flags=true}}, Clobber{written={0}, read={1, 2, 3}, nzcv_wr={.N, .Z, .C, .V}}},
@@ -3669,7 +3668,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.ADDVA,          {.ZA_TILE_S, .P_REG_MERGE, .P_REG_MERGE, .Z_REG_S, .NONE}, {.ZA_TILE_LOW, .PG, .PM3, .VN, .NONE}, 0xC0910000, 0xFFFF001C, .SME, {}}, Clobber{written={0}, read={0, 1, 2, 3}}},
 	},
 	.ZERO = {
-		{{.ZERO,           {.SME_PATTERN, .NONE, .NONE, .NONE, .NONE}, {.SME_PATTERN_FIELD, .NONE, .NONE, .NONE, .NONE}, 0xC0080000, 0xFFFFFF00, .SME, {}}, Clobber{}},
+		{{.ZERO,           {.SME_PATTERN, .NONE, .NONE, .NONE, .NONE}, {.SME_ZA_MASK, .NONE, .NONE, .NONE, .NONE}, 0xC0080000, 0xFFFFFF00, .SME, {}}, Clobber{}},
 	},
 	.FMOPA = {
 		{{.FMOPA,          {.ZA_TILE_S, .P_REG_MERGE, .P_REG_MERGE, .Z_REG_S, .Z_REG_S}, {.ZA_TILE_NUM_S, .PG, .PM3, .VN, .VM}, 0x80800000, 0xFFE08010, .SME, {}}, Clobber{written={0}, read={0, 1, 2, 3}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},

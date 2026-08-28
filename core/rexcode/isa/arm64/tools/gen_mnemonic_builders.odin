@@ -129,6 +129,7 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 	     .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		return .REG
 	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_REG_ANY,
+	     .Z_LIST1_B, .Z_LIST1_H, .Z_LIST1_S, .Z_LIST1_D, .Z_LIST2_B,
 	     .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D,
 	     .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
 		return .ZREG
@@ -182,9 +183,9 @@ list_count :: proc(e: a.Operand_Encoding) -> int {
 // The ZSHAPE_* constant naming this operand type's SVE element width.
 zshape_const :: proc(t: a.Operand_Type) -> string {
 	#partial switch t {
-	case .Z_REG_H, .Z_PAIR_H, .Z_QUAD_H: return "ZSHAPE_H"
-	case .Z_REG_S, .Z_PAIR_S, .Z_QUAD_S: return "ZSHAPE_S"
-	case .Z_REG_D, .Z_PAIR_D, .Z_QUAD_D: return "ZSHAPE_D"
+	case .Z_REG_H, .Z_PAIR_H, .Z_QUAD_H, .Z_LIST1_H: return "ZSHAPE_H"
+	case .Z_REG_S, .Z_PAIR_S, .Z_QUAD_S, .Z_LIST1_S: return "ZSHAPE_S"
+	case .Z_REG_D, .Z_PAIR_D, .Z_QUAD_D, .Z_LIST1_D: return "ZSHAPE_D"
 	}
 	return "ZSHAPE_B"
 }
@@ -253,6 +254,11 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 	case .Z_REG_H:  return "zh"
 	case .Z_REG_S:  return "zs"
 	case .Z_REG_D:  return "zd"
+	case .Z_LIST1_B: return "zl1b"
+	case .Z_LIST1_H: return "zl1h"
+	case .Z_LIST1_S: return "zl1s"
+	case .Z_LIST1_D: return "zl1d"
+	case .Z_LIST2_B: return "zl2b"
 	case .Z_PAIR_B: return "zpb"
 	case .Z_PAIR_H: return "zph"
 	case .Z_PAIR_S: return "zps"

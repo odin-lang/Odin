@@ -181,6 +181,11 @@ LANE_INDEX :: u8(0xFF)
 SVE_PATTERN_IMM :: u8(0xFE)
 SVE_MUL_IMM     :: u8(0xFD)
 
+// ZERO's operand is an 8-bit mask, one bit per .d tile, written as the list of
+// the largest tiles that exactly cover it: a .s tile is two .d tiles four
+// apart, a .h tile is four two apart, and the single .b tile is all eight.
+ZA_TILE_MASK :: u8(0xFC)
+
 // The 32 SVE element-count patterns; the gaps are reserved and print as a
 // bare number.
 @(rodata)

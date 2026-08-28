@@ -507,6 +507,11 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{reg = Register(REG_P | u16((word >> 5) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
 	case .PM:
 		return Operand{reg = Register(REG_P | u16((word >> 16) & 0xF)), kind = .REGISTER, size = pqual_for_type(ot)}
+	case .SME_ZA_MASK:
+		return Operand{immediate = i64(word & 0xFF), kind = .IMMEDIATE, size = ZA_TILE_MASK}
+	case .SME_ZA_ARRAY:
+		// elem 0 marks it as an array vector rather than a tile slice.
+		return op_za_slice(0, u8((word >> 13) & 0x3), u8(word & 0xF), 0)
 	case .ENC_ZT0:
 		return Operand{reg = ZT0, kind = .REGISTER, size = 0}
 	case .LUTI_IDX:
@@ -702,8 +707,12 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .ENC_ROR_SHIFT:
 		return Operand{immediate = i64((word >> 10) & 0x3F), kind = .IMMEDIATE, size = 1}
 	case .ENC_Z_PAIR_VD, .ENC_Z_QUAD_VD:
-		return Operand{reg = Register(REG_Z | u16(word & 0x1F)), kind = .REGISTER,
-		               size = reg_size_for_type(ot), list_count = en == .ENC_Z_PAIR_VD ? 2 : 4}
+		// A pair starts on an even register and a quad on a multiple of four,
+		// so the bits below that are not part of the field -- ZIP and UZP tell
+		// themselves apart with them.
+		pair := en == .ENC_Z_PAIR_VD
+		return Operand{reg = Register(REG_Z | u16(word & (pair ? 0x1E : 0x1C))), kind = .REGISTER,
+		               size = reg_size_for_type(ot), list_count = pair ? 2 : 4}
 	case .ENC_Z_PAIR_VN, .ENC_Z_QUAD_VN:
 		return Operand{reg = Register(REG_Z | u16((word >> 5) & 0x1F)), kind = .REGISTER,
 		               size = reg_size_for_type(ot), list_count = en == .ENC_Z_PAIR_VN ? 2 : 4}
@@ -737,7 +746,8 @@ reg_from_field :: #force_inline proc "contextless" (
 		 .V_4H_FP16, .V_8H_FP16, .V_1Q,
 		 .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		cls = REG_V
-	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_REG_ANY:
+	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_REG_ANY,
+	     .Z_LIST1_B, .Z_LIST1_H, .Z_LIST1_S, .Z_LIST1_D, .Z_LIST2_B:
 		cls = REG_Z
 	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV,
 	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
@@ -746,6 +756,8 @@ reg_from_field :: #force_inline proc "contextless" (
 		cls = REG_PN
 	case .ZT_REG:
 		cls = REG_ZT
+	case .ZA_ARRAY:
+		cls = REG_ZA
 	case .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D,
 	     .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
 		cls = REG_Z
@@ -786,6 +798,10 @@ reg_size_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
 	case .Z_REG_S:              return 4
 	case .Z_REG_D:              return 8
 	case .Z_REG_ANY:            return 0   // no element size in the syntax
+	case .Z_LIST1_B, .Z_LIST2_B: return 1
+	case .Z_LIST1_H:            return 2
+	case .Z_LIST1_S:            return 4
+	case .Z_LIST1_D:            return 8
 	case .P_REG_ZERO, .PN_REG_ZERO: return PQUAL_ZERO
 	case .P_REG_MERGE:          return PQUAL_MERGE
 	case .P_REG_B:              return PSHAPE_B
