@@ -1752,16 +1752,16 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.SM3SS1,         {.V_4S, .V_4S, .V_4S, .V_4S}, {.VD, .VN, .VM, .VA}, 0xCE400000, 0xFFE08000, .CRYPTO, {}},                                                          {written={0}, read={1, 2, 3}}},
 	},
 	.SM3TT1A = {
-		{{.SM3TT1A,        {.V_4S, .V_4S, .V_ELEM_S, .NONE}, {.VD, .VN, .VM, .NONE}, 0xCE408000, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
+		{{.SM3TT1A,        {.V_4S, .V_4S, .V_ELEM_S, .VEC_INDEX}, {.VD, .VN, .VM, .NEON_IDX2}, 0xCE408000, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
 	},
 	.SM3TT1B = {
-		{{.SM3TT1B,        {.V_4S, .V_4S, .V_ELEM_S, .NONE}, {.VD, .VN, .VM, .NONE}, 0xCE408400, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
+		{{.SM3TT1B,        {.V_4S, .V_4S, .V_ELEM_S, .VEC_INDEX}, {.VD, .VN, .VM, .NEON_IDX2}, 0xCE408400, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
 	},
 	.SM3TT2A = {
-		{{.SM3TT2A,        {.V_4S, .V_4S, .V_ELEM_S, .NONE}, {.VD, .VN, .VM, .NONE}, 0xCE408800, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
+		{{.SM3TT2A,        {.V_4S, .V_4S, .V_ELEM_S, .VEC_INDEX}, {.VD, .VN, .VM, .NEON_IDX2}, 0xCE408800, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
 	},
 	.SM3TT2B = {
-		{{.SM3TT2B,        {.V_4S, .V_4S, .V_ELEM_S, .NONE}, {.VD, .VN, .VM, .NONE}, 0xCE408C00, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
+		{{.SM3TT2B,        {.V_4S, .V_4S, .V_ELEM_S, .VEC_INDEX}, {.VD, .VN, .VM, .NEON_IDX2}, 0xCE408C00, 0xFFE0CC00, .CRYPTO, {}},                                                    {written={0}, read={0, 1, 2}}},
 	},
 	.SM4E = {
 		{{.SM4E,           {.V_4S, .V_4S, .NONE, .NONE}, {.VD, .VN, .NONE, .NONE}, 0xCEC08400, 0xFFFFFC00, .CRYPTO, {}},                                                      {written={0}, read={0, 1}}},
@@ -1771,11 +1771,11 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	},
 	.PMULL = {
 		{{.PMULL,          {.V_8H, .V_8B, .V_8B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E20E000, 0xFFE0FC00, .CRYPTO, {}},                                                        {written={0}, read={1, 2}}},
-		{{.PMULL,          {.V_2D, .V_1D, .V_1D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EE0E000, 0xFFE0FC00, .CRYPTO, {}},                                                        {written={0}, read={1, 2}}},
+		{{.PMULL,          {.V_1Q, .V_1D, .V_1D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x0EE0E000, 0xFFE0FC00, .CRYPTO, {}},                                                        {written={0}, read={1, 2}}},
 	},
 	.PMULL2 = {
 		{{.PMULL2,         {.V_8H, .V_16B, .V_16B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E20E000, 0xFFE0FC00, .CRYPTO, {}},                                                      {written={0}, read={1, 2}}},
-		{{.PMULL2,         {.V_2D, .V_2D,  .V_2D,  .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EE0E000, 0xFFE0FC00, .CRYPTO, {}},                                                      {written={0}, read={1, 2}}},
+		{{.PMULL2,         {.V_1Q, .V_2D,  .V_2D,  .NONE}, {.VD, .VN, .VM, .NONE}, 0x4EE0E000, 0xFFE0FC00, .CRYPTO, {}},                                                      {written={0}, read={1, 2}}},
 	},
 	.BFCVT = {
 		{{.BFCVT,          {.H_REG,   .S_REG,       .NONE,    .NONE}, {.RD, .RN, .NONE, .NONE}, 0x1E634000, 0xFFFFFC00, .BF16, {}},                                           {written={0}, read={1}, fpsr_wr={.IOC, .OFC, .UFC, .IXC, .IDC}, reads_fpcr=true}},
@@ -3039,16 +3039,16 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.EXT,            {.Z_REG_B, .Z_REG_B, .Z_REG_B, .IMM_8},     {.VD, .VD, .VM, .NONE},         0x05200000, 0xFFE0E000, .SVE,  {}},                                    {written={0}, read={1, 2}}},
 	},
 	.TBL = {
-		{{.TBL,            {.V_8B,    .V_16B,   .V_8B,    .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E000000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={1, 2}}},
-		{{.TBL,            {.V_16B,   .V_16B,   .V_16B,   .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E000000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={1, 2}}},
+		{{.TBL,            {.V_8B,    .V_LIST_16B,   .V_8B,    .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E000000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={1, 2}}},
+		{{.TBL,            {.V_16B,   .V_LIST_16B,   .V_16B,   .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E000000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={1, 2}}},
 		{{.TBL,            {.Z_REG_B, .Z_REG_B, .Z_REG_B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x05203000, 0xFFE0FC00, .SVE,  {}},                                                 {written={0}, read={1, 2}}},
 		{{.TBL,            {.Z_REG_H, .Z_REG_H, .Z_REG_H, .NONE}, {.VD, .VN, .VM, .NONE}, 0x05603000, 0xFFE0FC00, .SVE,  {}},                                                 {written={0}, read={1, 2}}},
 		{{.TBL,            {.Z_REG_S, .Z_REG_S, .Z_REG_S, .NONE}, {.VD, .VN, .VM, .NONE}, 0x05A03000, 0xFFE0FC00, .SVE,  {}},                                                 {written={0}, read={1, 2}}},
 		{{.TBL,            {.Z_REG_D, .Z_REG_D, .Z_REG_D, .NONE}, {.VD, .VN, .VM, .NONE}, 0x05E03000, 0xFFE0FC00, .SVE,  {is_64=true}},                                       {written={0}, read={1, 2}}},
 	},
 	.TBX = {
-		{{.TBX,            {.V_8B,    .V_16B,   .V_8B,    .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E001000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={0, 1, 2}}},
-		{{.TBX,            {.V_16B,   .V_16B,   .V_16B,   .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E001000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={0, 1, 2}}},
+		{{.TBX,            {.V_8B,    .V_LIST_16B,   .V_8B,    .NONE}, {.VD, .VN, .VM, .NONE}, 0x0E001000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={0, 1, 2}}},
+		{{.TBX,            {.V_16B,   .V_LIST_16B,   .V_16B,   .NONE}, {.VD, .VN, .VM, .NONE}, 0x4E001000, 0xFFE0FC00, .NEON, {}},                                                 {written={0}, read={0, 1, 2}}},
 		{{.TBX,            {.Z_REG_B, .Z_REG_B, .Z_REG_B, .NONE}, {.VD, .VN, .VM, .NONE}, 0x05202C00, 0xFFE0FC00, .SVE2, {}},                                                 {written={0}, read={0, 1, 2}}},
 	},
 	.ZIP1 = {

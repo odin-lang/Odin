@@ -127,15 +127,32 @@ sbprint :: proc(
 		if end_slot > 0 {
 			strings.write_byte(sb, ' ')
 			for slot in 0..<end_slot {
-				if slot > 0 {
+				op := &inst.ops[slot]
+				// A lane index belongs to the register before it, so it is
+				// written `[3]` with no separator rather than as an operand.
+				lane_index := op.kind == .IMMEDIATE && op.size == LANE_INDEX
+				if slot > 0 && !lane_index {
 					strings.write_byte(sb, ',')
 					if opts.space_after_comma { strings.write_byte(sb, ' ') }
 				}
-				if mov_wide && slot == 2 {
+				// A register the syntax writes as a list keeps its braces.
+				list := op.kind == .REGISTER && op.size == 80
+				switch {
+				case lane_index:
+					strings.write_byte(sb, '[')
+					write_decimal_u32(sb, u32(op.immediate))
+					strings.write_byte(sb, ']')
+				case mov_wide && slot == 2:
 					strings.write_string(sb, opts.uppercase ? "LSL #" : "lsl #")
-					write_decimal_u32(sb, u32(inst.ops[slot].immediate) * 16)
-				} else {
-					write_operand(sb, &inst.ops[slot], &display, opts)
+					write_decimal_u32(sb, u32(op.immediate) * 16)
+				case list:
+					strings.write_byte(sb, '{')
+					if opts.space_after_comma { strings.write_byte(sb, ' ') }
+					write_operand(sb, op, &display, opts)
+					if opts.space_after_comma { strings.write_byte(sb, ' ') }
+					strings.write_byte(sb, '}')
+				case:
+					write_operand(sb, op, &display, opts)
 				}
 			}
 			// CMLE/CMLT/FCMLE/FCMLT only ever compare against zero, and the
@@ -345,9 +362,9 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 // arrangements are multiples of 8, element views are odd, and the neutral 4
 // that every scalar class uses prints nothing.
 //
-// NOTE: an element-indexed operand still prints as `v0.s` -- the lane index
-// rides in a separate immediate operand, so `v0.s[2]` needs the printer to
-// fold that operand into this one, which it does not yet do.
+// A lane index arrives as its own immediate operand carrying the LANE_INDEX
+// marker; the operand loop glues it to the register it indexes (`v0.s[2]`)
+// instead of writing it as a separate `#2`.
 // A system register by name (`cntvct_el0`), falling back to the raw field
 // when it is not one we know.
 @(private="file")
@@ -382,6 +399,8 @@ write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercas
 		case 48: shape = "4s"
 		case 56: shape = "1d"
 		case 64: shape = "2d"
+		case 72: shape = "1q"
+		case 80: shape = "16b"   // written as a list; the braces are added by the caller
 		case 1:  shape = "b"
 		case 3:  shape = "h"
 		case 5:  shape = "s"

@@ -232,7 +232,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		else if imm5 & 0x2 != 0 { mb = 1 }
 		else if imm5 & 0x4 != 0 { mb = 2 }
 		else                    { mb = 3 }
-		return Operand{immediate = i64(imm5 >> (mb + 1)), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(imm5 >> (mb + 1)), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_IDX4:
 		// imm4 = index << markerbit; recover markerbit from imm5 in the word.
 		imm5 := (word >> 16) & 0x1F
@@ -241,7 +241,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		else if imm5 & 0x2 != 0 { mb = 1 }
 		else if imm5 & 0x4 != 0 { mb = 2 }
 		else                    { mb = 3 }
-		return Operand{immediate = i64(((word >> 11) & 0xF) >> mb), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(((word >> 11) & 0xF) >> mb), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_EXT_IDX:
 		return Operand{immediate = i64((word >> 11) & 0xF), kind = .IMMEDIATE, size = 1}
 	case .IMM5_HI:
@@ -264,15 +264,15 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(word & 0x7), kind = .IMMEDIATE, size = 1}
 	case .NEON_LANE_B:
 		i := ((word >> 30) & 0x1) << 3 | ((word >> 12) & 0x1) << 2 | ((word >> 10) & 0x3)
-		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_LANE_H:
 		i := ((word >> 30) & 0x1) << 2 | ((word >> 12) & 0x1) << 1 | ((word >> 11) & 0x1)
-		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_LANE_S:
 		i := ((word >> 30) & 0x1) << 1 | ((word >> 12) & 0x1)
-		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64(i), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .NEON_LANE_D:
-		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64((word >> 30) & 0x1), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .SVE_XAR_SHIFT:
 		tszh := (word >> 22) & 0x3
 		tszl := (word >> 19) & 0x3
@@ -626,6 +626,8 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		return Operand{immediate = i64(v), kind = .IMMEDIATE, size = 2}
 
 	// ---- Batch 3 misc immediates ----
+	case .NEON_IDX2:
+		return Operand{immediate = i64((word >> 12) & 0x3), kind = .IMMEDIATE, size = LANE_INDEX}
 	case .ENC_FCMLA_ROT:
 		return Operand{immediate = i64((word >> 12) & 0x3), kind = .IMMEDIATE, size = 1}
 	case .ENC_FCADD_ROT:
@@ -688,7 +690,7 @@ reg_from_field :: #force_inline proc "contextless" (
 	case .Q_REG:    cls = REG_Q
 	case .V_REG,
 		 .V_8B, .V_16B, .V_4H, .V_8H, .V_2S, .V_4S, .V_1D, .V_2D,
-		 .V_4H_FP16, .V_8H_FP16,
+		 .V_4H_FP16, .V_8H_FP16, .V_1Q, .V_LIST_16B,
 		 .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		cls = REG_V
 	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D:
@@ -722,6 +724,8 @@ reg_size_for_type :: #force_inline proc "contextless" (ot: Operand_Type) -> u8 {
 	case .V_4S:                 return 48
 	case .V_1D:                 return 56
 	case .V_2D:                 return 64
+	case .V_1Q:                 return 72
+	case .V_LIST_16B:           return 80
 	case .V_ELEM_B:             return 1
 	case .V_ELEM_H:             return 3
 	case .V_ELEM_S:             return 5

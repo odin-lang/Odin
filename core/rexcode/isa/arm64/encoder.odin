@@ -226,6 +226,10 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 56)
 	case .V_2D:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 64)
+	case .V_1Q:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 72)
+	case .V_LIST_16B:
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 80)
 	case .V_4H_FP16:
 		return op.kind == .REGISTER && reg_class(op.reg) == REG_V && (op.size == 0 || op.size == 24)
 	// Element-indexed V views: element size carried in op.size (B=1,H=2,S=4,
@@ -774,6 +778,8 @@ pack_operand_inline :: #force_inline proc(
 		return (vflag << 15) | (ws << 13) | tile
 
 	// ---- Batch 3 misc immediate encodings ----
+	case .NEON_IDX2:
+		return (u32(op.immediate) & 0x3) << 12
 	case .ENC_FCMLA_ROT:
 		// 2-bit rotation at bits 13:12 (0/1/2/3 = 0°/90°/180°/270°).
 		return (u32(op.immediate) & 0x3) << 12

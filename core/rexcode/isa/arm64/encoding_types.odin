@@ -200,6 +200,11 @@ Operand_Type :: enum u8 {
 	// ---- NEON element lane index (DUP/INS/EXT). The element-size marker
 	//      lives in the entry `bits`; the operand drives only the index bits. ----
 	VEC_INDEX,
+	V_1Q,          // NEON .1q -- one 128-bit lane (PMULL's destination). Not
+	               // expressible as lanes*elem-bytes, which is how the other
+	               // arrangements are coded, since 1*16 collides with 16B.
+	V_LIST_16B,    // a .16b register written as a list, `{v1.16b}` (TBL/TBX).
+	               // Only one-register lists are modelled so far.
 }
 
 // Where each operand's bits land in the 32-bit word.
@@ -385,6 +390,7 @@ Operand_Encoding :: enum u8 {
 
 	// ---- Misc new operand-encoding values (batch 3) ----
 	ENC_FCMLA_ROT,     // 2-bit rotation at bits 13:12 (FCMLA)
+	NEON_IDX2,         // 2-bit lane index at bits 13:12 (SM3TT)
 	ENC_FCADD_ROT,     // 1-bit rotation at bit 12 (FCADD)
 	ENC_SVE_PRFOP,     // 4-bit prefetch op at bits 3:0 (SVE PRFB/H/W/D)
 	ENC_LDRAA_IMM10,   // signed 10-bit imm10 at bits 21:12, scaled by 8 (LDRAA/B)

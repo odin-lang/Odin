@@ -153,6 +153,17 @@ op_cond :: #force_inline proc "contextless" (c: Cond) -> Operand {
 	return Operand{cond = u8(c), kind = .COND, size = 1}
 }
 
+// A vector lane index. It is a plain immediate in the encoding, but it prints
+// glued to the register it indexes (`v2.s[3]`) rather than as a separate
+// operand, so it is marked to tell it apart from an immediate that really is
+// one -- EXT's byte index, for instance, is written `#3`.
+LANE_INDEX :: u8(0xFF)
+
+@(require_results)
+op_lane_index :: #force_inline proc "contextless" (index: i64) -> Operand {
+	return Operand{immediate = index, kind = .IMMEDIATE, size = LANE_INDEX}
+}
+
 op_sysreg :: #force_inline proc "contextless" (sr: System_Register) -> Operand {
 	return Operand{sysreg = sr, kind = .SYSTEM_REGISTER, size = 2}
 }
@@ -227,6 +238,17 @@ op_v_1d  :: #force_inline proc "contextless" (r: Register) -> Operand {
 @(require_results)
 op_v_2d  :: #force_inline proc "contextless" (r: Register) -> Operand {
 	return Operand{reg = r, kind = .REGISTER, size = 64}
+}
+// .1q breaks the lanes*elem-bytes rule the others follow (1*16 would collide
+// with 16B), so it gets the next free multiple of 8.
+@(require_results)
+op_v_1q  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 72}
+}
+// A .16b register written as a one-element list, `{v1.16b}` (TBL/TBX).
+@(require_results)
+op_v_list_16b :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 80}
 }
 
 // Element-indexed V views (V0.B[i]/.H[i]/.S[i]/.D[i]). The element size rides

@@ -77,6 +77,11 @@ Operand_Category :: enum {
 
 Operand_Signature :: struct {
 	types: [4]a.Operand_Type,
+	// The encoding each operand uses. Needed because the operand TYPE is not
+	// always enough: .VEC_INDEX is a lane index under NEON_IDX*/NEON_LANE_*,
+	// which prints glued to its register, but EXT's byte index shares the type
+	// and prints as a plain `#3`.
+	encs:  [4]a.Operand_Encoding,
 	count: int,
 }
 
@@ -119,7 +124,7 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 	case .W_REG, .X_REG, .WSP_REG, .XSP_REG,
 	     .B_REG, .H_REG, .S_REG, .D_REG, .Q_REG, .V_REG,
 	     .V_8B, .V_16B, .V_4H, .V_8H, .V_2S, .V_4S, .V_1D, .V_2D,
-	     .V_4H_FP16, .V_8H_FP16,
+	     .V_4H_FP16, .V_8H_FP16, .V_1Q, .V_LIST_16B,
 	     .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		return .REG
 	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_PAIR, .Z_QUAD:
@@ -155,6 +160,18 @@ operand_param_count :: proc(t: a.Operand_Type) -> int {
 	return 1
 }
 
+// A lane index prints glued to the register it indexes, so it is built with
+// op_lane_index rather than op_imm. Keyed on the ENCODING: EXT writes its byte
+// index as a plain immediate while sharing the .VEC_INDEX operand type.
+is_lane_index :: proc(e: a.Operand_Encoding) -> bool {
+	#partial switch e {
+	case .NEON_IDX5, .NEON_IDX4, .NEON_IDX2,
+	     .NEON_LANE_B, .NEON_LANE_H, .NEON_LANE_S, .NEON_LANE_D:
+		return true
+	}
+	return false
+}
+
 // Width byte for op_imm / op_label (informational only; the matcher checks
 // operand kind, not size, so this never affects correctness).
 operand_imm_size :: proc(t: a.Operand_Type) -> u8 {
@@ -187,6 +204,8 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 	case .V_4S:             return "v4s"
 	case .V_1D:             return "v1d"
 	case .V_2D:             return "v2d"
+	case .V_1Q:             return "v1q"
+	case .V_LIST_16B:       return "vl16b"
 	case .V_ELEM_B:         return "veb"
 	case .V_ELEM_H:         return "veh"
 	case .V_ELEM_S:         return "ves"
@@ -223,6 +242,7 @@ build_signature :: proc(form: a.Encoding) -> (sig: Operand_Signature, ok: bool) 
 		if form.enc[i] == .IMPL { continue }
 
 		sig.types[sig.count] = op
+		sig.encs[sig.count]  = form.enc[i]
 		sig.count += 1
 	}
 	return sig, true
@@ -355,7 +375,7 @@ generate_proc_name :: proc(mnemonic: a.Mnemonic, sig: Operand_Signature) -> stri
 // the produced encoding is valid for the kept form).
 // -----------------------------------------------------------------------------
 
-write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]string) {
+write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, enc: a.Operand_Encoding, names: [3]string) {
 	#partial switch operand_category(t) {
 	case .REG:
 		#partial switch t {
@@ -367,6 +387,8 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]st
 		case .V_4S:  fmt.sbprintf(sb, "op_v_4s(%s)",  names[0])
 		case .V_1D:  fmt.sbprintf(sb, "op_v_1d(%s)",  names[0])
 		case .V_2D:  fmt.sbprintf(sb, "op_v_2d(%s)",  names[0])
+		case .V_1Q:  fmt.sbprintf(sb, "op_v_1q(%s)",  names[0])
+		case .V_LIST_16B: fmt.sbprintf(sb, "op_v_list_16b(%s)", names[0])
 		case .V_ELEM_B: fmt.sbprintf(sb, "op_v_elem_b(%s)", names[0])
 		case .V_ELEM_H: fmt.sbprintf(sb, "op_v_elem_h(%s)", names[0])
 		case .V_ELEM_S: fmt.sbprintf(sb, "op_v_elem_s(%s)", names[0])
@@ -384,7 +406,11 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]st
 	case .PREG:
 		fmt.sbprintf(sb, "op_reg(Register(REG_P | (u16(%s) & 0xF)))", names[0])
 	case .IMM:
-		fmt.sbprintf(sb, "op_imm(%s, %d)", names[0], operand_imm_size(t))
+		if is_lane_index(enc) {
+			fmt.sbprintf(sb, "op_lane_index(%s)", names[0])
+		} else {
+			fmt.sbprintf(sb, "op_imm(%s, %d)", names[0], operand_imm_size(t))
+		}
 	case .REL:
 		fmt.sbprintf(sb, "op_label(%s, 4)", names[0])
 	case .MEM:
@@ -499,7 +525,7 @@ write_inst_fallback :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 	for i in 0..<4 {
 		if i > 0 { strings.write_string(sb, ", ") }
 		if i < sig.count {
-			write_operand_expr(sb, sig.types[i], pnames[i])
+			write_operand_expr(sb, sig.types[i], sig.encs[i], pnames[i])
 		} else {
 			strings.write_string(sb, "{}")
 		}
