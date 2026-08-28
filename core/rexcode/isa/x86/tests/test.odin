@@ -3204,7 +3204,44 @@ tb_check :: proc(name: string, typed, generic: x86.Instruction) {
 	}
 }
 
+/* THE BUILDERS AND THE TABLES MUST BE THE SAME GENERATION.
+
+   `run_typed_builder_tests` below compares a HAND-LISTED sample of typed builders against the matcher
+   path, which is the right shape of check and covers about forty of 3820 builders. CALL r/m64 is not
+   among them — so when `9ae9a9bf9` shifted the encode table without regenerating the builders, its
+   baked hint 495 came to name JPE's `0F 8A` and this suite stayed green while every indirect call in
+   every JIT compiled to a conditional jump.
+
+   This closes it for ALL of them at once. A baked hint is valid exactly when it lands inside its own
+   mnemonic's run, so the whole invariant is a function of ENCODE_RUNS; the generator records a
+   fingerprint of the runs it generated against, and this compares it to the live table. Regenerating
+   the builders is what makes them agree again — one command, printed here so nobody has to find it. */
+run_builder_generation_test :: proc() {
+	fingerprint := u64(0xcbf2_9ce4_8422_2325)
+	for m in x86.Mnemonic {
+		r := x86.ENCODE_RUNS[m]
+		for part in ([2]u64{u64(r.start), u64(r.count)}) {
+			for shift: uint = 0; shift < 64; shift += 8 {
+				fingerprint = (fingerprint ~ ((part >> shift) & 0xff)) * 0x0000_0100_0000_01b3
+			}
+		}
+	}
+	if fingerprint == x86.BUILDER_TABLE_FINGERPRINT {
+		g_stats.passed += 1
+		g_stats.cases_validated += 1
+		return
+	}
+	g_stats.failed += 1
+	fmt.printf("    %sFAIL%s mnemonic_builders.odin is STALE: it bakes form indices for an ENCODE_RUNS\n", RED, RESET)
+	fmt.printf("         layout of %016x, but the loaded tables are %016x. Every builder past the\n",
+		x86.BUILDER_TABLE_FINGERPRINT, fingerprint)
+	fmt.printf("         first inserted form now names another mnemonic's encoding. Regenerate:\n")
+	fmt.printf("           odin run core/rexcode/isa/x86/tools/gen_mnemonic_builders.odin -file\n")
+}
+
 run_typed_builder_tests :: proc() {
+	run_builder_generation_test()
+
 	md8  := x86.mem_base_disp(x86.RBP, -16)
 	md32 := x86.mem_base_disp(x86.RCX, 100000)
 	mbi  := x86.mem_base_index_disp(x86.R8, x86.RDX, 4, 32)

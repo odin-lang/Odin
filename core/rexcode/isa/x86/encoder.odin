@@ -159,6 +159,27 @@ encode :: proc(
 		if mode == ._64 && inst.enc_hint != ENC_HINT_NONE && int(inst.enc_hint) <= len(ENCODE_FORMS) {
 			form_index = int(inst.enc_hint) - 1
 			matched_enc = &ENCODE_FORMS[form_index]
+			/* THE HINT MUST NAME A FORM OF THIS MNEMONIC. The bounds check above is not enough: the
+			   index is GLOBAL and baked into `mnemonic_builders.odin` at generation time, so any
+			   later edit to the encoding table that inserts or removes a form shifts every index
+			   after it and leaves the builders naming someone else's instruction. Nothing here
+			   noticed — the encoder took the form, emitted its bytes, and returned success.
+
+			   It has happened twice. `6e17e7a2d` left 2130 of 3671 builders pointing at the wrong
+			   form; `36af73834` regenerated both halves and cleared it; `baae2636b` (adding `in`
+			   and `out`) re-broke 37; `9ae9a9bf9` shifted an early mnemonic and broke 3393 of 3802,
+			   including CALL — whose r/m64 builder then encoded `0F 8A` (JPE) instead of `FF /2`,
+			   turning every indirect call into a conditional jump. The symptom was a segfault in a
+			   JIT'd program, arbitrarily far from the cause.
+
+			   Debug-only, so the release fast path is byte-for-byte what it was: this is a
+			   REGENERATION-TIME mistake, and it only has to be caught once by anyone running tests. */
+			when ODIN_DEBUG {
+				run := ENCODE_RUNS[inst.mnemonic]
+				if form_index < int(run.start) || form_index >= int(run.start) + int(run.count) {
+					panic("rexcode/x86: a baked enc_hint names a form outside its own mnemonic's run — mnemonic_builders.odin is stale relative to tables/x86.encode_*.bin. Regenerate it: odin run core/rexcode/isa/x86/tools/gen_mnemonic_builders.odin -file")
+				}
+			}
 		} else {
 			// Resolve the form on the matcher path (memoizing cache + scan) in a
 			// separate, non-inlined proc so this hot loop stays lean for the hint
