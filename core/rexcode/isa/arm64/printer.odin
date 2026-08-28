@@ -396,6 +396,18 @@ write_sysreg :: proc(sb: ^strings.Builder, sr: System_Register, uppercase: bool)
 }
 
 @(private="file")
+write_lowercase :: proc(sb: ^strings.Builder, s: string, uppercase: bool) {
+	for i in 0 ..< len(s) {
+		c := s[i]
+		if uppercase && c >= 'a' && c <= 'z' {
+			strings.write_byte(sb, c - 'a' + 'A')
+		} else {
+			strings.write_byte(sb, c)
+		}
+	}
+}
+
+@(private="file")
 write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercase: bool) {
 	shape := ""
 	sep := byte('.')
@@ -529,6 +541,19 @@ write_operand :: proc(
 		write_vector_shape(sb, op.reg, op.size, opts.uppercase)
 
 	case .IMMEDIATE:
+		// An SVE element-count pattern has a name, and its multiplier is
+		// written `mul #N` rather than as a bare immediate.
+		if op.size == SVE_PATTERN_IMM {
+			name := SVE_PATTERN_NAMES[op.immediate & 0x1F]
+			if name != "" {
+				write_lowercase(sb, name, opts.uppercase)
+				return
+			}
+		} else if op.size == SVE_MUL_IMM {
+			strings.write_string(sb, opts.uppercase ? "MUL #" : "mul #")
+			write_signed_decimal(sb, op.immediate)
+			return
+		}
 		strings.write_byte(sb, '#')
 		write_signed_decimal(sb, op.immediate)
 

@@ -176,6 +176,21 @@ op_cond :: #force_inline proc "contextless" (c: Cond) -> Operand {
 // one -- EXT's byte index, for instance, is written `#3`.
 LANE_INDEX :: u8(0xFF)
 
+// SVE writes its element-count pattern by name (`vl8`, `mul3`, `all`) and its
+// multiplier as `mul #N`, so both need telling apart from a plain immediate.
+SVE_PATTERN_IMM :: u8(0xFE)
+SVE_MUL_IMM     :: u8(0xFD)
+
+// The 32 SVE element-count patterns; the gaps are reserved and print as a
+// bare number.
+@(rodata)
+SVE_PATTERN_NAMES := [32]string{
+	"pow2", "vl1", "vl2", "vl3", "vl4", "vl5", "vl6", "vl7",
+	"vl8", "vl16", "vl32", "vl64", "vl128", "vl256", "", "",
+	"", "", "", "", "", "", "", "",
+	"", "", "", "", "", "mul4", "mul3", "all",
+}
+
 @(require_results)
 op_lane_index :: #force_inline proc "contextless" (index: i64) -> Operand {
 	return Operand{immediate = index, kind = .IMMEDIATE, size = LANE_INDEX}

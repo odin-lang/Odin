@@ -530,7 +530,10 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .SVE_SHIFT_TSZ_IMM:
 		return Operand{immediate = i64((word >> 16) & 0x7F), kind = .IMMEDIATE, size = 1}
 	case .SVE_PATTERN:
-		return Operand{immediate = i64((word >> 5) & 0x1F), kind = .IMMEDIATE, size = 1}
+		return Operand{immediate = i64((word >> 5) & 0x1F), kind = .IMMEDIATE, size = SVE_PATTERN_IMM}
+	case .IMM_MUL4:
+		// The field holds the multiplier minus one.
+		return Operand{immediate = i64(((word >> 16) & 0xF) + 1), kind = .IMMEDIATE, size = SVE_MUL_IMM}
 
 	// ---- SVE memory operands ----
 	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3,
