@@ -288,7 +288,8 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .ZA_SLICE
 
 	case .IMM_12, .IMM_16, .IMM_8, .IMM_6, .IMM_5, .IMM_4, .IMM_3, .IMM_2,
-		 .NZCV_IMM, .PSTATE_FIELD, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT, .VEC_INDEX:
+	     .NZCV_IMM, .PSTATE_FIELD, .HW_SHIFT, .LSE_SIZE, .VEC_SHIFT, .VEC_INDEX,
+	     .IMM_MUL4:
 		return op.kind == .IMMEDIATE
 	case .SYS_REG:
 		return op.kind == .SYSTEM_REGISTER
@@ -692,6 +693,16 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(op.immediate) & 0x7F) << 16
 	case .SVE_PATTERN:
 		return (u32(op.immediate) & 0x1F) << 5
+
+	case .IMM_MUL4:
+		// SVE element-count multiplier "MUL #imm" (INCW/DECW/CNTW/SQINCW/...).
+		// imm4 field at bits 19:16 encodes (imm - 1); asm range MUL #1..#16
+		// maps to 0..15. The operand carries the architectural multiplier
+		// (1..16), so subtract one here, matching the ENC_LSL_IMM_* /
+		// NEON_SHR_IMM convention of encoding the adjusted value.
+		mul := u32(op.immediate)
+		if mul == 0 { mul = 1 }
+		return ((mul - 1) & 0xF) << 16
 
 	// SVE memory operands
 	case .SVE_OFFSET_BASE_SS, .SVE_OFFSET_BASE_SS1, .SVE_OFFSET_BASE_SS2, .SVE_OFFSET_BASE_SS3,

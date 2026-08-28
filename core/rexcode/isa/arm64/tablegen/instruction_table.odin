@@ -391,6 +391,30 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.CSEL,           {.W_REG, .W_REG, .W_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x1A800000, 0xFFE00C00, .BASE, {}},      Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
 		{{.CSEL,           {.X_REG, .X_REG, .X_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x9A800000, 0xFFE00C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
 	},
+	.CSINC = {
+		{{.CSINC,          {.W_REG, .W_REG, .W_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x1A800400, 0xFFE00C00, .BASE, {}},      Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CSINC,          {.X_REG, .X_REG, .X_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x9A800400, 0xFFE00C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
+	},
+	.CSINV = {
+		{{.CSINV,          {.W_REG, .W_REG, .W_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x5A800000, 0xFFE00C00, .BASE, {}},      Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CSINV,          {.X_REG, .X_REG, .X_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0xDA800000, 0xFFE00C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
+	},
+	.CSNEG = {
+		{{.CSNEG,          {.W_REG, .W_REG, .W_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x5A800400, 0xFFE00C00, .BASE, {}},      Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CSNEG,          {.X_REG, .X_REG, .X_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0xDA800400, 0xFFE00C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
+	},
+	.CCMP = {
+		{{.CCMP,           {.W_REG, .W_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0x7A400000, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CCMP,           {.X_REG, .X_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0xFA400000, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CCMP,           {.W_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0x7A400800, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CCMP,           {.X_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0xFA400800, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+	},
+	.CCMN = {
+		{{.CCMN,           {.W_REG, .W_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0x3A400000, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CCMN,           {.X_REG, .X_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0xBA400000, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CCMN,           {.W_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0x3A400800, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+		{{.CCMN,           {.X_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0xBA400800, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
+	},
 	.CSET = {
 		{{.CSET,           {.W_REG, .COND_NOT_AL, .NONE, .NONE}, {.RD, .COND_HI_INV, .NONE, .NONE}, 0x1A9F07E0, 0xFFFF8FE0, .BASE, {}},      Clobber{written={0}, nzcv_rd={.N, .Z, .C, .V}}},
 		{{.CSET,           {.W_REG, .COND_NOT_AL, .NONE, .NONE}, {.RD, .COND_HI_INV, .NONE, .NONE}, 0x1A9F87E0, 0xFFFFCFE0, .BASE, {}},      Clobber{written={0}, nzcv_rd={.N, .Z, .C, .V}}},
@@ -430,30 +454,6 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.CNEG,           {.X_REG, .X_REG, .COND_NOT_AL, .NONE}, {.RD, .RN_RM, .COND_HI_INV, .NONE}, 0xDA800400, 0xFFE08C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1}, nzcv_rd={.N, .Z, .C, .V}}},
 		{{.CNEG,           {.X_REG, .X_REG, .COND_NOT_AL, .NONE}, {.RD, .RN_RM, .COND_HI_INV, .NONE}, 0xDA808400, 0xFFE0CC00, .BASE, {is_64=true}}, Clobber{written={0}, read={1}, nzcv_rd={.N, .Z, .C, .V}}},
 		{{.CNEG,           {.X_REG, .X_REG, .COND_NOT_AL, .NONE}, {.RD, .RN_RM, .COND_HI_INV, .NONE}, 0xDA80C400, 0xFFE0EC00, .BASE, {is_64=true}}, Clobber{written={0}, read={1}, nzcv_rd={.N, .Z, .C, .V}}},
-	},
-	.CSINC = {
-		{{.CSINC,          {.W_REG, .W_REG, .W_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x1A800400, 0xFFE00C00, .BASE, {}},      Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CSINC,          {.X_REG, .X_REG, .X_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x9A800400, 0xFFE00C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
-	},
-	.CSINV = {
-		{{.CSINV,          {.W_REG, .W_REG, .W_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x5A800000, 0xFFE00C00, .BASE, {}},      Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CSINV,          {.X_REG, .X_REG, .X_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0xDA800000, 0xFFE00C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
-	},
-	.CSNEG = {
-		{{.CSNEG,          {.W_REG, .W_REG, .W_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0x5A800400, 0xFFE00C00, .BASE, {}},      Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CSNEG,          {.X_REG, .X_REG, .X_REG, .COND}, {.RD, .RN, .RM, .COND_HI}, 0xDA800400, 0xFFE00C00, .BASE, {is_64=true}}, Clobber{written={0}, read={1, 2}, nzcv_rd={.N, .Z, .C, .V}}},
-	},
-	.CCMP = {
-		{{.CCMP,           {.W_REG, .W_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0x7A400000, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CCMP,           {.X_REG, .X_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0xFA400000, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CCMP,           {.W_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0x7A400800, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CCMP,           {.X_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0xFA400800, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
-	},
-	.CCMN = {
-		{{.CCMN,           {.W_REG, .W_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0x3A400000, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CCMN,           {.X_REG, .X_REG, .NZCV_IMM, .COND}, {.RN, .RM,      .NZCV_FIELD, .COND_HI}, 0xBA400000, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0, 1}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CCMN,           {.W_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0x3A400800, 0xFFE00C10, .BASE, {sets_flags=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
-		{{.CCMN,           {.X_REG, .IMM_5, .NZCV_IMM, .COND}, {.RN, .IMM5_HI, .NZCV_FIELD, .COND_HI}, 0xBA400800, 0xFFE00C10, .BASE, {sets_flags=true, is_64=true}}, Clobber{read={0}, nzcv_wr={.N, .Z, .C, .V}, nzcv_rd={.N, .Z, .C, .V}}},
 	},
 	.EXTR = {
 		{{.EXTR,           {.W_REG, .W_REG, .W_REG, .IMM_6}, {.RD, .RN, .RM, .IMM6}, 0x13800000, 0xFFE08000, .BASE, {}},      Clobber{written={0}, read={1, 2}}},
@@ -704,7 +704,7 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	},
 	.MSR = {
 		{{.MSR,            {.PSTATE_FIELD, .IMM_4, .NONE, .NONE}, {.MSR_PSTATE, .BARRIER_FIELD, .NONE, .NONE}, 0xD500401F, 0xFFF8F01F, .BASE, {}}, Clobber{side_effects={.PRIVILEGED}}},
-		{{.MSR,            {.SYS_REG, .X_REG, .NONE, .NONE}, {.SYS_FIELD,  .RT,            .NONE, .NONE}, 0xD5100000, 0xFFF00000, .BASE, {}},      Clobber{written={0}, read={1}, side_effects={.PRIVILEGED}}},
+		{{.MSR,            {.SYS_REG,      .X_REG, .NONE, .NONE}, {.SYS_FIELD,  .RT,            .NONE, .NONE}, 0xD5100000, 0xFFF00000, .BASE, {}}, Clobber{written={0}, read={1}, side_effects={.PRIVILEGED}}},
 	},
 	.ISB = {
 		{{.ISB,            {.IMM_4, .NONE, .NONE, .NONE}, {.BARRIER_FIELD, .NONE, .NONE, .NONE}, 0xD50330DF, 0xFFFFF0FF, .BASE, {}}, Clobber{side_effects={.ISYNC}}},
@@ -3679,6 +3679,200 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	},
 	.SUMOPA = {
 		{{.SUMOPA,         {.ZA_TILE_S, .P_REG_MERGE, .P_REG_MERGE, .Z_REG_B}, {.ZA_TILE_NUM_S, .PG, .PM3, .VN}, 0xA0A00000, 0xFFE08010, .SME, {}}, Clobber{written={0}, read={0, 1, 2, 3}}},
+	},
+	.CNTB = {
+		{{.CNTB,           {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0420E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}}},
+	},
+	.CNTH = {
+		{{.CNTH,           {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}}},
+	},
+	.CNTW = {
+		{{.CNTW,           {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}}},
+	},
+	.CNTD = {
+		{{.CNTD,           {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}}},
+	},
+	.INCB = {
+		{{.INCB,           {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0430E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+	},
+	.INCH = {
+		{{.INCH,           {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+		{{.INCH,           {.Z_REG_H, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470C000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}}},
+	},
+	.INCW = {
+		{{.INCW,           {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+		{{.INCW,           {.Z_REG_S, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0C000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}}},
+	},
+	.INCD = {
+		{{.INCD,           {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0E000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+		{{.INCD,           {.Z_REG_D, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0C000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}}},
+	},
+	.DECB = {
+		{{.DECB,           {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0430E400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+	},
+	.DECH = {
+		{{.DECH,           {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470E400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+		{{.DECH,           {.Z_REG_H, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470C400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}}},
+	},
+	.DECW = {
+		{{.DECW,           {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0E400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+		{{.DECW,           {.Z_REG_S, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0C400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}}},
+	},
+	.DECD = {
+		{{.DECD,           {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0E400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}}},
+		{{.DECD,           {.Z_REG_D, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0C400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}}},
+	},
+	.SQINCB = {
+		{{.SQINCB,         {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0430F000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQINCB,         {.W_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0420F000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.SQINCH = {
+		{{.SQINCH,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470F000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQINCH,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460F000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQINCH,         {.Z_REG_H, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460C000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.SQINCW = {
+		{{.SQINCW,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0F000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQINCW,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0F000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQINCW,         {.Z_REG_S, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0C000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.SQINCD = {
+		{{.SQINCD,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0F000, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQINCD,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0F000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQINCD,         {.Z_REG_D, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0C000, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.SQDECB = {
+		{{.SQDECB,         {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0430F800, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQDECB,         {.W_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0420F800, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.SQDECH = {
+		{{.SQDECH,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470F800, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQDECH,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460F800, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQDECH,         {.Z_REG_H, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460C800, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.SQDECW = {
+		{{.SQDECW,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0F800, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQDECW,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0F800, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQDECW,         {.Z_REG_S, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0C800, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.SQDECD = {
+		{{.SQDECD,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0F800, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQDECD,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0F800, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.SQDECD,         {.Z_REG_D, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0C800, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQINCB = {
+		{{.UQINCB,         {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0430F400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQINCB,         {.W_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0420F400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQINCH = {
+		{{.UQINCH,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470F400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQINCH,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460F400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQINCH,         {.Z_REG_H, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460C400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQINCW = {
+		{{.UQINCW,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0F400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQINCW,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0F400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQINCW,         {.Z_REG_S, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0C400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQINCD = {
+		{{.UQINCD,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0F400, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQINCD,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0F400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQINCD,         {.Z_REG_D, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0C400, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQDECB = {
+		{{.UQDECB,         {.X_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0430FC00, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQDECB,         {.W_REG, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0420FC00, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQDECH = {
+		{{.UQDECH,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0470FC00, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQDECH,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460FC00, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQDECH,         {.Z_REG_H, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x0460CC00, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQDECW = {
+		{{.UQDECW,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04B0FC00, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQDECW,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0FC00, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQDECW,         {.Z_REG_S, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04A0CC00, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.UQDECD = {
+		{{.UQDECD,         {.X_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04F0FC00, 0xFFF0FC00, .SVE, {is_64=true}}, Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQDECD,         {.W_REG,   .SVE_PATTERN, .IMM_MUL4, .NONE}, {.RD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0FC00, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+		{{.UQDECD,         {.Z_REG_D, .SVE_PATTERN, .IMM_MUL4, .NONE}, {.VD, .SVE_PATTERN, .IMM_MUL4, .NONE}, 0x04E0CC00, 0xFFF0FC00, .SVE, {}},      Clobber{written={0}, read={0}, fpsr_wr={.QC}}},
+	},
+	.CNTP = {
+		{{.CNTP,           {.X_REG, .P_REG_GOV, .P_REG, .NONE}, {.RD, .PG, .PN, .NONE}, 0x25208020, 0xFFFFE220, .SVE, {is_64=true}}, Clobber{written={0}, read={1, 2}}},
+		{{.CNTP,           {.X_REG, .P_REG_GOV, .P_REG, .NONE}, {.RD, .PG, .PN, .NONE}, 0x25608020, 0xFFFFE220, .SVE, {is_64=true}}, Clobber{written={0}, read={1, 2}}},
+		{{.CNTP,           {.X_REG, .P_REG_GOV, .P_REG, .NONE}, {.RD, .PG, .PN, .NONE}, 0x25A08020, 0xFFFFE220, .SVE, {is_64=true}}, Clobber{written={0}, read={1, 2}}},
+		{{.CNTP,           {.X_REG, .P_REG_GOV, .P_REG, .NONE}, {.RD, .PG, .PN, .NONE}, 0x25E08020, 0xFFFFE220, .SVE, {is_64=true}}, Clobber{written={0}, read={1, 2}}},
+	},
+	.INCP = {
+		{{.INCP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x252C8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.INCP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x256C8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.INCP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25AC8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.INCP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25EC8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.INCP,           {.Z_REG_H, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x256C8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}}},
+		{{.INCP,           {.Z_REG_S, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25AC8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}}},
+		{{.INCP,           {.Z_REG_D, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25EC8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}}},
+	},
+	.DECP = {
+		{{.DECP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x252D8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.DECP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x256D8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.DECP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25AD8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.DECP,           {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25ED8800, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}}},
+		{{.DECP,           {.Z_REG_H, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x256D8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}}},
+		{{.DECP,           {.Z_REG_S, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25AD8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}}},
+		{{.DECP,           {.Z_REG_D, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25ED8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}}},
+	},
+	.SQINCP = {
+		{{.SQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25288C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25688C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25A88C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25E88C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25288800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25688800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25A88800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25E88800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.Z_REG_H, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25688000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.Z_REG_S, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25A88000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQINCP,         {.Z_REG_D, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25E88000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+	},
+	.SQDECP = {
+		{{.SQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x252A8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x256A8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25AA8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25EA8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x252A8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x256A8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25AA8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25EA8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.Z_REG_H, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x256A8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.Z_REG_S, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25AA8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.SQDECP,         {.Z_REG_D, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25EA8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+	},
+	.UQINCP = {
+		{{.UQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25298C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25698C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25A98C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25E98C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25298800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25698800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25A98800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25E98800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.Z_REG_H, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25698000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.Z_REG_S, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25A98000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQINCP,         {.Z_REG_D, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25E98000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+	},
+	.UQDECP = {
+		{{.UQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x252B8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x256B8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25AB8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.X_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25EB8C00, 0xFFFFFE00, .SVE, {is_64=true}}, Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x252B8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x256B8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25AB8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.W_REG,   .P_REG, .NONE, .NONE}, {.RD, .PM, .NONE, .NONE}, 0x25EB8800, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.Z_REG_H, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x256B8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.Z_REG_S, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25AB8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
+		{{.UQDECP,         {.Z_REG_D, .P_REG, .NONE, .NONE}, {.VD, .PM, .NONE, .NONE}, 0x25EB8000, 0xFFFFFE00, .SVE, {}},      Clobber{written={0}, read={0, 1}, fpsr_wr={.QC}}},
 	},
 	.LD1Q = {
 		{{.LD1Q,           {.SME_SLICE_Q, .P_REG_ZERO, .MEM_SVE_SS, .NONE}, {.SME_SLICE_Q, .PG, .SVE_OFFSET_BASE_SS, .NONE}, 0xE1C00000, 0xFFE00010, .SME, {}}, Clobber{written={0}, read={1, 2}, reads_mem=true}},

@@ -392,6 +392,14 @@ Mnemonic :: enum u16 {
 	BFMOPA, BFMOPS,
 	SMOPA, SMOPS, UMOPA, UMOPS,
 	USMOPA, SUMOPA,
+	CNTB, CNTH, CNTW, CNTD,
+	INCB, INCH, INCW, INCD,
+	DECB, DECH, DECW, DECD,
+	SQINCB, SQINCH, SQINCW, SQINCD, SQDECB, SQDECH, SQDECW, SQDECD,
+	UQINCB, UQINCH, UQINCW, UQINCD, UQDECB, UQDECH, UQDECW, UQDECD,
+	CNTP, INCP, DECP,
+	SQINCP, SQDECP,
+	UQINCP, UQDECP,
 
 	// -------------------------------------------------------------------------
 	// SME tile slice load/store (LD1B/H/W/D/Q to ZA tile slice; ST1 reverse)
