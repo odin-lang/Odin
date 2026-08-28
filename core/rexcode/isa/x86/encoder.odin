@@ -334,8 +334,26 @@ encode :: proc(
 				pos += 1
 			}
 
-			// Address size override (67h)
-			if inst.flags.addr32 {
+			// Address size override (67h), when the CALLER asked for one. A form
+			// that requires a particular address size emits it below instead --
+			// this branch is inside the "any instruction flag is set" gate, and
+			// such a form needs the prefix whether or not the caller set a flag.
+			if inst.flags.addr32 && enc.flags.addr_size == .DEFAULT {
+				out[pos] = 0x67
+				pos += 1
+			}
+		}
+
+		// A form whose ADDRESS size is fixed (JRCXZ/JECXZ/JCXZ -- one opcode, the
+		// mnemonic saying which counter register) carries the prefix when its size
+		// is not the mode's default. Outside the flags gate above because it is a
+		// property of the ENCODING, not of the caller's request; `addr_size` is
+		// .DEFAULT for all but three forms, so the test is one compare against a
+		// field already loaded.
+		if enc.flags.addr_size != .DEFAULT {
+			// Reachability was settled by the matcher's gate, which refuses a form
+			// whose address size this mode cannot express.
+			if needs_67, _ := addr_size_prefix(enc.flags.addr_size, mode); needs_67 {
 				out[pos] = 0x67
 				pos += 1
 			}
@@ -890,6 +908,15 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// when not in Mode._32.
 	if enc.flags.mode_32_only && mode != ._32 {
 		return false
+	}
+
+	// Address-size gate: a form fixed to an address size this mode cannot reach
+	// is not encodable here at all -- JCXZ (16-bit) in long mode, where 67h
+	// selects 32-bit; JRCXZ (64-bit) outside it. Every other form is .DEFAULT.
+	if enc.flags.addr_size != .DEFAULT {
+		if _, reachable := addr_size_prefix(enc.flags.addr_size, mode); !reachable {
+			return false
+		}
 	}
 
 	// PUSH/POP FS/GS: the segment operand is fixed by the opcode (0F A0/A1 -> FS,

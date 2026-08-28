@@ -733,14 +733,20 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.JS, {.REL8,  .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0x78, 0, {}},         {flags_rd={.SF}, side_effects={.CONTROL}}},
 		{{.JS, {.REL32, .NONE, .NONE, .NONE}, {.ID, .NONE, .NONE, .NONE}, 0x88, 0, {esc=._0F}}, {flags_rd={.SF}, side_effects={.CONTROL}}},
 	},
+	/* 0xE3 is ONE opcode whose mnemonic is chosen by ADDRESS size -- which
+	   counter register it tests -- not by operand size. So the three are told
+	   apart by `addr_size` (67h against the mode default), never by REX.W, which
+	   does not affect address size at all: JRCXZ is a bare `E3 cb` in long mode
+	   and JECXZ is `67 E3 cb`; in protected mode JECXZ is bare and JCXZ takes
+	   the prefix, while JCXZ is unreachable in long mode and JRCXZ outside it. */
 	.JCXZ = {
-		{{.JCXZ, {.REL8, .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0xE3, 0, {}}, {implicit_rd={.RCX}, side_effects={.CONTROL}}},
+		{{.JCXZ, {.REL8, .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0xE3, 0, {addr_size=.A16}}, {implicit_rd={.RCX}, side_effects={.CONTROL}}},
 	},
 	.JECXZ = {
-		{{.JECXZ, {.REL8, .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0xE3, 0, {}}, {implicit_rd={.RCX}, side_effects={.CONTROL}}},
+		{{.JECXZ, {.REL8, .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0xE3, 0, {addr_size=.A32}}, {implicit_rd={.RCX}, side_effects={.CONTROL}}},
 	},
 	.JRCXZ = {
-		{{.JRCXZ, {.REL8, .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0xE3, 0, {force_rex_w=true}}, {implicit_rd={.RCX}, side_effects={.CONTROL}}},
+		{{.JRCXZ, {.REL8, .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0xE3, 0, {addr_size=.A64}}, {implicit_rd={.RCX}, side_effects={.CONTROL}}},
 	},
 	.LOOP = {
 		{{.LOOP, {.REL8, .NONE, .NONE, .NONE}, {.IB, .NONE, .NONE, .NONE}, 0xE2, 0, {}}, {implicit_wr={.RCX}, implicit_rd={.RCX}, side_effects={.CONTROL}}},

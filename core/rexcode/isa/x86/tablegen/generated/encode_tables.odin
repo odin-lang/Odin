@@ -585,11 +585,11 @@ ENCODE_FORMS := [2478]lib.Encoding{
 	{.JS,               {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0x78, 0, {explicit_count=1}},
 	{.JS,               {.REL32,     .NONE,      .NONE,      .NONE}, {.ID,   .NONE, .NONE, .NONE}, 0x88, 0, {esc=._0F, explicit_count=1}},
 	// .JCXZ
-	{.JCXZ,             {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0xE3, 0, {explicit_count=1}},
+	{.JCXZ,             {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0xE3, 0, {addr_size=.A16, explicit_count=1}},
 	// .JECXZ
-	{.JECXZ,            {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0xE3, 0, {explicit_count=1}},
+	{.JECXZ,            {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0xE3, 0, {addr_size=.A32, explicit_count=1}},
 	// .JRCXZ
-	{.JRCXZ,            {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0xE3, 0, {force_rex_w=true, explicit_count=1}},
+	{.JRCXZ,            {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0xE3, 0, {addr_size=.A64, explicit_count=1}},
 	// .LOOP
 	{.LOOP,             {.REL8,      .NONE,      .NONE,      .NONE}, {.IB,   .NONE, .NONE, .NONE}, 0xE2, 0, {explicit_count=1}},
 	// .LOOPE
