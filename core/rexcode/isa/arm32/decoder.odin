@@ -269,6 +269,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 			amt := u8((word >> 7) & 0x1F)
 			if st == .ROR && amt == 0 { return op_reg_shifted(reg, .RRX, 0) }
 			if st == .LSL && amt == 0 { return op_reg(reg) }
+			// A shift of zero is not a shift, so the field spends that
+			// spare value on 32 instead -- the one amount five bits cannot
+			// otherwise reach. LSL has no use for it and ROR spends it on
+			// RRX, so only these two.
+			if (st == .LSR || st == .ASR) && amt == 0 { return op_reg_shifted(reg, st, 32) }
 			return op_reg_shifted(reg, st, amt)
 		}
 		return op_reg(reg)
@@ -311,6 +316,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	// ---- A32 immediates ----
 	case .A32_IMM12:    return op_imm(i64(word & 0xFFF))
 	case .A32_IMM_SHIFT: return op_imm(i64((word >> 7) & 0x1F))
+	case .A32_IMM_SHIFT_32:
+		// The LSR and ASR mnemonics reach 32 the same way a shifted operand
+		// does: a field of zero, since a shift of zero would be a MOV.
+		amt := (word >> 7) & 0x1F
+		return op_imm(i64(amt == 0 ? 32 : amt))
 	case .A32_SHIFT_TYPE: return op_imm(i64((word >> 5) & 0x3))
 	case .A32_IMM24:
 		// Ambiguous: A32_IMM24 is used both for branch displacements (B/BL,
@@ -537,9 +547,18 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_imm(i64((word >> 18) & 0xF))
 
 	// ---- Saturate / bit field ----
+	case .VFP_FBITS:
+		// The fixed-point width is 16 or 32 by the sx bit, and the fraction
+		// is that less imm4:i -- so the widest fraction encodes as zero.
+		width: u32 = ((word >> 7) & 1) != 0 ? 32 : 16
+		return op_imm(i64(width - (((word & 0xF) << 1) | ((word >> 5) & 1))))
 	case .SAT_IMM5, .SAT_IMM5_T32:
-		// The field holds one less than the saturate position it names.
+		// SSAT and SSAT16 saturate to a signed width of one to 32, and the
+		// field holds one less than that. USAT and USAT16 saturate to an
+		// unsigned width of zero to 31, which the field holds as it stands.
 		return op_imm(i64(((word >> 16) & 0x1F) + 1))
+	case .SAT_IMM5_U, .SAT_IMM5_U_T32:
+		return op_imm(i64((word >> 16) & 0x1F))
 	case .BFX_WIDTH:
 		// One less than the width.
 		return op_imm(i64(((word >> 16) & 0x1F) + 1))

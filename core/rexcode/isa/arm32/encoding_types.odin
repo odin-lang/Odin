@@ -282,6 +282,7 @@ Operand_Encoding :: enum u8 {
 	// ---- Immediate field placements (A32) ----
 	A32_IMM12,             // bits 11-0 (LDR/STR offset)
 	A32_IMM_SHIFT,         // bits 11-7 (data-proc shift_imm)
+	A32_IMM_SHIFT_32,      // same field, but a zero means 32 (LSR/ASR)
 	A32_SHIFT_TYPE,        // bits 6-5
 	A32_RS_SHIFT,          // bits 11-8 (RSR uses Rs register)
 	A32_IMM24,             // bits 23-0 (B/BL/SVC)
@@ -410,8 +411,11 @@ Operand_Encoding :: enum u8 {
 	HINT_FIELD,            // hint imm
 
 	// ---- Saturate ----
-	SAT_IMM5,              // bits 20-16: SSAT/USAT saturate-to width
-	SAT_IMM5_T32,          // Thumb-2 saturate amount
+	VFP_FBITS,             // VCVT fixed-point fraction bits: width - (imm4:i)
+	SAT_IMM5,              // bits 20-16: SSAT/SSAT16 saturate-to width, less one
+	SAT_IMM5_T32,          // Thumb-2 signed saturate amount, less one
+	SAT_IMM5_U,            // bits 20-16: USAT/USAT16 width, which is not biased
+	SAT_IMM5_U_T32,        // Thumb-2 unsigned saturate amount
 
 	// ---- BFC/BFI/SBFX/UBFX ----
 	// SBFX/UBFX hold the width less one, where BFI/BFC hold the top bit's

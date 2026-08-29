@@ -614,8 +614,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.SSAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE}, {.RD_T32, .SAT_IMM5_T32, .RN_T32, .NONE}, 0xF3000000, 0xFFD08020, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.USAT = {
-		{.USAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE}, {.RD, .SAT_IMM5, .RM_A32, .NONE}, 0x06E00010, 0x0FE00030, .V6, .A32, {}, {}},
-		{.USAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE}, {.RD_T32, .SAT_IMM5_T32, .RN_T32, .NONE}, 0xF3800000, 0xFFD08020, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+		{.USAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE}, {.RD, .SAT_IMM5_U, .RM_A32, .NONE}, 0x06E00010, 0x0FE00030, .V6, .A32, {}, {}},
+		{.USAT, {.GPR, .IMM4_SAT, .GPR_SHIFTED, .NONE}, {.RD_T32, .SAT_IMM5_U_T32, .RN_T32, .NONE}, 0xF3800000, 0xFFD08020, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.SSAT16 = {
 		{.SSAT16, {.GPR, .IMM4_SAT, .GPR, .NONE}, {.RD, .SAT_IMM5, .RM_A32, .NONE}, 0x06A00F30, 0x0FF00FF0, .V6, .A32, {}, {}},
@@ -623,8 +623,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.SSAT16, {.GPR, .IMM4_SAT, .GPR, .NONE}, {.RD_T32, .SAT_IMM5_T32, .RN_T32, .NONE}, 0xF3200000, 0xFFF0F0F0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.USAT16 = {
-		{.USAT16, {.GPR, .IMM4_SAT, .GPR, .NONE}, {.RD, .SAT_IMM5, .RM_A32, .NONE}, 0x06E00F30, 0x0FF00FF0, .V6, .A32, {}, {}},
-		{.USAT16, {.GPR, .IMM4_SAT, .GPR, .NONE}, {.RD_T32, .SAT_IMM5_T32, .RN_T32, .NONE}, 0xF3A00000, 0xFFF0F0F0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+		{.USAT16, {.GPR, .IMM4_SAT, .GPR, .NONE}, {.RD, .SAT_IMM5_U, .RM_A32, .NONE}, 0x06E00F30, 0x0FF00FF0, .V6, .A32, {}, {}},
+		{.USAT16, {.GPR, .IMM4_SAT, .GPR, .NONE}, {.RD_T32, .SAT_IMM5_U_T32, .RN_T32, .NONE}, 0xF3A00000, 0xFFF0F0F0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 
 	// ARMv6 USAD8 / USADA8
@@ -1547,24 +1547,34 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// VCVT.BF16.F32 D, Q
 		// vcvt.bf16.f32 d0, q1 = 0xF3B6_0642 -> base 0xF3B60600
 		{.VCVT, {.DPR, .QPR, .NONE, .NONE}, {.VD_D, .VM_Q, .NONE, .NONE}, 0xF3B60600, 0xFFBF0FD0, .BF16, .A32, {cond_in_28=false}, {.F16, .F32}},
-		// VCVT.S32.F32 Sd, Sd, #fbits  -- to signed 32-bit fixed-point
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBE0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.S16, .F32}},
-		// VCVT.U32.F32 Sd, Sd, #fbits
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBF0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.U16, .F32}},
-		// VCVT.F32.S32 Sd, Sd, #fbits  -- from signed 32-bit fixed
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBA0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F32, .S16}},
-		// VCVT.F32.U32 Sd, Sd, #fbits
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBB0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F32, .U16}},
-		// VCVT.S16.F32 Sd, Sd, #fbits (sx=0 selects 16-bit fixed-point)
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBE0A40, 0x0FBF0FC0, .VFPV3, .A32, {}, {.S16, .F32}},
-		// VCVT.F32.S16 Sd, Sd, #fbits
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBA0A40, 0x0FBF0FC0, .VFPV3, .A32, {}, {.F32, .S16}},
-		// F64 variants (sz=1): change cp to 1011 (bit 8 = 1)
-		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0x0EBE0B40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.S16, .F64}},
-		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0x0EBA0B40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F64, .S16}},
-		// F16 variants (cp=1001, FEAT_FP16)
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBE0940, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.S16, .F16}},
-		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0x0EBA0940, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.F16, .S16}},
+		// VCVT between floating point and fixed point. The `sx` bit picks the
+		// fixed-point width -- clear for 16-bit, set for 32-bit -- and the
+		// number of fraction bits is that width less the imm4:i field, so a
+		// field of zero is the widest fraction rather than none at all.
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBA0940, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.F16, .S16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBB0940, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.F16, .U16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBE0940, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.S16, .F16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBF0940, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.U16, .F16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBA09C0, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.F16, .S32}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBB09C0, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.F16, .U32}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBE09C0, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.S32, .F16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBF09C0, 0x0FBF0FD0, .HALF_FP, .A32, {}, {.U32, .F16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBA0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F32, .S16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBB0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F32, .U16}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBE0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.S16, .F32}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBF0A40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.U16, .F32}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBA0AC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F32, .S32}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBB0AC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F32, .U32}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBE0AC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.S32, .F32}},
+		{.VCVT, {.SPR, .SPR, .IMM, .NONE}, {.VD_S, .VM_S, .VFP_FBITS, .NONE}, 0x0EBF0AC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.U32, .F32}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBA0B40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F64, .S16}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBB0B40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F64, .U16}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBE0B40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.S16, .F64}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBF0B40, 0x0FBF0FD0, .VFPV3, .A32, {}, {.U16, .F64}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBA0BC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F64, .S32}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBB0BC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.F64, .U32}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBE0BC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.S32, .F64}},
+		{.VCVT, {.DPR, .DPR, .IMM, .NONE}, {.VD_D, .VM_D, .VFP_FBITS, .NONE}, 0x0EBF0BC0, 0x0FBF0FD0, .VFPV3, .A32, {}, {.U32, .F64}},
 	},
 	.VCVTB = {
 		// VCVTB.F32.F16 / .F16.F32
@@ -2610,21 +2620,21 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 
 	// NEON crypto (ARMv8 FEAT_AES / FEAT_SHA1 / FEAT_SHA256)
 	//   AESE/AESD/AESMC/AESIMC: 1111 0011 1011 size 00 Vd 0011 op M 0 Vm  (op=0 AESE, 1 AESD; bit 7 selects MC)
-	.AESE   = { {.AESE,   {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B00300, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.AESD   = { {.AESD,   {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B00340, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.AESMC  = { {.AESMC,  {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B00380, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.AESIMC = { {.AESIMC, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B003C0, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {}} },
+	.AESE   = { {.AESE,   {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B00300, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {.SZ8, .NONE}} },
+	.AESD   = { {.AESD,   {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B00340, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {.SZ8, .NONE}} },
+	.AESMC  = { {.AESMC,  {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B00380, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {.SZ8, .NONE}} },
+	.AESIMC = { {.AESIMC, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B003C0, 0xFFB30FD0, .CRYPTO, .A32, {cond_in_28=false}, {.SZ8, .NONE}} },
 	// SHA1 family
-	.SHA1H   = { {.SHA1H,   {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B902C0, 0xFFBF0FD0, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA1SU1 = { {.SHA1SU1, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3BA0380, 0xFFBF0FD0, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA256SU0 = { {.SHA256SU0, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3BA03C0, 0xFFBF0FD0, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA1C   = { {.SHA1C,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2000C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA1P   = { {.SHA1P,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2100C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA1M   = { {.SHA1M,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2200C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA1SU0 = { {.SHA1SU0, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2300C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA256H   = { {.SHA256H,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3000C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA256H2  = { {.SHA256H2,  {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3100C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {}} },
-	.SHA256SU1 = { {.SHA256SU1, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3200C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {}} },
+	.SHA1H   = { {.SHA1H,   {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3B902C0, 0xFFBF0FD0, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA1SU1 = { {.SHA1SU1, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3BA0380, 0xFFBF0FD0, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA256SU0 = { {.SHA256SU0, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xF3BA03C0, 0xFFBF0FD0, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA1C   = { {.SHA1C,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2000C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA1P   = { {.SHA1P,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2100C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA1M   = { {.SHA1M,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2200C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA1SU0 = { {.SHA1SU0, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2300C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA256H   = { {.SHA256H,   {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3000C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA256H2  = { {.SHA256H2,  {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3100C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
+	.SHA256SU1 = { {.SHA256SU1, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3200C40, 0xFFB00F50, .CRYPTO, .A32, {cond_in_28=false}, {.SZ32, .NONE}} },
 
 	// =========================================================================
 	// §11 -- T16 Thumb-1 + T32 Thumb-2 (Thumb-only mnemonics)
@@ -2660,7 +2670,7 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LSL, {.GPR, .GPR, .GPR, .NONE}, {.RD_T32, .RN_T32, .RM_T32, .NONE}, 0xFA00F000, 0xFFF0F0F0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.LSR = {
-		{.LSR, {.GPR, .GPR, .IMM5, .NONE}, {.RD, .RM_A32, .A32_IMM_SHIFT, .NONE}, 0x01A00020, 0x0FFF0070, .BASE, .A32, {}, {}},
+		{.LSR, {.GPR, .GPR, .IMM5, .NONE}, {.RD, .RM_A32, .A32_IMM_SHIFT_32, .NONE}, 0x01A00020, 0x0FFF0070, .BASE, .A32, {}, {}},
 		{.LSR, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RM_A32, .RS_A32, .NONE},          0x01A00030, 0x0FFF00F0, .BASE, .A32, {}, {}},
 		// T16 Format 1: LSR imm
 		{.LSR, {.GPR_LOW, .GPR_LOW, .IMM5, .NONE}, {.RD_T16_LO, .RM_T16_LO, .NONE, .NONE}, 0x00000800, 0x0000F800, .THUMB, .T32, {cond_in_28=false}, {}},
@@ -2672,7 +2682,7 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.LSR, {.GPR, .GPR, .GPR, .NONE}, {.RD_T32, .RN_T32, .RM_T32, .NONE}, 0xFA20F000, 0xFFF0F0F0, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.ASR = {
-		{.ASR, {.GPR, .GPR, .IMM5, .NONE}, {.RD, .RM_A32, .A32_IMM_SHIFT, .NONE}, 0x01A00040, 0x0FFF0070, .BASE, .A32, {}, {}},
+		{.ASR, {.GPR, .GPR, .IMM5, .NONE}, {.RD, .RM_A32, .A32_IMM_SHIFT_32, .NONE}, 0x01A00040, 0x0FFF0070, .BASE, .A32, {}, {}},
 		{.ASR, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RM_A32, .RS_A32, .NONE},          0x01A00050, 0x0FFF00F0, .BASE, .A32, {}, {}},
 		// T16 Format 1: ASR imm
 		{.ASR, {.GPR_LOW, .GPR_LOW, .IMM5, .NONE}, {.RD_T16_LO, .RM_T16_LO, .NONE, .NONE}, 0x00001000, 0x0000F800, .THUMB, .T32, {cond_in_28=false}, {}},

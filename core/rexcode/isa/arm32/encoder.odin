@@ -426,6 +426,7 @@ pack_operand_inline :: #force_inline proc(
 	// ---- A32 immediate field placements ----
 	case .A32_IMM12:        return u32(op.immediate) & 0xFFF
 	case .A32_IMM_SHIFT:    return (u32(op.immediate) & 0x1F) << 7
+	case .A32_IMM_SHIFT_32: return (u32(op.immediate) & 0x1F) << 7   // 32 wraps to 0, which is what encodes it
 	case .A32_SHIFT_TYPE:   return (u32(op.immediate) & 0x3)  << 5
 	case .A32_RS_SHIFT:     return (u32(reg_hw(op.reg)) & 0xF) << 8
 	case .A32_IMM24:
@@ -660,8 +661,15 @@ pack_operand_inline :: #force_inline proc(
 	case .IT_MASK:          return u32(op.immediate) & 0xFF
 	case .CPS_IFLAGS:       return u32(op.immediate) & 0x1FF
 	case .HINT_FIELD:       return u32(op.immediate) & 0xFF
+	case .VFP_FBITS:
+		// sx is a fixed bit of the form, so the width comes from its pattern.
+		width: u32 = ((form.bits >> 7) & 1) != 0 ? 32 : 16
+		imm := width - (u32(op.immediate) & 0x3F)
+		return ((imm >> 1) & 0xF) | (imm & 1) << 5
 	case .SAT_IMM5, .SAT_IMM5_T32, .BFX_WIDTH:
 		return ((u32(op.immediate) - 1) & 0x1F) << 16
+	case .SAT_IMM5_U, .SAT_IMM5_U_T32:
+		return (u32(op.immediate) & 0x1F) << 16
 	case .BFI_MSB:
 		// msb = lsb + width - 1; the lsb rides in whichever slot carries it.
 		lsb: u32 = 0

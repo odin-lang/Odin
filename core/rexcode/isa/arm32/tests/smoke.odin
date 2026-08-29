@@ -530,11 +530,16 @@ run_smoke :: proc() {
 	check("VSTRB",   .VSTRB, 1, 0xEC600E00, 0xFEF00FD1)
 
 	// ---- VFP fixed-point conversions (VCVT with #fbits) ----
-	check("VCVT S32.F32", .VCVT, 11, 0x0EBE0A40, 0x0FBF0FD0)
-	check("VCVT U32.F32", .VCVT, 12, 0x0EBF0A40, 0x0FBF0FD0)
-	check("VCVT F32.S32", .VCVT, 13, 0x0EBA0A40, 0x0FBF0FD0)
-	check("VCVT F64",     .VCVT, 17, 0x0EBE0B40, 0x0FBF0FD0)
-	check("VCVT F16",     .VCVT, 19, 0x0EBE0940, 0x0FBF0FD0)
+	// The matrix runs cp (F16, F32, F64) outermost, then sx (16- then 32-bit
+	// fixed point), then opc2 (F<-S, F<-U, S<-F, U<-F).
+	check("VCVT F16.S16", .VCVT, 11, 0x0EBA0940, 0x0FBF0FD0)
+	check("VCVT S32.F16", .VCVT, 17, 0x0EBE09C0, 0x0FBF0FD0)
+	check("VCVT F32.S16", .VCVT, 19, 0x0EBA0A40, 0x0FBF0FD0)
+	check("VCVT S16.F32", .VCVT, 21, 0x0EBE0A40, 0x0FBF0FD0)
+	check("VCVT F32.S32", .VCVT, 23, 0x0EBA0AC0, 0x0FBF0FD0)
+	check("VCVT S32.F32", .VCVT, 25, 0x0EBE0AC0, 0x0FBF0FD0)
+	check("VCVT F64.S16", .VCVT, 27, 0x0EBA0B40, 0x0FBF0FD0)
+	check("VCVT S32.F64", .VCVT, 33, 0x0EBE0BC0, 0x0FBF0FD0)
 
 	// ---- NEON compare-with-zero ----
 	check("VCEQ D .I8",    .VCEQ, 10, 0xF3B10100, 0xFFBB0FD0)
