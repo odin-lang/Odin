@@ -336,6 +336,13 @@ Operand_Encoding :: enum u8 {
 	// encodes -- so the length rides in the encoding, the way the NEON
 	// structure-list lengths already do, and the encoder emits only Vn.
 	NEON_VN_TABLE_1, NEON_VN_TABLE_2, NEON_VN_TABLE_3, NEON_VN_TABLE_4,
+
+	// NEON "by scalar": the multiplier is one lane of a low D register, and
+	// the register number and the lane number share one four-bit field. How
+	// they share it depends on the element size -- 16-bit takes Vm from bits
+	// 2:0, so D0..D7, and the lane from M:bit3; 32-bit takes Vm from bits
+	// 3:0, so D0..D15, and the lane from M alone.
+	NEON_VM_SCALAR_16, NEON_VM_SCALAR_32,
 	// NEON structure load/store lists (VLD1-4 / VST1-4). Unlike VLDM's list,
 	// the register count is part of the form's type field at bits 11:8, so the
 	// encoding writes only Vd; how many registers -- and whether the run steps

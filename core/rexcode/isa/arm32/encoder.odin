@@ -286,7 +286,15 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	case .SPR:      return op.kind == .REGISTER && is_spr(op.reg)
 	case .DPR:      return op.kind == .REGISTER && is_dpr(op.reg)
 	case .QPR:      return op.kind == .REGISTER && is_qpr(op.reg)
-	case .DPR_ELEM: return op.kind == .REGISTER && is_dpr(op.reg)
+	case .DPR_ELEM:
+		if op.kind != .REGISTER || !is_dpr(op.reg) { return false }
+		// A by-scalar multiplier names a lane, and how far the register and
+		// lane numbers reach depends on how they share the field.
+		#partial switch enc {
+		case .NEON_VM_SCALAR_16: return op.has_lane && reg_hw(op.reg) < 8  && op.lane < 4
+		case .NEON_VM_SCALAR_32: return op.has_lane && reg_hw(op.reg) < 16 && op.lane < 2
+		}
+		return true
 	case .QPR_ELEM: return op.kind == .REGISTER && is_qpr(op.reg)
 	case .SPR_ELEM: return op.kind == .REGISTER && is_spr(op.reg)
 	case .SPR_LIST:
@@ -518,6 +526,12 @@ pack_operand_inline :: #force_inline proc(
 		n := u32(reg_hw(op.reg)) & 0x1F
 		shift, mask, _ := neon_lane_shape(enc)
 		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | (u32(op.lane) & mask) << shift
+	case .NEON_VM_SCALAR_16:
+		n := u32(reg_hw(op.reg)) & 0x7
+		idx := u32(op.lane) & 0x3
+		return n | ((idx >> 1) & 1) << 5 | (idx & 1) << 3
+	case .NEON_VM_SCALAR_32:
+		return (u32(reg_hw(op.reg)) & 0xF) | (u32(op.lane) & 1) << 5
 	case .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4:
 		// The run length is already a fixed bit of the form; only Vn is ours.
 		n := u32(reg_hw(op.reg)) & 0x1F

@@ -1736,11 +1736,11 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// VMUL MVE scalar: per LLVM 0xEE05_3E63 -> base 0xEE011E60
 		{.VMUL, {.QPR, .QPR, .GPR, .NONE}, {.VD_Q, .VN_Q, .RM_T32, .NONE}, 0xEE011E60, 0xEF811FF0, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.I8, .NONE}},
 		// Integer D-form .I16/.I32
-		{.VMUL, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2900840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VMUL, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VMUL, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VMUL, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 		// Integer Q-form .I16/.I32 (bit 24 = 1)
-		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_16, .NONE}, 0xF3900840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VMUL, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00840, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	// ---- VMLA / VMLS (integer + F32) ----
 	.VMLA = {
@@ -1760,10 +1760,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMLA, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2000D50, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.F32, .NONE}},
 		// MVE VMLA Qda, Qn, Rm (scalar)
 		{.VMLA, {.QPR, .QPR, .GPR, .NONE}, {.VD_Q, .VN_Q, .RM_T32, .NONE}, 0xEE010E40, 0xEF811F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.I8, .NONE}},
-		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2900040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VMLA, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_16, .NONE}, 0xF3900040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VMLA, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00040, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	.VMLS = {
 		{.VMLS, {.SPR, .SPR, .SPR, .NONE}, {.VD_S, .VN_S, .VM_S, .NONE}, 0x0E000A40, 0x0FB00B50, .VFPV2, .A32, {}, {.F32, .NONE}},
@@ -1780,10 +1780,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// NEON F32 (bit 21 = 1 distinguishes FMLS from FMLA)
 		{.VMLS, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2200D10, 0xFFB00F10, .NEON, .A32, {cond_in_28=false}, {.F32, .NONE}},
 		{.VMLS, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2200D50, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.F32, .NONE}},
-		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2900440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
-		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VMLS, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_16, .NONE}, 0xF3900440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VMLS, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00440, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	// ---- VAND / VBIC / VORR / VORN / VEOR (bitwise, no size variants) ----
 	.VAND = {
@@ -2226,8 +2226,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VDUP, {.DPR, .GPR, .NONE, .NONE}, {.VD_D, .RT_A32, .NONE, .NONE}, 0x0EC00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
 		{.VDUP, {.QPR, .GPR, .NONE, .NONE}, {.VD_Q, .RT_A32, .NONE, .NONE}, 0x0EE00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
 		// VDUP from vector lane (.D form): 1111 0011 1011 imm4 Vd 1100 0 Q M 0 Vm
-		{.VDUP, {.DPR, .DPR_ELEM, .NONE, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0xF3B00C00, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
-		{.VDUP, {.QPR, .DPR_ELEM, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3B00C40, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
+		{.VDUP, {.DPR, .DPR_ELEM, .NONE, .NONE}, {.VD_D, .NEON_VM_SCALAR_32, .NONE, .NONE}, 0xF3B00C00, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
+		{.VDUP, {.QPR, .DPR_ELEM, .NONE, .NONE}, {.VD_Q, .NEON_VM_SCALAR_32, .NONE, .NONE}, 0xF3B00C40, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
 		// MVE VDUP Qd, Rt
 		{.VDUP, {.QPR, .GPR, .NONE, .NONE}, {.VD_Q, .RT_T32, .NONE, .NONE}, 0xEE800B10, 0xFF900F5F, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.SZ32, .NONE}},
 	},
@@ -2394,11 +2394,11 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// polynomial: U=0, op=10
 		{.VMULL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2800E00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.P8, .NONE}},
 		// signed .S16/.S32
-		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
 		// unsigned .U16/.U32 (top byte 0xF3)
-		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3900A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
-		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3A00A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
+		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF3900A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
+		{.VMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00A40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
 	},
 	// VMLAL / VMLSL (widening multiply-accumulate)
 	//   VMLAL: signed F2800800 / unsigned F3800800; op=1000 (no minus); minus bit at 21
@@ -2409,10 +2409,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMLAL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3800800, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U8, .NONE}},
 		{.VMLAL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3900800, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
 		{.VMLAL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3A00800, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
-		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3900240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
-		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3A00240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
+		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF3900240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
+		{.VMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00240, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
 	},
 	.VMLSL = {
 		// VMLSL: op=1010 (bit 9 = 1)
@@ -2422,10 +2422,10 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VMLSL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3800A00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U8, .NONE}},
 		{.VMLSL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3900A00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
 		{.VMLSL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3A00A00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
-		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3900640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
-		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF3A00640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
+		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF3900640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U16, .NONE}},
+		{.VMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00640, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.U32, .NONE}},
 	},
 
 	// ---- VQDMULH / VQRDMULH (saturating doubling multiply, high half) ----
@@ -2459,42 +2459,42 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VQRDMLAH, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF3200B10, 0xFFB00F10, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
 		{.VQRDMLAH, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3100B50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
 		{.VQRDMLAH, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3200B50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VQRDMLAH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2900E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VQRDMLAH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VQRDMLAH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VQRDMLAH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VQRDMLAH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VQRDMLAH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VQRDMLAH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_16, .NONE}, 0xF3900E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VQRDMLAH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00E40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
 	},
 	.VQRDMLSH = {
 		{.VQRDMLSH, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF3100C10, 0xFFB00F10, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
 		{.VQRDMLSH, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF3200C10, 0xFFB00F10, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
 		{.VQRDMLSH, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3100C50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
 		{.VQRDMLSH, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF3200C50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VQRDMLSH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2900F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VQRDMLSH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2A00F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VQRDMLSH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3900F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VQRDMLSH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xF3A00F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VQRDMLSH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VQRDMLSH, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VQRDMLSH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_16, .NONE}, 0xF3900F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VQRDMLSH, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xF3A00F40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S32, .NONE}},
 	},
 	// VQDMULL: 1111 0010 1 D size Vn Vd 1101 N 0 M 0 Vm
 	.VQDMULL = {
 		{.VQDMULL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900D00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
 		{.VQDMULL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00D00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VQDMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900B40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VQDMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00B40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VQDMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900B40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VQDMULL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00B40, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
 	},
 	// VQDMLAL / VQDMLSL (saturating doubling multiply-accumulate long)
 	.VQDMLAL = {
 		// signed: 1111 0010 1 D size Vn Vd 1001 N 0 M 0 Vm
 		{.VQDMLAL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900900, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
 		{.VQDMLAL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00900, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VQDMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900340, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VQDMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00340, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VQDMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900340, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VQDMLAL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00340, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
 	},
 	.VQDMLSL = {
 		// signed: 1111 0010 1 D size Vn Vd 1011 N 0 M 0 Vm
 		{.VQDMLSL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900B00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
 		{.VQDMLSL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00B00, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
-		{.VQDMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2900740, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
-		{.VQDMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xF2A00740, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
+		{.VQDMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_16, .NONE}, 0xF2900740, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S16, .NONE}},
+		{.VQDMLSL, {.QPR, .DPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xF2A00740, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {.S32, .NONE}},
 	},
 
 	// ---- VMOVL / VMOVN / VQMOVN / VQMOVUN (widening/narrowing moves) ----
@@ -2725,8 +2725,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// VSDOT.S8 D: 0xFC200D00
 		{.VSDOT, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFC200D00, 0xFFB00F10, .DOT, .A32, {cond_in_28=false}, {.S8, .NONE}},
 		{.VSDOT, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFC200D40, 0xFFB00F50, .DOT, .A32, {cond_in_28=false}, {.S8, .NONE}},
-		{.VSDOT, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFE200D00, 0xFFB00F10, .DOT, .A32, {cond_in_28=false}, {.S8, .NONE}},
-		{.VSDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xFE200D40, 0xFFB00F50, .DOT, .A32, {cond_in_28=false}, {.S8, .NONE}},
+		{.VSDOT, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xFE200D00, 0xFFB00F10, .DOT, .A32, {cond_in_28=false}, {.S8, .NONE}},
+		{.VSDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xFE200D40, 0xFFB00F50, .DOT, .A32, {cond_in_28=false}, {.S8, .NONE}},
 	},
 	// VUDOT (unsigned): bit 4 = 1 distinguishes from VSDOT (bit 4 = 0).
 	//   vudot.u8 d0,d1,d2 = 0xFC21_0D12 -> base 0xFC200D10
@@ -2734,8 +2734,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VUDOT, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFC200D10, 0xFFB00F10, .DOT, .A32, {cond_in_28=false}, {.U8, .NONE}},
 		{.VUDOT, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFC200D50, 0xFFB00F50, .DOT, .A32, {cond_in_28=false}, {.U8, .NONE}},
 		// vudot.u8 d0,d1,d2[0] = 0xFE21_0D12 -> base 0xFE200D10 (bit 4 = 1 for U)
-		{.VUDOT, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFE200D10, 0xFFB00F10, .DOT, .A32, {cond_in_28=false}, {.U8, .NONE}},
-		{.VUDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xFE200D50, 0xFFB00F50, .DOT, .A32, {cond_in_28=false}, {.U8, .NONE}},
+		{.VUDOT, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xFE200D10, 0xFFB00F10, .DOT, .A32, {cond_in_28=false}, {.U8, .NONE}},
+		{.VUDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xFE200D50, 0xFFB00F50, .DOT, .A32, {cond_in_28=false}, {.U8, .NONE}},
 	},
 
 	// FEAT_FCMA (ARMv8.3): VCMLA / VCADD (complex multiply-add + add)
@@ -2745,8 +2745,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// Mask 0xFC800F10 leaves bits 24:23 variable for rotation operand
 		{.VCMLA, {.DPR, .DPR, .DPR, .IMM}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFC200800, 0xFC800F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
 		{.VCMLA, {.QPR, .QPR, .QPR, .IMM}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFC200840, 0xFC800F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
-		{.VCMLA, {.DPR, .DPR, .DPR_ELEM, .IMM}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFE000800, 0xFFB00F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
-		{.VCMLA, {.QPR, .QPR, .DPR_ELEM, .IMM}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xFE000840, 0xFFB00F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCMLA, {.DPR, .DPR, .DPR_ELEM, .IMM}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xFE000800, 0xFFB00F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCMLA, {.QPR, .QPR, .DPR_ELEM, .IMM}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xFE000840, 0xFFB00F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
 		{.VCMLA,  {.QPR, .QPR, .QPR, .IMM},  {.VD_Q, .VN_Q, .VM_Q, .MVE_ROT_CMLA},    0xFC200840, 0xFE611FF1, .MVE_FP,  .T32, {thumb32=true, cond_in_28=false}, {.F16, .NONE}},
 	},
 	.VCADD = {
@@ -2797,13 +2797,13 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	//   vsudot.u8 q0,q1,d2[0] = 0xFE82_0D52 -> base 0xFE800D50 (lane only)
 	.VSUDOT = {
 		{.VSUDOT, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFCA00D50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {}},
-		{.VSUDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xFE800D50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.U8, .NONE}},
+		{.VSUDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xFE800D50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.U8, .NONE}},
 	},
 	.VUSDOT = {
 		{.VUSDOT, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFCA00D00, 0xFFB00F10, .V8, .A32, {cond_in_28=false}, {.S8, .NONE}},
 		{.VUSDOT, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFCA00D40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S8, .NONE}},
-		{.VUSDOT, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFE800D00, 0xFFB00F10, .V8, .A32, {cond_in_28=false}, {.S8, .NONE}},
-		{.VUSDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .VM_D, .NONE}, 0xFE800D40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S8, .NONE}},
+		{.VUSDOT, {.DPR, .DPR, .DPR_ELEM, .NONE}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xFE800D00, 0xFFB00F10, .V8, .A32, {cond_in_28=false}, {.S8, .NONE}},
+		{.VUSDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xFE800D40, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.S8, .NONE}},
 	},
 
 	// =========================================================================

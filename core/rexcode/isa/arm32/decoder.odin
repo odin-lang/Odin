@@ -463,6 +463,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		op := op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> shift) & mask))
 		op.list = {count = count, stride = 1}
 		return op
+	case .NEON_VM_SCALAR_16:
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)),
+		                   u8(((word >> 5) & 1) << 1 | ((word >> 3) & 1)))
+	case .NEON_VM_SCALAR_32:
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0xF)), u8((word >> 5) & 1))
 	case .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4:
 		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
 		return op_reg_run(Register(REG_DPR | u16(n)), table_run_length(enc))
