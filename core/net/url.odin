@@ -44,16 +44,13 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 		if query_str != "" {
 			queries = make(map[string]string, allocator)
 			for query in strings.split_iterator(&query_str, "&") {
-				i = strings.index_byte(query, '=')
-				if i == -1 {
-					queries[query] = ""
-				} else {
-					value := query[i+1:]
-					if strings.index_byte(value, '=') != -1 {
-						continue // incorrect format
-					}
-					queries[query] = value // may not be set to anything, e.g. ?x=
+				query := query
+				key := strings.split_by_byte_iterator(&query, '=') or_continue
+				value, _ := strings.split_by_byte_iterator(&query, '=') // may be empty
+				if strings.index_byte(query, '=') != -1 {
+					continue // additional =, weird x=y=z format
 				}
+				queries[key] = value
 			}
 		}
 	}
