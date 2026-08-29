@@ -403,13 +403,16 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		mm := mem_imm(base, disp)
 		if u_bit == 0 { mm.sign = -1 }
 		return op_mem(mm)
-	case .MEM_IMM8_SCALED4:
-		// The VFP loads count the offset in words, so the eight bits reach
-		// +/-1020 rather than +/-255.
+	case .MEM_IMM8_SCALED4, .MEM_IMM8_SCALED4_PRE, .MEM_IMM8_SCALED4_POST:
+		// The VFP and coprocessor loads count the offset in words, so the
+		// eight bits reach +/-1020 rather than +/-255.
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFF) * 4
-		mm := mem_imm(base, u_bit == 0 ? -disp : disp)
+		if u_bit == 0 { disp = -disp }
+		mm := mem_imm(base, disp)
+		if enc == .MEM_IMM8_SCALED4_PRE  { mm.mode = .PRE_INDEX  }
+		if enc == .MEM_IMM8_SCALED4_POST { mm.mode = .POST_INDEX }
 		if u_bit == 0 { mm.sign = -1 }
 		return op_mem(mm)
 	case .MEM_IMM8_OFFSET:
@@ -442,6 +445,8 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .COPROC_OPC2_FIELD: return op_imm(i64((word >> 5) & 0x7))
 	case .COPROC_CRN_FIELD:  return op_reg(Register(REG_COPROC | u16((word >> 16) & 0xF)))
 	case .COPROC_CRM_FIELD:  return op_reg(Register(REG_COPROC | u16(word & 0xF)))
+	case .COPROC_CRD_FIELD:  return op_reg(Register(REG_COPROC | u16((word >> 12) & 0xF)))
+	case .COPROC_OPC1_MCR:   return op_imm(i64((word >> 21) & 0x7))
 	case .COPROC_OPC_MCRR:   return op_imm(i64((word >> 4) & 0xF))
 	case .NEON_CMODE:        return op_imm(i64((word >> 8) & 0xF))
 	case .NEON_OP_BIT:       return op_imm(i64((word >> 5) & 1))

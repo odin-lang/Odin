@@ -218,6 +218,9 @@ Mnemonic :: enum u16 {
 	MCR,    MCR2,    MRC,    MRC2,
 	MCRR,   MCRR2,   MRRC,   MRRC2,
 	LDC,    LDC2,    STC,    STC2,
+	// The N bit asks the coprocessor for the long transfer, and the syntax
+	// spells that on the mnemonic.
+	LDCL,   LDC2L,   STCL,   STC2L,
 
 	// -------------------------------------------------------------------------
 	// ARMv8 AArch32 CRC32 (FEAT_CRC32)

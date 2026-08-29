@@ -393,7 +393,9 @@ Operand_Encoding :: enum u8 {
 	MEM_IMM8_PRE_INDEX,
 	MEM_IMM8_POST_INDEX,
 	MEM_IMM8_OFFSET,
-	MEM_IMM8_SCALED4,      // VFP load/store: imm8 in words, U at bit 23       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
+	MEM_IMM8_SCALED4,      // VFP load/store: imm8 in words, U at bit 23
+	MEM_IMM8_SCALED4_PRE,  // same, pre-indexed
+	MEM_IMM8_SCALED4_POST, // same, post-indexed       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
 	MEM_REG_OFFSET,        // [Rn, ±Rm{, shift}]
 	MEM_PRE_INDEX,         // [Rn, #imm]! / [Rn, ±Rm]!
 	MEM_POST_INDEX,        // [Rn], #imm / [Rn], ±Rm
@@ -402,8 +404,10 @@ Operand_Encoding :: enum u8 {
 
 	// ---- Coprocessor ----
 	COPROC_NUM_FIELD,      // bits 11-8 in CDP/LDC/STC (cp_num)
-	COPROC_OPC1_FIELD,     // bits 23-20 (CDP / MCR / MRC opc1)
-	COPROC_OPC2_FIELD,     // bits 7-5  (MCR/MRC opc2)
+	COPROC_CRD_FIELD,      // bits 15-12 -- the destination, which is not CRn
+	COPROC_OPC1_MCR,       // bits 23-21 (MCR/MRC opc1, three bits not four)
+	COPROC_OPC1_FIELD,     // bits 23-20 (CDP opc1)
+	COPROC_OPC2_FIELD,     // bits 7-5  (CDP / MCR / MRC opc2)
 	COPROC_CRN_FIELD,      // bits 19-16
 	COPROC_CRM_FIELD,      // bits 3-0
 	COPROC_OPC_MCRR,       // bits 7-4 (MCRR/MRRC 4-bit opcode)
@@ -498,8 +502,8 @@ Data_Types :: [2]Data_Type
 
 Encoding :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [6]Operand_Type,     // 6
+	enc:      [6]Operand_Encoding, // 6
 	bits:     u32,                 // 4 -- static field pattern
 	mask:     u32,                 // 4 -- which bits are static
 	feature:  Feature,             // 1
@@ -507,7 +511,7 @@ Encoding :: struct #packed {
 	flags:    Encoding_Flags,      // 1
 	dt:       Data_Types,          // 2
 }
-#assert(size_of(Encoding) == 23)
+#assert(size_of(Encoding) == 27)
 
 // ---- Length introspection --------------------------------------------------
 //

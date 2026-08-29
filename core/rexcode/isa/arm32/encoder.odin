@@ -247,6 +247,10 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 		// because R0-as-index is exceedingly rare in real code.
 		has_index := op.mem.index != Register(0)
 		#partial switch form.enc[k] {
+		case .MEM_IMM8_SCALED4_PRE:
+			if m != .PRE_INDEX { return false }
+		case .MEM_IMM8_SCALED4_POST:
+			if m != .POST_INDEX { return false }
 		case .MEM_IMM12_OFFSET, .MEM_IMM8_OFFSET, .MEM_IMM8_SCALED4:
 			if m != .OFFSET { return false }
 			if has_index { return false }
@@ -575,7 +579,7 @@ pack_operand_inline :: #force_inline proc(
 		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | ((u32(op.list.count) * 2) & 0xFF)
 
 	// ---- Memory addressing composites --------------------------------------
-	case .MEM_IMM8_SCALED4:
+	case .MEM_IMM8_SCALED4, .MEM_IMM8_SCALED4_PRE, .MEM_IMM8_SCALED4_POST:
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
 		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
@@ -627,6 +631,8 @@ pack_operand_inline :: #force_inline proc(
 
 	// ---- Coprocessor -------------------------------------------------------
 	case .COPROC_NUM_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 8
+	case .COPROC_CRD_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 12
+	case .COPROC_OPC1_MCR:    return (u32(op.immediate) & 0x7) << 21
 	case .COPROC_OPC1_FIELD:  return (u32(op.immediate) & 0xF) << 20
 	case .COPROC_OPC2_FIELD:  return (u32(op.immediate) & 0x7) << 5
 	case .COPROC_CRN_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 16

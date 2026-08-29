@@ -58,8 +58,8 @@ T32_SUB_BUCKETS :: 32    // bits[24:20] of u32
 
 Entry :: struct {
 	mnemonic:   lib.Mnemonic,
-	ops:        [4]lib.Operand_Type,
-	enc:        [4]lib.Operand_Encoding,
+	ops:        [6]lib.Operand_Type,
+	enc:        [6]lib.Operand_Encoding,
 	bits:       u32,
 	mask:       u32,
 	feature:    lib.Feature,
@@ -351,12 +351,13 @@ emit_range :: proc(sb: ^strings.Builder, name: string, ranges: []Range) {
 // Shared row + flags formatting
 // -----------------------------------------------------------------------------
 
-write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [4]lib.Operand_Type,
-                  enc: [4]lib.Operand_Encoding, bits, mask: u32,
+write_row :: proc(sb: ^strings.Builder, mn: lib.Mnemonic, ops: [6]lib.Operand_Type,
+                  enc: [6]lib.Operand_Encoding, bits, mask: u32,
                   feature: lib.Feature, mode: lib.Mode, flags: lib.Encoding_Flags,
                   dt: lib.Data_Types) {
-	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}}, {{.%v,.%v}} }},\n",
-		mn, ops[0], ops[1], ops[2], ops[3], enc[0], enc[1], enc[2], enc[3],
+	fmt.sbprintf(sb, "\t{{ .%v, {{.%v,.%v,.%v,.%v,.%v,.%v}}, {{.%v,.%v,.%v,.%v,.%v,.%v}}, 0x%08X, 0x%08X, .%v, .%v, {{%s}}, {{.%v,.%v}} }},\n",
+		mn, ops[0], ops[1], ops[2], ops[3], ops[4], ops[5],
+		enc[0], enc[1], enc[2], enc[3], enc[4], enc[5],
 		bits, mask, feature, mode, flags_lit(flags), dt[0], dt[1])
 }
 
@@ -411,8 +412,8 @@ Encode_Run :: struct {
 
 Decode_Entry :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [6]Operand_Type,     // 6
+	enc:      [6]Operand_Encoding, // 6
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
@@ -420,7 +421,7 @@ Decode_Entry :: struct #packed {
 	flags:    Encoding_Flags,      // 1
 	dt:       Data_Types,          // 2 -- see Data_Type in encoding_types.odin
 }
-#assert(size_of(Decode_Entry) == 23)
+#assert(size_of(Decode_Entry) == 27)
 
 Decode_Index :: struct #packed {
 	start: u16,

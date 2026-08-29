@@ -25,8 +25,8 @@ Encode_Run :: struct {
 
 Decode_Entry :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [6]Operand_Type,     // 6
+	enc:      [6]Operand_Encoding, // 6
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
@@ -34,7 +34,7 @@ Decode_Entry :: struct #packed {
 	flags:    Encoding_Flags,      // 1
 	dt:       Data_Types,          // 2 -- see Data_Type in encoding_types.odin
 }
-#assert(size_of(Decode_Entry) == 23)
+#assert(size_of(Decode_Entry) == 27)
 
 Decode_Index :: struct #packed {
 	start: u16,
