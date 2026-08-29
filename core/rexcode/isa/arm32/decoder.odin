@@ -165,6 +165,14 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		if e.flags.sets_flags {
 			inst.sets_flags = true
 		}
+		// LDM/STM carry the writeback in bit 21; nothing else in the operand
+		// model records it, and without it the two forms print identically.
+		for k in 0 ..< len(e.enc) {
+			if e.enc[k] == .A32_REG_LIST {
+				inst.writeback = (word >> 21) & 1 != 0
+				break
+			}
+		}
 
 		for _, k in e.enc {
 			if e.enc[k] == .NONE { continue }
@@ -379,13 +387,17 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFFF)
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm(base, disp))
+		mm := mem_imm(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_IMM8_OFFSET:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
 		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm(base, disp))
+		mm := mem_imm(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_REG_OFFSET:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		idx  := Register(REG_GPR | u16(word & 0xF))
@@ -566,24 +578,36 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
 		if (word >> 23) & 1 == 0 { disp = -disp }
-		return op_mem(mem_imm_pre(base, disp))
+		mm := mem_imm_pre(base, disp)
+
+		if (word >> 23) & 1 == 0 { mm.sign = -1 }
+
+		return op_mem(mm)
 	case .MEM_IMM8_POST_INDEX:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
 		if (word >> 23) & 1 == 0 { disp = -disp }
-		return op_mem(mem_imm_post(base, disp))
+		mm := mem_imm_post(base, disp)
+
+		if (word >> 23) & 1 == 0 { mm.sign = -1 }
+
+		return op_mem(mm)
 	case .MEM_PRE_INDEX:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFFF)
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm_pre(base, disp))
+		mm := mem_imm_pre(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_POST_INDEX:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFFF)
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm_post(base, disp))
+		mm := mem_imm_post(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_LITERAL:
 		// PC-relative literal load: U bit + 12-bit signed disp
 		u_bit := (word >> 23) & 1

@@ -136,6 +136,9 @@ sbprint :: proc(
 			for k in 0..<inst.operand_count {
 				if k > 0 { strings.write_string(sb, ", ") }
 				write_operand(sb, &inst.ops[k], inst, offset, &display, opts)
+				// LDM/STM write the updated base back, and the syntax marks
+				// that with a `!` on the base register itself.
+				if k == 0 && inst.writeback { strings.write_byte(sb, '!') }
 			}
 		}
 		strings.write_string(sb, "\n")
@@ -573,7 +576,10 @@ write_operand :: proc(
 write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 	strings.write_string(sb, "[")
 	write_register(sb, m.base)
-	if reg_class(m.index) == REG_GPR && reg_hw(m.index) != 0 {
+	// An immediate-only form leaves index at Register(0), whose class is not
+	// REG_GPR -- so the class alone says whether there is an index. Excluding
+	// hw 0 as well made r0 unusable as one.
+	if reg_class(m.index) == REG_GPR {
 		// Register offset
 		switch m.mode {
 		case .OFFSET:
@@ -595,15 +601,18 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory) {
 	} else {
 		// An indexed form writes its displacement even when it is zero: the
 		// writeback is the point, and `[r0]` alone is the plain offset form.
+		// The U bit also survives a zero displacement, and an assembler needs
+		// to see it -- `#-0` and `#0` are different words.
+		neg := m.disp == 0 && m.sign < 0 ? "-" : ""
 		switch m.mode {
 		case .OFFSET:
-			if m.disp != 0 {
-				fmt.sbprintf(sb, ", #%d]", m.disp)
+			if m.disp != 0 || m.sign < 0 {
+				fmt.sbprintf(sb, ", #%s%d]", neg, m.disp)
 			} else {
 				strings.write_string(sb, "]")
 			}
-		case .PRE_INDEX:  fmt.sbprintf(sb, ", #%d]!", m.disp)
-		case .POST_INDEX: fmt.sbprintf(sb, "], #%d", m.disp)
+		case .PRE_INDEX:  fmt.sbprintf(sb, ", #%s%d]!", neg, m.disp)
+		case .POST_INDEX: fmt.sbprintf(sb, "], #%s%d", neg, m.disp)
 		}
 	}
 }

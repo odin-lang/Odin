@@ -164,6 +164,7 @@ encode_one_inline :: #force_inline proc(
 		   (want_len == 0 || inst_size_from_bits(f.bits, f.mode) == want_len) &&
 		   encoding_matches_inline(inst, f) &&
 		   inst.sets_flags == f.flags.sets_flags &&
+		   writeback_matches(inst, f) &&
 		   mem_mode_matches(inst, f) {
 			form = f
 		}
@@ -180,6 +181,7 @@ encode_one_inline :: #force_inline proc(
 			if !encoding_matches_inline(inst, &f) { continue }
 			if inst.sets_flags && !f.flags.sets_flags { continue }
 			if !inst.sets_flags && f.flags.sets_flags { continue }
+			if !writeback_matches(inst, &f) { continue }
 			if !mem_mode_matches(inst, &f) { continue }
 			form = &f
 			break
@@ -516,7 +518,7 @@ pack_operand_inline :: #force_inline proc(
 	case .MEM_IMM12_OFFSET:
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
 	case .RT2_A32_PAIR:
@@ -524,7 +526,7 @@ pack_operand_inline :: #force_inline proc(
 	case .MEM_IMM8_PRE_INDEX, .MEM_IMM8_POST_INDEX, .MEM_IMM8_OFFSET:
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFF
 		return base | (u_bit << 23) | ((disp >> 4) & 0xF) << 8 | (disp & 0xF)
 	case .MEM_REG_OFFSET:
@@ -538,14 +540,14 @@ pack_operand_inline :: #force_inline proc(
 		// P=1, W=1 in bits 24/21 to select pre-index addressing mode.
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
 	case .MEM_POST_INDEX:
 		// Same layout as MEM_IMM12_OFFSET; form bits select P=0 in bit 24.
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
-		u_bit: u32 = m.disp >= 0 ? 1 : 0
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
 		disp := u32(abs_i32(m.disp)) & 0xFFF
 		return base | (u_bit << 23) | disp
 	case .MEM_LITERAL:
@@ -881,4 +883,16 @@ neon_lane_shape :: #force_inline proc "contextless" (e: Operand_Encoding) -> (sh
 	case .NEON_LANE_D_16_4: return 6, 0x3, 4
 	case:                   return 7, 0x1, 4
 	}
+}
+
+// LDM/STM come in a writeback form and a plain one that differ only in bit 21,
+// so the operand shapes cannot tell them apart.
+@(private="file", require_results)
+writeback_matches :: #force_inline proc "contextless" (inst: ^Instruction, f: ^Encoding) -> bool {
+	for e in f.enc {
+		if e == .A32_REG_LIST {
+			return ((f.bits >> 21) & 1 != 0) == inst.writeback
+		}
+	}
+	return true
 }

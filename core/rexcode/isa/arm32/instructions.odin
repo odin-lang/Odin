@@ -39,7 +39,10 @@ Instruction :: struct #align(64) {
 		length:        u8   | 3,   // 2 or 4 bytes on the wire
 		sets_flags:    bool | 1,   // S bit (writes APSR.NZCV)
 		wide:          bool | 1,   // force the T32 wide form when both exist
-		// 3 bits spare
+		// LDM/STM write the updated base back when this is set, which the
+		// syntax shows as a `!` after the base register.
+		writeback:     bool | 1,
+		// 2 bits spare
 	},
 	// Form-id hint: when non-zero, this is (1 + the index into
 	// ENCODING_TABLE[mnemonic]) of the form the decoder produced. The encoder
