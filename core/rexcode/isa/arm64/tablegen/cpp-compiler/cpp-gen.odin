@@ -450,7 +450,7 @@ main :: proc() {
 	strings.write_string(&sb, "\ttypedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
 	strings.write_string(&sb, "\n")
 	{
-		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 20);\n")
+		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 22);\n")
 
 		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
 		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
@@ -458,8 +458,8 @@ main :: proc() {
 		defer strings.write_string(&sb, "\t};\n")
 		strings.write_string(&sb, """
 				Mnemonic        mnemonic;
-				OperandType     ops[4];
-				OperandEncoding enc[4];
+				OperandType     ops[5];
+				OperandEncoding enc[5];
 				u32             bits;
 				u32             mask;
 				Feature         feature;
@@ -631,8 +631,6 @@ main :: proc() {
 			// SVE vector + predicate registers.
 			case OP_Z_REG_B: case OP_Z_REG_H: case OP_Z_REG_S: case OP_Z_REG_D:
 			case OP_P_REG: case OP_P_REG_MERGE: case OP_P_REG_ZERO: case OP_P_REG_GOV:
-			// SME2 multi-vector register lists (first register of the list).
-			case OP_Z_PAIR: case OP_Z_QUAD:
 			// SME ZA tiles (ZA0.B .. ZAn.Q) — register-like tile operands.
 			case OP_ZA_TILE_B: case OP_ZA_TILE_H: case OP_ZA_TILE_S:
 			case OP_ZA_TILE_D: case OP_ZA_TILE_Q:
@@ -700,7 +698,6 @@ main :: proc() {
 			case OP_V_4H_FP16: case OP_V_8H_FP16:
 			case OP_V_ELEM_B: case OP_V_ELEM_H: case OP_V_ELEM_S: case OP_V_ELEM_D:
 			case OP_Z_REG_B: case OP_Z_REG_H: case OP_Z_REG_S: case OP_Z_REG_D:
-			case OP_Z_PAIR: case OP_Z_QUAD:
 				return AsmRegClass_Vector;
 
 			// SVE predicate registers.
@@ -825,7 +822,6 @@ main :: proc() {
 			// ---- Width is scalable, data-dependent, or set elsewhere -> 0 ----
 			case OP_Z_REG_B: case OP_Z_REG_H: case OP_Z_REG_S: case OP_Z_REG_D: // SVE VL-scaled
 			case OP_P_REG: case OP_P_REG_MERGE: case OP_P_REG_ZERO: case OP_P_REG_GOV: // predicate (VL/8)
-			case OP_Z_PAIR: case OP_Z_QUAD:                                       // SVE reg-lists (scalable)
 			case OP_ZA_TILE_B: case OP_ZA_TILE_H: case OP_ZA_TILE_S:
 			case OP_ZA_TILE_D: case OP_ZA_TILE_Q:                                 // SME tiles (scalable)
 			case OP_SME_PATTERN:                                                  // selector, no data width

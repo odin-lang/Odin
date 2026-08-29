@@ -31,6 +31,7 @@ enum AsmOperandKind : u8 {
 	AsmOperand_Register_Or_Memory,
 	AsmOperand_Immediate,
 	AsmOperand_Label,
+	AsmOperand_RegisterGroup,
 
 	AsmOperand_COUNT
 };

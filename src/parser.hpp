@@ -525,6 +525,13 @@ struct AstSplitArgs {
 		Ast * type;     \
 		Token close;    \
 	}) \
+	AST_KIND(AsmRegisterGroup, "asm register group", struct { \
+		Token        open;        \
+		Array<Ast *> registers;   \
+		Token        range_token; \
+		Token        close;       \
+		Ast *        type;        \
+	}) \
 	AST_KIND(AsmDirective, "asm directive", struct { \
 		Token        token;    \
 		Token        name;     \

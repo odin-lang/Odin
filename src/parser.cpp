@@ -558,6 +558,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmMemoryOperand.disp  = clone_ast(n->AsmMemoryOperand.disp,  f);
 		n->AsmMemoryOperand.type  = clone_ast(n->AsmMemoryOperand.type,  f);
 		break;
+	case Ast_AsmRegisterGroup:
+		n->AsmRegisterGroup.registers = clone_ast_array(n->AsmRegisterGroup.registers, f);
+		n->AsmRegisterGroup.type      = clone_ast(n->AsmRegisterGroup.type, f);
+		break;
 	case Ast_AsmDirective:
 		n->AsmDirective.operands = clone_ast_array(n->AsmDirective.operands, f);
 		break;
@@ -2571,6 +2575,61 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			mem->AsmMemoryOperand.type             = type;
 
 			return mem;
+		}
+		break;
+	case Token_OpenBrace:
+		if (allow_memory_operand) {
+			Token open  = expect_token(f, Token_OpenBrace);
+
+			Array<Ast *> registers = {};
+			registers.allocator = heap_allocator();
+			Ast *type = nullptr;
+
+			Ast *first_reg = parse_asm_operand(f, false);
+			Token range_token = {};
+			switch (f->curr_token.kind) {
+			case Token_RangeHalf:
+			case Token_RangeFull:
+				{
+					range_token = advance_token(f);
+					Ast *second_reg = parse_asm_operand(f, false);
+					array_reserve(&registers, 2);
+					array_add(&registers, first_reg);
+					array_add(&registers, second_reg);
+
+					if (allow_token(f, Token_Comma)) {
+						// allow for trailing comma
+					}
+				}
+				break;
+			default:
+				if (allow_token(f, Token_Comma)) {
+					// allow for trailing comma
+				}
+				while (f->curr_token.kind != Token_CloseBrace &&
+				       f->curr_token.kind != Token_EOF) {
+					Ast *reg = parse_asm_operand(f, false);
+					array_add(&registers, reg);
+
+					if (!allow_token(f, Token_Comma)) {
+						break;
+					}
+				}
+				break;
+			}
+			Token close = expect_token(f, Token_CloseBrace);
+			if (allow_token(f, Token_Colon)) {
+				type = parse_type(f);
+			}
+
+			Ast *rg = alloc_ast_node(f, Ast_AsmRegisterGroup);
+			rg->AsmRegisterGroup.open        = open;
+			rg->AsmRegisterGroup.registers   = registers;
+			rg->AsmRegisterGroup.range_token = range_token;
+			rg->AsmRegisterGroup.close       = close;
+			rg->AsmRegisterGroup.type        = type;
+
+			return rg;
 		}
 		break;
 	}
