@@ -505,7 +505,7 @@ run_smoke :: proc() {
 	check("VUMMLA",          .VUMMLA,    0, 0xFC200C50, 0xFFB00F50)
 	check("VUSMMLA",         .VUSMMLA,   0, 0xFCA00C40, 0xFFB00F50)
 	check("VUSDOT D",        .VUSDOT,    0, 0xFCA00D00, 0xFFB00F10)
-	check("VSUDOT lane",     .VSUDOT, 1, 0xFE800D50, 0xFFB00F50)
+	check("VSUDOT lane",     .VSUDOT, 0, 0xFE800D50, 0xFFB00F50)
 
 	// ---- Lane-indexed NEON ----
 	check("VMUL lane D .S16", .VMUL,  18, 0xF2900840, 0xFFB00F50)

@@ -2899,7 +2899,6 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	//   vusdot.s8 d0,d1,d2 = 0xFCA1_0D02 -> base 0xFCA00D00
 	//   vsudot.u8 q0,q1,d2[0] = 0xFE82_0D52 -> base 0xFE800D50 (lane only)
 	.VSUDOT = {
-		{.VSUDOT, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFCA00D50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {}},
 		{.VSUDOT, {.QPR, .QPR, .DPR_ELEM, .NONE}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xFE800D50, 0xFFB00F50, .V8, .A32, {cond_in_28=false}, {.U8, .NONE}},
 	},
 	.VUSDOT = {
