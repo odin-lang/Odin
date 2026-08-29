@@ -976,13 +976,9 @@ inst_vrev64_d_d            :: #force_inline proc "contextless" (dst: Register, s
 emit_vrev64_d_d            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vrev64_d_d(dst, src)) }
 inst_vext_d_d_d_imm4       :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register, imm: i64) -> Instruction { return Instruction{mnemonic = .VEXT, operand_count = 4, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), op_imm(imm)}} }
 emit_vext_d_d_d_imm4       :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register, imm: i64) { append(instructions, inst_vext_d_d_d_imm4(dst, src, src2, imm)) }
-inst_vtbl_d_d_d            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VTBL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 inst_vtbl_d_dlist_d        :: #force_inline proc "contextless" (dst: Register, regs: u16, src: Register) -> Instruction { return Instruction{mnemonic = .VTBL, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), op_reg(src), {}}} }
-emit_vtbl_d_d_d            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vtbl_d_d_d(dst, src, src2)) }
 emit_vtbl_d_dlist_d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16, src: Register) { append(instructions, inst_vtbl_d_dlist_d(dst, regs, src)) }
-inst_vtbx_d_d_d            :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VTBX, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 inst_vtbx_d_dlist_d        :: #force_inline proc "contextless" (dst: Register, regs: u16, src: Register) -> Instruction { return Instruction{mnemonic = .VTBX, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), op_reg(src), {}}} }
-emit_vtbx_d_d_d            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vtbx_d_d_d(dst, src, src2)) }
 emit_vtbx_d_dlist_d        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16, src: Register) { append(instructions, inst_vtbx_d_dlist_d(dst, regs, src)) }
 inst_vtrn_d_d              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VTRN, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vtrn_d_d              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vtrn_d_d(dst, src)) }
@@ -2187,10 +2183,10 @@ inst_vrev64                     :: inst_vrev64_d_d
 emit_vrev64                     :: emit_vrev64_d_d
 inst_vext                       :: inst_vext_d_d_d_imm4
 emit_vext                       :: emit_vext_d_d_d_imm4
-inst_vtbl                       :: proc{ inst_vtbl_d_d_d, inst_vtbl_d_dlist_d }
-emit_vtbl                       :: proc{ emit_vtbl_d_d_d, emit_vtbl_d_dlist_d }
-inst_vtbx                       :: proc{ inst_vtbx_d_d_d, inst_vtbx_d_dlist_d }
-emit_vtbx                       :: proc{ emit_vtbx_d_d_d, emit_vtbx_d_dlist_d }
+inst_vtbl                       :: inst_vtbl_d_dlist_d
+emit_vtbl                       :: emit_vtbl_d_dlist_d
+inst_vtbx                       :: inst_vtbx_d_dlist_d
+emit_vtbx                       :: emit_vtbx_d_dlist_d
 inst_vtrn                       :: inst_vtrn_d_d
 emit_vtrn                       :: emit_vtrn_d_d
 inst_vuzp                       :: inst_vuzp_d_d

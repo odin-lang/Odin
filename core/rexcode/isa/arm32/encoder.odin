@@ -264,14 +264,14 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 
 @(private="file")
 encoding_matches_inline :: #force_inline proc "contextless" (inst: ^Instruction, form: ^Encoding) -> bool {
-	return  operand_matches_inline(&inst.ops[0], form.ops[0]) &&
-	        operand_matches_inline(&inst.ops[1], form.ops[1]) &&
-	        operand_matches_inline(&inst.ops[2], form.ops[2]) &&
-	        operand_matches_inline(&inst.ops[3], form.ops[3])
+	return  operand_matches_inline(&inst.ops[0], form.ops[0], form.enc[0]) &&
+	        operand_matches_inline(&inst.ops[1], form.ops[1], form.enc[1]) &&
+	        operand_matches_inline(&inst.ops[2], form.ops[2], form.enc[2]) &&
+	        operand_matches_inline(&inst.ops[3], form.ops[3], form.enc[3])
 }
 
 @(private="file")
-operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Operand_Type) -> bool {
+operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Operand_Type, enc: Operand_Encoding) -> bool {
 	#partial switch ot {
 	case .NONE:
 		return op.kind == .NONE
@@ -292,7 +292,16 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	case .SPR_LIST:
 		return op.kind == .REGISTER && is_spr(op.reg)
 	case .DPR_LIST:
-		return op.kind == .REGISTER && is_dpr(op.reg)
+		if op.kind != .REGISTER || !is_dpr(op.reg) { return false }
+		// Forms whose run length is a fixed pattern bit are told apart only
+		// by that length -- {d0} and {d0, d1} are different instructions.
+		#partial switch enc {
+		case .NEON_VN_TABLE_1: return op.list.count == 1
+		case .NEON_VN_TABLE_2: return op.list.count == 2
+		case .NEON_VN_TABLE_3: return op.list.count == 3
+		case .NEON_VN_TABLE_4: return op.list.count == 4
+		}
+		return true
 	case .IMM, .IMM_MOD, .IMM_T32_MOD, .IMM12, .IMM5, .IMM5_W,
 	     .IMM4, .IMM4_SAT, .IMM8, .IMM3, .IMM_HINT, .IMM_BARRIER,
 	     .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
@@ -509,6 +518,10 @@ pack_operand_inline :: #force_inline proc(
 		n := u32(reg_hw(op.reg)) & 0x1F
 		shift, mask, _ := neon_lane_shape(enc)
 		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | (u32(op.lane) & mask) << shift
+	case .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4:
+		// The run length is already a fixed bit of the form; only Vn is ours.
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 7 | (n & 0xF) << 16
 	case .VFP_S_LIST:
 		n := u32(reg_hw(op.reg)) & 0x1F
 		return ((n >> 1) & 0xF) << 12 | (n & 1) << 22 | (u32(op.list.count) & 0xFF)

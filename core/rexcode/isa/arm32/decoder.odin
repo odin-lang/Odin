@@ -463,16 +463,19 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		op := op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> shift) & mask))
 		op.list = {count = count, stride = 1}
 		return op
+	case .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4:
+		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), table_run_length(enc))
 	case .VFP_S_LIST:
 		// {S<Vd>, ...} -- imm8 counts the registers, and the run starts at Vd.
 		// Both halves matter: keeping only the count printed the wrong bank
 		// and the wrong registers.
 		n := ((word >> 12) & 0xF) << 1 | ((word >> 22) & 1)
-		return op_reg_run(Register(REG_SPR | u16(n)), u8(word & 0xFF))
+		return op_reg_run(Register(REG_SPR | u16(n)), max(u8(word & 0xFF), 1))
 	case .VFP_D_LIST:
 		// {D<Vd>, ...} -- imm8 counts half-words here, two per D register.
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), u8((word & 0xFF) / 2))
+		return op_reg_run(Register(REG_DPR | u16(n)), max(u8((word & 0xFF) / 2), 1))
 
 	// ---- Branch fields (decoded into RELATIVE) ----
 	case .BRANCH_24:
@@ -637,6 +640,18 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 @(require_results)
 decode_max_instruction_count :: #force_inline proc "contextless" (data: []u8) -> int {
 	return len(data) / 2
+}
+
+// How many D registers a VTBL/VTBX table spans.
+@(private="file", require_results)
+table_run_length :: #force_inline proc "contextless" (e: Operand_Encoding) -> u8 {
+	#partial switch e {
+	case .NEON_VN_TABLE_1: return 1
+	case .NEON_VN_TABLE_2: return 2
+	case .NEON_VN_TABLE_3: return 3
+	case .NEON_VN_TABLE_4: return 4
+	}
+	return 1
 }
 
 // Typical-case estimate of the instruction count for `data`.

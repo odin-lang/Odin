@@ -213,6 +213,10 @@ infer_dt_suffix_from_inst :: proc(inst: ^Instruction) -> string {
 	if inst.operand_count == 0 { return "" }
 	op0 := &inst.ops[0]
 	if op0.kind != .REGISTER { return "" }
+	// A register list leads the load/store-multiple forms -- VPUSH, VPOP and
+	// friends -- and none of them take a data type. Guessing one from the
+	// bank produced `vpop.f64 {d0}`, which is not accepted syntax.
+	if op0.list.count > 0 { return "" }
 	switch reg_class(op0.reg) {
 	case REG_SPR: return ".f32"
 	case REG_DPR: return ".f64"

@@ -329,6 +329,13 @@ Operand_Encoding :: enum u8 {
 	// ---- VFP / NEON list ----
 	VFP_S_LIST,            // VLDM/VSTM single-prec list (8-bit count, start in Vd_S)
 	VFP_D_LIST,            // VLDM/VSTM double-prec list (8-bit count, start in Vd_D)
+
+	// VTBL/VTBX read their table from a run of one to four D registers
+	// starting at Vn. Which run length applies is the `len` field, which is
+	// a fixed pattern bit of each form rather than something the operand
+	// encodes -- so the length rides in the encoding, the way the NEON
+	// structure-list lengths already do, and the encoder emits only Vn.
+	NEON_VN_TABLE_1, NEON_VN_TABLE_2, NEON_VN_TABLE_3, NEON_VN_TABLE_4,
 	// NEON structure load/store lists (VLD1-4 / VST1-4). Unlike VLDM's list,
 	// the register count is part of the form's type field at bits 11:8, so the
 	// encoding writes only Vd; how many registers -- and whether the run steps
