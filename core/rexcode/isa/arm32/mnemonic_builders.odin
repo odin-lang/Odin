@@ -708,6 +708,10 @@ inst_vfnma_s_s_s           :: #force_inline proc "contextless" (dst: Register, s
 emit_vfnma_s_s_s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfnma_s_s_s(dst, src, src2)) }
 inst_vfnms_s_s_s           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFNMS, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
 emit_vfnms_s_s_s           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfnms_s_s_s(dst, src, src2)) }
+inst_vfmab_q_q_q           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFMAB, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+emit_vfmab_q_q_q           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfmab_q_q_q(dst, src, src2)) }
+inst_vfmat_q_q_q           :: #force_inline proc "contextless" (dst: Register, src: Register, src2: Register) -> Instruction { return Instruction{mnemonic = .VFMAT, operand_count = 3, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), op_reg(src2), {}}} }
+emit_vfmat_q_q_q           :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register, src2: Register) { append(instructions, inst_vfmat_q_q_q(dst, src, src2)) }
 inst_vabs_s_s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VABS, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vabs_s_s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vabs_s_s(dst, src)) }
 inst_vneg_s_s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VNEG, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
@@ -762,10 +766,14 @@ inst_vldr_s_mem            :: #force_inline proc "contextless" (dst: Register, s
 emit_vldr_s_mem            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_vldr_s_mem(dst, src)) }
 inst_vstr_s_mem            :: #force_inline proc "contextless" (dst: Register, src: Memory) -> Instruction { return Instruction{mnemonic = .VSTR, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_mem(src), {}, {}}} }
 emit_vstr_s_mem            :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Memory) { append(instructions, inst_vstr_s_mem(dst, src)) }
-inst_vldm_r_slist          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .VLDM, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
-emit_vldm_r_slist          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_vldm_r_slist(dst, regs)) }
-inst_vstm_r_slist          :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .VSTM, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
-emit_vstm_r_slist          :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_vstm_r_slist(dst, regs)) }
+inst_vldmia_r_slist        :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .VLDMIA, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_vldmia_r_slist        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_vldmia_r_slist(dst, regs)) }
+inst_vldmdb_r_slist        :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .VLDMDB, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_vldmdb_r_slist        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_vldmdb_r_slist(dst, regs)) }
+inst_vstmia_r_slist        :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .VSTMIA, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_vstmia_r_slist        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_vstmia_r_slist(dst, regs)) }
+inst_vstmdb_r_slist        :: #force_inline proc "contextless" (dst: Register, regs: u16) -> Instruction { return Instruction{mnemonic = .VSTMDB, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg(dst), op_reg_list(regs), {}, {}}} }
+emit_vstmdb_r_slist        :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, regs: u16) { append(instructions, inst_vstmdb_r_slist(dst, regs)) }
 inst_vpush_slist           :: #force_inline proc "contextless" (regs: u16) -> Instruction { return Instruction{mnemonic = .VPUSH, operand_count = 1, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), {}, {}, {}}} }
 emit_vpush_slist           :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16) { append(instructions, inst_vpush_slist(regs)) }
 inst_vpop_slist            :: #force_inline proc "contextless" (regs: u16) -> Instruction { return Instruction{mnemonic = .VPOP, operand_count = 1, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), {}, {}, {}}} }
@@ -1100,12 +1108,6 @@ inst_vmovx_s_s             :: #force_inline proc "contextless" (dst: Register, s
 emit_vmovx_s_s             :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vmovx_s_s(dst, src)) }
 inst_vins_s_s              :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .VINS, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
 emit_vins_s_s              :: #force_inline proc(instructions: ^[dynamic]Instruction, dst: Register, src: Register) { append(instructions, inst_vins_s_s(dst, src)) }
-inst_vld2r_dlist_mem       :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD2R, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vld2r_dlist_mem       :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld2r_dlist_mem(regs, src)) }
-inst_vld3r_dlist_mem       :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD3R, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vld3r_dlist_mem       :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld3r_dlist_mem(regs, src)) }
-inst_vld4r_dlist_mem       :: #force_inline proc "contextless" (regs: u16, src: Memory) -> Instruction { return Instruction{mnemonic = .VLD4R, operand_count = 2, mode = .A32, cond = 14, length = 4, ops = {op_reg_list(regs), op_mem(src), {}, {}}} }
-emit_vld4r_dlist_mem       :: #force_inline proc(instructions: ^[dynamic]Instruction, regs: u16, src: Memory) { append(instructions, inst_vld4r_dlist_mem(regs, src)) }
 inst_it_cond_imm4          :: #force_inline proc "contextless" (imm: i64, imm2: i64) -> Instruction { return Instruction{mnemonic = .IT, operand_count = 2, mode = .T32, cond = 14, length = 2, ops = {op_imm(imm), op_imm(imm2), {}, {}}} }
 emit_it_cond_imm4          :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, imm2: i64) { append(instructions, inst_it_cond_imm4(imm, imm2)) }
 inst_tt_r_r                :: #force_inline proc "contextless" (dst: Register, src: Register) -> Instruction { return Instruction{mnemonic = .TT, operand_count = 2, mode = .T32, cond = 14, length = 4, ops = {op_reg(dst), op_reg(src), {}, {}}} }
@@ -1983,6 +1985,10 @@ inst_vfnma                      :: inst_vfnma_s_s_s
 emit_vfnma                      :: emit_vfnma_s_s_s
 inst_vfnms                      :: inst_vfnms_s_s_s
 emit_vfnms                      :: emit_vfnms_s_s_s
+inst_vfmab                      :: inst_vfmab_q_q_q
+emit_vfmab                      :: emit_vfmab_q_q_q
+inst_vfmat                      :: inst_vfmat_q_q_q
+emit_vfmat                      :: emit_vfmat_q_q_q
 inst_vabs                       :: inst_vabs_s_s
 emit_vabs                       :: emit_vabs_s_s
 inst_vneg                       :: inst_vneg_s_s
@@ -2019,10 +2025,14 @@ inst_vldr                       :: inst_vldr_s_mem
 emit_vldr                       :: emit_vldr_s_mem
 inst_vstr                       :: inst_vstr_s_mem
 emit_vstr                       :: emit_vstr_s_mem
-inst_vldm                       :: inst_vldm_r_slist
-emit_vldm                       :: emit_vldm_r_slist
-inst_vstm                       :: inst_vstm_r_slist
-emit_vstm                       :: emit_vstm_r_slist
+inst_vldmia                     :: inst_vldmia_r_slist
+emit_vldmia                     :: emit_vldmia_r_slist
+inst_vldmdb                     :: inst_vldmdb_r_slist
+emit_vldmdb                     :: emit_vldmdb_r_slist
+inst_vstmia                     :: inst_vstmia_r_slist
+emit_vstmia                     :: emit_vstmia_r_slist
+inst_vstmdb                     :: inst_vstmdb_r_slist
+emit_vstmdb                     :: emit_vstmdb_r_slist
 inst_vpush                      :: inst_vpush_slist
 emit_vpush                      :: emit_vpush_slist
 inst_vpop                       :: inst_vpop_slist
@@ -2303,12 +2313,6 @@ inst_vmovx                      :: inst_vmovx_s_s
 emit_vmovx                      :: emit_vmovx_s_s
 inst_vins                       :: inst_vins_s_s
 emit_vins                       :: emit_vins_s_s
-inst_vld2r                      :: inst_vld2r_dlist_mem
-emit_vld2r                      :: emit_vld2r_dlist_mem
-inst_vld3r                      :: inst_vld3r_dlist_mem
-emit_vld3r                      :: emit_vld3r_dlist_mem
-inst_vld4r                      :: inst_vld4r_dlist_mem
-emit_vld4r                      :: emit_vld4r_dlist_mem
 inst_it                         :: inst_it_cond_imm4
 emit_it                         :: emit_it_cond_imm4
 inst_tt                         :: inst_tt_r_r

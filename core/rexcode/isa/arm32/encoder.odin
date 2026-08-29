@@ -541,6 +541,10 @@ pack_operand_inline :: #force_inline proc(
 		// Only Vd; the count lives in the form's type field.
 		n := u32(reg_hw(op.reg)) & 0x1F
 		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12
+	case .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4:
+		// Same, plus the spacing, which bit 5 carries.
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | (op.list.stride > 1 ? u32(1) : 0) << 5
 	case .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
 		n := u32(reg_hw(op.reg)) & 0x1F
 		shift, mask, _ := neon_lane_shape(enc)

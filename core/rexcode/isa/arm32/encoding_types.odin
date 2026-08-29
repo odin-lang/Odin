@@ -367,6 +367,9 @@ Operand_Encoding :: enum u8 {
 	NEON_D_LIST_3X,        // {d2, d4, d6}      -- spaced
 	NEON_D_LIST_4X,        // {d2, d4, d6, d8}  -- spaced
 	NEON_D_LIST_ALL,       // {d2[]}            -- to all lanes
+	// The structure loads that broadcast take a list of two, three or four,
+	// and bit 5 spaces it -- `{d0[], d2[]}` rather than `{d0[], d1[]}`.
+	NEON_D_LIST_ALL_2, NEON_D_LIST_ALL_3, NEON_D_LIST_ALL_4,
 	// VLD1/VST1 single-lane: Vd plus the lane index, whose width and position
 	// follow the element size -- bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
 	// Verified against llvm-mc.

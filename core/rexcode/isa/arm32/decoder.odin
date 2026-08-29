@@ -497,6 +497,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .NEON_D_LIST_ALL:
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
 		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, true)
+	case .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		count := u8(2 + (int(enc) - int(Operand_Encoding.NEON_D_LIST_ALL_2)))
+		return op_reg_run(Register(REG_DPR | u16(n)), count,
+		                  ((word >> 5) & 1) != 0 ? 2 : 1, true)
 	case .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
 		shift, mask, count := neon_lane_shape(enc)

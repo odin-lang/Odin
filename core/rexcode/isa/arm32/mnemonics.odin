@@ -232,6 +232,9 @@ Mnemonic :: enum u16 {
 	VADD,   VSUB,   VMUL,   VDIV,
 	VMLA,   VMLS,   VNMUL,  VNMLA,  VNMLS,
 	VFMA,   VFMS,   VFNMA,  VFNMS,
+	// The bfloat16 multiply-accumulates name which half of each pair they
+	// take, bottom or top, on the mnemonic.
+	VFMAB,  VFMAT,
 
 	VABS,   VNEG,   VSQRT,
 	VCMP,   VCMPE,
@@ -243,7 +246,8 @@ Mnemonic :: enum u16 {
 	VMOV,                                  // many forms (reg-reg, reg-imm, GPR-FPR)
 	VMRS,   VMSR,                          // FPSCR/coprocessor access
 	VLDR,   VSTR,
-	VLDM,   VSTM,
+	// The addressing mode is part of the name, as it is for LDM and STM.
+	VLDMIA, VLDMDB, VSTMIA, VSTMDB,
 	VPUSH,  VPOP,
 
 	VSEL,                                  // ARMv8 conditional select
@@ -346,8 +350,8 @@ Mnemonic :: enum u16 {
 	// -- MVE gather/scatter (vector offset addressing) ----------------------
 	// -- NEON compare-with-zero (distinct encodings from reg-vs-reg) --------
 	// -- NEON replicate loads (broadcast one element to all lanes) ----------
-	//    VLD1R already covered in VLD1; these are the 2/3/4 variants.
-	VLD2R,    VLD3R,    VLD4R,
+	// The broadcast structure loads are VLD2/VLD3/VLD4 with an all-lanes
+	// list, not mnemonics of their own -- that is how they are written.
 
 	// -- NEON single-element-lane load/store (lane form, not multi-vec) -----
 	// -- VFP fixed-point conversions (with #fbits operand) ------------------

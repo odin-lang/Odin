@@ -392,7 +392,9 @@ run_smoke :: proc() {
 	check("VFMSL Q",         .VFMSL, 1, 0xFCA00850, 0xFFB00F50)
 	check("VCVT BF16",       .VCVT, 10, 0xF3B60600, 0xFFBF0FD0)
 	check("VDOT BF16 D",     .VDOT, 0, 0xFC000D00, 0xFFB00F10)
-	check("VFMA BF16 Q",     .VFMA, 7, 0xFC300850, 0xFFB00F50)
+	// Bfloat16 names which half of each pair it takes on the mnemonic.
+	check("VFMAB BF16 Q",    .VFMAB, 0, 0xFC300810, 0xFFB00F70)
+	check("VFMAT BF16 Q",    .VFMAT, 0, 0xFC300850, 0xFFB00F70)
 	check("VMMLA BF16 Q",    .VMMLA, 0, 0xFC000C40, 0xFFB00F50)
 
 	// ---- Barriers / hints: ESB, PSB CSYNC, TSB CSYNC, CSDB, SB ----
@@ -553,9 +555,11 @@ run_smoke :: proc() {
 	check("VCLT D",        .VCLT, 14, 0xF3B10200, 0xFFBB0FD0)
 
 	// ---- NEON replicate loads ----
-	check("VLD2R",           .VLD2R, 0, 0xF4A00D0F, 0xFFB00F0F)
-	check("VLD3R",           .VLD3R, 0, 0xF4A00E0F, 0xFFB00F0F)
-	check("VLD4R",           .VLD4R, 0, 0xF4A00F0F, 0xFFB00F0F)
+	// The broadcast loads are VLD2/VLD3/VLD4 with an all-lanes list, and
+	// that form leads each of their entry lists.
+	check("VLD2 all-lanes",  .VLD2, 6, 0xF4A00D0F, 0xFFB00F0F)
+	check("VLD3 all-lanes",  .VLD3, 5, 0xF4A00E0F, 0xFFB00F0F)
+	check("VLD4 all-lanes",  .VLD4, 5, 0xF4A00F0F, 0xFFB00F0F)
 
 	// ---- NEON single-element lane loads/stores ----
 	check("VLD1 lane .8",     .VLD1, 5, 0xF4A0000F, 0xFFB00F1F)
