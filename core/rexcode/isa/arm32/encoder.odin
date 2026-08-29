@@ -247,7 +247,7 @@ mem_mode_matches :: #force_inline proc "contextless" (inst: ^Instruction, form: 
 		// because R0-as-index is exceedingly rare in real code.
 		has_index := op.mem.index != Register(0)
 		#partial switch form.enc[k] {
-		case .MEM_IMM12_OFFSET, .MEM_IMM8_OFFSET:
+		case .MEM_IMM12_OFFSET, .MEM_IMM8_OFFSET, .MEM_IMM8_SCALED4:
 			if m != .OFFSET { return false }
 			if has_index { return false }
 		case .MEM_REG_OFFSET, .MEM_DOUBLEREG:
@@ -545,6 +545,11 @@ pack_operand_inline :: #force_inline proc(
 		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | ((u32(op.list.count) * 2) & 0xFF)
 
 	// ---- Memory addressing composites --------------------------------------
+	case .MEM_IMM8_SCALED4:
+		m := op.mem
+		base := (u32(reg_hw(m.base)) & 0xF) << 16
+		u_bit: u32 = (m.disp > 0 || (m.disp == 0 && m.sign >= 0)) ? 1 : 0
+		return base | (u_bit << 23) | ((u32(abs_i32(m.disp)) / 4) & 0xFF)
 	case .MEM_IMM12_OFFSET:
 		m := op.mem
 		base := (u32(reg_hw(m.base)) & 0xF) << 16
@@ -667,6 +672,8 @@ pack_operand_inline :: #force_inline proc(
 		return (op.immediate == 270 ? u32(1) : 0) << 24
 	case .NEON_ROT_4:
 		return ((u32(op.immediate) / 90) & 3) << 20
+	case .NEON_ROT_4_HI:
+		return ((u32(op.immediate) / 90) & 3) << 23
 	case .VFP_FBITS:
 		// sx is a fixed bit of the form, so the width comes from its pattern.
 		width: u32 = ((form.bits >> 7) & 1) != 0 ? 32 : 16

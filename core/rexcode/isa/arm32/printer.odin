@@ -120,9 +120,11 @@ sbprint :: proc(
 				dt = DECODE_ENTRIES[de_idx].dt
 			}
 		}
-		if dt[0] == .NONE {
-			dt_suffix = infer_dt_suffix_from_inst(inst)
-		}
+		// No fallback beyond this. Guessing a data type from the register
+		// bank produced one for every VFP instruction that does not take
+		// any -- `vldr.f32`, `vorn.f64` -- and those are not accepted
+		// syntax. If a form needs a suffix, the table is where it says so.
+
 
 		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.sets_flags, opts.uppercase)
 		if dt[0] != .NONE {
@@ -205,23 +207,6 @@ infer_dt_suffix :: proc(form: ^Decode_Entry, inst: ^Instruction) -> string {
 	if feat == .FHM  { return ".f16" }
 	if feat == .FCMA { return ".f32" }
 
-	return ""
-}
-
-@(private="file")
-infer_dt_suffix_from_inst :: proc(inst: ^Instruction) -> string {
-	if inst.operand_count == 0 { return "" }
-	op0 := &inst.ops[0]
-	if op0.kind != .REGISTER { return "" }
-	// A register list leads the load/store-multiple forms -- VPUSH, VPOP and
-	// friends -- and none of them take a data type. Guessing one from the
-	// bank produced `vpop.f64 {d0}`, which is not accepted syntax.
-	if op0.list.count > 0 { return "" }
-	switch reg_class(op0.reg) {
-	case REG_SPR: return ".f32"
-	case REG_DPR: return ".f64"
-	case REG_QPR: return ""        // can't tell integer vs FP from operand alone
-	}
 	return ""
 }
 

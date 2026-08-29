@@ -370,6 +370,9 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.writes_pc   { append(&parts, "writes_pc=true")   }
 	if f.thumb32     { append(&parts, "thumb32=true")     }
 	if f.deprecated  { append(&parts, "deprecated=true")  }
+	if f.cond_in_21  { append(&parts, "cond_in_21=true")  }
+	// Every flag has to be named here: this is what re-emits the table, so a
+	// flag left out is a flag silently dropped on the next regeneration.
 	return strings.join(parts[:], ", ", context.temp_allocator)
 }
 

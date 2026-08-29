@@ -376,7 +376,8 @@ Operand_Encoding :: enum u8 {
 	RT2_A32_PAIR,
 	MEM_IMM8_PRE_INDEX,
 	MEM_IMM8_POST_INDEX,
-	MEM_IMM8_OFFSET,       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
+	MEM_IMM8_OFFSET,
+	MEM_IMM8_SCALED4,      // VFP load/store: imm8 in words, U at bit 23       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
 	MEM_REG_OFFSET,        // [Rn, ±Rm{, shift}]
 	MEM_PRE_INDEX,         // [Rn, #imm]! / [Rn, ±Rm]!
 	MEM_POST_INDEX,        // [Rn], #imm / [Rn], ±Rm
@@ -419,7 +420,9 @@ Operand_Encoding :: enum u8 {
 	NEON_SHLL_8, NEON_SHLL_16, NEON_SHLL_32,
 	// Complex-arithmetic rotations, named in degrees. VCADD has two, in bit
 	// 24; VCMLA has four, in bits 21:20.
-	NEON_ROT_2, NEON_ROT_4,
+	// VCMLA names its rotation twice over: the by-element forms put it in
+	// bits 21:20, the vector forms in 24:23.
+	NEON_ROT_2, NEON_ROT_4, NEON_ROT_4_HI,
 	SAT_IMM5,              // bits 20-16: SSAT/SSAT16 saturate-to width, less one
 	SAT_IMM5_T32,          // Thumb-2 signed saturate amount, less one
 	SAT_IMM5_U,            // bits 20-16: USAT/USAT16 width, which is not biased

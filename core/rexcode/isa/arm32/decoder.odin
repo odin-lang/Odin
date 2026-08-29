@@ -403,6 +403,15 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		mm := mem_imm(base, disp)
 		if u_bit == 0 { mm.sign = -1 }
 		return op_mem(mm)
+	case .MEM_IMM8_SCALED4:
+		// The VFP loads count the offset in words, so the eight bits reach
+		// +/-1020 rather than +/-255.
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		u_bit := (word >> 23) & 1
+		disp := i32(word & 0xFF) * 4
+		mm := mem_imm(base, u_bit == 0 ? -disp : disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_IMM8_OFFSET:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
@@ -555,6 +564,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .NEON_SHLL_32: return op_imm(32)
 	case .NEON_ROT_2:   return op_imm(((word >> 24) & 1) != 0 ? 270 : 90)
 	case .NEON_ROT_4:   return op_imm(i64(((word >> 20) & 3) * 90))
+	case .NEON_ROT_4_HI: return op_imm(i64(((word >> 23) & 3) * 90))
 	case .VFP_FBITS:
 		// The fixed-point width is 16 or 32 by the sx bit, and the fraction
 		// is that less imm4:i -- so the widest fraction encodes as zero.

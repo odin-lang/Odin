@@ -395,8 +395,8 @@ run_smoke :: proc() {
 	// ---- Barriers / hints: ESB, PSB CSYNC, TSB CSYNC, CSDB, SB ----
 	check("ESB A32",         .ESB, 0, 0x0320F010, 0x0FFFFFFF)
 	check("ESB T32",         .ESB, 1, 0xF3AF8010, 0xFFFFFFFF)
-	check("PSB_CSYNC A32",   .PSB_CSYNC, 0, 0x0320F011, 0x0FFFFFFF)
-	check("TSB_CSYNC A32",   .TSB_CSYNC, 0, 0x0320F012, 0x0FFFFFFF)
+	check("PSB_CSYNC A32",   .PSB_CSYNC, 0, 0xE320F011, 0xFFFFFFFF)
+	check("TSB_CSYNC A32",   .TSB_CSYNC, 0, 0xE320F012, 0xFFFFFFFF)
 	check("CSDB A32",        .CSDB, 0, 0x0320F014, 0x0FFFFFFF)
 	check("CSDB T32",        .CSDB, 1, 0xF3AF8014, 0xFFFFFFFF)
 	check("SB A32",          .SB, 0, 0xF57FF070, 0xFFFFFFFF)
