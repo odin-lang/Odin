@@ -1,11 +1,23 @@
 package sort
 
-import "core:slice"
 import "base:intrinsics"
 
-// WARNING: each call generates a new quicksort, only use in performance critical path
-//
-// This sort is not guaranteed to be stable
+Ordering :: enum {
+	Less = -1,
+	Equal = 0,
+	Greater = 1,
+}
+
+/*
+WARNING: each call generates a new quicksort, only use in performance critical path
+
+This sort is not guaranteed to be stable
+
+	example :: proc() {
+		arr := []int{3,2,1}
+		sort.sort_inlined(arr)
+	}
+*/
 sort_inlined :: proc(arr: $T/[]$E) where ORD(E) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -15,9 +27,20 @@ sort_inlined :: proc(arr: $T/[]$E) where ORD(E) {
 	}
 }
 
-// WARNING: each call generates a new quicksort, only use in performance critical path
-//
-// This sort is not guaranteed to be stable
+
+/*
+WARNING: each call generates a new quicksort, only use in performance critical path
+
+This sort is not guaranteed to be stable
+
+	example :: proc() {
+		Data :: struct { rand: int, data: int }
+		data_less :: proc(l, r: Data) -> bool { return l.rand < r.rand }
+		arr := make([]Data, 10)
+		// fill with data
+		sort.sort_inlined_by(arr, data_less)
+	}
+*/
 sort_inlined_by :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -26,9 +49,18 @@ sort_inlined_by :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool) {
 	}
 }
 
-// WARNING: each call generates a new quicksort, only use in performance critical path
-//
-// This sort is not guaranteed to be stable
+/*
+WARNING: each call generates a new quicksort, only use in performance critical path
+
+This sort is not guaranteed to be stable
+
+	example :: proc() {
+		arr := []int{3,2,1}
+		indices := sort.sort_inlined_with_indices(arr)
+		// arr = {1,2,3}
+		defer delete(indices)
+	}
+*/
 sort_inlined_with_indices :: proc(arr: $T/[]$E, allocator := context.allocator) -> (indices: []int) where ORD(E) {
 	indices = make([]int, len(arr), allocator)
 	when size_of(E) != 0 {
@@ -49,9 +81,20 @@ sort_inlined_with_indices :: proc(arr: $T/[]$E, allocator := context.allocator) 
 	return indices
 }
 
-// WARNING: each call generates a new quicksort, only use in performance critical path
-//
-// This sort is not guaranteed to be stable
+/*
+WARNING: each call generates a new quicksort, only use in performance critical path
+
+This sort is not guaranteed to be stable
+
+	example :: proc() {
+		Data :: struct { rand: int, data: [10]int }
+		data_less :: proc(l, r: Data) -> bool { return l.rand < r.rand }
+		arr := make([]Data, 10)
+		// fill with data
+		sort.sort_inlined_by_with_indices(arr, data_less, context.temp_allocator)
+		free_all(context.temp_allocator)
+	}
+*/
 sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool, allocator := context.allocator) -> (indices: []int) {
 	indices = make([]int, len(arr), allocator)
 
@@ -72,9 +115,24 @@ sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool,
 	return indices
 }
 
-// WARNING: each call generates a new quicksort, only use in performance critical path
-//
-// This sort is not guaranteed to be stable
+/*
+WARNING: each call generates a new quicksort, only use in performance critical path
+
+This sort is not guaranteed to be stable
+
+	example :: proc() {
+		Data :: struct { rand: int, data: [10]int }
+		modulus := []int{5,4,6,7,3,2,1,8,9,0}
+		less_data_modulus :: proc(l, r: Data, mod: ^[]int)->bool{
+			left := l.rand %% 10
+			right := r.rand %% 10
+			return mod[left] < mod[right]
+		}
+		arr := make([]Data, 10)
+		// fill with data
+		sort.sort_inlined_by_with_data(data, less_data_modulus, &modulus)
+	}
+*/
 sort_inlined_by_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: ^$D) -> bool, user_data: ^D) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -85,10 +143,26 @@ sort_inlined_by_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: 
 	}
 }
 
-// WARNING: each call generates a new quicksort, only use in performance critical path
-//
-// This sort is not guaranteed to be stable
-sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: rawptr) -> bool, user_data: ^$D, allocator := context.allocator) -> (indices: []int) {
+/*
+WARNING: each call generates a new quicksort, only use in performance critical path
+
+This sort is not guaranteed to be stable
+
+	example :: proc() {
+		Data :: struct { rand: int, data: [10]int }
+		modulus := []int{5,4,6,7,3,2,1,8,9,0}
+		less_data_modulus :: proc(l, r: Data, mod: ^[]int)->bool{
+			left := l.rand %% 10
+			right := r.rand %% 10
+			return mod[left] < mod[right]
+		}
+		arr := make([]Data, 10)
+		// fill with data
+		indices := sort.sort_inlined_by_with_indices_with_data(data, less_data_modulus, &modulus)
+		defer delete(indices)
+	}
+*/
+sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E, user_data: ^$D) -> bool, user_data: ^D, allocator := context.allocator) -> (indices: []int) {
 	indices = make([]int, len(arr), allocator)
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
@@ -103,8 +177,7 @@ sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E
 			arr := arr
 			ctx := &Context{arr, user_data}
 
-			_quick_lomuto(indices, ctx, proc(l, r: int, user_data: rawptr) -> bool {
-				ctx := (^Context)(user_data)
+			_quick_lomuto(indices, ctx, proc(l, r: int, ctx: ^Context) -> bool {
 				return LESS(ctx.arr[l] , ctx.arr[r], ctx.user_data)
 			})
 
@@ -117,7 +190,7 @@ sort_inlined_by_with_indices_with_data :: proc(arr: $T/[]$E, $LESS: proc(l, r: E
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
 // This sort is not guaranteed to be stable
-sort_inlined_by_cmp :: proc(arr: $T/[]$E, $CMP: proc(l, r: E) -> slice.Ordering) {
+sort_inlined_by_cmp :: proc(arr: $T/[]$E, $CMP: proc(l, r: E) -> Ordering) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
 			_quick_lomuto(arr, rawptr(nil), proc(l, r: E, user_data: rawptr) -> bool { return CMP(l, r) == .Less })
@@ -128,7 +201,7 @@ sort_inlined_by_cmp :: proc(arr: $T/[]$E, $CMP: proc(l, r: E) -> slice.Ordering)
 // WARNING: each call generates a new quicksort, only use in performance critical path
 //
 // This sort is not guaranteed to be stable
-sort_inlined_by_cmp_with_data :: proc(arr: $T/[]$E, $CMP: proc(l, r: E, user_data: ^$D) -> slice.Ordering, user_data: ^D) {
+sort_inlined_by_cmp_with_data :: proc(arr: $T/[]$E, $CMP: proc(l, r: E, user_data: ^$D) -> Ordering, user_data: ^D) {
 	when size_of(E) != 0 {
 		if len(arr) > 1 {
 			_quick_lomuto(arr, user_data, proc(l, r: E, user_data: ^D) -> bool {
