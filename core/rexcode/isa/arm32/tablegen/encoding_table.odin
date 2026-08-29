@@ -1588,19 +1588,19 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	// ARMv8: VCVTA/N/P/M (rounding-mode FP-to-int) - cond=1111 (unconditional class)
 	.VCVTA = {
 		{.VCVTA, {.SPR, .SPR, .NONE, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0xFEBC0A40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F32}},
-		{.VCVTA, {.DPR, .DPR, .NONE, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0xFEBC0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
+		{.VCVTA, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0xFEBC0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
 	},
 	.VCVTN = {
 		{.VCVTN, {.SPR, .SPR, .NONE, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0xFEBD0A40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F32}},
-		{.VCVTN, {.DPR, .DPR, .NONE, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0xFEBD0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
+		{.VCVTN, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0xFEBD0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
 	},
 	.VCVTP = {
 		{.VCVTP, {.SPR, .SPR, .NONE, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0xFEBE0A40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F32}},
-		{.VCVTP, {.DPR, .DPR, .NONE, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0xFEBE0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
+		{.VCVTP, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0xFEBE0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
 	},
 	.VCVTM = {
 		{.VCVTM, {.SPR, .SPR, .NONE, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0xFEBF0A40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F32}},
-		{.VCVTM, {.DPR, .DPR, .NONE, .NONE}, {.VD_D, .VM_D, .NONE, .NONE}, 0xFEBF0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
+		{.VCVTM, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0xFEBF0B40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.U32, .F64}},
 	},
 
 	// VMRS / VMSR (access FPSCR + friends as GPR)
@@ -1648,8 +1648,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	},
 	.VSEL = {
 		// VSEL<cond>.F32/F64 Sd, Sn, Sm -- cond field at bits 21-20 + 7
-		{.VSEL, {.SPR, .SPR, .SPR, .COND}, {.VD_S, .VN_S, .VM_S, .NONE}, 0xFE000A00, 0xFF800F50, .V8, .A32, {cond_in_28=false}, {.F32, .NONE}},
-		{.VSEL, {.DPR, .DPR, .DPR, .COND}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFE000B00, 0xFF800F50, .V8, .A32, {cond_in_28=false}, {.F64, .NONE}},
+		{.VSEL, {.SPR, .SPR, .SPR, .NONE}, {.VD_S, .VN_S, .VM_S, .NONE}, 0xFE000A00, 0xFF800F50, .V8, .A32, {cond_in_28=false, cond_in_21=true}, {.F32, .NONE}},
+		{.VSEL, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFE000B00, 0xFF800F50, .V8, .A32, {cond_in_28=false, cond_in_21=true}, {.F64, .NONE}},
 	},
 	.VRINTA = {
 		{.VRINTA, {.SPR, .SPR, .NONE, .NONE}, {.VD_S, .VM_S, .NONE, .NONE}, 0xFEB80A40, 0xFFBF0FD0, .V8, .A32, {cond_in_28=false}, {.F32, .NONE}},
@@ -1692,7 +1692,7 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VRINTX, {.QPR, .QPR, .NONE, .NONE}, {.VD_Q, .VM_Q, .NONE, .NONE}, 0xFFBA04C0, 0xFFBB0FD1, .MVE_FP, .T32, {thumb32=true, cond_in_28=false}, {.F32, .NONE}},
 	},
 	// VJCVT (ARMv8.3): F64 -> S32 with JS-style rounding
-	.VJCVT = { {.VJCVT, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0x0EB90BC0, 0x0FBF0FD0, .V8, .A32, {}, {}} },
+	.VJCVT = { {.VJCVT, {.SPR, .DPR, .NONE, .NONE}, {.VD_S, .VM_D, .NONE, .NONE}, 0x0EB90BC0, 0x0FBF0FD0, .V8, .A32, {}, {.S32, .F64}} },
 
 	// ---- VFP F16 scalar arithmetic (FEAT_FP16) ----
 	//   Uses coproc 9 (cp_num = 1001) instead of 10/11 used by F32/F64.
@@ -2233,8 +2233,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		// Variant: vector D[lane] form (1111 0011 1011 imm4 Vd 1100 0 Q M 0 Vm)
 		// We list the common scalar/Rt form for V_8B/V_16B/V_4H/V_8H/V_2S/V_4S.
 		// (encoder picks based on operand kinds)
-		{.VDUP, {.DPR, .GPR, .NONE, .NONE}, {.VD_D, .RT_A32, .NONE, .NONE}, 0x0EC00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
-		{.VDUP, {.QPR, .GPR, .NONE, .NONE}, {.VD_Q, .RT_A32, .NONE, .NONE}, 0x0EE00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
+		{.VDUP, {.DPR, .GPR, .NONE, .NONE}, {.VN_D, .RT_A32, .NONE, .NONE}, 0x0EC00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
+		{.VDUP, {.QPR, .GPR, .NONE, .NONE}, {.VN_Q, .RT_A32, .NONE, .NONE}, 0x0EE00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
 		// VDUP from vector lane (.D form): 1111 0011 1011 imm4 Vd 1100 0 Q M 0 Vm
 		{.VDUP, {.DPR, .DPR_ELEM, .NONE, .NONE}, {.VD_D, .NEON_VM_SCALAR_32, .NONE, .NONE}, 0xF3B00C00, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
 		{.VDUP, {.QPR, .DPR_ELEM, .NONE, .NONE}, {.VD_Q, .NEON_VM_SCALAR_32, .NONE, .NONE}, 0xF3B00C40, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
@@ -2548,9 +2548,9 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		//   imm6 encodes sh + size: 001sss for sh<8, 01sss for sh<16, 1sss for sh<32
 		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHIFT_IMM6, .NONE}, 0xF2800A10, 0xFE800FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		// VSHLL by max (#size) variant: 1111 0011 1 D 11 size 10 Vd 0011 0 0 M 0 Vm
-		{.VSHLL, {.QPR, .DPR, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3B20300, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}, {.I8, .NONE}},
-		{.VSHLL, {.QPR, .DPR, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3B60300, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
-		{.VSHLL, {.QPR, .DPR, .NONE, .NONE}, {.VD_Q, .VM_D, .NONE, .NONE}, 0xF3BA0300, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHLL_8, .NONE}, 0xF3B20300, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}, {.I8, .NONE}},
+		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHLL_16, .NONE}, 0xF3B60300, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VSHLL, {.QPR, .DPR, .IMM, .NONE}, {.VD_Q, .VM_D, .NEON_SHLL_32, .NONE}, 0xF3BA0300, 0xFFBF0FD0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
 	},
 	.VSHRN = {
 		// 1111 0010 1 D imm6 Vd 1000 0 0 M 1 Vm
@@ -2753,26 +2753,26 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	// VCADD: rotation in bit 24 only (2 values: 90, 270 deg)
 	.VCMLA = {
 		// Mask 0xFC800F10 leaves bits 24:23 variable for rotation operand
-		{.VCMLA, {.DPR, .DPR, .DPR, .IMM}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFC200800, 0xFC800F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
-		{.VCMLA, {.QPR, .QPR, .QPR, .IMM}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFC200840, 0xFC800F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
-		{.VCMLA, {.DPR, .DPR, .DPR_ELEM, .IMM}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NONE}, 0xFE000800, 0xFFB00F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
-		{.VCMLA, {.QPR, .QPR, .DPR_ELEM, .IMM}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NONE}, 0xFE000840, 0xFFB00F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCMLA, {.DPR, .DPR, .DPR, .IMM}, {.VD_D, .VN_D, .VM_D, .NEON_ROT_4}, 0xFC200800, 0xFC800F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCMLA, {.QPR, .QPR, .QPR, .IMM}, {.VD_Q, .VN_Q, .VM_Q, .NEON_ROT_4}, 0xFC200840, 0xFC800F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCMLA, {.DPR, .DPR, .DPR_ELEM, .IMM}, {.VD_D, .VN_D, .NEON_VM_SCALAR_32, .NEON_ROT_4}, 0xFE000800, 0xFFB00F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCMLA, {.QPR, .QPR, .DPR_ELEM, .IMM}, {.VD_Q, .VN_Q, .NEON_VM_SCALAR_32, .NEON_ROT_4}, 0xFE000840, 0xFFB00F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
 		{.VCMLA,  {.QPR, .QPR, .QPR, .IMM},  {.VD_Q, .VN_Q, .VM_Q, .MVE_ROT_CMLA},    0xFC200840, 0xFE611FF1, .MVE_FP,  .T32, {thumb32=true, cond_in_28=false}, {.F16, .NONE}},
 	},
 	.VCADD = {
 		// Mask 0xFE800F10 leaves bit 24 variable for rotation operand (90 or 270)
-		{.VCADD, {.DPR, .DPR, .DPR, .IMM}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFC800800, 0xFE800F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
-		{.VCADD, {.QPR, .QPR, .QPR, .IMM}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFC800840, 0xFE800F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCADD, {.DPR, .DPR, .DPR, .IMM}, {.VD_D, .VN_D, .VM_D, .NEON_ROT_2}, 0xFC800800, 0xFE800F10, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VCADD, {.QPR, .QPR, .QPR, .IMM}, {.VD_Q, .VN_Q, .VM_Q, .NEON_ROT_2}, 0xFC800840, 0xFE800F50, .FCMA, .A32, {cond_in_28=false}, {.F16, .NONE}},
 	},
 
 	// FEAT_FHM (ARMv8.2): FP16 fused multiply-add long
 	.VFMAL = {
-		{.VFMAL, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFC200810, 0xFFB00F10, .FHM, .A32, {cond_in_28=false}, {}},
-		{.VFMAL, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFC200850, 0xFFB00F50, .FHM, .A32, {cond_in_28=false}, {}},
+		{.VFMAL, {.DPR, .SPR, .SPR, .NONE}, {.VD_D, .VN_S, .VM_S, .NONE}, 0xFC200810, 0xFFB00F10, .FHM, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VFMAL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xFC200850, 0xFFB00F50, .FHM, .A32, {cond_in_28=false}, {.F16, .NONE}},
 	},
 	.VFMSL = {
-		{.VFMSL, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xFCA00810, 0xFFB00F10, .FHM, .A32, {cond_in_28=false}, {}},
-		{.VFMSL, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xFCA00850, 0xFFB00F50, .FHM, .A32, {cond_in_28=false}, {}},
+		{.VFMSL, {.DPR, .SPR, .SPR, .NONE}, {.VD_D, .VN_S, .VM_S, .NONE}, 0xFCA00810, 0xFFB00F10, .FHM, .A32, {cond_in_28=false}, {.F16, .NONE}},
+		{.VFMSL, {.QPR, .DPR, .DPR, .NONE}, {.VD_Q, .VN_D, .VM_D, .NONE}, 0xFCA00850, 0xFFB00F50, .FHM, .A32, {cond_in_28=false}, {.F16, .NONE}},
 	},
 
 	// FEAT_BF16 (ARMv8.6): BFloat16 arithmetic and conversion

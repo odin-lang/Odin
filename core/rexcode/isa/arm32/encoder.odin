@@ -661,6 +661,12 @@ pack_operand_inline :: #force_inline proc(
 	case .IT_MASK:          return u32(op.immediate) & 0xFF
 	case .CPS_IFLAGS:       return u32(op.immediate) & 0x1FF
 	case .HINT_FIELD:       return u32(op.immediate) & 0xFF
+	case .NEON_SHLL_8, .NEON_SHLL_16, .NEON_SHLL_32:
+		return 0    // the amount is the form's element size; no field carries it
+	case .NEON_ROT_2:
+		return (op.immediate == 270 ? u32(1) : 0) << 24
+	case .NEON_ROT_4:
+		return ((u32(op.immediate) / 90) & 3) << 20
 	case .VFP_FBITS:
 		// sx is a fixed bit of the form, so the width comes from its pattern.
 		width: u32 = ((form.bits >> 7) & 1) != 0 ? 32 : 16

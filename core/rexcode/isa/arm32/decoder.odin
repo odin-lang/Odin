@@ -157,7 +157,10 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		inst.dt = e.dt
 
 		// Cond: A32 entries with bits[31:28] variable in mask take cond from word
-		if mode == .A32 && (e.mask >> 28) == 0 {
+		if e.flags.cond_in_21 {
+			// Four conditions only, and not in their usual order.
+			inst.cond = VSEL_CONDITIONS[(word >> 20) & 3]
+		} else if mode == .A32 && (e.mask >> 28) == 0 {
 			inst.cond = u8((word >> 28) & 0xF)
 		} else {
 			inst.cond = 14    // AL / unconditional
@@ -547,6 +550,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_imm(i64((word >> 18) & 0xF))
 
 	// ---- Saturate / bit field ----
+	case .NEON_SHLL_8:  return op_imm(8)
+	case .NEON_SHLL_16: return op_imm(16)
+	case .NEON_SHLL_32: return op_imm(32)
+	case .NEON_ROT_2:   return op_imm(((word >> 24) & 1) != 0 ? 270 : 90)
+	case .NEON_ROT_4:   return op_imm(i64(((word >> 20) & 3) * 90))
 	case .VFP_FBITS:
 		// The fixed-point width is 16 or 32 by the sx bit, and the fraction
 		// is that less imm4:i -- so the widest fraction encodes as zero.
@@ -677,6 +685,10 @@ table_run_length :: #force_inline proc "contextless" (e: Operand_Encoding) -> u8
 	}
 	return 1
 }
+
+// The conditions VSEL can name, in the order bits 21:20 give them.
+@(private="file")
+VSEL_CONDITIONS := [4]u8{0, 6, 10, 12}   // EQ, VS, GE, GT
 
 // Typical-case estimate of the instruction count for `data`.
 @(require_results)

@@ -156,7 +156,9 @@ Encoding_Flags :: bit_field u8 {
 	writes_pc:   bool | 1,
 	thumb32:     bool | 1,   // T32 32-bit form (vs 16-bit). Ignored for A32.
 	deprecated:  bool | 1,
-	_:           u8   | 1,
+	// VSEL and friends are unconditional words that still name a condition,
+	// in bits 21:20 rather than 31:28, and spell it on the mnemonic.
+	cond_in_21:  bool | 1,
 }
 
 // ---- Operand types ----------------------------------------------------------
@@ -412,6 +414,12 @@ Operand_Encoding :: enum u8 {
 
 	// ---- Saturate ----
 	VFP_FBITS,             // VCVT fixed-point fraction bits: width - (imm4:i)
+	// VSHLL's widest form shifts by exactly the element size, which no field
+	// carries -- the size is a fixed bit of the form, so the amount is too.
+	NEON_SHLL_8, NEON_SHLL_16, NEON_SHLL_32,
+	// Complex-arithmetic rotations, named in degrees. VCADD has two, in bit
+	// 24; VCMLA has four, in bits 21:20.
+	NEON_ROT_2, NEON_ROT_4,
 	SAT_IMM5,              // bits 20-16: SSAT/SSAT16 saturate-to width, less one
 	SAT_IMM5_T32,          // Thumb-2 signed saturate amount, less one
 	SAT_IMM5_U,            // bits 20-16: USAT/USAT16 width, which is not biased

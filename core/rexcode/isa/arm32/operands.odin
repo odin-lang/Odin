@@ -69,11 +69,10 @@ Memory :: bit_field u64 {
 	base:       Register   | 15,  // GPR base register
 	index:      Register   | 15,  // GPR, or Register(0) for imm-only forms
 	shift_type: Shift_Type | 4,
-	shift_amt:  u8         | 5,   // 0..31 immediate shift
+	shift_amt:  u8         | 6,   // 0..32 -- LSR and ASR reach 32 through a zero field
 	mode:       Index_Mode | 2,
 	sign:       i8         | 3,   // +1 or -1 (U bit)
 	disp:       i32        | 19,  // immediate displacement (sign-extended)
-	// 1 bit spare
 }
 #assert(size_of(Memory) == 8)
 
@@ -112,12 +111,12 @@ Operand :: struct #packed {
 		using _: bit_field u32 {
 			reg:        Register   | 15,
 			shift_type: Shift_Type | 4,   // GPR_SHIFTED; .LSL/0 when plain
-			shift_amt:  u8         | 5,   // 0..31, or the Rs index for RSR
+			shift_amt:  u8         | 6,   // 0..32, or the Rs index for RSR
 			lane:       u8         | 5,   // SIMD lane for DPR_ELEM / QPR_ELEM
 			// Whether `lane` means anything. Lane 0 is a real index -- `d0[0]`
 			// is not `d0` -- so it cannot be spelled by lane == 0.
 			has_lane:   bool       | 1,
-			// 2 bits spare
+			// 1 bit spare
 		},
 		mem:       Memory,
 		immediate: i64,
