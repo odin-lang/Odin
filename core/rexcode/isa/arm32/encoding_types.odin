@@ -326,6 +326,13 @@ Operand_Encoding :: enum u8 {
 	VM_Q_MVE,
 	VFP_IMM8,
 	VM_S_PLUS1,            // the second S register of a consecutive pair
+	DBG_OPTION,            // DBG's option, bits 3:0 -- not the wider hint field
+	MRS_SPEC_REG,          // APSR or SPSR, by the R bit
+	VFP_SPEC_REG,          // VMRS/VMSR system register, bits 19:16
+	SETEND_ENDIAN,         // LE or BE, by the E bit
+	IMPL_SP,               // an SP the syntax names but no field encodes
+	MODE_IMM5,             // processor mode, bits 4:0 (SRS)
+	RN_A32_WB,             // base register whose writeback rides in bit 21
 	NEON_LANE_VN_32,       // Vn:N with the 32-bit lane index in bit 21              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
 	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)

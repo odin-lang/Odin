@@ -171,7 +171,7 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		// LDM/STM carry the writeback in bit 21; nothing else in the operand
 		// model records it, and without it the two forms print identically.
 		for k in 0 ..< len(e.enc) {
-			if e.enc[k] == .A32_REG_LIST {
+			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .RN_A32_WB || e.enc[k] == .IMPL_SP {
 				inst.writeback = (word >> 21) & 1 != 0
 				break
 			}
@@ -455,6 +455,13 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		// Only cmode 1111 expands to a float; the rest are bit patterns.
 		if cmode == 0b1111 { return op_float_imm(v) }
 		return op_hex_imm(v)
+	case .DBG_OPTION:    return op_imm(i64(word & 0xF))
+	case .MRS_SPEC_REG:  return op_reg(Register(REG_SREG | u16(((word >> 22) & 1) * 2)))
+	case .VFP_SPEC_REG:  return op_reg(Register(REG_FPSC | u16((word >> 16) & 0xF)))
+	case .SETEND_ENDIAN: return op_reg(Register(REG_ENDIAN | u16((word >> 9) & 1)))
+	case .IMPL_SP:       return op_reg(SP)
+	case .MODE_IMM5:     return op_imm(i64(word & 0x1F))
+	case .RN_A32_WB:     return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
 	case .VM_S_PLUS1:
 		// The second of a consecutive pair; only the first is encoded.
 		return op_reg(Register(REG_SPR | u16(((word & 0xF) << 1 | ((word >> 5) & 1)) + 1)))

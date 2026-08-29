@@ -312,7 +312,7 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 		return true
 	case .IMM, .IMM_MOD, .IMM_T32_MOD, .IMM12, .IMM5, .IMM5_W,
 	     .IMM4, .IMM4_SAT, .IMM8, .IMM3, .IMM_HINT, .IMM_BARRIER,
-	     .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
+	     .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
 	     .IMM_COPROC, .IMM_COPROC_OP, .NEON_IMM, .IMM16_LO_HI:
 		// A modified immediate reaches an immediate slot as an expanded bit
 		// pattern or a float, so all three kinds are the same slot's shape.
@@ -328,8 +328,12 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 		return op.kind == .MEMORY || op.kind == .RELATIVE
 	case .COPROC_REG, .COPROC_NUM:
 		return op.kind == .REGISTER || op.kind == .IMMEDIATE
+	case .IMM_ENDIAN:
+		return op.kind == .REGISTER
 	case .PSR_FIELD:
-		return op.kind == .IMMEDIATE
+		// APSR, SPSR and the endian tokens are named registers in the syntax
+		// even where no field encodes them.
+		return op.kind == .IMMEDIATE || op.kind == .REGISTER
 	case .VPR, .QPR_MVE:
 		return op.kind == .REGISTER && is_qpr(op.reg)
 	case .QPR_MVE_LIST:
@@ -497,6 +501,13 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0x7) << 17
 	case .VM_Q_MVE:
 		return (u32(reg_hw(op.reg)) & 0x7) << 1
+	case .DBG_OPTION:    return u32(op.immediate) & 0xF
+	case .MRS_SPEC_REG:  return 0    // the R bit is a fixed bit of the form
+	case .VFP_SPEC_REG:  return (u32(reg_hw(op.reg)) & 0xF) << 16
+	case .SETEND_ENDIAN: return (u32(reg_hw(op.reg)) & 1) << 9
+	case .IMPL_SP:       return 0
+	case .MODE_IMM5:     return u32(op.immediate) & 0x1F
+	case .RN_A32_WB:     return (u32(reg_hw(op.reg)) & 0xF) << 16
 	case .VM_S_PLUS1:
 		return 0    // only the first of the pair is encoded
 	case .NEON_LANE_VN_32:
@@ -953,7 +964,7 @@ neon_lane_shape :: #force_inline proc "contextless" (e: Operand_Encoding) -> (sh
 @(private="file", require_results)
 writeback_matches :: #force_inline proc "contextless" (inst: ^Instruction, f: ^Encoding) -> bool {
 	for e in f.enc {
-		if e == .A32_REG_LIST {
+		if e == .A32_REG_LIST || e == .RN_A32_WB || e == .IMPL_SP {
 			return ((f.bits >> 21) & 1 != 0) == inst.writeback
 		}
 	}

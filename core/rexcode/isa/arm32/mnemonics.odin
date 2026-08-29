@@ -207,8 +207,9 @@ Mnemonic :: enum u16 {
 	// -------------------------------------------------------------------------
 	// ARMv6 / Return-from-Exception
 	// -------------------------------------------------------------------------
-	RFE,                                   // return from exception
-	SRS,                                   // store return state
+	// The addressing mode is part of the name, as it is for LDM and STM.
+	RFEDA,  RFEDB,  RFEIA,  RFEIB,         // return from exception
+	SRSDA,  SRSDB,  SRSIA,  SRSIB,         // store return state
 
 	// -------------------------------------------------------------------------
 	// Coprocessor (legacy CP-space; many subsumed by VFP/NEON)

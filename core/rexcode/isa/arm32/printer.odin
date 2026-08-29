@@ -501,6 +501,8 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool = fals
 		}
 	case REG_COPROC:
 		fmt.sbprintf(sb, "c%d", hw)
+	case REG_ENDIAN:
+		strings.write_string(sb, hw == 0 ? "le" : "be")
 	case:
 		fmt.sbprintf(sb, "?%d", hw)
 	}

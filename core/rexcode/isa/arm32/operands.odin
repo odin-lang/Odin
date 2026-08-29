@@ -67,8 +67,9 @@ Index_Mode :: enum u8 {
 // multiplied by four in every Instruction. Field syntax and composite
 // literals are unchanged, so this is invisible to callers.
 //
-// A Register's raw value never exceeds REG_QPR|31 = 0x401F, so 15 bits hold
-// one losslessly (index uses Register(0), not a high sentinel, for "absent").
+// A memory base or index is always a GPR, whose raw value never exceeds
+// REG_GPR|15 = 0x100F, so 15 bits hold one losslessly (index uses
+// Register(0), not a high sentinel, for "absent").
 // `disp` gets 19 bits (+/-262,143) against a worst case of 4,095 -- the imm12
 // of an A32 load -- so there is ~64x headroom.
 Memory :: bit_field u64 {
@@ -115,14 +116,16 @@ Operand :: struct #packed {
 		// op.shift_type, op.shift_amt and op.lane still read and write
 		// exactly as they did when these were separate fields.
 		using _: bit_field u32 {
-			reg:        Register   | 15,
+			// Sixteen bits, not fifteen: the class nibble reaches 0x9000 for
+			// the endian tokens and 0x8000 for the coprocessor registers,
+			// and both were silently truncating.
+			reg:        Register   | 16,
 			shift_type: Shift_Type | 4,   // GPR_SHIFTED; .LSL/0 when plain
 			shift_amt:  u8         | 6,   // 0..32, or the Rs index for RSR
 			lane:       u8         | 5,   // SIMD lane for DPR_ELEM / QPR_ELEM
 			// Whether `lane` means anything. Lane 0 is a real index -- `d0[0]`
 			// is not `d0` -- so it cannot be spelled by lane == 0.
 			has_lane:   bool       | 1,
-			// 1 bit spare
 		},
 		mem:       Memory,
 		immediate: i64,

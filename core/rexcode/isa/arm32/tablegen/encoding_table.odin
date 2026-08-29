@@ -832,7 +832,7 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 
 	// MSR / MRS (status reg access)
 	.MRS = {
-		{.MRS, {.GPR, .PSR_FIELD, .NONE, .NONE}, {.RD, .NONE, .NONE, .NONE}, 0x010F0000, 0x0FBF0FFF, .BASE, .A32, {}, {}},
+		{.MRS, {.GPR, .PSR_FIELD, .NONE, .NONE}, {.RD, .MRS_SPEC_REG, .NONE, .NONE}, 0x010F0000, 0x0FBF0FFF, .BASE, .A32, {}, {}},
 		// T32 MRS: high=11110011 1110 1111  low=10 0 0 Rd 0000 0000
 		{.MRS, {.GPR, .PSR_FIELD, .NONE, .NONE}, {.RD_T32, .NONE, .NONE, .NONE}, 0xF3EF8000, 0xFFFFF0FF, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
@@ -849,7 +849,7 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.CPS = { {.CPS, {.IMM_IFLAGS, .NONE, .NONE, .NONE}, {.CPS_IFLAGS, .NONE, .NONE, .NONE}, 0xF1000000, 0xFFF1FE20, .V6, .A32, {cond_in_28=false}, {}} },
 
 	// SETEND (deprecated in ARMv8): 1111 0001 0000 0001 0000 000E 0000 0000
-	.SETEND = { {.SETEND, {.IMM_ENDIAN, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF1010000, 0xFFFFFDFF, .V6, .A32, {cond_in_28=false, deprecated=true}, {}} },
+	.SETEND = { {.SETEND, {.IMM_ENDIAN, .NONE, .NONE, .NONE}, {.SETEND_ENDIAN, .NONE, .NONE, .NONE}, 0xF1010000, 0xFFFFFDFF, .V6, .A32, {cond_in_28=false, deprecated=true}, {}} },
 
 	// SETPAN (ARMv8.1): A32 = 1111 0001 0001 0000 0000 0000 imm1 0000 0000  → bit 9 = imm
 	// T16:               1011 0110 0001 0 imm1 000                          → bit 3 = imm
@@ -887,7 +887,7 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.SEV, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF3AF8004, 0xFFFFFFFF, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.SEVL = { {.SEVL, {.NONE, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0x0320F005, 0x0FFFFFFF, .V8,  .A32, {}, {}} },
-	.DBG  = { {.DBG,  {.IMM_HINT, .NONE, .NONE, .NONE}, {.HINT_FIELD, .NONE, .NONE, .NONE}, 0x0320F0F0, 0x0FFFFFF0, .V7, .A32, {}, {}} },
+	.DBG  = { {.DBG,  {.IMM_HINT, .NONE, .NONE, .NONE}, {.DBG_OPTION, .NONE, .NONE, .NONE}, 0x0320F0F0, 0x0FFFFFF0, .V7, .A32, {}, {}} },
 	.HINT = { {.HINT, {.IMM_HINT, .NONE, .NONE, .NONE}, {.HINT_FIELD, .NONE, .NONE, .NONE}, 0x0320F000, 0x0FFFFF00, .V6K, .A32, {}, {}} },
 
 	// Memory barriers (ARMv7): 1111 0101 0111 1111 1111 0000 type imm4
@@ -1154,13 +1154,39 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	.SWPB = { {.SWPB, {.GPR, .GPR, .GPR, .NONE}, {.RT_A32, .RM_A32, .RN_A32, .NONE}, 0x01400090, 0x0FF00FF0, .BASE, .A32, {deprecated=true}, {}} },
 
 	// RFE / SRS (return-from-exception / store return state)
-	.RFE = {
-		// 1111 100 P U 0 W 1 Rn 0000 1010 0000 0000
-		{.RFE, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32, .NONE, .NONE, .NONE}, 0xF8100A00, 0xFE10FFFF, .V6, .A32, {cond_in_28=false}, {}},
+	// 1111 100 P U 0 W 1 Rn 0000 1010 0000 0000
+	.RFEDA = {
+		{.RFEDA, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF8100A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
+		{.RFEDA, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF8300A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
 	},
-	.SRS = {
-		// 1111 100 P U 1 W 0 1101 0000 0101 000 mode4
-		{.SRS, {.IMM, .NONE, .NONE, .NONE}, {.NONE, .NONE, .NONE, .NONE}, 0xF84D0500, 0xFE5FFFE0, .V6, .A32, {cond_in_28=false}, {}},
+	.RFEDB = {
+		{.RFEDB, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF9100A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
+		{.RFEDB, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF9300A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
+	},
+	.RFEIA = {
+		{.RFEIA, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF8900A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
+		{.RFEIA, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF8B00A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
+	},
+	.RFEIB = {
+		{.RFEIB, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF9900A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
+		{.RFEIB, {.GPR, .NONE, .NONE, .NONE}, {.RN_A32_WB, .NONE, .NONE, .NONE}, 0xF9B00A00, 0xFFF0FFFF, .V6, .A32, {cond_in_28=false}, {}},
+	},
+	// 1111 100 P U 1 W 0 1101 0000 0101 000 mode4
+	.SRSDA = {
+		{.SRSDA, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF84D0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
+		{.SRSDA, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF86D0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
+	},
+	.SRSDB = {
+		{.SRSDB, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF94D0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
+		{.SRSDB, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF96D0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
+	},
+	.SRSIA = {
+		{.SRSIA, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF8CD0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
+		{.SRSIA, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF8ED0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
+	},
+	.SRSIB = {
+		{.SRSIB, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF9CD0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
+		{.SRSIB, {.GPR, .IMM, .NONE, .NONE}, {.IMPL_SP, .MODE_IMM5, .NONE, .NONE}, 0xF9ED0500, 0xFFFFFFE0, .V6, .A32, {cond_in_28=false}, {}},
 	},
 
 	// =========================================================================
@@ -1605,8 +1631,8 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 
 	// VMRS / VMSR (access FPSCR + friends as GPR)
 	//   VMRS: cond 1110 1111 0001 Rt 1010 0001 0000     (Rt=PC means transfer to APSR.NZCV)
-	.VMRS = { {.VMRS, {.GPR, .NONE, .NONE, .NONE}, {.RT_A32, .NONE, .NONE, .NONE}, 0x0EF10A10, 0x0FFF0FFF, .VFPV2, .A32, {}, {}} },
-	.VMSR = { {.VMSR, {.GPR, .NONE, .NONE, .NONE}, {.RT_A32, .NONE, .NONE, .NONE}, 0x0EE10A10, 0x0FFF0FFF, .VFPV2, .A32, {}, {}} },
+	.VMRS = { {.VMRS, {.GPR, .PSR_FIELD, .NONE, .NONE}, {.RT_A32, .VFP_SPEC_REG, .NONE, .NONE}, 0x0EF10A10, 0x0FF00FFF, .VFPV2, .A32, {}, {}} },
+	.VMSR = { {.VMSR, {.PSR_FIELD, .GPR, .NONE, .NONE}, {.VFP_SPEC_REG, .RT_A32, .NONE, .NONE}, 0x0EE10A10, 0x0FF00FFF, .VFPV2, .A32, {}, {}} },
 
 	// VLDR / VSTR (single / double):  cond 1101 U D 0 1 Rn Vd 101 sz imm8
 	.VLDR = {
@@ -1803,12 +1829,36 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VAND, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xEF000150, 0xFFB10F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.VBIC = {
+		{.VBIC, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800130, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800170, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800330, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800370, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800530, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800570, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800730, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800770, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VBIC, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800930, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VBIC, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800970, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VBIC, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800B30, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VBIC, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800B70, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		// VBIC D: 1111 0010 0100 Vn Vd 0001 N 0 M 1 Vm
 		{.VBIC, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2100110, 0xFFB00F10, .NEON, .A32, {cond_in_28=false}, {}},
 		{.VBIC, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2100150, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {}},
 		{.VBIC, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xEF100150, 0xFFB10F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.VORR = {
+		{.VORR, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800110, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800150, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800310, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800350, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800510, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800550, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800710, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800750, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I32, .NONE}},
+		{.VORR, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800910, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VORR, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800950, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VORR, {.DPR, .IMM, .NONE, .NONE}, {.VD_D, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800B10, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
+		{.VORR, {.QPR, .IMM, .NONE, .NONE}, {.VD_Q, .NEON_IMM8_ABCDEFGH, .NONE, .NONE}, 0xF2800B50, 0xFEB80FF0, .NEON, .A32, {cond_in_28=false}, {.I16, .NONE}},
 		{.VORR, {.DPR, .DPR, .DPR, .NONE}, {.VD_D, .VN_D, .VM_D, .NONE}, 0xF2200110, 0xFFB00F10, .NEON, .A32, {cond_in_28=false}, {}},
 		{.VORR, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xF2200150, 0xFFB00F50, .NEON, .A32, {cond_in_28=false}, {}},
 		{.VORR, {.QPR, .QPR, .QPR, .NONE}, {.VD_Q, .VN_Q, .VM_Q, .NONE}, 0xEF200150, 0xFFB10F51, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {}},

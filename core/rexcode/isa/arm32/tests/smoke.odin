@@ -132,8 +132,9 @@ run_smoke :: proc() {
 	check("VFMA.F32",        .VFMA, 0, 0x0EA00A00, 0x0FB00B50)
 	check("VLDR.F32",        .VLDR, 0, 0x0D100A00, 0x0F300F00)
 	check("VSTR.F64",        .VSTR, 1, 0x0D000B00, 0x0F300F00)
-	check("VMRS",            .VMRS, 0, 0x0EF10A10, 0x0FFF0FFF)
-	check("VMSR",            .VMSR, 0, 0x0EE10A10, 0x0FFF0FFF)
+	// The system register is an operand now, so its field is not fixed.
+	check("VMRS",            .VMRS, 0, 0x0EF10A10, 0x0FF00FFF)
+	check("VMSR",            .VMSR, 0, 0x0EE10A10, 0x0FF00FFF)
 	check("VPUSH.F32",       .VPUSH,0, 0x0D2D0A00, 0x0FFF0F00)
 	check("VPOP.F64",        .VPOP, 1, 0x0CBD0B00, 0x0FFF0F00)
 	check("VCMP.F32",        .VCMP, 0, 0x0EB40A40, 0x0FBF0FD0)
@@ -160,7 +161,9 @@ run_smoke :: proc() {
 	check("VMUL NEON.I8 D",  .VMUL, 5, 0xF2000910, 0xFFB00F10)
 	check("VMUL NEON.F32 D", .VMUL, 13, 0xF3000D10, 0xFFB00F10)
 	check("VAND",            .VAND, 0, 0xF2000110, 0xFFB00F10)
-	check("VORR",            .VORR, 0, 0xF2200110, 0xFFB00F10)
+	// The modified-immediate forms come first; the register form follows.
+	check("VORR imm",        .VORR, 0, 0xF2800110, 0xFEB80FF0)
+	check("VORR reg",        .VORR, 12, 0xF2200110, 0xFFB00F10)
 	check("VEOR",            .VEOR, 0, 0xF3000110, 0xFFB00F10)
 	check("VBSL",            .VBSL, 0, 0xF3100110, 0xFFB00F10)
 	check("VMAX.S16 D",      .VMAX, 1, 0xF2100600, 0xFFB00F10)
