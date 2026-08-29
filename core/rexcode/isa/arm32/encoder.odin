@@ -314,7 +314,9 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 	     .IMM4, .IMM4_SAT, .IMM8, .IMM3, .IMM_HINT, .IMM_BARRIER,
 	     .IMM_ENDIAN, .IMM_IFLAGS, .IMM_BANKED, .IMM_SYSM,
 	     .IMM_COPROC, .IMM_COPROC_OP, .NEON_IMM, .IMM16_LO_HI:
-		return op.kind == .IMMEDIATE
+		// A modified immediate reaches an immediate slot as an expanded bit
+		// pattern or a float, so all three kinds are the same slot's shape.
+		return op.kind == .IMMEDIATE || op.kind == .HEX_IMMEDIATE || op.kind == .FLOAT_IMMEDIATE
 	case .REL24, .REL24_T32, .REL20, .REL11, .REL8, .REL_LDR_LITERAL, .REL_BF:
 		return op.kind == .RELATIVE
 	case .COND:
@@ -495,6 +497,11 @@ pack_operand_inline :: #force_inline proc(
 		return (u32(reg_hw(op.reg)) & 0x7) << 17
 	case .VM_Q_MVE:
 		return (u32(reg_hw(op.reg)) & 0x7) << 1
+	case .VM_S_PLUS1:
+		return 0    // only the first of the pair is encoded
+	case .NEON_LANE_VN_32:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		return ((n >> 4) & 1) << 7 | (n & 0xF) << 16 | (u32(op.lane) & 1) << 21
 	case .VFP_IMM8:
 		// Run the VFP 8-bit float encoder; the user supplies the wire-format
 		// 32-bit float bit pattern (for F32). The encoder finds the abcdefgh.

@@ -545,6 +545,10 @@ write_operand :: proc(
 		}
 	case .IMMEDIATE:
 		fmt.sbprintf(sb, "#%d", op.immediate)
+	case .HEX_IMMEDIATE:
+		fmt.sbprintf(sb, "#0x%x", op.immediate)
+	case .FLOAT_IMMEDIATE:
+		fmt.sbprintf(sb, "#%e", f64(transmute(f32)u32(op.immediate)))
 	case .MEMORY:
 		write_memory(sb, op.mem)
 	case .RELATIVE:

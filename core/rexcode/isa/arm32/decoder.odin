@@ -451,10 +451,21 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		a := extract_neon_modimm_abcdefgh(word)
 		cmode := (word >> 8) & 0xF
 		op := (word >> 5) & 1
-		return op_imm(i64(decode_neon_modimm(a, cmode, op)))
+		v := decode_neon_modimm(a, cmode, op)
+		// Only cmode 1111 expands to a float; the rest are bit patterns.
+		if cmode == 0b1111 { return op_float_imm(v) }
+		return op_hex_imm(v)
+	case .VM_S_PLUS1:
+		// The second of a consecutive pair; only the first is encoded.
+		return op_reg(Register(REG_SPR | u16(((word & 0xF) << 1 | ((word >> 5) & 1)) + 1)))
+	case .NEON_LANE_VN_32:
+		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
+		return op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> 21) & 1))
 	case .VFP_IMM8:
 		a := ((word >> 16) & 0xF) << 4 | (word & 0xF)
-		return op_imm(i64(decode_vfp_imm8_f32(a)))
+		// Held as the 32-bit pattern whatever the form's width: it is the
+		// same value either way, and it is what re-encoding needs back.
+		return op_float_imm(decode_vfp_imm8_f32(a))
 	case .NEON_D_LIST_1:
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
 		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, false)

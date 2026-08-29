@@ -31,6 +31,12 @@ Operand_Kind :: enum u8 {
 	MEMORY,
 	RELATIVE,
 	REG_LIST,    // LDM/STM/PUSH/POP bitmask (low 16 bits = R0..R15)
+	// A modified immediate is a bit pattern an 8-bit field expands into, and
+	// assemblers write it as one: in hex, or as a float when the expansion
+	// produced one. The value is stored expanded either way -- for the float
+	// it is the 32-bit pattern, which is what the encoder needs back.
+	HEX_IMMEDIATE,
+	FLOAT_IMMEDIATE,
 }
 
 // ---- Shift / addressing-mode helpers ---------------------------------------
@@ -154,6 +160,14 @@ op_reg_shifted :: #force_inline proc "contextless" (
 @(require_results)
 op_imm :: #force_inline proc "contextless" (v: i64, size: u8 = 4) -> Operand {
 	return Operand{immediate = v, kind = .IMMEDIATE, size = size}
+}
+@(require_results)
+op_hex_imm :: #force_inline proc "contextless" (v: u32) -> Operand {
+	return Operand{immediate = i64(v), kind = .HEX_IMMEDIATE, size = 4}
+}
+@(require_results)
+op_float_imm :: #force_inline proc "contextless" (bits: u32) -> Operand {
+	return Operand{immediate = i64(bits), kind = .FLOAT_IMMEDIATE, size = 4}
 }
 @(require_results)
 op_mem :: #force_inline proc "contextless" (m: Memory) -> Operand {

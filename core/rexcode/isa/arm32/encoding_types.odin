@@ -324,7 +324,9 @@ Operand_Encoding :: enum u8 {
 	// MVE 3-bit Q registers (Q0..Q7): Qn at bits 19:17, Qm at bits 3:1.
 	VN_Q_MVE,
 	VM_Q_MVE,
-	VFP_IMM8,              // VFP immediate (VMOV.F32/F64 #imm)
+	VFP_IMM8,
+	VM_S_PLUS1,            // the second S register of a consecutive pair
+	NEON_LANE_VN_32,       // Vn:N with the 32-bit lane index in bit 21              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
 	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)
 	NEON_OP_BIT,           // bit 5 (op for VMOV immediate variant)
