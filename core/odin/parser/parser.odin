@@ -318,9 +318,6 @@ consume_comment :: proc(p: ^Parser) -> (tok: tokenizer.Token, end_line: int) {
 	}
 
 	_ = next_token0(p)
-	if p.curr_tok.pos.line > tok.pos.line {
-		end_line += 1
-	}
 
 	return
 }
@@ -348,19 +345,13 @@ consume_comment_groups :: proc(p: ^Parser, prev: tokenizer.Token) {
 	if p.curr_tok.kind != .Comment {
 		return
 	}
-	comment: ^ast.Comment_Group
-	end_line := 0
 
 	if p.curr_tok.pos.line == prev.pos.line {
-		comment, end_line = consume_comment_group(p, 0)
-		if p.curr_tok.pos.line != end_line ||
-		   p.curr_tok.pos.line == prev.pos.line+1 ||
-		   p.curr_tok.kind == .EOF {
-			p.line_comment = comment
-		}
+		p.line_comment, _ = consume_comment_group(p, 0)
 	}
 
-	end_line = -1
+	comment: ^ast.Comment_Group
+	end_line: int
 	for p.curr_tok.kind == .Comment {
 		comment, end_line = consume_comment_group(p, 1)
 	}
@@ -2048,13 +2039,14 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			}
 		}
 
+		line_comment := p.line_comment
 		ok := expect_field_separator(p, type)
 
 		field := new_ast_field(names, type, default_value)
 		field.tag     = tag
 		field.docs    = docs
 		field.flags   = flags
-		field.comment = p.line_comment
+		field.comment = p.line_comment if p.line_comment != nil else line_comment
 		append(fields, field)
 
 		return ok
@@ -3862,6 +3854,8 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 
 	end := p.prev_tok
 
+	end_comment := p.line_comment
+
 	if p.expr_level >= 0 {
 		end: ^ast.Expr
 		if !is_mutable && len(values) > 0 {
@@ -3883,6 +3877,7 @@ parse_value_decl :: proc(p: ^Parser, names: []^ast.Expr, docs: ^ast.Comment_Grou
 
 	decl := ast.new(ast.Value_Decl, names[0].pos, end_pos(end))
 	decl.docs = docs
+	decl.comment = end_comment
 	decl.names = names
 	decl.type = type
 	decl.values = values

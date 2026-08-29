@@ -65,6 +65,95 @@ Foo :: bit_field uint {
 
 	ok := parser.parse_file(&p, &file)
 	testing.expect(t, ok, "bad parse")
+	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
+}
+
+@test
+test_parse_struct_field_comments :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	expect_comments :: proc (t: ^testing.T, docs: ^ast.Comment_Group, expected: []string, loc := #caller_location) {
+		if expected == nil {
+			testing.expect_value(t, docs, nil, loc)
+		} else {
+			testing.expect(t, docs != nil, "comment should not be nil", loc=loc)
+			testing.expect_value(t, len(docs.list), len(expected), loc)
+			for tok, i in docs.list {
+				testing.expect_value(t, tok.text, expected[i], loc)
+			}
+		}
+	}
+
+	file := ast.File{
+		fullpath = "test.odin",
+		src = `
+package main
+
+// foo doc
+Foo :: struct {
+	// doc1
+	a: int, // c1
+	b: int, // c2
+	// not included
+
+	// doc2
+	// doc3
+	c, d: int,  /* c3
+c4 */
+
+	e: struct {
+	} // c5
+	// not included
+}
+
+// not included
+
+Bar :: struct {x, y: int /* c4 */} // after`,
+	}
+
+	p := parser.default_parser()
+
+	p.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.errorf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	p.warn = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.warnf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	ok := parser.parse_file(&p, &file)
+
+	testing.expect(t, ok, "bad parse")
+	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
+
+	testing.expect_value(t, len(file.decls), 2)
+
+	foo_decl := file.decls[0].derived.(^ast.Value_Decl)
+	expect_comments(t, foo_decl.docs,    {"// foo doc"})
+	expect_comments(t, foo_decl.comment, nil)
+
+	foo := foo_decl.values[0].derived.(^ast.Struct_Type)
+	testing.expect_value(t, len(foo.fields.list), 4)
+	expect_comments(t, foo.fields.list[0].docs,    {"// doc1"})
+	expect_comments(t, foo.fields.list[0].comment, {"// c1"})
+	expect_comments(t, foo.fields.list[1].docs,    nil)
+	expect_comments(t, foo.fields.list[1].comment, {"// c2"})
+	expect_comments(t, foo.fields.list[2].docs,    {"// doc2", "// doc3"})
+	expect_comments(t, foo.fields.list[2].comment, {"/* c3\nc4 */"})
+	expect_comments(t, foo.fields.list[3].docs,    nil)
+	expect_comments(t, foo.fields.list[3].comment, {"// c5"})
+
+	bar_decl := file.decls[1].derived.(^ast.Value_Decl)
+	expect_comments(t, bar_decl.docs,    nil)
+	expect_comments(t, bar_decl.comment, {"// after"})
+
+	bar := bar_decl.values[0].derived.(^ast.Struct_Type)
+	testing.expect_value(t, len(bar.fields.list), 1)
+	expect_comments(t, bar.fields.list[0].docs,    nil)
+	expect_comments(t, bar.fields.list[0].comment, {"/* c4 */"})
 }
 
 @test
