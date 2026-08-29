@@ -122,8 +122,7 @@ test_sort_inlined_by_with_indices_with_data :: proc(t: ^testing.T) {
 
 	indecies := sort.sort_inlined_by_with_indices_with_data(
 		arr,
-		proc(l, r: i32, user_data: rawptr) -> bool {
-			modulus := (^[]i32)(user_data)
+		proc(l, r: i32, modulus: ^[]i32) -> bool {
 			return modulus[l %% 10] < modulus[r %% 10]
 		},
 		&modulus,
@@ -151,7 +150,7 @@ test_sort_inlined_by_cmp :: proc(t: ^testing.T) {
 
 	sort.sort_inlined_by_cmp(
 		arr,
-		proc(l, r: f32) -> slice.Ordering {
+		proc(l, r: f32) -> sort.Ordering {
 			if l < r  {return .Less}
 			if l > r {return .Greater}
 			return .Equal
@@ -177,7 +176,7 @@ test_sort_inlined_by_cmp_with_data :: proc(t: ^testing.T) {
 
 	sort.sort_inlined_by_cmp_with_data(
 		arr,
-		proc(l, r: int, modulus: ^[]int) -> slice.Ordering {
+		proc(l, r: int, modulus: ^[]int) -> sort.Ordering {
 			if modulus[l %% 10] < modulus[r %% 10] {
 				return .Less
 			}
