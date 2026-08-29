@@ -31,27 +31,28 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 		s = s[i+3:]
 	}
 
-	i = strings.index(s, "#")
+	i = strings.index_byte(s, '#')
 	if i != -1 {
 		fragment = s[i+1:]
 		s = s[:i]
 	}
 
-	i = strings.index(s, "?")
+	i = strings.index_byte(s, '?')
 	if i != -1 {
 		query_str := s[i+1:]
 		s = s[:i]
 		if query_str != "" {
-			queries_parts := strings.split(query_str, "&", allocator)
-			defer delete(queries_parts, allocator)
-			queries = make(map[string]string, len(queries_parts), allocator)
-			for q in queries_parts {
-				parts := strings.split(q, "=", allocator)
-				defer delete(parts, allocator)
-				switch len(parts) {
-				case 1:  queries[parts[0]] = ""        // NOTE(tetra): Query not set to anything, was but present.
-				case 2:  queries[parts[0]] = parts[1]  // NOTE(tetra): Query set to something.
-				case:    break
+			queries = make(map[string]string, allocator)
+			for query in strings.split_iterator(&query_str, "&") {
+				i = strings.index_byte(query, '=')
+				if i == -1 {
+					queries[query] = ""
+				} else {
+					value := query[i+1:]
+					if strings.index_byte(value, '=') != -1 {
+						continue // incorrect format
+					}
+					queries[query] = value // may not be set to anything, e.g. ?x=
 				}
 			}
 		}
