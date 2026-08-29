@@ -38,6 +38,9 @@ REG_COPROC :: u16(0x8000)
 // SETEND names its argument `le` or `be`. That is a bare token in the syntax,
 // which is what the special-register classes above already model.
 REG_ENDIAN :: u16(0x9000)
+// A coprocessor number is written `p15`, not as a plain number, and it is a
+// different thing from the CRn/CRm registers REG_COPROC names.
+REG_COPROC_NUM :: u16(0xA000)
 
 REG_CLASS_MASK :: u16(0xF000)
 REG_HW_MASK    :: u16(0x0FFF)

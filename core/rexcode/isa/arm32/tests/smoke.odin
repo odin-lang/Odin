@@ -117,8 +117,8 @@ run_smoke :: proc() {
 	check("STL (v8)",        .STL,    0, 0x0180FC90, 0x0FF0FFF0)
 
 	// ---- CRC32 ----
-	check("CRC32B",          .CRC32B,  0, 0x01000040, 0x0FF00FF0)
-	check("CRC32CW",         .CRC32CW, 0, 0x01400240, 0x0FF00FF0)
+	check("CRC32B",          .CRC32B,  0, 0xE1000040, 0xFFF00FF0)
+	check("CRC32CW",         .CRC32CW, 0, 0xE1400240, 0xFFF00FF0)
 
 	// ---- VFP scalar ----
 	check("VADD.F32",        .VADD, 0, 0x0E300A00, 0x0FB00B50)

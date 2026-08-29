@@ -437,7 +437,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .CPS_IFLAGS:   return op_imm(i64(word & 0x1FF))
 	case .PSR_FIELD_MASK: return op_imm(i64(decode_psr_field(word)))
 	case .SYSM_FIELD:   return op_imm(i64(word & 0xFF))
-	case .COPROC_NUM_FIELD:  return op_imm(i64((word >> 8) & 0xF))
+	case .COPROC_NUM_FIELD:  return op_reg(Register(REG_COPROC_NUM | u16((word >> 8) & 0xF)))
 	case .COPROC_OPC1_FIELD: return op_imm(i64((word >> 20) & 0xF))
 	case .COPROC_OPC2_FIELD: return op_imm(i64((word >> 5) & 0x7))
 	case .COPROC_CRN_FIELD:  return op_reg(Register(REG_COPROC | u16((word >> 16) & 0xF)))
@@ -508,6 +508,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		op := op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> shift) & mask))
 		op.list = {count = count, stride = 1}
 		return op
+	case .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32:
+		imm4 := (word >> 16) & 0xF
+		shift: u32 = enc == .NEON_VDUP_LANE_8 ? 1 : enc == .NEON_VDUP_LANE_16 ? 2 : 3
+		return op_dpr_lane(Register(REG_DPR | u16(((word >> 5) & 1) << 4 | (word & 0xF))),
+		                   u8(imm4 >> shift))
 	case .NEON_VM_SCALAR_16:
 		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)),
 		                   u8(((word >> 5) & 1) << 1 | ((word >> 3) & 1)))

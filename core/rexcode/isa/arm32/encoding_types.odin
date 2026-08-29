@@ -355,6 +355,10 @@ Operand_Encoding :: enum u8 {
 	// 2:0, so D0..D7, and the lane from M:bit3; 32-bit takes Vm from bits
 	// 3:0, so D0..D15, and the lane from M alone.
 	NEON_VM_SCALAR_16, NEON_VM_SCALAR_32,
+	// VDUP from a lane packs the element size and the lane index into one
+	// four-bit field: `xxx1` is a byte lane, `xx10` a halfword, `x100` a
+	// word, and the bits above the marker are the index.
+	NEON_VDUP_LANE_8, NEON_VDUP_LANE_16, NEON_VDUP_LANE_32,
 	// NEON structure load/store lists (VLD1-4 / VST1-4). Unlike VLDM's list,
 	// the register count is part of the form's type field at bits 11:8, so the
 	// encoding writes only Vd; how many registers -- and whether the run steps

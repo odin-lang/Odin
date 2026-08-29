@@ -1277,12 +1277,12 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 	// ARMv8 CRC32 family
 	//   cond 0001 0 sz 0 Rn Rd 0000 0 0 1 0 0 Rm   sz=00 byte / 01 half / 10 word
 	//   bit  9 selects CRC32 (0) vs CRC32C (1).
-	.CRC32B  = { {.CRC32B,  {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0x01000040, 0x0FF00FF0, .CRC32, .A32, {}, {}} },
-	.CRC32H  = { {.CRC32H,  {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0x01200040, 0x0FF00FF0, .CRC32, .A32, {}, {}} },
-	.CRC32W  = { {.CRC32W,  {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0x01400040, 0x0FF00FF0, .CRC32, .A32, {}, {}} },
-	.CRC32CB = { {.CRC32CB, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0x01000240, 0x0FF00FF0, .CRC32, .A32, {}, {}} },
-	.CRC32CH = { {.CRC32CH, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0x01200240, 0x0FF00FF0, .CRC32, .A32, {}, {}} },
-	.CRC32CW = { {.CRC32CW, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0x01400240, 0x0FF00FF0, .CRC32, .A32, {}, {}} },
+	.CRC32B  = { {.CRC32B,  {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0xE1000040, 0xFFF00FF0, .CRC32, .A32, {cond_in_28=false}, {}} },
+	.CRC32H  = { {.CRC32H,  {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0xE1200040, 0xFFF00FF0, .CRC32, .A32, {cond_in_28=false}, {}} },
+	.CRC32W  = { {.CRC32W,  {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0xE1400040, 0xFFF00FF0, .CRC32, .A32, {cond_in_28=false}, {}} },
+	.CRC32CB = { {.CRC32CB, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0xE1000240, 0xFFF00FF0, .CRC32, .A32, {cond_in_28=false}, {}} },
+	.CRC32CH = { {.CRC32CH, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0xE1200240, 0xFFF00FF0, .CRC32, .A32, {cond_in_28=false}, {}} },
+	.CRC32CW = { {.CRC32CW, {.GPR, .GPR, .GPR, .NONE}, {.RD, .RN_A32, .RM_A32, .NONE}, 0xE1400240, 0xFFF00FF0, .CRC32, .A32, {cond_in_28=false}, {}} },
 
 
 	// =========================================================================
@@ -2319,8 +2319,12 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.VDUP, {.DPR, .GPR, .NONE, .NONE}, {.VN_D, .RT_A32, .NONE, .NONE}, 0x0EC00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
 		{.VDUP, {.QPR, .GPR, .NONE, .NONE}, {.VN_Q, .RT_A32, .NONE, .NONE}, 0x0EE00B10, 0x0FF00FD0, .NEON, .A32, {}, {.SZ8, .NONE}},
 		// VDUP from vector lane (.D form): 1111 0011 1011 imm4 Vd 1100 0 Q M 0 Vm
-		{.VDUP, {.DPR, .DPR_ELEM, .NONE, .NONE}, {.VD_D, .NEON_VM_SCALAR_32, .NONE, .NONE}, 0xF3B00C00, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
-		{.VDUP, {.QPR, .DPR_ELEM, .NONE, .NONE}, {.VD_Q, .NEON_VM_SCALAR_32, .NONE, .NONE}, 0xF3B00C40, 0xFFB00FD0, .NEON, .A32, {cond_in_28=false}, {}},
+		{.VDUP, {.DPR, .DPR_ELEM, .NONE, .NONE}, {.VD_D, .NEON_VDUP_LANE_8, .NONE, .NONE}, 0xF3B10C00, 0xFFB10FD0, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VDUP, {.QPR, .DPR_ELEM, .NONE, .NONE}, {.VD_Q, .NEON_VDUP_LANE_8, .NONE, .NONE}, 0xF3B10C40, 0xFFB10FD0, .NEON, .A32, {cond_in_28=false}, {.SZ8, .NONE}},
+		{.VDUP, {.DPR, .DPR_ELEM, .NONE, .NONE}, {.VD_D, .NEON_VDUP_LANE_16, .NONE, .NONE}, 0xF3B20C00, 0xFFB30FD0, .NEON, .A32, {cond_in_28=false}, {.SZ16, .NONE}},
+		{.VDUP, {.QPR, .DPR_ELEM, .NONE, .NONE}, {.VD_Q, .NEON_VDUP_LANE_16, .NONE, .NONE}, 0xF3B20C40, 0xFFB30FD0, .NEON, .A32, {cond_in_28=false}, {.SZ16, .NONE}},
+		{.VDUP, {.DPR, .DPR_ELEM, .NONE, .NONE}, {.VD_D, .NEON_VDUP_LANE_32, .NONE, .NONE}, 0xF3B40C00, 0xFFB70FD0, .NEON, .A32, {cond_in_28=false}, {.SZ32, .NONE}},
+		{.VDUP, {.QPR, .DPR_ELEM, .NONE, .NONE}, {.VD_Q, .NEON_VDUP_LANE_32, .NONE, .NONE}, 0xF3B40C40, 0xFFB70FD0, .NEON, .A32, {cond_in_28=false}, {.SZ32, .NONE}},
 		// MVE VDUP Qd, Rt
 		{.VDUP, {.QPR, .GPR, .NONE, .NONE}, {.VD_Q, .RT_T32, .NONE, .NONE}, 0xEE800B10, 0xFF900F5F, .MVE_INT, .T32, {thumb32=true, cond_in_28=false}, {.SZ32, .NONE}},
 	},

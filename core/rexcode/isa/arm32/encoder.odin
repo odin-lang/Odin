@@ -293,6 +293,9 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, ot: Op
 		#partial switch enc {
 		case .NEON_VM_SCALAR_16: return op.has_lane && reg_hw(op.reg) < 8  && op.lane < 4
 		case .NEON_VM_SCALAR_32: return op.has_lane && reg_hw(op.reg) < 16 && op.lane < 2
+		case .NEON_VDUP_LANE_8:  return op.has_lane && op.lane < 8
+		case .NEON_VDUP_LANE_16: return op.has_lane && op.lane < 4
+		case .NEON_VDUP_LANE_32: return op.has_lane && op.lane < 2
 		}
 		return true
 	case .QPR_ELEM: return op.kind == .REGISTER && is_qpr(op.reg)
@@ -549,6 +552,11 @@ pack_operand_inline :: #force_inline proc(
 		n := u32(reg_hw(op.reg)) & 0x1F
 		shift, mask, _ := neon_lane_shape(enc)
 		return ((n >> 4) & 1) << 22 | (n & 0xF) << 12 | (u32(op.lane) & mask) << shift
+	case .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32:
+		n := u32(reg_hw(op.reg)) & 0x1F
+		shift: u32 = enc == .NEON_VDUP_LANE_8 ? 1 : enc == .NEON_VDUP_LANE_16 ? 2 : 3
+		// The marker bit below the index is a fixed bit of the form.
+		return ((n >> 4) & 1) << 5 | (n & 0xF) | (u32(op.lane) << shift) << 16
 	case .NEON_VM_SCALAR_16:
 		n := u32(reg_hw(op.reg)) & 0x7
 		idx := u32(op.lane) & 0x3
@@ -618,7 +626,7 @@ pack_operand_inline :: #force_inline proc(
 		return ((u32(reg_hw(m.base)) & 0xF) << 16) | (u32(reg_hw(m.index)) & 0xF)
 
 	// ---- Coprocessor -------------------------------------------------------
-	case .COPROC_NUM_FIELD:   return (u32(op.immediate) & 0xF) << 8
+	case .COPROC_NUM_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 8
 	case .COPROC_OPC1_FIELD:  return (u32(op.immediate) & 0xF) << 20
 	case .COPROC_OPC2_FIELD:  return (u32(op.immediate) & 0x7) << 5
 	case .COPROC_CRN_FIELD:   return (u32(reg_hw(op.reg)) & 0xF) << 16
