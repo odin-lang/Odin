@@ -136,7 +136,7 @@ run_smoke :: proc() {
 	check("VMSR",            .VMSR, 0, 0x0EE10A10, 0x0FFF0FFF)
 	check("VPUSH.F32",       .VPUSH,0, 0x0D2D0A00, 0x0FFF0F00)
 	check("VPOP.F64",        .VPOP, 1, 0x0CBD0B00, 0x0FFF0F00)
-	check("VCMP.F32",        .VCMP, 0, 0x0EB40A40, 0x0FBF0F50)
+	check("VCMP.F32",        .VCMP, 0, 0x0EB40A40, 0x0FBF0FD0)
 
 	// ---- ARMv8 FP ----
 	check("VMAXNM.F32",      .VMAXNM, 0, 0xFE800A00, 0xFFB00B50)
