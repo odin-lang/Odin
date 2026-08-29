@@ -529,8 +529,15 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_imm(i64((word >> 18) & 0xF))
 
 	// ---- Saturate / bit field ----
-	case .SAT_IMM5, .SAT_IMM5_T32, .BFI_MSB:
-		return op_imm(i64((word >> 16) & 0x1F))
+	case .SAT_IMM5, .SAT_IMM5_T32:
+		// The field holds one less than the saturate position it names.
+		return op_imm(i64(((word >> 16) & 0x1F) + 1))
+	case .BFX_WIDTH:
+		// One less than the width.
+		return op_imm(i64(((word >> 16) & 0x1F) + 1))
+	case .BFI_MSB:
+		// The top bit's position; the syntax wants the width.
+		return op_imm(i64(((word >> 16) & 0x1F) - ((word >> 7) & 0x1F) + 1))
 	case .BFI_LSB, .BFI_LSB_T32:
 		return op_imm(i64((word >> 7) & 0x1F))
 	case .NEON_SHIFT_IMM6:

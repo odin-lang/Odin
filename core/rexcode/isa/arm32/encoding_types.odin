@@ -400,6 +400,9 @@ Operand_Encoding :: enum u8 {
 	SAT_IMM5_T32,          // Thumb-2 saturate amount
 
 	// ---- BFC/BFI/SBFX/UBFX ----
+	// SBFX/UBFX hold the width less one, where BFI/BFC hold the top bit's
+	// position and the width is msb - lsb + 1.
+	BFX_WIDTH,
 	BFI_MSB,               // bits 20-16 (msb position)
 	BFI_LSB,               // bits 11-7  (lsb position; also shift_imm slot)
 	BFI_LSB_T32,           // Thumb-2 BFI lsb (different layout)

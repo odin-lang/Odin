@@ -754,14 +754,14 @@ ENCODING_TABLE := #partial [Mnemonic][]Encoding{
 		{.BFI, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFI_MSB}, 0xF3600000, 0xFFF08000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.SBFX = {
-		{.SBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD, .RM_A32, .BFI_LSB, .BFI_MSB}, 0x07A00050, 0x0FE00070, .V6T2, .A32, {}, {}},
+		{.SBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD, .RM_A32, .BFI_LSB, .BFX_WIDTH}, 0x07A00050, 0x0FE00070, .V6T2, .A32, {}, {}},
 		// T32 SBFX
-		{.SBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFI_MSB}, 0xF3400000, 0xFFF08000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+		{.SBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFX_WIDTH}, 0xF3400000, 0xFFF08000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 	.UBFX = {
-		{.UBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD, .RM_A32, .BFI_LSB, .BFI_MSB}, 0x07E00050, 0x0FE00070, .V6T2, .A32, {}, {}},
+		{.UBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD, .RM_A32, .BFI_LSB, .BFX_WIDTH}, 0x07E00050, 0x0FE00070, .V6T2, .A32, {}, {}},
 		// T32 UBFX
-		{.UBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFI_MSB}, 0xF3C00000, 0xFFF08000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
+		{.UBFX, {.GPR, .GPR, .IMM5, .IMM5_W}, {.RD_T32, .RN_T32, .BFI_LSB_T32, .BFX_WIDTH}, 0xF3C00000, 0xFFF08000, .V6T2, .T32, {thumb32=true, cond_in_28=false}, {}},
 	},
 
 	// =========================================================================

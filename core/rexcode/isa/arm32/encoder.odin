@@ -202,10 +202,10 @@ encode_one_inline :: #force_inline proc(
 		word = (word & 0x0FFFFFFF) | (u32(inst.cond) << 28)
 	}
 
-	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], pc, inst_idx, relocs, form) }
-	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], pc, inst_idx, relocs, form) }
-	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], pc, inst_idx, relocs, form) }
-	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], pc, inst_idx, relocs, form) }
+	if form.enc[0] != .NONE { word |= pack_operand_inline(&inst.ops[0], form.enc[0], pc, inst_idx, relocs, form, inst) }
+	if form.enc[1] != .NONE { word |= pack_operand_inline(&inst.ops[1], form.enc[1], pc, inst_idx, relocs, form, inst) }
+	if form.enc[2] != .NONE { word |= pack_operand_inline(&inst.ops[2], form.enc[2], pc, inst_idx, relocs, form, inst) }
+	if form.enc[3] != .NONE { word |= pack_operand_inline(&inst.ops[3], form.enc[3], pc, inst_idx, relocs, form, inst) }
 
 	return word, inst_size_from_bits(form.bits, form.mode), true
 }
@@ -334,6 +334,8 @@ pack_operand_inline :: #force_inline proc(
 	inst_idx: u16,
 	relocs:   ^[dynamic]Relocation,
 	form:     ^Encoding,
+	// BFI's msb is lsb + width - 1, so packing it needs a sibling operand.
+	inst:     ^Instruction,
 ) -> u32 {
 	switch enc {
 	case .NONE, .IMPL:
@@ -631,9 +633,15 @@ pack_operand_inline :: #force_inline proc(
 	case .IT_MASK:          return u32(op.immediate) & 0xFF
 	case .CPS_IFLAGS:       return u32(op.immediate) & 0x1FF
 	case .HINT_FIELD:       return u32(op.immediate) & 0xFF
-	case .SAT_IMM5, .SAT_IMM5_T32:
-		return (u32(op.immediate) & 0x1F) << 16
-	case .BFI_MSB:          return (u32(op.immediate) & 0x1F) << 16
+	case .SAT_IMM5, .SAT_IMM5_T32, .BFX_WIDTH:
+		return ((u32(op.immediate) - 1) & 0x1F) << 16
+	case .BFI_MSB:
+		// msb = lsb + width - 1; the lsb rides in whichever slot carries it.
+		lsb: u32 = 0
+		for e, k in form.enc {
+			if e == .BFI_LSB || e == .BFI_LSB_T32 { lsb = u32(inst.ops[k].immediate); break }
+		}
+		return ((lsb + u32(op.immediate) - 1) & 0x1F) << 16
 	case .BFI_LSB, .BFI_LSB_T32:
 		return (u32(op.immediate) & 0x1F) << 7
 	case .NEON_SHIFT_IMM6:  return (u32(op.immediate) & 0x3F) << 16
