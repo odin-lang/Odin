@@ -354,6 +354,11 @@ main :: proc() {
 				bool is_atomic = (cast(u16)side_effects & SideEffectFlag_ATOMIC) != 0;
 				return (implicit & ClobberReg_SP) != 0 || is_atomic;
 			}
+
+			bool is_status_snapshot() const {
+				u16 flags = cast(u16)this->flags_rd_call();
+				return gb_count_set_bits(flags & CLOBBER_FLAGS_COND) >= 4;
+			}
 		};
 
 		void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {

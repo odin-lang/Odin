@@ -156,6 +156,7 @@ struct Asm_amd64 {
 		case ClobberFlag_CF: return "c"; case ClobberFlag_PF: return "p";
 		case ClobberFlag_AF: return "a"; case ClobberFlag_ZF: return "z";
 		case ClobberFlag_SF: return "s"; case ClobberFlag_OF: return "o";
+		case ClobberFlag_DF: return "d"; case ClobberFlag_IF: return "i";
 		}
 		return "?";
 	}
@@ -365,6 +366,14 @@ struct Asm_amd64 {
 			}
 			u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
 			return (implicit & (ClobberReg_RSP|ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBX)) != 0;
+		}
+
+		bool is_status_snapshot() const {
+			u16 flags = cast(u16)this->flags_rd_call();
+			u16 const STATUS_FLAGS = ClobberFlag_CF | ClobberFlag_PF | ClobberFlag_AF |
+			                         ClobberFlag_ZF | ClobberFlag_SF | ClobberFlag_OF;
+			return ((flags & ClobberFlag_IF) != 0) ||
+			       (gb_count_set_bits(flags & STATUS_FLAGS) >= 4);
 		}
 	};
 

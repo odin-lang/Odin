@@ -289,6 +289,19 @@ main :: proc() {
 				bool is_atomic = false; // TODO(bill): Add ATOMIC flag to SideEffectFlags in the original INSTRUCTION_TABLE
 				return (implicit & (ClobberReg_SP)) != 0 || is_atomic;
 			}
+			bool is_status_snapshot() const {
+				// RiscV64 has no architectural condition flags: branches compare two GPRs
+				// directly (beq/bltu/…) and slt/sltu materialise a 0/1 into a GPR, so nothing
+				// ever consumes status as an implicit condition — flags_rd_call() is always
+				// empty and the flag read-before-write check is already vacuous here.
+				//
+				// The only status that exists — the accrued fcsr exception flags (fflags[4:0])
+				// and the frm rounding field — is read solely through an explicit CSR access
+				// (csrr* / frflags / frrm), which pulls the register out as an opaque value
+				// into a GPR. That is a snapshot by construction and must never require a
+				// producer, so every status read that RV64 can express qualifies.
+				return true;
+			}
 		};
 
 		void clobber_implicit_regs(StringSet *clobber_registers_set, u16 implicit_regs) {
