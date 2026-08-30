@@ -1252,6 +1252,90 @@ run_pipeline_tests :: proc() {
 			   "    str s0, [x1, w2, sxtw #2]\n")
 	}
 
+	// ---- 46. FP/SIMD pre/post-indexed loads and stores -------------------
+	//   LDR/STR B/H/S/D/Q with [Xn, #imm9]! and [Xn], #imm9 writeback.
+	//   Golden words from llvm-mc --triple=aarch64.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		insts := []a.Instruction{
+			a.inst_ldst(.LDR, a.b_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.h_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.s_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.d_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.q_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.b_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.h_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.s_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.d_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.STR, a.q_reg(0), a.mem_pre(a.X1, -16)),
+			a.inst_ldst(.LDR, a.b_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.h_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.s_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.d_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.LDR, a.q_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.b_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.h_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.s_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.d_reg(0), a.mem_post(a.X1, 32)),
+			a.inst_ldst(.STR, a.q_reg(0), a.mem_post(a.X1, 32)),
+		}
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("FP pre/post: encode", success)
+		eq_word("LDR B0,[X1,#-16]!", load_le(code[:],  0), 0x3C5F0C20)
+		eq_word("LDR H0,[X1,#-16]!", load_le(code[:],  4), 0x7C5F0C20)
+		eq_word("LDR S0,[X1,#-16]!", load_le(code[:],  8), 0xBC5F0C20)
+		eq_word("LDR D0,[X1,#-16]!", load_le(code[:], 12), 0xFC5F0C20)
+		eq_word("LDR Q0,[X1,#-16]!", load_le(code[:], 16), 0x3CDF0C20)
+		eq_word("STR B0,[X1,#-16]!", load_le(code[:], 20), 0x3C1F0C20)
+		eq_word("STR H0,[X1,#-16]!", load_le(code[:], 24), 0x7C1F0C20)
+		eq_word("STR S0,[X1,#-16]!", load_le(code[:], 28), 0xBC1F0C20)
+		eq_word("STR D0,[X1,#-16]!", load_le(code[:], 32), 0xFC1F0C20)
+		eq_word("STR Q0,[X1,#-16]!", load_le(code[:], 36), 0x3C9F0C20)
+		eq_word("LDR B0,[X1],#32",   load_le(code[:], 40), 0x3C420420)
+		eq_word("LDR H0,[X1],#32",   load_le(code[:], 44), 0x7C420420)
+		eq_word("LDR S0,[X1],#32",   load_le(code[:], 48), 0xBC420420)
+		eq_word("LDR D0,[X1],#32",   load_le(code[:], 52), 0xFC420420)
+		eq_word("LDR Q0,[X1],#32",   load_le(code[:], 56), 0x3CC20420)
+		eq_word("STR B0,[X1],#32",   load_le(code[:], 60), 0x3C020420)
+		eq_word("STR H0,[X1],#32",   load_le(code[:], 64), 0x7C020420)
+		eq_word("STR S0,[X1],#32",   load_le(code[:], 68), 0xBC020420)
+		eq_word("STR D0,[X1],#32",   load_le(code[:], 72), 0xFC020420)
+		eq_word("STR Q0,[X1],#32",   load_le(code[:], 76), 0x3C820420)
+
+		d_insts:  [dynamic]a.Instruction
+		d_info:   [dynamic]a.Instruction_Info
+		d_labels: [dynamic]a.Label_Definition
+		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
+		clear(&errors)
+		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("FP pre/post: decode", d_success && len(d_insts) == len(insts))
+		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+						 nil, nil, nil, context.temp_allocator)
+		eq_str("FP pre/post: print",
+			   text,
+			   "    ldr b0, [x1, #-16]!\n" +
+			   "    ldr h0, [x1, #-16]!\n" +
+			   "    ldr s0, [x1, #-16]!\n" +
+			   "    ldr d0, [x1, #-16]!\n" +
+			   "    ldr q0, [x1, #-16]!\n" +
+			   "    str b0, [x1, #-16]!\n" +
+			   "    str h0, [x1, #-16]!\n" +
+			   "    str s0, [x1, #-16]!\n" +
+			   "    str d0, [x1, #-16]!\n" +
+			   "    str q0, [x1, #-16]!\n" +
+			   "    ldr b0, [x1], #32\n"   +
+			   "    ldr h0, [x1], #32\n"   +
+			   "    ldr s0, [x1], #32\n"   +
+			   "    ldr d0, [x1], #32\n"   +
+			   "    ldr q0, [x1], #32\n"   +
+			   "    str b0, [x1], #32\n"   +
+			   "    str h0, [x1], #32\n"   +
+			   "    str s0, [x1], #32\n"   +
+			   "    str d0, [x1], #32\n"   +
+			   "    str q0, [x1], #32\n")
+	}
+
 	fmt.println()
 	fmt.printfln("==> arm64 pipeline: %d passed, %d failed", rpasses, rfailures)
 	if rfailures > 0 { os.exit(1) }
