@@ -1085,6 +1085,110 @@ run_pipeline_tests :: proc() {
 		   mismatches == 0)
 	}
 
+	// ---- 42. Extended-register addressing: [Xn, Wm|Xm, <extend> {#s}] ----
+	//   Register offset and extended-register offset are one instruction
+	//   word (option at 15:13 selects LSL/UXTW/SXTW/SXTX), served by the one
+	//   MEM_REG form. Golden words from llvm-mc --triple=aarch64.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		insts := []a.Instruction{
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.W2, .SXTW)),
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.W2, .SXTW, 3)),
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.W2, .UXTW, 3)),
+			a.inst_ldst(.LDR,   a.X0, a.mem_ext(a.X1, a.X2, .SXTX)),
+			a.inst_ldst(.LDR,   a.W0, a.mem_ext(a.X1, a.W2, .UXTW, 2)),
+			a.inst_ldst(.LDRB,  a.W0, a.mem_ext(a.X1, a.W2, .SXTW)),
+			a.inst_ldst(.LDRH,  a.W0, a.mem_ext(a.X1, a.W2, .UXTW, 1)),
+			a.inst_ldst(.LDRSW, a.X0, a.mem_ext(a.X1, a.W2, .SXTW, 2)),
+			a.inst_ldst(.STR,   a.X0, a.mem_ext(a.X1, a.W2, .SXTW, 3)),
+			a.inst_ldst(.STRB,  a.W0, a.mem_ext(a.X1, a.W2, .UXTW)),
+		}
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("mem ext: encode", success)
+		eq_word("LDR X0,[X1,W2,SXTW]",      load_le(code[:],  0), 0xF862C820)
+		eq_word("LDR X0,[X1,W2,SXTW #3]",   load_le(code[:],  4), 0xF862D820)
+		eq_word("LDR X0,[X1,W2,UXTW #3]",   load_le(code[:],  8), 0xF8625820)
+		eq_word("LDR X0,[X1,X2,SXTX]",      load_le(code[:], 12), 0xF862E820)
+		eq_word("LDR W0,[X1,W2,UXTW #2]",   load_le(code[:], 16), 0xB8625820)
+		eq_word("LDRB W0,[X1,W2,SXTW]",     load_le(code[:], 20), 0x3862C820)
+		eq_word("LDRH W0,[X1,W2,UXTW #1]",  load_le(code[:], 24), 0x78625820)
+		eq_word("LDRSW X0,[X1,W2,SXTW #2]", load_le(code[:], 28), 0xB8A2D820)
+		eq_word("STR X0,[X1,W2,SXTW #3]",   load_le(code[:], 32), 0xF822D820)
+		eq_word("STRB W0,[X1,W2,UXTW]",     load_le(code[:], 36), 0x38224820)
+
+		d_insts:  [dynamic]a.Instruction
+		d_info:   [dynamic]a.Instruction_Info
+		d_labels: [dynamic]a.Label_Definition
+		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
+		clear(&errors)
+		_, d_success := a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		ok("mem ext: decode", d_success && len(d_insts) == len(insts))
+		ok("mem ext: mode",   len(d_insts) == len(insts) &&
+		   d_insts[0].ops[1].mem.mode == .EXT_REG_OFFSET &&
+		   d_insts[0].ops[1].mem.extend == .SXTW)
+		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+						 nil, nil, nil, context.temp_allocator)
+		eq_str("mem ext: print",
+			   text,
+			   "    ldr x0, [x1, w2, sxtw]\n"    +
+			   "    ldr x0, [x1, w2, sxtw #3]\n" +
+			   "    ldr x0, [x1, w2, uxtw #3]\n" +
+			   "    ldr x0, [x1, x2, sxtx]\n"    +
+			   "    ldr w0, [x1, w2, uxtw #2]\n" +
+			   "    ldrb w0, [x1, w2, sxtw]\n"   +
+			   "    ldrh w0, [x1, w2, uxtw #1]\n" +
+			   "    ldrsw x0, [x1, w2, sxtw #2]\n" +
+			   "    str x0, [x1, w2, sxtw #3]\n" +
+			   "    strb w0, [x1, w2, uxtw]\n")
+	}
+
+	// ---- 43. LSL register offset prints its real amount ------------------
+	//   The S bit is one bit; the amount it stands for is log2 of the
+	//   transfer size. LDR X's #3 used to decode (and print) as #1.
+	{
+		clear(&relocs); clear(&errors)
+		for i in 0..<len(code) { code[i] = 0 }
+		insts := []a.Instruction{
+			a.inst_ldst(.LDR, a.X0, a.mem_reg(a.X1, a.X2, 3)),
+		}
+		byte_count, success := a.encode(insts, nil, code[:], &relocs, &errors)
+		ok("LSL amount: encode", success)
+		eq_word("LDR X0,[X1,X2,LSL #3]", load_le(code[:], 0), 0xF8627820)
+
+		d_insts:  [dynamic]a.Instruction
+		d_info:   [dynamic]a.Instruction_Info
+		d_labels: [dynamic]a.Label_Definition
+		defer delete(d_insts); defer delete(d_info); defer delete(d_labels)
+		clear(&errors)
+		a.decode(code[:byte_count], nil, &d_insts, &d_info, &d_labels, &errors)
+		text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+						 nil, nil, nil, context.temp_allocator)
+		eq_str("LSL amount: print", text, "    ldr x0, [x1, x2, lsl #3]\n")
+	}
+
+	// ---- 44. Extended-register addressing rejects malformed operands -----
+	//   A W index needs an extend; a W-extend needs a W index; the byte and
+	//   half extends cannot be named by the option field at all.
+	{
+		reject :: proc(name: string, inst: a.Instruction, code: []u8,
+					   relocs: ^[dynamic]a.Relocation, errors: ^[dynamic]a.Error) {
+			clear(relocs)
+			clear(errors)
+			insts := []a.Instruction{inst}
+			_, success := a.encode(insts, nil, code, relocs, errors)
+			ok(name, !success)
+		}
+		reject("reject W index without extend",
+			   a.inst_ldst(.LDR, a.X0, a.mem_reg(a.X1, a.W2)), code[:], &relocs, &errors)
+		reject("reject X index with UXTW",
+			   a.inst_ldst(.LDR, a.X0, a.mem_ext(a.X1, a.X2, .UXTW)), code[:], &relocs, &errors)
+		reject("reject W index with SXTX",
+			   a.inst_ldst(.LDR, a.X0, a.mem_ext(a.X1, a.W2, .SXTX)), code[:], &relocs, &errors)
+		reject("reject SXTB extend",
+			   a.inst_ldst(.LDR, a.X0, a.mem_ext(a.X1, a.W2, .SXTB)), code[:], &relocs, &errors)
+	}
+
 	fmt.println()
 	fmt.printfln("==> arm64 pipeline: %d passed, %d failed", rpasses, rfailures)
 	if rfailures > 0 { os.exit(1) }

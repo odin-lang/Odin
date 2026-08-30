@@ -378,16 +378,27 @@ extract_operand_inline :: #force_inline proc "contextless" (
 		base_hw := u8((word >> 5) & 0x1F)
 		idx_hw  := u8((word >> 16) & 0x1F)
 		option  := Extend((word >> 13) & 0x7)
-		s       := u8((word >> 12) & 0x1)
 		idx_cls := u16(REG_X)
 		if option == .UXTW || option == .SXTW { idx_cls = REG_W }
+		// S (bit 12) is one bit; the amount it stands for is log2 of the
+		// transfer size -- size (31:30), plus opc<1> (23) for SIMD (V at 26).
+		// A byte access with S set means an explicit `#0`, which Memory
+		// cannot hold apart from no amount; it decodes as no amount.
+		scale := u8((word >> 30) & 0x3)
+		if (word >> 26) & 1 == 1 {
+			scale |= u8((word >> 23) & 0x1) << 2
+		}
+		shift := (word >> 12) & 1 == 1 ? scale : 0
+		// Option 011 is LSL -- a plain register offset; the other three
+		// options are extended-register offsets.
+		mode := option == .UXTX ? Address_Mode.REG_OFFSET : .EXT_REG_OFFSET
 		return Operand{
 			mem = Memory{
 				base   = Register(REG_X | u16(base_hw)),
 				index  = Register(idx_cls | u16(idx_hw)),
 				extend = option,
-				shift  = s,
-				mode   = en == .OFFSET_EXT ? .EXT_REG_OFFSET : .REG_OFFSET,
+				shift  = shift,
+				mode   = mode,
 			},
 			kind = .MEMORY, size = 4,
 		}

@@ -316,8 +316,27 @@ operand_matches_inline :: #force_inline proc "contextless" (
 		return op.kind == .MEMORY && op.mem.mode == .PRE_INDEXED
 	case .MEM_POST:
 		return op.kind == .MEMORY && op.mem.mode == .POST_INDEXED
+	// Register offset and extended-register offset are one instruction word:
+	// the option field at 15:13 picks LSL / UXTW / SXTW / SXTX. One MEM_REG
+	// form serves both addressing modes, the way the RM slot takes plain and
+	// shifted registers, and the index register's width has to agree with the
+	// extend that consumes it.
 	case .MEM_REG:
-		return op.kind == .MEMORY && op.mem.mode == .REG_OFFSET
+		if op.kind != .MEMORY { return false }
+		if op.mem.mode == .REG_OFFSET {
+			return reg_class(op.mem.index) == REG_X
+		}
+		if op.mem.mode != .EXT_REG_OFFSET { return false }
+		switch op.mem.extend {
+		case .UXTB, .UXTH, .SXTB, .SXTH:
+			// The option field cannot name the byte/half extends.
+			return false
+		case .UXTW, .SXTW:
+			return reg_class(op.mem.index) == REG_W
+		case .UXTX, .SXTX:
+			return reg_class(op.mem.index) == REG_X
+		}
+		return false
 	case .MEM_EXT:
 		return op.kind == .MEMORY && op.mem.mode == .EXT_REG_OFFSET
 	// SVE: the plain mode is not enough -- a gather's scalar+scalar and
@@ -490,10 +509,15 @@ pack_operand_inline :: #force_inline proc(
 		imm_bits  := u32((i32(op.mem.disp) / scale) & 0x7F)
 		return base_bits | (imm_bits << 15)
 	case .OFFSET_REG:
-		// [Xn, Xm{, LSL #s}]: option=011, S = shift!=0.
+		// [Xn, Xm{, LSL #s}] or [Xn, Wm|Xm, <extend> {#s}] -- one encoding:
+		// option (15:13) is 011 for LSL and the extend value otherwise, and
+		// S (12) says whether a shift amount is present.
 		base_bits := (u32(reg_hw(op.mem.base))  & 0x1F) << 5
 		idx_bits  := (u32(reg_hw(op.mem.index)) & 0x1F) << 16
 		option    := u32(0x3) << 13
+		if op.mem.mode == .EXT_REG_OFFSET {
+			option = (u32(op.mem.extend) & 0x7) << 13
+		}
 		s_bit     := op.mem.shift != 0 ? u32(1) << 12 : 0
 		return base_bits | idx_bits | option | s_bit | (0x2 << 10)
 	case .OFFSET_EXT:

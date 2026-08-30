@@ -175,8 +175,10 @@ Operand_Type :: enum u8 {
 	MEM_OFFSET,    // [Xn{, #imm}]                    -> Address_Mode.OFFSET
 	MEM_PRE,       // [Xn, #imm]!                     -> PRE_INDEXED
 	MEM_POST,      // [Xn], #imm                      -> POST_INDEXED
-	MEM_REG,       // [Xn, Rm{, LSL #s}]              -> REG_OFFSET
-	MEM_EXT,       // [Xn, Wm, SXTW|UXTW|SXTX #s]     -> EXT_REG_OFFSET
+	MEM_REG,       // [Xn, Xm{, LSL #s}] or [Xn, Wm|Xm, <extend> {#s}]
+	               //   -> REG_OFFSET or EXT_REG_OFFSET; one word, option picks
+	MEM_EXT,       // subsumed by MEM_REG; kept because these values are baked
+	               //   into the table blobs
 	// SVE addressing. Kept distinct from the plain modes above: a gather
 	// load has both a scalar+scalar and a scalar+vector form under the one
 	// mnemonic, and those two differ only in the index register's class.
@@ -285,8 +287,10 @@ Operand_Encoding :: enum u8 {
 	OFFSET_PAIR_4,    // [Xn{, #imm}] / [Xn, #imm]! / [Xn], #imm -- imm7 x 4
 	OFFSET_PAIR_8,    //                                            imm7 x 8
 	OFFSET_PAIR_16,   //                                            imm7 x 16
-	OFFSET_REG,       // [Xn, Rm{, LSL #s}] register offset
-	OFFSET_EXT,       // [Xn, Wm, SXTW|UXTW|SXTX #s]
+	OFFSET_REG,       // [Xn, Xm{, LSL #s}] or [Xn, Wm|Xm, <extend> {#s}];
+	                  //   option (15:13) comes from the operand's mode/extend
+	OFFSET_EXT,       // subsumed by OFFSET_REG; kept because these values are
+	                  //   baked into the table blobs
 
 	// ---- PC-relative ----
 	BRANCH_26,        // B / BL  (operand-driven 26-bit field, scaled ×4)
