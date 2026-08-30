@@ -207,7 +207,7 @@ extract_operand_inline :: #force_inline proc "contextless" (
 	case .NZCV_FIELD:
 		return Operand{immediate = i64(word & 0xF), kind = .IMMEDIATE, size = 1}
 	case .SYS_FIELD:
-		return Operand{sysreg = System_Register((word >> 5) & 0x7FFF), kind = .SYSTEM_REGISTER, size = 2}
+		return Operand{reg = sysreg_from_bits((word >> 5) & 0x7FFF), kind = .REGISTER, size = 4}
 	case .HINT_FIELD:
 		return Operand{immediate = i64((word >> 5) & 0x7F), kind = .IMMEDIATE, size = 1}
 	case .BARRIER_FIELD:

@@ -28,7 +28,6 @@ Operand_Kind :: enum u8 {
 	SHIFTED_REG,      // X reg + shift type + shift amount
 	EXTENDED_REG,     // X/W reg + extend + amount
 	COND,             // 4-bit condition code (EQ/NE/.../AL/NV)
-	SYSTEM_REGISTER,  // MRS/MSR target, as a packed 15-bit field
 	ZA_SLICE,         // `za0h.b[w12, 0]` -- a row or column of an SME tile
 }
 
@@ -77,10 +76,13 @@ Address_Mode :: enum u8 {
 // (`m.base`, `m.disp`) and composite literals still work, so this is invisible
 // to callers.
 //
-// Widths: registers get the full 16 bits because the NONE sentinel is 0xFFFF.
-// That leaves 23 bits for `disp` (+/-4.19M) against a worst case of 65,520 --
-// LDR Q, [Xn, #imm12*16] -- the largest displacement any A64 addressing mode
-// can encode, so there is ~64x headroom.
+// Widths: registers get 16 bits. `Register` itself is a u32, but every class
+// legal in an address lives entirely in its low 16 bits -- only a system
+// register (class REG_SYS) carries field bits above them, and one is never a
+// valid base or index -- so the truncation is lossless and the NONE sentinel
+// (0xFFFF) round-trips. That leaves 23 bits for `disp` (+/-4.19M) against a
+// worst case of 65,520 -- LDR Q, [Xn, #imm12*16] -- the largest displacement
+// any A64 addressing mode can encode, so there is ~64x headroom.
 Memory :: bit_field u64 {
 	base:    Register     | 16,
 	index:   Register     | 16,  // NONE for OFFSET/PRE/POST/LITERAL
@@ -93,32 +95,31 @@ Memory :: bit_field u64 {
 #assert(size_of(Memory) == 8)
 
 Shifted_Reg :: struct #packed {
-	reg:    Register,    // 2
+	reg:    Register,    // 4
 	type:   Shift_Type,  // 1
 	amount: u8,          // 1  (0..63 for 64-bit; 0..31 for 32-bit)
 }
-#assert(size_of(Shifted_Reg) == 4)
+#assert(size_of(Shifted_Reg) == 6)
 
 Extended_Reg :: struct #packed {
-	reg:    Register,    // 2
+	reg:    Register,    // 4
 	extend: Extend,      // 1
 	amount: u8,          // 1  (0..4)
 }
-#assert(size_of(Extended_Reg) == 4)
+#assert(size_of(Extended_Reg) == 6)
 
-// 16-byte tagged operand. The union holds whichever payload matches `kind`.
+// 11-byte tagged operand. The union holds whichever payload matches `kind`.
 Operand :: struct #packed {
 	using _: struct #raw_union #packed {
-		reg:       Register,        // 2
+		reg:       Register,        // 4
 		mem:       Memory,          // 8
 		immediate: i64,             // 8
 		relative:  i64,             // 8
-		shifted:   Shifted_Reg,     // 8
-		extended:  Extended_Reg,    // 8
+		shifted:   Shifted_Reg,     // 6
+		extended:  Extended_Reg,    // 6
 		cond:      u8,              // 1
-		sysreg:    System_Register, // 2
 		za:        ZA_Slice,        // 4
-	}, // 12 total because of alignment
+	}, // 8 total -- the largest member wins
 	kind: Operand_Kind,                 // 1
 	size: u8,                           // 1 -- carried width info; meaning varies
 	// How many consecutive registers the syntax writes as a list, starting at
@@ -201,8 +202,11 @@ op_lane_index :: #force_inline proc "contextless" (index: i64) -> Operand {
 	return Operand{immediate = index, kind = .IMMEDIATE, size = LANE_INDEX}
 }
 
-op_sysreg :: #force_inline proc "contextless" (sr: System_Register) -> Operand {
-	return Operand{sysreg = sr, kind = .SYSTEM_REGISTER, size = 2}
+// A system register operand -- op_reg with the intent in the name, kept so
+// MRS/MSR call sites read as what they are.
+@(require_results)
+op_sysreg :: #force_inline proc "contextless" (sr: Register) -> Operand {
+	return op_reg(sr)
 }
 
 @(require_results)

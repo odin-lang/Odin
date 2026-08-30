@@ -1032,6 +1032,59 @@ run_pipeline_tests :: proc() {
 		eq_word("ROR W0,W1,#4", load_le(code[:], 0), 0x13811020)
 	}
 
+	// ---- 41. Every named system register round-trips --------------------
+	//   For each SYSREG_NAMES entry: encode MRS X0, <sr> (the word is fully
+	//   determined by the 15-bit field, so the expected bytes derive from the
+	//   table value), decode it back to the same register, and print it by
+	//   name. Guards the field's placement in `Register` end to end.
+	{
+		mismatches := 0
+		for entry in a.SYSREG_NAMES {
+			clear(&relocs)
+			clear(&errors)
+			sr := a.sysreg_from_bits(u32(entry.value))
+			insts := []a.Instruction{
+				a.Instruction{
+					mnemonic = .MRS, operand_count = 2, length = 4,
+					ops = {a.op_reg(a.X0), a.op_sysreg(sr), {}, {}, {}},
+				},
+			}
+			_, success := a.encode(insts, nil, code[:], &relocs, &errors)
+			want := u32(0xD5300000) | u32(entry.value) << 5
+			if !success || load_le(code[:], 0) != want {
+				fmt.printfln("  [FAIL] sysreg %s: encode got=%08x want=%08x",
+							 entry.name, load_le(code[:], 0), want)
+				mismatches += 1
+				continue
+			}
+
+			d_insts:  [dynamic]a.Instruction
+			d_info:   [dynamic]a.Instruction_Info
+			d_labels: [dynamic]a.Label_Definition
+			defer delete(d_insts)
+			defer delete(d_info)
+			defer delete(d_labels)
+			clear(&errors)
+			_, d_success := a.decode(code[:4], nil, &d_insts, &d_info, &d_labels, &errors)
+			if !d_success || len(d_insts) != 1 || d_insts[0].ops[1].reg != sr {
+				fmt.printfln("  [FAIL] sysreg %s: decode", entry.name)
+				mismatches += 1
+				continue
+			}
+
+			text := a.aprint(d_insts[:], d_info[:], d_labels[:],
+							 nil, nil, nil, context.temp_allocator)
+			want_text := fmt.tprintf("    mrs x0, %s\n", entry.name)
+			if text != want_text {
+				fmt.printfln("  [FAIL] sysreg %s: print got %q want %q",
+							 entry.name, text, want_text)
+				mismatches += 1
+			}
+		}
+		ok(fmt.tprintf("sysreg: all %d named registers round-trip", len(a.SYSREG_NAMES)),
+		   mismatches == 0)
+	}
+
 	fmt.println()
 	fmt.printfln("==> arm64 pipeline: %d passed, %d failed", rpasses, rfailures)
 	if rfailures > 0 { os.exit(1) }

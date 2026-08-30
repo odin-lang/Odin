@@ -27,7 +27,7 @@ package main
 //     SVE predicate (P_REG / merge / zero / gov) -> u8       / Register(REG_P|..) (suffix p)
 //     all immediates (incl ZA tile, SME slice,   -> i64      / op_imm           (suffix i)
 //       patterns, bitmask, HW, NZCV, ...)
-//     MRS/MSR system register        -> System_Register / op_sysreg         (suffix s)
+//     MRS/MSR system register        -> Register / op_sysreg         (suffix s)
 //     PC-relative label                          -> u32      / op_label         (suffix l)
 //     memory                                     -> Memory   / op_mem           (suffix m)
 //     condition code                             -> Cond     / op_cond          (suffix c)
@@ -70,7 +70,7 @@ Operand_Category :: enum {
 	REL,       // u32 label  -> op_label               (1 param, suffix l)
 	MEM,       // Memory     -> op_mem                 (1 param, suffix m)
 	COND,      // Cond       -> op_cond                (1 param, suffix c)
-	SYSREG,    // System_Register -> op_sysreg         (1 param, suffix s)
+	SYSREG,    // Register -> op_sysreg         (1 param, suffix s)
 	IMPLICIT,  // no parameter -- the operand names the only register it can
 	SHIFTED,   // Register + Shift_Type + u8 -> op_shifted   (3 params, suffix sh)
 	EXTENDED,  // Register + Extend + u8     -> op_extended  (3 params, suffix ex)
@@ -418,7 +418,7 @@ param_list :: proc(sig: Operand_Signature) -> [dynamic]Param {
 		case .COND:
 			append(&params, Param{decl = fmt.tprintf("%s: Cond", names[i][0]), name = names[i][0]})
 		case .SYSREG:
-			append(&params, Param{decl = fmt.tprintf("%s: System_Register", names[i][0]), name = names[i][0]})
+			append(&params, Param{decl = fmt.tprintf("%s: Register", names[i][0]), name = names[i][0]})
 		case .SHIFTED:
 			append(&params, Param{decl = fmt.tprintf("%s: Register",    names[i][0]), name = names[i][0]})
 			append(&params, Param{decl = fmt.tprintf("%s: Shift_Type", names[i][1]), name = names[i][1]})

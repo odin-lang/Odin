@@ -378,11 +378,11 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 // A system register by name (`cntvct_el0`), falling back to the raw field
 // when it is not one we know.
 @(private="file")
-write_sysreg :: proc(sb: ^strings.Builder, sr: System_Register, uppercase: bool) {
+write_sysreg :: proc(sb: ^strings.Builder, sr: Register, uppercase: bool) {
 	name, ok := sysreg_name(sr)
 	if !ok {
 		strings.write_byte(sb, '#')
-		write_signed_decimal(sb, i64(sr))
+		write_signed_decimal(sb, i64(sysreg_bits(sr)))
 		return
 	}
 	for i in 0 ..< len(name) {
@@ -563,6 +563,8 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 	case REG_ZA:
 		strings.write_string(sb, uppercase ? "ZA" : "za")
 		write_decimal_u32(sb, u32(hw))
+	case REG_SYS:
+		write_sysreg(sb, r, uppercase)
 	}
 }
 
@@ -599,9 +601,6 @@ write_operand :: proc(
 		}
 		strings.write_byte(sb, '#')
 		write_signed_decimal(sb, op.immediate)
-
-	case .SYSTEM_REGISTER:
-		write_sysreg(sb, op.sysreg, opts.uppercase)
 
 	case .ZA_SLICE:
 		// `za0h.b[w12, 0]`, or plain `za[w12, 0]` for a whole array vector

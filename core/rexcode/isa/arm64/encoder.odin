@@ -300,7 +300,7 @@ operand_matches_inline :: #force_inline proc "contextless" (
 	     .IMM_MUL4:
 		return op.kind == .IMMEDIATE
 	case .SYS_REG:
-		return op.kind == .SYSTEM_REGISTER
+		return op.kind == .REGISTER && reg_class(op.reg) == REG_SYS
 	case .BITMASK_IMM:
 		// The user passes the raw logical mask value; we validate that it
 		// fits the AArch64 bitmask-immediate encoding at the form's width.
@@ -416,7 +416,7 @@ pack_operand_inline :: #force_inline proc(
 			return (u32(reg_hw(op.extended.reg)) & 0x1F) << 16 |
 				   (u32(op.extended.extend)      & 0x7)  << 13 |
 				   (u32(op.extended.amount)      & 0x7)  << 10
-		case .NONE, .IMMEDIATE, .MEMORY, .RELATIVE, .COND, .SYSTEM_REGISTER, .ZA_SLICE:
+		case .NONE, .IMMEDIATE, .MEMORY, .RELATIVE, .COND, .ZA_SLICE:
 			return 0
 		}
 
@@ -443,7 +443,7 @@ pack_operand_inline :: #force_inline proc(
 	case .NZCV_FIELD:
 		return (u32(op.immediate) & 0xF) << 0
 	case .SYS_FIELD:
-		return (u32(op.sysreg) & 0x7FFF) << 5
+		return sysreg_bits(op.reg) << 5
 	case .HINT_FIELD:
 		return (u32(op.immediate) & 0x7F) << 5
 	case .BARRIER_FIELD:
