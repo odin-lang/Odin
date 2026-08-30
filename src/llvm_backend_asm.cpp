@@ -975,12 +975,187 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 	}
 };
 
+struct lbAsmGenerate_arm64 : lbAsmGenerate {
+	bool reverse_operand_order() override {
+		return false;
+	}
+
+	// AArch64 immediates carry their own '#'; registers are bare. No AT&T-style
+	// prefixes, so the generic PrintPrefixes bit is unused here.
+	u32 default_operand_write_flags() override {
+		return WriteOperandFlag_NONE;
+	}
+
+	// #clobber flags -> the AArch64 condition-code clobber (NZCV).
+	void emit_flags_clobber() override {
+		sep(); raw("~{cc}");
+	}
+
+	// LLVM inline-asm constraint class letters for AArch64.
+	char const *class_letter(AsmRegClass rc) override {
+		switch (rc) {
+		case AsmRegClass_Integer: return "r";    // GPR (x/w)
+		case AsmRegClass_Float:   return "w";    // FP/SIMD scalar (v/q/d/s/h/b)
+		case AsmRegClass_Vector:  return "w";    // Advanced SIMD / SVE data vector
+		case AsmRegClass_Mask:    return "^Upl"; // SVE governing predicate (p0-p7); use ^Upa for p0-p15
+		default:
+			GB_PANIC("asm: unknown reg class");
+			return "r";
+		}
+	}
+
+	// BR/BLR/RET take a bare register operand; there is no AT&T '*' indirection to
+	// emit, so nothing needs the IndirectBranch marker.
+	bool is_indirect_control_transfer(AstAsmInstruction *instr) override {
+		return false;
+	}
+
+	// AArch64 immediates are written '#<value>'; no scale/log2 addressing forms.
+	void write_constant_operand(Ast *op, u32 flags) override {
+		GB_ASSERT(op->tav.mode == Addressing_Constant);
+		op->tav.value = exact_value_to_integer(op->tav.value);
+		ExactValue ev = op->tav.value;
+		GB_ASSERT(ev.kind != ExactValue_Invalid);
+		switch (ev.kind) {
+		case ExactValue_Integer: {
+			GB_ASSERT((flags & (WriteOperandFlag_IsScale|WriteOperandFlag_IsScaleLog2)) == 0);
+			i64 val = exact_value_to_i64(ev);
+			if (flags & WriteOperandFlag_Negate) {
+				val = -val;
+			}
+			write_cstr("#");
+			this->write_i64(val);
+			break;
+		}
+		case ExactValue_Float:
+			error(op, "Floating-point literals that cannot be represented as an integer are not supported within asm operands");
+			break;
+		default:
+			GB_PANIC("Unsupported asm immediate literal %s", expr_to_string(op));
+			break;
+		}
+	}
+
+	void write_operand(Slice<i32> const &op_number, Ast *op, u32 flags) override {
+		if (op->tav.mode == Addressing_Constant) {
+			this->write_constant_operand(op, flags);
+			return;
+		}
+
+		// No '*' indirection on AArch64; the register prints normally.
+		flags &= ~WriteOperandFlag_IndirectBranch;
+
+		bool negate = (flags & WriteOperandFlag_Negate) != 0;
+		flags &= ~WriteOperandFlag_Negate;
+
+		switch (op->kind) {
+		case_ast_node(i, Ident, op);
+			Entity *e = entity_of_node(op);
+			auto *ed = entity_op(e);
+
+			if (ed->view_of >= 0) {
+				// Width-view (e.g. `p0w: u32 = p0`): the allocator picks one register;
+				// print it at the requested width via LLVM's w/x operand modifier so both
+				// names share it. AArch64 GPRs only expose 32-bit (w) and 64-bit (x)
+				// names; sub-word views still use the w register.
+				i32 idx = op_number[ed->view_of];
+				GB_ASSERT(idx >= 0);
+				char mod = 0;
+				switch (ed->view_bits) {
+				case 8: case 16: case 32: mod = 'w'; break;
+				case 64:                  mod = 'x'; break;
+				default: GB_PANIC("asm: invalid AArch64 width-view size %d", ed->view_bits); break;
+				}
+				asm_string = gb_string_append_fmt(asm_string, "${%d:%c}", idx, mod);
+			} else {
+				i32 idx = op_number[ed->total_index];
+				GB_ASSERT(idx >= 0);
+				if (ed->kind == AsmTemplateEntityDecl_Immediate) {
+					// Immediate parameter: '#' prefix, then LLVM substitutes the bare value.
+					if (negate) {
+						asm_string = gb_string_append_fmt(asm_string, "#-$%d", idx);
+					} else {
+						asm_string = gb_string_append_fmt(asm_string, "#$%d", idx);
+					}
+				} else {
+					GB_ASSERT(!negate); // only immediates/displacements negate
+					asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+				}
+			}
+		case_end;
+		case_ast_node(mem_op, AsmMemoryOperand, op);
+			this->write_memory_operand(op_number, mem_op, flags&~WriteOperandFlag_PrintPrefixes);
+		case_end;
+		case_ast_node(bl, BasicLit, op);
+			GB_PANIC("NOTE(bill): this should have been handled above");
+		case_end;
+		case_ast_node(label, AsmLabelDecl, op);
+			this->write_label(&label->name->Ident);
+		case_end;
+		case_ast_node(reg, AsmRegister, op);
+			this->write_string(reg->name.string); // bare: x0, w0, sp, xzr, v0, ...
+		case_end;
+		default:
+			GB_PANIC("TODO(bill): write_operand for '%s'", expr_to_string(op));
+			break;
+		}
+	}
+
+	// AArch64 addressing here: `[base]`, `[base, #disp]`, or `[base, Xindex]`.
+	// (Scaled/extended index and pre/post-index writebacks aren't expressible via
+	// this explicit-syntax path.)
+	void write_memory_operand(Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
+		GB_ASSERT_MSG(mem_op->segment_override == nullptr, "asm: AArch64 has no segment overrides");
+		GB_ASSERT_MSG(mem_op->scale == nullptr, "asm: AArch64 memory operands take no scaled index here");
+
+		write_cstr("[");
+		if (mem_op->base != nullptr) {
+			this->write_operand(op_number, mem_op->base, flags&~WriteOperandFlag_PrintPrefixes);
+		}
+		if (mem_op->index != nullptr) {
+			write_cstr(", ");
+			this->write_operand(op_number, mem_op->index, flags&~WriteOperandFlag_PrintPrefixes);
+		} else if (mem_op->disp) {
+			write_cstr(", ");
+			u32 disp_flags = flags;
+			if (mem_op->disp_op.kind == Token_Sub) {
+				disp_flags |= WriteOperandFlag_Negate;
+			}
+			this->write_operand(op_number, mem_op->disp, disp_flags);
+		}
+		write_cstr("]");
+	}
+
+	// A flag output '= %flags.<n|z|c|v>' lowers to '=@cc<cond>', where the condition
+	// is true exactly when that NZCV bit is set. (cs is an accepted alias of hs.)
+	String flag_output_cc_suffix(String const &pin_flag) override {
+		if (pin_flag == "n") return str_lit("mi"); // N == 1
+		if (pin_flag == "z") return str_lit("eq"); // Z == 1
+		if (pin_flag == "c") return str_lit("hs"); // C == 1
+		if (pin_flag == "v") return str_lit("vs"); // V == 1
+		return {};
+	}
+
+	// A64 spells conditional branches (and a few others) with '.', e.g. b.eq, which
+	// an Odin identifier can't contain; accept '_' and translate (b_eq -> b.eq).
+	void write_instruction_mnemonic(AstAsmInstruction *instr) override {
+		String name = instr->name->Ident.token.string;
+		for (isize i = 0; i < name.len; i++) {
+			char c = cast(char)name.text[i];
+			write_char(c == '_' ? '.' : c);
+		}
+	}
+};
+
 gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Array<lbValue> const &args) {
 	lbAsmGenerate_amd64   generator_amd64   = {};
+	lbAsmGenerate_arm64   generator_arm64 = {};
 	lbAsmGenerate_riscv64 generator_riscv64 = {};
 	lbAsmGenerate *generator = nullptr;
 	if (build_context.metrics.arch == TargetArch_amd64) {
 		generator = &generator_amd64;
+	} else if (build_context.metrics.arch == TargetArch_arm64) {
+		generator = &generator_arm64;
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		generator = &generator_riscv64;
 	} else {
