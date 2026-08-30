@@ -36,6 +36,13 @@ check :: proc(name: string, m: a.Mnemonic, idx: int, want_bits, want_mask: u32) 
 }
 
 main :: proc() {
+	for arg in os.args[1:] {
+		if arg == "bench" {
+			run_benchmarks()
+			return
+		}
+	}
+
 	fmt.println("=== AArch64 encoding-table spot checks ===")
 
 	// ---- Data-proc immediate ------------------------------------------------
