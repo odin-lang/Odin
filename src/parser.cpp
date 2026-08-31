@@ -2505,6 +2505,29 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 
 	case Token_OpenParen:
 		return parse_expr(f, false);
+
+	case Token_Hash:
+		{
+			Token hash = expect_token(f, Token_Hash);
+			Token name = expect_token(f, Token_Ident);
+			if (name.string == "pre" ||
+			    name.string == "post") {
+				operand = parse_asm_operand(f, allow_memory_operand);
+				if (operand == nullptr ||
+				    operand->kind != Ast_AsmMemoryOperand) {
+					error(name, "Expected an asm memory operand after #%.*s", LIT(name.string));
+				} else {
+					GB_ASSERT(operand->kind == Ast_AsmMemoryOperand);
+					if (name.string == "pre") {
+						operand->AsmMemoryOperand.kind = AsmMemoryOperand_Pre;
+					} else if (name.string == "post") {
+						operand->AsmMemoryOperand.kind = AsmMemoryOperand_Post;
+					}
+				}
+			}
+		}
+		break;
+
 	case Token_OpenBracket:
 		if (allow_memory_operand) {
 			Token open  = expect_token(f, Token_OpenBracket);

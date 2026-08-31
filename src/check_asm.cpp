@@ -93,6 +93,7 @@ gb_internal bool asm_reg_class_compatible(AsmRegClass want, AsmRegClass got) {
 	switch (want) {
 	case AsmRegClass_Integer:
 		return got == AsmRegClass_Integer;
+	case AsmRegClass_Float:
 	case AsmRegClass_Vector:
 		// A scalar float uses only the low lane, so it is valid in any vector
 		// register slot; a #simd vector matches the vector class exactly.
@@ -1222,6 +1223,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				case AsmOperand_Lane:
 					s = (w > 0) ? gb_string_append_fmt(s, "v%d[i]", cast(int)w)
 					            : gb_string_appendc(s, "v[i]");
+					break;
 				case AsmOperand_Memory:
 					s = (w > 0) ? gb_string_append_fmt(s, "m%d", cast(int)w)
 					            : gb_string_appendc(s, "m");
@@ -1706,8 +1708,10 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				op_expr = op_expr->IndexExpr.expr;
 			}
 			Entity *pe = entity_of_node(op_expr);
- 			if (pe == nullptr || pe->kind != Entity_Variable) {
- 				continue;
+ 			if (pe != nullptr && pe->kind == Entity_Variable) {
+ 				i32 di = -1;
+ 				check_asm_find_group(pe, tmpl_entity->AsmTemplate.decls, &di);
+ 				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, tmpl_entity->AsmTemplate.decls, di);
  			}
 		}
 
@@ -1795,6 +1799,20 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			int slot = user_operand_target_index(cast(int)i);
 			if (slot < 0) {
 				continue;
+			}
+			// A pre/post-index memory operand writes back (and reads) its base
+			// register. The operand kind is Memory, so the register/lane path below
+			// won't see it; record the base's def+use here so liveness sees the
+			// cursor advance and a later read of it isn't flagged undefined.
+			if (operands[i].expr != nullptr && operands[i].expr->kind == Ast_AsmMemoryOperand) {
+				auto *m = &operands[i].expr->AsmMemoryOperand;
+				if (m->kind == AsmMemoryOperand_Pre || m->kind == AsmMemoryOperand_Post) {
+					Entity *be = entity_of_node(m->base);
+					if (be != nullptr && be->kind == Entity_Variable) {
+						array_add(&facts->gen_params,  be);
+						array_add(&facts->read_params, be);
+					}
+				}
 			}
 			Entity *pe = entity_of_node(operands[i].expr);
 			if (pe == nullptr || pe->kind != Entity_Variable) {
@@ -2127,6 +2145,17 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			gbString s = expr_to_string(segment_override.expr);
 			error(segment_override.expr, "A segment override must be a selector register parameter, got %s", s);
 			gb_string_free(s);
+		}
+
+		switch (mem_op->kind) {
+		case AsmMemoryOperand_Default:
+			break;
+		case AsmMemoryOperand_Pre:
+		case AsmMemoryOperand_Post:
+			if (build_context.metrics.arch != TargetArch_arm64) {
+				error(expr, "#pre/#post asm memory operands are not supported by the target platform");
+			}
+			break;
 		}
 
 		Operand base  = {};

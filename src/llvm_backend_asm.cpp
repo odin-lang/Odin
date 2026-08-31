@@ -18,6 +18,8 @@ struct lbAsmGenerate {
 	i32                   curr_instr_pos;
 	Array<lbValue> const *curr_args;
 
+	PtrSet<Entity *>      lane_written;
+
 	enum WriteOperandFlags : u32 {
 		WriteOperandFlag_PrintPrefixes  = 1<<0,
 		WriteOperandFlag_IsScale        = 1<<1,
@@ -45,6 +47,23 @@ struct lbAsmGenerate {
 		this->asm_string  = gb_string_make_reserve(heap_allocator(), 256);
 		this->constraints = gb_string_make_reserve(heap_allocator(), 64);
 		map_init(&this->label_numbers);
+
+		// Pre-scan the body: any `dst[i]` operand written by INS marks its base
+		// entity as lane-written.
+		for (Ast *node : this->tmpl_node->instructions) {
+			if (node->kind != Ast_AsmInstruction) {
+				continue;
+			}
+			auto *in = &node->AsmInstruction;
+			// Destination is operand 0 on A64 (dst-first). A lane dest is an IndexExpr.
+			if (in->operands.count >= 1 && in->operands[0]->kind == Ast_IndexExpr) {
+				Ast *base = in->operands[0]->IndexExpr.expr;
+				Entity *be = entity_of_node(base);
+				if (be != nullptr) {
+					ptr_set_add(&this->lane_written, be);
+				}
+			}
+		}
 	}
 
 	void destroy() {
@@ -52,6 +71,7 @@ struct lbAsmGenerate {
 		gb_string_free(this->constraints);
 		map_destroy(&this->label_numbers);
 		map_destroy(&this->label_def_pos);
+		ptr_set_destroy(&this->lane_written);
 	}
 
 	void write_cstr(char const *cstr) { asm_string = gb_string_appendc      (asm_string, cstr);                                }
@@ -194,12 +214,22 @@ struct lbAsmGenerate {
 
 			sep();
 
+			// A lane-written operand is only PARTIALLY written (INS touches one lane,
+			// the rest read through), so it must be read-write '+' and cannot be
+			// early-clobber. Everything else is a normal '=' (early-clobber when a
+			// later instruction could read past it).
+			bool lane_rw = ptr_set_exists(&this->lane_written, e.entity);
+
 			// Register output: '=' ['&'] ( '{pin}' | class-letter )
-			raw("=");
-			// early-clobber: keep scratch, and any output a later instruction could read past,
-			// off an input's register. One instruction reads before it writes, so it is safe.
-			if (is_alloc_scratch || tmpl_node->instructions.count > 1) {
-				raw("&");
+			if (lane_rw) {
+				raw("+");
+			} else {
+				raw("=");
+				// early-clobber: keep scratch, and any output a later instruction could
+				// read past, off an input's register.
+				if (is_alloc_scratch || tmpl_node->instructions.count > 1) {
+					raw("&");
+				}
 			}
 			if (e.pin.len != 0) {
 				clobber("{", e.pin, "}");
@@ -211,6 +241,13 @@ struct lbAsmGenerate {
 
 			ret_slot[i] = cast(i32)ret_types.count;
 			array_add(&ret_types, ty);
+			// A '+' operand is both a result and an argument: it needs an input value
+			// too. A scratch has no incoming value, so pass undef; a real output that
+			// is lane-written likewise starts undef (the body fully defines its lanes).
+			if (lane_rw) {
+				LLVMValueRef undef = LLVMGetUndef(ty);
+				add_input_value(&param_types, &call_args, undef);
+			}
 			op_number[i] = next_op++;
 		}
 

@@ -425,6 +425,13 @@ struct AstSplitArgs {
 	Slice<Ast *> named;
 };
 
+enum AsmMemoryOperandKind : u8 {
+	AsmMemoryOperand_Default,
+	AsmMemoryOperand_Pre,
+	AsmMemoryOperand_Post,
+	AsmMemoryOperand_COUNT
+};
+
 #define AST_KINDS \
 	AST_KIND(Ident,          "identifier",      struct { \
 		Token                 token;    \
@@ -513,17 +520,18 @@ struct AstSplitArgs {
 		struct AsmInstructionFacts *facts; \
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
-		Token open;     \
-		Ast * segment_override; \
-		Ast * base;     \
-		Token index_op; \
-		Ast * index;    \
-		Token scale_op; \
-		Ast * scale;    \
-		Token disp_op;  \
-		Ast * disp;     \
-		Ast * type;     \
-		Token close;    \
+		AsmMemoryOperandKind kind; \
+		Token open;                \
+		Ast * segment_override;    \
+		Ast * base;                \
+		Token index_op;            \
+		Ast * index;               \
+		Token scale_op;            \
+		Ast * scale;               \
+		Token disp_op;             \
+		Ast * disp;                \
+		Ast * type;                \
+		Token close;               \
 	}) \
 	AST_KIND(AsmRegisterGroup, "asm register group", struct { \
 		Token        open;        \

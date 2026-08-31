@@ -3087,6 +3087,10 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 		{{.MOV,            {.V_ELEM_H, .V_ELEM_H,    .NONE,    .NONE, .NONE}, {.NEON_IDX5, .NEON_IDX4,     .NONE,      .NONE, .NONE}, 0x6E020400, 0xFFFF8400, .NEON, {}},                       {written={0}, read={1}}},
 		{{.MOV,            {.V_ELEM_S, .V_ELEM_S,    .NONE,    .NONE, .NONE}, {.NEON_IDX5, .NEON_IDX4,     .NONE,      .NONE, .NONE}, 0x6E040400, 0xFFFF8400, .NEON, {}},                       {written={0}, read={1}}},
 		{{.MOV,            {.V_ELEM_D, .V_ELEM_D,    .NONE,    .NONE, .NONE}, {.NEON_IDX5, .NEON_IDX4,     .NONE,      .NONE, .NONE}, 0x6E080400, 0xFFFF8400, .NEON, {}},                       {written={0}, read={1}}},
+		{{.MOV,            {.W_REG,    .V_ELEM_B,    .NONE,    .NONE, .NONE}, {.RD,        .NEON_IDX5,     .NONE,      .NONE, .NONE}, 0x0E013C00, 0xFFFFFC00, .NEON, {}},                       {written={0}, read={1}}},
+		{{.MOV,            {.W_REG,    .V_ELEM_H,    .NONE,    .NONE, .NONE}, {.RD,        .NEON_IDX5,     .NONE,      .NONE, .NONE}, 0x0E023C00, 0xFFFFFC00, .NEON, {}},                       {written={0}, read={1}}},
+		{{.MOV,            {.W_REG,    .V_ELEM_S,    .NONE,    .NONE, .NONE}, {.RD,        .NEON_IDX5,     .NONE,      .NONE, .NONE}, 0x0E043C00, 0xFFFFFC00, .NEON, {}},                       {written={0}, read={1}}},
+		{{.MOV,            {.X_REG,    .V_ELEM_D,    .NONE,    .NONE, .NONE}, {.RD,        .NEON_IDX5,     .NONE,      .NONE, .NONE}, 0x4E083C00, 0xFFFFFC00, .NEON, {is_64=true}},             {written={0}, read={1}}},
 	},
 	.EXT = {
 		{{.EXT,            {.V_8B,    .V_8B,    .V_8B,    .VEC_INDEX, .NONE}, {.VD, .VN, .VM, .NEON_EXT_IDX, .NONE}, 0x2E000000, 0xFFE0C400, .NEON, {}},                                        {written={0}, read={1, 2}}},

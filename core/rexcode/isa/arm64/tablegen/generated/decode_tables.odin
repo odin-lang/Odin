@@ -8,7 +8,7 @@ package rexcode_arm64_generated
 import lib "../.."
 
 @(rodata)
-DECODE_ENTRIES := [2720]lib.Decode_Entry{
+DECODE_ENTRIES := [2724]lib.Decode_Entry{
 	{ .AMX_SET, {.NONE,.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE,.NONE}, 0x00201220, 0xFFFFFFFF, .AMX, {} },
 	{ .AMX_CLR, {.NONE,.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE,.NONE}, 0x00201240, 0xFFFFFFFF, .AMX, {} },
 	{ .AMX_LDX, {.X_REG,.NONE,.NONE,.NONE,.NONE}, {.RT,.NONE,.NONE,.NONE,.NONE}, 0x00201000, 0xFFFFFFE0, .AMX, {is_64=true, explicit_count=1} },
@@ -1258,6 +1258,10 @@ DECODE_ENTRIES := [2720]lib.Decode_Entry{
 	{ .MOV, {.V_ELEM_H,.W_REG,.NONE,.NONE,.NONE}, {.NEON_IDX5,.RN,.NONE,.NONE,.NONE}, 0x4E021C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .MOV, {.V_ELEM_S,.W_REG,.NONE,.NONE,.NONE}, {.NEON_IDX5,.RN,.NONE,.NONE,.NONE}, 0x4E041C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .MOV, {.V_ELEM_D,.X_REG,.NONE,.NONE,.NONE}, {.NEON_IDX5,.RN,.NONE,.NONE,.NONE}, 0x4E081C00, 0xFFFFFC00, .NEON, {is_64=true, explicit_count=2} },
+	{ .MOV, {.W_REG,.V_ELEM_B,.NONE,.NONE,.NONE}, {.RD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x0E013C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.W_REG,.V_ELEM_H,.NONE,.NONE,.NONE}, {.RD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x0E023C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.W_REG,.V_ELEM_S,.NONE,.NONE,.NONE}, {.RD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x0E043C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.X_REG,.V_ELEM_D,.NONE,.NONE,.NONE}, {.RD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x4E083C00, 0xFFFFFC00, .NEON, {is_64=true, explicit_count=2} },
 	{ .NOT, {.V_8B,.V_8B,.NONE,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE,.NONE}, 0x2E205800, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .NOT, {.V_16B,.V_16B,.NONE,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE,.NONE}, 0x6E205800, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .REV64, {.V_8B,.V_8B,.NONE,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE,.NONE}, 0x0E200800, 0xFFFFFC00, .NEON, {explicit_count=2} },
@@ -2738,14 +2742,14 @@ DECODE_INDEX_OP0 := [16]lib.Decode_Index{
 	0x04 = { 751,  76},
 	0x05 = { 827,  50},
 	0x06 = { 877,  56},
-	0x07 = { 933, 1066},
-	0x08 = {1999,  16},
-	0x09 = {2015,  34},
-	0x0A = {2049, 130},
-	0x0B = {2179,  21},
-	0x0C = {2200, 167},
-	0x0D = {2367, 122},
-	0x0E = {2489,  49},
-	0x0F = {2538, 182},
+	0x07 = { 933, 1070},
+	0x08 = {2003,  16},
+	0x09 = {2019,  34},
+	0x0A = {2053, 130},
+	0x0B = {2183,  21},
+	0x0C = {2204, 167},
+	0x0D = {2371, 122},
+	0x0E = {2493,  49},
+	0x0F = {2542, 182},
 }
 
