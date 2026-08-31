@@ -805,6 +805,9 @@ main :: proc() {
 			gb_unused(t);
 			return 0;
 		}
+		bool operand_type_is_lane(OperandType t) const {
+			return false;
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")

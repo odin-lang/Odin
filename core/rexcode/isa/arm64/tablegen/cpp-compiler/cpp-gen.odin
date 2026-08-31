@@ -652,7 +652,6 @@ main :: proc() {
 			case OP_V_8B: case OP_V_16B: case OP_V_4H: case OP_V_8H:
 			case OP_V_2S: case OP_V_4S: case OP_V_1D: case OP_V_2D:
 			case OP_V_4H_FP16: case OP_V_8H_FP16:
-			case OP_V_ELEM_B: case OP_V_ELEM_H: case OP_V_ELEM_S: case OP_V_ELEM_D:
 			// SVE vector + predicate registers.
 			case OP_Z_REG_B: case OP_Z_REG_H: case OP_Z_REG_S: case OP_Z_REG_D:
 			case OP_P_REG: case OP_P_REG_MERGE: case OP_P_REG_ZERO: case OP_P_REG_GOV:
@@ -696,6 +695,9 @@ main :: proc() {
 			case OP_MEM_SVE_SS:  case OP_MEM_SVE_SI:
 			case OP_MEM_SVE_VEC: case OP_MEM_SVE_VB:
 				return AsmOperand_Memory;
+
+			case OP_V_ELEM_B: case OP_V_ELEM_H: case OP_V_ELEM_S: case OP_V_ELEM_D:
+				return AsmOperand_Lane;
 			}
 			return AsmOperand_Invalid;
 		}
@@ -929,6 +931,17 @@ main :: proc() {
 			gb_unused(t);
 			return 0; // arm64 fills this from the *form*, not the slot; see below
 		}
+		bool operand_type_is_lane(OperandType t) const {
+			switch (t) {
+			case OP_V_ELEM_B:
+			case OP_V_ELEM_H:
+			case OP_V_ELEM_S:
+			case OP_V_ELEM_D:
+				return true;
+			}
+			return false;
+		}
+
 	""")
 
 	strings.write_string(&sb, "\n\n")

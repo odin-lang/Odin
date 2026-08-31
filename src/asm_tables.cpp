@@ -32,6 +32,7 @@ enum AsmOperandKind : u8 {
 	AsmOperand_Immediate,
 	AsmOperand_Label,
 	AsmOperand_RegisterGroup,
+	AsmOperand_Lane,
 
 	AsmOperand_COUNT
 };
@@ -43,6 +44,8 @@ gb_global String const asm_operand_kind_strings[AsmOperand_COUNT] = {
 	str_lit("register or memory"),
 	str_lit("immediate"),
 	str_lit("label"),
+	str_lit("register group"),
+	str_lit("lane"),
 };
 
 gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
@@ -52,6 +55,8 @@ gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
 	str_lit("a register or memory"),
 	str_lit("an immediate"),
 	str_lit("a label"),
+	str_lit("a register group"),
+	str_lit("a lane"),
 };
 
 enum AsmOperandConstraintKind : u32 {

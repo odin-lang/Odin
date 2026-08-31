@@ -83,8 +83,7 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
-		// TODO(bill): Is this correct?
-		return AsmOperand_Register;
+		return AsmOperand_Lane;
 	case_end;
 	}
 	return AsmOperand_Invalid;
@@ -331,7 +330,10 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 		if (want_class == AsmRegClass_Vector && !is_memory) {
 			// A scalar float uses only the low lane, so it may be narrower than the
 			// slot; a #simd vector must match the vector width exactly.
-			bool width_ok = (got_class == AsmRegClass_Float) ? (got_w <= want_w) : (got_w == want_w);
+			bool is_lane = asm_ctx->operand_type_is_lane(slot);
+			bool width_ok = (got_class == AsmRegClass_Float && !is_lane)
+			              ? (got_w <= want_w)  // scalar float in a vector slot: narrower ok
+			              : (got_w == want_w); // lane element (or #simd vector): exact
 			if (!width_ok) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
@@ -1216,6 +1218,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					s = (w > 0) ? gb_string_append_fmt(s, "%s%d", reg, cast(int)w)
 					            : gb_string_appendc(s, reg);
 					break;
+				case AsmOperand_Lane:
+					s = (w > 0) ? gb_string_append_fmt(s, "v%d[i]", cast(int)w)
+					            : gb_string_appendc(s, "v[i]");
 				case AsmOperand_Memory:
 					s = (w > 0) ? gb_string_append_fmt(s, "m%d", cast(int)w)
 					            : gb_string_appendc(s, "m");
@@ -1249,6 +1254,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					}
 					break;
 				case AsmOperand_Register: // 1+ characters
+				case AsmOperand_Lane:
 				case AsmOperand_Memory:
 					if (w == 0) {
 						s = gb_string_appendc(s, "    ");
@@ -1270,6 +1276,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			switch (k) {
 			case AsmOperand_Label:
 			case AsmOperand_Register:
+			case AsmOperand_Lane:
 			case AsmOperand_Memory:
 			case AsmOperand_Register_Or_Memory:
 				all_implicit = false;

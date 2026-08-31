@@ -1398,10 +1398,13 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				GB_ASSERT_MSG(q != 0, "asm: cannot determine ARM64 lane element size for '%.*s'",
 				              LIT(e->token.string));
 
-				// NOTE(bill): fmov exception: fmov has no `vN.<T>[i]` lane form for S/D elements — lane i
-				// of an S/D element aliases the scalar view, so emit the scalar name (${N:s} /
-				// ${N:d}) with no lane suffix. (The `.d[1]` high-half form is the only real
-				// fmov lane form; if you need it, special-case lane==1 d-element separately.)
+				// fmov is the ONE exception: it has no `vN.<T>[i]` lane form for S/D
+				// elements — lane i of an S/D element aliases the scalar view, so emit
+				// the scalar name (${N:s}/${N:d}) with no lane suffix. (The `.d[1]`
+				// high-half form is the only real fmov lane form.)
+				// mov/dup DO have the general `.<T>[i]` lane form, so they take the
+				// normal path below and emit e.g. `mov s0, v0.s[2]` — with the scalar
+				// destination coming from the matched form's S_REG/D_REG slot (Fix 1).
 				bool is_fmov = instr != nullptr && instr->mnemonic == Asm_arm64::M_FMOV;
 				if (is_fmov && (q == 's' || q == 'd')) {
 					GB_ASSERT_MSG(lane == 0 || (q == 'd' && lane == 1),

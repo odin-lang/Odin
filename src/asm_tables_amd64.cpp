@@ -809,6 +809,9 @@ struct Asm_amd64 {
 		gb_unused(t);
 		return 0;
 	}
+	bool operand_type_is_lane(OperandType t) const {
+		return false;
+	}
 
 	int form_explicit_slot(Encoding const &form, int explicit_index) const {
 		int seen = 0;
