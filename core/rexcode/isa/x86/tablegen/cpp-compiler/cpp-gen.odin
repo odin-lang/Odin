@@ -799,7 +799,7 @@ main :: proc() {
 			return true;
 		}
 		char const *feature_name(u32 f) const {
-			return "?";
+			return "";
 		}
 		u16 operand_type_transfer_bytes(OperandType t) const {
 			gb_unused(t);
@@ -807,6 +807,10 @@ main :: proc() {
 		}
 		bool operand_type_is_lane(OperandType t) const {
 			return false;
+		}
+
+		String feature_name_from_form(Encoding const &form) const {
+			return {};
 		}
 	""")
 

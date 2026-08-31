@@ -1597,6 +1597,42 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				}
 			}
 		}
+		{
+			// Feature gate: the matched form may require a target feature (crc32b needs
+			// +crc, LSE atomics need +lse, ...). The form carries its Feature. It is
+			// satisfied if the feature is globally enabled for the target, OR if this
+			// template's own signature declares it via #require_target_feature /
+			// #enable_target_feature — a template opting in to a feature shouldn't be
+			// rejected just because the global build didn't enable it.
+			String feat = asm_ctx->feature_name_from_form(forms[valid_form_index]);
+			if (feat.len != 0) {
+				bool ok = check_target_feature_is_enabled(feat, nullptr);
+
+				if (!ok) {
+					// The proc type may declare the feature itself.
+					Type *pt = base_type(tmpl_entity->type);
+					GB_ASSERT(pt->kind == Type_Proc);
+					String req = pt->Proc.require_target_feature;
+					String en  = pt->Proc.enable_target_feature;
+					// These are comma-lists; `feat` is a single bare name. is_superset_of
+					// checks whether the declared list contains it.
+					if (req.len != 0 && check_target_feature_is_superset_of(req, feat, nullptr)) {
+						ok = true;
+					}
+					if (!ok && en.len != 0 && check_target_feature_is_superset_of(en, feat, nullptr)) {
+						ok = true;
+					}
+				}
+
+				if (!ok) {
+					error(instr->name,
+					      "'%.*s' requires the target feature '%.*s', which is not enabled; "
+					      "enable it on this 'asm' template (e.g. @(enable_target_feature=\"%.*s\")), "
+					      "or globally via '-target-features:\"%.*s\"' or a matching micro-architecture",
+					      LIT(name), LIT(feat), LIT(feat), LIT(feat));
+				}
+			}
+		}
 
 		// Handle clobbering from mnemonic
 		auto clobber = clobber_forms[valid_form_index];
@@ -2477,8 +2513,13 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		// always require the results of `asm` templates
 		type->Proc.require_results = true;
 	}
-
 	entity->type = type;
+
+	AttributeContext ac = make_attribute_context({}, {});
+	if (d != nullptr) {
+		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
+	}
+	check_target_feature_attributes(ac, entity, type);
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
 

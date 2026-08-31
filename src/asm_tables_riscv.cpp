@@ -773,7 +773,7 @@ struct Asm_riscv {
 		return true;
 	}
 	char const *feature_name(u32 f) const {
-		return "?";
+		return "";
 	}
 	u16 operand_type_transfer_bytes(OperandType t) const {
 		gb_unused(t);
@@ -781,6 +781,10 @@ struct Asm_riscv {
 	}
 	bool operand_type_is_lane(OperandType t) const {
 		return false;
+	}
+
+	String feature_name_from_form(Encoding const &form) const {
+		return {};
 	}
 
 	int form_explicit_slot(Encoding const &form, int explicit_index) const {

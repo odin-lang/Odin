@@ -1100,16 +1100,17 @@ struct Asm_arm64 {
 		}
 		return (enabled_features & (cast(u64)1 << cast(u64)f)) != 0;
 	}
-	char const *feature_name(u32 f) const {
+
+	char const *feature_name(Feature f) const {
 		switch (f) {
-		case F_BASE:   return "base";
-		case F_FP:     return "fp";
+		case F_BASE:   return "";
+		case F_FP:     return "fp-armv8";
 		case F_NEON:   return "neon";
 		case F_CRYPTO: return "crypto";
 		case F_CRC32:  return "crc";
 		case F_LSE:    return "lse";
 		case F_LSE2:   return "lse2";
-		case F_FP16:   return "fp16";
+		case F_FP16:   return "fullfp16";
 		case F_BF16:   return "bf16";
 		case F_DOT:    return "dotprod";
 		case F_PAC:    return "pauth";
@@ -1118,9 +1119,9 @@ struct Asm_arm64 {
 		case F_SVE:    return "sve";
 		case F_SVE2:   return "sve2";
 		case F_SME:    return "sme";
-		case F_AMX:    return "amx";
+		case F_AMX:    return ""; // Apple AMX: no LLVM feature flag
 		}
-		return "?";
+		return "";
 	}
 	u16 operand_type_transfer_bytes(OperandType t) const {
 		gb_unused(t);
@@ -1137,6 +1138,10 @@ struct Asm_arm64 {
 		return false;
 	}
 
+	String feature_name_from_form(Encoding const &form) const {
+		char const *str = feature_name(form.feature);
+		return make_string_c(str);
+	}
 
 	int form_explicit_slot(Encoding const &form, int explicit_index) const {
 		int seen = 0;
