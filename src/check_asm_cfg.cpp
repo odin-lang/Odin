@@ -1,3 +1,4 @@
+// check_asm_cfg.cpp
 
 enum {
 	ASM_WIDTH_REG_COUNT = 16

@@ -104,6 +104,88 @@ main :: proc() {
 			strings.write_string(&sb, "\t};\n")
 		}
 	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum OperandType : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in type_of(gen.Encoding{}.ops[0]) {
+			fmt.sbprintf(&sb, "\t\tOP_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum OperandEncoding : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in Operand_Encoding {
+			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum Feature : u16 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in Feature {
+			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n")
+	strings.write_string(&sb, "\ttypedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
+	strings.write_string(&sb, "\n")
+	{
+		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 21);\n")
+
+		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
+		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
+		strings.write_string(&sb, "\tstruct Encoding {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, """
+				Mnemonic        mnemonic;
+				OperandType     ops[4];
+				OperandEncoding enc[4];
+				u32             bits;
+				u32             mask;
+				Feature         feature;
+				EncodingFlags   flags;
+		\n
+		""")
+		Encoding_Flags :: type_of(gen.Encoding{}.flags)
+
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "has_implicit")
+			strings.write_string(&sb, "\t\tbool has_implicit  () const { ")
+			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
+			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "explicit_count")
+			strings.write_string(&sb, "\t\tu8   explicit_count() const { ")
+			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
+			strings.write_string(&sb, " }\n")
+		}
+		// {
+		// 	bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "op_count")
+		// 	bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "op_count")
+		// 	strings.write_string(&sb, "\t\tu8   op_count      () const { ")
+		// 	fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
+		// 	strings.write_string(&sb, " }\n")
+		// }
+		// {
+		// 	bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
+		// 	strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
+		// 	fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+		// 	strings.write_string(&sb, " }\n")
+		// }
+		// {
+		// 	bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "rep_ok")
+		// 	strings.write_string(&sb, "\t\tbool rep_ok        () const { ")
+		// 	fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+		// 	strings.write_string(&sb, " }\n")
+		// }
+	}
 	strings.write_string(&sb, "\n")
 	strings.write_string(&sb, """
 
@@ -275,7 +357,7 @@ main :: proc() {
 			bool has_halt() const {
 				return (cast(u16)side_effects & SideEffectFlag_TRAP) != 0;
 			}
-			bool is_conditional() const {
+			bool is_conditional(struct Encoding const &valid_form) const {
 				return has_control();
 			}
 			bool is_nondeterministic() const {
@@ -387,88 +469,6 @@ main :: proc() {
 	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")
 	strings.write_string(&sb, "\tstatic String const register_strings[REG_COUNT];\n")
 
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum OperandType : u8 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in type_of(gen.Encoding{}.ops[0]) {
-			fmt.sbprintf(&sb, "\t\tOP_%s,\n", op)
-		}
-
-	}
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum OperandEncoding : u8 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in Operand_Encoding {
-			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
-		}
-
-	}
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum Feature : u16 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in Feature {
-			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
-		}
-
-	}
-	strings.write_string(&sb, "\n")
-	strings.write_string(&sb, "\ttypedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
-	strings.write_string(&sb, "\n")
-	{
-		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 21);\n")
-
-		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
-		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
-		strings.write_string(&sb, "\tstruct Encoding {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, """
-				Mnemonic        mnemonic;
-				OperandType     ops[4];
-				OperandEncoding enc[4];
-				u32             bits;
-				u32             mask;
-				Feature         feature;
-				EncodingFlags   flags;
-		\n
-		""")
-		Encoding_Flags :: type_of(gen.Encoding{}.flags)
-
-		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "has_implicit")
-			strings.write_string(&sb, "\t\tbool has_implicit  () const { ")
-			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
-			strings.write_string(&sb, " }\n")
-		}
-		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
-			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "explicit_count")
-			strings.write_string(&sb, "\t\tu8   explicit_count() const { ")
-			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
-			strings.write_string(&sb, " }\n")
-		}
-		// {
-		// 	bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "op_count")
-		// 	bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "op_count")
-		// 	strings.write_string(&sb, "\t\tu8   op_count      () const { ")
-		// 	fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
-		// 	strings.write_string(&sb, " }\n")
-		// }
-		// {
-		// 	bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
-		// 	strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
-		// 	fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
-		// 	strings.write_string(&sb, " }\n")
-		// }
-		// {
-		// 	bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "rep_ok")
-		// 	strings.write_string(&sb, "\t\tbool rep_ok        () const { ")
-		// 	fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
-		// 	strings.write_string(&sb, " }\n")
-		// }
-	}
 	strings.write_string(&sb, "\n\n")
 	{
 		strings.write_string(&sb, "\t// Companion run index: ENCODE_RUNS[mnemonic] -> contiguous run in ENCODE_FORMS.\n")

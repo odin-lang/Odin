@@ -138,6 +138,108 @@ struct Asm_amd64 {
 		REG_COUNT
 	};
 
+
+	enum OperandType : u8 {
+		OP_NONE,
+		OP_R8,
+		OP_R16,
+		OP_R32,
+		OP_R64,
+		OP_RM8,
+		OP_RM16,
+		OP_RM32,
+		OP_RM64,
+		OP_M,
+		OP_M8,
+		OP_M16,
+		OP_M32,
+		OP_M64,
+		OP_M80,
+		OP_M128,
+		OP_M256,
+		OP_M512,
+		OP_IMM8,
+		OP_IMM16,
+		OP_IMM32,
+		OP_IMM64,
+		OP_IMM8SX,
+		OP_REL8,
+		OP_REL32,
+		OP_AL_IMPL,
+		OP_AX_IMPL,
+		OP_EAX_IMPL,
+		OP_RAX_IMPL,
+		OP_CL_IMPL,
+		OP_DX_IMPL,
+		OP_ONE_IMPL,
+		OP_SREG,
+		OP_CR,
+		OP_DR,
+		OP_XMM,
+		OP_YMM,
+		OP_ZMM,
+		OP_XMM_M32,
+		OP_XMM_M64,
+		OP_XMM_M128,
+		OP_YMM_M256,
+		OP_ZMM_M512,
+		OP_MM,
+		OP_MM_M64,
+		OP_ST0_IMPL,
+		OP_STI,
+		OP_XMM0_IMPL,
+		OP_K,
+		OP_K_M8,
+		OP_K_M16,
+		OP_K_M32,
+		OP_K_M64,
+		OP_MOFFS8,
+		OP_MOFFS16,
+		OP_MOFFS32,
+		OP_MOFFS64,
+		OP_PTR16_16,
+		OP_PTR16_32,
+		OP_PTR16_64,
+		OP_M16_16,
+		OP_M16_32,
+		OP_M16_64,
+	};
+
+
+	enum OperandEncoding : u8 {
+		ENC_NONE,
+		ENC_MR,
+		ENC_REG,
+		ENC_VVVV,
+		ENC_OP_R,
+		ENC_IB,
+		ENC_IW,
+		ENC_ID,
+		ENC_IQ,
+		ENC_IMPL,
+		ENC_IS4,
+		ENC_AAA,
+	};
+
+	typedef u32 EncodingFlags; // cannot use a C++ bit field to due lack of portability
+
+	#pragma pack(push, 1)
+	struct Encoding {
+		Mnemonic        mnemonic;
+		OperandType     ops[4];
+		OperandEncoding enc[4];
+		u8              opcode;
+		u8              ext;
+		EncodingFlags   flags;
+
+		bool has_implicit  () const { return ((flags>>23u)&1) != 0; }
+		u8   explicit_count() const { return cast(u8)((flags>>20u)&((1u<<3)-1)); }
+		bool lock_ok       () const { return ((flags>>14u)&1) != 0; }
+		bool rep_ok        () const { return ((flags>>15u)&1) != 0; }
+	};
+	#pragma pack(pop)
+	GB_STATIC_ASSERT(gb_size_of(Encoding) == 16);
+
 	enum ClobberFlags : u16 {
 		ClobberFlag_CF = 1<<0,
 		ClobberFlag_PF = 1<<1,
@@ -354,7 +456,7 @@ struct Asm_amd64 {
 		bool has_halt() const {
 			return (cast(u16)side_effects & SideEffectFlag_HALT) != 0;
 		}
-		bool is_conditional() const {
+		bool is_conditional(struct Encoding const &valid_form) const {
 			return has_control() && (cast(u16)flags_rd != 0);
 		}
 		bool is_nondeterministic() const {
@@ -426,108 +528,6 @@ struct Asm_amd64 {
 
 	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
-
-
-	enum OperandType : u8 {
-		OP_NONE,
-		OP_R8,
-		OP_R16,
-		OP_R32,
-		OP_R64,
-		OP_RM8,
-		OP_RM16,
-		OP_RM32,
-		OP_RM64,
-		OP_M,
-		OP_M8,
-		OP_M16,
-		OP_M32,
-		OP_M64,
-		OP_M80,
-		OP_M128,
-		OP_M256,
-		OP_M512,
-		OP_IMM8,
-		OP_IMM16,
-		OP_IMM32,
-		OP_IMM64,
-		OP_IMM8SX,
-		OP_REL8,
-		OP_REL32,
-		OP_AL_IMPL,
-		OP_AX_IMPL,
-		OP_EAX_IMPL,
-		OP_RAX_IMPL,
-		OP_CL_IMPL,
-		OP_DX_IMPL,
-		OP_ONE_IMPL,
-		OP_SREG,
-		OP_CR,
-		OP_DR,
-		OP_XMM,
-		OP_YMM,
-		OP_ZMM,
-		OP_XMM_M32,
-		OP_XMM_M64,
-		OP_XMM_M128,
-		OP_YMM_M256,
-		OP_ZMM_M512,
-		OP_MM,
-		OP_MM_M64,
-		OP_ST0_IMPL,
-		OP_STI,
-		OP_XMM0_IMPL,
-		OP_K,
-		OP_K_M8,
-		OP_K_M16,
-		OP_K_M32,
-		OP_K_M64,
-		OP_MOFFS8,
-		OP_MOFFS16,
-		OP_MOFFS32,
-		OP_MOFFS64,
-		OP_PTR16_16,
-		OP_PTR16_32,
-		OP_PTR16_64,
-		OP_M16_16,
-		OP_M16_32,
-		OP_M16_64,
-	};
-
-
-	enum OperandEncoding : u8 {
-		ENC_NONE,
-		ENC_MR,
-		ENC_REG,
-		ENC_VVVV,
-		ENC_OP_R,
-		ENC_IB,
-		ENC_IW,
-		ENC_ID,
-		ENC_IQ,
-		ENC_IMPL,
-		ENC_IS4,
-		ENC_AAA,
-	};
-
-	typedef u32 EncodingFlags; // cannot use a C++ bit field to due lack of portability
-
-	#pragma pack(push, 1)
-	struct Encoding {
-		Mnemonic        mnemonic;
-		OperandType     ops[4];
-		OperandEncoding enc[4];
-		u8              opcode;
-		u8              ext;
-		EncodingFlags   flags;
-
-		bool has_implicit  () const { return ((flags>>23u)&1) != 0; }
-		u8   explicit_count() const { return cast(u8)((flags>>20u)&((1u<<3)-1)); }
-		bool lock_ok       () const { return ((flags>>14u)&1) != 0; }
-		bool rep_ok        () const { return ((flags>>15u)&1) != 0; }
-	};
-	#pragma pack(pop)
-	GB_STATIC_ASSERT(gb_size_of(Encoding) == 16);
 
 
 	// Companion run index: ENCODE_RUNS[mnemonic] -> contiguous run in ENCODE_FORMS.

@@ -91,6 +91,10 @@ main :: proc() {
 			static const u16 REG_CLASS_Q    = 0x0A00; // Q0..Q31 (quad view)
 			static const u16 REG_CLASS_Z    = 0x0B00; // Z0..Z31 SVE scalable vector
 			static const u16 REG_CLASS_P    = 0x0C00; // P0..P15 SVE predicate
+			static const u16 REG_CLASS_PN   = 0x0D00; // PN8..PN15 SME2 predicate-as-counter
+			static const u16 REG_CLASS_ZT   = 0x0E00; // ZT0 SME2 lookup table
+			static const u16 REG_CLASS_ZA   = 0x0F00; // ZA0..ZA15 SME accumulator tiles
+			static const u16 REG_CLASS_SYS  = 0x1000; // MRS/MSR system registers
 			\n
 		""")
 		{
@@ -111,6 +115,74 @@ main :: proc() {
 			strings.write_string(&sb, "\n")
 			strings.write_string(&sb, "\t\tREG_COUNT\n")
 			strings.write_string(&sb, "\t};\n")
+		}
+	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum OperandType : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in type_of(gen.Encoding{}.ops[0]) {
+			fmt.sbprintf(&sb, "\t\tOP_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum OperandEncoding : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in Operand_Encoding {
+			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum Feature : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in Feature {
+			fmt.sbprintf(&sb, "\t\tF_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n")
+	strings.write_string(&sb, "\ttypedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
+	strings.write_string(&sb, "\n")
+	{
+		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 22);\n")
+
+		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
+		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
+		strings.write_string(&sb, "\tstruct Encoding {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, """
+				Mnemonic        mnemonic;
+				OperandType     ops[5];
+				OperandEncoding enc[5];
+				u32             bits;
+				u32             mask;
+				Feature         feature;
+				EncodingFlags   flags;
+		\n
+		""")
+		Encoding_Flags :: type_of(gen.Encoding{}.flags)
+
+		{
+			strings.write_string(&sb, "\t\tbool has_implicit  () const { ")
+			strings.write_string(&sb, "return false;")
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
+			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "explicit_count")
+			strings.write_string(&sb, "\t\tu8   explicit_count() const { ")
+			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "cond_branch")
+			strings.write_string(&sb, "\t\tbool is_conditional() const { ")
+			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+			strings.write_string(&sb, " }\n")
 		}
 	}
 	strings.write_string(&sb, "\n")
@@ -340,7 +412,10 @@ main :: proc() {
 				// WFI/WFE suspend execution (x86 HLT analog); SVC/HVC/SMC gate out.
 				return (cast(u16)side_effects & (SideEffectFlag_WAIT|SideEffectFlag_EXCEPTION)) != 0;
 			}
-			bool is_conditional() const {
+			bool is_conditional(struct Encoding const &valid_form) const {
+				if (valid_form.is_conditional()) {
+					return true;
+				}
 				return has_control() && (cast(u16)nzcv_rd != 0);
 			}
 			bool is_nondeterministic() const {
@@ -421,71 +496,9 @@ main :: proc() {
 	}
 
 
-	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")
+	strings.write_string(&sb, "\tstatic u32    const register_codes  [REG_COUNT];\n")
 	strings.write_string(&sb, "\tstatic String const register_strings[REG_COUNT];\n")
 
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum OperandType : u8 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in type_of(gen.Encoding{}.ops[0]) {
-			fmt.sbprintf(&sb, "\t\tOP_%s,\n", op)
-		}
-
-	}
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum OperandEncoding : u8 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in Operand_Encoding {
-			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
-		}
-
-	}
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum Feature : u8 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in Feature {
-			fmt.sbprintf(&sb, "\t\tF_%s,\n", op)
-		}
-
-	}
-	strings.write_string(&sb, "\n")
-	strings.write_string(&sb, "\ttypedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
-	strings.write_string(&sb, "\n")
-	{
-		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 22);\n")
-
-		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
-		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
-		strings.write_string(&sb, "\tstruct Encoding {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, """
-				Mnemonic        mnemonic;
-				OperandType     ops[5];
-				OperandEncoding enc[5];
-				u32             bits;
-				u32             mask;
-				Feature         feature;
-				EncodingFlags   flags;
-		\n
-		""")
-		Encoding_Flags :: type_of(gen.Encoding{}.flags)
-
-		{
-			strings.write_string(&sb, "\t\tbool has_implicit  () const { ")
-			strings.write_string(&sb, "return false;")
-			strings.write_string(&sb, " }\n")
-		}
-		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
-			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "explicit_count")
-			strings.write_string(&sb, "\t\tu8   explicit_count() const { ")
-			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
-			strings.write_string(&sb, " }\n")
-		}
-	}
 	strings.write_string(&sb, "\n\n")
 	{
 		strings.write_string(&sb, "\t// Companion run index: ENCODE_RUNS[mnemonic] -> contiguous run in ENCODE_FORMS.\n")
@@ -574,7 +587,7 @@ main :: proc() {
 			Clobber *CLOBBER_FORMS = cast(Clobber *)raw_clobber_forms;
 			return Slice<Clobber>{CLOBBER_FORMS+r.start, r.count};
 		}
-		u16 reg_class(/*Register*/ u16 r) const {
+		u16 reg_class(u32 r) const {
 			return 0xFF00 & r;
 		}
 		// size in bits for register
@@ -590,13 +603,17 @@ main :: proc() {
 			case REG_CLASS_S:   return 32;
 			case REG_CLASS_D:   return 64;
 			case REG_CLASS_Q:   return 128;
-			case REG_CLASS_Z:   return 0; // SVE scalable (VL, implementation-defined)
-			case REG_CLASS_P:   return 0; // SVE predicate (scalable)
+			case REG_CLASS_Z:   return 0;   // SVE scalable (VL, implementation-defined)
+			case REG_CLASS_P:   return 0;   // SVE predicate (scalable)
+			case REG_CLASS_PN:  return 0;   // SME2 predicate-as-counter (scalable)
+			case REG_CLASS_ZT:  return 512; // ZT0 is a fixed 512-bit table
+			case REG_CLASS_ZA:  return 0;   // SME ZA tile (scalable)
+			case REG_CLASS_SYS: return 64;  // 'word size'
 			}
 			return 0;
 		}
 
-		bool reg_is_segment(/*Register*/ u16 r) {
+		bool reg_is_segment(u32 r) {
 			gb_unused(r);
 			return false; // arm64 has no segment registers
 		}
@@ -655,6 +672,7 @@ main :: proc() {
 			case OP_VEC_SHIFT:   case OP_VEC_INDEX:
 			// Enum-like tokens that encode into an immediate field:
 			case OP_COND:        // condition code (EQ/NE/...) -> 4-bit field
+			case OP_COND_NOT_AL: // same, minus AL/NV (cset/cinc/cinv/cneg/csetm)
 			case OP_SME_PATTERN: case OP_SVE_PATTERN: // pattern / tile-list selectors
 			// JUDGMENT CALL: the following are register/tile-slice constructs
 			// syntactically, but this table models each as a single packed immediate
@@ -747,12 +765,16 @@ main :: proc() {
 		// A64 has no operand slot that only one named hardware register can fill
 		// (SP-taking slots accept any Xn or SP via the *_SP classes).
 		u16 operand_type_named_reg_class(OperandType t) const {
-			gb_unused(t);
+			if (t == OP_SYS_REG) {
+				return REG_CLASS_SYS;
+			}
 			return REG_CLASS_NONE;
 		}
 
 		String named_reg_class_string(u16 reg_class) const {
-			gb_unused(reg_class);
+			if (reg_class == REG_CLASS_SYS) {
+				return str_lit("system");
+			}
 			return str_lit("hardware");
 		}
 	""")
@@ -807,7 +829,7 @@ main :: proc() {
 			case OP_NZCV_IMM:    return 4;
 			case OP_HW_SHIFT:    return 2;  // 2-bit LSL hw (0/16/32/48)
 			case OP_LSE_SIZE:    return 2;
-			case OP_SYS_REG:     return 16; // op0:op1:CRn:CRm:op2 packed
+			case OP_SYS_REG:     return 15; // op0:op1:CRn:CRm:op2 packed
 			case OP_LSL_SHIFT_W: return 5;  // 0..31
 			case OP_LSL_SHIFT_X: return 6;  // 0..63
 			case OP_ROR_SHIFT:   return 6;  // imms field
@@ -816,6 +838,7 @@ main :: proc() {
 			case OP_SVE_PRFOP:   return 4;
 			case OP_LDRAA_IMM10: return 10;
 			case OP_COND:        return 4;
+			case OP_COND_NOT_AL: return 4;
 			case OP_SVE_PATTERN: return 5;  // 5-bit pattern field (PTRUE)
 
 			// ---- PC-relative displacement value widths ----
@@ -946,7 +969,7 @@ main :: proc() {
 	}
 
 	{
-		fmt.sbprintf(&sb, "u16 const Asm_{0:s}::register_codes[Asm_{0:s}::REG_COUNT] {{\n", ISA_NAME)
+		fmt.sbprintf(&sb, "u32 const Asm_{0:s}::register_codes[Asm_{0:s}::REG_COUNT] {{\n", ISA_NAME)
 		defer strings.write_string(&sb, "};\n");
 
 		count := uint(0)
@@ -1172,6 +1195,250 @@ Register :: enum u16 {
 	V29,
 	V30,
 	V31,
+
+	PN8,
+	PN9,
+	PN10,
+	PN11,
+	PN12,
+	PN13,
+	PN14,
+	PN15,
+
+	ZT0,
+
+	// System Registers
+	AFSR0_EL1,
+	AFSR1_EL1,
+	CURRENT_EL,
+	DAIF,
+	ELR_EL1,
+	ELR_EL2,
+	ELR_EL3,
+	ESR_EL1,
+	ESR_EL2,
+	FAR_EL1,
+	FAR_EL2,
+	ISR_EL1,
+	NZCV,
+	SPSR_EL1,
+	SPSR_EL2,
+	SPSR_EL3,
+	SP_EL0,
+	SP_EL1,
+	VBAR_EL1,
+	VBAR_EL2,
+	VBAR_EL3,
+	FPCR,
+	FPSR,
+	MVFR0_EL1,
+	MVFR1_EL1,
+	MVFR2_EL1,
+	CONTEXTIDR_EL1,
+	TPIDR2_EL0,
+	TPIDRRO_EL0,
+	TPIDR_EL0,
+	TPIDR_EL1,
+	TPIDR_EL2,
+	TPIDR_EL3,
+	CCSIDR_EL1,
+	CLIDR_EL1,
+	CSSELR_EL1,
+	CTR_EL0,
+	DCZID_EL0,
+	GMID_EL1,
+	ID_AA64AFR0_EL1,
+	ID_AA64AFR1_EL1,
+	ID_AA64DFR0_EL1,
+	ID_AA64DFR1_EL1,
+	ID_AA64DFR2_EL1,
+	ID_AA64ISAR0_EL1,
+	ID_AA64ISAR1_EL1,
+	ID_AA64ISAR2_EL1,
+	ID_AA64ISAR3_EL1,
+	ID_AA64MMFR0_EL1,
+	ID_AA64MMFR1_EL1,
+	ID_AA64MMFR2_EL1,
+	ID_AA64PFR0_EL1,
+	ID_AA64PFR1_EL1,
+	ID_AA64SMFR0_EL1,
+	ID_AA64ZFR0_EL1,
+	ID_AFR0_EL1,
+	ID_DFR0_EL1,
+	ID_ISAR0_EL1,
+	ID_ISAR1_EL1,
+	ID_ISAR2_EL1,
+	ID_ISAR3_EL1,
+	ID_ISAR4_EL1,
+	ID_ISAR5_EL1,
+	ID_ISAR6_EL1,
+	ID_MMFR0_EL1,
+	ID_MMFR1_EL1,
+	ID_MMFR2_EL1,
+	ID_MMFR3_EL1,
+	ID_MMFR4_EL1,
+	ID_MMFR5_EL1,
+	ID_PFR0_EL1,
+	ID_PFR1_EL1,
+	ID_PFR2_EL1,
+	MIDR_EL1,
+	MPIDR_EL1,
+	APDAKEYHI_EL1,
+	APDAKEYLO_EL1,
+	APDBKEYHI_EL1,
+	APDBKEYLO_EL1,
+	APGAKEYHI_EL1,
+	APGAKEYLO_EL1,
+	APIAKEYHI_EL1,
+	APIAKEYLO_EL1,
+	APIBKEYHI_EL1,
+	APIBKEYLO_EL1,
+	GCR_EL1,
+	RGSR_EL1,
+	TFSRE0_EL1,
+	TFSR_EL1,
+	SMCR_EL1,
+	SMCR_EL2,
+	SVCR,
+	ZCR_EL1,
+	ZCR_EL2,
+	ZCR_EL3,
+	ACTLR_EL1,
+	AMAIR_EL1,
+	CPACR_EL1,
+	LORC_EL1,
+	LOREA_EL1,
+	LORID_EL1,
+	LORN_EL1,
+	LORSA_EL1,
+	MAIR_EL1,
+	PAR_EL1,
+	SCTLR_EL1,
+	SCTLR_EL2,
+	SCTLR_EL3,
+	TCR_EL1,
+	TTBR0_EL1,
+	TTBR1_EL1,
+	CNTFRQ_EL0,
+	CNTHCTL_EL2,
+	CNTHP_CTL_EL2,
+	CNTHP_CVAL_EL2,
+	CNTHP_TVAL_EL2,
+	CNTHV_CTL_EL2,
+	CNTHV_CVAL_EL2,
+	CNTHV_TVAL_EL2,
+	CNTKCTL_EL1,
+	CNTPCT_EL0,
+	CNTPS_CTL_EL1,
+	CNTPS_CVAL_EL1,
+	CNTPS_TVAL_EL1,
+	CNTP_CTL_EL0,
+	CNTP_CVAL_EL0,
+	CNTP_TVAL_EL0,
+	CNTVCT_EL0,
+	CNTVOFF_EL2,
+	CNTV_CTL_EL0,
+	CNTV_CVAL_EL0,
+	CNTV_TVAL_EL0,
+	PMBIDR_EL1,
+	PMBLIMITR_EL1,
+	PMBPTR_EL1,
+	PMBSR_EL1,
+	PMSCR_EL1,
+	PMSELR_EL0,
+	PMSEVFR_EL1,
+	PMSFCR_EL1,
+	PMSICR_EL1,
+	PMSIDR_EL1,
+	PMSIRR_EL1,
+	PMSLATFR_EL1,
+	PMSWINC_EL0,
+	PMCCFILTR_EL0,
+	PMCCNTR_EL0,
+	PMCEID0_EL0,
+	PMCEID1_EL0,
+	PMCNTENCLR_EL0,
+	PMCNTENSET_EL0,
+	PMCR_EL0,
+	PMINTENCLR_EL1,
+	PMINTENSET_EL1,
+	PMOVSCLR_EL0,
+	PMUSERENR_EL0,
+	TRBBASER_EL1,
+	TRBIDR_EL1,
+	TRBLIMITR_EL1,
+	TRBMAR_EL1,
+	TRBPTR_EL1,
+	TRBSR_EL1,
+	TRBTRG_EL1,
+	DBGAUTHSTATUS_EL1,
+	DBGCLAIMCLR_EL1,
+	DBGCLAIMSET_EL1,
+	DBGDTRRX_EL0,
+	DBGDTRTX_EL0,
+	DBGDTR_EL0,
+	DBGPRCR_EL1,
+	DLR_EL0,
+	DSPSR_EL0,
+	MDCCINT_EL1,
+	MDRAR_EL1,
+	MDSCR_EL1,
+	OSLAR_EL1,
+	OSLSR_EL1,
+	PRSELR_EL1,
+	ICC_ASGI1R_EL1,
+	ICC_BPR0_EL1,
+	ICC_BPR1_EL1,
+	ICC_CTLR_EL1,
+	ICC_CTLR_EL3,
+	ICC_DIR_EL1,
+	ICC_EOIR0_EL1,
+	ICC_EOIR1_EL1,
+	ICC_HPPIR0_EL1,
+	ICC_HPPIR1_EL1,
+	ICC_IAR0_EL1,
+	ICC_IAR1_EL1,
+	ICC_IGRPEN0_EL1,
+	ICC_IGRPEN1_EL1,
+	ICC_IGRPEN1_EL3,
+	ICC_PMR_EL1,
+	ICC_RPR_EL1,
+	ICC_SGI0R_EL1,
+	ICC_SGI1R_EL1,
+	ICC_SRE_EL1,
+	ICC_SRE_EL2,
+	ICC_SRE_EL3,
+	ICH_EISR_EL2,
+	ICH_ELRSR_EL2,
+	ICH_HCR_EL2,
+	ICH_MISR_EL2,
+	ICH_VMCR_EL2,
+	ICH_VTR_EL2,
+	DISR_EL1,
+	ERRIDR_EL1,
+	ERRSELR_EL1,
+	ERXADDR_EL1,
+	ERXCTLR_EL1,
+	ERXFR_EL1,
+	ERXMISC0_EL1,
+	ERXMISC1_EL1,
+	ERXMISC2_EL1,
+	ERXMISC3_EL1,
+	ERXSTATUS_EL1,
+	VDISR_EL2,
+	VSESR_EL2,
+	GPCCR_EL3,
+	GPTBR_EL3,
+	HCR_EL2,
+	HSTR_EL2,
+	MDCR_EL2,
+	MFAR_EL3,
+	VTCR_EL2,
+	VTTBR_EL2,
+	DACR32_EL2,
+	FPEXC32_EL2,
+	RNDR,
+	RNDRRS,
 }
 
 REG_NONE :: 0x0000
@@ -1187,6 +1454,10 @@ REG_D    :: 0x0900   // D0..D31 (double view)
 REG_Q    :: 0x0A00   // Q0..Q31 (quad view)
 REG_Z    :: 0x0B00   // Z0..Z31 SVE scalable vector (low 128 aliased with V)
 REG_P    :: 0x0C00   // P0..P15 SVE predicate
+REG_PN   :: 0x0D00   // PN8..PN15 SME2 predicate-as-counter
+REG_ZT   :: 0x0E00   // ZT0, the SME2 lookup table
+REG_ZA   :: 0x0F00   // ZA0..ZA15, SME's accumulator tiles
+REG_SYS  :: 0x1000   // system registers (MRS/MSR); the field is in bits 16-30
 
 
 @(rodata)
@@ -1232,4 +1503,250 @@ REG_CODES := [Register]arm64.Register{
 	.V20 = arm64.Register(REG_V | 20), .V21 = arm64.Register(REG_V | 21), .V22 = arm64.Register(REG_V | 22), .V23 = arm64.Register(REG_V | 23),
 	.V24 = arm64.Register(REG_V | 24), .V25 = arm64.Register(REG_V | 25), .V26 = arm64.Register(REG_V | 26), .V27 = arm64.Register(REG_V | 27),
 	.V28 = arm64.Register(REG_V | 28), .V29 = arm64.Register(REG_V | 29), .V30 = arm64.Register(REG_V | 30), .V31 = arm64.Register(REG_V | 31),
+
+	// -----------------------------------------------------------------------------
+	// SME2 predicate-as-counter (PN8..PN15) and the ZT0 lookup table
+	// -----------------------------------------------------------------------------
+
+	.PN8  = arm64.Register(REG_PN |  8), .PN9  = arm64.Register(REG_PN |  9), .PN10 = arm64.Register(REG_PN | 10), .PN11 = arm64.Register(REG_PN | 11),
+	.PN12 = arm64.Register(REG_PN | 12), .PN13 = arm64.Register(REG_PN | 13), .PN14 = arm64.Register(REG_PN | 14), .PN15 = arm64.Register(REG_PN | 15),
+
+	.ZT0  = arm64.Register(REG_ZT | 0),
+
+
+	// -----------------------------------------------------------------------------
+	// System Registers
+	// -----------------------------------------------------------------------------
+
+	.AFSR0_EL1         = arm64.Register(REG_SYS | 0x4288_0000),
+	.AFSR1_EL1         = arm64.Register(REG_SYS | 0x4289_0000),
+	.CURRENT_EL        = arm64.Register(REG_SYS | 0x4212_0000),
+	.DAIF              = arm64.Register(REG_SYS | 0x5A11_0000),
+	.ELR_EL1           = arm64.Register(REG_SYS | 0x4201_0000),
+	.ELR_EL2           = arm64.Register(REG_SYS | 0x6201_0000),
+	.ELR_EL3           = arm64.Register(REG_SYS | 0x7201_0000),
+	.ESR_EL1           = arm64.Register(REG_SYS | 0x4290_0000),
+	.ESR_EL2           = arm64.Register(REG_SYS | 0x6290_0000),
+	.FAR_EL1           = arm64.Register(REG_SYS | 0x4300_0000),
+	.FAR_EL2           = arm64.Register(REG_SYS | 0x6300_0000),
+	.ISR_EL1           = arm64.Register(REG_SYS | 0x4608_0000),
+	.NZCV              = arm64.Register(REG_SYS | 0x5A10_0000),
+	.SPSR_EL1          = arm64.Register(REG_SYS | 0x4200_0000),
+	.SPSR_EL2          = arm64.Register(REG_SYS | 0x6200_0000),
+	.SPSR_EL3          = arm64.Register(REG_SYS | 0x7200_0000),
+	.SP_EL0            = arm64.Register(REG_SYS | 0x4208_0000),
+	.SP_EL1            = arm64.Register(REG_SYS | 0x6208_0000),
+	.VBAR_EL1          = arm64.Register(REG_SYS | 0x4600_0000),
+	.VBAR_EL2          = arm64.Register(REG_SYS | 0x6600_0000),
+	.VBAR_EL3          = arm64.Register(REG_SYS | 0x7600_0000),
+	.FPCR              = arm64.Register(REG_SYS | 0x5A20_0000),
+	.FPSR              = arm64.Register(REG_SYS | 0x5A21_0000),
+	.MVFR0_EL1         = arm64.Register(REG_SYS | 0x4018_0000),
+	.MVFR1_EL1         = arm64.Register(REG_SYS | 0x4019_0000),
+	.MVFR2_EL1         = arm64.Register(REG_SYS | 0x401A_0000),
+	.CONTEXTIDR_EL1    = arm64.Register(REG_SYS | 0x4681_0000),
+	.TPIDR2_EL0        = arm64.Register(REG_SYS | 0x5E85_0000),
+	.TPIDRRO_EL0       = arm64.Register(REG_SYS | 0x5E83_0000),
+	.TPIDR_EL0         = arm64.Register(REG_SYS | 0x5E82_0000),
+	.TPIDR_EL1         = arm64.Register(REG_SYS | 0x4684_0000),
+	.TPIDR_EL2         = arm64.Register(REG_SYS | 0x6682_0000),
+	.TPIDR_EL3         = arm64.Register(REG_SYS | 0x7682_0000),
+	.CCSIDR_EL1        = arm64.Register(REG_SYS | 0x4800_0000),
+	.CLIDR_EL1         = arm64.Register(REG_SYS | 0x4801_0000),
+	.CSSELR_EL1        = arm64.Register(REG_SYS | 0x5000_0000),
+	.CTR_EL0           = arm64.Register(REG_SYS | 0x5801_0000),
+	.DCZID_EL0         = arm64.Register(REG_SYS | 0x5807_0000),
+	.GMID_EL1          = arm64.Register(REG_SYS | 0x4804_0000),
+	.ID_AA64AFR0_EL1   = arm64.Register(REG_SYS | 0x402C_0000),
+	.ID_AA64AFR1_EL1   = arm64.Register(REG_SYS | 0x402D_0000),
+	.ID_AA64DFR0_EL1   = arm64.Register(REG_SYS | 0x4028_0000),
+	.ID_AA64DFR1_EL1   = arm64.Register(REG_SYS | 0x4029_0000),
+	.ID_AA64DFR2_EL1   = arm64.Register(REG_SYS | 0x402A_0000),
+	.ID_AA64ISAR0_EL1  = arm64.Register(REG_SYS | 0x4030_0000),
+	.ID_AA64ISAR1_EL1  = arm64.Register(REG_SYS | 0x4031_0000),
+	.ID_AA64ISAR2_EL1  = arm64.Register(REG_SYS | 0x4032_0000),
+	.ID_AA64ISAR3_EL1  = arm64.Register(REG_SYS | 0x4033_0000),
+	.ID_AA64MMFR0_EL1  = arm64.Register(REG_SYS | 0x4038_0000),
+	.ID_AA64MMFR1_EL1  = arm64.Register(REG_SYS | 0x4039_0000),
+	.ID_AA64MMFR2_EL1  = arm64.Register(REG_SYS | 0x403A_0000),
+	.ID_AA64PFR0_EL1   = arm64.Register(REG_SYS | 0x4020_0000),
+	.ID_AA64PFR1_EL1   = arm64.Register(REG_SYS | 0x4021_0000),
+	.ID_AA64SMFR0_EL1  = arm64.Register(REG_SYS | 0x4025_0000),
+	.ID_AA64ZFR0_EL1   = arm64.Register(REG_SYS | 0x4024_0000),
+	.ID_AFR0_EL1       = arm64.Register(REG_SYS | 0x400B_0000),
+	.ID_DFR0_EL1       = arm64.Register(REG_SYS | 0x400A_0000),
+	.ID_ISAR0_EL1      = arm64.Register(REG_SYS | 0x4010_0000),
+	.ID_ISAR1_EL1      = arm64.Register(REG_SYS | 0x4011_0000),
+	.ID_ISAR2_EL1      = arm64.Register(REG_SYS | 0x4012_0000),
+	.ID_ISAR3_EL1      = arm64.Register(REG_SYS | 0x4013_0000),
+	.ID_ISAR4_EL1      = arm64.Register(REG_SYS | 0x4014_0000),
+	.ID_ISAR5_EL1      = arm64.Register(REG_SYS | 0x4015_0000),
+	.ID_ISAR6_EL1      = arm64.Register(REG_SYS | 0x4017_0000),
+	.ID_MMFR0_EL1      = arm64.Register(REG_SYS | 0x400C_0000),
+	.ID_MMFR1_EL1      = arm64.Register(REG_SYS | 0x400D_0000),
+	.ID_MMFR2_EL1      = arm64.Register(REG_SYS | 0x400E_0000),
+	.ID_MMFR3_EL1      = arm64.Register(REG_SYS | 0x400F_0000),
+	.ID_MMFR4_EL1      = arm64.Register(REG_SYS | 0x4016_0000),
+	.ID_MMFR5_EL1      = arm64.Register(REG_SYS | 0x401E_0000),
+	.ID_PFR0_EL1       = arm64.Register(REG_SYS | 0x4008_0000),
+	.ID_PFR1_EL1       = arm64.Register(REG_SYS | 0x4009_0000),
+	.ID_PFR2_EL1       = arm64.Register(REG_SYS | 0x401C_0000),
+	.MIDR_EL1          = arm64.Register(REG_SYS | 0x4000_0000),
+	.MPIDR_EL1         = arm64.Register(REG_SYS | 0x4005_0000),
+	.APDAKEYHI_EL1     = arm64.Register(REG_SYS | 0x4111_0000),
+	.APDAKEYLO_EL1     = arm64.Register(REG_SYS | 0x4110_0000),
+	.APDBKEYHI_EL1     = arm64.Register(REG_SYS | 0x4113_0000),
+	.APDBKEYLO_EL1     = arm64.Register(REG_SYS | 0x4112_0000),
+	.APGAKEYHI_EL1     = arm64.Register(REG_SYS | 0x4119_0000),
+	.APGAKEYLO_EL1     = arm64.Register(REG_SYS | 0x4118_0000),
+	.APIAKEYHI_EL1     = arm64.Register(REG_SYS | 0x4109_0000),
+	.APIAKEYLO_EL1     = arm64.Register(REG_SYS | 0x4108_0000),
+	.APIBKEYHI_EL1     = arm64.Register(REG_SYS | 0x410B_0000),
+	.APIBKEYLO_EL1     = arm64.Register(REG_SYS | 0x410A_0000),
+	.GCR_EL1           = arm64.Register(REG_SYS | 0x4086_0000),
+	.RGSR_EL1          = arm64.Register(REG_SYS | 0x4085_0000),
+	.TFSRE0_EL1        = arm64.Register(REG_SYS | 0x42B1_0000),
+	.TFSR_EL1          = arm64.Register(REG_SYS | 0x42B0_0000),
+	.SMCR_EL1          = arm64.Register(REG_SYS | 0x4096_0000),
+	.SMCR_EL2          = arm64.Register(REG_SYS | 0x6096_0000),
+	.SVCR              = arm64.Register(REG_SYS | 0x5A12_0000),
+	.ZCR_EL1           = arm64.Register(REG_SYS | 0x4090_0000),
+	.ZCR_EL2           = arm64.Register(REG_SYS | 0x6090_0000),
+	.ZCR_EL3           = arm64.Register(REG_SYS | 0x7090_0000),
+	.ACTLR_EL1         = arm64.Register(REG_SYS | 0x4081_0000),
+	.AMAIR_EL1         = arm64.Register(REG_SYS | 0x4518_0000),
+	.CPACR_EL1         = arm64.Register(REG_SYS | 0x4082_0000),
+	.LORC_EL1          = arm64.Register(REG_SYS | 0x4523_0000),
+	.LOREA_EL1         = arm64.Register(REG_SYS | 0x4521_0000),
+	.LORID_EL1         = arm64.Register(REG_SYS | 0x4527_0000),
+	.LORN_EL1          = arm64.Register(REG_SYS | 0x4522_0000),
+	.LORSA_EL1         = arm64.Register(REG_SYS | 0x4520_0000),
+	.MAIR_EL1          = arm64.Register(REG_SYS | 0x4510_0000),
+	.PAR_EL1           = arm64.Register(REG_SYS | 0x43A0_0000),
+	.SCTLR_EL1         = arm64.Register(REG_SYS | 0x4080_0000),
+	.SCTLR_EL2         = arm64.Register(REG_SYS | 0x6080_0000),
+	.SCTLR_EL3         = arm64.Register(REG_SYS | 0x7080_0000),
+	.TCR_EL1           = arm64.Register(REG_SYS | 0x4102_0000),
+	.TTBR0_EL1         = arm64.Register(REG_SYS | 0x4100_0000),
+	.TTBR1_EL1         = arm64.Register(REG_SYS | 0x4101_0000),
+	.CNTFRQ_EL0        = arm64.Register(REG_SYS | 0x5F00_0000),
+	.CNTHCTL_EL2       = arm64.Register(REG_SYS | 0x6708_0000),
+	.CNTHP_CTL_EL2     = arm64.Register(REG_SYS | 0x6711_0000),
+	.CNTHP_CVAL_EL2    = arm64.Register(REG_SYS | 0x6712_0000),
+	.CNTHP_TVAL_EL2    = arm64.Register(REG_SYS | 0x6710_0000),
+	.CNTHV_CTL_EL2     = arm64.Register(REG_SYS | 0x6719_0000),
+	.CNTHV_CVAL_EL2    = arm64.Register(REG_SYS | 0x671A_0000),
+	.CNTHV_TVAL_EL2    = arm64.Register(REG_SYS | 0x6718_0000),
+	.CNTKCTL_EL1       = arm64.Register(REG_SYS | 0x4708_0000),
+	.CNTPCT_EL0        = arm64.Register(REG_SYS | 0x5F01_0000),
+	.CNTPS_CTL_EL1     = arm64.Register(REG_SYS | 0x7F11_0000),
+	.CNTPS_CVAL_EL1    = arm64.Register(REG_SYS | 0x7F12_0000),
+	.CNTPS_TVAL_EL1    = arm64.Register(REG_SYS | 0x7F10_0000),
+	.CNTP_CTL_EL0      = arm64.Register(REG_SYS | 0x5F11_0000),
+	.CNTP_CVAL_EL0     = arm64.Register(REG_SYS | 0x5F12_0000),
+	.CNTP_TVAL_EL0     = arm64.Register(REG_SYS | 0x5F10_0000),
+	.CNTVCT_EL0        = arm64.Register(REG_SYS | 0x5F02_0000),
+	.CNTVOFF_EL2       = arm64.Register(REG_SYS | 0x6703_0000),
+	.CNTV_CTL_EL0      = arm64.Register(REG_SYS | 0x5F19_0000),
+	.CNTV_CVAL_EL0     = arm64.Register(REG_SYS | 0x5F1A_0000),
+	.CNTV_TVAL_EL0     = arm64.Register(REG_SYS | 0x5F18_0000),
+	.PMBIDR_EL1        = arm64.Register(REG_SYS | 0x44D7_0000),
+	.PMBLIMITR_EL1     = arm64.Register(REG_SYS | 0x44D0_0000),
+	.PMBPTR_EL1        = arm64.Register(REG_SYS | 0x44D1_0000),
+	.PMBSR_EL1         = arm64.Register(REG_SYS | 0x44D3_0000),
+	.PMSCR_EL1         = arm64.Register(REG_SYS | 0x44C8_0000),
+	.PMSELR_EL0        = arm64.Register(REG_SYS | 0x5CE5_0000),
+	.PMSEVFR_EL1       = arm64.Register(REG_SYS | 0x44CD_0000),
+	.PMSFCR_EL1        = arm64.Register(REG_SYS | 0x44CC_0000),
+	.PMSICR_EL1        = arm64.Register(REG_SYS | 0x44CA_0000),
+	.PMSIDR_EL1        = arm64.Register(REG_SYS | 0x44CF_0000),
+	.PMSIRR_EL1        = arm64.Register(REG_SYS | 0x44CB_0000),
+	.PMSLATFR_EL1      = arm64.Register(REG_SYS | 0x44CE_0000),
+	.PMSWINC_EL0       = arm64.Register(REG_SYS | 0x5CE4_0000),
+	.PMCCFILTR_EL0     = arm64.Register(REG_SYS | 0x5F7F_0000),
+	.PMCCNTR_EL0       = arm64.Register(REG_SYS | 0x5CE8_0000),
+	.PMCEID0_EL0       = arm64.Register(REG_SYS | 0x5CE6_0000),
+	.PMCEID1_EL0       = arm64.Register(REG_SYS | 0x5CE7_0000),
+	.PMCNTENCLR_EL0    = arm64.Register(REG_SYS | 0x5CE2_0000),
+	.PMCNTENSET_EL0    = arm64.Register(REG_SYS | 0x5CE1_0000),
+	.PMCR_EL0          = arm64.Register(REG_SYS | 0x5CE0_0000),
+	.PMINTENCLR_EL1    = arm64.Register(REG_SYS | 0x44F2_0000),
+	.PMINTENSET_EL1    = arm64.Register(REG_SYS | 0x44F1_0000),
+	.PMOVSCLR_EL0      = arm64.Register(REG_SYS | 0x5CE3_0000),
+	.PMUSERENR_EL0     = arm64.Register(REG_SYS | 0x5CF0_0000),
+	.TRBBASER_EL1      = arm64.Register(REG_SYS | 0x44DA_0000),
+	.TRBIDR_EL1        = arm64.Register(REG_SYS | 0x44DF_0000),
+	.TRBLIMITR_EL1     = arm64.Register(REG_SYS | 0x44D8_0000),
+	.TRBMAR_EL1        = arm64.Register(REG_SYS | 0x44DC_0000),
+	.TRBPTR_EL1        = arm64.Register(REG_SYS | 0x44D9_0000),
+	.TRBSR_EL1         = arm64.Register(REG_SYS | 0x44DB_0000),
+	.TRBTRG_EL1        = arm64.Register(REG_SYS | 0x44DE_0000),
+	.DBGAUTHSTATUS_EL1 = arm64.Register(REG_SYS | 0x03F6_0000),
+	.DBGCLAIMCLR_EL1   = arm64.Register(REG_SYS | 0x03CE_0000),
+	.DBGCLAIMSET_EL1   = arm64.Register(REG_SYS | 0x03C6_0000),
+	.DBGDTRRX_EL0      = arm64.Register(REG_SYS | 0x1828_0000),
+	.DBGDTRTX_EL0      = arm64.Register(REG_SYS | 0x1828_0000),
+	.DBGDTR_EL0        = arm64.Register(REG_SYS | 0x1820_0000),
+	.DBGPRCR_EL1       = arm64.Register(REG_SYS | 0x00A4_0000),
+	.DLR_EL0           = arm64.Register(REG_SYS | 0x5A29_0000),
+	.DSPSR_EL0         = arm64.Register(REG_SYS | 0x5A28_0000),
+	.MDCCINT_EL1       = arm64.Register(REG_SYS | 0x0010_0000),
+	.MDRAR_EL1         = arm64.Register(REG_SYS | 0x0080_0000),
+	.MDSCR_EL1         = arm64.Register(REG_SYS | 0x0012_0000),
+	.OSLAR_EL1         = arm64.Register(REG_SYS | 0x0084_0000),
+	.OSLSR_EL1         = arm64.Register(REG_SYS | 0x008C_0000),
+	.PRSELR_EL1        = arm64.Register(REG_SYS | 0x4311_0000),
+	.ICC_ASGI1R_EL1    = arm64.Register(REG_SYS | 0x465E_0000),
+	.ICC_BPR0_EL1      = arm64.Register(REG_SYS | 0x4643_0000),
+	.ICC_BPR1_EL1      = arm64.Register(REG_SYS | 0x4663_0000),
+	.ICC_CTLR_EL1      = arm64.Register(REG_SYS | 0x4664_0000),
+	.ICC_CTLR_EL3      = arm64.Register(REG_SYS | 0x7664_0000),
+	.ICC_DIR_EL1       = arm64.Register(REG_SYS | 0x4659_0000),
+	.ICC_EOIR0_EL1     = arm64.Register(REG_SYS | 0x4641_0000),
+	.ICC_EOIR1_EL1     = arm64.Register(REG_SYS | 0x4661_0000),
+	.ICC_HPPIR0_EL1    = arm64.Register(REG_SYS | 0x4642_0000),
+	.ICC_HPPIR1_EL1    = arm64.Register(REG_SYS | 0x4662_0000),
+	.ICC_IAR0_EL1      = arm64.Register(REG_SYS | 0x4640_0000),
+	.ICC_IAR1_EL1      = arm64.Register(REG_SYS | 0x4660_0000),
+	.ICC_IGRPEN0_EL1   = arm64.Register(REG_SYS | 0x4666_0000),
+	.ICC_IGRPEN1_EL1   = arm64.Register(REG_SYS | 0x4667_0000),
+	.ICC_IGRPEN1_EL3   = arm64.Register(REG_SYS | 0x7667_0000),
+	.ICC_PMR_EL1       = arm64.Register(REG_SYS | 0x4230_0000),
+	.ICC_RPR_EL1       = arm64.Register(REG_SYS | 0x465B_0000),
+	.ICC_SGI0R_EL1     = arm64.Register(REG_SYS | 0x465F_0000),
+	.ICC_SGI1R_EL1     = arm64.Register(REG_SYS | 0x465D_0000),
+	.ICC_SRE_EL1       = arm64.Register(REG_SYS | 0x4665_0000),
+	.ICC_SRE_EL2       = arm64.Register(REG_SYS | 0x664D_0000),
+	.ICC_SRE_EL3       = arm64.Register(REG_SYS | 0x7665_0000),
+	.ICH_EISR_EL2      = arm64.Register(REG_SYS | 0x665B_0000),
+	.ICH_ELRSR_EL2     = arm64.Register(REG_SYS | 0x665D_0000),
+	.ICH_HCR_EL2       = arm64.Register(REG_SYS | 0x6658_0000),
+	.ICH_MISR_EL2      = arm64.Register(REG_SYS | 0x665A_0000),
+	.ICH_VMCR_EL2      = arm64.Register(REG_SYS | 0x665F_0000),
+	.ICH_VTR_EL2       = arm64.Register(REG_SYS | 0x6659_0000),
+	.DISR_EL1          = arm64.Register(REG_SYS | 0x4609_0000),
+	.ERRIDR_EL1        = arm64.Register(REG_SYS | 0x4298_0000),
+	.ERRSELR_EL1       = arm64.Register(REG_SYS | 0x4299_0000),
+	.ERXADDR_EL1       = arm64.Register(REG_SYS | 0x42A3_0000),
+	.ERXCTLR_EL1       = arm64.Register(REG_SYS | 0x42A1_0000),
+	.ERXFR_EL1         = arm64.Register(REG_SYS | 0x42A0_0000),
+	.ERXMISC0_EL1      = arm64.Register(REG_SYS | 0x42A8_0000),
+	.ERXMISC1_EL1      = arm64.Register(REG_SYS | 0x42A9_0000),
+	.ERXMISC2_EL1      = arm64.Register(REG_SYS | 0x42AA_0000),
+	.ERXMISC3_EL1      = arm64.Register(REG_SYS | 0x42AB_0000),
+	.ERXSTATUS_EL1     = arm64.Register(REG_SYS | 0x42A2_0000),
+	.VDISR_EL2         = arm64.Register(REG_SYS | 0x6609_0000),
+	.VSESR_EL2         = arm64.Register(REG_SYS | 0x6293_0000),
+	.GPCCR_EL3         = arm64.Register(REG_SYS | 0x710E_0000),
+	.GPTBR_EL3         = arm64.Register(REG_SYS | 0x710C_0000),
+	.HCR_EL2           = arm64.Register(REG_SYS | 0x6088_0000),
+	.HSTR_EL2          = arm64.Register(REG_SYS | 0x608B_0000),
+	.MDCR_EL2          = arm64.Register(REG_SYS | 0x6089_0000),
+	.MFAR_EL3          = arm64.Register(REG_SYS | 0x7305_0000),
+	.VTCR_EL2          = arm64.Register(REG_SYS | 0x610A_0000),
+	.VTTBR_EL2         = arm64.Register(REG_SYS | 0x6108_0000),
+	.DACR32_EL2        = arm64.Register(REG_SYS | 0x6180_0000),
+	.FPEXC32_EL2       = arm64.Register(REG_SYS | 0x6298_0000),
+	.RNDR              = arm64.Register(REG_SYS | 0x5920_0000),
+	.RNDRRS            = arm64.Register(REG_SYS | 0x5921_0000),
 }

@@ -55,6 +55,123 @@ struct Asm_riscv {
 	};
 
 
+	enum OperandType : u8 {
+		OP_NONE,
+		OP_GPR,
+		OP_FPR,
+		OP_IMM12,
+		OP_IMM12U,
+		OP_IMM5,
+		OP_IMM6,
+		OP_IMM20,
+		OP_REL13,
+		OP_REL21,
+		OP_MEM,
+		OP_CSR,
+		OP_FENCE_FLAGS,
+		OP_ROUND_MODE,
+		OP_ZIMM5,
+		OP_GPR_C,
+		OP_GPR_SP,
+		OP_GPR_NONZERO,
+		OP_FPR_C,
+		OP_IMM_C6S,
+		OP_IMM_C6U,
+		OP_IMM_C8U,
+		OP_IMM_C10S,
+		OP_IMM_C18S,
+		OP_REL9,
+		OP_REL12,
+		OP_MEM_C_W,
+		OP_MEM_C_D,
+		OP_MEM_C_SP_W,
+		OP_MEM_C_SP_D,
+	};
+
+
+	enum OperandEncoding : u8 {
+		ENC_NONE,
+		ENC_RD,
+		ENC_RS1,
+		ENC_RS2,
+		ENC_RS3,
+		ENC_SHAMT5,
+		ENC_SHAMT6,
+		ENC_IMM_I,
+		ENC_IMM_S,
+		ENC_IMM_B,
+		ENC_IMM_U,
+		ENC_IMM_J,
+		ENC_OFFSET_BASE_I,
+		ENC_OFFSET_BASE_S,
+		ENC_OFFSET_BASE_A,
+		ENC_CSR_FIELD,
+		ENC_ZIMM_FIELD,
+		ENC_FENCE_PRED,
+		ENC_FENCE_SUCC,
+		ENC_ROUND_FIELD,
+		ENC_AQRL,
+		ENC_C_RD_RS1,
+		ENC_C_RS2,
+		ENC_C_RD_PRIMED,
+		ENC_C_RS1_PRIMED,
+		ENC_C_RS2_PRIMED,
+		ENC_C_RD_RS1_PRIMED,
+		ENC_C_IMM_CI_S,
+		ENC_C_IMM_CI_U,
+		ENC_C_IMM_CIW,
+		ENC_C_IMM_LUI,
+		ENC_C_IMM_ADDI16SP,
+		ENC_C_IMM_CSS_W,
+		ENC_C_IMM_CSS_D,
+		ENC_C_IMM_CL_W,
+		ENC_C_IMM_CL_D,
+		ENC_C_BRANCH9,
+		ENC_C_BRANCH12,
+		ENC_C_OFFSET_BASE_W,
+		ENC_C_OFFSET_BASE_D,
+		ENC_C_SP_OFFSET_W,
+		ENC_C_SP_OFFSET_D,
+	};
+
+
+	enum Feature : u16 {
+		ENC_I,
+		ENC_M,
+		ENC_A,
+		ENC_F,
+		ENC_D,
+		ENC_ZICSR,
+		ENC_ZIFENCEI,
+		ENC_C,
+		ENC_ZBA,
+		ENC_ZBB,
+		ENC_ZBC,
+		ENC_ZBS,
+		ENC_ZICOND,
+		ENC_ZFH,
+		ENC_PRIV,
+	};
+
+	typedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability
+
+	#pragma pack(push, 1)
+	struct Encoding {
+		Mnemonic        mnemonic;
+		OperandType     ops[4];
+		OperandEncoding enc[4];
+		u32             bits;
+		u32             mask;
+		Feature         feature;
+		EncodingFlags   flags;
+
+		bool has_implicit  () const { return ((flags>>7u)&1) != 0; }
+		u8   explicit_count() const { return cast(u8)((flags>>4u)&((1u<<3)-1)); }
+	};
+	#pragma pack(pop)
+	GB_STATIC_ASSERT(gb_size_of(Encoding) == 21);
+
+
 	enum ClobberFlags : u8 {
 		ClobberFlag_NV = 1<<0, // invalid operation
 		ClobberFlag_DZ = 1<<1, // divide by zero
@@ -223,7 +340,7 @@ struct Asm_riscv {
 		bool has_halt() const {
 			return (cast(u16)side_effects & SideEffectFlag_TRAP) != 0;
 		}
-		bool is_conditional() const {
+		bool is_conditional(struct Encoding const &valid_form) const {
 			return has_control();
 		}
 		bool is_nondeterministic() const {
@@ -328,123 +445,6 @@ struct Asm_riscv {
 
 	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
-
-
-	enum OperandType : u8 {
-		OP_NONE,
-		OP_GPR,
-		OP_FPR,
-		OP_IMM12,
-		OP_IMM12U,
-		OP_IMM5,
-		OP_IMM6,
-		OP_IMM20,
-		OP_REL13,
-		OP_REL21,
-		OP_MEM,
-		OP_CSR,
-		OP_FENCE_FLAGS,
-		OP_ROUND_MODE,
-		OP_ZIMM5,
-		OP_GPR_C,
-		OP_GPR_SP,
-		OP_GPR_NONZERO,
-		OP_FPR_C,
-		OP_IMM_C6S,
-		OP_IMM_C6U,
-		OP_IMM_C8U,
-		OP_IMM_C10S,
-		OP_IMM_C18S,
-		OP_REL9,
-		OP_REL12,
-		OP_MEM_C_W,
-		OP_MEM_C_D,
-		OP_MEM_C_SP_W,
-		OP_MEM_C_SP_D,
-	};
-
-
-	enum OperandEncoding : u8 {
-		ENC_NONE,
-		ENC_RD,
-		ENC_RS1,
-		ENC_RS2,
-		ENC_RS3,
-		ENC_SHAMT5,
-		ENC_SHAMT6,
-		ENC_IMM_I,
-		ENC_IMM_S,
-		ENC_IMM_B,
-		ENC_IMM_U,
-		ENC_IMM_J,
-		ENC_OFFSET_BASE_I,
-		ENC_OFFSET_BASE_S,
-		ENC_OFFSET_BASE_A,
-		ENC_CSR_FIELD,
-		ENC_ZIMM_FIELD,
-		ENC_FENCE_PRED,
-		ENC_FENCE_SUCC,
-		ENC_ROUND_FIELD,
-		ENC_AQRL,
-		ENC_C_RD_RS1,
-		ENC_C_RS2,
-		ENC_C_RD_PRIMED,
-		ENC_C_RS1_PRIMED,
-		ENC_C_RS2_PRIMED,
-		ENC_C_RD_RS1_PRIMED,
-		ENC_C_IMM_CI_S,
-		ENC_C_IMM_CI_U,
-		ENC_C_IMM_CIW,
-		ENC_C_IMM_LUI,
-		ENC_C_IMM_ADDI16SP,
-		ENC_C_IMM_CSS_W,
-		ENC_C_IMM_CSS_D,
-		ENC_C_IMM_CL_W,
-		ENC_C_IMM_CL_D,
-		ENC_C_BRANCH9,
-		ENC_C_BRANCH12,
-		ENC_C_OFFSET_BASE_W,
-		ENC_C_OFFSET_BASE_D,
-		ENC_C_SP_OFFSET_W,
-		ENC_C_SP_OFFSET_D,
-	};
-
-
-	enum Feature : u16 {
-		ENC_I,
-		ENC_M,
-		ENC_A,
-		ENC_F,
-		ENC_D,
-		ENC_ZICSR,
-		ENC_ZIFENCEI,
-		ENC_C,
-		ENC_ZBA,
-		ENC_ZBB,
-		ENC_ZBC,
-		ENC_ZBS,
-		ENC_ZICOND,
-		ENC_ZFH,
-		ENC_PRIV,
-	};
-
-	typedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability
-
-	#pragma pack(push, 1)
-	struct Encoding {
-		Mnemonic        mnemonic;
-		OperandType     ops[4];
-		OperandEncoding enc[4];
-		u32             bits;
-		u32             mask;
-		Feature         feature;
-		EncodingFlags   flags;
-
-		bool has_implicit  () const { return ((flags>>7u)&1) != 0; }
-		u8   explicit_count() const { return cast(u8)((flags>>4u)&((1u<<3)-1)); }
-	};
-	#pragma pack(pop)
-	GB_STATIC_ASSERT(gb_size_of(Encoding) == 21);
 
 
 	// Companion run index: ENCODE_RUNS[mnemonic] -> contiguous run in ENCODE_FORMS.

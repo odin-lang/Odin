@@ -1785,7 +1785,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			bool control = clobber.has_control();
 			bool halt    = clobber.has_halt();
 			// A conditional branch reads a flag and can fall through -> not terminal.
-			bool conditional = clobber.is_conditional();
+			bool conditional = clobber.is_conditional(valid_form);
 
 			facts->is_control = control;
 			facts->is_conditional = conditional;
