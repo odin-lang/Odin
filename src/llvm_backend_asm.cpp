@@ -1,4 +1,4 @@
-#define LLVM_ASM_DEBUG_PRINT false
+#define LLVM_ASM_DEBUG_PRINT true
 
 struct lbAsmGenerate {
 	Entity *                      tmpl_entity;
@@ -7,6 +7,16 @@ struct lbAsmGenerate {
 
 	gbString asm_string;
 	gbString constraints;
+
+	// Stable per-template numbering for internal labels (assigned on first sight).
+	PtrMap<Entity *, i32> label_numbers;
+	i32                   next_label_number;
+	PtrMap<Entity *, i32> label_def_pos;
+
+	AstAsmInstruction *   curr_instr;
+	isize                 curr_operand_index;
+	i32                   curr_instr_pos;
+	Array<lbValue> const *curr_args;
 
 	enum WriteOperandFlags : u32 {
 		WriteOperandFlag_PrintPrefixes  = 1<<0,
@@ -34,11 +44,14 @@ struct lbAsmGenerate {
 
 		this->asm_string  = gb_string_make_reserve(heap_allocator(), 256);
 		this->constraints = gb_string_make_reserve(heap_allocator(), 64);
+		map_init(&this->label_numbers);
 	}
 
 	void destroy() {
 		gb_string_free(this->asm_string);
 		gb_string_free(this->constraints);
+		map_destroy(&this->label_numbers);
+		map_destroy(&this->label_def_pos);
 	}
 
 	void write_cstr(char const *cstr) { asm_string = gb_string_appendc      (asm_string, cstr);                                }
@@ -48,15 +61,30 @@ struct lbAsmGenerate {
 	void write_u64(u64 val)           { asm_string = gb_string_append_fmt   (asm_string, "%llu", cast(unsigned long long)val); }
 	void write_i64(i64 val)           { asm_string = gb_string_append_fmt   (asm_string, "%lld", cast(long long)val);          }
 
-	void write_label(AstIdent *label_ident) {
+	// AArch64's assembler requires conditional-branch targets to be assembler-local.
+	// Named .L symbols are treated as external within an inline-asm string, so use
+	// numeric locals: each label entity gets a small integer, a definition prints
+	// `N:`, and a reference prints `Nf` (forward) or `Nb` (backward). For targets
+	// that don't need this (amd64), the named form is still fine; this base method
+	// is overridden per target.
+	virtual void write_label_def(AstIdent *label_ident) {
 		String name = label_ident->token.string;
 		write_cstr(".L_");
 		write_string(tmpl_entity->token.string);
 		write_cstr("_");
 		write_string(name);
-		// ${:uid} expands to a per-instantiation unique integer, so repeated
-		// inlining of the same template can't collide on the label symbol.
 		write_cstr("${:uid}");
+	}
+	virtual void write_label_ref(AstIdent *label_ident) {
+		this->write_label_def(label_ident); // default: same spelling for def and ref
+	}
+
+	void write_label(AstIdent *label_ident) {
+		this->write_label_ref(label_ident);
+	}
+
+	virtual void prescan_label_positions() {
+		// do nothing by default
 	}
 
 	AsmTemplateEntityDecl *entity_op(Entity *parameter) {
@@ -108,6 +136,8 @@ struct lbAsmGenerate {
 
 		gb_string_clear(this->asm_string);
 		gb_string_clear(this->constraints);
+
+		this->curr_args = &args;
 
 		TEMPORARY_ALLOCATOR_GUARD();
 
@@ -247,10 +277,16 @@ struct lbAsmGenerate {
 			op_number[i] = next_op++;
 		}
 
+		// AArch64 uses numeric local labels for internal branches; resolve each label's
+		// definition position up front so references can pick f/b correctly.
+		this->prescan_label_positions();
+
 		// Build the template text
 		u32 op_flags = this->default_operand_write_flags();
 		bool reverse = this->reverse_operand_order();
 		for_array(i, tmpl_node->instructions) {
+			this->curr_instr_pos = cast(i32)i;
+
 			if (i > 0) {
 				write_cstr("\n");
 			}
@@ -269,12 +305,13 @@ struct lbAsmGenerate {
 					if (k > 0) { write_cstr(", "); }
 					u32 f = op_flags;
 					if (indirect) f |= WriteOperandFlag_IndirectBranch;
+					this->curr_instr = instr;
+					this->curr_operand_index = j;
 					this->write_operand(op_number, instr->operands[j], f);
 				}
 			case_end;
 			case_ast_node(label, AsmLabelDecl, instr_);
-				this->write_label(&label->name->Ident);
-				write_cstr(":");
+				this->write_label_def(&label->name->Ident);
 			case_end;
 			case_ast_node(dir, AsmDirective, instr_);
 				String name = dir->name.string;
@@ -976,6 +1013,148 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 };
 
 struct lbAsmGenerate_arm64 : lbAsmGenerate {
+	void prescan_label_positions() override {
+		map_init(&label_def_pos);
+		i32 pos = 0;
+		for (Ast *node : tmpl_node->instructions) {
+			if (node->kind == Ast_AsmLabelDecl) {
+				Entity *le = node->AsmLabelDecl.name->Ident.entity;
+				if (le != nullptr) {
+					map_set(&label_def_pos, le, pos);
+				}
+			}
+			pos += 1; // count every node so refs can compare positions consistently
+		}
+	}
+
+	i32 arm64_label_number(AstIdent *label_ident) {
+		Entity *le = label_ident->entity;
+		GB_ASSERT(le != nullptr);
+		if (i32 *n = map_get(&label_numbers, le)) {
+			return *n;
+		}
+		if (next_label_number == 0) {
+			map_init(&label_numbers);
+		}
+		i32 n = ++next_label_number; // 1-based; 0 reserved as "unassigned"
+		map_set(&label_numbers, le, n);
+		return n;
+	}
+
+	void write_label_def(AstIdent *label_ident) override {
+		// Numeric local definition: `N:` — never an f/b suffix.
+		asm_string = gb_string_append_fmt(asm_string, "%d:", this->arm64_label_number(label_ident));
+	}
+	void write_label_ref(AstIdent *label_ident) override {
+		Entity *le = label_ident->entity;
+		i32 n = this->arm64_label_number(label_ident);
+		i32 def_pos = -1;
+		if (i32 *p = map_get(&label_def_pos, le)) {
+			def_pos = *p;
+		}
+		// Forward if the definition comes at or after the referencing instruction.
+		// (A self/loop-top reference at the same position is backward once emitted;
+		//  a branch to a label defined later is forward.)
+		bool forward = def_pos > this->curr_instr_pos;
+		asm_string = gb_string_append_fmt(asm_string, "%d%c", n, forward ? 'f' : 'b');
+	}
+
+	// ARM64 condition-code encodings -> mnemonic. csel/cset/ccmp/b.<cc> take the
+	// bare mnemonic, NOT '#<n>'; the frontend resolves the cond to its 0..15 encoding.
+	static char const *arm64_cond_name(i64 e) {
+		static char const *n[16] = {
+			"eq","ne","hs","lo","mi","pl","vs","vc",
+			"hi","ls","ge","lt","gt","le","al","nv",
+		};
+		return (0 <= e && e < 16) ? n[e] : nullptr;
+	}
+
+	// Is user-operand `i` of this instruction the condition-code slot?
+	bool arm64_is_cond_slot(AstAsmInstruction *instr, isize i) {
+		if (instr->mnemonic == 0 || instr->valid_form_index < 0) {
+			return false;
+		}
+		auto forms = g_asm_arm64.encoding_forms(instr->mnemonic);
+		if (instr->valid_form_index >= forms.count) {
+			return false;
+		}
+		auto const &form = forms[instr->valid_form_index];
+		int slot = this->reverse_operand_order() ? cast(int)i : cast(int)i; // A64: no flip
+		if (slot < 0 || slot >= cast(int)gb_count_of(form.ops)) {
+			return false;
+		}
+		return g_asm_arm64.operand_type_is_cond_code(form.ops[slot]);
+	}
+
+	// The register-name modifier this *form slot* mandates, independent of the
+	// operand's Odin type. ldrb/strb want W even for an i64 param; a 128-bit vector
+	// load wants the Q name; scalar FP wants s/d. Returns 0 when bare $N is correct.
+	char arm64_slot_reg_modifier(AstAsmInstruction *instr, isize i) {
+		if (instr->mnemonic == 0 || instr->valid_form_index < 0) {
+			return 0;
+		}
+		auto forms = g_asm_arm64.encoding_forms(instr->mnemonic);
+		if (instr->valid_form_index >= forms.count) {
+			return 0;
+		}
+		auto const &form = forms[instr->valid_form_index];
+		if (i < 0 || i >= cast(isize)gb_count_of(form.ops)) {
+			return 0;
+		}
+		auto slot = form.ops[i];
+		AsmOperandKind k = g_asm_arm64.kind_from_operand_type(slot);
+		if (k != AsmOperand_Register && k != AsmOperand_Register_Or_Memory) {
+			return 0;
+		}
+		AsmRegClass cls = g_asm_arm64.operand_type_reg_class(slot);
+		i32         w   = g_asm_arm64.operand_type_bit_width(slot);
+		if (cls == AsmRegClass_Integer) {
+			return (w == 32) ? 'w' : (w == 64) ? 'x' : 0;
+		}
+		if (cls == AsmRegClass_Float || cls == AsmRegClass_Vector) {
+			switch (w) {
+			case 8:   return 'b';
+			case 16:  return 'h';
+			case 32:  return 's';
+			case 64:  return 'd';
+			case 128: return 'q';
+			}
+		}
+		return 0;
+	}
+
+	// NEON arrangement suffix (".4s", ".2d", ...) for a #simd operand in a slot that
+	// wants a vector arrangement rather than a scalar name. Empty when not applicable.
+	String arm64_arrangement_suffix(AstAsmInstruction *instr, isize i, Type *operand_type) {
+		if (instr->mnemonic == 0 || instr->valid_form_index < 0) {
+			return {};
+		}
+		auto forms = g_asm_arm64.encoding_forms(instr->mnemonic);
+		if (instr->valid_form_index >= forms.count) {
+			return {};
+		}
+		auto const &form = forms[instr->valid_form_index];
+		if (i < 0 || i >= cast(isize)gb_count_of(form.ops)) {
+			return {};
+		}
+		if (!g_asm_arm64.operand_type_wants_arrangement(form.ops[i])) {
+			return {};
+		}
+		Type *bt = base_type(operand_type);
+		if (bt->kind != Type_SimdVector) {
+			return {};
+		}
+		i64 lanes = bt->SimdVector.count;
+		i64 esz   = type_size_of(base_type(bt->SimdVector.elem));
+		switch (esz) {
+		case 1: return (lanes == 8)  ? str_lit(".8b")  : (lanes == 16) ? str_lit(".16b") : String{};
+		case 2: return (lanes == 4)  ? str_lit(".4h")  : (lanes == 8)  ? str_lit(".8h")  : String{};
+		case 4: return (lanes == 2)  ? str_lit(".2s")  : (lanes == 4)  ? str_lit(".4s")  : String{};
+		case 8: return (lanes == 1)  ? str_lit(".1d")  : (lanes == 2)  ? str_lit(".2d")  : String{};
+		}
+		return {};
+	}
+
 	bool reverse_operand_order() override {
 		return false;
 	}
@@ -1055,7 +1234,19 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 	}
 
 	void write_operand(Slice<i32> const &op_number, Ast *op, u32 flags) override {
+		AstAsmInstruction *instr = this->curr_instr;
+		isize              opi   = this->curr_operand_index;
+
 		if (op->tav.mode == Addressing_Constant) {
+			// A condition-code slot is a constant in the frontend but must print as a
+			// mnemonic (gt/lt/...), never '#<n>'.
+			if (instr != nullptr && this->arm64_is_cond_slot(instr, opi)) {
+				i64 e = exact_value_to_i64(exact_value_to_integer(op->tav.value));
+				char const *cc = arm64_cond_name(e);
+				GB_ASSERT_MSG(cc != nullptr, "asm: bad ARM64 condition encoding %lld", cast(long long)e);
+				write_cstr(cc);
+				return;
+			}
 			this->write_constant_operand(op, flags);
 			return;
 		}
@@ -1097,7 +1288,25 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 					}
 				} else {
 					GB_ASSERT(!negate); // only immediates/displacements negate
-					asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+					// An arrangement operand prints `vN.<T>` — bare $N (which lowers to
+					// the full vN) plus the ".4s"/".2d"/... suffix. It must NOT also take
+					// a register-name modifier: ${N:q} + .4s yields the invalid `q1.4s`.
+					// Only non-arrangement slots take the w/x/q/d/s modifier.
+					String arr = {};
+					if (instr != nullptr) {
+						arr = this->arm64_arrangement_suffix(instr, opi, ed->entity->type);
+					}
+					if (arr.len != 0) {
+						asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+						write_string(arr);
+					} else {
+						char mod = (instr != nullptr) ? this->arm64_slot_reg_modifier(instr, opi) : 0;
+						if (mod != 0) {
+							asm_string = gb_string_append_fmt(asm_string, "${%d:%c}", idx, mod);
+						} else {
+							asm_string = gb_string_append_fmt(asm_string, "$%d", idx);
+						}
+					}
 				}
 			}
 		case_end;
@@ -1119,19 +1328,41 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 			Ast *base_op = ie->expr;
 			Ast *index   = ie->index;
 
-			// The lane index is an assemble-time constant, validated and folded by the
-			// checker onto ie->index. If it isn't present here the checker already
-			// reported the error (non-constant / out-of-range lane), so bail rather than
-			// assert — lowering must not be the thing that crashes on a rejected program.
-			if (index->tav.mode != Addressing_Constant) {
-				return;
+			// Resolve the lane to a concrete i64. Two spellings reach here:
+			//   v[0]     — literal lane, folded onto the index node's tav
+			//   v[idx]   — $-immediate parameter; its value is the operand argument,
+			//              looked up via the decl exactly like any other immediate.
+			i64  lane      = -1;
+			bool have_lane = false;
+
+			if (index->kind == Ast_Ident) {
+				// Immediate-parameter lane: find its decl, confirm it's an immediate, read value.
+				Entity *ie_ = entity_of_node(index);
+				if (ie_ != nullptr) {
+					auto *ed = entity_op(ie_); // the AsmTemplateEntityDecl for this parameter
+					if (ed != nullptr && ed->kind == AsmTemplateEntityDecl_Immediate) {
+						GB_ASSERT(ed->param_index >= 0);
+						lbValue v = (*this->curr_args)[ed->param_index];
+						GB_ASSERT_MSG(LLVMIsAConstantInt(v.value),
+						              "asm: lane immediate '%.*s' is not a constant",
+						              LIT(ed->entity->token.string));
+						lane      = cast(i64)LLVMConstIntGetSExtValue(v.value);
+						have_lane = true;
+					}
+				}
 			}
-			ExactValue lane_ev = exact_value_to_integer(index->tav.value);
-			if (lane_ev.kind != ExactValue_Integer) {
-				return;
+
+			if (!have_lane) {
+				// Literal lane: value folded onto the index node by the checker.
+				GB_ASSERT_MSG(index->tav.mode == Addressing_Constant,
+				              "asm: AArch64 lane index reached lowering unfolded");
+				ExactValue ev = exact_value_to_integer(index->tav.value);
+				GB_ASSERT(ev.kind == ExactValue_Integer);
+				lane      = exact_value_to_i64(ev);
+				have_lane = true;
 			}
-			i64 lane = exact_value_to_i64(lane_ev);
-			GB_ASSERT(lane >= 0); // checker guarantees non-negative
+
+			GB_ASSERT(lane >= 0);
 
 			switch (base_op->kind) {
 			case_ast_node(reg, AsmRegister, base_op);
@@ -1147,7 +1378,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 					}
 				}
 				GB_ASSERT_MSG(has_arrangement,
-				              "asm: AArch64 lane access on register '%.*s' needs an element qualifier "
+				              "asm: ARM64 lane access on register '%.*s' needs an element qualifier "
 				              "(e.g. '%.*s.d[%lld]')",
 				              LIT(rname), LIT(rname), cast(long long)lane);
 				this->write_string(rname);
@@ -1164,14 +1395,31 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				GB_ASSERT(idx >= 0);
 
 				char q = this->arm64_lane_qualifier_for_type(ed->entity->type);
-				GB_ASSERT_MSG(q != 0, "asm: cannot determine AArch64 lane element size for '%.*s'",
+				GB_ASSERT_MSG(q != 0, "asm: cannot determine ARM64 lane element size for '%.*s'",
 				              LIT(e->token.string));
 
-				asm_string = gb_string_append_fmt(asm_string, "$%d.%c[%lld]", idx, q, cast(long long)lane);
+				// NOTE(bill): fmov exception: fmov has no `vN.<T>[i]` lane form for S/D elements — lane i
+				// of an S/D element aliases the scalar view, so emit the scalar name (${N:s} /
+				// ${N:d}) with no lane suffix. (The `.d[1]` high-half form is the only real
+				// fmov lane form; if you need it, special-case lane==1 d-element separately.)
+				bool is_fmov = instr != nullptr && instr->mnemonic == Asm_arm64::M_FMOV;
+				if (is_fmov && (q == 's' || q == 'd')) {
+					GB_ASSERT_MSG(lane == 0 || (q == 'd' && lane == 1),
+					              "asm: fmov has no lane form for %c[%lld]; only s[0]/d[0] (scalar) and d[1] exist",
+					              q, cast(long long)lane);
+					if (q == 'd' && lane == 1) {
+						// the one genuine fmov lane form: fmov Xd, Vn.d[1]
+						asm_string = gb_string_append_fmt(asm_string, "$%d.d[1]", idx);
+					} else {
+						asm_string = gb_string_append_fmt(asm_string, "${%d:%c}", idx, q);
+					}
+				} else {
+					asm_string = gb_string_append_fmt(asm_string, "$%d.%c[%lld]", idx, q, cast(long long)lane);
+				}
 			case_end;
 
 			default:
-				GB_PANIC("asm: AArch64 lane base must be an operand or explicit register, got '%s'",
+				GB_PANIC("asm: ARM64 lane base must be an operand or explicit register, got '%s'",
 				         expr_to_string(base_op));
 				break;
 			}

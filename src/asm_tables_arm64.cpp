@@ -959,6 +959,32 @@ struct Asm_arm64 {
 		return false;
 	}
 
+	bool operand_type_is_cond_code(OperandType t) const {
+		switch (t){
+		case OP_COND:
+		case OP_COND_NOT_AL:
+			return true;
+		}
+		return false;
+	}
+
+	// Does this slot's register spell as `vN.<T>` (an arrangement) rather than a
+	// scalar view (bN/hN/sN/dN/qN), a lane (vN.<T>[i]), or a bare vN? Drives the
+	// arrangement-suffix emission in the AArch64 backend. Element-indexed and
+	// scalar-view slots are deliberately excluded: those carry their width via the
+	// register-name modifier (${N:s|d|q}) or the explicit lane syntax instead.
+	bool operand_type_wants_arrangement(OperandType t) const {
+		switch (t) {
+		case OP_V_8B: case OP_V_16B:
+		case OP_V_4H: case OP_V_8H:
+		case OP_V_2S: case OP_V_4S:
+		case OP_V_1D: case OP_V_2D:
+		case OP_V_4H_FP16: case OP_V_8H_FP16:
+			return true;
+		}
+		return false;
+	}
+
 	AsmRegClass operand_type_reg_class(OperandType t) const {
 		// Same mapping as reg_class_from_operand_type.
 		return reg_class_from_operand_type(t);

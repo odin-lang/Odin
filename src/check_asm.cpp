@@ -2323,6 +2323,11 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
+		if (!allow_memory_operands) {
+			error(expr, "Invalid use of an index expression in an asm operand");
+			return;
+		}
+
 		Operand lhs = {};
 		Operand rhs = {};
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &lhs, ie->expr, false);
