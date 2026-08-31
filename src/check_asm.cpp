@@ -1547,6 +1547,50 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		check_operand_constraints(asm_ctx, operands, mnemonic, name);
 
+
+		// NOTE(bill): The scaled-index shift must equal log2(transfer size) on targets that require it
+		// e.g. on AArch64 register-offset loads/stores.
+		// Generic: forms with form_transfer_bytes()==0, or operands with no constant scale, impose nothing.
+		{
+			u16 tb = asm_ctx->form_transfer_bytes(forms[valid_form_index]);
+			if (tb != 0) {
+				i64 want = 0; { u16 b = tb; while (b > 1) { b >>= 1; want++; } }
+				for_array(oi, operands) {
+					Ast *e = operands[oi].expr;
+					if (e == nullptr || e->kind != Ast_AsmMemoryOperand) {
+						continue;
+					}
+					auto *m = &e->AsmMemoryOperand;
+					if (m->scale == nullptr || m->scale->tav.mode != Addressing_Constant) {
+						continue;
+					}
+					i64 raw = exact_value_to_i64(exact_value_to_integer(m->scale->tav.value));
+					// Normalise the '*' form to a shift amount; '<<'/'>>' are already shifts.
+					i64 shift = raw;
+					if (m->scale_op.kind == Token_Mul) {
+						switch (raw) {
+						case 1:  shift = 0;  break;
+						case 2:  shift = 1;  break;
+						case 4:  shift = 2;  break;
+						case 8:  shift = 3;  break;
+						case 16: shift = 4;  break;
+						default: shift = -1; break;
+						}
+					}
+					// shift 0 (unscaled) is always legal; otherwise it must match log2(size).
+					if (shift != 0 && shift != want) {
+						if (m->scale_op.kind == Token_Mul) {
+							error(m->scale, "'%.*s' scaled-index multiplier must be %lld (the %u-byte transfer size), got %lld",
+							      LIT(name), cast(long long)(cast(i64)1 << want), cast(unsigned)tb, cast(long long)raw);
+						} else {
+							error(m->scale, "'%.*s' scaled-index shift must be %lld (log2 of the %u-byte transfer), got %lld",
+							      LIT(name), cast(long long)want, cast(unsigned)tb, cast(long long)shift);
+						}
+					}
+				}
+			}
+		}
+
 		// Handle clobbering from mnemonic
 		auto clobber = clobber_forms[valid_form_index];
 
@@ -2225,6 +2269,10 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 							error(op, "The target platform does not support '%.*s' for shifting scale parameters in memory operands", LIT(op.string));
 						}
 					}
+
+					// Persist the folded scale so check_mnemonic can validate it against
+					// the matched form's transfer size (it reads mem_op->scale->tav).
+					add_type_and_value(ctx, mem_op->scale, scale.mode, scale.type, scale.value);
 				}
 			} else {
 				Entity *param_entity = entity_of_node(scale.expr);

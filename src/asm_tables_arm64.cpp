@@ -417,6 +417,7 @@ struct Asm_arm64 {
 		bool has_implicit  () const { return false; }
 		u8   explicit_count() const { return cast(u8)((flags>>5u)&((1u<<3)-1)); }
 		bool is_conditional() const { return ((flags>>1u)&1) != 0; }
+		u32 required_feature() const { return cast(u32)feature; }
 	};
 	#pragma pack(pop)
 	GB_STATIC_ASSERT(gb_size_of(Encoding) == 22);
@@ -1090,6 +1091,40 @@ struct Asm_arm64 {
 		return 0;
 	}
 
+
+	bool target_has_feature(u64 enabled_features, u32 f) const {
+		if (f == F_BASE) {
+			return true;
+		}
+		return (enabled_features & (cast(u64)1 << cast(u64)f)) != 0;
+	}
+	char const *feature_name(u32 f) const {
+		switch (f) {
+		case F_BASE:   return "base";
+		case F_FP:     return "fp";
+		case F_NEON:   return "neon";
+		case F_CRYPTO: return "crypto";
+		case F_CRC32:  return "crc";
+		case F_LSE:    return "lse";
+		case F_LSE2:   return "lse2";
+		case F_FP16:   return "fp16";
+		case F_BF16:   return "bf16";
+		case F_DOT:    return "dotprod";
+		case F_PAC:    return "pauth";
+		case F_BTI:    return "bti";
+		case F_MTE:    return "mte";
+		case F_SVE:    return "sve";
+		case F_SVE2:   return "sve2";
+		case F_SME:    return "sme";
+		case F_AMX:    return "amx";
+		}
+		return "?";
+	}
+	u16 operand_type_transfer_bytes(OperandType t) const {
+		gb_unused(t);
+		return 0; // arm64 fills this from the *form*, not the slot; see below
+	}
+
 	int form_explicit_slot(Encoding const &form, int explicit_index) const {
 		int seen = 0;
 		for (int j = 0; j < gb_count_of(form.ops); j++) {
@@ -1107,6 +1142,28 @@ struct Asm_arm64 {
 		}
 		return -1;
 	}
+
+	// Transfer size (bytes) a memory form's scaled index must match:
+	// shift == log2(bytes). Derived from the widest register operand in the form
+	// (the data being loaded/stored). 0 => no such constraint. Generic across ISAs.
+	u16 form_transfer_bytes(Encoding const &form) const {
+		u16 widest = 0;
+		for (int j = 0; j < gb_count_of(form.ops); j++) {
+			auto t = form.ops[j];
+			if (!t) {
+				break;
+			}
+			AsmOperandKind k = kind_from_operand_type(t);
+			if (k == AsmOperand_Register) {
+				u16 w = operand_type_bit_width(t);
+				if (w > widest) {
+					widest = w;
+				}
+			}
+		}
+		return cast(u16)(widest / 8);
+	}
+
 
 	bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) const {
 		// arm64 does not have instruction prefixes.

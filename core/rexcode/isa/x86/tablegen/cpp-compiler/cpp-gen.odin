@@ -794,6 +794,17 @@ main :: proc() {
 			}
 			return 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.
 		}
+
+		bool target_has_feature(u64 enabled_features, u32 f) const {
+			return true;
+		}
+		char const *feature_name(u32 f) const {
+			return "?";
+		}
+		u16 operand_type_transfer_bytes(OperandType t) const {
+			gb_unused(t);
+			return 0;
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")
@@ -815,6 +826,27 @@ main :: proc() {
 				seen += 1;
 			}
 			return -1;
+		}
+
+		// Transfer size (bytes) a memory form's scaled index must match:
+		// shift == log2(bytes). Derived from the widest register operand in the form
+		// (the data being loaded/stored). 0 => no such constraint. Generic across ISAs.
+		u16 form_transfer_bytes(Encoding const &form) const {
+			u16 widest = 0;
+			for (int j = 0; j < gb_count_of(form.ops); j++) {
+				auto t = form.ops[j];
+				if (!t) {
+					break;
+				}
+				AsmOperandKind k = kind_from_operand_type(t);
+				if (k == AsmOperand_Register) {
+					u16 w = operand_type_bit_width(t);
+					if (w > widest) {
+						widest = w;
+					}
+				}
+			}
+			return cast(u16)(widest / 8);
 		}
 	""")
 

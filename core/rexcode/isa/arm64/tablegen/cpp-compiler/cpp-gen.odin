@@ -184,6 +184,9 @@ main :: proc() {
 			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
 			strings.write_string(&sb, " }\n")
 		}
+		{
+			strings.write_string(&sb, "\t\tu32 required_feature() const { return cast(u32)feature; }\n")
+		}
 	}
 	strings.write_string(&sb, "\n")
 	strings.write_string(&sb, """
@@ -747,6 +750,32 @@ main :: proc() {
 			gb_unused(t);
 			return false;
 		}
+
+		bool operand_type_is_cond_code(OperandType t) const {
+			switch (t){
+			case OP_COND:
+			case OP_COND_NOT_AL:
+				return true;
+			}
+			return false;
+		}
+
+		// Does this slot's register spell as `vN.<T>` (an arrangement) rather than a
+		// scalar view (bN/hN/sN/dN/qN), a lane (vN.<T>[i]), or a bare vN? Drives the
+		// arrangement-suffix emission in the AArch64 backend. Element-indexed and
+		// scalar-view slots are deliberately excluded: those carry their width via the
+		// register-name modifier (${N:s|d|q}) or the explicit lane syntax instead.
+		bool operand_type_wants_arrangement(OperandType t) const {
+			switch (t) {
+			case OP_V_8B: case OP_V_16B:
+			case OP_V_4H: case OP_V_8H:
+			case OP_V_2S: case OP_V_4S:
+			case OP_V_1D: case OP_V_2D:
+			case OP_V_4H_FP16: case OP_V_8H_FP16:
+				return true;
+			}
+			return false;
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")
@@ -866,6 +895,40 @@ main :: proc() {
 			}
 			return 0;
 		}
+
+
+		bool target_has_feature(u64 enabled_features, u32 f) const {
+			if (f == F_BASE) {
+				return true;
+			}
+			return (enabled_features & (cast(u64)1 << cast(u64)f)) != 0;
+		}
+		char const *feature_name(u32 f) const {
+			switch (f) {
+			case F_BASE:   return "base";
+			case F_FP:     return "fp";
+			case F_NEON:   return "neon";
+			case F_CRYPTO: return "crypto";
+			case F_CRC32:  return "crc";
+			case F_LSE:    return "lse";
+			case F_LSE2:   return "lse2";
+			case F_FP16:   return "fp16";
+			case F_BF16:   return "bf16";
+			case F_DOT:    return "dotprod";
+			case F_PAC:    return "pauth";
+			case F_BTI:    return "bti";
+			case F_MTE:    return "mte";
+			case F_SVE:    return "sve";
+			case F_SVE2:   return "sve2";
+			case F_SME:    return "sme";
+			case F_AMX:    return "amx";
+			}
+			return "?";
+		}
+		u16 operand_type_transfer_bytes(OperandType t) const {
+			gb_unused(t);
+			return 0; // arm64 fills this from the *form*, not the slot; see below
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")
@@ -888,6 +951,28 @@ main :: proc() {
 			}
 			return -1;
 		}
+
+		// Transfer size (bytes) a memory form's scaled index must match:
+		// shift == log2(bytes). Derived from the widest register operand in the form
+		// (the data being loaded/stored). 0 => no such constraint. Generic across ISAs.
+		u16 form_transfer_bytes(Encoding const &form) const {
+			u16 widest = 0;
+			for (int j = 0; j < gb_count_of(form.ops); j++) {
+				auto t = form.ops[j];
+				if (!t) {
+					break;
+				}
+				AsmOperandKind k = kind_from_operand_type(t);
+				if (k == AsmOperand_Register) {
+					u16 w = operand_type_bit_width(t);
+					if (w > widest) {
+						widest = w;
+					}
+				}
+			}
+			return cast(u16)(widest / 8);
+		}
+
 	""")
 
 	strings.write_string(&sb, "\n\n")
