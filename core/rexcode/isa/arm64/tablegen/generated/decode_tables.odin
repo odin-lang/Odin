@@ -8,7 +8,7 @@ package rexcode_arm64_generated
 import lib "../.."
 
 @(rodata)
-DECODE_ENTRIES := [2706]lib.Decode_Entry{
+DECODE_ENTRIES := [2710]lib.Decode_Entry{
 	{ .AMX_SET, {.NONE,.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE,.NONE}, 0x00201220, 0xFFFFFFFF, .AMX, {} },
 	{ .AMX_CLR, {.NONE,.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE,.NONE}, 0x00201240, 0xFFFFFFFF, .AMX, {} },
 	{ .AMX_LDX, {.X_REG,.NONE,.NONE,.NONE,.NONE}, {.RT,.NONE,.NONE,.NONE,.NONE}, 0x00201000, 0xFFFFFFE0, .AMX, {is_64=true, explicit_count=1} },
@@ -2663,6 +2663,10 @@ DECODE_ENTRIES := [2706]lib.Decode_Entry{
 	{ .FRECPX, {.S_REG,.S_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x5EA1F800, 0xFFFFFC00, .FP, {explicit_count=2} },
 	{ .FRECPX, {.D_REG,.D_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x5EE1F800, 0xFFFFFC00, .FP, {explicit_count=2} },
 	{ .FRECPX, {.H_REG,.H_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x5EF9F800, 0xFFFFFC00, .FP16, {explicit_count=2} },
+	{ .MOV, {.B_REG,.V_ELEM_B,.NONE,.NONE,.NONE}, {.VD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x5E010400, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.H_REG,.V_ELEM_H,.NONE,.NONE,.NONE}, {.VD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x5E020400, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.S_REG,.V_ELEM_S,.NONE,.NONE,.NONE}, {.VD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x5E040400, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.D_REG,.V_ELEM_D,.NONE,.NONE,.NONE}, {.VD,.NEON_IDX5,.NONE,.NONE,.NONE}, 0x5E080400, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .FMOV, {.S_REG,.IMM_8,.NONE,.NONE,.NONE}, {.RD,.FMOV_SCALAR_IMM,.NONE,.NONE,.NONE}, 0x1E201000, 0xFFE01FE0, .FP, {explicit_count=2} },
 	{ .FMOV, {.D_REG,.IMM_8,.NONE,.NONE,.NONE}, {.RD,.FMOV_SCALAR_IMM,.NONE,.NONE,.NONE}, 0x1E601000, 0xFFE01FE0, .FP, {explicit_count=2} },
 	{ .FMOV, {.H_REG,.IMM_8,.NONE,.NONE,.NONE}, {.RD,.FMOV_SCALAR_IMM,.NONE,.NONE,.NONE}, 0x1EE01000, 0xFFE01FE0, .FP16, {explicit_count=2} },
@@ -2732,6 +2736,6 @@ DECODE_INDEX_OP0 := [16]lib.Decode_Index{
 	0x0C = {2192, 167},
 	0x0D = {2359, 122},
 	0x0E = {2481,  49},
-	0x0F = {2530, 176},
+	0x0F = {2530, 180},
 }
 
