@@ -3703,7 +3703,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			Token close = expect_token(f, Token_CloseBrace);
 
 			if (args.count == 0) {
-				syntax_error(token, "Expected a least 1 argument in a procedure group");
+				syntax_error(token, "Expected a least 1 argument in an asm group");
 			}
 
 			return ast_asm_group(f, token, open, close, args);

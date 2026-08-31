@@ -391,20 +391,6 @@ enum StmtAllowFlag {
 	StmtAllowFlag_Label   = 1<<1,
 };
 
-enum InlineAsmDialectKind : u8 {
-	InlineAsmDialect_Default, // ATT is default
-	InlineAsmDialect_ATT,
-	InlineAsmDialect_Intel,
-
-	InlineAsmDialect_COUNT,
-};
-
-gb_global char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
-	"",
-	"att",
-	"intel",
-};
-
 enum UnionTypeKind : u8 {
 	UnionType_Normal     = 0,
 	UnionType_no_nil     = 2,
