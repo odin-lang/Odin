@@ -319,7 +319,8 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	// must not be held against the slot's register class. Only width matters for the
 	// memory interpretation. Register operands still get the full class check.
 	if (want_class != AsmRegClass_Unknown && !is_memory) {
-		if (!asm_reg_class_compatible(want_class, got_class)) {
+		bool is_lane = asm_ctx->operand_type_is_lane(slot);
+		if (!is_lane && !asm_reg_class_compatible(want_class, got_class)) {
 			if (mismatch_) *mismatch_ = AsmMismatch_Class;
 			return false;
 		}
@@ -1687,7 +1688,6 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		u16 written_ops = cast(u16)clobber.written;
 		u16 pinned_param_writes = 0;
-		auto const &decls = tmpl_entity->AsmTemplate.decls;
 		for_array(i, operands) {
 			int tslot = user_operand_target_index(cast(int)i);
 			if (tslot < 0 || tslot >= 4 || (written_ops & (1u << tslot)) == 0) {
@@ -1700,12 +1700,15 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				explicit_writes |= b;
 				continue;
 			}
-			Entity *pe = entity_of_node(operands[i].expr);
-			if (pe != nullptr && pe->kind == Entity_Variable) {
-				i32 di = -1;
-				check_asm_find_group(pe, decls, &di);         // reuse existing index finder
-				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, decls, di);
+			// NOTE(bill): A lane operand `v[idx]` is an IndexExpr with no entity of its own
+			Ast *op_expr = operands[i].expr;
+			if (op_expr != nullptr && op_expr->kind == Ast_IndexExpr) {
+				op_expr = op_expr->IndexExpr.expr;
 			}
+			Entity *pe = entity_of_node(op_expr);
+ 			if (pe == nullptr || pe->kind != Entity_Variable) {
+ 				continue;
+ 			}
 		}
 
 		if (is_pseudo &&
@@ -2251,7 +2254,11 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		}
 
 		// base and index must be the same width
-		if (have_base && have_index && base_w != index_w) {
+		// AArch64 register-offset addressing allows a 32-bit index with a 64-bit base
+		// (extended-register form: uxtw/sxtw). Other targets require equal widths.
+		bool ext_index_ok = build_context.metrics.arch == TargetArch_arm64 &&
+		                    base_w == 64 && index_w == 32;
+		if (have_base && have_index && base_w != index_w && !ext_index_ok) {
 			Ast *at = mem_op->base ? mem_op->base : expr;
 			error(at, "A memory operand's base and index registers must be the same width, got a %d-bit base and a %d-bit index",
 			      cast(int)base_w, cast(int)index_w);

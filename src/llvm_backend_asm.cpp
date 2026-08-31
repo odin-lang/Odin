@@ -1470,6 +1470,27 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		}
 	}
 
+	char const *arm64_index_extend(AstAsmMemoryOperand *mem_op) {
+		Ast *idx = mem_op->index;
+		if (idx == nullptr) {
+			return "lsl";
+		}
+		// Resolve the index operand's type: explicit reg -> its reg width; a param ->
+		// its Odin type.
+		Type *ty = idx->tav.type;
+		if (ty == nullptr) {
+			return "lsl";
+		}
+		i32 w = check_asm_operand_bit_width(ty);
+		if (w == 64) {
+			return "lsl";
+		}
+		// 32-bit index: pick zero/sign extend from the type's signedness.
+		Type *bt = base_type(ty);
+		bool is_signed = is_type_integer(bt) && !is_type_unsigned(bt);
+		return is_signed ? "sxtw" : "uxtw";
+	}
+
 	// ARM64 addressing: `[base]`, `[base, #disp]`, `[base, Xindex]`, or
 	// `[base, Xindex, LSL #n]`. Base+index and base+disp are mutually exclusive
 	// addressing modes, so an index precludes a displacement.
@@ -1486,10 +1507,19 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 			write_cstr(", ");
 			this->write_operand(op_number, mem_op->index, flags&~WriteOperandFlag_PrintPrefixes);
 			if (mem_op->scale != nullptr) {
-				i64 shift = this->arm64_scale_shift_amount(mem_op);
-				// Omit the no-op shift so `[x0, x1, LSL #0]` prints as the canonical
-				// `[x0, x1]`.
-				if (shift != 0) {
+				// A 32-bit index needs an extend specifier (uxtw/sxtw); a 64-bit index
+				// uses lsl. The extend for a w-index is mandatory even at shift 0.
+				char const *extend = this->arm64_index_extend(mem_op); // "lsl", "uxtw", or "sxtw"
+				i64 shift = (mem_op->scale != nullptr) ? this->arm64_scale_shift_amount(mem_op) : 0;
+				bool is_lsl = (extend[0] == 'l');
+				if (!is_lsl) {
+					// w-index: always print the extend; shift optional.
+					if (shift != 0) {
+						asm_string = gb_string_append_fmt(asm_string, ", %s #%lld", extend, cast(long long)shift);
+					} else {
+						asm_string = gb_string_append_fmt(asm_string, ", %s", extend);
+					}
+				} else if (shift != 0) {
 					asm_string = gb_string_append_fmt(asm_string, ", lsl #%lld", cast(long long)shift);
 				}
 			}

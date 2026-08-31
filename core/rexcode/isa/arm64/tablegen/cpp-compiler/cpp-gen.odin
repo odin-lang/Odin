@@ -974,18 +974,30 @@ main :: proc() {
 		// shift == log2(bytes). Derived from the widest register operand in the form
 		// (the data being loaded/stored). 0 => no such constraint. Generic across ISAs.
 		u16 form_transfer_bytes(Encoding const &form) const {
+			// Mnemonic-pinned access sizes (byte/halfword variants).
+			switch (form.mnemonic) {
+			case M_LDRB:  case M_LDRSB: case M_STRB:
+			case M_LDARB: case M_STLRB:
+			case M_LDXRB: case M_STXRB: case M_LDAXRB: case M_STLXRB:
+				return 1;
+			case M_LDRH:  case M_LDRSH: case M_STRH:
+			case M_LDARH: case M_STLRH:
+			case M_LDXRH: case M_STXRH: case M_LDAXRH: case M_STLXRH:
+				return 2;
+			case M_LDRSW:
+				return 4;
+			}
+
+			// Otherwise the access equals the widest register operand (plain
+			// ldr/str x/w/q, ldp/stp, etc.).
 			u16 widest = 0;
 			for (int j = 0; j < gb_count_of(form.ops); j++) {
 				auto t = form.ops[j];
-				if (!t) {
-					break;
-				}
+				if (!t) break;
 				AsmOperandKind k = kind_from_operand_type(t);
 				if (k == AsmOperand_Register) {
 					u16 w = operand_type_bit_width(t);
-					if (w > widest) {
-						widest = w;
-					}
+					if (w > widest) widest = w;
 				}
 			}
 			return cast(u16)(widest / 8);

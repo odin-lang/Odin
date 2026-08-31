@@ -8,7 +8,7 @@ package rexcode_arm64_generated
 import lib "../.."
 
 @(rodata)
-DECODE_ENTRIES := [2710]lib.Decode_Entry{
+DECODE_ENTRIES := [2720]lib.Decode_Entry{
 	{ .AMX_SET, {.NONE,.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE,.NONE}, 0x00201220, 0xFFFFFFFF, .AMX, {} },
 	{ .AMX_CLR, {.NONE,.NONE,.NONE,.NONE,.NONE}, {.NONE,.NONE,.NONE,.NONE,.NONE}, 0x00201240, 0xFFFFFFFF, .AMX, {} },
 	{ .AMX_LDX, {.X_REG,.NONE,.NONE,.NONE,.NONE}, {.RT,.NONE,.NONE,.NONE,.NONE}, 0x00201000, 0xFFFFFFE0, .AMX, {is_64=true, explicit_count=1} },
@@ -1254,6 +1254,10 @@ DECODE_ENTRIES := [2710]lib.Decode_Entry{
 	{ .DUP, {.V_2S,.W_REG,.NONE,.NONE,.NONE}, {.VD,.RN,.NONE,.NONE,.NONE}, 0x0E040C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .DUP, {.V_4S,.W_REG,.NONE,.NONE,.NONE}, {.VD,.RN,.NONE,.NONE,.NONE}, 0x4E040C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .DUP, {.V_2D,.X_REG,.NONE,.NONE,.NONE}, {.VD,.RN,.NONE,.NONE,.NONE}, 0x4E080C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.V_ELEM_B,.W_REG,.NONE,.NONE,.NONE}, {.NEON_IDX5,.RN,.NONE,.NONE,.NONE}, 0x4E011C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.V_ELEM_H,.W_REG,.NONE,.NONE,.NONE}, {.NEON_IDX5,.RN,.NONE,.NONE,.NONE}, 0x4E021C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.V_ELEM_S,.W_REG,.NONE,.NONE,.NONE}, {.NEON_IDX5,.RN,.NONE,.NONE,.NONE}, 0x4E041C00, 0xFFFFFC00, .NEON, {explicit_count=2} },
+	{ .MOV, {.V_ELEM_D,.X_REG,.NONE,.NONE,.NONE}, {.NEON_IDX5,.RN,.NONE,.NONE,.NONE}, 0x4E081C00, 0xFFFFFC00, .NEON, {is_64=true, explicit_count=2} },
 	{ .NOT, {.V_8B,.V_8B,.NONE,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE,.NONE}, 0x2E205800, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .NOT, {.V_16B,.V_16B,.NONE,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE,.NONE}, 0x6E205800, 0xFFFFFC00, .NEON, {explicit_count=2} },
 	{ .REV64, {.V_8B,.V_8B,.NONE,.NONE,.NONE}, {.VD,.VN,.NONE,.NONE,.NONE}, 0x0E200800, 0xFFFFFC00, .NEON, {explicit_count=2} },
@@ -1389,6 +1393,10 @@ DECODE_ENTRIES := [2710]lib.Decode_Entry{
 	{ .DUP, {.V_16B,.V_ELEM_B,.VEC_INDEX,.NONE,.NONE}, {.VD,.VN,.NEON_IDX5,.NONE,.NONE}, 0x4E010400, 0xFFE1FC00, .NEON, {explicit_count=3} },
 	{ .INS, {.V_ELEM_S,.VEC_INDEX,.V_ELEM_S,.VEC_INDEX,.NONE}, {.VD,.NEON_IDX5,.VN,.NEON_IDX4,.NONE}, 0x6E040400, 0xFFE79C00, .NEON, {explicit_count=4} },
 	{ .INS, {.V_ELEM_B,.VEC_INDEX,.W_REG,.NONE,.NONE}, {.VD,.NEON_IDX5,.RN,.NONE,.NONE}, 0x4E011C00, 0xFFE1FC00, .NEON, {explicit_count=3} },
+	{ .MOV, {.V_ELEM_B,.V_ELEM_B,.NONE,.NONE,.NONE}, {.NEON_IDX5,.NEON_IDX4,.NONE,.NONE,.NONE}, 0x6E010400, 0xFFFF8400, .NEON, {explicit_count=2} },
+	{ .MOV, {.V_ELEM_H,.V_ELEM_H,.NONE,.NONE,.NONE}, {.NEON_IDX5,.NEON_IDX4,.NONE,.NONE,.NONE}, 0x6E020400, 0xFFFF8400, .NEON, {explicit_count=2} },
+	{ .MOV, {.V_ELEM_S,.V_ELEM_S,.NONE,.NONE,.NONE}, {.NEON_IDX5,.NEON_IDX4,.NONE,.NONE,.NONE}, 0x6E040400, 0xFFFF8400, .NEON, {explicit_count=2} },
+	{ .MOV, {.V_ELEM_D,.V_ELEM_D,.NONE,.NONE,.NONE}, {.NEON_IDX5,.NEON_IDX4,.NONE,.NONE,.NONE}, 0x6E080400, 0xFFFF8400, .NEON, {explicit_count=2} },
 	{ .ADD, {.V_16B,.V_16B,.V_16B,.NONE,.NONE}, {.VD,.VN,.VM,.NONE,.NONE}, 0x4E208400, 0xFFE0FC00, .NEON, {explicit_count=3} },
 	{ .ADD, {.V_8H,.V_8H,.V_8H,.NONE,.NONE}, {.VD,.VN,.VM,.NONE,.NONE}, 0x4E608400, 0xFFE0FC00, .NEON, {explicit_count=3} },
 	{ .ADD, {.V_4S,.V_4S,.V_4S,.NONE,.NONE}, {.VD,.VN,.VM,.NONE,.NONE}, 0x4EA08400, 0xFFE0FC00, .NEON, {explicit_count=3} },
@@ -2546,6 +2554,8 @@ DECODE_ENTRIES := [2710]lib.Decode_Entry{
 	{ .FMOV, {.X_REG,.D_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x9E660000, 0xFFFFFC00, .FP, {is_64=true, explicit_count=2} },
 	{ .FMOV, {.D_REG,.X_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x9E670000, 0xFFFFFC00, .FP, {is_64=true, explicit_count=2} },
 	{ .FMOV, {.H_REG,.H_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x1EE04000, 0xFFFFFC00, .FP16, {explicit_count=2} },
+	{ .FMOV, {.X_REG,.V_ELEM_D,.NONE,.NONE,.NONE}, {.RD,.NEON_LANE_D,.NONE,.NONE,.NONE}, 0x9EAE0000, 0xFFFFFC00, .FP, {is_64=true, explicit_count=2} },
+	{ .FMOV, {.V_ELEM_D,.X_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x9EAF0000, 0xFFFFFC00, .FP, {is_64=true, explicit_count=2} },
 	{ .FABS, {.S_REG,.S_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x1E20C000, 0xFFFFFC00, .FP, {explicit_count=2} },
 	{ .FABS, {.D_REG,.D_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x1E60C000, 0xFFFFFC00, .FP, {explicit_count=2} },
 	{ .FABS, {.H_REG,.H_REG,.NONE,.NONE,.NONE}, {.RD,.RN,.NONE,.NONE,.NONE}, 0x1EE0C000, 0xFFFFFC00, .FP16, {explicit_count=2} },
@@ -2728,14 +2738,14 @@ DECODE_INDEX_OP0 := [16]lib.Decode_Index{
 	0x04 = { 751,  76},
 	0x05 = { 827,  50},
 	0x06 = { 877,  56},
-	0x07 = { 933, 1058},
-	0x08 = {1991,  16},
-	0x09 = {2007,  34},
-	0x0A = {2041, 130},
-	0x0B = {2171,  21},
-	0x0C = {2192, 167},
-	0x0D = {2359, 122},
-	0x0E = {2481,  49},
-	0x0F = {2530, 180},
+	0x07 = { 933, 1066},
+	0x08 = {1999,  16},
+	0x09 = {2015,  34},
+	0x0A = {2049, 130},
+	0x0B = {2179,  21},
+	0x0C = {2200, 167},
+	0x0D = {2367, 122},
+	0x0E = {2489,  49},
+	0x0F = {2538, 182},
 }
 
