@@ -109,7 +109,6 @@ sort_inlined_by_with_indices :: proc(arr: $T/[]$E, $LESS: proc(l, r: E) -> bool,
 				index = i
 			}
 
-			// arr := arr
 			_quick_lomuto(indices, arr, proc(l, r: int, arr: T) -> bool {
 				return LESS(arr[l], arr[r])
 			})
@@ -238,14 +237,18 @@ sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 		}
 
 		cur_index := i
+		temp := data[cur_index]
+
 		for next_index != i {
 			indices[cur_index] *= -1
 
-			data[cur_index], data[next_index] = data[next_index], data[cur_index]
+			data[cur_index] = data[next_index]
 			
 			cur_index = next_index
 			next_index = indices[cur_index]
 		}
+		
+		data[cur_index] = temp
 		indices[i] *= -1
 	}
 }
