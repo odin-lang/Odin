@@ -980,18 +980,18 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		return false;
 	}
 
-	// AArch64 immediates carry their own '#'; registers are bare. No AT&T-style
+	// ARM64 immediates carry their own '#'; registers are bare. No AT&T-style
 	// prefixes, so the generic PrintPrefixes bit is unused here.
 	u32 default_operand_write_flags() override {
 		return WriteOperandFlag_NONE;
 	}
 
-	// #clobber flags -> the AArch64 condition-code clobber (NZCV).
+	// #clobber flags -> the ARM64 condition-code clobber (NZCV).
 	void emit_flags_clobber() override {
 		sep(); raw("~{cc}");
 	}
 
-	// LLVM inline-asm constraint class letters for AArch64.
+	// LLVM inline-asm constraint class letters for ARM64.
 	char const *class_letter(AsmRegClass rc) override {
 		switch (rc) {
 		case AsmRegClass_Integer: return "r";    // GPR (x/w)
@@ -1010,7 +1010,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		return false;
 	}
 
-	// AArch64 immediates are written '#<value>'; no scale/log2 addressing forms.
+	// ARM64 immediates are written '#<value>'; no scale/log2 addressing forms.
 	void write_constant_operand(Ast *op, u32 flags) override {
 		GB_ASSERT(op->tav.mode == Addressing_Constant);
 		op->tav.value = exact_value_to_integer(op->tav.value);
@@ -1036,13 +1036,31 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		}
 	}
 
+	// ARM64 lane element qualifier for `vN.<T>[i]`, from the operand's element type.
+	char arm64_lane_qualifier_for_type(Type *t) {
+		Type *bt = base_type(t);
+		Type *elem = bt;
+		if (bt->kind == Type_SimdVector) {
+			elem = bt->SimdVector.elem;
+		} else if (bt->kind == Type_Array) {
+			elem = bt->Array.elem;
+		}
+		switch (type_size_of(base_type(elem))) {
+		case 1: return 'b';
+		case 2: return 'h';
+		case 4: return 's';
+		case 8: return 'd';
+		}
+		return 0;
+	}
+
 	void write_operand(Slice<i32> const &op_number, Ast *op, u32 flags) override {
 		if (op->tav.mode == Addressing_Constant) {
 			this->write_constant_operand(op, flags);
 			return;
 		}
 
-		// No '*' indirection on AArch64; the register prints normally.
+		// No '*' indirection on ARM64; the register prints normally.
 		flags &= ~WriteOperandFlag_IndirectBranch;
 
 		bool negate = (flags & WriteOperandFlag_Negate) != 0;
@@ -1056,7 +1074,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 			if (ed->view_of >= 0) {
 				// Width-view (e.g. `p0w: u32 = p0`): the allocator picks one register;
 				// print it at the requested width via LLVM's w/x operand modifier so both
-				// names share it. AArch64 GPRs only expose 32-bit (w) and 64-bit (x)
+				// names share it. ARM64 GPRs only expose 32-bit (w) and 64-bit (x)
 				// names; sub-word views still use the w register.
 				i32 idx = op_number[ed->view_of];
 				GB_ASSERT(idx >= 0);
@@ -1064,7 +1082,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				switch (ed->view_bits) {
 				case 8: case 16: case 32: mod = 'w'; break;
 				case 64:                  mod = 'x'; break;
-				default: GB_PANIC("asm: invalid AArch64 width-view size %d", ed->view_bits); break;
+				default: GB_PANIC("asm: invalid ARM64 width-view size %d", ed->view_bits); break;
 				}
 				asm_string = gb_string_append_fmt(asm_string, "${%d:%c}", idx, mod);
 			} else {
@@ -1095,18 +1113,119 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		case_ast_node(reg, AsmRegister, op);
 			this->write_string(reg->name.string); // bare: x0, w0, sp, xzr, v0, ...
 		case_end;
+		case_ast_node(ie, IndexExpr, op);
+			// Vector-lane access: `acc[0]` -> `$N.d[0]` (i.e. v<N>.d[0]). The base names
+			// the SIMD operand; the index is a constant lane encoded in the instruction.
+			Ast *base_op = ie->expr;
+			Ast *index   = ie->index;
+
+			// The lane index is an assemble-time constant, validated and folded by the
+			// checker onto ie->index. If it isn't present here the checker already
+			// reported the error (non-constant / out-of-range lane), so bail rather than
+			// assert — lowering must not be the thing that crashes on a rejected program.
+			if (index->tav.mode != Addressing_Constant) {
+				return;
+			}
+			ExactValue lane_ev = exact_value_to_integer(index->tav.value);
+			if (lane_ev.kind != ExactValue_Integer) {
+				return;
+			}
+			i64 lane = exact_value_to_i64(lane_ev);
+			GB_ASSERT(lane >= 0); // checker guarantees non-negative
+
+			switch (base_op->kind) {
+			case_ast_node(reg, AsmRegister, base_op);
+				// Explicit register: the arrangement (`.d`, `.2d`, `.4s`) is part of the
+				// spelling, so print the name verbatim and append the lane. If it was
+				// written bare (`v0`), there is no element size to index by.
+				String rname = reg->name.string;
+				bool has_arrangement = false;
+				for (isize i = 0; i < rname.len; i++) {
+					if (rname.text[i] == '.') {
+						has_arrangement = true;
+						break;
+					}
+				}
+				GB_ASSERT_MSG(has_arrangement,
+				              "asm: AArch64 lane access on register '%.*s' needs an element qualifier "
+				              "(e.g. '%.*s.d[%lld]')",
+				              LIT(rname), LIT(rname), cast(long long)lane);
+				this->write_string(rname);
+				asm_string = gb_string_append_fmt(asm_string, "[%lld]", cast(long long)lane);
+			case_end;
+
+			case_ast_node(id, Ident, base_op);
+				Entity *e  = entity_of_node(base_op);
+				auto   *ed = entity_op(e);
+
+				// Lane form needs the v-register, so index the source operand directly with no
+				// width modifier (a width-view would force a scalar d/s name that can't take a lane).
+				i32 idx = (ed->view_of >= 0) ? op_number[ed->view_of] : op_number[ed->total_index];
+				GB_ASSERT(idx >= 0);
+
+				char q = this->arm64_lane_qualifier_for_type(ed->entity->type);
+				GB_ASSERT_MSG(q != 0, "asm: cannot determine AArch64 lane element size for '%.*s'",
+				              LIT(e->token.string));
+
+				asm_string = gb_string_append_fmt(asm_string, "$%d.%c[%lld]", idx, q, cast(long long)lane);
+			case_end;
+
+			default:
+				GB_PANIC("asm: AArch64 lane base must be an operand or explicit register, got '%s'",
+				         expr_to_string(base_op));
+				break;
+			}
+		case_end;
 		default:
 			GB_PANIC("TODO(bill): write_operand for '%s'", expr_to_string(op));
 			break;
 		}
 	}
 
-	// AArch64 addressing here: `[base]`, `[base, #disp]`, or `[base, Xindex]`.
-	// (Scaled/extended index and pre/post-index writebacks aren't expressible via
-	// this explicit-syntax path.)
+		// Resolve a memory scale to an ARM64 `LSL #n` shift amount. The frontend
+	// encodes scale either as a multiply (index * {1,2,4,8,16}) or as an explicit
+	// shift (index << n); ARM64 register-offset addressing always wants the shift.
+	i64 arm64_scale_shift_amount(AstAsmMemoryOperand *mem_op) {
+		Ast *scale = mem_op->scale;
+		GB_ASSERT(scale != nullptr);
+		GB_ASSERT_MSG(scale->tav.mode == Addressing_Constant,
+		              "asm: ARM64 memory scale must be a constant shift amount");
+		ExactValue ev = exact_value_to_integer(scale->tav.value);
+		GB_ASSERT(ev.kind == ExactValue_Integer);
+		i64 v = exact_value_to_i64(ev);
+
+		switch (mem_op->scale_op.kind) {
+		case Token_Mul:
+			switch (v) {
+			case 1:  return 0;
+			case 2:  return 1;
+			case 4:  return 2;
+			case 8:  return 3;
+			case 16: return 4; // 128-bit (Q) transfers
+			default:
+				error(scale, "asm: ARM64 memory scale must be 1, 2, 4, 8, or 16, got %lld", cast(long long)v);
+				return 0;
+			}
+		case Token_Shl:
+		case Token_Shr:
+			if (v < 0 || v > 4) {
+				error(scale, "asm: ARM64 memory shift amount must be between 0 and 4, got %lld", cast(long long)v);
+				return 0;
+			}
+			return v;
+		default:
+			GB_PANIC("asm: invalid ARM64 memory scale operator");
+			return 0;
+		}
+	}
+
+	// ARM64 addressing: `[base]`, `[base, #disp]`, `[base, Xindex]`, or
+	// `[base, Xindex, LSL #n]`. Base+index and base+disp are mutually exclusive
+	// addressing modes, so an index precludes a displacement.
 	void write_memory_operand(Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
-		GB_ASSERT_MSG(mem_op->segment_override == nullptr, "asm: AArch64 has no segment overrides");
-		GB_ASSERT_MSG(mem_op->scale == nullptr, "asm: AArch64 memory operands take no scaled index here");
+		GB_ASSERT_MSG(mem_op->segment_override == nullptr, "asm: ARM64 has no segment overrides");
+		GB_ASSERT_MSG(mem_op->scale == nullptr || mem_op->index != nullptr,
+		              "asm: ARM64 memory scale requires an index register");
 
 		write_cstr("[");
 		if (mem_op->base != nullptr) {
@@ -1115,6 +1234,14 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		if (mem_op->index != nullptr) {
 			write_cstr(", ");
 			this->write_operand(op_number, mem_op->index, flags&~WriteOperandFlag_PrintPrefixes);
+			if (mem_op->scale != nullptr) {
+				i64 shift = this->arm64_scale_shift_amount(mem_op);
+				// Omit the no-op shift so `[x0, x1, LSL #0]` prints as the canonical
+				// `[x0, x1]`.
+				if (shift != 0) {
+					asm_string = gb_string_append_fmt(asm_string, ", lsl #%lld", cast(long long)shift);
+				}
+			}
 		} else if (mem_op->disp) {
 			write_cstr(", ");
 			u32 disp_flags = flags;

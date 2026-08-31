@@ -2350,18 +2350,29 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			gbString s = type_to_string(rhs.type);
 			error(rhs.expr, "Expected an integer immediate as an index, got %s", s);
 			gb_string_free(s);
+		} else if (rhs.mode != Addressing_Constant || rhs.value.kind != ExactValue_Integer) {
+			Entity *pe = entity_of_node(rhs.expr);
+			bool is_poly_const = pe != nullptr && pe->kind == Entity_Variable &&
+			                     (pe->flags & EntityFlag_PolyConst) != 0;
+			if (!is_poly_const) {
+				error(rhs.expr, "A vector lane index must be an assemble-time integer constant");
+			}
 		}
 
 		if (build_context.metrics.arch != TargetArch_arm64) {
 			error(expr, "The target platform does not support vector element extraction syntax");
 		}
 
-
+		operand->expr = expr;
 		operand->mode = Addressing_Value;
 		operand->type = base_array_type(lhs.type);
 		operand->value = {};
 
-		add_type_and_value(ctx, expr, Addressing_Value, operand->type, {});
+		add_type_and_value(ctx, operand->expr, operand->mode, operand->type, operand->value);
+
+		if (rhs.mode == Addressing_Constant) {
+			add_type_and_value(ctx, rhs.expr, rhs.mode, rhs.type, rhs.value);
+		}
 		return;
 	case_end;
 	}
