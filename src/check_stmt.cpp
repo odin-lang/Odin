@@ -1167,6 +1167,8 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
+	// Tagless switch cases are independent predicates, not case values.
+	bool check_duplicate_cases = ss->tag != nullptr;
 
 	mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
 	check_open_scope(ctx, node);
@@ -1292,7 +1294,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				Operand b1 = rhs;
 				check_comparison(ctx, expr, &a1, &b1, Token_LtEq);
 
-				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				if (check_duplicate_cases) {
+					add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				}
 
 				if (is_type_string16(x.type)) {
 					// NOTE(bill): Force dependency for strings here
@@ -1325,7 +1329,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
-					add_type_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_type_to_seen_map(ctx, &seen, y);
+					}
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
@@ -1342,7 +1348,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 						continue;
 					}
 					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
-					add_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_to_seen_map(ctx, &seen, y);
+					}
 				}
 			}
 		}
