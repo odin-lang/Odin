@@ -1830,6 +1830,838 @@ vornq_u64 :: #force_inline proc "c" (a, b: uint64x2_t) -> uint64x2_t {
 	return simd.bit_or(simd.bit_xor(b, c), a)
 }
 
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_s8)
+@(require_results, enable_target_feature = "neon")
+vshl_n_s8 :: #force_inline proc "c" (v: int8x8_t, $N: int32_t) -> int8x8_t where 0 <= N, N < 8 {
+	return simd.shl(v, uint8x8_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_u8)
+@(require_results, enable_target_feature = "neon")
+vshl_n_u8 :: #force_inline proc "c" (v: uint8x8_t, $N: int32_t) -> uint8x8_t where 0 <= N, N < 8 {
+	return simd.shl(v, uint8x8_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_s16)
+@(require_results, enable_target_feature = "neon")
+vshl_n_s16 :: #force_inline proc "c" (v: int16x4_t, $N: int32_t) -> int16x4_t where 0 <= N, N < 16 {
+	return simd.shl(v, uint16x4_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_u16)
+@(require_results, enable_target_feature = "neon")
+vshl_n_u16 :: #force_inline proc "c" (v: uint16x4_t, $N: int32_t) -> uint16x4_t where 0 <= N, N < 16 {
+	return simd.shl(v, uint16x4_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_s32)
+@(require_results, enable_target_feature = "neon")
+vshl_n_s32 :: #force_inline proc "c" (v: int32x2_t, $N: int32_t) -> int32x2_t where 0 <= N, N < 32 {
+	return simd.shl(v, uint32x2_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_u32)
+@(require_results, enable_target_feature = "neon")
+vshl_n_u32 :: #force_inline proc "c" (v: uint32x2_t, $N: int32_t) -> uint32x2_t where 0 <= N, N < 32 {
+	return simd.shl(v, uint32x2_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_s64)
+@(require_results, enable_target_feature = "neon")
+vshl_n_s64 :: #force_inline proc "c" (v: int64x1_t, $N: int32_t) -> int64x1_t where 0 <= N, N < 64 {
+	return simd.shl(v, uint64x1_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_n_u64)
+@(require_results, enable_target_feature = "neon")
+vshl_n_u64 :: #force_inline proc "c" (v: uint64x1_t, $N: int32_t) -> uint64x1_t where 0 <= N, N < 64 {
+	return simd.shl(v, uint64x1_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_s8)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_s8 :: #force_inline proc "c" (v: int8x16_t, $N: int32_t) -> int8x16_t where 0 <= N, N < 8 {
+	return simd.shl(v, uint8x16_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_u8)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_u8 :: #force_inline proc "c" (v: uint8x16_t, $N: int32_t) -> uint8x16_t where 0 <= N, N < 8 {
+	return simd.shl(v, uint8x16_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_s16)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> int16x8_t where 0 <= N, N < 16 {
+	return simd.shl(v, uint16x8_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_u16)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_u16 :: #force_inline proc "c" (v: uint16x8_t, $N: int32_t) -> uint16x8_t where 0 <= N, N < 16 {
+	return simd.shl(v, uint16x8_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_s32)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> int32x4_t where 0 <= N, N < 32 {
+	return simd.shl(v, uint32x4_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_u32)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint32x4_t where 0 <= N, N < 32 {
+	return simd.shl(v, uint32x4_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_s64)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> int64x2_t where 0 <= N, N < 64 {
+	return simd.shl(v, uint64x2_t(N))
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_n_u64)
+@(require_results, enable_target_feature = "neon")
+vshlq_n_u64 :: #force_inline proc "c" (v: uint64x2_t, $N: int32_t) -> uint64x2_t where 0 <= N, N < 64 {
+	return simd.shl(v, uint64x2_t(N))
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_s8)
+@(require_results, enable_target_feature = "neon")
+vshl_s8 :: #force_inline proc "c" (a: int8x8_t, b: int8x8_t) -> int8x8_t {
+	return _vshl_s8(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_u8)
+@(require_results, enable_target_feature = "neon")
+vshl_u8 :: #force_inline proc "c" (a: uint8x8_t, b: int8x8_t) -> uint8x8_t {
+	return _vshl_u8(a, b)
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_s16)
+@(require_results, enable_target_feature = "neon")
+vshl_s16 :: #force_inline proc "c" (a: int16x4_t, b: int16x4_t) -> int16x4_t {
+	return _vshl_s16(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_u16)
+@(require_results, enable_target_feature = "neon")
+vshl_u16 :: #force_inline proc "c" (a: uint16x4_t, b: int16x4_t) -> uint16x4_t {
+	return _vshl_u16(a, b)
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_s32)
+@(require_results, enable_target_feature = "neon")
+vshl_s32 :: #force_inline proc "c" (a: int32x2_t, b: int32x2_t) -> int32x2_t {
+	return _vshl_s32(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_u32)
+@(require_results, enable_target_feature = "neon")
+vshl_u32 :: #force_inline proc "c" (a: uint32x2_t, b: int32x2_t) -> uint32x2_t {
+	return _vshl_u32(a, b)
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_s64)
+@(require_results, enable_target_feature = "neon")
+vshl_s64 :: #force_inline proc "c" (a: int64x1_t, b: int64x1_t) -> int64x1_t {
+	return _vshl_s64(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshl_u64)
+@(require_results, enable_target_feature = "neon")
+vshl_u64 :: #force_inline proc "c" (a: uint64x1_t, b: int64x1_t) -> uint64x1_t {
+	return _vshl_u64(a, b)
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_s8)
+@(require_results, enable_target_feature = "neon")
+vshlq_s8 :: #force_inline proc "c" (a: int8x16_t, b: int8x16_t) -> int8x16_t {
+	return _vshlq_s8(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_u8)
+@(require_results, enable_target_feature = "neon")
+vshlq_u8 :: #force_inline proc "c" (a: uint8x16_t, b: int8x16_t) -> uint8x16_t {
+	return _vshlq_u8(a, b)
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_s16)
+@(require_results, enable_target_feature = "neon")
+vshlq_s16 :: #force_inline proc "c" (a: int16x8_t, b: int16x8_t) -> int16x8_t {
+	return _vshlq_s16(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_u16)
+@(require_results, enable_target_feature = "neon")
+vshlq_u16 :: #force_inline proc "c" (a: uint16x8_t, b: int16x8_t) -> uint16x8_t {
+	return _vshlq_u16(a, b)
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_s32)
+@(require_results, enable_target_feature = "neon")
+vshlq_s32 :: #force_inline proc "c" (a: int32x4_t, b: int32x4_t) -> int32x4_t {
+	return _vshlq_s32(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_u32)
+@(require_results, enable_target_feature = "neon")
+vshlq_u32 :: #force_inline proc "c" (a: uint32x4_t, b: int32x4_t) -> uint32x4_t {
+	return _vshlq_u32(a, b)
+}
+
+// Signed Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_s64)
+@(require_results, enable_target_feature = "neon")
+vshlq_s64 :: #force_inline proc "c" (a: int64x2_t, b: int64x2_t) -> int64x2_t {
+	return _vshlq_s64(a, b)
+}
+
+// Unsigned Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshlq_u64)
+@(require_results, enable_target_feature = "neon")
+vshlq_u64 :: #force_inline proc "c" (a: uint64x2_t, b: int64x2_t) -> uint64x2_t {
+	return _vshlq_u64(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_s8)
+@(require_results, enable_target_feature = "neon")
+vrshl_s8 :: #force_inline proc "c" (a: int8x8_t, b: int8x8_t) -> int8x8_t {
+	return _vrshl_s8(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_u8)
+@(require_results, enable_target_feature = "neon")
+vrshl_u8 :: #force_inline proc "c" (a: uint8x8_t, b: int8x8_t) -> uint8x8_t {
+	return _vrshl_u8(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_s16)
+@(require_results, enable_target_feature = "neon")
+vrshl_s16 :: #force_inline proc "c" (a: int16x4_t, b: int16x4_t) -> int16x4_t {
+	return _vrshl_s16(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_u16)
+@(require_results, enable_target_feature = "neon")
+vrshl_u16 :: #force_inline proc "c" (a: uint16x4_t, b: int16x4_t) -> uint16x4_t {
+	return _vrshl_u16(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_s32)
+@(require_results, enable_target_feature = "neon")
+vrshl_s32 :: #force_inline proc "c" (a: int32x2_t, b: int32x2_t) -> int32x2_t {
+	return _vrshl_s32(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_u32)
+@(require_results, enable_target_feature = "neon")
+vrshl_u32 :: #force_inline proc "c" (a: uint32x2_t, b: int32x2_t) -> uint32x2_t {
+	return _vrshl_u32(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_s64)
+@(require_results, enable_target_feature = "neon")
+vrshl_s64 :: #force_inline proc "c" (a: int64x1_t, b: int64x1_t) -> int64x1_t {
+	return _vrshl_s64(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshl_u64)
+@(require_results, enable_target_feature = "neon")
+vrshl_u64 :: #force_inline proc "c" (a: uint64x1_t, b: int64x1_t) -> uint64x1_t {
+	return _vrshl_u64(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_s8)
+@(require_results, enable_target_feature = "neon")
+vrshlq_s8 :: #force_inline proc "c" (a: int8x16_t, b: int8x16_t) -> int8x16_t {
+	return _vrshlq_s8(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_u8)
+@(require_results, enable_target_feature = "neon")
+vrshlq_u8 :: #force_inline proc "c" (a: uint8x16_t, b: int8x16_t) -> uint8x16_t {
+	return _vrshlq_u8(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_s16)
+@(require_results, enable_target_feature = "neon")
+vrshlq_s16 :: #force_inline proc "c" (a: int16x8_t, b: int16x8_t) -> int16x8_t {
+	return _vrshlq_s16(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_u16)
+@(require_results, enable_target_feature = "neon")
+vrshlq_u16 :: #force_inline proc "c" (a: uint16x8_t, b: int16x8_t) -> uint16x8_t {
+	return _vrshlq_u16(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_s32)
+@(require_results, enable_target_feature = "neon")
+vrshlq_s32 :: #force_inline proc "c" (a: int32x4_t, b: int32x4_t) -> int32x4_t {
+	return _vrshlq_s32(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_u32)
+@(require_results, enable_target_feature = "neon")
+vrshlq_u32 :: #force_inline proc "c" (a: uint32x4_t, b: int32x4_t) -> uint32x4_t {
+	return _vrshlq_u32(a, b)
+}
+
+// Signed Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_s64)
+@(require_results, enable_target_feature = "neon")
+vrshlq_s64 :: #force_inline proc "c" (a: int64x2_t, b: int64x2_t) -> int64x2_t {
+	return _vrshlq_s64(a, b)
+}
+
+// Unsigned Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshlq_u64)
+@(require_results, enable_target_feature = "neon")
+vrshlq_u64 :: #force_inline proc "c" (a: uint64x2_t, b: int64x2_t) -> uint64x2_t {
+	return _vrshlq_u64(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_s8)
+@(require_results, enable_target_feature = "neon")
+vqshl_s8 :: #force_inline proc "c" (a: int8x8_t, b: int8x8_t) -> int8x8_t {
+	return _vqshl_s8(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_u8)
+@(require_results, enable_target_feature = "neon")
+vqshl_u8 :: #force_inline proc "c" (a: uint8x8_t, b: int8x8_t) -> uint8x8_t {
+	return _vqshl_u8(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_s16)
+@(require_results, enable_target_feature = "neon")
+vqshl_s16 :: #force_inline proc "c" (a: int16x4_t, b: int16x4_t) -> int16x4_t {
+	return _vqshl_s16(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_u16)
+@(require_results, enable_target_feature = "neon")
+vqshl_u16 :: #force_inline proc "c" (a: uint16x4_t, b: int16x4_t) -> uint16x4_t {
+	return _vqshl_u16(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_s32)
+@(require_results, enable_target_feature = "neon")
+vqshl_s32 :: #force_inline proc "c" (a: int32x2_t, b: int32x2_t) -> int32x2_t {
+	return _vqshl_s32(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_u32)
+@(require_results, enable_target_feature = "neon")
+vqshl_u32 :: #force_inline proc "c" (a: uint32x2_t, b: int32x2_t) -> uint32x2_t {
+	return _vqshl_u32(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_s64)
+@(require_results, enable_target_feature = "neon")
+vqshl_s64 :: #force_inline proc "c" (a: int64x1_t, b: int64x1_t) -> int64x1_t {
+	return _vqshl_s64(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_u64)
+@(require_results, enable_target_feature = "neon")
+vqshl_u64 :: #force_inline proc "c" (a: uint64x1_t, b: int64x1_t) -> uint64x1_t {
+	return _vqshl_u64(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_s8)
+@(require_results, enable_target_feature = "neon")
+vqshlq_s8 :: #force_inline proc "c" (a: int8x16_t, b: int8x16_t) -> int8x16_t {
+	return _vqshlq_s8(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_u8)
+@(require_results, enable_target_feature = "neon")
+vqshlq_u8 :: #force_inline proc "c" (a: uint8x16_t, b: int8x16_t) -> uint8x16_t {
+	return _vqshlq_u8(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_s16)
+@(require_results, enable_target_feature = "neon")
+vqshlq_s16 :: #force_inline proc "c" (a: int16x8_t, b: int16x8_t) -> int16x8_t {
+	return _vqshlq_s16(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_u16)
+@(require_results, enable_target_feature = "neon")
+vqshlq_u16 :: #force_inline proc "c" (a: uint16x8_t, b: int16x8_t) -> uint16x8_t {
+	return _vqshlq_u16(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_s32)
+@(require_results, enable_target_feature = "neon")
+vqshlq_s32 :: #force_inline proc "c" (a: int32x4_t, b: int32x4_t) -> int32x4_t {
+	return _vqshlq_s32(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_u32)
+@(require_results, enable_target_feature = "neon")
+vqshlq_u32 :: #force_inline proc "c" (a: uint32x4_t, b: int32x4_t) -> uint32x4_t {
+	return _vqshlq_u32(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_s64)
+@(require_results, enable_target_feature = "neon")
+vqshlq_s64 :: #force_inline proc "c" (a: int64x2_t, b: int64x2_t) -> int64x2_t {
+	return _vqshlq_s64(a, b)
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_u64)
+@(require_results, enable_target_feature = "neon")
+vqshlq_u64 :: #force_inline proc "c" (a: uint64x2_t, b: int64x2_t) -> uint64x2_t {
+	return _vqshlq_u64(a, b)
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_s8)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_s8 :: #force_inline proc "c" (v: int8x8_t, $N: int32_t) -> int8x8_t where 0 <= N, N < 8 {
+	return vqshl_s8(v, int8x8_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_u8)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_u8 :: #force_inline proc "c" (v: uint8x8_t, $N: int32_t) -> uint8x8_t where 0 <= N, N < 8 {
+	return vqshl_u8(v, int8x8_t(N))
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_s16 :: #force_inline proc "c" (v: int16x4_t, $N: int32_t) -> int16x4_t where 0 <= N, N < 16 {
+	return vqshl_s16(v, int16x4_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_u16)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_u16 :: #force_inline proc "c" (v: uint16x4_t, $N: int32_t) -> uint16x4_t where 0 <= N, N < 16 {
+	return vqshl_u16(v, int16x4_t(N))
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_s32 :: #force_inline proc "c" (v: int32x2_t, $N: int32_t) -> int32x2_t where 0 <= N, N < 32 {
+	return vqshl_s32(v, int32x2_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_u32)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_u32 :: #force_inline proc "c" (v: uint32x2_t, $N: int32_t) -> uint32x2_t where 0 <= N, N < 32 {
+	return vqshl_u32(v, int32x2_t(N))
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_s64 :: #force_inline proc "c" (v: int64x1_t, $N: int32_t) -> int64x1_t where 0 <= N, N < 64 {
+	return vqshl_s64(v, int64x1_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshl_n_u64)
+@(require_results, enable_target_feature = "neon")
+vqshl_n_u64 :: #force_inline proc "c" (v: uint64x1_t, $N: int32_t) -> uint64x1_t where 0 <= N, N < 64 {
+	return vqshl_u64(v, int64x1_t(N))
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_s8)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_s8 :: #force_inline proc "c" (v: int8x16_t, $N: int32_t) -> int8x16_t where 0 <= N, N < 8 {
+	return vqshlq_s8(v, int8x16_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_u8)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_u8 :: #force_inline proc "c" (v: uint8x16_t, $N: int32_t) -> uint8x16_t where 0 <= N, N < 8 {
+	return vqshlq_u8(v, int8x16_t(N))
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> int16x8_t where 0 <= N, N < 16 {
+	return vqshlq_s16(v, int16x8_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_u16)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_u16 :: #force_inline proc "c" (v: uint16x8_t, $N: int32_t) -> uint16x8_t where 0 <= N, N < 16 {
+	return vqshlq_u16(v, int16x8_t(N))
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> int32x4_t where 0 <= N, N < 32 {
+	return vqshlq_s32(v, int32x4_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_u32)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint32x4_t where 0 <= N, N < 32 {
+	return vqshlq_u32(v, int32x4_t(N))
+}
+
+// Signed Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> int64x2_t where 0 <= N, N < 64 {
+	return vqshlq_s64(v, int64x2_t(N))
+}
+
+// Unsigned Saturating Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlq_n_u64)
+@(require_results, enable_target_feature = "neon")
+vqshlq_n_u64 :: #force_inline proc "c" (v: uint64x2_t, $N: int32_t) -> uint64x2_t where 0 <= N, N < 64 {
+	return vqshlq_u64(v, int64x2_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlu_n_s8)
+@(require_results, enable_target_feature = "neon")
+vqshlu_n_s8 :: #force_inline proc "c" (v: int8x8_t, $N: int32_t) -> uint8x8_t where 0 <= N, N < 8 {
+	return _vqshlu_n_s8(v, int8x8_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlu_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqshlu_n_s16 :: #force_inline proc "c" (v: int16x4_t, $N: int32_t) -> uint16x4_t where 0 <= N, N < 16 {
+	return _vqshlu_n_s16(v, int16x4_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlu_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqshlu_n_s32 :: #force_inline proc "c" (v: int32x2_t, $N: int32_t) -> uint32x2_t where 0 <= N, N < 32 {
+	return _vqshlu_n_s32(v, int32x2_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlu_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqshlu_n_s64 :: #force_inline proc "c" (v: int64x1_t, $N: int32_t) -> uint64x1_t where 0 <= N, N < 64 {
+	return _vqshlu_n_s64(v, int64x1_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshluq_n_s8)
+@(require_results, enable_target_feature = "neon")
+vqshluq_n_s8 :: #force_inline proc "c" (v: int8x16_t, $N: int32_t) -> uint8x16_t where 0 <= N, N < 8 {
+	return _vqshluq_n_s8(v, int8x16_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshluq_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqshluq_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> uint16x8_t where 0 <= N, N < 16 {
+	return _vqshluq_n_s16(v, int16x8_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshluq_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqshluq_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> uint32x4_t where 0 <= N, N < 32 {
+	return _vqshluq_n_s32(v, int32x4_t(N))
+}
+
+// Signed Saturating Shift Left Unsigned.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshluq_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqshluq_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> uint64x2_t where 0 <= N, N < 64 {
+	return _vqshluq_n_s64(v, int64x2_t(N))
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_s8)
+@(require_results, enable_target_feature = "neon")
+vqrshl_s8 :: #force_inline proc "c" (a: int8x8_t, b: int8x8_t) -> int8x8_t {
+	return _vqrshl_s8(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_u8)
+@(require_results, enable_target_feature = "neon")
+vqrshl_u8 :: #force_inline proc "c" (a: uint8x8_t, b: int8x8_t) -> uint8x8_t {
+	return _vqrshl_u8(a, b)
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_s16)
+@(require_results, enable_target_feature = "neon")
+vqrshl_s16 :: #force_inline proc "c" (a: int16x4_t, b: int16x4_t) -> int16x4_t {
+	return _vqrshl_s16(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_u16)
+@(require_results, enable_target_feature = "neon")
+vqrshl_u16 :: #force_inline proc "c" (a: uint16x4_t, b: int16x4_t) -> uint16x4_t {
+	return _vqrshl_u16(a, b)
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_s32)
+@(require_results, enable_target_feature = "neon")
+vqrshl_s32 :: #force_inline proc "c" (a: int32x2_t, b: int32x2_t) -> int32x2_t {
+	return _vqrshl_s32(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_u32)
+@(require_results, enable_target_feature = "neon")
+vqrshl_u32 :: #force_inline proc "c" (a: uint32x2_t, b: int32x2_t) -> uint32x2_t {
+	return _vqrshl_u32(a, b)
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_s64)
+@(require_results, enable_target_feature = "neon")
+vqrshl_s64 :: #force_inline proc "c" (a: int64x1_t, b: int64x1_t) -> int64x1_t {
+	return _vqrshl_s64(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshl_u64)
+@(require_results, enable_target_feature = "neon")
+vqrshl_u64 :: #force_inline proc "c" (a: uint64x1_t, b: int64x1_t) -> uint64x1_t {
+	return _vqrshl_u64(a, b)
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_s8)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_s8 :: #force_inline proc "c" (a: int8x16_t, b: int8x16_t) -> int8x16_t {
+	return _vqrshlq_s8(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_u8)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_u8 :: #force_inline proc "c" (a: uint8x16_t, b: int8x16_t) -> uint8x16_t {
+	return _vqrshlq_u8(a, b)
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_s16)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_s16 :: #force_inline proc "c" (a: int16x8_t, b: int16x8_t) -> int16x8_t {
+	return _vqrshlq_s16(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_u16)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_u16 :: #force_inline proc "c" (a: uint16x8_t, b: int16x8_t) -> uint16x8_t {
+	return _vqrshlq_u16(a, b)
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_s32)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_s32 :: #force_inline proc "c" (a: int32x4_t, b: int32x4_t) -> int32x4_t {
+	return _vqrshlq_s32(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_u32)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_u32 :: #force_inline proc "c" (a: uint32x4_t, b: int32x4_t) -> uint32x4_t {
+	return _vqrshlq_u32(a, b)
+}
+
+// Signed Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_s64)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_s64 :: #force_inline proc "c" (a: int64x2_t, b: int64x2_t) -> int64x2_t {
+	return _vqrshlq_s64(a, b)
+}
+
+// Unsigned Saturating Rounding Shift Left.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlq_u64)
+@(require_results, enable_target_feature = "neon")
+vqrshlq_u64 :: #force_inline proc "c" (a: uint64x2_t, b: int64x2_t) -> uint64x2_t {
+	return _vqrshlq_u64(a, b)
+}
+
 when ODIN_ARCH == .arm64 {
 	// Table Lookup.
 	//
@@ -2642,6 +3474,288 @@ when ODIN_ARCH == .arm64 {
 	vqnegd_s64 :: #force_inline proc "c" (a: int64_t) -> int64_t {
 		return vget_lane_s64(vqneg_s64(vdup_n_s64(a)), 0)
 	}
+
+	// Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshld_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vshld_n_s64 :: #force_inline proc "c" (v: int64_t, $N: uint32_t) -> int64_t where N < 64 {
+		return v << N
+	}
+
+	// Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshld_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vshld_n_u64 :: #force_inline proc "c" (v: uint64_t, $N: uint32_t) -> uint64_t where N < 64 {
+		return v << N
+	}
+
+	// Signed Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshld_s64)
+	@(require_results, enable_target_feature = "neon")
+	vshld_s64 :: #force_inline proc "c" (a: int64_t, b: int64_t) -> int64_t {
+		return transmute(int64_t)vshl_s64(transmute(int64x1_t)a, transmute(int64x1_t)b)
+	}
+
+	// Unsigned Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshld_u64)
+	@(require_results, enable_target_feature = "neon")
+	vshld_u64 :: #force_inline proc "c" (a: uint64_t, b: int64_t) -> uint64_t {
+		return transmute(uint64_t)vshl_u64(transmute(uint64x1_t)a, transmute(int64x1_t)b)
+	}
+
+	// Signed Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshld_s64)
+	@(require_results, enable_target_feature = "neon")
+	vrshld_s64 :: #force_inline proc "c" (a: int64_t, b: int64_t) -> int64_t {
+		return _vrshld_s64(a, b)
+	}
+
+	// Unsigned Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshld_u64)
+	@(require_results, enable_target_feature = "neon")
+	vrshld_u64 :: #force_inline proc "c" (a: uint64_t, b: int64_t) -> uint64_t {
+		return _vrshld_u64(a, b)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshld_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqshld_s64 :: #force_inline proc "c" (a: int64_t, b: int64_t) -> int64_t {
+		return _vqshld_s64(a, b)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshld_u64)
+	@(require_results, enable_target_feature = "neon")
+	vqshld_u64 :: #force_inline proc "c" (a: uint64_t, b: int64_t) -> uint64_t {
+		return _vqshld_u64(a, b)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlb_s8)
+	@(require_results, enable_target_feature = "neon")
+	vqshlb_s8 :: #force_inline proc "c" (a: int8_t, b: int8_t) -> int8_t {
+		c := vqshl_s8(int8x8_t(a), int8x8_t(b))
+		return vget_lane_s8(c, 0)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlb_u8)
+	@(require_results, enable_target_feature = "neon")
+	vqshlb_u8 :: #force_inline proc "c" (a: uint8_t, b: int8_t) -> uint8_t {
+		c := vqshl_u8(uint8x8_t(a), int8x8_t(b))
+		return vget_lane_u8(c, 0)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlh_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqshlh_s16 :: #force_inline proc "c" (a: int16_t, b: int16_t) -> int16_t {
+		c := vqshl_s16(int16x4_t(a), int16x4_t(b))
+		return vget_lane_s16(c, 0)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlh_u16)
+	@(require_results, enable_target_feature = "neon")
+	vqshlh_u16 :: #force_inline proc "c" (a: uint16_t, b: int16_t) -> uint16_t {
+		c := vqshl_u16(uint16x4_t(a), int16x4_t(b))
+		return vget_lane_u16(c, 0)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshls_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqshls_s32 :: #force_inline proc "c" (a: int32_t, b: int32_t) -> int32_t {
+		c := vqshl_s32(int32x2_t(a), int32x2_t(b))
+		return vget_lane_s32(c, 0)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshls_u32)
+	@(require_results, enable_target_feature = "neon")
+	vqshls_u32 :: #force_inline proc "c" (a: uint32_t, b: int32_t) -> uint32_t {
+		c := vqshl_u32(uint32x2_t(a), int32x2_t(b))
+		return vget_lane_u32(c, 0)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshld_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqshld_n_s64 :: #force_inline proc "c" (v: int64_t, $N: int32_t) -> int64_t where 0 <= N, N < 64 {
+		return vget_lane_s64(vqshl_n_s64(int64x1_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshld_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vqshld_n_u64 :: #force_inline proc "c" (v: uint64_t, $N: int32_t) -> uint64_t where 0 <= N, N < 64 {
+		return vget_lane_u64(vqshl_n_u64(uint64x1_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlb_n_s8)
+	@(require_results, enable_target_feature = "neon")
+	vqshlb_n_s8 :: #force_inline proc "c" (v: int8_t, $N: int32_t) -> int8_t where 0 <= N, N < 8 {
+		return vget_lane_s8(vqshl_n_s8(int8x8_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlb_n_u8)
+	@(require_results, enable_target_feature = "neon")
+	vqshlb_n_u8 :: #force_inline proc "c" (v: uint8_t, $N: int32_t) -> uint8_t where 0 <= N, N < 8 {
+		return vget_lane_u8(vqshl_n_u8(uint8x8_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlh_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqshlh_n_s16 :: #force_inline proc "c" (v: int16_t, $N: int32_t) -> int16_t where 0 <= N, N < 16 {
+		return vget_lane_s16(vqshl_n_s16(int16x4_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlh_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vqshlh_n_u16 :: #force_inline proc "c" (v: uint16_t, $N: int32_t) -> uint16_t where 0 <= N, N < 16 {
+		return vget_lane_u16(vqshl_n_u16(uint16x4_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshls_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqshls_n_s32 :: #force_inline proc "c" (v: int32_t, $N: int32_t) -> int32_t where 0 <= N, N < 32 {
+		return vget_lane_s32(vqshl_n_s32(int32x2_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshls_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vqshls_n_u32 :: #force_inline proc "c" (v: uint32_t, $N: int32_t) -> uint32_t where 0 <= N, N < 32 {
+		return vget_lane_u32(vqshl_n_u32(uint32x2_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Left Unsigned.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlub_n_s8)
+	@(require_results, enable_target_feature = "neon")
+	vqshlub_n_s8 :: #force_inline proc "c" (v: int8_t, $N: int32_t) -> uint8_t where 0 <= N, N < 8 {
+		return vget_lane_u8(vqshlu_n_s8(int8x8_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Left Unsigned.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshluh_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqshluh_n_s16 :: #force_inline proc "c" (v: int16_t, $N: int32_t) -> uint16_t where 0 <= N, N < 16 {
+		return vget_lane_u16(vqshlu_n_s16(int16x4_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Left Unsigned.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlus_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqshlus_n_s32 :: #force_inline proc "c" (v: int32_t, $N: int32_t) -> uint32_t where 0 <= N, N < 32 {
+		return vget_lane_u32(vqshlu_n_s32(int32x2_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Left Unsigned.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshlud_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqshlud_n_s64 :: #force_inline proc "c" (v: int64_t, $N: int32_t) -> uint64_t where 0 <= N, N < 64 {
+		return vget_lane_u64(vqshlu_n_s64(int64x1_t(v), N), 0)
+	}
+
+	// Signed Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlb_s8)
+	@(require_results, enable_target_feature = "neon")
+	vqrshlb_s8 :: #force_inline proc "c" (a: int8_t, b: int8_t) -> int8_t {
+		c := vqrshl_s8(int8x8_t(a), int8x8_t(b))
+		return vget_lane_s8(c, 0)
+	}
+
+	// Unsigned Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlb_u8)
+	@(require_results, enable_target_feature = "neon")
+	vqrshlb_u8 :: #force_inline proc "c" (a: uint8_t, b: int8_t) -> uint8_t {
+		c := vqrshl_u8(uint8x8_t(a), int8x8_t(b))
+		return vget_lane_u8(c, 0)
+	}
+
+	// Signed Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlh_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshlh_s16 :: #force_inline proc "c" (a: int16_t, b: int16_t) -> int16_t {
+		c := vqrshl_s16(int16x4_t(a), int16x4_t(b))
+		return vget_lane_s16(c, 0)
+	}
+
+	// Unsigned Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshlh_u16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshlh_u16 :: #force_inline proc "c" (a: uint16_t, b: int16_t) -> uint16_t {
+		c := vqrshl_u16(uint16x4_t(a), int16x4_t(b))
+		return vget_lane_u16(c, 0)
+	}
+
+	// Signed Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshls_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshls_s32 :: #force_inline proc "c" (a: int32_t, b: int32_t) -> int32_t {
+		return _vqrshls_s32(a, b)
+	}
+
+	// Unsigned Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshls_u32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshls_u32 :: #force_inline proc "c" (a: uint32_t, b: int32_t) -> uint32_t {
+		return _vqrshls_u32(a, b)
+	}
+
+	// Signed Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshld_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshld_s64 :: #force_inline proc "c" (a: int64_t, b: int64_t) -> int64_t {
+		return _vqrshld_s64(a, b)
+	}
+
+	// Unsigned Saturating Rounding Shift Left.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshld_u64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshld_u64 :: #force_inline proc "c" (a: uint64_t, b: int64_t) -> uint64_t {
+		return _vqrshld_u64(a, b)
+	}
 }
 
 @(private, default_calling_convention = "none")
@@ -2670,6 +3784,150 @@ foreign _ {
 	_vqnegq_s16 :: proc(a: int16x8_t) -> int16x8_t ---
 	@(link_name = "llvm.aarch64.neon.sqneg.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqneg.v4i32")
 	_vqnegq_s32 :: proc(a: int32x4_t) -> int32x4_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v8i8")
+	_vshl_s8 :: proc(a: int8x8_t, b: int8x8_t) -> int8x8_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v8i8")
+	_vshl_u8 :: proc(a: uint8x8_t, b: int8x8_t) -> uint8x8_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v4i16")
+	_vshl_s16 :: proc(a: int16x4_t, b: int16x4_t) -> int16x4_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v4i16")
+	_vshl_u16 :: proc(a: uint16x4_t, b: int16x4_t) -> uint16x4_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v2i32")
+	_vshl_s32 :: proc(a: int32x2_t, b: int32x2_t) -> int32x2_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v2i32")
+	_vshl_u32 :: proc(a: uint32x2_t, b: int32x2_t) -> uint32x2_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v1i64")
+	_vshl_s64 :: proc(a: int64x1_t, b: int64x1_t) -> int64x1_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v1i64")
+	_vshl_u64 :: proc(a: uint64x1_t, b: int64x1_t) -> uint64x1_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v16i8")
+	_vshlq_s8 :: proc(a: int8x16_t, b: int8x16_t) -> int8x16_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v16i8")
+	_vshlq_u8 :: proc(a: uint8x16_t, b: int8x16_t) -> uint8x16_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v8i16")
+	_vshlq_s16 :: proc(a: int16x8_t, b: int16x8_t) -> int16x8_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v8i16")
+	_vshlq_u16 :: proc(a: uint16x8_t, b: int16x8_t) -> uint16x8_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v4i32")
+	_vshlq_s32 :: proc(a: int32x4_t, b: int32x4_t) -> int32x4_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v4i32")
+	_vshlq_u32 :: proc(a: uint32x4_t, b: int32x4_t) -> uint32x4_t ---
+	@(link_name = "llvm.aarch64.neon.sshl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshifts.v2i64")
+	_vshlq_s64 :: proc(a: int64x2_t, b: int64x2_t) -> int64x2_t ---
+	@(link_name = "llvm.aarch64.neon.ushl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vshiftu.v2i64")
+	_vshlq_u64 :: proc(a: uint64x2_t, b: int64x2_t) -> uint64x2_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v8i8")
+	_vrshl_s8 :: proc(a: int8x8_t, b: int8x8_t) -> int8x8_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v8i8")
+	_vrshl_u8 :: proc(a: uint8x8_t, b: int8x8_t) -> uint8x8_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v4i16")
+	_vrshl_s16 :: proc(a: int16x4_t, b: int16x4_t) -> int16x4_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v4i16")
+	_vrshl_u16 :: proc(a: uint16x4_t, b: int16x4_t) -> uint16x4_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v2i32")
+	_vrshl_s32 :: proc(a: int32x2_t, b: int32x2_t) -> int32x2_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v2i32")
+	_vrshl_u32 :: proc(a: uint32x2_t, b: int32x2_t) -> uint32x2_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v1i64")
+	_vrshl_s64 :: proc(a: int64x1_t, b: int64x1_t) -> int64x1_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v1i64")
+	_vrshl_u64 :: proc(a: uint64x1_t, b: int64x1_t) -> uint64x1_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v16i8")
+	_vrshlq_s8 :: proc(a: int8x16_t, b: int8x16_t) -> int8x16_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v16i8")
+	_vrshlq_u8 :: proc(a: uint8x16_t, b: int8x16_t) -> uint8x16_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v8i16")
+	_vrshlq_s16 :: proc(a: int16x8_t, b: int16x8_t) -> int16x8_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v8i16")
+	_vrshlq_u16 :: proc(a: uint16x8_t, b: int16x8_t) -> uint16x8_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v4i32")
+	_vrshlq_s32 :: proc(a: int32x4_t, b: int32x4_t) -> int32x4_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v4i32")
+	_vrshlq_u32 :: proc(a: uint32x4_t, b: int32x4_t) -> uint32x4_t ---
+	@(link_name = "llvm.aarch64.neon.srshl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshifts.v2i64")
+	_vrshlq_s64 :: proc(a: int64x2_t, b: int64x2_t) -> int64x2_t ---
+	@(link_name = "llvm.aarch64.neon.urshl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vrshiftu.v2i64")
+	_vrshlq_u64 :: proc(a: uint64x2_t, b: int64x2_t) -> uint64x2_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v8i8")
+	_vqshl_s8 :: proc(a: int8x8_t, b: int8x8_t) -> int8x8_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v8i8")
+	_vqshl_u8 :: proc(a: uint8x8_t, b: int8x8_t) -> uint8x8_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v4i16")
+	_vqshl_s16 :: proc(a: int16x4_t, b: int16x4_t) -> int16x4_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v4i16")
+	_vqshl_u16 :: proc(a: uint16x4_t, b: int16x4_t) -> uint16x4_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v2i32")
+	_vqshl_s32 :: proc(a: int32x2_t, b: int32x2_t) -> int32x2_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v2i32")
+	_vqshl_u32 :: proc(a: uint32x2_t, b: int32x2_t) -> uint32x2_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v1i64")
+	_vqshl_s64 :: proc(a: int64x1_t, b: int64x1_t) -> int64x1_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v1i64")
+	_vqshl_u64 :: proc(a: uint64x1_t, b: int64x1_t) -> uint64x1_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v16i8")
+	_vqshlq_s8 :: proc(a: int8x16_t, b: int8x16_t) -> int8x16_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v16i8")
+	_vqshlq_u8 :: proc(a: uint8x16_t, b: int8x16_t) -> uint8x16_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v8i16")
+	_vqshlq_s16 :: proc(a: int16x8_t, b: int16x8_t) -> int16x8_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v8i16")
+	_vqshlq_u16 :: proc(a: uint16x8_t, b: int16x8_t) -> uint16x8_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v4i32")
+	_vqshlq_s32 :: proc(a: int32x4_t, b: int32x4_t) -> int32x4_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v4i32")
+	_vqshlq_u32 :: proc(a: uint32x4_t, b: int32x4_t) -> uint32x4_t ---
+	@(link_name = "llvm.aarch64.neon.sqshl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshifts.v2i64")
+	_vqshlq_s64 :: proc(a: int64x2_t, b: int64x2_t) -> int64x2_t ---
+	@(link_name = "llvm.aarch64.neon.uqshl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftu.v2i64")
+	_vqshlq_u64 :: proc(a: uint64x2_t, b: int64x2_t) -> uint64x2_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v8i8")
+	_vqshlu_n_s8 :: proc(a: int8x8_t, b: int8x8_t) -> uint8x8_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v4i16")
+	_vqshlu_n_s16 :: proc(a: int16x4_t, b: int16x4_t) -> uint16x4_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v2i32")
+	_vqshlu_n_s32 :: proc(a: int32x2_t, b: int32x2_t) -> uint32x2_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v1i64")
+	_vqshlu_n_s64 :: proc(a: int64x1_t, b: int64x1_t) -> uint64x1_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v16i8")
+	_vqshluq_n_s8 :: proc(a: int8x16_t, b: int8x16_t) -> uint8x16_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v8i16")
+	_vqshluq_n_s16 :: proc(a: int16x8_t, b: int16x8_t) -> uint16x8_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v4i32")
+	_vqshluq_n_s32 :: proc(a: int32x4_t, b: int32x4_t) -> uint32x4_t ---
+	@(link_name = "llvm.aarch64.neon.sqshlu.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqshiftsu.v2i64")
+	_vqshluq_n_s64 :: proc(a: int64x2_t, b: int64x2_t) -> uint64x2_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v8i8")
+	_vqrshl_s8 :: proc(a: int8x8_t, b: int8x8_t) -> int8x8_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v8i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v8i8")
+	_vqrshl_u8 :: proc(a: uint8x8_t, b: int8x8_t) -> uint8x8_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v4i16")
+	_vqrshl_s16 :: proc(a: int16x4_t, b: int16x4_t) -> int16x4_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v4i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v4i16")
+	_vqrshl_u16 :: proc(a: uint16x4_t, b: int16x4_t) -> uint16x4_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v2i32")
+	_vqrshl_s32 :: proc(a: int32x2_t, b: int32x2_t) -> int32x2_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v2i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v2i32")
+	_vqrshl_u32 :: proc(a: uint32x2_t, b: int32x2_t) -> uint32x2_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v1i64")
+	_vqrshl_s64 :: proc(a: int64x1_t, b: int64x1_t) -> int64x1_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v1i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v1i64")
+	_vqrshl_u64 :: proc(a: uint64x1_t, b: int64x1_t) -> uint64x1_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v16i8")
+	_vqrshlq_s8 :: proc(a: int8x16_t, b: int8x16_t) -> int8x16_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v16i8" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v16i8")
+	_vqrshlq_u8 :: proc(a: uint8x16_t, b: int8x16_t) -> uint8x16_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v8i16")
+	_vqrshlq_s16 :: proc(a: int16x8_t, b: int16x8_t) -> int16x8_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v8i16" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v8i16")
+	_vqrshlq_u16 :: proc(a: uint16x8_t, b: int16x8_t) -> uint16x8_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v4i32")
+	_vqrshlq_s32 :: proc(a: int32x4_t, b: int32x4_t) -> int32x4_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v4i32" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v4i32")
+	_vqrshlq_u32 :: proc(a: uint32x4_t, b: int32x4_t) -> uint32x4_t ---
+	@(link_name = "llvm.aarch64.neon.sqrshl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshifts.v2i64")
+	_vqrshlq_s64 :: proc(a: int64x2_t, b: int64x2_t) -> int64x2_t ---
+	@(link_name = "llvm.aarch64.neon.uqrshl.v2i64" when ODIN_ARCH == .arm64 else "llvm.arm.neon.vqrshiftu.v2i64")
+	_vqrshlq_u64 :: proc(a: uint64x2_t, b: int64x2_t) -> uint64x2_t ---
 }
 
 when ODIN_ARCH == .arm32 {
@@ -2733,5 +3991,21 @@ when ODIN_ARCH == .arm64 {
 		_vqtbx4 :: proc(v: int8x8_t, t0, t1, t2, t3: int8x16_t, idx: uint8x8_t) -> int8x8_t ---
 		@(link_name = "llvm.aarch64.neon.tbx4.v16i8")
 		_vqtbx4q :: proc(v: int8x16_t, t0, t1, t2, t3: int8x16_t, idx: uint8x16_t) -> int8x16_t ---
+		@(link_name = "llvm.aarch64.neon.srshl.i64")
+		_vrshld_s64 :: proc(a: int64_t, b: int64_t) -> int64_t ---
+		@(link_name = "llvm.aarch64.neon.urshl.i64")
+		_vrshld_u64 :: proc(a: uint64_t, b: int64_t) -> uint64_t ---
+		@(link_name = "llvm.aarch64.neon.sqshl.i64")
+		_vqshld_s64 :: proc(a: int64_t, b: int64_t) -> int64_t ---
+		@(link_name = "llvm.aarch64.neon.uqshl.i64")
+		_vqshld_u64 :: proc(a: uint64_t, b: int64_t) -> uint64_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshl.i32")
+		_vqrshls_s32 :: proc(a: int32_t, b: int32_t) -> int32_t ---
+		@(link_name = "llvm.aarch64.neon.uqrshl.i32")
+		_vqrshls_u32 :: proc(a: uint32_t, b: int32_t) -> uint32_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshl.i64")
+		_vqrshld_s64 :: proc(a: int64_t, b: int64_t) -> int64_t ---
+		@(link_name = "llvm.aarch64.neon.uqrshl.i64")
+		_vqrshld_u64 :: proc(a: uint64_t, b: int64_t) -> uint64_t ---
 	}
 }
