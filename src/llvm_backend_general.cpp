@@ -551,7 +551,12 @@ gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
 		LLVMOpcode op = LLVMGetInstructionOpcode(instr);
 		switch (op) {
 		case LLVMRet:
-		case LLVMBr:
+		#if LLVM_VERSION_MAJOR >= 23
+            case LLVMUncondBr:
+            case LLVMCondBr:
+        #else
+            case LLVMBr:
+        #endif
 		case LLVMSwitch:
 		case LLVMIndirectBr:
 		case LLVMInvoke:
