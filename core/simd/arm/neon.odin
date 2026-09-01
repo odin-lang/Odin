@@ -2662,6 +2662,164 @@ vqrshlq_u64 :: #force_inline proc "c" (a: uint64x2_t, b: int64x2_t) -> uint64x2_
 	return _vqrshlq_u64(a, b)
 }
 
+// Signed Shift Left Long.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_n_s8)
+@(require_results, enable_target_feature = "neon")
+vshll_n_s8 :: #force_inline proc "c" (v: int8x8_t, $N: int32_t) -> int16x8_t where 0 <= N, N < 8 {
+	return simd.shl(cast(int16x8_t)v, uint16x8_t(N))
+}
+
+// Unsigned Shift Left Long.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_n_u8)
+@(require_results, enable_target_feature = "neon")
+vshll_n_u8 :: #force_inline proc "c" (v: uint8x8_t, $N: int32_t) -> uint16x8_t where 0 <= N, N < 8 {
+	return simd.shl(cast(uint16x8_t)v, uint16x8_t(N))
+}
+
+// Signed Shift Left Long.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_n_s16)
+@(require_results, enable_target_feature = "neon")
+vshll_n_s16 :: #force_inline proc "c" (v: int16x4_t, $N: int32_t) -> int32x4_t where 0 <= N, N < 16 {
+	return simd.shl(cast(int32x4_t)v, uint32x4_t(N))
+}
+
+// Unsigned Shift Left Long.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_n_u16)
+@(require_results, enable_target_feature = "neon")
+vshll_n_u16 :: #force_inline proc "c" (v: uint16x4_t, $N: int32_t) -> uint32x4_t where 0 <= N, N < 16 {
+	return simd.shl(cast(uint32x4_t)v, uint32x4_t(N))
+}
+
+// Signed Shift Left Long.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_n_s32)
+@(require_results, enable_target_feature = "neon")
+vshll_n_s32 :: #force_inline proc "c" (v: int32x2_t, $N: int32_t) -> int64x2_t where 0 <= N, N < 32 {
+	return simd.shl(cast(int64x2_t)v, uint64x2_t(N))
+}
+
+// Unsigned Shift Left Long.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_n_u32)
+@(require_results, enable_target_feature = "neon")
+vshll_n_u32 :: #force_inline proc "c" (v: uint32x2_t, $N: int32_t) -> uint64x2_t where 0 <= N, N < 32 {
+	return simd.shl(cast(uint64x2_t)v, uint64x2_t(N))
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_s8)
+@(require_results, enable_target_feature = "neon")
+vget_high_s8 :: #force_inline proc "c" (a: int8x16_t) -> int8x8_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 8, 9, 10, 11, 12, 13, 14, 15)
+	} else {
+		a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 8, 9, 10, 11, 12, 13, 14, 15)
+		return simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_u8)
+@(require_results, enable_target_feature = "neon")
+vget_high_u8 :: #force_inline proc "c" (a: uint8x16_t) -> uint8x8_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 8, 9, 10, 11, 12, 13, 14, 15)
+	} else {
+		a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 8, 9, 10, 11, 12, 13, 14, 15)
+		return simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_s16)
+@(require_results, enable_target_feature = "neon")
+vget_high_s16 :: #force_inline proc "c" (a: int16x8_t) -> int16x4_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 4, 5, 6, 7)
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 4, 5, 6, 7)
+		return simd.shuffle(b, b, 3, 2, 1, 0)
+	}
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_u16)
+@(require_results, enable_target_feature = "neon")
+vget_high_u16 :: #force_inline proc "c" (a: uint16x8_t) -> uint16x4_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 4, 5, 6, 7)
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 4, 5, 6, 7)
+		return simd.shuffle(b, b, 3, 2, 1, 0)
+	}
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_s32)
+@(require_results, enable_target_feature = "neon")
+vget_high_s32 :: #force_inline proc "c" (a: int32x4_t) -> int32x2_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 2, 3)
+	} else {
+		a := simd.shuffle(a, a, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 2, 3)
+		return simd.shuffle(b, b, 1, 0)
+	}
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_u32)
+@(require_results, enable_target_feature = "neon")
+vget_high_u32 :: #force_inline proc "c" (a: uint32x4_t) -> uint32x2_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 2, 3)
+	} else {
+		a := simd.shuffle(a, a, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 2, 3)
+		return simd.shuffle(b, b, 1, 0)
+	}
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_s64)
+@(require_results, enable_target_feature = "neon")
+vget_high_s64 :: #force_inline proc "c" (a: int64x2_t) -> int64x1_t {
+	when ODIN_ENDIAN == .Little {
+		return transmute(int64x1_t)simd.extract(a, 1)
+	} else {
+		a := simd.shuffle(a, a, 1, 0)
+		return transmute(int64x1_t)simd.extract(a, 1)
+	}
+}
+
+// Duplicate vector element to vector or scalar
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vget_high_u64)
+@(require_results, enable_target_feature = "neon")
+vget_high_u64 :: #force_inline proc "c" (a: uint64x2_t) -> uint64x1_t {
+	when ODIN_ENDIAN == .Little {
+		return transmute(uint64x1_t)simd.extract(a, 1)
+	} else {
+		a := simd.shuffle(a, a, 1, 0)
+		return transmute(uint64x1_t)simd.extract(a, 1)
+	}
+}
+
 when ODIN_ARCH == .arm64 {
 	// Table Lookup.
 	//
@@ -3755,6 +3913,54 @@ when ODIN_ARCH == .arm64 {
 	@(require_results, enable_target_feature = "neon")
 	vqrshld_u64 :: #force_inline proc "c" (a: uint64_t, b: int64_t) -> uint64_t {
 		return _vqrshld_u64(a, b)
+	}
+
+	// Signed Shift Left Long.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_high_n_s8)
+	@(require_results, enable_target_feature = "neon")
+	vshll_high_n_s8 :: #force_inline proc "c" (v: int8x16_t, $N: int32_t) -> int16x8_t where 0 <= N, N < 8 {
+		return vshll_n_s8(vget_high_s8(v), N)
+	}
+
+	// Unsigned Shift Left Long.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_high_n_u8)
+	@(require_results, enable_target_feature = "neon")
+	vshll_high_n_u8 :: #force_inline proc "c" (v: uint8x16_t, $N: int32_t) -> uint16x8_t where 0 <= N, N < 8 {
+		return vshll_n_u8(vget_high_u8(v), N)
+	}
+
+	// Signed Shift Left Long.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_high_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vshll_high_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> int32x4_t where 0 <= N, N < 16 {
+		return vshll_n_s16(vget_high_s16(v), N)
+	}
+
+	// Unsigned Shift Left Long.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_high_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vshll_high_n_u16 :: #force_inline proc "c" (v: uint16x8_t, $N: int32_t) -> uint32x4_t where 0 <= N, N < 16 {
+		return vshll_n_u16(vget_high_u16(v), N)
+	}
+
+	// Signed Shift Left Long.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_high_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vshll_high_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> int64x2_t where 0 <= N, N < 32 {
+		return vshll_n_s32(vget_high_s32(v), N)
+	}
+
+	// Unsigned Shift Left Long.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshll_high_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vshll_high_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint64x2_t where 0 <= N, N < 32 {
+		return vshll_n_u32(vget_high_u32(v), N)
 	}
 }
 
