@@ -81,6 +81,10 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 		}
 		return AsmOperand_Register;
 	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		return AsmOperand_Lane;
+	case_end;
 	}
 	return AsmOperand_Invalid;
 }
@@ -89,6 +93,7 @@ gb_internal bool asm_reg_class_compatible(AsmRegClass want, AsmRegClass got) {
 	switch (want) {
 	case AsmRegClass_Integer:
 		return got == AsmRegClass_Integer;
+	case AsmRegClass_Float:
 	case AsmRegClass_Vector:
 		// A scalar float uses only the low lane, so it is valid in any vector
 		// register slot; a #simd vector matches the vector class exactly.
@@ -151,6 +156,10 @@ gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs,
 		check_asm_collect_refs(asm_ctx, refs, m->disp,             touched_regs_);
 		return;
 	}
+	case Ast_IndexExpr:
+		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.expr,  touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.index, touched_regs_);
+		return;
 	}
 }
 enum AsmMismatch : u8 {
@@ -311,7 +320,8 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 	// must not be held against the slot's register class. Only width matters for the
 	// memory interpretation. Register operands still get the full class check.
 	if (want_class != AsmRegClass_Unknown && !is_memory) {
-		if (!asm_reg_class_compatible(want_class, got_class)) {
+		bool is_lane = asm_ctx->operand_type_is_lane(slot);
+		if (!is_lane && !asm_reg_class_compatible(want_class, got_class)) {
 			if (mismatch_) *mismatch_ = AsmMismatch_Class;
 			return false;
 		}
@@ -322,7 +332,10 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 		if (want_class == AsmRegClass_Vector && !is_memory) {
 			// A scalar float uses only the low lane, so it may be narrower than the
 			// slot; a #simd vector must match the vector width exactly.
-			bool width_ok = (got_class == AsmRegClass_Float) ? (got_w <= want_w) : (got_w == want_w);
+			bool is_lane = asm_ctx->operand_type_is_lane(slot);
+			bool width_ok = (got_class == AsmRegClass_Float && !is_lane)
+			              ? (got_w <= want_w)  // scalar float in a vector slot: narrower ok
+			              : (got_w == want_w); // lane element (or #simd vector): exact
 			if (!width_ok) {
 				if (mismatch_) *mismatch_ = AsmMismatch_Size;
 				return false;
@@ -848,13 +861,6 @@ gb_internal bool check_register(AsmCtx *asm_ctx, Operand *operand, AstAsmRegiste
 	if (r) {
 		operand->mode = Addressing_Value;
 
-		u16 reg_class = asm_ctx->reg_class(r);
-		if (reg_class == asm_ctx->REG_CLASS_K) {
-			// Opmask register: classify as a mask, not a 64-bit integer.
-			// operand->type = t_asm_mask; // see note if this type does not yet exist
-			// return true;
-		}
-
 		u16 width_in_bits = asm_ctx->reg_size(r);
 		switch (width_in_bits) {
 		case 0:
@@ -1149,6 +1155,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 	auto form_user_operand_count = [&](typename AsmCtx::Encoding const &form) -> int {
 		int count = is_pseudo ? target_explicit_count : cast(int)form.explicit_count();
+		GB_ASSERT_MSG(count <= 4, "%d", count);
 		return gb_max(count, 0);
 	};
 
@@ -1185,7 +1192,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		return asm_ctx->OP_NONE;
 	};
 
-	auto describe_form = [&](typename AsmCtx::Encoding const &form, typename AsmCtx::Clobber const &clobber) -> gbString {
+	auto describe_form = [&](typename AsmCtx::Encoding const &form, typename AsmCtx::Clobber const &clobber, isize max_count) -> gbString {
 		gbString s = gb_string_make(heap_allocator(), "");
 		int count = form_user_operand_count(form);
 		for (int i = 0; i < count; i++) {
@@ -1213,6 +1220,10 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					s = (w > 0) ? gb_string_append_fmt(s, "%s%d", reg, cast(int)w)
 					            : gb_string_appendc(s, reg);
 					break;
+				case AsmOperand_Lane:
+					s = (w > 0) ? gb_string_append_fmt(s, "v%d[i]", cast(int)w)
+					            : gb_string_appendc(s, "v[i]");
+					break;
 				case AsmOperand_Memory:
 					s = (w > 0) ? gb_string_append_fmt(s, "m%d", cast(int)w)
 					            : gb_string_appendc(s, "m");
@@ -1231,27 +1242,34 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				s = gb_string_appendc(s, ", ");
 			}
 
-			switch (k) {
-			case AsmOperand_Label: // 5 characters
-				break;
-			case AsmOperand_Immediate: // 3+ characters
-			case AsmOperand_Register_Or_Memory:
-				if (w == 0) {
-					s = gb_string_appendc(s, "  ");
-				} else if (w < 10) {
-					s = gb_string_appendc(s, " ");
+			if (max_count > 1) {
+				switch (k) {
+				case AsmOperand_Label: // 5 characters
+					break;
+				case AsmOperand_Immediate: // 3+ characters
+				case AsmOperand_Register_Or_Memory:
+					if (w == 0) {
+						s = gb_string_appendc(s, "   ");
+					} else if (w < 10) {
+						s = gb_string_appendc(s, "  ");
+					} else if (w < 100) {
+						s = gb_string_appendc(s, " ");
+					}
+					break;
+				case AsmOperand_Register: // 1+ characters
+				case AsmOperand_Lane:
+				case AsmOperand_Memory:
+					if (w == 0) {
+						s = gb_string_appendc(s, "    ");
+					} else if (w < 10) {
+						s = gb_string_appendc(s, "   ");
+					} else if (w < 100) {
+						s = gb_string_appendc(s, "  ");
+					} else {
+						s = gb_string_appendc(s, " ");
+					}
+					break;
 				}
-				break;
-			case AsmOperand_Register: // 1+ characters
-			case AsmOperand_Memory:
-				if (w == 0) {
-					s = gb_string_appendc(s, "    ");
-				} else if (w < 10) {
-					s = gb_string_appendc(s, "   ");
-				} else if (w < 100) {
-					s = gb_string_appendc(s, "  ");
-				}
-				break;
 			}
 		}
 		bool all_implicit = true;
@@ -1261,6 +1279,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			switch (k) {
 			case AsmOperand_Label:
 			case AsmOperand_Register:
+			case AsmOperand_Lane:
 			case AsmOperand_Memory:
 			case AsmOperand_Register_Or_Memory:
 				all_implicit = false;
@@ -1321,7 +1340,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			return;
 		}
 
-		gbString desc = describe_form(forms[form_index], clobber_forms[form_index]);
+		gbString desc = describe_form(forms[form_index], clobber_forms[form_index], 1);
 		defer (gb_string_free(desc));
 		String line = make_string(cast(u8 const *)desc, gb_string_length(desc));
 		line = string_trim_trailing_whitespace(line);
@@ -1343,7 +1362,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		);
 
 		for_array(fi, forms) {
-			gbString desc = describe_form(forms[fi], clobber_forms[fi]);
+			gbString desc = describe_form(forms[fi], clobber_forms[fi], forms.count);
 			bool dup = false;
 			for (auto const &l : lines) {
 				if (gb_string_are_equal(l, desc)) {
@@ -1538,6 +1557,86 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		check_operand_constraints(asm_ctx, operands, mnemonic, name);
 
+
+		// NOTE(bill): The scaled-index shift must equal log2(transfer size) on targets that require it
+		// e.g. on AArch64 register-offset loads/stores.
+		// Generic: forms with form_transfer_bytes()==0, or operands with no constant scale, impose nothing.
+		{
+			u16 tb = asm_ctx->form_transfer_bytes(forms[valid_form_index]);
+			if (tb != 0) {
+				i64 want = 0; { u16 b = tb; while (b > 1) { b >>= 1; want++; } }
+				for_array(oi, operands) {
+					Ast *e = operands[oi].expr;
+					if (e == nullptr || e->kind != Ast_AsmMemoryOperand) {
+						continue;
+					}
+					auto *m = &e->AsmMemoryOperand;
+					if (m->scale == nullptr || m->scale->tav.mode != Addressing_Constant) {
+						continue;
+					}
+					i64 raw = exact_value_to_i64(exact_value_to_integer(m->scale->tav.value));
+					// Normalise the '*' form to a shift amount; '<<'/'>>' are already shifts.
+					i64 shift = raw;
+					if (m->scale_op.kind == Token_Mul) {
+						switch (raw) {
+						case 1:  shift = 0;  break;
+						case 2:  shift = 1;  break;
+						case 4:  shift = 2;  break;
+						case 8:  shift = 3;  break;
+						case 16: shift = 4;  break;
+						default: shift = -1; break;
+						}
+					}
+					// shift 0 (unscaled) is always legal; otherwise it must match log2(size).
+					if (shift != 0 && shift != want) {
+						if (m->scale_op.kind == Token_Mul) {
+							error(m->scale, "'%.*s' scaled-index multiplier must be %lld (the %u-byte transfer size), got %lld",
+							      LIT(name), cast(long long)(cast(i64)1 << want), cast(unsigned)tb, cast(long long)raw);
+						} else {
+							error(m->scale, "'%.*s' scaled-index shift must be %lld (log2 of the %u-byte transfer), got %lld",
+							      LIT(name), cast(long long)want, cast(unsigned)tb, cast(long long)shift);
+						}
+					}
+				}
+			}
+		}
+		{
+			// Feature gate: the matched form may require a target feature (crc32b needs
+			// +crc, LSE atomics need +lse, ...). The form carries its Feature. It is
+			// satisfied if the feature is globally enabled for the target, OR if this
+			// template's own signature declares it via #require_target_feature /
+			// #enable_target_feature — a template opting in to a feature shouldn't be
+			// rejected just because the global build didn't enable it.
+			String feat = asm_ctx->feature_name_from_form(forms[valid_form_index]);
+			if (feat.len != 0) {
+				bool ok = check_target_feature_is_enabled(feat, nullptr);
+
+				if (!ok) {
+					// The proc type may declare the feature itself.
+					Type *pt = base_type(tmpl_entity->type);
+					GB_ASSERT(pt->kind == Type_Proc);
+					String req = pt->Proc.require_target_feature;
+					String en  = pt->Proc.enable_target_feature;
+					// These are comma-lists; `feat` is a single bare name. is_superset_of
+					// checks whether the declared list contains it.
+					if (req.len != 0 && check_target_feature_is_superset_of(req, feat, nullptr)) {
+						ok = true;
+					}
+					if (!ok && en.len != 0 && check_target_feature_is_superset_of(en, feat, nullptr)) {
+						ok = true;
+					}
+				}
+
+				if (!ok) {
+					error(instr->name,
+					      "'%.*s' requires the target feature '%.*s', which is not enabled; "
+					      "enable it on this 'asm' template (e.g. @(enable_target_feature=\"%.*s\")), "
+					      "or globally via '-target-features:\"%.*s\"' or a matching micro-architecture",
+					      LIT(name), LIT(feat), LIT(feat), LIT(feat));
+				}
+			}
+		}
+
 		// Handle clobbering from mnemonic
 		auto clobber = clobber_forms[valid_form_index];
 
@@ -1591,7 +1690,6 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		u16 written_ops = cast(u16)clobber.written;
 		u16 pinned_param_writes = 0;
-		auto const &decls = tmpl_entity->AsmTemplate.decls;
 		for_array(i, operands) {
 			int tslot = user_operand_target_index(cast(int)i);
 			if (tslot < 0 || tslot >= 4 || (written_ops & (1u << tslot)) == 0) {
@@ -1604,12 +1702,17 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				explicit_writes |= b;
 				continue;
 			}
-			Entity *pe = entity_of_node(operands[i].expr);
-			if (pe != nullptr && pe->kind == Entity_Variable) {
-				i32 di = -1;
-				check_asm_find_group(pe, decls, &di);         // reuse existing index finder
-				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, decls, di);
+			// NOTE(bill): A lane operand `v[idx]` is an IndexExpr with no entity of its own
+			Ast *op_expr = operands[i].expr;
+			if (op_expr != nullptr && op_expr->kind == Ast_IndexExpr) {
+				op_expr = op_expr->IndexExpr.expr;
 			}
+			Entity *pe = entity_of_node(op_expr);
+ 			if (pe != nullptr && pe->kind == Entity_Variable) {
+ 				i32 di = -1;
+ 				check_asm_find_group(pe, tmpl_entity->AsmTemplate.decls, &di);
+ 				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, tmpl_entity->AsmTemplate.decls, di);
+ 			}
 		}
 
 		if (is_pseudo &&
@@ -1631,7 +1734,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		facts->gen_regs   = produced | pinned_param_writes;
-		facts->gen_flags  = cast(u16)clobber.flags_wr;
+		facts->gen_flags  = cast(u16)clobber.flags_wr_call();
 		facts->read_flags = cast(u16)clobber.flags_rd_call();
 
 		// NOTE(bill): mnemonics such as `xor r, r` / `sub r, r` act as zeroing the destination
@@ -1696,6 +1799,20 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			int slot = user_operand_target_index(cast(int)i);
 			if (slot < 0) {
 				continue;
+			}
+			// A pre/post-index memory operand writes back (and reads) its base
+			// register. The operand kind is Memory, so the register/lane path below
+			// won't see it; record the base's def+use here so liveness sees the
+			// cursor advance and a later read of it isn't flagged undefined.
+			if (operands[i].expr != nullptr && operands[i].expr->kind == Ast_AsmMemoryOperand) {
+				auto *m = &operands[i].expr->AsmMemoryOperand;
+				if (m->kind == AsmMemoryOperand_Pre || m->kind == AsmMemoryOperand_Post) {
+					Entity *be = entity_of_node(m->base);
+					if (be != nullptr && be->kind == Entity_Variable) {
+						array_add(&facts->gen_params,  be);
+						array_add(&facts->read_params, be);
+					}
+				}
 			}
 			Entity *pe = entity_of_node(operands[i].expr);
 			if (pe == nullptr || pe->kind != Entity_Variable) {
@@ -1776,7 +1893,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			bool control = clobber.has_control();
 			bool halt    = clobber.has_halt();
 			// A conditional branch reads a flag and can fall through -> not terminal.
-			bool conditional = clobber.is_conditional();
+			bool conditional = clobber.is_conditional(valid_form);
 
 			facts->is_control = control;
 			facts->is_conditional = conditional;
@@ -2019,8 +2136,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		} else if (segment_override.expr->kind == Ast_AsmRegister) {
 			String reg_name = segment_override.expr->AsmRegister.name.string;
 			auto reg = asm_ctx->register_lookup(reg_name);
-			auto reg_class = asm_ctx->reg_class(asm_ctx->register_codes[reg]);
-			if (reg_class != asm_ctx->REG_CLASS_SEG) {
+			if (!asm_ctx->reg_is_segment(cast(u16)reg)) {
 				gbString s = expr_to_string(segment_override.expr);
 				error(segment_override.expr, "A segment override must be a selector register parameter, got %s", s);
 				gb_string_free(s);
@@ -2029,6 +2145,17 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			gbString s = expr_to_string(segment_override.expr);
 			error(segment_override.expr, "A segment override must be a selector register parameter, got %s", s);
 			gb_string_free(s);
+		}
+
+		switch (mem_op->kind) {
+		case AsmMemoryOperand_Default:
+			break;
+		case AsmMemoryOperand_Pre:
+		case AsmMemoryOperand_Post:
+			if (build_context.metrics.arch != TargetArch_arm64) {
+				error(expr, "#pre/#post asm memory operands are not supported by the target platform");
+			}
+			break;
 		}
 
 		Operand base  = {};
@@ -2156,7 +2283,11 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		}
 
 		// base and index must be the same width
-		if (have_base && have_index && base_w != index_w) {
+		// AArch64 register-offset addressing allows a 32-bit index with a 64-bit base
+		// (extended-register form: uxtw/sxtw). Other targets require equal widths.
+		bool ext_index_ok = build_context.metrics.arch == TargetArch_arm64 &&
+		                    base_w == 64 && index_w == 32;
+		if (have_base && have_index && base_w != index_w && !ext_index_ok) {
 			Ast *at = mem_op->base ? mem_op->base : expr;
 			error(at, "A memory operand's base and index registers must be the same width, got a %d-bit base and a %d-bit index",
 			      cast(int)base_w, cast(int)index_w);
@@ -2217,6 +2348,10 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 							error(op, "The target platform does not support '%.*s' for shifting scale parameters in memory operands", LIT(op.string));
 						}
 					}
+
+					// Persist the folded scale so check_mnemonic can validate it against
+					// the matched form's transfer size (it reads mem_op->scale->tav).
+					add_type_and_value(ctx, mem_op->scale, scale.mode, scale.type, scale.value);
 				}
 			} else {
 				Entity *param_entity = entity_of_node(scale.expr);
@@ -2313,6 +2448,65 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		add_type_and_value(ctx, expr, Addressing_Value, found->type, {});
 		return;
 	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		if (!allow_memory_operands) {
+			error(expr, "Invalid use of an index expression in an asm operand");
+			return;
+		}
+
+		Operand lhs = {};
+		Operand rhs = {};
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &lhs, ie->expr, false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &rhs, ie->index, false);
+
+		auto lhs_kind = determine_asm_operand_kind(&lhs);
+		if (lhs_kind != AsmOperand_Register) {
+			gbString s = expr_to_string(lhs.expr);
+			error(lhs.expr, "Expected a vector register, got '%s' which is %.*s",
+			      s, LIT(asm_operand_kind_expected_strings[lhs_kind]));
+			gb_string_free(s);
+		} else if (!is_type_simd_vector(lhs.type)) {
+			gbString s = type_to_string(lhs.type);
+			error(lhs.expr, "Expected a vector register, got %s", s);
+			gb_string_free(s);
+		}
+
+		auto rhs_kind = determine_asm_operand_kind(&rhs);
+		if (rhs_kind != AsmOperand_Immediate) {
+			gbString s = expr_to_string(rhs.expr);
+			error(rhs.expr, "Expected an integer immediate as an index, got '%s' which is %.*s",
+			      s, LIT(asm_operand_kind_expected_strings[rhs_kind]));
+			gb_string_free(s);
+		} else if (!is_type_integer(rhs.type)) {
+			gbString s = type_to_string(rhs.type);
+			error(rhs.expr, "Expected an integer immediate as an index, got %s", s);
+			gb_string_free(s);
+		} else if (rhs.mode != Addressing_Constant || rhs.value.kind != ExactValue_Integer) {
+			Entity *pe = entity_of_node(rhs.expr);
+			bool is_poly_const = pe != nullptr && pe->kind == Entity_Variable &&
+			                     (pe->flags & EntityFlag_PolyConst) != 0;
+			if (!is_poly_const) {
+				error(rhs.expr, "A vector lane index must be an assemble-time integer constant");
+			}
+		}
+
+		if (build_context.metrics.arch != TargetArch_arm64) {
+			error(expr, "The target platform does not support vector element extraction syntax");
+		}
+
+		operand->expr = expr;
+		operand->mode = Addressing_Value;
+		operand->type = base_array_type(lhs.type);
+		operand->value = {};
+
+		add_type_and_value(ctx, operand->expr, operand->mode, operand->type, operand->value);
+
+		if (rhs.mode == Addressing_Constant) {
+			add_type_and_value(ctx, rhs.expr, rhs.mode, rhs.type, rhs.value);
+		}
+		return;
+	case_end;
 	}
 
 	{
@@ -2355,8 +2549,13 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		// always require the results of `asm` templates
 		type->Proc.require_results = true;
 	}
-
 	entity->type = type;
+
+	AttributeContext ac = make_attribute_context({}, {});
+	if (d != nullptr) {
+		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
+	}
+	check_target_feature_attributes(ac, entity, type);
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
 
@@ -2814,6 +3013,8 @@ gb_internal void check_asm_template_from_entity(CheckerContext *c, Entity *e, De
 		check_asm_template(&g_asm_amd64, c, e, d);
 	} else if (build_context.metrics.arch == TargetArch_riscv64) {
 		check_asm_template(&g_asm_riscv, c, e, d);
+	} else if (build_context.metrics.arch == TargetArch_arm64) {
+		check_asm_template(&g_asm_arm64, c, e, d);
 	} else {
 		error(e->token, "asm templates are not currently supported for this target");
 	}

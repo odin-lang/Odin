@@ -41,22 +41,9 @@ struct Asm_riscv {
 	enum PrefixKind : u8 { PrefixKind_None };
 	
 
-	static const u16 REG_CLASS_NONE  = 0x000;
-	static const u16 REG_CLASS_GPR64 = 0x100;
-	static const u16 REG_CLASS_GPR32 = 0x200;
-	static const u16 REG_CLASS_GPR16 = 0x300;
-	static const u16 REG_CLASS_GPR8  = 0x400;
-	static const u16 REG_CLASS_GPR8H = 0x500;  // AH, CH, DH, BH - legacy high byte regs
-	static const u16 REG_CLASS_XMM   = 0x600;
-	static const u16 REG_CLASS_YMM   = 0x700;
-	static const u16 REG_CLASS_ZMM   = 0x800;
-	static const u16 REG_CLASS_K     = 0x900;  // opmask
-	static const u16 REG_CLASS_SEG   = 0xA00;  // segment
-	static const u16 REG_CLASS_CR    = 0xB00;  // control
-	static const u16 REG_CLASS_DR    = 0xC00;  // debug
-	static const u16 REG_CLASS_BND   = 0xD00;  // bound
-	static const u16 REG_CLASS_MM    = 0xE00;  // MMX
-	static const u16 REG_CLASS_ST    = 0xF00;  // x87 FPU
+	static const u16 REG_CLASS_NONE = 0x0000;
+	static const u16 REG_CLASS_GPR  = 0x0100; // x0..x31
+	static const u16 REG_CLASS_FPR  = 0x0200; // f0..f31
 	
 	enum Register : u16 {
 		REG_INVALID, REG_ZERO, REG_RA, REG_SP, REG_GP, REG_TP, REG_T0, REG_T1, REG_T2, REG_S0, REG_S1, REG_A0, REG_A1, REG_A2, REG_A3, REG_A4, 
@@ -66,6 +53,123 @@ struct Asm_riscv {
 		REG_FT11, 
 		REG_COUNT
 	};
+
+
+	enum OperandType : u8 {
+		OP_NONE,
+		OP_GPR,
+		OP_FPR,
+		OP_IMM12,
+		OP_IMM12U,
+		OP_IMM5,
+		OP_IMM6,
+		OP_IMM20,
+		OP_REL13,
+		OP_REL21,
+		OP_MEM,
+		OP_CSR,
+		OP_FENCE_FLAGS,
+		OP_ROUND_MODE,
+		OP_ZIMM5,
+		OP_GPR_C,
+		OP_GPR_SP,
+		OP_GPR_NONZERO,
+		OP_FPR_C,
+		OP_IMM_C6S,
+		OP_IMM_C6U,
+		OP_IMM_C8U,
+		OP_IMM_C10S,
+		OP_IMM_C18S,
+		OP_REL9,
+		OP_REL12,
+		OP_MEM_C_W,
+		OP_MEM_C_D,
+		OP_MEM_C_SP_W,
+		OP_MEM_C_SP_D,
+	};
+
+
+	enum OperandEncoding : u8 {
+		ENC_NONE,
+		ENC_RD,
+		ENC_RS1,
+		ENC_RS2,
+		ENC_RS3,
+		ENC_SHAMT5,
+		ENC_SHAMT6,
+		ENC_IMM_I,
+		ENC_IMM_S,
+		ENC_IMM_B,
+		ENC_IMM_U,
+		ENC_IMM_J,
+		ENC_OFFSET_BASE_I,
+		ENC_OFFSET_BASE_S,
+		ENC_OFFSET_BASE_A,
+		ENC_CSR_FIELD,
+		ENC_ZIMM_FIELD,
+		ENC_FENCE_PRED,
+		ENC_FENCE_SUCC,
+		ENC_ROUND_FIELD,
+		ENC_AQRL,
+		ENC_C_RD_RS1,
+		ENC_C_RS2,
+		ENC_C_RD_PRIMED,
+		ENC_C_RS1_PRIMED,
+		ENC_C_RS2_PRIMED,
+		ENC_C_RD_RS1_PRIMED,
+		ENC_C_IMM_CI_S,
+		ENC_C_IMM_CI_U,
+		ENC_C_IMM_CIW,
+		ENC_C_IMM_LUI,
+		ENC_C_IMM_ADDI16SP,
+		ENC_C_IMM_CSS_W,
+		ENC_C_IMM_CSS_D,
+		ENC_C_IMM_CL_W,
+		ENC_C_IMM_CL_D,
+		ENC_C_BRANCH9,
+		ENC_C_BRANCH12,
+		ENC_C_OFFSET_BASE_W,
+		ENC_C_OFFSET_BASE_D,
+		ENC_C_SP_OFFSET_W,
+		ENC_C_SP_OFFSET_D,
+	};
+
+
+	enum Feature : u16 {
+		ENC_I,
+		ENC_M,
+		ENC_A,
+		ENC_F,
+		ENC_D,
+		ENC_ZICSR,
+		ENC_ZIFENCEI,
+		ENC_C,
+		ENC_ZBA,
+		ENC_ZBB,
+		ENC_ZBC,
+		ENC_ZBS,
+		ENC_ZICOND,
+		ENC_ZFH,
+		ENC_PRIV,
+	};
+
+	typedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability
+
+	#pragma pack(push, 1)
+	struct Encoding {
+		Mnemonic        mnemonic;
+		OperandType     ops[4];
+		OperandEncoding enc[4];
+		u32             bits;
+		u32             mask;
+		Feature         feature;
+		EncodingFlags   flags;
+
+		bool has_implicit  () const { return ((flags>>7u)&1) != 0; }
+		u8   explicit_count() const { return cast(u8)((flags>>4u)&((1u<<3)-1)); }
+	};
+	#pragma pack(pop)
+	GB_STATIC_ASSERT(gb_size_of(Encoding) == 21);
 
 
 	enum ClobberFlags : u8 {
@@ -212,6 +316,9 @@ struct Asm_riscv {
 		ClobberFlags flags_rd_call() const {
 			return {};
 		}
+		ClobberFlags flags_wr_call() const {
+			return flags_wr;
+		}
 
 		bool implies_clobber_flags() const {
 			return (flags_wr != 0);
@@ -233,7 +340,7 @@ struct Asm_riscv {
 		bool has_halt() const {
 			return (cast(u16)side_effects & SideEffectFlag_TRAP) != 0;
 		}
-		bool is_conditional() const {
+		bool is_conditional(struct Encoding const &valid_form) const {
 			return has_control();
 		}
 		bool is_nondeterministic() const {
@@ -246,6 +353,19 @@ struct Asm_riscv {
 			u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
 			bool is_atomic = false; // TODO(bill): Add ATOMIC flag to SideEffectFlags in the original INSTRUCTION_TABLE
 			return (implicit & (ClobberReg_SP)) != 0 || is_atomic;
+		}
+		bool is_status_snapshot() const {
+			// RiscV64 has no architectural condition flags: branches compare two GPRs
+			// directly (beq/bltu/…) and slt/sltu materialise a 0/1 into a GPR, so nothing
+			// ever consumes status as an implicit condition — flags_rd_call() is always
+			// empty and the flag read-before-write check is already vacuous here.
+			//
+			// The only status that exists — the accrued fcsr exception flags (fflags[4:0])
+			// and the frm rounding field — is read solely through an explicit CSR access
+			// (csrr* / frflags / frrm), which pulls the register out as an opaque value
+			// into a GPR. That is a snapshot by construction and must never require a
+			// producer, so every status read that RV64 can express qualifies.
+			return true;
 		}
 	};
 
@@ -325,123 +445,6 @@ struct Asm_riscv {
 
 	static u16    const register_codes  [REG_COUNT];
 	static String const register_strings[REG_COUNT];
-
-
-	enum OperandType : u8 {
-		OP_NONE,
-		OP_GPR,
-		OP_FPR,
-		OP_IMM12,
-		OP_IMM12U,
-		OP_IMM5,
-		OP_IMM6,
-		OP_IMM20,
-		OP_REL13,
-		OP_REL21,
-		OP_MEM,
-		OP_CSR,
-		OP_FENCE_FLAGS,
-		OP_ROUND_MODE,
-		OP_ZIMM5,
-		OP_GPR_C,
-		OP_GPR_SP,
-		OP_GPR_NONZERO,
-		OP_FPR_C,
-		OP_IMM_C6S,
-		OP_IMM_C6U,
-		OP_IMM_C8U,
-		OP_IMM_C10S,
-		OP_IMM_C18S,
-		OP_REL9,
-		OP_REL12,
-		OP_MEM_C_W,
-		OP_MEM_C_D,
-		OP_MEM_C_SP_W,
-		OP_MEM_C_SP_D,
-	};
-
-
-	enum OperandEncoding : u8 {
-		ENC_NONE,
-		ENC_RD,
-		ENC_RS1,
-		ENC_RS2,
-		ENC_RS3,
-		ENC_SHAMT5,
-		ENC_SHAMT6,
-		ENC_IMM_I,
-		ENC_IMM_S,
-		ENC_IMM_B,
-		ENC_IMM_U,
-		ENC_IMM_J,
-		ENC_OFFSET_BASE_I,
-		ENC_OFFSET_BASE_S,
-		ENC_OFFSET_BASE_A,
-		ENC_CSR_FIELD,
-		ENC_ZIMM_FIELD,
-		ENC_FENCE_PRED,
-		ENC_FENCE_SUCC,
-		ENC_ROUND_FIELD,
-		ENC_AQRL,
-		ENC_C_RD_RS1,
-		ENC_C_RS2,
-		ENC_C_RD_PRIMED,
-		ENC_C_RS1_PRIMED,
-		ENC_C_RS2_PRIMED,
-		ENC_C_RD_RS1_PRIMED,
-		ENC_C_IMM_CI_S,
-		ENC_C_IMM_CI_U,
-		ENC_C_IMM_CIW,
-		ENC_C_IMM_LUI,
-		ENC_C_IMM_ADDI16SP,
-		ENC_C_IMM_CSS_W,
-		ENC_C_IMM_CSS_D,
-		ENC_C_IMM_CL_W,
-		ENC_C_IMM_CL_D,
-		ENC_C_BRANCH9,
-		ENC_C_BRANCH12,
-		ENC_C_OFFSET_BASE_W,
-		ENC_C_OFFSET_BASE_D,
-		ENC_C_SP_OFFSET_W,
-		ENC_C_SP_OFFSET_D,
-	};
-
-
-	enum Feature : u16 {
-		ENC_I,
-		ENC_M,
-		ENC_A,
-		ENC_F,
-		ENC_D,
-		ENC_ZICSR,
-		ENC_ZIFENCEI,
-		ENC_C,
-		ENC_ZBA,
-		ENC_ZBB,
-		ENC_ZBC,
-		ENC_ZBS,
-		ENC_ZICOND,
-		ENC_ZFH,
-		ENC_PRIV,
-	};
-
-	typedef u8 EncodingFlags; // cannot use a C++ bit field to due lack of portability
-
-	#pragma pack(push, 1)
-	struct Encoding {
-		Mnemonic        mnemonic;
-		OperandType     ops[4];
-		OperandEncoding enc[4];
-		u32             bits;
-		u32             mask;
-		Feature         feature;
-		EncodingFlags   flags;
-
-		bool has_implicit  () const { return ((flags>>7u)&1) != 0; }
-		u8   explicit_count() const { return cast(u8)((flags>>4u)&((1u<<3)-1)); }
-	};
-	#pragma pack(pop)
-	GB_STATIC_ASSERT(gb_size_of(Encoding) == 21);
 
 
 	// Companion run index: ENCODE_RUNS[mnemonic] -> contiguous run in ENCODE_FORMS.
@@ -576,23 +579,14 @@ struct Asm_riscv {
 	// size in bits for register
 	u16 reg_size(Register r) const {
 		switch (reg_class(register_codes[r])) {
-		case REG_CLASS_GPR64: return 64;
-		case REG_CLASS_GPR32: return 32;
-		case REG_CLASS_GPR16: return 16;
-		case REG_CLASS_GPR8:  return 8;
-		case REG_CLASS_GPR8H: return 8;
-		case REG_CLASS_XMM:   return 128;
-		case REG_CLASS_YMM:   return 256;
-		case REG_CLASS_ZMM:   return 512;
-		case REG_CLASS_K:     return 64;
-		case REG_CLASS_MM:    return 64;
-		case REG_CLASS_ST:    return 80;
-		case REG_CLASS_SEG:   return 16;
-		case REG_CLASS_CR:    return 64;
-		case REG_CLASS_DR:    return 64;
-		case REG_CLASS_BND:   return 128;
+		case REG_CLASS_GPR: return XLEN;
+		case REG_CLASS_FPR: return FLEN;
 		}
 		return 0;
+	}
+
+	bool reg_is_segment(/*Register*/ u16 r) {
+		return false;
 	}
 
 	bool integer_reg_width_is_exact() const {
@@ -775,6 +769,24 @@ struct Asm_riscv {
 		return 0;
 	}
 
+	bool target_has_feature(u64 enabled_features, u32 f) const {
+		return true;
+	}
+	char const *feature_name(u32 f) const {
+		return "";
+	}
+	u16 operand_type_transfer_bytes(OperandType t) const {
+		gb_unused(t);
+		return 0;
+	}
+	bool operand_type_is_lane(OperandType t) const {
+		return false;
+	}
+
+	String feature_name_from_form(Encoding const &form) const {
+		return {};
+	}
+
 	int form_explicit_slot(Encoding const &form, int explicit_index) const {
 		int seen = 0;
 		for (int j = 0; j < gb_count_of(form.ops); j++) {
@@ -791,6 +803,27 @@ struct Asm_riscv {
 			seen += 1;
 		}
 		return -1;
+	}
+
+	// Transfer size (bytes) a memory form's scaled index must match:
+	// shift == log2(bytes). Derived from the widest register operand in the form
+	// (the data being loaded/stored). 0 => no such constraint. Generic across ISAs.
+	u16 form_transfer_bytes(Encoding const &form) const {
+		u16 widest = 0;
+		for (int j = 0; j < gb_count_of(form.ops); j++) {
+			auto t = form.ops[j];
+			if (!t) {
+				break;
+			}
+			AsmOperandKind k = kind_from_operand_type(t);
+			if (k == AsmOperand_Register) {
+				u16 w = operand_type_bit_width(t);
+				if (w > widest) {
+					widest = w;
+				}
+			}
+		}
+		return cast(u16)(widest / 8);
 	}
 
 	bool prefix_kind_okay(u8 prefix, Encoding const &form, bool *requires_memory_dest_) const {

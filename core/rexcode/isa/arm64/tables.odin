@@ -25,14 +25,14 @@ Encode_Run :: struct {
 
 Decode_Entry :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [5]Operand_Type,     // 4
+	enc:      [5]Operand_Encoding, // 4
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
 	flags:    Encoding_Flags,      // 1
 }
-#assert(size_of(Decode_Entry) == 20)
+#assert(size_of(Decode_Entry) == 22)
 
 Decode_Index :: struct #packed {
 	start: u16,
@@ -44,10 +44,11 @@ Decode_Index :: struct #packed {
 // Loaded tables (rodata, embedded from tables/*.bin at compile time)
 // -----------------------------------------------------------------------------
 
-@(rodata) ENCODE_FORMS     := #load("tables/arm64.encode_forms.bin", []Encoding)
-@(rodata) ENCODE_RUNS      := #load("tables/arm64.encode_runs.bin",  []Encode_Run)
-@(rodata) DECODE_ENTRIES   := #load("tables/arm64.entries.bin",      []Decode_Entry)
-@(rodata) DECODE_INDEX_OP0 := #load("tables/arm64.idx_op0.bin",      []Decode_Index)
+@(rodata) ENCODE_FORMS     := #load("tables/arm64.encode_forms.bin",  []Encoding)
+@(rodata) CLOBBER_FORMS    := #load("tables/arm64.clobber_forms.bin", []Clobber)
+@(rodata) ENCODE_RUNS      := #load("tables/arm64.encode_runs.bin",   []Encode_Run)
+@(rodata) DECODE_ENTRIES   := #load("tables/arm64.entries.bin",       []Decode_Entry)
+@(rodata) DECODE_INDEX_OP0 := #load("tables/arm64.idx_op0.bin",       []Decode_Index)
 
 // -----------------------------------------------------------------------------
 // Accessors

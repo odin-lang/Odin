@@ -133,6 +133,71 @@ main :: proc() {
 			strings.write_string(&sb, "\t};\n")
 		}
 	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum OperandType : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in type_of(gen.Encoding{}.ops[0]) {
+			fmt.sbprintf(&sb, "\t\tOP_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n\n")
+	{
+		strings.write_string(&sb, "\tenum OperandEncoding : u8 {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		for op in Operand_Encoding {
+			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
+		}
+
+	}
+	strings.write_string(&sb, "\n")
+	strings.write_string(&sb, "\ttypedef u32 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
+	strings.write_string(&sb, "\n")
+	{
+		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 16);\n")
+
+		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
+		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
+		strings.write_string(&sb, "\tstruct Encoding {\n")
+		defer strings.write_string(&sb, "\t};\n")
+		strings.write_string(&sb, """
+				Mnemonic        mnemonic;
+				OperandType     ops[4];
+				OperandEncoding enc[4];
+				u8              opcode;
+				u8              ext;
+				EncodingFlags   flags;
+		\n
+		""")
+		Encoding_Flags :: type_of(gen.Encoding{}.flags)
+
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "has_implicit")
+			strings.write_string(&sb, "\t\tbool has_implicit  () const { ")
+			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
+			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "explicit_count")
+			strings.write_string(&sb, "\t\tu8   explicit_count() const { ")
+			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
+			strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
+			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+			strings.write_string(&sb, " }\n")
+		}
+		{
+			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "rep_ok")
+			strings.write_string(&sb, "\t\tbool rep_ok        () const { ")
+			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
+			strings.write_string(&sb, " }\n")
+		}
+	}
 	strings.write_string(&sb, "\n");
 	strings.write_string(&sb, """
 		enum ClobberFlags : u16 {
@@ -153,6 +218,7 @@ main :: proc() {
 			case ClobberFlag_CF: return \"c\"; case ClobberFlag_PF: return \"p\";
 			case ClobberFlag_AF: return \"a\"; case ClobberFlag_ZF: return \"z\";
 			case ClobberFlag_SF: return \"s\"; case ClobberFlag_OF: return \"o\";
+			case ClobberFlag_DF: return \"d\"; case ClobberFlag_IF: return \"i\";
 			}
 			return \"?\";
 		}
@@ -309,6 +375,9 @@ main :: proc() {
 			ClobberFlags flags_rd_call() const {
 				return flags_rd;
 			}
+			ClobberFlags flags_wr_call() const {
+				return flags_wr;
+			}
 
 			bool implies_clobber_flags() const {
 				u16 const FLAGS_MASK = ClobberFlag_CF|ClobberFlag_PF|ClobberFlag_AF|
@@ -347,7 +416,7 @@ main :: proc() {
 			bool has_halt() const {
 				return (cast(u16)side_effects & SideEffectFlag_HALT) != 0;
 			}
-			bool is_conditional() const {
+			bool is_conditional(struct Encoding const &valid_form) const {
 				return has_control() && (cast(u16)flags_rd != 0);
 			}
 			bool is_nondeterministic() const {
@@ -359,6 +428,14 @@ main :: proc() {
 				}
 				u16 implicit = cast(u16)implicit_rd | cast(u16)implicit_wr;
 				return (implicit & (ClobberReg_RSP|ClobberReg_RSI|ClobberReg_RDI|ClobberReg_RBX)) != 0;
+			}
+
+			bool is_status_snapshot() const {
+				u16 flags = cast(u16)this->flags_rd_call();
+				u16 const STATUS_FLAGS = ClobberFlag_CF | ClobberFlag_PF | ClobberFlag_AF |
+				                         ClobberFlag_ZF | ClobberFlag_SF | ClobberFlag_OF;
+				return ((flags & ClobberFlag_IF) != 0) ||
+				       (gb_count_set_bits(flags & STATUS_FLAGS) >= 4);
 			}
 		};
 
@@ -420,71 +497,7 @@ main :: proc() {
 	strings.write_string(&sb, "\tstatic u16    const register_codes  [REG_COUNT];\n")
 	strings.write_string(&sb, "\tstatic String const register_strings[REG_COUNT];\n")
 
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum OperandType : u8 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in type_of(gen.Encoding{}.ops[0]) {
-			fmt.sbprintf(&sb, "\t\tOP_%s,\n", op)
-		}
 
-	}
-	strings.write_string(&sb, "\n\n")
-	{
-		strings.write_string(&sb, "\tenum OperandEncoding : u8 {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		for op in Operand_Encoding {
-			fmt.sbprintf(&sb, "\t\tENC_%s,\n", op)
-		}
-
-	}
-	strings.write_string(&sb, "\n")
-	strings.write_string(&sb, "\ttypedef u32 EncodingFlags; // cannot use a C++ bit field to due lack of portability\n")
-	strings.write_string(&sb, "\n")
-	{
-		defer strings.write_string(&sb, "\tGB_STATIC_ASSERT(gb_size_of(Encoding) == 16);\n")
-
-		strings.write_string(&sb, "\t#pragma pack(push, 1)\n")
-		defer strings.write_string(&sb, "\t#pragma pack(pop)\n")
-		strings.write_string(&sb, "\tstruct Encoding {\n")
-		defer strings.write_string(&sb, "\t};\n")
-		strings.write_string(&sb, """
-				Mnemonic        mnemonic;
-				OperandType     ops[4];
-				OperandEncoding enc[4];
-				u8              opcode;
-				u8              ext;
-				EncodingFlags   flags;
-		\n
-		""")
-		Encoding_Flags :: type_of(gen.Encoding{}.flags)
-
-		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "has_implicit")
-			strings.write_string(&sb, "\t\tbool has_implicit  () const { ")
-			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
-			strings.write_string(&sb, " }\n")
-		}
-		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "explicit_count")
-			bit_size   := intrinsics.type_field_bit_size(Encoding_Flags, "explicit_count")
-			strings.write_string(&sb, "\t\tu8   explicit_count() const { ")
-			fmt.sbprintf(&sb, "return cast(u8)((flags>>%du)&((1u<<%d)-1));", bit_offset, bit_size)
-			strings.write_string(&sb, " }\n")
-		}
-		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "lock_ok")
-			strings.write_string(&sb, "\t\tbool lock_ok       () const { ")
-			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
-			strings.write_string(&sb, " }\n")
-		}
-		{
-			bit_offset := intrinsics.type_field_bit_offset(Encoding_Flags, "rep_ok")
-			strings.write_string(&sb, "\t\tbool rep_ok        () const { ")
-			fmt.sbprintf(&sb, "return ((flags>>%du)&1) != 0;", bit_offset)
-			strings.write_string(&sb, " }\n")
-		}
-	}
 	strings.write_string(&sb, "\n\n")
 	{
 		strings.write_string(&sb, "\t// Companion run index: ENCODE_RUNS[mnemonic] -> contiguous run in ENCODE_FORMS.\n")
@@ -590,6 +603,11 @@ main :: proc() {
 			case REG_CLASS_BND:   return 128;
 			}
 			return 0;
+		}
+
+		bool reg_is_segment(/*Register*/ u16 r) {
+			auto c = reg_class(register_codes[r]);
+			return c == REG_CLASS_SEG;
 		}
 
 		bool integer_reg_width_is_exact() const {
@@ -776,6 +794,24 @@ main :: proc() {
 			}
 			return 0; // OP_M (sizeless), OP_K (opmask width is data-dependent), OP_ONE_IMPL, moffs, ptr, sreg/cr/dr, etc.
 		}
+
+		bool target_has_feature(u64 enabled_features, u32 f) const {
+			return true;
+		}
+		char const *feature_name(u32 f) const {
+			return "";
+		}
+		u16 operand_type_transfer_bytes(OperandType t) const {
+			gb_unused(t);
+			return 0;
+		}
+		bool operand_type_is_lane(OperandType t) const {
+			return false;
+		}
+
+		String feature_name_from_form(Encoding const &form) const {
+			return {};
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")
@@ -797,6 +833,27 @@ main :: proc() {
 				seen += 1;
 			}
 			return -1;
+		}
+
+		// Transfer size (bytes) a memory form's scaled index must match:
+		// shift == log2(bytes). Derived from the widest register operand in the form
+		// (the data being loaded/stored). 0 => no such constraint. Generic across ISAs.
+		u16 form_transfer_bytes(Encoding const &form) const {
+			u16 widest = 0;
+			for (int j = 0; j < gb_count_of(form.ops); j++) {
+				auto t = form.ops[j];
+				if (!t) {
+					break;
+				}
+				AsmOperandKind k = kind_from_operand_type(t);
+				if (k == AsmOperand_Register) {
+					u16 w = operand_type_bit_width(t);
+					if (w > widest) {
+						widest = w;
+					}
+				}
+			}
+			return cast(u16)(widest / 8);
 		}
 	""")
 

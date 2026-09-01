@@ -391,20 +391,6 @@ enum StmtAllowFlag {
 	StmtAllowFlag_Label   = 1<<1,
 };
 
-enum InlineAsmDialectKind : u8 {
-	InlineAsmDialect_Default, // ATT is default
-	InlineAsmDialect_ATT,
-	InlineAsmDialect_Intel,
-
-	InlineAsmDialect_COUNT,
-};
-
-gb_global char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
-	"",
-	"att",
-	"intel",
-};
-
 enum UnionTypeKind : u8 {
 	UnionType_Normal     = 0,
 	UnionType_no_nil     = 2,
@@ -423,6 +409,13 @@ gb_global char const *union_type_kind_strings[UnionType_COUNT] = {
 struct AstSplitArgs {
 	Slice<Ast *> positional;
 	Slice<Ast *> named;
+};
+
+enum AsmMemoryOperandKind : u8 {
+	AsmMemoryOperand_Default,
+	AsmMemoryOperand_Pre,
+	AsmMemoryOperand_Post,
+	AsmMemoryOperand_COUNT
 };
 
 #define AST_KINDS \
@@ -513,17 +506,25 @@ struct AstSplitArgs {
 		struct AsmInstructionFacts *facts; \
 	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
-		Token open;     \
-		Ast * segment_override; \
-		Ast * base;     \
-		Token index_op; \
-		Ast * index;    \
-		Token scale_op; \
-		Ast * scale;    \
-		Token disp_op;  \
-		Ast * disp;     \
-		Ast * type;     \
-		Token close;    \
+		AsmMemoryOperandKind kind; \
+		Token open;                \
+		Ast * segment_override;    \
+		Ast * base;                \
+		Token index_op;            \
+		Ast * index;               \
+		Token scale_op;            \
+		Ast * scale;               \
+		Token disp_op;             \
+		Ast * disp;                \
+		Ast * type;                \
+		Token close;               \
+	}) \
+	AST_KIND(AsmRegisterGroup, "asm register group", struct { \
+		Token        open;        \
+		Array<Ast *> registers;   \
+		Token        range_token; \
+		Token        close;       \
+		Ast *        type;        \
 	}) \
 	AST_KIND(AsmDirective, "asm directive", struct { \
 		Token        token;    \

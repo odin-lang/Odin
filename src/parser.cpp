@@ -600,6 +600,10 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmMemoryOperand.disp  = clone_ast(n->AsmMemoryOperand.disp,  f);
 		n->AsmMemoryOperand.type  = clone_ast(n->AsmMemoryOperand.type,  f);
 		break;
+	case Ast_AsmRegisterGroup:
+		n->AsmRegisterGroup.registers = clone_ast_array(n->AsmRegisterGroup.registers, f);
+		n->AsmRegisterGroup.type      = clone_ast(n->AsmRegisterGroup.type, f);
+		break;
 	case Ast_AsmDirective:
 		n->AsmDirective.operands = clone_ast_array(n->AsmDirective.operands, f);
 		break;
@@ -2510,6 +2514,7 @@ gb_internal Ast *parse_asm_register(AstFile *f) {
 	return reg;
 }
 gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
+	Ast *operand = nullptr;
 	switch (f->curr_token.kind) {
 	case Token_Period:
 		{
@@ -2521,9 +2526,11 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			return label_decl;
 		}
 	case Token_Ident:
-		return parse_ident(f);
+		operand = parse_ident(f);
+		break;
 	case Token_Mod:
-		return parse_asm_register(f);
+		operand = parse_asm_register(f);
+		break;
 	case Token_Integer:
 	case Token_Float:
 	case Token_Rune:
@@ -2540,6 +2547,29 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 
 	case Token_OpenParen:
 		return parse_expr(f, false);
+
+	case Token_Hash:
+		{
+			Token hash = expect_token(f, Token_Hash);
+			Token name = expect_token(f, Token_Ident);
+			if (name.string == "pre" ||
+			    name.string == "post") {
+				operand = parse_asm_operand(f, allow_memory_operand);
+				if (operand == nullptr ||
+				    operand->kind != Ast_AsmMemoryOperand) {
+					error(name, "Expected an asm memory operand after #%.*s", LIT(name.string));
+				} else {
+					GB_ASSERT(operand->kind == Ast_AsmMemoryOperand);
+					if (name.string == "pre") {
+						operand->AsmMemoryOperand.kind = AsmMemoryOperand_Pre;
+					} else if (name.string == "post") {
+						operand->AsmMemoryOperand.kind = AsmMemoryOperand_Post;
+					}
+				}
+			}
+		}
+		break;
+
 	case Token_OpenBracket:
 		if (allow_memory_operand) {
 			Token open  = expect_token(f, Token_OpenBracket);
@@ -2612,11 +2642,75 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			return mem;
 		}
 		break;
+	case Token_OpenBrace:
+		if (allow_memory_operand) {
+			Token open  = expect_token(f, Token_OpenBrace);
+
+			Array<Ast *> registers = {};
+			registers.allocator = heap_allocator();
+			Ast *type = nullptr;
+
+			Ast *first_reg = parse_asm_operand(f, false);
+			Token range_token = {};
+			switch (f->curr_token.kind) {
+			case Token_RangeHalf:
+			case Token_RangeFull:
+				{
+					range_token = advance_token(f);
+					Ast *second_reg = parse_asm_operand(f, false);
+					array_reserve(&registers, 2);
+					array_add(&registers, first_reg);
+					array_add(&registers, second_reg);
+
+					if (allow_token(f, Token_Comma)) {
+						// allow for trailing comma
+					}
+				}
+				break;
+			default:
+				if (allow_token(f, Token_Comma)) {
+					// allow for trailing comma
+				}
+				while (f->curr_token.kind != Token_CloseBrace &&
+				       f->curr_token.kind != Token_EOF) {
+					Ast *reg = parse_asm_operand(f, false);
+					array_add(&registers, reg);
+
+					if (!allow_token(f, Token_Comma)) {
+						break;
+					}
+				}
+				break;
+			}
+			Token close = expect_token(f, Token_CloseBrace);
+			if (allow_token(f, Token_Colon)) {
+				type = parse_type(f);
+			}
+
+			Ast *rg = alloc_ast_node(f, Ast_AsmRegisterGroup);
+			rg->AsmRegisterGroup.open        = open;
+			rg->AsmRegisterGroup.registers   = registers;
+			rg->AsmRegisterGroup.range_token = range_token;
+			rg->AsmRegisterGroup.close       = close;
+			rg->AsmRegisterGroup.type        = type;
+
+			return rg;
+		}
+		break;
 	}
 
-	syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
-	advance_token(f);
-	return nullptr;
+	if (operand == nullptr) {
+		syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
+		advance_token(f);
+	} else if (f->curr_token.kind == Token_OpenBracket) {
+		f->expr_level++;
+		Token open = expect_token(f, Token_OpenBracket);
+		Ast *index = parse_asm_operand(f, false);
+		Token close = expect_token(f, Token_CloseBracket);
+		f->expr_level--;
+		operand = ast_index_expr(f, operand, index, open, close);
+	}
+	return operand;
 }
 
 gb_internal Slice<Ast *> parse_asm_operands(AstFile *f) {
@@ -2881,10 +2975,11 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 	}
 
 	if (build_context.metrics.arch == TargetArch_amd64 ||
-	    build_context.metrics.arch == TargetArch_riscv64) {
+	    build_context.metrics.arch == TargetArch_riscv64 ||
+	    build_context.metrics.arch == TargetArch_arm64) {
 	    	// okay
 	} else {
-		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64");
+		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64 or -target:*_arm64");
 	}
 
 	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);
@@ -3650,7 +3745,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			Token close = expect_token(f, Token_CloseBrace);
 
 			if (args.count == 0) {
-				syntax_error(token, "Expected a least 1 argument in a procedure group");
+				syntax_error(token, "Expected a least 1 argument in an asm group");
 			}
 
 			return ast_asm_group(f, token, open, close, args);

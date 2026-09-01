@@ -115,21 +115,63 @@ sbprint :: proc(
 
 		write_full_mnemonic(sb, inst, opts.uppercase)
 
-		// B.cond's condition is encoded into the mnemonic suffix (b.eq),
-		// so when printing we skip the first operand (it IS the cond).
-		start_slot := 0
-		if inst.mnemonic == .B_COND && inst.operand_count >= 1 && inst.ops[0].kind == .COND {
-			start_slot = 1
+
+		// MOVZ/MOVN/MOVK store the shift as an hw index (0..3 = LSL #0/16/32/48),
+		// which assemblers write as `lsl #16` and omit entirely when it is zero.
+		mov_wide := inst.mnemonic == .MOVZ || inst.mnemonic == .MOVN || inst.mnemonic == .MOVK
+		end_slot := int(inst.operand_count)
+		if mov_wide && end_slot == 3 && inst.ops[2].kind == .IMMEDIATE && inst.ops[2].immediate == 0 {
+			end_slot = 2
 		}
 
-		if int(inst.operand_count) > start_slot {
+		if end_slot > 0 {
 			strings.write_byte(sb, ' ')
-			for slot in start_slot..<int(inst.operand_count) {
-				if slot > start_slot {
+			for slot in 0..<end_slot {
+				op := &inst.ops[slot]
+				// A lane index belongs to the register before it, so it is
+				// written `[3]` with no separator rather than as an operand.
+				lane_index := op.kind == .IMMEDIATE && op.size == LANE_INDEX
+				if slot > 0 && !lane_index {
 					strings.write_byte(sb, ',')
 					if opts.space_after_comma { strings.write_byte(sb, ' ') }
 				}
-				write_operand(sb, &inst.ops[slot], &display, opts)
+				// A register the syntax writes as a list keeps its braces, and
+				// names every register in the run.
+				list := op.kind == .REGISTER && op.list_count > 0
+				switch {
+				case lane_index:
+					strings.write_byte(sb, '[')
+					write_decimal_u32(sb, u32(op.immediate))
+					strings.write_byte(sb, ']')
+				case mov_wide && slot == 2:
+					strings.write_string(sb, opts.uppercase ? "LSL #" : "lsl #")
+					write_decimal_u32(sb, u32(op.immediate) * 16)
+				case list:
+					strings.write_byte(sb, '{')
+					if opts.space_after_comma { strings.write_byte(sb, ' ') }
+					for n in 0 ..< op.list_count {
+						if n > 0 {
+							strings.write_byte(sb, ',')
+							if opts.space_after_comma { strings.write_byte(sb, ' ') }
+						}
+						// The run is consecutive and wraps at v31.
+						member := op^
+						member.reg = Register(reg_class(op.reg) | u16((reg_hw(op.reg) + n) & 0x1F))
+						write_operand(sb, &member, &display, opts)
+					}
+					if opts.space_after_comma { strings.write_byte(sb, ' ') }
+					strings.write_byte(sb, '}')
+				case:
+					write_operand(sb, op, &display, opts)
+				}
+			}
+			// CMLE/CMLT/FCMLE/FCMLT only ever compare against zero, and the
+			// zero is part of the syntax rather than an encoded operand -- an
+			// assembler will not take the instruction without it.
+			if inst.mnemonic == .CMLE || inst.mnemonic == .CMLT {
+				strings.write_string(sb, opts.space_after_comma ? ", #0" : ",#0")
+			} else if inst.mnemonic == .FCMLE || inst.mnemonic == .FCMLT {
+				strings.write_string(sb, opts.space_after_comma ? ", #0.0" : ",#0.0")
 			}
 		}
 		strings.write_string(sb, opts.separator)
@@ -273,30 +315,11 @@ wprintln :: proc(
 // Internal writers
 // =============================================================================
 
-// write_full_mnemonic handles a few special cases that need transformation:
-//   * Suffix family mnemonics (ADD_IMM/ADD_SR/ADD_ER) collapse to `add`.
-//   * B_COND prints as `b.<cond>` using the first operand's cond payload.
-//   * Mov-wide / shifted/extended/imm variants all share the canonical
-//     ARM ARM mnemonic; the suffix is for our internal disambiguation.
-
+// Every mnemonic now prints straight from its name -- the conditional
+// branches carry their condition in the name (B_LE -> `b.le`), so there is
+// no operand to fold in.
 @(private="file")
 write_full_mnemonic :: proc(sb: ^strings.Builder, inst: ^Instruction, uppercase: bool) {
-	// B_COND -> `b.<cond>` based on the first operand.
-	if inst.mnemonic == .B_COND && inst.operand_count >= 1 && inst.ops[0].kind == .COND {
-		strings.write_string(sb, uppercase ? "B." : "b.")
-		c := inst.ops[0].cond & 0xF
-		cn := COND_NAMES[c]
-		if uppercase {
-			for i in 0..<len(cn) {
-				ch := cn[i]
-				if ch >= 'a' && ch <= 'z' { strings.write_byte(sb, ch - 32) } else { strings.write_byte(sb, ch) }
-			}
-		} else {
-			strings.write_string(sb, cn)
-		}
-		return
-	}
-
 	write_mnemonic(sb, inst.mnemonic, uppercase)
 }
 
@@ -305,27 +328,174 @@ write_mnemonic :: proc(sb: ^strings.Builder, m: Mnemonic, uppercase: bool) {
 	name, ok := reflect.enum_name_from_value(m)
 	if !ok { strings.write_string(sb, "<?>"); return }
 
-	// Strip internal disambiguator suffixes -- the user-facing mnemonic
-	// is just the base name (ADD_IMM -> add, ADD_SR -> add, LDR_LIT -> ldr,
-	// CCMP_REG -> ccmp, MSR_REG -> msr, FMOV_GEN -> fmov, ...).
-	n := len(name)
-	suffixes := []string{ "_IMM", "_SR", "_ER", "_LIT", "_REG", "_COND", "_GEN" }
-	for s in suffixes {
-		if n > len(s) {
-			tail := name[n - len(s):]
-			if tail == s {
-				n -= len(s)
+	// Enum names are the assembler mnemonics, so this is a straight
+	// transliteration -- with one exception. The system instructions below
+	// are written by assemblers as a mnemonic plus an op-name token
+	// (`dc zva`, `tlbi vae1`, `bti j`), which we store as one enum member,
+	// so for those the first underscore prints as a space. Every other
+	// underscore is kept: AMX_LDX is an undocumented Apple coprocessor op
+	// with no assembler spelling at all, and printing it `amx ldx` would
+	// imply a two-token syntax that does not exist.
+	split, sep := -1, byte(' ')
+	for prefix in ([]string{"DC_", "IC_", "AT_", "TLBI_", "BTI_", "PSB_", "TSB_"}) {
+		if len(name) > len(prefix) && name[:len(prefix)] == prefix {
+			split = len(prefix) - 1
+			break
+		}
+	}
+	// Conditional branches spell the separator as a dot: B_LE -> `b.le`.
+	// BC_ is checked first, since it also starts with B.
+	if split < 0 {
+		for prefix in ([]string{"BC_", "B_"}) {
+			if len(name) > len(prefix) && name[:len(prefix)] == prefix {
+				split, sep = len(prefix) - 1, '.'
 				break
 			}
 		}
 	}
 
-	for i in 0..<n {
+	for i in 0..<len(name) {
 		c := name[i]
-		if c == '_' {
-			strings.write_byte(sb, '.')
+		if i == split {
+			strings.write_byte(sb, sep)
 		} else if !uppercase && c >= 'A' && c <= 'Z' {
 			strings.write_byte(sb, c + 32)
+		} else {
+			strings.write_byte(sb, c)
+		}
+	}
+}
+
+// NEON arrangement (`.4s`), element view (`.d`) or SVE element width (`.s`)
+// suffix. Vector operands carry the shape in op.size using the codes
+// op_v_*/op_z_* produce and the decoder restores (see operands.odin);
+// arrangements are multiples of 8, element views are odd, and the neutral 4
+// that every scalar class uses prints nothing.
+//
+// A lane index arrives as its own immediate operand carrying the LANE_INDEX
+// marker; the operand loop glues it to the register it indexes (`v0.s[2]`)
+// instead of writing it as a separate `#2`.
+// A system register by name (`cntvct_el0`), falling back to the raw field
+// when it is not one we know.
+@(private="file")
+write_sysreg :: proc(sb: ^strings.Builder, sr: Register, uppercase: bool) {
+	name, ok := sysreg_name(sr)
+	if !ok {
+		strings.write_byte(sb, '#')
+		write_signed_decimal(sb, i64(sysreg_bits(sr)))
+		return
+	}
+	for i in 0 ..< len(name) {
+		c := name[i]
+		if uppercase && c >= 'a' && c <= 'z' {
+			strings.write_byte(sb, c - 'a' + 'A')
+		} else {
+			strings.write_byte(sb, c)
+		}
+	}
+}
+
+// ZERO's tile list: the largest tiles that exactly cover the mask, biggest
+// first, so a mask of every bit reads `{za}` rather than eight .d tiles.
+@(private="file")
+write_za_tile_mask :: proc(sb: ^strings.Builder, mask: u8, opts: ^Print_Options) {
+	strings.write_byte(sb, '{')
+	rest  := mask
+	first := true
+	emit :: proc(sb: ^strings.Builder, first: ^bool, opts: ^Print_Options, n: int, suffix: string) {
+		if !first^ {
+			strings.write_byte(sb, ',')
+			if opts.space_after_comma { strings.write_byte(sb, ' ') }
+		}
+		first^ = false
+		strings.write_string(sb, opts.uppercase ? "ZA" : "za")
+		write_decimal_u32(sb, u32(n))
+		if suffix != "" {
+			strings.write_byte(sb, '.')
+			strings.write_string(sb, suffix)
+		}
+	}
+	if rest == 0xFF {
+		strings.write_string(sb, opts.uppercase ? "ZA" : "za")
+		strings.write_byte(sb, '}')
+		return
+	}
+	for n in 0 ..< 2 {
+		bit := u8(0x55) << u8(n)
+		if rest & bit == bit { emit(sb, &first, opts, n, opts.uppercase ? "H" : "h"); rest &~= bit }
+	}
+	for n in 0 ..< 4 {
+		bit := u8(0x11) << u8(n)
+		if rest & bit == bit { emit(sb, &first, opts, n, opts.uppercase ? "S" : "s"); rest &~= bit }
+	}
+	for n in 0 ..< 8 {
+		bit := u8(1) << u8(n)
+		if rest & bit == bit { emit(sb, &first, opts, n, opts.uppercase ? "D" : "d"); rest &~= bit }
+	}
+	strings.write_byte(sb, '}')
+}
+
+@(private="file")
+write_lowercase :: proc(sb: ^strings.Builder, s: string, uppercase: bool) {
+	for i in 0 ..< len(s) {
+		c := s[i]
+		if uppercase && c >= 'a' && c <= 'z' {
+			strings.write_byte(sb, c - 'a' + 'A')
+		} else {
+			strings.write_byte(sb, c)
+		}
+	}
+}
+
+@(private="file")
+write_vector_shape :: proc(sb: ^strings.Builder, r: Register, size: u8, uppercase: bool) {
+	shape := ""
+	sep := byte('.')
+	switch reg_class(r) {
+	case REG_V:
+		switch size {
+		case 8:  shape = "8b"
+		case 16: shape = "16b"
+		case 24: shape = "4h"
+		case 32: shape = "8h"
+		case 40: shape = "2s"
+		case 48: shape = "4s"
+		case 56: shape = "1d"
+		case 64: shape = "2d"
+		case 72: shape = "1q"
+		case 1:  shape = "b"
+		case 3:  shape = "h"
+		case 5:  shape = "s"
+		case 7:  shape = "d"
+		}
+	case REG_Z, REG_ZA:
+		switch size {
+		case 1:  shape = "b"
+		case 2:  shape = "h"
+		case 4:  shape = "s"
+		case 8:  shape = "d"
+		case 16: shape = "q"
+		}
+	// A predicate's suffix is its governing qualifier, and it hangs off a
+	// slash rather than a dot.
+	case REG_P, REG_PN:
+		switch size {
+		case PQUAL_ZERO:  sep = '/'; shape = "z"
+		case PQUAL_MERGE: sep = '/'; shape = "m"
+		case PSHAPE_B:    shape = "b"
+		case PSHAPE_H:    shape = "h"
+		case PSHAPE_S:    shape = "s"
+		case PSHAPE_D:    shape = "d"
+		}
+	}
+	if shape == "" {
+		return
+	}
+	strings.write_byte(sb, sep)
+	for i in 0..<len(shape) {
+		c := shape[i]
+		if uppercase && c >= 'a' && c <= 'z' {
+			strings.write_byte(sb, c - 32)
 		} else {
 			strings.write_byte(sb, c)
 		}
@@ -384,6 +554,17 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool) {
 	case REG_P:
 		strings.write_byte(sb, uppercase ? 'P' : 'p')
 		write_decimal_u32(sb, u32(hw))
+	case REG_PN:
+		strings.write_string(sb, uppercase ? "PN" : "pn")
+		write_decimal_u32(sb, u32(hw))
+	case REG_ZT:
+		strings.write_string(sb, uppercase ? "ZT" : "zt")
+		write_decimal_u32(sb, u32(hw))
+	case REG_ZA:
+		strings.write_string(sb, uppercase ? "ZA" : "za")
+		write_decimal_u32(sb, u32(hw))
+	case REG_SYS:
+		write_sysreg(sb, r, uppercase)
 	}
 }
 
@@ -399,10 +580,42 @@ write_operand :: proc(
 
 	case .REGISTER:
 		write_register(sb, op.reg, opts.uppercase)
+		write_vector_shape(sb, op.reg, op.size, opts.uppercase)
 
 	case .IMMEDIATE:
+		// An SVE element-count pattern has a name, and its multiplier is
+		// written `mul #N` rather than as a bare immediate.
+		if op.size == SVE_PATTERN_IMM {
+			name := SVE_PATTERN_NAMES[op.immediate & 0x1F]
+			if name != "" {
+				write_lowercase(sb, name, opts.uppercase)
+				return
+			}
+		} else if op.size == ZA_TILE_MASK {
+			write_za_tile_mask(sb, u8(op.immediate), opts)
+			return
+		} else if op.size == SVE_MUL_IMM {
+			strings.write_string(sb, opts.uppercase ? "MUL #" : "mul #")
+			write_signed_decimal(sb, op.immediate)
+			return
+		}
 		strings.write_byte(sb, '#')
 		write_signed_decimal(sb, op.immediate)
+
+	case .ZA_SLICE:
+		// `za0h.b[w12, 0]`, or plain `za[w12, 0]` for a whole array vector
+		strings.write_string(sb, opts.uppercase ? "ZA" : "za")
+		if op.za.elem != 0 {
+			write_decimal_u32(sb, u32(op.za.tile))
+			strings.write_byte(sb, op.za.vertical ? (opts.uppercase ? 'V' : 'v') : (opts.uppercase ? 'H' : 'h'))
+			write_vector_shape(sb, Register(REG_Z), op.za.elem, opts.uppercase)
+		}
+		strings.write_byte(sb, '[')
+		strings.write_string(sb, opts.uppercase ? "W" : "w")
+		write_decimal_u32(sb, 12 + u32(op.za.ws))
+		strings.write_string(sb, opts.space_after_comma ? ", " : ",")
+		write_decimal_u32(sb, u32(op.za.offset))
+		strings.write_byte(sb, ']')
 
 	case .COND:
 		c := op.cond & 0xF
@@ -443,7 +656,7 @@ write_operand :: proc(
 		}
 
 	case .MEMORY:
-		write_memory(sb, op.mem, opts)
+		write_memory(sb, op.mem, op.size, opts)
 
 	case .RELATIVE:
 		target := u32(op.relative)
@@ -456,7 +669,9 @@ write_operand :: proc(
 }
 
 @(private="file")
-write_memory :: proc(sb: ^strings.Builder, m: Memory, opts: ^Print_Options) {
+// `index_shape` names the element size of a vector index (SVE gather), which
+// Memory has no room left to carry; it is 0 for every ordinary addressing mode.
+write_memory :: proc(sb: ^strings.Builder, m: Memory, index_shape: u8, opts: ^Print_Options) {
 	strings.write_byte(sb, '[')
 	write_register(sb, m.base, opts.uppercase)
 
@@ -488,6 +703,9 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory, opts: ^Print_Options) {
 	case .REG_OFFSET:
 		strings.write_string(sb, ", ")
 		write_register(sb, m.index, opts.uppercase)
+		if reg_class(m.index) == REG_Z {
+			write_vector_shape(sb, m.index, index_shape, opts.uppercase)
+		}
 		if m.shift != 0 {
 			strings.write_string(sb, ", lsl #")
 			write_decimal_u32(sb, u32(m.shift))
@@ -497,6 +715,9 @@ write_memory :: proc(sb: ^strings.Builder, m: Memory, opts: ^Print_Options) {
 	case .EXT_REG_OFFSET:
 		strings.write_string(sb, ", ")
 		write_register(sb, m.index, opts.uppercase)
+		if reg_class(m.index) == REG_Z {
+			write_vector_shape(sb, m.index, index_shape, opts.uppercase)
+		}
 		strings.write_string(sb, ", ")
 		strings.write_string(sb, EXTEND_NAMES[u8(m.extend) & 0x7])
 		if m.shift != 0 {

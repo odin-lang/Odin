@@ -156,7 +156,9 @@ Encoding_Flags :: bit_field u8 {
 	writes_pc:   bool | 1,
 	thumb32:     bool | 1,   // T32 32-bit form (vs 16-bit). Ignored for A32.
 	deprecated:  bool | 1,
-	_:           u8   | 1,
+	// VSEL and friends are unconditional words that still name a condition,
+	// in bits 21:20 rather than 31:28, and spell it on the mnemonic.
+	cond_in_21:  bool | 1,
 }
 
 // ---- Operand types ----------------------------------------------------------
@@ -282,6 +284,7 @@ Operand_Encoding :: enum u8 {
 	// ---- Immediate field placements (A32) ----
 	A32_IMM12,             // bits 11-0 (LDR/STR offset)
 	A32_IMM_SHIFT,         // bits 11-7 (data-proc shift_imm)
+	A32_IMM_SHIFT_32,      // same field, but a zero means 32 (LSR/ASR)
 	A32_SHIFT_TYPE,        // bits 6-5
 	A32_RS_SHIFT,          // bits 11-8 (RSR uses Rs register)
 	A32_IMM24,             // bits 23-0 (B/BL/SVC)
@@ -321,7 +324,16 @@ Operand_Encoding :: enum u8 {
 	// MVE 3-bit Q registers (Q0..Q7): Qn at bits 19:17, Qm at bits 3:1.
 	VN_Q_MVE,
 	VM_Q_MVE,
-	VFP_IMM8,              // VFP immediate (VMOV.F32/F64 #imm)
+	VFP_IMM8,
+	VM_S_PLUS1,            // the second S register of a consecutive pair
+	DBG_OPTION,            // DBG's option, bits 3:0 -- not the wider hint field
+	MRS_SPEC_REG,          // APSR or SPSR, by the R bit
+	VFP_SPEC_REG,          // VMRS/VMSR system register, bits 19:16
+	SETEND_ENDIAN,         // LE or BE, by the E bit
+	IMPL_SP,               // an SP the syntax names but no field encodes
+	MODE_IMM5,             // processor mode, bits 4:0 (SRS)
+	RN_A32_WB,             // base register whose writeback rides in bit 21
+	NEON_LANE_VN_32,       // Vn:N with the 32-bit lane index in bit 21              // VFP immediate (VMOV.F32/F64 #imm)
 	NEON_IMM8_ABCDEFGH,    // bits 18-16 (abc) + bits 3-0 (defgh)
 	NEON_CMODE,            // bits 11-8 (cmode for VMOV/VMVN immediate)
 	NEON_OP_BIT,           // bit 5 (op for VMOV immediate variant)
@@ -330,9 +342,60 @@ Operand_Encoding :: enum u8 {
 	VFP_S_LIST,            // VLDM/VSTM single-prec list (8-bit count, start in Vd_S)
 	VFP_D_LIST,            // VLDM/VSTM double-prec list (8-bit count, start in Vd_D)
 
+	// VTBL/VTBX read their table from a run of one to four D registers
+	// starting at Vn. Which run length applies is the `len` field, which is
+	// a fixed pattern bit of each form rather than something the operand
+	// encodes -- so the length rides in the encoding, the way the NEON
+	// structure-list lengths already do, and the encoder emits only Vn.
+	NEON_VN_TABLE_1, NEON_VN_TABLE_2, NEON_VN_TABLE_3, NEON_VN_TABLE_4,
+
+	// NEON "by scalar": the multiplier is one lane of a low D register, and
+	// the register number and the lane number share one four-bit field. How
+	// they share it depends on the element size -- 16-bit takes Vm from bits
+	// 2:0, so D0..D7, and the lane from M:bit3; 32-bit takes Vm from bits
+	// 3:0, so D0..D15, and the lane from M alone.
+	NEON_VM_SCALAR_16, NEON_VM_SCALAR_32,
+	// VDUP from a lane packs the element size and the lane index into one
+	// four-bit field: `xxx1` is a byte lane, `xx10` a halfword, `x100` a
+	// word, and the bits above the marker are the index.
+	NEON_VDUP_LANE_8, NEON_VDUP_LANE_16, NEON_VDUP_LANE_32,
+	// NEON structure load/store lists (VLD1-4 / VST1-4). Unlike VLDM's list,
+	// the register count is part of the form's type field at bits 11:8, so the
+	// encoding writes only Vd; how many registers -- and whether the run steps
+	// by one or by two -- comes from the form. Verified against llvm-mc.
+	NEON_D_LIST_1,         // {d2}
+	NEON_D_LIST_2,         // {d2, d3}
+	NEON_D_LIST_3,         // {d2, d3, d4}
+	NEON_D_LIST_4,         // {d2, d3, d4, d5}
+	NEON_D_LIST_2X,        // {d2, d4}          -- spaced
+	NEON_D_LIST_3X,        // {d2, d4, d6}      -- spaced
+	NEON_D_LIST_4X,        // {d2, d4, d6, d8}  -- spaced
+	NEON_D_LIST_ALL,       // {d2[]}            -- to all lanes
+	// The structure loads that broadcast take a list of two, three or four,
+	// and bit 5 spaces it -- `{d0[], d2[]}` rather than `{d0[], d1[]}`.
+	NEON_D_LIST_ALL_2, NEON_D_LIST_ALL_3, NEON_D_LIST_ALL_4,
+	// VLD1/VST1 single-lane: Vd plus the lane index, whose width and position
+	// follow the element size -- bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
+	// Verified against llvm-mc.
+	// ..._N is how many registers the list holds: VLD2 writes `{d0[1], d1[1]}`.
+	NEON_LANE_D_8,    NEON_LANE_D_16,    NEON_LANE_D_32,
+	NEON_LANE_D_8_2,  NEON_LANE_D_16_2,  NEON_LANE_D_32_2,
+	NEON_LANE_D_8_3,  NEON_LANE_D_16_3,  NEON_LANE_D_32_3,
+	NEON_LANE_D_8_4,  NEON_LANE_D_16_4,  NEON_LANE_D_32_4,
+
 	// ---- Memory addressing composites ----
 	MEM_IMM12_OFFSET,      // [Rn, #±imm12]
-	MEM_IMM8_OFFSET,       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
+	// The halfword and dual load/stores split their 8-bit offset around the
+	// opcode at bits 7:4, so they cannot use the 12-bit forms below.
+	// LDRD/STRD name a register pair, and the second is always the first plus
+	// one, so it occupies no bits of its own.
+	RT2_A32_PAIR,
+	MEM_IMM8_PRE_INDEX,
+	MEM_IMM8_POST_INDEX,
+	MEM_IMM8_OFFSET,
+	MEM_IMM8_SCALED4,      // VFP load/store: imm8 in words, U at bit 23
+	MEM_IMM8_SCALED4_PRE,  // same, pre-indexed
+	MEM_IMM8_SCALED4_POST, // same, post-indexed       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
 	MEM_REG_OFFSET,        // [Rn, ±Rm{, shift}]
 	MEM_PRE_INDEX,         // [Rn, #imm]! / [Rn, ±Rm]!
 	MEM_POST_INDEX,        // [Rn], #imm / [Rn], ±Rm
@@ -341,8 +404,10 @@ Operand_Encoding :: enum u8 {
 
 	// ---- Coprocessor ----
 	COPROC_NUM_FIELD,      // bits 11-8 in CDP/LDC/STC (cp_num)
-	COPROC_OPC1_FIELD,     // bits 23-20 (CDP / MCR / MRC opc1)
-	COPROC_OPC2_FIELD,     // bits 7-5  (MCR/MRC opc2)
+	COPROC_CRD_FIELD,      // bits 15-12 -- the destination, which is not CRn
+	COPROC_OPC1_MCR,       // bits 23-21 (MCR/MRC opc1, three bits not four)
+	COPROC_OPC1_FIELD,     // bits 23-20 (CDP opc1)
+	COPROC_OPC2_FIELD,     // bits 7-5  (CDP / MCR / MRC opc2)
 	COPROC_CRN_FIELD,      // bits 19-16
 	COPROC_CRM_FIELD,      // bits 3-0
 	COPROC_OPC_MCRR,       // bits 7-4 (MCRR/MRRC 4-bit opcode)
@@ -369,10 +434,24 @@ Operand_Encoding :: enum u8 {
 	HINT_FIELD,            // hint imm
 
 	// ---- Saturate ----
-	SAT_IMM5,              // bits 20-16: SSAT/USAT saturate-to width
-	SAT_IMM5_T32,          // Thumb-2 saturate amount
+	VFP_FBITS,             // VCVT fixed-point fraction bits: width - (imm4:i)
+	// VSHLL's widest form shifts by exactly the element size, which no field
+	// carries -- the size is a fixed bit of the form, so the amount is too.
+	NEON_SHLL_8, NEON_SHLL_16, NEON_SHLL_32,
+	// Complex-arithmetic rotations, named in degrees. VCADD has two, in bit
+	// 24; VCMLA has four, in bits 21:20.
+	// VCMLA names its rotation twice over: the by-element forms put it in
+	// bits 21:20, the vector forms in 24:23.
+	NEON_ROT_2, NEON_ROT_4, NEON_ROT_4_HI,
+	SAT_IMM5,              // bits 20-16: SSAT/SSAT16 saturate-to width, less one
+	SAT_IMM5_T32,          // Thumb-2 signed saturate amount, less one
+	SAT_IMM5_U,            // bits 20-16: USAT/USAT16 width, which is not biased
+	SAT_IMM5_U_T32,        // Thumb-2 unsigned saturate amount
 
 	// ---- BFC/BFI/SBFX/UBFX ----
+	// SBFX/UBFX hold the width less one, where BFI/BFC hold the top bit's
+	// position and the width is msb - lsb + 1.
+	BFX_WIDTH,
 	BFI_MSB,               // bits 20-16 (msb position)
 	BFI_LSB,               // bits 11-7  (lsb position; also shift_imm slot)
 	BFI_LSB_T32,           // Thumb-2 BFI lsb (different layout)
@@ -397,17 +476,42 @@ Operand_Encoding :: enum u8 {
 
 // ---- Encoding struct -------------------------------------------------------
 
+// The data type an A32 mnemonic carries as a suffix: `vadd.i32`, `vcvt.s32.f32`,
+// `vstrb.8`. Unlike A64 -- where the arrangement belongs to each operand
+// (`add v0.4s, v1.4s, v2.4s`) -- in A32 it belongs to the INSTRUCTION, which is
+// why it lives here and on Instruction rather than on Operand.
+//
+// It is not decoration: NEON reuses one operand shape across every element
+// width, so `vadd.i8` and `vadd.f32` are both DPR,DPR,DPR and the type is the
+// only thing that separates their encodings. Without it the encoder can only
+// ever reach the first form of each shape.
+Data_Type :: enum u8 {
+	NONE,
+	S8, S16, S32, S64,     // signed integer
+	U8, U16, U32, U64,     // unsigned integer
+	I8, I16, I32, I64,     // sign-agnostic integer
+	F16, F32, F64,         // floating point
+	P8, P16,               // polynomial
+	BF16,                  // bfloat16
+	SZ8, SZ16, SZ32, SZ64, // bare element size (`vmov.32`, `vstrb.8`)
+}
+
+// Two slots because the convert family names both ends: `vcvt.s32.f32`.
+// Everything else leaves dt[1] as .NONE.
+Data_Types :: [2]Data_Type
+
 Encoding :: struct #packed {
 	mnemonic: Mnemonic,            // 2
-	ops:      [4]Operand_Type,     // 4
-	enc:      [4]Operand_Encoding, // 4
+	ops:      [6]Operand_Type,     // 6
+	enc:      [6]Operand_Encoding, // 6
 	bits:     u32,                 // 4 -- static field pattern
 	mask:     u32,                 // 4 -- which bits are static
 	feature:  Feature,             // 1
 	mode:     Mode,                // 1
 	flags:    Encoding_Flags,      // 1
+	dt:       Data_Types,          // 2
 }
-#assert(size_of(Encoding) == 21)
+#assert(size_of(Encoding) == 27)
 
 // ---- Length introspection --------------------------------------------------
 //

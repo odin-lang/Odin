@@ -1219,6 +1219,41 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 	}
 }
 
+gb_internal void check_target_feature_attributes(AttributeContext &ac, Entity *entity, Type *type) {
+	GB_ASSERT(type->kind == Type_Proc);
+	TypeProc *pt = &type->Proc;
+	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+		error(entity->token, "A procedure cannot have both @(require_target_feature=\"...\") and @(enable_target_feature=\"...\")");
+	}
+
+	if (build_context.strict_target_features && ac.enable_target_feature.len != 0) {
+		ac.require_target_feature = ac.enable_target_feature;
+		ac.enable_target_feature.len = 0;
+	}
+
+	if (ac.require_target_feature.len != 0) {
+		pt->require_target_feature = ac.require_target_feature;
+		String invalid;
+		if (!check_target_feature_is_valid_globally(ac.require_target_feature, &invalid)) {
+			error(entity->token, "Required target feature '%.*s' is not a valid target feature", LIT(invalid));
+		} else if (!check_target_feature_is_enabled(ac.require_target_feature, nullptr)) {
+			entity->flags |= EntityFlag_Disabled;
+		}
+	} else if (ac.enable_target_feature.len != 0) {
+
+		// NOTE: disallow wasm, features on that arch are always global to the module.
+		if (is_arch_wasm()) {
+			error(entity->token, "@(enable_target_feature=\"...\") is not allowed on wasm, features for wasm must be declared globally");
+		}
+
+		pt->enable_target_feature = ac.enable_target_feature;
+		String invalid;
+		if (!check_target_feature_is_valid_globally(ac.enable_target_feature, &invalid)) {
+			error(entity->token, "Procedure enabled target feature '%.*s' is not a valid target feature", LIT(invalid));
+		}
+	}
+}
+
 gb_internal void check_foreign_procedure(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e != nullptr);
 	GB_ASSERT(e->kind == Entity_Procedure);
@@ -1345,38 +1380,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	check_objc_methods(ctx, e, ac);
 
-	{
-		if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
-			error(e->token, "A procedure cannot have both @(require_target_feature=\"...\") and @(enable_target_feature=\"...\")");
-		}
-
-		if (build_context.strict_target_features && ac.enable_target_feature.len != 0) {
-			ac.require_target_feature = ac.enable_target_feature;
-			ac.enable_target_feature.len = 0;
-		}
-
-		if (ac.require_target_feature.len != 0) {
-			pt->require_target_feature = ac.require_target_feature;
-			String invalid;
-			if (!check_target_feature_is_valid_globally(ac.require_target_feature, &invalid)) {
-				error(e->token, "Required target feature '%.*s' is not a valid target feature", LIT(invalid));
-			} else if (!check_target_feature_is_enabled(ac.require_target_feature, nullptr)) {
-				e->flags |= EntityFlag_Disabled;
-			}
-		} else if (ac.enable_target_feature.len != 0) {
-
-			// NOTE: disallow wasm, features on that arch are always global to the module.
-			if (is_arch_wasm()) {
-				error(e->token, "@(enable_target_feature=\"...\") is not allowed on wasm, features for wasm must be declared globally");
-			}
-
-			pt->enable_target_feature = ac.enable_target_feature;
-			String invalid;
-			if (!check_target_feature_is_valid_globally(ac.enable_target_feature, &invalid)) {
-				error(e->token, "Procedure enabled target feature '%.*s' is not a valid target feature", LIT(invalid));
-			}
-		}
-	}
+	check_target_feature_attributes(ac, e, proc_type);
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:

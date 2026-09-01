@@ -48,7 +48,7 @@ GEN_ATTRIB :: "// rexcode  ·  Brendan Punsky (dotbmp@github), original author\n
 
 // Per-form operand signature.
 Operand_Signature :: struct {
-	types:  [4]a.Operand_Type,
+	types:  [6]a.Operand_Type,
 	mode:   a.Mode,
 	length: u8,            // on-wire byte length of the matched form (2 or 4)
 	count:  int,
@@ -242,7 +242,7 @@ form_signature :: proc(form: a.Encoding) -> (sig: Operand_Signature, ok: bool) {
 		if ot == .NONE { continue }
 		if is_implicit_operand(form.enc[i]) { continue }
 
-		if sig.count >= 4 {
+		if sig.count >= 6 {
 			return {}, false
 		}
 		sig.types[sig.count] = ot
@@ -415,7 +415,7 @@ inst_body :: proc(sb: ^strings.Builder, entry: Proc_Entry, ps: []Param) {
 	ops := strings.builder_make()
 	defer strings.builder_destroy(&ops)
 	pi := 0
-	for i in 0..<4 {
+	for i in 0..<6 {
 		if i > 0 { strings.write_string(&ops, ", ") }
 		if i < sig.count {
 			pi = operand_expr(&ops, sig.types[i], ps, pi)
@@ -626,7 +626,7 @@ main :: proc() {
 		fmt.printf("Mnemonics with builders:   %d\n", len(mlist))
 		fmt.printf("Procedures generated:      %d\n", total_procs)
 		fmt.printf("Forms total:               %d\n", total_forms)
-		fmt.printf("Forms skipped (>4 ops):    %d\n", skipped_forms)
+		fmt.printf("Forms skipped (>6 ops):    %d\n", skipped_forms)
 		fmt.printf("Forms folded (overload):   %d\n", dropped_overload)
 		fmt.printf("Zero-form mnemonics:       %d\n", len(zero_form))
 		for zm in zero_form { fmt.printf("    %v\n", zm) }
