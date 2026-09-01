@@ -3936,7 +3936,7 @@ parse_asm_operand :: proc(p: ^Parser, allow_memory_operand: bool) -> ^ast.Expr {
 		return parse_expr(p, false)
 
 	case .Hash:
-		hash := expect_token(p, .Hash)
+		_ = expect_token(p, .Hash)
 		name := expect_token(p, .Ident)
 		if name.text == "pre" || name.text == "post" {
 			operand = parse_asm_operand(p, allow_memory_operand)
