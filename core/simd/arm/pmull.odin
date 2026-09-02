@@ -630,6 +630,126 @@ vmvnq_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
 	return simd.bit_xor(a, b)
 }
 
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_p8)
+@(require_results, enable_target_feature = "neon")
+vsli_n_p8 :: #force_inline proc "c" (a, b: poly8x8_t, $N: int32_t) -> poly8x8_t where 0 <= N, N < 8 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(poly8x8_t)_vsli_n_s8(
+			transmute(int8x8_t)a,
+			transmute(int8x8_t)b,
+			N,
+		)
+	} else {
+		return transmute(poly8x8_t)_vshiftlins_v8i8(
+			transmute(int8x8_t)a,
+			transmute(int8x8_t)b,
+			int8x8_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_p16)
+@(require_results, enable_target_feature = "neon")
+vsli_n_p16 :: #force_inline proc "c" (a, b: poly16x4_t, $N: int32_t) -> poly16x4_t where 0 <= N, N < 16 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(poly16x4_t)_vsli_n_s16(
+			transmute(int16x4_t)a,
+			transmute(int16x4_t)b,
+			N,
+		)
+	} else {
+		return transmute(poly16x4_t)_vshiftlins_v4i16(
+			transmute(int16x4_t)a,
+			transmute(int16x4_t)b,
+			int16x4_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_p64)
+@(require_results, enable_target_feature = "neon")
+vsli_n_p64 :: #force_inline proc "c" (a, b: poly64x1_t, $N: int32_t) -> poly64x1_t where 0 <= N, N < 64 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(poly64x1_t)_vsli_n_s64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			N,
+		)
+	} else {
+		return transmute(poly64x1_t)_vshiftlins_v1i64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			int64x1_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_p8)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_p8 :: #force_inline proc "c" (a, b: poly8x16_t, $N: int32_t) -> poly8x16_t where 0 <= N, N < 8 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(poly8x16_t)_vsliq_n_s8(
+			transmute(int8x16_t)a,
+			transmute(int8x16_t)b,
+			N,
+		)
+	} else {
+		return transmute(poly8x16_t)_vshiftlins_v16i8(
+			transmute(int8x16_t)a,
+			transmute(int8x16_t)b,
+			int8x16_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_p16)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_p16 :: #force_inline proc "c" (a, b: poly16x8_t, $N: int32_t) -> poly16x8_t where 0 <= N, N < 16 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(poly16x8_t)_vsliq_n_s16(
+			transmute(int16x8_t)a,
+			transmute(int16x8_t)b,
+			N,
+		)
+	} else {
+		return transmute(poly16x8_t)_vshiftlins_v8i16(
+			transmute(int16x8_t)a,
+			transmute(int16x8_t)b,
+			int16x8_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_p64)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_p64 :: #force_inline proc "c" (a, b: poly64x2_t, $N: int32_t) -> poly64x2_t where 0 <= N, N < 64 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(poly64x2_t)_vsliq_n_s64(
+			transmute(int64x2_t)a,
+			transmute(int64x2_t)b,
+			N,
+		)
+	} else {
+		return transmute(poly64x2_t)_vshiftlins_v2i64(
+			transmute(int64x2_t)a,
+			transmute(int64x2_t)b,
+			int64x2_t(N),
+		)
+	}
+}
+
 when ODIN_ARCH == .arm64 {
 	// Polynomial multiply long
 	//

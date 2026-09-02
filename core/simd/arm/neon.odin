@@ -2820,6 +2820,262 @@ vget_high_u64 :: #force_inline proc "c" (a: uint64x2_t) -> uint64x1_t {
 	}
 }
 
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_s8)
+@(require_results, enable_target_feature = "neon")
+vsli_n_s8 :: #force_inline proc "c" (a, b: int8x8_t, $N: int32_t) -> int8x8_t where 0 <= N, N < 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vsli_n_s8(a, b, N)
+	} else {
+		return _vshiftlins_v8i8(a, b, int8x8_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_u8)
+@(require_results, enable_target_feature = "neon")
+vsli_n_u8 :: #force_inline proc "c" (a, b: uint8x8_t, $N: int32_t) -> uint8x8_t where 0 <= N, N < 8 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint8x8_t)_vsli_n_s8(
+			transmute(int8x8_t)a,
+			transmute(int8x8_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint8x8_t)_vshiftlins_v8i8(
+			transmute(int8x8_t)a,
+			transmute(int8x8_t)b,
+			int8x8_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_s16)
+@(require_results, enable_target_feature = "neon")
+vsli_n_s16 :: #force_inline proc "c" (a, b: int16x4_t, $N: int32_t) -> int16x4_t where 0 <= N, N < 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vsli_n_s16(a, b, N)
+	} else {
+		return _vshiftlins_v4i16(a, b, int16x4_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_u16)
+@(require_results, enable_target_feature = "neon")
+vsli_n_u16 :: #force_inline proc "c" (a, b: uint16x4_t, $N: int32_t) -> uint16x4_t where 0 <= N, N < 16 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint16x4_t)_vsli_n_s16(
+			transmute(int16x4_t)a,
+			transmute(int16x4_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint16x4_t)_vshiftlins_v4i16(
+			transmute(int16x4_t)a,
+			transmute(int16x4_t)b,
+			int16x4_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_s32)
+@(require_results, enable_target_feature = "neon")
+vsli_n_s32 :: #force_inline proc "c" (a, b: int32x2_t, $N: int32_t) -> int32x2_t where 0 <= N, N < 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vsli_n_s32(a, b, N)
+	} else {
+		return _vshiftlins_v2i32(a, b, int32x2_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_u32)
+@(require_results, enable_target_feature = "neon")
+vsli_n_u32 :: #force_inline proc "c" (a, b: uint32x2_t, $N: int32_t) -> uint32x2_t where 0 <= N, N < 32 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint32x2_t)_vsli_n_s32(
+			transmute(int32x2_t)a,
+			transmute(int32x2_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint32x2_t)_vshiftlins_v2i32(
+			transmute(int32x2_t)a,
+			transmute(int32x2_t)b,
+			int32x2_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_s64)
+@(require_results, enable_target_feature = "neon")
+vsli_n_s64 :: #force_inline proc "c" (a, b: int64x1_t, $N: int32_t) -> int64x1_t where 0 <= N, N < 64 {
+	when ODIN_ARCH == .arm64 {
+		return _vsli_n_s64(a, b, N)
+	} else {
+		return _vshiftlins_v1i64(a, b, int64x1_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsli_n_u64)
+@(require_results, enable_target_feature = "neon")
+vsli_n_u64 :: #force_inline proc "c" (a, b: uint64x1_t, $N: int32_t) -> uint64x1_t where 0 <= N, N < 64 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint64x1_t)_vsli_n_s64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint64x1_t)_vshiftlins_v1i64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			int64x1_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_s8)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_s8 :: #force_inline proc "c" (a, b: int8x16_t, $N: int32_t) -> int8x16_t where 0 <= N, N < 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vsliq_n_s8(a, b, N)
+	} else {
+		return _vshiftlins_v16i8(a, b, int8x16_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_u8)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_u8 :: #force_inline proc "c" (a, b: uint8x16_t, $N: int32_t) -> uint8x16_t where 0 <= N, N < 8 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint8x16_t)_vsliq_n_s8(
+			transmute(int8x16_t)a,
+			transmute(int8x16_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint8x16_t)_vshiftlins_v16i8(
+			transmute(int8x16_t)a,
+			transmute(int8x16_t)b,
+			int8x16_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_s16)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_s16 :: #force_inline proc "c" (a, b: int16x8_t, $N: int32_t) -> int16x8_t where 0 <= N, N < 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vsliq_n_s16(a, b, N)
+	} else {
+		return _vshiftlins_v8i16(a, b, int16x8_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_u16)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_u16 :: #force_inline proc "c" (a, b: uint16x8_t, $N: int32_t) -> uint16x8_t where 0 <= N, N < 16 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint16x8_t)_vsliq_n_s16(
+			transmute(int16x8_t)a,
+			transmute(int16x8_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint16x8_t)_vshiftlins_v8i16(
+			transmute(int16x8_t)a,
+			transmute(int16x8_t)b,
+			int16x8_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_s32)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_s32 :: #force_inline proc "c" (a, b: int32x4_t, $N: int32_t) -> int32x4_t where 0 <= N, N < 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vsliq_n_s32(a, b, N)
+	} else {
+		return _vshiftlins_v4i32(a, b, int32x4_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_u32)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_u32 :: #force_inline proc "c" (a, b: uint32x4_t, $N: int32_t) -> uint32x4_t where 0 <= N, N < 32 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint32x4_t)_vsliq_n_s32(
+			transmute(int32x4_t)a,
+			transmute(int32x4_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint32x4_t)_vshiftlins_v4i32(
+			transmute(int32x4_t)a,
+			transmute(int32x4_t)b,
+			int32x4_t(N),
+		)
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_s64)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_s64 :: #force_inline proc "c" (a, b: int64x2_t, $N: int32_t) -> int64x2_t where 0 <= N, N < 64 {
+	when ODIN_ARCH == .arm64 {
+		return _vsliq_n_s64(a, b, N)
+	} else {
+		return _vshiftlins_v2i64(a, b, int64x2_t(N))
+	}
+}
+
+// Shift Left and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsliq_n_u64)
+@(require_results, enable_target_feature = "neon")
+vsliq_n_u64 :: #force_inline proc "c" (a, b: uint64x2_t, $N: int32_t) -> uint64x2_t where 0 <= N, N < 64 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint64x2_t)_vsliq_n_s64(
+			transmute(int64x2_t)a,
+			transmute(int64x2_t)b,
+			N,
+		)
+	} else {
+		return transmute(uint64x2_t)_vshiftlins_v2i64(
+			transmute(int64x2_t)a,
+			transmute(int64x2_t)b,
+			int64x2_t(N),
+		)
+	}
+}
+
 when ODIN_ARCH == .arm64 {
 	// Table Lookup.
 	//
@@ -3962,6 +4218,30 @@ when ODIN_ARCH == .arm64 {
 	vshll_high_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint64x2_t where 0 <= N, N < 32 {
 		return vshll_n_u32(vget_high_u32(v), N)
 	}
+
+	// Shift Left and Insert.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vslid_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vslid_n_s64 :: #force_inline proc "c" (a, b: int64_t, $N: int32_t) -> int64_t where 0 <= N, N < 64 {
+		return transmute(int64_t)vsli_n_s64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			N,
+		)
+	}
+
+	// Shift Left and Insert.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vslid_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vslid_n_u64 :: #force_inline proc "c" (a, b: uint64_t, $N: int32_t) -> uint64_t where 0 <= N, N < 64 {
+		return transmute(uint64_t)vsli_n_u64(
+			transmute(uint64x1_t)a,
+			transmute(uint64x1_t)b,
+			N,
+		)
+	}
 }
 
 @(private, default_calling_convention = "none")
@@ -4155,6 +4435,22 @@ when ODIN_ARCH == .arm32 {
 		_vtbx3 :: proc(v: int8x8_t, t0, t1, t2: int8x8_t, idx: int8x8_t) -> int8x8_t ---
 		@(link_name = "llvm.arm.neon.vtbx4")
 		_vtbx4 :: proc(v: int8x8_t, t0, t1, t2, t3: int8x8_t, idx: int8x8_t) -> int8x8_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v8i8")
+		_vshiftlins_v8i8 :: proc(a: int8x8_t, b: int8x8_t, c: int8x8_t) -> int8x8_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v4i16")
+		_vshiftlins_v4i16 :: proc(a: int16x4_t, b: int16x4_t, c: int16x4_t) -> int16x4_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v2i32")
+		_vshiftlins_v2i32 :: proc(a: int32x2_t, b: int32x2_t, c: int32x2_t) -> int32x2_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v1i64")
+		_vshiftlins_v1i64 :: proc(a: int64x1_t, b: int64x1_t, c: int64x1_t) -> int64x1_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v16i8")
+		_vshiftlins_v16i8 :: proc(a: int8x16_t, b: int8x16_t, c: int8x16_t) -> int8x16_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v8i16")
+		_vshiftlins_v8i16 :: proc(a: int16x8_t, b: int16x8_t, c: int16x8_t) -> int16x8_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v4i32")
+		_vshiftlins_v4i32 :: proc(a: int32x4_t, b: int32x4_t, c: int32x4_t) -> int32x4_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v2i64")
+		_vshiftlins_v2i64 :: proc(a: int64x2_t, b: int64x2_t, c: int64x2_t) -> int64x2_t ---
 	}
 }
 
@@ -4213,5 +4509,21 @@ when ODIN_ARCH == .arm64 {
 		_vqrshld_s64 :: proc(a: int64_t, b: int64_t) -> int64_t ---
 		@(link_name = "llvm.aarch64.neon.uqrshl.i64")
 		_vqrshld_u64 :: proc(a: uint64_t, b: int64_t) -> uint64_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v8i8")
+		_vsli_n_s8 :: proc(a: int8x8_t, b: int8x8_t, n: int32_t) -> int8x8_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v4i16")
+		_vsli_n_s16 :: proc(a: int16x4_t, b: int16x4_t, n: int32_t) -> int16x4_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v2i32")
+		_vsli_n_s32 :: proc(a: int32x2_t, b: int32x2_t, n: int32_t) -> int32x2_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v1i64")
+		_vsli_n_s64 :: proc(a: int64x1_t, b: int64x1_t, n: int32_t) -> int64x1_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v16i8")
+		_vsliq_n_s8 :: proc(a: int8x16_t, b: int8x16_t, n: int32_t) -> int8x16_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v8i16")
+		_vsliq_n_s16 :: proc(a: int16x8_t, b: int16x8_t, n: int32_t) -> int16x8_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v4i32")
+		_vsliq_n_s32 :: proc(a: int32x4_t, b: int32x4_t, n: int32_t) -> int32x4_t ---
+		@(link_name = "llvm.aarch64.neon.vsli.v2i64")
+		_vsliq_n_s64 :: proc(a: int64x2_t, b: int64x2_t, n: int32_t) -> int64x2_t ---
 	}
 }
