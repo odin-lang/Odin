@@ -1102,7 +1102,13 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	if fi.prec_set {
 		prec = fi.prec
 		if prec == 0 && u == 0 {
-			fmt_write_padding(fi, fi.width)
+			if fi.minus {
+				io.write_byte(fi.writer, '0', &fi.n)
+				fmt_write_padding(fi, fi.width - 1)
+			} else {
+				fmt_write_padding(fi, fi.width - 1)
+				io.write_byte(fi.writer, '0', &fi.n)
+			}
 			return
 		}
 	} else if fi.zero && fi.width_set {

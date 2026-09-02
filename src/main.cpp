@@ -83,6 +83,10 @@ gb_global Timings global_timings = {0};
 
 #include "bug_report.cpp"
 
+#if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+int run_subprocess(const char *name, const char **args, bool honor_path = false);
+#endif
+
 // NOTE(bill): 'name' is used in debugging and profiling modes
 gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char const *name, char const *fmt, va_list va) {
 	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
@@ -154,7 +158,11 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 		gb_printf_err("[SYSTEM CALL] %s\n", name);
 		gb_printf_err("%s\n\n", cmd_line);
 	}
-	exit_code = system(cmd_line);
+
+	int argc;
+	char **argv = command_line_to_spawn_argv(cmd_line, &argc);
+
+	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true);
 	if (exit_on_err && WIFSIGNALED(exit_code)) {
 		struct rlimit limit = { 0, 0, };
 		setrlimit(RLIMIT_CORE, &limit);
@@ -236,10 +244,19 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 	return exit_code;
 }
 #else
-int run_subprocess(const char *name, const char **args) {
+int run_subprocess(const char *name, const char **args, bool honor_path) {
 	pid_t pid;
 	int status;
-	status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
+
+	String exec_name = make_string_c(args[0]);
+	exec_name = last_path_element(exec_name);
+	args[0] = alloc_cstring(gb_heap_allocator(), exec_name);
+
+	if (!honor_path) {
+		status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
+	} else {
+		status = posix_spawnp(&pid, name, NULL, NULL, (char *const *)args, environ);
+	}
 	if (status != 0) {
 		gb_printf_err("Could not spawn subprocess: %s\n", strerror(errno));
 		return -1;
@@ -448,6 +465,7 @@ enum BuildFlagKind {
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_DefaultToPanicAllocator,
 	BuildFlag_StrictStyle,
+	BuildFlag_StrictStylePackages,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
@@ -709,6 +727,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToPanicAllocator, str_lit("default-to-panic-allocator"),BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_StrictStylePackages,     str_lit("strict-style-packages"),     BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
@@ -1626,6 +1645,24 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_StrictStyle:
 							build_context.strict_style = true;
+							break;
+						case BuildFlag_StrictStylePackages:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = value.value_string;
+								String_Iterator it = {val, 0};
+								String pkg = {};
+								while (string_split_iterator_next(&it, ',', &pkg)) {
+									pkg = string_trim_whitespace(pkg);
+									if (!string_is_valid_identifier(pkg)) {
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
+										bad_flags = true;
+										continue;
+									}
+
+									string_set_add(&build_context.strict_style_packages, pkg);
+								}
+							}
 							break;
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
@@ -3244,6 +3281,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Errs on deprecated syntax.");
 			print_usage_line(2, "Errs when the attached-brace style is not adhered to (also known as 1TBS).");
 			print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
+		}
+		if (print_flag("-strict-style-packages:<comma-separated-strings>")) {
+			print_usage_line(2, "Sets which packages by name will be checked against with '-strict-style'.");
+			print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
 		}
 	}
 

@@ -82,20 +82,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-15-intel, macos-latest, ubuntu-latest, ubuntu-24.04-arm]
+        os: [macos-latest, ubuntu-latest, ubuntu-24.04-arm]
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'macos-15-intel' && 'MacOS Intel') || (matrix.os == 'ubuntu-latest' && 'Ubuntu') || (matrix.os == 'ubuntu-24.04-arm' && 'Ubuntu ARM') }} Build, Check, and Test
+    name: ${{ matrix.os == 'macos-latest' && 'MacOS ARM' || (matrix.os == 'ubuntu-latest' && 'Ubuntu') || (matrix.os == 'ubuntu-24.04-arm' && 'Ubuntu ARM') }} Build, Check, and Test
     timeout-minutes: 15
     steps:
 
       - uses: actions/checkout@v4
-
-      - name: Download LLVM (MacOS Intel)
-        if: matrix.os == 'macos-15-intel'
-        run: |
-          brew update
-          brew install llvm@20 lua@5.4 lld
-          echo "$(brew --prefix llvm@20)/bin" >> $GITHUB_PATH
 
       - name: Download LLVM (MacOS ARM)
         if: matrix.os == 'macos-latest'
@@ -125,7 +118,7 @@ jobs:
         run: |
           sudo apt-get install libcurl4-openssl-dev libmbedtls-dev
       - name: Install libcurl (macOS)
-        if: matrix.os == 'macos-15-intel' || matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest'
         run: |
           brew install curl mbedtls
       - name: Compile needed Vendor
@@ -160,13 +153,10 @@ jobs:
         run: ./odin test tests/core/crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -o:speed
       - name: Vendor library tests
         run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
-        if: matrix.os != 'macos-15-intel' && matrix.os != 'macos-latest'
+        if: matrix.os != 'macos-latest'
       - name: Vendor library tests (MacOS ARM)
         run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/opt/homebrew/opt/lua@5.4/lib"
         if: matrix.os == 'macos-latest'
-      - name: Vendor library tests (MacOS Intel)
-        run: ./odin test tests/vendor -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address -extra-linker-flags:"-L/usr/local/opt/lua@5.4/lib"
-        if: matrix.os == 'macos-15-intel'
 
       - name: Internals tests
         run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address

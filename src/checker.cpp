@@ -4564,6 +4564,35 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 	return false;
 }
 
+gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	} else if (name == "require_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->require_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "enable_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->enable_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	}
+	return false;
+}
 
 #include "check_expr.cpp"
 #include "check_builtin.cpp"

@@ -2022,36 +2022,42 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 											values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
 										}
 									} else if (is_local) {
-									#if 1
 										lbProcedure *p = m->curr_procedure;
 										GB_ASSERT(p != nullptr);
+
+										LLVMTypeRef field_llvm_type = lb_type(m, f->type);
+
+										LLVMValueRef ptr = nullptr;
 										if (LLVMIsConstant(values[index])) {
 											lbAddr addr = lb_add_local_generated(p, f->type, false);
 											lb_addr_store(p, addr, lbValue{values[index], f->type});
-											values[index] = lb_addr_load(p, addr).value;
+											ptr = addr.addr.value;
+										} else {
+											// a previous field already spilled this member to the stack
+											GB_ASSERT(LLVMIsALoadInst(values[index]));
+											ptr = LLVMGetOperand(values[index], 0);
 										}
 
-										GB_ASSERT(LLVMIsALoadInst(values[index]));
-
-										LLVMValueRef ptr = LLVMGetOperand(values[index], 0);
-
-										LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, idx_list_len);
+										LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, idx_list_len+1);
 										LLVMTypeRef lt_u32 = lb_type(m, t_u32);
+										indices[0] = LLVMConstInt(lt_u32, 0, false);
 										for (unsigned i = 0; i < idx_list_len; i++) {
-											indices[i] = LLVMConstInt(lt_u32, idx_list[i], false);
+											indices[i+1] = LLVMConstInt(lt_u32, idx_list[i], false);
 										}
 
-										ptr = LLVMBuildGEP2(p->builder, lb_type(m, f->type), ptr, indices, idx_list_len, "");
-										ptr = LLVMBuildPointerCast(p->builder, ptr, lb_type(m, alloc_type_pointer(tav.type)), "");
+										LLVMValueRef dst = LLVMBuildGEP2(p->builder, field_llvm_type, ptr, indices, idx_list_len+1, "");
+										dst = LLVMBuildPointerCast(p->builder, dst, lb_type(m, alloc_type_pointer(tav.type)), "");
 
 										if (LLVMIsALoadInst(elem_value)) {
 											i64 sz = type_size_of(tav.type);
 											LLVMValueRef src = LLVMGetOperand(elem_value, 0);
-											lb_mem_copy_non_overlapping(p, {ptr, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
+											lb_mem_copy_non_overlapping(p, {dst, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
 										} else {
-											OdinLLVMBuildStore(p, elem_value, ptr);
+											OdinLLVMBuildStore(p, elem_value, dst);
 										}
-									#endif
+
+										values[index] = OdinLLVMBuildLoad(p, field_llvm_type, ptr);
+
 										is_constant = false;
 									} else {
 										is_constant = false;

@@ -190,7 +190,13 @@ Mnemonic :: enum u16 {
 	LDAEXD, STLEXD,
 
 	// Block move
-	LDM,    STM,                           // base mnemonic w/ IA/IB/DA/DB suffix flag
+	LDM,    STM,                           // IA order (the default spelling)
+	// The other three increment/decrement orders are their own mnemonics --
+	// that is how an assembler spells them, and it is the only way to reach
+	// their encodings: all four share one operand shape, so nothing else
+	// tells them apart.
+	LDMIB,  LDMDA,  LDMDB,
+	STMIB,  STMDA,  STMDB,
 
 	// Stack convenience aliases
 	PUSH,   POP,
@@ -201,8 +207,9 @@ Mnemonic :: enum u16 {
 	// -------------------------------------------------------------------------
 	// ARMv6 / Return-from-Exception
 	// -------------------------------------------------------------------------
-	RFE,                                   // return from exception
-	SRS,                                   // store return state
+	// The addressing mode is part of the name, as it is for LDM and STM.
+	RFEDA,  RFEDB,  RFEIA,  RFEIB,         // return from exception
+	SRSDA,  SRSDB,  SRSIA,  SRSIB,         // store return state
 
 	// -------------------------------------------------------------------------
 	// Coprocessor (legacy CP-space; many subsumed by VFP/NEON)
@@ -211,6 +218,9 @@ Mnemonic :: enum u16 {
 	MCR,    MCR2,    MRC,    MRC2,
 	MCRR,   MCRR2,   MRRC,   MRRC2,
 	LDC,    LDC2,    STC,    STC2,
+	// The N bit asks the coprocessor for the long transfer, and the syntax
+	// spells that on the mnemonic.
+	LDCL,   LDC2L,   STCL,   STC2L,
 
 	// -------------------------------------------------------------------------
 	// ARMv8 AArch32 CRC32 (FEAT_CRC32)
@@ -225,6 +235,9 @@ Mnemonic :: enum u16 {
 	VADD,   VSUB,   VMUL,   VDIV,
 	VMLA,   VMLS,   VNMUL,  VNMLA,  VNMLS,
 	VFMA,   VFMS,   VFNMA,  VFNMS,
+	// The bfloat16 multiply-accumulates name which half of each pair they
+	// take, bottom or top, on the mnemonic.
+	VFMAB,  VFMAT,
 
 	VABS,   VNEG,   VSQRT,
 	VCMP,   VCMPE,
@@ -236,7 +249,8 @@ Mnemonic :: enum u16 {
 	VMOV,                                  // many forms (reg-reg, reg-imm, GPR-FPR)
 	VMRS,   VMSR,                          // FPSCR/coprocessor access
 	VLDR,   VSTR,
-	VLDM,   VSTM,
+	// The addressing mode is part of the name, as it is for LDM and STM.
+	VLDMIA, VLDMDB, VSTMIA, VSTMDB,
 	VPUSH,  VPOP,
 
 	VSEL,                                  // ARMv8 conditional select
@@ -251,7 +265,7 @@ Mnemonic :: enum u16 {
 	VMULL,  VMLAL,  VMLSL,
 	VQDMULL,VQDMLAL,VQDMLSL,
 	VQDMULH,VQRDMULH,
-	VQDMULH_LANE, VQRDMULH_LANE,           // indexed variants
+	// indexed variants
 
 	// ARMv8.1 FEAT_RDM: rounding doubling multiply-accumulate
 	VQRDMLAH, VQRDMLSH,
@@ -284,7 +298,7 @@ Mnemonic :: enum u16 {
 	VSHLL,                                 // shift-left long
 
 	VCLS,   VCLZ,   VCNT,
-	VPADD_F, VRECPE_F, VRSQRTE_F,          // (placeholders; canonical via operand types)
+	// (placeholders; canonical via operand types)
 
 	VREV16, VREV32, VREV64,
 	VEXT,                                  // vector extract
@@ -294,7 +308,7 @@ Mnemonic :: enum u16 {
 	VSWP,                                  // swap
 
 	// Lane access
-	VMOV_LANE,                             // VMOV.<dt> R, D[i] / VMOV.<dt> D[i], R
+	// VMOV.<dt> R, D[i] / VMOV.<dt> D[i], R
 
 	// Load/Store structures (NEON)
 	VLD1, VLD2, VLD3, VLD4,
@@ -310,20 +324,17 @@ Mnemonic :: enum u16 {
 
 	// -- Dot Product (FEAT_DotProd) ------------------------------------------
 	VSDOT,   VUDOT,
-	VSDOT_LANE, VUDOT_LANE,
-
 	// -- BF16 (FEAT_BF16) ----------------------------------------------------
-	VCVT_BF16,                             // BF16<->F32
-	VDOT_BF16,
-	VFMA_BF16,
-	VMMLA_BF16,
+	// BF16<->F32
+	VDOT,
+	VMMLA,
 
 	// -- FHM (FEAT_FHM) FP16 matrix mul/acc ----------------------------------
 	VFMAL,   VFMSL,                        // F16 fused multiply-add long
 
 	// -- ComplexNum (FEAT_FCMA) ----------------------------------------------
 	VCMLA,   VCADD,
-	VCMLA_LANE,                            // VCMLA by indexed scalar
+	// VCMLA by indexed scalar
 
 	// -- I8MM (FEAT_I8MM, ARMv8.6) integer matrix multiply + mixed-sign dot --
 	VSMMLA,                                // signed-signed 8x8 matrix mul
@@ -331,16 +342,7 @@ Mnemonic :: enum u16 {
 	VUSMMLA,                               // unsigned-signed
 	VSUDOT,                                // signed-unsigned dot product
 	VUSDOT,                                // unsigned-signed dot product
-	VSUDOT_LANE,
-	VUSDOT_LANE,
-
 	// -- Lane-indexed NEON multiply / MAC forms (heavily used in DSP/codec) --
-	VMUL_LANE,   VMLA_LANE,   VMLS_LANE,
-	VMULL_LANE,  VMLAL_LANE,  VMLSL_LANE,
-	VQDMULL_LANE, VQDMLAL_LANE, VQDMLSL_LANE,
-	VFMA_LANE,   VFMS_LANE,
-	VQRDMLAH_LANE, VQRDMLSH_LANE,
-
 	// -- MVE saturating unary -----------------------------------------------
 	VQABS,    VQNEG,
 
@@ -349,22 +351,14 @@ Mnemonic :: enum u16 {
 	VINS,                                  // insert F16 into high lane of S-reg
 
 	// -- MVE gather/scatter (vector offset addressing) ----------------------
-	VLDRB_GATHER, VLDRH_GATHER, VLDRW_GATHER, VLDRD_GATHER,
-	VSTRB_SCATTER, VSTRH_SCATTER, VSTRW_SCATTER, VSTRD_SCATTER,
-
 	// -- NEON compare-with-zero (distinct encodings from reg-vs-reg) --------
-	VCEQ_Z,    VCGE_Z,    VCGT_Z,    VCLE_Z,    VCLT_Z,
-
 	// -- NEON replicate loads (broadcast one element to all lanes) ----------
-	//    VLD1R already covered in VLD1; these are the 2/3/4 variants.
-	VLD2R,    VLD3R,    VLD4R,
+	// The broadcast structure loads are VLD2/VLD3/VLD4 with an all-lanes
+	// list, not mnemonics of their own -- that is how they are written.
 
 	// -- NEON single-element-lane load/store (lane form, not multi-vec) -----
-	VLD1_LANE, VLD2_LANE, VLD3_LANE, VLD4_LANE,
-	VST1_LANE, VST2_LANE, VST3_LANE, VST4_LANE,
-
 	// -- VFP fixed-point conversions (with #fbits operand) ------------------
-	VCVT_FIXED,                            // VCVT.<dt> Sd, Sd, #fbits family
+	// VCVT.<dt> Sd, Sd, #fbits family
 
 	// -------------------------------------------------------------------------
 	// Thumb-only mnemonics (extra ones not shared with A32)
@@ -411,7 +405,7 @@ Mnemonic :: enum u16 {
 	// use a register target Rm at hw0[3:0]; BFCSEL adds a 4-bit condition at
 	// hw0[5:2] (its else-target is the implicit fall-through). Byte-exact vs llvm-mc.
 	BF,                                    // branch future
-	BFI_BR,                                // branch future indirect (bfx)
+	BFX,                                // branch future indirect (bfx)
 	BFL,                                   // branch future and link
 	BFLX,                                  // branch future link and exchange
 	BFCSEL,                                // branch future conditional select
@@ -494,9 +488,9 @@ Mnemonic :: enum u16 {
 	VQRSHRUNB, VQRSHRUNT,
 
 	// Move between Qd-lane and GPR (MVE-specific 4-element split forms)
-	VMOV_Q_R,                              // VMOV Qd[i], Rt  -- single lane to GPR
-	VMOV_R_Q,                              // VMOV Rt, Qd[i]
-	VMOV_2GPR_Q,                           // VMOV Qd[2*i], Qd[2*i+1], Rt, Rt2 -- pair
+	// VMOV Qd[i], Rt  -- single lane to GPR
+	// VMOV Rt, Qd[i]
+	// VMOV Qd[2*i], Qd[2*i+1], Rt, Rt2 -- pair
 
 	// Saturating doubling MAC reductions
 	VQDMLADH,   VQDMLADHX,
@@ -505,8 +499,8 @@ Mnemonic :: enum u16 {
 	VQRDMLSDH,  VQRDMLSDHX,
 
 	// Misc
-	VHCADD_SAT,                            // (rarely used)
-	VCMLA_MVE,                             // (MVE form; VCMLA already exists)
+	// (rarely used)
+	// (MVE form; VCMLA already exists)
 
 	// MVE load/store (mostly reuses VLDR/VSTR but distinct forms exist):
 	VLDRB,   VLDRH,   VLDRW,   VLDRD,      // MVE contiguous load (B/H/W/D)

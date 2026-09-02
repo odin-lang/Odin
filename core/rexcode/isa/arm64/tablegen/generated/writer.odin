@@ -23,6 +23,7 @@ w :: proc(file: string, data: []u8) {
 
 main :: proc() {
 	w(TABLES + "arm64.encode_forms.bin", raw(&ENCODE_FORMS, size_of(ENCODE_FORMS)))
+	w(TABLES + "arm64.clobber_forms.bin", raw(&CLOBBER_FORMS, size_of(CLOBBER_FORMS)))
 	w(TABLES + "arm64.encode_runs.bin", raw(&ENCODE_RUNS, size_of(ENCODE_RUNS)))
 	w(TABLES + "arm64.entries.bin", raw(&DECODE_ENTRIES, size_of(DECODE_ENTRIES)))
 	w(TABLES + "arm64.idx_op0.bin", raw(&DECODE_INDEX_OP0, size_of(DECODE_INDEX_OP0)))

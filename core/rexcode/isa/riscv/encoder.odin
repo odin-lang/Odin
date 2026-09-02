@@ -56,6 +56,7 @@ encode :: proc(
 	errors:       ^[dynamic]Error,
 	resolve:      bool = true,
 	base_address: u64  = 0,
+	xlen:         XLEN = .RV64,
 ) -> (byte_count: u32, ok: bool) {
 	n_inst := u32(len(instructions))
 	if u32(len(code)) < n_inst * 4 {
@@ -75,7 +76,7 @@ encode :: proc(
 	for i in 0..<n_inst {
 		inst_pc[i] = byte_count
 		inst := &instructions[i]
-		word, ilen := encode_one_inline(inst, byte_count, u16(i), relocs, errors) or_return
+		word, ilen := encode_one_inline(inst, byte_count, u16(i), relocs, errors, xlen) or_return
 		if ilen == 2 {
 			write_u16_le(code, byte_count, u16(word))
 		} else {
@@ -129,6 +130,7 @@ encode_one_inline :: #force_inline proc(
 	inst_idx: u16,
 	relocs:   ^[dynamic]Relocation,
 	errors:   ^[dynamic]Error,
+	xlen:     XLEN,
 ) -> (word: u32, ilen: u8, ok: bool) {
 	if inst.mnemonic == .INVALID {
 		append(errors, Error{inst_idx = u32(inst_idx), code = .INVALID_MNEMONIC})
@@ -143,6 +145,9 @@ encode_one_inline :: #force_inline proc(
 
 	form: ^Encoding
 	for &f in forms {
+		// ZEXT_H and REV8 have one RV32 and one RV64 encoding with identical
+		// operands; without this the RV64 form was unreachable.
+		if !xlen_accepts(xlen, f.flags) { continue }
 		if encoding_matches_inline(inst, &f) {
 			form = &f
 			break

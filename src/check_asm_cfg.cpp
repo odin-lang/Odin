@@ -1,3 +1,4 @@
+// check_asm_cfg.cpp
 
 enum {
 	ASM_WIDTH_REG_COUNT = 16
@@ -692,7 +693,19 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 					check_asm_cfg_report_undef_reg(asm_ctx, cfg, entity, instr, f->name, bit);
 				}
 
+				bool is_status_snapshot = false;
+				if (instr->mnemonic && instr->valid_form_index >= 0) {
+					auto clobber_forms = asm_ctx->clobber_forms(instr->mnemonic);
+					if (clobber_forms.count > 0 && instr->valid_form_index < clobber_forms.count) {
+						auto &clobber = clobber_forms[instr->valid_form_index];
+						is_status_snapshot = clobber.is_status_snapshot();
+					}
+				}
+
 				u16 undef_flags = f->read_flags & ~run_flags & ~reported_flags;
+				if (is_status_snapshot) {
+					undef_flags = 0;
+				}
 				if (undef_flags != 0) {
 					reported_flags |= undef_flags;
 

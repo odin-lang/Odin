@@ -279,12 +279,30 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 
 	for p.curr_token.kind != end_token {
 		key := parse_object_key(p, p.allocator, loc) or_return
+
+		// `key` is allocated here and does not belong to `obj` until the insert below, so every
+		// path that leaves in between has to free it. The cleanup defer at the top of this proc
+		// only walks `obj`, so it cannot reach a key that never got there.
+		//
+		// JSON5 makes this reachable from ordinary malformed input: an unquoted ident is a legal
+		// key, so `{ broken not json` allocates "broken" and then fails in parse_colon, leaking
+		// it. The parse returns a nil Value, so the caller has nothing to destroy either.
+		key_stored := false
+		defer if !key_stored {
+			delete(key, p.allocator, loc)
+		}
+
 		parse_colon(p) or_return
 		elem := parse_value(p, loc) or_return
 
+		// `elem` is owned by this iteration for the same reason, until it is stored.
+		elem_stored := false
+		defer if !elem_stored {
+			destroy_value(elem, loc = loc)
+		}
+
 		if key in obj {
 			err = .Duplicate_Object_Key
-			delete(key, p.allocator, loc)
 			return
 		}
 
@@ -297,6 +315,8 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 				return nil, .Out_Of_Memory
 			}
 			obj[key] = elem
+			key_stored = true
+			elem_stored = true
 		}
 
 		if parse_comma(p) {
