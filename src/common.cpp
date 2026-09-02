@@ -69,6 +69,7 @@ template <> struct TypeIs64BitInteger<i64> { enum {value = true}; };
 uint32_t old_console_codepage = 0;
 void set_utf8_codepage() {
 	old_console_codepage = GetConsoleOutputCP();
+	SetConsoleOutputCP(65001);
 }
 
 void restore_old_codepage() {
