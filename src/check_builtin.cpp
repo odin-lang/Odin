@@ -3146,6 +3146,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 
 			ast_node(se, SelectorExpr, arg0);
+			if (unparen_expr(se->expr)->kind == Ast_SelectorExpr) {
+				gbString x = expr_to_string(arg0);
+				error(ce->args[0], "Chained expressions are not allowed for '%.*s', got '%s' ", LIT(builtin_name), x);
+				gb_string_free(x);
+				return false;
+
+			}
 
 			Operand x = {};
 			check_expr(c, &x, se->expr);
