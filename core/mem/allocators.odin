@@ -1338,6 +1338,9 @@ small_stack_alloc_non_zeroed :: proc(
 	return raw_data(bytes), err
 }
 
+@(private="file")
+SMALL_STACK_MAX_ALIGNMENT :: 1 << (8*size_of(Small_Stack_Allocation_Header{}.padding) - 1)
+
 /*
 Allocate memory from a small stack allocator.
 
@@ -1356,7 +1359,10 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 		panic("Allocation on an uninitialized Small Stack allocator.", loc)
 	}
 	alignment := alignment
-	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
+	alignment = max(alignment, 1)
+	if alignment > SMALL_STACK_MAX_ALIGNMENT {
+		return nil, .Invalid_Argument
+	}
 	curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset)
 	padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header))
 	if s.offset + padding + size > len(s.data) {
@@ -1544,7 +1550,10 @@ small_stack_resize_bytes_non_zeroed :: proc(
 	old_memory := raw_data(old_data)
 	old_size   := len(old_data)
 	alignment  := alignment
-	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
+	alignment  = max(alignment, 1)
+	if alignment > SMALL_STACK_MAX_ALIGNMENT {
+		return nil, .Invalid_Argument
+	}
 	if old_memory == nil {
 		return small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	}
