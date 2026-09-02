@@ -194,6 +194,19 @@ extern char **environ;
 #endif
 
 #if defined(GB_SYSTEM_WINDOWS)
+PROCESS_INFORMATION pi = {0};
+
+BOOL WINAPI run_subprocess_ctrl_c_handler(DWORD signal) {
+	switch (signal) {
+	case CTRL_C_EVENT:
+		// Caught ctrl-c event from child process.
+		TerminateProcess(pi.hProcess, 0);
+		return true;
+	default:
+		return false;
+	}
+}
+
 int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 	gbAllocator a = heap_allocator();
 
@@ -224,9 +237,10 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 	cmd_line[n] = '\0';
 
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
-	PROCESS_INFORMATION pi = {0};
+
 	int exit_code = 0;
 
+	SetConsoleCtrlHandler(run_subprocess_ctrl_c_handler, true);
 	if (CreateProcessW(nullptr, cmd_line,
 	                   nullptr, nullptr, true, 0, nullptr, nullptr,
 	                   &start_info, &pi)) {
@@ -241,6 +255,8 @@ int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
 		gb_free(a, cmd_line_utf8.text);
 		exit_code = -1;
 	}
+	SetConsoleCtrlHandler(run_subprocess_ctrl_c_handler, false);
+
 	return exit_code;
 }
 #else
