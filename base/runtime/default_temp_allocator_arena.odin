@@ -32,17 +32,17 @@ safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
 
 @(require_results)
 memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint, loc := #caller_location) -> (block: ^Memory_Block, err: Allocator_Error) {
-	alignment := max(alignment, uint(align_of(Memory_Block)), 16)
-	assert(alignment & (alignment-1) == 0, "non-power of two alignment", loc)
+	min_alignment := max(alignment, uint(align_of(Memory_Block)), 16)
+	assert(min_alignment & (min_alignment-1) == 0, "non-power of two alignment", loc)
 
-	base_offset := align_forward_uint(uint(size_of(Memory_Block)), alignment)
+	base_offset := align_forward_uint(uint(size_of(Memory_Block)), min_alignment)
 
 	total_size, size_ok := safe_add(capacity, base_offset)
 	if !size_ok {
 		return nil, .Out_Of_Memory
 	}
 
-	data := mem_alloc(int(total_size), int(alignment), allocator, loc) or_return
+	data := mem_alloc(int(total_size), int(min_alignment), allocator, loc) or_return
 	block = (^Memory_Block)(raw_data(data))
 	end := uintptr(raw_data(data)[len(data):])
 
