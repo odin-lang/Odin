@@ -14,7 +14,7 @@ REFERENCE_TIME :: windows.LONGLONG
 //
 AUDCLNT_SHAREMODE :: enum u32 {
 	SHARED,
-	EXCLUSIVE
+	EXCLUSIVE,
 }
 
 //-------------------------------------------------------------------------
