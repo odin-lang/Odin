@@ -267,6 +267,10 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 		}
 	}
 
+	when ODIN_OS == .Windows {
+		set_utf8_codepage()
+		defer restore_old_codepage()
+	}
 
 	// `-vet` needs parameters to be shadowed by themselves first as an
 	// explicit declaration, to allow the next line to work.
