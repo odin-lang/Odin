@@ -139,8 +139,7 @@ arena_alloc_unguarded :: proc(arena: ^Arena, size: uint, alignment: uint, loc :=
 					max(arena.default_commit_size, arena.minimum_block_size)
 			}
 
-			needed := mem.align_forward_uint(size, alignment)
-			needed = max(needed, arena.default_commit_size)
+			needed := max(size, arena.default_commit_size)
 			block_size := max(needed, arena.minimum_block_size)
 
 			new_block := memory_block_alloc(needed, block_size, alignment) or_return
