@@ -16,6 +16,14 @@ gb_internal i32 check_asm_operand_bit_width(Type *type) {
 	return cast(i32)(sz * 8);
 }
 
+gb_internal bool check_asm_target_supports_label_memory_operand(void) {
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:
+		return true;
+	}
+	return false;
+}
+
 gb_internal bool is_valid_asm_parameter_type(Type *type) {
 	if (is_type_integer(type)) {
 		// NOTE(bill): do not allow 128-bit integers
@@ -2207,6 +2215,25 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			}
 		}
 
+		if (disp.expr == nullptr) {
+			if (base.expr != nullptr && base.expr->kind == Ast_AsmLabelDecl) {
+				disp = base;
+				base = {};
+
+				mem_op->disp = mem_op->base;
+				mem_op->base = nullptr;
+			} else if (index.expr != nullptr && index.expr->kind == Ast_AsmLabelDecl) {
+				disp = index;
+				index = {};
+
+				mem_op->disp  = mem_op->index;
+				mem_op->index = nullptr;
+
+				mem_op->disp_op  = mem_op->index_op;
+				mem_op->index_op = {};
+			}
+		}
+
 		i32  base_w     = 0;
 		i32  index_w    = 0;
 		bool have_base  = false;
@@ -2375,6 +2402,19 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		for (int i = 0; disp.expr && i == 0; i++) {
 			if (disp.expr->kind == Ast_AsmRegister) {
 				error(disp.expr, "A displacement must be a constant integer value, got a register");
+				break;
+			}
+
+			if (disp.expr->kind == Ast_AsmLabelDecl) {
+				// NOTE(bill): The label was resolved (and marked used) by the recursive operand check
+				// above, so all that is left is rejecting the encodings that cannot carry it.
+				if (!check_asm_target_supports_label_memory_operand()) {
+					error(disp.expr, "The target platform does not support label references within memory operands");
+					break;
+				}
+				if (base.expr != nullptr || index.expr != nullptr || scale.expr != nullptr) {
+					error(disp.expr, "A label reference within a memory operand cannot be combined with a base, index, or scale; it is always relative to the instruction pointer");
+				}
 				break;
 			}
 
