@@ -1159,7 +1159,7 @@ If the message is nil, corresponding send channel will be skipped.
 
 **Returns**
 - Position of the available channel which was used for receiving or sending
-- `true` if sending/receiving was successfull, `false` if the channel was closed or no channel was available
+- `true` if sending/receiving was successful, `false` if the channel was closed or no channel was available
 
 Example:
 
