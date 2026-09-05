@@ -802,8 +802,9 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 		}
 
 		switch _ in op.send.socket {
-		case TCP_Socket: op.send.err = posix_tcp_send_error()
-		case UDP_Socket: op.send.err = posix_udp_send_error()
+		case TCP_Socket:  op.send.err = posix_tcp_send_error()
+		case Unix_Socket: op.send.err = posix_unix_send_error()
+		case UDP_Socket:  op.send.err = posix_udp_send_error()
 		}
 		return .Done
 	}
@@ -827,6 +828,8 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 		fd: posix.FD
 		switch sock in socket {
 		case TCP_Socket:
+			fd = posix.FD(sock)
+		case Unix_Socket:
 			fd = posix.FD(sock)
 		case UDP_Socket:
 			fd = posix.FD(sock)
@@ -891,6 +894,8 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 		fromaddr: posix.sockaddr_storage
 		switch sock in socket {
 		case TCP_Socket:
+			fd = posix.FD(sock)
+		case Unix_Socket:
 			fd = posix.FD(sock)
 		case UDP_Socket:
 			fd = posix.FD(sock)
@@ -1257,6 +1262,9 @@ timeout_and_delete :: proc(target: ^Operation) {
 		case TCP_Socket:
 			target.recv.err = TCP_Recv_Error.Timeout
 			ident = uintptr(sock)
+		case Unix_Socket:
+			target.recv.err = Unix_Recv_Error.Timeout
+			ident = uintptr(sock)
 		case UDP_Socket:
 			target.recv.err = UDP_Recv_Error.Timeout
 			ident = uintptr(sock)
@@ -1266,6 +1274,9 @@ timeout_and_delete :: proc(target: ^Operation) {
 		switch sock in target.send.socket {
 		case TCP_Socket:
 			target.send.err = TCP_Send_Error.Timeout
+			ident = uintptr(sock)
+		case Unix_Socket:
+			target.send.err = Unix_Send_Error.Timeout
 			ident = uintptr(sock)
 		case UDP_Socket:
 			target.send.err = UDP_Send_Error.Timeout
