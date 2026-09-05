@@ -409,56 +409,77 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		return process, .Invalid_Command
 	}
 
-	dir_fd := linux.AT_FDCWD
+	work_dir_fd := linux.AT_FDCWD
 	errno: linux.Errno
 	if desc.working_dir != "" {
 		dir_cstr := clone_to_cstring(desc.working_dir, temp_allocator) or_return
-		if dir_fd, errno = linux.open(dir_cstr, _OPENDIR_FLAGS); errno != .NONE {
+		if work_dir_fd, errno = linux.open(dir_cstr, _OPENDIR_FLAGS); errno != .NONE {
 			return process, _get_platform_error(errno)
 		}
 	}
 	defer if desc.working_dir != "" {
-		linux.close(dir_fd)
+		linux.close(work_dir_fd)
 	}
 
-	// search PATH if just a plain name is provided
 	exe_path: cstring
 	executable_name := desc.command[0]
-	if strings.index_byte(executable_name, '/') < 0 {
-		path_env := get_env("PATH", temp_allocator)
-		path_dirs := split_path_list(path_env, temp_allocator) or_return
 
+	if is_absolute_path(executable_name) {
+		exe_path = clone_to_cstring(executable_name, temp_allocator) or_return
+		if linux.access(exe_path, linux.X_OK) != .NONE {
+			return process, .Not_Exist
+		}
+
+	} else {
+		found: bool
+		cur_work_dir: string
 		exe_builder := strings.builder_make(temp_allocator) or_return
 
-		found: bool
-		for dir in path_dirs {
-			strings.builder_reset(&exe_builder)
-			strings.write_string(&exe_builder, dir)
-			strings.write_byte(&exe_builder, '/')
-			strings.write_string(&exe_builder, executable_name)
+		write_cwd :: proc(b: ^strings.Builder, cwd: ^string, allocator: runtime.Allocator) -> (err: Error) {
+			if cwd^ == "" {
+				cwd^ = get_working_directory(allocator) or_return
+			}
+			strings.write_string(b, cwd^)
+			if len(cwd) > 0 && !is_path_separator(cwd[len(cwd) - 1]) {
+				strings.write_byte(b, '/')
+			}
+			return
+		}
 
-			exe_path = strings.to_cstring(&exe_builder) or_return
-			stat: linux.Statx
-			if linux.statx(linux.AT_FDCWD, exe_path, {}, {.TYPE, .MODE}, &stat) == .NONE && .IFREG in stat.mode && .IXUSR in stat.mode {
-				found = true
-				break
+		// search PATH if just a plain name is provided
+		if strings.index_byte(executable_name, '/') < 0 {
+			path_env := get_env("PATH", temp_allocator)
+			path_dirs := split_path_list(path_env, temp_allocator) or_return
+
+			for dir in path_dirs {
+				strings.builder_reset(&exe_builder)
+
+				if !is_absolute_path(dir) {
+					write_cwd(&exe_builder, &cur_work_dir, temp_allocator) or_return
+				}
+
+				strings.write_string(&exe_builder, dir)
+				strings.write_byte(&exe_builder, '/')
+				strings.write_string(&exe_builder, executable_name)
+
+				exe_path = strings.to_cstring(&exe_builder) or_return
+				stat: linux.Statx
+				if linux.statx(linux.AT_FDCWD, exe_path, {}, {.TYPE, .MODE}, &stat) == .NONE && .IFREG in stat.mode && .IXUSR in stat.mode {
+					found = true
+					break
+				}
 			}
 		}
 		if !found {
 			// check in cwd to match windows behavior
 			strings.builder_reset(&exe_builder)
-			strings.write_string(&exe_builder, "./")
+			write_cwd(&exe_builder, &cur_work_dir, temp_allocator) or_return
 			strings.write_string(&exe_builder, executable_name)
 
 			exe_path = strings.to_cstring(&exe_builder) or_return
 			if linux.access(exe_path, linux.X_OK) != .NONE {
 				return process, .Not_Exist
 			}
-		}
-	} else {
-		exe_path = clone_to_cstring(executable_name, temp_allocator) or_return
-		if linux.access(exe_path, linux.X_OK) != .NONE {
-			return process, .Not_Exist
 		}
 	}
 
@@ -567,13 +588,13 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		if _, errno = linux.dup2(stderr_fd, STDERR); errno != .NONE {
 			write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 		}
-		if dir_fd != linux.AT_FDCWD {
-			if errno = linux.fchdir(dir_fd); errno != .NONE {
+		if work_dir_fd != linux.AT_FDCWD {
+			if errno = linux.fchdir(work_dir_fd); errno != .NONE {
 				write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 			}
 		}
 
-		errno = linux.execveat(dir_fd, exe_path, &cargs[0], env)
+		errno = linux.execve(exe_path, &cargs[0], env)
 		assert(errno != nil)
 		write_errno_to_parent_and_abort(child_pipe_fds[WRITE], errno)
 	}
