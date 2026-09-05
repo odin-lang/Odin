@@ -121,7 +121,9 @@ gb_internal void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts,
 
 			case Ast_ExprStmt:
 				if (is_diverging_stmt(n)) {
-					error(n, "Statements after a diverging procedure call are never executed");
+					Ast *n_after = stmts[i + 1];
+					gbString n_string = expr_to_string(n->ExprStmt.expr);
+					error(n_after, "Statements after diverging procedure call \"%s\" are never executed", n_string);
 				}
 				break;
 			}
