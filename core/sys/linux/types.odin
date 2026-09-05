@@ -65,7 +65,7 @@ Time_Spec :: struct {
 }
 
 /*
-	Represents time with millisecond precision.
+	Represents time with microsecond precision.
 */
 Time_Val :: struct {
 	seconds:      int,
