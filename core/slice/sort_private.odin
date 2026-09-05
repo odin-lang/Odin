@@ -126,180 +126,159 @@ _stable_sort_general :: proc(data: $T/[]$E, call: $P, $KIND: Sort_Kind) where (O
 }
 
 @(private)
-_smoothsort :: proc(base: [^]byte, nel: uint, width: uint, cmp: Generic_Cmp, arg: rawptr) {
-	pntz :: proc "contextless" (p: [2]uint) -> int {
-		r := intrinsics.count_trailing_zeros(p[0] - 1)
-		if r != 0 {
-			return int(r)
-		}
-		r = (8*size_of(uint) + intrinsics.count_trailing_zeros(p[1]))
-		if r != 8*size_of(uint) {
-			return int(r)
-		}
-		return 0
-	}
+_generic_quicksort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
+	loop(data, length, width, cmp, arg, true)
 
-	shl :: proc "contextless" (p: []uint, n: int) {
-		n := n
-		if n >= 8*size_of(uint) {
-			n -= 8*size_of(uint)
-			p[1] = p[0]
-			p[0] = 0
-		}
-		p[1] <<= uint(n)
-		p[0] |= p[0] >> uint(8*size_of(uint) - n)
-		p[0] <<= uint(n)
-	}
-	shr :: proc "contextless" (p: []uint, n: int) {
-		n := n
-		if n >= 8*size_of(uint) {
-			n -= 8*size_of(uint)
-			p[0] = p[1]
-			p[1] = 0
-		}
-		p[0] >>= uint(n)
-		p[0] |= p[1] << uint(8*size_of(uint) - n)
-		p[1] >>= uint(n)
-	}
+	loop :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, leftmost: bool) {
+		data := data; length := length; leftmost := leftmost
 
-	cycle :: proc "contextless" (width: uint, data: [][^]byte, n: int) {
-		if len(data) < 2 {
-			return
-		}
-		buf: [256]u8 = ---
-		data[n] = raw_data(buf[:])
-		width := width
-		for width != 0 {
-			l := builtin.min(size_of(buf), int(width))
-			copy(data[n][:l], data[0][:l])
-			for i in 0..<n {
-				copy(data[i][:l], data[i+1][:l])
-				data[i] = data[i][l:]
+		for {
+			if length <= 64 {
+				shell_sort(data, length, width, cmp, arg)
+				return
 			}
-			width -= uint(l)
-		}
-	}
 
-	sift :: proc(head: [^]byte, width: uint, cmp: Generic_Cmp, arg: rawptr, pshift: int, lp: []uint) {
-		head := head
-		buf: [14*size_of(uint)+1][^]byte = ---
-		buf[0] = head
-		i := 1
-		pshift := pshift
-		for pshift > 1 {
-			rt := head[-width:]
-			lf := head[-width:][-lp[pshift - 2]:]
-			if cmp(buf[0], lf, arg) >= .Equal && cmp(buf[0], rt, arg) >= .Equal {
-				break
+			log2 :: proc(n: int) -> (log: int) {
+				for n := n; n > 0; n >>= 1 {
+					log += 1
+				}
+				return log
 			}
-			if cmp(lf, rt, arg) >= .Equal {
-				buf[i], head = lf, lf
-				pshift -= 1
-			} else {
-				buf[i], head = rt, rt
-				pshift -= 2
-			}
-			i += 1
-		}
-		cycle(width, buf[:], i)
-	}
 
-	trinkle :: proc(head: [^]byte, width: uint, cmp: Generic_Cmp, arg: rawptr, pp: []uint, pshift: int, trusty: bool, lp: []uint) {
-		head := head
+			median_3_depth := log2(length) / 5
+			pivot_index := median_3(data, 0, length, width, cmp, arg, median_3_depth)
 
-		p := [2]uint{pp[0], pp[1]}
-
-		buf: [14*size_of(uint)+1][^]byte = ---
-		buf[0] = head
-
-		i := 1
-		trail := 0
-		pshift := pshift
-		trusty := trusty
-		for p[0] != 1 || p[1] != 0 {
-			stepson := head[-lp[pshift]:]
-			if cmp(stepson, buf[0], arg) <= .Equal {
-				break
-			}
-			if !trusty && pshift > 1 {
-				rt := head[-width:]
-				lf := head[-width:][-lp[pshift-2]:]
-				if cmp(rt, stepson, arg) >= .Equal || cmp(lf, stepson, arg) >= .Equal {
-					break
+			if !leftmost {
+				if cmp(data[pivot_index * width:], data[-width:], arg) == .Equal {
+					left := partition_lomuto_reverse(data, length, width, cmp, arg, pivot_index)
+					data = data[left * width:]
+					length = length - left
+					leftmost = false
+					continue
 				}
 			}
-			buf[i] = stepson
-			head = stepson
-			trail = pntz(p)
-			shr(p[:], trail)
-			pshift += trail
-			trusty = false
-			i += 1
+
+
+			left := partition_lomuto_block(data, length, width, cmp, arg, pivot_index)
+			right := length - left
+
+			if left < right {
+				loop(data, left, width, cmp, arg, leftmost)
+				data = data[(left + 1) * width:]
+				length = right - 1
+				leftmost = false
+			} else {
+				loop(data[(left + 1) * width:], right - 1, width, cmp, arg, false)
+				length = left
+			}
 		}
-		if trusty {
+		
+	}
+
+	shell_sort :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr) {
+		if length < 2 {
 			return
 		}
-		cycle(width, buf[:], i)
-		sift(head, width, cmp, arg, pshift, lp)
-	}
 
-	size := nel * width
-	if size == 0 {
-		return
-	}
+		gaps := []int{43, 17, 7, 3, 1}
 
-	lp: [12*size_of(uint)]uint = ---
-	lp[1] = width
-	lp[0] = lp[1]
-	for i := 2; true; i += 1 {
-		lp[i] = lp[i-2] + lp[i-1] + width
-		if lp[i] >= size {
-			break
+		k := 0
+		for gaps[k] > length {
+			k += 1
 		}
-	}
-
-	head := base
-	high := head[size - width:]
-	p := [2]uint{1, 0}
-	pshift := 1
-	for head < high {
-		if (p[0] & 3) == 3 {
-			sift(head, width, cmp, arg, pshift, lp[:])
-			shr(p[:], 2)
-			pshift += 2
-		} else {
-			if lp[pshift - 1] >= uint(uintptr(high) - uintptr(head)) {
-				trinkle(head, width, cmp, arg, p[:], pshift, false, lp[:])
-			} else {
-				sift(head, width, cmp, arg, pshift, lp[:])
-			}
-			if pshift == 1 {
-				shl(p[:], 1)
-				pshift = 0
-			} else {
-				shl(p[:], pshift - 1)
-				pshift = 1
+		for ; k < 5; k += 1 {
+			gap := gaps[k]
+			for i := gap ; i < length; i += 1 {
+				j := i
+				for j >= gap && cmp(data[(j - gap) * width:], data[j * width:], arg) == .Greater {
+					ptr_swap_non_overlapping(data[(j - gap) * width:], data[j * width:], width)
+					j -= gap
+				}
 			}
 		}
-		p[0] |= 1
-		head = head[width:]
 	}
-	trinkle(head, width, cmp, arg, p[:], pshift, false, lp[:])
-	for pshift != 1 || p[0] != 1 || p[1] != 0 {
-		if pshift <= 1 {
-			trail := pntz(p)
-			shr(p[:], trail)
-			pshift += trail
-		} else {
-			shl(p[:], 2)
-			pshift -= 2
-			p[0] ~= 7
-			shr(p[:], 1)
-			trinkle(head[-width:][-lp[pshift]:], width, cmp, arg, p[:], pshift + 1, true, lp[:])
-			shl(p[:], 1)
-			p[0] |= 1
-			trinkle(head[-width:], width, cmp, arg, p[:], pshift, true, lp[:])
+
+	median_3 :: proc(data: [^]byte, start, end, width: int, cmp: Generic_Cmp, arg: rawptr, depth: int) -> int #no_bounds_check {
+		if depth == 0 {
+			return start
 		}
-		head = head[-width:]
+
+		div := (end - start) / 3
+
+		swap := [3]int{
+			median_3(data, start          , start + div    , width, cmp, arg, depth - 1),
+			median_3(data, start + div    , start + div * 2, width, cmp, arg, depth - 1),
+			median_3(data, start + div * 2, end            , width, cmp, arg, depth - 1),
+		}
+		
+		x := cmp(data[swap[0] * width:], data[swap[1] * width:], arg) == .Less
+		y := cmp(data[swap[0] * width:], data[swap[2] * width:], arg) == .Less
+		z := cmp(data[swap[1] * width:], data[swap[2] * width:], arg) == .Less
+
+		return swap[(int)(x == y) + (int)(y ~ z)]
+	}
+
+	partition_lomuto_block :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (left: int) #no_bounds_check {
+		if pivot_index != 0 {
+			ptr_swap_non_overlapping(data[0:], data[pivot_index * width:], width)
+		}
+		pivot := data[0:]
+		left = 1
+
+		BLOCK_SIZE :: 64
+		block : [BLOCK_SIZE]u8 = ---
+		read := 1
+		block_base := 1
+
+		for {
+			unkown := length - read
+			less := 0
+			if unkown >= BLOCK_SIZE {
+				#unroll(8) for i in u8(0)..<BLOCK_SIZE {
+					block[less] = i 
+					less += cast(int)(cmp(data[read * width:], pivot, arg) == .Less)
+					read += 1
+				}
+			} else {
+				for i in 0..<unkown {
+					block[less] = u8(i) 
+					less += cast(int)(cmp(data[read * width:], pivot, arg) == .Less)
+					read += 1
+				}
+			}
+			for i in 0..<less {
+				ptr_swap_non_overlapping(data[(block_base + int(block[i])) * width:], data[left * width:], width)
+				left += 1
+			}
+			if unkown <= BLOCK_SIZE {break}
+			block_base = read
+			
+		}
+
+		left -= 1
+
+		ptr_swap_non_overlapping(data[0:], data[left * width:], width)
+		return left
+	}
+
+	partition_lomuto_reverse :: proc(data: [^]byte, length, width: int, cmp: Generic_Cmp, arg: rawptr, pivot_index: int) -> (right: int) #no_bounds_check {
+		if pivot_index != length - 1 {
+			ptr_swap_non_overlapping(data[(length - 1) * width:], data[pivot_index * width:], width)
+		}
+		pivot := data[(length - 1) * width:]
+		right = length - 2
+
+
+		for read := length - 2; read >= 0; read -= 1 {
+			if cmp(data[read * width:], pivot, arg) == .Greater {
+				ptr_swap_non_overlapping(data[right * width:], data[read * width:], width)
+				right -= 1
+			}
+		}
+		right += 1
+
+		ptr_swap_non_overlapping(data[(length - 1) * width:], data[right * width:], width)
+
+		return right
 	}
 }
