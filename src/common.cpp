@@ -375,6 +375,10 @@ gb_internal void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
 gb_global String global_module_path = {0};
 gb_global bool global_module_path_set = false;
 
+// The running compiler's own path, located once by internal_odin_exe_path. -cached tracks it so a
+// new toolchain invalidates cached executables. Empty if the executable cannot be located.
+gb_global String global_odin_exe_path = {0};
+
 
 #include "ptr_map.cpp"
 #include "ptr_set.cpp"
