@@ -3893,16 +3893,16 @@ when ODIN_ARCH == .arm64 {
 	//
 	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshld_n_s64)
 	@(require_results, enable_target_feature = "neon")
-	vshld_n_s64 :: #force_inline proc "c" (v: int64_t, $N: uint32_t) -> int64_t where N < 64 {
-		return v << N
+	vshld_n_s64 :: #force_inline proc "c" (v: int64_t, $N: int32_t) -> int64_t where 0 <= N, N < 64 {
+		return v << uint64_t(N)
 	}
 
 	// Shift Left.
 	//
 	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshld_n_u64)
 	@(require_results, enable_target_feature = "neon")
-	vshld_n_u64 :: #force_inline proc "c" (v: uint64_t, $N: uint32_t) -> uint64_t where N < 64 {
-		return v << N
+	vshld_n_u64 :: #force_inline proc "c" (v: uint64_t, $N: int32_t) -> uint64_t where 0 <= N, N < 64 {
+		return v << uint64_t(N)
 	}
 
 	// Signed Shift Left.
