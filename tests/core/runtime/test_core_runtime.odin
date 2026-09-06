@@ -884,6 +884,59 @@ test_soa_for_in_addr :: proc(t: ^testing.T) {
 	testing.expect_value(t, arr.y[1], 20)
 }
 
+// field access through an #soa pointer when the field is reached via `using`
+@(test)
+test_soa_pointer_using_field :: proc(t: ^testing.T) {
+	fixed: #soa[3]struct {
+		using foo: struct {
+			bar: int,
+		},
+	}
+	fixed[1].bar = 2
+	testing.expect_value(t, fixed.foo[1].bar, 2)
+
+	p := &fixed[1]
+	testing.expect_value(t, p.bar, 2)
+	p.bar = 3
+	testing.expect_value(t, fixed[1].bar, 3)
+	testing.expect_value(t, p^.bar, 3)
+	testing.expect_value(t, p.foo.bar, 3)
+
+	// nested using
+	nested: #soa[2]struct {
+		using inner: struct {
+			using mid: struct {
+				x: int,
+			},
+			y: int,
+		},
+		z: int,
+	}
+	nested[0] = {x = 1, y = 2, z = 3}
+	np := &nested[0]
+	testing.expect_value(t, np.x, 1)
+	testing.expect_value(t, np.y, 2)
+	testing.expect_value(t, np.z, 3)
+	np.x = 10
+	np.y = 20
+	np.z = 30
+	testing.expect_value(t, nested.inner[0].mid.x, 10)
+	testing.expect_value(t, nested.inner[0].y, 20)
+	testing.expect_value(t, nested.z[0], 30)
+
+	// slice / dynamic kinds use a different column representation
+	dyn := make(#soa[dynamic]struct {
+		using foo: struct {
+			bar: int,
+		},
+	}, 2)
+	defer delete(dyn)
+	dp := &dyn[1]
+	dp.bar = 7
+	testing.expect_value(t, dyn[1].bar, 7)
+	testing.expect_value(t, dyn.foo[1].bar, 7)
+}
+
 @(test)
 test_soa_array_allocator_resize :: proc(t: ^testing.T) {
 
