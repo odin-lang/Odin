@@ -705,38 +705,35 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			write_cstr(":");
 		}
 
-		if (mem_op->disp) {
+		auto const &cl = mem_op->classify;
+		if (cl.label != nullptr) {
 			u32 disp_flags = (flags & ~WriteOperandFlag_PrintPrefixes) | WriteOperandFlag_MemoryDisp;
-			if (mem_op->disp_op.kind == Token_Sub) {
-				disp_flags |= WriteOperandFlag_Negate;
-			}
-			this->write_operand(op_number, mem_op->disp, disp_flags);
+			this->write_operand(op_number, cl.label, disp_flags);
+		} else if (cl.has_disp_const &&
+		           (cl.disp_total != 0 || (cl.base == nullptr && cl.index == nullptr))) {
+			write_i64(cl.disp_total);
 		}
-		if (mem_op->base == nullptr && mem_op->index == nullptr) {
-			GB_ASSERT(mem_op->scale == nullptr);
+		if (cl.base == nullptr && cl.index == nullptr) {
+			GB_ASSERT(cl.scale == nullptr);
 			return;
 		}
 		write_cstr("(");
-		if (mem_op->base != nullptr) {
-			this->write_operand(op_number, mem_op->base, flags);
+		if (cl.base != nullptr) {
+			this->write_operand(op_number, cl.base, flags);
 		}
-		if (mem_op->index) {
-			u32 index_flags = flags;
-			if (mem_op->index_op.kind == Token_Sub) {
-				index_flags |= WriteOperandFlag_Negate;
-			}
+		if (cl.index != nullptr) {
 			write_cstr(",");
-			this->write_operand(op_number, mem_op->index, index_flags);
+			this->write_operand(op_number, cl.index, flags);
 
-			if (mem_op->scale) {
+			if (cl.scale != nullptr) {
 				write_cstr(",");
-				switch (mem_op->scale_op.kind) {
+				switch (cl.scale_op.kind) {
 				case Token_Mul:
-					this->write_operand(op_number, mem_op->scale, (flags|WriteOperandFlag_IsScale)&~WriteOperandFlag_PrintPrefixes);
+					this->write_operand(op_number, cl.scale, (flags|WriteOperandFlag_IsScale)&~WriteOperandFlag_PrintPrefixes);
 					break;
 				case Token_Shl:
 				case Token_Shr:
-					this->write_operand(op_number, mem_op->scale, (flags|WriteOperandFlag_IsScaleLog2)&~WriteOperandFlag_PrintPrefixes);
+					this->write_operand(op_number, cl.scale, (flags|WriteOperandFlag_IsScaleLog2)&~WriteOperandFlag_PrintPrefixes);
 					break;
 				}
 			}
@@ -1101,18 +1098,17 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 	// RISC-V addressing is `offset(base)`: signed 12-bit displacement + one base reg.
 	void write_memory_operand(Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		GB_ASSERT_MSG(mem_op->segment_override == nullptr, "asm: RISC-V has no segment overrides");
-		GB_ASSERT_MSG(mem_op->index == nullptr && mem_op->scale == nullptr, "asm: RISC-V memory operands have no index/scale");
+		GB_ASSERT_MSG(mem_op->classify.index == nullptr && mem_op->classify.scale == nullptr, "asm: RISC-V memory operands have no index/scale");
 
-		if (mem_op->disp) {
-			u32 disp_flags = flags & ~WriteOperandFlag_PrintPrefixes;
-			if (mem_op->disp_op.kind == Token_Sub) {
-				disp_flags |= WriteOperandFlag_Negate;
-			}
-			this->write_operand(op_number, mem_op->disp, disp_flags);
+		auto const &cl = mem_op->classify;
+		if (cl.label != nullptr) {
+			this->write_operand(op_number, cl.label, flags&~WriteOperandFlag_PrintPrefixes);
+		} else if (cl.has_disp_const && (cl.disp_total != 0 || cl.base == nullptr)) {
+			write_i64(cl.disp_total);
 		}
 		write_cstr("(");
-		if (mem_op->base != nullptr) {
-			this->write_operand(op_number, mem_op->base, flags&~WriteOperandFlag_PrintPrefixes);
+		if (cl.base != nullptr) {
+			this->write_operand(op_number, cl.base, flags&~WriteOperandFlag_PrintPrefixes);
 		}
 		write_cstr(")");
 	}
@@ -1557,7 +1553,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 	// encodes scale either as a multiply (index * {1,2,4,8,16}) or as an explicit
 	// shift (index << n); ARM64 register-offset addressing always wants the shift.
 	i64 arm64_scale_shift_amount(AstAsmMemoryOperand *mem_op) {
-		Ast *scale = mem_op->scale;
+		Ast *scale = mem_op->classify.scale;
 		GB_ASSERT(scale != nullptr);
 		GB_ASSERT_MSG(scale->tav.mode == Addressing_Constant,
 		              "asm: ARM64 memory scale must be a constant shift amount");
@@ -1565,7 +1561,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		GB_ASSERT(ev.kind == ExactValue_Integer);
 		i64 v = exact_value_to_i64(ev);
 
-		switch (mem_op->scale_op.kind) {
+		switch (mem_op->classify.scale_op.kind) {
 		case Token_Mul:
 			switch (v) {
 			case 1:  return 0;
@@ -1591,7 +1587,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 	}
 
 	char const *arm64_index_extend(AstAsmMemoryOperand *mem_op) {
-		Ast *idx = mem_op->index;
+		Ast *idx = mem_op->classify.index;
 		if (idx == nullptr) {
 			return "lsl";
 		}
@@ -1616,21 +1612,22 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 	// addressing modes, so an index precludes a displacement.
 	void write_memory_operand(Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) override {
 		GB_ASSERT_MSG(mem_op->segment_override == nullptr, "asm: ARM64 has no segment overrides");
-		GB_ASSERT_MSG(mem_op->scale == nullptr || mem_op->index != nullptr,
+		GB_ASSERT_MSG(mem_op->classify.scale == nullptr || mem_op->classify.index != nullptr,
 		              "asm: ARM64 memory scale requires an index register");
 
+		auto const &cl = mem_op->classify;
 		write_cstr("[");
-		if (mem_op->base != nullptr) {
-			this->write_operand(op_number, mem_op->base, flags&~WriteOperandFlag_PrintPrefixes);
+		if (cl.base != nullptr) {
+			this->write_operand(op_number, cl.base, flags&~WriteOperandFlag_PrintPrefixes);
 		}
-		if (mem_op->index != nullptr) {
+		if (cl.index != nullptr) {
 			write_cstr(", ");
-			this->write_operand(op_number, mem_op->index, flags&~WriteOperandFlag_PrintPrefixes);
-			if (mem_op->scale != nullptr) {
+			this->write_operand(op_number, cl.index, flags&~WriteOperandFlag_PrintPrefixes);
+			if (cl.scale != nullptr) {
 				// A 32-bit index needs an extend specifier (uxtw/sxtw); a 64-bit index
 				// uses lsl. The extend for a w-index is mandatory even at shift 0.
 				char const *extend = this->arm64_index_extend(mem_op); // "lsl", "uxtw", or "sxtw"
-				i64 shift = (mem_op->scale != nullptr) ? this->arm64_scale_shift_amount(mem_op) : 0;
+				i64 shift = this->arm64_scale_shift_amount(mem_op);
 				bool is_lsl = (extend[0] == 'l');
 				if (!is_lsl) {
 					// w-index: always print the extend; shift optional.
@@ -1643,13 +1640,8 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 					asm_string = gb_string_append_fmt(asm_string, ", lsl #%lld", cast(long long)shift);
 				}
 			}
-		} else if (mem_op->disp) {
-			write_cstr(", ");
-			u32 disp_flags = flags;
-			if (mem_op->disp_op.kind == Token_Sub) {
-				disp_flags |= WriteOperandFlag_Negate;
-			}
-			this->write_operand(op_number, mem_op->disp, disp_flags);
+		} else if (cl.has_disp_const && cl.disp_total != 0) {
+			asm_string = gb_string_append_fmt(asm_string, ", #%lld", cast(long long)cl.disp_total);
 		}
 		write_cstr("]");
 	}

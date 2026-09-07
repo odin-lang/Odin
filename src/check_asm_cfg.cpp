@@ -375,7 +375,8 @@ gb_internal void check_asm_cfg_report_undef_reg(AsmCtx *asm_ctx, AsmCfg *cfg, En
 template <typename AsmCtx>
 gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerContext *ctx, Entity *entity) {
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
-	auto const &decls     = entity->AsmTemplate.decls;
+	auto *ate = &entity->AsmTemplate;
+	auto const &decls     = ate->decls;
 	bool        diverging = entity->type->Proc.diverging;
 
 	if (cfg->blocks.count == 0) {
@@ -437,7 +438,7 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 
 	// NOTE(bill): #preserve
 	u16 preserve_bits = 0;
-	for (String const &reg : entity->AsmTemplate.preserve_registers_set) {
+	for (String const &reg : ate->preserve_registers_set) {
 		preserve_bits |= asm_ctx->clobber_bit_for_reg_name(reg);
 	}
 	seed_regs |= preserve_bits;
