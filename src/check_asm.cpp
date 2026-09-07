@@ -2086,9 +2086,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 	case_ast_node(pe, ParenExpr, expr);
 		check_expr(ctx, operand, expr);
 		if (operand->mode != Addressing_Constant) {
-			error(expr, "Asm operands within parentheses can only compile time constants, if they were supported");
-		} else {
-			error(expr, "Asm operands with parentheses are not currently supported");
+			error(expr, "Asm operands within parentheses must be compile time constants");
 		}
 		return;
 	case_end;
@@ -2174,6 +2172,73 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &index, mem_op->index, false);
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &scale, mem_op->scale, false);
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &disp,  mem_op->disp,  false);
+
+		// NOTE(bill): A term written as `index*scale` whose `index` is a compile time constant
+		// is not a scaled index at all (a scale attaches to a register,  never to a bare constant)
+		// The whole term will fold into the displacement.
+		//
+		// e.g. `[ptr + 8*32]` means `[ptr + 256]`, not index=8/scale=32.
+		//
+		// The parenthesized form `[ptr + (8*32)]` arrives with scale==nullptr and is handled by the constant-index swap just below.
+		if (index.expr != nullptr &&
+		    index.mode == Addressing_Constant && index.value.kind == ExactValue_Integer &&
+		    scale.expr != nullptr &&
+		    scale.mode == Addressing_Constant && scale.value.kind == ExactValue_Integer &&
+		    (disp.expr == nullptr ||
+		     (disp.mode == Addressing_Constant && disp.value.kind == ExactValue_Integer))) {
+			i64 iv = exact_value_to_i64(index.value);
+			i64 sv = exact_value_to_i64(scale.value);
+			i64 term = 0;
+			switch (mem_op->scale_op.kind) {
+			// TODO(bill): should I use the big-int math here to do the calculations?
+			case Token_Shl: term = iv << sv; break;
+			case Token_Shr: term = iv >> sv; break;
+			case Token_Mul: term = iv * sv;  break;
+			default:
+				GB_PANIC("Unknown scale operand: %.*s\n", LIT(mem_op->scale_op.string));
+				break;
+			}
+			if (mem_op->index_op.kind == Token_Sub) {
+				term = -term;
+			}
+
+			i64 dv = 0;
+			if (disp.expr != nullptr) {
+				dv = exact_value_to_i64(disp.value);
+				if (mem_op->disp_op.kind == Token_Sub) {
+					dv = -dv;
+				}
+			}
+			i64 total = term + dv;
+
+			ExactValue folded = exact_value_i64(gb_abs(total));
+			Token disp_op = {};
+			disp_op = mem_op->scale_op;
+
+			if (total < 0) {
+				disp_op.kind   = Token_Sub;
+				disp_op.string = str_lit("-");
+			} else {
+				disp_op.kind   = Token_Add;
+				disp_op.string = str_lit("+");
+			}
+
+			mem_op->disp     = mem_op->index;
+			mem_op->disp_op  = disp_op;
+			mem_op->index    = nullptr;
+			mem_op->index_op = {};
+			mem_op->scale    = nullptr;
+			mem_op->scale_op = {};
+			add_type_and_value(ctx, mem_op->disp, Addressing_Constant, t_untyped_integer, folded);
+
+			disp = {};
+			disp.expr  = mem_op->disp;
+			disp.mode  = Addressing_Constant;
+			disp.type  = t_untyped_integer;
+			disp.value = folded;
+			index = {};
+			scale = {};
+		}
 
 		// NOTE(bill): if the base/index is actually an immediate and there is no scale nor disp,
 		// then treat it as a disp, and modify the AST too
