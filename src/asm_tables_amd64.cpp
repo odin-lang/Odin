@@ -647,6 +647,15 @@ struct Asm_amd64 {
 		return true;
 	}
 
+	bool reg_is_non_allocateable(Register r) const {
+		switch (r) {
+		case REG_CR0: case REG_CR2: case REG_CR3: case REG_CR4: case REG_CR8:
+		case REG_CS:  case REG_DS:  case REG_ES:  case REG_FS:  case REG_GS: case REG_SS:
+			return true;
+		}
+		return false;
+	}
+
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
 		case OP_R8:  case OP_R16: case OP_R32: case OP_R64:

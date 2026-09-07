@@ -599,6 +599,14 @@ struct Asm_riscv {
 		return false;
 	}
 
+	bool reg_is_non_allocateable(Register r) const {
+		switch (r) {
+		case REG_ZERO:
+			return true;
+		}
+		return false;
+	}
+
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
 		case OP_NONE:

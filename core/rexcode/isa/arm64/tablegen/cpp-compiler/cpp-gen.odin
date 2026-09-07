@@ -630,6 +630,15 @@ main :: proc() {
 		bool supports_memory_index_not_just_disp() const {
 			return true; // base + (optionally extended/shifted) index register
 		}
+		bool reg_is_non_allocateable(Register r) const {
+			switch (r) {
+			case REG_XZR:
+			case REG_SP:
+			case REG_NZCV: case REG_DAIF: case REG_FPCR: case REG_FPSR:
+				return true;
+			}
+			return false;
+		}
 	""")
 	strings.write_string(&sb, "\n\n")
 

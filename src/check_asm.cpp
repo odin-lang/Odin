@@ -2928,6 +2928,26 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		error(previous_prefix_instr, "A prefix must be immediately followed by an instruction, but the template ended");
 	}
 
+
+	for (auto const &ed : ate->decls) {
+		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output) {
+			continue;
+		}
+		if (ed.tie >= 0 || ed.no_init) {
+			continue;
+		}
+		if (ed.pin.len != 0) {
+			auto r = asm_ctx->register_lookup(ed.pin);
+			if (asm_ctx->reg_is_non_allocateable(r)) {
+				error(ed.entity->token,
+				      "'asm' output '%.*s' is pinned to a register '%%%.*s' which cannot be an output; "
+				      "read it into a general-purpose register in the body instead "
+				      "(e.g. on AMD64, 'mov %%rax, %%%.*s' with the output pinned to %%rax)",
+				      LIT(ed.entity->token.string), LIT(ed.pin), LIT(ed.pin));
+			}
+		}
+	}
+
 	// NOTE(bill): After the linear collection pass of the mnemonics,
 	// now do the CFG building, analysis, and liveness checks (only if everything was correct)
 

@@ -619,6 +619,15 @@ main :: proc() {
 		bool supports_memory_index_not_just_disp() const {
 			return true;
 		}
+
+		bool reg_is_non_allocateable(Register r) const {
+			switch (r) {
+			case REG_CR0: case REG_CR2: case REG_CR3: case REG_CR4: case REG_CR8:
+			case REG_CS:  case REG_DS:  case REG_ES:  case REG_FS:  case REG_GS: case REG_SS:
+				return true;
+			}
+			return false;
+		}
 	""")
 	strings.write_string(&sb, "\n\n")
 

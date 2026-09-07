@@ -625,6 +625,14 @@ main :: proc() {
 		bool supports_memory_index_not_just_disp() const {
 			return false;
 		}
+
+		bool reg_is_non_allocateable(Register r) const {
+			switch (r) {
+			case REG_ZERO:
+				return true;
+			}
+			return false;
+		}
 	""")
 	strings.write_string(&sb, "\n\n")
 
