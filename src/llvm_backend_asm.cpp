@@ -88,15 +88,16 @@ struct lbAsmGenerate {
 	// that don't need this (amd64), the named form is still fine; this base method
 	// is overridden per target.
 	virtual void write_label_def(AstIdent *label_ident) {
+		this->write_label_ref(label_ident); // default: same spelling for def and ref
+		write_cstr(":");
+	}
+	virtual void write_label_ref(AstIdent *label_ident) {
 		String name = label_ident->token.string;
 		write_cstr(".L_");
 		write_string(tmpl_entity->token.string);
 		write_cstr("_");
 		write_string(name);
 		write_cstr("${:uid}");
-	}
-	virtual void write_label_ref(AstIdent *label_ident) {
-		this->write_label_def(label_ident); // default: same spelling for def and ref
 	}
 
 	void write_label(AstIdent *label_ident) {
