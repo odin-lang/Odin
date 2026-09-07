@@ -155,13 +155,20 @@ gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs,
 		// the bit; the unused check maps decl pins back through this mask.
 		if (touched_regs_) *touched_regs_ |= asm_ctx->clobber_bit_for_reg_name(expr->AsmRegister.name.string);
 		return;
+
+	case Ast_AsmMemoryTerm: {
+		auto *t = &expr->AsmMemoryTerm;
+		check_asm_collect_refs(asm_ctx, refs, t->operand, touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, t->scale,   touched_regs_);
+		return;
+	}
+
 	case Ast_AsmMemoryOperand: {
 		auto *m = &expr->AsmMemoryOperand;
 		check_asm_collect_refs(asm_ctx, refs, m->segment_override, touched_regs_);
-		check_asm_collect_refs(asm_ctx, refs, m->base,             touched_regs_);
-		check_asm_collect_refs(asm_ctx, refs, m->index,            touched_regs_);
-		check_asm_collect_refs(asm_ctx, refs, m->scale,            touched_regs_);
-		check_asm_collect_refs(asm_ctx, refs, m->disp,             touched_regs_);
+		for (Ast *term : m->terms) {
+			check_asm_collect_refs(asm_ctx, refs, term, touched_regs_);
+		}
 		return;
 	}
 	case Ast_IndexExpr:
@@ -1558,6 +1565,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		GB_ASSERT(tmpl_entity->kind == Entity_AsmTemplate);
+		auto *ate = &tmpl_entity->AsmTemplate;
 
 		GB_ASSERT(valid_form_index >= 0);
 		instr->mnemonic = mnemonic;
@@ -1571,21 +1579,28 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// Generic: forms with form_transfer_bytes()==0, or operands with no constant scale, impose nothing.
 		{
 			u16 tb = asm_ctx->form_transfer_bytes(forms[valid_form_index]);
-			if (tb != 0) {
-				i64 want = 0; { u16 b = tb; while (b > 1) { b >>= 1; want++; } }
+			if (build_context.metrics.arch == TargetArch_arm64 && tb != 0) {
+				i64 want = 0;
+				{
+					u16 b = tb;
+					while (b > 1) {
+						b >>= 1;
+						want++;
+					}
+				}
 				for_array(oi, operands) {
 					Ast *e = operands[oi].expr;
 					if (e == nullptr || e->kind != Ast_AsmMemoryOperand) {
 						continue;
 					}
 					auto *m = &e->AsmMemoryOperand;
-					if (m->scale == nullptr || m->scale->tav.mode != Addressing_Constant) {
+					if (m->classify.scale == nullptr || m->classify.scale->tav.mode != Addressing_Constant) {
 						continue;
 					}
-					i64 raw = exact_value_to_i64(exact_value_to_integer(m->scale->tav.value));
+					i64 raw = exact_value_to_i64(exact_value_to_integer(m->classify.scale->tav.value));
 					// Normalise the '*' form to a shift amount; '<<'/'>>' are already shifts.
 					i64 shift = raw;
-					if (m->scale_op.kind == Token_Mul) {
+					if (m->classify.scale_op.kind == Token_Mul) {
 						switch (raw) {
 						case 1:  shift = 0;  break;
 						case 2:  shift = 1;  break;
@@ -1597,11 +1612,11 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					}
 					// shift 0 (unscaled) is always legal; otherwise it must match log2(size).
 					if (shift != 0 && shift != want) {
-						if (m->scale_op.kind == Token_Mul) {
-							error(m->scale, "'%.*s' scaled-index multiplier must be %lld (the %u-byte transfer size), got %lld",
+						if (m->classify.scale_op.kind == Token_Mul) {
+							error(m->classify.scale, "'%.*s' scaled-index multiplier must be %lld (the %u-byte transfer size), got %lld",
 							      LIT(name), cast(long long)(cast(i64)1 << want), cast(unsigned)tb, cast(long long)raw);
 						} else {
-							error(m->scale, "'%.*s' scaled-index shift must be %lld (log2 of the %u-byte transfer), got %lld",
+							error(m->classify.scale, "'%.*s' scaled-index shift must be %lld (log2 of the %u-byte transfer), got %lld",
 							      LIT(name), cast(long long)want, cast(unsigned)tb, cast(long long)shift);
 						}
 					}
@@ -1673,12 +1688,12 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 		bool effective_side_effects = clobber.implies_side_effects() && !internal_branch;
 
-		tmpl_entity->AsmTemplate.clobber_flags  |= clobber.implies_clobber_flags();
-		tmpl_entity->AsmTemplate.clobber_memory |= clobber.implies_clobber_memory() && mem_is_real;
-		tmpl_entity->AsmTemplate.is_volatile    |= effective_side_effects;
+		ate->clobber_flags  |= clobber.implies_clobber_flags();
+		ate->clobber_memory |= clobber.implies_clobber_memory() && mem_is_real;
+		ate->is_volatile    |= effective_side_effects;
 
-		tmpl_entity->AsmTemplate.has_observable_side_effect |= effective_side_effects;
-		tmpl_entity->AsmTemplate.has_observable_side_effect |= clobber.writes_mem && mem_is_real;
+		ate->has_observable_side_effect |= effective_side_effects;
+		ate->has_observable_side_effect |= clobber.writes_mem && mem_is_real;
 
 		// #align_stack only matters if the body makes a call (which requires the stack
 		// aligned at the call boundary) or manipulates RSP directly. Plain memory access
@@ -1689,8 +1704,8 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		}
 
 		u16 pinned_mask = 0;
-		for_array(i, tmpl_entity->AsmTemplate.decls) {
-			pinned_mask |= asm_decl_resolve_pin_bit(asm_ctx, tmpl_entity->AsmTemplate.decls, cast(i32)i);
+		for_array(i, ate->decls) {
+			pinned_mask |= asm_decl_resolve_pin_bit(asm_ctx, ate->decls, cast(i32)i);
 		}
 
 		u16 produced = cast(u16)clobber.implicit_wr & asm_ctx->CLOBBER_REGS_NAMED;
@@ -1718,8 +1733,8 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			Entity *pe = entity_of_node(op_expr);
  			if (pe != nullptr && pe->kind == Entity_Variable) {
  				i32 di = -1;
- 				check_asm_find_group(pe, tmpl_entity->AsmTemplate.decls, &di);
- 				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, tmpl_entity->AsmTemplate.decls, di);
+ 				check_asm_find_group(pe, ate->decls, &di);
+ 				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, ate->decls, di);
  			}
 		}
 
@@ -1815,7 +1830,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			if (operands[i].expr != nullptr && operands[i].expr->kind == Ast_AsmMemoryOperand) {
 				auto *m = &operands[i].expr->AsmMemoryOperand;
 				if (m->kind == AsmMemoryOperand_Pre || m->kind == AsmMemoryOperand_Post) {
-					Entity *be = entity_of_node(m->base);
+					Entity *be = entity_of_node(m->classify.base);
 					if (be != nullptr && be->kind == Entity_Variable) {
 						array_add(&facts->gen_params,  be);
 						array_add(&facts->read_params, be);
@@ -1836,7 +1851,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 
 
 			{ // View aliasing: a view decl shares its source's physical register.
-				auto const &decls = tmpl_entity->AsmTemplate.decls;
+				auto const &decls = ate->decls;
 				i32 di = -1;
 				check_asm_find_group(pe, decls, &di);
 				if (di >= 0 && decls[di].view_of >= 0) {
@@ -1907,7 +1922,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			facts->is_conditional = conditional;
 			facts->is_terminal = halt || (control && !conditional);
 		}
-		asm_ctx->clobber_implicit_regs(&tmpl_entity->AsmTemplate.clobber_registers_set, produced);
+		asm_ctx->clobber_implicit_regs(&ate->clobber_registers_set, produced);
 
 		// Purity inference
 		if (cfg->can_be_pure) {
@@ -2059,6 +2074,40 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 }
 
 
+enum AsmTermCategory : u8 {
+	AsmTermCategory_Other,
+	AsmTermCategory_Register,
+	AsmTermCategory_Const,
+	AsmTermCategory_Immediate,
+	AsmTermCategory_Label,
+};
+
+gb_internal AsmTermCategory check_asm_mem_term_category(Operand *o, Array<AsmTemplateEntityDecl> const &decls) {
+	if (o == nullptr || o->expr == nullptr) {
+		return AsmTermCategory_Other;
+	}
+	if (o->expr->kind == Ast_AsmLabelDecl) {
+		return AsmTermCategory_Label;
+	}
+	if (o->expr->kind == Ast_AsmRegister) {
+		return AsmTermCategory_Register;
+	}
+	if (o->mode == Addressing_Constant) {
+		return AsmTermCategory_Const;
+	}
+	Entity *pe = entity_of_node(o->expr);
+	if (pe != nullptr && pe->kind == Entity_Variable) {
+		switch (check_asm_find_kind(pe, decls)) {
+		case AsmTemplateEntityDecl_Immediate:
+			return AsmTermCategory_Immediate;
+		case AsmTemplateEntityDecl_Register:
+		case AsmTemplateEntityDecl_Memory:
+			return AsmTermCategory_Register;
+		}
+	}
+	return AsmTermCategory_Other;
+}
+
 template <typename AsmCtx>
 gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, Operand *operand, Ast *expr, bool allow_memory_operands) {
 	if (expr == nullptr) {
@@ -2164,140 +2213,147 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			break;
 		}
 
+
 		Operand base  = {};
 		Operand index = {};
 		Operand scale = {};
 		Operand disp  = {};
-		check_asm_instruction_operand(asm_ctx, ctx, entity, &base,  mem_op->base,  false);
-		check_asm_instruction_operand(asm_ctx, ctx, entity, &index, mem_op->index, false);
-		check_asm_instruction_operand(asm_ctx, ctx, entity, &scale, mem_op->scale, false);
-		check_asm_instruction_operand(asm_ctx, ctx, entity, &disp,  mem_op->disp,  false);
+		Token   scale_op = {};
+		i64  disp_total     = 0;
+		bool has_disp_const = false;
+		Ast *disp_host      = nullptr; // node to host a folded constant displacement
+		Ast *label_node     = nullptr;
+		bool class_ok       = true;
 
-		// NOTE(bill): A term written as `index*scale` whose `index` is a compile time constant
-		// is not a scaled index at all (a scale attaches to a register,  never to a bare constant)
-		// The whole term will fold into the displacement.
-		//
-		// e.g. `[ptr + 8*32]` means `[ptr + 256]`, not index=8/scale=32.
-		//
-		// The parenthesized form `[ptr + (8*32)]` arrives with scale==nullptr and is handled by the constant-index swap just below.
-		if (index.expr != nullptr &&
-		    index.mode == Addressing_Constant && index.value.kind == ExactValue_Integer &&
-		    scale.expr != nullptr &&
-		    scale.mode == Addressing_Constant && scale.value.kind == ExactValue_Integer &&
-		    (disp.expr == nullptr ||
-		     (disp.mode == Addressing_Constant && disp.value.kind == ExactValue_Integer))) {
-			i64 iv = exact_value_to_i64(index.value);
-			i64 sv = exact_value_to_i64(scale.value);
-			i64 term = 0;
-			switch (mem_op->scale_op.kind) {
-			// TODO(bill): should I use the big-int math here to do the calculations?
-			case Token_Shl: term = iv << sv; break;
-			case Token_Shr: term = iv >> sv; break;
-			case Token_Mul: term = iv * sv;  break;
+		for (Ast *term_ast : mem_op->terms) {
+			if (term_ast == nullptr || term_ast->kind != Ast_AsmMemoryTerm) {
+				continue;
+			}
+			ast_node(term, AsmMemoryTerm, term_ast);
+			bool neg = term->op.kind == Token_Sub;
+
+			Operand o = {};
+			check_asm_instruction_operand(asm_ctx, ctx, entity, &o, term->operand, false);
+			AsmTermCategory operand_cat = check_asm_mem_term_category(&o, ate->decls);
+
+			if (term->scale != nullptr) {
+				Operand s = {};
+				check_asm_instruction_operand(asm_ctx, ctx, entity, &s, term->scale, false);
+				AsmTermCategory scale_cat = check_asm_mem_term_category(&s, ate->decls);
+
+				bool scale_is_const = scale_cat == AsmTermCategory_Const || scale_cat == AsmTermCategory_Immediate;
+				if (operand_cat == AsmTermCategory_Register && scale_is_const) {
+					// reg*scale -> a genuine scaled index
+					if (neg) {
+						error(term->operand, "A memory index register cannot be negated");
+						class_ok = false;
+					} else if (index.expr != nullptr) {
+						error(term->operand, "A memory operand may only have a single index register");
+						class_ok = false;
+					} else {
+						index    = o;
+						scale    = s;
+						scale_op = term->scale_op;
+					}
+				} else if (operand_cat == AsmTermCategory_Const && scale_cat == AsmTermCategory_Const &&
+				           o.value.kind == ExactValue_Integer && s.value.kind == ExactValue_Integer) {
+					i64 iv = exact_value_to_i64(o.value);
+					i64 sv = exact_value_to_i64(s.value);
+					i64 v  = 0;
+					// TODO(bill): should this be in big-int math or not?
+					switch (term->scale_op.kind) {
+					case Token_Shl: v = iv << sv; break;
+					case Token_Shr: v = iv >> sv; break;
+					case Token_Mul: v = iv *  sv; break;
+					default:
+						error(term->scale_op, "Unknown/unhandled scaling operator '%.*s'", LIT(term->scale_op.string));
+						class_ok = false;
+						break;
+					}
+					disp_total    += neg ? -v : v;
+					has_disp_const = true;
+					if (disp_host == nullptr) disp_host = term->operand;
+				} else {
+					error(term->operand, "A scaled term in a memory operand must be 'register*constant'");
+					class_ok = false;
+				}
+				continue;
+			}
+
+
+			switch (operand_cat) {
+			case AsmTermCategory_Register:
+				if (neg) {
+					error(term->operand, "A base or index register cannot be negated");
+					class_ok = false;
+				} else if (base.expr == nullptr) {
+					base = o;
+				} else if (index.expr == nullptr) {
+					index = o;
+				} else {
+					error(term->operand, "A memory operand may have at most a base and an index register");
+					class_ok = false;
+				}
+				break;
+			case AsmTermCategory_Const:
+				if (o.value.kind == ExactValue_Integer) {
+					i64 v = exact_value_to_i64(o.value);
+					disp_total    += neg ? -v : v;
+					has_disp_const = true;
+					if (disp_host == nullptr) disp_host = term->operand;
+				} else {
+					// non-integer constant: let the displacement check below report it
+					disp = o;
+				}
+				break;
+			case AsmTermCategory_Immediate:
+				// A $-immediate parameter is a legal assemble-time displacement.
+				if (disp.expr != nullptr) {
+					error(term->operand, "A memory operand may only have a single immediate displacement");
+					class_ok = false;
+				} else {
+					disp = o;
+				}
+				break;
+			case AsmTermCategory_Label:
+				if (label_node != nullptr) {
+					error(term->operand, "A memory operand may only reference a single label");
+					class_ok = false;
+				} else {
+					label_node = term->operand;
+					disp       = o;
+				}
+				break;
 			default:
-				GB_PANIC("Unknown scale operand: %.*s\n", LIT(mem_op->scale_op.string));
+				{
+					gbString s = expr_to_string(term->operand);
+					error(term->operand, "Invalid term in a memory operand, got %s", s);
+					gb_string_free(s);
+					class_ok = false;
+				}
 				break;
 			}
-			if (mem_op->index_op.kind == Token_Sub) {
-				term = -term;
-			}
+		}
 
-			i64 dv = 0;
-			if (disp.expr != nullptr) {
-				dv = exact_value_to_i64(disp.value);
-				if (mem_op->disp_op.kind == Token_Sub) {
-					dv = -dv;
-				}
-			}
-			i64 total = term + dv;
-
-			ExactValue folded = exact_value_i64(gb_abs(total));
-			Token disp_op = {};
-			disp_op = mem_op->scale_op;
-
-			if (total < 0) {
-				disp_op.kind   = Token_Sub;
-				disp_op.string = str_lit("-");
-			} else {
-				disp_op.kind   = Token_Add;
-				disp_op.string = str_lit("+");
-			}
-
-			mem_op->disp     = mem_op->index;
-			mem_op->disp_op  = disp_op;
-			mem_op->index    = nullptr;
-			mem_op->index_op = {};
-			mem_op->scale    = nullptr;
-			mem_op->scale_op = {};
-			add_type_and_value(ctx, mem_op->disp, Addressing_Constant, t_untyped_integer, folded);
-
-			disp = {};
-			disp.expr  = mem_op->disp;
+		// Materialise a single displacement operand from the folded constant, unless a
+		// label or immediate already occupies the displacement.
+		if (disp.expr == nullptr && has_disp_const && disp_host != nullptr) {
+			ExactValue folded = exact_value_i64(disp_total);
+			add_type_and_value(ctx, disp_host, Addressing_Constant, t_untyped_integer, folded);
+			disp.expr  = disp_host;
 			disp.mode  = Addressing_Constant;
 			disp.type  = t_untyped_integer;
 			disp.value = folded;
-			index = {};
-			scale = {};
 		}
 
-		// NOTE(bill): if the base/index is actually an immediate and there is no scale nor disp,
-		// then treat it as a disp, and modify the AST too
-		if (index.expr != nullptr && scale.expr == nullptr && disp.expr == nullptr) {
-			bool do_swap = index.mode == Addressing_Constant;
-			if (!do_swap) {
-				Entity *param_entity = entity_of_node(index.expr);
-				if (param_entity != nullptr && param_entity->kind == Entity_Variable) {
-					auto kind = check_asm_find_kind(param_entity, ate->decls);
-					do_swap = kind == AsmTemplateEntityDecl_Immediate;
-				}
-			}
-			if (do_swap) {
-				disp = index;
-				index = {};
-
-				mem_op->disp = mem_op->index;
-				mem_op->index = nullptr;
-
-				mem_op->disp_op = mem_op->index_op;
-				mem_op->index_op = {};
-			}
-		}
-		if (base.expr != nullptr && index.expr == nullptr && scale.expr == nullptr && disp.expr == nullptr) {
-			bool do_swap = base.mode == Addressing_Constant;
-			if (!do_swap) {
-				Entity *param_entity = entity_of_node(base.expr);
-				if (param_entity != nullptr && param_entity->kind == Entity_Variable) {
-					auto kind = check_asm_find_kind(param_entity, ate->decls);
-					do_swap = kind == AsmTemplateEntityDecl_Immediate;
-				}
-			}
-			if (do_swap) {
-				disp = base;
-				base = {};
-
-				mem_op->disp = mem_op->base;
-				mem_op->base = nullptr;
-			}
-		}
-
-		if (disp.expr == nullptr) {
-			if (base.expr != nullptr && base.expr->kind == Ast_AsmLabelDecl) {
-				disp = base;
-				base = {};
-
-				mem_op->disp = mem_op->base;
-				mem_op->base = nullptr;
-			} else if (index.expr != nullptr && index.expr->kind == Ast_AsmLabelDecl) {
-				disp = index;
-				index = {};
-
-				mem_op->disp  = mem_op->index;
-				mem_op->index = nullptr;
-
-				mem_op->disp_op  = mem_op->index_op;
-				mem_op->index_op = {};
-			}
-		}
+		mem_op->classify.base           = base.expr;
+		mem_op->classify.index          = index.expr;
+		mem_op->classify.scale          = scale.expr;
+		mem_op->classify.scale_op       = scale_op;
+		mem_op->classify.label          = label_node;
+		mem_op->classify.disp_total     = disp_total;
+		mem_op->classify.has_disp_const = has_disp_const;
+		mem_op->classify.ok             = class_ok;
 
 		i32  base_w     = 0;
 		i32  index_w    = 0;
@@ -2380,7 +2436,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		bool ext_index_ok = build_context.metrics.arch == TargetArch_arm64 &&
 		                    base_w == 64 && index_w == 32;
 		if (have_base && have_index && base_w != index_w && !ext_index_ok) {
-			Ast *at = mem_op->base ? mem_op->base : expr;
+			Ast *at = base.expr ? base.expr : expr;
 			error(at, "A memory operand's base and index registers must be the same width, got a %d-bit base and a %d-bit index",
 			      cast(int)base_w, cast(int)index_w);
 		}
@@ -2407,7 +2463,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 				} else {
 					i64 v = exact_value_to_i64(scale.value);
 
-					Token op = mem_op->scale_op;
+					Token op = scale_op;
 					switch (op.kind) {
 					case Token_Mul:
 						switch (v) {
@@ -2441,9 +2497,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 						}
 					}
 
-					// Persist the folded scale so check_mnemonic can validate it against
-					// the matched form's transfer size (it reads mem_op->scale->tav).
-					add_type_and_value(ctx, mem_op->scale, scale.mode, scale.type, scale.value);
+					add_type_and_value(ctx, scale.expr, scale.mode, scale.type, scale.value);
 				}
 			} else {
 				Entity *param_entity = entity_of_node(scale.expr);

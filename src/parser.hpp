@@ -418,6 +418,17 @@ enum AsmMemoryOperandKind : u8 {
 	AsmMemoryOperand_COUNT
 };
 
+struct AsmMemClassify {
+	Ast * base;
+	Ast * index;
+	Ast * scale;
+	Token scale_op;
+	Ast * label; // IP-relative disp, if any
+	i64   disp_total;
+	bool  has_disp_const;
+	bool  ok;
+};
+
 #define AST_KINDS \
 	AST_KIND(Ident,          "identifier",      struct { \
 		Token                 token;    \
@@ -505,19 +516,20 @@ enum AsmMemoryOperandKind : u8 {
 		i32 valid_form_index;  \
 		struct AsmInstructionFacts *facts; \
 	}) \
+	AST_KIND(AsmMemoryTerm, "asm memory term", struct { \
+		Token op;       \
+		Ast * operand;  \
+		Token scale_op; \
+		Ast * scale;    \
+	}) \
 	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
-		AsmMemoryOperandKind kind; \
-		Token open;                \
-		Ast * segment_override;    \
-		Ast * base;                \
-		Token index_op;            \
-		Ast * index;               \
-		Token scale_op;            \
-		Ast * scale;               \
-		Token disp_op;             \
-		Ast * disp;                \
-		Ast * type;                \
-		Token close;               \
+		AsmMemoryOperandKind kind;       \
+		Token          open;             \
+		Ast *          segment_override; \
+		Slice<Ast *>   terms;            \
+		AsmMemClassify classify;         \
+		Ast *          type;             \
+		Token          close;            \
 	}) \
 	AST_KIND(AsmRegisterGroup, "asm register group", struct { \
 		Token        open;        \
