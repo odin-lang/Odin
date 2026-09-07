@@ -690,6 +690,11 @@ struct Asm_riscv {
 			return false;
 		}
 	}
+	String required_vector_feature(i32 w) const {
+		// The base ISA has no vector registers; any vector operand needs the V extension.
+		if (w > 0) return str_lit("v");
+		return str_lit("");
+	}
 
 	AsmRegClass operand_type_reg_class(OperandType t) const {
 		// Same mapping as reg_class_from_operand_type — these two look

@@ -2930,20 +2930,28 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 
 
 	for (auto const &ed : ate->decls) {
-		if (ed.param_group != AsmTemplateEntityDeclParamGroup_Output) {
-			continue;
-		}
-		if (ed.tie >= 0 || ed.no_init) {
-			continue;
-		}
-		if (ed.pin.len != 0) {
-			auto r = asm_ctx->register_lookup(ed.pin);
-			if (asm_ctx->reg_is_non_allocateable(r)) {
+		if (is_type_simd_vector(ed.entity->type)) {
+			i32 vw = cast(i32)(type_size_of(ed.entity->type) * 8);
+			String feat = asm_ctx->required_vector_feature(vw);
+			if (feat.len != 0 && !check_target_feature_is_enabled(feat, nullptr)) {
 				error(ed.entity->token,
-				      "'asm' output '%.*s' is pinned to a register '%%%.*s' which cannot be an output; "
-				      "read it into a general-purpose register in the body instead "
-				      "(e.g. on AMD64, 'mov %%rax, %%%.*s' with the output pinned to %%rax)",
-				      LIT(ed.entity->token.string), LIT(ed.pin), LIT(ed.pin));
+				      "'asm' vector operand '%.*s' is %d-bit, which requires the '%.*s' target feature",
+				      LIT(ed.entity->token.string), vw, LIT(feat));
+			}
+		}
+
+		if (ed.param_group == AsmTemplateEntityDeclParamGroup_Output) {
+			if (ed.tie >= 0 || ed.no_init) {
+				// ignore
+			} else if (ed.pin.len != 0) {
+				auto r = asm_ctx->register_lookup(ed.pin);
+				if (asm_ctx->reg_is_non_allocateable(r)) {
+					error(ed.entity->token,
+					      "'asm' output '%.*s' is pinned to a register '%%%.*s' which cannot be an output; "
+					      "read it into a general-purpose register in the body instead "
+					      "(e.g. on AMD64, 'mov %%rax, %%%.*s' with the output pinned to %%rax)",
+					      LIT(ed.entity->token.string), LIT(ed.pin), LIT(ed.pin));
+				}
 			}
 		}
 	}

@@ -997,6 +997,14 @@ struct Asm_arm64 {
 		return false;
 	}
 
+	String required_vector_feature(i32 w) const {
+		// NEON is 128-bit fixed and part of the AArch64 baseline for Odin's targets;
+		// anything wider is SVE (scalable) — reject fixed >128 vectors, they can't map
+		// to a NEON operand. SVE vectors aren't width-addressable this way.
+		if (w > 128) return str_lit("sve");
+		return str_lit(""); // <=128: NEON, always available
+	}
+
 	AsmRegClass operand_type_reg_class(OperandType t) const {
 		// Same mapping as reg_class_from_operand_type.
 		return reg_class_from_operand_type(t);

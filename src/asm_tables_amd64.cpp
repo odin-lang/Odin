@@ -758,6 +758,13 @@ struct Asm_amd64 {
 		return str_lit("");
 	}
 
+	String required_vector_feature(i32 w) const {
+		if (w >= 512) return str_lit("avx512f");
+		if (w >= 256) return str_lit("avx");
+		if (w >= 128) return str_lit("sse2"); // XMM; sse for f32-only, sse2 for the rest
+		return str_lit("");
+	}
+
 	AsmRegClass operand_type_reg_class(OperandType t) const {
 		switch (t) {
 		case OP_R8:  case OP_R16:  case OP_R32:  case OP_R64:

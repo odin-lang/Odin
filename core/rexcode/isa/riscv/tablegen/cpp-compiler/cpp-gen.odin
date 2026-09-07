@@ -726,6 +726,11 @@ main :: proc() {
 				return false;
 			}
 		}
+		String required_vector_feature(i32 w) const {
+			// The base ISA has no vector registers; any vector operand needs the V extension.
+			if (w > 0) return str_lit("v");
+			return str_lit("");
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")

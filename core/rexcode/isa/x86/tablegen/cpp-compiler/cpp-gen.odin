@@ -739,6 +739,13 @@ main :: proc() {
 			}
 			return str_lit("");
 		}
+
+		String required_vector_feature(i32 w) const {
+			if (w >= 512) return str_lit("avx512f");
+			if (w >= 256) return str_lit("avx");
+			if (w >= 128) return str_lit("sse2"); // XMM; sse for f32-only, sse2 for the rest
+			return str_lit("");
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")

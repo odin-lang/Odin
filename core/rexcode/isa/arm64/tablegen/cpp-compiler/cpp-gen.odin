@@ -787,6 +787,14 @@ main :: proc() {
 			}
 			return false;
 		}
+
+		String required_vector_feature(i32 w) const {
+			// NEON is 128-bit fixed and part of the AArch64 baseline for Odin's targets;
+			// anything wider is SVE (scalable) — reject fixed >128 vectors, they can't map
+			// to a NEON operand. SVE vectors aren't width-addressable this way.
+			if (w > 128) return str_lit("sve");
+			return str_lit(""); // <=128: NEON, always available
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")
