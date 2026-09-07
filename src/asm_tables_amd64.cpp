@@ -744,6 +744,20 @@ struct Asm_amd64 {
 		return false;
 	}
 
+	String implicit_reg_name(OperandType t) const {
+		switch (t) {
+		case OP_AL_IMPL:   return str_lit("al");
+		case OP_AX_IMPL:   return str_lit("ax");
+		case OP_EAX_IMPL:  return str_lit("eax");
+		case OP_RAX_IMPL:  return str_lit("rax");
+		case OP_CL_IMPL:   return str_lit("cl");
+		case OP_DX_IMPL:   return str_lit("dx");
+		case OP_ST0_IMPL:  return str_lit("st");
+		case OP_XMM0_IMPL: return str_lit("xmm0");
+		}
+		return str_lit("");
+	}
+
 	AsmRegClass operand_type_reg_class(OperandType t) const {
 		switch (t) {
 		case OP_R8:  case OP_R16:  case OP_R32:  case OP_R64:

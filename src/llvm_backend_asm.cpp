@@ -1,4 +1,4 @@
-#define LLVM_ASM_DEBUG_PRINT true
+#define LLVM_ASM_DEBUG_PRINT false
 
 struct lbAsmGenerate {
 	Entity *                      tmpl_entity;
@@ -346,6 +346,9 @@ struct lbAsmGenerate {
 					this->curr_operand_index = j;
 					this->write_operand(op_number, instr->operands[j], f);
 				}
+
+				bool has_user_operands = n > 0;
+				this->write_implicit_operands(instr, has_user_operands);
 			case_end;
 			case_ast_node(label, AsmLabelDecl, instr_);
 				this->write_label_def(&label->name->Ident);
@@ -576,6 +579,10 @@ struct lbAsmGenerate {
 	virtual void        write_instruction_mnemonic  (AstAsmInstruction *instr)                                            = 0; // name (+ any suffix / spelling fixup)
 	virtual void        write_memory_operand        (Slice<i32> const &op_number, AstAsmMemoryOperand *mem_op, u32 flags) = 0;
 	virtual String      flag_output_cc_suffix       (String const &pin_flag)                                              = 0;
+
+	virtual void write_implicit_operands(AstAsmInstruction *instr, bool has_user_operands) {
+		return;
+	}
 
 };
 
@@ -892,29 +899,61 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		}
 		auto const &form = forms[instr->valid_form_index];
 
-		i32 width = 0;
+		// NOTE(bill): If every operand is implicit, write_implicit_operands prints
+		// the registers (out %al, %dx), which carry the size themselves, so no mnemonic suffix.
+		// Only a form with a printed-but-sizeless operand (an immediate port, as in `outb $123`) needs the suffix.
+		{
+			bool all_implicit = true;
+			bool any = false;
+			for (auto ot : form.ops) {
+				if (ot == g_asm_amd64.OP_NONE) {
+					break;
+				}
+				any = true;
+				if (!g_asm_amd64.operand_type_is_implicit(ot)) {
+					all_implicit = false;
+					break;
+				}
+			}
+			if (any && all_implicit) {
+				return 0;
+			}
+		}
+
+		i32 explicit_width = 0;
+		i32 implicit_width = 0;
 		for (auto ot : form.ops) {
 			if (ot == g_asm_amd64.OP_NONE) {
 				break;
 			}
-			if (g_asm_amd64.operand_type_is_implicit(ot)) {
-				continue;
-			}
+
 			AsmRegClass cls = g_asm_amd64.operand_type_reg_class(ot);
 			if (cls == AsmRegClass_Vector || cls == AsmRegClass_Mask) {
 				return 0;
 			}
+
+			i32 w = g_asm_amd64.operand_type_bit_width(ot);
+			bool sized = (w == 8 || w == 16 || w == 32 || w == 64);
+
+			if (g_asm_amd64.operand_type_is_implicit(ot)) {
+				if (sized && cls == AsmRegClass_Integer) {
+					implicit_width = gb_max(implicit_width, w);
+				}
+				continue;
+			}
+
 			AsmOperandKind kind = g_asm_amd64.kind_from_operand_type(ot);
 			if (kind != AsmOperand_Register &&
 			    kind != AsmOperand_Memory &&
 			    kind != AsmOperand_Register_Or_Memory) {
 				continue;
 			}
-			i32 w = g_asm_amd64.operand_type_bit_width(ot);
-			if (w == 8 || w == 16 || w == 32 || w == 64) {
-				width = gb_max(width, w);
+			if (sized) {
+				explicit_width = gb_max(explicit_width, w);
 			}
 		}
+
+		i32 width = explicit_width != 0 ? explicit_width : implicit_width;
 
 		switch (width) {
 		case 8:  return 'b';
@@ -923,6 +962,49 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		case 64: return 'q';
 		}
 		return 0;
+	}
+
+	bool form_is_all_implicit(AstAsmInstruction *instr) {
+		if (instr->mnemonic == 0 || instr->valid_form_index < 0) {
+			return false;
+		}
+		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
+		if (instr->valid_form_index >= forms.count) {
+			return false;
+		}
+		auto const &form = forms[instr->valid_form_index];
+		bool any = false;
+		for (auto ot : form.ops) {
+			if (ot == g_asm_amd64.OP_NONE) break;
+			any = true;
+			if (!g_asm_amd64.operand_type_is_implicit(ot)) return false;
+		}
+		return any;
+	}
+
+	void write_implicit_operands(AstAsmInstruction *instr, bool has_user_operands) override {
+		if (has_user_operands || !this->form_is_all_implicit(instr)) {
+			return;
+		}
+		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
+		auto const &form = forms[instr->valid_form_index];
+
+		i32 slots[4]; i32 nslots = 0;
+		for (i32 s = 0; s < 4; s++) {
+			if (form.ops[s] == g_asm_amd64.OP_NONE) break;
+			slots[nslots++] = s;
+		}
+		bool reverse = this->reverse_operand_order();
+		bool emitted = false;
+		for (i32 k = 0; k < nslots; k++) {
+			i32 s = reverse ? slots[nslots-1-k] : slots[k];
+			String rn = g_asm_amd64.implicit_reg_name(form.ops[s]);
+			if (rn.len == 0) continue; // ONE_IMPL etc. — never printed
+			if (emitted) write_cstr(", ");
+			write_cstr("%");
+			write_string(rn);
+			emitted = true;
+		}
 	}
 };
 

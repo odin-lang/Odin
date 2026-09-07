@@ -725,6 +725,20 @@ main :: proc() {
 			}
 			return false;
 		}
+
+		String implicit_reg_name(OperandType t) const {
+			switch (t) {
+			case OP_AL_IMPL:   return str_lit("al");
+			case OP_AX_IMPL:   return str_lit("ax");
+			case OP_EAX_IMPL:  return str_lit("eax");
+			case OP_RAX_IMPL:  return str_lit("rax");
+			case OP_CL_IMPL:   return str_lit("cl");
+			case OP_DX_IMPL:   return str_lit("dx");
+			case OP_ST0_IMPL:  return str_lit("st");
+			case OP_XMM0_IMPL: return str_lit("xmm0");
+			}
+			return str_lit("");
+		}
 	""")
 
 	strings.write_string(&sb, "\n\n")
