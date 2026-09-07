@@ -1579,8 +1579,15 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		// Generic: forms with form_transfer_bytes()==0, or operands with no constant scale, impose nothing.
 		{
 			u16 tb = asm_ctx->form_transfer_bytes(forms[valid_form_index]);
-			if (tb != 0) {
-				i64 want = 0; { u16 b = tb; while (b > 1) { b >>= 1; want++; } }
+			if (build_context.metrics.arch == TargetArch_arm64 && tb != 0) {
+				i64 want = 0;
+				{
+					u16 b = tb;
+					while (b > 1) {
+						b >>= 1;
+						want++;
+					}
+				}
 				for_array(oi, operands) {
 					Ast *e = operands[oi].expr;
 					if (e == nullptr || e->kind != Ast_AsmMemoryOperand) {
