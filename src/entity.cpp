@@ -357,6 +357,7 @@ struct Entity {
 			bool      clobber_flags;
 			bool      clobber_memory;
 			StringSet clobber_registers_set;
+			StringSet preserve_registers_set;
 
 			Scope *param_scope;
 			Scope *label_scope;

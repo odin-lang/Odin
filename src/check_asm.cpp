@@ -2603,7 +2603,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	{ // check clobbers
 		bool is_volatile       = false;
 		bool is_align_stack    = false;
-		auto *clobber_registers_set = &entity->AsmTemplate.clobber_registers_set;
+		auto *clobber_registers_set  = &entity->AsmTemplate.clobber_registers_set;
+		auto *preserve_registers_set = &entity->AsmTemplate.preserve_registers_set;
 
 		bool clobber_flags  = false;
 		bool clobber_memory = false;
@@ -2633,22 +2634,36 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 				continue;
 			}
 
+			if (clobber->name.string == "preserve" ||
+			    clobber->name.string == "clobber") {
+				// okay
+			} else {
+				error(clobber->name, "Unknown clobber directive '#%.*s'", LIT(clobber->name.string));
+				continue;
+			}
+
+			bool is_preserve = clobber->name.string == "preserve";
+			auto *target_set = is_preserve ? preserve_registers_set : clobber_registers_set;
+
 			switch (clobber->value->kind) {
 			case_ast_node(asm_reg, AsmRegister, clobber->value)
 				String reg = asm_reg->name.string;
 				if (asm_reg->flag.string != "") {
-					error(asm_reg->flag, "#clobber on specific flags is not allowed");
+					error(asm_reg->flag, "#%.*s on specific flags is not allowed", LIT(clobber->name.string));
 				}
 				Operand operand = {};
 				if (check_register(asm_ctx, &operand, asm_reg)) {
-					if (string_set_update(clobber_registers_set, reg)) {
-						error(clobber->value, "#clobber %%%.*s has already been defined", LIT(reg));
+					if (string_set_update(target_set, reg)) {
+						error(clobber->value, "#%.*s %%%.*s has already been defined", LIT(clobber->name.string), LIT(reg));
 					}
 				}
 			case_end;
 			case_ast_node(ident, Ident, clobber->value);
 				String str = ident->token.string;
-				if (str == "flags") {
+				if (is_preserve) {
+					// #preserve applies only to registers, not flags/memory.
+					error(clobber->value, "Expected a register for a '#preserve' specification, got '%.*s'", LIT(str));
+				} else if (str == "flags") {
 					if (clobber_flags) {
 						error(clobber->value, "#clobber flags has already been defined");
 					}
@@ -2659,11 +2674,13 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 					}
 					clobber_memory = true;
 				} else {
-					error(clobber->value, "Expected either a register, 'flags', or 'memory' for a '#clobber' specification, got '%.*s'", LIT(str));
+					error(clobber->value, "Expected either a register, 'flags', or 'memory' for a '#%.*s' specification, got '%.*s'", LIT(str), LIT(clobber->name.string));
 				}
 			case_end;
 			default:
-				error(clobber->value, "Expected either a register, 'flags', or 'memory' for a '#clobber' specification");
+				error(clobber->value, "Expected a register%s for a '#%.*s' specification",
+				      is_preserve ? "" : ", 'flags', or 'memory'",
+				      LIT(clobber->name.string));
 				break;
 			}
 		}
@@ -2679,6 +2696,14 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
 			if (rname != reg) {
 				string_set_update(clobber_registers_set, rname);
+			}
+		}
+
+		for (String const &reg : *preserve_registers_set) {
+			u16 bit = asm_ctx->clobber_bit_for_reg_name(reg);
+			String rname = make_string_c(asm_ctx->clobber_reg_bit_name(bit));
+			if (rname != reg) {
+				string_set_update(preserve_registers_set, rname);
 			}
 		}
 	}

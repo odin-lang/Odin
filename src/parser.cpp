@@ -2922,7 +2922,8 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 					clobber->AsmClobber.token = hash;
 					clobber->AsmClobber.name  = name;
 					array_add(&clobbers, clobber);
-				} else if (name.string == "clobber") {
+				} else if (name.string == "clobber" ||
+				           name.string == "preserve") {
 					Ast *value = parse_asm_operand(f, false);
 					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
 					clobber->AsmClobber.token = hash;
@@ -2930,7 +2931,7 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 					clobber->AsmClobber.value = value;
 					array_add(&clobbers, clobber);
 				} else {
-					syntax_error(name, "Expected #clobber, #side_effects, or #align_stack, got '%.*s'", LIT(name.string));
+					syntax_error(name, "Expected #clobber, #preserve, #side_effects, #align_stack, or #pure, got '%.*s'", LIT(name.string));
 				}
 			} else {
 				syntax_error(f->curr_token, "Expected am asm specification which begins with a identifier, got '%.*s'", LIT(f->curr_token.string));
