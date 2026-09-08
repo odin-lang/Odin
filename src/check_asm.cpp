@@ -2218,6 +2218,14 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 				error(expr, "Condition code '%.*s' is not defined in scope. Condition codes are ordinary constants in Odin, "
 				            "define it e.g. `%.*s :: 0b%s` (%u)",
 				            LIT(i->token.string), LIT(i->token.string), bits, cond_code);
+
+				// NOTE(bill): Add this here to improve error propagation because this is the most likely result
+				operand->mode  = Addressing_Constant;
+				operand->value = exact_value_i64(cond_code);
+				operand->type  = t_untyped_integer;
+
+				add_type_and_value(ctx, expr, operand->mode, operand->type, operand->value);
+
 				return;
 			}
 			error(expr, "Undeclared asm parameter or constant '%.*s'", LIT(i->token.string));
