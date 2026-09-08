@@ -652,8 +652,6 @@ main :: proc() {
 			// Integer GPR / GPR-or-SP, including shifted- and extended-register forms.
 			case OP_W_REG:      case OP_X_REG:
 			case OP_WSP_REG:    case OP_XSP_REG:
-			case OP_W_SHIFTED:  case OP_X_SHIFTED:
-			case OP_W_EXTENDED: case OP_X_EXTENDED:
 			// SIMD&FP scalar views.
 			case OP_B_REG: case OP_H_REG: case OP_S_REG: case OP_D_REG: case OP_Q_REG:
 			// NEON vector: plain, arrangement, FP16, element-indexed.
@@ -669,6 +667,13 @@ main :: proc() {
 			case OP_ZA_TILE_D: case OP_ZA_TILE_Q:
 			case OP_SYS_REG:     // MRS/MSR system-register name -> 16-bit field (cf. riscv CSR)
 				return AsmOperand_Register;
+
+			// ---- Shifted / extended register operands (`reg, lsl #n` / `reg, uxtw #n`) ----
+			// A plain register also fills these slots (shift #0); a shifted register does
+			// NOT fill a plain-register slot. That asymmetry lives in asm_operand_kind_fits.
+			case OP_W_SHIFTED:  case OP_X_SHIFTED:
+			case OP_W_EXTENDED: case OP_X_EXTENDED:
+				return AsmOperand_RegisterShift;
 
 			// ---- Immediates (numeric literals and immediate-encoded selectors) ----
 			case OP_IMM_2:  case OP_IMM_3:  case OP_IMM_4:  case OP_IMM_5:
