@@ -2362,7 +2362,9 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 					}
 					disp_total += neg ? -v : v;
 					has_disp_const = true;
-					if (disp_host == nullptr) disp_host = term->operand;
+					if (disp_host == nullptr) {
+						disp_host = term->operand;
+					}
 				} else {
 					error(term->operand, "A scaled term in a memory operand must be 'register*constant'");
 					class_ok = false;
@@ -2388,9 +2390,11 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			case AsmTermCategory_Const:
 				if (o.value.kind == ExactValue_Integer) {
 					i64 v = exact_value_to_i64(o.value);
-					disp_total    += neg ? -v : v;
+					disp_total += neg ? -v : v;
 					has_disp_const = true;
-					if (disp_host == nullptr) disp_host = term->operand;
+					if (disp_host == nullptr) {
+						disp_host = term->operand;
+					}
 				} else {
 					// non-integer constant: let the displacement check below report it
 					disp = o;
@@ -2462,73 +2466,60 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		bool have_index = false;
 
 		// base: must resolve to a 32/64-bit integer register
-		if (base.expr) {
+		for (int i = 0; base.expr && i == 0; i++) {
 			String reg_name = {};
-			bool ok_kind = true;
 			if (base.expr->kind == Ast_AsmRegister) {
 				reg_name = base.expr->AsmRegister.name.string;
-				ok_kind = check_register(asm_ctx, &base, &base.expr->AsmRegister);
-			} else {
-				Entity *param_entity = entity_of_node(base.expr);
-				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
-					gbString s = expr_to_string(base.expr);
-					error(base.expr, "A base value must be a register parameter, got %s", s);
-					gb_string_free(s);
-					ok_kind = false;
-				} else {
-					auto kind = check_asm_find_kind(param_entity, ate->decls);
-					// A pointer/integer parameter used as an address base lowers to a
-					// register operand, so accept both Register and Memory kinds here.
-					if (kind != AsmTemplateEntityDecl_Register && kind != AsmTemplateEntityDecl_Memory) {
-						gbString s = expr_to_string(base.expr);
-						error(base.expr, "A base value must be a register parameter, got %s", s);
-						gb_string_free(s);
-						ok_kind = false;
-					}
+				if (check_register(asm_ctx, &base, &base.expr->AsmRegister)) {
+					have_base = check_asm_addr_register(&base, AsmAddr_Base, reg_name, &base_w);
 				}
+				break;
 			}
-			if (ok_kind) {
-				have_base = check_asm_addr_register(&base, AsmAddr_Base, reg_name, &base_w);
+			Entity *param_entity = entity_of_node(base.expr);
+			if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
+				gbString s = expr_to_string(base.expr);
+				error(base.expr, "A base value must be a register parameter, got %s", s);
+				gb_string_free(s);
+				break;
 			}
+			auto kind = check_asm_find_kind(param_entity, ate->decls);
+			// A pointer/integer parameter used as an address base lowers to a
+			// register operand, so accept both Register and Memory kinds here.
+			if (kind != AsmTemplateEntityDecl_Register && kind != AsmTemplateEntityDecl_Memory) {
+				gbString s = expr_to_string(base.expr);
+				error(base.expr, "A base value must be a register parameter, got %s", s);
+				gb_string_free(s);
+				break;
+			}
+			have_base = check_asm_addr_register(&base, AsmAddr_Base, reg_name, &base_w);
 		}
 
 		// index: must resolve to a 32/64-bit integer register, and not rsp/esp
-		if (index.expr) {
-			String reg_name = {};
-			bool ok_kind = true;
+		for (int i = 0; index.expr && i == 0; i++) {
 			if (index.expr->kind == Ast_AsmRegister) {
-				reg_name = index.expr->AsmRegister.name.string;
-				ok_kind = check_register(asm_ctx, &index, &index.expr->AsmRegister);
-			} else {
-				Entity *param_entity = entity_of_node(index.expr);
-				if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
-					gbString s = expr_to_string(index.expr);
-					error(index.expr, "An index value must be an integer register, got %s", s);
-					gb_string_free(s);
-					ok_kind = false;
-				} else {
-					auto kind = check_asm_find_kind(param_entity, ate->decls);
-					switch (kind) {
-					case AsmTemplateEntityDecl_Register:
-					case AsmTemplateEntityDecl_Immediate:
-						// okay
-						break;
-					default:
-						{
-							gbString s = expr_to_string(index.expr);
-							gbString t = type_to_string(index.type);
-							error(index.expr, "An index must be an integer register, got %s of type %s", s, t);
-							gb_string_free(t);
-							gb_string_free(s);
-							ok_kind = false;
-						}
-						break;
-					}
+				String reg_name = index.expr->AsmRegister.name.string;
+				if (check_register(asm_ctx, &index, &index.expr->AsmRegister)) {
+					have_index = check_asm_addr_register(&index, AsmAddr_Index, reg_name, &index_w);
 				}
+				break;
 			}
-			if (ok_kind) {
-				have_index = check_asm_addr_register(&index, AsmAddr_Index, reg_name, &index_w);
+			Entity *param_entity = entity_of_node(index.expr);
+			if (param_entity == nullptr || param_entity->kind != Entity_Variable) {
+				gbString s = expr_to_string(index.expr);
+				error(index.expr, "An index value must be an integer register, got %s", s);
+				gb_string_free(s);
+				break;
 			}
+			auto kind = check_asm_find_kind(param_entity, ate->decls);
+			if (kind != AsmTemplateEntityDecl_Register && kind != AsmTemplateEntityDecl_Memory) {
+				gbString s = expr_to_string(index.expr);
+				gbString t = type_to_string(index.type);
+				error(index.expr, "An index must be an integer register, got %s of type %s", s, t);
+				gb_string_free(t);
+				gb_string_free(s);
+				break;
+			}
+			have_index = check_asm_addr_register(&index, AsmAddr_Index, /*reg_name*/{}, &index_w);
 		}
 
 		// base and index must be the same width
@@ -2691,7 +2682,6 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 					gb_string_free(s);
 					// leave operand->type == t_rawptr ("unsized")
 				}
-
 			}
 		}
 
