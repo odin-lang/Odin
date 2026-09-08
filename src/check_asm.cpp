@@ -93,8 +93,26 @@ gb_internal AsmOperandKind determine_asm_operand_kind(Operand const *operand) {
 	case_ast_node(ie, IndexExpr, expr);
 		return AsmOperand_Lane;
 	case_end;
+
+	case_ast_node(be, BinaryExpr, expr);
+		return AsmOperand_RegisterShift;
+	case_end;
+
 	}
 	return AsmOperand_Invalid;
+}
+
+gb_internal bool asm_operand_kind_fits(AsmOperandKind dst, AsmOperandKind src) {
+	if (dst == src) {
+		return true;
+	}
+	switch (dst) {
+	case AsmOperand_Register_Or_Memory:
+		return src == AsmOperand_Register || src == AsmOperand_Memory;
+	case AsmOperand_RegisterShift:
+		return src == AsmOperand_Register;
+	}
+	return false;
 }
 
 gb_internal bool asm_reg_class_compatible(AsmRegClass want, AsmRegClass got) {
@@ -174,6 +192,15 @@ gb_internal void check_asm_collect_refs(AsmCtx *asm_ctx, PtrSet<Entity *> *refs,
 	case Ast_IndexExpr:
 		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.expr,  touched_regs_);
 		check_asm_collect_refs(asm_ctx, refs, expr->IndexExpr.index, touched_regs_);
+		return;
+
+	case Ast_UnaryExpr:
+		check_asm_collect_refs(asm_ctx, refs, expr->UnaryExpr.expr,  touched_regs_);
+		return;
+
+	case Ast_BinaryExpr:
+		check_asm_collect_refs(asm_ctx, refs, expr->BinaryExpr.left,  touched_regs_);
+		check_asm_collect_refs(asm_ctx, refs, expr->BinaryExpr.right, touched_regs_);
 		return;
 	}
 }
@@ -1484,8 +1511,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			AsmOperandKind dst = asm_ctx->kind_from_operand_type(type);
 			AsmOperandKind src = determine_asm_operand_kind(operand);
 
-			bool kind_ok = (dst == src) ||
-			               (dst == AsmOperand_Register_Or_Memory && (src == AsmOperand_Register || src == AsmOperand_Memory));
+			bool kind_ok = asm_operand_kind_fits(dst, src);
 
 			// Bias toward wider register slots so an r64 form outranks an otherwise-equal r32 form.
 			width_pref += cast(int)asm_ctx->operand_type_bit_width(type);
@@ -1976,9 +2002,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			possible_kinds      [i] = dst;
 			possible_class_kinds[i] = asm_ctx->reg_class_from_operand_type(type);
 
-			bool kind_ok = (dst == src) ||
-			               (dst == AsmOperand_Register_Or_Memory
-			                && (src == AsmOperand_Register || src == AsmOperand_Memory));
+			bool kind_ok = asm_operand_kind_fits(dst, src);
 			if (!kind_ok) {
 				valid_spots[i] = false;
 			} else {
@@ -2616,7 +2640,7 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 
 		Operand lhs = {};
 		Operand rhs = {};
-		check_asm_instruction_operand(asm_ctx, ctx, entity, &lhs, ie->expr, false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &lhs, ie->expr,  false);
 		check_asm_instruction_operand(asm_ctx, ctx, entity, &rhs, ie->index, false);
 
 		auto lhs_kind = determine_asm_operand_kind(&lhs);
@@ -2664,6 +2688,65 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		if (rhs.mode == Addressing_Constant) {
 			add_type_and_value(ctx, rhs.expr, rhs.mode, rhs.type, rhs.value);
 		}
+		return;
+	case_end;
+
+	case_ast_node(be, BinaryExpr, expr);
+		switch (be->op.kind) {
+		case Token_Shl:
+		case Token_Shr:
+		case Token_Mul:
+			break;
+		default:
+			error(be->op, "Unsupported operator '%.*s' in an asm operand; only a register shift/scale ('<<', '>>', '*') is allowed here", LIT(be->op.string));
+			return;
+		}
+
+		if (build_context.metrics.arch != TargetArch_arm64) {
+			error(expr, "Asm shifted/scaled register operands are not supported by the target platform");
+			return;
+		}
+
+		Operand reg    = {};
+		Operand amount = {};
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &reg,    be->left,  false);
+		check_asm_instruction_operand(asm_ctx, ctx, entity, &amount, be->right, false);
+		if (reg.mode == Addressing_Invalid || amount.mode == Addressing_Invalid) {
+			return;
+		}
+		if (determine_asm_operand_kind(&reg) != AsmOperand_Register) {
+			gbString s = expr_to_string(reg.expr);
+			error(reg.expr, "The left-hand side of a register shift/scale must be a register, got %s", s);
+			gb_string_free(s);
+			return;
+		}
+
+		if (determine_asm_operand_kind(&amount) != AsmOperand_Immediate) {
+			error(amount.expr, "The right side of a register shift/scale must be an immediate");
+			return;
+		}
+
+		if (amount.mode == Addressing_Constant && amount.value.kind == ExactValue_Integer) {
+			i64 amt = exact_value_to_i64(amount.value);
+			if (be->op.kind == Token_Mul) {
+				if (amt <= 0 || (amt & (amt-1)) != 0) {
+					error(be->right, "A register scale using '*' must be a positive power of two, got %lld", cast(long long)amt);
+					return;
+				}
+			} else {
+				i64 max_shift = 63;
+				if (reg.type != nullptr && is_type_integer(reg.type)) {
+					max_shift = 8*cast(i64)type_size_of(reg.type) - 1;
+				}
+				if (amt < 0 || amt > max_shift) {
+					error(be->right, "A register shift amount must be within 0..=%lld, got %lld", cast(long long)max_shift, cast(long long)amt);
+					return;
+				}
+			}
+		}
+
+		operand->mode = reg.mode;
+		operand->type = reg.type;
 		return;
 	case_end;
 	}

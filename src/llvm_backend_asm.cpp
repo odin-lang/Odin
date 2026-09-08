@@ -1219,7 +1219,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		}
 		auto slot = form.ops[i];
 		AsmOperandKind k = g_asm_arm64.kind_from_operand_type(slot);
-		if (k != AsmOperand_Register && k != AsmOperand_Register_Or_Memory) {
+		if (k != AsmOperand_Register && k != AsmOperand_Register_Or_Memory && k != AsmOperand_RegisterShift) {
 			return 0;
 		}
 		AsmRegClass cls = g_asm_arm64.operand_type_reg_class(slot);
@@ -1541,6 +1541,55 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				GB_PANIC("asm: ARM64 lane base must be an operand or explicit register, got '%s'",
 				         expr_to_string(base_op));
 				break;
+			}
+		case_end;
+		case_ast_node(be, BinaryExpr, op);
+			// Shifted/scaled register operand -> `reg, <shift> #n`. `<<`=lsl, `>>`=lsr,
+			// and `*` is lsl by log2 of the (power-of-two) multiplier. Only produced on
+			// ARM64 (the checker rejects it elsewhere) and only for a *_SHIFTED slot.
+			char const *shift_name = nullptr;
+			switch (be->op.kind) {
+			case Token_Shl: shift_name = "lsl"; break;
+			case Token_Shr: shift_name = "lsr"; break;
+			case Token_Mul: shift_name = "lsl"; break;
+			default:
+				GB_PANIC("asm: unexpected register-shift operator '%.*s'", LIT(be->op.string));
+				break;
+			}
+
+			// The register takes the slot's own w/x modifier (arm64_slot_reg_modifier now
+			// covers RegisterShift), so recurse for it, then append the shift modifier.
+			this->write_operand(op_number, be->left, flags & ~WriteOperandFlag_PrintPrefixes);
+
+			Ast *amount = be->right;
+			if (amount->tav.mode == Addressing_Constant) {
+				i64 v = exact_value_to_i64(exact_value_to_integer(amount->tav.value));
+				i64 shift = v;
+				if (be->op.kind == Token_Mul) {
+					// reg * 2^k  ==  reg, lsl #k
+					shift = 0;
+					while (v > 1) {
+						v >>= 1;
+						shift++;
+					}
+				}
+				asm_string = gb_string_append_fmt(asm_string, ", %s #%lld", shift_name, cast(long long)shift);
+			} else {
+				// $-immediate shift amount. A runtime amount has no compile-time log2, so
+				// '*' must be a constant; '<<'/'>>' substitute the value via LLVM ($idx).
+				if (be->op.kind == Token_Mul) {
+					error(amount, "A '*' register scale needs a constant power-of-two amount");
+					break;
+				}
+				Entity *e  = entity_of_node(amount);
+				auto   *ed = entity_op(e);
+				if (ed == nullptr || ed->kind != AsmTemplateEntityDecl_Immediate) {
+					error(amount, "A register shift amount must be a constant or $-immediate");
+					break;
+				}
+				i32 idx = op_number[ed->total_index];
+				GB_ASSERT(idx >= 0);
+				asm_string = gb_string_append_fmt(asm_string, ", %s #$%d", shift_name, idx);
 			}
 		case_end;
 		default:

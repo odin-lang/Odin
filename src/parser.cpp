@@ -2516,6 +2516,19 @@ gb_internal Ast *parse_asm_register(AstFile *f) {
 	return reg;
 }
 
+
+gb_internal bool asm_operand_is_shiftable(Ast *operand) {
+	if (operand == nullptr) {
+		return false;
+	}
+	switch (operand->kind) {
+	case Ast_AsmRegister:
+	case Ast_Ident:
+		return true;
+	}
+	return false;
+}
+
 gb_internal Ast *ast_asm_memory_term(AstFile *f, Token op, Ast *operand, Token scale_op, Ast *scale) {
 	Ast *term = alloc_ast_node(f, Ast_AsmMemoryTerm);
 	term->AsmMemoryTerm.op = op;
@@ -2712,7 +2725,10 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 	if (operand == nullptr) {
 		syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
 		advance_token(f);
-	} else if (f->curr_token.kind == Token_OpenBracket) {
+		return operand;
+	}
+
+	if (f->curr_token.kind == Token_OpenBracket) {
 		f->expr_level++;
 		Token open = expect_token(f, Token_OpenBracket);
 		Ast *index = parse_asm_operand(f, false);
@@ -2720,6 +2736,25 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 		f->expr_level--;
 		operand = ast_index_expr(f, operand, index, open, close);
 	}
+
+	if (allow_memory_operand && asm_operand_is_shiftable(operand)) {
+		switch (f->curr_token.kind) {
+		case Token_Mul:
+		case Token_Shl:
+		case Token_Shr:
+			{
+				Token op = advance_token(f);
+				Ast *amount = parse_asm_operand(f, false);
+				Ast *be = alloc_ast_node(f, Ast_BinaryExpr);
+				be->BinaryExpr.left = operand;
+				be->BinaryExpr.op = op;
+				be->BinaryExpr.right = amount;
+				operand = be;
+			}
+			break;
+		}
+	}
+
 	return operand;
 }
 
