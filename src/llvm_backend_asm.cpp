@@ -1,4 +1,4 @@
-#define LLVM_ASM_DEBUG_PRINT true
+#define LLVM_ASM_DEBUG_PRINT false
 
 struct lbAsmGenerate {
 	Entity *                      tmpl_entity;
