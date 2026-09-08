@@ -744,11 +744,11 @@ _mm256_permute2f128_si256 :: #force_inline proc "c" (a, b: __m256i, $IMM8: u8) -
 		r,
 		__m256i(0),
 
-		4 if ((IMM8 & 0xf) & 0b1000) != 0 else 0,
-		4 if ((IMM8 & 0xf) & 0b1000) != 0 else 1,
+		4 when ((IMM8 & 0xf) & 0b1000) != 0 else 0,
+		4 when ((IMM8 & 0xf) & 0b1000) != 0 else 1,
 
-		4 if (((IMM8 & 0xf0)>>4) & 0b1000) != 0 else 2,
-		4 if (((IMM8 & 0xf0)>>4) & 0b1000) != 0 else 3,
+		4 when (((IMM8 & 0xf0)>>4) & 0b1000) != 0 else 2,
+		4 when (((IMM8 & 0xf0)>>4) & 0b1000) != 0 else 3,
 	)
 }
 
