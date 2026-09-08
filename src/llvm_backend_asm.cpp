@@ -1559,22 +1559,32 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 			}
 		case_end;
 		case_ast_node(be, BinaryExpr, op);
+			// The register takes the slot's own w/x modifier (arm64_slot_reg_modifier now
+			// covers RegisterShift), so recurse for it, then append the shift modifier.
+			this->write_operand(op_number, be->left, flags & ~WriteOperandFlag_PrintPrefixes);
+
 			// Shifted/scaled register operand -> `reg, <shift> #n`. `<<`=lsl, `>>`=lsr,
 			// and `*` is lsl by log2 of the (power-of-two) multiplier. Only produced on
 			// ARM64 (the checker rejects it elsewhere) and only for a *_SHIFTED slot.
 			char const *shift_name = nullptr;
 			switch (be->op.kind) {
-			case Token_Shl: shift_name = "lsl"; break;
-			case Token_Shr: shift_name = "lsr"; break;
-			case Token_Mul: shift_name = "lsl"; break;
+			case Token_Shl:
+			case Token_Mul:
+				shift_name = "lsl";
+				break;
+			case Token_Shr:
+				{
+					// `>>` is arithmetic on a signed operand, logical on an unsigned one.
+					Type *t = be->left->tav.type;
+					bool is_signed = t != nullptr && is_type_integer(t) && !is_type_unsigned(t);
+					shift_name = is_signed ? "asr" : "lsr";
+				}
+				break;
 			default:
 				GB_PANIC("asm: unexpected register-shift operator '%.*s'", LIT(be->op.string));
 				break;
 			}
 
-			// The register takes the slot's own w/x modifier (arm64_slot_reg_modifier now
-			// covers RegisterShift), so recurse for it, then append the shift modifier.
-			this->write_operand(op_number, be->left, flags & ~WriteOperandFlag_PrintPrefixes);
 
 			i64 raw = 0;
 
@@ -1595,7 +1605,6 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				              LIT(ed->entity->token.string));
 				raw = cast(i64)LLVMConstIntGetSExtValue(v.value);
 			}
-
 
 			i64 shift = 0;
 

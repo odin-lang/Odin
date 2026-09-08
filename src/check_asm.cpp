@@ -2340,15 +2340,27 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 					i64 v  = 0;
 					// TODO(bill): should this be in big-int math or not?
 					switch (term->scale_op.kind) {
-					case Token_Shl: v = iv << sv; break;
-					case Token_Shr: v = iv >> sv; break;
-					case Token_Mul: v = iv *  sv; break;
+					case Token_Shl:
+					case Token_Shr:
+						// A shift by a negative amount or by >= the width is undefined;
+						// guard it rather than fold UB into the displacement.
+						if (sv < 0 || sv >= 64) {
+							error(term->scale_op, "A constant shift amount must be within 0 ..< 64, got %lld", cast(long long)sv);
+							class_ok = false;
+							sv = gb_clamp(sv, 0, 63);
+							break;
+						}
+						v = (term->scale_op.kind == Token_Shl) ? (iv << sv) : (iv >> sv);
+						break;
+					case Token_Mul:
+						v = iv * sv;
+						break;
 					default:
 						error(term->scale_op, "Unknown/unhandled scaling operator '%.*s'", LIT(term->scale_op.string));
 						class_ok = false;
 						break;
 					}
-					disp_total    += neg ? -v : v;
+					disp_total += neg ? -v : v;
 					has_disp_const = true;
 					if (disp_host == nullptr) disp_host = term->operand;
 				} else {
