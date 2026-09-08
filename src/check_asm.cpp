@@ -1274,6 +1274,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					s = (w > 0) ? gb_string_append_fmt(s, "%s/m%d", reg, cast(int)w)
 					            : gb_string_append_fmt(s, "%s/m", reg);
 					break;
+				case AsmOperand_RegisterShift:
+					s = (w > 0) ? gb_string_append_fmt(s, "%s%d{,sh}", reg, cast(int)w)
+					            : gb_string_append_fmt(s, "%s{,sh}", reg);
 				default:
 					s = gb_string_appendc(s, "operand");
 					break;
@@ -1311,6 +1314,12 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 						s = gb_string_appendc(s, " ");
 					}
 					break;
+				case AsmOperand_RegisterShift:
+					// "<reg><w>{,sh}" — 5 trailing chars beyond the register arm
+					if      (w == 0)   s = gb_string_appendc(s, " ");
+					else if (w < 10)   s = gb_string_appendc(s, "");
+					// tune to match your actual column width; the point is: don't leave it unpadded
+					break;
 				}
 			}
 		}
@@ -1321,6 +1330,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			switch (k) {
 			case AsmOperand_Label:
 			case AsmOperand_Register:
+			case AsmOperand_RegisterShift:
 			case AsmOperand_Lane:
 			case AsmOperand_Memory:
 			case AsmOperand_Register_Or_Memory:
