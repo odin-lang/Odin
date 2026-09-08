@@ -5930,7 +5930,10 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 				if (entity->kind == Entity_ProcGroup) {
 					return entity;
 				}
-				GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
+				// GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
+				if (entity->type == nullptr) {
+					return nullptr;
+				}
 			}
 		}
 
@@ -6061,7 +6064,10 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 				return entity;
 			}
-			GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
+			// GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
+			if (entity->type == nullptr) {
+				return nullptr;
+			}
 		}
 	}
 
