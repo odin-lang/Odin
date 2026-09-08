@@ -690,6 +690,15 @@ struct Asm_riscv {
 			return false;
 		}
 	}
+
+	bool operand_type_is_cond_code(OperandType t) const {
+		return false;
+	}
+
+	bool is_cond_code_name(String name, u32 *bit_code_) const {
+		return false;
+	}
+
 	String required_vector_feature(i32 w) const {
 		// The base ISA has no vector registers; any vector operand needs the V extension.
 		if (w > 0) return str_lit("v");

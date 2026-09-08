@@ -776,6 +776,28 @@ main :: proc() {
 			return false;
 		}
 
+		bool is_cond_code_name(String name, u32 *bit_code_) const {
+			struct CondCode { String name; u32 code; };
+			static CondCode const table[] = {
+				{str_lit("eq"),  0}, {str_lit("ne"),  1},
+				{str_lit("hs"),  2}, {str_lit("lo"),  3},
+				{str_lit("mi"),  4}, {str_lit("pl"),  5},
+				{str_lit("vs"),  6}, {str_lit("vc"),  7},
+				{str_lit("hi"),  8}, {str_lit("ls"),  9},
+				{str_lit("ge"), 10}, {str_lit("lt"), 11},
+				{str_lit("gt"), 12}, {str_lit("le"), 13},
+				{str_lit("al"), 14}, {str_lit("nv"), 15},
+				{str_lit("cs"),  2}, // alias of hs
+				{str_lit("cc"),  3}, // alias of lo
+			};
+			for (CondCode const &cc : table) {
+				if (name == cc.name) {
+					if (bit_code_) *bit_code_ = cc.code;
+					return true;
+				}
+			}
+			return false;
+		}
 		// Does this slot's register spell as `vN.<T>` (an arrangement) rather than a
 		// scalar view (bN/hN/sN/dN/qN), a lane (vN.<T>[i]), or a bare vN? Drives the
 		// arrangement-suffix emission in the AArch64 backend. Element-indexed and

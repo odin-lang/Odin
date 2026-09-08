@@ -2170,7 +2170,26 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		check_expr(ctx, operand, expr);
 		if (operand->mode != Addressing_Constant) {
 			error(expr, "Asm operands within parentheses must be compile time constants");
+			return;
 		}
+
+		Ast *inner = pe->expr;
+		bool trivial = false;
+		switch (inner->kind) {
+		case Ast_BasicLit:
+		case Ast_Ident:
+			trivial = true;
+			break;
+		case Ast_UnaryExpr:
+			// `(-3)` / `(~x)` — a unary on an atom parses fine unparenthesised.
+			trivial = inner->UnaryExpr.expr->kind == Ast_BasicLit ||
+			          inner->UnaryExpr.expr->kind == Ast_Ident;
+			break;
+		}
+		if (trivial) {
+			warning(expr, "Redundant parentheses around a single asm operand; the parentheses can be removed");
+		}
+
 		return;
 	case_end;
 
@@ -2184,6 +2203,23 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		}
 		found = scope_lookup(param_scope->parent, i->interned, i->hash);
 		if (found == nullptr) {
+			u32 cond_code = 0;
+			if (asm_ctx->is_cond_code_name(i->token.string, &cond_code)) {
+				// A condition code (e.g. `eq` in `csinc r, a, b, eq`) is not built-in:
+				// condition codes are ordinary constants in Odin. Point the user at the
+				// fix rather than the generic "undeclared" message.
+				char bits[5] = {
+					char('0' + ((cond_code >> 3) & 1)),
+					char('0' + ((cond_code >> 2) & 1)),
+					char('0' + ((cond_code >> 1) & 1)),
+					char('0' + ( cond_code       & 1)),
+					0,
+				};
+				error(expr, "Condition code '%.*s' is not defined in scope. Condition codes are ordinary constants in Odin, "
+				            "define it e.g. `%.*s :: 0b%s` (%u)",
+				            LIT(i->token.string), LIT(i->token.string), bits, cond_code);
+				return;
+			}
 			error(expr, "Undeclared asm parameter or constant '%.*s'", LIT(i->token.string));
 			return;
 		}

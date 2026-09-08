@@ -744,6 +744,14 @@ struct Asm_amd64 {
 		return false;
 	}
 
+	bool operand_type_is_cond_code(OperandType t) const {
+		return false;
+	}
+
+	bool is_cond_code_name(String name, u32 *bit_code_) const {
+		return false;
+	}
+
 	String implicit_reg_name(OperandType t) const {
 		switch (t) {
 		case OP_AL_IMPL:   return str_lit("al");
