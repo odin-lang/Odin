@@ -2917,13 +2917,30 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			switch (clobber->value->kind) {
 			case_ast_node(asm_reg, AsmRegister, clobber->value)
 				String reg = asm_reg->name.string;
-				if (asm_reg->flag.string != "") {
-					error(asm_reg->flag, "#%.*s on specific flags is not allowed", LIT(clobber->name.string));
-				}
-				Operand operand = {};
-				if (check_register(asm_ctx, &operand, asm_reg)) {
-					if (string_set_update(target_set, reg)) {
-						error(clobber->value, "#%.*s %%%.*s has already been defined", LIT(clobber->name.string), LIT(reg));
+
+				if (reg == "flags") {
+					// `%flags` clobbers all condition flags — the preferred spelling.
+					// A specific flag bit (`%flags.z`) can't be individually clobbered,
+					// and flags are meaningless for `#preserve`.
+					if (asm_reg->flag.string != "") {
+						error(asm_reg->flag, "#%.*s on a specific flag ('%%flags.%.*s') is not allowed; use '%%flags' to clobber all condition flags",
+						      LIT(clobber->name.string), LIT(asm_reg->flag.string));
+					} else if (is_preserve) {
+						error(clobber->value, "Expected a register for a '#preserve' specification, got '%%flags'");
+					} else if (clobber_flags) {
+						error(clobber->value, "#clobber %%flags has already been defined");
+					} else {
+						clobber_flags = true;
+					}
+				} else {
+					if (asm_reg->flag.string != "") {
+						error(asm_reg->flag, "#%.*s on specific flags is not allowed", LIT(clobber->name.string));
+					}
+					Operand operand = {};
+					if (check_register(asm_ctx, &operand, asm_reg)) {
+						if (string_set_update(target_set, reg)) {
+							error(clobber->value, "#%.*s %%%.*s has already been defined", LIT(clobber->name.string), LIT(reg));
+						}
 					}
 				}
 			case_end;
@@ -2933,6 +2950,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 					// #preserve applies only to registers, not flags/memory.
 					error(clobber->value, "Expected a register for a '#preserve' specification, got '%.*s'", LIT(str));
 				} else if (str == "flags") {
+					// Deprecated bare-identifier spelling; `%flags` is the register form.
+					warning(clobber->value, "#clobber flags is deprecated; use '#clobber %%flags' instead");
 					if (clobber_flags) {
 						error(clobber->value, "#clobber flags has already been defined");
 					}
