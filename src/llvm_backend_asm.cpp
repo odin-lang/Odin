@@ -1,4 +1,4 @@
-#define LLVM_ASM_DEBUG_PRINT false
+#define LLVM_ASM_DEBUG_PRINT true
 
 struct lbAsmGenerate {
 	Entity *                      tmpl_entity;
@@ -890,6 +890,21 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			return 0;
 		}
 		GB_ASSERT(instr->valid_form_index >= 0);
+
+		// NOTE(bill): The descriptor-table ops (lgdt/lidt/sgdt/sidt) take an m16:32 / m16:64 pseudo-descriptor.
+		// Its size can't be carried by the memory operand and it isn't a 1/2/4/8-byte scalar,
+		// so LLVM's AT&T assembler requires an explicit mnemonic suffix to pick the form: 'q' in 64-bit mode ('l' in 32-bit).
+		switch (instr->mnemonic) {
+		case Asm_amd64::M_LGDT:
+		case Asm_amd64::M_LIDT:
+		case Asm_amd64::M_SGDT:
+		case Asm_amd64::M_SIDT:
+			if (build_context.metrics.arch == TargetArch_i386) {
+				return 'l';
+			}
+			return 'q';
+		}
+
 
 		auto forms = g_asm_amd64.encoding_forms(instr->mnemonic);
 		if (forms.count <= 1) {

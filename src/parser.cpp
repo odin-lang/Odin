@@ -2618,9 +2618,10 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			Token op = {};
 			op.kind = Token_Add;
 
-			while (f->curr_token.kind != Token_EOF &&
-			       f->curr_token.kind != Token_Semicolon &&
-			       f->curr_token.kind != Token_CloseBracket) {
+			while (base != nullptr ||
+			       (f->curr_token.kind != Token_EOF &&
+			        f->curr_token.kind != Token_Semicolon &&
+			        f->curr_token.kind != Token_CloseBracket)) {
 			       	Ast *operand = nullptr;
 				Ast *scale = nullptr;
 				Token scale_op = {};

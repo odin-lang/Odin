@@ -2389,6 +2389,17 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 		mem_op->classify.has_disp_const = has_disp_const;
 		mem_op->classify.ok             = class_ok;
 
+		// Defensive: a well-formed memory operand always classifies to at least one
+		// of base / index / label / displacement. If none is set, the term list
+		// reached the checker empty or malformed — e.g. a bare `[reg]` whose sole
+		// term the parser dropped (it pushes terms only inside the +/- loop). Catch
+		// that here rather than silently emitting a memory operand with no address.
+		GB_ASSERT_MSG(!(base.expr == nullptr && index.expr == nullptr &&
+		                label_node == nullptr && !has_disp_const && disp.expr == nullptr),
+		              "asm: memory operand produced no base/index/displacement "
+		              "(terms.count = %td); the parser likely dropped a single-term '[operand]'",
+		              cast(isize)mem_op->terms.count);
+
 		i32  base_w     = 0;
 		i32  index_w    = 0;
 		bool have_base  = false;
