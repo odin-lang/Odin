@@ -1816,15 +1816,18 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		return res;
 	case BuiltinProc_simd_abs:
 		if (is_float) {
-			LLVMValueRef pos = arg0.value;
-			LLVMValueRef neg = LLVMBuildFNeg(p->builder, pos, "");
-			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOGT, pos, neg, "");
-			res.value = LLVMBuildSelect(p->builder, cond, pos, neg, "");
+			LLVMTypeRef types[1] = {LLVMTypeOf(arg0.value)};
+			LLVMValueRef args[1] = {arg0.value};
+			res.value = lb_call_intrinsic(p, "llvm.fabs", args, gb_count_of(args), types, gb_count_of(types));
+		} else if (is_signed) {
+			LLVMTypeRef types[1] = {LLVMTypeOf(arg0.value)};
+			// is_int_min_poison=false, so abs(min(T)) = min(T) and not poison
+			LLVMValueRef is_int_min_poison = lb_const_bool(p->module, t_llvm_bool, false).value;
+			LLVMValueRef args[2] = {arg0.value, is_int_min_poison};
+			res.value = lb_call_intrinsic(p, "llvm.abs", args, gb_count_of(args), types, gb_count_of(types));
 		} else {
-			LLVMValueRef pos = arg0.value;
-			LLVMValueRef neg = LLVMBuildNeg(p->builder, pos, "");
-			LLVMValueRef cond = LLVMBuildICmp(p->builder, is_signed ? LLVMIntSGT : LLVMIntUGT, pos, neg, "");
-			res.value = LLVMBuildSelect(p->builder, cond, pos, neg, "");
+			// unsigned integers -> |x| = x
+			res.value = arg0.value;
 		}
 		return res;
 	case BuiltinProc_simd_min:
