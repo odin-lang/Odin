@@ -1206,6 +1206,7 @@ gb_internal void init_universal(void) {
 			{"wasm32",    TargetArch_wasm32},
 			{"wasm64p32", TargetArch_wasm64p32},
 			{"riscv64",   TargetArch_riscv64},
+			{"mips32",    TargetArch_mips32},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Arch_Type"), values, gb_count_of(values));
@@ -1247,6 +1248,7 @@ gb_internal void init_universal(void) {
 			{"iPhoneSimulator", Subtarget_iPhoneSimulator},
 			{"Android",         Subtarget_Android},
 			{"Playdate",        Subtarget_Playdate},
+			{"N64",             Subtarget_N64},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Platform_Subtarget_Type"), values, gb_count_of(values));

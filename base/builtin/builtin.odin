@@ -275,6 +275,8 @@ uintptr       :: uintptr
 rawptr        :: rawptr
 string        :: string
 cstring       :: cstring
+string16      :: string16
+cstring16     :: cstring16
 any           :: any
 
 typeid        :: typeid

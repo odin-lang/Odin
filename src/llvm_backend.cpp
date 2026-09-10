@@ -119,6 +119,14 @@ gb_internal String get_default_features() {
 		}
 	}
 
+	if (bc->metrics.arch == TargetArch_mips32) {
+		if (selected_subtarget == Subtarget_N64) {
+			return str_lit("mips3,gp64,fpxx,nooddspreg");
+		}
+		return microarch;
+	}
+
+
 	GB_PANIC("unknown microarch: %.*s", LIT(microarch));
 	return {};
 }
@@ -3122,6 +3130,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		LLVMInitializeARMAsmPrinter();
 		LLVMInitializeARMAsmParser();
 		LLVMInitializeARMDisassembler();
+		break;
+	case TargetArch_mips32:
+		LLVMInitializeMipsTargetInfo();
+		LLVMInitializeMipsTarget();
+		LLVMInitializeMipsTargetMC();
+		LLVMInitializeMipsAsmPrinter();
+		LLVMInitializeMipsAsmParser();
+		LLVMInitializeMipsDisassembler();
 		break;
 	default:
 		GB_PANIC("Unimplemented LLVM target initialization");

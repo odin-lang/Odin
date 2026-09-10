@@ -624,6 +624,7 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		wasm32,
 		wasm64p32,
 		riscv64,
+		mips32,
 	}
 */
 Odin_Arch_Type :: type_of(ODIN_ARCH)
@@ -684,6 +685,7 @@ ALL_ODIN_OS_TYPES :: Odin_OS_Types{
 		iPhone,
 		iPhoneSimulator
 		Android,
+		N64,
 	}
 */
 Odin_Platform_Subtarget_Type :: type_of(ODIN_PLATFORM_SUBTARGET)

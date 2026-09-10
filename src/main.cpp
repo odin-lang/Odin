@@ -1302,11 +1302,14 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								String str = value.value_string;
 								bool found = false;
 
-								if (selected_target_metrics->metrics->os != TargetOs_darwin &&
-										selected_target_metrics->metrics->os != TargetOs_linux &&
-									 (selected_target_metrics->metrics->os != TargetOs_freestanding ||
-										selected_target_metrics->metrics->arch != TargetArch_arm32)) {
-									gb_printf_err("-subtarget can only be used with darwin, linux or freestanding_arm32 based targets at the moment\n");
+								if (selected_target_metrics->metrics->os == TargetOs_freestanding &&
+								    selected_target_metrics->metrics->arch == TargetArch_mips32) {
+									// okay
+								} else if (selected_target_metrics->metrics->os != TargetOs_darwin &&
+								           selected_target_metrics->metrics->os != TargetOs_linux &&
+								           (selected_target_metrics->metrics->os != TargetOs_freestanding ||
+								            selected_target_metrics->metrics->arch != TargetArch_arm32)) {
+									gb_printf_err("-subtarget can only be used with darwin, linux, freestanding_arm32, or freestanding_mips32 based targets at the moment\n");
 									bad_flags = true;
 									break;
 								}

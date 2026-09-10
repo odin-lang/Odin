@@ -56,6 +56,7 @@ enum TargetArchKind : u16 {
 	TargetArch_wasm32,
 	TargetArch_wasm64p32,
 	TargetArch_riscv64,
+	TargetArch_mips32,
 
 	TargetArch_COUNT,
 };
@@ -69,6 +70,7 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("wasm32"),
 	str_lit("wasm64p32"),
 	str_lit("riscv64"),
+	str_lit("mips32"),
 };
 
 enum TargetEndianKind : u8 {
@@ -147,6 +149,7 @@ gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
+	TargetEndian_Big, // mip32
 };
 
 #ifndef ODIN_VERSION_RAW
@@ -172,6 +175,7 @@ enum Subtarget : u32 {
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
 	Subtarget_Playdate,
+	Subtarget_N64, // Nintendo64
 	
 	Subtarget_COUNT,
 	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
@@ -183,6 +187,7 @@ gb_global String subtarget_strings[Subtarget_COUNT] = {
 	str_lit("iphonesimulator"),
 	str_lit("android"),
 	str_lit("playdate"),
+	str_lit("n64"),
 };
 
 
@@ -900,6 +905,14 @@ gb_global TargetMetrics target_freestanding_riscv64 = {
 	str_lit("riscv64-unknown-gnu"),
 };
 
+gb_global TargetMetrics target_freestanding_mips32 = {
+	TargetOs_freestanding,
+	TargetArch_mips32,
+	4, 4, 8, 8,
+	str_lit("mips-unknown-unknown"),
+};
+
+
 
 struct NamedTargetMetrics {
 	String name;
@@ -945,6 +958,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_arm32"), &target_freestanding_arm32 },
 
 	{ str_lit("freestanding_riscv64"), &target_freestanding_riscv64 },
+
+	{ str_lit("freestanding_mips32"), &target_freestanding_mips32},
 };
 
 gb_global NamedTargetMetrics *selected_target_metrics;
@@ -1752,6 +1767,8 @@ gb_internal void init_build_context_error_pos_style() {
 	}
 }
 
+gb_internal void setup_bedrock_mode(void);
+
 gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subtarget) {
 	BuildContext *bc = &build_context;
 
@@ -1903,6 +1920,53 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			break;
 		}
 	}
+
+	if (selected_subtarget == Subtarget_N64) {
+		GB_ASSERT(bc->cross_compiling);
+
+		if (metrics != &target_freestanding_mips32) {
+			gb_printf_err("-subtarget:n64 must use -target:freestanding_mips\n");
+			gb_exit(1);
+		}
+
+		bc->bedrock = true;
+		bc->disable_red_zone = true;
+
+		switch (build_context.build_mode) {
+		case BuildMode_Object:
+		case BuildMode_Assembly:
+		case BuildMode_LLVM_IR:
+			break;
+		default:
+		case BuildMode_DynamicLibrary:
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+			if ((build_context.command_kind & Command__does_build) != 0) {
+				gb_printf_err("Unsupported -build-mode for -subtarget:n64\n");
+				gb_printf_err("\tCurrently only supporting: \n");
+				gb_printf_err("\t\tobject\n");
+				gb_printf_err("\t\tassembly\n");
+				gb_printf_err("\t\tllvm-ir\n");
+				gb_exit(1);
+			}
+			break;
+		}
+
+		String const n64_features = str_lit("+mips3,+gp64,+fpxx,+nooddspreg");
+
+		if(bc->target_features_string.len > 0) {
+			bc->target_features_string = concatenate3_strings(permanent_allocator(), n64_features, str_lit(","), bc->target_features_string);
+		} else {
+			bc->target_features_string = n64_features;
+		}
+
+		if (bc->reloc_mode == RelocMode_Default) {
+			bc->reloc_mode = RelocMode_Static;
+		}
+
+		setup_bedrock_mode();
+	}
+
 
 	if (metrics->os == TargetOs_darwin) {
 		switch (subtarget) {
