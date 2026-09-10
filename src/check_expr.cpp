@@ -12209,9 +12209,9 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 		if (index < 0) {
 			ERROR_BLOCK();
 			gbString str = expr_to_string(o->expr);
-			error(o->expr, "Cannot index a constant '%s'", str);
+			error(o->expr, "Cannot index a constant '%s' with a variable index", str);
 			if (!build_context.terse_errors) {
-				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+				error_line("\tSuggestion: store the constant into a variable or index it with a constant index\n");
 			}
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
