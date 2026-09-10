@@ -3494,41 +3494,53 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator, loc :
 @(private, require_results)
 internal_substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok: bool) #no_bounds_check {
 	sub = s
-	ok  = true
-
 	rune_i: int
 
 	if rune_start > 0 {
-		ok = false
+		start_byte := -1
 		for _, i in sub {
-			if rune_start == rune_i {
-				ok = true
-				sub = sub[i:]
+			if rune_i == rune_start {
+				start_byte = i
 				break
 			}
 			rune_i += 1
 		}
-		if !ok {
-			sub = sub[rune_i:]
-		}
-	}
-
-	if rune_end >= rune_start {
-		ok = false
-		for _, i in sub {
-			if rune_end == rune_i {
-				ok = true
-				sub = sub[:i]
-				break
+		if start_byte < 0 {
+			// One past the last rune is a valid, empty-tail start.
+			if rune_i != rune_start {
+				return "", false
 			}
-			rune_i += 1
+			start_byte = len(sub)
 		}
-
-		if rune_end == rune_i {
-			ok = true
-		}
+		sub = sub[start_byte:]
 	}
 
+	if rune_end < 0 {
+		ok = true
+		return
+	}
+	if rune_end < rune_start {
+		return "", false
+	}
+
+	end_byte := -1
+	for _, i in sub {
+		if rune_i == rune_end {
+			end_byte = i
+			break
+		}
+		rune_i += 1
+	}
+	if end_byte < 0 {
+		// Out of range: keep the start-trimmed `sub`, just report failure.
+		if rune_i != rune_end {
+			return
+		}
+	} else {
+		sub = sub[:end_byte]
+	}
+
+	ok = true
 	return
 }
 
@@ -3558,7 +3570,7 @@ substring :: proc(s: string, rune_start: int, rune_end: int) -> (sub: string, ok
 /*
 Returns a substring of `s` that starts at rune index `rune_start` and goes up to the end of the string.
 
-Think of it as slicing `s[rune_start:]` but rune-wise.
+Think of it as slicing `s[rune_start:]` but rune-wise. As with a normal slice, `rune_start == rune_count(s)` is in bounds and yields an empty string.
 
 Inputs:
 - s: the string to substring
@@ -3566,7 +3578,7 @@ Inputs:
 
 Returns:
 - sub: the substring
-- ok: whether the rune indexes where in bounds of the original string
+- ok: whether `rune_start` was in bounds of the original string
 */
 @(require_results)
 substring_from :: proc(s: string, rune_start: int) -> (sub: string, ok: bool) {
