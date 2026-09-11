@@ -1,4 +1,4 @@
-#+build !freestanding, wasm32, wasm64p32
+#+build !freestanding, wasm32, wasm64p32, wasm64
 package mem
 
 import "base:runtime"

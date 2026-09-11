@@ -1,5 +1,5 @@
 #+private
-#+build wasm32, wasm64p32
+#+build wasm32, wasm64p32, wasm64
 #+no-instrumentation
 package runtime
 
