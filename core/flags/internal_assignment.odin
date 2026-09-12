@@ -99,9 +99,17 @@ set_odin_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (error: Erro
 	return
 }
 
-// Set a `-flag` argument, UNIX-style.
+// Set a UNIX-style flag.
 @(optimization_mode="favor_size")
-set_unix_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (future_args: int, error: Error) {
+set_unix_flag :: proc(
+	model: ^$T,
+	parser: ^Parser,
+	name: string,
+	require_boolean: bool,
+) -> (
+	future_args: int,
+	error: Error,
+) {
 	// We make a special case for help requests.
 	switch name {
 	case RESERVED_HELP_FLAG, RESERVED_HELP_FLAG_SHORT:
@@ -115,6 +123,13 @@ set_unix_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (future_args
 		ptr := cast(^bool)(cast(uintptr)model + field.offset)
 		ptr^ = true
 	case runtime.Type_Info_Dynamic_Array:
+		if require_boolean {
+			return 0, Parse_Error {
+				.No_Value,
+				fmt.tprintf("Flag `%s` requires a value and must be last in a short-option bundle.", name),
+			}
+		}
+
 		future_args = 1
 		if tag, ok := reflect.struct_tag_lookup(field.tag, TAG_ARGS); ok {
 			if length, is_manifold := get_struct_subtag(tag, SUBTAG_MANIFOLD); is_manifold {
@@ -128,6 +143,13 @@ set_unix_flag :: proc(model: ^$T, parser: ^Parser, name: string) -> (future_args
 			}
 		}
 	case:
+		if require_boolean {
+			return 0, Parse_Error {
+				.No_Value,
+				fmt.tprintf("Flag `%s` requires a value and must be last in a short-option bundle.", name),
+			}
+		}
+
 		// `--flag`, waiting on its value.
 		future_args = 1
 	}
