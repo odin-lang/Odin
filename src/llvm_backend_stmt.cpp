@@ -2851,7 +2851,12 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		bool const_cond = LLVMConstIntGetZExtValue(cond.value) != 0;
 
 		LLVMValueRef if_instr = LLVMGetLastInstruction(p->curr_block->block);
-		GB_ASSERT(LLVMGetInstructionOpcode(if_instr) == LLVMBr);
+		#if LLVM_VERSION_MAJOR >= 23
+            auto opcode = LLVMGetInstructionOpcode(if_instr);
+            GB_ASSERT(opcode == LLVMUncondBr || opcode == LLVMCondBr);
+        #else
+            GB_ASSERT(LLVMGetInstructionOpcode(if_instr) == LLVMBr);
+        #endif
 		GB_ASSERT(LLVMIsConditional(if_instr));
 		LLVMInstructionEraseFromParent(if_instr);
 
