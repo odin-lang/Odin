@@ -149,6 +149,33 @@ error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
 	t.error_count += 1
 }
 
+read_rune :: proc (t: ^Tokenizer, offset := 0) -> (rune, int) {
+	byte_offset := 0
+	for i := 0 ; i <= offset; i += 1 {
+		if t.read_offset + byte_offset >= len(t.src) {
+			return 0, 0
+		}
+		r, w := rune(t.src[t.read_offset + byte_offset]), 1
+		switch {
+		case r == 0:
+			error(t, t.offset, "illegal character NUL")
+		case r >= utf8.RUNE_SELF:
+			r, w = utf8.decode_rune_in_string(t.src[t.read_offset+byte_offset:])
+			if r == utf8.RUNE_ERROR && w == 1 {
+				error(t, t.offset, "illegal UTF-8 encoding")
+			} else if r == utf8.RUNE_BOM && t.offset > 0 {
+				error(t, t.offset, "illegal byte order mark")
+			}
+		}
+		if i == offset {
+			return r,w
+		}
+		byte_offset += w
+	}
+	
+	return 0, 0
+}
+
 advance_rune :: proc(t: ^Tokenizer) {
 	if t.read_offset < len(t.src) {
 		t.offset = t.read_offset
@@ -156,18 +183,7 @@ advance_rune :: proc(t: ^Tokenizer) {
 			t.line_offset = t.offset
 			t.line_count += 1
 		}
-		r, w := rune(t.src[t.read_offset]), 1
-		switch {
-		case r == 0:
-			error(t, t.offset, "illegal character NUL")
-		case r >= utf8.RUNE_SELF:
-			r, w = utf8.decode_rune_in_string(t.src[t.read_offset:])
-			if r == utf8.RUNE_ERROR && w == 1 {
-				error(t, t.offset, "illegal UTF-8 encoding")
-			} else if r == utf8.RUNE_BOM && t.offset > 0 {
-				error(t, t.offset, "illegal byte order mark")
-			}
-		}
+		r, w := read_rune(t)
 		t.read_offset += w
 		t.ch = r
 	} else {
@@ -178,6 +194,11 @@ advance_rune :: proc(t: ^Tokenizer) {
 		}
 		t.ch = -1
 	}
+}
+
+peek_rune :: proc(t: ^Tokenizer, offset := 0) -> rune {
+	r, w := read_rune(t, offset)
+	return r
 }
 
 peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
@@ -306,22 +327,81 @@ scan_identifier :: proc(t: ^Tokenizer) -> string {
 	return string(t.src[offset : t.offset])
 }
 
-scan_string :: proc(t: ^Tokenizer) -> string {
+scan_string :: proc(t: ^Tokenizer, quote: rune) -> string {
 	offset := t.offset-1
 
-	for {
-		ch := t.ch
-		if ch == '\n' || ch < 0 {
-			error(t, offset, "string literal was not terminated")
-			break
+	exit : {
+	if quote == '"' {
+		// Python-style triple-quoted string literal `"""..."""`.
+		if t.ch == '"' && peek_rune(t, 0) == '"' {
+			advance_rune(t) // consume the second opening `"`
+			advance_rune(t) // consume the third opening `"`
+			for ;; {
+				r : rune = t.ch
+				if r < 0 {
+					error(t, offset, "Triple-quote multi-line string literal not terminated")
+					break
+				}
+				advance_rune(t)
+				// A closing `"""` is three consecutive quotes: `r` plus the
+				// next two runes. `t->curr_rune` is now the second quote and
+				// `peek_byte(t, 0)` is the third.
+				if r == quote && t.ch == '"' && peek_rune(t, 0) == '"' {
+					advance_rune(t) // consume the second closing `"`
+					advance_rune(t) // consume the third closing `"`
+					break
+				}
+				if r == '\\' {
+					scan_escape(t)
+				}
+			}
+			break exit
 		}
-		advance_rune(t)
-		if ch == '"' {
-			break
+		for ;; {
+			r : rune = t.ch;
+			if (r == '\n' || r < 0) {
+				error(t, offset, "String literal not terminated");
+				break;
+			}
+			advance_rune(t);
+			if (r == quote) {
+				break;
+			}
+			if (r == '\\') {
+				scan_escape(t);
+			}
 		}
-		if ch == '\\' {
-			scan_escape(t)
+	} else {
+		if (t.ch == '`' && peek_rune(t, 0) == '`') {
+			advance_rune(t) // consume the second opening ```
+			advance_rune(t) // consume the third opening ```
+			for ;; {
+				r : rune = t.ch
+				if r < 0 {
+					error(t, offset, "Triple-quote multi-line string literal not terminated")
+					break
+				}
+				advance_rune(t)
+				if r == quote && t.ch == '`' && peek_rune(t, 0) == '`' {
+					advance_rune(t) // consume the second closing ```
+					advance_rune(t) // consume the third closing ```
+					break
+				}
+			}
+			break exit
 		}
+		for ;; {
+			r : rune = t.ch
+			if (r < 0) {
+				error(t, offset, "String literal not terminated")
+				break
+			}
+			advance_rune(t)
+			if (r == quote) {
+				break
+			}
+		}
+	}
 	}
 
 	return string(t.src[offset : t.offset])
@@ -329,6 +409,13 @@ scan_string :: proc(t: ^Tokenizer) -> string {
 
 scan_raw_string :: proc(t: ^Tokenizer) -> string {
 	offset := t.offset-1
+
+	triple_quoted := t.ch == rune('`') && peek_rune(t, 0) == rune('`')
+
+	if triple_quoted {
+		advance_rune(t)
+		advance_rune(t)
+	}
 
 	for {
 		ch := t.ch
@@ -338,7 +425,13 @@ scan_raw_string :: proc(t: ^Tokenizer) -> string {
 		}
 		advance_rune(t)
 		if ch == '`' {
-			break
+			if !triple_quoted {
+				break
+			} else if (t.ch == '`' && peek_rune(t, 0) == '`') {
+				advance_rune(t)
+				advance_rune(t)
+				break
+			}
 		}
 	}
 
@@ -627,12 +720,12 @@ scan :: proc(t: ^Tokenizer) -> Token {
 		case '\'':
 			kind = .Rune
 			lit = scan_rune(t)
+		case '`':
+			fallthrough
 		case '"':
 			kind = .String
-			lit = scan_string(t)
-		case '`':
-			kind = .String
-			lit = scan_raw_string(t)
+			lit = scan_string(t, ch)
+
 		case '.':
 			kind = .Period
 			switch t.ch {
