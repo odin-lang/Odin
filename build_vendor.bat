@@ -22,3 +22,21 @@ if not exist "vendor\cgltf\lib\*.lib" (
 		call build.bat
 	popd
 )
+
+if not exist "vendor\commonmark\*.lib" (
+	pushd vendor\commonmark
+		call build.bat
+	popd
+)
+
+if not exist "vendor\box3d\lib\*.lib" (
+	pushd vendor\box3d\src
+		call build.bat
+	popd
+)
+
+if not exist "vendor\kb_text_shape\lib\*.lib" (
+	pushd vendor\kb_text_shape\src
+		call build.bat
+	popd
+)
