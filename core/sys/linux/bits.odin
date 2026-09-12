@@ -176,6 +176,7 @@ when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
 		NOATIME   = 18,
 		CLOEXEC   = 19,
 		PATH      = 21,
+		TMPFILE   = 22,
 	}
 	// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
 	#assert(1 << uint(Open_Flags_Bits.WRONLY)    == 0o0000000_1)
@@ -195,6 +196,7 @@ when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
 	#assert(1 << uint(Open_Flags_Bits.NOATIME)   == 0o0_1000000)
 	#assert(1 << uint(Open_Flags_Bits.CLOEXEC)   == 0o0_2000000)
 	#assert(1 << uint(Open_Flags_Bits.PATH)      == 0o_10000000)
+ 	#assert(1 << uint(Open_Flags_Bits.TMPFILE)   == 0o_20000000)
 } else {
 	Open_Flags_Bits :: enum {
 		WRONLY    = 0,
@@ -214,6 +216,7 @@ when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
 		NOATIME   = 18,
 		CLOEXEC   = 19,
 		PATH      = 21,
+		TMPFILE   = 22,
 	}
 }
 
