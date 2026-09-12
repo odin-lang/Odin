@@ -144,6 +144,68 @@ swizzle_may_widen_its_operand :: proc(t: ^testing.T) {
 	testing.expect_value(t, intrinsics.simd_extract(w, 7), u32(4))
 }
 
+// simd_select takes lane i from the 1st operand where the mask lane is nonzero/true
+// and from the 2nd otherwise
+@(test)
+simd_select_const_ops :: proc(t: ^testing.T) {
+	mask: #simd[4]i32 = {7, 0, -1, 0}
+	x:    #simd[4]i32 = {1, 2, 3, 4}
+	y:    #simd[4]i32 = {5, 6, 7, 8}
+	testing.expect_value(t, simd.to_array(intrinsics.simd_select(mask, x, y)), [4]i32{1, 6, 3, 8})
+
+	bmask: #simd[4]b32 = {false, true, true, false}
+	fx:    #simd[4]f32 = {1.5, 2.5, 3.5, 4.5}
+	fy:    #simd[4]f32 = {-1, -2, -3, -4}
+	testing.expect_value(t, simd.to_array(intrinsics.simd_select(bmask, fx, fy)), [4]f32{-1, 2.5, 3.5, -4})
+}
+
+// simd_runtime_swizzle reads src[indices[i]] into lane i
+@(test)
+simd_runtime_swizzle_const_ops :: proc(t: ^testing.T) {
+	bytes:   #simd[16]u8 = {0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150}
+	reverse: #simd[16]u8 = {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0}
+	testing.expect_value(t, simd.to_array(intrinsics.simd_runtime_swizzle(bytes, reverse)),
+		[16]u8{150, 140, 130, 120, 110, 100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 0})
+
+	words:  #simd[4]u32 = {100, 200, 300, 400}
+	rotate: #simd[4]u32 = {1, 2, 3, 0}
+	testing.expect_value(t, simd.to_array(intrinsics.simd_runtime_swizzle(words, rotate)), [4]u32{200, 300, 400, 100})
+
+	halves: #simd[8]i16 = {0, 1, 2, 3, 4, 5, 6, 7}
+	dup:    #simd[8]i16 = {0, 0, 3, 3, 5, 5, 7, 7}
+	testing.expect_value(t, simd.to_array(intrinsics.simd_runtime_swizzle(halves, dup)), [8]i16{0, 0, 3, 3, 5, 5, 7, 7})
+}
+
+// runtime operands must evaluate once
+@(test)
+simd_select_runtime_ops :: proc(t: ^testing.T) {
+	calls: i32 = 0
+	mask: #simd[4]i32 = {1, 0, -1, 0}
+
+	count_calls :: proc(c: ^i32, site: i32) -> #simd[4]i32 {
+		c^ += 1
+		return (#simd[4]i32)(site*100 + c^)
+	}
+
+	r := intrinsics.simd_select(mask, count_calls(&calls, 1), count_calls(&calls, 2))
+	testing.expect_value(t, simd.to_array(r), [4]i32{101, 202, 101, 202})
+}
+
+// runtime operands must evaluate once
+@(test)
+simd_runtime_swizzle_runtime_ops :: proc(t: ^testing.T) {
+	calls: u16 = 0
+	src: #simd[8]u16 = {0, 1, 2, 3, 4, 5, 6, 7}
+
+	count_calls :: proc(c: ^u16) -> #simd[8]u16 {
+		c^ += 1
+		return (#simd[8]u16)(c^)
+	}
+
+	r := intrinsics.simd_runtime_swizzle(src, count_calls(&calls))
+	testing.expect_value(t, simd.to_array(r), [8]u16{1, 1, 1, 1, 1, 1, 1, 1})
+}
+
 // A pairwise operation folds adjacent lanes within each operand, so it needs an even lane
 // count -- `base:intrinsics` declares `LANES % 2 == 0`. At one lane it has nothing to pair
 // with and silently switches to combining the two operands instead, which is why that width
