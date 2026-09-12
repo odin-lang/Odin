@@ -727,6 +727,7 @@ struct CheckerInfo {
 	Array<Entity *> definitions;
 	Array<Entity *> entities;
 	Array<Entity *> required_foreign_imports_through_force;
+	Array<Entity *> foreign_library_names; // for -cached mtime checking
 
 	BlockingMutex     defineables_mutex;
 	Array<Defineable> defineables;
