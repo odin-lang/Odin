@@ -1522,17 +1522,13 @@ gb_internal bool lb_llvm_simd_bulk_op_unary(lbProcedure *p, lbValue arg, LLVMVal
 
 	LLVMValueRef val = arg.value;
 	unsigned count = cast(unsigned)vt->SimdVector.count;
-	Type *elem = base_type(vt->SimdVector.elem);
 
 	if (count < default_width) {
 		LLVMValueRef *grow_indices   = gb_alloc_array(temporary_allocator(), LLVMValueRef, default_width);
 		LLVMValueRef *shrink_indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
 
 		for (unsigned i = 0; i < count; i++) {
-			ExactValue idx = is_type_float(elem) ?
-				exact_value_float(cast(f64)i) :
-				exact_value_u64(i);
-			shrink_indices[i] = lb_const_value(p->module, elem, idx).value;
+			shrink_indices[i] = lb_const_value(p->module, t_u32, exact_value_u64(i)).value;
 			grow_indices[i]   = shrink_indices[i];
 		}
 		for (unsigned i = count; i < default_width; i++) {
@@ -1558,8 +1554,8 @@ gb_internal bool lb_llvm_simd_bulk_op_unary(lbProcedure *p, lbValue arg, LLVMVal
 		LLVMValueRef *parts = gb_alloc_array(temporary_allocator(), LLVMValueRef, parts_count);
 		for (unsigned i = 0; i < parts_count; i++) {
 			LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, default_width);
-			for (unsigned i = 0; i < default_width; i++) {
-				indices[i] = lb_const_value(p->module, t_u32, exact_value_u64(4*i+0)).value;
+			for (unsigned j = 0; j < default_width; j++) {
+				indices[j] = lb_const_value(p->module, t_u32, exact_value_u64(i*default_width + j)).value;
 			}
 
 			parts[i] = LLVMBuildShuffleVector(p->builder, val, val, LLVMConstVector(indices, default_width), "");
