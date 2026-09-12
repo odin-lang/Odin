@@ -1,6 +1,7 @@
 package test_internal
 
 import "base:intrinsics"
+import "core:math"
 import "core:simd"
 import "core:testing"
 
@@ -243,4 +244,44 @@ simd_extract_accepts_a_runtime_index :: proc(t: ^testing.T) {
 	w := intrinsics.simd_replace(v, i, u32(99))
 	testing.expect_value(t, intrinsics.simd_extract(w, 2), u32(99))
 	testing.expect_value(t, intrinsics.simd_extract(w, 0), u32(10))
+}
+
+// simd_approx_recip and simd_approx_recip_sqrt
+
+@(test)
+simd_approx_recip :: proc(t: ^testing.T) {
+
+	check_approx_recip_width :: proc(t: ^testing.T, $N: int, loc := #caller_location) {
+
+		TOLERANCE :: 1e-3
+
+		v: #simd[N]f32
+		for i in 0..<N {
+			v = intrinsics.simd_replace(v, i, f32(i + 1))
+		}
+
+		r := intrinsics.simd_approx_recip(v)
+		s := intrinsics.simd_approx_recip_sqrt(v)
+		for i in 0..<N {
+			x := intrinsics.simd_extract(v, i)
+
+			want := 1 / x
+			got  := intrinsics.simd_extract(r, i)
+			testing.expectf(t, abs(got - want) <= TOLERANCE * want,
+				"simd_approx_recip(#simd[%d]f32) lane %d: got %v, want ~%v", N, i, got, want, loc = loc)
+
+			want_sqrt := 1 / math.sqrt(x)
+			got_sqrt  := intrinsics.simd_extract(s, i)
+			testing.expectf(t, abs(got_sqrt - want_sqrt) <= TOLERANCE * want_sqrt,
+				"simd_approx_recip_sqrt(#simd[%d]f32) lane %d: got %v, want ~%v", N, i, got_sqrt, want_sqrt, loc = loc)
+		}
+	}
+
+	check_approx_recip_width(t, 1)
+	check_approx_recip_width(t, 2)
+	check_approx_recip_width(t, 4)
+	check_approx_recip_width(t, 8)
+	check_approx_recip_width(t, 16)
+	check_approx_recip_width(t, 32)
+	check_approx_recip_width(t, 64)
 }
