@@ -176,6 +176,12 @@ when ODIN_ARCH != .arm64 && ODIN_ARCH != .arm32 {
 		NOATIME   = 18,
 		CLOEXEC   = 19,
 		PATH      = 21,
+		/*
+			Used with open() to create an anonymous temporary file formally belonging
+			to a directory specified by the filename.
+			(This flag requires a .DIRECTORY flag because the filename is always a directory.
+			Note that this is distinct from C code where the O_TMPFILE constant contains O_DIRECTORY implicitly.)
+		*/
 		TMPFILE   = 22,
 	}
 	// https://github.com/torvalds/linux/blob/7367539ad4b0f8f9b396baf02110962333719a48/include/uapi/asm-generic/fcntl.h#L19
