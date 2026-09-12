@@ -95,7 +95,7 @@ reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
 }
 
 
-swap :: proc(array: $T/[]$E, a, b: int) {
+swap :: #force_inline proc(array: $T/[]$E, a, b: int) {
 	when size_of(E) > 8 {
 		ptr_swap_non_overlapping(&array[a], &array[b], size_of(E))
 	} else {
