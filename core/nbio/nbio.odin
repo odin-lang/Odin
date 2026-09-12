@@ -200,7 +200,7 @@ WARN: once an operation's callback is called it can not be removed anymore (use 
 
 WARN: needs to be called from the thread of the event loop the target belongs to.
 
-Common use would be to cancel a timeout, remove a polling, or remove an `accept` before calling `close` on it's socket.
+Common use would be to cancel a timeout, remove a polling, or remove an `accept` before calling `close` on its socket.
 */
 remove :: proc(target: ^Operation) {
 	if target == nil {

@@ -665,7 +665,7 @@ test_nonblocking_option :: proc(t: ^testing.T) {
 	}
 }
 
-// Test that when the server closes it's connection, the client's next receive is `0, nil` to indicate a correct close.
+// Test that when the server closes its connection, the client's next receive is `0, nil` to indicate a correct close.
 @(test)
 test_connection_close :: proc(t: ^testing.T) {
 	server, listen_err := net.listen_tcp({address=net.IP4_Address{127, 0, 0, 1}, port=0})
