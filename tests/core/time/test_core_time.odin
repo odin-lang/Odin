@@ -587,3 +587,31 @@ test_check_timezone_edgecases :: proc(t: ^testing.T) {
 
 	testing.expectf(t, datetime_eq(ret_dt, expected_tog_dt), "Failed to convert to Togatapu time")
 }
+
+@test
+test_check_timezone_transition_instant :: proc(t: ^testing.T) {
+	ber_tz, ber_load_ok := tz.region_load("Europe/Berlin")
+	testing.expectf(t, ber_load_ok, "Failed to load Europe/Berlin timezone")
+	defer tz.region_destroy(ber_tz)
+
+	// Daylight saving time starts on 2024-03-31 and ends on 2024-10-27, both at 01:00:00 UTC.
+	// The new offset applies from the exact second of the transition.
+	Transition_Case :: struct {
+		utc, expected: [6]i64,
+	}
+	cases := [?]Transition_Case{
+		{{2024,  3, 31, 0, 59, 59}, {2024,  3, 31, 1, 59, 59}},
+		{{2024,  3, 31, 1,  0,  0}, {2024,  3, 31, 3,  0,  0}},
+		{{2024,  3, 31, 1,  0,  1}, {2024,  3, 31, 3,  0,  1}},
+		{{2024, 10, 27, 0, 59, 59}, {2024, 10, 27, 2, 59, 59}},
+		{{2024, 10, 27, 1,  0,  0}, {2024, 10, 27, 2,  0,  0}},
+		{{2024, 10, 27, 1,  0,  1}, {2024, 10, 27, 2,  0,  1}},
+	}
+	for c in cases {
+		utc_dt, _      := dt.components_to_datetime(c.utc[0], c.utc[1], c.utc[2], c.utc[3], c.utc[4], c.utc[5])
+		expected_dt, _ := dt.components_to_datetime(c.expected[0], c.expected[1], c.expected[2], c.expected[3], c.expected[4], c.expected[5])
+
+		ret_dt := tz.datetime_to_tz(utc_dt, ber_tz)
+		testing.expectf(t, datetime_eq(ret_dt, expected_dt), "Expected %v UTC to be %v in Berlin, got %v %v", c.utc, c.expected, ret_dt.date, ret_dt.time)
+	}
+}

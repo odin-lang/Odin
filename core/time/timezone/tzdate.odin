@@ -52,7 +52,7 @@ region_get_nearest :: proc(region: ^datetime.TZ_Region, tm: time.Time) -> (out: 
 
 	for left < right {
 		mid := int(uint(left+right) >> 1)
-		if region.records[mid].time < tm_sec {
+		if region.records[mid].time <= tm_sec {
 			left = mid + 1
 		} else {
 			right = mid
