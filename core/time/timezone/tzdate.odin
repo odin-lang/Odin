@@ -150,6 +150,10 @@ process_rrule :: proc(rrule: datetime.TZ_RRule, tm: time.Time) -> (out: datetime
 	std_secs := trans_date_to_seconds(i64(y), rrule.std_date) or_return
 	dst_secs := trans_date_to_seconds(i64(y), rrule.dst_date) or_return
 
+	// The transition times of the rule are local times, in the offset that is in effect before the transition.
+	std_secs -= rrule.std_offset
+	dst_secs -= rrule.dst_offset
+
 	records := []datetime.TZ_Record{
 		{
 			time = std_secs,

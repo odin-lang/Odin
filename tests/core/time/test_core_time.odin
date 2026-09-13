@@ -565,6 +565,49 @@ test_check_timezone_posix_tz :: proc(t: ^testing.T) {
 }
 
 @test
+test_check_timezone_posix_tz_transitions :: proc(t: ^testing.T) {
+	// A region without transition records only uses its POSIX TZ rule, like a slim TZif file after its last transition.
+	// The transition times of the rule are local times, in the offset that is in effect before the transition.
+	Transition_Case :: struct {
+		posix_tz:      string,
+		utc, expected: [6]i64,
+	}
+	cases := [?]Transition_Case{
+		// DST starts on 2024-03-31 and ends on 2024-10-27, both at 01:00 UTC.
+		{"CET-1CEST,M3.5.0,M10.5.0/3", {2024,  1, 15, 12,  0,  0}, {2024,  1, 15, 13,  0,  0}},
+		{"CET-1CEST,M3.5.0,M10.5.0/3", {2024,  3, 31,  0, 59, 59}, {2024,  3, 31,  1, 59, 59}},
+		{"CET-1CEST,M3.5.0,M10.5.0/3", {2024,  3, 31,  1,  0,  0}, {2024,  3, 31,  3,  0,  0}},
+		{"CET-1CEST,M3.5.0,M10.5.0/3", {2024,  7,  1, 12,  0,  0}, {2024,  7,  1, 14,  0,  0}},
+		{"CET-1CEST,M3.5.0,M10.5.0/3", {2024, 10, 27,  0, 59, 59}, {2024, 10, 27,  2, 59, 59}},
+		{"CET-1CEST,M3.5.0,M10.5.0/3", {2024, 10, 27,  1,  0,  0}, {2024, 10, 27,  2,  0,  0}},
+
+		// DST starts on 2024-03-10 at 07:00 UTC and ends on 2024-11-03 at 06:00 UTC.
+		{"EST5EDT,M3.2.0,M11.1.0",     {2024,  3, 10,  6, 59, 59}, {2024,  3, 10,  1, 59, 59}},
+		{"EST5EDT,M3.2.0,M11.1.0",     {2024,  3, 10,  7,  0,  0}, {2024,  3, 10,  3,  0,  0}},
+		{"EST5EDT,M3.2.0,M11.1.0",     {2024, 11,  3,  5, 59, 59}, {2024, 11,  3,  1, 59, 59}},
+		{"EST5EDT,M3.2.0,M11.1.0",     {2024, 11,  3,  6,  0,  0}, {2024, 11,  3,  1,  0,  0}},
+
+		// DST ends on 2024-04-06 and starts on 2024-10-05, both at 16:00 UTC.
+		{"AEST-10AEDT,M10.1.0,M4.1.0/3", {2024,  4,  6, 15, 59, 59}, {2024,  4,  7,  2, 59, 59}},
+		{"AEST-10AEDT,M10.1.0,M4.1.0/3", {2024,  4,  6, 16,  0,  0}, {2024,  4,  7,  2,  0,  0}},
+		{"AEST-10AEDT,M10.1.0,M4.1.0/3", {2024, 10,  5, 15, 59, 59}, {2024, 10,  6,  1, 59, 59}},
+		{"AEST-10AEDT,M10.1.0,M4.1.0/3", {2024, 10,  5, 16,  0,  0}, {2024, 10,  6,  3,  0,  0}},
+	}
+	for c in cases {
+		rrule, rrule_ok := tz.parse_posix_tz(c.posix_tz)
+		testing.expectf(t, rrule_ok, "Failed to parse posix tz %q", c.posix_tz)
+		defer tz.rrule_destroy(rrule)
+		region := dt.TZ_Region{name = c.posix_tz, rrule = rrule}
+
+		utc_dt, _      := dt.components_to_datetime(c.utc[0], c.utc[1], c.utc[2], c.utc[3], c.utc[4], c.utc[5])
+		expected_dt, _ := dt.components_to_datetime(c.expected[0], c.expected[1], c.expected[2], c.expected[3], c.expected[4], c.expected[5])
+
+		ret_dt := tz.datetime_to_tz(utc_dt, &region)
+		testing.expectf(t, datetime_eq(ret_dt, expected_dt), "Expected %v UTC to be %v in %s, got %v %v", c.utc, c.expected, c.posix_tz, ret_dt.date, ret_dt.time)
+	}
+}
+
+@test
 test_check_timezone_edgecases :: proc(t: ^testing.T) {
 	utc_dt, _ := dt.components_to_datetime(2024, 10, 4, 0, 47, 0)
 
