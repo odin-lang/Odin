@@ -353,14 +353,14 @@ struct Entity {
 
 			bool has_observable_side_effect;
 
-
-			bool      clobber_flags;
-			bool      clobber_memory;
-			StringSet clobber_registers_set;
-
 			Scope *param_scope;
 			Scope *label_scope;
 			Array<AsmTemplateEntityDecl> decls;
+
+			StringSet clobber_registers_set;
+			StringSet preserve_registers_set;
+			bool      clobber_flags;
+			bool      clobber_memory;
 		} AsmTemplate;
 	};
 };

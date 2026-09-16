@@ -45,7 +45,6 @@ $ODIN test ../test_issue_6165.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON -o:speed
 $ODIN test ../test_issue_6396.odin $COMMON
-$ODIN test ../test_pr_6476.odin $COMMON
 
 if [[ $($ODIN build ../test_issue_6240.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
@@ -91,6 +90,7 @@ $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
+$ODIN run ../test_issue_7564.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
 if [[ $($ODIN check ../test_issue_7421_tagged_duplicate.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"

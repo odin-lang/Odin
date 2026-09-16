@@ -33,6 +33,7 @@ enum AsmOperandKind : u8 {
 	AsmOperand_Label,
 	AsmOperand_RegisterGroup,
 	AsmOperand_Lane,
+	AsmOperand_RegisterShift,
 
 	AsmOperand_COUNT
 };
@@ -46,6 +47,7 @@ gb_global String const asm_operand_kind_strings[AsmOperand_COUNT] = {
 	str_lit("label"),
 	str_lit("register group"),
 	str_lit("lane"),
+	str_lit("register shift"),
 };
 
 gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
@@ -57,6 +59,7 @@ gb_global String const asm_operand_kind_expected_strings[AsmOperand_COUNT] = {
 	str_lit("a label"),
 	str_lit("a register group"),
 	str_lit("a lane"),
+	str_lit("a register shift"),
 };
 
 enum AsmOperandConstraintKind : u32 {

@@ -186,17 +186,17 @@ foreign lib {
 	GetGlyphImage         :: proc(font: ^Font, ch: u32, image_type: ^ImageType) -> ^SDL.Surface ---
 	GetGlyphImageForIndex :: proc(font: ^Font, glyph_index: u32, image_type: ^ImageType) -> ^SDL.Surface ---
 
-	RenderText_Solid           :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color) -> ^SDL.Surface ---
-	RenderText_Solid_Wrapped   :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color, wrap_Length: c.int) -> ^SDL.Surface ---
+	RenderText_Solid           :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg: SDL.Color) -> ^SDL.Surface ---
+	RenderText_Solid_Wrapped   :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg: SDL.Color, wrap_Length: c.int) -> ^SDL.Surface ---
 	RenderGlyph_Solid          :: proc(font: ^Font, ch: u32, fg: SDL.Color) -> ^SDL.Surface ---
-	RenderText_Shaded          :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color) -> ^SDL.Surface ---
-	RenderText_Shaded_Wrapped  :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
+	RenderText_Shaded          :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg, bg: SDL.Color) -> ^SDL.Surface ---
+	RenderText_Shaded_Wrapped  :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
 	RenderGlyph_Shaded         :: proc(font: ^Font, ch: u32, fg, bg: SDL.Color) -> ^SDL.Surface ---
-	RenderText_Blended         :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color) -> ^SDL.Surface ---
-	RenderText_Blended_Wrapped :: proc(font: ^Font, text: cstring, length: c.size_t, fg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
+	RenderText_Blended         :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg: SDL.Color) -> ^SDL.Surface ---
+	RenderText_Blended_Wrapped :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
 	RenderGlyph_Blended        :: proc(font: ^Font, ch: u32, fg: SDL.Color) -> ^SDL.Surface ---
-	RenderText_LCD             :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color) -> ^SDL.Surface ---
-	RenderText_LCD_Wrapped     :: proc(font: ^Font, text: cstring, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
+	RenderText_LCD             :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg, bg: SDL.Color) -> ^SDL.Surface ---
+	RenderText_LCD_Wrapped     :: proc(font: ^Font, text: [^]byte, length: c.size_t, fg, bg: SDL.Color, wrap_width: c.int) -> ^SDL.Surface ---
 	RenderGlyph_LCD            :: proc(font: ^Font, ch: u32, fg, bg: SDL.Color) -> ^SDL.Surface ---
 
 	CreateSurfaceTextEngine :: proc() -> ^TextEngine ---
@@ -210,7 +210,7 @@ foreign lib {
 	SetGPUTextEngineWinding           :: proc(engine: ^TextEngine, winding: GPUTextEngineWinding) ---
 	GetGPUTextEngineWinding           :: proc(#by_ptr engine: TextEngine) -> GPUTextEngineWinding ---
 
-	CreateText                :: proc(engine: ^TextEngine, font: ^Font, text: cstring, length: c.size_t) -> ^Text ---
+	CreateText                :: proc(engine: ^TextEngine, font: ^Font, text: [^]byte, length: c.size_t) -> ^Text ---
 	GetTextProperties         :: proc(text: ^Text) -> SDL.PropertiesID ---
 	GetTextEngine             :: proc(text: ^Text) -> ^TextEngine ---
 	GetTextFont               :: proc(text: ^Text) -> ^Font ---
@@ -247,9 +247,9 @@ foreign lib {
 	GetGlyphMetrics :: proc(font: ^Font, ch: u32, minx, maxx, miny, maxy, advance: ^c.int) -> bool ---
 	GetGlyphKerning :: proc(font: ^Font, previous_ch: u32, ch: u32, kerning: ^c.int) -> bool ---
 
-	GetStringSize        :: proc(font: ^Font, text: cstring, length: c.size_t, w, h: ^c.int) -> bool ---
-	GetStringSizeWrapped :: proc(font: ^Font, text: cstring, length: c.size_t, wrap_width: c.int, w, h: ^c.int) -> bool ---
-	MeasureString        :: proc(font: ^Font, text: cstring, length: c.size_t, max_width: c.int, measured_width: ^c.int, measured_length: ^c.size_t) -> bool ---
+	GetStringSize        :: proc(font: ^Font, text: [^]byte, length: c.size_t, w, h: ^c.int) -> bool ---
+	GetStringSizeWrapped :: proc(font: ^Font, text: [^]byte, length: c.size_t, wrap_width: c.int, w, h: ^c.int) -> bool ---
+	MeasureString        :: proc(font: ^Font, text: [^]byte, length: c.size_t, max_width: c.int, measured_width: ^c.int, measured_length: ^c.size_t) -> bool ---
 
 	DrawSurfaceText           :: proc(text: ^Text, x, y: c.int, surface: ^SDL.Surface) -> bool ---
 	DestroySurfaceTextEngine  :: proc(engine: ^TextEngine) ---
@@ -273,9 +273,9 @@ foreign lib {
 	GetTextWrapWidth             :: proc(text: ^Text, wrap_width: ^c.int) -> bool ---
 	SetTextWrapWhitespaceVisible :: proc(text: ^Text, visible: bool) -> bool ---
 
-	SetTextString    :: proc(text: ^Text, string: cstring, length: c.size_t) -> bool ---
-	InsertTextString :: proc(text: ^Text, offset: c.int, string: cstring, length: c.size_t) -> bool ---
-	AppendTextString :: proc(text: ^Text, string: cstring, length: c.size_t) -> bool ---
+	SetTextString    :: proc(text: ^Text, string: [^]byte, length: c.size_t) -> bool ---
+	InsertTextString :: proc(text: ^Text, offset: c.int, string: [^]byte, length: c.size_t) -> bool ---
+	AppendTextString :: proc(text: ^Text, string: [^]byte, length: c.size_t) -> bool ---
 	DeleteTextString :: proc(text: ^Text, offset, length: c.int) -> bool ---
 
 	GetTextSize :: proc(text: ^Text, w, h: ^c.int) -> bool ---
@@ -290,4 +290,9 @@ foreign lib {
 	DestroyText :: proc(text: ^Text) ---
 	CloseFont   :: proc(font: ^Font) ---
 	Quit        :: proc() ---
+}
+
+@(require_results)
+ExpandString :: proc "c" (str: string) -> ([^]byte, c.size_t) {
+	return raw_data(str), len(str)
 }

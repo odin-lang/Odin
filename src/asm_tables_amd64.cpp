@@ -647,6 +647,15 @@ struct Asm_amd64 {
 		return true;
 	}
 
+	bool reg_is_non_allocateable(Register r) const {
+		switch (r) {
+		case REG_CR0: case REG_CR2: case REG_CR3: case REG_CR4: case REG_CR8:
+		case REG_CS:  case REG_DS:  case REG_ES:  case REG_FS:  case REG_GS: case REG_SS:
+			return true;
+		}
+		return false;
+	}
+
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
 		case OP_R8:  case OP_R16: case OP_R32: case OP_R64:
@@ -733,6 +742,35 @@ struct Asm_amd64 {
 			return true;
 		}
 		return false;
+	}
+
+	bool operand_type_is_cond_code(OperandType t) const {
+		return false;
+	}
+
+	bool is_cond_code_name(String name, u32 *bit_code_) const {
+		return false;
+	}
+
+	String implicit_reg_name(OperandType t) const {
+		switch (t) {
+		case OP_AL_IMPL:   return str_lit("al");
+		case OP_AX_IMPL:   return str_lit("ax");
+		case OP_EAX_IMPL:  return str_lit("eax");
+		case OP_RAX_IMPL:  return str_lit("rax");
+		case OP_CL_IMPL:   return str_lit("cl");
+		case OP_DX_IMPL:   return str_lit("dx");
+		case OP_ST0_IMPL:  return str_lit("st");
+		case OP_XMM0_IMPL: return str_lit("xmm0");
+		}
+		return str_lit("");
+	}
+
+	String required_vector_feature(i32 w) const {
+		if (w >= 512) return str_lit("avx512f");
+		if (w >= 256) return str_lit("avx");
+		if (w >= 128) return str_lit("sse2"); // XMM; sse for f32-only, sse2 for the rest
+		return str_lit("");
 	}
 
 	AsmRegClass operand_type_reg_class(OperandType t) const {

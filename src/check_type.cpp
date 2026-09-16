@@ -887,7 +887,8 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	enum_type->Enum.scope = ctx->scope;
 
 	Type *base_type = t_int;
-	if (unparen_expr(et->base_type) != nullptr) {
+	bool base_type_implicit = (unparen_expr(et->base_type) == nullptr);
+	if (!base_type_implicit) {
 		base_type = check_type(ctx, et->base_type);
 	}
 
@@ -967,6 +968,27 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		} else {
 			iota = exact_binary_operator_value(Token_Add, iota, exact_value_i64(1));
 			entity_flags |= EntityConstantFlag_ImplicitEnumValue;
+
+			if (!base_type_implicit) {
+				int bits_iota = mp_count_bits(&iota.value_integer);
+				int bits_type = (int)type_size_of(base_type) * 8;
+				if (bits_iota > bits_type) {
+					ERROR_BLOCK();
+
+					gbString a = expr_to_string(ident);
+					gbString b = exact_value_to_string(iota);
+					gbString c = type_to_string(base_type);
+					gbString d = type_to_string(constant_type);
+					defer(
+						gb_string_free(a);
+						gb_string_free(b);
+						gb_string_free(c);
+						gb_string_free(d);
+					);
+
+					error(ident, "'%s' gets value '%s' which overflows base type '%s' of enumeration '%s'", a, b, c, d);
+				}
+			}
 		}
 
 

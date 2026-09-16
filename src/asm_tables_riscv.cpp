@@ -599,6 +599,14 @@ struct Asm_riscv {
 		return false;
 	}
 
+	bool reg_is_non_allocateable(Register r) const {
+		switch (r) {
+		case REG_ZERO:
+			return true;
+		}
+		return false;
+	}
+
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
 		case OP_NONE:
@@ -681,6 +689,20 @@ struct Asm_riscv {
 		default:
 			return false;
 		}
+	}
+
+	bool operand_type_is_cond_code(OperandType t) const {
+		return false;
+	}
+
+	bool is_cond_code_name(String name, u32 *bit_code_) const {
+		return false;
+	}
+
+	String required_vector_feature(i32 w) const {
+		// The base ISA has no vector registers; any vector operand needs the V extension.
+		if (w > 0) return str_lit("v");
+		return str_lit("");
 	}
 
 	AsmRegClass operand_type_reg_class(OperandType t) const {

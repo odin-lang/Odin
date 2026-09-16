@@ -592,13 +592,15 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
 		n->AsmInstruction.facts    = nullptr;
 		break;
+	case Ast_AsmMemoryTerm:
+		n->AsmMemoryTerm.operand = clone_ast(n->AsmMemoryTerm.operand);
+		n->AsmMemoryTerm.scale   = clone_ast(n->AsmMemoryTerm.scale);
+		break;
 	case Ast_AsmMemoryOperand:
 		n->AsmMemoryOperand.segment_override = clone_ast(n->AsmMemoryOperand.segment_override, f);
-		n->AsmMemoryOperand.base  = clone_ast(n->AsmMemoryOperand.base,  f);
-		n->AsmMemoryOperand.index = clone_ast(n->AsmMemoryOperand.index, f);
-		n->AsmMemoryOperand.scale = clone_ast(n->AsmMemoryOperand.scale, f);
-		n->AsmMemoryOperand.disp  = clone_ast(n->AsmMemoryOperand.disp,  f);
-		n->AsmMemoryOperand.type  = clone_ast(n->AsmMemoryOperand.type,  f);
+		n->AsmMemoryOperand.terms            = clone_ast_array(n->AsmMemoryOperand.terms, f);
+		n->AsmMemoryOperand.classify         = {}; // NOTE(bill): It needs to be re-classified after a clone
+		n->AsmMemoryOperand.type             = clone_ast(n->AsmMemoryOperand.type, f);
 		break;
 	case Ast_AsmRegisterGroup:
 		n->AsmRegisterGroup.registers = clone_ast_array(n->AsmRegisterGroup.registers, f);
@@ -2513,6 +2515,29 @@ gb_internal Ast *parse_asm_register(AstFile *f) {
 	}
 	return reg;
 }
+
+
+gb_internal bool asm_operand_is_shiftable(Ast *operand) {
+	if (operand == nullptr) {
+		return false;
+	}
+	switch (operand->kind) {
+	case Ast_AsmRegister:
+	case Ast_Ident:
+		return true;
+	}
+	return false;
+}
+
+gb_internal Ast *ast_asm_memory_term(AstFile *f, Token op, Ast *operand, Token scale_op, Ast *scale) {
+	Ast *term = alloc_ast_node(f, Ast_AsmMemoryTerm);
+	term->AsmMemoryTerm.op = op;
+	term->AsmMemoryTerm.operand = operand;
+	term->AsmMemoryTerm.scale_op = scale_op;
+	term->AsmMemoryTerm.scale = scale;
+	return term;
+}
+
 gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 	Ast *operand = nullptr;
 	switch (f->curr_token.kind) {
@@ -2574,17 +2599,8 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 		if (allow_memory_operand) {
 			Token open  = expect_token(f, Token_OpenBracket);
 			Ast *segment_override = nullptr;
-			Ast *base  = nullptr;
-			Ast *index = nullptr;
-			Ast *scale = nullptr;
-			Ast *disp  = nullptr;
-			Ast *type  = nullptr;
 
-			Token index_op = {};
-			Token scale_op = {};
-			Token disp_op  = {};
-
-			base = parse_asm_operand(f, false);
+			Ast *base = parse_asm_operand(f, false);
 
 			if (allow_token(f, Token_Colon)) {
 				// [segment: ...]
@@ -2596,30 +2612,44 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 				base = parse_asm_operand(f, false);
 			}
 
-			// [base]
-			// [base + index]
-			// [base - index]
-			// [base + index + disp]
-			// [base + index*scale] // *, <<, >>
-			// [base + index*scale + disp]
-			if (allow_token(f, Token_Add) ||
-			    allow_token(f, Token_Sub)) {
-			    	index_op = f->prev_token;
-				index = parse_asm_operand(f, false);
+			Array<Ast *> terms = {};
+			terms.allocator = heap_allocator();
+
+			Token op = {};
+			op.kind = Token_Add;
+
+			while (base != nullptr ||
+			       (f->curr_token.kind != Token_EOF &&
+			        f->curr_token.kind != Token_Semicolon &&
+			        f->curr_token.kind != Token_CloseBracket)) {
+			       	Ast *operand = nullptr;
+				Ast *scale = nullptr;
+				Token scale_op = {};
+
+				if (base != nullptr) {
+					operand = base;
+					base = nullptr;
+				} else {
+					operand = parse_asm_operand(f, false);
+				}
 				if (allow_token(f, Token_Mul) ||
 				    allow_token(f, Token_Shl) ||
 				    allow_token(f, Token_Shr)) {
-				    	scale_op = f->prev_token;
-					scale = parse_asm_operand(f, false);
+					scale_op = f->prev_token;
+					scale    = parse_asm_operand(f, false);
 				}
-				if (allow_token(f, Token_Add) ||
-				    allow_token(f, Token_Sub)) {
-					disp_op = f->prev_token;
-					disp = parse_asm_operand(f, false);
+				array_add(&terms, ast_asm_memory_term(f, op, operand, scale_op, scale));
+				if (allow_token(f, Token_Add) || allow_token(f, Token_Sub)) {
+					op = f->prev_token;
+					continue;
 				}
+				break;
 			}
 
+
+
 			Token close = expect_token(f, Token_CloseBracket);
+			Ast *type = nullptr;
 
 			// [...]:type
 			if (allow_token(f, Token_Colon)) {
@@ -2629,13 +2659,7 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 			Ast *mem = alloc_ast_node(f, Ast_AsmMemoryOperand);
 			mem->AsmMemoryOperand.open             = open;
 			mem->AsmMemoryOperand.segment_override = segment_override;
-			mem->AsmMemoryOperand.base             = base;
-			mem->AsmMemoryOperand.index_op         = index_op;
-			mem->AsmMemoryOperand.index            = index;
-			mem->AsmMemoryOperand.scale_op         = scale_op;
-			mem->AsmMemoryOperand.scale            = scale;
-			mem->AsmMemoryOperand.disp_op          = disp_op;
-			mem->AsmMemoryOperand.disp             = disp;
+			mem->AsmMemoryOperand.terms            = slice_from_array(terms);
 			mem->AsmMemoryOperand.close            = close;
 			mem->AsmMemoryOperand.type             = type;
 
@@ -2702,7 +2726,10 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 	if (operand == nullptr) {
 		syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
 		advance_token(f);
-	} else if (f->curr_token.kind == Token_OpenBracket) {
+		return operand;
+	}
+
+	if (f->curr_token.kind == Token_OpenBracket) {
 		f->expr_level++;
 		Token open = expect_token(f, Token_OpenBracket);
 		Ast *index = parse_asm_operand(f, false);
@@ -2710,6 +2737,25 @@ gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
 		f->expr_level--;
 		operand = ast_index_expr(f, operand, index, open, close);
 	}
+
+	if (allow_memory_operand && asm_operand_is_shiftable(operand)) {
+		switch (f->curr_token.kind) {
+		case Token_Mul:
+		case Token_Shl:
+		case Token_Shr:
+			{
+				Token op = advance_token(f);
+				Ast *amount = parse_asm_operand(f, false);
+				Ast *be = alloc_ast_node(f, Ast_BinaryExpr);
+				be->BinaryExpr.left = operand;
+				be->BinaryExpr.op = op;
+				be->BinaryExpr.right = amount;
+				operand = be;
+			}
+			break;
+		}
+	}
+
 	return operand;
 }
 
@@ -2922,7 +2968,8 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 					clobber->AsmClobber.token = hash;
 					clobber->AsmClobber.name  = name;
 					array_add(&clobbers, clobber);
-				} else if (name.string == "clobber") {
+				} else if (name.string == "clobber" ||
+				           name.string == "preserve") {
 					Ast *value = parse_asm_operand(f, false);
 					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
 					clobber->AsmClobber.token = hash;
@@ -2930,7 +2977,7 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 					clobber->AsmClobber.value = value;
 					array_add(&clobbers, clobber);
 				} else {
-					syntax_error(name, "Expected #clobber, #side_effects, or #align_stack, got '%.*s'", LIT(name.string));
+					syntax_error(name, "Expected #clobber, #preserve, #volatile, #align_stack, or #pure, got '%.*s'", LIT(name.string));
 				}
 			} else {
 				syntax_error(f->curr_token, "Expected am asm specification which begins with a identifier, got '%.*s'", LIT(f->curr_token.string));

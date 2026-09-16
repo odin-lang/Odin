@@ -848,6 +848,15 @@ struct Asm_arm64 {
 	bool supports_memory_index_not_just_disp() const {
 		return true; // base + (optionally extended/shifted) index register
 	}
+	bool reg_is_non_allocateable(Register r) const {
+		switch (r) {
+		case REG_XZR:
+		case REG_SP:
+		case REG_NZCV: case REG_DAIF: case REG_FPCR: case REG_FPSR:
+			return true;
+		}
+		return false;
+	}
 
 	AsmOperandKind kind_from_operand_type(OperandType type) const {
 		switch (type) {
@@ -858,8 +867,6 @@ struct Asm_arm64 {
 		// Integer GPR / GPR-or-SP, including shifted- and extended-register forms.
 		case OP_W_REG:      case OP_X_REG:
 		case OP_WSP_REG:    case OP_XSP_REG:
-		case OP_W_SHIFTED:  case OP_X_SHIFTED:
-		case OP_W_EXTENDED: case OP_X_EXTENDED:
 		// SIMD&FP scalar views.
 		case OP_B_REG: case OP_H_REG: case OP_S_REG: case OP_D_REG: case OP_Q_REG:
 		// NEON vector: plain, arrangement, FP16, element-indexed.
@@ -875,6 +882,13 @@ struct Asm_arm64 {
 		case OP_ZA_TILE_D: case OP_ZA_TILE_Q:
 		case OP_SYS_REG:     // MRS/MSR system-register name -> 16-bit field (cf. riscv CSR)
 			return AsmOperand_Register;
+
+		// ---- Shifted / extended register operands (`reg, lsl #n` / `reg, uxtw #n`) ----
+		// A plain register also fills these slots (shift #0); a shifted register does
+		// NOT fill a plain-register slot. That asymmetry lives in asm_operand_kind_fits.
+		case OP_W_SHIFTED:  case OP_X_SHIFTED:
+		case OP_W_EXTENDED: case OP_X_EXTENDED:
+			return AsmOperand_RegisterShift;
 
 		// ---- Immediates (numeric literals and immediate-encoded selectors) ----
 		case OP_IMM_2:  case OP_IMM_3:  case OP_IMM_4:  case OP_IMM_5:
@@ -971,6 +985,28 @@ struct Asm_arm64 {
 		return false;
 	}
 
+	bool is_cond_code_name(String name, u32 *bit_code_) const {
+		struct CondCode { String name; u32 code; };
+		static CondCode const table[] = {
+			{str_lit("eq"),  0}, {str_lit("ne"),  1},
+			{str_lit("hs"),  2}, {str_lit("lo"),  3},
+			{str_lit("mi"),  4}, {str_lit("pl"),  5},
+			{str_lit("vs"),  6}, {str_lit("vc"),  7},
+			{str_lit("hi"),  8}, {str_lit("ls"),  9},
+			{str_lit("ge"), 10}, {str_lit("lt"), 11},
+			{str_lit("gt"), 12}, {str_lit("le"), 13},
+			{str_lit("al"), 14}, {str_lit("nv"), 15},
+			{str_lit("cs"),  2}, // alias of hs
+			{str_lit("cc"),  3}, // alias of lo
+		};
+		for (CondCode const &cc : table) {
+			if (name == cc.name) {
+				if (bit_code_) *bit_code_ = cc.code;
+				return true;
+			}
+		}
+		return false;
+	}
 	// Does this slot's register spell as `vN.<T>` (an arrangement) rather than a
 	// scalar view (bN/hN/sN/dN/qN), a lane (vN.<T>[i]), or a bare vN? Drives the
 	// arrangement-suffix emission in the AArch64 backend. Element-indexed and
@@ -986,6 +1022,14 @@ struct Asm_arm64 {
 			return true;
 		}
 		return false;
+	}
+
+	String required_vector_feature(i32 w) const {
+		// NEON is 128-bit fixed and part of the AArch64 baseline for Odin's targets;
+		// anything wider is SVE (scalable) — reject fixed >128 vectors, they can't map
+		// to a NEON operand. SVE vectors aren't width-addressable this way.
+		if (w > 128) return str_lit("sve");
+		return str_lit(""); // <=128: NEON, always available
 	}
 
 	AsmRegClass operand_type_reg_class(OperandType t) const {

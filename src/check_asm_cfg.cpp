@@ -375,7 +375,8 @@ gb_internal void check_asm_cfg_report_undef_reg(AsmCtx *asm_ctx, AsmCfg *cfg, En
 template <typename AsmCtx>
 gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerContext *ctx, Entity *entity) {
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
-	auto const &decls     = entity->AsmTemplate.decls;
+	auto *ate = &entity->AsmTemplate;
+	auto const &decls     = ate->decls;
 	bool        diverging = entity->type->Proc.diverging;
 
 	if (cfg->blocks.count == 0) {
@@ -402,23 +403,51 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 	// NOTE(bill): entry seed intiailization which mirrors the linear seeding of defined_regs
 	u16 seed_regs = 0;
 	u64 seed_pm   = 0;
+	AsmRegW entry_seed_w = {};
 	for_array(i, decls) {
 		auto const &ed = decls[i];
 		u16 pin_bit = cfg->decl_pin_bit[i];
+		bool is_input_pin = false;
 		if (ed.no_init) {
 			seed_pm |= bit_of(ed.entity);
 			seed_regs |= pin_bit;
+			is_input_pin = true;
 		}
 		switch (ed.param_group) {
 		case AsmTemplateEntityDeclParamGroup_Input:
 			seed_pm |= bit_of(ed.entity);
 			seed_regs |= pin_bit;
+			is_input_pin = true;
 			break;
 		case AsmTemplateEntityDeclParamGroup_Output:
 			if (ed.tie >= 0) {
 				seed_pm |= bit_of(ed.entity);
 			}
 			break;
+		}
+
+		if (is_input_pin && pin_bit != 0 && ed.entity != nullptr) {
+			i32 wi = asm_reg_index_from_bit(pin_bit);
+			if (wi >= 0) {
+				i32 tw = cast(i32)(type_size_of(ed.entity->type) * 8);
+				if (tw > 255) tw = 255;
+				entry_seed_w.e[wi] = gb_max(entry_seed_w.e[wi], cast(u8)tw);
+			}
+		}
+	}
+
+	// NOTE(bill): #preserve
+	u16 preserve_bits = 0;
+	for (String const &reg : ate->preserve_registers_set) {
+		preserve_bits |= asm_ctx->clobber_bit_for_reg_name(reg);
+	}
+	seed_regs |= preserve_bits;
+	{
+		u8 full = cast(u8)(build_context.metrics.ptr_size * 8);
+		for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
+			if (preserve_bits & cast(u16)(1u << idx)) {
+				entry_seed_w.e[idx] = gb_max(entry_seed_w.e[idx], full);
+			}
 		}
 	}
 
@@ -561,6 +590,9 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 			continue;
 		}
 		in_w[bi] = {};
+		if (bi == 0) {
+			in_w[bi] = entry_seed_w;
+		}
 		for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
 			out_w[bi].e[idx] = gb_max(in_w[bi].e[idx], gen_w[bi].e[idx]);
 		}
@@ -591,6 +623,8 @@ gb_internal void check_asm_cfg_analyse(AsmCtx *asm_ctx, AsmCfg *cfg, CheckerCont
 						nin.e[idx] = gb_min(nin.e[idx], out_w[p].e[idx]);
 					}
 				}
+			} else {
+				nin = entry_seed_w;
 			}
 			for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
 				nout.e[idx] = gb_max(nin.e[idx], gen_w[bi].e[idx]);
