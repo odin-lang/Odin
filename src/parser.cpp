@@ -2977,7 +2977,7 @@ gb_internal Ast *parse_asm_template(AstFile *f) {
 					clobber->AsmClobber.value = value;
 					array_add(&clobbers, clobber);
 				} else {
-					syntax_error(name, "Expected #clobber, #preserve, #side_effects, #align_stack, or #pure, got '%.*s'", LIT(name.string));
+					syntax_error(name, "Expected #clobber, #preserve, #volatile, #align_stack, or #pure, got '%.*s'", LIT(name.string));
 				}
 			} else {
 				syntax_error(f->curr_token, "Expected am asm specification which begins with a identifier, got '%.*s'", LIT(f->curr_token.string));
