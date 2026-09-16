@@ -3628,6 +3628,694 @@ vrsraq_n_u64 :: #force_inline proc "c" (a, b: uint64x2_t, $N: int32_t) -> uint64
 	return simd.add(a, vrshrq_n_u64(b, N))
 }
 
+// Signed Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_n_s16)
+@(require_results, enable_target_feature = "neon")
+vshrn_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> int8x8_t where 1 <= N, N <= 8 {
+	return cast(int8x8_t)simd.shr(v, uint16x8_t(N))
+}
+
+// Unsigned Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_n_u16)
+@(require_results, enable_target_feature = "neon")
+vshrn_n_u16 :: #force_inline proc "c" (v: uint16x8_t, $N: int32_t) -> uint8x8_t where 1 <= N, N <= 8 {
+	return cast(uint8x8_t)simd.shr(v, uint16x8_t(N))
+}
+
+// Signed Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_n_s32)
+@(require_results, enable_target_feature = "neon")
+vshrn_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> int16x4_t where 1 <= N, N <= 16 {
+	return cast(int16x4_t)simd.shr(v, uint32x4_t(N))
+}
+
+// Unsigned Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_n_u32)
+@(require_results, enable_target_feature = "neon")
+vshrn_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint16x4_t where 1 <= N, N <= 16 {
+	return cast(uint16x4_t)simd.shr(v, uint32x4_t(N))
+}
+
+// Signed Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_n_s64)
+@(require_results, enable_target_feature = "neon")
+vshrn_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> int32x2_t where 1 <= N, N <= 32 {
+	return cast(int32x2_t)simd.shr(v, uint64x2_t(N))
+}
+
+// Unsigned Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_n_u64)
+@(require_results, enable_target_feature = "neon")
+vshrn_n_u64 :: #force_inline proc "c" (v: uint64x2_t, $N: int32_t) -> uint32x2_t where 1 <= N, N <= 32 {
+	return cast(uint32x2_t)simd.shr(v, uint64x2_t(N))
+}
+
+// Signed Saturating Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqshrn_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> int8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrn_n_s16(v, N)
+	} else {
+		return _vqshrn_n_s16(v, int16x8_t(-N))
+	}
+}
+
+// Unsigned Saturating Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_n_u16)
+@(require_results, enable_target_feature = "neon")
+vqshrn_n_u16 :: #force_inline proc "c" (v: uint16x8_t, $N: int32_t) -> uint8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrn_n_u16(v, N)
+	} else {
+		return _vqshrn_n_u16(v, uint16x8_t(uint16_t(N - 1) ~ max(uint16_t)))
+	}
+}
+
+// Signed Saturating Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqshrn_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> int16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrn_n_s32(v, N)
+	} else {
+		return _vqshrn_n_s32(v, int32x4_t(-N))
+	}
+}
+
+// Unsigned Saturating Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_n_u32)
+@(require_results, enable_target_feature = "neon")
+vqshrn_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrn_n_u32(v, N)
+	} else {
+		return _vqshrn_n_u32(v, uint32x4_t(uint32_t(N - 1) ~ max(uint32_t)))
+	}
+}
+
+// Signed Saturating Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqshrn_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> int32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrn_n_s64(v, N)
+	} else {
+		return _vqshrn_n_s64(v, int64x2_t(-N))
+	}
+}
+
+// Unsigned Saturating Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_n_u64)
+@(require_results, enable_target_feature = "neon")
+vqshrn_n_u64 :: #force_inline proc "c" (v: uint64x2_t, $N: int32_t) -> uint32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrn_n_u64(v, N)
+	} else {
+		return _vqshrn_n_u64(v, uint64x2_t(uint64_t(N - 1) ~ max(uint64_t)))
+	}
+}
+
+// Signed Saturating Shift Right Unsigned Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrun_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqshrun_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> uint8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrun_n_s16(v, N)
+	} else {
+		return _vqshrun_n_s16(v, int16x8_t(-N))
+	}
+}
+
+// Signed Saturating Shift Right Unsigned Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrun_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqshrun_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> uint16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrun_n_s32(v, N)
+	} else {
+		return _vqshrun_n_s32(v, int32x4_t(-N))
+	}
+}
+
+// Signed Saturating Shift Right Unsigned Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrun_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqshrun_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> uint32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vqshrun_n_s64(v, N)
+	} else {
+		return _vqshrun_n_s64(v, int64x2_t(-N))
+	}
+}
+
+// Signed Rounding Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_n_s16)
+@(require_results, enable_target_feature = "neon")
+vrshrn_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> int8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vrshrn_n_s16(v, N)
+	} else {
+		return _vrshrn_n_s16(v, int16x8_t(-N))
+	}
+}
+
+// Unsigned Rounding Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_n_u16)
+@(require_results, enable_target_feature = "neon")
+vrshrn_n_u16 :: #force_inline proc "c" (v: uint16x8_t, $N: int32_t) -> uint8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint8x8_t)_vrshrn_n_s16(transmute(int16x8_t)v, N)
+	} else {
+		return transmute(uint8x8_t)_vrshrn_n_s16(transmute(int16x8_t)v, int16x8_t(-N))
+	}
+}
+
+// Signed Rounding Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_n_s32)
+@(require_results, enable_target_feature = "neon")
+vrshrn_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> int16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vrshrn_n_s32(v, N)
+	} else {
+		return _vrshrn_n_s32(v, int32x4_t(-N))
+	}
+}
+
+// Unsigned Rounding Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_n_u32)
+@(require_results, enable_target_feature = "neon")
+vrshrn_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint16x4_t)_vrshrn_n_s32(transmute(int32x4_t)v, N)
+	} else {
+		return transmute(uint16x4_t)_vrshrn_n_s32(transmute(int32x4_t)v, int32x4_t(-N))
+	}
+}
+
+// Signed Rounding Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_n_s64)
+@(require_results, enable_target_feature = "neon")
+vrshrn_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> int32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vrshrn_n_s64(v, N)
+	} else {
+		return _vrshrn_n_s64(v, int64x2_t(-N))
+	}
+}
+
+// Unsigned Rounding Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_n_u64)
+@(require_results, enable_target_feature = "neon")
+vrshrn_n_u64 :: #force_inline proc "c" (v: uint64x2_t, $N: int32_t) -> uint32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return transmute(uint32x2_t)_vrshrn_n_s64(transmute(int64x2_t)v, N)
+	} else {
+		return transmute(uint32x2_t)_vrshrn_n_s64(transmute(int64x2_t)v, int64x2_t(-N))
+	}
+}
+
+// Signed Saturating Rounded Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqrshrn_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> int8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrn_n_s16(v, N)
+	} else {
+		return _vqrshrn_n_s16(v, int16x8_t(-N))
+	}
+}
+
+// Unsigned Saturating Rounded Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_n_u16)
+@(require_results, enable_target_feature = "neon")
+vqrshrn_n_u16 :: #force_inline proc "c" (v: uint16x8_t, $N: int32_t) -> uint8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrn_n_u16(v, N)
+	} else {
+		return _vqrshrn_n_u16(v, uint16x8_t(uint16_t(N - 1) ~ max(uint16_t)))
+	}
+}
+
+// Signed Saturating Rounded Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqrshrn_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> int16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrn_n_s32(v, N)
+	} else {
+		return _vqrshrn_n_s32(v, int32x4_t(-N))
+	}
+}
+
+// Unsigned Saturating Rounded Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_n_u32)
+@(require_results, enable_target_feature = "neon")
+vqrshrn_n_u32 :: #force_inline proc "c" (v: uint32x4_t, $N: int32_t) -> uint16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrn_n_u32(v, N)
+	} else {
+		return _vqrshrn_n_u32(v, uint32x4_t(uint32_t(N - 1) ~ max(uint32_t)))
+	}
+}
+
+// Signed Saturating Rounded Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqrshrn_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> int32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrn_n_s64(v, N)
+	} else {
+		return _vqrshrn_n_s64(v, int64x2_t(-N))
+	}
+}
+
+// Unsigned Saturating Rounded Shift Right Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_n_u64)
+@(require_results, enable_target_feature = "neon")
+vqrshrn_n_u64 :: #force_inline proc "c" (v: uint64x2_t, $N: int32_t) -> uint32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrn_n_u64(v, N)
+	} else {
+		return _vqrshrn_n_u64(v, uint64x2_t(uint64_t(N - 1) ~ max(uint64_t)))
+	}
+}
+
+// Signed Saturating Rounded Shift Right Unsigned Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrun_n_s16)
+@(require_results, enable_target_feature = "neon")
+vqrshrun_n_s16 :: #force_inline proc "c" (v: int16x8_t, $N: int32_t) -> uint8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrun_n_s16(v, N)
+	} else {
+		return _vqrshrun_n_s16(v, int16x8_t(-N))
+	}
+}
+
+// Signed Saturating Rounded Shift Right Unsigned Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrun_n_s32)
+@(require_results, enable_target_feature = "neon")
+vqrshrun_n_s32 :: #force_inline proc "c" (v: int32x4_t, $N: int32_t) -> uint16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrun_n_s32(v, N)
+	} else {
+		return _vqrshrun_n_s32(v, int32x4_t(-N))
+	}
+}
+
+// Signed Saturating Rounded Shift Right Unsigned Narrow.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrun_n_s64)
+@(require_results, enable_target_feature = "neon")
+vqrshrun_n_s64 :: #force_inline proc "c" (v: int64x2_t, $N: int32_t) -> uint32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		return _vqrshrun_n_s64(v, N)
+	} else {
+		return _vqrshrun_n_s64(v, int64x2_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_s8)
+@(require_results, enable_target_feature = "neon")
+vsri_n_s8 :: #force_inline proc "c" (a, b: int8x8_t, $N: int32_t) -> int8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		when N == 8 {
+			return a
+		} else {
+			M :: max(uint8_t) >> uint8_t(N) ~ max(uint8_t)
+			return transmute(int8x8_t)simd.bit_or(
+				simd.bit_and(transmute(uint8x8_t)a, uint8x8_t(M)),
+				simd.shr(transmute(uint8x8_t)b, uint8x8_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v8i8(a, b, int8x8_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_u8)
+@(require_results, enable_target_feature = "neon")
+vsri_n_u8 :: #force_inline proc "c" (a, b: uint8x8_t, $N: int32_t) -> uint8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		when N == 8 {
+			return a
+		} else {
+			M :: max(uint8_t) >> uint8_t(N) ~ max(uint8_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint8x8_t(M)),
+				simd.shr(b, uint8x8_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint8x8_t)_vshiftrins_v8i8(
+			transmute(int8x8_t)a,
+			transmute(int8x8_t)b,
+			int8x8_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_s16)
+@(require_results, enable_target_feature = "neon")
+vsri_n_s16 :: #force_inline proc "c" (a, b: int16x4_t, $N: int32_t) -> int16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		when N == 16 {
+			return a
+		} else {
+			M :: max(uint16_t) >> uint16_t(N) ~ max(uint16_t)
+			return transmute(int16x4_t)simd.bit_or(
+				simd.bit_and(transmute(uint16x4_t)a, uint16x4_t(M)),
+				simd.shr(transmute(uint16x4_t)b, uint16x4_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v4i16(a, b, int16x4_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_u16)
+@(require_results, enable_target_feature = "neon")
+vsri_n_u16 :: #force_inline proc "c" (a, b: uint16x4_t, $N: int32_t) -> uint16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		when N == 16 {
+			return a
+		} else {
+			M :: max(uint16_t) >> uint16_t(N) ~ max(uint16_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint16x4_t(M)),
+				simd.shr(b, uint16x4_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint16x4_t)_vshiftrins_v4i16(
+			transmute(int16x4_t)a,
+			transmute(int16x4_t)b,
+			int16x4_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_s32)
+@(require_results, enable_target_feature = "neon")
+vsri_n_s32 :: #force_inline proc "c" (a, b: int32x2_t, $N: int32_t) -> int32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		when N == 32 {
+			return a
+		} else {
+			M :: max(uint32_t) >> uint32_t(N) ~ max(uint32_t)
+			return transmute(int32x2_t)simd.bit_or(
+				simd.bit_and(transmute(uint32x2_t)a, uint32x2_t(M)),
+				simd.shr(transmute(uint32x2_t)b, uint32x2_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v2i32(a, b, int32x2_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_u32)
+@(require_results, enable_target_feature = "neon")
+vsri_n_u32 :: #force_inline proc "c" (a, b: uint32x2_t, $N: int32_t) -> uint32x2_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		when N == 32 {
+			return a
+		} else {
+			M :: max(uint32_t) >> uint32_t(N) ~ max(uint32_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint32x2_t(M)),
+				simd.shr(b, uint32x2_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint32x2_t)_vshiftrins_v2i32(
+			transmute(int32x2_t)a,
+			transmute(int32x2_t)b,
+			int32x2_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_s64)
+@(require_results, enable_target_feature = "neon")
+vsri_n_s64 :: #force_inline proc "c" (a, b: int64x1_t, $N: int32_t) -> int64x1_t where 1 <= N, N <= 64 {
+	when ODIN_ARCH == .arm64 {
+		when N == 64 {
+			return a
+		} else {
+			M :: max(uint64_t) >> uint64_t(N) ~ max(uint64_t)
+			return transmute(int64x1_t)simd.bit_or(
+				simd.bit_and(transmute(uint64x1_t)a, uint64x1_t(M)),
+				simd.shr(transmute(uint64x1_t)b, uint64x1_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v1i64(a, b, int64x1_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_u64)
+@(require_results, enable_target_feature = "neon")
+vsri_n_u64 :: #force_inline proc "c" (a, b: uint64x1_t, $N: int32_t) -> uint64x1_t where 1 <= N, N <= 64 {
+	when ODIN_ARCH == .arm64 {
+		when N == 64 {
+			return a
+		} else {
+			M :: max(uint64_t) >> uint64_t(N) ~ max(uint64_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint64x1_t(M)),
+				simd.shr(b, uint64x1_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint64x1_t)_vshiftrins_v1i64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			int64x1_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_s8)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_s8 :: #force_inline proc "c" (a, b: int8x16_t, $N: int32_t) -> int8x16_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		when N == 8 {
+			return a
+		} else {
+			M :: max(uint8_t) >> uint8_t(N) ~ max(uint8_t)
+			return transmute(int8x16_t)simd.bit_or(
+				simd.bit_and(transmute(uint8x16_t)a, uint8x16_t(M)),
+				simd.shr(transmute(uint8x16_t)b, uint8x16_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v16i8(a, b, int8x16_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_u8)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_u8 :: #force_inline proc "c" (a, b: uint8x16_t, $N: int32_t) -> uint8x16_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		when N == 8 {
+			return a
+		} else {
+			M :: max(uint8_t) >> uint8_t(N) ~ max(uint8_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint8x16_t(M)),
+				simd.shr(b, uint8x16_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint8x16_t)_vshiftrins_v16i8(
+			transmute(int8x16_t)a,
+			transmute(int8x16_t)b,
+			int8x16_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_s16)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_s16 :: #force_inline proc "c" (a, b: int16x8_t, $N: int32_t) -> int16x8_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		when N == 16 {
+			return a
+		} else {
+			M :: max(uint16_t) >> uint16_t(N) ~ max(uint16_t)
+			return transmute(int16x8_t)simd.bit_or(
+				simd.bit_and(transmute(uint16x8_t)a, uint16x8_t(M)),
+				simd.shr(transmute(uint16x8_t)b, uint16x8_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v8i16(a, b, int16x8_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_u16)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_u16 :: #force_inline proc "c" (a, b: uint16x8_t, $N: int32_t) -> uint16x8_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		when N == 16 {
+			return a
+		} else {
+			M :: max(uint16_t) >> uint16_t(N) ~ max(uint16_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint16x8_t(M)),
+				simd.shr(b, uint16x8_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint16x8_t)_vshiftrins_v8i16(
+			transmute(int16x8_t)a,
+			transmute(int16x8_t)b,
+			int16x8_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_s32)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_s32 :: #force_inline proc "c" (a, b: int32x4_t, $N: int32_t) -> int32x4_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		when N == 32 {
+			return a
+		} else {
+			M :: max(uint32_t) >> uint32_t(N) ~ max(uint32_t)
+			return transmute(int32x4_t)simd.bit_or(
+				simd.bit_and(transmute(uint32x4_t)a, uint32x4_t(M)),
+				simd.shr(transmute(uint32x4_t)b, uint32x4_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v4i32(a, b, int32x4_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_u32)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_u32 :: #force_inline proc "c" (a, b: uint32x4_t, $N: int32_t) -> uint32x4_t where 1 <= N, N <= 32 {
+	when ODIN_ARCH == .arm64 {
+		when N == 32 {
+			return a
+		} else {
+			M :: max(uint32_t) >> uint32_t(N) ~ max(uint32_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint32x4_t(M)),
+				simd.shr(b, uint32x4_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint32x4_t)_vshiftrins_v4i32(
+			transmute(int32x4_t)a,
+			transmute(int32x4_t)b,
+			int32x4_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_s64)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_s64 :: #force_inline proc "c" (a, b: int64x2_t, $N: int32_t) -> int64x2_t where 1 <= N, N <= 64 {
+	when ODIN_ARCH == .arm64 {
+		when N == 64 {
+			return a
+		} else {
+			M :: max(uint64_t) >> uint64_t(N) ~ max(uint64_t)
+			return transmute(int64x2_t)simd.bit_or(
+				simd.bit_and(transmute(uint64x2_t)a, uint64x2_t(M)),
+				simd.shr(transmute(uint64x2_t)b, uint64x2_t(N)),
+			)
+		}
+	} else {
+		return _vshiftrins_v2i64(a, b, int64x2_t(-N))
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_u64)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_u64 :: #force_inline proc "c" (a, b: uint64x2_t, $N: int32_t) -> uint64x2_t where 1 <= N, N <= 64 {
+	when ODIN_ARCH == .arm64 {
+		when N == 64 {
+			return a
+		} else {
+			M :: max(uint64_t) >> uint64_t(N) ~ max(uint64_t)
+			return simd.bit_or(
+				simd.bit_and(a, uint64x2_t(M)),
+				simd.shr(b, uint64x2_t(N)),
+			)
+		}
+	} else {
+		return transmute(uint64x2_t)_vshiftrins_v2i64(
+			transmute(int64x2_t)a,
+			transmute(int64x2_t)b,
+			int64x2_t(-N),
+		)
+	}
+}
+
 when ODIN_ARCH == .arm64 {
 	// Table Lookup.
 	//
@@ -4863,6 +5551,414 @@ when ODIN_ARCH == .arm64 {
 	vrsrad_n_u64 :: #force_inline proc "c" (a, b: uint64_t, $N: int32_t) -> uint64_t where 1 <= N, N <= 64 {
 		return a + vrshrd_n_u64(b, N)
 	}
+
+	// Signed Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_high_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vshrn_high_n_s16 :: #force_inline proc "c" (r: int8x8_t, v: int16x8_t, $N: int32_t) -> int8x16_t where 1 <= N, N <= 8 {
+		return vcombine_s8(r, vshrn_n_s16(v, N))
+	}
+
+	// Unsigned Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_high_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vshrn_high_n_u16 :: #force_inline proc "c" (r: uint8x8_t, v: uint16x8_t, $N: int32_t) -> uint8x16_t where 1 <= N, N <= 8 {
+		return vcombine_u8(r, vshrn_n_u16(v, N))
+	}
+
+	// Signed Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_high_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vshrn_high_n_s32 :: #force_inline proc "c" (r: int16x4_t, v: int32x4_t, $N: int32_t) -> int16x8_t where 1 <= N, N <= 16 {
+		return vcombine_s16(r, vshrn_n_s32(v, N))
+	}
+
+	// Unsigned Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_high_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vshrn_high_n_u32 :: #force_inline proc "c" (r: uint16x4_t, v: uint32x4_t, $N: int32_t) -> uint16x8_t where 1 <= N, N <= 16 {
+		return vcombine_u16(r, vshrn_n_u32(v, N))
+	}
+
+	// Signed Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_high_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vshrn_high_n_s64 :: #force_inline proc "c" (r: int32x2_t, v: int64x2_t, $N: int32_t) -> int32x4_t where 1 <= N, N <= 32 {
+		return vcombine_s32(r, vshrn_n_s64(v, N))
+	}
+
+	// Unsigned Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vshrn_high_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vshrn_high_n_u64 :: #force_inline proc "c" (r: uint32x2_t, v: uint64x2_t, $N: int32_t) -> uint32x4_t where 1 <= N, N <= 32 {
+		return vcombine_u32(r, vshrn_n_u64(v, N))
+	}
+
+	// Signed Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_high_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqshrn_high_n_s16 :: #force_inline proc "c" (r: int8x8_t, v: int16x8_t, $N: int32_t) -> int8x16_t where 1 <= N, N <= 8 {
+		return vcombine_s8(r, vqshrn_n_s16(v, N))
+	}
+
+	// Unsigned Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_high_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vqshrn_high_n_u16 :: #force_inline proc "c" (r: uint8x8_t, v: uint16x8_t, $N: int32_t) -> uint8x16_t where 1 <= N, N <= 8 {
+		return vcombine_u8(r, vqshrn_n_u16(v, N))
+	}
+
+	// Signed Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_high_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqshrn_high_n_s32 :: #force_inline proc "c" (r: int16x4_t, v: int32x4_t, $N: int32_t) -> int16x8_t where 1 <= N, N <= 16 {
+		return vcombine_s16(r, vqshrn_n_s32(v, N))
+	}
+
+	// Unsigned Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_high_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vqshrn_high_n_u32 :: #force_inline proc "c" (r: uint16x4_t, v: uint32x4_t, $N: int32_t) -> uint16x8_t where 1 <= N, N <= 16 {
+		return vcombine_u16(r, vqshrn_n_u32(v, N))
+	}
+
+	// Signed Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_high_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqshrn_high_n_s64 :: #force_inline proc "c" (r: int32x2_t, v: int64x2_t, $N: int32_t) -> int32x4_t where 1 <= N, N <= 32 {
+		return vcombine_s32(r, vqshrn_n_s64(v, N))
+	}
+
+	// Unsigned Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrn_high_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vqshrn_high_n_u64 :: #force_inline proc "c" (r: uint32x2_t, v: uint64x2_t, $N: int32_t) -> uint32x4_t where 1 <= N, N <= 32 {
+		return vcombine_u32(r, vqshrn_n_u64(v, N))
+	}
+
+	// Signed Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrnh_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqshrnh_n_s16 :: #force_inline proc "c" (v: int16_t, $N: int32_t) -> int8_t where 1 <= N, N <= 8 {
+		return vget_lane_s8(vqshrn_n_s16(int16x8_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrnh_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vqshrnh_n_u16 :: #force_inline proc "c" (v: uint16_t, $N: int32_t) -> uint8_t where 1 <= N, N <= 8 {
+		return vget_lane_u8(vqshrn_n_u16(uint16x8_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrns_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqshrns_n_s32 :: #force_inline proc "c" (v: int32_t, $N: int32_t) -> int16_t where 1 <= N, N <= 16 {
+		return vget_lane_s16(vqshrn_n_s32(int32x4_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrns_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vqshrns_n_u32 :: #force_inline proc "c" (v: uint32_t, $N: int32_t) -> uint16_t where 1 <= N, N <= 16 {
+		return vget_lane_u16(vqshrn_n_u32(uint32x4_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrnd_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqshrnd_n_s64 :: #force_inline proc "c" (v: int64_t, $N: int32_t) -> int32_t where 1 <= N, N <= 32 {
+		return _vqshrnd_n_s64(v, N)
+	}
+
+	// Unsigned Saturating Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrnd_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vqshrnd_n_u64 :: #force_inline proc "c" (v: uint64_t, $N: int32_t) -> uint32_t where 1 <= N, N <= 32 {
+		return _vqshrnd_n_u64(v, N)
+	}
+
+	// Signed Saturating Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrun_high_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqshrun_high_n_s16 :: #force_inline proc "c" (r: uint8x8_t, v: int16x8_t, $N: int32_t) -> uint8x16_t where 1 <= N, N <= 8 {
+		return vcombine_u8(r, vqshrun_n_s16(v, N))
+	}
+
+	// Signed Saturating Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrun_high_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqshrun_high_n_s32 :: #force_inline proc "c" (r: uint16x4_t, v: int32x4_t, $N: int32_t) -> uint16x8_t where 1 <= N, N <= 16 {
+		return vcombine_u16(r, vqshrun_n_s32(v, N))
+	}
+
+	// Signed Saturating Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrun_high_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqshrun_high_n_s64 :: #force_inline proc "c" (r: uint32x2_t, v: int64x2_t, $N: int32_t) -> uint32x4_t where 1 <= N, N <= 32 {
+		return vcombine_u32(r, vqshrun_n_s64(v, N))
+	}
+
+	// Signed Saturating Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrunh_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqshrunh_n_s16 :: #force_inline proc "c" (v: int16_t, $N: int32_t) -> uint8_t where 1 <= N, N <= 8 {
+		return vget_lane_u8(vqshrun_n_s16(int16x8_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshruns_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqshruns_n_s32 :: #force_inline proc "c" (v: int32_t, $N: int32_t) -> uint16_t where 1 <= N, N <= 16 {
+		return vget_lane_u16(vqshrun_n_s32(int32x4_t(v), N), 0)
+	}
+
+	// Signed Saturating Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqshrund_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqshrund_n_s64 :: #force_inline proc "c" (v: int64_t, $N: int32_t) -> uint32_t where 1 <= N, N <= 32 {
+		return vget_lane_u32(vqshrun_n_s64(int64x2_t(v), N), 0)
+	}
+
+	// Signed Rounding Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_high_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vrshrn_high_n_s16 :: #force_inline proc "c" (r: int8x8_t, v: int16x8_t, $N: int32_t) -> int8x16_t where 1 <= N, N <= 8 {
+		return vcombine_s8(r, vrshrn_n_s16(v, N))
+	}
+
+	// Unsigned Rounding Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_high_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vrshrn_high_n_u16 :: #force_inline proc "c" (r: uint8x8_t, v: uint16x8_t, $N: int32_t) -> uint8x16_t where 1 <= N, N <= 8 {
+		return vcombine_u8(r, vrshrn_n_u16(v, N))
+	}
+
+	// Signed Rounding Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_high_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vrshrn_high_n_s32 :: #force_inline proc "c" (r: int16x4_t, v: int32x4_t, $N: int32_t) -> int16x8_t where 1 <= N, N <= 16 {
+		return vcombine_s16(r, vrshrn_n_s32(v, N))
+	}
+
+	// Unsigned Rounding Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_high_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vrshrn_high_n_u32 :: #force_inline proc "c" (r: uint16x4_t, v: uint32x4_t, $N: int32_t) -> uint16x8_t where 1 <= N, N <= 16 {
+		return vcombine_u16(r, vrshrn_n_u32(v, N))
+	}
+
+	// Signed Rounding Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_high_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vrshrn_high_n_s64 :: #force_inline proc "c" (r: int32x2_t, v: int64x2_t, $N: int32_t) -> int32x4_t where 1 <= N, N <= 32 {
+		return vcombine_s32(r, vrshrn_n_s64(v, N))
+	}
+
+	// Unsigned Rounding Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrshrn_high_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vrshrn_high_n_u64 :: #force_inline proc "c" (r: uint32x2_t, v: uint64x2_t, $N: int32_t) -> uint32x4_t where 1 <= N, N <= 32 {
+		return vcombine_u32(r, vrshrn_n_u64(v, N))
+	}
+
+	// Signed Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_high_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrn_high_n_s16 :: #force_inline proc "c" (r: int8x8_t, v: int16x8_t, $N: int32_t) -> int8x16_t where 1 <= N, N <= 8 {
+		return vcombine_s8(r, vqrshrn_n_s16(v, N))
+	}
+
+	// Unsigned Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_high_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrn_high_n_u16 :: #force_inline proc "c" (r: uint8x8_t, v: uint16x8_t, $N: int32_t) -> uint8x16_t where 1 <= N, N <= 8 {
+		return vcombine_u8(r, vqrshrn_n_u16(v, N))
+	}
+
+	// Signed Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_high_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrn_high_n_s32 :: #force_inline proc "c" (r: int16x4_t, v: int32x4_t, $N: int32_t) -> int16x8_t where 1 <= N, N <= 16 {
+		return vcombine_s16(r, vqrshrn_n_s32(v, N))
+	}
+
+	// Unsigned Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_high_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrn_high_n_u32 :: #force_inline proc "c" (r: uint16x4_t, v: uint32x4_t, $N: int32_t) -> uint16x8_t where 1 <= N, N <= 16 {
+		return vcombine_u16(r, vqrshrn_n_u32(v, N))
+	}
+
+	// Signed Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_high_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrn_high_n_s64 :: #force_inline proc "c" (r: int32x2_t, v: int64x2_t, $N: int32_t) -> int32x4_t where 1 <= N, N <= 32 {
+		return vcombine_s32(r, vqrshrn_n_s64(v, N))
+	}
+
+	// Unsigned Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrn_high_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrn_high_n_u64 :: #force_inline proc "c" (r: uint32x2_t, v: uint64x2_t, $N: int32_t) -> uint32x4_t where 1 <= N, N <= 32 {
+		return vcombine_u32(r, vqrshrn_n_u64(v, N))
+	}
+
+	// Signed Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrnh_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrnh_n_s16 :: #force_inline proc "c" (v: int16_t, $N: int32_t) -> int8_t where 1 <= N, N <= 8 {
+		return vget_lane_s8(vqrshrn_n_s16(int16x8_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrnh_n_u16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrnh_n_u16 :: #force_inline proc "c" (v: uint16_t, $N: int32_t) -> uint8_t where 1 <= N, N <= 8 {
+		return vget_lane_u8(vqrshrn_n_u16(uint16x8_t(v), N), 0)
+	}
+
+	// Signed Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrns_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrns_n_s32 :: #force_inline proc "c" (v: int32_t, $N: int32_t) -> int16_t where 1 <= N, N <= 16 {
+		return vget_lane_s16(vqrshrn_n_s32(int32x4_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrns_n_u32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrns_n_u32 :: #force_inline proc "c" (v: uint32_t, $N: int32_t) -> uint16_t where 1 <= N, N <= 16 {
+		return vget_lane_u16(vqrshrn_n_u32(uint32x4_t(v), N), 0)
+	}
+
+	// Signed Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrnd_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrnd_n_s64 :: #force_inline proc "c" (v: int64_t, $N: int32_t) -> int32_t where 1 <= N, N <= 32 {
+		return vget_lane_s32(vqrshrn_n_s64(int64x2_t(v), N), 0)
+	}
+
+	// Unsigned Saturating Rounded Shift Right Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrnd_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrnd_n_u64 :: #force_inline proc "c" (v: uint64_t, $N: int32_t) -> uint32_t where 1 <= N, N <= 32 {
+		return vget_lane_u32(vqrshrn_n_u64(uint64x2_t(v), N), 0)
+	}
+
+	// Signed Saturating Rounded Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrun_high_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrun_high_n_s16 :: #force_inline proc "c" (r: uint8x8_t, v: int16x8_t, $N: int32_t) -> uint8x16_t where 1 <= N, N <= 8 {
+		return vcombine_u8(r, vqrshrun_n_s16(v, N))
+	}
+
+	// Signed Saturating Rounded Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrun_high_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrun_high_n_s32 :: #force_inline proc "c" (r: uint16x4_t, v: int32x4_t, $N: int32_t) -> uint16x8_t where 1 <= N, N <= 16 {
+		return vcombine_u16(r, vqrshrun_n_s32(v, N))
+	}
+
+	// Signed Saturating Rounded Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrun_high_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrun_high_n_s64 :: #force_inline proc "c" (r: uint32x2_t, v: int64x2_t, $N: int32_t) -> uint32x4_t where 1 <= N, N <= 32 {
+		return vcombine_u32(r, vqrshrun_n_s64(v, N))
+	}
+
+	// Signed Saturating Rounded Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrunh_n_s16)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrunh_n_s16 :: #force_inline proc "c" (v: int16_t, $N: int32_t) -> uint8_t where 1 <= N, N <= 8 {
+		return vget_lane_u8(vqrshrun_n_s16(int16x8_t(v), N), 0)
+	}
+
+	// Signed Saturating Rounded Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshruns_n_s32)
+	@(require_results, enable_target_feature = "neon")
+	vqrshruns_n_s32 :: #force_inline proc "c" (v: int32_t, $N: int32_t) -> uint16_t where 1 <= N, N <= 16 {
+		return vget_lane_u16(vqrshrun_n_s32(int32x4_t(v), N), 0)
+	}
+
+	// Signed Saturating Rounded Shift Right Unsigned Narrow.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vqrshrund_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vqrshrund_n_s64 :: #force_inline proc "c" (v: int64_t, $N: int32_t) -> uint32_t where 1 <= N, N <= 32 {
+		return vget_lane_u32(vqrshrun_n_s64(int64x2_t(v), N), 0)
+	}
+
+	// Shift Right and Insert.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsrid_n_s64)
+	@(require_results, enable_target_feature = "neon")
+	vsrid_n_s64 :: #force_inline proc "c" (a, b: int64_t, $N: int32_t) -> int64_t where 1 <= N, N <= 64 {
+		return transmute(int64_t)vsri_n_s64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			N,
+		)
+	}
+
+	// Shift Right and Insert.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsrid_n_u64)
+	@(require_results, enable_target_feature = "neon")
+	vsrid_n_u64 :: #force_inline proc "c" (a, b: uint64_t, $N: int32_t) -> uint64_t where 1 <= N, N <= 64 {
+		return transmute(uint64_t)vsri_n_u64(
+			transmute(uint64x1_t)a,
+			transmute(uint64x1_t)b,
+			N,
+		)
+	}
 }
 
 @(private, default_calling_convention = "none")
@@ -5072,6 +6168,64 @@ when ODIN_ARCH == .arm32 {
 		_vshiftlins_v4i32 :: proc(a: int32x4_t, b: int32x4_t, c: int32x4_t) -> int32x4_t ---
 		@(link_name = "llvm.arm.neon.vshiftins.v2i64")
 		_vshiftlins_v2i64 :: proc(a: int64x2_t, b: int64x2_t, c: int64x2_t) -> int64x2_t ---
+		@(link_name = "llvm.arm.neon.vqshiftns.v8i8")
+		_vqshrn_n_s16 :: proc(a: int16x8_t, n: int16x8_t) -> int8x8_t ---
+		@(link_name = "llvm.arm.neon.vqshiftnu.v8i8")
+		_vqshrn_n_u16 :: proc(a: uint16x8_t, n: uint16x8_t) -> uint8x8_t ---
+		@(link_name = "llvm.arm.neon.vqshiftns.v4i16")
+		_vqshrn_n_s32 :: proc(a: int32x4_t, n: int32x4_t) -> int16x4_t ---
+		@(link_name = "llvm.arm.neon.vqshiftnu.v4i16")
+		_vqshrn_n_u32 :: proc(a: uint32x4_t, n: uint32x4_t) -> uint16x4_t ---
+		@(link_name = "llvm.arm.neon.vqshiftns.v2i32")
+		_vqshrn_n_s64 :: proc(a: int64x2_t, n: int64x2_t) -> int32x2_t ---
+		@(link_name = "llvm.arm.neon.vqshiftnu.v2i32")
+		_vqshrn_n_u64 :: proc(a: uint64x2_t, n: uint64x2_t) -> uint32x2_t ---
+		@(link_name = "llvm.arm.neon.vqshiftnsu.v8i8")
+		_vqshrun_n_s16 :: proc(a: int16x8_t, n: int16x8_t) -> uint8x8_t ---
+		@(link_name = "llvm.arm.neon.vqshiftnsu.v4i16")
+		_vqshrun_n_s32 :: proc(a: int32x4_t, n: int32x4_t) -> uint16x4_t ---
+		@(link_name = "llvm.arm.neon.vqshiftnsu.v2i32")
+		_vqshrun_n_s64 :: proc(a: int64x2_t, n: int64x2_t) -> uint32x2_t ---
+		@(link_name = "llvm.arm.neon.vrshiftn.v8i8")
+		_vrshrn_n_s16 :: proc(a: int16x8_t, n: int16x8_t) -> int8x8_t ---
+		@(link_name = "llvm.arm.neon.vrshiftn.v4i16")
+		_vrshrn_n_s32 :: proc(a: int32x4_t, n: int32x4_t) -> int16x4_t ---
+		@(link_name = "llvm.arm.neon.vrshiftn.v2i32")
+		_vrshrn_n_s64 :: proc(a: int64x2_t, n: int64x2_t) -> int32x2_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftns.v8i8")
+		_vqrshrn_n_s16 :: proc(a: int16x8_t, n: int16x8_t) -> int8x8_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftnu.v8i8")
+		_vqrshrn_n_u16 :: proc(a: uint16x8_t, n: uint16x8_t) -> uint8x8_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftns.v4i16")
+		_vqrshrn_n_s32 :: proc(a: int32x4_t, n: int32x4_t) -> int16x4_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftnu.v4i16")
+		_vqrshrn_n_u32 :: proc(a: uint32x4_t, n: uint32x4_t) -> uint16x4_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftns.v2i32")
+		_vqrshrn_n_s64 :: proc(a: int64x2_t, n: int64x2_t) -> int32x2_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftnu.v2i32")
+		_vqrshrn_n_u64 :: proc(a: uint64x2_t, n: uint64x2_t) -> uint32x2_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftnsu.v8i8")
+		_vqrshrun_n_s16 :: proc(a: int16x8_t, n: int16x8_t) -> uint8x8_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftnsu.v4i16")
+		_vqrshrun_n_s32 :: proc(a: int32x4_t, n: int32x4_t) -> uint16x4_t ---
+		@(link_name = "llvm.arm.neon.vqrshiftnsu.v2i32")
+		_vqrshrun_n_s64 :: proc(a: int64x2_t, n: int64x2_t) -> uint32x2_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v8i8")
+		_vshiftrins_v8i8 :: proc(a: int8x8_t, b: int8x8_t, c: int8x8_t) -> int8x8_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v4i16")
+		_vshiftrins_v4i16 :: proc(a: int16x4_t, b: int16x4_t, c: int16x4_t) -> int16x4_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v2i32")
+		_vshiftrins_v2i32 :: proc(a: int32x2_t, b: int32x2_t, c: int32x2_t) -> int32x2_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v1i64")
+		_vshiftrins_v1i64 :: proc(a: int64x1_t, b: int64x1_t, c: int64x1_t) -> int64x1_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v16i8")
+		_vshiftrins_v16i8 :: proc(a: int8x16_t, b: int8x16_t, c: int8x16_t) -> int8x16_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v8i16")
+		_vshiftrins_v8i16 :: proc(a: int16x8_t, b: int16x8_t, c: int16x8_t) -> int16x8_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v4i32")
+		_vshiftrins_v4i32 :: proc(a: int32x4_t, b: int32x4_t, c: int32x4_t) -> int32x4_t ---
+		@(link_name = "llvm.arm.neon.vshiftins.v2i64")
+		_vshiftrins_v2i64 :: proc(a: int64x2_t, b: int64x2_t, c: int64x2_t) -> int64x2_t ---
 	}
 }
 
@@ -5146,5 +6300,51 @@ when ODIN_ARCH == .arm64 {
 		_vsliq_n_s32 :: proc(a: int32x4_t, b: int32x4_t, n: int32_t) -> int32x4_t ---
 		@(link_name = "llvm.aarch64.neon.vsli.v2i64")
 		_vsliq_n_s64 :: proc(a: int64x2_t, b: int64x2_t, n: int32_t) -> int64x2_t ---
+		@(link_name = "llvm.aarch64.neon.sqshrn.v8i8")
+		_vqshrn_n_s16 :: proc(a: int16x8_t, n: int32_t) -> int8x8_t ---
+		@(link_name = "llvm.aarch64.neon.uqshrn.v8i8")
+		_vqshrn_n_u16 :: proc(a: uint16x8_t, n: int32_t) -> uint8x8_t ---
+		@(link_name = "llvm.aarch64.neon.sqshrn.v4i16")
+		_vqshrn_n_s32 :: proc(a: int32x4_t, n: int32_t) -> int16x4_t ---
+		@(link_name = "llvm.aarch64.neon.uqshrn.v4i16")
+		_vqshrn_n_u32 :: proc(a: uint32x4_t, n: int32_t) -> uint16x4_t ---
+		@(link_name = "llvm.aarch64.neon.sqshrn.v2i32")
+		_vqshrn_n_s64 :: proc(a: int64x2_t, n: int32_t) -> int32x2_t ---
+		@(link_name = "llvm.aarch64.neon.uqshrn.v2i32")
+		_vqshrn_n_u64 :: proc(a: uint64x2_t, n: int32_t) -> uint32x2_t ---
+		@(link_name = "llvm.aarch64.neon.sqshrn.i32")
+		_vqshrnd_n_s64 :: proc(a: int64_t, n: int32_t) -> int32_t ---
+		@(link_name = "llvm.aarch64.neon.uqshrn.i32")
+		_vqshrnd_n_u64 :: proc(a: uint64_t, n: int32_t) -> uint32_t ---
+		@(link_name = "llvm.aarch64.neon.sqshrun.v8i8")
+		_vqshrun_n_s16 :: proc(a: int16x8_t, n: int32_t) -> uint8x8_t ---
+		@(link_name = "llvm.aarch64.neon.sqshrun.v4i16")
+		_vqshrun_n_s32 :: proc(a: int32x4_t, n: int32_t) -> uint16x4_t ---
+		@(link_name = "llvm.aarch64.neon.sqshrun.v2i32")
+		_vqshrun_n_s64 :: proc(a: int64x2_t, n: int32_t) -> uint32x2_t ---
+		@(link_name = "llvm.aarch64.neon.rshrn.v8i8")
+		_vrshrn_n_s16 :: proc(a: int16x8_t, n: int32_t) -> int8x8_t ---
+		@(link_name = "llvm.aarch64.neon.rshrn.v4i16")
+		_vrshrn_n_s32 :: proc(a: int32x4_t, n: int32_t) -> int16x4_t ---
+		@(link_name = "llvm.aarch64.neon.rshrn.v2i32")
+		_vrshrn_n_s64 :: proc(a: int64x2_t, n: int32_t) -> int32x2_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshrn.v8i8")
+		_vqrshrn_n_s16 :: proc(a: int16x8_t, n: int32_t) -> int8x8_t ---
+		@(link_name = "llvm.aarch64.neon.uqrshrn.v8i8")
+		_vqrshrn_n_u16 :: proc(a: uint16x8_t, n: int32_t) -> uint8x8_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshrn.v4i16")
+		_vqrshrn_n_s32 :: proc(a: int32x4_t, n: int32_t) -> int16x4_t ---
+		@(link_name = "llvm.aarch64.neon.uqrshrn.v4i16")
+		_vqrshrn_n_u32 :: proc(a: uint32x4_t, n: int32_t) -> uint16x4_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshrn.v2i32")
+		_vqrshrn_n_s64 :: proc(a: int64x2_t, n: int32_t) -> int32x2_t ---
+		@(link_name = "llvm.aarch64.neon.uqrshrn.v2i32")
+		_vqrshrn_n_u64 :: proc(a: uint64x2_t, n: int32_t) -> uint32x2_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshrun.v8i8")
+		_vqrshrun_n_s16 :: proc(a: int16x8_t, n: int32_t) -> uint8x8_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshrun.v4i16")
+		_vqrshrun_n_s32 :: proc(a: int32x4_t, n: int32_t) -> uint16x4_t ---
+		@(link_name = "llvm.aarch64.neon.sqrshrun.v2i32")
+		_vqrshrun_n_s64 :: proc(a: int64x2_t, n: int32_t) -> uint32x2_t ---
 	}
 }
