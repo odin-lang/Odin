@@ -213,16 +213,22 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	case ProcedureOptimizationMode_FavorSize:
 		lb_add_attribute_to_proc(m, p->value, "optsize");
 		break;
+	default:
+		// need optsize per proc for -o:size;
+		// (inliner, unroller, vectorizer, etc check it) 
+		if (build_context.optimization_level == OptimizationLevel_Size) {
+			lb_add_attribute_to_proc(m, p->value, "optsize");
+		}
+		break;
 	}
 
 	if (pt->Proc.enable_target_feature.len != 0) {
 		gbString feature_str = gb_string_make(temporary_allocator(), "");
 
 		String_Iterator it = {pt->Proc.enable_target_feature, 0};
+		String str = {};
 		bool first = true;
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		while (string_split_iterator_next(&it, ',', &str)) {
 			bool add_prefix = !(string_starts_with(str, '+') || string_starts_with(str, '-'));
 			if (!first) {
 				feature_str = gb_string_appendc(feature_str, ",");
@@ -1516,17 +1522,13 @@ gb_internal bool lb_llvm_simd_bulk_op_unary(lbProcedure *p, lbValue arg, LLVMVal
 
 	LLVMValueRef val = arg.value;
 	unsigned count = cast(unsigned)vt->SimdVector.count;
-	Type *elem = base_type(vt->SimdVector.elem);
 
 	if (count < default_width) {
 		LLVMValueRef *grow_indices   = gb_alloc_array(temporary_allocator(), LLVMValueRef, default_width);
 		LLVMValueRef *shrink_indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
 
 		for (unsigned i = 0; i < count; i++) {
-			ExactValue idx = is_type_float(elem) ?
-				exact_value_float(cast(f64)i) :
-				exact_value_u64(i);
-			shrink_indices[i] = lb_const_value(p->module, elem, idx).value;
+			shrink_indices[i] = lb_const_value(p->module, t_u32, exact_value_u64(i)).value;
 			grow_indices[i]   = shrink_indices[i];
 		}
 		for (unsigned i = count; i < default_width; i++) {
@@ -1552,8 +1554,8 @@ gb_internal bool lb_llvm_simd_bulk_op_unary(lbProcedure *p, lbValue arg, LLVMVal
 		LLVMValueRef *parts = gb_alloc_array(temporary_allocator(), LLVMValueRef, parts_count);
 		for (unsigned i = 0; i < parts_count; i++) {
 			LLVMValueRef *indices = gb_alloc_array(temporary_allocator(), LLVMValueRef, default_width);
-			for (unsigned i = 0; i < default_width; i++) {
-				indices[i] = lb_const_value(p->module, t_u32, exact_value_u64(4*i+0)).value;
+			for (unsigned j = 0; j < default_width; j++) {
+				indices[j] = lb_const_value(p->module, t_u32, exact_value_u64(i*default_width + j)).value;
 			}
 
 			parts[i] = LLVMBuildShuffleVector(p->builder, val, val, LLVMConstVector(indices, default_width), "");
@@ -1810,15 +1812,18 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		return res;
 	case BuiltinProc_simd_abs:
 		if (is_float) {
-			LLVMValueRef pos = arg0.value;
-			LLVMValueRef neg = LLVMBuildFNeg(p->builder, pos, "");
-			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOGT, pos, neg, "");
-			res.value = LLVMBuildSelect(p->builder, cond, pos, neg, "");
+			LLVMTypeRef types[1] = {LLVMTypeOf(arg0.value)};
+			LLVMValueRef args[1] = {arg0.value};
+			res.value = lb_call_intrinsic(p, "llvm.fabs", args, gb_count_of(args), types, gb_count_of(types));
+		} else if (is_signed) {
+			LLVMTypeRef types[1] = {LLVMTypeOf(arg0.value)};
+			// is_int_min_poison=false, so abs(min(T)) = min(T) and not poison
+			LLVMValueRef is_int_min_poison = lb_const_bool(p->module, t_llvm_bool, false).value;
+			LLVMValueRef args[2] = {arg0.value, is_int_min_poison};
+			res.value = lb_call_intrinsic(p, "llvm.abs", args, gb_count_of(args), types, gb_count_of(types));
 		} else {
-			LLVMValueRef pos = arg0.value;
-			LLVMValueRef neg = LLVMBuildNeg(p->builder, pos, "");
-			LLVMValueRef cond = LLVMBuildICmp(p->builder, is_signed ? LLVMIntSGT : LLVMIntUGT, pos, neg, "");
-			res.value = LLVMBuildSelect(p->builder, cond, pos, neg, "");
+			// unsigned integers -> |x| = x
+			res.value = arg0.value;
 		}
 		return res;
 	case BuiltinProc_simd_min:
@@ -4613,9 +4618,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_c_va_start:
 		{
 			lbValue ptr  = lb_build_expr(p, ce->args[0]);
-			lbValue args = lb_build_expr(p, ce->args[1]);
-
-			gb_unused(args);
 
 			LLVMValueRef va_start_args[] = {ptr.value};
 			LLVMTypeRef  va_start_types[] = {lb_type(p->module, ptr.type)};
@@ -4651,7 +4653,14 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		{
 			lbValue ptr = lb_build_expr(p, ce->args[0]);
 			Type *type = type_of_expr(ce->args[1]);
-			LLVMValueRef value = LLVMBuildVAArg(p->builder, ptr.value, lb_type(p->module, type), "");
+			LLVMTypeRef llvm_type = lb_type(p->module, type);
+			
+			bool is_win64 = build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_amd64;
+			if (is_win64 && LLVMGetTypeKind(llvm_type) == LLVMIntegerTypeKind && LLVMGetIntTypeWidth(llvm_type) < 64) {
+				LLVMValueRef slot = LLVMBuildVAArg(p->builder, ptr.value, lb_type(p->module, t_u64), "");
+				return {LLVMBuildTrunc(p->builder, slot, llvm_type, ""), type};
+			}
+			LLVMValueRef value = LLVMBuildVAArg(p->builder, ptr.value, llvm_type, "");
 
 			return {value, type};
 		} break;

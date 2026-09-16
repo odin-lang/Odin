@@ -281,7 +281,7 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_,
 			}
 			i64 align = big_int_to_i64(&v);
 			if (align < 1 || !gb_is_power_of_two(cast(isize)align)) {
-				error(node, "#%s must be a power of 2, got %lld", msg, align);
+				error(node, "#%s must be a power of 2, got %lld", msg, cast(long long)align);
 				return false;
 			}
 			*align_ = align;
@@ -1120,6 +1120,13 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			gb_string_free(s);
 		}
 
+		if (o.mode == Addressing_Constant) {
+			convert_to_typed(ctx, &o, t_int);
+			if (o.mode == Addressing_Invalid) {
+				o.value = exact_value_i64(1);
+			}
+		}
+
 		ExactValue bit_size = o.value;
 
 		if (bit_size.kind != ExactValue_Integer) {
@@ -1390,7 +1397,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 			if (lower > 0) {
 				actual_lower = 0;
 			} else if (lower < 0) {
-				error(bs->elem, "bit_set does not allow a negative lower bound (%lld) when an underlying type is set", lower);
+				error(bs->elem, "bit_set does not allow a negative lower bound (%lld) when an underlying type is set", cast(long long)lower);
 			}
 		}
 
@@ -1419,9 +1426,9 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		}
 		if (!is_valid) {
 			if (actual_lower != lower) {
-				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", cast(long long)bits, cast(long long)bits_required);
 			} else {
-				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", cast(long long)bits, cast(long long)bits_required);
 			}
 		}
 		
@@ -1481,7 +1488,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 						lower_changed = true;
 					} else if (lower < 0) {
 						gbString s = type_to_string(elem);
-						error(bs->elem, "bit_set does not allow a negative lower bound (%lld) of the element type '%s' when an underlying type is set", lower, s);
+						error(bs->elem, "bit_set does not allow a negative lower bound (%lld) of the element type '%s' when an underlying type is set", cast(long long)lower, s);
 						gb_string_free(s);
 					}
 				}
@@ -1489,9 +1496,9 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 				if (upper - lower >= bits) {
 					i64 bits_required = upper-lower+1;
 					if (lower_changed) {
-						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
+						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", cast(long long)bits, cast(long long)bits_required);
 					} else {
-						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", cast(long long)bits, cast(long long)bits_required);
 					}
 				}
 
@@ -4139,7 +4146,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	}
 	#endif
 
-	if (type->kind == Type_Named && type->Named.base == nullptr || is_type_typed(type)) {
+	if (type->kind == Type_Named && base_type(type) == nullptr || is_type_typed(type)) {
 		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);

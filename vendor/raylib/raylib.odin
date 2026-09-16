@@ -663,7 +663,7 @@ MouseButton :: enum c.int {
 	MIDDLE  = 2,                      // Mouse button middle (pressed wheel)
 	SIDE    = 3,                      // Mouse button side (advanced mouse device)
 	EXTRA   = 4,                      // Mouse button extra (advanced mouse device)
-	FORWARD = 5,                      // Mouse button fordward (advanced mouse device)
+	FORWARD = 5,                      // Mouse button forward (advanced mouse device)
 	BACK    = 6,                      // Mouse button back (advanced mouse device)
 }
 

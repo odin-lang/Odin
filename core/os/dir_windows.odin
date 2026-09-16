@@ -42,6 +42,7 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 		#assert(size_of(fi.inode) == size_of(file_id_info.FileId))
 		#assert(size_of(fi.inode) == 16)
 		runtime.mem_copy_non_overlapping(&fi.inode, &file_id_info.FileId, 16)
+		fi.device = file_id_info.VolumeSerialNumber
 	}
 
 	return

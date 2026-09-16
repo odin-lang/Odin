@@ -113,8 +113,8 @@ main :: proc() {
 	// ---- NMOS undocumented ----------------------------------------------------
 	check_mode("LAX zp",       .LAX,      .MEM_ZP,   0xA7)
 	check_mode("LAX abs,Y",    .LAX,      .MEM_ABS_Y,0xBF)
-	check_mode("SAX_NMOS zp",  .SAX_NMOS, .MEM_ZP,   0x87)
-	check_mode("SAX_NMOS abs", .SAX_NMOS, .MEM_ABS,  0x8F)
+	check_mode("SAX zp (NMOS)",  .SAX, .MEM_ZP,   0x87)
+	check_mode("SAX abs (NMOS)", .SAX, .MEM_ABS,  0x8F)
 	check_mode("DCP abs",      .DCP,      .MEM_ABS,  0xCF)
 	check_mode("ISC abs",      .ISC,      .MEM_ABS,  0xEF)
 	check_mode("RLA abs",      .RLA,      .MEM_ABS,  0x2F)

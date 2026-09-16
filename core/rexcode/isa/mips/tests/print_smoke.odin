@@ -173,9 +173,9 @@ run_printer_tests :: proc() {
         clear(&errors)
         mips.decode(code[:byte_count], nil, &dec_insts, &dec_info, &dec_labels, &errors)
 
-        names: map[u32]string
+        names: mips.Label_Names // keyed by BYTE OFFSET
         defer delete(names)
-        names[0] = "loop"
+        names[mips.Label_Offset(0)] = "loop"
         out := mips.aprint(dec_insts[:], dec_info[:], dec_labels[:],
                            nil, nil, &names, context.temp_allocator)
         pcheck("Named label",

@@ -4564,6 +4564,35 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 	return false;
 }
 
+gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	} else if (name == "require_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->require_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "enable_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->enable_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	}
+	return false;
+}
 
 #include "check_expr.cpp"
 #include "check_builtin.cpp"
@@ -7380,24 +7409,24 @@ gb_internal void check_objc_context_provider_procedures(Checker *c) {
 
 		const char *self_param_err = "The @(objc_context_provider) procedure must take as a parameter a single pointer to the @(objc_type) value.";
 		if (proc.param_count != 1) {
-			error(proc_entity->token, self_param_err);
+			error(proc_entity->token, "%s", self_param_err);
 		}
 
 		Type *self_param = base_type(proc.params->Tuple.variables[0]->type);
 		if (self_param->kind != Type_Pointer) {
-			error(proc_entity->token, self_param_err);
+			error(proc_entity->token, "%s", self_param_err);
 		}
 
 		Type *self_type = base_named_type(self_param->Pointer.elem);
 		if (!internal_check_is_assignable_to(self_type, e->type) &&
 			!(e->TypeName.objc_ivar && internal_check_is_assignable_to(self_type, e->TypeName.objc_ivar))) {
-			error(proc_entity->token, self_param_err);
+			error(proc_entity->token, "%s", self_param_err);
 		}
 		if (proc.calling_convention != ProcCC_CDecl && proc.calling_convention != ProcCC_Contextless) {
-			error(e->token, self_param_err);
+			error(e->token, "%s", self_param_err);
 		}
 		if (proc.is_polymorphic) {
-			error(e->token, self_param_err);
+			error(e->token, "%s", self_param_err);
 		}
 	}
 }

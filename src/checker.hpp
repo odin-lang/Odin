@@ -839,6 +839,7 @@ struct CheckerContext {
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
+	Ast *asm_template_hint;
 };
 
 gb_internal u64 check_vet_flags(CheckerContext *c);

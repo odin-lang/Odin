@@ -214,6 +214,31 @@ main :: proc() {
 
 	}
 
+	/* THE TABLE THIS FILE WAS GENERATED AGAINST, as a fingerprint over ENCODE_RUNS.
+
+	   Every builder below bakes an ABSOLUTE index into ENCODE_FORMS. Whether that index is still
+	   right depends on exactly one thing — the (start, count) run of its mnemonic — so hashing the
+	   runs captures the whole invariant: if this fingerprint still matches the live table, every
+	   baked hint is still inside its own mnemonic's forms; if it does not, this file is stale and
+	   every builder after the first inserted form names someone else's instruction.
+
+	   It has gone stale twice, silently, because nothing compared the two halves: `6e17e7a2d` left
+	   2130 of 3671 builders pointing at the wrong form, and after `36af73834` regenerated both,
+	   `baae2636b` and `9ae9a9bf9` re-broke 37 and then 3393 of 3802 — the latter including CALL,
+	   whose r/m64 builder encoded `0F 8A` (JPE) instead of `FF /2`, turning every indirect call
+	   into a conditional jump. `tests/test.odin` checks this constant. */
+	fingerprint := u64(0xcbf2_9ce4_8422_2325)
+	for m in x86.Mnemonic {
+		r := x86.ENCODE_RUNS[m]
+		for part in ([2]u64{u64(r.start), u64(r.count)}) {
+			for shift: uint = 0; shift < 64; shift += 8 {
+				fingerprint = (fingerprint ~ ((part >> shift) & 0xff)) * 0x0000_0100_0000_01b3
+			}
+		}
+	}
+	strings.write_string(&sb, "\n// The ENCODE_RUNS layout these hints were generated against — see the note in the generator.\n")
+	strings.write_string(&sb, fmt.tprintf("BUILDER_TABLE_FINGERPRINT :: u64(0x%016x)\n", fingerprint))
+
 	output := strings.to_string(sb)
 
 	err := os.write_entire_file(#directory + "/../mnemonic_builders.odin", transmute([]u8)strings.concatenate({GEN_ATTRIB, output}))

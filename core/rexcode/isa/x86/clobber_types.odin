@@ -24,6 +24,7 @@ Side_Effect :: enum u8 {
 	PRIVILEGED,   // requires CPL0 / reads-writes supervisor machine state
 	CONTROL,      // alters control flow (writes RIP): branches, calls, returns
 	CET,          // control-flow-enforcement: landing pads, shadow-stack ops
+	NONDETERMINISTIC,
 }
 Side_Effects :: distinct bit_set[Side_Effect; u16]
 

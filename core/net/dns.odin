@@ -620,7 +620,8 @@ validate_hostname :: proc(hostname: string) -> (ok: bool) {
 	return true
 }
 
-parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil) -> (record: DNS_Record, ok: bool) {
+parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (record: DNS_Record, ok: bool) {
+	context.allocator = allocator
 	record_buf := packet[cur_off^:]
 
 	srv_record_name, hn_sz := decode_hostname(packet, cur_off^, context.temp_allocator) or_return

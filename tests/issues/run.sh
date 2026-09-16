@@ -45,7 +45,6 @@ $ODIN test ../test_issue_6165.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON -o:speed
 $ODIN test ../test_issue_6396.odin $COMMON
-$ODIN test ../test_pr_6476.odin $COMMON
 
 if [[ $($ODIN build ../test_issue_6240.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 3 ]]; then
 	echo "SUCCESSFUL 1/1"
@@ -88,11 +87,51 @@ else
 	exit 1
 fi
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
+$ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
+$ODIN test ../test_issue_7421.odin $COMMON
+if [[ $($ODIN check ../test_issue_7421_tagged_duplicate.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN check ../test_issue_7429.odin $COMMON_CHECK
 $ODIN test ../test_issue_7356.odin $COMMON
+$ODIN test ../test_issue_7336.odin $COMMON
 $ODIN build ../test_issue_7167.odin $COMMON
 $ODIN build ../test_issue_7188.odin $COMMON
+$ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
+$ODIN test ../test_issue_bool_to_be_conversion.odin $COMMON
+$ODIN test ../test_issue_bool_comparison_truthiness.odin $COMMON
+$ODIN test ../test_issue_const_array_broadcast.odin $COMMON
+$ODIN test ../test_issue_swizzle_multi_assign.odin $COMMON
+
+$ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
+if [[ $($ODIN check ../test_issue_foreign_redeclaration_mismatch.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_ellipsis_type_call.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+# `asm` templates are amd64-only, so this file is empty on every other architecture
+if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
+	if [[ $($ODIN doc ../test_issue_asm_doc_category.odin -file 2>&1 | grep -c "asm templates") -eq 1 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+fi
 
 if [[ $($ODIN build ../test_issue_7108.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"

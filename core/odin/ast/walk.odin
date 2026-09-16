@@ -161,12 +161,6 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		walk(v, n.expr)
 	case ^Auto_Cast:
 		walk(v, n.expr)
-	case ^Inline_Asm_Expr:
-		walk_expr_list(v, n.param_types)
-		walk(v, n.return_type)
-		walk(v, n.constraints_string)
-		walk(v, n.asm_string)
-
 
 	case ^Bad_Stmt:
 	case ^Empty_Stmt:
@@ -431,6 +425,63 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		walk(v, n.name)
 		walk(v, n.type)
 		walk(v, n.bit_size)
+
+	case ^Asm_Template:
+		walk(v, n.type)
+		for spec in n.specs {
+			walk(v, spec)
+		}
+		for clobber in n.clobbers {
+			walk(v, clobber)
+		}
+		walk_stmt_list(v, n.instructions)
+	case ^Asm_Spec:
+		walk(v, n.name)
+		if n.tied_name != nil {
+			walk(v, n.tied_name)
+		}
+		if n.type != nil {
+			walk(v, n.type)
+		}
+		if n.value != nil {
+			walk(v, n.value)
+		}
+		walk_expr_list(v, n.directives)
+	case ^Asm_Register:
+	case ^Asm_Clobber:
+		if n.value != nil {
+			walk(v, n.value)
+		}
+	case ^Asm_Label:
+	case ^Asm_Label_Decl:
+		walk(v, n.label)
+	case ^Asm_Instruction:
+		walk(v, n.name)
+		walk_expr_list(v, n.operands)
+	case ^Asm_Memory_Operand:
+		if n.segment_override != nil {
+			walk(v, n.segment_override)
+		}
+		walk(v, n.base)
+		if n.index != nil {
+			walk(v, n.index)
+		}
+		if n.scale != nil {
+			walk(v, n.scale)
+		}
+		if n.disp != nil {
+			walk(v, n.disp)
+		}
+		if n.type != nil {
+			walk(v, n.type)
+		}
+	case ^Asm_Register_Group:
+		walk_expr_list(v, n.registers)
+		if n.type != nil {
+			walk(v, n.type)
+		}
+	case ^Asm_Directive:
+		walk_expr_list(v, n.operands)
 	case:
 		fmt.panicf("ast.walk: unexpected node type %T", n)
 	}

@@ -12,6 +12,7 @@ package all
 @(require) import "vendor:miniaudio"
 @(require) import "vendor:portmidi"
 @(require) import "vendor:raylib"
+@(require) import "vendor:raylib/rlgl"
 @(require) import "vendor:zlib"
 
 @(require) import "vendor:sdl2"

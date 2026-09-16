@@ -196,6 +196,8 @@ struct AsmTemplateEntityDecl {
 
 	i32 view_of; // total_index of the source operand this is a width-view of, else -1
 	i32 view_bits; // the view width in bits, otherwise 0
+
+	bool no_init;
 };
 
 // An Entity is a named "thing" in the language
@@ -340,22 +342,25 @@ struct Entity {
 			String name;
 			Ast *node;
 			Ast *parent;
+
+			i32 asm_block_index;
 		} Label;
 		struct {
 			Ast *node;
 			bool is_volatile;
 			bool is_align_stack;
+			bool is_pure;
 
 			bool has_observable_side_effect;
-
-
-			bool      clobber_flags;
-			bool      clobber_memory;
-			StringSet clobber_registers_set;
 
 			Scope *param_scope;
 			Scope *label_scope;
 			Array<AsmTemplateEntityDecl> decls;
+
+			StringSet clobber_registers_set;
+			StringSet preserve_registers_set;
+			bool      clobber_flags;
+			bool      clobber_memory;
 		} AsmTemplate;
 	};
 };
@@ -574,6 +579,7 @@ gb_internal Entity *alloc_entity_label(Scope *scope, Token token, Type *type, As
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
 	entity->Label.parent = parent;
+	entity->Label.asm_block_index = -1;
 	entity->state = EntityState_Resolved;
 	return entity;
 }

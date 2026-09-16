@@ -28,6 +28,8 @@ gb_internal Token ast_token(Ast *node) {
 		return ast_token(node->AsmInstruction.name);
 	case Ast_AsmMemoryOperand:
 		return node->AsmMemoryOperand.open;
+	case Ast_AsmRegisterGroup:
+		return node->AsmRegisterGroup.open;
 	case Ast_AsmDirective:
 		return node->AsmDirective.token;
 
@@ -211,6 +213,11 @@ Token ast_end_token(Ast *node) {
 			return ast_end_token(node->AsmMemoryOperand.type);
 		}
 		return node->AsmMemoryOperand.close;
+	case Ast_AsmRegisterGroup:
+		if (node->AsmRegisterGroup.type) {
+			return ast_end_token(node->AsmRegisterGroup.type);
+		}
+		return node->AsmRegisterGroup.close;
 
 	case Ast_BadExpr:       return node->BadExpr.end;
 	case Ast_TagExpr:
