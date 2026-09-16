@@ -11,11 +11,11 @@ if exist "build\" rmdir /S /Q build
 mkdir build
 pushd build
 
-set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables
+set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables -microarch:native
 
 @echo on
 
-..\..\..\odin run ..\gen.odin -file -- . || exit /b
+..\..\..\odin run ..\gen.odin -file -microarch:native -- . || exit /b
 
 @echo off
 REM Ask the C compiler which tiers it has, by preprocessing the generated

@@ -22,7 +22,7 @@ here=$(cd "$(dirname "$0")" && pwd)
 # The C side's optimisation level. An ABI is a link-time contract, so the two
 # sides are built independently and either may be optimised: `ABI_CFLAGS=-O2`.
 : "${ABI_CFLAGS:=}"
-COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
+COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables -microarch:native"
 
 CC_TARGET=""; [ -n "$TRIPLE" ] && CC_TARGET="--target=$TRIPLE"
 ODIN_TARGET=""; [ -n "$TARGET" ] && ODIN_TARGET="-target:$TARGET"
@@ -36,7 +36,7 @@ pushd "$here/build" > /dev/null
 
 set -x
 
-$ODIN run ../gen.odin -file -- .
+$ODIN run ../gen.odin -file -microarch:native -- .
 
 # Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
 # The Odin side must use the same tiers or it references symbols C never emitted.
