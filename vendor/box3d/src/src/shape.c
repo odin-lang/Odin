@@ -424,7 +424,7 @@ b3ShapeId b3CreateHeightFieldShape( b3BodyId bodyId, const b3ShapeDef* def, cons
 	return shapeId;
 }
 
-b3ShapeId b3CreateCompoundShape( b3BodyId bodyId, b3ShapeDef* def, const b3CompoundData* compound )
+b3ShapeId b3CreateBakedCompoundShape( b3BodyId bodyId, b3ShapeDef* def, const b3CompoundData* compound )
 {
 	b3ShapeId shapeId = b3CreateShape( bodyId, def, compound, b3_compoundShape, b3Transform_identity, b3Vec3_one, false );
 	if ( shapeId.index1 != 0 )
@@ -1295,6 +1295,8 @@ void b3Shape_SetMeshMaterial( b3ShapeId shapeId, b3SurfaceMaterial surfaceMateri
 
 	B3_ASSERT( 0 <= index && index < shape->materialCount );
 	B3_ASSERT( shape->type != b3_compoundShape );
+
+	B3_REC( world, ShapeSetMeshMaterial, shapeId, surfaceMaterial, index );
 	b3GetShapeMaterials( shape )[index] = surfaceMaterial;
 }
 
@@ -1613,6 +1615,14 @@ void b3Shape_SetHull( b3ShapeId shapeId, const b3HullData* hull )
 		return;
 	}
 
+	if ( world->recording != NULL )
+	{
+		// Intern the shared hull.
+		uint32_t geometryId = b3RecInternHull( world->recording, data );
+		b3RecArgs_ShapeSetHull setArgs = { shapeId, geometryId };
+		b3RecWrite_ShapeSetHull( world->recording, &setArgs );
+	}
+
 	b3DestroyShapeAllocationForShapeChange( world, shape );
 
 	shape->hull = data;
@@ -1639,6 +1649,13 @@ void b3Shape_SetMesh( b3ShapeId shapeId, const b3MeshData* meshData, b3Vec3 scal
 	}
 
 	world->locked = true;
+
+	if ( world->recording != NULL )
+	{
+		uint32_t geometryId = b3RecInternMesh( world->recording, meshData );
+		b3RecArgs_ShapeSetMesh setArgs = { shapeId, geometryId, scale };
+		b3RecWrite_ShapeSetMesh( world->recording, &setArgs );
+	}
 
 	b3Shape* shape = b3GetShape( world, shapeId );
 

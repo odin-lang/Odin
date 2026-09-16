@@ -277,6 +277,8 @@ odin
 *.bin
 demo.bin
 libLLVM*.so*
+*.a
+*.o
 
 # core:rexcode commits its generated encode/decode tables: each arch's tablegen
 # emits human-readable Odin, serialized to tables/*.bin, which the library
@@ -307,6 +309,8 @@ build.sh
 *.raddbg
 *.rdi
 tests/issues/build/*
+tests/abi/build/*
+tests/abi/build-cross/*
 misc/featuregen/featuregen
 
 # Clangd stuff

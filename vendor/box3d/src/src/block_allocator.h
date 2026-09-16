@@ -26,7 +26,7 @@ typedef struct b3BlockAllocator
 	int allocationCount;
 } b3BlockAllocator;
 
-// Element must be large enough to hold a pointer
+// Element must be large enough to hold a pointer. The element size is rounded up to B3_ALIGNMENT.
 b3BlockAllocator b3CreateBlockAllocator( int elementSize, int initialCount );
 void b3DestroyBlockAllocator( b3BlockAllocator* allocator );
 

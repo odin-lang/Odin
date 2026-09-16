@@ -19,13 +19,13 @@ typedef struct b3ManifoldConstraintPoint
 
 typedef struct b3ManifoldConstraint
 {
-	// todo use pointer buffer
 	b3ManifoldConstraintPoint points[4];
 	int pointCount;
 	b3Vec3 normal;
 	b3Vec3 tangent1;
 	b3Vec3 tangent2;
-	b3Vec3 originA, originB;
+	// Friction centers
+	b3Vec3 centerA, centerB;
 	float twistMass;
 	float twistImpulse;
 	b3Matrix2 tangentMass;

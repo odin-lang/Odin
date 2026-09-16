@@ -244,8 +244,11 @@ wake_up :: proc(t: ^testing.T) {
 			}, context)
 			defer thread.destroy(thr)
 
-			// Should block forever until the thread calling wake_up will make it return.
-			ev(t, nbio.tick(), nil)
+			// A tick can return without progress; loop until the wake is observed.
+			// A lost wake would block here forever and trip the fail timeout.
+			for !hit {
+				ev(t, nbio.tick(), nil)
+			}
 			e(t, hit)
 
 			nbio.remove(accept)

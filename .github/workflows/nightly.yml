@@ -95,12 +95,12 @@ jobs:
   build_macos:
     strategy:
       matrix:
-        arch: [amd64, arm64]
+        arch: [arm64]
     env:
       ARCH: ${{ matrix.arch }}
     name: Macos Build ${{ matrix.arch }}
     if: github.repository == 'odin-lang/Odin'
-    runs-on: ${{ matrix.arch == 'amd64' && 'macos-15-intel' || 'macos-latest' }}
+    runs-on: ${{ 'macos-latest' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -137,7 +137,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.arch == 'amd64' && 'macos_artifacts' || 'macos_arm_artifacts' }}
+          name: ${{ 'macos_arm_artifacts' }}
           path: dist.tar.gz
   upload_b2:
     runs-on: [ubuntu-latest]
@@ -176,12 +176,6 @@ jobs:
           name: linux_arm_artifacts
           path: linux_arm_artifacts
 
-      - name: Download macOS artifacts
-        uses: actions/download-artifact@v4.1.7
-        with:
-          name: macos_artifacts
-          path: macos_artifacts
-
       - name: Download macOS arm artifacts
         uses: actions/download-artifact@v4.1.7
         with:
@@ -204,7 +198,6 @@ jobs:
           python3 ci/nightly.py artifact windows-amd64 windows_artifacts/
           python3 ci/nightly.py artifact linux-amd64 linux_artifacts/dist.tar.gz
           python3 ci/nightly.py artifact linux-arm64 linux_arm_artifacts/dist.tar.gz
-          python3 ci/nightly.py artifact macos-amd64 macos_artifacts/dist.tar.gz
           python3 ci/nightly.py artifact macos-arm64 macos_arm_artifacts/dist.tar.gz
           python3 ci/nightly.py prune
           python3 ci/nightly.py json

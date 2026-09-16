@@ -251,6 +251,8 @@ type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_uni
 type_integer_to_unsigned :: proc($T: typeid) -> type where type_is_integer(T), !type_is_unsigned(T) ---
 type_integer_to_signed   :: proc($T: typeid) -> type where type_is_integer(T), type_is_unsigned(T) ---
 
+// Directional: true when U contains every field of V, matched on name and type.
+// Swapping the arguments can change the answer, and an empty V will return true.
 type_has_shared_fields :: proc($U, $V: typeid) -> bool where type_is_struct(U), type_is_struct(V) ---
 
 

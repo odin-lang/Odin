@@ -137,3 +137,113 @@ print_decimal :: proc(sb: ^strings.Builder, value: u32) {
 		strings.write_byte(sb, buf[j])
 	}
 }
+
+// -----------------------------------------------------------------------------
+// Label display (presentation-side naming)
+// -----------------------------------------------------------------------------
+//
+// Internal label ids are allocation-order handles — the encoder's creation
+// order, or the decoder's branch-DISCOVERY order (a loop's latch names the
+// header before an earlier forward target). That order is an accident as far
+// as a listing is concerned: naming labels by raw id makes the numbers appear
+// out of order down the page. Display naming is therefore derived HERE, once
+// per print call, independent of the ids:
+//
+//   - every DEFINED label offset gets a display number in ASCENDING ADDRESS
+//     order, so a listing reads L0, L1, L2 … top to bottom;
+//   - the caller may name any BYTE OFFSET via `Label_Names`
+//     (`names[0] = "factorial"` heads the listing with the function name) —
+//     a named offset is displayable even when no Label_Definition points at
+//     it, since nothing need branch to a function's entry.
+//
+// `Label_Offset` is a distinct type so a map keyed by the OLD contract
+// (internal label ids) fails to compile instead of silently mis-naming.
+
+Label_Offset :: distinct u32
+
+// Caller-supplied display names, keyed by byte offset into the printed region.
+Label_Names :: map[Label_Offset]string
+
+// Per-print-call display state: the sorted set of displayable label offsets
+// (display number = index) plus the caller's names.
+Label_Display :: struct {
+	offsets: [dynamic]u32, // ascending; a label's display number is its index here
+	names:   ^Label_Names, // byte-offset-keyed caller names (nil = none)
+}
+
+label_display_init :: proc(display: ^Label_Display, label_defs: []Label_Definition, names: ^Label_Names, allocator := context.allocator) {
+	display.names = names
+	display.offsets = make([dynamic]u32, 0, len(label_defs), allocator)
+	insert_sorted :: proc(offsets: ^[dynamic]u32, offset: u32) {
+		lo, hi := 0, len(offsets)
+		for lo < hi {
+			mid := (lo + hi) / 2
+			if offsets[mid] < offset {
+				lo = mid + 1
+			} else {
+				hi = mid
+			}
+		}
+		if lo < len(offsets) && offsets[lo] == offset {
+			return // already displayable
+		}
+		append(offsets, 0)
+		copy(offsets[lo + 1:], offsets[lo:])
+		offsets[lo] = offset
+	}
+	for definition in label_defs {
+		if definition == LABEL_UNDEFINED {
+			continue
+		}
+		insert_sorted(&display.offsets, u32(definition))
+	}
+	if names != nil {
+		for offset in names^ {
+			insert_sorted(&display.offsets, u32(offset))
+		}
+	}
+}
+
+label_display_destroy :: proc(display: ^Label_Display) {
+	delete(display.offsets)
+}
+
+// Is there a displayable label at `offset` (a definition, or a caller-named offset)?
+label_display_at :: proc(display: ^Label_Display, offset: u32) -> bool {
+	_, found := label_display_rank(display, offset)
+	return found
+}
+
+// The display number of the label at `offset` (its rank in address order).
+label_display_rank :: proc(display: ^Label_Display, offset: u32) -> (rank: int, found: bool) {
+	lo, hi := 0, len(display.offsets)
+	for lo < hi {
+		mid := (lo + hi) / 2
+		if display.offsets[mid] < offset {
+			lo = mid + 1
+		} else {
+			hi = mid
+		}
+	}
+	if lo < len(display.offsets) && display.offsets[lo] == offset {
+		return lo, true
+	}
+	return 0, false
+}
+
+// Write the display name for the label at `offset`: the caller's name for that
+// offset if one was supplied, else `<prefix><rank>` with the address-ordered rank.
+label_display_write :: proc(display: ^Label_Display, sb: ^strings.Builder, offset: u32, prefix: string) {
+	if display.names != nil {
+		if name, has := display.names^[Label_Offset(offset)]; has {
+			strings.write_string(sb, name)
+			return
+		}
+	}
+	rank, found := label_display_rank(display, offset)
+	if !found {
+		rank = 0 // an undisplayable offset never reaches here from the printers; be lenient
+	}
+	strings.write_string(sb, prefix)
+	print_decimal(sb, u32(rank))
+}

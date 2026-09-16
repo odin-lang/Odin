@@ -444,6 +444,19 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			      expr_str,
 			      LIT(context_name));
 			rhs->mode = Addressing_Invalid;
+			return nullptr;
+		}
+		case Addressing_Builtin: {
+			// a builtin is not a value
+			gbString expr_str = expr_to_string(rhs->expr);
+			defer (gb_string_free(expr_str));
+
+			error(rhs->expr,
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+			rhs->mode = Addressing_Invalid;
+			return nullptr;
 		}
 		case Addressing_Invalid:
 			return nullptr;
@@ -941,14 +954,17 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			error(x.expr, "Expected a constant integer for #unroll, got '%s'", s);
 			gb_string_free(s);
 		} else {
-			ExactValue value = exact_value_to_integer(x.value);
-			i64 v = exact_value_to_i64(value);
-			if (v < 1) {
-				error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
-			} else {
-				unroll_count = v;
-				if (v > 1024) {
-					error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+			convert_to_typed(ctx, &x, t_int);
+			if (x.mode != Addressing_Invalid) {
+				ExactValue value = exact_value_to_integer(x.value);
+				i64 v = exact_value_to_i64(value);
+				if (v < 1) {
+					error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
+				} else {
+					unroll_count = v;
+					if (v > 1024) {
+						error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+					}
 				}
 			}
 
@@ -1134,9 +1150,9 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		if (ctx->inline_for_depth >= MAX_INLINE_FOR_DEPTH && prev_inline_for_depth < MAX_INLINE_FOR_DEPTH) {
 			ERROR_BLOCK();
 			if (prev_inline_for_depth > 0) {
-				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			} else {
-				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			}
 			error_line("\tUse a normal 'for' loop instead by removing the 'inline' prefix\n");
 			ctx->inline_for_depth = MAX_INLINE_FOR_DEPTH;
@@ -1151,6 +1167,8 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
+	// Tagless switch cases are independent predicates, not case values.
+	bool check_duplicate_cases = ss->tag != nullptr;
 
 	mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
 	check_open_scope(ctx, node);
@@ -1276,7 +1294,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				Operand b1 = rhs;
 				check_comparison(ctx, expr, &a1, &b1, Token_LtEq);
 
-				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				if (check_duplicate_cases) {
+					add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				}
 
 				if (is_type_string16(x.type)) {
 					// NOTE(bill): Force dependency for strings here
@@ -1309,7 +1329,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
-					add_type_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_type_to_seen_map(ctx, &seen, y);
+					}
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
@@ -1326,7 +1348,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 						continue;
 					}
 					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
-					add_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_to_seen_map(ctx, &seen, y);
+					}
 				}
 			}
 		}
@@ -1371,7 +1395,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1647,7 +1671,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1883,7 +1907,12 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_Array:
-				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
+				// for #soa container with array element type, the element carries Addressing_SoaVariable,
+				// rather than Addressing_Variable; the element itself has no address,
+				// but each component does, so for &v in soa[i] is addressable
+				is_possibly_addressable = operand.mode == Addressing_Variable ||
+				                          operand.mode == Addressing_SoaVariable ||
+				                          is_ptr;
 				array_add(&vals, t->Array.elem);
 				array_add(&vals, t_int);
 				break;
@@ -2493,7 +2522,7 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 			{
 				gbString lhs = expr_to_string(be->left);
 				gbString rhs = expr_to_string(be->right);
-				error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
+				error_line("\tSuggestion: Did you mean to do an assignment?\n");
 				error_line("\t            '%s = %s;'\n", lhs, rhs);
 				gb_string_free(rhs);
 				gb_string_free(lhs);

@@ -419,6 +419,9 @@ typedef struct b3SurfaceMaterial
 	/// carry a b3DebugMaterial preset, see b3MakeDebugColor.
 	/// @see b3HexColor
 	uint32_t customColor;
+
+	/// Explicit padding. Must be zero.
+	uint32_t padding;
 } b3SurfaceMaterial;
 
 /// Use this to initialize your surface material
@@ -490,6 +493,7 @@ typedef struct b3ShapeDef
 	bool isSensor;
 
 	/// Enable sensor events for this shape. This applies to sensors and non-sensors. False by default, even for sensors.
+	/// Only convex shapes may act as sensor visitors.
 	bool enableSensorEvents;
 
 	/// Enable contact events for this shape. Only applies to kinematic and dynamic bodies. Ignored for sensors. False by default.
@@ -1930,8 +1934,7 @@ typedef struct b3Capsule
  * @{
  */
 
-/// A hull vertex. Identified by a half-edge with this
-/// vertex as its tail.
+/// A hull vertex. Identified by a half-edge with this vertex as its tail.
 typedef struct b3HullVertex
 {
 	/// A half-edge that has this vertex as the origin
@@ -1965,7 +1968,7 @@ typedef struct b3HullFace
 } b3HullFace;
 
 /// 64-bit hull version. Useful for validating serialized data.
-#define B3_HULL_VERSION 0x9D4716CE3793900Eull
+#define B3_HULL_VERSION 0xDA5150191B994C01ull
 
 /// A convex hull.
 /// @note This data structure has data hanging off the end and cannot be directly copied.
@@ -2016,11 +2019,17 @@ typedef struct b3HullData
 	/// The face count. Hulls faces are convex polygons.
 	int faceCount;
 
+	/// Offset of the face plane array in bytes from the struct address.
+	int planeOffset;
+
 	/// Offset of the face array in bytes from the struct address.
 	int faceOffset;
 
-	/// Offset of the face plane array in bytes from the struct address.
-	int planeOffset;
+	/// Offset of structure of array (SOA) vertices
+	int soaVertexOffset;
+
+	/// Offset of structure of array (SOA) unit normal vectors
+	int soaNormalOffset;
 
 	/// Explicit padding. Hull identity is a content hash and memcmp over raw bytes,
 	/// so there must be no unnamed padding for struct copies to scramble.
@@ -2035,9 +2044,15 @@ typedef struct b3BoxHull
 	b3HullVertex boxVertices[8]; ///< Box vertices.
 	b3Vec3 boxPoints[8];		 ///< Box points.
 	b3HullHalfEdge boxEdges[24]; ///< Box half-edges.
-	b3HullFace boxFaces[6];		 ///< Box faces.
-	uint8_t padding[2];			 ///< Explicit padding, see b3HullData::padding.
 	b3Plane boxPlanes[6];		 ///< Box face planes.
+	b3HullFace boxFaces[6];		 ///< Box faces.
+	uint8_t padding[10];		 ///< Explicit padding, see b3HullData::padding.
+	float vx[8];				 ///< vertex x
+	float vy[8];				 ///< vertex y
+	float vz[8];				 ///< vertex z
+	float nx[8];				 ///< normal x, padded to multiple of 4
+	float ny[8];				 ///< normal y, padded to multiple of 4
+	float nz[8];				 ///< normal z, padded to multiple of 4
 } b3BoxHull;
 
 /**@}*/ // hull
@@ -2048,13 +2063,13 @@ typedef struct b3BoxHull
  * @{
  */
 
-/// This is used to create a re-usable collision mesh
+/// This is used to create a re-usable collision mesh.
 typedef struct b3MeshDef
 {
 	/// Triangle vertices
 	b3Vec3* vertices;
 
-	/// Triangle vertex indices. 3 for each triangle.
+	/// Triangle vertex indices. 3 for each triangle. CCW winding.
 	int32_t* indices;
 
 	/// Triangle material index. 1 per triangle. Indexes into b3ShapeDef::materials.
@@ -2407,14 +2422,14 @@ typedef struct b3CompoundDef
 	int sphereCount;
 } b3CompoundDef;
 
-/// The compound version depends on the tree, mesh, and hull versions.
-#define B3_COMPOUND_VERSION ( 0x830778DB07086EB4ull ^ B3_DYNAMIC_TREE_VERSION ^ B3_MESH_VERSION ^ B3_HULL_VERSION )
+/// The baked compound version depends on the tree, mesh, and hull versions.
+#define B3_COMPOUND_VERSION ( 0xB11DCE70FAD5622Bull ^ B3_DYNAMIC_TREE_VERSION ^ B3_MESH_VERSION ^ B3_HULL_VERSION )
 
 /// Meshes used in compounds have limited space for materials. If you have
 /// a mesh with many materials, you can use it outside of the compound.
 #define B3_MAX_COMPOUND_MESH_MATERIALS 4
 
-/// The runtime data for a baked compound shape. This is a potentially large yet highly optimized
+/// The data for a baked compound shape. This is a potentially large yet highly optimized
 /// data structure. It can contain thousands of child shapes, yet at runtime it populates
 /// into the world as a single shape in the runtime broad-phase.
 /// This data structure has data living off the end and must be accessed using offsets.
@@ -2530,10 +2545,10 @@ typedef struct b3ChildShape
 	/// Tagged union.
 	union
 	{
-		b3Capsule capsule;	///< Capsule.
+		b3Capsule capsule;		///< Capsule.
 		const b3HullData* hull; ///< Hull.
-		b3Mesh mesh;		///< Mesh.
-		b3Sphere sphere;	///< Sphere.
+		b3Mesh mesh;			///< Mesh.
+		b3Sphere sphere;		///< Sphere.
 	};
 
 	/// Transform of the shape into compound local space.
@@ -2943,12 +2958,12 @@ typedef struct b3DebugShape
 	/// Tagged union.
 	union
 	{
-		const b3Capsule* capsule;		  ///< Capsule shape.
+		const b3Capsule* capsule;			  ///< Capsule shape.
 		const b3CompoundData* compound;		  ///< Compound shape.
 		const b3HeightFieldData* heightField; ///< Height-field shape.
-		const b3HullData* hull;			  ///< Convex hull shape.
-		const b3Mesh* mesh;				  ///< Mesh shape with scale.
-		const b3Sphere* sphere;			  ///< Sphere shape.
+		const b3HullData* hull;				  ///< Convex hull shape.
+		const b3Mesh* mesh;					  ///< Mesh shape with scale.
+		const b3Sphere* sphere;				  ///< Sphere shape.
 	};
 } b3DebugShape;
 
@@ -2957,8 +2972,10 @@ typedef struct b3DebugShape
 /// it stays accurate far from the origin. Shift into your own camera frame inside the callbacks.
 typedef struct b3DebugDraw
 {
-	/// Draws a shape and returns true if drawing should continue
-	bool ( *DrawShapeFcn )( void* userShape, b3WorldTransform transform, b3HexColor color, void* context );
+	/// Draws a user shape. The userShape pointer is owned by the application and is known to Box3D as
+	/// an opaque pointer returned from b3CreateDebugShapeCallback. When this is called the drawn shape has 
+	/// passed a culling test against drawingBounds below.
+	void ( *DrawShapeFcn )( void* userShape, b3WorldTransform transform, b3HexColor color, void* context );
 
 	/// Draw a line segment.
 	void ( *DrawSegmentFcn )( b3Pos p1, b3Pos p2, b3HexColor color, void* context );
@@ -3018,7 +3035,7 @@ typedef struct b3DebugDraw
 	bool drawContacts;
 
 	/// Draw contact anchor A or B
-	int drawAnchorA;
+	bool drawAnchorA;
 
 	/// Option to visualize the graph coloring used for contacts and joints
 	bool drawGraphColors;
@@ -3031,9 +3048,6 @@ typedef struct b3DebugDraw
 
 	/// Option to draw contact normal forces
 	bool drawContactForces;
-
-	/// Option to draw contact friction forces
-	bool drawFrictionForces;
 
 	/// Option to draw islands as bounding boxes
 	bool drawIslands;

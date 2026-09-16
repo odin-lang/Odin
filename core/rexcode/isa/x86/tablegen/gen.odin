@@ -23,6 +23,7 @@ package rexcode_x86_tablegen
 // before Stage B dumps it to raw bytes, so the blobs can never drift from a
 // well-typed table.
 
+import "base:intrinsics"
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -34,6 +35,7 @@ import lib "../"
 // `Mnemonic`/`Encoding` unqualified — its body stays byte-for-byte unedited.
 Encoding  :: lib.Encoding
 Mnemonic  :: lib.Mnemonic
+Clobber   :: lib.Clobber
 PREFIX_66 :: lib.PREFIX_66
 PREFIX_F3 :: lib.PREFIX_F3
 PREFIX_F2 :: lib.PREFIX_F2
@@ -47,21 +49,22 @@ BLOBS := [?]Blob{
 	{"ENCODE_FORMS",          "x86.encode_forms.bin",   "Encoding"},
 	{"ENCODE_RUNS",           "x86.encode_runs.bin",    "Encode_Run"},
 	{"ENCODE_RECIPES",        "x86.encode_recipes.bin", "Form_Recipe"},
-	{"MODRM_TABLE",           "x86.modrm.bin",        "ModRM_Info"},
-	{"SIB_TABLE",             "x86.sib.bin",          "SIB_Info"},
-	{"LEGACY_DECODE_ENTRIES", "x86.legacy.bin",       "Decode_Entry"},
-	{"VEX_DECODE_ENTRIES",    "x86.vex.bin",          "VEX_Decode_Entry"},
-	{"EVEX_DECODE_ENTRIES",   "x86.evex.bin",         "VEX_Decode_Entry"},
-	{"DECODE_INDEX_LEGACY",   "x86.idx_legacy.bin",   "Decode_Index"},
-	{"DECODE_INDEX_ESC_0F",   "x86.idx_0f.bin",       "Decode_Index"},
-	{"DECODE_INDEX_ESC_0F38", "x86.idx_0f38.bin",     "Decode_Index"},
-	{"DECODE_INDEX_ESC_0F3A", "x86.idx_0f3a.bin",     "Decode_Index"},
-	{"VEX_INDEX_0F",          "x86.vex_idx_0f.bin",   "Decode_Index"},
-	{"VEX_INDEX_0F38",        "x86.vex_idx_0f38.bin", "Decode_Index"},
-	{"VEX_INDEX_0F3A",        "x86.vex_idx_0f3a.bin", "Decode_Index"},
-	{"EVEX_INDEX_0F",         "x86.evex_idx_0f.bin",  "Decode_Index"},
-	{"EVEX_INDEX_0F38",       "x86.evex_idx_0f38.bin","Decode_Index"},
-	{"EVEX_INDEX_0F3A",       "x86.evex_idx_0f3a.bin","Decode_Index"},
+	{"MODRM_TABLE",           "x86.modrm.bin",          "ModRM_Info"},
+	{"SIB_TABLE",             "x86.sib.bin",            "SIB_Info"},
+	{"LEGACY_DECODE_ENTRIES", "x86.legacy.bin",         "Decode_Entry"},
+	{"VEX_DECODE_ENTRIES",    "x86.vex.bin",            "VEX_Decode_Entry"},
+	{"EVEX_DECODE_ENTRIES",   "x86.evex.bin",           "VEX_Decode_Entry"},
+	{"DECODE_INDEX_LEGACY",   "x86.idx_legacy.bin",     "Decode_Index"},
+	{"DECODE_INDEX_ESC_0F",   "x86.idx_0f.bin",         "Decode_Index"},
+	{"DECODE_INDEX_ESC_0F38", "x86.idx_0f38.bin",       "Decode_Index"},
+	{"DECODE_INDEX_ESC_0F3A", "x86.idx_0f3a.bin",       "Decode_Index"},
+	{"VEX_INDEX_0F",          "x86.vex_idx_0f.bin",     "Decode_Index"},
+	{"VEX_INDEX_0F38",        "x86.vex_idx_0f38.bin",   "Decode_Index"},
+	{"VEX_INDEX_0F3A",        "x86.vex_idx_0f3a.bin",   "Decode_Index"},
+	{"EVEX_INDEX_0F",         "x86.evex_idx_0f.bin",    "Decode_Index"},
+	{"EVEX_INDEX_0F38",       "x86.evex_idx_0f38.bin",  "Decode_Index"},
+	{"EVEX_INDEX_0F3A",       "x86.evex_idx_0f3a.bin",  "Decode_Index"},
+	{"CLOBBER_FORMS",         "x86.clobber_forms.bin",  "Clobber"},
 }
 
 DIR_GEN     :: #directory + "/generated/"
@@ -81,7 +84,7 @@ main :: proc() {
 // -----------------------------------------------------------------------------
 
 total_forms :: proc() -> (n: int) {
-	for m in Mnemonic { n += len(ENCODING_TABLE[m]) }
+	for m in Mnemonic { n += len(INSTRUCTION_TABLE[m]) }
 	return
 }
 
@@ -94,7 +97,7 @@ emit_encode_tables :: proc() {
 
 	max_name := 0
 	for m in Mnemonic {
-		if len(ENCODING_TABLE[m]) > 0 {
+		if len(INSTRUCTION_TABLE[m]) > 0 {
 			max_name = max(max_name, len(reflect.enum_string(m)))
 		}
 	}
@@ -102,10 +105,20 @@ emit_encode_tables :: proc() {
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total_forms())
 	for m in Mnemonic {
-		forms := ENCODING_TABLE[m]
+		forms := &INSTRUCTION_TABLE[m]
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
-		for f in forms { write_encoding(&sb, f, max_name) }
+		for f in forms { write_encoding(&sb, f.encoding, max_name) }
+	}
+	strings.write_string(&sb, "}\n\n")
+
+	strings.write_string(&sb, "@(rodata)\n")
+	fmt.sbprintfln(&sb, "CLOBBER_FORMS := [%d]lib.Clobber{{", total_forms())
+	for m in Mnemonic {
+		forms := &INSTRUCTION_TABLE[m]
+		if len(forms) == 0 { continue }
+		fmt.sbprintfln(&sb, "\t// .%v", m)
+		for f in forms { write_clobber(&sb, f.clobber, max_name) }
 	}
 	strings.write_string(&sb, "}\n\n")
 
@@ -116,7 +129,7 @@ emit_encode_tables :: proc() {
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
-		n := len(ENCODING_TABLE[m])
+		n := len(INSTRUCTION_TABLE[m])
 		name := reflect.enum_string(m)
 		fmt.sbprintf(&sb, "\t.%s", name)
 		for _ in 0..<run_name-len(name) { strings.write_byte(&sb, ' ') }
@@ -152,6 +165,63 @@ write_encoding :: proc(sb: ^strings.Builder, e: lib.Encoding, max_name: int) {
 	strings.write_string(sb, "},\n")
 }
 
+write_clobber :: proc(sb: ^strings.Builder, c: lib.Clobber, max_name: int) {
+	i := 0
+	sep :: proc(sb: ^strings.Builder, i: ^int) {
+		if i^ > 0 { strings.write_string(sb, ", ") }
+		i^ += 1
+	}
+	write_flags :: proc(sb: ^strings.Builder, name: string, flags: $T) {
+		strings.write_string(sb, name)
+		strings.write_string(sb, "={")
+		i := 0
+		for flag in flags {
+			if i > 0 { strings.write_string(sb, ", ") }
+			when intrinsics.type_is_enum(type_of(flag)) {
+				fmt.sbprintf(sb, ".%s", flag)
+			} else {
+				fmt.sbprintf(sb, "%v", flag)
+			}
+			i += 1
+		}
+		strings.write_string(sb, "}")
+	}
+
+	strings.write_string(sb, "\t{")
+	if c.written != nil {
+		sep(sb, &i); write_flags(sb, "written", c.written)
+	}
+	if c.read != nil {
+		sep(sb, &i); write_flags(sb, "read", c.read)
+	}
+	if c.implicit_wr != nil {
+		sep(sb, &i); write_flags(sb, "implicit_wr", c.implicit_wr)
+	}
+	if c.implicit_rd != nil {
+		sep(sb, &i); write_flags(sb, "implicit_rd", c.implicit_rd)
+	}
+	if c.flags_wr != nil {
+		sep(sb, &i); write_flags(sb, "flags_wr", c.flags_wr)
+	}
+	if c.flags_undef != nil {
+		sep(sb, &i); write_flags(sb, "flags_undef", c.flags_undef)
+	}
+	if c.flags_rd != nil {
+		sep(sb, &i); write_flags(sb, "flags_rd", c.flags_rd)
+	}
+	if c.writes_mem {
+		sep(sb, &i); strings.write_string(sb, "writes_mem=true")
+	}
+	if c.reads_mem {
+		sep(sb, &i); strings.write_string(sb, "reads_mem=true")
+	}
+	if c.side_effects != nil {
+		sep(sb, &i); write_flags(sb, "side_effects", c.side_effects)
+	}
+
+	strings.write_string(sb, "},\n")
+}
+
 // -----------------------------------------------------------------------------
 // Decode side
 // -----------------------------------------------------------------------------
@@ -172,7 +242,8 @@ Collected_Entry :: struct {
 emit_decode_tables :: proc() -> (n_legacy, n_vex, n_evex: int) {
 	legacy, vex, evex: [dynamic]Collected_Entry
 	for m in Mnemonic {
-		for enc in ENCODING_TABLE[m] {
+		for &form in INSTRUCTION_TABLE[m] {
+			enc := &form.encoding
 			e := Collected_Entry{
 				esc      = enc.flags.esc,
 				prefix   = enc.flags.prefix,
@@ -196,6 +267,9 @@ emit_decode_tables :: proc() -> (n_legacy, n_vex, n_evex: int) {
 			}
 		}
 	}
+	drop_aliased(&legacy)
+	drop_aliased(&vex)
+	drop_aliased(&evex)
 	slice.sort_by(legacy[:], entry_less)
 	slice.sort_by(vex[:],    entry_less)
 	slice.sort_by(evex[:],   entry_less)
@@ -217,6 +291,73 @@ emit_decode_tables :: proc() -> (n_legacy, n_vex, n_evex: int) {
 
 	emit_file(DIR_GEN + "decode_tables.odin", &sb)
 	return len(legacy), len(vex), len(evex)
+}
+
+/*
+	Several mnemonics can name ONE encoding (SHL and SAL are both /4 in the shift
+	group; JE and JZ are both 0x74). The decoder reads bytes, so it cannot tell
+	them apart and must simply print one name -- which means the choice has to be
+	declared, or it falls out of wherever the entry lands in the sort below.
+
+	lib.MNEMONIC_ALIASES declares it. An alias entry is dropped here, before the
+	tables are written, so the name never reaches the decoder at all; it stays
+	fully encodable, since ENCODE_FORMS is built from the same table separately.
+
+	The drop is CONDITIONAL on the canonical name covering the byte-identical
+	encoding. That is what keeps the rule safe for a mnemonic that is an alias at
+	one opcode and the only name at another: MOV aliases MOVABS at the `A0`-`A3`
+	moffs and `B8+r` imm64 forms, and dropping it unconditionally would leave
+	`88`/`89` -- ordinary register MOV -- with no decode entry at all.
+*/
+drop_aliased :: proc(entries: ^[dynamic]Collected_Entry) {
+	Key :: struct {
+		esc:    lib.Escape,
+		prefix: u8,
+		opcode: u8,
+		ext:    u8,
+		ops:    [4]lib.Operand_Type,
+		enc:    [4]lib.Operand_Encoding,
+		flags:  lib.Encoding_Flags,
+		vex_w:  lib.VEX_W,
+		vex_l:  lib.VEX_L,
+	}
+	key_of :: proc(e: Collected_Entry) -> Key {
+		return Key{e.esc, e.prefix, e.opcode, e.ext, e.ops, e.enc, e.flags, e.vex_w, e.vex_l}
+	}
+	/* Which mnemonics each indistinguishable encoding is spelled by. */
+	names := make(map[Key][dynamic]lib.Mnemonic)
+	defer {
+		for _, list in names { delete(list) }
+		delete(names)
+	}
+	for e in entries {
+		key := key_of(e)
+		list, present := &names[key]
+		if !present {
+			names[key] = make([dynamic]lib.Mnemonic)
+			list = &names[key]
+		}
+		append(list, e.mnemonic)
+	}
+
+	kept := 0
+	for e in entries {
+		drop := false
+		for entry in lib.MNEMONIC_ALIASES {
+			if entry.alias != e.mnemonic { continue }
+			for spelling in names[key_of(e)] {
+				if spelling == entry.canonical {
+					drop = true
+					break
+				}
+			}
+			if drop { break }
+		}
+		if drop { continue }
+		entries[kept] = e
+		kept += 1
+	}
+	resize(entries, kept)
 }
 
 entry_less :: proc(a, b: Collected_Entry) -> bool {
@@ -399,6 +540,12 @@ write_flags :: proc(sb: ^strings.Builder, enc: union{lib.Encoding, Collected_Ent
 	if flags.rep_ok                { append(&parts, "rep_ok=true") }
 	if flags.modrm_reg_ext         { append(&parts, "modrm_reg_ext=true") }
 	if flags.mode_32_only          { append(&parts, "mode_32_only=true") }
+	if flags.addr_size != .DEFAULT { append(&parts, fmt.tprintf("addr_size=.%v", flags.addr_size)) }
+	/* EVERY Encoding_Flags field must be listed above. This enumerates the
+	   struct by hand, so a field added there and forgotten here is silently
+	   dropped from the generated tables -- the flag reads back as its zero value
+	   and the instruction is quietly mis-modelled, with nothing to see in the
+	   diff but its absence. `addr_size` was added and did exactly that. */
 
 	switch e in enc {
 	case lib.Encoding:
@@ -456,6 +603,7 @@ emit_writer :: proc() {
 	strings.write_string(&sb, "// GENERATED by ../gen.odin -- DO NOT EDIT.\n")
 	strings.write_string(&sb, "// Stage B: serialize the typed tables above to raw blobs under ../../tables/.\n\n")
 	strings.write_string(&sb, "import \"core:os\"\nimport \"core:fmt\"\n\n")
+	strings.write_string(&sb, "import tablegen \"..\"\n\n")
 	strings.write_string(&sb, "TABLES :: #directory + \"/../../tables/\"\n\n")
 	strings.write_string(&sb, "raw :: #force_inline proc \"contextless\" (p: rawptr, n: int) -> []u8 {\n")
 	strings.write_string(&sb, "\treturn (cast([^]u8)p)[:n]\n}\n\n")
@@ -465,7 +613,11 @@ emit_writer :: proc() {
 	strings.write_string(&sb, "\t\tos.exit(1)\n\t}\n}\n\n")
 	strings.write_string(&sb, "main :: proc() {\n")
 	for b in BLOBS {
-		fmt.sbprintfln(&sb, "\tw(TABLES + \"%s\", raw(&%s, size_of(%s)))", b.file, b.global, b.global)
+		if b.global == "CLOBBER_TABLE" {
+			fmt.sbprintfln(&sb, "\tw(TABLES + \"%s\", raw(&tablegen.%s, size_of(tablegen.%s)))", b.file, b.global, b.global)
+		} else {
+			fmt.sbprintfln(&sb, "\tw(TABLES + \"%s\", raw(&%s, size_of(%s)))", b.file, b.global, b.global)
+		}
 	}
 	strings.write_string(&sb, "}\n")
 	emit_file(DIR_GEN + "writer.odin", &sb)
@@ -540,6 +692,14 @@ LOADER_ACCESSORS :: `// --------------------------------------------------------
 encoding_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Encoding {
 	r := ENCODE_RUNS[u16(m)]
 	return ENCODE_FORMS[r.start:][:r.count]
+}
+
+// Per-mnemonic encode forms: the run of ENCODE_FORMS belonging to ` + "`m`" + `.
+// Replaces the old ENCODING_TABLE[m] slice; the returned view is into rodata.
+@(private, require_results)
+clobber_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Clobber {
+	r := ENCODE_RUNS[u16(m)]
+	return CLOBBER_FORMS[r.start:][:r.count]
 }
 
 // Flat [prefix][opcode] lookup into a logical [4][256] index table.

@@ -1,5 +1,6 @@
 package _chacha20
 
+import "base:intrinsics"
 import "core:crypto"
 import "core:encoding/endian"
 import "core:math/bits"
@@ -108,11 +109,16 @@ check_counter_limit :: proc(ctx: ^Context, nr_blocks: int) {
 
 	ctr_ok: bool
 	if ctx._is_ietf_flavor {
-		ctr_ok = u64(ctx._s[12]) + u64(nr_blocks) <= MAX_CTR_IETF
+		if intrinsics.unlikely(ctx._s[12] == MAX_CTR_IETF && nr_blocks > 1) {
+			// Allow the final block.
+			ctr_ok = false
+		} else {
+			ctr_ok = u64(ctx._s[12]) + u64(nr_blocks) <= MAX_CTR_IETF
+		}
 	} else {
 		ctr := (u64(ctx._s[13]) << 32) | u64(ctx._s[12])
-		_, carry := bits.add_u64(ctr, u64(nr_blocks), 0)
-		ctr_ok = carry == 0
+		new_ctr, carry := bits.add_u64(ctr, u64(nr_blocks), 0)
+		ctr_ok = carry == 0 || new_ctr != 0 // Allow the final block.
 	}
 
 	ensure(ctr_ok, "crypto/chacha20: maximum (X)ChaCha20 keystream per IV reached")

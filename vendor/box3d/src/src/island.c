@@ -498,7 +498,7 @@ void b3SplitIsland( b3World* world, int baseId )
 		}
 	}
 
-	// Early return — island is still fully connected, no split needed.
+	// Island is still fully connected, no split needed.
 	if ( componentCount == 1 )
 	{
 		baseIsland->constraintRemoveCount = 0;

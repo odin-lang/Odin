@@ -3,6 +3,7 @@
 package rexcode_arm32_tests
 
 import "core:fmt"
+import "core:strings"
 import "core:os"
 import a "../"
 
@@ -328,6 +329,53 @@ run_pipeline_tests :: proc() {
 	check_roundtrip("ADD r0, r1, #0xFF000000",
 		a.inst_r_r_i(.ADD, a.R0, a.R1, 0xFF000000))
 
+	// ---- Words the table sweep cannot reach ----
+	// The sweep decodes each form's canonical word, which has every variable
+	// field zero. For the coprocessor forms that means p0, which ARMv8
+	// reserves and no assembler will take -- so these are checked here, by
+	// the text they print, against what an assembler makes of it.
+	fmt.println("\n==== Coprocessor words, decoded to text ====")
+	check_decodes_to(0xEE2431C5, "cdp p1, #2, c3, c4, c5, #6")
+	check_decodes_to(0xEE4431D5, "mcr p1, #2, r3, c4, c5, #6")
+	check_decodes_to(0xEE5431D5, "mrc p1, #2, r3, c4, c5, #6")
+	check_decodes_to(0xEE117F30, "mrc p15, #0, r7, c1, c0, #1")
+	check_decodes_to(0xEC443125, "mcrr p1, #2, r3, r4, c5")
+	check_decodes_to(0xEC543125, "mrrc p1, #2, r3, r4, c5")
+	check_decodes_to(0xED932102, "ldc p1, c2, [r3, #8]")
+	check_decodes_to(0xEDB32102, "ldc p1, c2, [r3, #8]!")
+	check_decodes_to(0xECB32102, "ldc p1, c2, [r3], #8")
+	check_decodes_to(0xEDD32102, "ldcl p1, c2, [r3, #8]")
+	check_decodes_to(0xEDC32102, "stcl p1, c2, [r3, #8]")
+	check_decodes_to(0xED132102, "ldc p1, c2, [r3, #-8]")
+
 	fmt.printf("\n==> arm32 pipeline: %d passed, %d failed\n", ok, fail)
 	if fail > 0 { os.exit(1) }
+}
+
+// Decode one word and compare what it prints against the text an assembler
+// accepts for it.
+check_decodes_to :: proc(word: u32, want: string) {
+	code := [4]u8{u8(word), u8(word >> 8), u8(word >> 16), u8(word >> 24)}
+	back:   [dynamic]a.Instruction
+	info:   [dynamic]a.Instruction_Info
+	labels: [dynamic]a.Label_Definition
+	errs:   [dynamic]a.Error
+	defer { delete(back); delete(info); delete(labels); delete(errs) }
+	a.decode(code[:], nil, &back, &info, &labels, &errs, .A32)
+	if len(back) != 1 {
+		fmt.printf("  [FAIL] %08x: decoded to %d instructions, want 1\n", word, len(back))
+		fail += 1
+		return
+	}
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+	a.sbprint(&sb, back[:], info[:], nil)
+	got := strings.trim_space(strings.to_string(sb))
+	if got != want {
+		fmt.printf("  [FAIL] %08x: got %q want %q\n", word, got, want)
+		fail += 1
+		return
+	}
+	fmt.printf("  [ok]   %08x -> %s\n", word, got)
+	ok += 1
 }

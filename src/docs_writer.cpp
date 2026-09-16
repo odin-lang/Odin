@@ -265,8 +265,12 @@ gb_internal OdinDocPosition odin_doc_token_pos_cast(OdinDocWriter *w, TokenPos c
 		AstFile *file = global_files[pos.file_id];
 		if (file != nullptr) {
 			OdinDocFileIndex *file_index_found = map_get(&w->file_cache, file);
-			GB_ASSERT(file_index_found != nullptr);
-			file_index = *file_index_found;
+			// NOTE: a documented entity may hold a position in a file belonging to an
+			// imported package. Such files are only in file_cache when -all-packages is
+			// used, so fall back to the reserved "no file" index.
+			if (file_index_found != nullptr) {
+				file_index = *file_index_found;
+			}
 		}
 	}
 
@@ -886,6 +890,9 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 		}
 		break;
 	case Entity_Constant:
+		if (init_expr == nullptr) {
+			init_expr = e->Constant.init_expr;
+		}
 		field_group_index = e->Constant.field_group_index;
 		break;
 	case Entity_Procedure:

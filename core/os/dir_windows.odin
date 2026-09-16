@@ -16,8 +16,15 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 	}
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-	path := concatenate({base_path, `\`, win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_else ""}, allocator) or_return
+	filename := win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_else ""
 
+	pieces: []string
+	if len(base_path) > 0 && is_path_separator(base_path[len(base_path) - 1]) {
+		pieces = {base_path, filename}
+	} else {
+		pieces = {base_path, Path_Separator_String, filename}
+	}
+	path   := concatenate(pieces, allocator) or_return
 	handle := win32.HANDLE(_open_internal(path, {.Read}, Permissions_Read_Write_All) or_else 0)
 	defer win32.CloseHandle(handle)
 
@@ -35,6 +42,7 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 		#assert(size_of(fi.inode) == size_of(file_id_info.FileId))
 		#assert(size_of(fi.inode) == 16)
 		runtime.mem_copy_non_overlapping(&fi.inode, &file_id_info.FileId, 16)
+		fi.device = file_id_info.VolumeSerialNumber
 	}
 
 	return

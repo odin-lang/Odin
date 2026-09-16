@@ -28,4 +28,5 @@ main :: proc() {
 	w(TABLES + "riscv.idx_opcode.bin", raw(&DECODE_INDEX_OPCODE, size_of(DECODE_INDEX_OPCODE)))
 	w(TABLES + "riscv.idx_op_fp.bin", raw(&DECODE_INDEX_OP_FP, size_of(DECODE_INDEX_OP_FP)))
 	w(TABLES + "riscv.idx_rvc.bin", raw(&DECODE_INDEX_RVC, size_of(DECODE_INDEX_RVC)))
+	w(TABLES + "riscv.clobber_forms.bin", raw(&CLOBBER_FORMS, size_of(CLOBBER_FORMS)))
 }

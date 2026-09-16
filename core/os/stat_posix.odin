@@ -12,6 +12,7 @@ internal_stat :: proc(stat: posix.stat_t, fullpath: string) -> (fi: File_Info) {
 	_, fi.name = split_path(fi.fullpath)
 
 	fi.inode = u128(stat.st_ino)
+	fi.device = u64(stat.st_dev)
 	fi.size = i64(stat.st_size)
 
 	fi.mode = transmute(Permissions)u32(transmute(posix._mode_t)(stat.st_mode - posix.S_IFMT))

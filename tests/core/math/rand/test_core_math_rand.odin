@@ -1,3 +1,4 @@
+#+build !netbsd
 package test_core_math_rand
 
 import "core:math"
@@ -9,6 +10,9 @@ Generator :: struct {
 	gen:    rand.Generator,
 	biased: bool,
 }
+
+// Disable on NetBSD due to Illegal Instruction on CI, even with `microarch:native`
+// `@(test, disable="...")` still runs the test.
 
 @(test)
 test_prngs :: proc(t: ^testing.T) {

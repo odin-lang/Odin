@@ -248,9 +248,9 @@ run_pipeline_tests :: proc() {
 		m.decode(code[:byte_count], nil,
 				 &d_insts, &d_info, &d_labels, &errors, cpu = .CMOS_65C02)
 
-		names: map[u32]string
+		names: m.Label_Names // keyed by BYTE OFFSET
 		defer delete(names)
-		names[0] = "start"
+		names[m.Label_Offset(0)] = "start"
 
 		text := m.aprint(d_insts[:], d_info[:], d_labels[:],
 						 nil, nil, &names, context.temp_allocator)

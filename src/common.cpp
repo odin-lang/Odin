@@ -65,6 +65,21 @@ template <typename T> struct TypeIs64BitInteger { enum {value = false}; };
 template <> struct TypeIs64BitInteger<u64> { enum {value = true}; };
 template <> struct TypeIs64BitInteger<i64> { enum {value = true}; };
 
+#if defined(GB_SYSTEM_WINDOWS)
+uint32_t old_console_codepage = 0;
+void set_utf8_codepage() {
+	old_console_codepage = GetConsoleOutputCP();
+	SetConsoleOutputCP(65001);
+}
+
+void restore_old_codepage() {
+	// Nothing we can do if this fails, so we're not asserting or anything.
+	SetConsoleOutputCP(old_console_codepage);
+}
+#else
+void set_utf8_codepage() {}
+void restore_old_codepage() {}
+#endif
 
 
 #include "unicode.cpp"
@@ -725,6 +740,75 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, isize
 	return argv;
 }
 
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+
+gb_internal char **command_line_to_spawn_argv(const char *cmd_line, int *_argc) {
+	u32 i, j;
+
+	u32 len = cast(u32)strlen(cmd_line);
+	i = len*gb_size_of(void *) + gb_size_of(void *);
+
+	char **argv = cast(char **)gb_alloc(gb_heap_allocator(), i + (len+1));
+	char *_argv = (cast(char *)argv)+i;
+
+	u32 argc = 0;
+	argv[argc] = _argv;
+	bool in_quote = false;
+	bool in_text = false;
+	bool in_space = true;
+	i = 0;
+	j = 0;
+
+	for (;;) {
+		char a = cmd_line[i];
+		if (a == 0) {
+			break;
+		}
+		if (in_quote) {
+			if (a == '\"') {
+				in_quote = false;
+			} else {
+				_argv[j++] = a;
+			}
+		} else {
+			switch (a) {
+			case '\"':
+				in_quote = true;
+				in_text = true;
+				if (in_space) {
+					// check_double_dash();
+					argv[argc++] = _argv + j;
+				}
+				in_space = false;
+				break;
+			case ' ':
+			case '\t':
+			case '\n':
+			case '\r':
+				if (in_text) _argv[j++] = '\0';
+				in_text = false;
+				in_space = true;
+				break;
+			default:
+				in_text = true;
+				if (in_space) {
+					// check_double_dash();
+					argv[argc++] = _argv + j;
+				}
+				_argv[j++] = a;
+				in_space = false;
+				break;
+			}
+		}
+		i++;
+	}
+	_argv[j] = '\0';
+	argv[argc] = nullptr;
+
+	if (_argc) *_argc = argc;
+	return argv;
+}
+
 #endif
 
 #include "path.cpp"
@@ -885,8 +969,13 @@ gb_internal isize levenstein_distance_case_insensitive(String const &a, String c
 					minimum = substitute;
 				}
 				// Damerau-Levenshtein (transposition extension)
+				// NOTE: this is the "optimal string alignment" variant, which is what this
+				// matrix supports; the transposition discount only applies when the two
+				// characters are actually swapped.
 				#if USE_DAMERAU_LEVENSHTEIN
-				if (i > 1 && j > 1) {
+				if (i > 1 && j > 1 &&
+				    a_c == gb_char_to_lower(cast(char)b.text[j-2]) &&
+				    b_c == gb_char_to_lower(cast(char)a.text[i-2])) {
 					isize transpose = matrix[(i-2)*w + j-2] + 1;
 					if (transpose < minimum) {
 						minimum = transpose;

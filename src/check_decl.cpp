@@ -83,11 +83,7 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			}
 			t = default_type(t);
 		}
-		if (is_type_asm_proc(t)) {
-			error(e->token, "Invalid use of inline asm in %.*s", LIT(context_name));
-			e->type = t_invalid;
-			return nullptr;
-		} else if (is_type_polymorphic(t)) {
+		if (is_type_polymorphic(t)) {
 			Entity *e2 = entity_of_node(operand->expr);
 			if (e2 == nullptr) {
 				e->type = t_invalid;
@@ -473,7 +469,11 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 	check_type_path_pop(ctx);
 
 	Type *base = base_type(bt);
-	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+	if (base == nullptr) {
+		// `bt` is a named type that is still being checked, e.g. a cycle back through a
+		// pointer or slice, so chain to it and let it resolve when it does.
+		base = bt;
+	} else if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
 		base = clone_enum_type(ctx, base, named);
 	}
 	named->Named.base = base;
@@ -881,10 +881,10 @@ gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 		    	if (x_base->Struct.is_raw_union) {
 		    		return true;
 		    	}
-		    	if (x->Struct.fields.count == y->Struct.fields.count) {
-		    		for (isize i = 0; i < x->Struct.fields.count; i++) {
-		    			Entity *a = x->Struct.fields[i];
-		    			Entity *b = y->Struct.fields[i];
+		    	if (x_base->Struct.fields.count == y_base->Struct.fields.count) {
+		    		for (isize i = 0; i < x_base->Struct.fields.count; i++) {
+		    			Entity *a = x_base->Struct.fields[i];
+		    			Entity *b = y_base->Struct.fields[i];
 		    			bool similar = signature_parameter_similar_enough(a->type, b->type);
 		    			if (!similar) {
 		    				// NOTE(bill): If the fields are not similar enough, then stop.
@@ -1158,7 +1158,7 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 					error(e->token, "Imported Objective-C methods must use the \"c\" calling convention");
 					return;
 				} else if (tn->TypeName.objc_context_provider) {
-					error(e->token, "Imported Objective-C class '%.*s' must not declare context providers.", tn->type->Named.name);
+					error(e->token, "Imported Objective-C class '%.*s' must not declare context providers.", LIT(tn->type->Named.name));
 					return;
 				} else if (tn->TypeName.objc_is_implementation) {
 					error(e->token, "Imported Objective-C methods used in a class with @(objc_implement) is not allowed.");
@@ -1215,6 +1215,41 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 			if (ok) {
 				array_add(&md->type_entries, TypeNameObjCMetadataEntry{string_interner_insert(ac.objc_name), e});
 			}
+		}
+	}
+}
+
+gb_internal void check_target_feature_attributes(AttributeContext &ac, Entity *entity, Type *type) {
+	GB_ASSERT(type->kind == Type_Proc);
+	TypeProc *pt = &type->Proc;
+	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+		error(entity->token, "A procedure cannot have both @(require_target_feature=\"...\") and @(enable_target_feature=\"...\")");
+	}
+
+	if (build_context.strict_target_features && ac.enable_target_feature.len != 0) {
+		ac.require_target_feature = ac.enable_target_feature;
+		ac.enable_target_feature.len = 0;
+	}
+
+	if (ac.require_target_feature.len != 0) {
+		pt->require_target_feature = ac.require_target_feature;
+		String invalid;
+		if (!check_target_feature_is_valid_globally(ac.require_target_feature, &invalid)) {
+			error(entity->token, "Required target feature '%.*s' is not a valid target feature", LIT(invalid));
+		} else if (!check_target_feature_is_enabled(ac.require_target_feature, nullptr)) {
+			entity->flags |= EntityFlag_Disabled;
+		}
+	} else if (ac.enable_target_feature.len != 0) {
+
+		// NOTE: disallow wasm, features on that arch are always global to the module.
+		if (is_arch_wasm()) {
+			error(entity->token, "@(enable_target_feature=\"...\") is not allowed on wasm, features for wasm must be declared globally");
+		}
+
+		pt->enable_target_feature = ac.enable_target_feature;
+		String invalid;
+		if (!check_target_feature_is_valid_globally(ac.enable_target_feature, &invalid)) {
+			error(entity->token, "Procedure enabled target feature '%.*s' is not a valid target feature", LIT(invalid));
 		}
 	}
 }
@@ -1345,38 +1380,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	check_objc_methods(ctx, e, ac);
 
-	{
-		if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
-			error(e->token, "A procedure cannot have both @(require_target_feature=\"...\") and @(enable_target_feature=\"...\")");
-		}
-
-		if (build_context.strict_target_features && ac.enable_target_feature.len != 0) {
-			ac.require_target_feature = ac.enable_target_feature;
-			ac.enable_target_feature.len = 0;
-		}
-
-		if (ac.require_target_feature.len != 0) {
-			pt->require_target_feature = ac.require_target_feature;
-			String invalid;
-			if (!check_target_feature_is_valid_globally(ac.require_target_feature, &invalid)) {
-				error(e->token, "Required target feature '%.*s' is not a valid target feature", LIT(invalid));
-			} else if (!check_target_feature_is_enabled(ac.require_target_feature, nullptr)) {
-				e->flags |= EntityFlag_Disabled;
-			}
-		} else if (ac.enable_target_feature.len != 0) {
-
-			// NOTE: disallow wasm, features on that arch are always global to the module.
-			if (is_arch_wasm()) {
-				error(e->token, "@(enable_target_feature=\"...\") is not allowed on wasm, features for wasm must be declared globally");
-			}
-
-			pt->enable_target_feature = ac.enable_target_feature;
-			String invalid;
-			if (!check_target_feature_is_valid_globally(ac.enable_target_feature, &invalid)) {
-				error(e->token, "Procedure enabled target feature '%.*s' is not a valid target feature", LIT(invalid));
-			}
-		}
-	}
+	check_target_feature_attributes(ac, e, proc_type);
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
@@ -1983,9 +1987,146 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, d->attributes, proc_group_attribute, &ac);
 	check_objc_methods(ctx, pg_entity, ac);
-
-
 }
+
+gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, DeclInfo *d) {
+	GB_ASSERT(asm_entity->kind == Entity_ProcGroup);
+	auto *pge = &asm_entity->ProcGroup;
+	String proc_group_name = asm_entity->token.string;
+
+	ast_node(pg, AsmGroup, d->init_expr);
+
+	pge->entities = array_make<Entity*>(permanent_allocator(), 0, pg->args.count);
+
+	// NOTE(bill): This must be set here to prevent cycles in checking if someone
+	// places the entity within itself
+	asm_entity->type = t_invalid;
+
+	PtrSet<Entity *> entity_set = {};
+	ptr_set_init(&entity_set, 2*pg->args.count);
+
+	for (Ast *arg_ : pg->args) {
+		Ast *arg = arg_;
+		Entity *e = nullptr;
+		Operand o = {};
+		if (arg->kind == Ast_BinaryExpr && arg->BinaryExpr.op.kind == Token_where) {
+			Ast *cond_expr = arg->BinaryExpr.right;
+			Operand cond = {};
+			check_expr(ctx, &cond, cond_expr);
+			if (cond.mode != Addressing_Invalid) {
+				if (cond.mode != Addressing_Constant || !is_type_boolean(cond.type) || cond.value.kind != ExactValue_Bool) {
+					error(arg, "Expected a constant binary expression for the 'where' clause");
+				} else if (!cond.value.value_bool) {
+					continue;
+				}
+			}
+
+			arg = arg->BinaryExpr.left;
+		}
+
+		Ast *prev_hint = ctx->asm_template_hint;
+		ctx->asm_template_hint = arg;
+		if (arg->kind == Ast_Ident) {
+			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
+		} else if (arg->kind == Ast_SelectorExpr) {
+			e = check_selector(ctx, &o, arg, nullptr);
+		}
+		ctx->asm_template_hint = prev_hint;
+		if (e == nullptr) {
+			error(arg, "Expected a valid entity name in asm template group, got %.*s", LIT(ast_strings[arg->kind]));
+			continue;
+		}
+		if (e->kind != Entity_AsmTemplate) {
+			error(arg, "Expected an asm template");
+			continue;
+		}
+
+		if (ptr_set_update(&entity_set, e)) {
+			error(arg, "Previous use of `%.*s` in asm template group", LIT(e->token.string));
+			continue;
+		}
+		array_add(&pge->entities, e);
+	}
+
+	ptr_set_destroy(&entity_set);
+
+	for (isize j = 0; j < pge->entities.count; j++) {
+		Entity *p = pge->entities[j];
+		if (p->type == t_invalid) {
+			// NOTE(bill): This invalid overload has already been handled
+			continue;
+		}
+
+		if (p->flags & EntityFlag_Disabled) {
+			continue;
+		}
+
+		String name = p->token.string;
+
+		for (isize k = j+1; k < pge->entities.count; k++) {
+			Entity *q = pge->entities[k];
+			GB_ASSERT(p != q);
+
+			bool is_invalid = false;
+
+			TokenPos pos = q->token.pos;
+
+			if (q->type == nullptr || q->type == t_invalid) {
+				continue;
+			}
+
+			ERROR_BLOCK();
+
+			if (q->flags & EntityFlag_Disabled) {
+				continue;
+			}
+
+			ProcTypeOverloadKind kind = are_proc_types_overload_safe(p->type, q->type);
+			bool both_have_where_clauses = false;
+			// NOTE(bill): asm template do not have `where` clauses
+
+			if (!both_have_where_clauses) switch (kind) {
+			case ProcOverload_Identical:
+				error(p->token, "Overloaded asm template '%.*s' has the same type as another asm template in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				is_invalid = true;
+				break;
+			// case ProcOverload_CallingConvention:
+				// error(p->token, "Overloaded asm template '%.*s' has the same type as another asm template in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				// is_invalid = true;
+				// break;
+			case ProcOverload_ParamVariadic:
+				error(p->token, "Overloaded asm template '%.*s' has the same type as another asm template in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				is_invalid = true;
+				break;
+			case ProcOverload_ResultCount:
+			case ProcOverload_ResultTypes:
+				error(p->token, "Overloaded asm template '%.*s' has the same parameters but different results in the asm template group '%.*s'", LIT(name), LIT(proc_group_name));
+				is_invalid = true;
+				break;
+			case ProcOverload_Polymorphic:
+				break;
+			case ProcOverload_ParamCount:
+			case ProcOverload_ParamTypes:
+			case ProcOverload_TargetFeatures:
+				// This is okay :)
+				break;
+
+			}
+
+			if (is_invalid) {
+				error_line("\tprevious asm template at %s\n", token_pos_to_string(pos));
+				q->type = t_invalid;
+			}
+		}
+	}
+
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, d->attributes, proc_group_attribute, &ac);
+	check_objc_methods(ctx, asm_entity, ac);
+}
+
+#include "check_asm.cpp"
+
 
 gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
@@ -2060,7 +2201,15 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 			check_proc_decl(&c, e, d);
 			break;
 		case Entity_ProcGroup:
-			check_proc_group_decl(&c, e, d);
+			if (e->ProcGroup.is_asm_group) {
+				check_asm_group_decl(&c, e, d);
+			} else {
+				check_proc_group_decl(&c, e, d);
+			}
+			break;
+
+		case Entity_AsmTemplate:
+			check_asm_template_from_entity(&c, e, d);
 			break;
 		}
 

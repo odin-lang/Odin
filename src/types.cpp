@@ -983,9 +983,12 @@ gb_internal Type *base_enum_type(Type *t) {
 }
 
 gb_internal Type *core_type(Type *t) {
-	for (;;) {
+	// each step strictly unwraps one layer; this only bounds a cycle
+	enum { CORE_TYPE_MAX_DEPTH = 1024 };
+
+	for (isize depth = 0; depth < CORE_TYPE_MAX_DEPTH; depth += 1) {
 		if (t == nullptr) {
-			break;
+			return t;
 		}
 
 		switch (t->kind) {
@@ -996,15 +999,21 @@ gb_internal Type *core_type(Type *t) {
 			t = t->Named.base;
 			continue;
 		case Type_Enum:
+			if (t == t->Enum.base_type) {
+				return t_invalid;
+			}
 			t = t->Enum.base_type;
 			continue;
 		case Type_BitField:
+			if (t == t->BitField.backing_type) {
+				return t_invalid;
+			}
 			t = t->BitField.backing_type;
 			continue;
 		}
-		break;
+		return t;
 	}
-	return t;
+	return t_invalid;
 }
 
 gb_internal void set_base_type(Type *t, Type *base) {
@@ -1446,11 +1455,13 @@ gb_internal bool is_type_ordered(Type *t) {
 	return false;
 }
 gb_internal bool is_type_ordered_numeric(Type *t) {
-	t = core_type(t);
+	t = base_type(t);
 	if (t == nullptr) { return false; }
 	switch (t->kind) {
 	case Type_Basic:
 		return (t->Basic.flags & BasicFlag_OrderedNumeric) != 0;
+	case Type_Enum:
+		return is_type_ordered_numeric(t->Enum.base_type);
 	}
 	return false;
 }
@@ -1605,16 +1616,8 @@ gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	// could be maximally aligned but as a compromise, having no padding will be
 	// beneficial to third libraries that assume no padding
 
-	i64 total_expected_size = row_count*column_count*elem_size;
-	// i64 min_alignment = prev_pow2(elem_align * row_count);
-	i64 min_alignment = prev_pow2(total_expected_size);
-	while (total_expected_size != 0 && (total_expected_size % min_alignment) != 0) {
-		min_alignment >>= 1;
-	}
-	min_alignment = gb_max(min_alignment, elem_align);
-
-	i64 align = gb_min(min_alignment, build_context.max_simd_align);
-	return align;
+	gb_unused(row_count); gb_unused(column_count); gb_unused(elem_size);
+	return gb_clamp(elem_align, 1, build_context.max_simd_align);
 }
 
 
@@ -1948,6 +1951,13 @@ gb_internal Type *core_array_type(Type *t) {
 	}
 }
 
+gb_internal Type *core_broadcastable_elem_type(Type *t) {
+	while (is_type_array(t)) {
+		t = base_array_type(t);
+	}
+	return t;
+}
+
 gb_internal i32 type_math_rank(Type *t) {
 	i32 rank = 0;
 	for (;;) {
@@ -2091,10 +2101,11 @@ gb_internal bool is_type_endian_big(Type *t) {
 		return build_context.endian_kind == TargetEndian_Big;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_big(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_big(&basic_types[Basic_uintptr]);
 	}
-	return build_context.endian_kind == TargetEndian_Big;
+	// a type with no endianness is neither little nor big
+	return false;
 }
 gb_internal bool is_type_endian_little(Type *t) {
 	t = core_type(t);
@@ -2108,10 +2119,11 @@ gb_internal bool is_type_endian_little(Type *t) {
 		return build_context.endian_kind == TargetEndian_Little;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_little(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_little(&basic_types[Basic_uintptr]);
 	}
-	return build_context.endian_kind == TargetEndian_Little;
+	// a type with no endianness is neither little nor big
+	return false;
 }
 
 gb_internal bool is_type_endian_platform(Type *t) {
@@ -2121,7 +2133,7 @@ gb_internal bool is_type_endian_platform(Type *t) {
 		return (t->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) == 0;
 	} else if (t->kind == Type_BitSet) {
 		return is_type_endian_platform(bit_set_to_int(t));
-	} else if (t->kind == Type_Pointer) {
+	} else if (t->kind == Type_Pointer || t->kind == Type_MultiPointer) {
 		return is_type_endian_platform(&basic_types[Basic_uintptr]);
 	}
 	return false;
@@ -2144,6 +2156,7 @@ gb_internal bool is_type_endian_specific(Type *t) {
 		case Basic_u32le:
 		case Basic_i64le:
 		case Basic_u64le:
+		case Basic_i128le:
 		case Basic_u128le:
 			return true;
 
@@ -2153,6 +2166,7 @@ gb_internal bool is_type_endian_specific(Type *t) {
 		case Basic_u32be:
 		case Basic_i64be:
 		case Basic_u64be:
+		case Basic_i128be:
 		case Basic_u128be:
 			return true;
 
@@ -2179,6 +2193,10 @@ gb_internal bool is_type_dereferenceable(Type *t) {
 
 
 gb_internal bool is_type_different_to_arch_endianness(Type *t) {
+	// a type with no endianness never needs swapping
+	if (!is_type_endian_specific(t)) {
+		return false;
+	}
 	switch (build_context.endian_kind) {
 	case TargetEndian_Little:
 		return !is_type_endian_little(t);
@@ -2822,6 +2840,10 @@ gb_internal bool is_type_comparable(Type *t) {
 
 	case Type_Struct:
 		if (t->Struct.soa_kind != StructSoa_None) {
+			return false;
+		}
+		// an unspecialized polymorphic record has no values to compare
+		if (is_type_polymorphic_record_unspecialized(t)) {
 			return false;
 		}
 		if (t->Struct.is_raw_union) {
@@ -3596,6 +3618,23 @@ gb_internal Type *union_tag_type(Type *u) {
 	return t_uint;
 }
 
+gb_internal bool type_conversion_is_variant(Type *dst, Type *src) {
+	dst = base_type(core_broadcastable_elem_type(dst));
+	if (dst == nullptr) { return false; }
+
+	switch (dst->kind) {
+	case Type_Union:
+		if (union_is_variant_of(dst, src)) {
+			return true;
+		}
+		if (dst->Union.variants.count == 1) {
+			return type_conversion_is_variant(dst->Union.variants[0], src);
+		}
+		return false;
+	}
+	return false;
+}
+
 gb_internal int matched_target_features(TypeProc *t) {
 	if (t->require_target_feature.len == 0) {
 		return 0;
@@ -3603,9 +3642,8 @@ gb_internal int matched_target_features(TypeProc *t) {
 
 	int matches = 0;
 	String_Iterator it = {t->require_target_feature, 0};
-	for (;;) {
-		String str = string_split_iterator(&it, ',');
-		if (str == "") break;
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
 		if (check_target_feature_is_valid_for_target_arch(str, nullptr)) {
 			matches += 1;
 		}
@@ -3683,14 +3721,6 @@ gb_internal ProcTypeOverloadKind are_proc_types_overload_safe(Type *x, Type *y) 
 
 	if (matched_target_features(&px) != matched_target_features(&py)) {
 		return ProcOverload_TargetFeatures;
-	}
-
-	if (px.params != nullptr && py.params != nullptr) {
-		Entity *ex = px.params->Tuple.variables[0];
-		Entity *ey = py.params->Tuple.variables[0];
-		bool ok = are_types_identical(ex->type, ey->type);
-		if (ok) {
-		}
 	}
 
 	return ProcOverload_Identical;
@@ -4351,6 +4381,18 @@ gb_internal i64 type_align_of(Type *t) {
 }
 
 
+// The largest alignment the target permits. The i386 System V psABI caps every scalar at 4, unlike
+// Windows. Anything that derives its alignment from a COMPONENT rather than from its own size has
+// to be capped here too.
+gb_internal i64 type_target_max_align(void) {
+	i64 max_align = build_context.max_align;
+	if (build_context.metrics.arch == TargetArch_i386 &&
+	    build_context.metrics.os != TargetOs_windows) {
+		max_align = gb_min(max_align, 4);
+	}
+	return max_align;
+}
+
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	GB_ASSERT(path != nullptr);
 	if (t->failure) {
@@ -4375,10 +4417,11 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		case Basic_uintptr: case Basic_rawptr:
 			return build_context.ptr_size;
 
+		// A complex aligns to one component and a quaternion to one of its four.
 		case Basic_complex32: case Basic_complex64: case Basic_complex128:
-			return type_size_of_internal(t, path) / 2;
+			return gb_min(type_size_of_internal(t, path) / 2, type_target_max_align());
 		case Basic_quaternion64: case Basic_quaternion128: case Basic_quaternion256:
-			return type_size_of_internal(t, path) / 4;
+			return gb_min(type_size_of_internal(t, path) / 4, type_target_max_align());
 		}
 	} break;
 
@@ -4425,6 +4468,9 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		return build_context.int_size;
 
 	case Type_BitField:
+		if (t == t->BitField.backing_type) {
+			return FAILURE_ALIGNMENT;
+		}
 		return type_align_of_internal(t->BitField.backing_type, path);
 
 	case Type_Tuple: {
@@ -4441,6 +4487,9 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	case Type_Map:
 		return build_context.ptr_size;
 	case Type_Enum:
+		if (t == t->Enum.base_type) {
+			return FAILURE_ALIGNMENT;
+		}
 		return type_align_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
@@ -4496,8 +4545,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (t->Struct.custom_min_field_align > 0) {
 			max = gb_max(max, t->Struct.custom_min_field_align);
 		}
-		if (t->Struct.custom_max_field_align != 0 &&
-		    t->Struct.custom_max_field_align > t->Struct.custom_min_field_align) {
+		if (t->Struct.custom_max_field_align != 0) {
 			max = gb_min(max, t->Struct.custom_max_field_align);
 		}
 		return max;
@@ -4518,7 +4566,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align*2);
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align);
 	}
 
 	case Type_Matrix:
@@ -4530,7 +4578,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	// NOTE(bill): Things that are bigger than build_context.ptr_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
-	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
+	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, type_target_max_align());
 }
 
 gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union, i64 min_field_align, i64 max_field_align) {
@@ -4567,7 +4615,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 			} else {
 				Type *t = fields[i]->type;
 				i64 align = gb_max(type_align_of_internal(t, &path), min_field_align);
-				if (max_field_align > min_field_align) {
+				if (max_field_align != 0) {
 					align = gb_min(align, max_field_align);
 				}
 				i64 size  = gb_max(type_size_of_internal(t, &path), 0);
@@ -4741,6 +4789,9 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Enum:
+		if (t == t->Enum.base_type) {
+			return FAILURE_SIZE;
+		}
 		return type_size_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
@@ -4852,6 +4903,11 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_BitField:
+		// a self-referential backing type is an illegal cycle; this prevents the
+		// tail call below from spinning
+		if (t == t->BitField.backing_type) {
+			return FAILURE_SIZE;
+		}
 		return type_size_of_internal(t->BitField.backing_type, path);
 	}
 

@@ -529,3 +529,34 @@ enumerated_array :: proc(t: ^testing.T) {
 		testing.expect_value(t, unmarshaled, Sparse_Fruit_Stock)
 	}
 }
+
+@test
+malformed_object_frees_its_partial_allocations :: proc(t: ^testing.T) {
+	// parse_object_body allocates a key, then may fail in parse_colon or parse_value before that
+	// key is ever inserted into the object. That proc's cleanup only walks the object, so such a
+	// key was orphaned: unreachable to the caller, which is handed a nil Value, and therefore
+	// leaked on every malformed input of this shape.
+	//
+	// JSON5 makes it reachable from ordinary input, since an unquoted ident is a legal key and
+	// anything other than a colon after it fails -- but plain JSON leaks it too, via a quoted key.
+	//
+	// The test runner's memory tracking is what asserts this: each case only has to parse and be
+	// destroyed without leaving an allocation behind.
+	cases := []string {
+		`{ broken not json`,
+		`{"a" 1}`,
+		`{"a": }`,
+		`{"a": 1, "a": 2}`,
+		`{"a": {"b" 1}}`,
+		`{"a": {"b": {"c" 1}}}`,
+		`{"a": [1, }`,
+	}
+
+	for spec in ([]json.Specification{.JSON, .JSON5}) {
+		for src in cases {
+			value, err := json.parse(transmute([]u8)src, spec = spec)
+			testing.expectf(t, err != nil, "%q must not parse under %v", src, spec)
+			json.destroy_value(value)
+		}
+	}
+}

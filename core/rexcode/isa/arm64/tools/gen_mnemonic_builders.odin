@@ -12,7 +12,7 @@ package main
 // with per-mnemonic overload groups.
 //
 // AArch64 has ~50 operand types, many exotic (SVE/SME/NEON-arrangement/
-// shifted/extended/bitmask/sysreg). EVERY operand type is now mapped to a
+// shifted/extended/bitmask/system-register). EVERY operand type is mapped to a
 // concrete Odin parameter (or parameters) and a constructor expression, so
 // NO form is skipped: every mnemonic that has at least one encode form gets
 // an inst_<mnem> / emit_<mnem> overload group.
@@ -26,7 +26,8 @@ package main
 //     SVE Z register / Z pair / Z quad           -> u8       / op_z_*           (suffix z)
 //     SVE predicate (P_REG / merge / zero / gov) -> u8       / Register(REG_P|..) (suffix p)
 //     all immediates (incl ZA tile, SME slice,   -> i64      / op_imm           (suffix i)
-//       patterns, bitmask, sysreg, HW, NZCV, ...)
+//       patterns, bitmask, HW, NZCV, ...)
+//     MRS/MSR system register        -> Register / op_sysreg         (suffix s)
 //     PC-relative label                          -> u32      / op_label         (suffix l)
 //     memory                                     -> Memory   / op_mem           (suffix m)
 //     condition code                             -> Cond     / op_cond          (suffix c)
@@ -69,12 +70,19 @@ Operand_Category :: enum {
 	REL,       // u32 label  -> op_label               (1 param, suffix l)
 	MEM,       // Memory     -> op_mem                 (1 param, suffix m)
 	COND,      // Cond       -> op_cond                (1 param, suffix c)
+	SYSREG,    // Register -> op_sysreg         (1 param, suffix s)
+	IMPLICIT,  // no parameter -- the operand names the only register it can
 	SHIFTED,   // Register + Shift_Type + u8 -> op_shifted   (3 params, suffix sh)
 	EXTENDED,  // Register + Extend + u8     -> op_extended  (3 params, suffix ex)
 }
 
 Operand_Signature :: struct {
-	types: [4]a.Operand_Type,
+	types: [5]a.Operand_Type,
+	// The encoding each operand uses. Needed because the operand TYPE is not
+	// always enough: .VEC_INDEX is a lane index under NEON_IDX*/NEON_LANE_*,
+	// which prints glued to its register, but EXT's byte index shares the type
+	// and prints as a plain `#3`.
+	encs:  [5]a.Operand_Encoding,
 	count: int,
 }
 
@@ -89,6 +97,27 @@ mnemonic_to_lower :: proc(m: a.Mnemonic) -> string {
 	return strings.to_lower(name)
 }
 
+// The parameter TYPES of a form's builder, joined -- the key Odin actually
+// overloads on. Distinct operand categories can share a type: a Z register
+// and a P register are both passed as `u8`, so `inst_trn2_z_z_z` and
+// `inst_trn2_p_p_p` have different names but the same signature. Both are
+// still emitted as standalone procedures; only the first of a colliding set
+// may join the overload group, since Odin rejects a group holding two
+// procedures of identical type.
+odin_type_key :: proc(sig: Operand_Signature) -> string {
+	params := param_list(sig)
+	defer delete(params)
+	sb: strings.Builder
+	strings.builder_init(&sb)
+	for p in params {
+		if i := strings.index(p.decl, ": "); i >= 0 {
+			strings.write_string(&sb, p.decl[i+2:])
+		}
+		strings.write_byte(&sb, ',')
+	}
+	return strings.to_string(sb)
+}
+
 // Every operand type now maps to a category -- nothing is unsupported, so no
 // form is ever skipped.
 operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
@@ -96,19 +125,31 @@ operand_category :: proc(t: a.Operand_Type) -> Operand_Category {
 	case .W_REG, .X_REG, .WSP_REG, .XSP_REG,
 	     .B_REG, .H_REG, .S_REG, .D_REG, .Q_REG, .V_REG,
 	     .V_8B, .V_16B, .V_4H, .V_8H, .V_2S, .V_4S, .V_1D, .V_2D,
-	     .V_4H_FP16, .V_8H_FP16,
+	     .V_4H_FP16, .V_8H_FP16, .V_1Q,
 	     .V_ELEM_B, .V_ELEM_H, .V_ELEM_S, .V_ELEM_D:
 		return .REG
-	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_PAIR, .Z_QUAD:
+	case .Z_REG_B, .Z_REG_H, .Z_REG_S, .Z_REG_D, .Z_REG_ANY,
+	     .Z_LIST1_B, .Z_LIST1_H, .Z_LIST1_S, .Z_LIST1_D, .Z_LIST2_B,
+	     .Z_PAIR_B, .Z_PAIR_H, .Z_PAIR_S, .Z_PAIR_D,
+	     .Z_QUAD_B, .Z_QUAD_H, .Z_QUAD_S, .Z_QUAD_D:
 		return .ZREG
-	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV:
+	case .P_REG, .P_REG_MERGE, .P_REG_ZERO, .P_REG_GOV, .PN_REG, .PN_REG_ZERO,
+	     .P_REG_B, .P_REG_H, .P_REG_S, .P_REG_D:
 		return .PREG
+	case .ZT_REG:
+		// There is only one ZT register, so it takes no parameter at all.
+		return .IMPLICIT
 	case .REL_26, .REL_19, .REL_14, .REL_PG21:
 		return .REL
-	case .MEM:
+	case .MEM_OFFSET, .MEM_PRE, .MEM_POST, .MEM_REG, .MEM_EXT,
+	     .MEM_SVE_SS, .MEM_SVE_SI, .MEM_SVE_VEC, .MEM_SVE_VB:
+		// All addressing modes take one `Memory` parameter, so they share a
+		// builder signature: the encoder picks the form from mem.mode.
 		return .MEM
-	case .COND:
+	case .COND, .COND_NOT_AL:
 		return .COND
+	case .SYS_REG:
+		return .SYSREG
 	case .W_SHIFTED, .X_SHIFTED:
 		return .SHIFTED
 	case .W_EXTENDED, .X_EXTENDED:
@@ -125,6 +166,61 @@ operand_param_count :: proc(t: a.Operand_Type) -> int {
 		return 3
 	}
 	return 1
+}
+
+// How many consecutive registers this encoding's operand is written as, or 0
+// when it is a plain register.
+list_count :: proc(e: a.Operand_Encoding) -> int {
+	#partial switch e {
+	case .VD_LIST1, .VN_LIST1: return 1
+	case .VD_LIST2, .VN_LIST2: return 2
+	case .VD_LIST3, .VN_LIST3: return 3
+	case .VD_LIST4, .VN_LIST4: return 4
+	}
+	return 0
+}
+
+// The ZSHAPE_* constant naming this operand type's SVE element width.
+zshape_const :: proc(t: a.Operand_Type) -> string {
+	#partial switch t {
+	case .Z_REG_H, .Z_PAIR_H, .Z_QUAD_H, .Z_LIST1_H: return "ZSHAPE_H"
+	case .Z_REG_S, .Z_PAIR_S, .Z_QUAD_S, .Z_LIST1_S: return "ZSHAPE_S"
+	case .Z_REG_D, .Z_PAIR_D, .Z_QUAD_D, .Z_LIST1_D: return "ZSHAPE_D"
+	}
+	return "ZSHAPE_B"
+}
+
+// The VSHAPE_* constant naming this operand type's arrangement.
+vshape_const :: proc(t: a.Operand_Type) -> string {
+	#partial switch t {
+	case .V_8B:             return "VSHAPE_8B"
+	case .V_16B:            return "VSHAPE_16B"
+	case .V_4H, .V_4H_FP16: return "VSHAPE_4H"
+	case .V_8H, .V_8H_FP16: return "VSHAPE_8H"
+	case .V_2S:             return "VSHAPE_2S"
+	case .V_4S:             return "VSHAPE_4S"
+	case .V_1D:             return "VSHAPE_1D"
+	case .V_2D:             return "VSHAPE_2D"
+	case .V_1Q:             return "VSHAPE_1Q"
+	case .V_ELEM_B:         return "VSHAPE_ELEM_B"
+	case .V_ELEM_H:         return "VSHAPE_ELEM_H"
+	case .V_ELEM_S:         return "VSHAPE_ELEM_S"
+	case .V_ELEM_D:         return "VSHAPE_ELEM_D"
+	}
+	return "VSHAPE_NONE"
+}
+
+// A lane index prints glued to the register it indexes, so it is built with
+// op_lane_index rather than op_imm. Keyed on the ENCODING: EXT writes its byte
+// index as a plain immediate while sharing the .VEC_INDEX operand type.
+is_lane_index :: proc(e: a.Operand_Encoding) -> bool {
+	#partial switch e {
+	case .NEON_IDX5, .NEON_IDX4, .NEON_IDX2,
+	     .NEON_LANE_B, .NEON_LANE_H, .NEON_LANE_S, .NEON_LANE_D,
+	     .SVE_FMLA_IDX_H, .SVE_FMLA_IDX_S, .SVE_FMLA_IDX_D, .LUTI_IDX:
+		return true
+	}
+	return false
 }
 
 // Width byte for op_imm / op_label (informational only; the matcher checks
@@ -145,6 +241,52 @@ operand_imm_size :: proc(t: a.Operand_Type) -> u8 {
 // Odin-type dedup: two forms producing the same name also produce the same
 // proc signature (which Odin forbids twice in one overload group).
 operand_suffix :: proc(t: a.Operand_Type) -> string {
+	// A NEON arrangement is not recoverable from a Register, so it has to live
+	// in the name: without this every arrangement of a mnemonic collapses onto
+	// one builder and only the first is reachable. FP16 variants share a token
+	// with their non-FP16 twin because they build an identical operand -- the
+	// encoder tells those two apart by the form, not the operand.
+	// An SVE element size is not recoverable from the u8 a Z operand is passed
+	// as, so it has to live in the name -- otherwise every size of a mnemonic
+	// collapses onto one builder and only the first is reachable.
+	#partial switch t {
+	case .Z_REG_B:  return "zb"
+	case .Z_REG_H:  return "zh"
+	case .Z_REG_S:  return "zs"
+	case .Z_REG_D:  return "zd"
+	case .Z_LIST1_B: return "zl1b"
+	case .Z_LIST1_H: return "zl1h"
+	case .Z_LIST1_S: return "zl1s"
+	case .Z_LIST1_D: return "zl1d"
+	case .Z_LIST2_B: return "zl2b"
+	case .Z_PAIR_B: return "zpb"
+	case .Z_PAIR_H: return "zph"
+	case .Z_PAIR_S: return "zps"
+	case .Z_PAIR_D: return "zpd"
+	case .Z_QUAD_B: return "zqb"
+	case .Z_QUAD_H: return "zqh"
+	case .Z_QUAD_S: return "zqs"
+	case .Z_QUAD_D: return "zqd"
+	case .P_REG_B: return "pb"
+	case .P_REG_H: return "ph"
+	case .P_REG_S: return "ps"
+	case .P_REG_D: return "pd"
+	case .PN_REG:      return "pn"
+	case .PN_REG_ZERO: return "pnz"
+	case .V_8B:             return "v8b"
+	case .V_16B:            return "v16b"
+	case .V_4H, .V_4H_FP16: return "v4h"
+	case .V_8H, .V_8H_FP16: return "v8h"
+	case .V_2S:             return "v2s"
+	case .V_4S:             return "v4s"
+	case .V_1D:             return "v1d"
+	case .V_2D:             return "v2d"
+	case .V_1Q:             return "v1q"
+	case .V_ELEM_B:         return "veb"
+	case .V_ELEM_H:         return "veh"
+	case .V_ELEM_S:         return "ves"
+	case .V_ELEM_D:         return "ved"
+	}
 	switch operand_category(t) {
 	case .REG:      return "r"
 	case .ZREG:     return "z"
@@ -153,6 +295,8 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 	case .REL:      return "l"
 	case .MEM:      return "m"
 	case .COND:     return "c"
+	case .SYSREG:   return "s"
+	case .IMPLICIT: return "zt"
 	case .SHIFTED:  return "sh"
 	case .EXTENDED: return "ex"
 	}
@@ -167,7 +311,7 @@ operand_suffix :: proc(t: a.Operand_Type) -> string {
 // included; only truly implicit operands (enc == .IMPL, which AArch64's tables
 // never actually use) carry no param.
 build_signature :: proc(form: a.Encoding) -> (sig: Operand_Signature, ok: bool) {
-	for i in 0..<4 {
+	for i in 0..<5 {
 		op := form.ops[i]
 		if op == .NONE { continue }
 
@@ -175,6 +319,7 @@ build_signature :: proc(form: a.Encoding) -> (sig: Operand_Signature, ok: bool) 
 		if form.enc[i] == .IMPL { continue }
 
 		sig.types[sig.count] = op
+		sig.encs[sig.count]  = form.enc[i]
 		sig.count += 1
 	}
 	return sig, true
@@ -194,8 +339,8 @@ Param :: struct {
 // the shift/extend kind and amount. This is the single source of truth for
 // parameter names; param_list derives the typed declarations from it so the
 // declared params always match the expressions that reference them.
-operand_primary_names :: proc(sig: Operand_Signature) -> [4][3]string {
-	result: [4][3]string
+operand_primary_names :: proc(sig: Operand_Signature) -> [5][3]string {
+	result: [5][3]string
 	reg_count := 0
 	imm_count := 0
 	zp_count  := 0
@@ -231,6 +376,10 @@ operand_primary_names :: proc(sig: Operand_Signature) -> [4][3]string {
 			result[i][0] = "mem"
 		case .COND:
 			result[i][0] = "cond"
+		case .SYSREG:
+			result[i][0] = "sysreg"
+		case .IMPLICIT:
+			result[i][0] = ""
 		case .SHIFTED:
 			rn := reg_name(i, &reg_count)
 			result[i][0] = rn
@@ -258,6 +407,8 @@ param_list :: proc(sig: Operand_Signature) -> [dynamic]Param {
 			append(&params, Param{decl = fmt.tprintf("%s: Register", names[i][0]), name = names[i][0]})
 		case .ZREG, .PREG:
 			append(&params, Param{decl = fmt.tprintf("%s: u8", names[i][0]), name = names[i][0]})
+		case .IMPLICIT:
+			// no parameter
 		case .IMM:
 			append(&params, Param{decl = fmt.tprintf("%s: i64", names[i][0]), name = names[i][0]})
 		case .REL:
@@ -266,6 +417,8 @@ param_list :: proc(sig: Operand_Signature) -> [dynamic]Param {
 			append(&params, Param{decl = fmt.tprintf("%s: Memory", names[i][0]), name = names[i][0]})
 		case .COND:
 			append(&params, Param{decl = fmt.tprintf("%s: Cond", names[i][0]), name = names[i][0]})
+		case .SYSREG:
+			append(&params, Param{decl = fmt.tprintf("%s: Register", names[i][0]), name = names[i][0]})
 		case .SHIFTED:
 			append(&params, Param{decl = fmt.tprintf("%s: Register",    names[i][0]), name = names[i][0]})
 			append(&params, Param{decl = fmt.tprintf("%s: Shift_Type", names[i][1]), name = names[i][1]})
@@ -303,22 +456,36 @@ generate_proc_name :: proc(mnemonic: a.Mnemonic, sig: Operand_Signature) -> stri
 // the produced encoding is valid for the kept form).
 // -----------------------------------------------------------------------------
 
-write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]string) {
+write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, enc: a.Operand_Encoding, names: [3]string) {
+	// A register the syntax writes as a list carries how many, which is a
+	// property of the form rather than of the operand type.
+	if n := list_count(enc); n > 0 {
+		// A Z operand arrives as a bare register number, so it has to be given
+		// its class before it can head a list.
+		if operand_category(t) == .ZREG {
+			fmt.sbprintf(sb, "op_v_list(Register(REG_Z | (u16(%s) & 0x1F)), %s, %d)",
+			             names[0], zshape_const(t), n)
+		} else {
+			fmt.sbprintf(sb, "op_v_list(%s, %s, %d)", names[0], vshape_const(t), n)
+		}
+		return
+	}
 	#partial switch operand_category(t) {
 	case .REG:
 		#partial switch t {
-		case .V_8B:  fmt.sbprintf(sb, "op_v_8b(u8(reg_hw(%s)))",  names[0])
-		case .V_16B: fmt.sbprintf(sb, "op_v_16b(u8(reg_hw(%s)))", names[0])
-		case .V_4H, .V_4H_FP16: fmt.sbprintf(sb, "op_v_4h(u8(reg_hw(%s)))", names[0])
-		case .V_8H, .V_8H_FP16: fmt.sbprintf(sb, "op_v_8h(u8(reg_hw(%s)))", names[0])
-		case .V_2S:  fmt.sbprintf(sb, "op_v_2s(u8(reg_hw(%s)))",  names[0])
-		case .V_4S:  fmt.sbprintf(sb, "op_v_4s(u8(reg_hw(%s)))",  names[0])
-		case .V_1D:  fmt.sbprintf(sb, "op_v_1d(u8(reg_hw(%s)))",  names[0])
-		case .V_2D:  fmt.sbprintf(sb, "op_v_2d(u8(reg_hw(%s)))",  names[0])
-		case .V_ELEM_B: fmt.sbprintf(sb, "op_v_elem_b(u8(reg_hw(%s)))", names[0])
-		case .V_ELEM_H: fmt.sbprintf(sb, "op_v_elem_h(u8(reg_hw(%s)))", names[0])
-		case .V_ELEM_S: fmt.sbprintf(sb, "op_v_elem_s(u8(reg_hw(%s)))", names[0])
-		case .V_ELEM_D: fmt.sbprintf(sb, "op_v_elem_d(u8(reg_hw(%s)))", names[0])
+		case .V_8B:  fmt.sbprintf(sb, "op_v_8b(%s)",  names[0])
+		case .V_16B: fmt.sbprintf(sb, "op_v_16b(%s)", names[0])
+		case .V_4H, .V_4H_FP16: fmt.sbprintf(sb, "op_v_4h(%s)", names[0])
+		case .V_8H, .V_8H_FP16: fmt.sbprintf(sb, "op_v_8h(%s)", names[0])
+		case .V_2S:  fmt.sbprintf(sb, "op_v_2s(%s)",  names[0])
+		case .V_4S:  fmt.sbprintf(sb, "op_v_4s(%s)",  names[0])
+		case .V_1D:  fmt.sbprintf(sb, "op_v_1d(%s)",  names[0])
+		case .V_2D:  fmt.sbprintf(sb, "op_v_2d(%s)",  names[0])
+		case .V_1Q:  fmt.sbprintf(sb, "op_v_1q(%s)",  names[0])
+		case .V_ELEM_B: fmt.sbprintf(sb, "op_v_elem_b(%s)", names[0])
+		case .V_ELEM_H: fmt.sbprintf(sb, "op_v_elem_h(%s)", names[0])
+		case .V_ELEM_S: fmt.sbprintf(sb, "op_v_elem_s(%s)", names[0])
+		case .V_ELEM_D: fmt.sbprintf(sb, "op_v_elem_d(%s)", names[0])
 		case:        fmt.sbprintf(sb, "op_reg(%s)", names[0])
 		}
 	case .ZREG:
@@ -327,18 +494,35 @@ write_operand_expr :: proc(sb: ^strings.Builder, t: a.Operand_Type, names: [3]st
 		case .Z_REG_H: fmt.sbprintf(sb, "op_z_h(%s)", names[0])
 		case .Z_REG_S: fmt.sbprintf(sb, "op_z_s(%s)", names[0])
 		case .Z_REG_D: fmt.sbprintf(sb, "op_z_d(%s)", names[0])
-		case:          fmt.sbprintf(sb, "op_reg(Register(REG_Z | (u16(%s) & 0x1F)))", names[0])  // Z_PAIR / Z_QUAD
+		case .Z_PAIR_B, .Z_QUAD_B: fmt.sbprintf(sb, "op_z_b(%s)", names[0])
+		case .Z_PAIR_H, .Z_QUAD_H: fmt.sbprintf(sb, "op_z_h(%s)", names[0])
+		case .Z_PAIR_S, .Z_QUAD_S: fmt.sbprintf(sb, "op_z_s(%s)", names[0])
+		case .Z_PAIR_D, .Z_QUAD_D: fmt.sbprintf(sb, "op_z_d(%s)", names[0])
+		case:          fmt.sbprintf(sb, "op_reg(Register(REG_Z | (u16(%s) & 0x1F)))", names[0])  // Z_REG_ANY
 		}
 	case .PREG:
-		fmt.sbprintf(sb, "op_reg(Register(REG_P | (u16(%s) & 0xF)))", names[0])
+		if t == .PN_REG || t == .PN_REG_ZERO {
+			// SME2 numbers its predicate-as-counter registers from 8.
+			fmt.sbprintf(sb, "op_reg(Register(REG_PN | (8 + (u16(%s) & 0x7))))", names[0])
+		} else {
+			fmt.sbprintf(sb, "op_reg(Register(REG_P | (u16(%s) & 0xF)))", names[0])
+		}
 	case .IMM:
-		fmt.sbprintf(sb, "op_imm(%s, %d)", names[0], operand_imm_size(t))
+		if is_lane_index(enc) {
+			fmt.sbprintf(sb, "op_lane_index(%s)", names[0])
+		} else {
+			fmt.sbprintf(sb, "op_imm(%s, %d)", names[0], operand_imm_size(t))
+		}
 	case .REL:
 		fmt.sbprintf(sb, "op_label(%s, 4)", names[0])
 	case .MEM:
 		fmt.sbprintf(sb, "op_mem(%s)", names[0])
 	case .COND:
 		fmt.sbprintf(sb, "op_cond(%s)", names[0])
+	case .SYSREG:
+		fmt.sbprintf(sb, "op_sysreg(%s)", names[0])
+	case .IMPLICIT:
+		strings.write_string(sb, "op_reg(ZT0)")
 	case .SHIFTED:
 		fmt.sbprintf(sb, "op_shifted(%s, %s, %s)", names[0], names[1], names[2])
 	case .EXTENDED:
@@ -374,7 +558,7 @@ uses_plain_constructors :: proc(sig: Operand_Signature) -> bool {
 			     .V_4H_FP16, .V_8H_FP16:
 				return false   // needs op_v_*
 			}
-		case .IMM, .REL, .MEM, .COND:
+		case .IMM, .REL, .MEM, .COND, .SYSREG:
 			// fine
 		case:
 			return false       // ZREG / PREG / SHIFTED / EXTENDED
@@ -442,10 +626,10 @@ write_inst_fallback :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 	defer delete(mstr)
 
 	fmt.sbprintf(sb, "Instruction{{mnemonic = .%s, operand_count = %d, length = 4, ops = {{", mstr, sig.count)
-	for i in 0..<4 {
+	for i in 0..<5 {
 		if i > 0 { strings.write_string(sb, ", ") }
 		if i < sig.count {
-			write_operand_expr(sb, sig.types[i], pnames[i])
+			write_operand_expr(sb, sig.types[i], sig.encs[i], pnames[i])
 		} else {
 			strings.write_string(sb, "{}")
 		}
@@ -620,8 +804,26 @@ main :: proc() {
 
 `)
 	for m in mnemonic_list {
-		procs := procs_by_mnemonic[m]
-		if len(procs) == 0 { continue }
+		all_procs := procs_by_mnemonic[m]
+		if len(all_procs) == 0 { continue }
+
+		// Only type-distinct forms can be group members (see odin_type_key).
+		procs: [dynamic]Proc_Entry
+		defer delete(procs)
+		{
+			seen: map[string]bool
+			defer delete(seen)
+			for e in all_procs {
+				key := odin_type_key(e.sig)
+				if seen[key] {
+					delete(key)
+					continue
+				}
+				seen[key] = true
+				append(&procs, e)
+			}
+		}
+
 		mlow := mnemonic_to_lower(m)
 
 		// inst_ group
@@ -659,21 +861,10 @@ main :: proc() {
 		}
 	}
 
-	// Builder aliases for redundant SME enum names that were removed from the
-	// Mnemonic enum: they are the same instructions as the canonical *_TILE /
-	// MOVA_*_FROM_* forms, so the convenient *_za / *_to_* names delegate to them.
-	sme_aliases := [][2]string{
-		{"sme_ld1b_za", "sme_ld1b_tile"}, {"sme_ld1h_za", "sme_ld1h_tile"},
-		{"sme_ld1w_za", "sme_ld1w_tile"}, {"sme_ld1d_za", "sme_ld1d_tile"},
-		{"sme_ld1q_za", "sme_ld1q_tile"}, {"sme_st1b_za", "sme_st1b_tile"},
-		{"sme_st1h_za", "sme_st1h_tile"}, {"sme_st1w_za", "sme_st1w_tile"},
-		{"sme_st1d_za", "sme_st1d_tile"}, {"sme_st1q_za", "sme_st1q_tile"},
-		{"sme_mova_to_z", "sme_mova_z_from_tile"}, {"sme_mova_to_za", "sme_mova_tile_from_z"},
-	}
-	strings.write_string(&sb, "\n// Aliases: redundant SME names -> canonical tile/MOVA builders.\n")
-	for al in sme_aliases {
-		fmt.sbprintf(&sb, "inst_%s :: inst_%s\nemit_%s :: emit_%s\n", al[0], al[1], al[0], al[1])
-	}
+	// (The SME *_za / *_to_* builder aliases that used to be appended here are
+	// gone: SME_LD1B_TILE, SME_MOVA_Z_FROM_TILE and friends now carry their
+	// assembler names -- LD1B, MOVA -- so inst_ld1b / inst_mova already are
+	// the canonical builders and no delegating alias is needed.)
 
 	output := strings.to_string(sb)
 	err := os.write_entire_file(#directory + "/../mnemonic_builders.odin", transmute([]u8)strings.concatenate({GEN_ATTRIB, output}))

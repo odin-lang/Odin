@@ -84,7 +84,13 @@ _remove_all :: proc(path: string) -> Error {
 	}
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	dir := win32_utf8_to_wstring(path, temp_allocator) or_return
+
+	// SHFileOperationW is documented as not thread safe with relative paths.
+	abs_path := path
+	if !_is_absolute_path(path) {
+		abs_path = _get_absolute_path(path, temp_allocator) or_return
+	}
+	dir := win32_utf8_to_wstring(abs_path, temp_allocator) or_return
 
 	empty: [1]u16
 

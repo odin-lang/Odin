@@ -281,7 +281,7 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_,
 			}
 			i64 align = big_int_to_i64(&v);
 			if (align < 1 || !gb_is_power_of_two(cast(isize)align)) {
-				error(node, "#%s must be a power of 2, got %lld", msg, align);
+				error(node, "#%s must be a power of 2, got %lld", msg, cast(long long)align);
 				return false;
 			}
 			*align_ = align;
@@ -677,7 +677,9 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	
 	scope_reserve(ctx->scope, min_field_count);
 
-	if (st->is_raw_union && min_field_count > 1) {
+	// Even a one-field `#raw_union` must be marked. RISC-V psABI excludes unions from the hardware
+	// floating-point convention. `struct{union{f32}}` goes in `a0` where `struct{f32}` goes in `fa0`.
+	if (st->is_raw_union) {
 		struct_type->Struct.is_raw_union = true;
 		context = str_lit("struct #raw_union");
 	}
@@ -885,7 +887,8 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 	enum_type->Enum.scope = ctx->scope;
 
 	Type *base_type = t_int;
-	if (unparen_expr(et->base_type) != nullptr) {
+	bool base_type_implicit = (unparen_expr(et->base_type) == nullptr);
+	if (!base_type_implicit) {
 		base_type = check_type(ctx, et->base_type);
 	}
 
@@ -965,6 +968,27 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		} else {
 			iota = exact_binary_operator_value(Token_Add, iota, exact_value_i64(1));
 			entity_flags |= EntityConstantFlag_ImplicitEnumValue;
+
+			if (!base_type_implicit) {
+				int bits_iota = mp_count_bits(&iota.value_integer);
+				int bits_type = (int)type_size_of(base_type) * 8;
+				if (bits_iota > bits_type) {
+					ERROR_BLOCK();
+
+					gbString a = expr_to_string(ident);
+					gbString b = exact_value_to_string(iota);
+					gbString c = type_to_string(base_type);
+					gbString d = type_to_string(constant_type);
+					defer(
+						gb_string_free(a);
+						gb_string_free(b);
+						gb_string_free(c);
+						gb_string_free(d);
+					);
+
+					error(ident, "'%s' gets value '%s' which overflows base type '%s' of enumeration '%s'", a, b, c, d);
+				}
+			}
 		}
 
 
@@ -1009,6 +1033,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 		e->Constant.flags |= entity_flags;
 		e->Constant.docs = docs;
 		e->Constant.comment = comment;
+		e->Constant.init_expr = init;
 
 		auto interned = entity_interned_name(e);
 
@@ -1115,6 +1140,13 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			gbString s = expr_to_string(f->bit_size);
 			error(f->bit_size, "Wrap the expression in parentheses, e.g. (%s)", s);
 			gb_string_free(s);
+		}
+
+		if (o.mode == Addressing_Constant) {
+			convert_to_typed(ctx, &o, t_int);
+			if (o.mode == Addressing_Invalid) {
+				o.value = exact_value_i64(1);
+			}
 		}
 
 		ExactValue bit_size = o.value;
@@ -1367,7 +1399,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 			gb_free(a, s.text);
 			return;
 		}
-		if (!check_representable_as_constant(c, iv, t, nullptr)) {
+		if (!check_representable_as_constant(c, jv, t, nullptr)) {
 			gbAllocator a = heap_allocator();
 			String s = big_int_to_string(a, &j);
 			gbString ts = type_to_string(t);
@@ -1387,7 +1419,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 			if (lower > 0) {
 				actual_lower = 0;
 			} else if (lower < 0) {
-				error(bs->elem, "bit_set does not allow a negative lower bound (%lld) when an underlying type is set", lower);
+				error(bs->elem, "bit_set does not allow a negative lower bound (%lld) when an underlying type is set", cast(long long)lower);
 			}
 		}
 
@@ -1416,9 +1448,9 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		}
 		if (!is_valid) {
 			if (actual_lower != lower) {
-				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", cast(long long)bits, cast(long long)bits_required);
 			} else {
-				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", cast(long long)bits, cast(long long)bits_required);
 			}
 		}
 		
@@ -1478,7 +1510,7 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 						lower_changed = true;
 					} else if (lower < 0) {
 						gbString s = type_to_string(elem);
-						error(bs->elem, "bit_set does not allow a negative lower bound (%lld) of the element type '%s' when an underlying type is set", lower, s);
+						error(bs->elem, "bit_set does not allow a negative lower bound (%lld) of the element type '%s' when an underlying type is set", cast(long long)lower, s);
 						gb_string_free(s);
 					}
 				}
@@ -1486,9 +1518,9 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 				if (upper - lower >= bits) {
 					i64 bits_required = upper-lower+1;
 					if (lower_changed) {
-						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", bits, bits_required);
+						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", cast(long long)bits, cast(long long)bits_required);
 					} else {
-						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", bits, bits_required);
+						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", cast(long long)bits, cast(long long)bits_required);
 					}
 				}
 
@@ -1791,6 +1823,7 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 					if (e->kind == Entity_Procedure) {
 						param_value.kind = ParameterValue_Constant;
 						param_value.value = exact_value_procedure(e->identifier);
+						param_value.proc_entity = e;
 						add_entity_use(ctx, e->identifier, e);
 					} else {
 						if (e->flags & EntityFlag_Param) {
@@ -2143,8 +2176,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						// This is just to add the error message to determine_type_from_polymorphic which
 						// depends on valid position information
 						op.expr = _params;
-						op.mode = Addressing_Invalid;
-						op.type = t_invalid;
+
+						// NOTE(taylbr): Can still have valid type with null expr. Needed for resolving
+						if (op.mode == Addressing_Invalid || op.type == nullptr) {
+							op.mode = Addressing_Invalid;
+							op.type = t_invalid;
+						}
 					}
 					if (is_type_polymorphic_type) {
 						type = determine_type_from_polymorphic(ctx, type, op);
@@ -2841,9 +2878,14 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	}
 	Type *type = core_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
-		if (o->value.kind == ExactValue_Integer) {
-			BigInt count = o->value.value_integer;
-			if (big_int_is_neg(&o->value.value_integer)) {
+		ExactValue value = o->value;
+		if (value.kind == ExactValue_Float) {
+			// NOTE: an integral float is a valid count, but it must be range checked as an integer
+			value = exact_value_to_integer(value);
+		}
+		if (value.kind == ExactValue_Integer) {
+			BigInt count = value.value_integer;
+			if (big_int_is_neg(&count)) {
 				gbAllocator a = heap_allocator();
 				String str = big_int_to_string(a, &count);
 				error(e, "Invalid negative array count, %.*s", LIT(str));
@@ -2859,12 +2901,6 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 			error(e, "Array count too large, %.*s", LIT(str));
 			gb_free(a, str.text);
 			return 0;
-		} else if (o->value.kind == ExactValue_Float) {
-			u64 u = cast(u64)o->value.value_float;
-			f64 f = cast(f64)u;
-			if (f == o->value.value_float) {
-				return u;
-			}
 		}
 	}
 
@@ -2986,6 +3022,11 @@ gb_internal void init_map_internal_types(Type *type) {
 }
 
 gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
+	if (build_context.bedrock) {
+		// the map runtime is declared '#+build !bedrock'
+		return;
+	}
+
 	key = core_type(key);
 
 	if (is_type_cstring(key)) {
@@ -3121,14 +3162,25 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 			error(node, "Invalid matrix column count, got nothing");
 		} else {
 			gbString s = expr_to_string(column.expr);
-			error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
+			error(column.expr, "Invalid matrix column count, expected %d+ columns, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
 			gb_string_free(s);
 		}
 	}
 	
-	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
-		i64 element_count = row_count*column_count;
-		error(column.expr, "Matrix types are limited to a maximum of %d elements, got %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)element_count);
+	if (generic_row == nullptr && generic_column == nullptr) {
+		// row_count*column_count can overflow and wrap back under the limit, so test the
+		// dimensions first; each is at least MATRIX_ELEMENT_COUNT_MIN. Either one exceeding
+		// the maximum means the product does too
+		if (row_count > MATRIX_ELEMENT_COUNT_MAX || column_count > MATRIX_ELEMENT_COUNT_MAX ||
+		    row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
+			// the element count is only printable when the multiply cannot overflow, which is
+			// exactly the case the dimension test above catches
+			if (row_count != 0 && column_count > I64_MAX/row_count) {
+				error(node, "Matrix types are limited to a maximum of %d elements, got %lld by %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)row_count, cast(long long)column_count);
+			} else {
+				error(node, "Matrix types are limited to a maximum of %d elements, got %lld by %lld (%lld elements)", MATRIX_ELEMENT_COUNT_MAX, cast(long long)row_count, cast(long long)column_count, cast(long long)(row_count*column_count));
+			}
+		}
 	}
 
 
@@ -3472,6 +3524,22 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 			Type *bt = base_type(index);
 			GB_ASSERT(bt->kind == Type_Enum);
 
+			// the length is `max - min + 1`, computed exactly and then narrowed to an i64. a
+			// wide enough enumeration wraps & nothing tests downstream; reject here
+			if (bt->Enum.fields.count > 0 &&
+			    bt->Enum.min_value != nullptr && bt->Enum.max_value != nullptr) {
+				ExactValue span = exact_value_sub(*bt->Enum.max_value, *bt->Enum.min_value);
+				ExactValue len  = exact_value_add(span, exact_value_i64(1));
+				if (len.kind == ExactValue_Integer && len.value_integer.used > 1) {
+					gbAllocator a = heap_allocator();
+					String str = big_int_to_string(a, &len.value_integer);
+					error(e, "Enumerated array length too large, %.*s", LIT(str));
+					gb_free(a, str.text);
+					*type = t_invalid;
+					return;
+				}
+			}
+
 			Type *t = alloc_type_enumerated_array(elem, index, bt->Enum.min_value, bt->Enum.max_value, bt->Enum.fields.count, Token_Invalid);
 
 			bool is_sparse = false;
@@ -3506,9 +3574,12 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 			return;
 		}
 
+		// Track user input and recovery value seperate, since both could be '0'
+		bool count_recovered = false;
 		if (count < 0) {
 			error(at->count, "? can only be used in conjunction with compound literals");
 			count = 0;
+			count_recovered = true;
 		}
 
 
@@ -3530,7 +3601,12 @@ gb_internal void check_array_type_internal(CheckerContext *ctx, Ast *e, Type **t
 					// Ignore
 				} else if (count < 1 || !is_power_of_two(count)) {
 					*type = alloc_type_array(elem, count, generic_type);
-					if (ctx->disallow_polymorphic_return_types && count == 0) {
+					if (count_recovered) {
+						return;
+					}
+					// a polymorphic value used as the count is still unresolved while the
+					// signature is checked and reads as 0; only a written count is constant
+					if (ctx->disallow_polymorphic_return_types && o.mode != Addressing_Constant) {
 						return;
 					}
 					error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
@@ -4092,7 +4168,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	}
 	#endif
 
-	if (type->kind == Type_Named && type->Named.base == nullptr || is_type_typed(type)) {
+	if (type->kind == Type_Named && base_type(type) == nullptr || is_type_typed(type)) {
 		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);

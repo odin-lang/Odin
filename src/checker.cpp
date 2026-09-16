@@ -1834,6 +1834,12 @@ retry:;
 		expr = we->cond->tav.value.value_bool ? we->x : we->y;
 		goto retry;
 	case_end;
+	case_ast_node(label, AsmLabelDecl, expr);
+		return entity_of_node(label->name);
+	case_end;
+	case_ast_node(at, AsmTemplate, expr);
+		return at->anonymous_entity;
+	case_end;
 	}
 	return nullptr;
 }
@@ -2050,18 +2056,26 @@ gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
+		// NOTE: the insertion order is a race between the files of a package, so order the pair by
+		// position; the later declaration stays the anchor, as it is the one being reported
+		TokenPos first = prev->token.pos;
+		TokenPos second = pos;
+		if (second < first) {
+			first = pos;
+			second = prev->token.pos;
+		}
 		if (found->flags & EntityFlag_Result) {
-			error(prev->token,
+			error(second,
 			      "Direct shadowing of the named return value '%.*s' in this scope\n"
 			      "\tat %s",
 			      LIT(name),
-			      token_pos_to_string(pos));
+			      token_pos_to_string(first));
 		} else {
-			error(prev->token,
+			error(second,
 			      "Redeclaration of '%.*s' in this scope\n"
 			      "\tat %s",
 			      LIT(name),
-			      token_pos_to_string(pos));
+			      token_pos_to_string(first));
 		}
 	}
 	return false;
@@ -2674,6 +2688,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, alloc_type_pointer(bt->FixedCapacityDynamicArray.elem));
 		add_min_dep_type_info(c, alloc_type_array(bt->FixedCapacityDynamicArray.elem, bt->FixedCapacityDynamicArray.capacity));
 		add_min_dep_type_info(c, t_int);
+		break;
 
 	case Type_Enum:
 		add_min_dep_type_info(c, bt->Enum.base_type);
@@ -4549,6 +4564,35 @@ gb_internal DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 	return false;
 }
 
+gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
+	} else if (name == "require_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->require_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "enable_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->enable_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	}
+	return false;
+}
 
 #include "check_expr.cpp"
 #include "check_builtin.cpp"
@@ -5052,6 +5096,24 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				if (fl != nullptr) {
 					error(name, "Procedure groups are not allowed within a foreign block");
 				}
+			} else if (init->kind == Ast_AsmGroup) {
+				ast_node(ag, AsmGroup, init);
+				e = alloc_entity_proc_group(d->scope, token, nullptr);
+				e->ProcGroup.is_asm_group = true;
+				if (fl != nullptr) {
+					error(name, "Asm template groups are not allowed within a foreign block");
+				}
+			}else if (init->kind == Ast_AsmTemplate) {
+				if (c->scope->flags&ScopeFlag_Type) {
+					error(name, "Asm templates are not allowed within a struct");
+					continue;
+				}
+				ast_node(at, AsmTemplate, init);
+				e = alloc_entity_asm_template(d->scope, token, nullptr, init);
+				if (fl != nullptr) {
+					error(name, "Asm templates are not allowed within a foreign block");
+				}
+				d->init_expr = init;
 			} else {
 				e = alloc_entity_constant(d->scope, token, nullptr, empty_exact_value);
 			}
@@ -5647,7 +5709,7 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		ERROR_BLOCK();
 
 		if (id->import_name.string.len > 0) {
-			error(token, "Import name '%.*s' cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
+			error(token, "Import name '%.*s' is not a valid identifier", LIT(id->import_name.string));
 		} else {
 			error(id->token, "Import name '%.*s' is not a valid identifier", LIT(invalid_name));
 			error_line("\tSuggestion: Rename the directory or explicitly set an import name like this 'import <new_name> %.*s'", LIT(id->relpath.string));
@@ -7347,24 +7409,24 @@ gb_internal void check_objc_context_provider_procedures(Checker *c) {
 
 		const char *self_param_err = "The @(objc_context_provider) procedure must take as a parameter a single pointer to the @(objc_type) value.";
 		if (proc.param_count != 1) {
-			error(proc_entity->token, self_param_err);
+			error(proc_entity->token, "%s", self_param_err);
 		}
 
 		Type *self_param = base_type(proc.params->Tuple.variables[0]->type);
 		if (self_param->kind != Type_Pointer) {
-			error(proc_entity->token, self_param_err);
+			error(proc_entity->token, "%s", self_param_err);
 		}
 
 		Type *self_type = base_named_type(self_param->Pointer.elem);
 		if (!internal_check_is_assignable_to(self_type, e->type) &&
 			!(e->TypeName.objc_ivar && internal_check_is_assignable_to(self_type, e->TypeName.objc_ivar))) {
-			error(proc_entity->token, self_param_err);
+			error(proc_entity->token, "%s", self_param_err);
 		}
 		if (proc.calling_convention != ProcCC_CDecl && proc.calling_convention != ProcCC_Contextless) {
-			error(e->token, self_param_err);
+			error(e->token, "%s", self_param_err);
 		}
 		if (proc.is_polymorphic) {
-			error(e->token, self_param_err);
+			error(e->token, "%s", self_param_err);
 		}
 	}
 }
