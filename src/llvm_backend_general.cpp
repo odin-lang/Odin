@@ -1755,9 +1755,10 @@ gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbVal
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
 			unsigned type_align = cast(unsigned)dst_align;
+			unsigned src_type_align = gb_min(type_align, LLVMGetAlignment(value.value));
 			LLVMBuildMemMove(p->builder,
 			                 dst_ptr, lb_try_get_alignment(p->module, dst_ptr, type_align),
-			                 src_ptr, lb_try_get_alignment(p->module, src_ptr_original, type_align),
+			                 src_ptr, lb_try_get_alignment(p->module, src_ptr_original, src_type_align),
 			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		} else if (LLVMIsConstant(value.value)) {
