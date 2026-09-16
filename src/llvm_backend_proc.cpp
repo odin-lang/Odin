@@ -2899,7 +2899,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			case BuiltinProc_simd_gather:
 				if (LLVM_VERSION_MAJOR >= 22) {
 					arg_count = 3;
-					args[0] = ptr; align_idx = 0;
+					args[0] = ptr; align_idx = 1;
 					args[1] = mask;
 					args[2] = val;
 				} else {
@@ -2917,7 +2917,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				if (LLVM_VERSION_MAJOR >= 22) {
 					arg_count = 3;
 					args[0] = val;
-					args[1] = ptr; align_idx = 1;
+					args[1] = ptr; align_idx = 2;
 					args[2] = mask;
 				} else {
 					args[0] = val;
@@ -2947,7 +2947,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			res.value = lb_call_intrinsic(p, name, args, arg_count, types, type_count);
 			if (align_idx >= 0) {
 				LLVMAttributeRef align_attr = lb_create_enum_attribute(p->module->ctx, "align", alignment);
-				LLVMAddAttributeAtIndex(res.value, align_idx, align_attr);
+				LLVMAddCallSiteAttribute(res.value, align_idx, align_attr);
 			}
 			return res;
 
