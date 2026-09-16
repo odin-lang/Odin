@@ -2838,7 +2838,10 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		ast_node(bd, BasicDirective, ce->proc);
 		String name = bd->name.string;
 		if (name == "location") {
-			String procedure = p->entity->token.string;
+			String procedure = {};
+			if (p->entity != nullptr) {
+				procedure = p->entity->token.string;
+			}
 			TokenPos pos = ast_token(ce->proc).pos;
 			if (ce->args.count > 0) {
 				Ast *ident = unselector_expr(ce->args[0]);

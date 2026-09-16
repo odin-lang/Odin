@@ -2434,6 +2434,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 			}
 		}
 
+		init_core_source_code_location(c->checker);
 		operand->type = t_source_code_location;
 		operand->mode = Addressing_Value;
 	} else if (name == "caller_expression") {
