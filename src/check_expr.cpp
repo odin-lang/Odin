@@ -5600,7 +5600,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				if (success_) *success_ = false;
 				if (finish_) *finish_ = true;
 				return empty_exact_value;
-			} else if (is_type_struct(node->tav.type)) {
+			} else if (is_type_struct(node->tav.type) || is_type_bit_field(node->tav.type)) {
 				bool found = false;
 				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
