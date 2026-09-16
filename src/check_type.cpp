@@ -971,7 +971,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 
 			if (!base_type_implicit) {
 				int bits_iota = mp_count_bits(&iota.value_integer);
-				int bits_type = type_size_of(base_type) * 8;
+				int bits_type = (int)type_size_of(base_type) * 8;
 				if (bits_iota > bits_type) {
 					ERROR_BLOCK();
 
