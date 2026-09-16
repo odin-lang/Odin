@@ -1708,6 +1708,9 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		}
 	}
 
+	// NOTE: runtime operands must be built exactly once,
+	// a rebuilt operand is emitted again and calls will reevaluate (side effects included);
+	// consts (e.g. simd_shuffle's indices) may be rebuilt
 	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
 	lbValue arg1 = {}; if (ce->args.count > 1) arg1 = lb_build_expr(p, ce->args[1]);
 	lbValue arg2 = {}; if (ce->args.count > 2) arg2 = lb_build_expr(p, ce->args[2]);
@@ -2125,8 +2128,8 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 	case BuiltinProc_simd_select:
 		{
 			LLVMValueRef cond = arg0.value;
-			LLVMValueRef x = lb_build_expr(p, ce->args[1]).value;
-			LLVMValueRef y = lb_build_expr(p, ce->args[2]).value;
+			LLVMValueRef x = arg1.value;
+			LLVMValueRef y = arg2.value;
 
 			cond = LLVMBuildICmp(p->builder, LLVMIntNE, cond, LLVMConstNull(LLVMTypeOf(cond)), "");
 			res.value = LLVMBuildSelect(p->builder, cond, x, y, "");
@@ -2136,7 +2139,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 	case BuiltinProc_simd_runtime_swizzle:
 		{
 			LLVMValueRef src = arg0.value;
-			LLVMValueRef indices = lb_build_expr(p, ce->args[1]).value;
+			LLVMValueRef indices = arg1.value;
 			
 			Type *vt = base_type(arg0.type);
 			GB_ASSERT(vt->kind == Type_SimdVector);
