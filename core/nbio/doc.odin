@@ -69,7 +69,7 @@ callbacks run on it.
 
 If you try to execute an operation on a thread that has no running event loop
 a panic will be executed. Instead a worker thread can execute operations onto
-a running event loop by taking it's reference and executing operations with
+a running event loop by taking its reference and executing operations with
 that reference.
 
 In this case:
@@ -189,7 +189,7 @@ Example:
 
 Callbacks are guaranteed to be invoked in a later tick, never synchronously.
 This means that the operation returned from a procedure is at least valid till
-the end of the current tick, because an operation is freed after it's callback
+the end of the current tick, because an operation is freed after its callback
 is called. Thus you can set user data after an execution is queued, or call
 `remove`, removing subtle "race" conditions and simplifying control flow.
 

@@ -506,7 +506,7 @@ buffer is aligned to the boundary specified by `alignment`.
 
 **Errors**:
 - `None`: No error.
-- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+- `Out_Of_Memory`: When the allocator's backing buffer or its backing
 	allocator does not have enough space to fit in an allocation with the new
 	size, or an operating system failure occurs.
 - `Invalid_Pointer`: The pointer referring to a memory region does not belong
@@ -566,7 +566,7 @@ memory.
 
 **Errors**:
 - `None`: No error.
-- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+- `Out_Of_Memory`: When the allocator's backing buffer or its backing
 	allocator does not have enough space to fit in an allocation with the new
 	size, or an operating system failure occurs.
 - `Invalid_Pointer`: The pointer referring to a memory region does not belong
@@ -622,7 +622,7 @@ buffer is aligned to the boundary specified by `alignment`.
 
 **Errors**:
 - `None`: No error.
-- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+- `Out_Of_Memory`: When the allocator's backing buffer or its backing
 	allocator does not have enough space to fit in an allocation with the new
 	size, or an operating system failure occurs.
 - `Invalid_Pointer`: The pointer referring to a memory region does not belong
@@ -679,7 +679,7 @@ any new memory.
 
 **Errors**:
 - `None`: No error.
-- `Out_Of_Memory`: When the allocator's backing buffer or it's backing
+- `Out_Of_Memory`: When the allocator's backing buffer or its backing
 	allocator does not have enough space to fit in an allocation with the new
 	size, or an operating system failure occurs.
 - `Invalid_Pointer`: The pointer referring to a memory region does not belong
