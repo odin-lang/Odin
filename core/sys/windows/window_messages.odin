@@ -376,7 +376,6 @@ DDM_SETFMT                        :: 0x0400
 DM_GETDEFID                       :: 0x0400
 NIN_SELECT                        :: 0x0400
 TBM_GETPOS                        :: 0x0400
-WM_PSD_PAGESETUPDLG               :: 0x0400
 WM_USER                           :: 0x0400
 CBEM_INSERTITEMA                  :: 0x0401
 DDM_DRAW                          :: 0x0401
@@ -389,7 +388,6 @@ TB_ENABLEBUTTON                   :: 0x0401
 TBM_GETRANGEMIN                   :: 0x0401
 TTM_ACTIVATE                      :: 0x0401
 WM_CHOOSEFONT_GETLOGFONT          :: 0x0401
-WM_PSD_FULLPAGERECT               :: 0x0401
 CBEM_SETIMAGELIST                 :: 0x0402
 DDM_CLOSE                         :: 0x0402
 DM_REPOSITION                     :: 0x0402
@@ -399,7 +397,6 @@ RB_DELETEBAND                     :: 0x0402
 SB_GETTEXTA                       :: 0x0402
 TB_CHECKBUTTON                    :: 0x0402
 TBM_GETRANGEMAX                   :: 0x0402
-WM_PSD_MINMARGINRECT              :: 0x0402
 CBEM_GETIMAGELIST                 :: 0x0403
 DDM_BEGIN                         :: 0x0403
 HKM_SETRULES                      :: 0x0403
@@ -409,7 +406,6 @@ SB_GETTEXTLENGTHA                 :: 0x0403
 TBM_GETTIC                        :: 0x0403
 TB_PRESSBUTTON                    :: 0x0403
 TTM_SETDELAYTIME                  :: 0x0403
-WM_PSD_MARGINRECT                 :: 0x0403
 CBEM_GETITEMA                     :: 0x0404
 DDM_END                           :: 0x0404
 PBM_SETSTEP                       :: 0x0404
@@ -418,13 +414,11 @@ SB_SETPARTS                       :: 0x0404
 TB_HIDEBUTTON                     :: 0x0404
 TBM_SETTIC                        :: 0x0404
 TTM_ADDTOOLA                      :: 0x0404
-WM_PSD_GREEKTEXTRECT              :: 0x0404
 CBEM_SETITEMA                     :: 0x0405
 PBM_STEPIT                        :: 0x0405
 TB_INDETERMINATE                  :: 0x0405
 TBM_SETPOS                        :: 0x0405
 TTM_DELTOOLA                      :: 0x0405
-WM_PSD_ENVSTAMPRECT               :: 0x0405
 CBEM_GETCOMBOCONTROL              :: 0x0406
 PBM_SETRANGE32                    :: 0x0406
 RB_SETBANDINFOA                   :: 0x0406
@@ -432,7 +426,6 @@ SB_GETPARTS                       :: 0x0406
 TB_MARKBUTTON                     :: 0x0406
 TBM_SETRANGE                      :: 0x0406
 TTM_NEWTOOLRECTA                  :: 0x0406
-WM_PSD_YAFULLPAGERECT             :: 0x0406
 CBEM_GETEDITCONTROL               :: 0x0407
 PBM_GETRANGE                      :: 0x0407
 RB_SETPARENT                      :: 0x0407
