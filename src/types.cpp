@@ -3963,6 +3963,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 		bool is_soa_of_array = is_soa && is_type_array(type->Struct.soa_elem);
 
 		if (is_soa_of_array) {
+			if (sel.entity == nullptr) {
+				return sel;
+			}
+
 			InternedString mapped_field_name = {};
 			String n = field_name.string();
 			     if (n == "r") mapped_field_name = string_interner_insert(str_lit("x"));
