@@ -244,3 +244,38 @@ union_named_constants :: proc(t: ^testing.T) {
 		inner = {Promoted_Value(int(1)), 0, 0},
 	})
 }
+
+@(test)
+union_anonymous_using_constants :: proc(t: ^testing.T) {
+	S :: struct {
+		using a: bit_field u32 {
+			x: u32 | 32,
+		},
+	}
+	s := S{x = 1}
+	testing.expect_value(t, s.x, 1)
+
+	Strata :: enum i8 {
+		background  = -1,
+		base        = 0,
+		high        = 1,
+		overlay     = 2,
+		tooltip     = 3,
+	}
+
+	View :: struct {
+		flags: Flags,
+		using _: bit_field u16 {
+			strata  : Strata    | 4,
+			level   : int       | 12,
+		},
+		size: [2] f32,
+	}
+
+	Flags :: bit_set [Flag; u32]
+	Flag :: enum {debug}
+
+	v := View {flags={.debug}, strata=.high, level=777, size={111,222}}
+	testing.expect_value(t, v.strata, Strata.high)
+	testing.expect_value(t, v.level,  777)
+}
