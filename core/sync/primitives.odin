@@ -399,7 +399,7 @@ modify a shared variable shall:
 1. Acquire a lock on a mutex.
 2. Modify the shared memory.
 3. Release the lock.
-3. Call `cond_signal` or `cond_broadcast`.
+4. Call `cond_signal` or `cond_broadcast`.
 
 A thread that intends to wait on a shared variable shall:
 
