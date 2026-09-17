@@ -651,7 +651,7 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		gb_exit(1);
 	}
 
-	push_error_value(pos, ErrorValue_Warning);
+	push_error_value(pos, ErrorValue_Error);
 
 	if (pos.line == 0) {
 		error_out_empty();
@@ -683,7 +683,7 @@ gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end,
 		gb_exit(1);
 	}
 
-	push_error_value(pos, ErrorValue_Warning);
+	push_error_value(pos, ErrorValue_Error);
 
 	if (pos.line == 0) {
 		error_out_empty();

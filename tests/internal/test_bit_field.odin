@@ -171,3 +171,28 @@ bit_field_full_width_fields :: proc(t: ^testing.T) {
 	h.hi = 0
 	testing.expect_value(t, transmute(u64)h, 0xCAFE_F00D)
 }
+
+// field access on a constant bit_field used to always return the zero value
+@(test)
+bit_field_constant_field_access :: proc(t: ^testing.T) {
+	BF :: bit_field u32 { a: u8 | 3, b: u16 | 9, c: bool | 1, d: u8 | 7 }
+
+	FULL :: BF{ a = 3, b = 100, c = true, d = 5 }
+	testing.expect_value(t, FULL.a, u8(3))
+	testing.expect_value(t, FULL.b, u16(100))
+	testing.expect_value(t, FULL.c, true)
+	testing.expect_value(t, FULL.d, u8(5))
+
+	// unset fields still read as zero
+	EMPTY :: BF{}
+	testing.expect_value(t, EMPTY.a, u8(0))
+	testing.expect_value(t, EMPTY.b, u16(0))
+	testing.expect_value(t, EMPTY.c, false)
+	testing.expect_value(t, EMPTY.d, u8(0))
+
+	v := FULL
+	testing.expect_value(t, v.a, FULL.a)
+	testing.expect_value(t, v.b, FULL.b)
+	testing.expect_value(t, v.c, FULL.c)
+	testing.expect_value(t, v.d, FULL.d)
+}

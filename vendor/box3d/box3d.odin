@@ -15,6 +15,7 @@ LIB_PATH :: (
 	else "lib/linux-amd64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .amd64 && !BOX3D_SHARED
 	else "lib/linux-arm64/libbox3d.a" when ODIN_OS == .Linux && ODIN_ARCH == .arm64 && !BOX3D_SHARED
 	else "lib/darwin/libbox3d.a"      when ODIN_OS == .Darwin && (ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64) && !BOX3D_SHARED
+	else "lib/box3ddll.lib"           when ODIN_OS == .Windows && BOX3D_SHARED
 	else "lib/box3d.lib"              when ODIN_OS == .Windows
 	else ""
 )

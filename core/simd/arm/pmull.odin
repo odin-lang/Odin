@@ -750,6 +750,150 @@ vsliq_n_p64 :: #force_inline proc "c" (a, b: poly64x2_t, $N: int32_t) -> poly64x
 	}
 }
 
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_p8)
+@(require_results, enable_target_feature = "neon")
+vsri_n_p8 :: #force_inline proc "c" (a, b: poly8x8_t, $N: int32_t) -> poly8x8_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		when N == 8 {
+			return a
+		} else {
+			M :: max(poly8_t) >> poly8_t(N) ~ max(poly8_t)
+			return simd.bit_or(
+				simd.bit_and(a, poly8x8_t(M)),
+				simd.shr(b, poly8x8_t(N)),
+			)
+		}
+	} else {
+		return transmute(poly8x8_t)_vshiftrins_v8i8(
+			transmute(int8x8_t)a,
+			transmute(int8x8_t)b,
+			int8x8_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_p16)
+@(require_results, enable_target_feature = "neon")
+vsri_n_p16 :: #force_inline proc "c" (a, b: poly16x4_t, $N: int32_t) -> poly16x4_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		when N == 16 {
+			return a
+		} else {
+			M :: max(poly16_t) >> poly16_t(N) ~ max(poly16_t)
+			return simd.bit_or(
+				simd.bit_and(a, poly16x4_t(M)),
+				simd.shr(b, poly16x4_t(N)),
+			)
+		}
+	} else {
+		return transmute(poly16x4_t)_vshiftrins_v4i16(
+			transmute(int16x4_t)a,
+			transmute(int16x4_t)b,
+			int16x4_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsri_n_p64)
+@(require_results, enable_target_feature = "neon")
+vsri_n_p64 :: #force_inline proc "c" (a, b: poly64x1_t, $N: int32_t) -> poly64x1_t where 1 <= N, N <= 64 {
+	when ODIN_ARCH == .arm64 {
+		when N == 64 {
+			return a
+		} else {
+			M :: max(poly64_t) >> poly64_t(N) ~ max(poly64_t)
+			return simd.bit_or(
+				simd.bit_and(a, poly64x1_t(M)),
+				simd.shr(b, poly64x1_t(N)),
+			)
+		}
+	} else {
+		return transmute(poly64x1_t)_vshiftrins_v1i64(
+			transmute(int64x1_t)a,
+			transmute(int64x1_t)b,
+			int64x1_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_p8)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_p8 :: #force_inline proc "c" (a, b: poly8x16_t, $N: int32_t) -> poly8x16_t where 1 <= N, N <= 8 {
+	when ODIN_ARCH == .arm64 {
+		when N == 8 {
+			return a
+		} else {
+			M :: max(poly8_t) >> poly8_t(N) ~ max(poly8_t)
+			return simd.bit_or(
+				simd.bit_and(a, poly8x16_t(M)),
+				simd.shr(b, poly8x16_t(N)),
+			)
+		}
+	} else {
+		return transmute(poly8x16_t)_vshiftrins_v16i8(
+			transmute(int8x16_t)a,
+			transmute(int8x16_t)b,
+			int8x16_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_p16)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_p16 :: #force_inline proc "c" (a, b: poly16x8_t, $N: int32_t) -> poly16x8_t where 1 <= N, N <= 16 {
+	when ODIN_ARCH == .arm64 {
+		when N == 16 {
+			return a
+		} else {
+			M :: max(poly16_t) >> poly16_t(N) ~ max(poly16_t)
+			return simd.bit_or(
+				simd.bit_and(a, poly16x8_t(M)),
+				simd.shr(b, poly16x8_t(N)),
+			)
+		}
+	} else {
+		return transmute(poly16x8_t)_vshiftrins_v8i16(
+			transmute(int16x8_t)a,
+			transmute(int16x8_t)b,
+			int16x8_t(-N),
+		)
+	}
+}
+
+// Shift Right and Insert.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsriq_n_p64)
+@(require_results, enable_target_feature = "neon")
+vsriq_n_p64 :: #force_inline proc "c" (a, b: poly64x2_t, $N: int32_t) -> poly64x2_t where 1 <= N, N <= 64 {
+	when ODIN_ARCH == .arm64 {
+		when N == 64 {
+			return a
+		} else {
+			M :: max(poly64_t) >> poly64_t(N) ~ max(poly64_t)
+			return simd.bit_or(
+				simd.bit_and(a, poly64x2_t(M)),
+				simd.shr(b, poly64x2_t(N)),
+			)
+		}
+	} else {
+		return transmute(poly64x2_t)_vshiftrins_v2i64(
+			transmute(int64x2_t)a,
+			transmute(int64x2_t)b,
+			int64x2_t(-N),
+		)
+	}
+}
+
 when ODIN_ARCH == .arm64 {
 	// Polynomial multiply long
 	//
