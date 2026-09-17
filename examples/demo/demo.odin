@@ -57,7 +57,7 @@ the_basics :: proc() {
 		// Lexical elements and literals
 		// A comment
 
-		my_integer_variable: int // A comment for documentaton
+		my_integer_variable: int // A comment for documentation
 
 		// Multi-line comments begin with /* and end with */. Multi-line comments can
 		// also be nested (unlike in C):
