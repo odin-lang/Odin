@@ -1778,7 +1778,8 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast 
 			TokenPos pos = f->token.pos;
 			Type *this_type = base_type(e->type);
 			Type *other_type = base_type(f->type);
-			if (!signature_parameter_similar_enough(this_type, other_type)) {
+			bool type_is_null = (e->type == nullptr || f->type == nullptr);
+			if (type_is_null || !signature_parameter_similar_enough(this_type, other_type)) {
 				error(e->token,
 				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
 				      "\tat %s",
