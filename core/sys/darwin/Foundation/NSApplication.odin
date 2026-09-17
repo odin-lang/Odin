@@ -199,6 +199,16 @@ Application_sendAction :: proc "c" (self: ^Application, action: SEL, to: id, fro
 	msgSend(nil, self, "sendAction:to:from:", action, to, from)
 }
 
+@(objc_type=Application, objc_name="presentationOptions")
+Application_presentationOptions :: proc "c" (self: ^Application) -> ^ApplicationPresentationOptions {
+	return msgSend(^ApplicationPresentationOptions, self, "presentationOptions")
+}
+
+@(objc_type=Application, objc_name="setPresentationOptions")
+Application_setPresentationOptions :: proc "c" (self: ^Application, presentationOptions: ApplicationPresentationOptions) {
+	msgSend(nil, self, "setPresentationOptions:", presentationOptions)
+}
+
 
 
 
