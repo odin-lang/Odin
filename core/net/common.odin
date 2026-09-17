@@ -59,8 +59,10 @@ Network_Error :: union #shared_nil {
 	Bind_Error,
 	TCP_Send_Error,
 	UDP_Send_Error,
+	Unix_Send_Error,
 	TCP_Recv_Error,
 	UDP_Recv_Error,
+	Unix_Recv_Error,
 	Shutdown_Error,
 	Interfaces_Error,
 	Socket_Info_Error,
@@ -120,17 +122,20 @@ DEFAULT_TCP_OPTIONS :: TCP_Options {
 */
 Socket     :: distinct i64
 
-TCP_Socket :: distinct Socket
-UDP_Socket :: distinct Socket
+TCP_Socket  :: distinct Socket
+UDP_Socket  :: distinct Socket
+Unix_Socket :: distinct Socket
 
 Socket_Protocol :: enum {
 	TCP,
 	UDP,
+	UNIX,
 }
 
 Any_Socket :: union {
 	TCP_Socket,
 	UDP_Socket,
+	Unix_Socket,
 }
 
 /*
@@ -158,6 +163,7 @@ Endpoint :: struct {
 Address_Family :: enum {
 	IP4,
 	IP6,
+	UNIX,
 }
 
 Netmask :: distinct Address
