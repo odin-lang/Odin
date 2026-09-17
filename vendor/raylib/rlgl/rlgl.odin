@@ -470,8 +470,11 @@ foreign lib {
 	DisableScissorTest     :: proc() ---                           // Disable scissor test
 	Scissor                :: proc(x, y, width, height: c.int) --- // Scissor test
 	EnableWireMode         :: proc() ---                           // Enable wire mode
-	EnablePointMode        :: proc() --- 							 // Enable point mode
 	DisableWireMode        :: proc() ---                           // Disable wire and point modes
+	EnablePointMode        :: proc() ---                           // Enable point mode
+	DisablePointMode       :: proc() ---                           // Disable point mode
+	SetPointSize           :: proc() ---                           // Set the point drawing size 
+	GetPointSize           :: proc() ---                           // Get the point drawing size 
 	SetLineWidth           :: proc(width: f32) ---                 // Set the line drawing width
 	GetLineWidth           :: proc() -> f32 ---                    // Get the line drawing width
 	EnableSmoothLines      :: proc() ---                           // Enable line aliasing
@@ -556,11 +559,16 @@ foreign lib {
 	FramebufferAttach   :: proc(fboId, texId: c.uint, attachType: c.int, texType: c.int, mipLevel: c.int) --- // Attach texture/renderbuffer to a framebuffer
 	FramebufferComplete :: proc(id: c.uint) -> bool ---                                                       // Verify framebuffer is complete
 	UnloadFramebuffer   :: proc(id: c.uint) ---                                                               // Delete framebuffer from GPU
+	// WARNING: Copy and resize framebuffer functionality only defined for software backend
+	CopyFramebuffer   :: proc(x: c.int, y: c.int, width: c.int, height: c.int, format: c.int, pixels: rawptr) --- // Copy framebuffer pixel data to internal buffer
+	ResizeFramebuffer :: proc(width: c.int, height: c.int) ---                                                    // Resize internal framebuffer 
 
 	// Shaders management
-	LoadShaderCode      :: proc(vsCode, fsCode: cstring) -> c.uint ---                                // Load shader from code strings
-	CompileShader       :: proc(shaderCode: cstring, type: c.int) -> c.uint ---                       // Compile custom shader and return shader id (type: VERTEX_SHADER, FRAGMENT_SHADER, COMPUTE_SHADER)
-	LoadShaderProgram   :: proc(vShaderId, fShaderId: c.uint) -> c.uint ---                           // Load custom shader program
+	LoadShader :: proc(code: cstring, type: c.int) -> c.uint ---                                      // Load (compile) shader and return shader id (type: RL_VERTEX_SHADER, RL_FRAGMENT_SHADER, RL_COMPUTE_SHADER)
+	LoadShaderProgram :: proc(vsCode: cstring, fsCode: cstring) -> c.uint ---                         // Load shader from code strings
+	LoadShaderProgramEx :: proc(vsId: c.uint, fsId: c.uint) -> c.uint ---                             // Load shader program, using already loaded shader ids
+	LoadShaderProgramCompute :: proc(csId: c.uint) -> c.uint ---                                      // Load compute shader program
+
 	UnloadShader        :: proc(id: c.uint) ---                                                       // Unload shader, loaded with rlLoadShader()
 	UnloadShaderProgram :: proc(id: c.uint) ---                                                       // Unload shader program
 	GetLocationUniform  :: proc(shaderId: c.uint, uniformName: cstring) -> c.int ---                  // Get shader location uniform
@@ -571,7 +579,6 @@ foreign lib {
 	SetShader           :: proc(id: c.uint, locs: [^]c.int) ---                                       // Set shader currently active (id and locations)
 
 	// Compute shader management
-	LoadComputeShaderProgram :: proc(shaderId: c.uint) -> c.uint ---     // Load compute shader program
 	ComputeShaderDispatch    :: proc(groupX, groupY, groupZ: c.uint) --- // Dispatch compute shader (equivalent to *draw* for graphics pipeline)
 
 	// Shader buffer storage object management (ssbo)
