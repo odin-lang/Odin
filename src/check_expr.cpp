@@ -11203,6 +11203,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 
 					max += tt->variables.count-1;
+					if (0 <= max_type_count && max_type_count <= max) {
+						error(e, "Expansion reaches index %lld which goes out of bounds (>= %lld) for %.*s", cast(long long)max, cast(long long)max_type_count, LIT(context_name));
+					}
 				} else {
 					check_assignment(c, &operand, elem_type, context_name);
 
