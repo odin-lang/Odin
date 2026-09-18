@@ -373,13 +373,11 @@ WM_CTLINIT                        :: 0x0387
 WM_PENEVENT                       :: 0x0388
 WM_PENWINLAST                     :: 0x038f
 DDM_SETFMT                        :: 0x0400
-DM_GETDEFID                       :: 0x0400
 NIN_SELECT                        :: 0x0400
 TBM_GETPOS                        :: 0x0400
 WM_USER                           :: 0x0400
 CBEM_INSERTITEMA                  :: 0x0401
 DDM_DRAW                          :: 0x0401
-DM_SETDEFID                       :: 0x0401
 HKM_SETHOTKEY                     :: 0x0401
 PBM_SETRANGE                      :: 0x0401
 RB_INSERTBANDA                    :: 0x0401
@@ -390,7 +388,6 @@ TTM_ACTIVATE                      :: 0x0401
 WM_CHOOSEFONT_GETLOGFONT          :: 0x0401
 CBEM_SETIMAGELIST                 :: 0x0402
 DDM_CLOSE                         :: 0x0402
-DM_REPOSITION                     :: 0x0402
 HKM_GETHOTKEY                     :: 0x0402
 PBM_SETPOS                        :: 0x0402
 RB_DELETEBAND                     :: 0x0402
