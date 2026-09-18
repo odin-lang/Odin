@@ -10959,6 +10959,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 							Operand src_o = o;
 							src_o.type = src_field->type;
 
+							if (index + jj >= field_count)
+								continue ;
 							field = t->Struct.fields[index + (jj++)];
 
 							check_assignment(c, &src_o, field->type, str_lit("structure literal"));
@@ -10981,15 +10983,18 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 						handled_elem_count += 1;
 					}
-
+					if (handled_elem_count > field_count) {
+						error(o.expr, "Expansion overflows structure literal, expected %td, got %td", field_count, handled_elem_count);
+						break ;
+					}
 				}
 				if (cl->elems.count < field_count) {
 					if (min_field_count < field_count) {
 						if (cl->elems.count < min_field_count) {
-							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
+							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, handled_elem_count);
 						}
 					} else if (handled_elem_count != field_count) {
-						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, handled_elem_count);
 					}
 				}
 			}
