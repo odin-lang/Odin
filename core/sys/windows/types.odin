@@ -1865,6 +1865,7 @@ MB_MODEMASK :: 0x00003000
 MB_MISCMASK :: 0x0000C000
 
 // Dialog Box Command IDs
+
 IDOK       :: 1
 IDCANCEL   :: 2
 IDABORT    :: 3
