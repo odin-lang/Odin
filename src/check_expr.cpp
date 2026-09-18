@@ -10940,7 +10940,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						continue;
 					}
 					if (index >= field_count) {
-						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, index + 1);
 						break;
 					}
 
@@ -10988,9 +10988,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						break ;
 					}
 				}
-				if (cl->elems.count < field_count) {
+				if (handled_elem_count < field_count) {
 					if (min_field_count < field_count) {
-						if (cl->elems.count < min_field_count) {
+						if (handled_elem_count < min_field_count) {
 							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, handled_elem_count);
 						}
 					} else if (handled_elem_count != field_count) {
