@@ -162,7 +162,7 @@ dsa_sign_internal :: proc(
 	ctx: []byte,
 	rnd: []byte,
 	priv_key: ^Private_Key,
-	external_mu: []byte = nil
+	external_mu: []byte = nil,
 ) -> bool {
 	params := priv_key.params
 	switch params {
