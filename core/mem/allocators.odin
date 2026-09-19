@@ -262,7 +262,7 @@ arena_alloc_bytes_non_zeroed :: proc(
 	a:    ^Arena,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if a.data == nil {
 		panic("Allocation on uninitialized Arena allocator.", loc)
@@ -654,7 +654,7 @@ scratch_resize :: proc(
 	old_size:   int,
 	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := scratch_resize_bytes(s, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
@@ -682,7 +682,7 @@ scratch_resize_bytes :: proc(
 	old_data: []byte,
 	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := scratch_resize_bytes_non_zeroed(s, old_data, size, alignment, loc)
 	if bytes != nil && size > len(old_data) {
@@ -714,7 +714,7 @@ scratch_resize_non_zeroed :: proc(
 	old_size:   int,
 	size:       int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := scratch_resize_bytes_non_zeroed(s, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
@@ -742,7 +742,7 @@ scratch_resize_bytes_non_zeroed :: proc(
 	old_data: []byte,
 	size:     int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	old_memory := raw_data(old_data)
 	old_size := len(old_data)
@@ -883,7 +883,7 @@ stack_alloc :: proc(
 	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := stack_alloc_bytes(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -901,7 +901,7 @@ stack_alloc_bytes :: proc(
 	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	bytes, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	if bytes != nil {
@@ -922,7 +922,7 @@ stack_alloc_non_zeroed :: proc(
 	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> (rawptr, Allocator_Error) {
 	bytes, err := stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	return raw_data(bytes), err
@@ -940,7 +940,7 @@ stack_alloc_bytes_non_zeroed :: proc(
 	s:    ^Stack,
 	size: int,
 	alignment := DEFAULT_ALIGNMENT,
-	loc       := #caller_location
+	loc       := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if s.data == nil {
 		panic("Allocation on an uninitialized Stack allocator.", loc)
