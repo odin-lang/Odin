@@ -171,6 +171,8 @@ else
 	$ODIN test ../test_issue_5640.odin -o:none $COMMON
 fi
 
+$ODIN test ../test_issue_7547.odin $COMMON
+
 set +x
 
 popd

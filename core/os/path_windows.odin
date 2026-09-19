@@ -90,7 +90,13 @@ _remove_all :: proc(path: string) -> Error {
 	if !_is_absolute_path(path) {
 		abs_path = _get_absolute_path(path, temp_allocator) or_return
 	}
-	dir := win32_utf8_to_wstring(abs_path, temp_allocator) or_return
+	// SHFileOperationW reads a double-NUL-terminated path list; the converted
+	// path carries a single terminator, so the second NUL is appended here to
+	// keep the shell operation from scanning past the buffer (#7547).
+	path_units := win32_utf8_to_utf16(abs_path, temp_allocator) or_return
+	path_list := make([]u16, len(path_units)+2, temp_allocator) or_return
+	copy(path_list, path_units)
+	dir := cstring16(raw_data(path_list))
 
 	empty: [1]u16
 
