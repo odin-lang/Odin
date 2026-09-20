@@ -279,6 +279,12 @@ struct lbDefer {
 	};
 };
 
+struct lbLifetimeLocal {
+	LLVMValueRef ptr;
+	i64          size;
+	isize        scope_index;
+};
+
 struct lbTargetList {
 	lbTargetList *prev;
 	bool          is_block;
@@ -374,6 +380,11 @@ struct lbProcedure {
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
 
 	Array<lbValue> asan_stack_locals;
+
+	Array<lbLifetimeLocal> lifetime_locals;
+	// matches scope_stack (count == scope_index);
+	// whether that scope's named locals may be lifetime marked
+	Array<bool>            lifetime_scopes;
 
 	void (*generate_body)(lbModule *m, lbProcedure *p);
 	Array<lbGlobalVariable> *global_variables;
@@ -486,6 +497,10 @@ gb_internal lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lb
 gb_internal lbAddr lb_add_global_generated_from_procedure(lbProcedure *p, Type *type, lbValue value={});
 gb_internal lbAddr lb_add_global_generated_with_name(lbModule *m, Type *type, lbValue value, String name, Entity **entity_=nullptr);
 gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, bool force_no_init=false);
+
+gb_internal bool lb_lifetime_markers_enabled(void);
+gb_internal void lb_add_lifetime_local(lbProcedure *p, LLVMValueRef ptr, Type *type);
+gb_internal void lb_emit_lifetime_ends(lbProcedure *p, lbDeferExitKind kind, lbBlock *block);
 
 gb_internal void lb_add_foreign_library_path(lbModule *m, Entity *e);
 

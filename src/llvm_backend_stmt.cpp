@@ -292,7 +292,11 @@ gb_internal void lb_pop_target_list(lbProcedure *p) {
 	p->target_list = p->target_list->prev;
 }
 
-gb_internal void lb_open_scope(lbProcedure *p, Scope *s) {
+// NOTE: lifetime_scope=true means that this scope ends exactly where
+// lb_close_scope is called for it, which is what makes it safe to mark
+// named locals with llvm.lifetime.start/llvm.lifetime.end;
+// (it is NOT true for the scope a loop statement opens for its own variables)
+gb_internal void lb_open_scope(lbProcedure *p, Scope *s, bool lifetime_scope=false) {
 	lbModule *m = p->module;
 	if (m->debug_builder) {
 		LLVMMetadataRef curr_metadata = lb_get_llvm_metadata(m, s);
@@ -328,10 +332,11 @@ gb_internal void lb_open_scope(lbProcedure *p, Scope *s) {
 	p->curr_scope = s;
 	p->scope_index += 1;
 	array_add(&p->scope_stack, s);
-
+	array_add(&p->lifetime_scopes, lifetime_scope);
 }
 
 gb_internal void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node, bool pop_stack=true) {
+	GB_ASSERT(p->scope_stack.count == p->lifetime_scopes.count);
 	lb_emit_defer_stmts(p, kind, block, node);
 	GB_ASSERT(p->scope_index > 0);
 
@@ -352,6 +357,7 @@ gb_internal void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *b
 
 	p->scope_index -= 1;
 	array_pop(&p->scope_stack);
+	array_pop(&p->lifetime_scopes);
 }
 
 gb_internal void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
@@ -2102,7 +2108,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		lb_start_block(p, body);
 
 		lb_push_target_list(p, ss->label, done, nullptr, fall);
-		lb_open_scope(p, body->scope);
+		lb_open_scope(p, body->scope, true);
 		lb_build_stmt_list(p, cc->stmts);
 		lb_close_scope(p, lbDeferExit_Default, body, clause);
 		lb_pop_target_list(p);
@@ -2120,7 +2126,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		lb_start_block(p, default_block);
 
 		lb_push_target_list(p, ss->label, done, nullptr, default_fall);
-		lb_open_scope(p, default_block->scope);
+		lb_open_scope(p, default_block->scope, true);
 		lb_build_stmt_list(p, default_stmts);
 		lb_close_scope(p, lbDeferExit_Default, default_block, default_clause);
 		lb_pop_target_list(p);
@@ -2308,7 +2314,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		ast_node(cc, CaseClause, clause);
 
 		Entity *case_entity = implicit_entity_of_node(clause);
-		lb_open_scope(p, cc->scope);
+		lb_open_scope(p, cc->scope, true);
 
 		if (cc->list.count == 0) {
 			lb_start_block(p, default_block);
@@ -2661,6 +2667,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 						rw_mutex_shared_unlock(&p->module->values_mutex);
 						lb_emit_store(p, found, lb_emit_conv(p, res, e->type));
 					}
+					// lifetime ends are emitted in lb_emit_defer_stmts,
+					// but no defers run on this path, so call it explicitly
+					lb_emit_lifetime_ends(p, lbDeferExit_Return, nullptr);
 					LLVMBuildRetVoid(p->builder);
 					return;
 				}
@@ -3300,7 +3309,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			tl->is_block = true;
 		}
 
-		lb_open_scope(p, bs->scope);
+		lb_open_scope(p, bs->scope, true);
 		lb_build_stmt_list(p, bs->stmts);
 		lb_close_scope(p, lbDeferExit_Default, nullptr, node);
 
@@ -3579,6 +3588,9 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 			}
 		}
 	}
+
+	// end lifetimes after the defer bodies, a defer may reference the locals
+	lb_emit_lifetime_ends(p, kind, block);
 }
 
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node) {
