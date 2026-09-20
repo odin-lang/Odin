@@ -50,6 +50,14 @@ tile_round_mode_t :: enum c.int {
 	UP   = 1,
 }
 
+/** Enum declaring allowed values for \c u8 value stored in \c deepImageState type. */
+deep_image_state_t :: enum c.int {
+	MESSY           = 0,
+	SORTED          = 1,
+	NON_OVERLAPPING = 2,
+	TIDY            = 3,
+}
+
 /** @brief Enum capturing the underlying data type on a channel. */
 pixel_type_t :: enum c.int {
 	UINT  = 0,
