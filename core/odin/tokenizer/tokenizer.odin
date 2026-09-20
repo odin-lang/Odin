@@ -197,7 +197,7 @@ advance_rune :: proc(t: ^Tokenizer) {
 }
 
 peek_rune :: proc(t: ^Tokenizer, offset := 0) -> rune {
-	r, w := read_rune(t, offset)
+	r, _ := read_rune(t, offset)
 	return r
 }
 
@@ -358,17 +358,17 @@ scan_string :: proc(t: ^Tokenizer, quote: rune) -> string {
 			break exit
 		}
 		for ;; {
-			r : rune = t.ch;
+			r : rune = t.ch
 			if (r == '\n' || r < 0) {
-				error(t, offset, "String literal not terminated");
-				break;
+				error(t, offset, "String literal not terminated")
+				break
 			}
-			advance_rune(t);
+			advance_rune(t)
 			if (r == quote) {
-				break;
+				break
 			}
 			if (r == '\\') {
-				scan_escape(t);
+				scan_escape(t)
 			}
 		}
 	} else {
