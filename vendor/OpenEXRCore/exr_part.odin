@@ -276,7 +276,7 @@ foreign lib {
 		displayWindow:      ^attr_box2i_t,
 		dataWindow:         ^attr_box2i_t,
 		pixelaspectratio:   f32,
-		screenWindowCenter: attr_v2f_t,
+		screenWindowCenter: ^attr_v2f_t,
 		screenWindowWidth:  f32,
 		lineorder:          lineorder_t,
 		ctype:              compression_t) -> result_t ---
@@ -482,7 +482,7 @@ foreign lib {
 		name:       cstring,
 		comp:       compression_t) -> result_t ---
 
-	attr_get_double :: proc(ctxt: const_context_t, part_index: c.int, name: cstring, out: f64) -> result_t ---
+	attr_get_double :: proc(ctxt: const_context_t, part_index: c.int, name: cstring, out: ^f64) -> result_t ---
 
 	attr_set_double :: proc(ctxt: context_t, part_index: c.int, name: cstring, val: f64) -> result_t ---
 
