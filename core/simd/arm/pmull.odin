@@ -1999,6 +1999,20 @@ when ODIN_ARCH == .arm64 {
 		}
 	}
 
+	// Unzip vectors (secondary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vuzp2q_p64)
+	@(require_results, enable_target_feature = "neon")
+	vuzp2q_p64 :: #force_inline proc "c" (a, b: poly64x2_t) -> poly64x2_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 1, 3)
+		} else {
+			a := simd.shuffle(a, a, 1, 0)
+			b := simd.shuffle(b, b, 1, 0)
+			c := simd.shuffle(a, b, 1, 3)
+			return simd.shuffle(c, c, 1, 0)
+		}
+	}
 }
 
 @(private, default_calling_convention = "none")
