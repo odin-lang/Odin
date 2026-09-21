@@ -331,7 +331,7 @@ is_operator :: proc(kind: Token_Kind) -> bool {
 		return true
 	case .In, .Not_In:
 		return true
-	case .If:
+	case .If, .When, .Or_Else:
 		return true
 	}
 	return false
