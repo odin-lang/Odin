@@ -185,6 +185,7 @@ foreign kernel32 {
 	GetExitCodeThread    :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread      :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
 	SuspendThread        :: proc(hThread: HANDLE) -> DWORD ---
+	ExitThread           :: proc(dwExitCode: DWORD) ---
 
 	GetProcessAffinityMask :: proc(
 		hProcess: HANDLE,
