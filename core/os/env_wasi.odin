@@ -74,12 +74,13 @@ _lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: 
 
 	sync.shared_guard(&g_env_mutex)
 
-	value, found = g_env[key] or_return
-	if !found {
+	val, ok := g_env[key]
+	
+	if !ok {
 		return "", .Env_Var_Not_Found
 	}
 	
-	value = clone_string(value, allocator) or_return
+	value = clone_string(val, allocator) or_return
 	return
 }
 
