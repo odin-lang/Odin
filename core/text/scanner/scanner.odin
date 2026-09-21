@@ -73,7 +73,7 @@ C_Like_Tokens    :: Scan_Flags{.Scan_Idents, .Scan_Ints, .Scan_C_Int_Prefixes, .
 Whitespace :: distinct bit_set['\x00'..<utf8.RUNE_SELF; u128]
 
 // Odin_Whitespace is the default value for the Scanner's whitespace field
-Odin_Whitespace :: Whitespace{'\t', '\n', '\r', ' '}
+Odin_Whitespace :: Whitespace{'\t', '\n', '\r', '\f', ' '}
 C_Whitespace    :: Whitespace{'\t', '\n', '\r', '\v', '\f', ' '}
 
 
