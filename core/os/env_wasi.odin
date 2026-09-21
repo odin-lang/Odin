@@ -67,15 +67,19 @@ delete_string_if_not_original :: proc(str: string) {
 }
 
 @(require_results)
-_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, error: Error) {
 	if err := build_env(); err != nil {
-		return
+		return "", .Env_Var_Not_Found
 	}
 
 	sync.shared_guard(&g_env_mutex)
 
-	value = g_env[key] or_return
-	value, _ = clone_string(value, allocator)
+	value, found = g_env[key] or_return
+	if !found {
+		return "", .Env_Var_Not_Found
+	}
+	
+	value = clone_string(value, allocator) or_return
 	return
 }
 
