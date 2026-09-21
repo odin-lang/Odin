@@ -161,6 +161,10 @@ StringEncodings :: enum Index {
 
 @(link_prefix="CF", default_calling_convention="c")
 foreign CoreFoundation {
+	StringGetTypeID :: proc() -> TypeID ---
+	StringCreateWithBytes :: proc(alloc: AllocatorRef, bytes: [^]u8, numBytes: Index, encoding: StringEncoding, isExternalRepresentation: b8) -> String ---
+	StringCreateWithCString :: proc(alloc: AllocatorRef, cStr: cstring, encoding: StringEncoding) -> String ---
+
 	// Copies the character contents of a string to a local C string buffer after converting the characters to a given encoding.
 	StringGetCString :: proc(theString: String, buffer: [^]byte, bufferSize: Index, encoding: StringEncoding) -> b8 ---
 
