@@ -366,6 +366,9 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 
 	check_collect_entities(c, nodes);
 
+	// NOTE: checking a declaration can insert entities into this very scope - a procedure alias
+	// goes through `override_entity_in_scope`, which inserts into the scope being iterated - so
+	// the iteration must not be invalidated by `s->elements` growing; see ScopeMapIterator.
 	for (auto const &entry : s->elements) {
 		Entity *e = entry.value;\
 		switch (e->kind) {
