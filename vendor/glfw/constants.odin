@@ -42,7 +42,7 @@ KEY_MINUS         :: 45  /* - */
 KEY_PERIOD        :: 46  /* . */
 KEY_SLASH         :: 47  /* / */
 KEY_SEMICOLON     :: 59  /* ; */
-KEY_EQUAL         :: 61  /* :: */
+KEY_EQUAL         :: 61  /* = */
 KEY_LEFT_BRACKET  :: 91  /* [ */
 KEY_BACKSLASH     :: 92  /* \ */
 KEY_RIGHT_BRACKET :: 93  /* ] */
