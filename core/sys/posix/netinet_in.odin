@@ -23,12 +23,13 @@ INET_ADDRSTRLEN  :: 16
 INET6_ADDRSTRLEN :: 46
 
 Protocol :: enum c.int {
-	IP   = IPPROTO_IP,
-	ICMP = IPPROTO_ICMP,
-	IPV6 = IPPROTO_IPV6,
-	RAW  = IPPROTO_RAW,
-	TCP  = IPPROTO_TCP,
-	UDP  = IPPROTO_UDP,
+	UNSPEC = 0,
+	IP     = IPPROTO_IP,
+	ICMP   = IPPROTO_ICMP,
+	IPV6   = IPPROTO_IPV6,
+	RAW    = IPPROTO_RAW,
+	TCP    = IPPROTO_TCP,
+	UDP    = IPPROTO_UDP,
 }
 
 when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
