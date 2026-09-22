@@ -3926,8 +3926,8 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (args.count > 2) {
 		// NOTE(bill): Allow for both `odin command path -flags` and `odin command -flags path`
-		// To do this, if the first argument after the command and last argument is NOT a flag,
-		// then put that last parameter first
+		// To do this, if the first argument after the command is a flag,
+		// then put the first non-flag parameter first
 		isize end_arg = double_dash_pos >= 0 ? double_dash_pos : args.count-1;
 		if (args[1] == "bundle" && args.count > 4) {
 			if (string_starts_with(args[3], str_lit("-")) &&
@@ -3937,14 +3937,21 @@ int main(int arg_count, char const **arg_ptr) {
 				array_inject_at(&args, 3, possible_path);
 			}
 		} else if (args.count > 3) {
-			if (string_starts_with(args[2], str_lit("-")) &&
-			    !string_starts_with(args[end_arg], str_lit("-"))) {
-				String possible_path = args[end_arg];
-				array_ordered_remove(&args, end_arg);
-				array_inject_at(&args, 2, possible_path);
+			if (string_starts_with(args[2], str_lit("-"))) {
+				// All build flags are single argv tokens (`-flag` or `-flag:value`),
+				// so the first non-flag token is the path, wherever it sits amongst
+				// the flags (e.g. `odin run -cached foo.odin -file`).
+				for (isize k = 3; k <= end_arg; k++) {
+					if (!string_starts_with(args[k], str_lit("-"))) {
+						String possible_path = args[k];
+						array_ordered_remove(&args, k);
+						array_inject_at(&args, 2, possible_path);
+						break;
+					}
+				}
 			}
 		}
-	}
+}
 
 	bool run_output = false;
 	if (command == "run" || command == "test") {

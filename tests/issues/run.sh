@@ -305,6 +305,20 @@ if [[ "$(uname)" != "FreeBSD" ]]; then
 		echo "SUCCESSFUL 0/1 (-cached: SDK env vars missing from env.manifest)"
 		exit 1
 	fi
+
+	# Flags may precede the path: `odin build -cached <file> -file ...` must behave
+	# like the path-first spelling, for build, run, and test alike.
+	rm -rf "$CACHED_HOME"
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN build -cached ../test_cached_foreign_libs.odin -file -microarch:native -out:cached_flagorder_app >/dev/null
+	if [[ -x cached_flagorder_app ]] && ./cached_flagorder_app; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached: 'odin build -cached <file> -file ...' failed)"
+		exit 1
+	fi
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN run -cached ../test_cached_foreign_libs.odin -file -microarch:native
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN test -cached ../test_cached_foreign_libs.odin -file -microarch:native
+	echo "SUCCESSFUL 1/1"
 fi
 
 set +x
