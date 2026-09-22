@@ -2293,14 +2293,18 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	string_set_init(&bc->target_features_set, 1024);
 
-	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
+	// Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
 
-	{
-		String build_project_name  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
-		GB_ASSERT(build_project_name.len > 0);
-		bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
+	Path   main_pkg           = bc->build_paths[BuildPath_Main_Package];
+	String build_project_name = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
+
+	if (build_project_name.len == 0) {
+		// Happens when building a package at root.
+		build_project_name = str_lit("/");
 	}
+
+	bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
 
 	bool produces_output_file = false;
 	if (bc->command_kind == Command_doc && bc->cmd_doc_flags & CmdDocFlag_DocFormat) {
@@ -2458,13 +2462,14 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else {
 		Path output_path;
 
-		if (str_eq(init_filename, str_lit("."))) {
+		if (str_eq(init_filename, str_lit(".")) || str_eq(init_filename, str_lit("/"))) {
 			// We must name the output file after the current directory.
 			debugf("Output name will be created from current base name %.*s.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
 			String last_element  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
 
 			if (last_element.len == 0) {
-				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
+				String init_fullpath = path_to_full_path(ha, init_filename);
+				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(init_fullpath));
 				return false;
 			}
 			output_path.basename = copy_string(ha, bc->build_paths[BuildPath_Main_Package].basename);

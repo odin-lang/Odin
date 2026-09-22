@@ -465,17 +465,27 @@ gb_internal void scope_map_clear(ScopeMap *m) {
 	m->count = 0;
 }
 
+// IMPORTANT NOTE: an iteration snapshots the table pointer and capacity when it is constructed,
+// so that inserting into the map while iterating it cannot invalidate the iteration.
+// `scope_map_insert` may grow the map - rehashing into a newly allocated table - at any time, and
+// `begin`/`end` are both created before the loop body runs: without the snapshot, `end` would
+// keep the capacity that `begin` saw while `operator++`/`operator*` read the reallocated table,
+// walking past the end of it. An iteration therefore walks the table it began on: a slot written
+// in place (an insert that does not rehash) is seen when the walk reaches it, while the entries
+// written into a table that a rehash replaced are not.
 struct ScopeMapIterator {
 	ScopeMap const *map;
-	u32 index;
+	ScopeMapSlot *  slots;
+	u32             cap;
+	u32             index;
 
 	ScopeMapIterator &operator++() noexcept {
 		for (;;) {
 			++index;
-			if (map->cap == index) {
+			if (cap == index) {
 				return *this;
 			}
-			ScopeMapSlot *s = map->slots+index;
+			ScopeMapSlot *s = slots+index;
 			if (s->hash) {
 				return *this;
 			}
@@ -483,20 +493,20 @@ struct ScopeMapIterator {
 	}
 
 	bool operator==(ScopeMapIterator const &other) const noexcept {
-		return this->map == other.map && this->index == other.index;
+		return this->map == other.map && this->slots == other.slots && this->index == other.index;
 	}
 
 	operator ScopeMapSlot *() const {
-		return map->slots+index;
+		return slots+index;
 	}
 };
 
 
 gb_internal ScopeMapIterator end(ScopeMap &m) noexcept {
-	return ScopeMapIterator{&m, m.cap};
+	return ScopeMapIterator{&m, m.slots, m.cap, m.cap};
 }
 gb_internal ScopeMapIterator const end(ScopeMap const &m) noexcept {
-	return ScopeMapIterator{&m, m.cap};
+	return ScopeMapIterator{&m, m.slots, m.cap, m.cap};
 }
 gb_internal ScopeMapIterator begin(ScopeMap &m) noexcept {
 	if (m.count == 0) {
@@ -510,7 +520,7 @@ gb_internal ScopeMapIterator begin(ScopeMap &m) noexcept {
 		}
 		index++;
 	}
-	return ScopeMapIterator{&m, index};
+	return ScopeMapIterator{&m, m.slots, m.cap, index};
 }
 gb_internal ScopeMapIterator const begin(ScopeMap const &m) noexcept {
 	if (m.count == 0) {
@@ -524,7 +534,7 @@ gb_internal ScopeMapIterator const begin(ScopeMap const &m) noexcept {
 		}
 		index++;
 	}
-	return ScopeMapIterator{&m, index};
+	return ScopeMapIterator{&m, m.slots, m.cap, index};
 }
 
 enum ScopeFlag : i32 {
