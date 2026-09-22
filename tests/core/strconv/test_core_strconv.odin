@@ -180,3 +180,92 @@ test_infinity :: proc(t: ^testing.T) {
 	testing.expect_value(t, ok, false)
 	testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
 }
+
+@(test)
+test_parse_int_overflow :: proc(t: ^testing.T) {
+	{
+		v, ok := strconv.parse_i64("9223372036854775807")
+		testing.expect_value(t, v, max(i64))
+		testing.expect_value(t, ok, true)
+
+		v, ok = strconv.parse_i64("-9223372036854775808")
+		testing.expect_value(t, v, min(i64))
+		testing.expect_value(t, ok, true)
+
+		v, ok = strconv.parse_i64("-0x8000_0000_0000_0000")
+		testing.expect_value(t, v, min(i64))
+		testing.expect_value(t, ok, true)
+
+		v, ok = strconv.parse_i64("7fffffffffffffff", 16)
+		testing.expect_value(t, v, max(i64))
+		testing.expect_value(t, ok, true)
+
+		_, ok = strconv.parse_i64("9223372036854775808")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_i64("-9223372036854775809")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_i64("0x8000000000000000")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_i64("-8000000000000001", 16)
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_i64("922337203685477580888")
+		testing.expect_value(t, ok, false)
+	}
+	{
+		v, ok := strconv.parse_u64("18446744073709551615")
+		testing.expect_value(t, v, max(u64))
+		testing.expect_value(t, ok, true)
+
+		v, ok = strconv.parse_u64("ffffffffffffffff", 16)
+		testing.expect_value(t, v, max(u64))
+		testing.expect_value(t, ok, true)
+
+		_, ok = strconv.parse_u64("18446744073709551616")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_u64("0x1_0000_0000_0000_0000")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_u64("10000000000000000", 16)
+		testing.expect_value(t, ok, false)
+	}
+	{
+		v, ok := strconv.parse_i128("170141183460469231731687303715884105727")
+		testing.expect_value(t, v, max(i128))
+		testing.expect_value(t, ok, true)
+
+		v, ok = strconv.parse_i128("-170141183460469231731687303715884105728")
+		testing.expect_value(t, v, min(i128))
+		testing.expect_value(t, ok, true)
+
+		v, ok = strconv.parse_i128("-80000000000000000000000000000000", 16)
+		testing.expect_value(t, v, min(i128))
+		testing.expect_value(t, ok, true)
+
+		_, ok = strconv.parse_i128("170141183460469231731687303715884105728")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_i128("-170141183460469231731687303715884105729")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_i128("0x8000_0000_0000_0000_0000_0000_0000_0000")
+		testing.expect_value(t, ok, false)
+	}
+	{
+		v, ok := strconv.parse_u128("340282366920938463463374607431768211455")
+		testing.expect_value(t, v, max(u128))
+		testing.expect_value(t, ok, true)
+
+		_, ok = strconv.parse_u128("340282366920938463463374607431768211456")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_u128("100000000000000000000000000000000", 16)
+		testing.expect_value(t, ok, false)
+	}
+	{
+		v, ok := strconv.parse_int("-1234")
+		testing.expect_value(t, v, -1234)
+		testing.expect_value(t, ok, true)
+
+		_, ok = strconv.parse_int("922337203685477580888")
+		testing.expect_value(t, ok, false)
+
+		_, ok = strconv.parse_uint("18446744073709551616")
+		testing.expect_value(t, ok, false)
+	}
+}
