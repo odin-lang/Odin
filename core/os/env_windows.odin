@@ -79,12 +79,18 @@ _set_env :: proc(key, value: string) -> Error {
 
 _unset_env :: proc(key: string) -> bool {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	k, _ := win32_utf8_to_wstring(key, temp_allocator)
+	k, allocator_error := win32_utf8_to_wstring(key, temp_allocator)
+	if allocator_error != nil {
+		return false
+	}
 	return bool(win32.SetEnvironmentVariableW(k, nil))
 }
 
+// Can fail silently.
 _clear_env :: proc() {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
+	// NOTE: If the `environ` call fails, `envs` will be empty.
+	//       Although the caller won't know about it.
 	envs, _ := environ(temp_allocator)
 	for env in envs {
 		for j in 1..<len(env) {
