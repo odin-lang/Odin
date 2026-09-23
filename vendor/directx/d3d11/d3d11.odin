@@ -3293,8 +3293,8 @@ IUserDefinedAnnotation_VTable :: struct {
 	using iunknown_vtable : IUnknown_VTable,
 	BeginEvent: proc "system" (this: ^IUserDefinedAnnotation, Name: LPCWSTR) -> i32,
 	EndEvent:   proc "system" (this: ^IUserDefinedAnnotation) -> i32,
-	GetStatus:  proc "system" (this: ^IUserDefinedAnnotation) -> i32,
 	SetMarker:  proc "system" (this: ^IUserDefinedAnnotation, Name: LPCWSTR),
+	GetStatus:  proc "system" (this: ^IUserDefinedAnnotation) -> i32,
 }
 
 IVideoDevice_UUID_STRING :: "10EC4D5B-975A-4689-B9E4-D0AAC30FE333"
