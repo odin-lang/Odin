@@ -2802,7 +2802,7 @@ IDevice_VTable :: struct {
 	CopyDescriptors:                  proc "system" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: [^]CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: [^]u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: [^]CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: [^]u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
 	CopyDescriptorsSimple:            proc "system" (this: ^IDevice, NumDescriptors: u32, DestDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, SrcDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
 	GetResourceAllocationInfo:        proc "system" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: [^]RESOURCE_DESC),
-	GetCustomHeapProperties:          proc "system" (this: ^IDevice, nodeMask: u32, heapType: HEAP_TYPE) -> HEAP_PROPERTIES,
+	GetCustomHeapProperties:          proc "system" (this: ^IDevice, RetVal: ^HEAP_PROPERTIES, nodeMask: u32, heapType: HEAP_TYPE) -> ^HEAP_PROPERTIES,
 	CreateCommittedResource:          proc "system" (this: ^IDevice, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateHeap:                       proc "system" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	CreatePlacedResource:             proc "system" (this: ^IDevice, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
@@ -2819,7 +2819,7 @@ IDevice_VTable :: struct {
 	SetStablePowerState:              proc "system" (this: ^IDevice, Enable: BOOL) -> HRESULT,
 	CreateCommandSignature:           proc "system" (this: ^IDevice, pDesc: ^COMMAND_SIGNATURE_DESC, pRootSignature: ^IRootSignature, riid: ^IID, ppvCommandSignature: ^rawptr) -> HRESULT,
 	GetResourceTiling:                proc "system" (this: ^IDevice, pTiledResource: ^IResource, pNumTilesForEntireResource: ^u32, pPackedMipDesc: ^PACKED_MIP_INFO, pStandardTileShapeForNonPackedMips: ^TILE_SHAPE, pNumSubresourceTilings: ^u32, FirstSubresourceTilingToGet: u32, pSubresourceTilingsForNonPackedMips: ^SUBRESOURCE_TILING),
-	GetAdapterLuid:                   proc "system" (this: ^IDevice) -> LUID,
+	GetAdapterLuid:                   proc "system" (this: ^IDevice, RetVal: ^LUID) -> ^LUID,
 }
 
 
@@ -3015,7 +3015,7 @@ ISwapChainAssistant :: struct #raw_union {
 }
 ISwapChainAssistant_VTable :: struct {
 	using iunknown_vtable: IUnknown_VTable,
-	GetLUID:                           proc "system" (this: ^ISwapChainAssistant) -> LUID,
+	GetLUID:                           proc "system" (this: ^ISwapChainAssistant, RetVal: ^LUID) -> ^LUID,
 	GetSwapChainObject:                proc "system" (this: ^ISwapChainAssistant, riid: ^IID, ppv: ^rawptr) -> HRESULT,
 	GetCurrentResourceAndCommandQueue: proc "system" (this: ^ISwapChainAssistant, riidResource: ^IID, ppvResource: ^rawptr, riidQueue: ^IID, ppvQueue: ^rawptr) -> HRESULT,
 	InsertImplicitSync:                proc "system" (this: ^ISwapChainAssistant) -> HRESULT,
