@@ -242,6 +242,27 @@ bug_5931 :: proc(t: ^testing.T) {
 	assert(rem_str == "28948022309329048855892746252171976963317496166410141009864396001977208667952")
 }
 
+@(test)
+bug_rat_mul_rat_square :: proc(t: ^testing.T) {
+	x, square: big.Rat
+	defer big.destroy(&x, &square)
+
+	big.rat_set_frac(&x, big.DIGIT(2), big.DIGIT(3))
+
+	big.rat_mul_rat(&square, &x, &x)
+	big.rat_mul_rat(&x, &x, &x)
+
+	for r in ([]^big.Rat{&square, &x}) {
+		num_str, _ := big.int_itoa_string(&r.a)
+		defer delete(num_str)
+		assert(num_str == "4")
+
+		den_str, _ := big.int_itoa_string(&r.b)
+		defer delete(den_str)
+		assert(den_str == "9")
+	}
+}
+
 
 // Test helpers
 
