@@ -1056,7 +1056,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 			mantissa |= 1
 		}
 
-		for mantissa >> (1+info.mantbits+2) != 0 {
+		for mantissa >> (info.mantbits+3) != 0 {
 			mantissa = mantissa>>1 | mantissa&1
 			exp += 1
 		}
