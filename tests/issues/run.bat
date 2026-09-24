@@ -58,6 +58,7 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_sysv_abi.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_7073-1.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 ..\..\..\odin test ..\test_issue_swizzle_multi_assign.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_7547.odin %COMMON%  || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local -o:speed || exit /b
 
