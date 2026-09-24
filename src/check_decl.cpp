@@ -1560,7 +1560,11 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 			if (e->pkg->kind == Package_Init) {
 				if (ctx->info->entry_point != nullptr) {
-					error(e->token, "Redeclaration of the entry pointer procedure 'main'");
+					begin_error_block();
+					error(e->token, "Redeclaration of the entry point procedure 'main'");
+					error_line("\tSuggestion: Is this a single-file package? If so, try compiling using the `-file` flag.\n");
+					end_error_block();
+
 				} else {
 					ctx->info->entry_point = e;
 				}
