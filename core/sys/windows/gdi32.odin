@@ -24,7 +24,14 @@ foreign gdi32 {
 	CreateDIBSection      :: proc(hdc: HDC, pbmi: ^BITMAPINFO, usage: UINT, ppvBits: ^PVOID, hSection: HANDLE, offset: DWORD) -> HBITMAP ---
 	StretchDIBits         :: proc(hdc: HDC, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight: INT, lpBits: LPVOID, lpbmi: ^BITMAPINFO, iUsage: UINT, rop: DWORD) -> INT ---
 	StretchBlt            :: proc(hdcDest: HDC, xDest, yDest, wDest, hDest: INT, hdcSrc: HDC, xSrc, ySrc, wSrc, hSrc: INT, rop: DWORD) -> BOOL ---
+	GetStretchBltMode     :: proc(hdc: HDC) -> c_int ---
+	SetStretchBltMode     :: proc(hdc: HDC, mode: c_int) -> c_int ---
 
+	GetPixel            :: proc(hdc: HDC, x, y: c_int) -> COLORREF ---
+	SetPixel            :: proc(hdc: HDC, x, y: c_int, color: COLORREF) -> COLORREF ---
+	SetPixelV           :: proc(hdc: HDC, x, y: c_int, color: COLORREF) -> BOOL ---
+
+	GetPixelFormat      :: proc(hdc: HDC) -> c_int ---
 	SetPixelFormat      :: proc(hdc: HDC, format: INT, ppfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---
 	ChoosePixelFormat   :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
 	DescribePixelFormat :: proc(hdc: HDC, iPixelFormat: INT, nBytes: UINT, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
@@ -67,8 +74,8 @@ foreign gdi32 {
 	SelectPalette  :: proc(hdc: HDC, hPal: HPALETTE, bForceBkgd: BOOL) -> HPALETTE ---
 	RealizePalette :: proc(hdc: HDC) -> UINT ---
 
+	GetTextColor :: proc(hdc: HDC) -> COLORREF ---
 	SetTextColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
-	SetPixel     :: proc(hdc: HDC, x: INT, y: INT, color: COLORREF) -> COLORREF ---
 
 	GdiTransparentBlt :: proc(hdcDest: HDC, xoriginDest, yoriginDest, wDest, hDest: INT, hdcSrc: HDC, xoriginSrc, yoriginSrc, wSrc, hSrc: INT, crTransparent: UINT) -> BOOL ---
 	GdiGradientFill   :: proc(hdc: HDC, pVertex: PTRIVERTEX, nVertex: ULONG, pMesh: PVOID, nCount: ULONG, ulMode: ULONG) -> BOOL ---
@@ -279,6 +286,12 @@ RGN_COPY :: 5
 // WHITEONBLACK :: 2
 // COLORONCOLOR :: 3
 // HALFTONE     :: 4
+
+/* New StretchBlt() Modes */
+STRETCH_ANDSCANS     :: BLACKONWHITE
+STRETCH_DELETESCANS  :: COLORONCOLOR
+STRETCH_HALFTONE     :: HALFTONE
+STRETCH_ORSCANS      :: WHITEONBLACK
 
 /* PolyFill() Modes */
 ALTERNATE :: 1
