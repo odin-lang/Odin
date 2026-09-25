@@ -83,10 +83,20 @@ foreign gdi32 {
 	Polygon     :: proc(hdc: HDC, apt: [^]POINT, cpt: c_int) -> BOOL ---
 	PolyPolygon :: proc(hdc: HDC, apt: [^]POINT, asz: [^]c_int, csz: c_int) -> BOOL ---
 
-	// Line Drawing Functions
-	MoveToEx   :: proc(hdc: HDC, x: i32, y: i32, lppt: ^POINT) -> BOOL ---
-	LineTo     :: proc(hdc: HDC, x: i32, y: i32) -> BOOL ---
+	AngleArc :: proc(hdc: HDC, x, y: INT, r: DWORD, StartAngle, SweepAngle: FLOAT) -> BOOL ---
+	Arc :: proc(hdc: HDC, x1, y1, x2, y2, x3, y3, x4, y4: INT) -> BOOL ---
+	ArcTo :: proc(hdc: HDC, left, top, right, bottom, xr1, yr1, xr2, yr2: INT) -> BOOL ---
+	GetArcDirection :: proc(hdc: HDC) -> ArcDirection ---
+	LineDDA :: proc(xStart, yStart, xEnd, yEnd: INT, lpProc: LINEDDAPROC, data: LPARAM) -> BOOL ---
+	LineTo :: proc(hdc: HDC, x, y: INT) -> BOOL ---
+	MoveToEx :: proc(hdc: HDC, x: INT, y: INT, lppt: ^POINT) -> BOOL ---
+	PolyBezier :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
+	PolyBezierTo :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
+	PolyDraw :: proc(hdc: HDC, apt: [^]POINT, aj: ^BYTE, cpt: INT) -> BOOL ---
+	Polyline :: proc(hdc: HDC, apt: [^]POINT, cpt: INT) -> BOOL ---
 	PolylineTo :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
+	PolyPolyline :: proc(hdc: HDC, apt: [^]POINT, asz: ^DWORD, csz: DWORD) -> BOOL ---
+	SetArcDirection :: proc(hdc: HDC, dir: ArcDirection) -> INT ---
 }
 
 @(require_results)
@@ -379,3 +389,12 @@ NEWTEXTMETRICW :: struct {
 }
 
 FONTENUMPROCW :: #type proc "system" (lpelf: ^ENUMLOGFONTW, lpntm: ^NEWTEXTMETRICW, FontType: DWORD, lParam: LPARAM) -> INT
+
+ArcDirection :: enum INT {
+	// Arcs and rectangles are drawn counterclockwise.
+	AD_COUNTERCLOCKWISE = 1,
+	// Arcs and rectangles are drawn clockwise.
+	AD_CLOCKWISE = 2,
+}
+
+LINEDDAPROC :: #type proc(x, y: INT, lpData: LPARAM)

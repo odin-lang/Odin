@@ -16,6 +16,7 @@ c_short     :: c.short
 c_ushort    :: c.ushort
 size_t      :: c.size_t
 wchar_t     :: c.wchar_t
+c_float     :: c.float
 
 DWORD           :: c_ulong
 DWORDLONG       :: c.ulonglong
@@ -86,6 +87,7 @@ LSTATUS         :: LONG
 PHKEY           :: ^HKEY
 PUSHORT         :: ^USHORT
 PCHAR           :: ^CHAR
+FLOAT           :: c_float
 
 UINT8  ::  u8
 UINT16 :: u16
