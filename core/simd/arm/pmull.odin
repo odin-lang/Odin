@@ -2233,6 +2233,172 @@ when ODIN_ARCH == .arm64 {
 			return simd.shuffle(c, c, 1, 0)
 		}
 	}
+
+	// Reverse bit order.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrbit_p8)
+	@(require_results, enable_target_feature = "neon")
+	vrbit_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+		return simd.reverse_bits(a)
+	}
+
+	// Reverse bit order.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrbitq_p8)
+	@(require_results, enable_target_feature = "neon")
+	vrbitq_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+		return simd.reverse_bits(a)
+	}
+
+	// Transpose vectors (primary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn1_p8)
+	@(require_results, enable_target_feature = "neon")
+	vtrn1_p8 :: #force_inline proc "c" (a, b: poly8x8_t) -> poly8x8_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+		} else {
+			a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (primary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn1_p16)
+	@(require_results, enable_target_feature = "neon")
+	vtrn1_p16 :: #force_inline proc "c" (a, b: poly16x4_t) -> poly16x4_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 0, 4, 2, 6)
+		} else {
+			a := simd.shuffle(a, a, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 0, 4, 2, 6)
+			return simd.shuffle(c, c, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (primary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn1q_p8)
+	@(require_results, enable_target_feature = "neon")
+	vtrn1q_p8 :: #force_inline proc "c" (a, b: poly8x16_t) -> poly8x16_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 0, 16, 2, 18, 4, 20, 6, 22, 8, 24, 10, 26, 12, 28, 14, 30)
+		} else {
+			a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 0, 16, 2, 18, 4, 20, 6, 22, 8, 24, 10, 26, 12, 28, 14, 30)
+			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (primary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn1q_p16)
+	@(require_results, enable_target_feature = "neon")
+	vtrn1q_p16 :: #force_inline proc "c" (a, b: poly16x8_t) -> poly16x8_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+		} else {
+			a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (primary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn1q_p64)
+	@(require_results, enable_target_feature = "neon")
+	vtrn1q_p64 :: #force_inline proc "c" (a, b: poly64x2_t) -> poly64x2_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 0, 2)
+		} else {
+			a := simd.shuffle(a, a, 1, 0)
+			b := simd.shuffle(b, b, 1, 0)
+			c := simd.shuffle(a, b, 0, 2)
+			return simd.shuffle(c, c, 1, 0)
+		}
+	}
+
+	// Transpose vectors (secondary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn2_p8)
+	@(require_results, enable_target_feature = "neon")
+	vtrn2_p8 :: #force_inline proc "c" (a, b: poly8x8_t) -> poly8x8_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+		} else {
+			a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (secondary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn2_p16)
+	@(require_results, enable_target_feature = "neon")
+	vtrn2_p16 :: #force_inline proc "c" (a, b: poly16x4_t) -> poly16x4_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 1, 5, 3, 7)
+		} else {
+			a := simd.shuffle(a, a, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 1, 5, 3, 7)
+			return simd.shuffle(c, c, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (secondary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn2q_p8)
+	@(require_results, enable_target_feature = "neon")
+	vtrn2q_p8 :: #force_inline proc "c" (a, b: poly8x16_t) -> poly8x16_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 1, 17, 3, 19, 5, 21, 7, 23, 9, 25, 11, 27, 13, 29, 15, 31)
+		} else {
+			a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 1, 17, 3, 19, 5, 21, 7, 23, 9, 25, 11, 27, 13, 29, 15, 31)
+			return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (secondary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn2q_p16)
+	@(require_results, enable_target_feature = "neon")
+	vtrn2q_p16 :: #force_inline proc "c" (a, b: poly16x8_t) -> poly16x8_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+		} else {
+			a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+			b := simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+			c := simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+			return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		}
+	}
+
+	// Transpose vectors (secondary).
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn2q_p64)
+	@(require_results, enable_target_feature = "neon")
+	vtrn2q_p64 :: #force_inline proc "c" (a, b: poly64x2_t) -> poly64x2_t {
+		when ODIN_ENDIAN == .Little {
+			return simd.shuffle(a, b, 1, 3)
+		} else {
+			a := simd.shuffle(a, a, 1, 0)
+			b := simd.shuffle(b, b, 1, 0)
+			c := simd.shuffle(a, b, 1, 3)
+			return simd.shuffle(c, c, 1, 0)
+		}
+	}
 }
 
 @(private, default_calling_convention = "none")
