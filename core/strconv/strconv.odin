@@ -746,9 +746,13 @@ Output:
 - ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
 parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
-	v: f64 = ---
-	v, ok = parse_f64(s, n)
-	return f32(v), ok
+	nr: int
+	value, nr, ok = parse_f32_prefix(s)
+	if ok && len(s) != nr {
+		ok = false
+	}
+	if n != nil { n^ = nr }
+	return
 }
 /*
 Parses a 64-bit floating point number from a string
@@ -817,10 +821,7 @@ Output:
 - ok: A boolean indicating whether the parsing was successful.
 */
 parse_f32_prefix :: proc(str: string) -> (value: f32, nr: int, ok: bool) {
-	f: f64
-	f, nr, ok = parse_f64_prefix(str)
-	value = f32(f)
-	return
+	return parse_float_prefix_generic(f32, str)
 }
 /*
 Parses a 64-bit floating point number from a string and returns the parsed number, the length of the parsed substring, and a boolean indicating whether the parsing was successful
@@ -855,6 +856,11 @@ Output:
 - ok: `false` if a base 10 float could not be found
 */
 parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
+	return parse_float_prefix_generic(f64, str)
+}
+
+// Parses directly to `T`, so the result is correctly rounded for both `f32` and `f64`.
+parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: int, ok: bool) where T == f32 || T == f64 {
 	common_prefix_len_ignore_case :: proc "contextless" (s, prefix: string) -> int {
 		n := len(prefix)
 		if n > len(s) {
@@ -1122,19 +1128,27 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 
 		switch digits {
 		case 4:
-			value = cast(f64)transmute(f16)cast(u16)as_int
+			value = cast(T)transmute(f16)cast(u16)as_int
 		case 8:
-			value = cast(f64)transmute(f32)cast(u32)as_int
+			value = cast(T)transmute(f32)cast(u32)as_int
 		case 16:
-			value = transmute(f64)as_int
+			value = cast(T)transmute(f64)as_int
 		case:
 			ok = false
 		}
 		return
 	}
 
-	if value, nr, ok = check_special(str); ok {
-		return
+	if f, n, special := check_special(str); special {
+		return T(f), n, true
+	}
+
+	when T == f64 {
+		Bits :: u64
+		info := &_f64_info
+	} else {
+		Bits :: u32
+		info := &_f32_info
 	}
 
 	mantissa: u64
@@ -1143,11 +1157,18 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	mantissa, exp, neg, trunc, hex, nr = parse_components(str) or_return
 
 	if hex {
-		value, ok = parse_hex(str, mantissa, exp, neg, trunc)
+		f: f64
+		f, ok = parse_hex(str, mantissa, exp, neg, trunc)
+		value = T(f)
+		when T == f32 {
+			// A finite f64 can be too large for f32.
+			ok = ok && transmute(u32)value & 0x7f80_0000 != 0x7f80_0000
+		}
 		return
 	}
 
-	trunc_block: if !trunc {
+	// Clinger's fast path algorithm
+	clinger_fast_path: if !trunc && !(ODIN_ARCH == .i386 && ODIN_OS != .Windows) {
 		@(static, rodata) pow10 := [?]f64{
 			1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,  1e8,  1e9,
 			1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
@@ -1155,33 +1176,58 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		}
 
 		if mantissa>>_f64_info.mantbits != 0 {
-			break trunc_block
+			break clinger_fast_path
 		}
 		f := f64(mantissa)
-		f_abs := f
+		switch {
+		case exp == 0:
+		case exp > 0 && exp <= 15+22:
+			e := exp
+			if e > 22 {
+				f *= pow10[e-22]
+				e = 22
+				if f > 1e15 {
+					break clinger_fast_path
+				}
+			}
+			f *= pow10[e]
+		case -22 <= exp && exp < 0:
+			f /= pow10[-exp]
+		case:
+			break clinger_fast_path
+		}
+		when T == f32 {
+			// Every f32 midpoint is an f64 value, so rounding to f64 cannot
+			// move the result past a midpoint. The conversion to f32 is then
+			// correct, unless the f64 result is exactly a midpoint.
+			if transmute(u64)f & (1<<29 - 1) == 1<<28 {
+				break clinger_fast_path
+			}
+		}
 		if neg {
 			f = -f
 		}
-		switch {
-		case exp == 0:
-			return f, nr, true
-		case exp > 0 && exp <= 15+22:
-			if exp > 22 {
-				f *= pow10[exp-22]
-				exp = 22
-			}
-			if f_abs > 1e15 || f_abs < 1e-15 {
-				break trunc_block
-			}
-			return f * pow10[exp], nr, true
-		case -22 <= exp && exp < 0:
-			return f / pow10[-exp], nr, true
-		}
+		return T(f), nr, true
 	}
+
+	// Eisel-Lemire's fast float algorithm
+	fast_float: {
+		b := fast_float_compute_float(T, exp, mantissa)
+		if trunc && b != fast_float_compute_float(T, exp, mantissa+1) {
+			break fast_float
+		}
+		ok = b >> info.mantbits != 1<<info.expbits - 1 // infinity means overflow
+		if neg {
+			b |= 1 << info.mantbits << info.expbits
+		}
+		return transmute(T)Bits(b), nr, ok
+	}
+
+	// Slow path for arbitrary-precision decimal
 	d: decimal.Decimal
 	decimal.set(&d, str[:nr])
-	b, overflow := decimal_to_float_bits(&d, &_f64_info)
-	value = transmute(f64)b
+	b, overflow := decimal_to_float_bits(&d, info)
+	value = transmute(T)Bits(b)
 	ok = !overflow
 	return
 }
