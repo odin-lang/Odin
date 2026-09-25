@@ -60,6 +60,7 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_swizzle_multi_assign.odin %COMMON%  || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local -o:speed || exit /b
+..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
 
 @echo off
 

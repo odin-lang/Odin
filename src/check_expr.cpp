@@ -9527,7 +9527,9 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			return true;
 		}
 		if (expr->kind == Ast_ProcLit) {
-			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
+			ExactValue value = exact_value_procedure(expr);
+			value.variant_type = o->value.variant_type;
+			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), value);
 			return true;
 		}
 
