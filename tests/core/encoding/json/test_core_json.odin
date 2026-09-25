@@ -2,6 +2,7 @@ package test_core_json
 
 import "core:encoding/json"
 import "core:testing"
+import "core:unicode/utf8"
 import "core:mem/virtual"
 import "base:runtime"
 
@@ -426,6 +427,24 @@ utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
 	val, err := json.parse_string(`"🐛✅"`)
 	defer json.destroy_value(val)
 	testing.expectf(t, err == nil, "Expected `json.parse` to return nil, got %v", err)
+}
+
+@test
+invalid_utf8_in_string_is_replaced :: proc(t: ^testing.T) {
+	// Every one of these bytes is invalid on its own, so each is replaced by
+	// U+FFFD, which is three bytes: the unquoted string is longer than the quoted
+	// one, and the buffer has to have been sized for that.
+	val, err := json.parse_string("\"\xff\xfe\xff\xfe\xff\xfe\xff\xfe\"")
+	defer json.destroy_value(val)
+	testing.expectf(t, err == nil, "Expected `json.parse_string` to return nil, got %v", err)
+
+	str, ok := val.(json.String)
+	testing.expect(t, ok, "Expected a string value")
+	testing.expectf(t, len(str) == 8 * utf8.rune_size(utf8.RUNE_ERROR), "Expected eight replacement characters, got %d bytes", len(str))
+	testing.expect(t, utf8.valid_string(string(str)), "Expected the unquoted string to be valid UTF-8")
+	for r in string(str) {
+		testing.expectf(t, r == utf8.RUNE_ERROR, "Expected every rune to be U+FFFD, got %U", r)
+	}
 }
 
 @test
