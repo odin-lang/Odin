@@ -409,7 +409,23 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		return clone_string(s, allocator, loc)
 	}
 
-	b := bytes_make(len(s) + 2*utf8.UTF_MAX, 1, allocator) or_return
+	// A byte that is not valid UTF-8 is replaced by utf8.RUNE_ERROR, which encodes
+	// wider than the single byte it stands in for, so a string holding several of
+	// them unquotes to more bytes than it was quoted in. Count them up front so the
+	// buffer fits. Nothing else in the loop below grows its input: a two-byte
+	// escape like \n writes one byte, \xXX writes at most two for four, \uXXXX at
+	// most three for six, and a surrogate pair four for twelve.
+	extra := 0
+	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
+	for j := i; j < len(s); {
+		r, size := utf8.decode_rune_in_string(s[j:])
+		if r == utf8.RUNE_ERROR && size == 1 {
+			extra += replacement_size - 1
+		}
+		j += size
+	}
+
+	b := bytes_make(len(s) + 2*utf8.UTF_MAX + extra, 1, allocator) or_return
 	w := copy(b, s[0:i])
 
 	if len(b) == 0 && allocator.data == nil {
