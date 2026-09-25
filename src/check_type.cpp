@@ -350,7 +350,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
 
 	// NOTE: `find_polymorphic_record_entity` never matches a polymorphic specialization.
-	// Adding one here would just grow gen_types by one per check and make the linear lookups quadratic overall.
+	// Adding one here would just grow `gen_types` by one per check and make the linear lookups quadratic overall.
 	if (is_type_polymorphic(named_type)) {
 		return;
 	}
