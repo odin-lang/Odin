@@ -349,8 +349,8 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 	// TODO(bill): Is this even correct? Or should the metadata be copied?
 	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
 
-	// NOTE: `find_polymorphic_record_entity` never matches a polymorphic specialization.
-	// Adding one here would just grow `gen_types` by one per check and make the linear lookups quadratic overall.
+	// NOTE: Do not add polymorphic specializations to gen_types.
+	// Adding one here would just grow gen_types by one per check and make the linear lookups quadratic overall.
 	if (is_type_polymorphic(named_type)) {
 		return;
 	}
