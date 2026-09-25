@@ -1243,6 +1243,226 @@ vuzpq_p16 :: #force_inline proc "c" (a, b: poly16x8_t) -> poly16x8x2_t {
 	}
 }
 
+// Reverse elements in 16-bit halfwords.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev16_p8)
+@(require_results, enable_target_feature = "neon")
+vrev16_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 1, 0, 3, 2, 5, 4, 7, 6)
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 1, 0, 3, 2, 5, 4, 7, 6)
+		return simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 16-bit halfwords.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev16q_p8)
+@(require_results, enable_target_feature = "neon")
+vrev16q_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14)
+	} else {
+		a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 13, 12, 15, 14)
+		return simd.shuffle(b, b, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 32-bit words.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev32_p8)
+@(require_results, enable_target_feature = "neon")
+vrev32_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 3, 2, 1, 0, 7, 6, 5, 4)
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 3, 2, 1, 0, 7, 6, 5, 4)
+		return simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 32-bit words.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev32_p16)
+@(require_results, enable_target_feature = "neon")
+vrev32_p16 :: #force_inline proc "c" (a: poly16x4_t) -> poly16x4_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 1, 0, 3, 2)
+	} else {
+		a := simd.shuffle(a, a, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 1, 0, 3, 2)
+		return simd.shuffle(b, b, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 32-bit words.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev32q_p8)
+@(require_results, enable_target_feature = "neon")
+vrev32q_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12)
+	} else {
+		a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 3, 2, 1, 0, 7, 6, 5, 4, 11, 10, 9, 8, 15, 14, 13, 12)
+		return simd.shuffle(b, b, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 32-bit words.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev32q_p16)
+@(require_results, enable_target_feature = "neon")
+vrev32q_p16 :: #force_inline proc "c" (a: poly16x8_t) -> poly16x8_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 1, 0, 3, 2, 5, 4, 7, 6)
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 1, 0, 3, 2, 5, 4, 7, 6)
+		return simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 64-bit doublewords.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev64_p8)
+@(require_results, enable_target_feature = "neon")
+vrev64_p8 :: #force_inline proc "c" (a: poly8x8_t) -> poly8x8_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		return simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 64-bit doublewords.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev64_p16)
+@(require_results, enable_target_feature = "neon")
+vrev64_p16 :: #force_inline proc "c" (a: poly16x4_t) -> poly16x4_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 3, 2, 1, 0)
+	} else {
+		a := simd.shuffle(a, a, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 3, 2, 1, 0)
+		return simd.shuffle(b, b, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 64-bit doublewords.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev64q_p8)
+@(require_results, enable_target_feature = "neon")
+vrev64q_p8 :: #force_inline proc "c" (a: poly8x16_t) -> poly8x16_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8)
+	} else {
+		a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0, 15, 14, 13, 12, 11, 10, 9, 8)
+		return simd.shuffle(b, b, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Reverse elements in 64-bit doublewords.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vrev64q_p16)
+@(require_results, enable_target_feature = "neon")
+vrev64q_p16 :: #force_inline proc "c" (a: poly16x8_t) -> poly16x8_t {
+	when ODIN_ENDIAN == .Little {
+		return simd.shuffle(a, a, 3, 2, 1, 0, 7, 6, 5, 4)
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(a, a, 3, 2, 1, 0, 7, 6, 5, 4)
+		return simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Transpose vectors.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn_p8)
+@(require_results, enable_target_feature = "neon")
+vtrn_p8 :: #force_inline proc "c" (a, b: poly8x8_t) -> poly8x8x2_t {
+	when ODIN_ENDIAN == .Little {
+		c := simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+		d := simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+		return poly8x8x2_t {c, d}
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+		d := simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+		c  = simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		d  = simd.shuffle(d, d, 7, 6, 5, 4, 3, 2, 1, 0)
+		return poly8x8x2_t {c, d}
+	}
+}
+
+// Transpose vectors.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrn_p16)
+@(require_results, enable_target_feature = "neon")
+vtrn_p16 :: #force_inline proc "c" (a, b: poly16x4_t) -> poly16x4x2_t {
+	when ODIN_ENDIAN == .Little {
+		c := simd.shuffle(a, b, 0, 4, 2, 6)
+		d := simd.shuffle(a, b, 1, 5, 3, 7)
+		return poly16x4x2_t {c, d}
+	} else {
+		a := simd.shuffle(a, a, 3, 2, 1, 0)
+		b := simd.shuffle(b, b, 3, 2, 1, 0)
+		c := simd.shuffle(a, b, 0, 4, 2, 6)
+		d := simd.shuffle(a, b, 1, 5, 3, 7)
+		c  = simd.shuffle(c, c, 3, 2, 1, 0)
+		d  = simd.shuffle(d, d, 3, 2, 1, 0)
+		return poly16x4x2_t {c, d}
+	}
+}
+
+// Transpose vectors.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrnq_p8)
+@(require_results, enable_target_feature = "neon")
+vtrnq_p8 :: #force_inline proc "c" (a, b: poly8x16_t) -> poly8x16x2_t {
+	when ODIN_ENDIAN == .Little {
+		c := simd.shuffle(a, b, 0, 16, 2, 18, 4, 20, 6, 22, 8, 24, 10, 26, 12, 28, 14, 30)
+		d := simd.shuffle(a, b, 1, 17, 3, 19, 5, 21, 7, 23, 9, 25, 11, 27, 13, 29, 15, 31)
+		return poly8x16x2_t {c, d}
+	} else {
+		a := simd.shuffle(a, a, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(b, b, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.shuffle(a, b, 0, 16, 2, 18, 4, 20, 6, 22, 8, 24, 10, 26, 12, 28, 14, 30)
+		d := simd.shuffle(a, b, 1, 17, 3, 19, 5, 21, 7, 23, 9, 25, 11, 27, 13, 29, 15, 31)
+		c  = simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		d  = simd.shuffle(d, d, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		return poly8x16x2_t {c, d}
+	}
+}
+
+// Transpose vectors.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vtrnq_p16)
+@(require_results, enable_target_feature = "neon")
+vtrnq_p16 :: #force_inline proc "c" (a, b: poly16x8_t) -> poly16x8x2_t {
+	when ODIN_ENDIAN == .Little {
+		c := simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+		d := simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+		return poly16x8x2_t {c, d}
+	} else {
+		a := simd.shuffle(a, a, 7, 6, 5, 4, 3, 2, 1, 0)
+		b := simd.shuffle(b, b, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.shuffle(a, b, 0, 8, 2, 10, 4, 12, 6, 14)
+		d := simd.shuffle(a, b, 1, 9, 3, 11, 5, 13, 7, 15)
+		c  = simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+		d  = simd.shuffle(d, d, 7, 6, 5, 4, 3, 2, 1, 0)
+		return poly16x8x2_t {c, d}
+	}
+}
+
 when ODIN_ARCH == .arm64 {
 	// Polynomial multiply long
 	//
