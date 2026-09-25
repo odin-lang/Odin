@@ -145,14 +145,37 @@ foreign user32 {
 
 	CreateMenu             :: proc() -> HMENU ---
 	CreatePopupMenu        :: proc() -> HMENU ---
+	RemoveMenu             :: proc(hMenu: HMENU, uPosition: UINT, uFlags: UINT) -> BOOL ---
 	DeleteMenu             :: proc(hMenu: HMENU, uPosition: UINT, uFlags: UINT) -> BOOL ---
 	DestroyMenu            :: proc(hMenu: HMENU) -> BOOL ---
 	InsertMenuW            :: proc(hMenu: HMENU, uPosition: UINT, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
 	AppendMenuW            :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
+	ModifyMenuW            :: proc(hMenu: HMENU, uPosition: UINT, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
 	GetMenu                :: proc(hWnd: HWND) -> HMENU ---
 	SetMenu                :: proc(hWnd: HWND, hMenu: HMENU) -> BOOL ---
-	TrackPopupMenu         :: proc(hMenu: HMENU, uFlags: UINT, x, y: INT, nReserved: INT, hWnd: HWND, prcRect: ^RECT) -> INT ---
+	TrackPopupMenu         :: proc(hMenu: HMENU, uFlags: UINT, x, y: c_int, nReserved: c_int, hWnd: HWND, prcRect: ^RECT) -> BOOL ---
+	TrackPopupMenuEx       :: proc(hMenu: HMENU, uFlags: UINT, x, y: c_int, hwnd: HWND, lptpm: LPTPMPARAMS) -> BOOL ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
+	LoadMenuW              :: proc(hInstance: HINSTANCE, lpMenuName: LPCWSTR) -> HMENU ---
+	LoadMenuIndirectW      :: proc(lpMenuTemplate: ^MENUTEMPLATEW) -> HMENU ---
+	ChangeMenuW            :: proc(hMenu: HMENU, cmd: UINT, lpszNewItem: LPCWSTR, cmdInsert: UINT, flags: UINT) -> BOOL ---
+	HiliteMenuItem         :: proc(hWnd: HWND, hMenu: HMENU, uIDHiliteItem: UINT, uHilite: UINT) -> BOOL ---
+	GetMenuStringW         :: proc(hMenu: HMENU, uIDItem: UINT, lpString: LPWSTR, cchMax: c_int, flags: UINT) -> c_int ---
+	GetMenuState           :: proc(hMenu: HMENU, uId: UINT, uFlags: UINT) -> UINT ---
+	DrawMenuBar            :: proc(hWnd: HWND) -> BOOL ---
+	GetSystemMenu          :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
+	CheckMenuItem          :: proc(hMenu: HMENU, uIDCHeckItem: UINT, uCheck: UINT) -> DWORD ---
+	EnableMenuItem         :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
+	GetSubMenu             :: proc(hMenu: HMENU, nPos: c_int) -> HMENU ---
+	GetMenuItemID          :: proc(hMenu: HMENU, nPos: c_int) -> UINT ---
+	GetMenuItemCount       :: proc(hMenu: HMENU) -> c_int ---
+	SetMenuItemBitmaps     :: proc(hMenu: HMENU, uPosition: UINT, uFlags: UINT, hBitmapUnchecked: HBITMAP, hBitmapChecked: HBITMAP) -> BOOL ---
+	GetMenuInfo            :: proc(hMenu: HMENU, lpMenuInfo: LPMENUINFO) -> BOOL ---
+	SetMenuInfo            :: proc(hMenu: HMENU, lpMenuInfo: LPMENUINFO) -> BOOL ---
+	EndMenu                :: proc() -> BOOL ---
+	
+	GetMenuCheckMarkDimensions    :: proc() -> LONG ---
+	CalculatePopupWindowPosition  :: proc(anchorPoint: ^POINT, windowSize: ^SIZE, flags: UINT, excludeRect: ^RECT, popupWindowPosition: ^RECT) -> BOOL ---
 
 	CreateAcceleratorTableW :: proc(paccel: LPACCEL, cAccel: INT) -> HACCEL ---
 	DestroyAcceleratorTable :: proc(hAccel: HACCEL) -> BOOL ---
@@ -166,6 +189,7 @@ foreign user32 {
 	GetMenuDefaultItem :: proc(hMenu: HMENU, fByPos: UINT, gmdiFlags: UINT) -> UINT ---
 	SetMenuDefaultItem :: proc(hMenu: HMENU, uItem: UINT, fByPos: UINT) -> BOOL ---
 	GetMenuItemRect    :: proc(hWnd: HWND, hMenu: HMENU, uItem: UINT, lprcItem: LPRECT) -> c_int ---
+	MenuItemFromPoint  :: proc(hWnd: HWND, hMenu: HMENU, ptScreen: POINT) -> c_int ---
 
 	GetUpdateRect  :: proc(hWnd: HWND, lpRect: LPRECT, bErase: BOOL) -> BOOL ---
 	ValidateRect   :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
@@ -300,10 +324,6 @@ foreign user32 {
 	GetSystemMetricsForDpi :: proc(nIndex: c_int, dpi: UINT) -> c_int ---
 
 	GetCursorInfo :: proc(pci: PCURSORINFO) -> BOOL ---
-
-	GetSystemMenu     :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
-	EnableMenuItem    :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
-	MenuItemFromPoint :: proc(hWnd: HWND, hMenu: HMENU, ptScreen: POINT) -> INT ---
 
 	DrawTextW   :: proc(hdc: HDC, lpchText: LPCWSTR, cchText: INT, lprc: LPRECT, format: DrawTextFormat) -> INT ---
 	DrawTextExW :: proc(hdc: HDC, lpchText: LPCWSTR, cchText: INT, lprc: LPRECT, format: DrawTextFormat, lpdtp: PDRAWTEXTPARAMS) -> INT ---
@@ -762,32 +782,6 @@ ACCEL :: struct {
 }
 LPACCEL :: ^ACCEL
 
-MIIM_STATE      :: 0x00000001
-MIIM_ID         :: 0x00000002
-MIIM_SUBMENU    :: 0x00000004
-MIIM_CHECKMARKS :: 0x00000008
-MIIM_TYPE       :: 0x00000010
-MIIM_DATA       :: 0x00000020
-
-MIIM_STRING :: 0x00000040
-MIIM_BITMAP :: 0x00000080
-MIIM_FTYPE  :: 0x00000100
-
-MENUITEMINFOW :: struct {
-	cbSize:        UINT,
-	fMask:         UINT,
-	fType:         UINT,         // used if MIIM_TYPE (4.0) or MIIM_FTYPE (>4.0)
-	fState:        UINT,        // used if MIIM_STATE
-	wID:           UINT,           // used if MIIM_ID
-	hSubMenu:      HMENU,      // used if MIIM_SUBMENU
-	hbmpChecked:   HBITMAP,   // used if MIIM_CHECKMARKS
-	hbmpUnchecked: HBITMAP, // used if MIIM_CHECKMARKS
-	dwItemData:    ULONG_PTR,   // used if MIIM_DATA
-	dwTypeData:    LPWSTR,    // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
-	cch:           UINT,           // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
-	hbmpItem:      HBITMAP,      // used if MIIM_BITMAP
-}
-LPMENUITEMINFOW :: ^MENUITEMINFOW
 DISPLAY_DEVICEW :: struct {
 	cb:           DWORD,
 	DeviceName:   [32]WCHAR,
@@ -1080,6 +1074,161 @@ COPYDATASTRUCT :: struct {
 }
 
 PCOPYDATASTRUCT :: ^COPYDATASTRUCT
+
+//
+// Menus
+//
+
+// return codes for `WM_MENUCHAR`
+
+MNC_IGNORE           :: 0
+MNC_CLOSE            :: 1
+MNC_EXECUTE          :: 2
+MNC_SELECT           :: 3
+
+TPMPARAMS :: struct {
+	cbSize:     UINT,  // Size of structure
+	rcExclude:  RECT,  // Screen coordinates of rectangle to exclude when positioning
+}
+
+LPTPMPARAMS :: #type ^TPMPARAMS
+
+// Menu-specific access flags
+
+MENU_GET_ITEM_INFO      :: 0x0001 // GetMenuInfo, GetMenuItemInfo
+MENU_GET_ITEM_DATA      :: 0x0002 // Get dwMenuData
+MENU_GET_SUBMENU        :: 0x0004 // Get Sub Menu
+MENU_INSERT_MENU        :: 0x0008 // InsertMenu
+MENU_INSERT_ITEM        :: 0x0010 // InsertMenuItem
+MENU_DELETE_MENU        :: 0x0020 // DeleteMenu, RemoveMenu
+MENU_SET_ITEM_INFO      :: 0x0040 // SetMenuItemInfo, ModifyMenu
+MENU_ENABLE_ITEM        :: 0x0080 // EnableMenuItem
+MENU_CHECK_ITEM         :: 0x0100 // CheckMenuItem
+MENU_SET_DEFAULT_ITEM   :: 0x0200 // SetMenuDefaultItem
+MENU_SET_ITEM_DATA      :: 0x0400 // Set dwMenuData
+MENU_SET_SUBMENU        :: 0x0800 // Set Sub Menu
+
+MENU_READ_ACCESS        :: STANDARD_RIGHTS_READ | MENU_GET_ITEM_INFO | MENU_GET_ITEM_DATA | MENU_GET_SUBMENU
+MENU_WRITE_ACCESS       :: STANDARD_RIGHTS_WRITE | MENU_INSERT_MENU | MENU_INSERT_ITEM | MENU_DELETE_MENU | MENU_SET_ITEM_INFO | MENU_ENABLE_ITEM | MENU_CHECK_ITEM | MENU_SET_DEFAULT_ITEM | MENU_SET_ITEM_DATA | MENU_SET_SUBMENU
+MENU_EXECUTE_ACCESS     :: STANDARD_RIGHTS_EXECUTE
+MENU_ALL_ACCESS         :: STANDARD_RIGHTS_ALL | MENU_READ_ACCESS | MENU_WRITE_ACCESS | MENU_EXECUTE_ACCESS
+
+MNS_NOCHECK             :: 0x80000000
+MNS_MODELESS            :: 0x40000000
+MNS_DRAGDROP            :: 0x20000000
+MNS_AUTODISMISS         :: 0x10000000
+MNS_NOTIFYBYPOS         :: 0x08000000
+MNS_CHECKORBMP          :: 0x04000000
+
+MIM_MAXHEIGHT           :: 0x00000001
+MIM_BACKGROUND          :: 0x00000002
+MIM_HELPID              :: 0x00000004
+MIM_MENUDATA            :: 0x00000008
+MIM_STYLE               :: 0x00000010
+MIM_APPLYTOSUBMENUS     :: 0x80000000
+
+MENUINFO :: struct {
+	cbSize:           DWORD,
+	fMask:            DWORD,
+	dwStyle:          DWORD,
+	cyMax:            UINT,
+	hbrBack:          HBRUSH,
+	dwContextHelpID:  DWORD,
+	dwMenuData:       ULONG_PTR,
+}
+
+LPMENUINFO   :: #type ^MENUINFO
+LPCMENUINFO  :: #type ^MENUINFO
+
+// `WM_MENUDRAG` return values.
+
+MND_CONTINUE       :: 0
+MND_ENDMENU        :: 1
+
+MENUGETOBJECTINFO :: struct {
+	dwFlags:  DWORD,
+	uPos:     UINT,
+	hmenu:    HMENU,
+	riid:     PVOID,
+	pvObj:    PVOID,
+}
+
+// `MENUGETOBJECTINFO` dwFlags values
+
+MNGOF_TOPGAP         :: 0x00000001
+MNGOF_BOTTOMGAP      :: 0x00000002
+
+// `WM_MENUGETOBJECT` return values
+
+MNGO_NOINTERFACE     :: 0x00000000
+MNGO_NOERROR         :: 0x00000001
+
+MIIM_STATE           :: 0x00000001
+MIIM_ID              :: 0x00000002
+MIIM_SUBMENU         :: 0x00000004
+MIIM_CHECKMARKS      :: 0x00000008
+MIIM_TYPE            :: 0x00000010
+MIIM_DATA            :: 0x00000020
+MIIM_STRING          :: 0x00000040
+MIIM_BITMAP          :: 0x00000080
+MIIM_FTYPE           :: 0x00000100
+
+HBMMENU_CALLBACK            :: cast(HBITMAP)~cast(uintptr)0
+HBMMENU_SYSTEM              :: cast(HBITMAP)cast(uintptr) 1
+HBMMENU_MBAR_RESTORE        :: cast(HBITMAP)cast(uintptr) 2
+HBMMENU_MBAR_MINIMIZE       :: cast(HBITMAP)cast(uintptr) 3
+HBMMENU_MBAR_CLOSE          :: cast(HBITMAP)cast(uintptr) 5
+HBMMENU_MBAR_CLOSE_D        :: cast(HBITMAP)cast(uintptr) 6
+HBMMENU_MBAR_MINIMIZE_D     :: cast(HBITMAP)cast(uintptr) 7
+HBMMENU_POPUP_CLOSE         :: cast(HBITMAP)cast(uintptr) 8
+HBMMENU_POPUP_RESTORE       :: cast(HBITMAP)cast(uintptr) 9
+HBMMENU_POPUP_MAXIMIZE      :: cast(HBITMAP)cast(uintptr)10
+HBMMENU_POPUP_MINIMIZE      :: cast(HBITMAP)cast(uintptr)11
+
+MENUITEMINFOW :: struct {
+	cbSize:         UINT,
+	fMask:          UINT,
+	fType:          UINT,       // used if MIIM_TYPE (4.0) or MIIM_FTYPE (>4.0)
+	fState:         UINT,       // used if MIIM_STATE
+	wID:            UINT,       // used if MIIM_ID
+	hSubMenu:       HMENU,      // used if MIIM_SUBMENU
+	hbmpChecked:    HBITMAP,    // used if MIIM_CHECKMARKS
+	hbmpUnchecked:  HBITMAP,    // used if MIIM_CHECKMARKS
+	dwItemData:     ULONG_PTR,  // used if MIIM_DATA
+	dwTypeData:     LPWSTR,     // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+	cch:            UINT,       // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+	hbmpItem:       HBITMAP,    // used if MIIM_BITMAP
+}
+
+LPMENUITEMINFOW  :: #type ^MENUITEMINFOW
+LPCMENUITEMINFOW :: #type ^MENUITEMINFOW
+
+// Flags for `TrackPopupMenu`
+
+TPM_LEFTALIGN        :: 0x0000 // Positions the shortcut menu so that its left side is aligned with the coordinate specified by the x parameter.
+TPM_CENTERALIGN      :: 0x0004 // Centers the shortcut menu horizontally relative to the coordinate specified by the x parameter.
+TPM_RIGHTALIGN       :: 0x0008 // Positions the shortcut menu so that its right side is aligned with the coordinate specified by the x parameter.
+TPM_TOPALIGN         :: 0x0000 // Positions the shortcut menu so that its top side is aligned with the coordinate specified by the y parameter.
+TPM_VCENTERALIGN     :: 0x0010 // Centers the shortcut menu vertically relative to the coordinate specified by the y parameter.
+TPM_BOTTOMALIGN      :: 0x0020 // Positions the shortcut menu so that its bottom side is aligned with the coordinate specified by the y parameter.
+TPM_LEFTBUTTON       :: 0x0000 // The user can select menu items with only the left mouse button.
+TPM_RIGHTBUTTON      :: 0x0002 // The user can select menu items with both the left and right mouse buttons.
+TPM_RECURSE          :: 0x0001 // Use the TPM_RECURSE flag to display a menu when another menu is already displayed. This is intended to support context menus within a menu.
+TPM_HORIZONTAL       :: 0x0000
+TPM_VERTICAL         :: 0x0040
+TPM_NONOTIFY         :: 0x0080 // The function does not send notification messages when the user clicks a menu item.
+TPM_RETURNCMD        :: 0x0100 // The function returns the menu item identifier of the user's selection in the return value.
+TPM_HORPOSANIMATION  :: 0x0400 // Animates the menu from left to right.
+TPM_HORNEGANIMATION  :: 0x0800 // Animates the menu from right to left.
+TPM_VERPOSANIMATION  :: 0x1000 // Animates the menu from top to bottom.
+TPM_VERNEGANIMATION  :: 0x2000 // Animates the menu from bottom to top.
+TPM_NOANIMATION      :: 0x4000 // Displays menu without animation.
+TPM_LAYOUTRTL        :: 0x8000 // For right-to-left text layout, use TPM_LAYOUTRTL. By default, the text layout is left-to-right.
+TPM_WORKAREA         :: 0x10000
+
+// This type is defined for `LoadMenuIndirectW`, but is only ever used as a pointer.
+// The contents of a menu item template must be interpted dynamically.
+MENUTEMPLATEW :: struct { }
 
 //
 // Dialog Manager
