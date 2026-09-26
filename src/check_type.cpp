@@ -3086,7 +3086,7 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 	}
 }
 
-gb_internal void validate_map_key(CheckerContext *ctx, Ast *node, Type *key) {
+gb_internal void check_map_key(CheckerContext *ctx, Ast *node, Type *key) {
 	if (!is_type_valid_for_keys(key)) {
 		if (is_type_boolean(key)) {
 			error(node, "A boolean cannot be used as a key for a map, use an array instead for this case");
@@ -3128,27 +3128,14 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	type->Map.key   = key;
 	type->Map.value = value;
 
-	// If the key type is still being resolved its struct fields may be empty causing false invalid key errors.
-	// Defer to check_deferred_map_key_types which runs after all global entities are resolved.
-	if (key->kind == Type_Named && key->Named.type_name && key->Named.type_name->state.load() == EntityState_InProgress) {
-		array_add(&ctx->checker->deferred_map_key_checks, node);
-	} else {
-		validate_map_key(ctx, node, key);
-	}
+	// NOTE: The key may not be fully checked yet. Defer to `check_map_key` (See #6348)
+	mpsc_enqueue(&ctx->checker->map_keys_to_check, MapKeyCheck{ctx->decl, node, key});
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
 
 	if (build_context.bedrock) {
 		error(node, "'map' is not a valid type when using '-bedrock'");
-	}
-}
-
-gb_internal void check_deferred_map_key_types(Checker *c) {
-	CheckerContext ctx = c->builtin_ctx;
-	ctx.decl = make_decl_info(nullptr, nullptr);
-	for (Ast *node : c->deferred_map_key_checks) {
-		validate_map_key(&ctx, node, node->tav.type->Map.key);
 	}
 }
 

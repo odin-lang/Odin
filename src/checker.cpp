@@ -1752,10 +1752,10 @@ gb_internal void init_checker(Checker *c) {
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
 	array_init(&c->nested_proc_lits, heap_allocator(), 0, 1<<20);
-	array_init(&c->deferred_map_key_checks, heap_allocator());
 
 	mpsc_init(&c->global_untyped_queue, a); // , 1<<20);
 	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
+	mpsc_init(&c->map_keys_to_check, a);
 
 	init_checker_context(&c->builtin_ctx, c);
 }
@@ -1767,9 +1767,9 @@ gb_internal void destroy_checker(Checker *c) {
 
 	array_free(&c->nested_proc_lits);
 	array_free(&c->procs_to_check);
-	array_free(&c->deferred_map_key_checks);
 	mpsc_destroy(&c->global_untyped_queue);
 	mpsc_destroy(&c->soa_types_to_complete);
+	mpsc_destroy(&c->map_keys_to_check);
 }
 
 
@@ -5392,8 +5392,6 @@ gb_internal void check_all_global_entities(Checker *c) {
 		}
 	}
 
-	check_deferred_map_key_types(c);
-
 	in_single_threaded_checker_stage.store(false, std::memory_order_relaxed);
 }
 
@@ -7507,10 +7505,22 @@ gb_internal void check_add_definitions_from_queues(Checker *c) {
 	}
 }
 
+gb_internal void check_map_keys_from_queue(Checker *c) {
+	CheckerContext ctx = {};
+	init_checker_context(&ctx, c);
+	defer (destroy_checker_context(&ctx));
+
+	for (MapKeyCheck mk = {}; mpsc_dequeue(&c->map_keys_to_check, &mk); /**/) {
+		ctx.decl = mk.decl;
+		check_map_key(&ctx, mk.node, mk.key);
+	}
+}
+
 gb_internal void check_merge_queues_into_arrays(Checker *c) {
 	for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
 		complete_soa_type(c, t, false);
 	}
+	check_map_keys_from_queue(c);
 	check_add_entities_from_queues(c);
 	check_add_definitions_from_queues(c);
 	thread_pool_wait();

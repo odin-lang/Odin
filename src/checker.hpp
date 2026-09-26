@@ -638,6 +638,12 @@ struct UntypedExprInfo {
 
 typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
 
+struct MapKeyCheck {
+	DeclInfo *decl;
+	Ast *node;
+	Type *key;
+};
+
 enum ObjcMsgKind : u32 {
 	ObjcMsg_normal,
 	ObjcMsg_fpret,
@@ -869,10 +875,9 @@ struct Checker {
 	BlockingMutex nested_proc_lits_mutex;
 	Array<DeclInfo *> nested_proc_lits;
 
-	Array<Ast *> deferred_map_key_checks;
-
 	MPSCQueue<UntypedExprInfo> global_untyped_queue;
 	MPSCQueue<Type *> soa_types_to_complete;
+	MPSCQueue<MapKeyCheck> map_keys_to_check;
 };
 
 
