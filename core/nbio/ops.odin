@@ -100,7 +100,7 @@ accept_poly :: #force_inline proc(
 	p: $T,
 	cb: $C/proc(op: ^Operation, p: T),
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 
 	op := prep_accept(socket, _poly_cb(C, T), timeout, l)
@@ -582,7 +582,7 @@ recv :: #force_inline proc(
 	cb: Callback,
 	all := false,
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation {
 	op := prep_recv(socket, bufs, cb, all, timeout, l)
 	exec(op)
@@ -1053,7 +1053,7 @@ read_poly :: #force_inline proc(
 	cb: $C/proc(op: ^Operation, p: T),
 	all := false,
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 
 	op := prep_read(handle, offset, buf, _poly_cb(C, T), all=all, timeout=timeout, l=l)
@@ -1092,7 +1092,7 @@ read_poly2 :: #force_inline proc(
 	cb: $C/proc(op: ^Operation, p: T, p2: T2),
 	all := false,
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation where size_of(T) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 
 	op := prep_read(handle, offset, buf, _poly_cb2(C, T, T2), all, timeout, l)
@@ -1132,7 +1132,7 @@ read_poly3 :: #force_inline proc(
 	cb: $C/proc(op: ^Operation, p: T, p2: T2, p3: T3),
 	all := false,
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation where size_of(T) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 
 	op := prep_read(handle, offset, buf, _poly_cb3(C, T, T2, T3), all, timeout, l)
@@ -1270,7 +1270,7 @@ write_poly :: #force_inline proc(
 	cb: $C/proc(op: ^Operation, p: T),
 	all := true,
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation where size_of(T) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 
 	op := prep_write(handle, offset, buf, _poly_cb(C, T), all=all, timeout=timeout, l=l)
@@ -1309,7 +1309,7 @@ write_poly2 :: #force_inline proc(
 	cb: $C/proc(op: ^Operation, p: T, p2: T2),
 	all := true,
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation where size_of(T) + size_of(T2) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 
 	op := prep_write(handle, offset, buf, _poly_cb2(C, T, T2), all, timeout, l)
@@ -1349,7 +1349,7 @@ write_poly3 :: #force_inline proc(
 	cb: $C/proc(op: ^Operation, p: T, p2: T2, p3: T3),
 	all := true,
 	timeout: time.Duration = NO_TIMEOUT,
-	l: ^Event_Loop = nil
+	l: ^Event_Loop = nil,
 ) -> ^Operation where size_of(T) + size_of(T2) + size_of(T3) <= size_of(rawptr) * MAX_USER_ARGUMENTS {
 
 	op := prep_write(handle, offset, buf, _poly_cb3(C, T, T2, T3), all, timeout, l)

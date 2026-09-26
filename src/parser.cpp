@@ -5188,7 +5188,12 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 	}
 
 	if (allow_token(f, Token_Eq)) {
+		// NOTE(bplu4t2f): We're usually at expr_level == 1 here, but the default value expr needs to be self-contained to ensure correct newline behavior after it.
+		isize previous_expr_level = f->expr_level;
+		f->expr_level = 0;
 		default_value = parse_expr(f, false);
+		GB_ASSERT(f->expr_level == 0);
+		f->expr_level = previous_expr_level;
 		if (!allow_default_parameters) {
 			syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
 			default_value = nullptr;
@@ -5263,7 +5268,12 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 		}
 
 		if (allow_token(f, Token_Eq)) {
+			// NOTE(bplu4t2f): We're usually at expr_level == 1 here, but the default value expr needs to be self-contained to ensure correct newline behavior after it.
+			isize previous_expr_level = f->expr_level;
+			f->expr_level = 0;
 			default_value = parse_expr(f, false);
+			GB_ASSERT(f->expr_level == 0);
+			f->expr_level = previous_expr_level;
 			if (!allow_default_parameters) {
 				syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
 				default_value = nullptr;
