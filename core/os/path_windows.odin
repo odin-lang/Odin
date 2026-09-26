@@ -213,16 +213,18 @@ has_long_path_support :: proc "contextless" () -> bool {
 
 @(require_results)
 _fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> ([]u16, runtime.Allocator_Error) {
-	return win32_utf8_to_utf16(_fix_long_path_internal(path), allocator)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({allocator})
+	return win32_utf8_to_utf16(_fix_long_path_internal(path, temp_allocator), allocator)
 }
 
 @(require_results)
 _fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (win32.wstring, runtime.Allocator_Error) {
-	return win32_utf8_to_wstring(_fix_long_path_internal(path), allocator)
+	temp_allocator := TEMP_ALLOCATOR_GUARD({allocator})
+	return win32_utf8_to_wstring(_fix_long_path_internal(path, temp_allocator), allocator)
 }
 
 @(require_results)
-_fix_long_path_internal :: proc(path: string) -> string {
+_fix_long_path_internal :: proc(path: string, allocator: runtime.Allocator) -> string {
 	if has_long_path_support() {
 		return path
 	}
@@ -244,10 +246,8 @@ _fix_long_path_internal :: proc(path: string) -> string {
 		return path
 	}
 
-	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-
 	PREFIX :: `\\?`
-	path_buf := make([]byte, len(PREFIX)+len(path)+1, temp_allocator)
+	path_buf := make([]byte, len(PREFIX)+len(path)+1, allocator)
 	copy(path_buf, PREFIX)
 	n := len(path)
 	r, w := 0, len(PREFIX)
