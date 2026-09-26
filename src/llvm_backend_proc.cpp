@@ -136,6 +136,8 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->context_stack.allocator     = a;
 	p->scope_stack.allocator       = a;
 	p->asan_stack_locals.allocator = a;
+	p->lifetime_locals.allocator   = a;
+	p->lifetime_scopes.allocator   = a;
 	// map_init(&p->selector_values,  0);
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
@@ -462,6 +464,8 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->branch_blocks.allocator     = a;
 	p->context_stack.allocator     = a;
 	p->asan_stack_locals.allocator = a;
+	p->lifetime_locals.allocator   = a;
+	p->lifetime_scopes.allocator   = a;
 	map_init(&p->tuple_fix_map, 0);
 
 

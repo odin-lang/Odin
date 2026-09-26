@@ -3911,6 +3911,147 @@ gb_internal lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block
 }
 
 
+
+// only named user locals are marked, and only where the innermost open
+// scope opted in with lb_open_scope(..., lifetime_scope=true);
+// these include blocks (proc body, loop/if/else bodies, do, {}) and switch cases
+//
+// notably excluded:
+// 1) params and named results;
+// 2) locals declared by a statement outside its body (e.g. for i:=0; ..., or if x := f()),
+//    see comment on lb_open_scope;
+// 3) temps made by lb_add_local_generated (these have no syntactic scope);
+// 4) a constant literal that needs backing storage (slice, or a struct containing a slice) 
+//    gets it from lb_const_value, not lb_add_local, so v := []i8{...} gets no markers
+//    (TODO: this can be handled in lb_const_value)
+//
+// opt in with the -lifetime-markers compiler flag;
+// code that uses an address of a local past the local's scope should NOT use the flag;
+// (this is not hypothetical, core:crypto does it in a few places)
+gb_internal bool lb_lifetime_markers_enabled(void) {
+	if (!build_context.lifetime_markers) {
+		return false;
+	}
+	if (build_context.optimization_level < OptimizationLevel_Size) {
+		// the StackColoring pass only runs at opt levels >= Size
+		return false;
+	}
+	if (build_context.sanitizer_flags & SanitizerFlag_Address) {
+		// this is conservative, so that markers don't interfere with
+		// the manual unpoisoning currently done in lb_emit_defer_stmts
+		return false;
+	}
+	return true;
+}
+
+gb_internal bool lb_can_emit_at_curr_block(lbProcedure *p) {
+	if (p->curr_block == nullptr) {
+		return false;
+	}
+	return !lb_is_instr_terminating(LLVMGetLastInstruction(p->curr_block->block));
+}
+
+// ptr must be an alloca
+gb_internal void lb_emit_lifetime_marker(lbProcedure *p, char const *name, LLVMValueRef ptr, i64 size) {
+	LLVMTypeRef types[1] = { LLVMTypeOf(ptr) };
+#if LLVM_VERSION_MAJOR >= 22
+	// the size operand was removed in LLVM 22
+	gb_unused(size);
+	LLVMValueRef args[1] = {
+		ptr,
+	};
+#else
+	LLVMValueRef args[2] = {
+		LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), cast(u64)size, false),
+		ptr,
+	};
+#endif
+	lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
+}
+
+gb_internal bool lb_lifetime_scope_is_markable(lbProcedure *p) {
+	GB_ASSERT(p->lifetime_scopes.count == p->scope_index);
+	if (p->scope_index < 1) {
+		// scope 0 is lb_begin_procedure_body (params, named results);
+		// proc body block is scope 1
+		return false;
+	}
+	return p->lifetime_scopes[p->lifetime_scopes.count-1];
+}
+
+gb_internal void lb_add_lifetime_local(lbProcedure *p, LLVMValueRef ptr, Type *type) {
+	if (!lb_lifetime_markers_enabled()) {
+		return;
+	}
+	if (!lb_lifetime_scope_is_markable(p)) {
+		return;
+	}
+	i64 size = type_size_of(type);
+	if (size <= 0) {
+		return;
+	}
+	GB_ASSERT(lb_can_emit_at_curr_block(p));
+
+	lb_emit_lifetime_marker(p, "llvm.lifetime.start", ptr, size);
+
+	lbLifetimeLocal l = {};
+	l.ptr         = ptr;
+	l.size        = size;
+	l.scope_index = p->scope_index;
+	array_add(&p->lifetime_locals, l);
+}
+
+// this mirrors what lb_emit_defer_stmts does over p->defer_stmts;
+// must run after the defer bodies, because a defer may reference the locals
+gb_internal void lb_emit_lifetime_ends(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
+	if (p->lifetime_locals.count == 0) {
+		return;
+	}
+	bool can_emit = lb_can_emit_at_curr_block(p);
+	if (kind == lbDeferExit_Branch) {
+		GB_ASSERT(block != nullptr);
+	}
+	if (!can_emit && kind != lbDeferExit_Default) {
+		// only a default close has stuff to do when no end can be emitted
+		return;
+	}
+
+	isize i = p->lifetime_locals.count;
+	while (i --> 0) {
+		lbLifetimeLocal const &l = p->lifetime_locals[i];
+
+		if (kind == lbDeferExit_Default) {
+			// p->scope_index is the scope ending and only its own locals are done;
+			// everything with a smaller index belongs to scopes that are still open,
+			// so stop on the first non-matching one
+			if (l.scope_index != p->scope_index) {
+				GB_ASSERT(l.scope_index < p->scope_index);
+				return;
+			}
+			if (can_emit) {
+				lb_emit_lifetime_marker(p, "llvm.lifetime.end", l.ptr, l.size);
+			}
+			// always pop no matter whether lifetime.end was emitted above
+			array_pop(&p->lifetime_locals);
+		} else if (kind == lbDeferExit_Return) {
+			lb_emit_lifetime_marker(p, "llvm.lifetime.end", l.ptr, l.size);
+			// don't pop here,
+			// ended lifetimes will be popped in their owning scope default close
+		} else if (kind == lbDeferExit_Branch) {
+			// block->scope_index is the depth we land back at
+			// and everything deeper is being unwound;
+			// end all lifetimes (innermost first) up to this level
+			if (l.scope_index <= block->scope_index) {
+				return;
+			}
+			lb_emit_lifetime_marker(p, "llvm.lifetime.end", l.ptr, l.size);
+			// don't pop here,
+			// ended lifetimes will be popped in their owning scope default close
+		}
+	}
+}
+
+
 gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, bool force_no_init) {
 	GB_ASSERT(p->decl_block != p->curr_block);
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
@@ -3929,6 +4070,15 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	}
 
 	LLVMValueRef ptr = llvm_alloca(p, llvm_type, alignment, name);
+
+	if (e != nullptr) {
+		// only named user locals get lifetime markers;
+		//
+		// the alloca itself sits in p->decl_block, but llvm_alloca moves the builder back
+		// to p->curr_block, which is where the declaration actually runs and the slot becomes live;
+		// emitting lifetime.start here keeps it before any stores to the local (zero init included)
+		lb_add_lifetime_local(p, ptr, type);
+	}
 
 	if (!zero_init && !force_no_init) {
 		// If there is any padding of any kind, just zero init regardless of zero_init parameter
