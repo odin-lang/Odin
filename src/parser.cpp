@@ -7663,7 +7663,10 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 				tok.pos.file_id = file->id;
 				tok.pos.line = gb_max(tok.pos.line, 1);
 				tok.pos.column = gb_max(tok.pos.column, 1);
+				begin_error_block();
 				syntax_error(tok, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
+				error_line("\tSuggestion: Is this a single-file package? If so, try compiling using the `-file` flag.\n");
+				end_error_block();
 			}
 		}
 		mutex_unlock(&pkg->name_mutex);

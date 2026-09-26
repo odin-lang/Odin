@@ -90,6 +90,7 @@ $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
+$ODIN run ../test_issue_7482.odin $COMMON
 $ODIN run ../test_issue_7564.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
 if [[ $($ODIN check ../test_issue_7421_tagged_duplicate.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
