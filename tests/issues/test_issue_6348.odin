@@ -1,26 +1,20 @@
 // Tests issue #6348 https://github.com/odin-lang/Odin/issues/6348
 package test_issues
 
-import "core:testing"
+// The key is still being checked when the map type is
+Foo :: struct { f: proc(^Bar) }
+Bar :: struct { m: map[Foo]int }
 
-// Key type declared before map type
-Foo1 :: struct { f: proc(^Bar1) }
-Bar1 :: struct { m: map[Foo1]int }
+// including in the key's own declaration
+Self :: struct { f: proc(map[Self]int) }
 
-// Map type declared before key type
-Bar2 :: struct { m: map[Foo2]int }
-Foo2 :: struct { f: proc(^Bar2) }
+// and when the key only contains or renames it
+Foo2 :: struct { b: ^Bar2 }
+Key2 :: distinct Foo2
+Bar2 :: struct { a: map[[2]Foo2]int, d: map[Key2]int }
 
-// Named proc type alias
-MyProc :: proc(^Bar3)
-Foo3    :: struct { f: MyProc }
-Bar3    :: struct { m: map[Foo3]int }
-
-// Chain
-Foo4 :: struct { f: proc(^Baz4) }
-Baz4 :: struct { g: proc(^Bar4) }
-Bar4 :: struct { m: map[Foo4]int }
-
-
-@(test)
-test_issue_6348 :: proc(t: ^testing.T) {}
+// and for declarations in a procedure
+local_types :: proc() {
+	Foo :: struct { b: ^Bar }
+	Bar :: struct { m: map[Foo]int }
+}
