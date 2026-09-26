@@ -114,6 +114,8 @@ foreign user32 {
 	LoadCursorA    :: proc(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR ---
 	LoadCursorW    :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
 	LoadImageW     :: proc(hInst: HINSTANCE, name: LPCWSTR, type: UINT, cx, cy: INT, fuLoad: UINT) -> HANDLE ---
+	LoadStringA    :: proc(hInstance: HINSTANCE, uID: UINT, lpBuffer: LPSTR, cchBufferMax: c_int) -> c_int ---
+	LoadStringW    :: proc(hInstance: HINSTANCE, uID: UINT, lpBuffer: LPWSTR, cchBufferMax: c_int) -> c_int ---
 
 	CreateIcon             :: proc(hInstance: HINSTANCE, nWidth, nHeight: INT, cPlanes: BYTE, cBitsPixel: BYTE, lpbANDbits: PBYTE, lpbXORbits: PBYTE) -> HICON ---
 	CreateIconFromResource :: proc(presbits: PBYTE, dwResSize: DWORD, fIcon: BOOL, dwVer: DWORD) -> HICON ---
