@@ -1412,6 +1412,13 @@ gb_internal lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbVal
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 
+	// NOTE: Only an array of the matrix's element type is a vector. Any other array is array programming. (See #6302)
+	Type *elem = base_array_type(is_type_matrix(lhs.type) ? lhs.type : rhs.type);
+	if ((is_type_array_like(lhs.type) && !are_types_identical(base_array_type(lhs.type), elem)) ||
+	    (is_type_array_like(rhs.type) && !are_types_identical(base_array_type(rhs.type), elem))) {
+		return lb_emit_arith_array(p, op, lhs, rhs, type);
+	}
+
 	if (op == Token_Mul && !component_wise) {
 		Type *xt = base_type(lhs.type);
 		Type *yt = base_type(rhs.type);
