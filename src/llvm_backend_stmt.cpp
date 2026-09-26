@@ -2392,6 +2392,23 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			} else { // by reference
 				GB_ASSERT(by_reference);
 				ptr = lb_emit_conv(p, data, ct_ptr);
+				if (switch_kind == TypeSwitch_Union) {
+					Type *ut = base_type(type_deref(parent_ptr.type));
+					GB_ASSERT(ut->kind == Type_Union);
+					if (ut->Union.custom_align > 0) {
+						// union #align(N) can lower alignment below the variant type alignment;
+						// the variant ptr is a cast (not a GEP), so bind the case variable to a
+						// zero-offset GEP for the max-align metadata to attach to;
+						// (a constant base folds the GEP, but a nested union recovers via the ConstantExpr GEP)
+						// TODO: direct access to a whole global union is not handled
+						LLVMValueRef zero = lb_const_int(m, t_int, 0).value;
+						LLVMValueRef gep = LLVMBuildInBoundsGEP2(p->builder, LLVMInt8TypeInContext(m->ctx), ptr.value, &zero, 1, "");
+						if (LLVMIsAInstruction(gep)) {
+							lb_set_metadata_custom_u64(m, gep, ODIN_METADATA_MAX_ALIGN, cast(u64)type_align_of(ut));
+						}
+						ptr.value = gep;
+					}
+				}
 			}
 			GB_ASSERT(are_types_identical(case_entity->type, type_deref(ptr.type)));
 			lb_add_entity(p->module, case_entity, ptr);
@@ -2569,10 +2586,10 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
 				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
 			} else {
-				LLVMBuildStore(p->builder, res_val, p->return_ptr.addr.value);
+				OdinLLVMBuildStore(p, res_val, p->return_ptr.addr.value);
 			}
 		} else {
-			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
+			OdinLLVMBuildStore(p, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
 		}
 
 		lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr, pos);
@@ -2601,7 +2618,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 			// reuse the temp return value memory where possible
 			LLVMValueRef ptr = p->temp_callee_return_struct_memory;
 			LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
-			LLVMBuildStore(p->builder, ret_val, nptr);
+			OdinLLVMBuildStore(p, ret_val, nptr);
 			ret_val = OdinLLVMBuildLoad(p, ret_type, ptr);
 		} else {
 			ret_val = OdinLLVMBuildTransmute(p, ret_val, ret_type);
