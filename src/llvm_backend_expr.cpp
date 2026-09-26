@@ -6659,7 +6659,15 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
-			lbAddr addr = lb_build_addr(p, se->expr);
+			lbAddr addr = {};
+			if (is_type_soa_pointer(tav.type)) {
+				// auto-deref p.bar, where p is an #soa pointer;
+				// same lowering as an explicit p^.bar so `using` paths
+				// go through lbAddr_SoaVariable instead of deep-GEP on the fat pointer
+				addr = lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, se->expr));
+			} else {
+				addr = lb_build_addr(p, se->expr);
+			}
 
 			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
 			//				 It is incoherent otherwise as Objective-C objects are zero-sized.
