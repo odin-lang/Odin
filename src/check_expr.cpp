@@ -10948,7 +10948,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						continue;
 					}
 					if (index >= field_count) {
-						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, index + 1);
 						break;
 					}
 
@@ -10967,6 +10967,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 							Operand src_o = o;
 							src_o.type = src_field->type;
 
+							if (index + jj >= field_count)
+								continue ;
 							field = t->Struct.fields[index + (jj++)];
 
 							check_assignment(c, &src_o, field->type, str_lit("structure literal"));
@@ -10989,15 +10991,18 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 						handled_elem_count += 1;
 					}
-
+					if (handled_elem_count > field_count) {
+						error(o.expr, "Expansion overflows structure literal, expected %td, got %td", field_count, handled_elem_count);
+						break ;
+					}
 				}
-				if (cl->elems.count < field_count) {
+				if (handled_elem_count < field_count) {
 					if (min_field_count < field_count) {
-						if (cl->elems.count < min_field_count) {
-							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
+						if (handled_elem_count < min_field_count) {
+							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, handled_elem_count);
 						}
 					} else if (handled_elem_count != field_count) {
-						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, handled_elem_count);
 					}
 				}
 			}
@@ -11211,6 +11216,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 
 					max += tt->variables.count-1;
+					if (0 <= max_type_count && max_type_count <= max) {
+						error(e, "Expansion reaches index %lld which goes out of bounds (>= %lld) for %.*s", cast(long long)max, cast(long long)max_type_count, LIT(context_name));
+					}
 				} else {
 					check_assignment(c, &operand, elem_type, context_name);
 
