@@ -236,8 +236,25 @@ utf8_to_wstring_buf :: proc(buf: []u16, s: string) -> wstring {
 // An empty string is valid, and results in a value distinct from `nil`.
 utf8_to_wstring :: proc{utf8_to_wstring_alloc, utf8_to_wstring_buf}
 
+/*
+Converts a UTF-16 `wstring` into a regular UTF-8 `string` and allocates the result.
+The procedure can either assume a null-terminated input string, or convert
+a fixed number of characters.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to be converted
+- N: The number of characters in `s` that should be converted. A value of `-1` indicates that the
+     procedure should keep going until it finds a terminating null character in `s`.
+- allocator: (default: context.temp_allocator)
+
+Returns:
+- res: A cloned and converted string
+- err: An optional allocator error if one occured, `nil` otherwise
+*/
 @(require_results)
-wstring_to_utf8_alloc :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
+wstring_to_utf8_alloc :: proc(s: wstring, N := -1, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
 	context.allocator = allocator
 
 	if N == 0 {
@@ -271,6 +288,22 @@ wstring_to_utf8_alloc :: proc(s: wstring, N: int, allocator := context.temp_allo
 	return string(text[:n]), nil
 }
 
+/*
+Converts a UTF-16 `wstring` into a regular UTF-8 `string`, using `buf` as its backing buffer.
+The procedure can either assume a null-terminated input string, or convert
+a fixed number of characters.
+
+*Uses `buf` for backing*
+
+Inputs:
+- buf: Backing buffer for result string
+- s: The string to be converted
+- N: The number of characters in `s` that should be converted. A value of `-1` indicates that the
+     procedure should keep going until it finds a terminating null character in `s`.
+
+Returns:
+- res: A cloned and converted string
+*/
 @(require_results)
 wstring_to_utf8_buf :: proc(buf: []u8, s: wstring, N := -1) -> (res: string) {
 	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, c_int(N), nil, 0, nil, nil)
@@ -307,7 +340,7 @@ to it will be converted.
 
 Inputs:
 - s: The string to be converted
-- allocator: (default: context.allocator)
+- allocator: (default: context.temp_allocator)
 
 Returns:
 - res: A cloned and converted string
