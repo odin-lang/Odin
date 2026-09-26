@@ -3086,6 +3086,26 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 	}
 }
 
+gb_internal void check_map_key(CheckerContext *ctx, Ast *node, Type *key) {
+	if (!is_type_valid_for_keys(key)) {
+		if (is_type_boolean(key)) {
+			error(node, "A boolean cannot be used as a key for a map, use an array instead for this case");
+		} else {
+			gbString str = type_to_string(key);
+			error(node, "Invalid type of a key for a map, got '%s'", str);
+			gb_string_free(str);
+		}
+		return;
+	}
+	if (type_size_of(key) == 0) {
+		gbString str = type_to_string(key);
+		error(node, "Invalid type of a key for a map of size 0, got '%s'", str);
+		gb_string_free(str);
+		return;
+	}
+	add_map_key_type_dependencies(ctx, key);
+}
+
 gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
@@ -3105,25 +3125,11 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	Type *key   = check_type(ctx, mt->key);
 	Type *value = check_type(ctx, mt->value);
 
-	if (!is_type_valid_for_keys(key)) {
-		if (is_type_boolean(key)) {
-			error(node, "A boolean cannot be used as a key for a map, use an array instead for this case");
-		} else {
-			gbString str = type_to_string(key);
-			error(node, "Invalid type of a key for a map, got '%s'", str);
-			gb_string_free(str);
-		}
-	}
-	if (type_size_of(key) == 0) {
-		gbString str = type_to_string(key);
-		error(node, "Invalid type of a key for a map of size 0, got '%s'", str);
-		gb_string_free(str);
-	}
-
 	type->Map.key   = key;
 	type->Map.value = value;
 
-	add_map_key_type_dependencies(ctx, key);
+	// NOTE: The key may not be fully checked yet. Defer to `check_map_key` (See #6348)
+	mpsc_enqueue(&ctx->checker->map_keys_to_check, MapKeyCheck{ctx->decl, node, key});
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);
