@@ -3390,7 +3390,7 @@ gb_internal Entity *find_core_entity(Checker *c, String name) {
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
-		// NOTE(bill): This will exit the program as it's cannot continue without it!
+		// NOTE(bill): This will exit the program as it cannot continue without it!
 	}
 	return e;
 }
@@ -3402,7 +3402,7 @@ gb_internal Type *find_core_type(Checker *c, String name) {
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s'\n"
 , LIT(name));
-		// NOTE(bill): This will exit the program as it's cannot continue without it!
+		// NOTE(bill): This will exit the program as it cannot continue without it!
 	}
 	if (e->type == nullptr) {
 		check_single_global_entity(c, e, e->decl_info);
@@ -3419,7 +3419,7 @@ gb_internal Entity *find_entity_in_pkg(CheckerInfo *info, String const &pkg, Str
 	Entity *e = scope_lookup_current(package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
-		// NOTE(bill): This will exit the program as it's cannot continue without it!
+		// NOTE(bill): This will exit the program as it cannot continue without it!
 	}
 	return e;
 }
@@ -3431,7 +3431,7 @@ gb_internal Type *find_type_in_pkg(CheckerInfo *info, String const &pkg, String 
 	Entity *e = scope_lookup_current(package->scope, interned, hash);
 	if (e == nullptr) {
 		compiler_error("Could not find type declaration for '%.*s.%.*s'\n", LIT(pkg), LIT(name));
-		// NOTE(bill): This will exit the program as it's cannot continue without it!
+		// NOTE(bill): This will exit the program as it cannot continue without it!
 	}
 	GB_ASSERT(e->type != nullptr);
 	return e->type;

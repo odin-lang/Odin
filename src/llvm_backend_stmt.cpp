@@ -2939,7 +2939,7 @@ gb_internal void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	lb_start_block(p, loop);
 
 	if (loop != body) {
-		// right now the condition (all expressions) will not set it's debug location, so we will do it here
+		// right now the condition (all expressions) will not set its debug location, so we will do it here
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, fs->cond));
 		}
@@ -3508,7 +3508,7 @@ gb_internal void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	if (p->curr_block == nullptr) {
 		return;
 	}
-	// NOTE(bill): The prev block may defer injection before it's terminator
+	// NOTE(bill): The prev block may defer injection before its terminator
 	LLVMValueRef last_instr = LLVMGetLastInstruction(p->curr_block->block);
 	if (last_instr != nullptr && LLVMIsAReturnInst(last_instr)) {
 		// NOTE(bill): ReturnStmt defer stuff will be handled previously
