@@ -129,8 +129,8 @@ _process_info_by_pid :: proc(pid: int, selection: Process_Info_Fields, allocator
 	defer linux.close(proc_fd)
 
 	username_if: if .Username in selection {
-		s: linux.Stat
-		if errno = linux.fstat(proc_fd, &s); errno != .NONE {
+		s: linux.Statx
+		if errno = linux.statx(proc_fd, "", {.EMPTY_PATH}, {.UID}, &s); errno != .NONE {
 			err = _get_platform_error(errno)
 			break username_if
 		}
@@ -438,8 +438,8 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 			strings.write_string(&exe_builder, executable_name)
 
 			exe_path = strings.to_cstring(&exe_builder) or_return
-			stat := linux.Stat{}
-			if linux.stat(exe_path, &stat) == .NONE && .IFREG in stat.mode && .IXUSR in stat.mode {
+			stat: linux.Statx
+			if linux.statx(linux.AT_FDCWD, exe_path, {}, {.TYPE, .MODE}, &stat) == .NONE && .IFREG in stat.mode && .IXUSR in stat.mode {
 				found = true
 				break
 			}

@@ -13,10 +13,11 @@ constant-time byte comparison.
 - The crypto packages are not thread-safe.
 - Best-effort is make to mitigate timing side-channels on reasonable
   architectures.  Architectures that are known to be unreasonable include
-  but are not limited to i386, i486, and WebAssembly.
+  but are not limited to i386, i486, VIA Nano 2000, ARM7T/ARM9T/Cortex-M3,
+  and WASM.
 - Implementations assume a 64-bit architecture (64-bit integer arithmetic
-  is fast, and includes add-with-carry, sub-with-borrow, and full-result
-  multiply).
+  is fast, and includes contant-time add-with-carry, sub-with-borrow, and
+  full-result multiply).
 - Hardware sidechannels are explicitly out of scope for this package.
   Notable examples include but are not limited to:
   - Power/RF side-channels etc.

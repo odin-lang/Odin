@@ -432,11 +432,37 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
-		check_assignment(ctx, rhs, nullptr, str_lit("assignment to '_' identifier"));
-		if (rhs->mode == Addressing_Invalid) {
+		String context_name = str_lit("assignment to '_' identifier");
+		check_assignment(ctx, rhs, nullptr, context_name);
+		switch (rhs->mode) {
+		case Addressing_ProcGroup: {
+			gbString expr_str = expr_to_string(rhs->expr);
+			defer (gb_string_free(expr_str));
+
+			error(rhs->expr,
+			      "Cannot assign procedure group '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+			rhs->mode = Addressing_Invalid;
 			return nullptr;
 		}
-		return rhs->type;
+		case Addressing_Builtin: {
+			// a builtin is not a value
+			gbString expr_str = expr_to_string(rhs->expr);
+			defer (gb_string_free(expr_str));
+
+			error(rhs->expr,
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+			rhs->mode = Addressing_Invalid;
+			return nullptr;
+		}
+		case Addressing_Invalid:
+			return nullptr;
+		default:
+			return rhs->type;
+		}
 	}
 
 	Entity *e = nullptr;
@@ -928,14 +954,17 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			error(x.expr, "Expected a constant integer for #unroll, got '%s'", s);
 			gb_string_free(s);
 		} else {
-			ExactValue value = exact_value_to_integer(x.value);
-			i64 v = exact_value_to_i64(value);
-			if (v < 1) {
-				error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
-			} else {
-				unroll_count = v;
-				if (v > 1024) {
-					error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+			convert_to_typed(ctx, &x, t_int);
+			if (x.mode != Addressing_Invalid) {
+				ExactValue value = exact_value_to_integer(x.value);
+				i64 v = exact_value_to_i64(value);
+				if (v < 1) {
+					error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
+				} else {
+					unroll_count = v;
+					if (v > 1024) {
+						error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+					}
 				}
 			}
 
@@ -1121,23 +1150,25 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		if (ctx->inline_for_depth >= MAX_INLINE_FOR_DEPTH && prev_inline_for_depth < MAX_INLINE_FOR_DEPTH) {
 			ERROR_BLOCK();
 			if (prev_inline_for_depth > 0) {
-				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			} else {
-				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			}
 			error_line("\tUse a normal 'for' loop instead by removing the 'inline' prefix\n");
 			ctx->inline_for_depth = MAX_INLINE_FOR_DEPTH;
 		}
 	}
 
-	check_stmt(ctx, irs->body, mod_flags);
-
+	u32 new_flags = mod_flags & ~Stmt_BreakAllowed & ~Stmt_ContinueAllowed;
+	check_stmt(ctx, irs->body, new_flags);
 }
 
 gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
+	// Tagless switch cases are independent predicates, not case values.
+	bool check_duplicate_cases = ss->tag != nullptr;
 
 	mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
 	check_open_scope(ctx, node);
@@ -1263,7 +1294,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				Operand b1 = rhs;
 				check_comparison(ctx, expr, &a1, &b1, Token_LtEq);
 
-				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				if (check_duplicate_cases) {
+					add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				}
 
 				if (is_type_string16(x.type)) {
 					// NOTE(bill): Force dependency for strings here
@@ -1296,6 +1329,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
+					if (check_duplicate_cases) {
+						add_type_to_seen_map(ctx, &seen, y);
+					}
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
@@ -1312,7 +1348,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 						continue;
 					}
 					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
-					add_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_to_seen_map(ctx, &seen, y);
+					}
 				}
 			}
 		}
@@ -1357,7 +1395,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1473,6 +1511,14 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	if (lhs->kind != Ast_Ident) {
 		error(rhs, "Expected an identifier, got '%.*s'", LIT(ast_strings[rhs->kind]));
 		return;
+	}
+
+	if (switch_kind == TypeSwitch_Union) {
+		if (is_addressed) {
+			if (x.mode != Addressing_Variable && !is_type_pointer(x.type)) {
+				error(lhs->Ident.token, "The element variable '%.*s' cannot be made addressable", LIT(lhs->Ident.token.string));
+			}
+		}
 	}
 
 
@@ -1625,7 +1671,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1861,7 +1907,12 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				break;
 
 			case Type_Array:
-				is_possibly_addressable = operand.mode == Addressing_Variable || is_ptr;
+				// for #soa container with array element type, the element carries Addressing_SoaVariable,
+				// rather than Addressing_Variable; the element itself has no address,
+				// but each component does, so for &v in soa[i] is addressable
+				is_possibly_addressable = operand.mode == Addressing_Variable ||
+				                          operand.mode == Addressing_SoaVariable ||
+				                          is_ptr;
 				array_add(&vals, t->Array.elem);
 				array_add(&vals, t_int);
 				break;
@@ -2260,7 +2311,9 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 					error(e->token, "'thread_local' variables cannot be declared within a defer statement");
 				}
 			}
-			e->Variable.thread_local_model = ac.thread_local_model;
+			if (!build_context.no_thread_local) {
+				e->Variable.thread_local_model = ac.thread_local_model;
+			}
 		}
 
 		if (ac.is_static && ac.thread_local_model != "") {
@@ -2469,7 +2522,7 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 			{
 				gbString lhs = expr_to_string(be->left);
 				gbString rhs = expr_to_string(be->right);
-				error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
+				error_line("\tSuggestion: Did you mean to do an assignment?\n");
 				error_line("\t            '%s = %s;'\n", lhs, rhs);
 				gb_string_free(rhs);
 				gb_string_free(lhs);

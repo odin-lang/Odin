@@ -65,7 +65,7 @@ Capable of representing any time within the following range:
 - `max: 2262-04-11 23:47:16.854775807 +0000 UTC`
 */
 Time :: struct {
-	_nsec: i64, // Measured in UNIX nanonseconds
+	_nsec: i64, // Measured in UNIX nanoseconds
 }
 
 /*

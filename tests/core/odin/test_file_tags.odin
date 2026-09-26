@@ -34,7 +34,7 @@ package main
 			},
 		}, {// [2]
 			src = `
-#+build linux, darwin, freebsd, openbsd, netbsd, haiku
+#+build linux, darwin, freebsd, openbsd, netbsd
 #+build arm32, arm64
 package main
 			`,
@@ -45,7 +45,6 @@ package main
 					{os = {.FreeBSD}, arch = runtime.ALL_ODIN_ARCH_TYPES},
 					{os = {.OpenBSD}, arch = runtime.ALL_ODIN_ARCH_TYPES},
 					{os = {.NetBSD},  arch = runtime.ALL_ODIN_ARCH_TYPES},
-					{os = {.Haiku},   arch = runtime.ALL_ODIN_ARCH_TYPES},
 					parser.BUILD_KIND_NEWLINE_MARKER,
 					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.arm32}},
 					{os = runtime.ALL_ODIN_OS_TYPES, arch = {.arm64}},

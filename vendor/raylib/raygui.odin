@@ -16,7 +16,7 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Darwin {
 	when ODIN_ARCH == .arm64 {
 		foreign import lib {
-			"macos-arm64/libraygui.dylib" when RAYGUI_SHARED else "macos-arm64/libraygui.a",
+			"macos/libraygui-arm64.dylib" when RAYGUI_SHARED else "macos/libraygui-arm64.a",
 		}
 	} else {
 		foreign import lib {

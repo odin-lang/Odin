@@ -2,18 +2,82 @@
 
 gb_global std::atomic<bool> g_parsing_done;
 
+
+gb_internal bool in_strict_style_packages(AstFile *file) {
+	if (file == nullptr) {
+		return true;
+	}
+
+	if (file->pkg == nullptr) {
+		return true;
+	}
+
+	if (file->pkg_decl == nullptr) {
+		return true;
+	}
+
+	if (build_context.strict_style_packages.entries.count == 0) {
+		return true;
+	}
+
+	String pkg_name = {};
+
+	if (file->pkg->name.len > 0) {
+		pkg_name = file->pkg->name;
+	} else if (file->pkg_decl->kind == Ast_PackageDecl) {
+		Token name_token = file->pkg_decl->PackageDecl.name;
+		if (name_token.kind == Token_Ident) {
+			pkg_name = name_token.string;
+		}
+	}
+
+	if (pkg_name.len == 0) {
+		return true;
+	}
+
+	return string_set_exists(&build_context.strict_style_packages, pkg_name);
+}
+
+
 gb_internal bool in_vet_packages(AstFile *file) {
 	if (file == nullptr) {
 		return true;
 	}
+
 	if (file->pkg == nullptr) {
 		return true;
 	}
+
+	if (file->pkg_decl == nullptr) {
+		return true;
+	}
+
 	if (build_context.vet_packages.entries.count == 0) {
 		return true;
 	}
-	return string_set_exists(&build_context.vet_packages, file->pkg->name);
+
+	String pkg_name = {};
+
+	if (file->pkg->name.len > 0) {
+		pkg_name = file->pkg->name;
+	} else if (file->pkg_decl->kind == Ast_PackageDecl) {
+		Token name_token = file->pkg_decl->PackageDecl.name;
+		if (name_token.kind == Token_Ident) {
+			pkg_name = name_token.string;
+		}
+	}
+
+	if (pkg_name.len == 0) {
+		return true;
+	}
+
+	return string_set_exists(&build_context.vet_packages, pkg_name);
 }
+
+gb_internal bool is_strict_style(AstFile *file) {
+	return build_context.strict_style && in_strict_style_packages(file);
+}
+
 
 gb_internal u64 ast_file_vet_flags(AstFile *f) {
 	if (f != nullptr && f->vet_flags_set) {
@@ -40,7 +104,7 @@ gb_internal bool ast_file_vet_explicit_allocators(AstFile *f) {
 }
 
 gb_internal bool file_allow_newline(AstFile *f) {
-	bool is_strict = build_context.strict_style || ast_file_vet_style(f);
+	bool is_strict = is_strict_style(f) || ast_file_vet_style(f);
 	return !is_strict;
 }
 
@@ -91,6 +155,12 @@ gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) 
 	if (len < offset) {
 		return nullptr;
 	}
+
+	// a column past the first cannot belong to a line the offset has already left
+	if (offset > 0 && pos.column > 1 && start[offset-1] == '\n') {
+		offset -= 1;
+	}
+
 	u8 *pos_offset = start+offset;
 
 	u8 *line_start = pos_offset;
@@ -209,6 +279,9 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 	case Ast_ProcGroup:
 		n->ProcGroup.args = clone_ast_array(n->ProcGroup.args, f);
 		break;
+	case Ast_AsmGroup:
+		n->AsmGroup.args = clone_ast_array(n->AsmGroup.args, f);
+		break;
 	case Ast_ProcLit:
 		n->ProcLit.type = clone_ast(n->ProcLit.type, f);
 		n->ProcLit.body = clone_ast(n->ProcLit.body, f);
@@ -307,13 +380,6 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		break;
 	case Ast_AutoCast:
 		n->AutoCast.expr = clone_ast(n->AutoCast.expr, f);
-		break;
-
-	case Ast_InlineAsmExpr:
-		n->InlineAsmExpr.param_types        = clone_ast_array(n->InlineAsmExpr.param_types, f);
-		n->InlineAsmExpr.return_type        = clone_ast(n->InlineAsmExpr.return_type, f);
-		n->InlineAsmExpr.asm_string         = clone_ast(n->InlineAsmExpr.asm_string, f);
-		n->InlineAsmExpr.constraints_string = clone_ast(n->InlineAsmExpr.constraints_string, f);
 		break;
 
 	case Ast_BadStmt:   break;
@@ -498,12 +564,57 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->MatrixType.column_count = clone_ast(n->MatrixType.column_count, f);
 		n->MatrixType.elem         = clone_ast(n->MatrixType.elem, f);
 		break;
-	}
 
+	case Ast_AsmTemplate:
+		n->AsmTemplate.signature    = clone_ast(n->AsmTemplate.signature, f);
+		n->AsmTemplate.specs        = clone_ast_array(n->AsmTemplate.specs, f);
+		n->AsmTemplate.clobbers     = clone_ast_array(n->AsmTemplate.clobbers, f);
+		n->AsmTemplate.instructions = clone_ast_array(n->AsmTemplate.instructions, f);
+		n->AsmTemplate.anonymous_entity = nullptr;
+		break;
+	case Ast_AsmRegister:
+		break;
+	case Ast_AsmSpec:
+		n->AsmSpec.name       = clone_ast(n->AsmSpec.name,      f);
+		n->AsmSpec.tied_name  = clone_ast(n->AsmSpec.tied_name, f);
+		n->AsmSpec.type       = clone_ast(n->AsmSpec.type,      f);
+		n->AsmSpec.value      = clone_ast(n->AsmSpec.value,     f);
+		n->AsmSpec.directives = clone_ast_array(n->AsmSpec.directives, f);
+		break;
+	case Ast_AsmClobber:
+		n->AsmClobber.value = clone_ast(n->AsmClobber.value, f);
+		break;
+	case Ast_AsmLabelDecl:
+		n->AsmLabelDecl.name = clone_ast(n->AsmLabelDecl.name, f);
+		break;
+	case Ast_AsmInstruction:
+		n->AsmInstruction.name     = clone_ast(n->AsmInstruction.name, f);
+		n->AsmInstruction.operands = clone_ast_array(n->AsmInstruction.operands, f);
+		n->AsmInstruction.facts    = nullptr;
+		break;
+	case Ast_AsmMemoryTerm:
+		n->AsmMemoryTerm.operand = clone_ast(n->AsmMemoryTerm.operand);
+		n->AsmMemoryTerm.scale   = clone_ast(n->AsmMemoryTerm.scale);
+		break;
+	case Ast_AsmMemoryOperand:
+		n->AsmMemoryOperand.segment_override = clone_ast(n->AsmMemoryOperand.segment_override, f);
+		n->AsmMemoryOperand.terms            = clone_ast_array(n->AsmMemoryOperand.terms, f);
+		n->AsmMemoryOperand.classify         = {}; // NOTE(bill): It needs to be re-classified after a clone
+		n->AsmMemoryOperand.type             = clone_ast(n->AsmMemoryOperand.type, f);
+		break;
+	case Ast_AsmRegisterGroup:
+		n->AsmRegisterGroup.registers = clone_ast_array(n->AsmRegisterGroup.registers, f);
+		n->AsmRegisterGroup.type      = clone_ast(n->AsmRegisterGroup.type, f);
+		break;
+	case Ast_AsmDirective:
+		n->AsmDirective.operands = clone_ast_array(n->AsmDirective.operands, f);
+		break;
+	}
 	return n;
 }
 
 
+gb_internal void error(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
@@ -557,6 +668,7 @@ gb_internal void syntax_error_with_verbose(Ast *node, char const *fmt, ...) {
 }
 
 
+gb_internal void error_no_newline(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void error_no_newline(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	if (node != nullptr) {
@@ -572,6 +684,7 @@ gb_internal void error_no_newline(Ast *node, char const *fmt, ...) {
 	}
 }
 
+gb_internal void warning(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void warning(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
@@ -585,6 +698,7 @@ gb_internal void warning(Ast *node, char const *fmt, ...) {
 	va_end(va);
 }
 
+gb_internal void syntax_error(Ast *node, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
 gb_internal void syntax_error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
@@ -791,6 +905,25 @@ gb_internal Ast *ast_uninit(AstFile *f, Token token) {
 }
 
 gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
+	auto token_pos_at_offset = [](Token const &token, isize offset) -> TokenPos {
+		TokenPos pos = token.pos;
+		if (offset <= 0) {
+			return pos;
+		}
+		String s = token.string;
+		isize n = gb_min(offset, s.len);
+		for (isize i = 0; i < n; i++) {
+			if (s.text[i] == '\n') {
+				pos.line += 1;
+				pos.column = 1;
+			} else {
+				pos.column += 1;
+			}
+			pos.offset += 1;
+		}
+		return pos;
+	};
+
 	String s = token.string;
 	string_interner_insert(s);
 	switch (token.kind) {
@@ -800,7 +933,35 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 		}
 		break;
 	case Token_String:
-		if (!unquote_string(ast_allocator(f), &s, 0, s.text[0] == '`')) {
+		if (s.len >= 6 &&
+		    ((s.text[0] == '"' && s.text[1] == '"' && s.text[2] == '"') ||
+		     (s.text[0] == '`' && s.text[1] == '`' && s.text[2] == '`'))) {
+			TripleStringErrorKind terr = TripleStringError_None;
+			isize terr_off = -1;
+			if (!unquote_string_triple(ast_allocator(f), &s, string_contains_char(s, '\r'), &terr, &terr_off)) {
+				TokenPos pos = token_pos_at_offset(token, terr_off);
+				switch (terr) {
+				case TripleStringError_ContentOnOpeningLine:
+					syntax_error(pos, "A multi-line string literal must begin on the line after the opening delimiter");
+					break;
+				case TripleStringError_ClosingNotOnOwnLine:
+					syntax_error(pos, "The closing delimiter of a multi-line string literal must be on its own line");
+					break;
+				case TripleStringError_UnderIndented:
+					syntax_error(pos, "This line is indented less than the closing delimiter of the multi-line string literal");
+					break;
+				case TripleStringError_IndentationMismatch:
+					syntax_error(pos, "The indentation of this line does not match the closing delimiter of the multi-line string literal");
+					break;
+				case TripleStringError_InvalidEscape:
+					syntax_error(pos, "Invalid escape sequence in string literal");
+					break;
+				default:
+					syntax_error(pos, "Invalid multi-line string literal");
+					break;
+				}
+			}
+		} else if (!unquote_string(ast_allocator(f), &s, 0, s.text[0] == '`')) {
 			syntax_error(token, "Invalid string literal");
 		}
 		break;
@@ -870,6 +1031,15 @@ gb_internal Ast *ast_proc_group(AstFile *f, Token token, Token open, Token close
 	result->ProcGroup.open  = open;
 	result->ProcGroup.close = close;
 	result->ProcGroup.args = slice_from_array(args);
+	return result;
+}
+
+gb_internal Ast *ast_asm_group(AstFile *f, Token token, Token open, Token close, Array<Ast *> const &args) {
+	Ast *result = alloc_ast_node(f, Ast_AsmGroup);
+	result->AsmGroup.token = token;
+	result->AsmGroup.open  = open;
+	result->AsmGroup.close = close;
+	result->AsmGroup.args = slice_from_array(args);
 	return result;
 }
 
@@ -969,32 +1139,6 @@ gb_internal Ast *ast_auto_cast(AstFile *f, Token token, Ast *expr) {
 	result->AutoCast.expr  = expr;
 	return result;
 }
-
-
-gb_internal Ast *ast_inline_asm_expr(AstFile *f, Token token, Token open, Token close,
-                         Array<Ast *> const &param_types,
-                         Ast *return_type,
-                         Ast *asm_string,
-                         Ast *constraints_string,
-                         bool has_side_effects,
-                         bool is_align_stack,
-                         InlineAsmDialectKind dialect) {
-
-	Ast *result = alloc_ast_node(f, Ast_InlineAsmExpr);
-	result->InlineAsmExpr.token              = token;
-	result->InlineAsmExpr.open               = open;
-	result->InlineAsmExpr.close              = close;
-	result->InlineAsmExpr.param_types        = slice_from_array(param_types);
-	result->InlineAsmExpr.return_type        = return_type;
-	result->InlineAsmExpr.asm_string         = asm_string;
-	result->InlineAsmExpr.constraints_string = constraints_string;
-	result->InlineAsmExpr.has_side_effects   = has_side_effects;
-	result->InlineAsmExpr.is_align_stack     = is_align_stack;
-	result->InlineAsmExpr.dialect            = dialect;
-	return result;
-}
-
-
 
 
 gb_internal Ast *ast_bad_stmt(AstFile *f, Token begin, Token end) {
@@ -1529,6 +1673,9 @@ gb_internal Token advance_token(AstFile *f) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
 			consume_comment_groups(f, prev);
+			if (f->curr_token.kind == Token_Semicolon && ignore_newlines(f) && f->curr_token.string == "\n") {
+				advance_token(f);
+			}
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -1584,7 +1731,7 @@ gb_internal bool skip_possible_newline_for_literal(AstFile *f, bool ignore_stric
 			switch (next.kind) {
 			case Token_OpenBrace:
 			case Token_else:
-				if (build_context.strict_style && !ignore_strict_style) {
+				if (is_strict_style(f) && !ignore_strict_style) {
 					syntax_error(next, "With '-strict-style' the attached brace style (1TBS) is enforced");
 				}
 				/*fallthrough*/
@@ -1702,7 +1849,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		syntax_error(prev, "'..' for ranges are not allowed, did you mean '..<' or '..='?");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
-	
+
 	advance_token(f);
 	return prev;
 }
@@ -1837,7 +1984,7 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 		return;
 	}
 
-	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
+	if (is_strict_style(f) || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
 		syntax_error(*prev_token, "Found unneeded semicolon");
 	}
 	prev_token->flags |= TokenFlag_Remove;
@@ -2039,9 +2186,6 @@ gb_internal Ast *parse_literal_value(AstFile *f, Ast *type) {
 }
 
 gb_internal Ast *parse_value(AstFile *f) {
-	if (f->curr_token.kind == Token_OpenBrace) {
-		return parse_literal_value(f, nullptr);
-	}
 	Ast *value;
 	bool prev_allow_range = f->allow_range;
 	f->allow_range = true;
@@ -2058,54 +2202,6 @@ gb_internal void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTa
 		syntax_error(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
-}
-
-gb_internal bool is_foreign_name_valid(String const &name) {
-	if (name.len == 0) {
-		return false;
-	}
-	isize offset = 0;
-	while (offset < name.len) {
-		Rune rune;
-		isize remaining = name.len - offset;
-		isize width = utf8_decode(name.text+offset, remaining, &rune);
-		if (rune == GB_RUNE_INVALID && width == 1) {
-			return false;
-		} else if (rune == GB_RUNE_BOM && remaining > 0) {
-			return false;
-		}
-
-		if (offset == 0) {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alpha(cast(char)rune))
-					return false;
-				break;
-			}
-		} else {
-			switch (rune) {
-			case '-':
-			case '$':
-			case '.':
-			case '_':
-				break;
-			default:
-				if (!gb_char_is_alphanumeric(cast(char)rune)) {
-					return false;
-				}
-				break;
-			}
-		}
-
-		offset += width;
-	}
-
-	return true;
 }
 
 gb_internal void parse_proc_tags(AstFile *f, u64 *tags) {
@@ -2405,6 +2501,545 @@ gb_internal void parser_check_polymorphic_record_parameters(AstFile *f, Ast *pol
 }
 
 
+gb_internal Ast *parse_asm_register(AstFile *f) {
+	Token token = expect_token(f, Token_Mod);
+	Token name  = expect_token(f, Token_Ident);
+	Ast *reg = alloc_ast_node(f, Ast_AsmRegister);
+	reg->AsmRegister.token = token;
+	reg->AsmRegister.name  = name;
+	if (allow_token(f, Token_Period)) {
+		Token flag = expect_token_after(f, Token_Ident, "register name and period for the flag");
+		if (flag.kind == Token_Ident) {
+			reg->AsmRegister.flag = flag;
+		}
+	}
+	return reg;
+}
+
+
+gb_internal bool asm_operand_is_shiftable(Ast *operand) {
+	if (operand == nullptr) {
+		return false;
+	}
+	switch (operand->kind) {
+	case Ast_AsmRegister:
+	case Ast_Ident:
+		return true;
+	}
+	return false;
+}
+
+gb_internal Ast *ast_asm_memory_term(AstFile *f, Token op, Ast *operand, Token scale_op, Ast *scale) {
+	Ast *term = alloc_ast_node(f, Ast_AsmMemoryTerm);
+	term->AsmMemoryTerm.op = op;
+	term->AsmMemoryTerm.operand = operand;
+	term->AsmMemoryTerm.scale_op = scale_op;
+	term->AsmMemoryTerm.scale = scale;
+	return term;
+}
+
+gb_internal Ast *parse_asm_operand(AstFile *f, bool allow_memory_operand) {
+	Ast *operand = nullptr;
+	switch (f->curr_token.kind) {
+	case Token_Period:
+		{
+			Token token = expect_token(f, Token_Period);
+			Ast *name   = parse_ident(f);
+			Ast *label_decl = alloc_ast_node(f, Ast_AsmLabelDecl);
+			label_decl->AsmLabelDecl.token = token;
+			label_decl->AsmLabelDecl.name  = name;
+			return label_decl;
+		}
+	case Token_Ident:
+		operand = parse_ident(f);
+		break;
+	case Token_Mod:
+		operand = parse_asm_register(f);
+		break;
+	case Token_Integer:
+	case Token_Float:
+	case Token_Rune:
+		return ast_basic_lit(f, advance_token(f));
+
+	case Token_Add:
+	case Token_Sub:
+	case Token_Xor:
+		{
+			Token token = advance_token(f);
+			Ast *op = parse_asm_operand(f, false);
+			return ast_unary_expr(f, token, op);
+		}
+
+	case Token_OpenParen:
+		return parse_expr(f, false);
+
+	case Token_Hash:
+		{
+			Token hash = expect_token(f, Token_Hash);
+			Token name = expect_token(f, Token_Ident);
+			if (name.string == "pre" ||
+			    name.string == "post") {
+				operand = parse_asm_operand(f, allow_memory_operand);
+				if (operand == nullptr ||
+				    operand->kind != Ast_AsmMemoryOperand) {
+					error(name, "Expected an asm memory operand after #%.*s", LIT(name.string));
+				} else {
+					GB_ASSERT(operand->kind == Ast_AsmMemoryOperand);
+					if (name.string == "pre") {
+						operand->AsmMemoryOperand.kind = AsmMemoryOperand_Pre;
+					} else if (name.string == "post") {
+						operand->AsmMemoryOperand.kind = AsmMemoryOperand_Post;
+					}
+				}
+			}
+		}
+		break;
+
+	case Token_OpenBracket:
+		if (allow_memory_operand) {
+			Token open  = expect_token(f, Token_OpenBracket);
+			Ast *segment_override = nullptr;
+
+			Ast *base = parse_asm_operand(f, false);
+
+			if (allow_token(f, Token_Colon)) {
+				// [segment: ...]
+				segment_override = base;
+				if (segment_override != nullptr &&
+				    segment_override->kind != Ast_AsmRegister) {
+					error(segment_override, "Expected an asm register as the segment override");
+				}
+				base = parse_asm_operand(f, false);
+			}
+
+			Array<Ast *> terms = {};
+			terms.allocator = heap_allocator();
+
+			Token op = {};
+			op.kind = Token_Add;
+
+			while (base != nullptr ||
+			       (f->curr_token.kind != Token_EOF &&
+			        f->curr_token.kind != Token_Semicolon &&
+			        f->curr_token.kind != Token_CloseBracket)) {
+			       	Ast *operand = nullptr;
+				Ast *scale = nullptr;
+				Token scale_op = {};
+
+				if (base != nullptr) {
+					operand = base;
+					base = nullptr;
+				} else {
+					operand = parse_asm_operand(f, false);
+				}
+				if (allow_token(f, Token_Mul) ||
+				    allow_token(f, Token_Shl) ||
+				    allow_token(f, Token_Shr)) {
+					scale_op = f->prev_token;
+					scale    = parse_asm_operand(f, false);
+				}
+				array_add(&terms, ast_asm_memory_term(f, op, operand, scale_op, scale));
+				if (allow_token(f, Token_Add) || allow_token(f, Token_Sub)) {
+					op = f->prev_token;
+					continue;
+				}
+				break;
+			}
+
+
+
+			Token close = expect_token(f, Token_CloseBracket);
+			Ast *type = nullptr;
+
+			// [...]:type
+			if (allow_token(f, Token_Colon)) {
+				type = parse_type(f);
+			}
+
+			Ast *mem = alloc_ast_node(f, Ast_AsmMemoryOperand);
+			mem->AsmMemoryOperand.open             = open;
+			mem->AsmMemoryOperand.segment_override = segment_override;
+			mem->AsmMemoryOperand.terms            = slice_from_array(terms);
+			mem->AsmMemoryOperand.close            = close;
+			mem->AsmMemoryOperand.type             = type;
+
+			return mem;
+		}
+		break;
+	case Token_OpenBrace:
+		if (allow_memory_operand) {
+			Token open  = expect_token(f, Token_OpenBrace);
+
+			Array<Ast *> registers = {};
+			registers.allocator = heap_allocator();
+			Ast *type = nullptr;
+
+			Ast *first_reg = parse_asm_operand(f, false);
+			Token range_token = {};
+			switch (f->curr_token.kind) {
+			case Token_RangeHalf:
+			case Token_RangeFull:
+				{
+					range_token = advance_token(f);
+					Ast *second_reg = parse_asm_operand(f, false);
+					array_reserve(&registers, 2);
+					array_add(&registers, first_reg);
+					array_add(&registers, second_reg);
+
+					if (allow_token(f, Token_Comma)) {
+						// allow for trailing comma
+					}
+				}
+				break;
+			default:
+				if (allow_token(f, Token_Comma)) {
+					// allow for trailing comma
+				}
+				while (f->curr_token.kind != Token_CloseBrace &&
+				       f->curr_token.kind != Token_EOF) {
+					Ast *reg = parse_asm_operand(f, false);
+					array_add(&registers, reg);
+
+					if (!allow_token(f, Token_Comma)) {
+						break;
+					}
+				}
+				break;
+			}
+			Token close = expect_token(f, Token_CloseBrace);
+			if (allow_token(f, Token_Colon)) {
+				type = parse_type(f);
+			}
+
+			Ast *rg = alloc_ast_node(f, Ast_AsmRegisterGroup);
+			rg->AsmRegisterGroup.open        = open;
+			rg->AsmRegisterGroup.registers   = registers;
+			rg->AsmRegisterGroup.range_token = range_token;
+			rg->AsmRegisterGroup.close       = close;
+			rg->AsmRegisterGroup.type        = type;
+
+			return rg;
+		}
+		break;
+	}
+
+	if (operand == nullptr) {
+		syntax_error(f->curr_token, "Invalid asm operand, found '%.*s'", LIT(f->curr_token.string));
+		advance_token(f);
+		return operand;
+	}
+
+	if (f->curr_token.kind == Token_OpenBracket) {
+		f->expr_level++;
+		Token open = expect_token(f, Token_OpenBracket);
+		Ast *index = parse_asm_operand(f, false);
+		Token close = expect_token(f, Token_CloseBracket);
+		f->expr_level--;
+		operand = ast_index_expr(f, operand, index, open, close);
+	}
+
+	if (allow_memory_operand && asm_operand_is_shiftable(operand)) {
+		switch (f->curr_token.kind) {
+		case Token_Mul:
+		case Token_Shl:
+		case Token_Shr:
+			{
+				Token op = advance_token(f);
+				Ast *amount = parse_asm_operand(f, false);
+				Ast *be = alloc_ast_node(f, Ast_BinaryExpr);
+				be->BinaryExpr.left = operand;
+				be->BinaryExpr.op = op;
+				be->BinaryExpr.right = amount;
+				operand = be;
+			}
+			break;
+		}
+	}
+
+	return operand;
+}
+
+gb_internal Slice<Ast *> parse_asm_operands(AstFile *f) {
+	Array<Ast *> operands = {};
+	operands.allocator = heap_allocator();
+
+	while (f->curr_token.kind != Token_Semicolon &&
+	       f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		Ast *operand = parse_asm_operand(f, true);
+		if (operand != nullptr) {
+			array_add(&operands, operand);
+		}
+	       	if (!allow_token(f, Token_Comma)) {
+	       		break;
+	       	}
+	}
+
+	if (allow_token(f, Token_Semicolon)) {
+		// okay
+	}
+
+	return slice_from_array(operands);
+}
+
+
+gb_internal Ast *parse_asm_ident(AstFile *f, bool allow_poly_names=false) {
+	Token token = f->curr_token;
+	if (token.kind == Token_Ident) {
+		advance_token(f);
+	} else if (token_is_keyword(token.kind)) {
+		advance_token(f);
+	} else {
+		token.string = str_lit("_");
+		expect_token(f, Token_Ident);
+	}
+	return ast_ident(f, token);
+}
+
+
+gb_internal Ast *parse_asm_instruction(AstFile *f) {
+	if (allow_token(f, Token_Semicolon)) {
+		return nullptr;
+	}
+
+	if (token_is_keyword(f->curr_token.kind)) {
+		Ast *name = parse_asm_ident(f);
+		auto operands = parse_asm_operands(f);
+		Ast *instruction = alloc_ast_node(f, Ast_AsmInstruction);
+		instruction->AsmInstruction.name = name;
+		instruction->AsmInstruction.operands = operands;
+		instruction->AsmInstruction.valid_form_index = -1;
+		return instruction;
+	}
+
+	switch (f->curr_token.kind) {
+	case Token_Ident:
+		{
+			Ast *name = parse_asm_ident(f);
+			auto operands = parse_asm_operands(f);
+			Ast *instruction = alloc_ast_node(f, Ast_AsmInstruction);
+			instruction->AsmInstruction.name = name;
+			instruction->AsmInstruction.operands = operands;
+			instruction->AsmInstruction.valid_form_index = -1;
+			return instruction;
+		}
+	case Token_Period:
+		{
+			Token token = expect_token(f, Token_Period);
+			Ast *name   = parse_ident(f);
+			expect_token(f, Token_Colon);
+			Ast *label_decl = alloc_ast_node(f, Ast_AsmLabelDecl);
+			label_decl->AsmLabelDecl.token = token;
+			label_decl->AsmLabelDecl.name  = name;
+			return label_decl;
+		}
+	case Token_Hash:
+		{
+			Token token   = expect_token(f, Token_Hash);
+			Token name    = expect_token(f, Token_Ident);
+			auto operands = parse_asm_operands(f);
+			Ast *dir = alloc_ast_node(f, Ast_AsmDirective);
+			dir->AsmDirective.token = token;
+			dir->AsmDirective.name = name;
+			dir->AsmDirective.operands = operands;
+			return dir;
+		}
+	}
+	syntax_error(f->curr_token, "Expected an asm instruction, got '%.*s'", LIT(f->curr_token.string));
+	advance_token(f);
+	return nullptr;
+}
+
+gb_internal Ast *parse_results(AstFile *f, bool *diverging);
+gb_internal bool is_field_list_generic(AstFieldList *field_list, bool check_names);
+gb_internal Ast *parse_asm_signature(AstFile *f, Token asm_token) {
+	Ast *params = nullptr;
+	Ast *results = nullptr;
+	bool diverging = false;
+
+	ProcCallingConvention cc = ProcCC_InlineAsm;
+
+	expect_token(f, Token_OpenParen);
+	f->expr_level += 1;
+	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, false, true);
+	if (file_allow_newline(f)) {
+		skip_possible_newline(f);
+	}
+	f->expr_level -= 1;
+	expect_token_after(f, Token_CloseParen, "asm template parameter list");
+	results = parse_results(f, &diverging);
+
+	u64 tags = 0;
+	bool is_generic = is_field_list_generic(&params->FieldList, true);
+	if (!is_generic && (results != nullptr)) {
+		is_generic = is_field_list_generic(&results->FieldList, false);
+	}
+
+	return ast_proc_type(f, asm_token, params, results, tags, cc, is_generic, diverging);
+}
+
+gb_internal Ast *parse_asm_spec(AstFile *f) {
+	Ast *name      = parse_ident(f);
+	Ast *tied_name = nullptr;
+	Ast *type      = nullptr;
+	Ast *value     = nullptr;
+	if (allow_token(f, Token_ArrowRight)) {
+		tied_name = parse_ident(f);
+	}
+	if (allow_token(f, Token_Colon)) {
+		type = parse_type(f);
+	}
+	if (allow_token(f, Token_Eq)) {
+		if (f->curr_token.kind == Token_Ident) {
+			value = parse_ident(f);
+		} else if (f->curr_token.kind == Token_Mod) {
+			value = parse_asm_register(f);
+		} else {
+			error(f->curr_token, "Expected a register or scratch parameter");
+			Ast *dummy = parse_expr(f, true);
+			gb_unused(dummy);
+		}
+	}
+
+	if (tied_name != nullptr) {
+		if (type != nullptr) {
+			syntax_error(f->curr_token, "An asm specification for tied values cannot declare a type");
+		}
+	} else if (type == nullptr && value == nullptr) {
+		syntax_error(f->curr_token, "An asm specification must specify at least either a type or a value if the value is not tied");
+	}
+
+	Array<Ast *> directives = {};
+	directives.allocator = heap_allocator();
+
+	while (f->curr_token.kind == Token_Hash) {
+		Token token = expect_token(f, Token_Hash);
+		Token name = expect_token_after(f, Token_Ident, "hash for directive");
+		if (name.kind == Token_Ident) {
+			Ast *directive = ast_basic_directive(f, token, name);
+			array_add(&directives, directive);
+		}
+	}
+
+
+	Ast *spec = alloc_ast_node(f, Ast_AsmSpec);
+	spec->AsmSpec.name       = name;
+	spec->AsmSpec.tied_name  = tied_name;
+	spec->AsmSpec.type       = type;
+	spec->AsmSpec.value      = value;
+	spec->AsmSpec.directives = directives;
+	return spec;
+}
+
+
+gb_internal Ast *parse_asm_template(AstFile *f) {
+	Token token = expect_token(f, Token_asm);
+
+	Ast *signature = parse_asm_signature(f, token);
+
+	Slice<Ast *> asm_specs = {};
+	Slice<Ast *> asm_clobbers  = {};
+
+	if (file_allow_newline(f)) {
+		skip_possible_newline(f);
+	}
+
+	if (f->curr_token.kind == Token_OpenBracket) {
+		Array<Ast *> specs = {};
+		specs.allocator = heap_allocator();
+
+		Array<Ast *> clobbers = {};
+		clobbers.allocator = heap_allocator();
+
+		Token open = expect_token(f, Token_OpenBracket);
+		while (f->curr_token.kind != Token_CloseBracket &&
+		       f->curr_token.kind != Token_EOF) {
+			Ast *spec = nullptr;
+			if (f->curr_token.kind == Token_Ident) {
+				spec = parse_asm_spec(f);
+			} else if (f->curr_token.kind == Token_Hash) {
+				Token hash = expect_token(f, Token_Hash);
+				Token name = expect_token(f, Token_Ident);
+
+				if (name.string == "volatile" ||
+				    name.string == "align_stack" ||
+				    name.string == "pure") {
+					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
+					clobber->AsmClobber.token = hash;
+					clobber->AsmClobber.name  = name;
+					array_add(&clobbers, clobber);
+				} else if (name.string == "clobber" ||
+				           name.string == "preserve") {
+					Ast *value = parse_asm_operand(f, false);
+					Ast *clobber = alloc_ast_node(f, Ast_AsmClobber);
+					clobber->AsmClobber.token = hash;
+					clobber->AsmClobber.name  = name;
+					clobber->AsmClobber.value = value;
+					array_add(&clobbers, clobber);
+				} else {
+					syntax_error(name, "Expected #clobber, #preserve, #volatile, #align_stack, or #pure, got '%.*s'", LIT(name.string));
+				}
+			} else {
+				syntax_error(f->curr_token, "Expected am asm specification which begins with a identifier, got '%.*s'", LIT(f->curr_token.string));
+				advance_token(f);
+			}
+			if (spec != nullptr) {
+				array_add(&specs, spec);
+			}
+			if (!allow_token(f, Token_Comma)) {
+				break;
+			}
+		}
+		Token close = expect_token(f, Token_CloseBracket);
+		if (file_allow_newline(f)) {
+			skip_possible_newline(f);
+		}
+
+		asm_specs    = slice_from_array(specs);
+		asm_clobbers = slice_from_array(clobbers);
+	}
+
+	Slice<Ast *> asm_instructions = {};
+
+	if (!allow_token(f, Token_OpenBrace)) {
+		syntax_error(f->curr_token, "Expected a body for an asm template");
+		advance_token(f);
+	} else {
+		Array<Ast *> instructions = {};
+		instructions.allocator = heap_allocator();
+
+		while (f->curr_token.kind != Token_CloseBrace &&
+		       f->curr_token.kind != Token_EOF) {
+			Ast *instruction = parse_asm_instruction(f);
+			if (instruction != nullptr) {
+				array_add(&instructions, instruction);
+			}
+		}
+
+		Token close = expect_token(f, Token_CloseBrace);
+
+		asm_instructions = slice_from_array(instructions);
+	}
+
+	if (build_context.metrics.arch == TargetArch_amd64 ||
+	    build_context.metrics.arch == TargetArch_riscv64 ||
+	    build_context.metrics.arch == TargetArch_arm64) {
+	    	// okay
+	} else {
+		syntax_error(token, "asm templates are currently only supported on -target:*_amd64 or -target:*_riscv64 or -target:*_arm64");
+	}
+
+	Ast *asm_template = alloc_ast_node(f, Ast_AsmTemplate);
+	asm_template->AsmTemplate.token            = token;
+	asm_template->AsmTemplate.signature        = signature;
+	asm_template->AsmTemplate.specs            = asm_specs;
+	asm_template->AsmTemplate.clobbers         = asm_clobbers;
+	asm_template->AsmTemplate.instructions     = asm_instructions;
+	asm_template->AsmTemplate.end              = f->prev_token;
+	return asm_template;
+}
+
+
 gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
 	switch (f->curr_token.kind) {
@@ -2579,8 +3214,14 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			while (f->curr_token.kind != Token_CloseBrace &&
 			       f->curr_token.kind != Token_EOF) {
 				Ast *elem = parse_expr(f, false);
-				array_add(&args, elem);
 
+				if (f->curr_token.kind == Token_where) {
+					Token where = expect_token(f, Token_where);
+					Ast *cond = parse_expr(f, false);
+					elem = ast_binary_expr(f, where, elem, cond);
+				}
+
+				array_add(&args, elem);
 				if (!allow_field_separator(f)) {
 					break;
 				}
@@ -2945,10 +3586,6 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		f->expr_level = prev_level;
 
-		if (is_raw_union && is_packed) {
-			is_packed = false;
-			syntax_error(token, "'#raw_union' cannot also be '#packed'");
-		}
 		if (is_raw_union && is_all_or_none) {
 			is_all_or_none = false;
 			syntax_error(token, "'#raw_union' cannot also be '#all_or_none'");
@@ -3129,83 +3766,38 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		return ast_bit_set_type(f, token, elem, underlying);
 	}
 
-	case Token_asm: {
-		Token token = expect_token(f, Token_asm);
+	case Token_asm:
+		if (peek_token(f).kind == Token_OpenBrace) { // asm group
+			Token token = expect_token(f, Token_asm);
+			Token open = expect_token(f, Token_OpenBrace);
 
-		Array<Ast *> param_types = {};
-		Ast *return_type = nullptr;
-		if (allow_token(f, Token_OpenParen)) {
-			param_types = array_make<Ast *>(ast_allocator(f));
-			while (f->curr_token.kind != Token_CloseParen && f->curr_token.kind != Token_EOF) {
-				Ast *t = parse_type(f);
-				array_add(&param_types, t);
-				if (f->curr_token.kind != Token_Comma ||
-				    f->curr_token.kind == Token_EOF) {
-				    break;
+			auto args = array_make<Ast *>(ast_allocator(f));
+
+			while (f->curr_token.kind != Token_CloseBrace &&
+			       f->curr_token.kind != Token_EOF) {
+				Ast *elem = parse_expr(f, false);
+
+				if (f->curr_token.kind == Token_where) {
+					Token where = expect_token(f, Token_where);
+					Ast *cond = parse_expr(f, false);
+					elem = ast_binary_expr(f, where, elem, cond);
 				}
-				advance_token(f);
-			}
-			expect_token(f, Token_CloseParen);
 
-			if (allow_token(f, Token_ArrowRight)) {
-				return_type = parse_type(f);
-			}
-		}
-
-		bool has_side_effects = false;
-		bool is_align_stack = false;
-		InlineAsmDialectKind dialect = InlineAsmDialect_Default;
-
-		while (f->curr_token.kind == Token_Hash) {
-			advance_token(f);
-			if (f->curr_token.kind == Token_Ident) {
-				Token token = advance_token(f);
-				String name = token.string;
-				if (name == "side_effects") {
-					if (has_side_effects) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#side_effects'");
-					}
-					has_side_effects = true;
-				} else if (name == "align_stack") {
-					if (is_align_stack) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#align_stack'");
-					}
-					is_align_stack = true;
-				} else if (name == "att") {
-					if (dialect == InlineAsmDialect_ATT) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#att'");
-					} else if (dialect != InlineAsmDialect_Default) {
-						syntax_error(token, "Conflicting asm dialects");
-					} else {
-						dialect = InlineAsmDialect_ATT;
-					}
-				} else if (name == "intel") {
-					if (dialect == InlineAsmDialect_Intel) {
-						syntax_error(token, "Duplicate directive on inline asm expression: '#intel'");
-					} else if (dialect != InlineAsmDialect_Default) {
-						syntax_error(token, "Conflicting asm dialects");
-					} else {
-						dialect = InlineAsmDialect_Intel;
-					}
-				} else {
-					syntax_error(token, "Invalid directive on inline asm expression: '#%.*s'", LIT(token.string));
+				array_add(&args, elem);
+				if (!allow_field_separator(f)) {
+					break;
 				}
-			} else {
-				syntax_error(f->curr_token, "Expected an identifier after hash");
 			}
+
+			Token close = expect_token(f, Token_CloseBrace);
+
+			if (args.count == 0) {
+				syntax_error(token, "Expected a least 1 argument in an asm group");
+			}
+
+			return ast_asm_group(f, token, open, close, args);
 		}
-
-		skip_possible_newline_for_literal(f);
-		Token open = expect_token(f, Token_OpenBrace);
-		Ast *asm_string = parse_expr(f, false);
-		expect_token(f, Token_Comma);
-		Ast *constraints_string = parse_expr(f, false);
-		allow_token(f, Token_Comma);
-		Token close = expect_closing_brace_of_field_list(f);
-
-		return ast_inline_asm_expr(f, token, open, close, param_types, return_type, asm_string, constraints_string, has_side_effects, is_align_stack, dialect);
-	}
-
+		return parse_asm_template(f);
 	}
 
 	return nullptr;
@@ -3275,7 +3867,10 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 		} else if (seen_ellipsis) {
 			syntax_error(arg, "Positional arguments are not allowed after '..'");
 		}
-		array_add(&args, arg);
+		if (arg != nullptr) {
+			// `parse_atom_expr` returns nothing when `allow_type` is set and there is no operand
+			array_add(&args, arg);
+		}
 
 		if (ellipsis.pos.line != 0) {
 			seen_ellipsis = true;
@@ -3525,6 +4120,7 @@ gb_internal Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	case Token_Xor:
 	case Token_And:
 	case Token_Not:
+	case Token_MulMul: // 'expand_values' operator
 	case Token_Mul: // Used for error handling when people do C-like things
 	{
 		Token token = advance_token(f);
@@ -3630,7 +4226,9 @@ gb_internal Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 		case Token_when:
 			if (prev.pos.line < op.pos.line) {
 				// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-				goto loop_end;
+				if (f->expr_level <= 0) {
+					goto loop_end;
+				}
 			}
 			break;
 		}
@@ -4106,6 +4704,71 @@ gb_internal ProcCallingConvention string_to_calling_convention(String const &s) 
 	return ProcCC_Invalid;
 }
 
+gb_internal bool is_ast_generic(Ast *a) {
+	bool is_generic = false;
+	if (a != nullptr) {
+		switch (a->kind) {
+		case Ast_TypeidType:
+			is_generic = a->TypeidType.specialization != nullptr;
+			break;
+		case Ast_PolyType:
+			is_generic = true;
+			break;
+		case Ast_ProcType:
+			is_generic = a->ProcType.generic;
+			break;
+		case Ast_PointerType:
+			is_generic = is_ast_generic(a->PointerType.type);
+			break;
+		case Ast_MultiPointerType:
+			is_generic = is_ast_generic(a->MultiPointerType.type);
+			break;
+		case Ast_ArrayType:
+			is_generic = is_ast_generic(a->ArrayType.elem) || is_ast_generic(a->ArrayType.count);
+			break;
+		case Ast_DynamicArrayType:
+			is_generic = is_ast_generic(a->DynamicArrayType.elem);
+			break;
+		case Ast_FixedCapacityDynamicArrayType:
+			is_generic = is_ast_generic(a->FixedCapacityDynamicArrayType.elem) || is_ast_generic(a->FixedCapacityDynamicArrayType.capacity);
+			break;
+		case Ast_BitSetType:
+			is_generic = is_ast_generic(a->BitSetType.elem);
+			break;
+		case Ast_MapType:
+			is_generic = is_ast_generic(a->MapType.key) || is_ast_generic(a->MapType.value);
+			break;
+		case Ast_MatrixType:
+			is_generic = is_ast_generic(a->MatrixType.row_count) || is_ast_generic(a->MatrixType.column_count) || is_ast_generic(a->MatrixType.elem);
+			break;
+		}
+	}
+	return is_generic;
+}
+
+gb_internal bool is_field_list_generic(AstFieldList *field_list, bool check_names) {
+	bool is_generic = false;
+
+	for (Ast *param : field_list->list) {
+		ast_node(field, Field, param);
+		if (is_ast_generic(field->type)) {
+			is_generic = true;
+			goto end;
+		}
+		if (!check_names || field->type == nullptr) {
+			continue;
+		}
+		for (Ast *name : field->names) {
+			if (name->kind == Ast_PolyType) {
+				is_generic = true;
+				goto end;
+			}
+		}
+	}
+end:
+	return is_generic;
+}
+
 gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	Ast *params = nullptr;
 	Ast *results = nullptr;
@@ -4141,24 +4804,11 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	results = parse_results(f, &diverging);
 
 	u64 tags = 0;
-	bool is_generic = false;
-
-	for (Ast *param : params->FieldList.list) {
-		ast_node(field, Field, param);
-		if (field->type != nullptr) {
-		    if (field->type->kind == Ast_PolyType) {
-				is_generic = true;
-				goto end;
-			}
-			for (Ast *name : field->names) {
-				if (name->kind == Ast_PolyType) {
-					is_generic = true;
-					goto end;
-				}
-			}
-		}
+	bool is_generic = is_field_list_generic(&params->FieldList, true);
+	if (!is_generic && (results != nullptr)) {
+		is_generic = is_field_list_generic(&results->FieldList, false);
 	}
-end:
+
 	return ast_proc_type(f, proc_token, params, results, tags, cc, is_generic, diverging);
 }
 
@@ -4216,18 +4866,33 @@ gb_internal FieldFlag is_token_field_prefix(AstFile *f) {
 		return FieldFlag_using;
 
 	case Token_Hash:
-		advance_token(f);
-		switch (f->curr_token.kind) {
-		case Token_Ident:
-			for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
-				auto const &mapping = parse_field_prefix_mappings[i];
-				if (mapping.token_kind == Token_Hash) {
-					if (f->curr_token.string == mapping.name) {
-						return mapping.flag;
-					}
+		{
+			// Check for types first before fields
+			Token tok = peek_token(f);
+			if (tok.kind == Token_Ident) {
+				if (tok.string == "simd" ||
+				    tok.string == "type" ||
+				    tok.string == "row_major" ||
+				    tok.string == "column_major" ||
+				    tok.string == "sparse" ||
+				    tok.string == "soa") {
+					return FieldFlag_Invalid;
 				}
 			}
-			break;
+
+			advance_token(f);
+			switch (f->curr_token.kind) {
+			case Token_Ident:
+				for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
+					auto const &mapping = parse_field_prefix_mappings[i];
+					if (mapping.token_kind == Token_Hash) {
+						if (f->curr_token.string == mapping.name) {
+							return mapping.flag;
+						}
+					}
+				}
+				break;
+			}
 		}
 		return FieldFlag_Unknown;
 	}
@@ -4293,7 +4958,7 @@ gb_internal u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_f
 				if (m.token_kind == Token_Hash) {
 					prefix = "#";
 				}
-				syntax_error(f->curr_token, "'%s%.*s' in not allowed within this field list", prefix, LIT(m.name));
+				syntax_error(f->curr_token, "'%s%.*s' is not allowed within this field list", prefix, LIT(m.name));
 			}
 		}
 
@@ -5393,7 +6058,10 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	case Token_Xor:
 	case Token_Not:
 	case Token_And:
-	case Token_Mul: // Used for error handling when people do C-like things
+	// Used for error handling when people do C-like things
+	case Token_Mul:
+	case Token_Increment:
+	case Token_Decrement:
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
 		expect_semicolon(f);
 		return s;
@@ -6027,6 +6695,19 @@ gb_internal bool is_import_path_valid(String const &path) {
 	return false;
 }
 
+gb_internal bool is_import_path_absolute(String const &path) {
+	if (path.len > 0 && path[0] == '/') {
+		return true;
+	}
+	if (path.len > 2 &&
+	    gb_char_is_alpha(path[0]) &&
+	    path[1] == ':' &&
+	    (path[2] == '/' || path[2] == '\\')) {
+		return true;
+	}
+	return false;
+}
+
 gb_internal bool is_build_flag_path_valid(String const &path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
@@ -6089,12 +6770,13 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	do_warning = &syntax_warning;
 	if (use_check_errors) {
 		do_error = &error;
-		do_error = &warning;
+		do_warning = &warning;
 	}
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
 	String collection_name = {};
+	bool is_import_decl_path = node->kind == Ast_ImportDecl || node->kind == Ast_ForeignImportDecl;
 
 	isize colon_pos = -1;
 	for (isize j = 0; j < original_string.len; j++) {
@@ -6107,11 +6789,13 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	bool has_windows_drive = false;
 #if defined(GB_SYSTEM_WINDOWS)
 	if (file_mutex == nullptr) {
-		if (colon_pos == 1 && original_string.len > 2) {
-			if (original_string[2] == '/' || original_string[2] == '\\') {
-				colon_pos = -1;
-				has_windows_drive = true;
-			}
+		if (!is_import_decl_path &&
+		    colon_pos == 1 &&
+		    original_string.len > 2 &&
+		    gb_char_is_alpha(original_string[0]) &&
+		    (original_string[2] == '/' || original_string[2] == '\\')) {
+			colon_pos = -1;
+			has_windows_drive = true;
 		}
 
 		for (isize i = 0; i < original_string.len; i++) {
@@ -6135,6 +6819,10 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		file_str = original_string;
 	}
 
+	if (is_import_decl_path && is_import_path_absolute(file_str)) {
+		do_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+		return false;
+	}
 
 	if (has_windows_drive) {
 		String sub_file_path = substring(file_str, 3, file_str.len);
@@ -6207,8 +6895,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 	if (has_windows_drive) {
 		*path = file_str;
 	} else {
-		bool ok = false;
-		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, &ok));
+		String fullpath = string_trim_whitespace(get_fullpath_relative(permanent_allocator(), base_dir, file_str, nullptr));
 		*path = fullpath;
 	}
 	return true;
@@ -6260,6 +6947,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 			ast_node(id, ImportDecl, node);
 
 			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+			if (is_import_path_absolute(original_string)) {
+				syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
+				continue;
+			}
+
 			String import_path = {};
 			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
 			if (!ok) {
@@ -6286,6 +6979,12 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				GB_ASSERT(fp->kind == Ast_BasicLit);
 				Token fp_token = fp->BasicLit.token;
 				String file_str = string_trim_whitespace(string_value_from_token(f, fp_token));
+				if (is_import_path_absolute(file_str)) {
+					syntax_error(node, "Invalid import path: '%.*s'", LIT(file_str));
+					decls[i] = ast_bad_decl(f, fp_token, fp_token);
+					goto end;
+				}
+
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(fullpath, str_lit(".o"))) {
 					String foreign_path = {};
@@ -6385,6 +7084,11 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 			}
 			if (p == "ignore") {
 				this_kind_correct = false;
+				continue;
+			}
+
+			if (p == "bedrock") {
+				this_kind_correct = build_context.bedrock == !is_notted;
 				continue;
 			}
 
@@ -6524,6 +7228,8 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags)
 			error_line("\tusing-param\n");
 			error_line("\tstyle\n");
 			error_line("\textra\n");
+			error_line("\tsemicolon\n");
+			error_line("\tdeprecated\n");
 			error_line("\tcast\n");
 			error_line("\ttabs\n");
 			error_line("\texplicit-allocators\n");
@@ -6957,7 +7663,10 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 				tok.pos.file_id = file->id;
 				tok.pos.line = gb_max(tok.pos.line, 1);
 				tok.pos.column = gb_max(tok.pos.column, 1);
+				begin_error_block();
 				syntax_error(tok, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
+				error_line("\tSuggestion: Is this a single-file package? If so, try compiling using the `-file` flag.\n");
+				end_error_block();
 			}
 		}
 		mutex_unlock(&pkg->name_mutex);
@@ -7068,4 +7777,3 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	return ParseFile_None;
 }
-

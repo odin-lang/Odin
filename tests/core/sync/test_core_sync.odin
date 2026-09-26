@@ -8,7 +8,6 @@
 package test_core_sync
 
 import "base:intrinsics"
-// import "core:log"
 import "core:sync"
 import "core:testing"
 import "core:thread"
@@ -538,6 +537,12 @@ test_ticket_mutex :: proc(t: ^testing.T) {
 
 @test
 test_benaphore :: proc(t: ^testing.T) {
+	when ODIN_ARCH == .riscv64 {
+		// NOTE(Jeroen): Regularly times out on the simulated RISC-V CI runners,
+		//               so we're skipping the test there.
+		return
+	}
+
 	testing.set_fail_timeout(t, FAIL_TIME)
 
 	Data :: struct {

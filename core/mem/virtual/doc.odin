@@ -65,8 +65,8 @@ Example:
 	import vmem "core:mem/virtual"
 
 	main :: proc() {
-		data, err := virtual.map_file_from_path(#file, {.Read})
-		defer virtual.unmap_file(data)
+		data, err := vmem.map_file_from_path(#file, {.Read})
+		defer vmem.unmap_file(data)
 		fmt.printfln("Error: %v", err)
 		fmt.printfln("Data:  %s", data)
 	}

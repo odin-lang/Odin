@@ -180,3 +180,40 @@ test_infinity :: proc(t: ^testing.T) {
 	testing.expect_value(t, ok, false)
 	testing.expect_value(t, math.classify(f), math.Float_Class.Inf)
 }
+
+@(test)
+test_float_hex :: proc(t: ^testing.T) {
+	Case64 :: struct { s: string, bits: u64 }
+	cases64 := [?]Case64{
+		{"0x1.8p1",                 0x4008000000000000},
+		{"0x1.0fp0",                0x3ff0f00000000000}, // hex letter digit after a zero
+		{"0x1.0000000000000fp0",    0x3ff0000000000001}, // more bits than fit, must round
+		{"0x1.123456789abcdef0p0",  0x3ff123456789abce},
+		{"0x1.fffffffffffffp1023",  0x7fefffffffffffff},
+		{"0x1p-1022",               0x0010000000000000},
+		{"0x1p-1074",               0x0000000000000001}, // subnormal
+		{"0x1.8p-1074",             0x0000000000000002},
+		{"0x1p-1075",               0x0000000000000000},
+		{"-0x1.fp-1070",            0x800000000000001f},
+	}
+	for c in cases64 {
+		f, ok := strconv.parse_f64(c.s)
+		testing.expectf(t, ok, "%q: ok=false", c.s)
+		testing.expectf(t, transmute(u64)f == c.bits, "%q: got %016x, want %016x", c.s, transmute(u64)f, c.bits)
+	}
+
+	Case32 :: struct { s: string, bits: u32 }
+	cases32 := [?]Case32{
+		{"0x1.fffffep127", 0x7f7fffff},
+		{"0x1.ffffffp0",   0x40000000}, // halfway, round to even
+		{"0x1.234567p0",   0x3f91a2b4},
+		{"0x1p-126",       0x00800000},
+		{"0x1p-149",       0x00000001}, // subnormal
+		{"0x1.8p-149",     0x00000002},
+	}
+	for c in cases32 {
+		f, ok := strconv.parse_f32(c.s)
+		testing.expectf(t, ok, "%q: ok=false", c.s)
+		testing.expectf(t, transmute(u32)f == c.bits, "%q: got %08x, want %08x", c.s, transmute(u32)f, c.bits)
+	}
+}

@@ -14,7 +14,7 @@ RESIZE_LIB :: (
 when RESIZE_LIB != "" {
 	when !#exists(RESIZE_LIB) {
 		// The STB libraries are shipped with the compiler on Windows so a Windows specific message should not be needed.
-		#panic("Could not find the compiled STB libraries, they can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/stb/src\"`")
+		#panic("Could not find the compiled STB libraries, they can be compiled by running `\"" + ODIN_ROOT + "vendor/stb/src/build_stb.sh\"`")
 	}
 }
 

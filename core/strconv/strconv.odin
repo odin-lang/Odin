@@ -342,6 +342,7 @@ Parses a signed integer value from the input string, using the specified base or
 - base: The base of the number system to use for parsing (default: 0)
 	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
 	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
 
@@ -385,6 +386,7 @@ Parses an unsigned integer value from the input string, using the specified base
 - base: The base of the number system to use for parsing (default: 0, inferred)
 	- If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
 	- If base is not 0, it will be used for parsing regardless of any prefix in the input string
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
 Example:
 
@@ -971,6 +973,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 				continue loop
 			case base == 16 && 'a' <= lower(c) && lower(c) <= 'f':
 				saw_digits = true
+				trailing_zeroes_nd = -1
 				nd += 1
 				if nd_mant < MAX_MANT_DIGITS {
 					mantissa *= 16
@@ -1053,13 +1056,13 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 			mantissa |= 1
 		}
 
-		for mantissa != 0 && mantissa >> (info.mantbits+2) == 0 {
+		for mantissa >> (info.mantbits+3) != 0 {
 			mantissa = mantissa>>1 | mantissa&1
 			exp += 1
 		}
 
 		// denormalize
-		if mantissa > 1 && exp < MIN_EXP-2 {
+		for mantissa > 1 && exp < MIN_EXP-2 {
 			mantissa = mantissa>>1 | mantissa&1
 			exp += 1
 		}

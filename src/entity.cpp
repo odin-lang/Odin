@@ -15,7 +15,8 @@ struct DeclInfo;
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
 	ENTITY_KIND(Nil) \
-	ENTITY_KIND(Label)
+	ENTITY_KIND(Label) \
+	ENTITY_KIND(AsmTemplate)
 
 enum EntityKind {
 #define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
@@ -111,6 +112,7 @@ enum ParameterValueKind {
 struct ParameterValue {
 	ParameterValueKind kind;
 	Ast *original_ast_expr;
+	Entity *proc_entity;
 	union {
 		ExactValue value;
 		Ast *ast_value;
@@ -158,6 +160,46 @@ gb_internal TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
 	return md;
 }
 
+enum AsmTemplateEntityDeclKind : u8 {
+	AsmTemplateEntityDecl_Invalid,
+	AsmTemplateEntityDecl_Register,
+	AsmTemplateEntityDecl_Memory,
+	AsmTemplateEntityDecl_Immediate,
+
+	AsmTemplateEntityDecl_COUNT
+};
+
+enum AsmTemplateEntityDeclParamGroup : u8 {
+	AsmTemplateEntityDeclParamGroup_Unknown,
+	AsmTemplateEntityDeclParamGroup_Input,
+	AsmTemplateEntityDeclParamGroup_Output,
+	AsmTemplateEntityDeclParamGroup_Scratch,
+
+	AsmTemplateEntityDeclParamGroup_COUNT
+};
+
+struct AsmTemplateEntityDecl {
+	Entity *                        entity;
+	Entity *                        tied_entity;
+	AsmTemplateEntityDeclKind       kind;
+	AsmTemplateEntityDeclParamGroup param_group;
+	AsmRegClass                     reg_class;
+
+	String                          pin;
+	String                          pin_flag; // e.g. %flags.zf
+
+	i32 total_index;
+
+	i32 param_index;  // index into the Proc signature's params (inputs), else -1
+	i32 result_index; // index into results (outputs), else -1
+	i32 tie; // InOut: index into operands[] of the tied output; else -1
+
+	i32 view_of; // total_index of the source operand this is a width-view of, else -1
+	i32 view_bits; // the view width in bits, otherwise 0
+
+	bool no_init;
+};
+
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
@@ -204,6 +246,7 @@ struct Entity {
 			i32 field_group_index;
 			CommentGroup *docs;
 			CommentGroup *comment;
+			Ast *init_expr; // only used for enum values
 		} Constant;
 		struct {
 			Ast *type_expr; // only used for some variables within procedure bodies
@@ -249,6 +292,7 @@ struct Entity {
 			String  link_name;
 			String  link_prefix;
 			String  link_suffix;
+			String  link_section;
 			String  objc_selector_name;
 			Entity *objc_class;
 			DeferredProcedure deferred_procedure;
@@ -256,6 +300,9 @@ struct Entity {
 			struct GenProcsData *gen_procs;
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
+
+			u64     fast_math_flags;
+
 			bool    is_foreign                 : 1;
 			bool    is_export                  : 1;
 			bool    generated_from_polymorphic : 1;
@@ -271,6 +318,7 @@ struct Entity {
 			bool    is_objc_class_method       : 1;
 		} Procedure;
 		struct {
+			bool is_asm_group;
 			Array<Entity *> entities;
 		} ProcGroup;
 		struct {
@@ -294,9 +342,32 @@ struct Entity {
 			String name;
 			Ast *node;
 			Ast *parent;
+
+			i32 asm_block_index;
 		} Label;
+		struct {
+			Ast *node;
+			bool is_volatile;
+			bool is_align_stack;
+			bool is_pure;
+
+			bool has_observable_side_effect;
+
+			Scope *param_scope;
+			Scope *label_scope;
+			Array<AsmTemplateEntityDecl> decls;
+
+			StringSet clobber_registers_set;
+			StringSet preserve_registers_set;
+			bool      clobber_flags;
+			bool      clobber_memory;
+		} AsmTemplate;
 	};
 };
+
+
+gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type);
+gb_internal bool is_type_internally_pointer_like(Type *t);
 
 gb_internal InternedString entity_interned_name(Entity *entity) {
 	auto name = entity->interned_name.load();
@@ -307,6 +378,26 @@ gb_internal InternedString entity_interned_name(Entity *entity) {
 	}
 	return name;
 }
+
+
+gb_internal AsmTemplateEntityDecl asm_template_entity_decl_default(Entity *entity) {
+	AsmTemplateEntityDecl ed = {};
+	ed.kind = AsmTemplateEntityDecl_Register;
+	if (is_type_internally_pointer_like(entity->type)) {
+		ed.kind = AsmTemplateEntityDecl_Memory;
+	}
+	ed.reg_class = check_asm_reg_class_from_type(entity->type);
+	ed.entity = entity;
+	ed.total_index  = -1;
+	ed.param_index  = -1;
+	ed.result_index = -1;
+	ed.tie          = -1;
+	ed.view_of      = -1;
+	ed.view_bits    =  0;
+
+	return ed;
+}
+
 
 gb_internal bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
 	switch (kind) {
@@ -472,8 +563,12 @@ gb_internal Entity *alloc_entity_library_name(Scope *scope, Token token, Type *t
 }
 
 
-
-
+gb_internal Entity *alloc_entity_asm_template(Scope *scope, Token token, Type *type, Ast *node) {
+	GB_ASSERT(node->kind == Ast_AsmTemplate);
+	Entity *entity = alloc_entity(Entity_AsmTemplate, scope, token, type);
+	entity->AsmTemplate.node = node;
+	return entity;
+}
 
 gb_internal Entity *alloc_entity_nil(String name, Type *type) {
 	Entity *entity = alloc_entity(Entity_Nil, nullptr, make_token_ident(name), type);
@@ -484,6 +579,7 @@ gb_internal Entity *alloc_entity_label(Scope *scope, Token token, Type *type, As
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
 	entity->Label.parent = parent;
+	entity->Label.asm_block_index = -1;
 	entity->state = EntityState_Resolved;
 	return entity;
 }

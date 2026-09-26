@@ -51,8 +51,6 @@ Example:
 	Tn :: i18n.get_n
 
 	mo :: proc() {
-		using fmt
-
 		err: i18n.Error
 
 		// Parse MO file and set it as the active translation so we can omit `get`'s "catalog" parameter.
@@ -62,26 +60,24 @@ Example:
 		if err != .None { return }
 
 		// These are in the .MO catalog.
-		println("-----")
-		println(T(""))
-		println("-----")
-		println(T("There are 69,105 leaves here."))
-		println("-----")
-		println(T("Hellope, World!"))
-		println("-----")
+		fmt.println("-----")
+		fmt.println(T(""))
+		fmt.println("-----")
+		fmt.println(T("There are 69,105 leaves here."))
+		fmt.println("-----")
+		fmt.println(T("Hellope, World!"))
+		fmt.println("-----")
 		// We pass 1 into `T` to get the singular format string, then 1 again into printf.
-		printf(Tn("There is %d leaf.\n", 1), 1)
+		fmt.printf(Tn("There is %d leaf.\n", 1), 1)
 		// We pass 42 into `T` to get the plural format string, then 42 again into printf.
-		printf(Tn("There is %d leaf.\n", 42), 42)
+		fmt.printf(Tn("There is %d leaf.\n", 42), 42)
 
 		// This isn't in the translation catalog, so the key is passed back untranslated.
-		println("-----")
-		println(T("Come visit us on Discord!"))
+		fmt.println("-----")
+		fmt.println(T("Come visit us on Discord!"))
 	}
 
 	qt :: proc() {
-		using fmt
-
 		err: i18n.Error
 
 		// Parse QT file and set it as the active translation so we can omit `get`'s "catalog" parameter.
@@ -91,18 +87,18 @@ Example:
 		if err != .None { return }
 
 		// These are in the .TS catalog. As you can see they have sections.
-		println("--- Page section ---")
-		println("Page:Text for translation =", T("Page", "Text for translation"))
-		println("-----")
-		println("Page:Also text to translate =", T("Page", "Also text to translate"))
-		println("-----")
-		println("--- installscript section ---")
-		println("installscript:99 bottles of beer on the wall =", T("installscript", "99 bottles of beer on the wall"))
-		println("-----")
-		println("--- apple_count section ---")
-		println("apple_count:%d apple(s) =")
-		println("\t 1  =", Tn("apple_count", "%d apple(s)", 1))
-		println("\t 42 =", Tn("apple_count", "%d apple(s)", 42))
+		fmt.println("--- Page section ---")
+		fmt.println("Page:Text for translation =", T("Page", "Text for translation"))
+		fmt.println("-----")
+		fmt.println("Page:Also text to translate =", T("Page", "Also text to translate"))
+		fmt.println("-----")
+		fmt.println("--- installscript section ---")
+		fmt.println("installscript:99 bottles of beer on the wall =", T("installscript", "99 bottles of beer on the wall"))
+		fmt.println("-----")
+		fmt.println("--- apple_count section ---")
+		fmt.println("apple_count:%d apple(s) =")
+		fmt.println("\t 1  =", Tn("apple_count", "%d apple(s)", 1))
+		fmt.println("\t 42 =", Tn("apple_count", "%d apple(s)", 42))
 	}
 */
 package i18n

@@ -19,7 +19,6 @@ package net
 */
 
 import "core:strings"
-import "core:strconv"
 import "core:unicode/utf8"
 import "core:encoding/hex"
 
@@ -32,28 +31,26 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 		s = s[i+3:]
 	}
 
-	i = strings.index(s, "#")
+	i = strings.index_byte(s, '#')
 	if i != -1 {
 		fragment = s[i+1:]
 		s = s[:i]
 	}
 
-	i = strings.index(s, "?")
+	i = strings.index_byte(s, '?')
 	if i != -1 {
 		query_str := s[i+1:]
 		s = s[:i]
 		if query_str != "" {
-			queries_parts := strings.split(query_str, "&")
-			defer delete(queries_parts)
-			queries = make(map[string]string, len(queries_parts), allocator)
-			for q in queries_parts {
-				parts := strings.split(q, "=")
-				defer delete(parts)
-				switch len(parts) {
-				case 1:  queries[parts[0]] = ""        // NOTE(tetra): Query not set to anything, was but present.
-				case 2:  queries[parts[0]] = parts[1]  // NOTE(tetra): Query set to something.
-				case:    break
+			queries = make(map[string]string, allocator)
+			for query in strings.split_iterator(&query_str, "&") {
+				query := query
+				key := strings.split_by_byte_iterator(&query, '=') or_continue
+				value, _ := strings.split_by_byte_iterator(&query, '=') // may be empty
+				if strings.index_byte(query, '=') != -1 {
+					continue // additional =, weird x=y=z format
 				}
+				queries[key] = value
 			}
 		}
 	}
@@ -114,6 +111,8 @@ join_url :: proc(scheme, host, path: string, queries: map[string]string, fragmen
 }
 
 percent_encode :: proc(s: string, allocator := context.allocator) -> string {
+	HEX_DIGITS_UPPER := "0123456789ABCDEF" // NOTE(michtesar): RFC 3986 §2.1
+
 	b := strings.builder_make(allocator)
 	strings.builder_grow(&b, len(s) + 16) // NOTE(tetra): A reasonable number to allow for the number of things we need to escape.
 
@@ -124,10 +123,9 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 		case:
 			bytes, n := utf8.encode_rune(ch)
 			for byte in bytes[:n] {
-				buf: [2]u8 = ---
-				t := strconv.write_int(buf[:], i64(byte), 16)
-				strings.write_rune(&b, '%')
-				strings.write_string(&b, t)
+				strings.write_byte(&b, '%')
+				strings.write_byte(&b, HEX_DIGITS_UPPER[byte >> 4])
+				strings.write_byte(&b, HEX_DIGITS_UPPER[byte & 0xF])
 			}
 		}
 	}
@@ -154,7 +152,7 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		strings.write_string(&b, s[:i])
 		s = s[i:]
 
-		if len(s) == 0 {
+		if len(s) <= 1 {
 			return // percent without anything after it
 		}
 		s = s[1:]

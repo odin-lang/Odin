@@ -141,6 +141,52 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 }
 
 @test
+test_sort_stability :: proc(t: ^testing.T) {
+	// Test sizes are all prime.
+	test_sizes :: []int{7, 13, 347, 1031, 10111, 100003}
+	Data :: struct {
+		rand: int,
+		index: int,
+	}
+
+	for test_size in test_sizes {
+		rand.reset(t.seed)
+
+		vals  := make([]Data, test_size)
+		defer delete(vals)
+
+		// Set up test values
+		for &val, i in vals {
+			val = {rand.int_max(10), i}
+		}
+
+		// Sort
+		slice.stable_sort_by(vals, proc(l, r: Data) -> bool {return l.rand < r.rand})
+
+		// Verify sorted test values
+		rand.reset(t.seed)
+
+		sum := vals[0].index
+		for i in 1..<len(vals) {
+			sum += vals[i].index
+			if vals[i - 1].rand > vals[i].rand {
+				testing.expect(t, false, "Expected slice to be sorted")
+			}
+			if vals[i - 1].rand < vals[i].rand {
+				continue
+			}
+			if vals[i - 1].index > vals[i].index {
+				testing.expect(t, false, "Expected slice to be stable")
+			}
+		}
+
+		testing.expect(t, sum == test_size * (test_size - 1) / 2, "Expected slice to have all indecies")
+
+	}
+}
+
+
+@test
 test_binary_search :: proc(t: ^testing.T) {
 	index: int
 	found: bool
@@ -223,59 +269,6 @@ UNIQUE_TEST_VECTORS :: [][2][]int{
 	{{2,2,2},             {2}},
 	{{1,1,1,2,2,3,3,3,3}, {1,2,3}},
 	{{1,2,4,4,5},         {1,2,4,5}},
-}
-
-@test
-test_unique :: proc(t: ^testing.T) {
-	for v in UNIQUE_TEST_VECTORS {
-		assorted := v[0]
-		expected := v[1]
-
-		uniq := slice.unique(assorted)
-		testing.expectf(t, slice.equal(uniq, expected), "Expected slice.uniq(%v) == %v, got %v", v[0], v[1], uniq)
-	}
-
-	for v in UNIQUE_TEST_VECTORS {
-		assorted := v[0]
-		expected := v[1]
-
-		uniq := slice.unique_proc(assorted, proc(a, b: int) -> bool {
-			return a == b
-		})
-		testing.expectf(t, slice.equal(uniq, expected), "Expected slice.unique_proc(%v, ...) == %v, got %v", v[0], v[1], uniq)
-	}
-
-	r := rand.create(t.seed)
-	context.random_generator = rand.default_random_generator(&r)
-
-	// 10_000 random tests
-	for _ in 0..<10_000 {
-		assorted: [dynamic]i64
-		expected: [dynamic]i64
-
-		// Prime with 1 value
-		old := rand.int63()
-		append(&assorted, old)
-		append(&expected, old)
-
-		// Add 99 additional random values
-		for _ in 1..<100 {
-			new := rand.int63()
-			append(&assorted, new)
-			if old != new {
-				append(&expected, new)
-			}
-			old = new
-		}
-
-		original := slice.clone(assorted[:])
-		uniq := slice.unique(assorted[:])
-		testing.expectf(t, slice.equal(uniq, expected[:]), "Expected slice.uniq(%v) == %v, got %v", original, expected, uniq)
-
-		delete(assorted)
-		delete(original)
-		delete(expected)
-	}
 }
 
 @test

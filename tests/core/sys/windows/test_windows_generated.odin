@@ -680,17 +680,17 @@ verify_error_codes :: proc(t: ^testing.T) {
 @(test)
 verify_error_helpers :: proc(t: ^testing.T) {
 	// winerror.h
-	expect_value(t, win32.SUCCEEDED(-1), 0x00000000)
-	expect_value(t, win32.SUCCEEDED(0), 0x00000001)
-	expect_value(t, win32.SUCCEEDED(1), 0x00000001)
+	expect_value(t, uint(win32.SUCCEEDED(-1)), 0x00000000)
+	expect_value(t, uint(win32.SUCCEEDED(0)), 0x00000001)
+	expect_value(t, uint(win32.SUCCEEDED(1)), 0x00000001)
 
-	expect_value(t, win32.FAILED(-1), 0x00000001)
-	expect_value(t, win32.FAILED(0), 0x00000000)
-	expect_value(t, win32.FAILED(1), 0x00000000)
+	expect_value(t, uint(win32.FAILED(-1)), 0x00000001)
+	expect_value(t, uint(win32.FAILED(0)), 0x00000000)
+	expect_value(t, uint(win32.FAILED(1)), 0x00000000)
 
-	expect_value(t, win32.IS_ERROR(-1), 0x00000001)
-	expect_value(t, win32.IS_ERROR(0), 0x00000000)
-	expect_value(t, win32.IS_ERROR(1), 0x00000000)
+	expect_value(t, uint(win32.IS_ERROR(-1)), 0x00000001)
+	expect_value(t, uint(win32.IS_ERROR(0)), 0x00000000)
+	expect_value(t, uint(win32.IS_ERROR(1)), 0x00000000)
 
 	expect_value(t, win32.HRESULT_CODE(0xFFFFCCCC), 0x0000CCCC)
 	expect_value(t, win32.HRESULT_FACILITY(0xFFFFCCCC), 0x00001FFF)

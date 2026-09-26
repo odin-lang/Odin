@@ -284,7 +284,7 @@ void typeid_hash_context_init(TypeidHashContext *hash_ctx) {
 u64 rotate_left64(u64 x, u64 k) {
 	static u64 const n = 64;
 	u64 s = k & (n-1);
-	return (x<<s) | (x>>(n-2));
+	return (x<<s) | (x>>(n-s));
 }
 
 void sip_compress(SipHashContext *sip) {
@@ -516,10 +516,29 @@ gb_internal u64 type_hash_canonical_type(Type *type) {
 		return prev_hash;
 	}
 
+	// NOTE(tf2spi): Unwrap type aliases similar to are_types_identical*
+	Type *type_unaliased = type;
+	if (type->kind == Type_Named) {
+		Entity *e = type->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			type_unaliased = type->Named.base;
+		}
+	}
 	TypeWriter w = {};
 	type_writer_make_hasher(&w, &w.hash_ctx);
-	write_type_to_canonical_string(&w, type);
+	write_type_to_canonical_string(&w, type_unaliased);
 	u64 hash = typeid_hash_context_fini(&w.hash_ctx);
+	if (build_context.webkit_switch_workaround) {
+		// Clear the top bit so every `typeid` is in [1, 2^63). A `switch` over a
+		// typeid (e.g. a type switch over `any` in core:fmt) then has a case-value
+		// span < 2^63. WebKit's B3/OMG wasm JIT computes a switch's value range as
+		// a signed i64 (max - min); a span >= 2^63 overflows and makes it build a
+		// pathologically-sized jump table, OOM-crashing the tab.
+		// WebKit bug: https://bugs.webkit.org/show_bug.cgi?id=317022
+		// Odin issue/PR: https://github.com/odin-lang/Odin/issues/6810
+		hash &= 0x7fffffffffffffffull;
+		hash = hash ? hash : 1;
+	}
 
 	type->canonical_hash.store(hash, std::memory_order_relaxed);
 
@@ -554,7 +573,8 @@ gb_internal gbString string_canonical_entity_name(gbAllocator allocator, Entity 
 
 gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 	GB_ASSERT(e != nullptr);
-	if (e->kind == Entity_Procedure || e->kind == Entity_TypeName || e->kind == Entity_Variable) {
+	if (e->kind == Entity_Procedure || e->kind == Entity_AsmTemplate ||
+	    e->kind == Entity_TypeName  || e->kind == Entity_Variable) {
 		if (e->kind == Entity_Procedure && (e->Procedure.is_export || e->Procedure.is_foreign)) {
 			// no prefix
 			return;
@@ -655,6 +675,17 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 			}
 
 			goto write_base_name;
+		} else if (s->decl_info != nullptr && s->decl_info->proc_lit != nullptr) {
+			Ast *proc_lit = s->decl_info->proc_lit;
+			String file_name = filename_without_directory(proc_lit->file()->fullpath);
+			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
+			type_writer_append_fmt(w, CANONICAL_NAME_SEPARATOR CANONICAL_ANON_PREFIX "_%.*s:%d" CANONICAL_NAME_SEPARATOR,
+			                       LIT(file_name), ast_token(proc_lit).pos.offset);
+			if (e->scope->index > 0) {
+				write_scope_index_suffix = true;
+			}
+
+			goto write_base_name;
 		} else if ((s->flags & ScopeFlag_File) && s->file != nullptr) {
 			String file_name = filename_without_directory(s->file->fullpath);
 			type_writer_append(w, e->pkg->name.text, e->pkg->name.len);
@@ -721,6 +752,7 @@ write_base_name:
 		// For debug symbols only
 		/*fallthrough*/
 	case Entity_Procedure:
+	case Entity_AsmTemplate:
 	case Entity_Variable:
 		type_writer_append(w, e->token.string.text, e->token.string.len);
 		if (is_type_polymorphic(e->type)) {
@@ -960,6 +992,12 @@ gb_internal void write_type_to_canonical_string(TypeWriter *w, Type *type) {
 		if (type->Proc.result_count > 0) {
 			type_writer_appendc(w, "->");
 			write_canonical_params(w, type->Proc.results);
+		}
+		if (type->Proc.diverging) {
+			type_writer_appendc(w, "!");
+		}
+		if (type->Proc.optional_ok) {
+			type_writer_appendc(w, "#optional_ok");
 		}
 		return;
 

@@ -67,6 +67,8 @@ Token_Kind :: enum u32 {
 		Cmp_And,  // &&
 		Cmp_Or,   // ||
 
+		Mul_Mul,  // **
+
 	B_Assign_Op_Begin,
 		Add_Eq,     // +=
 		Sub_Eq,     // -=
@@ -152,8 +154,6 @@ Token_Kind :: enum u32 {
 		Or_Break,    // or_break
 		Or_Continue, // or_continue
 		Asm,         // asm
-		Inline,      // inline
-		No_Inline,   // no_inline
 		Matrix,      // matrix
 	B_Keyword_End,
 
@@ -201,6 +201,8 @@ tokens := [Token_Kind.COUNT]string {
 
 	"&&",
 	"||",
+
+	"**",
 
 	"",
 	"+=",
@@ -287,8 +289,6 @@ tokens := [Token_Kind.COUNT]string {
 	"or_break",
 	"or_continue",
 	"asm",
-	"inline",
-	"no_inline",
 	"matrix",
 	"",
 }

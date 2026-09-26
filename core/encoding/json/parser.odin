@@ -14,9 +14,16 @@ Parser :: struct {
 	parse_integers: bool,
 }
 
-make_parser :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> Parser {
+make_parser :: proc{
+	make_parser_from_bytes,
+	make_parser_from_string,
+}
+
+@(require_results)
+make_parser_from_bytes :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> Parser {
 	return make_parser_from_string(string(data), spec, parse_integers, allocator)
 }
+@(require_results)
 make_parser_from_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator) -> Parser {
 	p: Parser
 	p.tok = make_tokenizer(data, spec, parse_integers)
@@ -27,11 +34,18 @@ make_parser_from_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, par
 	return p
 }
 
+parse :: proc{
+	parse_bytes,
+	parse_string,
+}
 
-parse :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator, loc := #caller_location) -> (Value, Error) {
+
+@(require_results)
+parse_bytes :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator, loc := #caller_location) -> (Value, Error) {
 	return parse_string(string(data), spec, parse_integers, allocator, loc)
 }
 
+@(require_results)
 parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false, allocator := context.allocator, loc := #caller_location) -> (Value, Error) {
 	context.allocator = allocator
 	p := make_parser_from_string(data, spec, parse_integers, allocator)
@@ -51,6 +65,7 @@ parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers
 	return parse_object(&p, loc)
 }
 
+@(require_results)
 token_end_pos :: proc(tok: Token) -> Pos {
 	end := tok.pos
 	end.offset += len(tok.text)
@@ -65,6 +80,7 @@ advance_token :: proc(p: ^Parser) -> (Token, Error) {
 }
 
 
+@(require_results)
 allow_token :: proc(p: ^Parser, kind: Token_Kind) -> bool {
 	if p.curr_token.kind == kind {
 		advance_token(p)
@@ -73,6 +89,7 @@ allow_token :: proc(p: ^Parser, kind: Token_Kind) -> bool {
 	return false
 }
 
+@(require_results)
 expect_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 	prev := p.curr_token
 	advance_token(p)
@@ -83,6 +100,7 @@ expect_token :: proc(p: ^Parser, kind: Token_Kind) -> Error {
 }
 
 
+@(require_results)
 parse_colon :: proc(p: ^Parser) -> (err: Error) {
 	colon_err := expect_token(p, .Colon)
 	if colon_err == nil {
@@ -91,6 +109,7 @@ parse_colon :: proc(p: ^Parser) -> (err: Error) {
 	return .Expected_Colon_After_Key
 }
 
+@(require_results)
 parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
 	switch p.spec {
 	case .JSON5, .MJSON:
@@ -106,6 +125,7 @@ parse_comma :: proc(p: ^Parser) -> (do_break: bool) {
 	return false
 }
 
+@(require_results)
 parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	token := p.curr_token
@@ -176,6 +196,7 @@ parse_value :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	return
 }
 
+@(require_results)
 parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	err = .None
 	expect_token(p, .Open_Bracket) or_return
@@ -203,7 +224,7 @@ parse_array :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: 
 	return
 }
 
-@(private)
+@(private, require_results)
 bytes_make :: proc(size, alignment: int, allocator: mem.Allocator, loc := #caller_location) -> (bytes: []byte, err: Error) {
 	b, berr := mem.alloc_bytes(size, alignment, allocator, loc)
 	if berr != nil {
@@ -217,6 +238,7 @@ bytes_make :: proc(size, alignment: int, allocator: mem.Allocator, loc := #calle
 	return
 }
 
+@(require_results)
 clone_string :: proc(s: string, allocator: mem.Allocator, loc := #caller_location) -> (str: string, err: Error) {
 	n := len(s)
 	b := bytes_make(n+1, 1, allocator, loc) or_return
@@ -228,6 +250,7 @@ clone_string :: proc(s: string, allocator: mem.Allocator, loc := #caller_locatio
 	return
 }
 
+@(require_results)
 parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #caller_location) -> (key: string, err: Error) {
 	tok := p.curr_token
 	if p.spec != .JSON {
@@ -242,6 +265,7 @@ parse_object_key :: proc(p: ^Parser, key_allocator: mem.Allocator, loc := #calle
 	return unquote_string(tok, p.spec, key_allocator, loc)
 }
 
+@(require_results)
 parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_location) -> (obj: Object, err: Error) {
 	obj = make(Object, allocator=p.allocator, loc=loc)
 
@@ -255,12 +279,30 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 
 	for p.curr_token.kind != end_token {
 		key := parse_object_key(p, p.allocator, loc) or_return
+
+		// `key` is allocated here and does not belong to `obj` until the insert below, so every
+		// path that leaves in between has to free it. The cleanup defer at the top of this proc
+		// only walks `obj`, so it cannot reach a key that never got there.
+		//
+		// JSON5 makes this reachable from ordinary malformed input: an unquoted ident is a legal
+		// key, so `{ broken not json` allocates "broken" and then fails in parse_colon, leaking
+		// it. The parse returns a nil Value, so the caller has nothing to destroy either.
+		key_stored := false
+		defer if !key_stored {
+			delete(key, p.allocator, loc)
+		}
+
 		parse_colon(p) or_return
 		elem := parse_value(p, loc) or_return
 
+		// `elem` is owned by this iteration for the same reason, until it is stored.
+		elem_stored := false
+		defer if !elem_stored {
+			destroy_value(elem, loc = loc)
+		}
+
 		if key in obj {
 			err = .Duplicate_Object_Key
-			delete(key, p.allocator, loc)
 			return
 		}
 
@@ -273,6 +315,8 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 				return nil, .Out_Of_Memory
 			}
 			obj[key] = elem
+			key_stored = true
+			elem_stored = true
 		}
 
 		if parse_comma(p) {
@@ -282,6 +326,7 @@ parse_object_body :: proc(p: ^Parser, end_token: Token_Kind, loc := #caller_loca
 	return obj, .None
 }
 
+@(require_results)
 parse_object :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err: Error) {
 	expect_token(p, .Open_Brace) or_return
 	obj := parse_object_body(p, .Close_Brace, loc) or_return
@@ -291,6 +336,7 @@ parse_object :: proc(p: ^Parser, loc := #caller_location) -> (value: Value, err:
 
 
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
+@(require_results)
 unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator, loc := #caller_location) -> (value: string, err: Error) {
 	get_u2_rune :: proc(s: string) -> rune {
 		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
@@ -363,7 +409,23 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 		return clone_string(s, allocator, loc)
 	}
 
-	b := bytes_make(len(s) + 2*utf8.UTF_MAX, 1, allocator) or_return
+	// A byte that is not valid UTF-8 is replaced by utf8.RUNE_ERROR, which encodes
+	// wider than the single byte it stands in for, so a string holding several of
+	// them unquotes to more bytes than it was quoted in. Count them up front so the
+	// buffer fits. Nothing else in the loop below grows its input: a two-byte
+	// escape like \n writes one byte, \xXX writes at most two for four, \uXXXX at
+	// most three for six, and a surrogate pair four for twelve.
+	extra := 0
+	replacement_size := utf8.rune_size(utf8.RUNE_ERROR)
+	for j := i; j < len(s); {
+		r, size := utf8.decode_rune_in_string(s[j:])
+		if r == utf8.RUNE_ERROR && size == 1 {
+			extra += replacement_size - 1
+		}
+		j += size
+	}
+
+	b := bytes_make(len(s) + 2*utf8.UTF_MAX + extra, 1, allocator) or_return
 	w := copy(b, s[0:i])
 
 	if len(b) == 0 && allocator.data == nil {
@@ -474,7 +536,10 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 			i += width
 
 			buf, buf_width := utf8.encode_rune(r)
-			assert(buf_width <= width)
+			// If we have an invalid utf8 character, width can be smaller than the width of RUNE_ERROR
+			if r != utf8.RUNE_ERROR {
+				assert(buf_width <= width)
+			}
 			copy(b[w:], buf[:buf_width])
 			w += buf_width
 		}

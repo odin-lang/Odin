@@ -1,4 +1,4 @@
-#+build openbsd, freebsd, netbsd, essence, haiku
+#+build openbsd, freebsd, netbsd
 package sysinfo
 
 @(private)

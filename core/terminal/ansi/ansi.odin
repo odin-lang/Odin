@@ -32,12 +32,14 @@ DSR     :: "6n" // Device Status Report
 
 // CSI: private sequences
 
-SCP          :: "s"    // Save Current Cursor Position
-RCP          :: "u"    // Restore Saved Cursor Position
-DECAWM_ON    :: "?7h"  // Auto Wrap Mode (Enabled)
-DECAWM_OFF   :: "?7l"  // Auto Wrap Mode (Disabled)
-DECTCEM_SHOW :: "?25h" // Text Cursor Enable Mode (Visible)
-DECTCEM_HIDE :: "?25l" // Text Cursor Enable Mode (Invisible)
+SCP          :: "s"      // Save Current Cursor Position
+RCP          :: "u"      // Restore Saved Cursor Position
+DECAWM_ON    :: "?7h"    // Auto Wrap Mode (Enabled)
+DECAWM_OFF   :: "?7l"    // Auto Wrap Mode (Disabled)
+DECTCEM_SHOW :: "?25h"   // Text Cursor Enable Mode (Visible)
+DECTCEM_HIDE :: "?25l"   // Text Cursor Enable Mode (Invisible)
+DECASB_ENTER :: "?1049h" // Alternate Screen Buffer (Enter)
+DECASB_EXIT  :: "?1049l" // Alternate Screen Buffer (Exit)
 
 // SGR sequences
 

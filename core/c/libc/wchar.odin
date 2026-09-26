@@ -17,12 +17,12 @@ foreign libc {
 	fwscanf   :: proc(stream: ^FILE, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	swprintf  :: proc(stream: ^FILE, n: size_t, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	swscanf   :: proc(s, format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
-	vfwprintf :: proc(stream: ^FILE, format: [^]wchar_t, arg: va_list) -> int ---
-	vfwscanf  :: proc(stream: ^FILE, format: [^]wchar_t, arg: va_list) -> int ---
-	vswprintf :: proc(s: [^]wchar_t, n: size_t, format: [^]wchar_t, arg: va_list) -> int ---
-	vswscanf  :: proc(s, format: [^]wchar_t, arg: va_list) -> int ---
-	vwprintf  :: proc(format: [^]wchar_t, arg: va_list) -> int ---
-	vwscanf   :: proc(format: [^]wchar_t, arg: va_list) -> int ---
+	vfwprintf :: proc(stream: ^FILE, format: [^]wchar_t, arg: ^va_list) -> int ---
+	vfwscanf  :: proc(stream: ^FILE, format: [^]wchar_t, arg: ^va_list) -> int ---
+	vswprintf :: proc(s: [^]wchar_t, n: size_t, format: [^]wchar_t, arg: ^va_list) -> int ---
+	vswscanf  :: proc(s, format: [^]wchar_t, arg: ^va_list) -> int ---
+	vwprintf  :: proc(format: [^]wchar_t, arg: ^va_list) -> int ---
+	vwscanf   :: proc(format: [^]wchar_t, arg: ^va_list) -> int ---
 	wprintf   :: proc(format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 	wscanf    :: proc(format: [^]wchar_t, #c_vararg arg: ..any) -> int ---
 

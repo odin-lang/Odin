@@ -30,18 +30,23 @@ SIZE                :: win32.SIZE
 WCHAR               :: win32.WCHAR
 DWORD               :: win32.DWORD
 
-IUnknown :: win32.IUnknown
+IUnknown        :: win32.IUnknown
 IUnknown_VTable :: win32.IUnknown_VTable
-LPUNKNOWN :: win32.LPUNKNOWN
+LPUNKNOWN       :: win32.LPUNKNOWN
 
 @(default_calling_convention="system")
 foreign dxgi {
 	CreateDXGIFactory            :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
 	CreateDXGIFactory1           :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
 	CreateDXGIFactory2           :: proc(Flags: CREATE_FACTORY, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
-	DXGIGetDebugInterface1       :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
+}
+
+@(default_calling_convention="system", link_prefix="DXGI")
+foreign dxgi {
+	GetDebugInterface1           :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
 	DeclareAdapterRemovalSupport :: proc() -> HRESULT ---
 }
+
 
 STANDARD_MULTISAMPLE_QUALITY_PATTERN :: 0xffffffff
 CENTER_MULTISAMPLE_QUALITY_PATTERN :: 0xfffffffe
@@ -581,7 +586,7 @@ ISwapChain_VTable :: struct {
 	SetFullscreenState:  proc "system" (this: ^ISwapChain, Fullscreen: BOOL, pTarget: ^IOutput) -> HRESULT,
 	GetFullscreenState:  proc "system" (this: ^ISwapChain, pFullscreen: ^BOOL, ppTarget: ^^IOutput) -> HRESULT,
 	GetDesc:             proc "system" (this: ^ISwapChain, pDesc: ^SWAP_CHAIN_DESC) -> HRESULT,
-	ResizeBuffers:       proc "system" (this: ^ISwapChain, BufferCount: u32, Width: u32, Height: u32, NewFormat: FORMAT, SwapChainFlags: SWAP_CHAIN) -> HRESULT,
+	ResizeBuffers:       proc "system" (this: ^ISwapChain, BufferCount: u32, Width, Height: u32, NewFormat: FORMAT, SwapChainFlags: SWAP_CHAIN) -> HRESULT,
 	ResizeTarget:        proc "system" (this: ^ISwapChain, pNewTargetParameters: ^MODE_DESC) -> HRESULT,
 	GetContainingOutput: proc "system" (this: ^ISwapChain, ppOutput: ^^IOutput) -> HRESULT,
 	GetFrameStatistics:  proc "system" (this: ^ISwapChain, pStats: ^FRAME_STATISTICS) -> HRESULT,
@@ -739,10 +744,10 @@ IOutputDuplication :: struct #raw_union {
 IOutputDuplication_VTable :: struct {
 	using idxgiobject_vtable: IObject_VTable,
 	GetDesc:              proc "system" (this: ^IOutputDuplication, pDesc: ^OUTDUPL_DESC),
-	AcquireNextFrame:     proc "system" (this: ^IOutputDuplication, TimeoutInMilliseconds: u32, pFrameInfo: ^OUTDUPL_FRAME_INFO, ppDesktopResource: ^^IResource) -> HRESULT,
-	GetFrameDirtyRects:   proc "system" (this: ^IOutputDuplication, DirtyRectsBufferSize: u32, pDirtyRectsBuffer: ^RECT, pDirtyRectsBufferSizeRequired: ^u32) -> HRESULT,
-	GetFrameMoveRects:    proc "system" (this: ^IOutputDuplication, MoveRectsBufferSize: u32, pMoveRectBuffer: ^OUTDUPL_MOVE_RECT, pMoveRectsBufferSizeRequired: ^u32) -> HRESULT,
-	GetFramePointerShape: proc "system" (this: ^IOutputDuplication, PointerShapeBufferSize: u32, pPointerShapeBuffer: rawptr, pPointerShapeBufferSizeRequired: ^u32, pPointerShapeInfo: ^OUTDUPL_POINTER_SHAPE_INFO) -> HRESULT,
+	AcquireNextFrame:     proc "system" (this: ^IOutputDuplication, TimeoutInMilliseconds:  u32, pFrameInfo:          ^OUTDUPL_FRAME_INFO, ppDesktopResource:               ^^IResource) -> HRESULT,
+	GetFrameDirtyRects:   proc "system" (this: ^IOutputDuplication, DirtyRectsBufferSize:   u32, pDirtyRectsBuffer:   ^RECT,               pDirtyRectsBufferSizeRequired:   ^u32)        -> HRESULT,
+	GetFrameMoveRects:    proc "system" (this: ^IOutputDuplication, MoveRectsBufferSize:    u32, pMoveRectBuffer:     ^OUTDUPL_MOVE_RECT,  pMoveRectsBufferSizeRequired:    ^u32)        -> HRESULT,
+	GetFramePointerShape: proc "system" (this: ^IOutputDuplication, PointerShapeBufferSize: u32, pPointerShapeBuffer: rawptr,              pPointerShapeBufferSizeRequired: ^u32, pPointerShapeInfo: ^OUTDUPL_POINTER_SHAPE_INFO) -> HRESULT,
 	MapDesktopSurface:    proc "system" (this: ^IOutputDuplication, pLockedRect: ^MAPPED_RECT) -> HRESULT,
 	UnMapDesktopSurface:  proc "system" (this: ^IOutputDuplication) -> HRESULT,
 	ReleaseFrame:         proc "system" (this: ^IOutputDuplication) -> HRESULT,
@@ -836,7 +841,7 @@ SWAP_CHAIN_FULLSCREEN_DESC :: struct {
 PRESENT_PARAMETERS :: struct {
 	DirtyRectsCount: u32,
 
-	pDirtyRects:     [^]RECT,
+	pDirtyRects:     [^]RECT `fmt:"v,DirtyRectsCount"`,
 	pScrollRect:     ^RECT,
 	pScrollOffset:   ^POINT,
 }
@@ -967,8 +972,8 @@ ISwapChain2 :: struct #raw_union {
 }
 ISwapChain2_VTable :: struct {
 	using idxgiswapchain1_vtable: ISwapChain1_VTable,
-	SetSourceSize:                 proc "system" (this: ^ISwapChain2, Width: u32, Height: u32) -> HRESULT,
-	GetSourceSize:                 proc "system" (this: ^ISwapChain2, pWidth: ^u32, pHeight: ^u32) -> HRESULT,
+	SetSourceSize:                 proc "system" (this: ^ISwapChain2, Width, Height: u32) -> HRESULT,
+	GetSourceSize:                 proc "system" (this: ^ISwapChain2, pWidth, pHeight: ^u32) -> HRESULT,
 	SetMaximumFrameLatency:        proc "system" (this: ^ISwapChain2, MaxLatency: u32) -> HRESULT,
 	GetMaximumFrameLatency:        proc "system" (this: ^ISwapChain2, pMaxLatency: ^u32) -> HRESULT,
 	GetFrameLatencyWaitableObject: proc "system" (this: ^ISwapChain2) -> HANDLE,
@@ -1020,7 +1025,7 @@ IDecodeSwapChain_VTable :: struct {
 	PresentBuffer: proc "system" (this: ^IDecodeSwapChain, BufferToPresent: u32, SyncInterval: u32, Flags: PRESENT) -> HRESULT,
 	SetSourceRect: proc "system" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
 	SetTargetRect: proc "system" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
-	SetDestSize:   proc "system" (this: ^IDecodeSwapChain, Width: u32, Height: u32) -> HRESULT,
+	SetDestSize:   proc "system" (this: ^IDecodeSwapChain, Width, Height: u32) -> HRESULT,
 	GetSourceRect: proc "system" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
 	GetTargetRect: proc "system" (this: ^IDecodeSwapChain, pRect: ^RECT) -> HRESULT,
 	GetDestSize:   proc "system" (this: ^IDecodeSwapChain, pWidth: ^u32, pHeight: ^u32) -> HRESULT,
@@ -1104,7 +1109,7 @@ ISwapChain3_VTable :: struct {
 	GetCurrentBackBufferIndex: proc "system" (this: ^ISwapChain3) -> u32,
 	CheckColorSpaceSupport:    proc "system" (this: ^ISwapChain3, ColorSpace: COLOR_SPACE_TYPE, pColorSpaceSupport: ^SWAP_CHAIN_COLOR_SPACE_SUPPORT) -> HRESULT,
 	SetColorSpace1:            proc "system" (this: ^ISwapChain3, ColorSpace: COLOR_SPACE_TYPE) -> HRESULT,
-	ResizeBuffers1:            proc "system" (this: ^ISwapChain3, BufferCount: u32, Width: u32, Height: u32, Format: FORMAT, SwapChainFlags: SWAP_CHAIN, pCreationNodeMask: ^u32, ppPresentQueue: ^^IUnknown) -> HRESULT,
+	ResizeBuffers1:            proc "system" (this: ^ISwapChain3, BufferCount: u32, Width, Height: u32, Format: FORMAT, SwapChainFlags: SWAP_CHAIN, pCreationNodeMask: ^u32, ppPresentQueue: ^^IUnknown) -> HRESULT,
 }
 OVERLAY_COLOR_SPACE_SUPPORT :: distinct bit_set[OVERLAY_COLOR_SPACE_SUPPORT_FLAG; u32]
 OVERLAY_COLOR_SPACE_SUPPORT_FLAG :: enum u32 {
@@ -1164,8 +1169,9 @@ IAdapter3_VTable :: struct {
 }
 
 OUTDUPL_FLAG :: enum i32 {
-	COMPOSITED_UI_CAPTURE_ONLY = 1,
+	COMPOSITED_UI_CAPTURE_ONLY = 0,
 }
+OUTDUPL_FLAGS :: distinct bit_set[OUTDUPL_FLAG; i32]
 
 
 IOutput5_UUID_STRING :: "80A07424-AB52-42EB-833C-0C42FD282D98"
@@ -1176,7 +1182,7 @@ IOutput5 :: struct #raw_union {
 }
 IOutput5_VTable :: struct {
 	using idxgioutput4_vtable: IOutput4_VTable,
-	DuplicateOutput1: proc "system" (this: ^IOutput5, pDevice: ^IUnknown, Flags: u32, SupportedFormatsCount: u32, pSupportedFormats: ^FORMAT, ppOutputDuplication: ^^IOutputDuplication) -> HRESULT,
+	DuplicateOutput1: proc "system" (this: ^IOutput5, pDevice: ^IUnknown, Flags: OUTDUPL_FLAGS, SupportedFormatsCount: u32, pSupportedFormats: [^]FORMAT, ppOutputDuplication: ^^IOutputDuplication) -> HRESULT,
 }
 
 HDR_METADATA_TYPE :: enum i32 {

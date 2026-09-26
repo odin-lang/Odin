@@ -474,7 +474,7 @@ space_ranges := [?]i32{
 	0x1680,  0x1680, // Ogham space mark
 	0x2000,  0x200b, // en dash .. zero-width space
 	0x200e,  0x200f, // LTR mark .. RTL mark (pattern whitespace)
-	0x2028,  0x2029,     0x3000,  0x3000,
+	0x2028,  0x2029, // paragraph and line seperators
 	0x202f,  0x202f, // narrow no-break space
 	0x205f,  0x205f, // medium mathematical space
 	0x3000,  0x3000, // ideographic space
@@ -492,7 +492,7 @@ unicode_spaces := [?]i32{
 	0x1680, // Ogham space mark
 	0x2000, // en dash .. zero-width space
 	0x200e, 0x200f, // LTR mark .. RTL mark (pattern whitespace)
-	0x2028, 0x2029,  0x3000,  0x3000,
+	0x2028, 0x2029, // paragraph and line seperators
 	0x202f, // narrow no-break space
 	0x205f, // medium mathematical space
 	0x3000, // ideographic space
@@ -540,6 +540,7 @@ to_upper_ranges := [?]i32{
 
 @(rodata)
 to_upper_singlets := [?]i32{
+	0x00df, 8115,
 	0x00ff, 621,
 	0x0101, 499,
 	0x0103, 499,
@@ -1204,6 +1205,7 @@ to_lower_singlets := [?]i32{
 	0x1e90, 501,
 	0x1e92, 501,
 	0x1e94, 501,
+	0x1e9e, -7115,
 	0x1ea0, 501,
 	0x1ea2, 501,
 	0x1ea4, 501,

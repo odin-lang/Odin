@@ -406,7 +406,7 @@ push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T, loc := #caller_location) -
 }
 
 /*
-Consume `n` elements from the back of the queue.
+Consume `n` elements from the front of the queue.
 
 This will raise a bounds checking error if the queue does not have enough elements.
 */

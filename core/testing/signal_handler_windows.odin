@@ -48,7 +48,7 @@ when ODIN_ARCH == .i386 {
 
 @(private="file")
 stop_runner_callback :: proc "system" (ctrl_type: win32.DWORD) -> win32.BOOL  {
-	if ctrl_type == win32.CTRL_C_EVENT {
+	if ctrl_type == win32.CTRL_C_EVENT || ctrl_type == win32.CTRL_BREAK_EVENT || ctrl_type == win32.CTRL_CLOSE_EVENT {
 		prev := intrinsics.atomic_add(&stop_runner_flag, 1)
 
 		// If the flag was already set (if this is the second signal sent for example),
@@ -77,6 +77,12 @@ stop_test_callback :: proc "system" (info: ^win32.EXCEPTION_POINTERS) -> win32.L
 
 	context = runtime.default_context()
 	code := info.ExceptionRecord.ExceptionCode
+	if code < 0x8000_0000 {
+		// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/87fba13e-bf06-450e-83b1-9241dc81e781
+		// Ignore informational status codes
+		return win32.EXCEPTION_CONTINUE_SEARCH
+	}
+
 
 	if local_test_index == -1 {
 		// We're the test runner, and we ourselves have caught a signal from
@@ -134,7 +140,7 @@ This is a dire bug and should be reported to the Odin developers.
 			}
 			signal := local_test_expected_failures.signal
 			switch signal {
-			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION
+			case libc.SIGILL:  passed = code == win32.EXCEPTION_ILLEGAL_INSTRUCTION || code == win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED
 			case libc.SIGSEGV: passed = code == win32.EXCEPTION_ACCESS_VIOLATION
 			case libc.SIGFPE:
 				switch code {
@@ -163,6 +169,7 @@ _setup_signal_handler :: proc() {
 	// For tests:
 	// Catch the following:
 	// - Asserts and panics;
+	// - Out of Bounds exeptions;
 	// - Arithmetic errors; and
 	// - Segmentation faults (illegal memory access).
 	win32.AddVectoredExceptionHandler(0, stop_test_callback)
@@ -194,10 +201,11 @@ _should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) 
 			reason = .Successful_Stop
 		} else {
 			switch intrinsics.atomic_load(&stop_test_signal) {
-			case win32.EXCEPTION_ILLEGAL_INSTRUCTION: reason = .Illegal_Instruction
-			case win32.EXCEPTION_ACCESS_VIOLATION:    reason = .Segmentation_Fault
-			case win32.EXCEPTION_BREAKPOINT:          reason = .Unhandled_Trap
-			case win32.EXCEPTION_SINGLE_STEP:         reason = .Unhandled_Trap
+			case win32.EXCEPTION_ARRAY_BOUNDS_EXCEEDED: reason = .Illegal_Instruction
+			case win32.EXCEPTION_ILLEGAL_INSTRUCTION:   reason = .Illegal_Instruction
+			case win32.EXCEPTION_ACCESS_VIOLATION:      reason = .Segmentation_Fault
+			case win32.EXCEPTION_BREAKPOINT:            reason = .Unhandled_Trap
+			case win32.EXCEPTION_SINGLE_STEP:           reason = .Unhandled_Trap
 
 			case win32.EXCEPTION_FLT_DENORMAL_OPERAND ..= win32.EXCEPTION_INT_OVERFLOW:
 				reason = .Arithmetic_Error
@@ -208,4 +216,3 @@ _should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) 
 
 	return
 }
-

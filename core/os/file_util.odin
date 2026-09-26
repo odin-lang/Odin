@@ -216,18 +216,18 @@ read_entire_file_from_file :: proc(f: ^File, allocator: runtime.Allocator, loc :
 		return
 	} else {
 		buffer: [1024]u8
-		out_buffer := make([dynamic]u8, 0, 0, allocator, loc)
-		total := 0
+		out_buffer := make([dynamic]u8, 0, 0, allocator, loc) or_return
 		for {
 			n: int
 			n, err = read(f, buffer[:])
-			total += n
-			append_elems(&out_buffer, ..buffer[:n], loc=loc) or_return
+			if _, aerr := append_elems(&out_buffer, ..buffer[:n], loc=loc); aerr != nil {
+				return out_buffer[:], aerr
+			}
 			if err != nil {
 				if err == .EOF || err == .Broken_Pipe {
 					err = nil
 				}
-				data = out_buffer[:total]
+				data = out_buffer[:]
 				return
 			}
 		}

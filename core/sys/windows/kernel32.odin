@@ -180,7 +180,7 @@ foreign kernel32 {
 	ResumeThread         :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority    :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority    :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
-	GetThreadDescription :: proc(hThread: HANDLE, ppszThreadDescription: ^PCWSTR) -> HRESULT ---
+	GetThreadDescription :: proc(hThread: HANDLE, ppszThreadDescription: ^PWSTR) -> HRESULT ---
 	SetThreadDescription :: proc(hThread: HANDLE, lpThreadDescription: PCWSTR) -> HRESULT ---
 	GetExitCodeThread    :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread      :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
@@ -370,14 +370,14 @@ foreign kernel32 {
 		dwReserved: DWORD,
 		nNumberOfBytesToLockLow: DWORD,
 		nNumberOfBytesToLockHigh: DWORD,
-		lpOverlapped: ^LPOVERLAPPED,
+		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL ---
 	UnlockFileEx :: proc(
 		hFile: HANDLE,
 		dwReserved: DWORD,
 		nNumberOfBytesToUnlockLow: DWORD,
 		nNumberOfBytesToLockHigh: DWORD,
-		lpOverlapped: ^LPOVERLAPPED,
+		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL --- 
 
 	GetFileTime :: proc(
@@ -571,17 +571,18 @@ foreign kernel32 {
 	DisconnectNamedPipe :: proc(hNamedPipe: HANDLE) -> BOOL ---
 	WaitNamedPipeW      :: proc(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD) -> BOOL ---
 
-	AllocConsole               :: proc() -> BOOL ---
-	AttachConsole              :: proc(dwProcessId: DWORD) -> BOOL ---
-	SetConsoleCtrlHandler      :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
-	GenerateConsoleCtrlEvent   :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
-	FreeConsole                :: proc() -> BOOL ---
-	GetConsoleWindow           :: proc() -> HWND ---
-	GetConsoleScreenBufferInfo :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfo: PCONSOLE_SCREEN_BUFFER_INFO) -> BOOL ---
-	SetConsoleScreenBufferSize :: proc(hConsoleOutput: HANDLE, dwSize: COORD) -> BOOL ---
-	SetConsoleWindowInfo       :: proc(hConsoleOutput: HANDLE, bAbsolute: BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
-	GetConsoleCursorInfo       :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
-	SetConsoleCursorInfo       :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
+	AllocConsole                 :: proc() -> BOOL ---
+	AttachConsole                :: proc(dwProcessId: DWORD) -> BOOL ---
+	SetConsoleCtrlHandler        :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
+	GenerateConsoleCtrlEvent     :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
+	FreeConsole                  :: proc() -> BOOL ---
+	GetConsoleWindow             :: proc() -> HWND ---
+	GetConsoleScreenBufferInfo   :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfo: PCONSOLE_SCREEN_BUFFER_INFO) -> BOOL ---
+	GetConsoleScreenBufferInfoEx :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfoEx: PCONSOLE_SCREEN_BUFFER_INFOEX) -> BOOL ---
+	SetConsoleScreenBufferSize   :: proc(hConsoleOutput: HANDLE, dwSize: COORD) -> BOOL ---
+	SetConsoleWindowInfo         :: proc(hConsoleOutput: HANDLE, bAbsolute: BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
+	GetConsoleCursorInfo         :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
+	SetConsoleCursorInfo         :: proc(hConsoleOutput: HANDLE, lpConsoleCursorInfo: PCONSOLE_CURSOR_INFO) -> BOOL ---
 
 	GetDiskFreeSpaceExW :: proc(
 		lpDirectoryName: LPCWSTR,

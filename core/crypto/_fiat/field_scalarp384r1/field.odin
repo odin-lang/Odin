@@ -31,7 +31,7 @@ fe_from_bytes :: proc "contextless" (
 	out1: ^Montgomery_Domain_Field_Element,
 	arg1: []byte,
 ) -> bool {
-	ensure_contextless(len(out1) <= 64, "p384r1: invalid scalar input buffer")
+	ensure_contextless(len(arg1) <= 64, "p384r1: invalid scalar input buffer")
 
 	is_canonical := false
 	s_len := len(arg1)
@@ -60,7 +60,7 @@ fe_from_bytes :: proc "contextless" (
 		reduced[3], borrow = bits.sub_u64(tmp[3], ELL[3], borrow)
 		reduced[4], borrow = bits.sub_u64(tmp[4], ELL[4], borrow)
 		reduced[5], borrow = bits.sub_u64(tmp[5], ELL[5], borrow)
-		need_reduced := subtle.u64_is_zero(borrow)
+		need_reduced := subtle.eq0(borrow)
 
 		fe_cond_select(&tmp, &tmp, &reduced, int(need_reduced))
 		fe_to_montgomery(out1, &tmp)

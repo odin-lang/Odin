@@ -2,10 +2,6 @@ package sdl3
 
 import "core:c"
 
-@(link_prefix="SDL_")
-foreign lib {
-	joystick_lock: ^Mutex
-}
 
 Joystick :: struct {}
 JoystickID :: distinct Uint32

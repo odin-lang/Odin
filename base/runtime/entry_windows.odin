@@ -16,10 +16,15 @@ when ODIN_BUILD_MODE == .Dynamic {
 
 		switch dll_forward_reason {
 		case .Process_Attach:
-			#force_no_inline _startup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
+			when ODIN_CODEPAGE_MAGIC {
+				old_console_codepage = GetConsoleOutputCP()
+				SetConsoleOutputCP(UTF_8)
+			}
 			intrinsics.__entry_point()
 		case .Process_Detach:
-			#force_no_inline _cleanup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _cleanup_runtime() }
+			when ODIN_CODEPAGE_MAGIC { SetConsoleOutputCP(old_console_codepage) }
 		case .Thread_Attach:
 			break
 		case .Thread_Detach:
@@ -35,18 +40,28 @@ when ODIN_BUILD_MODE == .Dynamic {
 		main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
 			args__ = argv[:argc]
 			context = default_context()
-			#force_no_inline _startup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
+			when ODIN_CODEPAGE_MAGIC {
+				old_console_codepage = GetConsoleOutputCP()
+				SetConsoleOutputCP(UTF_8)
+			}
 			intrinsics.__entry_point()
-			#force_no_inline _cleanup_runtime()
+			when !ODIN_BEDROCK       { #force_no_inline _cleanup_runtime() }
+			when ODIN_CODEPAGE_MAGIC { SetConsoleOutputCP(old_console_codepage) }
 			return 0
 		}
 	} else when ODIN_NO_CRT {
 		@(link_name="mainCRTStartup", linkage="strong", require)
 		mainCRTStartup :: proc "system" () -> i32 {
 			context = default_context()
-			#force_no_inline _startup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
+			when ODIN_CODEPAGE_MAGIC {
+				old_console_codepage = GetConsoleOutputCP()
+				SetConsoleOutputCP(UTF_8)
+			}
 			intrinsics.__entry_point()
-			#force_no_inline _cleanup_runtime()
+			when !ODIN_BEDROCK       { #force_no_inline _cleanup_runtime() }
+			when ODIN_CODEPAGE_MAGIC { SetConsoleOutputCP(old_console_codepage) }
 			return 0
 		}
 	} else {
@@ -54,9 +69,14 @@ when ODIN_BUILD_MODE == .Dynamic {
 		main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
 			args__ = argv[:argc]
 			context = default_context()
-			#force_no_inline _startup_runtime()
+			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
+			when ODIN_CODEPAGE_MAGIC {
+				old_console_codepage = GetConsoleOutputCP()
+				SetConsoleOutputCP(UTF_8)
+			}
 			intrinsics.__entry_point()
-			#force_no_inline _cleanup_runtime()
+			when !ODIN_BEDROCK       { #force_no_inline _cleanup_runtime() }
+			when ODIN_CODEPAGE_MAGIC { SetConsoleOutputCP(old_console_codepage) }
 			return 0
 		}
 	}

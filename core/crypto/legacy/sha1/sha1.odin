@@ -19,6 +19,7 @@ package sha1
         zhibog, dotbmp:  Initial implementation.
 */
 
+import "base:intrinsics"
 import "core:crypto"
 import "core:encoding/endian"
 import "core:math/bits"
@@ -107,7 +108,7 @@ final :: proc(ctx: ^Context, hash: []byte, finalize_clone: bool = false) {
 			i += 1
 		}
 		transform(ctx, ctx.data[:])
-		crypto.set(&ctx.data, 0, 56)
+		intrinsics.mem_zero(&ctx.data, 56)
 	}
 
 	ctx.bitlen += u64(ctx.datalen * 8)

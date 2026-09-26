@@ -1,4 +1,4 @@
-#+build linux, darwin, netbsd, openbsd, freebsd, haiku
+#+build linux, darwin, netbsd, openbsd, freebsd
 package posix
 
 import "core:c"
@@ -31,30 +31,19 @@ Protocol :: enum c.int {
 	UDP  = IPPROTO_UDP,
 }
 
-when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux || ODIN_OS == .Haiku {
+when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS == .OpenBSD || ODIN_OS == .Linux {
 
 	in_addr :: struct {
 		s_addr: in_addr_t, /* [PSX] big endian address */
 	}
 
-	when ODIN_OS == .Haiku {
-		in6_addr :: struct #packed {
-			using _: struct #raw_union {
-				s6_addr:     [16]c.uint8_t, /* [PSX] big endian address */
-				__u6_addr16: [8]c.uint16_t,
-				__u6_addr32: [4]c.uint32_t,
-			},
-		}
-	} else {
-		in6_addr :: struct {
-			using _: struct #raw_union {
-				s6_addr:     [16]c.uint8_t, /* [PSX] big endian address */
-				__u6_addr16: [8]c.uint16_t,
-				__u6_addr32: [4]c.uint32_t,
-			},
-		}
+	in6_addr :: struct {
+		using _: struct #raw_union {
+			s6_addr:     [16]c.uint8_t, /* [PSX] big endian address */
+			__u6_addr16: [8]c.uint16_t,
+			__u6_addr32: [4]c.uint32_t,
+		},
 	}
-
 
 	when ODIN_OS == .Linux {
 
@@ -88,13 +77,8 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 
 	} else {
 
-		when ODIN_OS == .Haiku {
-			@(private)
-			_SIN_ZEROSIZE :: 24
-		} else {
-			@(private)
-			_SIN_ZEROSIZE :: 8
-		}
+		@(private)
+		_SIN_ZEROSIZE :: 8
 
 		sockaddr_in :: struct {
 			sin_len:    c.uint8_t,
@@ -118,23 +102,13 @@ when ODIN_OS == .Darwin || ODIN_OS == .FreeBSD || ODIN_OS == .NetBSD || ODIN_OS 
 			ipv6mr_interface: c.uint,   /* [PSX] interface index */
 		}
 
-		when ODIN_OS == .Haiku {
-			IPV6_JOIN_GROUP     :: 28
-			IPV6_LEAVE_GROUP    :: 29
-			IPV6_MULTICAST_HOPS :: 25
-			IPV6_MULTICAST_IF   :: 24
-			IPV6_MULTICAST_LOOP :: 26
-			IPV6_UNICAST_HOPS   :: 27
-			IPV6_V6ONLY         :: 30	
-		} else {
-			IPV6_JOIN_GROUP     :: 12
-			IPV6_LEAVE_GROUP    :: 13
-			IPV6_MULTICAST_HOPS :: 10
-			IPV6_MULTICAST_IF   :: 9
-			IPV6_MULTICAST_LOOP :: 11
-			IPV6_UNICAST_HOPS   :: 4
-			IPV6_V6ONLY         :: 27
-		}
+		IPV6_JOIN_GROUP     :: 12
+		IPV6_LEAVE_GROUP    :: 13
+		IPV6_MULTICAST_HOPS :: 10
+		IPV6_MULTICAST_IF   :: 9
+		IPV6_MULTICAST_LOOP :: 11
+		IPV6_UNICAST_HOPS   :: 4
+		IPV6_V6ONLY         :: 27
 
 	}
 

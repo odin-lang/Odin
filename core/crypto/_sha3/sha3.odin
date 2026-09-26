@@ -31,21 +31,24 @@ DS_SHA3 :: 0x06
 DS_SHAKE :: 0x1f
 DS_CSHAKE :: 0x04
 
+DS_TURBOSHAKE_DEFAULT :: 0x1f
+
 Context :: struct {
-	st:             struct #raw_union {
+	st:                 struct #raw_union {
 		b: [200]u8,
 		q: [25]u64,
 	},
-	pt:             int,
-	rsiz:           int,
-	mdlen:          int,
-	dsbyte:         byte,
-	is_initialized: bool,
-	is_finalized:   bool, // For SHAKE (unlimited squeeze is allowed)
+	pt:                 int,
+	rsiz:               int,
+	mdlen:              int,
+	keccak_round_start: i32, // Round at which keccak_permute starts
+	dsbyte:             byte,
+	is_initialized:     bool,
+	is_finalized:       bool, // For SHAKE (unlimited squeeze is allowed)
 }
 
 @(private, rodata)
-keccakf_rndc := [?]u64 {
+keccak_rndc := [?]u64 {
 	0x0000000000000001, 0x0000000000008082, 0x800000000000808a,
 	0x8000000080008000, 0x000000000000808b, 0x0000000080000001,
 	0x8000000080008081, 0x8000000000008009, 0x000000000000008a,
@@ -57,20 +60,23 @@ keccakf_rndc := [?]u64 {
 }
 
 @(private, rodata)
-keccakf_rotc := [?]int {
+keccak_rotc := [?]int {
 	1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14,
 	27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44,
 }
 
 @(private, rodata)
-keccakf_piln := [?]i32 {
+keccak_piln := [?]i32 {
 	10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4,
 	15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1,
 }
 
+// Covers the Keccak permutation rounds, allows for a starting round parameter to support for example Keccak-p[1600,12]
 @(private)
-keccakf :: proc "contextless" (st: ^[25]u64) {
-	i, j, r: i32 = ---, ---, ---
+keccak_permute :: proc "contextless" (st: ^[25]u64, starting_round: i32 = 0) {
+	ensure_contextless((starting_round >= 0 && starting_round <= 23), "crypto/sha3: invalid Keccak permutation starting round")
+
+	i, j, r: i32 = ---, ---, starting_round
 	t: u64 = ---
 	bc: [5]u64 = ---
 
@@ -80,7 +86,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 		}
 	}
 
-	for r = 0; r < ROUNDS; r += 1 {
+	for ; r < ROUNDS; r += 1 {
 		// theta
 		for i = 0; i < 5; i += 1 {
 			bc[i] = st[i] ~ st[i + 5] ~ st[i + 10] ~ st[i + 15] ~ st[i + 20]
@@ -96,9 +102,9 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 		// rho pi
 		t = st[1]
 		for i = 0; i < 24; i += 1 {
-			j = keccakf_piln[i]
+			j = keccak_piln[i]
 			bc[0] = st[j]
-			st[j] = bits.rotate_left64(t, keccakf_rotc[i])
+			st[j] = bits.rotate_left64(t, keccak_rotc[i])
 			t = bc[0]
 		}
 
@@ -112,7 +118,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
 			}
 		}
 
-		st[0] ~= keccakf_rndc[r]
+		st[0] ~= keccak_rndc[r]
 	}
 
 	when ODIN_ENDIAN != .Little {
@@ -142,7 +148,7 @@ update :: proc "contextless" (ctx: ^Context, data: []byte) {
 		ctx.st.b[j] ~= data[i]
 		j += 1
 		if j >= ctx.rsiz {
-			keccakf(&ctx.st.q)
+			keccak_permute(&ctx.st.q, ctx.keccak_round_start)
 			j = 0
 		}
 	}
@@ -164,7 +170,7 @@ final :: proc "contextless" (ctx: ^Context, hash: []byte, finalize_clone: bool =
 	ctx.st.b[ctx.pt] ~= ctx.dsbyte
 
 	ctx.st.b[ctx.rsiz - 1] ~= 0x80
-	keccakf(&ctx.st.q)
+	keccak_permute(&ctx.st.q, ctx.keccak_round_start)
 	for i := 0; i < ctx.mdlen; i += 1 {
 		hash[i] = ctx.st.b[i]
 	}
@@ -188,7 +194,7 @@ shake_xof :: proc "contextless" (ctx: ^Context) {
 
 	ctx.st.b[ctx.pt] ~= ctx.dsbyte
 	ctx.st.b[ctx.rsiz - 1] ~= 0x80
-	keccakf(&ctx.st.q)
+	keccak_permute(&ctx.st.q, ctx.keccak_round_start)
 	ctx.pt = 0
 
 	ctx.is_finalized = true // No more absorb, unlimited squeeze.
@@ -201,7 +207,7 @@ shake_out :: proc "contextless" (ctx: ^Context, hash: []byte) {
 	j := ctx.pt
 	for i := 0; i < len(hash); i += 1 {
 		if j >= ctx.rsiz {
-			keccakf(&ctx.st.q)
+			keccak_permute(&ctx.st.q, ctx.keccak_round_start)
 			j = 0
 		}
 		hash[i] = ctx.st.b[j]

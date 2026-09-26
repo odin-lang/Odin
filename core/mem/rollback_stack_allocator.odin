@@ -344,7 +344,7 @@ rb_resize_bytes_non_zeroed :: proc(
 		}
 	}
 	result = rb_alloc_bytes_non_zeroed(stack, size, alignment) or_return
-	runtime.mem_copy_non_overlapping(raw_data(result), ptr, old_size)
+	runtime.mem_copy_non_overlapping(raw_data(result), ptr, min(old_size, size))
 	err = rb_free(stack, ptr)
 	return
 }

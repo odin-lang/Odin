@@ -2,6 +2,7 @@
 // To process paths such as URLs that depend on forward slashes regardless of the OS, use the slashpath package.
 package filepath
 
+import "base:runtime"
 import "core:os"
 import "core:strings"
 
@@ -32,7 +33,15 @@ Join all `elems` with the system's path separator and normalize the result.
 
 For example, `join_path({"/home", "foo", "bar.txt"})` will result in `"/home/foo/bar.txt"`.
 */
-join :: os.join_path
+join :: proc(
+	elems: []string,
+	allocator := context.allocator,
+) -> (
+	joined: string,
+	err: runtime.Allocator_Error,
+) {
+	return os.join_path(elems, allocator)
+}
 
 /*
 	Returns leading volume name.
@@ -136,7 +145,15 @@ long_ext :: os.long_ext
 	If the result of the path is an empty string, the returned path with be `"."`.
 
 */
-clean :: os.clean_path
+clean :: proc(
+	path: string,
+	allocator := context.allocator,
+) -> (
+	cleaned: string,
+	err: runtime.Allocator_Error,
+) {
+	return os.clean_path(path, allocator)
+}
 
 /*
 Returns the result of replacing each path separator character in the path
@@ -144,7 +161,16 @@ with the specific character `new_sep`.
 
 *Allocates Using Provided Allocator*
 */
-replace_path_separators := os.replace_path_separators
+replace_separators :: proc(
+	path: string,
+	new_sep: rune,
+	allocator := context.allocator,
+) -> (
+	new_path: string,
+	err: os.Error,
+) {
+	return os.replace_path_separators(path, new_sep, allocator)
+}
 
 /*
 Return true if `path` is an absolute path as opposed to a relative one.
@@ -156,7 +182,16 @@ Get the absolute path to `path` with respect to the process's current directory.
 
 *Allocates Using Provided Allocator*
 */
-abs :: os.get_absolute_path
+@(require_results)
+abs :: proc(
+	path: string,
+	allocator := context.allocator,
+) -> (
+	absolute_path: string,
+	error: os.Error,
+) {
+	return os.get_absolute_path(path, allocator)
+}
 
 Relative_Error :: enum {
 	None,
@@ -249,17 +284,7 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 	`dir` calls `clean` on the path and trailing separators are removed. If the path is empty or consists purely
 	of separators, then `"."` is returned.
 */
-dir :: proc(path: string, allocator := context.allocator) -> string {
-	i := len(path) > 0 ? len(path) - 1 : 0
-	for i > 0 && !is_separator(path[i]) {
-		i -= 1
-	}
-	res, dir_err := clean(path[:i], allocator)
-
-	if dir_err != nil { return "" }
-	return res
-}
-
+dir :: os.dir
 
 
 // Splits the PATH-like `path` string, returning an array of its separated components (delete after use).

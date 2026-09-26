@@ -146,6 +146,7 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 							for i in 0..<count {
 								write_rune(&builder, decoded[i])
 							}
+							prev = decoded[count - 1]
 							continue
 						}
 					}

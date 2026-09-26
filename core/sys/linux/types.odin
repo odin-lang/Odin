@@ -65,7 +65,7 @@ Time_Spec :: struct {
 }
 
 /*
-	Represents time with millisecond precision.
+	Represents time with microsecond precision.
 */
 Time_Val :: struct {
 	seconds:      int,
@@ -747,10 +747,10 @@ Sig_Action_Special :: enum uint {
 }
 
 Sig_Action_Flags :: bit_set[Sig_Action_Flag; uint]
-Sig_Action :: struct($T: typeid) {
+Sig_Action :: struct {
 	using _u: struct #raw_union {
 		handler: Sig_Handler_Fn,
-		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: ^T),
+		sigaction: #type proc "c" (sig: Signal, si: ^Sig_Info, ctx: rawptr),
 		special: Sig_Action_Special,
 	},
 	flags: Sig_Action_Flags,

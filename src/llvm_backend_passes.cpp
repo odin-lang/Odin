@@ -3,9 +3,17 @@
 		array_add(&passes, "function(annotation-remarks)");
 		break;
 	case 0:
-		array_add(&passes, "always-inline");
-		if (build_context.internal_llvm_mem2reg) {
-			array_add(&passes, "function<eager-inv>(mem2reg)");
+		if (build_context.internal_llvm_no_sroa) {
+			// Old -o:minimal behavior
+			array_add(&passes, "always-inline");
+		} else {
+			array_add(&passes, "annotation2metadata");
+			array_add(&passes, "inferattrs");
+			array_add(&passes, "forceattrs");
+			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,early-cse<>)");
+			array_add(&passes, "always-inline");
+			array_add(&passes, "function<eager-inv>(sroa<modify-cfg>,instsimplify,simplifycfg<bonus-inst-threshold=1;no-forward-switch-cond;switch-range-to-icmp;no-switch-to-lookup;keep-loops;no-hoist-common-insts;no-sink-common-insts;speculate-blocks;simplify-cond-branch>)");
+			// array_add(&passes, "verify");
 		}
 		array_add(&passes, "function(annotation-remarks)");
 		break;

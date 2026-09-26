@@ -281,7 +281,7 @@ round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Inf
 	}
 
 	upper_: decimal.Decimal; upper := &upper_
-	decimal.assign(upper, 2*mant - 1)
+	decimal.assign(upper, 2*mant + 1)
 	decimal.shift(upper, exp - int(flt.mantbits) - 1)
 
 	mantlo: u64

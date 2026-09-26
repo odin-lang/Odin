@@ -7,7 +7,7 @@ Declarations which are required by the compiler
 There are a lot of files in this package and below is described roughly what
 kind of functionality is placed in different files:
 
-| File pattern         | Description
+| File pattern         | Description                                          |
 |----------------------|------------------------------------------------------|
 | `core.odin`          | Contains the declarations that compiler will require to be present. Contains context-related declarations, `Type_Info` declarations and some other types used to implement the runtime and other packages. |
 | `core_builtin*.odin` | Contain `@(builtin)` declarations that can be used without importing the package. Most of them aren't required by the compiler |

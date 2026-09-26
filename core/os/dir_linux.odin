@@ -97,8 +97,8 @@ _read_directory_iterator_init :: proc(it: ^Read_Directory_Iterator, f: ^File) {
 		return
 	}
 
-	stat: linux.Stat
-	errno := linux.fstat(linux.Fd(fd(f)), &stat)
+	stat: linux.Statx
+	errno := linux.statx(linux.Fd(fd(f)), "", {.EMPTY_PATH}, {.TYPE}, &stat)
 	if errno != .NONE {
 		read_directory_iterator_set_error(it, name(f), _get_platform_error(errno))
 		return

@@ -222,7 +222,7 @@ utf8_to_wstring_alloc_test :: proc(t : ^testing.T) {
 	buf : [^]u16
 
 	result = win32.utf8_to_wstring_alloc("Hello\x00, World!", allocator)
-	buf = transmute([^]u16)result
+	buf = cast([^]u16)result
 	testing.expect(t, result != nil)
 	testing.expect_value(t, buf[4], 'o')
 	testing.expect_value(t, buf[5], 0)
@@ -231,12 +231,12 @@ utf8_to_wstring_alloc_test :: proc(t : ^testing.T) {
 	testing.expect_value(t, buf[14], 0)
 
 	result = win32.utf8_to_wstring_alloc("H\x00\x00", allocator)
-	buf = transmute([^]u16)result
+	buf = cast([^]u16)result
 	testing.expect(t, result != nil)
 	testing.expect_value(t, buf[1], 0)
 
 	result = win32.utf8_to_wstring_alloc("你好，世界！", allocator)
-	buf = transmute([^]u16)result
+	buf = cast([^]u16)result
 	testing.expect(t, result != nil)
 	testing.expect_value(t, buf[0], 0x4F60)
 	testing.expect_value(t, buf[1], 0x597D)
@@ -247,7 +247,7 @@ utf8_to_wstring_alloc_test :: proc(t : ^testing.T) {
 	testing.expect_value(t, buf[6], 0)
 
 	result = win32.utf8_to_wstring_alloc("", allocator)
-	buf = transmute([^]u16)result
+	buf = cast([^]u16)result
 	// Valid, and distinguishable from an error.
 	testing.expect(t, result != nil)
 	testing.expect_value(t, buf[0], 0)

@@ -27,7 +27,7 @@ when ODIN_OS == .Windows {
 }
 
 when !#exists(LIB_PATH) {
-	#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running the `build_box2d.sh` script at `" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
+	#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running `\"" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
 }
 
 foreign import lib {
@@ -68,6 +68,8 @@ foreign lib {
 	// Override the default assert callback
 	//	@param assertFcn a non-null assert callback
 	SetAssertFcn :: proc(assertfcn: AssertFcn) ---
+	// Get the current version of Box2D.
+	GetVersion   :: proc() -> Version ---
 
 	// Get the absolute number of system ticks. The value is platform specific.
 	GetTicks                :: proc() -> u64 ---
@@ -988,22 +990,22 @@ foreign lib {
 	// Create a circle shape and attach it to a body. The shape definition and geometry are fully cloned.
 	// Contacts are not created until the next time step.
 	//	@return the shape id for accessing the shape
-	CreateCircleShape              :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr circle: Circle) -> ShapeId ---
+	CreateCircleShape              :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, circle: ^Circle) -> ShapeId ---
 
 	// Create a line segment shape and attach it to a body. The shape definition and geometry are fully cloned.
 	// Contacts are not created until the next time step.
 	//	@return the shape id for accessing the shape
-	CreateSegmentShape             :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr segment: Segment) -> ShapeId ---
+	CreateSegmentShape             :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, segment: ^Segment) -> ShapeId ---
 
 	// Create a capsule shape and attach it to a body. The shape definition and geometry are fully cloned.
 	// Contacts are not created until the next time step.
 	//	@return the shape id for accessing the shape
-	CreateCapsuleShape             :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr capsule: Capsule) -> ShapeId ---
+	CreateCapsuleShape             :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, capsule: ^Capsule) -> ShapeId ---
 
 	// Create a polygon shape and attach it to a body. The shape definition and geometry are fully cloned.
 	// Contacts are not created until the next time step.
 	//	@return the shape id for accessing the shape
-	CreatePolygonShape             :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, #by_ptr polygon: Polygon) -> ShapeId ---
+	CreatePolygonShape             :: proc(bodyId: BodyId, #by_ptr def: ShapeDef, polygon: ^Polygon) -> ShapeId ---
 
 	// Destroy a shape. You may defer the body mass update which can improve performance if several shapes on a
 	//	body are destroyed at once.

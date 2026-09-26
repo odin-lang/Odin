@@ -536,8 +536,15 @@ scratch_alloc_bytes_non_zeroed :: proc(
 		// we don't need to be so strict about every byte.
 		aligned_size += alignment - 1
 	}
-	if s.curr_offset+aligned_size <= len(s.data) {
-		offset := uintptr(s.curr_offset)
+	if aligned_size <= len(s.data) {
+		offset := uintptr(0)
+		if s.curr_offset+aligned_size <= len(s.data) {
+			offset = uintptr(s.curr_offset)
+		} else {
+			// The allocation will cause an overflow past the boundary of the
+			// space available, so reset to the starting offset.
+			offset = 0
+		}
 		start := uintptr(raw_data(s.data))
 		ptr := rawptr(offset+start)
 		// We keep track of the original base pointer without extra alignment
@@ -1338,6 +1345,9 @@ small_stack_alloc_non_zeroed :: proc(
 	return raw_data(bytes), err
 }
 
+@(private="file")
+SMALL_STACK_MAX_ALIGNMENT :: 1 << (8*size_of(Small_Stack_Allocation_Header{}.padding) - 1)
+
 /*
 Allocate memory from a small stack allocator.
 
@@ -1356,7 +1366,10 @@ small_stack_alloc_bytes_non_zeroed :: proc(
 		panic("Allocation on an uninitialized Small Stack allocator.", loc)
 	}
 	alignment := alignment
-	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
+	alignment = max(alignment, 1)
+	if alignment > SMALL_STACK_MAX_ALIGNMENT {
+		return nil, .Invalid_Argument
+	}
 	curr_addr := uintptr(raw_data(s.data)) + uintptr(s.offset)
 	padding := calc_padding_with_header(curr_addr, uintptr(alignment), size_of(Small_Stack_Allocation_Header))
 	if s.offset + padding + size > len(s.data) {
@@ -1544,7 +1557,10 @@ small_stack_resize_bytes_non_zeroed :: proc(
 	old_memory := raw_data(old_data)
 	old_size   := len(old_data)
 	alignment  := alignment
-	alignment = clamp(alignment, 1, 8*size_of(Stack_Allocation_Header{}.padding)/2)
+	alignment  = max(alignment, 1)
+	if alignment > SMALL_STACK_MAX_ALIGNMENT {
+		return nil, .Invalid_Argument
+	}
 	if old_memory == nil {
 		return small_stack_alloc_bytes_non_zeroed(s, size, alignment, loc)
 	}
@@ -1621,20 +1637,6 @@ small_stack_allocator_proc :: proc(
 	return nil, nil
 }
 
-
-/* Preserved for compatibility */
-Dynamic_Pool                          :: Dynamic_Arena
-DYNAMIC_POOL_BLOCK_SIZE_DEFAULT       :: DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT
-DYNAMIC_POOL_OUT_OF_BAND_SIZE_DEFAULT :: DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT
-dynamic_pool_allocator_proc           :: dynamic_arena_allocator_proc
-dynamic_pool_free_all                 :: dynamic_arena_free_all
-dynamic_pool_reset                    :: dynamic_arena_reset
-dynamic_pool_alloc_bytes              :: dynamic_arena_alloc_bytes
-dynamic_pool_alloc                    :: dynamic_arena_alloc
-dynamic_pool_init                     :: dynamic_arena_init
-dynamic_pool_allocator                :: dynamic_arena_allocator
-dynamic_pool_destroy                  :: dynamic_arena_destroy
-
 /*
 Default block size for dynamic arena.
 */
@@ -1651,7 +1653,7 @@ Dynamic arena allocator data.
 Dynamic_Arena :: struct {
 	block_size:           int,
 	out_band_size:        int,
-	alignment:            int,
+	minimum_alignment:    int,
 	unused_blocks:        [dynamic]rawptr,
 	used_blocks:          [dynamic]rawptr,
 	out_band_allocations: [dynamic]rawptr,
@@ -1668,23 +1670,23 @@ This procedure initializes a dynamic arena. The specified `block_allocator`
 will be used to allocate arena blocks, and `array_allocator` to allocate
 arrays of blocks and out-band blocks. The blocks have the default size of
 `block_size` and out-band threshold will be `out_band_size`. All allocations
-will be aligned to a boundary specified by `alignment`.
+will be aligned at a minimum to a boundary specified by `minimum_alignment`.
 */
 dynamic_arena_init :: proc(
-	pool: ^Dynamic_Arena,
-	block_allocator := context.allocator,
-	array_allocator := context.allocator,
-	block_size      := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
-	out_band_size   := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
-	alignment       := DEFAULT_ALIGNMENT,
+	arena: ^Dynamic_Arena,
+	block_allocator   := context.allocator,
+	array_allocator   := context.allocator,
+	block_size        := DYNAMIC_ARENA_BLOCK_SIZE_DEFAULT,
+	out_band_size     := DYNAMIC_ARENA_OUT_OF_BAND_SIZE_DEFAULT,
+	minimum_alignment := DEFAULT_ALIGNMENT,
 ) {
-	pool.block_size                     = block_size
-	pool.out_band_size                  = out_band_size
-	pool.alignment                      = alignment
-	pool.block_allocator                = block_allocator
-	pool.out_band_allocations.allocator = array_allocator
-	pool.unused_blocks.allocator        = array_allocator
-	pool.used_blocks.allocator          = array_allocator
+	arena.block_size                     = block_size
+	arena.out_band_size                  = out_band_size
+	arena.minimum_alignment              = minimum_alignment
+	arena.block_allocator                = block_allocator
+	arena.out_band_allocations.allocator = array_allocator
+	arena.unused_blocks.allocator        = array_allocator
+	arena.used_blocks.allocator          = array_allocator
 }
 
 /*
@@ -1728,7 +1730,7 @@ dynamic_arena_destroy :: proc(a: ^Dynamic_Arena) {
 }
 
 @(private="file")
-_dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, loc := #caller_location) -> (err: Allocator_Error) {
+_dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, alignment: int, loc := #caller_location) -> (err: Allocator_Error) {
 	if a.block_allocator.procedure == nil {
 		panic("You must call `dynamic_arena_init` on a Dynamic Arena before using it.", loc)
 	}
@@ -1744,7 +1746,7 @@ _dynamic_arena_cycle_new_block :: proc(a: ^Dynamic_Arena, loc := #caller_locatio
 			a.block_allocator.data,
 			Allocator_Mode.Alloc,
 			a.block_size,
-			a.alignment,
+			max(a.minimum_alignment, alignment),
 			nil,
 			0,
 		)
@@ -1766,8 +1768,8 @@ zero-initialized. This procedure returns a pointer to the newly allocated memory
 region.
 */
 @(require_results)
-dynamic_arena_alloc :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
-	data, err := dynamic_arena_alloc_bytes(a, size, loc)
+dynamic_arena_alloc :: proc(a: ^Dynamic_Arena, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> (rawptr, Allocator_Error) {
+	data, err := dynamic_arena_alloc_bytes(a, size, alignment, loc)
 	return raw_data(data), err
 }
 
@@ -1780,8 +1782,8 @@ zero-initialized. This procedure returns a slice of the newly allocated memory
 region.
 */
 @(require_results)
-dynamic_arena_alloc_bytes :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	bytes, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, loc)
+dynamic_arena_alloc_bytes :: proc(a: ^Dynamic_Arena, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	bytes, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
 	if bytes != nil {
 		zero_slice(bytes)
 	}
@@ -1797,8 +1799,8 @@ zero-initialized. This procedure returns a pointer to the newly allocated
 memory region.
 */
 @(require_results)
-dynamic_arena_alloc_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> (rawptr, Allocator_Error) {
-	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, loc)
+dynamic_arena_alloc_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> (rawptr, Allocator_Error) {
+	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
 	return raw_data(data), err
 }
 
@@ -1811,31 +1813,35 @@ zero-initialized. This procedure returns a slice of the newly allocated
 memory region.
 */
 @(require_results)
-dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+dynamic_arena_alloc_bytes_non_zeroed :: proc(a: ^Dynamic_Arena, size: int, alignment: int = DEFAULT_ALIGNMENT, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	if size >= a.out_band_size {
 		assert(a.out_band_allocations.allocator.procedure != nil, "Backing array allocator must be initialized", loc=loc)
-		memory, err := alloc_bytes_non_zeroed(size, a.alignment, a.out_band_allocations.allocator, loc)
+		memory, err := alloc_bytes_non_zeroed(size, alignment, a.out_band_allocations.allocator, loc)
 		if memory != nil {
 			append(&a.out_band_allocations, raw_data(memory), loc = loc)
 		}
 		return memory, err
 	}
-	n := align_formula(size, a.alignment)
+	actual_alignment := max(a.minimum_alignment, alignment)
+	n := align_formula(size, actual_alignment)
 	if n > a.block_size {
 		return nil, .Invalid_Argument
 	}
-	if a.bytes_left < n {
-		err := _dynamic_arena_cycle_new_block(a, loc)
+	memory := align_forward(a.current_pos, uintptr(actual_alignment))
+	margin := int(uintptr(memory) - uintptr(a.current_pos))
+	for a.bytes_left < margin + n {
+		err := _dynamic_arena_cycle_new_block(a, alignment, loc)
 		if err != nil {
 			return nil, err
 		}
 		if a.current_block == nil {
 			return nil, .Out_Of_Memory
 		}
+		memory = align_forward(a.current_pos, uintptr(actual_alignment))
+		margin = int(uintptr(memory) - uintptr(a.current_pos))
 	}
-	memory := a.current_pos
-	a.current_pos = ([^]byte)(a.current_pos)[n:]
-	a.bytes_left -= n
+	a.current_pos = ([^]byte)(memory)[n:]
+	a.bytes_left -= margin + n
 	result := ([^]byte)(memory)[:size]
 	// ensure_poisoned(result)
 	// sanitizer.address_unpoison(result)
@@ -1900,9 +1906,10 @@ dynamic_arena_resize :: proc(
 	old_memory: rawptr,
 	old_size:   int,
 	size:       int,
+	alignment:  int = DEFAULT_ALIGNMENT,
 	loc := #caller_location,
 ) -> (rawptr, Allocator_Error) {
-	bytes, err := dynamic_arena_resize_bytes(a, byte_slice(old_memory, old_size), size, loc)
+	bytes, err := dynamic_arena_resize_bytes(a, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
 }
 
@@ -1921,16 +1928,17 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 dynamic_arena_resize_bytes :: proc(
-	a:        ^Dynamic_Arena,
-	old_data: []byte,
-	size:     int,
+	a:         ^Dynamic_Arena,
+	old_data:  []byte,
+	size:      int,
+	alignment: int = DEFAULT_ALIGNMENT,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if size == 0 {
 		// NOTE: This allocator has no Free mode.
 		return nil, nil
 	}
-	bytes, err := dynamic_arena_resize_bytes_non_zeroed(a, old_data, size, loc)
+	bytes, err := dynamic_arena_resize_bytes_non_zeroed(a, old_data, size, alignment, loc)
 	if bytes != nil {
 		if old_data == nil {
 			zero_slice(bytes)
@@ -1960,9 +1968,10 @@ dynamic_arena_resize_non_zeroed :: proc(
 	old_memory: rawptr,
 	old_size:   int,
 	size:       int,
+	alignment:  int = DEFAULT_ALIGNMENT,
 	loc := #caller_location,
 ) -> (rawptr, Allocator_Error) {
-	bytes, err := dynamic_arena_resize_bytes_non_zeroed(a, byte_slice(old_memory, old_size), size, loc)
+	bytes, err := dynamic_arena_resize_bytes_non_zeroed(a, byte_slice(old_memory, old_size), size, alignment, loc)
 	return raw_data(bytes), err
 }
 
@@ -1981,9 +1990,10 @@ This procedure returns the slice of the resized memory region.
 */
 @(require_results)
 dynamic_arena_resize_bytes_non_zeroed :: proc(
-	a:        ^Dynamic_Arena,
-	old_data: []byte,
-	size:     int,
+	a:         ^Dynamic_Arena,
+	old_data:  []byte,
+	size:      int,
+	alignment: int = DEFAULT_ALIGNMENT,
 	loc := #caller_location,
 ) -> ([]byte, Allocator_Error) {
 	if size == 0 {
@@ -1998,7 +2008,7 @@ dynamic_arena_resize_bytes_non_zeroed :: proc(
 	}
 	// No information is kept about allocations in this allocator, thus we
 	// cannot truly resize anything and must reallocate.
-	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, loc)
+	data, err := dynamic_arena_alloc_bytes_non_zeroed(a, size, alignment, loc)
 	if err == nil {
 		runtime.copy(data, byte_slice(old_memory, old_size))
 	}
@@ -2017,17 +2027,17 @@ dynamic_arena_allocator_proc :: proc(
 	arena := (^Dynamic_Arena)(allocator_data)
 	switch mode {
 	case .Alloc:
-		return dynamic_arena_alloc_bytes(arena, size, loc)
+		return dynamic_arena_alloc_bytes(arena, size, alignment, loc)
 	case .Alloc_Non_Zeroed:
-		return dynamic_arena_alloc_bytes_non_zeroed(arena, size, loc)
+		return dynamic_arena_alloc_bytes_non_zeroed(arena, size, alignment, loc)
 	case .Free:
 		return nil, .Mode_Not_Implemented
 	case .Free_All:
 		dynamic_arena_free_all(arena, loc)
 	case .Resize:
-		return dynamic_arena_resize_bytes(arena, byte_slice(old_memory, old_size), size, loc)
+		return dynamic_arena_resize_bytes(arena, byte_slice(old_memory, old_size), size, alignment, loc)
 	case .Resize_Non_Zeroed:
-		return dynamic_arena_resize_bytes_non_zeroed(arena, byte_slice(old_memory, old_size), size, loc)
+		return dynamic_arena_resize_bytes_non_zeroed(arena, byte_slice(old_memory, old_size), size, alignment, loc)
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
 		if set != nil {
@@ -2038,7 +2048,7 @@ dynamic_arena_allocator_proc :: proc(
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
 			info.size = arena.block_size
-			info.alignment = arena.alignment
+			info.alignment = arena.minimum_alignment
 			return byte_slice(info, size_of(info^)), nil
 		}
 		return nil, nil

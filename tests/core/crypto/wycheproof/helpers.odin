@@ -4,8 +4,6 @@ import "core:crypto/hash"
 import "core:fmt"
 import "core:strings"
 
-panic_fn :: proc(arg: any)
-
 hash_name_to_algorithm :: proc(alg_str: string) -> (hash.Algorithm, bool) {
 	alg_enums := [][hash.Algorithm]string {
 		hash.ALGORITHM_NAMES,

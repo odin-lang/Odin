@@ -134,6 +134,7 @@ register_user_marshaler :: proc(id: typeid, marshaler: User_Marshaler) -> Regist
 	return .None
 }
 
+@(require_results)
 marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator, loc)
 	defer if err != nil {
@@ -781,6 +782,7 @@ cast_any_int_to_u128 :: proc(any_int_value: any) -> u128 {
 	case i16le:  u = u128(i)
 	case i32le:  u = u128(i)
 	case i64le:  u = u128(i)
+	case i128le: u = u128(i)
 	case u16le:  u = u128(i)
 	case u32le:  u = u128(i)
 	case u64le:  u = u128(i)
@@ -789,6 +791,7 @@ cast_any_int_to_u128 :: proc(any_int_value: any) -> u128 {
 	case i16be:  u = u128(i)
 	case i32be:  u = u128(i)
 	case i64be:  u = u128(i)
+	case i128be: u = u128(i)
 	case u16be:  u = u128(i)
 	case u32be:  u = u128(i)
 	case u64be:  u = u128(i)

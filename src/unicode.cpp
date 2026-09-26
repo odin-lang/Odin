@@ -127,7 +127,7 @@ gb_internal isize utf8_decode(u8 const *str, isize str_len, Rune *codepoint_out)
 
 		sz = x&7;
 		accept = global__utf8_accept_ranges[x>>4];
-		if (str_len < gb_size_of(sz))
+		if (str_len < sz)
 			goto invalid_codepoint;
 
 		b1 = str[1];

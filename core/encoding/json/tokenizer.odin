@@ -49,11 +49,12 @@ Tokenizer :: struct {
 	curr_line_offset: int,
 	spec:             Specification,
 	parse_integers:   bool,
-	insert_comma: bool,
+	insert_comma:     bool,
 }
 
 
 
+@(require_results)
 make_tokenizer :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> Tokenizer {
 	t := Tokenizer{pos = {line=1}, data = data, spec = spec, parse_integers = parse_integers}
 	next_rune(&t)
@@ -78,6 +79,7 @@ next_rune :: proc(t: ^Tokenizer) -> rune #no_bounds_check {
 }
 
 
+@(require_results)
 get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 	skip_digits :: proc(t: ^Tokenizer) {
 		for t.offset < len(t.data) {
@@ -101,6 +103,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		}
 	}
 
+	@(require_results)
 	scan_escape :: proc(t: ^Tokenizer) -> bool {
 		switch t.r {
 		case '"', '\'', '\\', '/', 'b', 'n', 'r', 't', 'f':
@@ -125,7 +128,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 		return false
 	}
 
-	skip_whitespace :: proc(t: ^Tokenizer, on_newline: bool) -> rune {
+	skip_whitespace :: proc(t: ^Tokenizer, on_newline: bool) {
 		loop: for t.offset < len(t.data) {
 			switch t.r {
 			case ' ', '\t', '\v', '\f', '\r':
@@ -149,7 +152,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				break loop
 			}
 		}
-		return t.r
+		return
 	}
 
 	skip_to_next_line :: proc(t: ^Tokenizer) {
@@ -310,7 +313,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 				break
 			}
 			if r == '\\' {
-				scan_escape(t)
+				_ = scan_escape(t)
 			}
 		}
 
@@ -347,10 +350,8 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 			case '*':
 				// None-nested multi-line comments
 				for t.offset < len(t.data) {
-					next_rune(t)
-					if t.r == '*' {
-						next_rune(t)
-						if t.r == '/' {
+					if next_rune(t) == '*' {
+						if next_rune(t) == '/' {
 							next_rune(t)
 							return get_token(t)
 						}
@@ -385,6 +386,7 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 
 
+@(require_results)
 is_valid_number :: proc(str: string, spec: Specification) -> bool {
 	s := str
 	if s == "" {
@@ -473,6 +475,7 @@ is_valid_number :: proc(str: string, spec: Specification) -> bool {
 	return s == ""
 }
 
+@(require_results)
 is_valid_string_literal :: proc(str: string, spec: Specification) -> bool {
 	s := str
 	if len(s) < 2 {

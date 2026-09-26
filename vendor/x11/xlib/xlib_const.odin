@@ -110,6 +110,8 @@ PropModePrepend :: 1
 PropModeAppend  :: 2
 
 XA_ATOM              :: Atom(4)
+XA_CARDINAL          :: Atom(6)
+XA_INTEGER           :: Atom(19)
 XA_WM_CLASS          :: Atom(67)
 XA_WM_CLIENT_MACHINE :: Atom(36)
 XA_WM_COMMAND        :: Atom(34)
@@ -711,7 +713,7 @@ AllHints :: WMHints{
 	.WindowGroupHint,
 }
 
-SizeHints :: bit_set[SizeHintsBits; uint]
+SizeHints :: bit_set[SizeHintsBits; int]
 SizeHintsBits :: enum {
 	USPosition  = 0,
 	USSize      = 1,

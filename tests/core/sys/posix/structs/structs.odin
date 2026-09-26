@@ -45,9 +45,7 @@ main :: proc() {
 
 	fmt.println("passwd", size_of(posix.passwd), align_of(posix.passwd))
 
-	when ODIN_OS != .Haiku {
-		fmt.println("shmid_ds", size_of(posix.shmid_ds), align_of(posix.shmid_ds))
-	}
+	fmt.println("shmid_ds", size_of(posix.shmid_ds), align_of(posix.shmid_ds))
 	
 	fmt.println("ipc_perm", size_of(posix.ipc_perm), align_of(posix.ipc_perm))
 	fmt.println("msqid_ds", size_of(posix.msqid_ds), align_of(posix.msqid_ds))
@@ -81,9 +79,7 @@ main :: proc() {
 
 	fmt.println("utimbuf", size_of(posix.utimbuf), align_of(posix.utimbuf))
 
-	when ODIN_OS != .Haiku {
-		fmt.println("wordexp_t", size_of(posix.wordexp_t), align_of(posix.wordexp_t))
-	}
+	fmt.println("wordexp_t", size_of(posix.wordexp_t), align_of(posix.wordexp_t))
 	
 	fmt.println("time_t", size_of(posix.time_t), align_of(posix.time_t))
 	fmt.println("timespec", size_of(posix.timespec), align_of(posix.timespec))

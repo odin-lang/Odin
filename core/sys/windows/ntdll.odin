@@ -7,6 +7,19 @@ foreign import ntdll_lib "system:ntdll.lib"
 foreign ntdll_lib {
 	RtlGetVersion :: proc(lpVersionInformation: ^OSVERSIONINFOEXW) -> NTSTATUS ---
 
+	NtDeviceIoControlFile :: proc(
+		FileHandle:         HANDLE,
+		Event:              HANDLE,
+		ApcRoutine:         PIO_APC_ROUTINE,
+		ApcContext:         rawptr,
+		IoStatusBlock:      PIO_STATUS_BLOCK,
+		IoControlCode:      ULONG,
+		InputBuffer:        rawptr,
+		InputBufferLength:  ULONG,
+		OutputBuffer:       rawptr,
+		OutputBufferLength: ULONG,
+	) -> NTSTATUS ---
+
 
 	NtQueryInformationProcess :: proc(
 		ProcessHandle:            HANDLE,
@@ -50,6 +63,22 @@ foreign ntdll_lib {
 		EaBuffer: PVOID,
 		EaLength: ULONG,
 	) -> NTSTATUS ---
+
+
+	NtAssociateWaitCompletionPacket :: proc(
+		WaitCompletionPacketHandle: HANDLE,
+		IoCompletionHandle:         HANDLE,
+		TargetObjectHandle:         HANDLE,
+		KeyContext:                 PVOID,
+		ApcContext:                 PVOID,
+		IoStatus:                   NTSTATUS,
+		IoStatusInformation:        ULONG_PTR,
+		AlreadySignaled:            ^BOOLEAN,
+	) -> NTSTATUS ---
+
+	NtDelayExecution :: proc(Alertable: BOOL, DelayInterval: PLARGE_INTEGER) -> NTSTATUS ---
+
+	ZwSetTimerResolution :: proc(RequestedResolution: ULONG, Set: BOOLEAN, ActualResolution: PULONG) -> NTSTATUS ---
 }
 
 

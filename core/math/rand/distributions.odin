@@ -1,5 +1,6 @@
 package rand
 
+import "base:runtime"
 import "core:math"
 
 float64_uniform :: float64_range
@@ -335,4 +336,77 @@ float64_gompertz :: proc(eta, b: f64, gen := context.random_generator) -> f64 {
 @(require_results)
 float32_gompertz :: proc(eta, b: f32, gen := context.random_generator) -> f32 {
 	return f32(float64_gompertz(f64(eta), f64(b), gen))
+}
+
+
+
+// A contextual structure for generating Zipf distributed variates.
+Zipf :: struct {
+	gen:           runtime.Random_Generator,
+	imax:          f64,
+	v:             f64,
+	q:             f64,
+	s:             f64,
+	oneminus_Q:    f64,
+	oneminus_Qinv: f64,
+	hxm:           f64,
+	hx0_minus_hxm: f64,
+}
+
+
+// Creates a Zipf variate generator.
+// The generator produces values k ∈ [0, imax] such that P(k) is proportional to (v + k) ** (-s).
+// The parameters must be: s > 1 and v >= 1
+//
+// W.Hormann, G.Derflinger:
+// "Rejection-Inversion to Generate Variates from Monotone Discrete Distributions"
+// [[ http://eeyore.wu-wien.ac.at/papers/96-04-04.wh-der.ps.gz ]]
+@(require_results)
+zipf_create :: proc(s, v: f64, imax: u64, gen := context.random_generator) -> (z: Zipf, ok: bool) {
+	if s <= 1 || v < 1 {
+		return
+	}
+	z.gen           = gen
+	z.imax          = f64(imax)
+	z.v             = v
+	z.q             = s
+	z.oneminus_Q    = 1.0 - z.q
+	z.oneminus_Qinv = 1.0 / z.oneminus_Q
+	z.hxm           = zipf_h(z, z.imax + 0.5)
+	z.hx0_minus_hxm = zipf_h(z, 0.5) - math.exp(math.ln(z.v)*(-z.q)) - z.hxm
+	z.s             = 1 - zipf_hinv(z, zipf_h(z, 1.5)-math.exp(-z.q * math.ln(z.v+1.0)))
+	return z, true
+}
+
+
+@(require_results)
+zipf_h :: proc(z: Zipf, x: f64) -> f64 {
+	return math.exp(z.oneminus_Q * math.ln(z.v + x) * z.oneminus_Qinv)
+}
+@(require_results)
+zipf_hinv :: proc(z: Zipf, x: f64) -> f64 {
+	return math.exp(z.oneminus_Qinv * math.ln(z.oneminus_Q * x)) - z.v
+}
+
+
+// Returns a value drawn from the zipf distribution described by the `Zipf` contextual structure.
+@(require_results)
+zipf_uint64 :: proc(z: Zipf) -> u64 {
+	assert(z.gen.procedure != nil)
+	k := f64(0.0)
+
+	for {
+		r := float64(z.gen) // [0, 1)
+		ur := r * z.hx0_minus_hxm + z.hxm
+		x := zipf_hinv(z, ur)
+		k = math.floor(x + 0.5)
+		if k-x <= z.s {
+			break
+		}
+		if ur >= zipf_h(z, k+0.5) - math.exp(-math.ln(k + z.v)*z.q) {
+			break
+		}
+	}
+
+	return u64(k)
 }

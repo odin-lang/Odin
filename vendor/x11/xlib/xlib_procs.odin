@@ -181,11 +181,11 @@ foreign xlib {
 	DestroyWindow     :: proc(display: ^Display, window: Window) ---
 	DestroySubwindows :: proc(display: ^Display, window: Window) ---
 	// Windows: mapping/unmapping
-	MapWindow         :: proc(display: ^Display, window: Window) ---
-	MapRaised         :: proc(display: ^Display, window: Window) ---
-	MapSubwindows     :: proc(display: ^Display, window: Window) ---
-	UnmapWindow       :: proc(display: ^Display, window: Window) ---
-	UnmapSubwindows   :: proc(display: ^Display, window: Window) ---
+	MapWindow         :: proc(display: ^Display, window: Window) -> b32 ---
+	MapRaised         :: proc(display: ^Display, window: Window) -> b32 ---
+	MapSubwindows     :: proc(display: ^Display, window: Window) -> b32 ---
+	UnmapWindow       :: proc(display: ^Display, window: Window) -> b32 ---
+	UnmapSubwindows   :: proc(display: ^Display, window: Window) -> b32 ---
 	// Windows: configuring
 	ConfigureWindow :: proc(
 		display: ^Display,
@@ -295,6 +295,7 @@ foreign xlib {
 		src_y:      i32,
 		dst_x:      ^i32,
 		dst_y:      ^i32,
+		dst_child:  ^Window,
 		) -> b32 ---
 	QueryPointer :: proc(
 		display: ^Display,
@@ -314,10 +315,11 @@ foreign xlib {
 		existing: b32,
 		) -> Atom ---
 	InternAtoms :: proc(
-		display: ^Display,
-		names:   [^]cstring,
-		count:   i32,
-		atoms:   [^]Atom,
+		display:        ^Display,
+		names:          [^]cstring,
+		count:          i32,
+		only_if_exists: b32,
+		atoms_return:   [^]Atom,
 		) -> Status ---
 	GetAtomName :: proc(
 		display: ^Display,
@@ -338,10 +340,10 @@ foreign xlib {
 		long_len:    int,
 		delete:      b32,
 		req_type:    Atom,
-		act_type:    [^]Atom,
-		act_format:  [^]i32,
-		nitems:      [^]uint,
-		bytes_after: [^]uint,
+		act_type:    ^Atom,
+		act_format:  ^i32,
+		nitems:      ^uint,
+		bytes_after: ^uint,
 		props:       ^rawptr,
 	) -> i32 ---
 	ListProperties :: proc(
@@ -656,12 +658,12 @@ foreign xlib {
 	SetGraphicsExposures :: proc(display: ^Display, gc: GC, exp: b32) ---
 	// Graphics functions
 	ClearArea :: proc(
-		display: ^Display, 
-		window:  Window, 
-		x:       i32, 
-		y:       i32, 
-		width:   u32, 
-		height:  u32, 
+		display: ^Display,
+		window:  Window,
+		x:       i32,
+		y:       i32,
+		width:   u32,
+		height:  u32,
 		exp:     b32,
 		) ---
 	ClearWindow :: proc(
@@ -1026,7 +1028,7 @@ foreign xlib {
 	// Events
 	SelectInput   :: proc(display: ^Display, window: Window, mask: EventMask) ---
 	Flush         :: proc(display: ^Display) -> i32 ---
-	Sync          :: proc(display: ^Display, discard: bool) -> i32 ---
+	Sync          :: proc(display: ^Display, discard: b32) -> i32 ---
 	EventsQueued  :: proc(display: ^Display, mode: EventQueueMode) -> i32 ---
 	Pending       :: proc(display: ^Display) -> i32 ---
 	NextEvent     :: proc(display: ^Display, event: ^XEvent) ---
@@ -1301,7 +1303,7 @@ foreign xlib {
 		dipslay:   ^Display,
 		window:    Window,
 		screen_no: i32,
-		) -> Status ---
+		) -> b32 ---
 	WithdrawWindow :: proc(
 		dipslay:   ^Display,
 		window:    Window,
@@ -1366,7 +1368,7 @@ foreign xlib {
 		display: ^Display,
 		window:  Window,
 		) -> ^XWMHints ---
-	// Setting and reading MW_NORMAL_HINTS property
+	// Setting and reading WM_NORMAL_HINTS property
 	AllocSizeHints :: proc() -> ^XSizeHints ---
 	SetWMNormalHints :: proc(
 		display: ^Display,

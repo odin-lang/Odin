@@ -13,7 +13,7 @@ LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/miniaudio.a"
 
 when !#exists(LIB) {
 	// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
-	#panic("Could not find the compiled miniaudio library, it can be compiled by running `make -C \"" + ODIN_ROOT + "vendor/miniaudio/src\"`")
+	#panic("Could not find the compiled miniaudio library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio.sh\"`")
 }
 
 foreign import lib { LIB }
@@ -35,12 +35,12 @@ version_check :: proc "contextless" () {
 		n += copy(buf[n:], BINDINGS_VERSION_STRING)
 		n += copy(buf[n:], ", but version ")
 		n += copy(buf[n:], string(version_string()))
-		n += copy(buf[n:], " is linked, make sure to compile the correct miniaudio version by going to `vendor/miniaudio/src` ")
+		n += copy(buf[n:], " is linked, make sure to compile the correct miniaudio version by executing `")
 
 		when ODIN_OS == .Windows {
-			n += copy(buf[n:], "and executing `build.bat`")
+			n += copy(buf[n:], "vendor\\miniaudio\\src\\build.bat`")
 		} else {
-			n += copy(buf[n:], "and executing `make`")
+			n += copy(buf[n:], "vendor/miniaudio/src/build_miniaudio.sh`")
 		}
 
 		panic_contextless(string(buf[:n]))

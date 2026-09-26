@@ -218,7 +218,7 @@ copy_directory_all :: proc(dst, src: string, dst_perm := Permissions_Default) ->
 
 @(private)
 _copy_directory_all :: proc(dst, src: string, dst_perm := Permissions_Default) -> Error {
-	err := make_directory(dst, dst_perm)
+	err := make_directory_all(dst, dst_perm)
 	if err != nil && err != .Exist {
 		return err
 	}

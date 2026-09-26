@@ -76,8 +76,8 @@ foreign lib {
 	Quit                       :: proc() ---
 	GetNumAudioDecoders        :: proc() -> c.int ---
 	GetAudioDecoder            :: proc(index: c.int) -> cstring ---
-	CreateMixerDevice          :: proc(devid: SDL.AudioDeviceID, #by_ptr spec: SDL.AudioSpec) -> ^Mixer ---
-	CreateMixer                :: proc(#by_ptr spec: SDL.AudioSpec) -> ^Mixer ---
+	CreateMixerDevice          :: proc(devid: SDL.AudioDeviceID, spec: Maybe(^SDL.AudioSpec)) -> ^Mixer ---
+	CreateMixer                :: proc(spec: Maybe(^SDL.AudioSpec)) -> ^Mixer ---
 	DestroyMixer               :: proc(mixer: ^Mixer) ---
 	GetMixerProperties         :: proc(mixer: ^Mixer) -> SDL.PropertiesID ---
 	GetMixerFormat             :: proc(mixer: ^Mixer, spec: ^SDL.AudioSpec) -> c.bool ---
@@ -145,8 +145,8 @@ foreign lib {
 	SetTrackFrequencyRatio     :: proc(track: ^Track, ratio: c.float) -> c.bool ---
 	GetTrackFrequencyRatio     :: proc(track: ^Track) -> c.float ---
 	SetTrackOutputChannelMap   :: proc(track: ^Track, chmap: [^]c.int, count: c.int) -> c.bool ---
-	SetTrackStereo             :: proc(track: ^Track, #by_ptr gains: StereoGains) -> c.bool ---
-	SetTrack3DPosition         :: proc(track: ^Track, #by_ptr position: Point3D) -> c.bool ---
+	SetTrackStereo             :: proc(track: ^Track, gains: Maybe(^StereoGains)) -> c.bool ---
+	SetTrack3DPosition         :: proc(track: ^Track, position: Maybe(^Point3D)) -> c.bool ---
 	GetTrack3DPosition         :: proc(track: ^Track, position: ^Point3D) -> c.bool ---
 	CreateGroup                :: proc(mixer: ^Mixer) -> ^Group ---
 	DestroyGroup               :: proc(group: ^Group) ---

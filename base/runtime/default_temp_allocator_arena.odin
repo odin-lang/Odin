@@ -32,21 +32,26 @@ safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
 
 @(require_results)
 memory_block_alloc :: proc(allocator: Allocator, capacity: uint, alignment: uint, loc := #caller_location) -> (block: ^Memory_Block, err: Allocator_Error) {
-	total_size  := uint(capacity + max(alignment, size_of(Memory_Block)))
-	base_offset := uintptr(max(alignment, size_of(Memory_Block)))
+	min_alignment := max(alignment, uint(align_of(Memory_Block)), 16)
+	assert(min_alignment & (min_alignment-1) == 0, "non-power of two alignment", loc)
 
-	min_alignment: int = max(16, align_of(Memory_Block), int(alignment))
-	data := mem_alloc(int(total_size), min_alignment, allocator, loc) or_return
+	base_offset := align_forward_uint(uint(size_of(Memory_Block)), min_alignment)
+
+	total_size, size_ok := safe_add(capacity, base_offset)
+	if !size_ok {
+		return nil, .Out_Of_Memory
+	}
+
+	data := mem_alloc(int(total_size), int(min_alignment), allocator, loc) or_return
 	block = (^Memory_Block)(raw_data(data))
 	end := uintptr(raw_data(data)[len(data):])
 
 	block.allocator = allocator
-	block.base = ([^]byte)(uintptr(block) + base_offset)
+	block.base = ([^]byte)(uintptr(block) + uintptr(base_offset))
 	block.capacity = uint(end - uintptr(block.base))
 
 	// sanitizer.address_poison(block.base, block.capacity)
 
-	// Should be zeroed
 	assert(block.used == 0)
 	assert(block.prev == nil)
 	return
@@ -226,7 +231,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 				if start < old_end && old_end == block.used && new_end <= block.capacity {
 					// grow data in-place, adjusting next allocation
 					block.used = uint(new_end)
-					arena.total_used = uint(new_end)
+					arena.total_used += size - old_size
 					data = block.base[start:new_end]
 					// sanitizer.address_unpoison(data)
 					return

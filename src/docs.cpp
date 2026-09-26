@@ -1,6 +1,6 @@
 // Generates Documentation
 
-gb_global int print_entity_kind_ordering[Entity_Count] = {
+gb_global int print_entity_kind_ordering[] = {
 	/*Invalid*/     -1,
 	/*Constant*/    0,
 	/*Variable*/    1,
@@ -12,8 +12,10 @@ gb_global int print_entity_kind_ordering[Entity_Count] = {
 	/*LibraryName*/ -1,
 	/*Nil*/         -1,
 	/*Label*/       -1,
+	/*AsmTemplate*/ 5,
 };
-gb_global char const *print_entity_names[Entity_Count] = {
+GB_STATIC_ASSERT(gb_count_of(print_entity_kind_ordering) == Entity_Count);
+gb_global char const *print_entity_names[] = {
 	/*Invalid*/     "",
 	/*Constant*/    "constants",
 	/*Variable*/    "variables",
@@ -25,7 +27,9 @@ gb_global char const *print_entity_names[Entity_Count] = {
 	/*LibraryName*/ "library names",
 	/*Nil*/         "",
 	/*Label*/       "",
+	/*AsmTemplate*/ "asm templates",
 };
+GB_STATIC_ASSERT(gb_count_of(print_entity_names) == Entity_Count);
 
 
 gb_internal GB_COMPARE_PROC(cmp_entities_for_printing) {
@@ -257,6 +261,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 			case Entity_ProcGroup:
 			case Entity_ImportName:
 			case Entity_LibraryName:
+			case Entity_AsmTemplate:
 				// Fine
 				break;
 			}

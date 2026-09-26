@@ -28,8 +28,8 @@ MIN_TAG_SIZE :: 4
 MAX_TAG_SIZE :: (1 << 32) - 1
 
 // RECOMMENDED_TAG_SIZE is the recommended tag size in bytes.
-RECOMMENTED_TAG_SIZE :: 32 // 256-bits
-// RECOMMENDNED_SALT_SIZE is the recommended salt size in bytes.
+RECOMMENDED_TAG_SIZE :: 32 // 256-bits
+// RECOMMENDED_SALT_SIZE is the recommended salt size in bytes.
 RECOMMENDED_SALT_SIZE :: 16 // 128-bits
 
 @(private)
@@ -143,7 +143,7 @@ derive :: proc(
 	m_ := 4 * u64(p) * (m / u64(4 * p))
 	b := mem.alloc_bytes_non_zeroed(
 		int(m_) * BLOCK_SIZE_BYTES,
-		alignment = mem.DEFAULT_PAGE_SIZE,
+		alignment = mem.PAGE_SIZE,
 		allocator = allocator,
 	) or_return
 	defer delete(b, allocator)

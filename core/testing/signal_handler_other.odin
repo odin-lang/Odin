@@ -5,7 +5,6 @@
 #+build !freebsd
 #+build !openbsd
 #+build !netbsd
-#+build !haiku
 package testing
 
 /*

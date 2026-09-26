@@ -2,6 +2,7 @@ package test_core_json
 
 import "core:encoding/json"
 import "core:testing"
+import "core:unicode/utf8"
 import "core:mem/virtual"
 import "base:runtime"
 
@@ -429,6 +430,24 @@ utf8_string_of_multibyte_characters :: proc(t: ^testing.T) {
 }
 
 @test
+invalid_utf8_in_string_is_replaced :: proc(t: ^testing.T) {
+	// Every one of these bytes is invalid on its own, so each is replaced by
+	// U+FFFD, which is three bytes: the unquoted string is longer than the quoted
+	// one, and the buffer has to have been sized for that.
+	val, err := json.parse_string("\"\xff\xfe\xff\xfe\xff\xfe\xff\xfe\"")
+	defer json.destroy_value(val)
+	testing.expectf(t, err == nil, "Expected `json.parse_string` to return nil, got %v", err)
+
+	str, ok := val.(json.String)
+	testing.expect(t, ok, "Expected a string value")
+	testing.expectf(t, len(str) == 8 * utf8.rune_size(utf8.RUNE_ERROR), "Expected eight replacement characters, got %d bytes", len(str))
+	testing.expect(t, utf8.valid_string(string(str)), "Expected the unquoted string to be valid UTF-8")
+	for r in string(str) {
+		testing.expectf(t, r == utf8.RUNE_ERROR, "Expected every rune to be U+FFFD, got %U", r)
+	}
+}
+
+@test
 struct_with_ignore_tags :: proc(t: ^testing.T) {
 	My_Struct :: struct {
 		a: string `json:"-"`,
@@ -527,5 +546,36 @@ enumerated_array :: proc(t: ^testing.T) {
 		err_unmarshal := json.unmarshal(marshaled, &unmarshaled)
 		testing.expect_value(t, err_unmarshal, nil)
 		testing.expect_value(t, unmarshaled, Sparse_Fruit_Stock)
+	}
+}
+
+@test
+malformed_object_frees_its_partial_allocations :: proc(t: ^testing.T) {
+	// parse_object_body allocates a key, then may fail in parse_colon or parse_value before that
+	// key is ever inserted into the object. That proc's cleanup only walks the object, so such a
+	// key was orphaned: unreachable to the caller, which is handed a nil Value, and therefore
+	// leaked on every malformed input of this shape.
+	//
+	// JSON5 makes it reachable from ordinary input, since an unquoted ident is a legal key and
+	// anything other than a colon after it fails -- but plain JSON leaks it too, via a quoted key.
+	//
+	// The test runner's memory tracking is what asserts this: each case only has to parse and be
+	// destroyed without leaving an allocation behind.
+	cases := []string {
+		`{ broken not json`,
+		`{"a" 1}`,
+		`{"a": }`,
+		`{"a": 1, "a": 2}`,
+		`{"a": {"b" 1}}`,
+		`{"a": {"b": {"c" 1}}}`,
+		`{"a": [1, }`,
+	}
+
+	for spec in ([]json.Specification{.JSON, .JSON5}) {
+		for src in cases {
+			value, err := json.parse(transmute([]u8)src, spec = spec)
+			testing.expectf(t, err != nil, "%q must not parse under %v", src, spec)
+			json.destroy_value(value)
+		}
 	}
 }

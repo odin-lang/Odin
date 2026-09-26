@@ -3,6 +3,7 @@ package encoding_json
 import "core:mem"
 
 // NOTE(bill): is_valid will not check for duplicate keys
+@(require_results)
 is_valid :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := false) -> bool {
 	p := make_parser(data, spec, parse_integers, mem.nil_allocator())
 
@@ -21,6 +22,7 @@ is_valid :: proc(data: []byte, spec := DEFAULT_SPECIFICATION, parse_integers := 
 	return validate_object(&p)
 }
 
+@(require_results)
 validate_object_key :: proc(p: ^Parser) -> bool {
 	if p.spec != .JSON {
 		if allow_token(p, .Ident) {
@@ -31,6 +33,7 @@ validate_object_key :: proc(p: ^Parser) -> bool {
 	return err == .None
 }
 
+@(require_results)
 validate_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> bool {
 	for p.curr_token.kind != end_token {
 		if !validate_object_key(p) {
@@ -48,6 +51,7 @@ validate_object_body :: proc(p: ^Parser, end_token: Token_Kind) -> bool {
 	return true
 }
 
+@(require_results)
 validate_object :: proc(p: ^Parser) -> bool {
 	if err := expect_token(p, .Open_Brace); err != .None {
 		return false
@@ -61,6 +65,7 @@ validate_object :: proc(p: ^Parser) -> bool {
 	return true
 }
 
+@(require_results)
 validate_array :: proc(p: ^Parser) -> bool {
 	if err := expect_token(p, .Open_Bracket); err != .None {
 		return false
@@ -83,6 +88,7 @@ validate_array :: proc(p: ^Parser) -> bool {
 	return true
 }
 
+@(require_results)
 validate_value :: proc(p: ^Parser) -> bool {
 	token := p.curr_token
 

@@ -4,6 +4,8 @@ The `vendor:` prefix for Odin imports is a package collection that comes with th
 
 Its use is similar to that of `core:` packages, which would be available in any Odin implementation.
 
+These packages and their associated binary files are curated and maintained by the Odin team. Please don't open pull requests for `vendor:` without first consulting them, whether it be to propose a new package or update bindings to a newer version. In the best of cases this often results in a duplication of effort. Localized fixes where type or procedure definitions diverge between the Odin binding and upstream are welcome.
+
 Presently, the `vendor:` collection comprises the following packages:
 
 ## cgltf
@@ -114,7 +116,7 @@ This package is available under the Zlib license. See `LICENSE` for more details
 
 ## SDL2
 
-Bindings for the cross platform multimedia API [SDL3](https://github.com/libsdl-org/SDL) and its sub-projects.
+Bindings for the cross platform multimedia API [SDL2](https://github.com/libsdl-org/SDL) and its sub-projects.
 
 `SDL2.dll` and `SDL2.lib` are available under SDL's [zlib](https://github.com/libsdl-org/SDL/blob/main/LICENSE.txt) license.
 
@@ -144,7 +146,7 @@ SDL2 TTF relies on 3rd party libraries `zlib`, available under the ZLIB license,
 
 ## SDL3
 
-Bindings for the cross platform multimedia API [SDL2](https://github.com/libsdl-org/SDL) and its sub-projects.
+Bindings for the cross platform multimedia API [SDL3](https://github.com/libsdl-org/SDL) and its sub-projects.
 
 `SDL3.dll` and `SDL3.lib` are available under SDL's [zlib](https://github.com/libsdl-org/SDL/blob/main/LICENSE.txt) license.
 

@@ -413,10 +413,15 @@ e.g.
 	'name.tar.gz' -> 'name.tar'
 	'name.txt'    -> 'name'
 
+Returns an empty string if the path is empty
 Returns an empty string if there is no stem. e.g: '.gitignore'.
 Returns an empty string if there's a trailing path separator.
 */
 stem :: proc(path: string) -> string {
+	if path == "" {
+		return ""
+	}
+
 	// If the last character is a path separator, there is no file.
 	if is_path_separator(path[len(path) - 1]) {
 		return ""
@@ -741,7 +746,7 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error
 		m := make([]string, 1)
-		m[0] = pattern
+		m[0] = strings.clone(pattern)
 		return m[:], nil
 	}
 
