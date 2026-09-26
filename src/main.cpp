@@ -523,6 +523,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalIgnoreLLVMBuild,
 	BuildFlag_InternalIgnorePanic,
 	BuildFlag_InternalModulePerFile,
+	BuildFlag_Cached,
 	BuildFlag_InternalCached,
 	BuildFlag_InternalNoInline,
 	BuildFlag_InternalByValue,
@@ -684,6 +685,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Define,                  str_lit("define"),                    BuildFlagParam_String,  Command__does_check, true);
 	add_flag(&build_flags, BuildFlag_BuildMode,               str_lit("build-mode"),                BuildFlagParam_String,  Command__does_build); // Commands_build is not used to allow for a better error message
 	add_flag(&build_flags, BuildFlag_KeepExecutable,          str_lit("keep-executable"),           BuildFlagParam_None,    Command__does_build | Command_test);
+	add_flag(&build_flags, BuildFlag_Cached,                  str_lit("cached"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_Target,                  str_lit("target"),                    BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Subtarget,               str_lit("subtarget"),                 BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
@@ -1812,6 +1814,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalModulePerFile:
 							build_context.module_per_file = true;
 							build_context.use_separate_modules = true;
+							break;
+						case BuildFlag_Cached:
+							build_context.cached = true;
 							break;
 						case BuildFlag_InternalCached:
 							build_context.cached = true;
@@ -3052,6 +3057,13 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "If you build your program or test using `odin build`, the compiler does not automatically execute");
 			print_usage_line(2, "the resulting program, and this option is not applicable.");
 		}
+
+		if (print_flag("-cached")) {
+			print_usage_line(2, "Caches the built executable and reuses it when nothing that affects it has changed.");
+			print_usage_line(2, "An entry is reused only if the source files, the build flags, the compiler itself,");
+			print_usage_line(2, "and the environment variables that reach the output are all unchanged.");
+			print_usage_line(2, "Cached in $ODIN_CACHE_DIR, else the user cache directory. `odin clear-cache` empties it.");
+		}
 	}
 
 	if (run_or_build) {
@@ -3914,8 +3926,8 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (args.count > 2) {
 		// NOTE(bill): Allow for both `odin command path -flags` and `odin command -flags path`
-		// To do this, if the first argument after the command and last argument is NOT a flag,
-		// then put that last parameter first
+		// To do this, if the first argument after the command is a flag,
+		// then put the first non-flag parameter first
 		isize end_arg = double_dash_pos >= 0 ? double_dash_pos : args.count-1;
 		if (args[1] == "bundle" && args.count > 4) {
 			if (string_starts_with(args[3], str_lit("-")) &&
@@ -3925,14 +3937,21 @@ int main(int arg_count, char const **arg_ptr) {
 				array_inject_at(&args, 3, possible_path);
 			}
 		} else if (args.count > 3) {
-			if (string_starts_with(args[2], str_lit("-")) &&
-			    !string_starts_with(args[end_arg], str_lit("-"))) {
-				String possible_path = args[end_arg];
-				array_ordered_remove(&args, end_arg);
-				array_inject_at(&args, 2, possible_path);
+			if (string_starts_with(args[2], str_lit("-"))) {
+				// All build flags are single argv tokens (`-flag` or `-flag:value`),
+				// so the first non-flag token is the path, wherever it sits amongst
+				// the flags (e.g. `odin run -cached foo.odin -file`).
+				for (isize k = 3; k <= end_arg; k++) {
+					if (!string_starts_with(args[k], str_lit("-"))) {
+						String possible_path = args[k];
+						array_ordered_remove(&args, k);
+						array_inject_at(&args, 2, possible_path);
+						break;
+					}
+				}
 			}
 		}
-	}
+}
 
 	bool run_output = false;
 	if (command == "run" || command == "test") {
@@ -4098,6 +4117,11 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.show_help) {
 		return print_show_help(args[0], command);
+	}
+
+	// -cached identity only: `odin run` shares the `build` entry; `test` stays distinct.
+	if (command == "run" && args.count > 1) {
+		args[1] = str_lit("build");
 	}
 
 	if (build_context.bedrock) {
@@ -4390,7 +4414,12 @@ int main(int arg_count, char const **arg_ptr) {
 	init_checker(checker);
 	defer (destroy_checker(checker)); // this is here because of a `goto`
 
-	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
+	// Only when nothing the checker resolves can join the file list. #load'ed files and foreign
+	// import paths are both known only after checking, so gathering here would produce a shorter
+	// list, hash to a different cache directory, and leave one that is never written to.
+	if (build_context.cached &&
+	    parser->total_seen_load_directive_count.load() == 0 &&
+	    parser->total_seen_foreign_import_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");
 		if (try_cached_build(checker, args)) {
 			goto end_of_code_gen;
@@ -4528,11 +4557,13 @@ end_of_code_gen:;
 
 	if (build_context.cached) {
 		MAIN_TIME_SECTION("write cached build");
-		if (!build_context.build_cache_data.copy_already_done) {
-			try_copy_executable_to_cache();
+		// Manifests vouch for the executable: publish them only once it is in place.
+		bool copy_ok = build_context.build_cache_data.copy_already_done;
+		if (!copy_ok) {
+			copy_ok = try_copy_executable_to_cache();
 		}
 
-		if (failed_to_cache_parsing) {
+		if (failed_to_cache_parsing && copy_ok) {
 			write_cached_build(checker, args);
 		}
 	}

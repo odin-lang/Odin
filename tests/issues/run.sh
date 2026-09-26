@@ -181,6 +181,147 @@ else
 	$ODIN test ../test_issue_5640.odin -o:none $COMMON
 fi
 
+# -cached: an entry may only be reused when nothing that affects the executable has changed.
+# skipped on freebsd: the emulated ci vm sigills on the -cached build, though it passes on every
+# native target plus netbsd.
+if [[ "$(uname)" != "FreeBSD" ]]; then
+	clang -c ../test_cached_foreign_libs.c -o cached_foreign_libs_c.o
+	ar rcs libcached_foreign_libs.a cached_foreign_libs_c.o
+	CACHED_HOME="$PWD/cached_test_home"
+	rm -rf "$CACHED_HOME"
+	# -microarch:native like $COMMON: `odin run` refuses to execute a binary built for a newer
+	# microarch than the host, and CI runners are sometimes an emulated CPU older than the default.
+	cached_build() { ODIN_CACHE_DIR="$CACHED_HOME" $ODIN build ../test_cached_foreign_libs.odin -file -cached -microarch:native -show-debug-messages -out:cached_foreign_libs_app "$@" 2>&1; }
+	# $1 is what the next build must do: from_cache (reuse) or to_cache (rebuild). Rest are flags.
+	# The output is captured before being searched: `grep -q` exits on its first match and would
+	# SIGPIPE the compiler, which prints this line before it writes the manifests.
+	expect_cache() {
+		local want="$1"; shift
+		local out
+		out=$(cached_build "$@")
+		if echo "$out" | grep -q "try_copy_executable_${want}_cache"; then
+			echo "SUCCESSFUL 1/1"
+		else
+			echo "SUCCESSFUL 0/1 (-cached: expected ${want}_cache for '$*')"
+			exit 1
+		fi
+	}
+
+	cached_build >/dev/null # cold build, fills the cache
+	expect_cache from
+	# a static foreign lib is baked into the executable, so changing one must rebuild
+	touch -t 203012312359 libcached_foreign_libs.a
+	expect_cache to
+	expect_cache from
+
+	# build flags are part of the identity of an entry: the cache directory is keyed on source
+	# paths alone, so without this check -o:speed would be handed the -o:none executable.
+	expect_cache to   -o:speed
+	expect_cache from -o:speed
+
+	# the compiler itself is an input; a newer one must invalidate what an older one produced.
+	touch "$ODIN"
+	expect_cache to   -o:speed
+	expect_cache from -o:speed
+
+	# cache entries are published via a temp + rename: no temps may survive, and the restored
+	# executable must keep its permissions (gb_file_copy creates new files as 0666).
+	rm -rf "$CACHED_HOME"
+	cached_build >/dev/null
+	cached_build >/dev/null
+	leftover_temps=$(find "$CACHED_HOME" -name '*.tmp' | wc -l | tr -d ' ')
+	if [[ "$leftover_temps" == "0" ]] && [[ -x cached_foreign_libs_app ]] && ./cached_foreign_libs_app; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached leaked temps, or the restored executable is broken)"
+		exit 1
+	fi
+
+	# The entry is always copied, so it must survive `odin run` deleting the output.
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN run ../test_cached_foreign_libs.odin -file -cached -microarch:native
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN run ../test_cached_foreign_libs.odin -file -cached -microarch:native
+	entry=$(find "$CACHED_HOME" -name 'cached-exe*.bin' | head -1)
+	if [[ -x "$entry" ]] && "$entry"; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached: the cache entry did not survive 'odin run')"
+		exit 1
+	fi
+
+	# `odin run` shares the `odin build` entry with identical flags.
+	rm -rf "$CACHED_HOME"
+	cached_run() { ODIN_CACHE_DIR="$CACHED_HOME" $ODIN run ../test_cached_foreign_libs.odin -file -cached -microarch:native -show-debug-messages -out:cached_foreign_libs_app "$@" 2>&1; }
+	cached_build >/dev/null # cold build, fills the cache
+	expect_cache from
+	out=$(cached_run)
+	if echo "$out" | grep -q "try_copy_executable_from_cache"; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached: 'odin run' did not reuse the build entry)"
+		exit 1
+	fi
+	expect_cache from # run did not overwrite the manifests
+
+	# clear-cache unlinks symlinks without following them.
+	rm -rf "$CACHED_HOME"
+	cached_build >/dev/null
+	victim="$PWD/cached_clear_victim"
+	echo victim-data > "$victim"
+	entry_dir=$(dirname "$(find "$CACHED_HOME" -name 'cached-exe*.bin' | head -1)")
+	ln -s "$victim" "$entry_dir/link_outside"
+	ln -s / "$entry_dir/link_dir_outside"
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN clear-cache
+	if [[ -f "$victim" ]] && [[ "$(cat "$victim")" == "victim-data" ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached: clear-cache followed a symlink outside the cache)"
+		exit 1
+	fi
+	rm -f "$victim"
+
+	# A corrupt manifest is a miss, never a hit.
+	rm -rf "$CACHED_HOME"
+	cached_build >/dev/null
+	expect_cache from
+	entry_dir=$(dirname "$(find "$CACHED_HOME" -name 'cached-exe*.bin' | head -1)")
+	echo "garbage-not-int" > "$entry_dir/files.manifest"
+	expect_cache to
+	expect_cache from
+
+	# SDK env changes invalidate the entry.
+	rm -rf "$CACHED_HOME"
+	WindowsSdkDir=/tmp/cached_sdk1 ODIN_CACHE_DIR="$CACHED_HOME" $ODIN build ../test_cached_foreign_libs.odin -file -cached -microarch:native -show-debug-messages -out:cached_foreign_libs_app >/dev/null
+	out=$(WindowsSdkDir=/tmp/cached_sdk2 ODIN_CACHE_DIR="$CACHED_HOME" $ODIN build ../test_cached_foreign_libs.odin -file -cached -microarch:native -show-debug-messages -out:cached_foreign_libs_app 2>&1)
+	if echo "$out" | grep -q "try_copy_executable_to_cache"; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached: SDK env change did not invalidate)"
+		exit 1
+	fi
+	# The remaining SDK vars are tracked in env.manifest.
+	entry_dir=$(dirname "$(find "$CACHED_HOME" -name 'cached-exe*.bin' | head -1)")
+	if grep -q "^DEVELOPER_DIR=" "$entry_dir/env.manifest" && grep -q "^SDKROOT=" "$entry_dir/env.manifest" && grep -q "^WindowsSdkDir=" "$entry_dir/env.manifest" && grep -q "^WindowsSDKVersion=" "$entry_dir/env.manifest" && grep -q "^LIB=" "$entry_dir/env.manifest"; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached: SDK env vars missing from env.manifest)"
+		exit 1
+	fi
+
+	# Flags may precede the path: `odin build -cached <file> -file ...` must behave
+	# like the path-first spelling, for build, run, and test alike.
+	rm -rf "$CACHED_HOME"
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN build -cached ../test_cached_foreign_libs.odin -file -microarch:native -out:cached_flagorder_app >/dev/null
+	if [[ -x cached_flagorder_app ]] && ./cached_flagorder_app; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1 (-cached: 'odin build -cached <file> -file ...' failed)"
+		exit 1
+	fi
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN run -cached ../test_cached_foreign_libs.odin -file -microarch:native
+	ODIN_CACHE_DIR="$CACHED_HOME" $ODIN test -cached ../test_cached_foreign_libs.odin -file -microarch:native
+	echo "SUCCESSFUL 1/1"
+fi
+
 set +x
 
 popd
