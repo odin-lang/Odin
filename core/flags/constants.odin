@@ -22,6 +22,7 @@ SUBTAG_MANIFOLD   :: "manifold"
 SUBTAG_FILE       :: "file"
 SUBTAG_PERMS      :: "perms"
 SUBTAG_INDISTINCT :: "indistinct"
+SUBTAG_SHORT      :: "short"
 
 TAG_USAGE         :: "usage"
 
