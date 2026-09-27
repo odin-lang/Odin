@@ -1958,6 +1958,15 @@ gb_internal Type *core_broadcastable_elem_type(Type *t) {
 	return t;
 }
 
+gb_internal i32 type_array_depth(Type *t) {
+	i32 depth = 0;
+	while (is_type_array_like(t)) {
+		t = base_array_type(t);
+		depth += 1;
+	}
+	return depth;
+}
+
 gb_internal i32 type_math_rank(Type *t) {
 	i32 rank = 0;
 	for (;;) {
