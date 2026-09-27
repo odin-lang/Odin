@@ -179,11 +179,11 @@ foreign user32 {
 	GetMenuCheckMarkDimensions    :: proc() -> LONG ---
 	CalculatePopupWindowPosition  :: proc(anchorPoint: ^POINT, windowSize: ^SIZE, flags: UINT, excludeRect: ^RECT, popupWindowPosition: ^RECT) -> BOOL ---
 
-	CreateAcceleratorTableW :: proc(paccel: LPACCEL, cAccel: INT) -> HACCEL ---
+	CreateAcceleratorTableW :: proc(paccel: LPACCEL, cAccel: c_int) -> HACCEL ---
 	DestroyAcceleratorTable :: proc(hAccel: HACCEL) -> BOOL ---
 	LoadAcceleratorsW       :: proc(hInstance: HINSTANCE, lpTableName: LPCWSTR) -> HACCEL ---
-	TranslateAcceleratorW   :: proc(hWnd: HWND, hAccTable: HACCEL, lpMsg: LPMSG) -> INT ---
-	CopyAcceleratorTableW   :: proc(hAccelSrc: HACCEL, lpAccelDst: LPACCEL, cAccelEntries: INT) -> INT ---
+	TranslateAcceleratorW   :: proc(hWnd: HWND, hAccTable: HACCEL, lpMsg: LPMSG) -> c_int ---
+	CopyAcceleratorTableW   :: proc(hAccelSrc: HACCEL, lpAccelDst: LPACCEL, cAccelEntries: INT) -> c_int ---
 
 	InsertMenuItemW    :: proc(hmenu: HMENU, item: UINT, fByPosition: BOOL, lpmi: LPMENUITEMINFOW) -> BOOL ---
 	GetMenuItemInfoW   :: proc(hmenu: HMENU, item: UINT, fByPosition: BOOL, lpmii: LPMENUITEMINFOW) -> BOOL ---
