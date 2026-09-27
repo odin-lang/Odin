@@ -22,8 +22,7 @@ import "core:math/bits"
 	  Software: Practice and Experience 53 (7), 2023. https://arxiv.org/abs/2212.06644
 */
 
-@(private="file")
-_POW5_128_MIN_EXP :: -342
+_SMALLEST_POWER_OF_FIVE :: -342
 
 /*
 Computes the `T` closest to `w * 10^q`, rounding ties to even.
@@ -42,55 +41,57 @@ calls return the same bits, the result is correct. Otherwise, use a slow path.
 */
 fast_float_compute_float :: proc "contextless" ($T: typeid, q: int, w: u64) -> u64 where T == f32 || T == f64 #no_bounds_check {
 	when T == f64 {
-		MANT_BITS          :: 52
-		MIN_EXPONENT       :: -1023
-		INFINITE_POWER     :: 0x7ff
-		SMALLEST_POW10     :: -342
-		LARGEST_POW10      :: 308
-		MIN_EXP_ROUND_EVEN :: -4
-		MAX_EXP_ROUND_EVEN :: 23
+		MANTISSA_EXPLICIT_BITS     :: 52
+		MINIMUM_EXPONENT           :: -1023
+		INFINITE_POWER             :: 0x7ff
+		SMALLEST_POWER_OF_TEN      :: -342
+		LARGEST_POWER_OF_TEN       :: 308
+		MIN_EXPONENT_ROUND_TO_EVEN :: -4
+		MAX_EXPONENT_ROUND_TO_EVEN :: 23
 	} else {
-		MANT_BITS          :: 23
-		MIN_EXPONENT       :: -127
-		INFINITE_POWER     :: 0xff
-		SMALLEST_POW10     :: -64
-		LARGEST_POW10      :: 38
-		MIN_EXP_ROUND_EVEN :: -17
-		MAX_EXP_ROUND_EVEN :: 10
+		MANTISSA_EXPLICIT_BITS     :: 23
+		MINIMUM_EXPONENT           :: -127
+		INFINITE_POWER             :: 0xff
+		SMALLEST_POWER_OF_TEN      :: -64
+		LARGEST_POWER_OF_TEN       :: 38
+		MIN_EXPONENT_ROUND_TO_EVEN :: -17
+		MAX_EXPONENT_ROUND_TO_EVEN :: 10
 	}
 
-	// w <= max(u64) and q < SMALLEST_POW10 always rounds to zero.
-	if w == 0 || q < SMALLEST_POW10 {
+	// w <= max(u64) and q < SMALLEST_POWER_OF_TEN always rounds to zero.
+	if w == 0 || q < SMALLEST_POWER_OF_TEN {
 		return 0
 	}
-	if q > LARGEST_POW10 {
-		return INFINITE_POWER << MANT_BITS
+	if q > LARGEST_POWER_OF_TEN {
+		return INFINITE_POWER << MANTISSA_EXPLICIT_BITS
 	}
 
+	// Set the most significant bit of w.
 	lz := bits.count_leading_zeros(w)
-	wn := w << lz // normalized so the top bit is set
+	w := w
+	w <<= lz
 
-	// Compute a 128-bit approximation of wn * 5^q. We need the product to be accurate
-	// to MANT_BITS+3 bits. If the lower bits of the high word are all ones, the error
-	// in the first product could affect them, so we refine the result with the lower
-	// half of the power of five.
-	PRECISION_MASK :: max(u64) >> (MANT_BITS + 3)
-	pow5 := &_POW5_128[q - _POW5_128_MIN_EXP]
-	hi, lo := bits.mul_u64(wn, pow5[0])
-	if hi & PRECISION_MASK == PRECISION_MASK {
-		hi2, _ := bits.mul_u64(wn, pow5[1])
-		lo += hi2
-		if hi2 > lo {
-			hi += 1
+	// Compute a 128-bit approximation of w * 5^q. We need the product to be accurate
+	// to MANTISSA_EXPLICIT_BITS+3 bits. If the lower bits of the high word are all ones,
+	// the error in the first product could affect them, so we refine the result with
+	// the lower half of the power of five.
+	PRECISION_MASK :: max(u64) >> (MANTISSA_EXPLICIT_BITS + 3)
+	pow5 := &_POWER_OF_FIVE_128[q - _SMALLEST_POWER_OF_FIVE]
+	high, low := bits.mul_u64(w, pow5[0])
+	if high & PRECISION_MASK == PRECISION_MASK {
+		second_high, _ := bits.mul_u64(w, pow5[1])
+		low += second_high
+		if second_high > low {
+			high += 1
 		}
 	}
 	// Mushtak & Lemire (2023) prove that this product is always accurate enough.
 
-	upperbit := int(hi >> 63)
-	shift    := uint(upperbit + 64 - MANT_BITS - 3)
-	mantissa := hi >> shift
+	upperbit := int(high >> 63)
+	shift    := uint(upperbit + 64 - MANTISSA_EXPLICIT_BITS - 3)
+	mantissa := high >> shift
 	// ((152170 + 65536) * q) >> 16 is floor(q * log2(10)) for |q| < 1650.
-	power2   := (((152170 + 65536) * q) >> 16) + 63 + upperbit - int(lz) - MIN_EXPONENT
+	power2   := (((152170 + 65536) * q) >> 16) + 63 + upperbit - int(lz) - MINIMUM_EXPONENT
 
 	if power2 <= 0 {
 		// Subnormal result.
@@ -108,28 +109,28 @@ fast_float_compute_float :: proc "contextless" ($T: typeid, q: int, w: u64) -> u
 	// We usually round up. If the value is exactly halfway between two floats,
 	// and the lower float is even, we must round down. An exact halfway value is
 	// possible only for a small range of exponents.
-	if lo <= 1 && q >= MIN_EXP_ROUND_EVEN && q <= MAX_EXP_ROUND_EVEN && mantissa & 3 == 1 {
-		if mantissa << shift == hi {
+	if low <= 1 && q >= MIN_EXPONENT_ROUND_TO_EVEN && q <= MAX_EXPONENT_ROUND_TO_EVEN && mantissa & 3 == 1 {
+		if mantissa << shift == high {
 			mantissa &~= 1
 		}
 	}
 	mantissa += mantissa & 1 // round up
 	mantissa >>= 1
-	if mantissa >= 2 << MANT_BITS {
-		mantissa = 1 << MANT_BITS
+	if mantissa >= 2 << MANTISSA_EXPLICIT_BITS {
+		mantissa = 1 << MANTISSA_EXPLICIT_BITS
 		power2 += 1
 	}
-	mantissa &~= 1 << MANT_BITS
+	mantissa &~= 1 << MANTISSA_EXPLICIT_BITS
 	if power2 >= INFINITE_POWER {
-		return INFINITE_POWER << MANT_BITS
+		return INFINITE_POWER << MANTISSA_EXPLICIT_BITS
 	}
-	return mantissa | u64(power2) << MANT_BITS
+	return mantissa | u64(power2) << MANTISSA_EXPLICIT_BITS
 }
 
 // 128-bit truncated mantissas of 5^-342 to 5^308, with the most significant
 // bit set. Generated by fast_float script/table_generation.py.
-@(private="file", rodata)
-_POW5_128 := [651][2]u64{
+@(rodata)
+_POWER_OF_FIVE_128 := [651][2]u64{
 	{0xeef453d6923bd65a, 0x113faa2906a13b3f}, // 5^-342
 	{0x9558b4661b6565f8, 0x4ac7ca59a424c507}, // 5^-341
 	{0xbaaee17fa23ebf76, 0x5d79bcf00d2df649}, // 5^-340

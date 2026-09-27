@@ -1,4 +1,4 @@
-This license applies to the Eisel-Lemire code and the _POW5_128 table in
+This license applies to the Eisel-Lemire code and the _POWER_OF_FIVE_128 table in
 fast_float.odin, which are ported from ffc.h and fast_float.
 
   ffc.h:      https://github.com/kolemannix/ffc.h
