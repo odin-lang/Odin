@@ -163,6 +163,7 @@ struct AstFile {
 	Array<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
 
 	std::atomic<isize> seen_load_directive_count;
+	std::atomic<isize> seen_foreign_import_count;
 
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
@@ -235,6 +236,7 @@ struct Parser {
 	std::atomic<isize>     total_line_count;
 
 	std::atomic<isize>     total_seen_load_directive_count;
+	std::atomic<isize>     total_seen_foreign_import_count;
 
 	// TODO(bill): What should this mutex be per?
 	//  * Parser
