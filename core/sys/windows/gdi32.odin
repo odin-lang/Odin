@@ -25,6 +25,7 @@ foreign gdi32 {
 	StretchDIBits         :: proc(hdc: HDC, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight: INT, lpBits: LPVOID, lpbmi: ^BITMAPINFO, iUsage: UINT, rop: DWORD) -> INT ---
 	StretchBlt            :: proc(hdcDest: HDC, xDest, yDest, wDest, hDest: INT, hdcSrc: HDC, xSrc, ySrc, wSrc, hSrc: INT, rop: DWORD) -> BOOL ---
 
+	GetPixelFormat      :: proc(hdc: HDC) -> INT ---
 	SetPixelFormat      :: proc(hdc: HDC, format: INT, ppfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---
 	ChoosePixelFormat   :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
 	DescribePixelFormat :: proc(hdc: HDC, iPixelFormat: INT, nBytes: UINT, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
@@ -45,6 +46,9 @@ foreign gdi32 {
 	EnumFontFamiliesExW   :: proc(hdc: HDC, lpLogfont: LPLOGFONTW, lpProc: FONTENUMPROCW, lParam: LPARAM, dwFlags: DWORD) -> INT ---
 
 	TextOutW              :: proc(hdc: HDC, x, y: INT, lpString: LPCWSTR, c: INT) -> BOOL ---
+	ExtTextOutW           :: proc(hdc: HDC, x, y: INT, options: UINT, lprect: ^RECT, lpString: LPCWSTR, c: UINT, lpDx: ^INT) -> BOOL ---
+	SetTextAlign          :: proc(hdc: HDC, align: UINT) -> UINT ---
+	GetTextAlign          :: proc(hdc: HDC) -> UINT ---
 	GetTextExtentPoint32W :: proc(hdc: HDC, lpString: LPCWSTR, c: INT, psizl: LPSIZE) -> BOOL ---
 	GetTextMetricsW       :: proc(hdc: HDC, lptm: LPTEXTMETRICW) -> BOOL ---
 
@@ -68,6 +72,7 @@ foreign gdi32 {
 	RealizePalette :: proc(hdc: HDC) -> UINT ---
 
 	SetTextColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
+	GetTextColor :: proc(hdc: HDC) -> COLORREF ---
 	SetPixel     :: proc(hdc: HDC, x: INT, y: INT, color: COLORREF) -> COLORREF ---
 
 	GdiTransparentBlt :: proc(hdcDest: HDC, xoriginDest, yoriginDest, wDest, hDest: INT, hdcSrc: HDC, xoriginSrc, yoriginSrc, wSrc, hSrc: INT, crTransparent: UINT) -> BOOL ---
@@ -313,6 +318,32 @@ TA_BOTTOM     :: 8
 TA_BASELINE   :: 24
 TA_RTLREADING :: 256
 TA_MASK       :: (TA_BASELINE+TA_CENTER+TA_UPDATECP+TA_RTLREADING)
+
+VTA_BASELINE :: TA_BASELINE
+VTA_LEFT     :: TA_BOTTOM
+VTA_RIGHT    :: TA_TOP
+VTA_CENTER   :: TA_CENTER
+VTA_BOTTOM   :: TA_RIGHT
+VTA_TOP      :: TA_LEFT
+
+ETO_OPAQUE            :: 0x0002
+ETO_CLIPPED           :: 0x0004
+ETO_GLYPH_INDEX       :: 0x0010
+ETO_RTLREADING        :: 0x0080
+ETO_NUMERICSLOCAL     :: 0x0400
+ETO_NUMERICSLATIN     :: 0x0800
+ETO_IGNORELANGUAGE    :: 0x1000
+ETO_PDY               :: 0x2000
+ETO_REVERSE_INDEX_MAP :: 0x10000
+
+ASPECT_FILTERING :: 0x0001
+
+DCB_RESET      :: 0x0001
+DCB_ACCUMULATE :: 0x0002
+DCB_DIRTY      :: DCB_ACCUMULATE
+DCB_SET        :: (DCB_RESET | DCB_ACCUMULATE)
+DCB_ENABLE     :: 0x0004
+DCB_DISABLE    :: 0x0008
 
 MM_MAX_NUMAXES :: 16
 DESIGNVECTOR :: struct {
