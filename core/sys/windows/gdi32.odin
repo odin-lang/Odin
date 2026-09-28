@@ -172,24 +172,6 @@ BKMODE :: enum {
 	OPAQUE      = 2,
 }
 
-ICONINFO :: struct {
-	fIcon:              BOOL,
-	xHotspot, yHotspot: DWORD,
-	hbmMask, hbmColor:  HBITMAP,
-}
-PICONINFO :: ^ICONINFO
-
-ICONINFOEXW :: struct {
-	cbSize:             DWORD,
-	fIcon:              BOOL,
-	xHotspot, yHotspot: DWORD,
-	hbmMask, hbmColor:  HBITMAP,
-	wResID:             WORD,
-	szModName:          [MAX_PATH]WCHAR,
-	szResName:          [MAX_PATH]WCHAR,
-}
-PICONINFOEXW :: ^ICONINFOEXW
-
 AC_SRC_OVER  :: 0x00
 AC_SRC_ALPHA :: 0x01
 
