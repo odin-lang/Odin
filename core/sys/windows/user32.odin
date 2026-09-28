@@ -491,9 +491,9 @@ RAWHID :: struct {
 
 RAWMOUSE :: struct {
 	usFlags: USHORT,
-	using DUMMYUNIONNAME: struct #raw_union {
+	using _: struct #raw_union {
 		ulButtons: ULONG,
-		using DUMMYSTRUCTNAME: struct {
+		using _: struct {
 			usButtonFlags: USHORT,
 			usButtonData: USHORT,
 		},
