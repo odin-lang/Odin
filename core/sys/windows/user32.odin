@@ -784,6 +784,10 @@ ACCEL :: struct {
 }
 LPACCEL :: ^ACCEL
 
+ICON_SMALL          :: 0
+ICON_BIG            :: 1
+ICON_SMALL2         :: 2
+
 DISPLAY_DEVICEW :: struct {
 	cb:           DWORD,
 	DeviceName:   [32]WCHAR,
