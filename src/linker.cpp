@@ -263,11 +263,11 @@ try_cross_linking:;
 
 						#if defined(GB_SYSTEM_WINDOWS)
 							char nasm_path[4096] = {0};
-							gb_snprintf_va(
+							gb_snprintf(
 								nasm_path,
 								gb_count_of(nasm_path) - 1,
 								"%.*s\\bin\\nasm\\windows\\nasm.exe",
-								LIT(build_context.ODIN_ROOT),
+								LIT(build_context.ODIN_ROOT)
 							);
 						#else
 							const char *nasm_path = gb_get_env("ODIN_NASM_PATH", permanent_allocator());
@@ -357,7 +357,7 @@ try_cross_linking:;
 					char linker_path[4096] = {0};
 					gb_snprintf(
 						linker_path,
-						gb_count_of(buf) - 1,
+						gb_count_of(linker_path) - 1,
 						"%.*s\\bin\\lld-link",
 						LIT(build_context.ODIN_ROOT)
 					);
