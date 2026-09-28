@@ -718,6 +718,8 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 
 };
 
+gb_internal lbCallingConventionKind lb_calling_convention_kind(ProcCallingConvention cc);
+
 enum : LLVMDWARFTypeEncoding {
 	LLVMDWARFTypeEncoding_Address = 1,
 	LLVMDWARFTypeEncoding_Boolean = 2,
