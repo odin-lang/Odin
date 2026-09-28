@@ -30,7 +30,7 @@ foreign user32 {
 	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
 
 	RegisterClassW   :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
-	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
+	RegisterClassExW :: proc(lpWndClassEx: ^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
 	RegisterHotKey :: proc(hnwd: HWND, id: c_int, fsModifiers: UINT, vk: UINT) -> BOOL ---
