@@ -2542,11 +2542,6 @@ DC_BRUSH            :: 18
 DC_PEN              :: 19
 STOCK_LAST          :: 19
 
-// GetDeviceCaps() indices
-HORZSIZE   :: 4
-VERTSIZE   :: 6
-LOGPIXELSX :: 88
-LOGPIXELSY :: 90
 
 CLR_INVALID :: 0xFFFFFFFF
 
