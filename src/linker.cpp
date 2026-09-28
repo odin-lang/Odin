@@ -140,9 +140,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 				LIT(target_arch_names[build_context.metrics.arch])
 			);
 			build_context.keep_object_files = true;
+		} else {
+			is_windows_cross = true;
+			goto try_cross_linking;
 		}
-		is_windows_cross = true;
-		goto try_cross_linking;
 	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
@@ -230,7 +231,9 @@ try_cross_linking:;
 					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
 					// IMPORTANT NOTE(bill): calling `string_to_lower` here is not an issue because
 					// we will never uses these strings afterwards
+				#if defined(GB_SYSTEM_WINDOWS)
 					string_to_lower(&lib);
+				#endif
 					if (lib.len == 0) {
 						continue;
 					}
