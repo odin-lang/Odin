@@ -2,7 +2,7 @@
 #+private
 package runtime
 
-foreign import Bcrypt "system:bcrypt.lib"
+foreign import bcrypt "system:Bcrypt.lib"
 foreign import kernel32 "system:Kernel32.lib"
 
 _HAS_RAND_BYTES :: true
