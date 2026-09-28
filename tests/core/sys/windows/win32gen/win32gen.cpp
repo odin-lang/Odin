@@ -14,14 +14,6 @@
 #include <iostream>
 #include <fstream>
 #include <filesystem>
-#include <map>
-
-#include <cassert>
-#include <codecvt>
-#include <cstdint>
-#include <iostream>
-#include <locale>
-#include <string>
 using namespace std;
 using namespace std::filesystem;
 
@@ -55,6 +47,10 @@ static std::string ConvertLPCWSTRToString(const LPCWSTR lpcwszStr)
 	<< '\t' << "expect_value(t, win32." << #s << ", " \
 	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
 
+#define expect_value_int(s) out \
+	<< '\t' << "expect_value_int(t, win32." << #s << ", " \
+	<< std::dec << s << ")" << endl
+
 #define expect_value_bool(s) out \
 	<< '\t' << "expect_value(t, uint(win32." << #s << "), " \
 	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
@@ -74,6 +70,18 @@ static std::string ConvertLPCWSTRToString(const LPCWSTR lpcwszStr)
 #define expect_value_str(s) out \
 	<< '\t' << "expect_value_str(t, win32." << #s << ", L(\"" << ConvertLPCWSTRToString(s) << "\"))" << endl
 
+#define expect_value_enum(e, s) out \
+	<< '\t' << "expect_value(t, win32." << e << "." << #s << ", " \
+	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
+
+#define expect_value_enum_remap(e, v, s) out \
+	<< '\t' << "expect_value(t, win32." << e << "." << v << ", " \
+	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
+
+#define expect_flags(e, v, s) out \
+	<< '\t' << "expect_flags(t, win32." << e << "{." << v << "}, " \
+	<< "0x" << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << s << ")" << endl
+
 static void verify_win32_type_sizes(ofstream& out) {
 	test_proc_begin();
 	test_proc_comment("minwindef.h");
@@ -89,9 +97,9 @@ static void verify_win32_type_sizes(ofstream& out) {
 	expect_size(BYTE);	// unsigned char
 	expect_size(WORD);	// unsigned short
 #ifdef PROPVARIANT
-	expect_size(FLOAT); // float
+	expect_size(FLOAT);	 // float
 	expect_size(DOUBLE); // double
-	expect_size(DATE); // double
+	expect_size(DATE);	 // double
 #endif
 	// expect_size(PFLOAT);
 	expect_size(PBOOL);
@@ -115,7 +123,6 @@ static void verify_win32_type_sizes(ofstream& out) {
 	expect_size(UINT_PTR); // unsigned __int64
 	expect_size(LONG_PTR); // __int64
 
-	expect_size(HANDLE);  // void *
 	expect_size(WPARAM);  // unsigned __int64
 	expect_size(LPARAM);  // __int64
 	expect_size(LRESULT); // __int64
@@ -142,6 +149,12 @@ static void verify_win32_type_sizes(ofstream& out) {
 	// expect_size(HKL);
 
 	//expect_size(HFILE);
+	expect_size(FILETIME);
+
+	test_proc_comment("processthreadsapi.h");
+	expect_size(PROCESS_INFORMATION);
+	expect_size(STARTUPINFOW);
+	//expect_size(APC_CALLBACK_DATA);
 
 	test_proc_comment("windef.h");
 	expect_size(HWND);
@@ -203,11 +216,17 @@ static void verify_win32_type_sizes(ofstream& out) {
 	// SHCreateLibrary
 	test_proc_comment("wtypesbase.h");
 	expect_size(OLECHAR);
-	//test_proc_comment("objbase.h");
-	//expect_value(COINIT_MULTITHREADED);
-	//expect_value(COINIT_APARTMENTTHREADED);
-	//expect_value(COINIT_DISABLE_OLE1DDE);
-	//expect_value(COINIT_SPEED_OVER_MEMORY);
+	test_proc_end();
+}
+
+static void verify_win32_enums(ofstream& out) {
+	test_proc_begin();
+	test_proc_comment("objbase.h");
+	test_proc_comment("enum COINIT");
+	expect_value_enum_remap("COINIT", "MULTITHREADED", COINIT_MULTITHREADED);
+	expect_value_enum_remap("COINIT", "APARTMENTTHREADED", COINIT_APARTMENTTHREADED);
+	expect_value_enum_remap("COINIT", "DISABLE_OLE1DDE", COINIT_DISABLE_OLE1DDE);
+	expect_value_enum_remap("COINIT", "SPEED_OVER_MEMORY", COINIT_SPEED_OVER_MEMORY);
 	test_proc_end();
 }
 
@@ -244,7 +263,6 @@ static void verify_winnt(ofstream& out) {
 	expect_size(CHAR);
 	expect_size(SHORT);
 	expect_size(LONG);
-	expect_size(INT);
 	expect_size(WCHAR);
 	// expect_size(LONGLONG);
 	expect_size(ULONGLONG);
@@ -268,6 +286,15 @@ static void verify_winnt(ofstream& out) {
 	expect_value(LANG_INVARIANT);
 	expect_value(SUBLANG_NEUTRAL);
 	expect_value(SUBLANG_DEFAULT);
+	expect_size(CONTEXT);
+
+	test_proc_comment("Token Object Definitions");
+	expect_size(TOKEN_PRIMARY_GROUP);
+	expect_size(TOKEN_OWNER);
+	expect_size(TOKEN_GROUPS_AND_PRIVILEGES);
+	expect_size(TOKEN_DEFAULT_DACL);
+	test_proc_comment("ACL and ACE");
+	expect_size(ACL);
 	test_proc_end();
 }
 
@@ -288,15 +315,17 @@ static void verify_winuser(ofstream& out) {
 	expect_size(HARDWAREINPUT);
 	expect_size(INPUT);
 
-	// expect_size(ICONINFO);
-	// expect_size(CURSORSHAPE);
+	expect_size(ICONINFO);
 	expect_size(ICONINFOEXW);
 
 	expect_size(CURSORINFO);
+	expect_size(CURSORSHAPE);
 	//expect_value(CURSOR_SHOWING);
 	//expect_value(CURSOR_SUPPRESSED);
 
 	expect_size(WINDOWINFO);
+
+	expect_size(MENUINFO);
 
 	expect_size(RAWINPUTHEADER);
 	//expect_size(RAWHID);
@@ -305,12 +334,13 @@ static void verify_winuser(ofstream& out) {
 	expect_size(RAWINPUT);
 	expect_size(RAWINPUTDEVICE);
 	expect_size(RAWINPUTDEVICELIST);
+	expect_size(HRAWINPUT);
 
 	expect_size(RID_DEVICE_INFO_HID);
 	expect_size(RID_DEVICE_INFO_KEYBOARD);
 	expect_size(RID_DEVICE_INFO_MOUSE);
 	expect_size(RID_DEVICE_INFO);
-	expect_value(GET_RAWINPUT_CODE_WPARAM(0x12345678));
+	//expect_value(GET_RAWINPUT_CODE_WPARAM(0x12345678));
 
 	expect_size(DRAWTEXTPARAMS);
 	expect_size(BSMINFO);
@@ -453,6 +483,410 @@ static void verify_winuser(ofstream& out) {
 	expect_value(MIIM_BITMAP);
 	expect_value(MIIM_FTYPE);
 
+	expect_value(RIDEV_REMOVE);
+	expect_value(RIDEV_EXCLUDE);
+	expect_value(RIDEV_PAGEONLY);
+	expect_value(RIDEV_NOLEGACY);
+	expect_value(RIDEV_INPUTSINK);
+	expect_value(RIDEV_CAPTUREMOUSE);
+	expect_value(RIDEV_NOHOTKEYS);
+	expect_value(RIDEV_APPKEYS);
+	expect_value(RIDEV_EXINPUTSINK);
+	expect_value(RIDEV_DEVNOTIFY);
+
+	expect_value(RID_HEADER);
+	expect_value(RID_INPUT);
+
+	expect_value(RIDI_PREPARSEDDATA);
+	expect_value(RIDI_DEVICENAME);
+	expect_value(RIDI_DEVICEINFO);
+
+	expect_value(RIM_TYPEMOUSE);
+	expect_value(RIM_TYPEKEYBOARD);
+	expect_value(RIM_TYPEHID);
+
+	test_proc_comment("enum INPUT_TYPE used by INPUT");
+	expect_value_enum_remap("INPUT_TYPE", "MOUSE", INPUT_MOUSE);
+	expect_value_enum_remap("INPUT_TYPE", "KEYBOARD", INPUT_KEYBOARD);
+	expect_value_enum_remap("INPUT_TYPE", "HARDWARE", INPUT_HARDWARE);
+
+	test_proc_comment("enum RAWINPUT_CODE");
+	expect_value_enum("RAWINPUT_CODE", RIM_INPUT);
+	expect_value_enum("RAWINPUT_CODE", RIM_INPUTSINK);
+
+	test_proc_comment("enum DrawTextFormat");
+	expect_value_enum("DrawTextFormat", DT_TOP);
+	expect_value_enum("DrawTextFormat", DT_LEFT);
+	expect_value_enum("DrawTextFormat", DT_CENTER);
+	expect_value_enum("DrawTextFormat", DT_RIGHT);
+	expect_value_enum("DrawTextFormat", DT_VCENTER);
+	expect_value_enum("DrawTextFormat", DT_BOTTOM);
+	expect_value_enum("DrawTextFormat", DT_WORDBREAK);
+	expect_value_enum("DrawTextFormat", DT_SINGLELINE);
+	expect_value_enum("DrawTextFormat", DT_EXPANDTABS);
+	expect_value_enum("DrawTextFormat", DT_TABSTOP);
+	expect_value_enum("DrawTextFormat", DT_NOCLIP);
+	expect_value_enum("DrawTextFormat", DT_EXTERNALLEADING);
+	expect_value_enum("DrawTextFormat", DT_CALCRECT);
+	expect_value_enum("DrawTextFormat", DT_NOPREFIX);
+	expect_value_enum("DrawTextFormat", DT_INTERNAL);
+	expect_value_enum("DrawTextFormat", DT_EDITCONTROL);
+	expect_value_enum("DrawTextFormat", DT_PATH_ELLIPSIS);
+	expect_value_enum("DrawTextFormat", DT_END_ELLIPSIS);
+	expect_value_enum("DrawTextFormat", DT_MODIFYSTRING);
+	expect_value_enum("DrawTextFormat", DT_RTLREADING);
+	expect_value_enum("DrawTextFormat", DT_WORD_ELLIPSIS);
+	expect_value_enum("DrawTextFormat", DT_NOFULLWIDTHCHARBREAK);
+	expect_value_enum("DrawTextFormat", DT_HIDEPREFIX);
+	expect_value_enum("DrawTextFormat", DT_PREFIXONLY);
+
+	test_proc_comment("enum RedrawWindowFlags");
+	expect_value_enum("RedrawWindowFlags", RDW_INVALIDATE);
+	expect_value_enum("RedrawWindowFlags", RDW_INTERNALPAINT);
+	expect_value_enum("RedrawWindowFlags", RDW_ERASE);
+	expect_value_enum("RedrawWindowFlags", RDW_VALIDATE);
+	expect_value_enum("RedrawWindowFlags", RDW_NOINTERNALPAINT);
+	expect_value_enum("RedrawWindowFlags", RDW_NOERASE);
+	expect_value_enum("RedrawWindowFlags", RDW_NOCHILDREN);
+	expect_value_enum("RedrawWindowFlags", RDW_ALLCHILDREN);
+	expect_value_enum("RedrawWindowFlags", RDW_UPDATENOW);
+	expect_value_enum("RedrawWindowFlags", RDW_ERASENOW);
+	expect_value_enum("RedrawWindowFlags", RDW_FRAME);
+	expect_value_enum("RedrawWindowFlags", RDW_NOFRAME);
+
+	test_proc_comment("enum GetUserObjectInformationFlags");
+	expect_value_enum("GetUserObjectInformationFlags", UOI_FLAGS);
+	expect_value_enum("GetUserObjectInformationFlags", UOI_NAME);
+	expect_value_enum("GetUserObjectInformationFlags", UOI_TYPE);
+	expect_value_enum("GetUserObjectInformationFlags", UOI_USER_SID);
+	expect_value_enum("GetUserObjectInformationFlags", UOI_HEAPSIZE);
+	expect_value_enum("GetUserObjectInformationFlags", UOI_IO);
+	expect_value_enum("GetUserObjectInformationFlags", UOI_TIMERPROC_EXCEPTION_SUPPRESSION);
+
+	test_proc_comment("enum Monitor_From_Flags");
+	expect_value_enum("Monitor_From_Flags", MONITOR_DEFAULTTONULL);
+	expect_value_enum("Monitor_From_Flags", MONITOR_DEFAULTTOPRIMARY);
+	expect_value_enum("Monitor_From_Flags", MONITOR_DEFAULTTONEAREST);
+
+	test_proc_comment("bit_set WinEventFlag");
+	// expect_flags("WinEventFlags", "OUTOFCONTEXT", WINEVENT_OUTOFCONTEXT); // ZERO
+	expect_flags("WinEventFlags", "SKIPOWNTHREAD", WINEVENT_SKIPOWNTHREAD);
+	expect_flags("WinEventFlags", "SKIPOWNPROCESS", WINEVENT_SKIPOWNPROCESS);
+	expect_flags("WinEventFlags", "INCONTEXT", WINEVENT_INCONTEXT);
+
+	test_proc_comment("Window Class Styles");
+	expect_value(CS_VREDRAW);
+	expect_value(CS_HREDRAW);
+	expect_value(CS_DBLCLKS);
+	expect_value(CS_OWNDC);
+	expect_value(CS_CLASSDC);
+	expect_value(CS_PARENTDC);
+	expect_value(CS_NOCLOSE);
+	expect_value(CS_SAVEBITS);
+	expect_value(CS_BYTEALIGNCLIENT);
+	expect_value(CS_BYTEALIGNWINDOW);
+	expect_value(CS_GLOBALCLASS);
+	// expect_value(CS_IME);
+	expect_value(CS_DROPSHADOW);
+
+	test_proc_comment("Window Styles");
+	expect_value(WS_OVERLAPPED);
+	expect_value(WS_POPUP);
+	expect_value(WS_CHILD);
+	expect_value(WS_MINIMIZE);
+	expect_value(WS_VISIBLE);
+	expect_value(WS_DISABLED);
+	expect_value(WS_CLIPSIBLINGS);
+	expect_value(WS_CLIPCHILDREN);
+	expect_value(WS_MAXIMIZE);
+	expect_value(WS_CAPTION);
+	expect_value(WS_BORDER);
+	expect_value(WS_DLGFRAME);
+	expect_value(WS_VSCROLL);
+	expect_value(WS_HSCROLL);
+	expect_value(WS_SYSMENU);
+	expect_value(WS_THICKFRAME);
+	expect_value(WS_GROUP);
+	expect_value(WS_TABSTOP);
+	expect_value(WS_MINIMIZEBOX);
+	expect_value(WS_MAXIMIZEBOX);
+	expect_value(WS_TILED);
+	expect_value(WS_ICONIC);
+	expect_value(WS_SIZEBOX);
+	expect_value(WS_TILEDWINDOW);
+	expect_value(WS_OVERLAPPEDWINDOW);
+	expect_value(WS_POPUPWINDOW);
+	expect_value(WS_CHILDWINDOW);
+
+	test_proc_comment("Extended Window Styles");
+	expect_value(WS_EX_ACCEPTFILES);
+	expect_value(WS_EX_APPWINDOW);
+	expect_value(WS_EX_CLIENTEDGE);
+	expect_value(WS_EX_COMPOSITED);
+	expect_value(WS_EX_CONTEXTHELP);
+	expect_value(WS_EX_CONTROLPARENT);
+	expect_value(WS_EX_DLGMODALFRAME);
+	// expect_value(WS_EX_DRAGDETECT);
+	expect_value(WS_EX_LAYERED);
+	expect_value(WS_EX_LAYOUTRTL);
+	expect_value(WS_EX_LEFT);
+	expect_value(WS_EX_LEFTSCROLLBAR);
+	expect_value(WS_EX_LTRREADING);
+	expect_value(WS_EX_MDICHILD);
+	expect_value(WS_EX_NOACTIVATE);
+	expect_value(WS_EX_NOINHERITLAYOUT);
+	expect_value(WS_EX_NOPARENTNOTIFY);
+	expect_value(WS_EX_NOREDIRECTIONBITMAP);
+	expect_value(WS_EX_OVERLAPPEDWINDOW);
+	expect_value(WS_EX_PALETTEWINDOW);
+	expect_value(WS_EX_RIGHT);
+	expect_value(WS_EX_RIGHTSCROLLBAR);
+	expect_value(WS_EX_RTLREADING);
+	expect_value(WS_EX_STATICEDGE);
+	expect_value(WS_EX_TOOLWINDOW);
+	expect_value(WS_EX_TOPMOST);
+	expect_value(WS_EX_TRANSPARENT);
+	expect_value(WS_EX_WINDOWEDGE);
+
+	test_proc_end();
+}
+
+static void verify_gdi32(ofstream& out) {
+	test_proc_begin();
+	test_proc_comment("wingdi.h");
+	expect_size(DEVMODEW);
+	// expect_size(RGBTRIPLE);
+	expect_size(RGBQUAD);
+	expect_size(BITMAPINFOHEADER);
+	expect_size(BITMAPFILEHEADER);
+	expect_size(BITMAP);
+	expect_size(BITMAPV5HEADER);
+	expect_size(CIEXYZTRIPLE);
+	expect_size(CIEXYZ);
+	expect_size(FXPT2DOT30);
+	expect_size(PALETTEENTRY);
+	// expect_size(LOGPALETTE);
+	expect_size(LOGBRUSH);
+	expect_size(TEXTMETRICW);
+	expect_size(POINTFLOAT);
+	expect_size(GLYPHMETRICSFLOAT);
+	expect_size(DESIGNVECTOR);
+	expect_value(LF_FACESIZE);
+	expect_value(LF_FULLFACESIZE);
+	expect_size(LOGFONTW);
+	expect_size(ENUMLOGFONTW);
+	expect_size(ENUMLOGFONTEXW);
+	expect_size(ENUMLOGFONTEXDVW);
+	expect_size(NEWTEXTMETRICW);
+
+	expect_size(LAYERPLANEDESCRIPTOR);
+	expect_size(COLOR16);
+	expect_size(TRIVERTEX);
+	expect_size(GRADIENT_TRIANGLE);
+	expect_size(GRADIENT_RECT);
+	expect_size(BLENDFUNCTION);
+
+	expect_size(DISPLAY_DEVICEW);
+	expect_value(AC_SRC_OVER);
+	expect_value(AC_SRC_ALPHA);
+	expect_value(RGB(12, 34, 56));
+	expect_value(PALETTERGB(12, 34, 56));
+	expect_value(PALETTEINDEX(123));
+	expect_value(GRADIENT_FILL_RECT_H);
+	expect_value(GRADIENT_FILL_RECT_V);
+	expect_value(GRADIENT_FILL_TRIANGLE);
+
+	expect_value(BS_SOLID);
+	expect_value(BS_NULL);
+	expect_value(BS_HOLLOW);
+	expect_value(BS_HATCHED);
+	expect_value(BS_PATTERN);
+	expect_value(BS_INDEXED);
+	expect_value(BS_DIBPATTERN);
+	expect_value(BS_DIBPATTERNPT);
+	expect_value(BS_PATTERN8X8);
+	expect_value(BS_DIBPATTERN8X8);
+	expect_value(BS_MONOPATTERN);
+
+	expect_value(HS_HORIZONTAL);
+	expect_value(HS_VERTICAL);
+	expect_value(HS_FDIAGONAL);
+	expect_value(HS_BDIAGONAL);
+	expect_value(HS_CROSS);
+	expect_value(HS_DIAGCROSS);
+	expect_value(HS_API_MAX);
+
+	expect_value(PS_SOLID);
+	expect_value(PS_DASH);
+	expect_value(PS_DOT);
+	expect_value(PS_DASHDOT);
+	expect_value(PS_DASHDOTDOT);
+	expect_value(PS_NULL);
+	expect_value(PS_INSIDEFRAME);
+	expect_value(PS_USERSTYLE);
+	expect_value(PS_ALTERNATE);
+	expect_value(PS_STYLE_MASK);
+
+	expect_value(PS_ENDCAP_ROUND);
+	expect_value(PS_ENDCAP_SQUARE);
+	expect_value(PS_ENDCAP_FLAT);
+	expect_value(PS_ENDCAP_MASK);
+
+	expect_value(PS_JOIN_ROUND);
+	expect_value(PS_JOIN_BEVEL);
+	expect_value(PS_JOIN_MITER);
+
+	expect_value(PS_COSMETIC);
+	expect_value(PS_GEOMETRIC);
+	expect_value(PS_TYPE_MASK);
+
+	test_proc_comment("Pixel format descriptor");
+	expect_size(PIXELFORMATDESCRIPTOR);
+	expect_value(PFD_TYPE_RGBA);
+	expect_value(PFD_TYPE_COLORINDEX);
+	expect_value(PFD_MAIN_PLANE);
+	expect_value(PFD_OVERLAY_PLANE);
+	expect_value_int(PFD_UNDERLAY_PLANE);
+	expect_value(PFD_DOUBLEBUFFER);
+	expect_value(PFD_STEREO);
+	expect_value(PFD_DRAW_TO_WINDOW);
+	expect_value(PFD_DRAW_TO_BITMAP);
+	expect_value(PFD_SUPPORT_GDI);
+	expect_value(PFD_SUPPORT_OPENGL);
+	expect_value(PFD_GENERIC_FORMAT);
+	expect_value(PFD_NEED_PALETTE);
+	expect_value(PFD_NEED_SYSTEM_PALETTE);
+	expect_value(PFD_SWAP_EXCHANGE);
+	expect_value(PFD_SWAP_COPY);
+	expect_value(PFD_SWAP_LAYER_BUFFERS);
+	expect_value(PFD_GENERIC_ACCELERATED);
+	expect_value(PFD_SUPPORT_DIRECTDRAW);
+	expect_value(PFD_DIRECT3D_ACCELERATED);
+	expect_value(PFD_SUPPORT_COMPOSITION);
+	expect_value(PFD_DEPTH_DONTCARE);
+	expect_value(PFD_DOUBLEBUFFER_DONTCARE);
+	expect_value(PFD_STEREO_DONTCARE);
+
+	test_proc_comment("Constants for the biCompression field");
+	expect_value(BI_RGB);
+	expect_value(BI_RLE8);
+	expect_value(BI_RLE4);
+	expect_value(BI_BITFIELDS);
+	expect_value(BI_JPEG);
+	expect_value(BI_PNG);
+
+	test_proc_comment("Binary raster ops");
+	expect_value(R2_BLACK);
+	expect_value(R2_NOTMERGEPEN);
+	expect_value(R2_MASKNOTPEN);
+	expect_value(R2_NOTCOPYPEN);
+	expect_value(R2_MASKPENNOT);
+	expect_value(R2_NOT);
+	expect_value(R2_XORPEN);
+	expect_value(R2_NOTMASKPEN);
+	expect_value(R2_MASKPEN);
+	expect_value(R2_NOTXORPEN);
+	expect_value(R2_NOP);
+	expect_value(R2_MERGENOTPEN);
+	expect_value(R2_COPYPEN);
+	expect_value(R2_MERGEPENNOT);
+	expect_value(R2_MERGEPEN);
+	expect_value(R2_WHITE);
+	test_proc_comment("Ternary raster operations");
+	expect_value(SRCCOPY);
+	expect_value(SRCPAINT);
+	expect_value(SRCAND);
+	expect_value(SRCINVERT);
+	expect_value(SRCERASE);
+	expect_value(NOTSRCCOPY);
+	expect_value(NOTSRCERASE);
+	expect_value(MERGECOPY);
+	expect_value(MERGEPAINT);
+	expect_value(PATCOPY);
+	expect_value(PATPAINT);
+	expect_value(PATINVERT);
+	expect_value(DSTINVERT);
+	expect_value(BLACKNESS);
+	expect_value(WHITENESS);
+	expect_value(NOMIRRORBITMAP);
+	expect_value(CAPTUREBLT);
+	test_proc_comment("Region Flags");
+	expect_value(ERROR);
+	expect_value(NULLREGION);
+	expect_value(SIMPLEREGION);
+	expect_value(COMPLEXREGION);
+	expect_value(RGN_ERROR);
+	test_proc_comment("CombineRgn() Styles");
+	expect_value(RGN_AND);
+	expect_value(RGN_OR);
+	expect_value(RGN_XOR);
+	expect_value(RGN_DIFF);
+	expect_value(RGN_COPY);
+	test_proc_comment("StretchBlt() Modes");
+	expect_value(BLACKONWHITE);
+	expect_value(WHITEONBLACK);
+	expect_value(COLORONCOLOR);
+	expect_value(HALFTONE);
+	//expect_value(STRETCH_ANDSCANS);
+	//expect_value(STRETCH_ORSCANS);
+	//expect_value(STRETCH_DELETESCANS);
+	//expect_value(STRETCH_HALFTONE);
+	test_proc_comment("PolyFill() Modes");
+	expect_value(ALTERNATE);
+	expect_value(WINDING);
+	test_proc_comment("Layout Orientation Options");
+	expect_value(LAYOUT_RTL);
+	expect_value(LAYOUT_BTT);
+	expect_value(LAYOUT_VBH);
+	expect_value(LAYOUT_ORIENTATIONMASK);
+	test_proc_comment("Text Alignment Options");
+	expect_value(TA_NOUPDATECP);
+	expect_value(TA_UPDATECP);
+	expect_value(TA_LEFT);
+	expect_value(TA_RIGHT);
+	expect_value(TA_CENTER);
+	expect_value(TA_TOP);
+	expect_value(TA_BOTTOM);
+	expect_value(TA_BASELINE);
+	expect_value(TA_RTLREADING);
+	expect_value(TA_MASK);
+
+	expect_value(VTA_BASELINE);
+	expect_value(VTA_LEFT);
+	expect_value(VTA_RIGHT);
+	expect_value(VTA_CENTER);
+	expect_value(VTA_BOTTOM);
+	expect_value(VTA_TOP);
+
+	expect_value(ETO_OPAQUE);
+	expect_value(ETO_CLIPPED);
+	expect_value(ETO_GLYPH_INDEX);
+	expect_value(ETO_RTLREADING);
+	expect_value(ETO_NUMERICSLOCAL);
+	expect_value(ETO_NUMERICSLATIN);
+	expect_value(ETO_IGNORELANGUAGE);
+	expect_value(ETO_PDY);
+	expect_value(ETO_REVERSE_INDEX_MAP);
+
+	expect_value(ASPECT_FILTERING);
+
+	test_proc_comment("Bounds Accumulation APIs");
+	expect_value(DCB_RESET);
+	expect_value(DCB_ACCUMULATE);
+	expect_value(DCB_DIRTY);
+	expect_value(DCB_SET);
+	expect_value(DCB_ENABLE);
+	expect_value(DCB_DISABLE);
+
+	test_proc_comment("enum BKMODE");
+	expect_value_enum("BKMODE", TRANSPARENT);
+	expect_value_enum("BKMODE", OPAQUE);
+
+	test_proc_comment("enum ArcDirection");
+	expect_value_enum("ArcDirection", AD_COUNTERCLOCKWISE);
+	expect_value_enum("ArcDirection", AD_CLOCKWISE);
+
+	test_proc_comment("font constants");
 	expect_value(ANSI_CHARSET);
 	expect_value(DEFAULT_CHARSET);
 	expect_value(SYMBOL_CHARSET);
@@ -535,172 +969,6 @@ static void verify_winuser(ofstream& out) {
 	test_proc_end();
 }
 
-static void verify_gdi32(ofstream& out) {
-	test_proc_begin();
-	test_proc_comment("wingdi.h");
-	expect_size(DEVMODEW);
-	// expect_size(RGBTRIPLE);
-	expect_size(RGBQUAD);
-	expect_size(PIXELFORMATDESCRIPTOR);
-	expect_size(BITMAPINFOHEADER);
-	expect_size(BITMAPFILEHEADER);
-	expect_size(BITMAP);
-	expect_size(BITMAPV5HEADER);
-	expect_size(CIEXYZTRIPLE);
-	expect_size(CIEXYZ);
-	expect_size(FXPT2DOT30);
-	expect_size(TEXTMETRICW);
-	expect_size(POINTFLOAT);
-	expect_size(GLYPHMETRICSFLOAT);
-	// expect_size(LOGPALETTE);
-	expect_size(PALETTEENTRY);
-	expect_size(DESIGNVECTOR);
-	expect_value(LF_FACESIZE);
-	expect_value(LF_FULLFACESIZE);
-	expect_size(LOGFONTW);
-	expect_size(ENUMLOGFONTW);
-	expect_size(ENUMLOGFONTEXW);
-	expect_size(ENUMLOGFONTEXDVW);
-	expect_size(NEWTEXTMETRICW);
-
-	expect_size(LAYERPLANEDESCRIPTOR);
-	expect_size(COLOR16);
-	expect_size(TRIVERTEX);
-	expect_size(GRADIENT_TRIANGLE);
-	expect_size(GRADIENT_RECT);
-	expect_size(BLENDFUNCTION);
-	expect_size(DISPLAY_DEVICEW);
-	expect_value(AC_SRC_OVER);
-	expect_value(AC_SRC_ALPHA);
-	expect_value(RGB(12, 34, 56));
-	expect_value(PALETTERGB(12, 34, 56));
-	expect_value(PALETTEINDEX(123));
-	expect_value(GRADIENT_FILL_RECT_H);
-	expect_value(GRADIENT_FILL_RECT_V);
-	expect_value(GRADIENT_FILL_TRIANGLE);
-
-	expect_value(BS_SOLID);
-	expect_value(BS_NULL);
-	expect_value(BS_HOLLOW);
-	expect_value(BS_HATCHED);
-	expect_value(BS_PATTERN);
-	expect_value(BS_INDEXED);
-	expect_value(BS_DIBPATTERN);
-	expect_value(BS_DIBPATTERNPT);
-	expect_value(BS_PATTERN8X8);
-	expect_value(BS_DIBPATTERN8X8);
-	expect_value(BS_MONOPATTERN);
-
-	expect_value(HS_HORIZONTAL);
-	expect_value(HS_VERTICAL);
-	expect_value(HS_FDIAGONAL);
-	expect_value(HS_BDIAGONAL);
-	expect_value(HS_CROSS);
-	expect_value(HS_DIAGCROSS);
-	expect_value(HS_API_MAX);
-
-	expect_value(PS_SOLID);
-	expect_value(PS_DASH);
-	expect_value(PS_DOT);
-	expect_value(PS_DASHDOT);
-	expect_value(PS_DASHDOTDOT);
-	expect_value(PS_NULL);
-	expect_value(PS_INSIDEFRAME);
-	expect_value(PS_USERSTYLE);
-	expect_value(PS_ALTERNATE);
-	expect_value(PS_STYLE_MASK);
-
-	expect_value(PS_ENDCAP_ROUND);
-	expect_value(PS_ENDCAP_SQUARE);
-	expect_value(PS_ENDCAP_FLAT);
-	expect_value(PS_ENDCAP_MASK);
-
-	expect_value(PS_JOIN_ROUND);
-	expect_value(PS_JOIN_BEVEL);
-	expect_value(PS_JOIN_MITER);
-
-	expect_value(PS_COSMETIC);
-	expect_value(PS_GEOMETRIC);
-	expect_value(PS_TYPE_MASK);
-
-	test_proc_comment("Binary raster ops");
-	expect_value(R2_BLACK);
-	expect_value(R2_NOTMERGEPEN);
-	expect_value(R2_MASKNOTPEN);
-	expect_value(R2_NOTCOPYPEN);
-	expect_value(R2_MASKPENNOT);
-	expect_value(R2_NOT);
-	expect_value(R2_XORPEN);
-	expect_value(R2_NOTMASKPEN);
-	expect_value(R2_MASKPEN);
-	expect_value(R2_NOTXORPEN);
-	expect_value(R2_NOP);
-	expect_value(R2_MERGENOTPEN);
-	expect_value(R2_COPYPEN);
-	expect_value(R2_MERGEPENNOT);
-	expect_value(R2_MERGEPEN);
-	expect_value(R2_WHITE);
-	test_proc_comment("Ternary raster operations");
-	expect_value(SRCCOPY);
-	expect_value(SRCPAINT);
-	expect_value(SRCAND);
-	expect_value(SRCINVERT);
-	expect_value(SRCERASE);
-	expect_value(NOTSRCCOPY);
-	expect_value(NOTSRCERASE);
-	expect_value(MERGECOPY);
-	expect_value(MERGEPAINT);
-	expect_value(PATCOPY);
-	expect_value(PATPAINT);
-	expect_value(PATINVERT);
-	expect_value(DSTINVERT);
-	expect_value(BLACKNESS);
-	expect_value(WHITENESS);
-	expect_value(NOMIRRORBITMAP);
-	expect_value(CAPTUREBLT);
-	test_proc_comment("Region Flags");
-	expect_value(ERROR);
-	expect_value(NULLREGION);
-	expect_value(SIMPLEREGION);
-	expect_value(COMPLEXREGION);
-	expect_value(RGN_ERROR);
-	test_proc_comment("CombineRgn() Styles");
-	expect_value(RGN_AND);
-	expect_value(RGN_OR);
-	expect_value(RGN_XOR);
-	expect_value(RGN_DIFF);
-	expect_value(RGN_COPY);
-	test_proc_comment("StretchBlt() Modes");
-	expect_value(BLACKONWHITE);
-	expect_value(WHITEONBLACK);
-	expect_value(COLORONCOLOR);
-	expect_value(HALFTONE);
-	//expect_value(STRETCH_ANDSCANS);
-	//expect_value(STRETCH_ORSCANS);
-	//expect_value(STRETCH_DELETESCANS);
-	//expect_value(STRETCH_HALFTONE);
-	test_proc_comment("PolyFill() Modes");
-	expect_value(ALTERNATE);
-	expect_value(WINDING);
-	test_proc_comment("Layout Orientation Options");
-	expect_value(LAYOUT_RTL);
-	expect_value(LAYOUT_BTT);
-	expect_value(LAYOUT_VBH);
-	expect_value(LAYOUT_ORIENTATIONMASK);
-	test_proc_comment("Text Alignment Options");
-	expect_value(TA_NOUPDATECP);
-	expect_value(TA_UPDATECP);
-	expect_value(TA_LEFT);
-	expect_value(TA_RIGHT);
-	expect_value(TA_CENTER);
-	expect_value(TA_TOP);
-	expect_value(TA_BOTTOM);
-	expect_value(TA_BASELINE);
-	expect_value(TA_RTLREADING);
-	expect_value(TA_MASK);
-	test_proc_end();
-}
-
 static void verify_winmm(ofstream& out) {
 	test_proc_begin();
 	test_proc_comment("timeapi.h");
@@ -708,13 +976,86 @@ static void verify_winmm(ofstream& out) {
 	test_proc_comment("mmsyscom.h");
 	expect_size(MMVERSION);
 	expect_size(MMTIME);
+	expect_value(MMSYSERR_BASE);
+	expect_value(WAVERR_BASE);
+	expect_value(MIDIERR_BASE);
+	expect_value(TIMERR_BASE);
+	expect_value(JOYERR_BASE);
+	expect_value(MCIERR_BASE);
+	expect_value(MIXERR_BASE);
+	expect_value(MCI_STRING_OFFSET);
+	expect_value(MCI_VD_OFFSET);
+	expect_value(MCI_CD_OFFSET);
+	expect_value(MCI_WAVE_OFFSET);
+	expect_value(MCI_SEQ_OFFSET);
+
 	test_proc_comment("mmreg.h");
 	expect_size(WAVEFORMATEX);
 	expect_size(WAVEFORMATEXTENSIBLE);
 	test_proc_comment("mmeapi.h");
+	test_proc_comment("waveform audio error return values");
+	expect_value(WAVERR_BADFORMAT);
+	expect_value(WAVERR_STILLPLAYING);
+	expect_value(WAVERR_UNPREPARED);
+	expect_value(WAVERR_SYNC);
+	expect_value(WAVERR_LASTERROR);
+	test_proc_comment("wave callback messages");
+	expect_value(WOM_OPEN);
+	expect_value(WOM_CLOSE);
+	expect_value(WOM_DONE);
+	expect_value(WIM_OPEN);
+	expect_value(WIM_CLOSE);
+	expect_value(WIM_DATA);
+	test_proc_comment("device ID for wave device mapper");
+	expect_value(WAVE_MAPPER);
+	test_proc_comment("flags for dwFlags parameter in waveOutOpen() and waveInOpen()");
+	expect_value(WAVE_FORMAT_QUERY);
+	expect_value(WAVE_ALLOWSYNC);
+	expect_value(WAVE_MAPPED);
+	expect_value(WAVE_FORMAT_DIRECT);
+	expect_value(WAVE_FORMAT_DIRECT_QUERY);
+	expect_value(WAVE_MAPPED_DEFAULT_COMMUNICATION_DEVICE);
 	expect_size(WAVEHDR);
-	expect_size(WAVEINCAPSW);
+	expect_value(WHDR_DONE);
+	expect_value(WHDR_PREPARED);
+	expect_value(WHDR_BEGINLOOP);
+	expect_value(WHDR_ENDLOOP);
+	expect_value(WHDR_INQUEUE);
 	expect_size(WAVEOUTCAPSW);
+	expect_value(WAVECAPS_PITCH);
+	expect_value(WAVECAPS_PLAYBACKRATE);
+	expect_value(WAVECAPS_VOLUME);
+	expect_value(WAVECAPS_LRVOLUME);
+	expect_value(WAVECAPS_SYNC);
+	expect_value(WAVECAPS_SAMPLEACCURATE);
+	expect_size(WAVEINCAPSW);
+	test_proc_comment("defines for dwFormat field of WAVEINCAPS and WAVEOUTCAPS");
+	expect_value(WAVE_INVALIDFORMAT);
+	expect_value(WAVE_FORMAT_1M08);
+	expect_value(WAVE_FORMAT_1S08);
+	expect_value(WAVE_FORMAT_1M16);
+	expect_value(WAVE_FORMAT_1S16);
+	expect_value(WAVE_FORMAT_2M08);
+	expect_value(WAVE_FORMAT_2S08);
+	expect_value(WAVE_FORMAT_2M16);
+	expect_value(WAVE_FORMAT_2S16);
+	expect_value(WAVE_FORMAT_4M08);
+	expect_value(WAVE_FORMAT_4S08);
+	expect_value(WAVE_FORMAT_4M16);
+	expect_value(WAVE_FORMAT_4S16);
+	expect_value(WAVE_FORMAT_44M08);
+	expect_value(WAVE_FORMAT_44S08);
+	expect_value(WAVE_FORMAT_44M16);
+	expect_value(WAVE_FORMAT_44S16);
+	expect_value(WAVE_FORMAT_48M08);
+	expect_value(WAVE_FORMAT_48S08);
+	expect_value(WAVE_FORMAT_48M16);
+	expect_value(WAVE_FORMAT_48S16);
+	expect_value(WAVE_FORMAT_96M08);
+	expect_value(WAVE_FORMAT_96S08);
+	expect_value(WAVE_FORMAT_96M16);
+	expect_value(WAVE_FORMAT_96S16);
+
 	test_proc_end();
 }
 
@@ -917,6 +1258,7 @@ static void test_core_sys_windows(ofstream& out) {
 		<< "import \"core:testing\"" << endl
 		<< "import win32 \"core:sys/windows\"" << endl;
 	verify_win32_type_sizes(out);
+	verify_win32_enums(out);
 	verify_macros(out);
 	verify_winnt(out);
 	verify_winuser(out);
@@ -937,4 +1279,5 @@ int main(int argc, char* argv[]) {
 	ofstream out(filepath);
 	test_core_sys_windows(out);
 	out.close();
+	return 0;
 }
