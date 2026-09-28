@@ -133,7 +133,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 	bool is_android = false;
 	bool is_windows_cross = false;
-	if (build_context.cross_compiling && build_context.different_os && build_context.metrics.os == TargetOs_windows) {
+	if (build_context.cross_compiling && build_context.metrics.os == TargetOs_windows) {
 		if (build_context.linker_choice != Linker_lld) {
 			gb_printf_err("Cannot link for Windows without LLD (%.*s %.*s)\n",
 				LIT(target_os_names[build_context.metrics.os]),
@@ -220,6 +220,29 @@ try_cross_linking:;
 			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
 
+		#if !defined(GB_SYSTEM_WINDOWS)
+			StringMap<String> libs_normalized = {};
+			string_map_init(&libs_normalized);
+			defer (string_map_destroy(&libs_normalized));
+			Array<FileInfo> walker_list = {};
+			ReadDirectoryError rd_err = read_directory(build_context.windows_sdk_root, &walker_list);
+			for_array(i, walker_list) {
+				FileInfo entry = walker_list[i];
+				if (entry.is_dir) {
+					Array<FileInfo> walker_children = {};
+					ReadDirectoryError child_rd_err = read_directory(entry.fullpath, &walker_children);
+					for_array(j, walker_children) {
+						array_add(&walker_list, walker_children[j]);
+					}
+					array_free(&walker_children);
+					continue;
+				}
+				String lowered_name = copy_string(permanent_allocator(), entry.name);
+				string_to_lower(&lowered_name);
+				string_map_set(&libs_normalized, lowered_name, entry.name);
+			}
+		#endif
+
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				// NOTE(bill): Add these before the linking values
@@ -229,14 +252,24 @@ try_cross_linking:;
 				}
 				for_array(i, e->LibraryName.paths) {
 					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
-					// IMPORTANT NOTE(bill): calling `string_to_lower` here is not an issue because
-					// we will never uses these strings afterwards
-				#if defined(GB_SYSTEM_WINDOWS)
-					string_to_lower(&lib);
-				#endif
 					if (lib.len == 0) {
 						continue;
 					}
+
+				#if defined(GB_SYSTEM_WINDOWS)
+					// IMPORTANT NOTE(bill): calling `string_to_lower` here is not an issue because
+					// we will never uses these strings afterwards
+					string_to_lower(&lib);
+				#else
+					if (lib[0] != '/') {
+						String lowered_name = copy_string(permanent_allocator(), lib);
+						string_to_lower(&lowered_name);
+						String *fixed_lib = string_map_get(&libs_normalized, lowered_name);
+						if (fixed_lib != nullptr) {
+							lib = *fixed_lib;
+						}
+					}
+				#endif
 
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
@@ -326,6 +359,10 @@ try_cross_linking:;
 				} else {
 					link_settings = gb_string_append_fmt(link_settings, " /defaultlib:libcmt");
 				}
+			}
+
+			if (build_context.windows_sdk_root.len > 0) {
+				link_settings = gb_string_append_fmt(link_settings, " /winsysroot:%.*s", LIT(build_context.windows_sdk_root));
 			}
 
 			if (build_context.ODIN_DEBUG) {
