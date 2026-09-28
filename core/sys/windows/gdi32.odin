@@ -1,7 +1,7 @@
 #+build windows
 package sys_windows
 
-foreign import gdi32 "system:Gdi32.lib"
+foreign import gdi32 "system:Gdi32.Lib"
 
 @(default_calling_convention="system")
 foreign gdi32 {

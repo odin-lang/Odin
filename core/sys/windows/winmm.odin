@@ -1,7 +1,7 @@
 #+build windows
 package sys_windows
 
-foreign import winmm "system:Winmm.lib"
+foreign import winmm "system:WinMM.Lib"
 
 MMRESULT :: UINT
 

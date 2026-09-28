@@ -1,7 +1,7 @@
 #+build windows
 package sys_windows
 
-foreign import bcrypt "system:Bcrypt.lib"
+foreign import bcrypt "system:bcrypt.lib"
 
 BCRYPT_USE_SYSTEM_PREFERRED_RNG: DWORD : 0x00000002
 

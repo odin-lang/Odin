@@ -131,13 +131,21 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		return result;
 	}
 
-	bool is_cross_linking = false;
 	bool is_android = false;
-
-	if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
+	bool is_windows_cross = false;
+	if (build_context.cross_compiling && build_context.different_os && build_context.metrics.os == TargetOs_windows) {
+		if (build_context.linker_choice != Linker_lld) {
+			gb_printf_err("Cannot link for Windows without LLD (%.*s %.*s)\n",
+				LIT(target_os_names[build_context.metrics.os]),
+				LIT(target_arch_names[build_context.metrics.arch])
+			);
+			build_context.keep_object_files = true;
+		}
+		is_windows_cross = true;
+		goto try_cross_linking;
+	} else if (build_context.cross_compiling && (build_context.different_os || selected_subtarget != Subtarget_Default)) {
 		switch (selected_subtarget) {
 		case Subtarget_Android:
-			is_cross_linking = true;
 			is_android = true;
 			goto try_cross_linking;
 		default:
@@ -156,7 +164,7 @@ try_cross_linking:;
 		bool is_windows = build_context.metrics.os == TargetOs_windows;
 	#else
 		String section_name = str_lit("ld-link");
-		bool is_windows = false;
+		bool is_windows = is_windows_cross;
 	#endif
 
 		bool is_osx = build_context.metrics.os == TargetOs_darwin;
@@ -250,13 +258,27 @@ try_cross_linking:;
 							obj_format = str_lit("win32");
 						#endif
 
+						#if defined(GB_SYSTEM_WINDOWS)
+							char nasm_path[4096] = {0};
+							gb_snprintf_va(
+								nasm_path,
+								gb_count_of(nasm_path) - 1,
+								"%.*s\\bin\\nasm\\windows\\nasm.exe",
+								LIT(build_context.ODIN_ROOT),
+							);
+						#else
+							const char *nasm_path = gb_get_env("ODIN_NASM_PATH", permanent_allocator());
+							if (nasm_path == nullptr) {
+								nasm_path = "nasm";
+							}
+						#endif
 							result = system_exec_command_line_app("nasm",
-								"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
+								"\"%s\" \"%.*s\" "
 								"-f \"%.*s\" "
 								"-o \"%.*s\" "
 								"%.*s "
 								"",
-								LIT(build_context.ODIN_ROOT), LIT(asm_file),
+								nasm_path, LIT(asm_file),
 								LIT(obj_format),
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
@@ -327,27 +349,43 @@ try_cross_linking:;
 
 			switch (build_context.linker_choice) {
 			case Linker_lld:
-				result = system_exec_command_line_app("msvc-lld-link",
-					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
-					"%.*s "
-					"%.*s "
-					"%s "
-					"%s "
-					"",
-					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
-					link_settings,
-					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
-					LIT(build_context.link_flags),
-					LIT(build_context.extra_linker_flags),
-					lib_str,
-					lld_lto_flags
-				);
+				{
+				#if defined(GB_SYSTEM_WINDOWS)
+					char linker_path[4096] = {0};
+					gb_snprintf(
+						linker_path,
+						gb_count_of(buf) - 1,
+						"%.*s\\bin\\lld-link",
+						LIT(build_context.ODIN_ROOT)
+					);
+				#else
+					const char *linker_path = gb_get_env("ODIN_LLD_PATH", permanent_allocator());
+					if (linker_path == nullptr) {
+						linker_path = "lld-link";
+					}
+				#endif
+					result = system_exec_command_line_app("lld-link",
+						"\"%s\" %s -OUT:\"%.*s\" %s "
+						"/nologo /incremental:no /opt:ref /subsystem:%.*s "
+						"%.*s "
+						"%.*s "
+						"%s "
+						"%s "
+						"",
+						linker_path, object_files, LIT(output_filename),
+						link_settings,
+						LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
+						LIT(build_context.link_flags),
+						LIT(build_context.extra_linker_flags),
+						lib_str,
+						lld_lto_flags
+					);
 
-				if (result) {
-					return result;
+					if (result) {
+						return result;
+					}
+					break;
 				}
-				break;
 			case Linker_radlink:
 				result = system_exec_command_line_app("msvc-rad-link",
 					"\"%.*s\\bin\\radlink\" %s -OUT:\"%.*s\" %s "

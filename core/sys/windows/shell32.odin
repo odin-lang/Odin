@@ -1,7 +1,7 @@
 #+build windows
 package sys_windows
 
-foreign import shell32 "system:Shell32.lib"
+foreign import shell32 "system:shell32.lib"
 
 @(default_calling_convention="system")
 foreign shell32 {
