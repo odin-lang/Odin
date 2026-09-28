@@ -110,6 +110,7 @@ foreign user32 {
 
 	LoadIconA      :: proc(hInstance: HINSTANCE, lpIconName: LPCSTR) -> HICON ---
 	LoadIconW      :: proc(hInstance: HINSTANCE, lpIconName: LPCWSTR) -> HICON ---
+	GetIconInfo    :: proc(hIcon: HICON, piconinfo: PICONINFO) -> BOOL ---
 	GetIconInfoExW :: proc(hIcon: HICON, piconinfo: PICONINFOEXW) -> BOOL ---
 	LoadCursorA    :: proc(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR ---
 	LoadCursorW    :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
