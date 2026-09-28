@@ -133,7 +133,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 	bool is_android = false;
 	bool is_windows_cross = false;
-	if (build_context.cross_compiling && build_context.metrics.os == TargetOs_windows) {
+	if (build_context.cross_compiling && build_context.different_os && build_context.metrics.os == TargetOs_windows) {
 		if (build_context.linker_choice != Linker_lld) {
 			gb_printf_err("Cannot link for Windows without LLD (%.*s %.*s)\n",
 				LIT(target_os_names[build_context.metrics.os]),
