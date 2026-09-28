@@ -22,7 +22,7 @@ when ODIN_OS == .Windows {
 		"system:d3dcompiler.lib",
 		"system:ws2_32.lib",
 		"system:userenv.lib",
-		"system:bcrypt.lib",
+		"system:Bcrypt.lib",
 		"system:ntdll.lib",
 		"system:opengl32.lib",
 		"system:advapi32.lib",

@@ -2,7 +2,7 @@
 package sys_windows
 
 import "base:intrinsics"
-foreign import user32 "system:User32.Lib"
+foreign import user32 "system:User32.lib"
 
 @(default_calling_convention="system")
 foreign user32 {

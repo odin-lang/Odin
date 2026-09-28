@@ -103,10 +103,10 @@ when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:" + ("msvcrt" when RAYLIB_SHARED else "libcmt"))
 	foreign import lib {
 		"windows/raylibdll.lib" when RAYLIB_SHARED else "windows/raylib.lib" ,
-		"system:WinMM.Lib",
-		"system:Gdi32.Lib",
-		"system:User32.Lib",
-		"system:shell32.lib",
+		"system:Winmm.lib",
+		"system:Gdi32.lib",
+		"system:User32.lib",
+		"system:Shell32.lib",
 	}
 } else when ODIN_OS == .Linux  {
 	when ODIN_ARCH == .arm64 {

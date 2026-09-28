@@ -6,13 +6,13 @@ when ODIN_OS == .Windows {
 		foreign import ENet {
 			"lib/enet64.lib",
 			"system:Ws2_32.lib",
-			"system:WinMM.Lib",
+			"system:Winmm.lib",
 		}
 	} else {
 		foreign import ENet {
 			"lib/enet.lib",
 			"system:Ws2_32.lib",
-			"system:WinMM.Lib",
+			"system:Winmm.lib",
 		}
 	}
 } else {

@@ -11,7 +11,7 @@ when ODIN_OS == .Windows {
 	} else {
 		foreign import lib {
 			"portmidi_s.lib",
-			"system:WinMM.Lib",
+			"system:Winmm.lib",
 			"system:Advapi32.lib",
 		}
 	}
