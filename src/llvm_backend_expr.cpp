@@ -6074,7 +6074,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		// NOTE(bill): inline insertion sort should be good enough, right?
 		for (isize i = 1; i < values.count; i++) {
 			for (isize j = i;
-			     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+			     j > 0 && fields[j].bit_offset < fields[j-1].bit_offset;
 			     j--) {
 				auto vtmp = values[j];
 				values[j] = values[j-1];
