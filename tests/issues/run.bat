@@ -38,7 +38,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_6484.odin -no-entry-point %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6753.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_6874.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
-..\..\..\odin test ..\test_issue_6951.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_6951_5214.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_6979.odin -no-entry-point %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7008.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b

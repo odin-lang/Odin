@@ -86,7 +86,7 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
-$ODIN test ../test_issue_6951.odin $COMMON
+$ODIN test ../test_issue_6951_5214.odin $COMMON
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
