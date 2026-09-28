@@ -154,6 +154,8 @@ foreign user32 {
 	AppendMenuW            :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
 	GetMenu                :: proc(hWnd: HWND) -> HMENU ---
 	SetMenu                :: proc(hWnd: HWND, hMenu: HMENU) -> BOOL ---
+	GetMenuInfo            :: proc(hMenu: HMENU, lpMenuInfo: LPMENUINFO) -> BOOL ---
+	SetMenuInfo            :: proc(hMenu: HMENU, lpMenuInfo: LPMENUINFO) -> BOOL ---
 	TrackPopupMenu         :: proc(hMenu: HMENU, uFlags: UINT, x, y: INT, nReserved: INT, hWnd: HWND, prcRect: ^RECT) -> INT ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
 
@@ -793,6 +795,18 @@ MENUITEMINFOW :: struct {
 	hbmpItem:      HBITMAP,      // used if MIIM_BITMAP
 }
 LPMENUITEMINFOW :: ^MENUITEMINFOW
+
+MENUINFO :: struct {
+	cbSize:          DWORD,
+	fMask:           DWORD,
+	dwStyle:         DWORD,
+	cyMax:           UINT,
+	hbrBack:         HBRUSH,
+	dwContextHelpID: DWORD,
+	dwMenuData:      ULONG_PTR,
+}
+LPMENUINFO :: ^MENUINFO
+
 DISPLAY_DEVICEW :: struct {
 	cb:           DWORD,
 	DeviceName:   [32]WCHAR,
