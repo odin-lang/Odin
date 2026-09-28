@@ -661,6 +661,14 @@ CURSORINFO :: struct {
 }
 PCURSORINFO :: ^CURSORINFO
 
+CURSORSHAPE :: struct {
+	xHotSpot, yHotSpot: INT,
+	cx, cy: INT,
+	cbWidth: INT,
+	Planes: BYTE,
+	BitsPixel: BYTE,
+}
+
 ICONINFO :: struct {
 	fIcon: BOOL,
 	xHotspot, yHotspot: DWORD,
