@@ -167,6 +167,7 @@ foreign user32 {
 	DrawMenuBar            :: proc(hWnd: HWND) -> BOOL ---
 	GetSystemMenu          :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
 	CheckMenuItem          :: proc(hMenu: HMENU, uIDCHeckItem: UINT, uCheck: UINT) -> DWORD ---
+	CheckMenuRadioItem     :: proc(hMenu: HMENU, first: UINT, last: UINT, check: UINT, flags: UINT) -> BOOL ---
 	EnableMenuItem         :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
 	GetSubMenu             :: proc(hMenu: HMENU, nPos: c_int) -> HMENU ---
 	GetMenuItemID          :: proc(hMenu: HMENU, nPos: c_int) -> UINT ---

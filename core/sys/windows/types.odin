@@ -1272,7 +1272,7 @@ FF_MODERN     :: 3 << 4
 FF_SCRIPT     :: 4 << 4
 FF_DECORATIVE :: 5 << 4
 
-TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
+TIMERPROC :: #type proc "system" (hWnd: HWND, uMsg: UINT, idEvent: UINT_PTR, dwTime: DWORD)
 
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
