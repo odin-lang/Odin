@@ -9,7 +9,7 @@ import "core:math/bits"
 
 	Ported from ffc.h (https://github.com/kolemannix/ffc.h)
 	Made available under the Boost Software License 1.0,
-	see LICENSE_fast_float in this package.
+	see LICENSE at the bottom of the file.
 
 	List of contributors:
 		Daniel Lemire, João Paulo Magalhaes: Original fast_float implementation
@@ -129,24 +129,19 @@ fast_float_compute_float :: proc "contextless" ($T: typeid, q: int, w: u64) -> u
 	return mantissa | u64(power2) << MANTISSA_EXPLICIT_BITS
 }
 
-// A fast scanner for the common decimal float syntax, `[+-] digits [. digits] [(e|E) [+-] digits]`.
-// It reads 8 digits at a time with SWAR ("SIMD within a register") integer arithmetic.
-//
-// It skips a `_` between digits, and a second `.` ends the number.
-// It returns `ok = false` for a hex float, "inf", "nan", and a string that is not a number.
-// Then the caller tries `check_special` and `scan_hex_float`.
-
 @(private)
 MAX_SIG_DIGITS :: 19 // 10^19 - 1 < 2^64
 
 /*
 Scans a decimal floating-point number at the start of `s`.
+A fast scanner for the decimal float syntax: `[+-] digits [. digits] [(e|E) [+-] digits]`
+It skips a `_` between digits
 
 **Returns**
 - mantissa, exp: The value is `mantissa * 10^exp`. If `trunc` is true, the significant digits after the first 19 were dropped, and at least one of them was not zero.
 - neg: The number has a minus sign.
 - nr: The number of bytes in the number.
-- ok: `false` if `s` does not start with a decimal number.
+- ok: `false` if `s` is not a number
 */
 parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa: u64, exp: int, neg, trunc: bool, nr: int, ok: bool) #no_bounds_check {
 	n := len(s)
@@ -168,7 +163,7 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 	}
 	digits := i - int_start
 	if i < n && s[i] == '_' {
-		more: int
+		more: int = ---
 		i, mantissa, more = parse_digits_with_separators(s, i, mantissa)
 		digits += more
 	}
@@ -184,7 +179,7 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 		}
 		frac_digits := i - frac_start
 		if i < n && s[i] == '_' {
-			more: int
+			more: int = ---
 			i, mantissa, more = parse_digits_with_separators(s, i, mantissa)
 			frac_digits += more
 		}
@@ -231,7 +226,7 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 }
 
 
-// Returns the new position, the mantissa and the number of digits.
+// Returns the new position, the mantissa and the number of digits
 @(cold)
 parse_digits_with_separators :: proc "contextless" (s: string, i: int, mantissa: u64) -> (int, u64, int) #no_bounds_check {
 	i, mantissa := i, mantissa
@@ -414,7 +409,7 @@ scan_decimal_exact :: proc "contextless" (s: string) -> (mantissa: u64, exp: int
 	return m, e, neg, trunc, i, true
 }
 
-// Loads 8 bytes starting at `s[i]` in little-endian order. The caller checks that `i+8 <= len(s)`.
+// Loads 8 bytes starting at `s[i]` in little-endian order
 read8_to_u64 :: #force_inline proc "contextless" (s: string, i: int) -> u64 {
 	return u64(intrinsics.unaligned_load((^u64le)(&raw_data(s)[i])))
 }
@@ -423,7 +418,7 @@ read4_to_u32 :: #force_inline proc "contextless" (s: string, i: int) -> u32 {
 	return u32(intrinsics.unaligned_load((^u32le)(&raw_data(s)[i])))
 }
 
-// Reports if all 8 bytes of `v` are ASCII digits.
+// Reports if all 8 bytes of `v` are ASCII digits
 is_made_of_eight_digits_fast :: #force_inline proc "contextless" (v: u64) -> bool {
 	return ((v + 0x4646_4646_4646_4646) | (v - 0x3030_3030_3030_3030)) & 0x8080_8080_8080_8080 == 0
 }
@@ -432,7 +427,7 @@ is_made_of_four_digits_fast :: #force_inline proc "contextless" (v: u32) -> bool
 	return ((v + 0x4646_4646) | (v - 0x3030_3030)) & 0x8080_8080 == 0
 }
 
-// Returns the new position and mantissa.
+// Returns the new position and mantissa
 loop_parse_if_eight_digits :: #force_inline proc "contextless" (s: string, i: int, m: u64) -> (int, u64) #no_bounds_check {
 	i, m := i, m
 	for i+8 <= len(s) {
