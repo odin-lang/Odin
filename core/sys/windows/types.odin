@@ -1724,6 +1724,8 @@ NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
 NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
 NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
 
+// Pointer to a double-null-terminated string.
+// Special care must be taken when converting to this type.
 PCZZWSTR :: cstring16
 
 SHFILEOPSTRUCTW :: struct {
