@@ -2434,7 +2434,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			if (e->Variable.is_rodata) {
 				cc.is_rodata = true;
 			}
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, cc);
+			value = lb_const_value(p->module, is_type_any(e->type) ? ast_value->tav.type : e->type, ast_value->tav.value, cc);
 		}
 
 		String mangled_name = {};
@@ -2488,6 +2488,22 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals.data, vals.count);
 				LLVMSetInitializer(global, init);
 			} else {
+				LLVMTypeRef expected_type = lb_type(p->module, e->type);
+				LLVMTypeRef actual_type = LLVMTypeOf(value.value);
+				GB_ASSERT_MSG(lb_sizeof(actual_type) == lb_sizeof(expected_type),
+					"size mismatch for @(static) initializer of %.*s",
+					LIT(name));
+				if (actual_type != expected_type) {
+					LLVMDeleteGlobal(global);
+					global = LLVMAddGlobal(p->module->mod, actual_type, c_name);
+					LLVMSetAlignment(global, cast(u32)type_align_of(e->type));
+					if (e->Variable.is_rodata) {
+						LLVMSetGlobalConstant(global, true);
+					}
+					if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
+						LLVMSetLinkage(global, LLVMInternalLinkage);
+					}
+				}
 				LLVMSetInitializer(global, value.value);
 			}
 		}

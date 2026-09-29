@@ -868,7 +868,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
 
-	if (is_type_union(type) && is_type_union_constantable(type)) {
+	// A union constant needs a payload this backend can build, and the checker pins
+	// `variant_type` even for variants it cannot (`any` needs a backing global and a typeid),
+	// so ask the same question the aggregate constant paths ask.
+	if (is_type_union(type) && (is_type_union_constantable(type) ||
+	    (value.variant_type != nullptr && elem_type_can_be_constant(value.variant_type)))) {
 		Type *bt = base_type(type);
 		GB_ASSERT(bt->kind == Type_Union);
 		if (bt->Union.variants.count == 0) {
