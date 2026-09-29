@@ -11707,10 +11707,6 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			field_count = et->Enum.fields.count;
 		}
 
-		if (is_type_array(bit_set_to_int(t))) {
-			is_constant = false;
-		}
-
 		for (Ast *elem : cl->elems) {
 			if (elem->kind == Ast_FieldValue) {
 				error(elem, "'field = value' in a bit_set literal is not allowed");
