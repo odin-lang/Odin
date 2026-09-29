@@ -1187,7 +1187,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	} else {
 		x.mode  = Addressing_Constant;
-		x.type  = t_bool;
+		x.type  = t_untyped_bool;
 		x.value = exact_value_bool(true);
 
 		Token token  = {};
