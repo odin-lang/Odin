@@ -2338,6 +2338,35 @@ gb_internal bool check_update_float_precision(ExactValue *value, Type *type) {
 }
 
 
+gb_internal ExactValue exact_value_round_component_to_float(ExactValue comp, int mantissa_bits, int ebias) {
+	switch (comp.kind) {
+	case ExactValue_Rational:
+		return exact_value_float(big_rat_to_float(&comp.value_rational->num, &comp.value_rational->den, mantissa_bits, ebias));
+	case ExactValue_Integer: {
+		ExactValue r = exact_value_rational_from_integer(&comp.value_integer);
+		return exact_value_float(big_rat_to_float(&r.value_rational->num, &r.value_rational->den, mantissa_bits, ebias));
+	}
+	}
+	return exact_value_to_float(comp);
+}
+
+gb_internal void complex_quaternion_element_float_format(Type *type, int *mantissa_bits, int *ebias) {
+	*mantissa_bits = 52;
+	*ebias         = 1023;
+	switch (type->Basic.kind) {
+	case Basic_complex32:
+	case Basic_quaternion64:
+		*mantissa_bits = 10;
+		*ebias         = 15;
+		break;
+	case Basic_complex64:
+	case Basic_quaternion128:
+		*mantissa_bits = 23;
+		*ebias         = 127;
+		break;
+	}
+}
+
 gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	if (in_value.kind == ExactValue_Invalid) {
 		// NOTE(bill): There's already been an error
@@ -2597,7 +2626,11 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			ExactValue imag = exact_value_imag(v);
 			if (real.kind != ExactValue_Invalid &&
 			    imag.kind != ExactValue_Invalid) {
-				if (out_value) *out_value = exact_value_complex(exact_value_to_f64(real), exact_value_to_f64(imag));
+				int mantissa_bits, ebias;
+				complex_quaternion_element_float_format(type, &mantissa_bits, &ebias);
+				if (out_value) *out_value = exact_value_complex_ev(
+					exact_value_round_component_to_float(real, mantissa_bits, ebias),
+					exact_value_round_component_to_float(imag, mantissa_bits, ebias));
 				return true;
 			}
 			break;
@@ -2625,7 +2658,13 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			ExactValue kmag = exact_value_kmag(v);
 			if (real.kind != ExactValue_Invalid &&
 			    imag.kind != ExactValue_Invalid) {
-				if (out_value) *out_value = exact_value_quaternion(exact_value_to_f64(real), exact_value_to_f64(imag), exact_value_to_f64(jmag), exact_value_to_f64(kmag));
+				int mantissa_bits, ebias;
+				complex_quaternion_element_float_format(type, &mantissa_bits, &ebias);
+				if (out_value) *out_value = exact_value_quaternion_ev(
+					exact_value_round_component_to_float(real, mantissa_bits, ebias),
+					exact_value_round_component_to_float(imag, mantissa_bits, ebias),
+					exact_value_round_component_to_float(jmag, mantissa_bits, ebias),
+					exact_value_round_component_to_float(kmag, mantissa_bits, ebias));
 				return true;
 			}
 			break;
@@ -5824,42 +5863,42 @@ gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *oper
 		return value;
 	} else if (value.kind == ExactValue_Quaternion) {
 		// @QuaternionLayout
-		Quaternion256 q = *value.value_quaternion;
+		ExactQuaternion q = *value.value_quaternion;
 		GB_ASSERT(sel.index.count == 1);
 
 		switch (sel.index[0]) {
 		case 3: // w
 			if (success_) *success_ = true;
-			return exact_value_float(q.real);
+			return q.real;
 
 		case 0: // x
 			if (success_) *success_ = true;
-			return exact_value_float(q.imag);
+			return q.imag;
 
 		case 1: // y
 			if (success_) *success_ = true;
-			return exact_value_float(q.jmag);
+			return q.jmag;
 
 		case 2: // z
 			if (success_) *success_ = true;
-			return exact_value_float(q.kmag);
+			return q.kmag;
 		}
 
 		if (success_) *success_ = false;
 		return empty_exact_value;
 	} else if (value.kind == ExactValue_Complex) {
 		// @QuaternionLayout
-		Complex128 c = *value.value_complex;
+		ExactComplex c = *value.value_complex;
 		GB_ASSERT(sel.index.count == 1);
 
 		switch (sel.index[0]) {
 		case 0: // real
 			if (success_) *success_ = true;
-			return exact_value_float(c.real);
+			return c.real;
 
 		case 1: // imag
 			if (success_) *success_ = true;
-			return exact_value_float(c.imag);
+			return c.imag;
 		}
 
 		if (success_) *success_ = false;
@@ -13097,15 +13136,15 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 		return big_int_is_zero(&v.value_rational->num);
 	case ExactValue_Complex:
 		if (v.value_complex) {
-			return v.value_complex->real == 0.0 && v.value_complex->imag == 0.0;
+			return is_exact_value_zero(v.value_complex->real) && is_exact_value_zero(v.value_complex->imag);
 		}
 		return true;
 	case ExactValue_Quaternion:
 		if (v.value_quaternion) {
-			return v.value_quaternion->real == 0.0 &&
-			       v.value_quaternion->imag == 0.0 &&
-			       v.value_quaternion->jmag == 0.0 &&
-			       v.value_quaternion->kmag == 0.0;
+			return is_exact_value_zero(v.value_quaternion->real) &&
+			       is_exact_value_zero(v.value_quaternion->imag) &&
+			       is_exact_value_zero(v.value_quaternion->jmag) &&
+			       is_exact_value_zero(v.value_quaternion->kmag);
 		}
 		return true;
 	case ExactValue_Pointer:

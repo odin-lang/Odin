@@ -1353,16 +1353,16 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			LLVMValueRef values[2] = {};
 			switch (8*type_size_of(type)) {
 			case 32:
-				values[0] = lb_const_f16(m, cast(f32)value.value_complex->real);
-				values[1] = lb_const_f16(m, cast(f32)value.value_complex->imag);
+				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 64:
-				values[0] = lb_const_f32(m, cast(f32)value.value_complex->real);
-				values[1] = lb_const_f32(m, cast(f32)value.value_complex->imag);
+				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 128:
-				values[0] = LLVMConstReal(lb_type(m, t_f64), value.value_complex->real);
-				values[1] = LLVMConstReal(lb_type(m, t_f64), value.value_complex->imag);
+				values[0] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_complex->real));
+				values[1] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_complex->imag));
 				break;
 			}
 
@@ -1376,24 +1376,24 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			switch (8*type_size_of(type)) {
 			case 64:
 				// @QuaternionLayout
-				values[3] = lb_const_f16(m, cast(f32)value.value_quaternion->real);
-				values[0] = lb_const_f16(m, cast(f32)value.value_quaternion->imag);
-				values[1] = lb_const_f16(m, cast(f32)value.value_quaternion->jmag);
-				values[2] = lb_const_f16(m, cast(f32)value.value_quaternion->kmag);
+				values[3] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 128:
 				// @QuaternionLayout
-				values[3] = lb_const_f32(m, cast(f32)value.value_quaternion->real);
-				values[0] = lb_const_f32(m, cast(f32)value.value_quaternion->imag);
-				values[1] = lb_const_f32(m, cast(f32)value.value_quaternion->jmag);
-				values[2] = lb_const_f32(m, cast(f32)value.value_quaternion->kmag);
+				values[3] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 256:
 				// @QuaternionLayout
-				values[3] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->real);
-				values[0] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->imag);
-				values[1] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->jmag);
-				values[2] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->kmag);
+				values[3] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->real));
+				values[0] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			}
 
