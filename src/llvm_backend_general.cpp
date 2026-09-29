@@ -1994,13 +1994,17 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 
 	mutex_lock(&m->func_raw_types_mutex);
 
+	// NOTE: `map_get` returns an interior pointer into the map's storage, which another codegen thread's
+	// `map_set` (below) can free by growing/rehashing the map. Read the value out *while still holding the
+	// lock*; dereferencing `found` after unlocking is a data race that can return a freed/garbage type.
 	LLVMTypeRef *found = map_get(&m->func_raw_types, type);
-	if (found) {
-		mutex_unlock(&m->func_raw_types_mutex);
-		return *found;
-	}
+	LLVMTypeRef found_type = found ? *found : nullptr;
 
 	mutex_unlock(&m->func_raw_types_mutex);
+
+	if (found_type != nullptr) {
+		return found_type;
+	}
 
 	unsigned param_count = 0;
 
