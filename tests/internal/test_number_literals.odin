@@ -93,3 +93,17 @@ float_literal_f16_f32_precision :: proc(t: ^testing.T) {
 	// can't test a reject, but these confirm large finite values still fold correctly).
 	testing.expect_value(t, f32(1e38), strconv.parse_f32("1e38") or_else 0)
 }
+
+@(test)
+float_constant_builtins :: proc(t: ^testing.T) {
+	// Constant-folded builtins on decimal-float (rational) constants must not crash or mis-fold.
+	// `abs` in particular used to hit an unhandled ExactValue kind.
+	#assert(abs(-1.5) == 1.5)
+	#assert(abs(1.5) == 1.5)
+	#assert(abs(0.3 - 0.5) == 0.2)  // exact: |3/10 - 5/10| == 1/5
+	#assert(min(0.1, 0.2) == 0.1)
+	#assert(max(0.1, 0.2) == 0.2)
+	#assert(clamp(1.5, 0.0, 1.0) == 1.0)
+	testing.expect_value(t, abs(-2.5), 2.5)
+	testing.expect_value(t, min(1.0/3.0, 1.0/4.0), 1.0/4.0)
+}
