@@ -46,6 +46,7 @@ HRGN            :: distinct HANDLE
 HRSRC           :: distinct HANDLE
 HWINSTA         :: distinct HANDLE
 HACCEL          :: distinct HANDLE
+HCOLORSPACE     :: distinct HANDLE
 BOOL            :: distinct b32
 BYTE            :: distinct u8
 BOOLEAN         :: distinct b8
@@ -2519,6 +2520,12 @@ STOCK_LAST          :: 19
 
 CLR_INVALID :: 0xFFFFFFFF
 
+RGBTRIPLE :: struct #packed {
+	rgbtBlue:    BYTE,
+	rgbtGreen:   BYTE,
+	rgbtRed:     BYTE,
+}
+
 RGBQUAD :: struct {
 	rgbBlue:     BYTE,
 	rgbGreen:    BYTE,
@@ -2571,6 +2578,11 @@ BITMAPINFOHEADER :: struct {
 
 BITMAPINFO :: struct {
 	bmiHeader: BITMAPINFOHEADER,
+
+	// NOTE: The actual length of this array is dynamic, and depends
+	//       on the number of color table entries if the bitmap uses
+	//       indexed color, OR the number of bitfields if the bitmap
+	//       header specifies a bitfield value in `biCompression`.
 	bmiColors: [1]RGBQUAD,
 }
 
