@@ -2511,11 +2511,32 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		default: GB_PANIC("Compiler error: Unknown integer type!"); break;
 		}
 	} else if (is_type_float(type)) {
-		ExactValue v = exact_value_to_float(in_value);
-		if (v.kind != ExactValue_Float) {
-			return false;
+		ExactValue v;
+		if (in_value.kind == ExactValue_Rational) {
+			// Round the exact rational directly to the target format (single rounding, ties-to-even),
+			// rather than rational -> f64 -> f16/f32 which would round twice.
+
+
+			int mantissa_bits = 52;
+			int ebias         = 1023;
+			switch (type->Basic.kind) {
+			case Basic_f16: case Basic_f16le: case Basic_f16be:
+				mantissa_bits = 10;
+				ebias         = 15;
+				break;
+			case Basic_f32: case Basic_f32le: case Basic_f32be:
+				mantissa_bits = 23;
+				ebias         = 127;
+				break;
+			}
+			v = exact_value_float(big_rat_to_float(&in_value.value_rational->num, &in_value.value_rational->den, mantissa_bits, ebias));
+		} else {
+			v = exact_value_to_float(in_value);
+			if (v.kind != ExactValue_Float) {
+				return false;
+			}
+			check_update_float_precision(&v, type);
 		}
-		check_update_float_precision(&v, type);
 
 		// An exact finite constant (integer or rational) that overflows the target float's range is not
 		// representable by it; without this it would silently become +/-Inf (e.g. `x: f64 = 1.0e400`).

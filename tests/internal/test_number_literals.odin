@@ -1,6 +1,7 @@
 package test_internal
 
 import "core:testing"
+import "core:strconv"
 
 // Regression tests for numeric literal parsing and constant folding:
 //   * an integer literal with a large exponent (e.g. `98765e309`) is an exact arbitrary-precision
@@ -55,4 +56,40 @@ large_integer_literals :: proc(t: ^testing.T) {
 	// A large-exponent integer literal that fits a wide integer type is exact.
 	testing.expect(t, u128(1e38) > u128(1e37), "1e38 > 1e37 as u128")
 	testing.expect_value(t, u128(1e38) / u128(1e19), u128(1e19))
+}
+
+@(test)
+float_literal_f16_f32_precision :: proc(t: ^testing.T) {
+	// f16/f32 constants are rounded once, directly from the exact value, so a constant-folded literal
+	// matches the correctly-rounded runtime parse (rather than double-rounding via f64).
+	c32 :: proc(t: ^testing.T, got: f32, lit: string) {
+		want, _ := strconv.parse_f32(lit)
+		testing.expectf(t, transmute(u32)got == transmute(u32)want,
+			"f32 %s: got %08x, want %08x", lit, transmute(u32)got, transmute(u32)want)
+	}
+	c32(t, 0.1, "0.1")
+	c32(t, 0.2, "0.2")
+	c32(t, 0.3, "0.3")
+	c32(t, f32(1.0/3.0), "0.3333333333333333")
+	c32(t, 3.14159265358979323846, "3.14159265358979323846")
+	c32(t, 1.1, "1.1")
+	c32(t, 1e-40, "1e-40")   // subnormal f32
+	c32(t, 1.5e-45, "1.5e-45")
+	c32(t, 8388609.0, "8388609.0") // 2^23 + 1
+
+	// f16 spot checks against an f64-parsed reference (53 bits is exact relative to f16's 11).
+	c16 :: proc(t: ^testing.T, got: f16, lit: string) {
+		w64, _ := strconv.parse_f64(lit)
+		want := f16(w64)
+		testing.expectf(t, transmute(u16)got == transmute(u16)want,
+			"f16 %s: got %04x, want %04x", lit, transmute(u16)got, transmute(u16)want)
+	}
+	c16(t, 0.1, "0.1")
+	c16(t, f16(1.0/3.0), "0.3333333333333333")
+	c16(t, 3.14159265358979323846, "3.14159265358979323846")
+	c16(t, 6e-8, "6e-8") // subnormal f16
+
+	// f16/f32 overflow of an exact constant is rejected, not silently +Inf (compile-time #assert
+	// can't test a reject, but these confirm large finite values still fold correctly).
+	testing.expect_value(t, f32(1e38), strconv.parse_f32("1e38") or_else 0)
 }

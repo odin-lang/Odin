@@ -1,11 +1,8 @@
-// An exact rational value: num/den with den > 0, kept in lowest terms.
 struct BigRat {
 	mp_int num; // signed
 	mp_int den; // > 0
 };
 
-// Guards against a tiny literal requesting an enormous 10^N (e.g. `1.0e999999999`). Far beyond any
-// representable float (f64 range is ~1e+-324); a literal past this is rejected as malformed.
 i64 const BIG_RAT_MAX_DECIMAL_EXP = 65536;
 
 // Reduce num/den to lowest terms with den > 0 (0 becomes 0/1).
@@ -112,14 +109,18 @@ gb_internal bool big_rat_from_decimal_string(String const &s, mp_int *num, mp_in
 	return true;
 }
 
-// Convert the exact rational `a/b` (b != 0) to the nearest f64 (round-to-nearest, ties-to-even).
+// Convert the exact rational `a/b` (b != 0) to the nearest value of a target IEEE-754 binary float,
+// with round-to-nearest, ties-to-even. `mantissa_bits`/`ebias` select the target format:
+//   f16: 10 / 15,  f32: 23 / 127,  f64: 52 / 1023.
+// The result is returned as an f64 that exactly equals that target value (target subnormals and
+// overflow-to-infinity included), so it can be stored in an f64 and re-emitted losslessly.
 // NOTE(bill): Ported from core:math/big `internal_rat_to_float`.
-gb_internal f64 big_rat_to_f64(mp_int const *a_in, mp_int const *b_in) {
-	int const MSIZE  = 52;         // explicit mantissa bits
-	int const MSIZE1 = MSIZE + 1;  // 53, incl. the implicit bit
-	int const MSIZE2 = MSIZE + 2;  // 54, one guard bit
-	int const EBIAS  = 1023;
-	int const EMIN   = 1 - EBIAS;  // -1022
+gb_internal f64 big_rat_to_float(mp_int const *a_in, mp_int const *b_in, int mantissa_bits, int ebias) {
+	// NOTE: lowercase locals on purpose: `MSIZE` is a system macro on some platforms (arm/param.h).
+	int const msize  = mantissa_bits; // explicit mantissa bits
+	int const msize1 = msize + 1;     // incl. the implicit bit
+	int const msize2 = msize + 2;     // one guard bit
+	int const emin   = 1 - ebias;
 
 	int alen = mp_count_bits(a_in);
 	if (alen == 0) {
@@ -135,7 +136,7 @@ gb_internal f64 big_rat_to_f64(mp_int const *a_in, mp_int const *b_in) {
 	mp_abs(a_in, &a2);
 	mp_abs(b_in, &b2);
 
-	int shift = MSIZE2 - exp;
+	int shift = msize2 - exp;
 	if (shift > 0) {
 		mp_mul_2d(&a2, shift, &a2);
 	} else if (shift < 0) {
@@ -146,26 +147,26 @@ gb_internal f64 big_rat_to_f64(mp_int const *a_in, mp_int const *b_in) {
 	bool has_rem = !mp_iszero(&r);
 	u64 mantissa = mp_get_mag_u64(&q);
 
-	if ((mantissa >> MSIZE2) == 1) {
+	if ((mantissa >> msize2) == 1) {
 		if (mantissa & 1) has_rem = true;
 		mantissa >>= 1;
 		exp += 1;
 	}
-	// mantissa is now in [2^53, 2^54): 53 significant bits plus one guard bit.
+	// mantissa is now in [2^msize1, 2^msize2): msize1 significant bits plus one guard bit.
 
-	if (EMIN - MSIZE <= exp && exp <= EMIN) {
+	if (emin - msize <= exp && exp <= emin) {
 		// Denormalise: fold the bits that fall below the subnormal grid into the guard/sticky.
-		unsigned sh = cast(unsigned)(EMIN - (exp - 1));
+		unsigned sh = cast(unsigned)(emin - (exp - 1));
 		u64 lost = mantissa & ((cast(u64)1 << sh) - 1);
 		has_rem = has_rem || (lost != 0);
 		mantissa >>= sh;
-		exp = 2 - EBIAS;
+		exp = 2 - ebias;
 	}
 
 	if (mantissa & 1) {
 		if (has_rem || (mantissa & 2)) { // round half to even
 			mantissa += 1;
-			if (mantissa >= (cast(u64)1 << MSIZE2)) {
+			if (mantissa >= (cast(u64)1 << msize2)) {
 				mantissa >>= 1;
 				exp += 1;
 			}
@@ -173,9 +174,21 @@ gb_internal f64 big_rat_to_f64(mp_int const *a_in, mp_int const *b_in) {
 	}
 	mantissa >>= 1; // drop the guard bit
 
-	f64 f = ldexp(cast(f64)mantissa, exp - MSIZE1);
+	f64 f = ldexp(cast(f64)mantissa, exp - msize1);
+	// Materialise the target format's overflow-to-infinity (exact otherwise: `f` already has the
+	// target's mantissa width and exponent, so the narrowing cast does not round).
+	if (msize == 23) {
+		f = cast(f64)cast(f32)f;
+	} else if (msize == 10) {
+		f = cast(f64)f16_to_f32(f32_to_f16(cast(f32)f));
+	}
 	if (has_sign) {
 		f = -f;
 	}
 	return f;
+}
+
+// Convert the exact rational `a/b` (b != 0) to the nearest f64 (round-to-nearest, ties-to-even).
+gb_internal f64 big_rat_to_f64(mp_int const *a_in, mp_int const *b_in) {
+	return big_rat_to_float(a_in, b_in, 52, 1023);
 }
