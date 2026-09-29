@@ -95,6 +95,47 @@ float_literal_f16_f32_precision :: proc(t: ^testing.T) {
 }
 
 @(test)
+rational_arithmetic_precision_cap :: proc(t: ^testing.T) {
+	// Exact-rational constant folding is bounded so a pathological expression cannot grow the
+	// numerator/denominator without limit. Repeatedly squaring a non-dyadic fraction doubles the
+	// denominator's bit-length at every step; past the precision cap the fold falls back to a rounded
+	// f64. This whole chain therefore folds in a few kilobytes; without the cap `X32` alone would need a
+	// denominator of ~10**(2**32) (gigabytes) to fold exactly, stalling or OOMing the compiler. The test
+	// passing quickly *is* the regression check — that the guard keeps runaway folding bounded.
+	X0  :: 0.3
+	X1  :: X0*X0
+	X2  :: X1*X1
+	X3  :: X2*X2
+	X4  :: X3*X3
+	X5  :: X4*X4
+	X6  :: X5*X5
+	X7  :: X6*X6
+	X8  :: X7*X7
+	X9  :: X8*X8
+	X10 :: X9*X9
+	X11 :: X10*X10
+	X12 :: X11*X11
+	X13 :: X12*X12
+	X14 :: X13*X13
+	X15 :: X14*X14
+	X16 :: X15*X15
+	X17 :: X16*X16
+	X18 :: X17*X17
+	X19 :: X18*X18
+	X20 :: X19*X19
+	X24 :: (X20*X20)*(X20*X20) // 0.3 ** 2**24
+	X28 :: (X24*X24)*(X24*X24)
+	X32 :: (X28*X28)*(X28*X28) // 0.3 ** 2**32
+
+	// 0.3 ** 2**32 is astronomically small, so once folding falls back to f64 it underflows to 0.
+	testing.expect(t, X32 == 0.0, "rational precision cap: deeply-squared fraction folds to a bounded f64")
+	testing.expect(t, !(X32 != X32), "capped value is a real number, not NaN")
+
+	// A shallow fold is still exact: 0.3 ** 4 == 81/10000 rounds to the same f64 as the literal 0.0081.
+	testing.expect(t, X2 == 0.0081, "shallow rational folding stays exact")
+}
+
+@(test)
 float_constant_builtins :: proc(t: ^testing.T) {
 	// Constant-folded builtins on decimal-float (rational) constants must not crash or mis-fold.
 	// `abs` in particular used to hit an unhandled ExactValue kind.

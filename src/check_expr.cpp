@@ -2367,6 +2367,14 @@ gb_internal void complex_quaternion_element_float_format(Type *type, int *mantis
 	}
 }
 
+gb_internal bool exact_value_component_overflows_float(ExactValue comp, int mantissa_bits, int ebias) {
+	if (comp.kind != ExactValue_Integer && comp.kind != ExactValue_Rational) {
+		return false;
+	}
+	ExactValue r = exact_value_round_component_to_float(comp, mantissa_bits, ebias);
+	return isinf(r.value_float) || isnan(r.value_float);
+}
+
 gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value) {
 	if (in_value.kind == ExactValue_Invalid) {
 		// NOTE(bill): There's already been an error
@@ -2628,6 +2636,12 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			    imag.kind != ExactValue_Invalid) {
 				int mantissa_bits, ebias;
 				complex_quaternion_element_float_format(type, &mantissa_bits, &ebias);
+				// A finite component that overflows the element float is not representable (parity with
+				// scalar floats). Leave out_value unset so the diagnostic reports the source value.
+				if (exact_value_component_overflows_float(real, mantissa_bits, ebias) ||
+				    exact_value_component_overflows_float(imag, mantissa_bits, ebias)) {
+					return false;
+				}
 				if (out_value) *out_value = exact_value_complex_ev(
 					exact_value_round_component_to_float(real, mantissa_bits, ebias),
 					exact_value_round_component_to_float(imag, mantissa_bits, ebias));
@@ -2660,6 +2674,14 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			    imag.kind != ExactValue_Invalid) {
 				int mantissa_bits, ebias;
 				complex_quaternion_element_float_format(type, &mantissa_bits, &ebias);
+				// A finite component that overflows the element float is not representable (parity with
+				// scalar floats). Leave out_value unset so the diagnostic reports the source value.
+				if (exact_value_component_overflows_float(real, mantissa_bits, ebias) ||
+				    exact_value_component_overflows_float(imag, mantissa_bits, ebias) ||
+				    exact_value_component_overflows_float(jmag, mantissa_bits, ebias) ||
+				    exact_value_component_overflows_float(kmag, mantissa_bits, ebias)) {
+					return false;
+				}
 				if (out_value) *out_value = exact_value_quaternion_ev(
 					exact_value_round_component_to_float(real, mantissa_bits, ebias),
 					exact_value_round_component_to_float(imag, mantissa_bits, ebias),

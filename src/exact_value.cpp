@@ -1329,6 +1329,22 @@ gb_internal Entity *strip_entity_wrapping(Entity *e);
 
 gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
 
+gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit);
+
+gb_internal gbString write_exact_complex_component_to_string(gbString str, ExactValue comp, isize string_limit) {
+	f64 f = exact_value_to_f64(comp);
+
+	// The float formatter cannot render a magnitude at or beyond 2**63 (it prints 2**63's digits on a
+	// loop), and that also catches Inf/NaN since the range test below is false for them. For an exact
+	// integer/rational component that large, print its exact form (digits, or `num.0/den`) instead.
+	static f64 const LIMIT = 9223372036854775808.0; // 2**63
+	bool formatter_safe = (f >= -LIMIT) && (f <= LIMIT);
+	if (!formatter_safe && (comp.kind == ExactValue_Integer || comp.kind == ExactValue_Rational)) {
+		return write_exact_value_to_string(str, comp, string_limit);
+	}
+	return gb_string_append_fmt(str, "%.17g", f);
+}
+
 gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit=36) {
 	switch (v.kind) {
 	case ExactValue_Invalid:
@@ -1395,9 +1411,19 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 			return str;
 		}
 	case ExactValue_Complex:
-		return gb_string_append_fmt(str, "%.17g+%.17gi", exact_value_to_f64(v.value_complex->real), exact_value_to_f64(v.value_complex->imag));
+		str = write_exact_complex_component_to_string(str, v.value_complex->real, string_limit);
+		str = gb_string_append_fmt(str, "+");
+		str = write_exact_complex_component_to_string(str, v.value_complex->imag, string_limit);
+		return gb_string_append_fmt(str, "i");
 	case ExactValue_Quaternion:
-		return gb_string_append_fmt(str, "%.17g+%.17gi+%.17gj+%.17gk", exact_value_to_f64(v.value_quaternion->real), exact_value_to_f64(v.value_quaternion->imag), exact_value_to_f64(v.value_quaternion->jmag), exact_value_to_f64(v.value_quaternion->kmag));
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->real, string_limit);
+		str = gb_string_append_fmt(str, "+");
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->imag, string_limit);
+		str = gb_string_append_fmt(str, "i+");
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->jmag, string_limit);
+		str = gb_string_append_fmt(str, "j+");
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->kmag, string_limit);
+		return gb_string_append_fmt(str, "k");
 
 	case ExactValue_Pointer:
 		return str;
