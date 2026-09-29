@@ -3223,7 +3223,7 @@ gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 		if (op == Token_Mul && is_type_matrix(value.type) && is_type_array(lhs_type)) {
 			lbValue old_value = lb_addr_load(p, lhs);
 			Type *type = old_value.type;
-			lbValue new_value = lb_emit_vector_mul_matrix(p, old_value, value, type);
+			lbValue new_value = lb_emit_arith_matrix(p, op, old_value, value, type, false);
 			lb_addr_store(p, lhs, new_value);
 			return;
 		}
