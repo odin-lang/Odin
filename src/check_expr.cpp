@@ -9183,6 +9183,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			gb_string_free(b);
 			gb_string_free(a);
 		}
+		if (is_arch_wasm() && !check_target_feature_is_enabled(str_lit("tail-call"), nullptr)) {
+			error(call, "'#must_tail' on a WebAssembly target requires the 'tail-call' target feature, e.g. '-target-features:tail-call'");
+		}
 		break;
 	}
 
