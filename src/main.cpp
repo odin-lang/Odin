@@ -7,6 +7,7 @@
 	#pragma warning(disable: 4505)
 #endif
 #include "big_int.cpp"
+#include "big_rat.cpp"
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
