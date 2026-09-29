@@ -6,6 +6,12 @@ A secondary param can be used to supply a custom alphabet to `encode` and a matc
 If none is supplied it just uses the standard Base64 alphabet.
 In case your specific version does not use padding, you may
 truncate it from the encoded output.
+
+By default `decode` is lenient, accepting padded and unpadded input and not
+checking the trailing padding bits. Decode options can enable strict
+(RFC 4648 section 3.5) canonical decoding: `{.Strict}` requires correct
+padding and zero trailing bits, while `{.Strict, .No_Padding}` accepts only
+canonical unpadded input.
 */
 package encoding_base64
 
@@ -122,7 +128,22 @@ Error :: union #shared_nil {
 Decode_Error :: enum {
 	None,
 	Invalid_Character,
+	Invalid_Padding,
+	Non_Canonical,
 }
+
+// Decode_Option selects optional validation performed by the decode routines.
+Decode_Option :: enum {
+	// Strict requires canonical input as described in RFC 4648 section 3.5:
+	// trailing padding bits must be zero, padding must be exact, and padding
+	// characters may only appear at the end.
+	Strict,
+	// No_Padding rejects the padding character, requiring unpadded input.
+	No_Padding,
+}
+
+// Decode_Options is a set of Decode_Option values.
+Decode_Options :: bit_set[Decode_Option; u8]
 
 encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> (encoded: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	out_length := encoded_len(data)
@@ -211,7 +232,97 @@ encoded_len :: proc(data: []byte) -> int {
 	return ((4 * length / 3) + 3) &~ 3
 }
 
-decode :: proc(data: string, DEC_TBL := DEC_TABLE, dst: []byte = nil, allocator := context.allocator) -> (decoded: []byte, err: Error) {
+@(private)
+validate_strict_decode :: proc(data: string, dec_tbl: [256]i8, options: Decode_Options) -> Decode_Error {
+	if options == {} {
+		return .None
+	}
+
+	n := len(data)
+	if n == 0 {
+		return .None
+	}
+
+	si := n
+	pad: int
+	if .No_Padding in options {
+		for i in 0 ..< n {
+			if data[i] == PADDING {
+				return .Invalid_Padding
+			}
+		}
+	} else {
+		for si > 0 && data[si - 1] == PADDING {
+			si -= 1
+			pad += 1
+		}
+		if pad > 2 {
+			return .Invalid_Padding
+		}
+		for j in 0 ..< si {
+			if data[j] == PADDING {
+				return .Invalid_Padding
+			}
+		}
+	}
+
+	rem := si % 4
+	if .No_Padding in options && rem == 1 {
+		return .Invalid_Padding
+	}
+
+	if .Strict in options {
+		if .No_Padding not_in options {
+			if n % 4 != 0 {
+				return .Invalid_Padding
+			}
+
+			switch rem {
+			case 0:
+				if pad != 0 {
+					return .Invalid_Padding
+				}
+			case 2:
+				if pad != 2 {
+					return .Invalid_Padding
+				}
+			case 3:
+				if pad != 1 {
+					return .Invalid_Padding
+				}
+			case:
+				return .Invalid_Padding
+			}
+		}
+
+		switch rem {
+		case 2:
+			c := dec_tbl[data[si - 1]]
+			if c < 0 {
+				return .Invalid_Character
+			}
+			if (c & 0x0f) != 0 {
+				return .Non_Canonical
+			}
+		case 3:
+			c := dec_tbl[data[si - 1]]
+			if c < 0 {
+				return .Invalid_Character
+			}
+			if (c & 0x03) != 0 {
+				return .Non_Canonical
+			}
+		}
+	}
+
+	return .None
+}
+
+decode :: proc(data: string, DEC_TBL := DEC_TABLE, dst: []byte = nil, allocator := context.allocator, options := Decode_Options{}) -> (decoded: []byte, err: Error) {
+	if derr := validate_strict_decode(data, DEC_TBL, options); derr != .None {
+		return nil, derr
+	}
+
 	out_length := decoded_len(data)
 	if out_length == 0 {
 		return nil, nil
@@ -231,7 +342,11 @@ decode :: proc(data: string, DEC_TBL := DEC_TABLE, dst: []byte = nil, allocator 
 	return
 }
 
-decode_into_buf :: proc(dst: []byte, data: string, DEC_TBL := DEC_TABLE) -> (decoded: []byte, err: Error) {
+decode_into_buf :: proc(dst: []byte, data: string, DEC_TBL := DEC_TABLE, options := Decode_Options{}) -> (decoded: []byte, err: Error) {
+	if derr := validate_strict_decode(data, DEC_TBL, options); derr != .None {
+		return nil, derr
+	}
+
 	out_length := decoded_len(data)
 	if out_length == 0 {
 		return
@@ -240,7 +355,11 @@ decode_into_buf :: proc(dst: []byte, data: string, DEC_TBL := DEC_TABLE) -> (dec
 	return decode_impl(dst, data, DEC_TBL)
 }
 
-decode_into :: proc(w: io.Writer, data: string, DEC_TBL := DEC_TABLE) -> Error {
+decode_into :: proc(w: io.Writer, data: string, DEC_TBL := DEC_TABLE, options := Decode_Options{}) -> Error {
+	if derr := validate_strict_decode(data, DEC_TBL, options); derr != .None {
+		return derr
+	}
+
 	_, err := decode_impl(w, data, DEC_TBL)
 	return err
 }
