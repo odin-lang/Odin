@@ -284,9 +284,9 @@ Inputs:
 Returns:
 - ba: Allocates a `Bit_Array`, backing data is set to `max-min / 64` indices, rounded up (eg 65 - 0 allocates for [2]u64).
 */
-create :: proc(max_index: int, min_index: int = 0, allocator := context.allocator) -> (res: ^Bit_Array, ok: bool) #optional_ok {
+create :: proc(max_index: int, min_index: int = 0, allocator := context.allocator, loc := #caller_location) -> (res: ^Bit_Array, ok: bool) #optional_ok {
 	size_in_bits := max_index - min_index
-	assert(max_index >= min_index && size_in_bits > 0)
+	assert(max_index >= min_index, loc=loc)
 
 	if size_in_bits < 0 { return {}, false }
 
