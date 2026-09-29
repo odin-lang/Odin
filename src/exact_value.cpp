@@ -483,20 +483,24 @@ gb_internal ExactValue exact_value_float_from_string(String string) {
 		return exact_value_integer_from_string(string);
 	}
 
-	{
-		// NOTE(bill): A decimal literal whose value is an integer (e.g. `98765.0e309`) is kept
-		// as an exact arbitrary-precision integer so it is not silently rounded to `+Inf` by `strtod`
-		bool is_integral = false;
-		ExactValue v = exact_value_integer_from_decimal_float_string(string, &is_integral);
-		if (is_integral) {
-			return v;
-		}
-	}
-
 	bool success;
 	f64 f = float_from_string(string, &success);
 	if (!success) {
 		return {ExactValue_Invalid};
+	}
+
+	// NOTE: A finite decimal literal is kept as a floating-point value so that ordinary
+	// floating-point constant arithmetic behaves as expected (e.g. `1.0 / 16.0` is `0.0625`, not
+	// integer division). Only when the literal overflows `f64` to an infinity is it re-parsed as an
+	// exact arbitrary-precision integer (every such literal is integer-valued, e.g. `98765.0e309`),
+	// so that it is not silently turned into `+Inf` and its representability can be checked exactly.
+	if (isinf(f)) {
+		bool is_integral = false;
+		ExactValue v = exact_value_integer_from_decimal_float_string(string, &is_integral);
+		if (is_integral) {
+			// This is the exact integer value, or Invalid if it exceeds the exponent cap.
+			return v;
+		}
 	}
 	return exact_value_float(f);
 }
