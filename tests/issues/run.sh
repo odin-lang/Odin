@@ -86,6 +86,7 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+$ODIN test ../test_issue_6951_5214.odin $COMMON
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
@@ -109,6 +110,7 @@ $ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_bool_to_be_conversion.odin $COMMON
 $ODIN test ../test_issue_bool_comparison_truthiness.odin $COMMON
 $ODIN test ../test_issue_const_array_broadcast.odin $COMMON
+$ODIN test ../test_issue_proc_constant_instantiation.odin $COMMON
 $ODIN test ../test_issue_swizzle_multi_assign.odin $COMMON
 
 $ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK

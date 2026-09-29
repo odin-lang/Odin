@@ -2205,7 +2205,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						bool valid = false;
 						if (is_type_proc(op.type)) {
 							Ast *expr = unparen_expr(op.expr);
-							Entity *proc_entity = entity_from_expr(expr);
+							Entity *proc_entity = strip_entity_wrapping(expr);
 							if (proc_entity) {
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
 								valid = true;
