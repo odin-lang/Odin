@@ -951,7 +951,12 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			Entity *e = poly_proc_data.gen_entity;
 			add_type_and_value(c, operand->expr, Addressing_Value, e->type, {});
-			add_entity_use(c, operand->expr, e);
+			Ast *expr = unparen_expr(operand->expr);
+			if (expr->kind == Ast_SelectorExpr) {
+				add_entity_use(c, expr->SelectorExpr.selector, e);
+			} else {
+				add_entity_use(c, operand->expr, e);
+			}
 			return 4;
 		}
 
@@ -2511,6 +2516,28 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			return false;
 		}
 		check_update_float_precision(&v, type);
+
+		if (in_value.kind == ExactValue_Integer) {
+			bool overflowed = isinf(v.value_float) || isnan(v.value_float);
+			if (!overflowed) {
+				switch (type->Basic.kind) {
+				case Basic_f16:
+				case Basic_f16le:
+				case Basic_f16be:
+					// `check_update_float_precision` only rounds `f16` to `f32` precision, so a value
+					// that is finite as `f32` but out of range for `f16` must be caught explicitly.
+					if (isinf(cast(f64)f16_to_f32(f32_to_f16(cast(f32)v.value_float)))) {
+						overflowed = true;
+					}
+					break;
+				}
+			}
+			if (overflowed) {
+				// Leave `out_value` unset so the diagnostic reports the exact (finite) source value.
+				return false;
+			}
+		}
+
 		if (out_value) *out_value = v;
 
 		switch (type->Basic.kind) {
@@ -5825,7 +5852,7 @@ gb_internal Type *determine_swizzle_array_type(Type *original_type, Type *type_h
 	Type *elem_type = array_type->Array.elem;
 
 	Type *swizzle_array_type = nullptr;
-	Type *bth = base_type(type_deref(type_hint));
+	Type *bth = base_type(type_hint);
 	if (bth != nullptr && bth->kind == Type_Array &&
 	    bth->Array.count == new_count &&
 	    are_types_identical(bth->Array.elem, elem_type)) {
@@ -5833,7 +5860,7 @@ gb_internal Type *determine_swizzle_array_type(Type *original_type, Type *type_h
 	} else {
 		i64 max_count = array_type->Array.count;
 		if (new_count == max_count) {
-			swizzle_array_type = original_type;
+			swizzle_array_type = type_deref(original_type);
 		} else {
 			swizzle_array_type = alloc_type_array(elem_type, new_count);
 		}
@@ -9156,6 +9183,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			gb_string_free(b);
 			gb_string_free(a);
 		}
+		if (is_arch_wasm() && !check_target_feature_is_enabled(str_lit("tail-call"), nullptr)) {
+			error(call, "'#must_tail' on a WebAssembly target requires the 'tail-call' target feature, e.g. '-target-features:tail-call'");
+		}
 		break;
 	}
 
@@ -9527,7 +9557,9 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			return true;
 		}
 		if (expr->kind == Ast_ProcLit) {
-			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
+			ExactValue value = exact_value_procedure(expr);
+			value.variant_type = o->value.variant_type;
+			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), value);
 			return true;
 		}
 
@@ -11678,10 +11710,6 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			field_count = et->Enum.fields.count;
 		}
 
-		if (is_type_array(bit_set_to_int(t))) {
-			is_constant = false;
-		}
-
 		for (Ast *elem : cl->elems) {
 			if (elem->kind == Ast_FieldValue) {
 				error(elem, "'field = value' in a bit_set literal is not allowed");
@@ -12600,6 +12628,10 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			t = t_untyped_integer;
 			if (bl->token.kind == Token_Rune) {
 				t = t_untyped_rune;
+			} else if (string_contains_char(bl->token.string, '.')) {
+				// NOTE(bill): A floating-point literal whose value happens to be an integer (e.g. `98765.0e309`) keeps
+				// its exact value as an integer, but still defaults to untyped float because it was written in floating-point form.
+				t = t_untyped_float;
 			}
 			break;
 		default:
