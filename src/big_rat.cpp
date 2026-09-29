@@ -24,18 +24,22 @@ gb_internal void big_rat_normalize(mp_int *num, mp_int *den) {
 	}
 	mp_int g;
 	mp_int one;
-	mp_init(&g);
-	mp_init(&one);
+	mp_init(&g);   defer (mp_clear(&g));
+	mp_init(&one); defer (mp_clear(&one));
 	mp_set_u64(&one, 1);
 
-	defer (mp_clear(&g));
-	defer (mp_clear(&one));
 
 	mp_gcd(num, den, &g);
 	if (!mp_iszero(&g) && mp_cmp(&g, &one) != MP_EQ) {
-		mp_int q, r; mp_init(&q); mp_init(&r); defer (mp_clear(&q)); defer (mp_clear(&r));
-		mp_div(num, &g, &q, &r); mp_copy(&q, num);
-		mp_div(den, &g, &q, &r); mp_copy(&q, den);
+		mp_int q, r;
+		mp_init(&q); defer (mp_clear(&q));
+		mp_init(&r); defer (mp_clear(&r));
+
+		mp_div(num, &g, &q, &r);
+		mp_copy(&q, num);
+
+		mp_div(den, &g, &q, &r);
+		mp_copy(&q, den);
 	}
 }
 
@@ -59,16 +63,22 @@ gb_internal bool big_rat_from_decimal_string(String const &s, mp_int *num, mp_in
 			continue;
 		}
 		if (c == '.') {
-			if (seen_dot) return false;
+			if (seen_dot) {
+				return false;
+			}
 			seen_dot = true;
 			continue;
 		}
 		if (c == 'e' || c == 'E') {
 			break;
 		}
-		if (!gb_char_is_digit(cast(char)c)) return false;
+		if (!gb_char_is_digit(cast(char)c)) {
+			return false;
+		}
 		digits[dlen++] = cast(char)c;
-		if (seen_dot) frac_digits += 1;
+		if (seen_dot) {
+			frac_digits += 1;
+		}
 	}
 	if (dlen == 0) {
 		digits[dlen++] = '0';
@@ -86,8 +96,12 @@ gb_internal bool big_rat_from_decimal_string(String const &s, mp_int *num, mp_in
 		isize exp_digits = 0;
 		for (; i < s.len; i++) {
 			u8 c = s[i];
-			if (c == '_') continue;
-			if (!gb_char_is_digit(cast(char)c)) return false;
+			if (c == '_') {
+				continue;
+			}
+			if (!gb_char_is_digit(cast(char)c)) {
+				return false;
+			}
 			if (exp <= BIG_RAT_MAX_DECIMAL_EXP) { // clamp so it cannot overflow; rejected below
 				exp = exp*10 + cast(i64)(c - '0');
 			}
@@ -145,8 +159,12 @@ gb_internal f64 big_rat_to_float(mp_int const *a_in, mp_int const *b_in, int man
 	int exp = alen - mp_count_bits(b_in);
 
 	mp_int a2, b2, q, r;
-	mp_init(&a2); mp_init(&b2); mp_init(&q); mp_init(&r);
-	defer (mp_clear(&a2)); defer (mp_clear(&b2)); defer (mp_clear(&q)); defer (mp_clear(&r));
+
+	mp_init(&a2); defer (mp_clear(&a2));
+	mp_init(&b2); defer (mp_clear(&b2));
+	mp_init(&q);  defer (mp_clear(&q));
+	mp_init(&r);  defer (mp_clear(&r));
+
 	mp_abs(a_in, &a2);
 	mp_abs(b_in, &b2);
 
@@ -162,7 +180,9 @@ gb_internal f64 big_rat_to_float(mp_int const *a_in, mp_int const *b_in, int man
 	u64 mantissa = mp_get_mag_u64(&q);
 
 	if ((mantissa >> msize2) == 1) {
-		if (mantissa & 1) has_rem = true;
+		if (mantissa & 1) {
+			has_rem = true;
+		}
 		mantissa >>= 1;
 		exp += 1;
 	}
