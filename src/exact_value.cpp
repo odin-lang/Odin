@@ -349,6 +349,106 @@ gb_internal f64 float_from_string(String const &string, bool *success = nullptr)
 */
 }
 
+gb_internal ExactValue exact_value_integer_from_decimal_float_string(String const &string, bool *is_integral) {
+	*is_integral = false;
+
+	BigInt mantissa = {};
+	big_int_from_u64(&mantissa, 0);
+	defer (big_int_dealloc(&mantissa));
+	BigInt ten = {};
+	big_int_from_u64(&ten, 10);
+	defer (big_int_dealloc(&ten));
+	BigInt digit = {};
+	defer (big_int_dealloc(&digit));
+
+	isize i = 0;
+	i64 frac_digits = 0;
+	bool seen_dot = false;
+	for (; i < string.len; i++) {
+		u8 c = string.text[i];
+		if (c == '_') {
+			continue;
+		}
+		if (c == '.') {
+			if (seen_dot) {
+				return {ExactValue_Invalid};
+			}
+			seen_dot = true;
+			continue;
+		}
+		if (c == 'e' || c == 'E') {
+			break;
+		}
+		if (!gb_char_is_digit(cast(char)c)) {
+			// NOTE(bill): Not a plain base-10 float literal (the tokenizer should have prevented this).
+			return {ExactValue_Invalid};
+		}
+		big_int_from_u64(&digit, u64_digit_value(cast(Rune)c));
+		big_int_mul_eq(&mantissa, &ten);
+		big_int_add_eq(&mantissa, &digit);
+		if (seen_dot) {
+			frac_digits += 1;
+		}
+	}
+
+	i64 exp = 0;
+	bool exp_negative = false;
+	if (i < string.len && (string.text[i] == 'e' || string.text[i] == 'E')) {
+		i += 1;
+		if (i < string.len && (string.text[i] == '+' || string.text[i] == '-')) {
+			exp_negative = string.text[i] == '-';
+			i += 1;
+		}
+		isize exp_digits = 0;
+		for (; i < string.len; i++) {
+			u8 c = string.text[i];
+			if (c == '_') {
+				continue;
+			}
+			if (!gb_char_is_digit(cast(char)c)) {
+				return {ExactValue_Invalid};
+			}
+			if (exp <= 512) {
+				// NOTE(bill): clamp so it cannot overflow; anything past the cap is rejected below
+				exp = exp*10 + cast(i64)u64_digit_value(cast(Rune)c);
+			}
+			exp_digits += 1;
+		}
+		if (exp_digits == 0) {
+			return {ExactValue_Invalid};
+		}
+	}
+
+	i64 signed_exp = exp_negative ? -exp : exp;
+	i64 effective_exp = signed_exp - frac_digits;
+	if (effective_exp < 0) {
+		// NOTE(bill): The value has a fractional part, so it is not an integer; let the caller parse it as a float.
+		return {ExactValue_Invalid};
+	}
+
+	*is_integral = true;
+
+	// NOTE(bill): Guard against pathological allocations; kept consistent with `big_int_from_string`.
+	if (signed_exp > 512) {
+		return {ExactValue_Invalid};
+	}
+
+	bool success = true;
+	BigInt scale = {};
+	mp_init(&scale);
+	defer (big_int_dealloc(&scale));
+	big_int_exp_u64(&scale, &ten, cast(u64)effective_exp, &success);
+	if (!success) {
+		return {ExactValue_Invalid};
+	}
+
+	ExactValue result = {ExactValue_Integer};
+	result.value_integer = {0};
+	mp_init(&result.value_integer);
+	big_int_mul(&result.value_integer, &mantissa, &scale);
+	return result;
+}
+
 gb_internal ExactValue exact_value_float_from_string(String string) {
 	if (string.len > 2 && string[0] == '0' && string[1] == 'h') {
 
@@ -381,6 +481,16 @@ gb_internal ExactValue exact_value_float_from_string(String string) {
 	if (!string_contains_char(string, '.') && !string_contains_char(string, '-')) {
 		// NOTE(bill): treat as integer
 		return exact_value_integer_from_string(string);
+	}
+
+	{
+		// NOTE(bill): A decimal literal whose value is an integer (e.g. `98765.0e309`) is kept
+		// as an exact arbitrary-precision integer so it is not silently rounded to `+Inf` by `strtod`
+		bool is_integral = false;
+		ExactValue v = exact_value_integer_from_decimal_float_string(string, &is_integral);
+		if (is_integral) {
+			return v;
+		}
 	}
 
 	bool success;
