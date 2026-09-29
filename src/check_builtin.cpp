@@ -4594,6 +4594,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				operand->value.value_float = bit_cast<f64>(abs);
 				break;
 			}
+			case ExactValue_Rational: {
+				mp_int n; mp_init(&n);
+				defer (mp_clear(&n));
+				mp_abs(&operand->value.value_rational->num, &n);
+				operand->value = exact_value_rational_from_ints(&n, &operand->value.value_rational->den);
+				break;
+			}
 			case ExactValue_Complex: {
 				f64 r = operand->value.value_complex->real;
 				f64 i = operand->value.value_complex->imag;

@@ -502,7 +502,7 @@ gb_internal ExactValue exact_value_to_integer(ExactValue v) {
 		return exact_value_i64(cast(i64)cast(intptr)v.value_pointer);
 
 	case ExactValue_Rational:
-		// Only an exact integer (den == 1 after reduction) converts to an integer.
+		// NOTE(bill): Only an exact integer (den == 1 after reduction) converts to an integer
 		if (mp_cmp_d(&v.value_rational->den, 1) == MP_EQ) {
 			ExactValue r = {ExactValue_Integer};
 			r.value_integer = {0};
@@ -1339,6 +1339,14 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 	case ExactValue_Float:
 		return gb_string_append_fmt(str, "%.17g", v.value_float);
 	case ExactValue_Rational:
+		// Integer-valued (den == 1, e.g. an overflowing literal like `1.0e400`) prints its exact decimal,
+		// so a diagnostic shows the real magnitude rather than an f64 that has rounded to +Inf.
+		if (mp_cmp_d(&v.value_rational->den, 1) == MP_EQ) {
+			String s = big_int_to_string(heap_allocator(), &v.value_rational->num);
+			str = gb_string_append_length(str, s.text, s.len);
+			gb_free(heap_allocator(), s.text);
+			return str;
+		}
 		return gb_string_append_fmt(str, "%.17g", big_rat_to_f64(&v.value_rational->num, &v.value_rational->den));
 	case ExactValue_Complex:
 		return gb_string_append_fmt(str, "%.17g+%.17gi", v.value_complex->real, v.value_complex->imag);

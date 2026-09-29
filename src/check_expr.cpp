@@ -4873,6 +4873,11 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 					fail = true;
 				}
 				break;
+			case ExactValue_Rational:
+				if (big_int_is_zero(&y->value.value_rational->num)) {
+					fail = true;
+				}
+				break;
 			}
 
 			if (fail) {
