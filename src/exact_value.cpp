@@ -380,106 +380,6 @@ gb_internal f64 float_from_string(String const &string, bool *success = nullptr)
 */
 }
 
-gb_internal ExactValue exact_value_integer_from_decimal_float_string(String const &string, bool *is_integral) {
-	*is_integral = false;
-
-	BigInt mantissa = {};
-	big_int_from_u64(&mantissa, 0);
-	defer (big_int_dealloc(&mantissa));
-	BigInt ten = {};
-	big_int_from_u64(&ten, 10);
-	defer (big_int_dealloc(&ten));
-	BigInt digit = {};
-	defer (big_int_dealloc(&digit));
-
-	isize i = 0;
-	i64 frac_digits = 0;
-	bool seen_dot = false;
-	for (; i < string.len; i++) {
-		u8 c = string.text[i];
-		if (c == '_') {
-			continue;
-		}
-		if (c == '.') {
-			if (seen_dot) {
-				return {ExactValue_Invalid};
-			}
-			seen_dot = true;
-			continue;
-		}
-		if (c == 'e' || c == 'E') {
-			break;
-		}
-		if (!gb_char_is_digit(cast(char)c)) {
-			// NOTE(bill): Not a plain base-10 float literal (the tokenizer should have prevented this).
-			return {ExactValue_Invalid};
-		}
-		big_int_from_u64(&digit, u64_digit_value(cast(Rune)c));
-		big_int_mul_eq(&mantissa, &ten);
-		big_int_add_eq(&mantissa, &digit);
-		if (seen_dot) {
-			frac_digits += 1;
-		}
-	}
-
-	i64 exp = 0;
-	bool exp_negative = false;
-	if (i < string.len && (string.text[i] == 'e' || string.text[i] == 'E')) {
-		i += 1;
-		if (i < string.len && (string.text[i] == '+' || string.text[i] == '-')) {
-			exp_negative = string.text[i] == '-';
-			i += 1;
-		}
-		isize exp_digits = 0;
-		for (; i < string.len; i++) {
-			u8 c = string.text[i];
-			if (c == '_') {
-				continue;
-			}
-			if (!gb_char_is_digit(cast(char)c)) {
-				return {ExactValue_Invalid};
-			}
-			if (exp <= 512) {
-				// NOTE(bill): clamp so it cannot overflow; anything past the cap is rejected below
-				exp = exp*10 + cast(i64)u64_digit_value(cast(Rune)c);
-			}
-			exp_digits += 1;
-		}
-		if (exp_digits == 0) {
-			return {ExactValue_Invalid};
-		}
-	}
-
-	i64 signed_exp = exp_negative ? -exp : exp;
-	i64 effective_exp = signed_exp - frac_digits;
-	if (effective_exp < 0) {
-		// NOTE(bill): The value has a fractional part, so it is not an integer; let the caller parse it as a float.
-		return {ExactValue_Invalid};
-	}
-
-	*is_integral = true;
-
-	// NOTE(bill): Guard against pathological allocations; kept consistent with `big_int_from_string`.
-	if (signed_exp > 512) {
-		return {ExactValue_Invalid};
-	}
-
-	bool success = true;
-	BigInt scale = {};
-	mp_init(&scale);
-	defer (big_int_dealloc(&scale));
-	big_int_exp_u64(&scale, &ten, cast(u64)effective_exp, &success);
-	if (!success) {
-		return {ExactValue_Invalid};
-	}
-
-	ExactValue result = {ExactValue_Integer};
-	result.value_integer = {0};
-	mp_init(&result.value_integer);
-	big_int_mul(&result.value_integer, &mantissa, &scale);
-	return result;
-}
-
 gb_internal ExactValue exact_value_float_from_string(String string) {
 	if (string.len > 2 && string[0] == '0' && string[1] == 'h') {
 
@@ -514,26 +414,28 @@ gb_internal ExactValue exact_value_float_from_string(String string) {
 		return exact_value_integer_from_string(string);
 	}
 
-	bool success;
-	f64 f = float_from_string(string, &success);
-	if (!success) {
-		return {ExactValue_Invalid};
-	}
-
-	// NOTE: A finite decimal literal is kept as a floating-point value so that ordinary
-	// floating-point constant arithmetic behaves as expected (e.g. `1.0 / 16.0` is `0.0625`, not
-	// integer division). Only when the literal overflows `f64` to an infinity is it re-parsed as an
-	// exact arbitrary-precision integer (every such literal is integer-valued, e.g. `98765.0e309`),
-	// so that it is not silently turned into `+Inf` and its representability can be checked exactly.
-	if (isinf(f)) {
-		bool is_integral = false;
-		ExactValue v = exact_value_integer_from_decimal_float_string(string, &is_integral);
-		if (is_integral) {
-			// This is the exact integer value, or Invalid if it exceeds the exponent cap.
-			return v;
+	// A finite base-10 floating-point literal is kept as an EXACT rational so that constant folding is
+	// exact and only rounds once, when the constant is finally given a concrete type (see
+	// `exact_value_to_float` and `check_representable_as_constant`). This mirrors Go's `go/constant`,
+	// where small values are held as `big.Rat`. The `0h...` hexadecimal-float path above keeps its
+	// exact bit pattern as an `f64`; that is also the side channel for the +/-Inf and NaN values that a
+	// rational cannot represent.
+	mp_int num, den;
+	if (big_rat_from_decimal_string(string, &num, &den)) {
+		// A zero-valued literal stays an f64 so that signed zero survives: a rational 0/1 has no sign,
+		// but `-0.0` (unary minus applied to this `0.0`) must keep its sign bit.
+		bool is_zero = mp_iszero(&num);
+		if (is_zero) {
+			mp_clear(&num);
+			mp_clear(&den);
+			return exact_value_float(0.0);
 		}
+		ExactValue r = exact_value_rational_from_ints(&num, &den);
+		mp_clear(&num);
+		mp_clear(&den);
+		return r;
 	}
-	return exact_value_float(f);
+	return {ExactValue_Invalid};
 }
 
 
@@ -1457,56 +1359,4 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 
 gb_internal gbString exact_value_to_string(ExactValue const &v, isize string_limit=36) {
 	return write_exact_value_to_string(gb_string_make(heap_allocator(), ""), v, string_limit);
-}
-
-// TEMPORARY(bill): exercise ExactValue_Rational arithmetic/compare/convert
-gb_internal ExactValue exact_value_rational_from_decimal(char const *lit) {
-	mp_int num, den;
-	big_rat_from_decimal_string(make_string_c(lit), &num, &den);
-	ExactValue r = exact_value_rational_from_ints(&num, &den);
-	mp_clear(&num);
-	mp_clear(&den);
-	return r;
-}
-
-gb_internal void exact_value_rational_selftest(void) {
-	int total = 0, diffs = 0;
-	#define RAT(s)          exact_value_rational_from_decimal(s)
-	#define BIN(a, op, b)   exact_binary_operator_value(op, a, b)
-	#define TOF(v)          exact_value_to_float(v).value_float
-	#define CHK(label, gotf, wantstr) do {       \
-		f64 g_ = (gotf);                     \
-		f64 w_ = strtod((wantstr), nullptr); \
-		union { f64 f; u64 u; } gg, ww;      \
-		gg.f = g_;                           \
-		ww.f = w_;                           \
-		bool ok_ = gg.u == ww.u;             \
-		total += 1;                          \
-		if (!ok_) { diffs += 1; }            \
-		gb_printf("  %-24s got=%-24.17g want=%-24.17g %s\n", label, g_, w_, ok_ ? "OK" : "DIFF"); \
-	} while (0)
-
-	CHK("0.1 + 0.2",       TOF(BIN(RAT("0.1"), Token_Add, RAT("0.2"))), "0.3");
-	CHK("1.0 / 16.0",      TOF(BIN(RAT("1.0"), Token_Quo, RAT("16.0"))), "0.0625");
-	CHK("3.0 / 2.0",       TOF(BIN(RAT("3.0"), Token_Quo, RAT("2.0"))), "1.5");
-	CHK("2/3 + 1/3",       TOF(BIN(BIN(RAT("2.0"), Token_Quo, RAT("3.0")), Token_Add, BIN(RAT("1.0"), Token_Quo, RAT("3.0")))), "1.0");
-	CHK("0.3 - 0.2 - 0.1", TOF(BIN(BIN(RAT("0.3"), Token_Sub, RAT("0.2")), Token_Sub, RAT("0.1"))), "0.0");
-
-	// mixed integer + rational (exercises match_exact_values Integer -> Rational)
-	{
-		ExactValue one = exact_value_i64(1);
-		CHK("1 + 0.5 (int+rat)", TOF(BIN(one, Token_Add, RAT("0.5"))), "1.5");
-	}
-	// comparison folding: (0.1 + 0.2) == 0.3 is exactly true with rationals
-	{
-		bool eq = compare_exact_values(Token_CmpEq, BIN(RAT("0.1"), Token_Add, RAT("0.2")), RAT("0.3"));
-		total += 1; if (!eq) diffs += 1;
-		gb_printf("  %-24s got=%-5s              %s\n", "(0.1+0.2) == 0.3", eq ? "true" : "false", eq ? "OK" : "DIFF");
-	}
-
-	#undef RAT
-	#undef BIN
-	#undef TOF
-	#undef CHK
-	gb_printf("exact_value_rational_selftest: %d/%d ok (%d diffs)\n", total-diffs, total, diffs);
 }

@@ -1323,6 +1323,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			res.value = lb_big_int_to_llvm(m, original_type, &value.value_integer);
 		}
 		return res;
+	case ExactValue_Rational:
+		// Round the exact rational to the target float once, then emit as a float constant.
+		value = exact_value_to_float(value);
+		/*fallthrough*/
 	case ExactValue_Float:
 		if (is_type_different_to_arch_endianness(type)) {
 			if (type->Basic.kind == Basic_f32le || type->Basic.kind == Basic_f32be) {

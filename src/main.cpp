@@ -937,7 +937,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						case BuildFlagParam_Float:
-							if (value.kind != ExactValue_Float) {
+							if (value.kind != ExactValue_Float && value.kind != ExactValue_Rational) {
 								gb_printf_err("%.*s expected a floating pointer number, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
@@ -3859,12 +3859,6 @@ int main(int arg_count, char const **arg_ptr) {
 	init_global_error_collector();
 	init_keyword_hash_table();
 	init_terminal();
-
-	// TEMPORARY(bill): validate the exact-rational core in-tree.
-	if (gb_get_env("ODIN_BIGRAT_SELFTEST", heap_allocator()) != nullptr) {
-		exact_value_rational_selftest();
-		return 0;
-	}
 
 	if (!check_env()) {
 		return 1;

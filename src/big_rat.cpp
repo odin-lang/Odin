@@ -4,6 +4,10 @@ struct BigRat {
 	mp_int den; // > 0
 };
 
+// Guards against a tiny literal requesting an enormous 10^N (e.g. `1.0e999999999`). Far beyond any
+// representable float (f64 range is ~1e+-324); a literal past this is rejected as malformed.
+i64 const BIG_RAT_MAX_DECIMAL_EXP = 65536;
+
 // Reduce num/den to lowest terms with den > 0 (0 becomes 0/1).
 gb_internal void big_rat_normalize(mp_int *num, mp_int *den) {
 	if (mp_iszero(num)) {
@@ -73,7 +77,9 @@ gb_internal bool big_rat_from_decimal_string(String const &s, mp_int *num, mp_in
 			u8 c = s[i];
 			if (c == '_') continue;
 			if (!gb_char_is_digit(cast(char)c)) return false;
-			exp = exp*10 + cast(i64)(c - '0');
+			if (exp <= BIG_RAT_MAX_DECIMAL_EXP) { // clamp so it cannot overflow; rejected below
+				exp = exp*10 + cast(i64)(c - '0');
+			}
 			exp_digits += 1;
 		}
 		if (exp_digits == 0) return false;
@@ -81,6 +87,9 @@ gb_internal bool big_rat_from_decimal_string(String const &s, mp_int *num, mp_in
 
 	i64 signed_exp = exp_neg ? -exp : exp;
 	i64 net = signed_exp - frac_digits; // value = mantissa * 10^net
+	if (net > BIG_RAT_MAX_DECIMAL_EXP || net < -BIG_RAT_MAX_DECIMAL_EXP) {
+		return false;
+	}
 
 	mp_init(num);
 	mp_init(den);
@@ -170,46 +179,3 @@ gb_internal f64 big_rat_to_f64(mp_int const *a_in, mp_int const *b_in) {
 	}
 	return f;
 }
-
-/*
-gb_internal void big_rat_selftest(void) {
-	char const *lits[] = {
-		"0.1", "0.2", "0.3", "0.5", "1.5",
-		"3.14159265358979323846",
-		"1e10", "1e100", "1e308",
-		"1.7976931348623157e308",     // ~max normal
-		"2.2250738585072014e-308",    // min normal
-		"5e-324",                     // smallest subnormal
-		"2.5e-324", "7.5e-324",       // subnormal ties
-		"1e-324", "4e-324",           // below the smallest subnormal (round to 0 / to 1 ulp)
-		"9007199254740993",           // 2^53 + 1
-		"98765.0e309",                // overflow -> +Inf
-		"-0.1", "-2.5e-324",
-		"0.1000000000000000055511151231257827021181583404541015625", // exact f64(0.1)
-	};
-	int total = 0, diffs = 0;
-	for (isize k = 0; k < cast(isize)(gb_size_of(lits)/gb_size_of(lits[0])); k++) {
-		char const *lit = lits[k];
-		mp_int num, den;
-		if (!big_rat_from_decimal_string(make_string_c(lit), &num, &den)) {
-			gb_printf_err("  PARSE FAIL: %s\n", lit);
-			continue;
-		}
-		f64 mine = big_rat_to_f64(&num, &den);
-		mp_clear(&num); mp_clear(&den);
-
-		char *end = nullptr;
-		f64 ref = strtod(lit, &end);
-
-		union { f64 f; u64 u; } mb, rb;
-		mb.f = mine; rb.f = ref;
-		bool ok = mb.u == rb.u;
-		if (!ok) diffs += 1;
-		total += 1;
-		gb_printf("  %-56s mine=%016llx ref=%016llx %s\n",
-		          lit, cast(unsigned long long)mb.u, cast(unsigned long long)rb.u, ok ? "OK" : "DIFF");
-	}
-	gb_printf("big_rat_selftest: %d/%d correctly rounded vs strtod (%d diffs)\n", total-diffs, total, diffs);
-}
-
-*/

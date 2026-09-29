@@ -2517,7 +2517,9 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 		}
 		check_update_float_precision(&v, type);
 
-		if (in_value.kind == ExactValue_Integer) {
+		// An exact finite constant (integer or rational) that overflows the target float's range is not
+		// representable by it; without this it would silently become +/-Inf (e.g. `x: f64 = 1.0e400`).
+		if (in_value.kind == ExactValue_Integer || in_value.kind == ExactValue_Rational) {
 			bool overflowed = isinf(v.value_float) || isnan(v.value_float);
 			if (!overflowed) {
 				switch (type->Basic.kind) {
@@ -2738,7 +2740,7 @@ gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, 
 // Returns how the empty value of `type` should be spelled when a numeric zero was written,
 // or nullptr if there is nothing worth suggesting.
 gb_internal char const *zero_value_suggestion(Operand *o, Type *type) {
-	if (o->value.kind != ExactValue_Integer && o->value.kind != ExactValue_Float) {
+	if (o->value.kind != ExactValue_Integer && o->value.kind != ExactValue_Float && o->value.kind != ExactValue_Rational) {
 		return nullptr;
 	}
 	if (!is_exact_value_zero(o->value)) {
@@ -12630,6 +12632,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		case ExactValue_String:     t = t_untyped_string;     break;
 		case ExactValue_String16:   t = t_string16;           break; // TODO(bill): determine this correctly
 		case ExactValue_Float:      t = t_untyped_float;      break;
+		case ExactValue_Rational:   t = t_untyped_float;      break; // exact decimal float literal
 		case ExactValue_Complex:    t = t_untyped_complex;    break;
 		case ExactValue_Quaternion: t = t_untyped_quaternion; break;
 		case ExactValue_Integer:
@@ -13064,6 +13067,8 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 		return big_int_is_zero(&v.value_integer);
 	case ExactValue_Float:
 		return v.value_float == 0.0;
+	case ExactValue_Rational:
+		return big_int_is_zero(&v.value_rational->num);
 	case ExactValue_Complex:
 		if (v.value_complex) {
 			return v.value_complex->real == 0.0 && v.value_complex->imag == 0.0;

@@ -5202,6 +5202,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = o.type;
 
 		ExactValue value = o.value;
+		if (value.kind == ExactValue_Rational) {
+			value = exact_value_to_float(value); // constant floor/ceil/round operate on the f64
+		}
 		if (value.kind == ExactValue_Integer) {
 			// do nothing
 		} else if (value.kind == ExactValue_Float) {
