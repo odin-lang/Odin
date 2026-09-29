@@ -5852,7 +5852,7 @@ gb_internal Type *determine_swizzle_array_type(Type *original_type, Type *type_h
 	Type *elem_type = array_type->Array.elem;
 
 	Type *swizzle_array_type = nullptr;
-	Type *bth = base_type(type_deref(type_hint));
+	Type *bth = base_type(type_hint);
 	if (bth != nullptr && bth->kind == Type_Array &&
 	    bth->Array.count == new_count &&
 	    are_types_identical(bth->Array.elem, elem_type)) {
@@ -5860,7 +5860,7 @@ gb_internal Type *determine_swizzle_array_type(Type *original_type, Type *type_h
 	} else {
 		i64 max_count = array_type->Array.count;
 		if (new_count == max_count) {
-			swizzle_array_type = original_type;
+			swizzle_array_type = type_deref(original_type);
 		} else {
 			swizzle_array_type = alloc_type_array(elem_type, new_count);
 		}
