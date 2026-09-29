@@ -30,6 +30,7 @@ enum ExactValueKind {
 	ExactValue_String16    = 11,
 	ExactValue_AsmTemplate = 12,
 	ExactValue_Variant     = 13,
+	ExactValue_Rational    = 14, // exact num/den for untyped float constants
 
 	ExactValue_Count,
 };
@@ -50,6 +51,7 @@ gb_global char const *exact_value_kind_string[ExactValue_Count] = {
 	"String16",
 	"AsmTemplate",
 	"Variant",
+	"Rational",
 };
 
 struct ExactValue {
@@ -59,6 +61,7 @@ struct ExactValue {
 		String         value_string;
 		BigInt         value_integer;
 		f64            value_float;
+		BigRat *       value_rational;
 		i64            value_pointer; // NOTE(bill): This must be an integer and not a pointer
 		Complex128    *value_complex;
 		Quaternion256 *value_quaternion;
@@ -99,6 +102,15 @@ gb_internal uintptr hash_exact_value(ExactValue v) {
 	case ExactValue_Float:
 		res = gb_fnv32a(&v.value_float, gb_size_of(v.value_float));
 		break;
+	case ExactValue_Rational:
+		{
+			BigInt const &n = v.value_rational->num;
+			BigInt const &d = v.value_rational->den;
+			u32 kn = gb_fnv32a(n.dp, gb_size_of(*n.dp) * n.used);
+			u32 kd = gb_fnv32a(d.dp, gb_size_of(*d.dp) * d.used);
+			res = ((kn ^ (u8)n.sign) * 0x01000193) ^ kd;
+			break;
+		}
 	case ExactValue_Pointer:
 		res = ptr_map_hash_key(v.value_pointer);
 		break;
@@ -171,6 +183,25 @@ gb_internal ExactValue exact_value_float(f64 f) {
 	ExactValue result = {ExactValue_Float};
 	result.value_float = f;
 	return result;
+}
+
+// Make an exact-rational value from num/den (copied and reduced to lowest terms, den > 0).
+gb_internal ExactValue exact_value_rational_from_ints(mp_int const *num, mp_int const *den) {
+	BigRat *br = permanent_alloc_item<BigRat>();
+	mp_init(&br->num);
+	mp_init(&br->den);
+	mp_copy(num, &br->num);
+	mp_copy(den, &br->den);
+	big_rat_normalize(&br->num, &br->den);
+
+	ExactValue result = {ExactValue_Rational};
+	result.value_rational = br;
+	return result;
+}
+
+gb_internal ExactValue exact_value_rational_from_integer(BigInt const *i) {
+	mp_int one; mp_init(&one); defer (mp_clear(&one)); mp_set_u64(&one, 1);
+	return exact_value_rational_from_ints(i, &one);
 }
 
 gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
@@ -567,6 +598,17 @@ gb_internal ExactValue exact_value_to_integer(ExactValue v) {
 
 	case ExactValue_Pointer:
 		return exact_value_i64(cast(i64)cast(intptr)v.value_pointer);
+
+	case ExactValue_Rational:
+		// Only an exact integer (den == 1 after reduction) converts to an integer.
+		if (mp_cmp_d(&v.value_rational->den, 1) == MP_EQ) {
+			ExactValue r = {ExactValue_Integer};
+			r.value_integer = {0};
+			mp_init(&r.value_integer);
+			mp_copy(&v.value_rational->num, &r.value_integer);
+			return r;
+		}
+		break;
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -578,6 +620,8 @@ gb_internal ExactValue exact_value_to_float(ExactValue v) {
 		return exact_value_float(big_int_to_f64(&v.value_integer));
 	case ExactValue_Float:
 		return v;
+	case ExactValue_Rational:
+		return exact_value_float(big_rat_to_f64(&v.value_rational->num, &v.value_rational->den));
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -589,6 +633,8 @@ gb_internal ExactValue exact_value_to_complex(ExactValue v) {
 		return exact_value_complex(big_int_to_f64(&v.value_integer), 0);
 	case ExactValue_Float:
 		return exact_value_complex(v.value_float, 0);
+	case ExactValue_Rational:
+		return exact_value_complex(big_rat_to_f64(&v.value_rational->num, &v.value_rational->den), 0);
 	case ExactValue_Complex:
 		return v;
 	// case ExactValue_Quaternion:
@@ -604,6 +650,8 @@ gb_internal ExactValue exact_value_to_quaternion(ExactValue v) {
 		return exact_value_quaternion(big_int_to_f64(&v.value_integer), 0, 0, 0);
 	case ExactValue_Float:
 		return exact_value_quaternion(v.value_float, 0, 0, 0);
+	case ExactValue_Rational:
+		return exact_value_quaternion(big_rat_to_f64(&v.value_rational->num, &v.value_rational->den), 0, 0, 0);
 	case ExactValue_Complex:
 		return exact_value_quaternion(v.value_complex->real, v.value_complex->imag, 0, 0);
 	case ExactValue_Quaternion:
@@ -618,6 +666,7 @@ gb_internal ExactValue exact_value_real(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 		return v;
 	case ExactValue_Complex:
 		return exact_value_float(v.value_complex->real);
@@ -632,6 +681,7 @@ gb_internal ExactValue exact_value_imag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 		return exact_value_i64(0);
 	case ExactValue_Complex:
 		return exact_value_float(v.value_complex->imag);
@@ -646,6 +696,7 @@ gb_internal ExactValue exact_value_jmag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 	case ExactValue_Complex:
 		return exact_value_i64(0);
 	case ExactValue_Quaternion:
@@ -659,6 +710,7 @@ gb_internal ExactValue exact_value_kmag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 	case ExactValue_Complex:
 		return exact_value_i64(0);
 	case ExactValue_Quaternion:
@@ -740,6 +792,7 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 		switch (v.kind) {
 		case ExactValue_Invalid:
 		case ExactValue_Integer:
+		case ExactValue_Rational:
 		case ExactValue_Float:
 		case ExactValue_Complex:
 		case ExactValue_Quaternion:
@@ -762,6 +815,11 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 			ExactValue i = v;
 			i.value_float = -i.value_float;
 			return i;
+		}
+		case ExactValue_Rational: {
+			mp_int n; mp_init(&n); defer (mp_clear(&n));
+			big_int_neg(&n, &v.value_rational->num);
+			return exact_value_rational_from_ints(&n, &v.value_rational->den);
 		}
 		case ExactValue_Complex: {
 			f64 real = v.value_complex->real;
@@ -823,16 +881,18 @@ gb_internal i32 exact_value_order(ExactValue const &v) {
 		return 1;
 	case ExactValue_Integer:
 		return 2;
-	case ExactValue_Float:
+	case ExactValue_Rational: // exact; between integer and (lossy) float
 		return 3;
-	case ExactValue_Complex:
+	case ExactValue_Float:
 		return 4;
-	case ExactValue_Quaternion:
+	case ExactValue_Complex:
 		return 5;
-	case ExactValue_Pointer:
+	case ExactValue_Quaternion:
 		return 6;
-	case ExactValue_Procedure:
+	case ExactValue_Pointer:
 		return 7;
+	case ExactValue_Procedure:
+		return 8;
 
 	default:
 		GB_PANIC("How'd you get here? Invalid Value.kind %d", v.kind);
@@ -867,6 +927,10 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 		switch (y->kind) {
 		case ExactValue_Integer:
 			return;
+		case ExactValue_Rational:
+			// Promote the integer to an exact rational so folding stays exact.
+			*x = exact_value_rational_from_integer(&x->value_integer);
+			return;
 		case ExactValue_Float:
 			// TODO(bill): Is this good enough?
 			*x = exact_value_float(big_int_to_f64(&x->value_integer));
@@ -876,6 +940,22 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 			return;
 		case ExactValue_Quaternion:
 			*x = exact_value_quaternion(big_int_to_f64(&x->value_integer), 0, 0, 0);
+			return;
+		}
+		break;
+
+	case ExactValue_Rational:
+		switch (y->kind) {
+		case ExactValue_Rational:
+			return;
+		case ExactValue_Float:
+			*x = exact_value_to_float(*x);
+			return;
+		case ExactValue_Complex:
+			*x = exact_value_to_complex(*x);
+			return;
+		case ExactValue_Quaternion:
+			*x = exact_value_to_quaternion(*x);
 			return;
 		}
 		break;
@@ -953,6 +1033,27 @@ gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, E
 		ExactValue res = {ExactValue_Integer};
 		res.value_integer = c;
 		return res;
+	}
+
+	case ExactValue_Rational: {
+		// Exact rational arithmetic: a/b (op) c/d, result reduced to lowest terms.
+		mp_int const *an = &x.value_rational->num, *ad = &x.value_rational->den;
+		mp_int const *bn = &y.value_rational->num, *bd = &y.value_rational->den;
+		mp_int nn, nd, t1, t2;
+		mp_init(&nn); mp_init(&nd); mp_init(&t1); mp_init(&t2);
+		defer (mp_clear(&nn)); defer (mp_clear(&nd)); defer (mp_clear(&t1)); defer (mp_clear(&t2));
+		switch (op) {
+		case Token_Add: // (an*bd + bn*ad) / (ad*bd)
+			big_int_mul(&t1, an, bd); big_int_mul(&t2, bn, ad); big_int_add(&nn, &t1, &t2); big_int_mul(&nd, ad, bd); break;
+		case Token_Sub:
+			big_int_mul(&t1, an, bd); big_int_mul(&t2, bn, ad); big_int_sub(&nn, &t1, &t2); big_int_mul(&nd, ad, bd); break;
+		case Token_Mul:
+			big_int_mul(&nn, an, bn); big_int_mul(&nd, ad, bd); break;
+		case Token_Quo: // (an/ad) / (bn/bd) = (an*bd) / (ad*bn)
+			big_int_mul(&nn, an, bd); big_int_mul(&nd, ad, bn); break;
+		default: goto error;
+		}
+		return exact_value_rational_from_ints(&nn, &nd);
 	}
 
 	case ExactValue_Float: {
@@ -1125,6 +1226,23 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 
 	case ExactValue_Integer: {
 		i32 cmp = big_int_cmp(&x.value_integer, &y.value_integer);
+		switch (op) {
+		case Token_CmpEq: return cmp == 0;
+		case Token_NotEq: return cmp != 0;
+		case Token_Lt:    return cmp <  0;
+		case Token_LtEq:  return cmp <= 0;
+		case Token_Gt:    return cmp >  0;
+		case Token_GtEq:  return cmp >= 0;
+		}
+		break;
+	}
+
+	case ExactValue_Rational: {
+		// a/b (op) c/d with b,d > 0  <=>  a*d (op) c*b
+		mp_int lhs, rhs; mp_init(&lhs); mp_init(&rhs); defer (mp_clear(&lhs)); defer (mp_clear(&rhs));
+		big_int_mul(&lhs, &x.value_rational->num, &y.value_rational->den);
+		big_int_mul(&rhs, &y.value_rational->num, &x.value_rational->den);
+		i32 cmp = big_int_cmp(&lhs, &rhs);
 		switch (op) {
 		case Token_CmpEq: return cmp == 0;
 		case Token_NotEq: return cmp != 0;
@@ -1318,6 +1436,8 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 	// NOTE(tf2spi): %.17g is specific enough to canonically serialize f64
 	case ExactValue_Float:
 		return gb_string_append_fmt(str, "%.17g", v.value_float);
+	case ExactValue_Rational:
+		return gb_string_append_fmt(str, "%.17g", big_rat_to_f64(&v.value_rational->num, &v.value_rational->den));
 	case ExactValue_Complex:
 		return gb_string_append_fmt(str, "%.17g+%.17gi", v.value_complex->real, v.value_complex->imag);
 	case ExactValue_Quaternion:
@@ -1337,4 +1457,56 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 
 gb_internal gbString exact_value_to_string(ExactValue const &v, isize string_limit=36) {
 	return write_exact_value_to_string(gb_string_make(heap_allocator(), ""), v, string_limit);
+}
+
+// TEMPORARY(bill): exercise ExactValue_Rational arithmetic/compare/convert
+gb_internal ExactValue exact_value_rational_from_decimal(char const *lit) {
+	mp_int num, den;
+	big_rat_from_decimal_string(make_string_c(lit), &num, &den);
+	ExactValue r = exact_value_rational_from_ints(&num, &den);
+	mp_clear(&num);
+	mp_clear(&den);
+	return r;
+}
+
+gb_internal void exact_value_rational_selftest(void) {
+	int total = 0, diffs = 0;
+	#define RAT(s)          exact_value_rational_from_decimal(s)
+	#define BIN(a, op, b)   exact_binary_operator_value(op, a, b)
+	#define TOF(v)          exact_value_to_float(v).value_float
+	#define CHK(label, gotf, wantstr) do {       \
+		f64 g_ = (gotf);                     \
+		f64 w_ = strtod((wantstr), nullptr); \
+		union { f64 f; u64 u; } gg, ww;      \
+		gg.f = g_;                           \
+		ww.f = w_;                           \
+		bool ok_ = gg.u == ww.u;             \
+		total += 1;                          \
+		if (!ok_) { diffs += 1; }            \
+		gb_printf("  %-24s got=%-24.17g want=%-24.17g %s\n", label, g_, w_, ok_ ? "OK" : "DIFF"); \
+	} while (0)
+
+	CHK("0.1 + 0.2",       TOF(BIN(RAT("0.1"), Token_Add, RAT("0.2"))), "0.3");
+	CHK("1.0 / 16.0",      TOF(BIN(RAT("1.0"), Token_Quo, RAT("16.0"))), "0.0625");
+	CHK("3.0 / 2.0",       TOF(BIN(RAT("3.0"), Token_Quo, RAT("2.0"))), "1.5");
+	CHK("2/3 + 1/3",       TOF(BIN(BIN(RAT("2.0"), Token_Quo, RAT("3.0")), Token_Add, BIN(RAT("1.0"), Token_Quo, RAT("3.0")))), "1.0");
+	CHK("0.3 - 0.2 - 0.1", TOF(BIN(BIN(RAT("0.3"), Token_Sub, RAT("0.2")), Token_Sub, RAT("0.1"))), "0.0");
+
+	// mixed integer + rational (exercises match_exact_values Integer -> Rational)
+	{
+		ExactValue one = exact_value_i64(1);
+		CHK("1 + 0.5 (int+rat)", TOF(BIN(one, Token_Add, RAT("0.5"))), "1.5");
+	}
+	// comparison folding: (0.1 + 0.2) == 0.3 is exactly true with rationals
+	{
+		bool eq = compare_exact_values(Token_CmpEq, BIN(RAT("0.1"), Token_Add, RAT("0.2")), RAT("0.3"));
+		total += 1; if (!eq) diffs += 1;
+		gb_printf("  %-24s got=%-5s              %s\n", "(0.1+0.2) == 0.3", eq ? "true" : "false", eq ? "OK" : "DIFF");
+	}
+
+	#undef RAT
+	#undef BIN
+	#undef TOF
+	#undef CHK
+	gb_printf("exact_value_rational_selftest: %d/%d ok (%d diffs)\n", total-diffs, total, diffs);
 }

@@ -1,3 +1,29 @@
+// An exact rational value: num/den with den > 0, kept in lowest terms.
+struct BigRat {
+	mp_int num; // signed
+	mp_int den; // > 0
+};
+
+// Reduce num/den to lowest terms with den > 0 (0 becomes 0/1).
+gb_internal void big_rat_normalize(mp_int *num, mp_int *den) {
+	if (mp_iszero(num)) {
+		mp_set_u64(den, 1);
+		return;
+	}
+	if (big_int_is_neg(den)) {
+		mp_neg(num, num);
+		mp_neg(den, den);
+	}
+	mp_int g;   mp_init(&g);   defer (mp_clear(&g));
+	mp_int one; mp_init(&one); defer (mp_clear(&one)); mp_set_u64(&one, 1);
+	mp_gcd(num, den, &g);
+	if (!mp_iszero(&g) && mp_cmp(&g, &one) != MP_EQ) {
+		mp_int q, r; mp_init(&q); mp_init(&r); defer (mp_clear(&q)); defer (mp_clear(&r));
+		mp_div(num, &g, &q, &r); mp_copy(&q, num);
+		mp_div(den, &g, &q, &r); mp_copy(&q, den);
+	}
+}
+
 gb_internal bool big_rat_from_decimal_string(String const &s, mp_int *num, mp_int *den) {
 	TEMPORARY_ALLOCATOR_GUARD();
 	char *digits = gb_alloc_array(temporary_allocator(), char, s.len + 2);

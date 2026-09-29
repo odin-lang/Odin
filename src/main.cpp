@@ -3860,6 +3860,12 @@ int main(int arg_count, char const **arg_ptr) {
 	init_keyword_hash_table();
 	init_terminal();
 
+	// TEMPORARY(bill): validate the exact-rational core in-tree.
+	if (gb_get_env("ODIN_BIGRAT_SELFTEST", heap_allocator()) != nullptr) {
+		exact_value_rational_selftest();
+		return 0;
+	}
+
 	if (!check_env()) {
 		return 1;
 	}
