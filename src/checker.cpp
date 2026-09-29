@@ -1480,6 +1480,7 @@ gb_internal void init_universal(void) {
 			type = t_untyped_integer;
 			break;
 		case ExactValue_Float:
+		case ExactValue_Rational:
 			type = t_untyped_float;
 			break;
 		}

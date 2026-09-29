@@ -1139,7 +1139,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			error(f->bit_size, "A bit_field's specified bit size must be a constant");
 			o.mode = Addressing_Invalid;
 		}
-		if (o.value.kind == ExactValue_Float) {
+		if (o.value.kind == ExactValue_Float || o.value.kind == ExactValue_Rational) {
 			o.value = exact_value_to_integer(o.value);
 		}
 		if (f->bit_size->kind == Ast_BinaryExpr && f->bit_size->BinaryExpr.op.kind == Token_Or) {
@@ -2882,7 +2882,7 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	Type *type = core_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		ExactValue value = o->value;
-		if (value.kind == ExactValue_Float) {
+		if (value.kind == ExactValue_Float || value.kind == ExactValue_Rational) {
 			// NOTE: an integral float is a valid count, but it must be range checked as an integer
 			value = exact_value_to_integer(value);
 		}

@@ -7,6 +7,7 @@
 	#pragma warning(disable: 4505)
 #endif
 #include "big_int.cpp"
+#include "big_rat.cpp"
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
@@ -936,7 +937,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						case BuildFlagParam_Float:
-							if (value.kind != ExactValue_Float) {
+							if (value.kind != ExactValue_Float && value.kind != ExactValue_Rational) {
 								gb_printf_err("%.*s expected a floating pointer number, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
