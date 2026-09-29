@@ -3,7 +3,14 @@ struct BigRat {
 	mp_int den; // > 0
 };
 
-i64 const BIG_RAT_MAX_DECIMAL_EXP = 65536;
+gb_global i64 const BIG_RAT_MAX_DECIMAL_EXP    = 65536;
+gb_global i32 const BIG_RAT_MAX_COMPONENT_BITS = 65536;
+
+// True if either component's magnitude exceeds BIG_RAT_MAX_COMPONENT_BITS (call after normalizing).
+gb_internal bool big_rat_components_too_large(mp_int const *num, mp_int const *den) {
+	return mp_count_bits(num) > BIG_RAT_MAX_COMPONENT_BITS ||
+	       mp_count_bits(den) > BIG_RAT_MAX_COMPONENT_BITS;
+}
 
 // Reduce num/den to lowest terms with den > 0 (0 becomes 0/1).
 gb_internal void big_rat_normalize(mp_int *num, mp_int *den) {
@@ -15,8 +22,15 @@ gb_internal void big_rat_normalize(mp_int *num, mp_int *den) {
 		mp_neg(num, num);
 		mp_neg(den, den);
 	}
-	mp_int g;   mp_init(&g);   defer (mp_clear(&g));
-	mp_int one; mp_init(&one); defer (mp_clear(&one)); mp_set_u64(&one, 1);
+	mp_int g;
+	mp_int one;
+	mp_init(&g);
+	mp_init(&one);
+	mp_set_u64(&one, 1);
+
+	defer (mp_clear(&g));
+	defer (mp_clear(&one));
+
 	mp_gcd(num, den, &g);
 	if (!mp_iszero(&g) && mp_cmp(&g, &one) != MP_EQ) {
 		mp_int q, r; mp_init(&q); mp_init(&r); defer (mp_clear(&q)); defer (mp_clear(&r));
