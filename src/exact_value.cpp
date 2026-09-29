@@ -215,8 +215,14 @@ gb_internal ExactValue exact_value_rational_from_integer(BigInt const *i) {
 	return exact_value_rational_from_ints(i, &one);
 }
 
-// Promote an integer to an exact rational, leaving other kinds untouched. Used so complex/quaternion
-// division does true rational division rather than the integer `Token_Quo` path (which is `fmod`).
+gb_internal ExactValue exact_value_rational_arith_result(mp_int const *num, mp_int const *den) {
+	ExactValue r = exact_value_rational_from_ints(num, den); // normalizes (GCD reduce)
+	if (big_rat_components_too_large(&r.value_rational->num, &r.value_rational->den)) {
+		return exact_value_float(big_rat_to_f64(&r.value_rational->num, &r.value_rational->den));
+	}
+	return r;
+}
+
 gb_internal ExactValue exact_value_as_rational_if_integer(ExactValue v) {
 	if (v.kind == ExactValue_Integer) {
 		return exact_value_rational_from_integer(&v.value_integer);
@@ -978,7 +984,7 @@ gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, E
 			big_int_mul(&nn, an, bd); big_int_mul(&nd, ad, bn); break;
 		default: goto error;
 		}
-		return exact_value_rational_from_ints(&nn, &nd);
+		return exact_value_rational_arith_result(&nn, &nd);
 	}
 
 	case ExactValue_Float: {
@@ -1375,7 +1381,19 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 			gb_free(heap_allocator(), s.text);
 			return str;
 		}
-		return gb_string_append_fmt(str, "%.17g", big_rat_to_f64(&v.value_rational->num, &v.value_rational->den));
+		// Non-integer: print the exact fraction as `<num>.0/<den>` (e.g. `1.0/3`). The `.0` on the
+		// numerator marks it as a decimal division, so it reads as the float `1.0/3` rather than the
+		// integer division `1/3` (which would be 0), and it round-trips as valid Odin source.
+		{
+			String ns = big_int_to_string(heap_allocator(), &v.value_rational->num);
+			String ds = big_int_to_string(heap_allocator(), &v.value_rational->den);
+			str = gb_string_append_length(str, ns.text, ns.len);
+			str = gb_string_append_fmt(str, ".0/");
+			str = gb_string_append_length(str, ds.text, ds.len);
+			gb_free(heap_allocator(), ns.text);
+			gb_free(heap_allocator(), ds.text);
+			return str;
+		}
 	case ExactValue_Complex:
 		return gb_string_append_fmt(str, "%.17g+%.17gi", exact_value_to_f64(v.value_complex->real), exact_value_to_f64(v.value_complex->imag));
 	case ExactValue_Quaternion:
