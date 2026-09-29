@@ -150,6 +150,15 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 // 	return LLVMPointerType(func_type, 0);
 // }
 
+gb_internal lbCallingConventionKind lb_calling_convention_kind(ProcCallingConvention cc) {
+	if (selected_subtarget == Subtarget_Playdate) {
+		return lbCallingConvention_ARM_AAPCS_VFP;
+	}
+	if (is_arch_wasm()) {
+		return lbCallingConvention_C;
+	}
+	return lb_calling_convention_map[cc];
+}
 
 gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
 	if (ft == nullptr) {
@@ -204,13 +213,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		LLVMAddAttributeAtIndex(fn, offset, noalias_attr);
 	}
 
-	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// TODO(bill): Clean up this logic
-	if (selected_subtarget == Subtarget_Playdate) {
-		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
-	} else if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[calling_convention];
-	}
+	lbCallingConventionKind cc_kind = lb_calling_convention_kind(calling_convention);
 	// if (build_context.metrics.arch == TargetArch_amd64) {
 	// 	if (build_context.metrics.os == TargetOs_windows) {
 	// 		if (cc_kind == lbCallingConvention_C) {

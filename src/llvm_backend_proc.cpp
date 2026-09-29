@@ -475,31 +475,24 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
 	Type *pt = p->type;
-	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	if (selected_subtarget == Subtarget_Playdate) {
-		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
-	} else if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-	}
-	LLVMSetFunctionCallConv(p->value, cc_kind);
+	LLVMSetFunctionCallConv(p->value, lb_calling_convention_kind(pt->Proc.calling_convention));
 	lbValue proc_value = {p->value, p->type};
 	lb_add_member(m, p->name, proc_value);
 	lb_add_procedure_value(m, p);
 
 
-	// NOTE(bill): offset==0 is the return value
-	isize offset = 1;
+	// return-by-ptr is index 1
 	if (pt->Proc.return_by_pointer) {
 		lb_add_proc_attribute_at_index(p, 1, "sret");
 		lb_add_proc_attribute_at_index(p, 1, "noalias");
-		offset = 2;
 	}
 
-	isize parameter_index = 0;
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
-		lb_add_proc_attribute_at_index(p, offset+parameter_index, "noalias");
-		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nonnull");
-		lb_add_nocapture_proc_attribute_at_index(p, offset+parameter_index);
+		// context is the last parameter
+		isize context_index = cast(isize)LLVMCountParams(p->value);
+		lb_add_proc_attribute_at_index(p, context_index, "noalias");
+		lb_add_proc_attribute_at_index(p, context_index, "nonnull");
+		lb_add_nocapture_proc_attribute_at_index(p, context_index);
 	}
 	return p;
 }
@@ -1079,11 +1072,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
-		auto llvm_cc = lb_calling_convention_map[proc_type->Proc.calling_convention];
-		if (selected_subtarget == Subtarget_Playdate) {
-			llvm_cc = lbCallingConvention_ARM_AAPCS_VFP;
-		}
-		LLVMSetInstructionCallConv(ret, llvm_cc);
+		LLVMSetInstructionCallConv(ret, lb_calling_convention_kind(proc_type->Proc.calling_convention));
 
 		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {

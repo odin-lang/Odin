@@ -2516,6 +2516,28 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 			return false;
 		}
 		check_update_float_precision(&v, type);
+
+		if (in_value.kind == ExactValue_Integer) {
+			bool overflowed = isinf(v.value_float) || isnan(v.value_float);
+			if (!overflowed) {
+				switch (type->Basic.kind) {
+				case Basic_f16:
+				case Basic_f16le:
+				case Basic_f16be:
+					// `check_update_float_precision` only rounds `f16` to `f32` precision, so a value
+					// that is finite as `f32` but out of range for `f16` must be caught explicitly.
+					if (isinf(cast(f64)f16_to_f32(f32_to_f16(cast(f32)v.value_float)))) {
+						overflowed = true;
+					}
+					break;
+				}
+			}
+			if (overflowed) {
+				// Leave `out_value` unset so the diagnostic reports the exact (finite) source value.
+				return false;
+			}
+		}
+
 		if (out_value) *out_value = v;
 
 		switch (type->Basic.kind) {
@@ -5830,7 +5852,7 @@ gb_internal Type *determine_swizzle_array_type(Type *original_type, Type *type_h
 	Type *elem_type = array_type->Array.elem;
 
 	Type *swizzle_array_type = nullptr;
-	Type *bth = base_type(type_deref(type_hint));
+	Type *bth = base_type(type_hint);
 	if (bth != nullptr && bth->kind == Type_Array &&
 	    bth->Array.count == new_count &&
 	    are_types_identical(bth->Array.elem, elem_type)) {
@@ -5838,7 +5860,7 @@ gb_internal Type *determine_swizzle_array_type(Type *original_type, Type *type_h
 	} else {
 		i64 max_count = array_type->Array.count;
 		if (new_count == max_count) {
-			swizzle_array_type = original_type;
+			swizzle_array_type = type_deref(original_type);
 		} else {
 			swizzle_array_type = alloc_type_array(elem_type, new_count);
 		}
@@ -9161,6 +9183,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			gb_string_free(b);
 			gb_string_free(a);
 		}
+		if (is_arch_wasm() && !check_target_feature_is_enabled(str_lit("tail-call"), nullptr)) {
+			error(call, "'#must_tail' on a WebAssembly target requires the 'tail-call' target feature, e.g. '-target-features:tail-call'");
+		}
 		break;
 	}
 
@@ -9532,7 +9557,9 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			return true;
 		}
 		if (expr->kind == Ast_ProcLit) {
-			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
+			ExactValue value = exact_value_procedure(expr);
+			value.variant_type = o->value.variant_type;
+			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), value);
 			return true;
 		}
 
@@ -10948,7 +10975,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						continue;
 					}
 					if (index >= field_count) {
-						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, index + 1);
 						break;
 					}
 
@@ -10967,6 +10994,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 							Operand src_o = o;
 							src_o.type = src_field->type;
 
+							if (index + jj >= field_count)
+								continue ;
 							field = t->Struct.fields[index + (jj++)];
 
 							check_assignment(c, &src_o, field->type, str_lit("structure literal"));
@@ -10989,15 +11018,18 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 						handled_elem_count += 1;
 					}
-
+					if (handled_elem_count > field_count) {
+						error(o.expr, "Expansion overflows structure literal, expected %td, got %td", field_count, handled_elem_count);
+						break ;
+					}
 				}
-				if (cl->elems.count < field_count) {
+				if (handled_elem_count < field_count) {
 					if (min_field_count < field_count) {
-						if (cl->elems.count < min_field_count) {
-							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
+						if (handled_elem_count < min_field_count) {
+							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, handled_elem_count);
 						}
 					} else if (handled_elem_count != field_count) {
-						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, handled_elem_count);
 					}
 				}
 			}
@@ -11211,6 +11243,9 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 					}
 
 					max += tt->variables.count-1;
+					if (0 <= max_type_count && max_type_count <= max) {
+						error(e, "Expansion reaches index %lld which goes out of bounds (>= %lld) for %.*s", cast(long long)max, cast(long long)max_type_count, LIT(context_name));
+					}
 				} else {
 					check_assignment(c, &operand, elem_type, context_name);
 
@@ -11681,10 +11716,6 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		isize field_count = 0;
 		if (et != nullptr && et->kind == Type_Enum) {
 			field_count = et->Enum.fields.count;
-		}
-
-		if (is_type_array(bit_set_to_int(t))) {
-			is_constant = false;
 		}
 
 		for (Ast *elem : cl->elems) {
@@ -12605,6 +12636,10 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			t = t_untyped_integer;
 			if (bl->token.kind == Token_Rune) {
 				t = t_untyped_rune;
+			} else if (string_contains_char(bl->token.string, '.')) {
+				// NOTE(bill): A floating-point literal whose value happens to be an integer (e.g. `98765.0e309`) keeps
+				// its exact value as an integer, but still defaults to untyped float because it was written in floating-point form.
+				t = t_untyped_float;
 			}
 			break;
 		default:

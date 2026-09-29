@@ -116,7 +116,7 @@ test_infinity :: proc(t: ^testing.T) {
 			testing.expect_value(t, math.classify(f), math.Float_Class.Zero)
 		}
 	}
-	
+
 	s = "+infinity"
 	for i in 0 ..< len(s) + 1 {
 		ss := s[:i]
@@ -216,4 +216,111 @@ test_float_hex :: proc(t: ^testing.T) {
 		testing.expectf(t, ok, "%q: ok=false", c.s)
 		testing.expectf(t, transmute(u32)f == c.bits, "%q: got %08x, want %08x", c.s, transmute(u32)f, c.bits)
 	}
+}
+
+@(test)
+test_float_rounding_f64 :: proc(t: ^testing.T) {
+	Case :: struct { s: string, bits: u64 }
+	cases := []Case{
+		{"1.2",                     0x3ff3333333333333},
+		{"123456789e-5",            0x40934a4584f4c6e7},
+		{"4503599627370495",        0x432ffffffffffffe}, // 2^52 - 1
+		{"0.1234567890123456",      0x3fbf9add3746f659}, // 16 digits
+		{"1e22",                    0x4480f0cf064dd592},
+		{"1e-22",                   0x3b5e392010175ee6},
+		{"1e37",                    0x479e17b84357691b}, // 1e15 * 1e22
+		{"-0.0",                    0x8000000000000000},
+		{"1_000.5",                 0x408f440000000000},
+		{"12345678901234e30",       0x48e1b716107ef6cd},
+		{"8807505e35",              0x48a43896104bfb7b},
+		{"49275500062000e27",       0x486219d883804133},
+		{"9007199254740991",        0x433fffffffffffff}, // 2^53 - 1
+		{"0.12345678901234567",     0x3fbf9add3746f65e}, // 17 digits
+		{"1e-23",                   0x3b282db34012b251},
+		{"1e38",                    0x47d2ced32a16a1b1},
+		{"1.7976931348623157e308",  0x7fefffffffffffff}, // largest f64
+		{"2.2250738585072014e-308", 0x0010000000000000}, // smallest normal
+		{"2.4703282292062328e-324", 0x0000000000000001}, // rounds up to the smallest subnormal
+		{"2.4703282292062327e-324", 0x0000000000000000}, // rounds down to zero
+		{"9007199254740993",        0x4340000000000000}, // halfway, round to even
+		{"123456789012345678901234",   0x44ba249b1f10a06d},
+		{"0.1000000000000000000000001", 0x3fb999999999999a},
+		{"9007199254740993.0000000000000000001", 0x4340000000000001},
+	}
+	for c in cases {
+		f, ok := strconv.parse_f64(c.s)
+		testing.expectf(t, ok, "%q: ok=false", c.s)
+		testing.expectf(t, transmute(u64)f == c.bits, "%q: got %016x, want %016x", c.s, transmute(u64)f, c.bits)
+	}
+}
+
+@(test)
+test_float_rounding_f32 :: proc(t: ^testing.T) {
+	Case :: struct { s: string, bits: u32 }
+	cases := []Case{
+		{"1.2",                                  0x3f99999a},
+		{"3.4028235e38",                         0x7f7fffff},
+		{"1.17549435e-38",                       0x00800000},
+		{"1e-45",                                0x00000001},
+		// Parsing as f64 and converting to f32 rounds twice and gives the wrong f32.
+		// These use Eisel-Lemire or the slow path.
+		{"7.0064923216240854e-46",               0x00000001},
+		{"1.1754947011469036e-38",               0x00800003},
+		{"2.1665680640000002384185791015625e9",  0x4f012335},
+		{"8.589934335999999523162841796875e+09", 0x4fffffff},
+		{"0.00036393293703440577",               0x39bece41},
+		// The f64 fast path gives exactly an f32 midpoint, but the input is not
+		// a midpoint. The conversion to f32 would round the wrong way.
+		{"2.295306995511055e-01",                0x3e6b0a19},
+		{"2.346675395965576e+01",                0x41bbbbe9},
+		{"1.26108672702685e-03",                 0x3aa54b0d},
+		{"2.76996448636055e-01",                 0x3e8dd27b},
+	}
+	for c in cases {
+		f, ok := strconv.parse_f32(c.s)
+		testing.expectf(t, ok, "%q: ok=false", c.s)
+		testing.expectf(t, transmute(u32)f == c.bits, "%q: got %08x, want %08x", c.s, transmute(u32)f, c.bits)
+	}
+
+	n: int
+	f, ok := strconv.parse_f32("1.5x", &n)
+	testing.expect_value(t, f, 1.5)
+	testing.expect_value(t, n, 3)
+	testing.expect_value(t, ok, false)
+}
+
+@(test)
+test_float_overflow :: proc(t: ^testing.T) {
+	f64v, ok64 := strconv.parse_f64("1e309")
+	testing.expect_value(t, math.classify(f64v), math.Float_Class.Inf)
+	testing.expect_value(t, ok64, false)
+
+	f64v, ok64 = strconv.parse_f64("-1e309")
+	testing.expect_value(t, math.classify(f64v), math.Float_Class.Neg_Inf)
+	testing.expect_value(t, ok64, false)
+
+	f32v, ok32 := strconv.parse_f32("1e39")
+	testing.expect_value(t, math.classify(f32v), math.Float_Class.Inf)
+	testing.expect_value(t, ok32, false)
+
+	f32v, ok32 = strconv.parse_f32("-1e39")
+	testing.expect_value(t, math.classify(f32v), math.Float_Class.Neg_Inf)
+	testing.expect_value(t, ok32, false)
+
+	f32v, ok32 = strconv.parse_f32("0x1p128")
+	testing.expect_value(t, math.classify(f32v), math.Float_Class.Inf)
+	testing.expect_value(t, ok32, false)
+
+	f32v, ok32 = strconv.parse_f32("1e309")
+	testing.expect_value(t, math.classify(f32v), math.Float_Class.Inf)
+	testing.expect_value(t, ok32, false)
+
+	// Underflow to zero is not an error.
+	f64v, ok64 = strconv.parse_f64("1e-400")
+	testing.expect_value(t, f64v, 0)
+	testing.expect_value(t, ok64, true)
+
+	f32v, ok32 = strconv.parse_f32("1e-50")
+	testing.expect_value(t, f32v, 0)
+	testing.expect_value(t, ok32, true)
 }

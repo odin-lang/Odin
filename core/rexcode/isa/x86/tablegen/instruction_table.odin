@@ -2416,10 +2416,12 @@ INSTRUCTION_TABLE := [Mnemonic][]Form{
 	.VMOVNTDQ = {
 		{{.VMOVNTDQ, {.M128, .XMM, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xE7, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}}, {written={0}, read={1}, writes_mem=true, reads_mem=true}},
 		{{.VMOVNTDQ, {.M256, .YMM, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xE7, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1}}, {written={0}, read={1}, writes_mem=true, reads_mem=true}},
+		{{.VMOVNTDQ, {.M512, .ZMM, .NONE, .NONE}, {.MR, .REG, .NONE, .NONE}, 0xE7, 0, {esc=._0F, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L2}}, {written={0}, read={1}, writes_mem=true, reads_mem=true}},
 	},
 	.VMOVNTDQA = {
 		{{.VMOVNTDQA, {.XMM, .M128, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x2A, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L0}}, {written={0}, read={1}, reads_mem=true}},
 		{{.VMOVNTDQA, {.YMM, .M256, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x2A, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.VEX, vex_l=.L1}}, {written={0}, read={1}, reads_mem=true}},
+		{{.VMOVNTDQA, {.ZMM, .M512, .NONE, .NONE}, {.REG, .MR, .NONE, .NONE}, 0x2A, 0, {esc=._0F38, prefix=PREFIX_66, vex_type=.EVEX, vex_l=.L2}}, {written={0}, read={1}, reads_mem=true}},
 	},
 	.VADDSUBPS = {
 		{{.VADDSUBPS, {.XMM, .XMM, .XMM_M128, .NONE}, {.REG, .VVVV, .MR, .NONE}, 0xD0, 0, {esc=._0F, prefix=PREFIX_F2, vex_type=.VEX, vex_l=.L0}}, {written={0}, read={1, 2}, implicit_wr={.MXCSR}, reads_mem=true}},

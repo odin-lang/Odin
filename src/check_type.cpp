@@ -1384,14 +1384,11 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		Type *t = default_type(lhs.type);
 		if (bs->underlying != nullptr) {
 			Type *u = check_type(c, bs->underlying);
-			// if (!is_valid_bit_field_backing_type(u)) {
-			if (!is_type_integer(u)) {
+			if (!is_valid_bit_field_backing_type(u)) {
 				gbString ts = type_to_string(u);
-				error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
+				error(bs->underlying, "Expected an underlying integer or array of integers for the bit set, got %s", ts);
 				gb_string_free(ts);
-				if (!is_valid_bit_field_backing_type(u)) {
-					return;
-				}
+				return;
 			}
 			type->BitSet.underlying = u;
 		}
@@ -1502,9 +1499,9 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 				i64 bits = MAX_BITS
 ;				if (bs->underlying != nullptr) {
 					Type *u = check_type(c, bs->underlying);
-					if (!is_type_integer(u)) {
+					if (!is_valid_bit_field_backing_type(u)) {
 						gbString ts = type_to_string(u);
-						error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
+						error(bs->underlying, "Expected an underlying integer or array of integers for the bit set, got %s", ts);
 						gb_string_free(ts);
 						return;
 					}
@@ -2208,7 +2205,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						bool valid = false;
 						if (is_type_proc(op.type)) {
 							Ast *expr = unparen_expr(op.expr);
-							Entity *proc_entity = entity_from_expr(expr);
+							Entity *proc_entity = strip_entity_wrapping(expr);
 							if (proc_entity) {
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
 								valid = true;
