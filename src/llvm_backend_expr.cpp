@@ -6273,14 +6273,14 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 						GB_ASSERT(mask_width > 0);
 						bits_to_set -= mask_width;
 
-						LLVMValueRef mask = lb_const_low_bits_mask(vt, mask_width);
+						LLVMValueRef mask = lb_const_low_bits_mask(lit, mask_width);
 
-						LLVMValueRef to_set = LLVMBuildAnd(p->builder, val, mask, "");
+						LLVMValueRef to_set = LLVMBuildIntCast2(p->builder, val, lit, false, "");
+						to_set = LLVMBuildAnd(p->builder, to_set, mask, "");
 
 						if (elem_bit_offset != 0) {
-							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(lit, elem_bit_offset, false), "");
 						}
-						to_set = LLVMBuildTrunc(p->builder, to_set, lit, "");
 
 						if (LLVMIsNull(elems[elem_idx])) {
 							elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
