@@ -4418,17 +4418,25 @@ gb_internal bool is_ise_expr(Ast *node) {
 	return node->kind == Ast_ImplicitSelectorExpr;
 }
 
-// An argument expression that cannot be typed on its own and needs a target type. When passed to a
-// polymorphic parameter whose type is only known after substitution, it is deferred and resolved once
-// that type is determined (see materialize_deferred_untyped_arg).
 gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
+	if (node == nullptr) {
+		return false;
+	}
 	node = unparen_expr(node);
 	if (node == nullptr) {
 		return false;
 	}
 	switch (node->kind) {
-	case Ast_CompoundLit:          return node->CompoundLit.type == nullptr;
-	case Ast_ImplicitSelectorExpr: return true;
+	case Ast_CompoundLit:
+		return node->CompoundLit.type == nullptr;
+	case Ast_ImplicitSelectorExpr:
+		return true;
+	case Ast_TernaryIfExpr:
+		return arg_is_deferrable_untyped_expr(node->TernaryIfExpr.x) &&
+		       arg_is_deferrable_untyped_expr(node->TernaryIfExpr.y);
+	case Ast_TernaryWhenExpr:
+		return arg_is_deferrable_untyped_expr(node->TernaryWhenExpr.x) &&
+		       arg_is_deferrable_untyped_expr(node->TernaryWhenExpr.y);
 	}
 	return false;
 }
