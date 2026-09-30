@@ -4418,6 +4418,21 @@ gb_internal bool is_ise_expr(Ast *node) {
 	return node->kind == Ast_ImplicitSelectorExpr;
 }
 
+// An argument expression that cannot be typed on its own and needs a target type. When passed to a
+// polymorphic parameter whose type is only known after substitution, it is deferred and resolved once
+// that type is determined (see materialize_deferred_untyped_arg).
+gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
+	node = unparen_expr(node);
+	if (node == nullptr) {
+		return false;
+	}
+	switch (node->kind) {
+	case Ast_CompoundLit:          return node->CompoundLit.type == nullptr;
+	case Ast_ImplicitSelectorExpr: return true;
+	}
+	return false;
+}
+
 gb_internal bool can_use_other_type_as_type_hint(bool use_lhs_as_type_hint, Type *other_type) {
 	if (use_lhs_as_type_hint) { // RHS in this case
 		return other_type != nullptr && other_type != t_invalid && is_type_typed(other_type);
@@ -6686,10 +6701,10 @@ enum UnpackFlag : u32 {
 	UnpackFlag_None       = 0,
 	UnpackFlag_AllowOk    = 1<<0,
 	UnpackFlag_AllowUndef = 1<<1,
-	// For calls to polymorphic procedures: a bare `{...}` argument with no concrete type hint is left
-	// unchecked as a deferred operand instead of erroring, to be resolved once the poly parameter's
-	// type is known (see materialize_deferred_compound_lit).
-	UnpackFlag_DeferUntypedCompoundLit = 1<<2,
+	// For calls to polymorphic procedures: an argument that needs a target type (`{...}`, `.Member`)
+	// with no concrete type hint is left unchecked as a deferred operand instead of erroring, to be
+	// resolved once the poly parameter's type is known (see materialize_deferred_untyped_arg).
+	UnpackFlag_DeferUntypedArg = 1<<2,
 };
 
 
@@ -6760,17 +6775,17 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 		}
 
 		Ast *rhs_expr = unparen_expr(rhs);
-		bool defer_untyped_compound_lit =
-			(flags & UnpackFlag_DeferUntypedCompoundLit) != 0 &&
-			rhs_expr != nullptr && rhs_expr->kind == Ast_CompoundLit && rhs_expr->CompoundLit.type == nullptr &&
+		bool defer_untyped_arg =
+			(flags & UnpackFlag_DeferUntypedArg) != 0 &&
+			arg_is_deferrable_untyped_expr(rhs) &&
 			(type_hint == nullptr || is_type_polymorphic(type_hint));
-		if (defer_untyped_compound_lit) {
-			// NOTE: Leave the literal unchecked; its type comes from the resolved poly parameter later.
+		if (defer_untyped_arg) {
+			// NOTE(bill): Leave the argument unchecked; its type comes from the resolved poly parameter later.
 			// Kept as an "invalid" operand so polymorphic determination treats it as carrying no info.
 			o.mode = Addressing_Invalid;
 			o.type = t_invalid;
 			o.expr = rhs;
-			o.deferred_compound_lit = true;
+			o.deferred_untyped_arg = true;
 		} else if (allow_undef && rhs_expr != nullptr && rhs_expr->kind == Ast_Uninit) {
 			// NOTE(bill): Just handle this very specific logic here
 			o.type = t_untyped_uninit;
@@ -6906,18 +6921,18 @@ gb_internal isize lookup_procedure_parameter(Type *type, String const &parameter
 	return lookup_procedure_parameter(&type->Proc, parameter_name);
 }
 
-// Resolve a deferred untyped compound-literal argument now that its parameter type is known.
+// Resolve a deferred untyped argument (`{...}`, `.Member`) now that its parameter type is known.
 // `param_type` is the concrete (post-substitution) parameter/element type for the slot. On success the
 // operand is checked against it as if it had been written with that type; on failure it is marked
 // invalid. When !show_error the check is muted (trial scoring of a procedure-group candidate) but its
 // failure is still recorded, so the candidate can be rejected without printing anything.
-gb_internal void materialize_deferred_compound_lit(CheckerContext *c, Operand *o, Type *param_type, bool show_error) {
-	GB_ASSERT(o->deferred_compound_lit);
-	o->deferred_compound_lit = false;
-	Ast *lit = o->expr;
+gb_internal void materialize_deferred_untyped_arg(CheckerContext *c, Operand *o, Type *param_type, bool show_error) {
+	GB_ASSERT(o->deferred_untyped_arg);
+	o->deferred_untyped_arg = false;
+	Ast *expr = o->expr;
 
 	if (param_type == nullptr || param_type == t_invalid || is_type_polymorphic(param_type)) {
-		// The slot's type could not be determined from the other arguments, so the literal is genuinely
+		// The slot's type could not be determined from the other arguments, so the argument is genuinely
 		// untypable here (e.g. `proc(e: $E)` called with a bare `{...}`). Leave it invalid; polymorphic
 		// determination has already reported why the type could not be resolved.
 		o->mode = Addressing_Invalid;
@@ -6926,11 +6941,11 @@ gb_internal void materialize_deferred_compound_lit(CheckerContext *c, Operand *o
 	}
 
 	if (show_error) {
-		check_expr_base(c, o, lit, param_type);
+		check_expr_base(c, o, expr, param_type);
 	} else {
 		i64 muted_before = error_mute_count();
 		begin_error_mute();
-		check_expr_base(c, o, lit, param_type);
+		check_expr_base(c, o, expr, param_type);
 		end_error_mute();
 		if (error_mute_count() != muted_before) {
 			o->mode = Addressing_Invalid;
@@ -7280,8 +7295,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 		for (isize i = 0; i < pt->param_count; i++) {
 			Operand *o = &ordered_operands[i];
-			if (o->deferred_compound_lit) {
-				materialize_deferred_compound_lit(c, o, pt->params->Tuple.variables[i]->type, show_error);
+			if (o->deferred_untyped_arg) {
+				materialize_deferred_untyped_arg(c, o, pt->params->Tuple.variables[i]->type, show_error);
 			}
 			if (o->mode == Addressing_Invalid) {
 				continue;
@@ -7332,11 +7347,11 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		for_array(operand_index, variadic_operands) {
 			Operand *o = &variadic_operands[operand_index];
 			Operand deferred_local;
-			if (o->deferred_compound_lit) {
+			if (o->deferred_untyped_arg) {
 				// `variadic_operands` aliases the shared operand buffer reused across candidates, so
 				// resolve into a local copy rather than mutating it in place.
 				deferred_local = *o;
-				materialize_deferred_compound_lit(c, &deferred_local, vari_expand ? slice : elem, show_error);
+				materialize_deferred_untyped_arg(c, &deferred_local, vari_expand ? slice : elem, show_error);
 				o = &deferred_local;
 			}
 			if (vari_expand) {
@@ -8457,7 +8472,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 				variadic_index = pt->variadic_index;
 			}
 			if (pt->is_polymorphic) {
-				unpack_flags |= UnpackFlag_DeferUntypedCompoundLit;
+				unpack_flags |= UnpackFlag_DeferUntypedArg;
 			}
 		}
 		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, unpack_flags, variadic_index);
@@ -8489,17 +8504,16 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			}
 
 			Operand o = {};
-			Ast *value_expr = unparen_expr(value);
-			bool defer_untyped_compound_lit =
+			bool defer_untyped_arg =
 				pt != nullptr && pt->is_polymorphic &&
-				value_expr != nullptr && value_expr->kind == Ast_CompoundLit && value_expr->CompoundLit.type == nullptr &&
+				arg_is_deferrable_untyped_expr(value) &&
 				(type_hint == nullptr || is_type_polymorphic(type_hint));
-			if (defer_untyped_compound_lit) {
-				// Mirror the positional path: resolve the literal from the poly parameter's type later.
+			if (defer_untyped_arg) {
+				// Mirror the positional path: resolve the argument from the poly parameter's type later.
 				o.mode = Addressing_Invalid;
 				o.type = t_invalid;
 				o.expr = value;
-				o.deferred_compound_lit = true;
+				o.deferred_untyped_arg = true;
 			} else {
 				check_expr_with_type_hint(c, &o, value, type_hint);
 				if (o.mode == Addressing_Invalid) {
