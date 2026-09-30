@@ -235,7 +235,7 @@ fe_sqrt :: proc "contextless" (out1, arg1: ^Montgomery_Domain_Field_Element) -> 
 	fe_mul(out1, &xx, out1)
 
 	// Step 4: t0 = x^0xc
-	fe_pow2k(&t0, &xx, 2)
+	fe_pow2k(&t0, out1, 2)
 
 	// Step 5: z = x^0xf
 	fe_mul(out1, out1, &t0)

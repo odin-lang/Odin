@@ -1139,7 +1139,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			error(f->bit_size, "A bit_field's specified bit size must be a constant");
 			o.mode = Addressing_Invalid;
 		}
-		if (o.value.kind == ExactValue_Float) {
+		if (o.value.kind == ExactValue_Float || o.value.kind == ExactValue_Rational) {
 			o.value = exact_value_to_integer(o.value);
 		}
 		if (f->bit_size->kind == Ast_BinaryExpr && f->bit_size->BinaryExpr.op.kind == Token_Or) {
@@ -1311,6 +1311,91 @@ gb_internal bool is_type_valid_bit_set_range(Type *t) {
 	return false;
 }
 
+gb_internal Type *narrowest_integer_type_for_bits(Type *like, i64 needed_bits) {
+	if (needed_bits > 128) {
+		return nullptr;
+	}
+
+	bool is_unsigned = is_type_unsigned(like);
+	bool little = false;
+	bool big    = false;
+
+	Type *bt = core_type(like);
+	if (bt != nullptr && bt->kind == Type_Basic) {
+		little = (bt->Basic.flags & BasicFlag_EndianLittle) != 0;
+		big    = (bt->Basic.flags & BasicFlag_EndianBig)    != 0;
+	}
+
+	Type *native_u[] = {t_u8, t_u16,   t_u32,   t_u64,   t_u128};
+	Type *native_i[] = {t_i8, t_i16,   t_i32,   t_i64,   t_i128};
+	Type *little_u[] = {      t_u16le, t_u32le, t_u64le, t_u128le};
+	Type *little_i[] = {      t_i16le, t_i32le, t_i64le, t_i128le};
+	Type *big_u[]    = {      t_u16be, t_u32be, t_u64be, t_u128be};
+	Type *big_i[]    = {      t_i16be, t_i32be, t_i64be, t_i128be};
+
+	Type **candidates = native_u;
+	isize candidate_count = gb_count_of(native_u);
+	if (little) {
+		candidates      = is_unsigned ? little_u : little_i;
+		candidate_count = is_unsigned ? gb_count_of(little_u) : gb_count_of(little_i);
+	} else if (big) {
+		candidates      = is_unsigned ? big_u : big_i;
+		candidate_count = is_unsigned ? gb_count_of(big_u) : gb_count_of(big_i);
+	} else {
+		candidates      = is_unsigned ? native_u : native_i;
+		candidate_count = is_unsigned ? gb_count_of(native_u) : gb_count_of(native_i);
+	}
+
+	for (isize i = 0; i < candidate_count; i++) {
+		if (8*type_size_of(candidates[i]) >= needed_bits) {
+			return candidates[i];
+		}
+	}
+	return nullptr;
+}
+
+gb_internal void suggest_bit_set_backing_type(Ast *elem, Type *underlying, i64 upper, bool note_lower_bound_forced) {
+	i64 const needed_bits = upper + 1;
+
+	Type *unit = t_u64;
+	if (underlying != nullptr) {
+		Type *bt = base_type(underlying);
+		unit = (bt->kind == Type_Array) ? bt->Array.elem : underlying;
+	}
+	i64 const unit_bits = 8*type_size_of(unit);
+	i64 const count = unit_bits > 0 ? (needed_bits + unit_bits - 1) / unit_bits : 1;
+
+	Type *scalar = narrowest_integer_type_for_bits(unit, needed_bits);
+	bool  show_scalar = scalar != nullptr;
+	bool  show_array  = count >= 2;
+
+	gbString es = expr_to_string(elem);
+	gbString us = type_to_string(unit);
+
+	char const *lead = underlying != nullptr
+		? "\tSuggestion: A larger backing type is required, e.g. "
+		: "\tSuggestion: An explicit backing integer or array type may be specified to allow for a larger range, e.g. ";
+
+	if (show_scalar && show_array) {
+		gbString ss = type_to_string(scalar);
+		error_line("%s'bit_set[%s; %s]' or 'bit_set[%s; [%lld]%s]'\n", lead, es, ss, es, cast(long long)count, us);
+		gb_string_free(ss);
+	} else if (show_scalar) {
+		gbString ss = type_to_string(scalar);
+		error_line("%s'bit_set[%s; %s]'\n", lead, es, ss);
+		gb_string_free(ss);
+	} else {
+		error_line("%s'bit_set[%s; [%lld]%s]'\n", lead, es, cast(long long)count, us);
+	}
+
+	if (note_lower_bound_forced) {
+		error_line("\t            Note: an explicit backing type forces the lower bound of the bit_set to be 0\n");
+	}
+
+	gb_string_free(us);
+	gb_string_free(es);
+}
+
 gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *node) {
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
@@ -1384,14 +1469,11 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 		Type *t = default_type(lhs.type);
 		if (bs->underlying != nullptr) {
 			Type *u = check_type(c, bs->underlying);
-			// if (!is_valid_bit_field_backing_type(u)) {
-			if (!is_type_integer(u)) {
+			if (!is_valid_bit_field_backing_type(u)) {
 				gbString ts = type_to_string(u);
-				error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
+				error(bs->underlying, "Expected an underlying integer or array of integers for the bit set, got %s", ts);
 				gb_string_free(ts);
-				if (!is_valid_bit_field_backing_type(u)) {
-					return;
-				}
+				return;
 			}
 			type->BitSet.underlying = u;
 		}
@@ -1453,10 +1535,15 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 			break;
 		}
 		if (!is_valid) {
+			ERROR_BLOCK();
 			if (actual_lower != lower) {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", cast(long long)bits, cast(long long)bits_required);
+				suggest_bit_set_backing_type(bs->elem, type->BitSet.underlying, upper, /*note_lower_bound_forced*/false);
 			} else {
 				error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", cast(long long)bits, cast(long long)bits_required);
+				if (lower >= 0) {
+					suggest_bit_set_backing_type(bs->elem, type->BitSet.underlying, upper, /*note_lower_bound_forced*/lower > 0);
+				}
 			}
 		}
 		
@@ -1502,9 +1589,9 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 				i64 bits = MAX_BITS
 ;				if (bs->underlying != nullptr) {
 					Type *u = check_type(c, bs->underlying);
-					if (!is_type_integer(u)) {
+					if (!is_valid_bit_field_backing_type(u)) {
 						gbString ts = type_to_string(u);
-						error(bs->underlying, "Expected an underlying integer for the bit set, got %s", ts);
+						error(bs->underlying, "Expected an underlying integer or array of integers for the bit set, got %s", ts);
 						gb_string_free(ts);
 						return;
 					}
@@ -1522,11 +1609,16 @@ gb_internal void check_bit_set_type(CheckerContext *c, Type *type, Type *named_t
 				}
 
 				if (upper - lower >= bits) {
+					ERROR_BLOCK();
 					i64 bits_required = upper-lower+1;
 					if (lower_changed) {
 						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required (internally the lower bound was changed to 0 as an underlying type was set)", cast(long long)bits, cast(long long)bits_required);
+						suggest_bit_set_backing_type(bs->elem, type->BitSet.underlying, upper, /*note_lower_bound_forced*/false);
 					} else {
 						error(bs->elem, "bit_set range is greater than %lld bits, %lld bits are required", cast(long long)bits, cast(long long)bits_required);
+						if (lower >= 0) {
+							suggest_bit_set_backing_type(bs->elem, type->BitSet.underlying, upper, /*note_lower_bound_forced*/lower > 0);
+						}
 					}
 				}
 
@@ -2208,7 +2300,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						bool valid = false;
 						if (is_type_proc(op.type)) {
 							Ast *expr = unparen_expr(op.expr);
-							Entity *proc_entity = entity_from_expr(expr);
+							Entity *proc_entity = strip_entity_wrapping(expr);
 							if (proc_entity) {
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
 								valid = true;
@@ -2885,7 +2977,7 @@ gb_internal i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	Type *type = core_type(o->type);
 	if (is_type_untyped(type) || is_type_integer(type)) {
 		ExactValue value = o->value;
-		if (value.kind == ExactValue_Float) {
+		if (value.kind == ExactValue_Float || value.kind == ExactValue_Rational) {
 			// NOTE: an integral float is a valid count, but it must be range checked as an integer
 			value = exact_value_to_integer(value);
 		}

@@ -494,6 +494,22 @@ gb_internal void write_canonical_params(TypeWriter *w, Type *params) {
 		case Entity_Constant:
 			{
 				type_writer_appendc(w, CANONICAL_PARAM_CONST);
+				if (v->Constant.value.kind == ExactValue_Procedure) {
+					// NOTE: a procedure is named by its declaration, as different procedures can be spelt the same (See #5318)
+					Ast *expr = unparen_expr(v->Constant.value.value_procedure);
+					Entity *proc = strip_entity_wrapping(expr);
+					if (proc != nullptr) {
+						write_canonical_entity_name(w, proc);
+						break;
+					}
+					if (expr->kind == Ast_ProcLit) {
+						DeclInfo *parent = expr->ProcLit.decl->parent;
+						if (parent != nullptr && parent->entity) {
+							write_canonical_entity_name(w, parent->entity);
+							type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
+						}
+					}
+				}
 				gbString s = exact_value_to_string(v->Constant.value, 1<<16);
 				type_writer_append(w, s, gb_string_length(s));
 				gb_string_free(s);

@@ -1187,7 +1187,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	} else {
 		x.mode  = Addressing_Constant;
-		x.type  = t_bool;
+		x.type  = t_untyped_bool;
 		x.value = exact_value_bool(true);
 
 		Token token  = {};
@@ -1314,6 +1314,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					check_expr_or_type(ctx, &y, expr, x.type);
 				} else {
 					check_expr_with_type_hint(ctx, &y, expr, x.type);
+				}
+				if (expr->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+					error(expr, "Procedure calls that have an associated deferred procedure are not allowed within case clauses");
 				}
 
 				if (x.mode == Addressing_Invalid ||

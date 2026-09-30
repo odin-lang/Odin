@@ -7,12 +7,10 @@ struct Type;
 struct Entity;
 gb_internal bool are_types_identical(Type *x, Type *y);
 
-struct Complex128 {
-	f64 real, imag;
-};
-struct Quaternion256 {
-	f64 imag, jmag, kmag, real;
-};
+// NOTE(bill): Defined after ExactValue below, since their components are now exact values
+// (each a Float=f64 or Rational=big_rat) so complex/quaternion constant folding stays exact.
+struct ExactComplex;
+struct ExactQuaternion;
 
 enum ExactValueKind {
 	ExactValue_Invalid     = 0,
@@ -30,6 +28,7 @@ enum ExactValueKind {
 	ExactValue_String16    = 11,
 	ExactValue_AsmTemplate = 12,
 	ExactValue_Variant     = 13,
+	ExactValue_Rational    = 14, // exact num/den for untyped float constants
 
 	ExactValue_Count,
 };
@@ -50,26 +49,37 @@ gb_global char const *exact_value_kind_string[ExactValue_Count] = {
 	"String16",
 	"AsmTemplate",
 	"Variant",
+	"Rational",
 };
 
 struct ExactValue {
 	ExactValueKind kind;
 	union {
-		bool           value_bool;
-		String         value_string;
-		BigInt         value_integer;
-		f64            value_float;
-		i64            value_pointer; // NOTE(bill): This must be an integer and not a pointer
-		Complex128    *value_complex;
-		Quaternion256 *value_quaternion;
-		Ast *          value_compound;
-		Ast *          value_procedure;
-		Type *         value_typeid;
-		String16       value_string16;
-		Ast *          value_asm_template;
-		Ast *          value_variant;
+		bool             value_bool;
+		String           value_string;
+		BigInt           value_integer;
+		f64              value_float;
+		BigRat *         value_rational;
+		i64              value_pointer; // NOTE(bill): This must be an integer and not a pointer
+		ExactComplex    *value_complex;
+		ExactQuaternion *value_quaternion;
+		Ast *            value_compound;
+		Ast *            value_procedure;
+		Type *           value_typeid;
+		String16         value_string16;
+		Ast *            value_asm_template;
+		Ast *            value_variant;
 	};
 	Type *variant_type;
+};
+
+// Complex/quaternion components are exact numeric values (Integer/Rational/Float), so their constant
+// arithmetic keeps full precision until the value is rounded to a concrete type.
+struct ExactComplex {
+	ExactValue real, imag;
+};
+struct ExactQuaternion {
+	ExactValue imag, jmag, kmag, real;
 };
 
 gb_global ExactValue const empty_exact_value = {};
@@ -99,14 +109,27 @@ gb_internal uintptr hash_exact_value(ExactValue v) {
 	case ExactValue_Float:
 		res = gb_fnv32a(&v.value_float, gb_size_of(v.value_float));
 		break;
+	case ExactValue_Rational:
+		{
+			BigInt const &n = v.value_rational->num;
+			BigInt const &d = v.value_rational->den;
+			u32 kn = gb_fnv32a(n.dp, gb_size_of(*n.dp) * n.used);
+			u32 kd = gb_fnv32a(d.dp, gb_size_of(*d.dp) * d.used);
+			res = ((kn ^ (u8)n.sign) * 0x01000193) ^ kd;
+			break;
+		}
 	case ExactValue_Pointer:
 		res = ptr_map_hash_key(v.value_pointer);
 		break;
 	case ExactValue_Complex:
-		res = gb_fnv32a(v.value_complex, gb_size_of(Complex128));
+		res = hash_exact_value(v.value_complex->real) ^
+		      (hash_exact_value(v.value_complex->imag) * 0x01000193);
 		break;
 	case ExactValue_Quaternion:
-		res = gb_fnv32a(v.value_quaternion, gb_size_of(Quaternion256));
+		res = hash_exact_value(v.value_quaternion->real) ^
+		      (hash_exact_value(v.value_quaternion->imag) * 0x01000193) ^
+		      (hash_exact_value(v.value_quaternion->jmag) * 0x01000193) ^
+		      (hash_exact_value(v.value_quaternion->kmag) * 0x01000193);
 		break;
 	case ExactValue_Compound:
 		res = ptr_map_hash_key(v.value_compound);
@@ -173,22 +196,64 @@ gb_internal ExactValue exact_value_float(f64 f) {
 	return result;
 }
 
-gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
+// Make an exact-rational value from num/den (copied and reduced to lowest terms, den > 0).
+gb_internal ExactValue exact_value_rational_from_ints(mp_int const *num, mp_int const *den) {
+	BigRat *br = permanent_alloc_item<BigRat>();
+	mp_init(&br->num);
+	mp_init(&br->den);
+	mp_copy(num, &br->num);
+	mp_copy(den, &br->den);
+	big_rat_normalize(&br->num, &br->den);
+
+	ExactValue result = {ExactValue_Rational};
+	result.value_rational = br;
+	return result;
+}
+
+gb_internal ExactValue exact_value_rational_from_integer(BigInt const *i) {
+	mp_int one; mp_init(&one); defer (mp_clear(&one)); mp_set_u64(&one, 1);
+	return exact_value_rational_from_ints(i, &one);
+}
+
+gb_internal ExactValue exact_value_rational_arith_result(mp_int const *num, mp_int const *den) {
+	ExactValue r = exact_value_rational_from_ints(num, den); // normalizes (GCD reduce)
+	if (big_rat_components_too_large(&r.value_rational->num, &r.value_rational->den)) {
+		return exact_value_float(big_rat_to_f64(&r.value_rational->num, &r.value_rational->den));
+	}
+	return r;
+}
+
+gb_internal ExactValue exact_value_as_rational_if_integer(ExactValue v) {
+	if (v.kind == ExactValue_Integer) {
+		return exact_value_rational_from_integer(&v.value_integer);
+	}
+	return v;
+}
+
+// Exact-component constructors: each component is a numeric ExactValue (Integer/Rational/Float).
+gb_internal ExactValue exact_value_complex_ev(ExactValue real, ExactValue imag) {
 	ExactValue result = {ExactValue_Complex};
-	result.value_complex = permanent_alloc_item<Complex128>();
+	result.value_complex = permanent_alloc_item<ExactComplex>();
 	result.value_complex->real = real;
 	result.value_complex->imag = imag;
 	return result;
 }
-
-gb_internal ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
+gb_internal ExactValue exact_value_quaternion_ev(ExactValue real, ExactValue imag, ExactValue jmag, ExactValue kmag) {
 	ExactValue result = {ExactValue_Quaternion};
-	result.value_quaternion = permanent_alloc_item<Quaternion256>();
+	result.value_quaternion = permanent_alloc_item<ExactQuaternion>();
 	result.value_quaternion->real = real;
 	result.value_quaternion->imag = imag;
 	result.value_quaternion->jmag = jmag;
 	result.value_quaternion->kmag = kmag;
 	return result;
+}
+
+gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
+	return exact_value_complex_ev(exact_value_float(real), exact_value_float(imag));
+}
+
+gb_internal ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
+	return exact_value_quaternion_ev(exact_value_float(real), exact_value_float(imag), exact_value_float(jmag), exact_value_float(kmag));
 }
 
 gb_internal ExactValue exact_value_pointer(i64 ptr) {
@@ -383,12 +448,28 @@ gb_internal ExactValue exact_value_float_from_string(String string) {
 		return exact_value_integer_from_string(string);
 	}
 
-	bool success;
-	f64 f = float_from_string(string, &success);
-	if (!success) {
-		return {ExactValue_Invalid};
+	// A finite base-10 floating-point literal is kept as an EXACT rational so that constant folding is
+	// exact and only rounds once, when the constant is finally given a concrete type (see
+	// `exact_value_to_float` and `check_representable_as_constant`). This mirrors Go's `go/constant`,
+	// where small values are held as `big.Rat`. The `0h...` hexadecimal-float path above keeps its
+	// exact bit pattern as an `f64`; that is also the side channel for the +/-Inf and NaN values that a
+	// rational cannot represent.
+	mp_int num, den;
+	if (big_rat_from_decimal_string(string, &num, &den)) {
+		// A zero-valued literal stays an f64 so that signed zero survives: a rational 0/1 has no sign,
+		// but `-0.0` (unary minus applied to this `0.0`) must keep its sign bit.
+		bool is_zero = mp_iszero(&num);
+		if (is_zero) {
+			mp_clear(&num);
+			mp_clear(&den);
+			return exact_value_float(0.0);
+		}
+		ExactValue r = exact_value_rational_from_ints(&num, &den);
+		mp_clear(&num);
+		mp_clear(&den);
+		return r;
 	}
-	return exact_value_float(f);
+	return {ExactValue_Invalid};
 }
 
 
@@ -401,12 +482,15 @@ gb_internal ExactValue exact_value_from_basic_literal(TokenKind kind, String con
 		String str = string;
 		Rune last_rune = cast(Rune)str[str.len-1];
 		str.len--; // Ignore the 'i|j|k'
-		f64 imag = float_from_string(str);
+		// Parse the magnitude with the same exact (rational) path as an ordinary float literal so the
+		// imaginary component keeps full precision rather than being pre-rounded to f64.
+		ExactValue imag = exact_value_float_from_string(str);
+		ExactValue zero = exact_value_i64(0);
 
 		switch (last_rune) {
-		case 'i': return exact_value_complex(0, imag);
-		case 'j': return exact_value_quaternion(0, 0, imag, 0);
-		case 'k': return exact_value_quaternion(0, 0, 0, imag);
+		case 'i': return exact_value_complex_ev(zero, imag);
+		case 'j': return exact_value_quaternion_ev(zero, zero, imag, zero);
+		case 'k': return exact_value_quaternion_ev(zero, zero, zero, imag);
 		default: GB_PANIC("Invalid imaginary basic literal");
 		}
 	}
@@ -453,6 +537,17 @@ gb_internal ExactValue exact_value_to_integer(ExactValue v) {
 
 	case ExactValue_Pointer:
 		return exact_value_i64(cast(i64)cast(intptr)v.value_pointer);
+
+	case ExactValue_Rational:
+		// NOTE(bill): Only an exact integer (den == 1 after reduction) converts to an integer
+		if (mp_cmp_d(&v.value_rational->den, 1) == MP_EQ) {
+			ExactValue r = {ExactValue_Integer};
+			r.value_integer = {0};
+			mp_init(&r.value_integer);
+			mp_copy(&v.value_rational->num, &r.value_integer);
+			return r;
+		}
+		break;
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -464,6 +559,8 @@ gb_internal ExactValue exact_value_to_float(ExactValue v) {
 		return exact_value_float(big_int_to_f64(&v.value_integer));
 	case ExactValue_Float:
 		return v;
+	case ExactValue_Rational:
+		return exact_value_float(big_rat_to_f64(&v.value_rational->num, &v.value_rational->den));
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -472,31 +569,27 @@ gb_internal ExactValue exact_value_to_float(ExactValue v) {
 gb_internal ExactValue exact_value_to_complex(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return exact_value_complex(big_int_to_f64(&v.value_integer), 0);
 	case ExactValue_Float:
-		return exact_value_complex(v.value_float, 0);
+	case ExactValue_Rational:
+		return exact_value_complex_ev(v, exact_value_i64(0)); // keep the real component exact
 	case ExactValue_Complex:
 		return v;
-	// case ExactValue_Quaternion:
-		// return exact_value_complex(v.value_quaternion.real, v.value_quaternion.imag);
 	}
 	ExactValue r = {ExactValue_Invalid};
-	v.value_complex = permanent_alloc_item<Complex128>();
 	return r;
 }
 gb_internal ExactValue exact_value_to_quaternion(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
-		return exact_value_quaternion(big_int_to_f64(&v.value_integer), 0, 0, 0);
 	case ExactValue_Float:
-		return exact_value_quaternion(v.value_float, 0, 0, 0);
+	case ExactValue_Rational:
+		return exact_value_quaternion_ev(v, exact_value_i64(0), exact_value_i64(0), exact_value_i64(0));
 	case ExactValue_Complex:
-		return exact_value_quaternion(v.value_complex->real, v.value_complex->imag, 0, 0);
+		return exact_value_quaternion_ev(v.value_complex->real, v.value_complex->imag, exact_value_i64(0), exact_value_i64(0));
 	case ExactValue_Quaternion:
 		return v;
 	}
 	ExactValue r = {ExactValue_Invalid};
-	v.value_quaternion = permanent_alloc_item<Quaternion256>();
 	return r;
 }
 
@@ -504,11 +597,12 @@ gb_internal ExactValue exact_value_real(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 		return v;
 	case ExactValue_Complex:
-		return exact_value_float(v.value_complex->real);
+		return v.value_complex->real;
 	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion->real);
+		return v.value_quaternion->real;
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -518,11 +612,12 @@ gb_internal ExactValue exact_value_imag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 		return exact_value_i64(0);
 	case ExactValue_Complex:
-		return exact_value_float(v.value_complex->imag);
+		return v.value_complex->imag;
 	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion->imag);
+		return v.value_quaternion->imag;
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -532,10 +627,11 @@ gb_internal ExactValue exact_value_jmag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 	case ExactValue_Complex:
 		return exact_value_i64(0);
 	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion->jmag);
+		return v.value_quaternion->jmag;
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -545,10 +641,11 @@ gb_internal ExactValue exact_value_kmag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
+	case ExactValue_Rational:
 	case ExactValue_Complex:
 		return exact_value_i64(0);
 	case ExactValue_Quaternion:
-		return exact_value_float(v.value_quaternion->kmag);
+		return v.value_quaternion->kmag;
 	}
 	ExactValue r = {ExactValue_Invalid};
 	return r;
@@ -626,6 +723,7 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 		switch (v.kind) {
 		case ExactValue_Invalid:
 		case ExactValue_Integer:
+		case ExactValue_Rational:
 		case ExactValue_Float:
 		case ExactValue_Complex:
 		case ExactValue_Quaternion:
@@ -649,17 +747,22 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 			i.value_float = -i.value_float;
 			return i;
 		}
+		case ExactValue_Rational: {
+			mp_int n; mp_init(&n); defer (mp_clear(&n));
+			big_int_neg(&n, &v.value_rational->num);
+			return exact_value_rational_from_ints(&n, &v.value_rational->den);
+		}
 		case ExactValue_Complex: {
-			f64 real = v.value_complex->real;
-			f64 imag = v.value_complex->imag;
-			return exact_value_complex(-real, -imag);
+			ExactValue re = exact_unary_operator_value(Token_Sub, v.value_complex->real, precision, is_unsigned);
+			ExactValue im = exact_unary_operator_value(Token_Sub, v.value_complex->imag, precision, is_unsigned);
+			return exact_value_complex_ev(re, im);
 		}
 		case ExactValue_Quaternion: {
-			f64 real = v.value_quaternion->real;
-			f64 imag = v.value_quaternion->imag;
-			f64 jmag = v.value_quaternion->jmag;
-			f64 kmag = v.value_quaternion->kmag;
-			return exact_value_quaternion(-real, -imag, -jmag, -kmag);
+			ExactValue re = exact_unary_operator_value(Token_Sub, v.value_quaternion->real, precision, is_unsigned);
+			ExactValue im = exact_unary_operator_value(Token_Sub, v.value_quaternion->imag, precision, is_unsigned);
+			ExactValue jm = exact_unary_operator_value(Token_Sub, v.value_quaternion->jmag, precision, is_unsigned);
+			ExactValue km = exact_unary_operator_value(Token_Sub, v.value_quaternion->kmag, precision, is_unsigned);
+			return exact_value_quaternion_ev(re, im, jm, km);
 		}
 		}
 		break;
@@ -709,16 +812,18 @@ gb_internal i32 exact_value_order(ExactValue const &v) {
 		return 1;
 	case ExactValue_Integer:
 		return 2;
-	case ExactValue_Float:
+	case ExactValue_Rational: // exact; between integer and (lossy) float
 		return 3;
-	case ExactValue_Complex:
+	case ExactValue_Float:
 		return 4;
-	case ExactValue_Quaternion:
+	case ExactValue_Complex:
 		return 5;
-	case ExactValue_Pointer:
+	case ExactValue_Quaternion:
 		return 6;
-	case ExactValue_Procedure:
+	case ExactValue_Pointer:
 		return 7;
+	case ExactValue_Procedure:
+		return 8;
 
 	default:
 		GB_PANIC("How'd you get here? Invalid Value.kind %d", v.kind);
@@ -753,15 +858,35 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 		switch (y->kind) {
 		case ExactValue_Integer:
 			return;
+		case ExactValue_Rational:
+			// Promote the integer to an exact rational so folding stays exact.
+			*x = exact_value_rational_from_integer(&x->value_integer);
+			return;
 		case ExactValue_Float:
 			// TODO(bill): Is this good enough?
 			*x = exact_value_float(big_int_to_f64(&x->value_integer));
 			return;
 		case ExactValue_Complex:
-			*x = exact_value_complex(big_int_to_f64(&x->value_integer), 0);
+			*x = exact_value_to_complex(*x);    // keep the integer component exact
 			return;
 		case ExactValue_Quaternion:
-			*x = exact_value_quaternion(big_int_to_f64(&x->value_integer), 0, 0, 0);
+			*x = exact_value_to_quaternion(*x); // keep the integer component exact
+			return;
+		}
+		break;
+
+	case ExactValue_Rational:
+		switch (y->kind) {
+		case ExactValue_Rational:
+			return;
+		case ExactValue_Float:
+			*x = exact_value_to_float(*x);
+			return;
+		case ExactValue_Complex:
+			*x = exact_value_to_complex(*x);
+			return;
+		case ExactValue_Quaternion:
+			*x = exact_value_to_quaternion(*x);
 			return;
 		}
 		break;
@@ -841,6 +966,27 @@ gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, E
 		return res;
 	}
 
+	case ExactValue_Rational: {
+		// Exact rational arithmetic: a/b (op) c/d, result reduced to lowest terms.
+		mp_int const *an = &x.value_rational->num, *ad = &x.value_rational->den;
+		mp_int const *bn = &y.value_rational->num, *bd = &y.value_rational->den;
+		mp_int nn, nd, t1, t2;
+		mp_init(&nn); mp_init(&nd); mp_init(&t1); mp_init(&t2);
+		defer (mp_clear(&nn)); defer (mp_clear(&nd)); defer (mp_clear(&t1)); defer (mp_clear(&t2));
+		switch (op) {
+		case Token_Add: // (an*bd + bn*ad) / (ad*bd)
+			big_int_mul(&t1, an, bd); big_int_mul(&t2, bn, ad); big_int_add(&nn, &t1, &t2); big_int_mul(&nd, ad, bd); break;
+		case Token_Sub:
+			big_int_mul(&t1, an, bd); big_int_mul(&t2, bn, ad); big_int_sub(&nn, &t1, &t2); big_int_mul(&nd, ad, bd); break;
+		case Token_Mul:
+			big_int_mul(&nn, an, bn); big_int_mul(&nd, ad, bd); break;
+		case Token_Quo: // (an/ad) / (bn/bd) = (an*bd) / (ad*bn)
+			big_int_mul(&nn, an, bd); big_int_mul(&nd, ad, bn); break;
+		default: goto error;
+		}
+		return exact_value_rational_arith_result(&nn, &nd);
+	}
+
 	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
@@ -855,86 +1001,103 @@ gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, E
 	}
 
 	case ExactValue_Complex: {
+		// Exact per-component arithmetic (each component is an Integer/Rational/Float ExactValue).
+		#define EV_MUL(p, q) exact_binary_operator_value(Token_Mul, (p), (q))
+		#define EV_ADD(p, q) exact_binary_operator_value(Token_Add, (p), (q))
+		#define EV_SUB(p, q) exact_binary_operator_value(Token_Sub, (p), (q))
+		#define EV_QUO(p, q) exact_binary_operator_value(Token_Quo, exact_value_as_rational_if_integer(p), exact_value_as_rational_if_integer(q))
 		y = exact_value_to_complex(y);
-		f64 a = x.value_complex->real;
-		f64 b = x.value_complex->imag;
-		f64 c = y.value_complex->real;
-		f64 d = y.value_complex->imag;
-		f64 real = 0;
-		f64 imag = 0;
+		ExactValue a = x.value_complex->real;
+		ExactValue b = x.value_complex->imag;
+		ExactValue c = y.value_complex->real;
+		ExactValue d = y.value_complex->imag;
+		ExactValue real = {};
+		ExactValue imag = {};
 		switch (op) {
 		case Token_Add:
-			real = a + c;
-			imag = b + d;
+			real = EV_ADD(a, c);
+			imag = EV_ADD(b, d);
 			break;
 		case Token_Sub:
-			real = a - c;
-			imag = b - d;
+			real = EV_SUB(a, c);
+			imag = EV_SUB(b, d);
 			break;
 		case Token_Mul:
-			real = (a*c - b*d);
-			imag = (b*c + a*d);
+			real = EV_SUB(EV_MUL(a, c), EV_MUL(b, d)); // a*c - b*d
+			imag = EV_ADD(EV_MUL(b, c), EV_MUL(a, d)); // b*c + a*d
 			break;
 		case Token_Quo: {
-			f64 s = c*c + d*d;
-			real = (a*c + b*d)/s;
-			imag = (b*c - a*d)/s;
+			ExactValue s = EV_ADD(EV_MUL(c, c), EV_MUL(d, d));   // c*c + d*d
+			real = EV_QUO(EV_ADD(EV_MUL(a, c), EV_MUL(b, d)), s); // (a*c + b*d)/s
+			imag = EV_QUO(EV_SUB(EV_MUL(b, c), EV_MUL(a, d)), s); // (b*c - a*d)/s
 			break;
 		}
 		default: goto error;
 		}
-		return exact_value_complex(real, imag);
-		break;
+		return exact_value_complex_ev(real, imag);
+		#undef EV_MUL
+		#undef EV_ADD
+		#undef EV_SUB
+		#undef EV_QUO
 	}
 
 	case ExactValue_Quaternion: {
+		#define EV_MUL(p, q) exact_binary_operator_value(Token_Mul, (p), (q))
+		#define EV_ADD(p, q) exact_binary_operator_value(Token_Add, (p), (q))
+		#define EV_SUB(p, q) exact_binary_operator_value(Token_Sub, (p), (q))
+		#define EV_QUO(p, q) exact_binary_operator_value(Token_Quo, exact_value_as_rational_if_integer(p), exact_value_as_rational_if_integer(q))
+		#define EV_NEG(p)    exact_unary_operator_value(Token_Sub, (p), 0, false)
 		y = exact_value_to_quaternion(y);
-		f64 xr = x.value_quaternion->real;
-		f64 xi = x.value_quaternion->imag;
-		f64 xj = x.value_quaternion->jmag;
-		f64 xk = x.value_quaternion->kmag;
-		f64 yr = y.value_quaternion->real;
-		f64 yi = y.value_quaternion->imag;
-		f64 yj = y.value_quaternion->jmag;
-		f64 yk = y.value_quaternion->kmag;
+		ExactValue xr = x.value_quaternion->real;
+		ExactValue xi = x.value_quaternion->imag;
+		ExactValue xj = x.value_quaternion->jmag;
+		ExactValue xk = x.value_quaternion->kmag;
+		ExactValue yr = y.value_quaternion->real;
+		ExactValue yi = y.value_quaternion->imag;
+		ExactValue yj = y.value_quaternion->jmag;
+		ExactValue yk = y.value_quaternion->kmag;
 
-
-		f64 real = 0;
-		f64 imag = 0;
-		f64 jmag = 0;
-		f64 kmag = 0;
+		ExactValue real = {};
+		ExactValue imag = {};
+		ExactValue jmag = {};
+		ExactValue kmag = {};
 
 		switch (op) {
 		case Token_Add:
-			real = xr + yr;
-			imag = xi + yi;
-			jmag = xj + yj;
-			kmag = xk + yk;
+			real = EV_ADD(xr, yr); imag = EV_ADD(xi, yi); jmag = EV_ADD(xj, yj); kmag = EV_ADD(xk, yk);
 			break;
 		case Token_Sub:
-			real = xr - yr;
-			imag = xi - yi;
-			jmag = xj - yj;
-			kmag = xk - yk;
+			real = EV_SUB(xr, yr); imag = EV_SUB(xi, yi); jmag = EV_SUB(xj, yj); kmag = EV_SUB(xk, yk);
 			break;
 		case Token_Mul:
-			imag = xr * yi + xi * yr + xj * yk - xk * yj;
-			jmag = xr * yj - xi * yk + xj * yr + xk * yi;
-			kmag = xr * yk + xi * yj - xj * yi + xk * yr;
-			real = xr * yr - xi * yi - xj * yj - xk * yk;
+			// Hamilton product (matches the previous f64 formulas term-for-term).
+			imag = EV_SUB(EV_ADD(EV_ADD(EV_MUL(xr, yi), EV_MUL(xi, yr)), EV_MUL(xj, yk)), EV_MUL(xk, yj));
+			jmag = EV_ADD(EV_ADD(EV_SUB(EV_MUL(xr, yj), EV_MUL(xi, yk)), EV_MUL(xj, yr)), EV_MUL(xk, yi));
+			kmag = EV_ADD(EV_SUB(EV_ADD(EV_MUL(xr, yk), EV_MUL(xi, yj)), EV_MUL(xj, yi)), EV_MUL(xk, yr));
+			real = EV_SUB(EV_SUB(EV_SUB(EV_MUL(xr, yr), EV_MUL(xi, yi)), EV_MUL(xj, yj)), EV_MUL(xk, yk));
 			break;
 		case Token_Quo: {
-			f64 invmag2 = 1.0 / (yr*yr + yi*yi + yj*yj + yk*yk);
-			imag = (xr * -yi + xi * +yr + xj * -yk - xk * -yj) * invmag2;
-			jmag = (xr * -yj - xi * -yk + xj * +yr + xk * -yi) * invmag2;
-			kmag = (xr * -yk + xi * -yj - xj * -yi + xk * +yr) * invmag2;
-			real = (xr * +yr - xi * -yi - xj * -yj - xk * -yk) * invmag2;
+			// q1 / q2 = q1 * conj(q2) / |q2|^2
+			ExactValue nyi = EV_NEG(yi), nyj = EV_NEG(yj), nyk = EV_NEG(yk);
+			ExactValue mag2 = EV_ADD(EV_ADD(EV_ADD(EV_MUL(yr, yr), EV_MUL(yi, yi)), EV_MUL(yj, yj)), EV_MUL(yk, yk));
+			imag = EV_SUB(EV_ADD(EV_ADD(EV_MUL(xr, nyi), EV_MUL(xi, yr)), EV_MUL(xj, nyk)), EV_MUL(xk, nyj));
+			jmag = EV_ADD(EV_ADD(EV_SUB(EV_MUL(xr, nyj), EV_MUL(xi, nyk)), EV_MUL(xj, yr)), EV_MUL(xk, nyi));
+			kmag = EV_ADD(EV_SUB(EV_ADD(EV_MUL(xr, nyk), EV_MUL(xi, nyj)), EV_MUL(xj, nyi)), EV_MUL(xk, yr));
+			real = EV_SUB(EV_SUB(EV_SUB(EV_MUL(xr, yr), EV_MUL(xi, nyi)), EV_MUL(xj, nyj)), EV_MUL(xk, nyk));
+			imag = EV_QUO(imag, mag2);
+			jmag = EV_QUO(jmag, mag2);
+			kmag = EV_QUO(kmag, mag2);
+			real = EV_QUO(real, mag2);
 			break;
 		}
 		default: goto error;
 		}
-		return exact_value_quaternion(real, imag, jmag, kmag);
-		break;
+		return exact_value_quaternion_ev(real, imag, jmag, kmag);
+		#undef EV_MUL
+		#undef EV_ADD
+		#undef EV_SUB
+		#undef EV_QUO
+		#undef EV_NEG
 	}
 
 	case ExactValue_String: {
@@ -1022,6 +1185,23 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 		break;
 	}
 
+	case ExactValue_Rational: {
+		// a/b (op) c/d with b,d > 0  <=>  a*d (op) c*b
+		mp_int lhs, rhs; mp_init(&lhs); mp_init(&rhs); defer (mp_clear(&lhs)); defer (mp_clear(&rhs));
+		big_int_mul(&lhs, &x.value_rational->num, &y.value_rational->den);
+		big_int_mul(&rhs, &y.value_rational->num, &x.value_rational->den);
+		i32 cmp = big_int_cmp(&lhs, &rhs);
+		switch (op) {
+		case Token_CmpEq: return cmp == 0;
+		case Token_NotEq: return cmp != 0;
+		case Token_Lt:    return cmp <  0;
+		case Token_LtEq:  return cmp <= 0;
+		case Token_Gt:    return cmp >  0;
+		case Token_GtEq:  return cmp >= 0;
+		}
+		break;
+	}
+
 	case ExactValue_Float: {
 		f64 a = x.value_float;
 		f64 b = y.value_float;
@@ -1041,40 +1221,28 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 	}
 
 	case ExactValue_Complex: {
-		f64 a = x.value_complex->real;
-		f64 b = x.value_complex->imag;
-		f64 c = y.value_complex->real;
-		f64 d = y.value_complex->imag;
-		if (isnan(a) || isnan(b) || isnan(c) || isnan(d)) {
-			return op == Token_NotEq;
-		}
-
+		// Compare component-wise using exact comparisons (each component is a numeric ExactValue).
+		ExactComplex a = *x.value_complex;
+		ExactComplex b = *y.value_complex;
+		bool real_eq = compare_exact_values(Token_CmpEq, a.real, b.real);
+		bool imag_eq = compare_exact_values(Token_CmpEq, a.imag, b.imag);
 		switch (op) {
-		case Token_CmpEq: return cmp_f64(a, c) == 0 && cmp_f64(b, d) == 0;
-		case Token_NotEq: return cmp_f64(a, c) != 0 || cmp_f64(b, d) != 0;
+		case Token_CmpEq: return real_eq && imag_eq;
+		case Token_NotEq: return !real_eq || !imag_eq;
 		}
 		break;
 	}
 
 	case ExactValue_Quaternion: {
-		Quaternion256 a = *x.value_quaternion;
-		Quaternion256 b = *y.value_quaternion;
-		if (isnan(a.real) || isnan(a.imag) || isnan(a.jmag) || isnan(a.kmag) ||
-		    isnan(b.real) || isnan(b.imag) || isnan(b.jmag) || isnan(b.kmag)) {
-			return op == Token_NotEq;
-		}
-
+		ExactQuaternion a = *x.value_quaternion;
+		ExactQuaternion b = *y.value_quaternion;
+		bool real_eq = compare_exact_values(Token_CmpEq, a.real, b.real);
+		bool imag_eq = compare_exact_values(Token_CmpEq, a.imag, b.imag);
+		bool jmag_eq = compare_exact_values(Token_CmpEq, a.jmag, b.jmag);
+		bool kmag_eq = compare_exact_values(Token_CmpEq, a.kmag, b.kmag);
 		switch (op) {
-		case Token_CmpEq:
-			return cmp_f64(a.real, b.real) == 0 &&
-			       cmp_f64(a.imag, b.imag) == 0 &&
-			       cmp_f64(a.jmag, b.jmag) == 0 &&
-			       cmp_f64(a.kmag, b.kmag) == 0;
-		case Token_NotEq:
-			return cmp_f64(a.real, b.real) != 0 ||
-			       cmp_f64(a.imag, b.imag) != 0 ||
-			       cmp_f64(a.jmag, b.jmag) != 0 ||
-			       cmp_f64(a.kmag, b.kmag) != 0;
+		case Token_CmpEq: return real_eq && imag_eq && jmag_eq && kmag_eq;
+		case Token_NotEq: return !real_eq || !imag_eq || !jmag_eq || !kmag_eq;
 		}
 		break;
 	}
@@ -1161,6 +1329,22 @@ gb_internal Entity *strip_entity_wrapping(Entity *e);
 
 gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
 
+gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit);
+
+gb_internal gbString write_exact_complex_component_to_string(gbString str, ExactValue comp, isize string_limit) {
+	f64 f = exact_value_to_f64(comp);
+
+	// The float formatter cannot render a magnitude at or beyond 2**63 (it prints 2**63's digits on a
+	// loop), and that also catches Inf/NaN since the range test below is false for them. For an exact
+	// integer/rational component that large, print its exact form (digits, or `num.0/den`) instead.
+	static f64 const LIMIT = 9223372036854775808.0; // 2**63
+	bool formatter_safe = (f >= -LIMIT) && (f <= LIMIT);
+	if (!formatter_safe && (comp.kind == ExactValue_Integer || comp.kind == ExactValue_Rational)) {
+		return write_exact_value_to_string(str, comp, string_limit);
+	}
+	return gb_string_append_fmt(str, "%.17g", f);
+}
+
 gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit=36) {
 	switch (v.kind) {
 	case ExactValue_Invalid:
@@ -1204,10 +1388,42 @@ gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const 
 	// NOTE(tf2spi): %.17g is specific enough to canonically serialize f64
 	case ExactValue_Float:
 		return gb_string_append_fmt(str, "%.17g", v.value_float);
+	case ExactValue_Rational:
+		// Integer-valued (den == 1, e.g. an overflowing literal like `1.0e400`) prints its exact decimal,
+		// so a diagnostic shows the real magnitude rather than an f64 that has rounded to +Inf.
+		if (mp_cmp_d(&v.value_rational->den, 1) == MP_EQ) {
+			String s = big_int_to_string(heap_allocator(), &v.value_rational->num);
+			str = gb_string_append_length(str, s.text, s.len);
+			gb_free(heap_allocator(), s.text);
+			return str;
+		}
+		// Non-integer: print the exact fraction as `<num>.0/<den>` (e.g. `1.0/3`). The `.0` on the
+		// numerator marks it as a decimal division, so it reads as the float `1.0/3` rather than the
+		// integer division `1/3` (which would be 0), and it round-trips as valid Odin source.
+		{
+			String ns = big_int_to_string(heap_allocator(), &v.value_rational->num);
+			String ds = big_int_to_string(heap_allocator(), &v.value_rational->den);
+			str = gb_string_append_length(str, ns.text, ns.len);
+			str = gb_string_append_fmt(str, ".0/");
+			str = gb_string_append_length(str, ds.text, ds.len);
+			gb_free(heap_allocator(), ns.text);
+			gb_free(heap_allocator(), ds.text);
+			return str;
+		}
 	case ExactValue_Complex:
-		return gb_string_append_fmt(str, "%.17g+%.17gi", v.value_complex->real, v.value_complex->imag);
+		str = write_exact_complex_component_to_string(str, v.value_complex->real, string_limit);
+		str = gb_string_append_fmt(str, "+");
+		str = write_exact_complex_component_to_string(str, v.value_complex->imag, string_limit);
+		return gb_string_append_fmt(str, "i");
 	case ExactValue_Quaternion:
-		return gb_string_append_fmt(str, "%.17g+%.17gi+%.17gj+%.17gk", v.value_quaternion->real, v.value_quaternion->imag, v.value_quaternion->jmag, v.value_quaternion->kmag);
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->real, string_limit);
+		str = gb_string_append_fmt(str, "+");
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->imag, string_limit);
+		str = gb_string_append_fmt(str, "i+");
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->jmag, string_limit);
+		str = gb_string_append_fmt(str, "j+");
+		str = write_exact_complex_component_to_string(str, v.value_quaternion->kmag, string_limit);
+		return gb_string_append_fmt(str, "k");
 
 	case ExactValue_Pointer:
 		return str;

@@ -7,6 +7,7 @@
 	#pragma warning(disable: 4505)
 #endif
 #include "big_int.cpp"
+#include "big_rat.cpp"
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
@@ -430,6 +431,7 @@ enum BuildFlagKind {
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_WebkitSwitchWorkaround,
 	BuildFlag_NoTypeAssert,
+	BuildFlag_LifetimeMarkers,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_DynamicLiterals,
 	BuildFlag_NoCRT,
@@ -691,6 +693,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_WebkitSwitchWorkaround,  str_lit("webkit-switch-workaround"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoTypeAssert,            str_lit("no-type-assert"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_LifetimeMarkers,         str_lit("lifetime-markers"),          BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DynamicLiterals,         str_lit("dynamic-literals"),          BuildFlagParam_None,    Command__does_check);
@@ -936,7 +939,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						case BuildFlagParam_Float:
-							if (value.kind != ExactValue_Float) {
+							if (value.kind != ExactValue_Float && value.kind != ExactValue_Rational) {
 								gb_printf_err("%.*s expected a floating pointer number, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
@@ -1391,6 +1394,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_NoTypeAssert:
 							build_context.no_type_assert = true;
+							break;
+						case BuildFlag_LifetimeMarkers:
+							build_context.lifetime_markers = true;
 							break;
 						case BuildFlag_NoDynamicLiterals:
 							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
@@ -3055,6 +3061,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
+		if (print_flag("-lifetime-markers")) {
+			print_usage_line(2, "Emits lifetime markers for named locals, so that locals from");
+			print_usage_line(2, "non-overlapping scopes may reuse stack.");
+			print_usage_line(2, "Requires '-o:size' or above; no effect with '-sanitize:address'.");
+			print_usage_line(2, "Warning: this applies to every package in the build; using the address");
+			print_usage_line(2, "of a local after the local's declaring scope ended can miscompile.");
+		}
+
 		if (print_flag("-linker:<string>")) {
 			print_usage_line(2, "Specify the linker to use.");
 			print_usage_line(2, "Choices:");
