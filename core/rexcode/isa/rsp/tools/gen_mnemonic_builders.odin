@@ -408,7 +408,7 @@ generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
 			strings.write_string(sb, " = 0")
 		}
 	}
-	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, ") { append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_string(sb, "(")
 	for p, i in params {
