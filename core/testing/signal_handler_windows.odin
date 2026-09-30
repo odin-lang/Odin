@@ -48,7 +48,7 @@ when ODIN_ARCH == .i386 {
 
 @(private="file")
 stop_runner_callback :: proc "system" (ctrl_type: win32.DWORD) -> win32.BOOL  {
-	if ctrl_type == win32.CTRL_C_EVENT {
+	if ctrl_type == win32.CTRL_C_EVENT || ctrl_type == win32.CTRL_BREAK_EVENT || ctrl_type == win32.CTRL_CLOSE_EVENT {
 		prev := intrinsics.atomic_add(&stop_runner_flag, 1)
 
 		// If the flag was already set (if this is the second signal sent for example),
@@ -77,6 +77,12 @@ stop_test_callback :: proc "system" (info: ^win32.EXCEPTION_POINTERS) -> win32.L
 
 	context = runtime.default_context()
 	code := info.ExceptionRecord.ExceptionCode
+	if code < 0x8000_0000 {
+		// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/87fba13e-bf06-450e-83b1-9241dc81e781
+		// Ignore informational status codes
+		return win32.EXCEPTION_CONTINUE_SEARCH
+	}
+
 
 	if local_test_index == -1 {
 		// We're the test runner, and we ourselves have caught a signal from
@@ -210,4 +216,3 @@ _should_stop_test :: proc() -> (test_index: int, reason: Stop_Reason, ok: bool) 
 
 	return
 }
-

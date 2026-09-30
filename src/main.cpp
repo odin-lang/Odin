@@ -7,6 +7,7 @@
 	#pragma warning(disable: 4505)
 #endif
 #include "big_int.cpp"
+#include "big_rat.cpp"
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
@@ -68,6 +69,8 @@ gb_global Timings global_timings = {0};
 #include "parser.hpp"
 #include "checker.hpp"
 
+#include "asm_tables.cpp"
+
 #include "parser.cpp"
 #include "checker.cpp"
 #include "docs.cpp"
@@ -80,6 +83,10 @@ gb_global Timings global_timings = {0};
 #include "llvm_backend.cpp"
 
 #include "bug_report.cpp"
+
+#if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+int run_subprocess(const char *name, const char **args, bool honor_path = false);
+#endif
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char const *name, char const *fmt, va_list va) {
@@ -152,7 +159,11 @@ gb_internal i32 system_exec_command_line_app_internal(bool exit_on_err, char con
 		gb_printf_err("[SYSTEM CALL] %s\n", name);
 		gb_printf_err("%s\n\n", cmd_line);
 	}
-	exit_code = system(cmd_line);
+
+	int argc;
+	char **argv = command_line_to_spawn_argv(cmd_line, &argc);
+
+	exit_code = run_subprocess(argv[0], cast(const char**)(argv), true);
 	if (exit_on_err && WIFSIGNALED(exit_code)) {
 		struct rlimit limit = { 0, 0, };
 		setrlimit(RLIMIT_CORE, &limit);
@@ -178,20 +189,91 @@ gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, 
 	return exit_code;
 }
 
-#if defined(GB_SYSTEM_WINDOWS)
-#include <process.h>
-#else
+#if !defined(GB_SYSTEM_WINDOWS)
 #include <spawn.h>
 extern char **environ;
 #endif
 
-int run_subprocess(const char *name, const char **args) {
 #if defined(GB_SYSTEM_WINDOWS)
-	return (int)_spawnv(_P_WAIT, name, args);
+PROCESS_INFORMATION pi = {0};
+
+BOOL WINAPI run_subprocess_ctrl_c_handler(DWORD signal) {
+	switch (signal) {
+	case CTRL_C_EVENT:
+		// Caught ctrl-c event from child process.
+		TerminateProcess(pi.hProcess, 0);
+		return true;
+	default:
+		return false;
+	}
+}
+
+int run_subprocess(String const &exe_name, wchar_t *after_double_dash_raw) {
+	gbAllocator a = heap_allocator();
+
+	String16 wexe_name = string_to_string16(a, exe_name);
+	defer (gb_free(a, wexe_name.text));
+
+	isize args_len = 0;
+	if (after_double_dash_raw) {
+		args_len = string16_len(cast(u16 *)after_double_dash_raw);
+	}
+
+	isize cmd_len = wexe_name.len + 2;
+	if (args_len > 0) cmd_len += args_len + 1;
+
+	wchar_t *cmd_line = gb_alloc_array(a, wchar_t, cmd_len + 1);
+	defer (gb_free(a, cmd_line));
+
+	isize n = 0;
+	cmd_line[n++] = '"';
+	gb_memmove(cmd_line + n, wexe_name.text, wexe_name.len * gb_size_of(wchar_t));
+	n += wexe_name.len;
+	cmd_line[n++] = '"';
+	if (args_len > 0) {
+		cmd_line[n++] = ' ';
+		gb_memmove(cmd_line + n, after_double_dash_raw, args_len * gb_size_of(wchar_t));
+		n += args_len;
+	}
+	cmd_line[n] = '\0';
+
+	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
+
+	int exit_code = 0;
+
+	SetConsoleCtrlHandler(run_subprocess_ctrl_c_handler, true);
+	if (CreateProcessW(nullptr, cmd_line,
+	                   nullptr, nullptr, true, 0, nullptr, nullptr,
+	                   &start_info, &pi)) {
+		WaitForSingleObject(pi.hProcess, INFINITE);
+		GetExitCodeProcess(pi.hProcess, cast(DWORD *)&exit_code);
+
+		CloseHandle(pi.hProcess);
+		CloseHandle(pi.hThread);
+	} else {
+		String cmd_line_utf8 = string16_to_string(a, make_string16(cast(u16 *)cmd_line, n));
+		gb_printf_err("Failed to execute command:\n\t%.*s\n", LIT(cmd_line_utf8));
+		gb_free(a, cmd_line_utf8.text);
+		exit_code = -1;
+	}
+	SetConsoleCtrlHandler(run_subprocess_ctrl_c_handler, false);
+
+	return exit_code;
+}
 #else
+int run_subprocess(const char *name, const char **args, bool honor_path) {
 	pid_t pid;
 	int status;
-	status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
+
+	String exec_name = make_string_c(args[0]);
+	exec_name = last_path_element(exec_name);
+	args[0] = alloc_cstring(gb_heap_allocator(), exec_name);
+
+	if (!honor_path) {
+		status = posix_spawn(&pid, name, NULL, NULL, (char *const *)args, environ);
+	} else {
+		status = posix_spawnp(&pid, name, NULL, NULL, (char *const *)args, environ);
+	}
 	if (status != 0) {
 		gb_printf_err("Could not spawn subprocess: %s\n", strerror(errno));
 		return -1;
@@ -215,8 +297,8 @@ int run_subprocess(const char *name, const char **args) {
 		}
 	}
 	GB_PANIC("Subprocess failure");
-#endif
 }
+#endif
 
 #if defined(GB_SYSTEM_WINDOWS)
 #define popen _popen
@@ -250,12 +332,12 @@ gb_internal bool system_exec_command_line_app_output(char const *command, gbStri
 	return true;
 }
 
-gb_internal Array<String> setup_args(int argc, char const **argv) {
+gb_internal Array<String> setup_args(int argc, char const **argv, isize *double_dash_pos, wchar_t **after_double_dash_raw) {
 	gbAllocator a = heap_allocator();
 
 #if defined(GB_SYSTEM_WINDOWS)
 	int wargc = 0;
-	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc);
+	wchar_t **wargv = command_line_to_wargv(GetCommandLineW(), &wargc, double_dash_pos, after_double_dash_raw);
 	auto args = array_make<String>(a, 0, wargc);
 	for (isize i = 0; i < wargc; i++) {
 		u16 *warg = cast(u16 *)wargv[i];
@@ -264,6 +346,8 @@ gb_internal Array<String> setup_args(int argc, char const **argv) {
 		String arg = string16_to_string(a, wstr);
 		if (arg.len > 0) {
 			array_add(&args, arg);
+		} else if (double_dash_pos && *double_dash_pos > 0 && args.count < *double_dash_pos) {
+			*double_dash_pos -= 1;
 		}
 	}
 	return args;
@@ -347,6 +431,7 @@ enum BuildFlagKind {
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_WebkitSwitchWorkaround,
 	BuildFlag_NoTypeAssert,
+	BuildFlag_LifetimeMarkers,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_DynamicLiterals,
 	BuildFlag_NoCRT,
@@ -397,6 +482,7 @@ enum BuildFlagKind {
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_DefaultToPanicAllocator,
 	BuildFlag_StrictStyle,
+	BuildFlag_StrictStylePackages,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
@@ -489,6 +575,27 @@ gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, Str
 	array_add(build_flags, flag);
 }
 
+// A value such as `1e-5` is a float, not an integer. Base prefixed literals are excluded because
+// `e` is a valid digit in bases 16 and above, e.g. `0x1e`.
+gb_internal bool build_param_looks_like_float(String const &param) {
+	if (string_contains_char(param, '.')) {
+		return true;
+	}
+	isize i = 0;
+	if (param.len > 0 && (param[0] == '-' || param[0] == '+')) {
+		i = 1;
+	}
+	if (param.len > i+1 && param[i] == '0' && !gb_char_is_digit(cast(char)param[i+1])) {
+		return false;
+	}
+	for (; i < param.len; i++) {
+		if (param[i] == 'e' || param[i] == 'E') {
+			return true;
+		}
+	}
+	return false;
+}
+
 gb_internal ExactValue build_param_to_exact_value(String name, String param) {
 	ExactValue value = {};
 
@@ -514,7 +621,7 @@ gb_internal ExactValue build_param_to_exact_value(String name, String param) {
 		Try to parse as an integer or float
 	*/
 	if (param[0] == '-' || param[0] == '+' || gb_is_between(param[0], '0', '9')) {
-		if (string_contains_char(param, '.')) {
+		if (build_param_looks_like_float(param)) {
 			value = exact_value_float_from_string(param);
 		} else {
 			value = exact_value_integer_from_string(param);
@@ -586,6 +693,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_WebkitSwitchWorkaround,  str_lit("webkit-switch-workaround"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoTypeAssert,            str_lit("no-type-assert"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_LifetimeMarkers,         str_lit("lifetime-markers"),          BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DynamicLiterals,         str_lit("dynamic-literals"),          BuildFlagParam_None,    Command__does_check);
@@ -636,6 +744,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToPanicAllocator, str_lit("default-to-panic-allocator"),BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_StrictStylePackages,     str_lit("strict-style-packages"),     BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
@@ -830,7 +939,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						case BuildFlagParam_Float:
-							if (value.kind != ExactValue_Float) {
+							if (value.kind != ExactValue_Float && value.kind != ExactValue_Rational) {
 								gb_printf_err("%.*s expected a floating pointer number, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
@@ -1286,6 +1395,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoTypeAssert:
 							build_context.no_type_assert = true;
 							break;
+						case BuildFlag_LifetimeMarkers:
+							build_context.lifetime_markers = true;
+							break;
 						case BuildFlag_NoDynamicLiterals:
 							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
 							break;
@@ -1384,12 +1496,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								GB_ASSERT(value.kind == ExactValue_String);
 								String val = value.value_string;
 								String_Iterator it = {val, 0};
-								for (;;) {
-									String pkg = string_split_iterator(&it, ',');
-									if (pkg.len == 0) {
-										break;
-									}
-
+								String pkg = {};
+								while (string_split_iterator_next(&it, ',', &pkg)) {
 									pkg = string_trim_whitespace(pkg);
 									if (!string_is_valid_identifier(pkg)) {
 										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
@@ -1407,12 +1515,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								GB_ASSERT(value.kind == ExactValue_String);
 								String val = value.value_string;
 								String_Iterator it = {val, 0};
-								for (;;) {
-									String attr = string_split_iterator(&it, ',');
-									if (attr.len == 0) {
-										break;
-									}
-
+								String attr = {};
+								while (string_split_iterator_next(&it, ',', &attr)) {
 									attr = string_trim_whitespace(attr);
 									if (!string_is_valid_identifier(attr)) {
 										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(attr));
@@ -1560,6 +1664,24 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_StrictStyle:
 							build_context.strict_style = true;
+							break;
+						case BuildFlag_StrictStylePackages:
+							{
+								GB_ASSERT(value.kind == ExactValue_String);
+								String val = value.value_string;
+								String_Iterator it = {val, 0};
+								String pkg = {};
+								while (string_split_iterator_next(&it, ',', &pkg)) {
+									pkg = string_trim_whitespace(pkg);
+									if (!string_is_valid_identifier(pkg)) {
+										gb_printf_err("-%.*s '%.*s' must be a valid identifier\n", LIT(name), LIT(pkg));
+										bad_flags = true;
+										continue;
+									}
+
+									string_set_add(&build_context.strict_style_packages, pkg);
+								}
+							}
 							break;
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
@@ -2939,6 +3061,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
+		if (print_flag("-lifetime-markers")) {
+			print_usage_line(2, "Emits lifetime markers for named locals, so that locals from");
+			print_usage_line(2, "non-overlapping scopes may reuse stack.");
+			print_usage_line(2, "Requires '-o:size' or above; no effect with '-sanitize:address'.");
+			print_usage_line(2, "Warning: this applies to every package in the build; using the address");
+			print_usage_line(2, "of a local after the local's declaring scope ended can miscompile.");
+		}
+
 		if (print_flag("-linker:<string>")) {
 			print_usage_line(2, "Specify the linker to use.");
 			print_usage_line(2, "Choices:");
@@ -3179,6 +3309,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Errs when the attached-brace style is not adhered to (also known as 1TBS).");
 			print_usage_line(2, "Errs when 'case' labels are not in the same column as the associated 'switch' token.");
 		}
+		if (print_flag("-strict-style-packages:<comma-separated-strings>")) {
+			print_usage_line(2, "Sets which packages by name will be checked against with '-strict-style'.");
+			print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
+		}
 	}
 
 	if (run_or_build) {
@@ -3392,6 +3526,7 @@ gb_internal void print_show_unused(Checker *c) {
 		case Entity_ProcGroup:
 		case Entity_ImportName:
 		case Entity_LibraryName:
+		case Entity_AsmTemplate:
 			// Fine
 			break;
 		}
@@ -3725,6 +3860,13 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (timings_destroy(&global_timings));
 
 	MAIN_TIME_SECTION("initialization");
+	// NOTE(Jeroen): Set codepage to UTF-8 (Windows only) and restore on exit.
+	//               Keep in mind this is for the compiler's own output only.
+	//               Like error messages on lines containing unicode.
+	//               Child processes will inherit the default codepage,
+	//               and so must do their own codepage management if they want.
+	set_utf8_codepage();
+	defer (restore_old_codepage());
 
 	init_string_interner();
 	init_global_error_collector();
@@ -3757,17 +3899,23 @@ int main(int arg_count, char const **arg_ptr) {
 	
 	init_build_context_error_pos_style();
 
-	Array<String> args = setup_args(arg_count, arg_ptr);
+	isize double_dash_pos = -1;
+	wchar_t *after_double_dash_raw = nullptr;
+	Array<String> args = setup_args(arg_count, arg_ptr, &double_dash_pos, &after_double_dash_raw);
+#if !defined(GB_SYSTEM_WINDOWS)
 	Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 	defer (array_free(&run_args));
+#endif
 
 	String command = args[1];
 	String init_filename = {};
 	isize  last_non_run_arg = args.count;
 
-	isize double_dash_pos = -1;
 	for_array(i, args) {
 		if (args[i] == "--") {
+#if defined(GB_SYSTEM_WINDOWS)
+			GB_ASSERT(double_dash_pos == i);
+#endif
 			double_dash_pos = i;
 			break;
 		}
@@ -3811,25 +3959,20 @@ int main(int arg_count, char const **arg_ptr) {
 			build_context.command_kind = Command_test;
 		}
 
-		isize run_args_start_idx = -1;
-		for_array(i, args) {
-			if (args[i] == "--") {
-				run_args_start_idx = i;
-				break;
-			}
-		}
-		if (run_args_start_idx != -1) {
-			last_non_run_arg = run_args_start_idx;
+		if (double_dash_pos != -1) {
+			last_non_run_arg = double_dash_pos;
 
-			if (run_args_start_idx == 2) {
+			if (double_dash_pos == 2) {
 				// missing src path on argv[2], invocation: odin [run|test] --
 				usage(args[0]);
 				return 1;
 			}
 
-			for(isize i = run_args_start_idx+1; i < args.count; ++i) {
+#if !defined(GB_SYSTEM_WINDOWS)
+			for(isize i = double_dash_pos+1; i < args.count; ++i) {
 				array_add(&run_args, args[i]);
 			}
+#endif
 		}
 		args = array_slice(args, 0, last_non_run_arg);
 
@@ -4087,9 +4230,8 @@ int main(int arg_count, char const **arg_ptr) {
 	} else {
 		String march_list = target_microarch_list[build_context.metrics.arch];
 		String_Iterator it = {march_list, 0};
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		String str = {};
+		while (string_split_iterator_next(&it, ',', &str)) {
 			if (str == build_context.microarch) {
 				// Found matching microarch
 				print_microarch_list = false;
@@ -4114,9 +4256,8 @@ int main(int arg_count, char const **arg_ptr) {
 		String march_list  = target_microarch_list[build_context.metrics.arch];
 		String_Iterator it = {march_list, 0};
 
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		String str = {};
+		while (string_split_iterator_next(&it, ',', &str)) {
 			if (str == default_march) {
 				gb_printf("\t%.*s (default)\n", LIT(str));
 			} else {
@@ -4130,9 +4271,8 @@ int main(int arg_count, char const **arg_ptr) {
 	String default_features = get_default_features();
 	{
 		String_Iterator it = {default_features, 0};
-		for (;;) {
-			String str = string_split_iterator(&it, ',');
-			if (str == "") break;
+		String str = {};
+		while (string_split_iterator_next(&it, ',', &str)) {
 			string_set_add(&build_context.target_features_set, str);
 		}
 	}
@@ -4152,10 +4292,8 @@ int main(int arg_count, char const **arg_ptr) {
 
 	if (build_context.target_features_string.len != 0) {
 		String_Iterator target_it = {build_context.target_features_string, 0};
-		for (;;) {
-			String item = string_split_iterator(&target_it, ',');
-			if (item == "") break;
-			
+		String item = {};
+		while (string_split_iterator_next(&target_it, ',', &item)) {
 			String stripped_item = item;
 			if (*stripped_item.text == '+' || *stripped_item.text == '-') {
 				stripped_item.text++;
@@ -4172,9 +4310,8 @@ int main(int arg_count, char const **arg_ptr) {
 
 				String feature_list = target_features_list[build_context.metrics.arch];
 				String_Iterator it = {feature_list, 0};
-				for (;;) {
-					String str = string_split_iterator(&it, ',');
-					if (str == "") break;
+				String str = {};
+				while (string_split_iterator_next(&it, ',', &str)) {
 					if (check_single_target_feature_is_valid(default_features, str)) {
 						if (has_ansi_terminal_colours()) {
 							gb_printf("\t%.*s\x1b[38;5;244m (implied by target microarch %.*s)\x1b[0m\n", LIT(str), LIT(march));
@@ -4240,6 +4377,9 @@ int main(int arg_count, char const **arg_ptr) {
 	Parser * parser  = permanent_alloc_item<Parser>();
 	Checker *checker = permanent_alloc_item<Checker>();
 	bool failed_to_cache_parsing = false;
+
+	TIME_SECTION("init asm tables");
+	init_asm_tables(build_context.metrics.ptr_size);
 
 	MAIN_TIME_SECTION("parse files");
 
@@ -4422,6 +4562,9 @@ end_of_code_gen:;
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
+#if defined(GB_SYSTEM_WINDOWS)
+		int subprocess_res = run_subprocess(exe_name, after_double_dash_raw);
+#else
 		const char* exe_name_cstring = alloc_cstring(heap_allocator(), exe_name);
 		Array<const char *> run_args_cstring = array_make<const char *>(heap_allocator(), 0, run_args.count);
 		defer({
@@ -4436,6 +4579,7 @@ end_of_code_gen:;
 		array_add(&run_args_cstring, NULL);
 
 		int subprocess_res = run_subprocess(exe_name_cstring, run_args_cstring.data);
+#endif
 		if (subprocess_res) {
 			gb_exit(subprocess_res);
 		}

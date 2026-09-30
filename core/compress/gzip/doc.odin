@@ -53,7 +53,7 @@ Example:
 			if file == "-" {
 				// Read from stdin
 				ctx := &compress.Context_Stream_Input{
-					input = os.stdin.stream,
+					input = os.to_stream(os.stdin),
 				}
 				err = gzip.load(ctx, &buf)
 			} else {

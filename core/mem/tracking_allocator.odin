@@ -82,6 +82,8 @@ Destroy the tracking allocator.
 tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 	delete(t.allocation_map)
 	delete(t.bad_free_array)
+	t.allocation_map = {}
+	t.bad_free_array = {}
 }
 
 /*

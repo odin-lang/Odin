@@ -84,19 +84,25 @@ _remove_all :: proc(path: string) -> Error {
 	}
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	dir := win32_utf8_to_wstring(path, temp_allocator) or_return
 
-	empty: [1]u16
+	// SHFileOperationW is documented as not thread safe with relative paths.
+	abs_path := path
+	if !_is_absolute_path(path) {
+		abs_path = _get_absolute_path(path, temp_allocator) or_return
+	}
+
+	// NOTE: The path `dir` must be double-null-terminated (`PCZZWSTR`).
+	dir := win32_utf8_to_pczzwstr(abs_path, temp_allocator) or_return
 
 	file_op := win32.SHFILEOPSTRUCTW {
 		nil,
 		win32.FO_DELETE,
 		dir,
-		cstring16(&empty[0]),
+		nil,
 		win32.FOF_NOCONFIRMATION | win32.FOF_NOERRORUI | win32.FOF_SILENT,
 		false,
 		nil,
-		cstring16(&empty[0]),
+		nil,
 	}
 	res := win32.SHFileOperationW(&file_op)
 	if res != 0 {

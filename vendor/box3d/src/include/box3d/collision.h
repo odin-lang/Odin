@@ -44,7 +44,8 @@ B3_API uint64_t b3DynamicTree_GetCategoryBits( b3DynamicTree* tree, int proxyId 
 B3_API b3TreeStats b3DynamicTree_Query( const b3DynamicTree* tree, b3AABB aabb, uint64_t maskBits, bool requireAllBits,
 										b3TreeQueryCallbackFcn* callback, void* context );
 
-/// Query an AABB for the closest object. The callback function is called for each proxy that might be closest to the supplied point.
+/// Query an AABB for the closest object. The callback function is called for each proxy that might be closest to the supplied
+/// point.
 /// @param tree the dynamic tree to query
 /// @param point the query point
 /// @param maskBits nodes are skipped if the bit-wise AND with the node category bits is zero
@@ -163,6 +164,17 @@ B3_INLINE const b3HullHalfEdge* b3GetHullEdges( const b3HullData* hull )
 	return (const b3HullHalfEdge*)( (intptr_t)hull + hull->edgeOffset );
 }
 
+/// Get read only hull planes.
+B3_INLINE const b3Plane* b3GetHullPlanes( const b3HullData* hull )
+{
+	if ( hull->planeOffset == 0 )
+	{
+		return NULL;
+	}
+
+	return (const b3Plane*)( (intptr_t)hull + hull->planeOffset );
+}
+
 /// Get read only hull faces.
 B3_INLINE const b3HullFace* b3GetHullFaces( const b3HullData* hull )
 {
@@ -174,15 +186,30 @@ B3_INLINE const b3HullFace* b3GetHullFaces( const b3HullData* hull )
 	return (const b3HullFace*)( (intptr_t)hull + hull->faceOffset );
 }
 
-/// Get read only hull planes.
-B3_INLINE const b3Plane* b3GetHullPlanes( const b3HullData* hull )
+/// Get read only SOA vertices. This is an array of vertices with all x values,
+/// y values, and z values as separate arrays. The array lengths are padded to
+/// a multiple of 4. The padded values are repeats of the first value.
+B3_INLINE const float* b3GetHullSoaVertices( const b3HullData* hull )
 {
-	if ( hull->planeOffset == 0 )
+	if ( hull->soaVertexOffset == 0 )
 	{
 		return NULL;
 	}
 
-	return (const b3Plane*)( (intptr_t)hull + hull->planeOffset );
+	return (const float*)( (intptr_t)hull + hull->soaVertexOffset );
+}
+
+/// Get read only SOA unit normal vectors. This is an array of normals with all x values,
+/// y values, and z values as separate arrays. The array lengths are padded to
+/// a multiple of 4. The padded values are repeats of the first value.
+B3_INLINE const float* b3GetHullSoaNormals( const b3HullData* hull )
+{
+	if ( hull->soaNormalOffset == 0 )
+	{
+		return NULL;
+	}
+
+	return (const float*)( (intptr_t)hull + hull->soaNormalOffset );
 }
 
 /// Create a tessellated cylinder as a hull.
@@ -426,14 +453,12 @@ B3_API b3CompoundData* b3CreateCompound( const b3CompoundDef* def );
 /// Destroy a compound shape.
 B3_API void b3DestroyCompound( b3CompoundData* compound );
 
-/// If bytes is null then this returns the number of required bytes. This clones all the
-/// data into the bytes buffer. This is expected to run offline or asynchronously.
-/// This mutates the compound to nullify pointers, leaving the compound in an unusable state.
+/// Cast the provided compound data to bytes, setting the internal pointers to null.
+/// Use this before serializing the compound bytes.
 B3_API uint8_t* b3ConvertCompoundToBytes( b3CompoundData* compound );
 
-/// Convert bytes to compound. This does not clone. The bytes must remain in scope while the
-/// compound is used. This is done to improve run-time performance and allow for instancing.
-/// The bytes are mutated to fixup pointers.
+/// Cast the provided bytes to compound data, setting up internal pointers.
+/// Use this after de-serializing the compound bytes.
 B3_API b3CompoundData* b3ConvertBytesToCompound( uint8_t* bytes, int byteCount );
 
 /**@}*/ // compound
@@ -610,17 +635,17 @@ B3_API void b3CollideHullAndCapsule( b3LocalManifold* manifold, int capacity, co
 B3_API void b3CollideHulls( b3LocalManifold* manifold, int capacity, const b3HullData* hullA, const b3HullData* hullB,
 							b3Transform transformBtoA, b3SATCache* cache );
 
-/// Collide a capsule and a triangle.
-B3_API void b3CollideCapsuleAndTriangle( b3LocalManifold* manifold, int capacity, const b3Capsule* capsuleA,
-										 const b3Vec3* triangleB, b3SimplexCache* cache );
+/// Collide a triangle and capsule. Normal points from triangle to capsule.
+B3_API void b3CollideTriangleAndCapsule( b3LocalManifold* manifold, int capacity, const b3Vec3* triangleA,
+										 const b3Capsule* capsuleB, b3SimplexCache* cache );
 
-/// Collide a hull and a triangle.
-B3_API void b3CollideHullAndTriangle( b3LocalManifold* manifold, int capacity, const b3HullData* hullA, b3Vec3 v1, b3Vec3 v2,
-									  b3Vec3 v3, int triangleFlags, b3SATCache* cache, bool enableSpeculative );
+/// Collide a triangle and hull. Normal points from triangle to hull.
+B3_API void b3CollideTriangleAndHull( b3LocalManifold* manifold, int capacity, b3Vec3 v1, b3Vec3 v2, b3Vec3 v3, int triangleFlags,
+									  const b3HullData* hullB, b3SATCache* cache, bool enableSpeculative );
 
-/// Collide a sphere and a triangle.
-B3_API void b3CollideSphereAndTriangle( b3LocalManifold* manifold, int capacity, const b3Sphere* sphereA,
-										const b3Vec3* triangleB );
+/// Collide a triangle and sphere. Normal points from triangle to sphere.
+B3_API void b3CollideTriangleAndSphere( b3LocalManifold* manifold, int capacity, const b3Vec3* triangleA,
+										const b3Sphere* sphereB );
 
 /**@}*/ // collision
 

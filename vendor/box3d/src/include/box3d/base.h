@@ -38,7 +38,7 @@
 #ifdef __cplusplus
 	#define B3_API extern "C" BOX3D_EXPORT
 	#define B3_INLINE inline
-
+	#define B3_ALIGN_AS(N) alignas(N)
 #if defined( _MSC_VER )
 	#define B3_FORCE_INLINE __forceinline
 #elif defined( __GNUC__ ) || defined( __clang__ )
@@ -52,6 +52,7 @@
 #else
 	#define B3_API BOX3D_EXPORT
 	#define B3_INLINE static inline
+	#define B3_ALIGN_AS(N) _Alignas(N)
 
 #if defined( _MSC_VER )
 	#define B3_FORCE_INLINE static __forceinline
@@ -66,6 +67,13 @@
 	#define B3_ZERO_INIT {0}
 #endif
 // clang-format on
+
+// This is used to validate arguments for functions similar to printf.
+#if defined( __GNUC__ ) || defined( __clang__ )
+#define B3_PRINTF_FORMAT( INDEX1, INDEX2 ) __attribute__( ( format( printf, INDEX1, INDEX2 ) ) )
+#else
+#define B3_PRINTF_FORMAT( INDEX1, INDEX2 )
+#endif
 
 #if defined( BOX3D_VALIDATE ) && !defined( NDEBUG )
 #define B3_ENABLE_VALIDATION 1
@@ -124,7 +132,7 @@ B3_API void b3SetAssertFcn( b3AssertFcn* assertFcn );
 /// Internal assertion handler. Allows for host intervention.
 B3_API int b3InternalAssert( const char* condition, const char* fileName, int lineNumber );
 /// Assert that a condition is true.
-#define B3_ASSERT( condition )                                                                                                  \
+#define B3_ASSERT( condition )                                                                                                   \
 	( (void)( ( !!( condition ) ) || ( b3InternalAssert( #condition, __FILE__, (int)( __LINE__ ) ), 0 ) ) )
 #else
 #define B3_ASSERT( ... ) ( (void)0 )

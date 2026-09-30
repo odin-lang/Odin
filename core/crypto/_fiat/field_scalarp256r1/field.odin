@@ -38,7 +38,7 @@ fe_from_bytes :: proc "contextless" (
 	out1: ^Montgomery_Domain_Field_Element,
 	arg1: []byte,
 ) -> bool {
-	ensure_contextless(len(out1) <= 64, "p256r1: invalid scalar input buffer")
+	ensure_contextless(len(arg1) <= 64, "p256r1: invalid scalar input buffer")
 
 	is_canonical := false
 	s_len := len(arg1)

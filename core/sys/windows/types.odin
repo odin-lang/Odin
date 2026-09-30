@@ -1724,6 +1724,8 @@ NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
 NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
 NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
 
+// Pointer to a double-null-terminated string.
+// Special care must be taken when converting to this type.
 PCZZWSTR :: cstring16
 
 SHFILEOPSTRUCTW :: struct {
@@ -2963,10 +2965,10 @@ FILE_END_OF_FILE_INFO :: struct {
 }
 
 FILE_NOTIFY_INFORMATION :: struct {
-	next_entry_offset: DWORD,
-	action:            DWORD,
-	file_name_length:  DWORD,
-	file_name:         [1]WCHAR,
+	NextEntryOffset: DWORD,
+	Action:          DWORD,
+	FileNameLength:  DWORD,
+	FileName:        [1]WCHAR,
 }
 
 REPARSE_DATA_BUFFER :: struct {
@@ -3538,7 +3540,7 @@ LoadLibraryEx_Flag :: enum DWORD {
 	LOAD_LIBRARY_SEARCH_DEFAULT_DIRS    = 12, // 1 << 12: 0x1000,
 	LOAD_LIBRARY_SAFE_CURRENT_DIRS      = 13, // 1 << 13: 0x2000,
 }
-LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag]
+LoadLibraryEx_Flags :: distinct bit_set[LoadLibraryEx_Flag; DWORD]
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
 // Used in LogonUserExW

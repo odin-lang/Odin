@@ -91,22 +91,111 @@ floattidf_unsigned :: proc "c" (a: u128) -> f64 {
 }
 
 
+// f64 -> unsigned integer conversion (truncating toward zero)
+// decompose the f64 into significand and exponent, shift the significand into place,
+// saturate out of range values
+//
+// Uses parts of compiler-rt's [fp_fixuint_impl.inc](https://github.com/llvm/llvm-project/blob/main/compiler-rt/lib/builtins/fp_fixuint_impl.inc), licensed under the [Apache License v2.0 with LLVM Exceptions](https://github.com/llvm/llvm-project/blob/main/compiler-rt/LICENSE.TXT).
+// For a copy of the license, see `LICENSE-compiler-rt.txt`.
+@(private="file")
+fixuint :: proc "contextless" ($U: typeid, a: f64) -> U where intrinsics.type_is_unsigned(U) {
+	BITS             :: 8 * size_of(U)
+	SIGNIFICAND_BITS :: 52
+	EXPONENT_BIAS    :: 1023
+
+	IMPLICIT_BIT     :: (u64(1) << SIGNIFICAND_BITS)
+	SIGNIFICAND_MASK :: (IMPLICIT_BIT - 1)
+
+	// Break a into sign, exponent, significand parts.
+	a_rep := transmute(u64)a
+	negative := (a_rep >> 63) != 0
+	exponent := i32((a_rep >> SIGNIFICAND_BITS) & 0x7ff) - EXPONENT_BIAS
+	significand := (a_rep & SIGNIFICAND_MASK) | IMPLICIT_BIT
+
+	// If either the value or the exponent is negative, the result is zero.
+	if negative || exponent < 0 {
+		return 0
+	}
+
+	// If the value is too large for the integer type, saturate.
+	if exponent >= BITS {
+		return max(U)
+	}
+
+	// If 0 <= exponent < SIGNIFICAND_BITS, right shift to get the result.
+	// Otherwise, shift left.
+	if exponent < SIGNIFICAND_BITS {
+		return U(significand >> u32(SIGNIFICAND_BITS - exponent))
+	}
+	return U(significand) << u32(exponent - SIGNIFICAND_BITS)
+}
+
+// f64 -> signed integer conversion (truncating toward zero)
+// decompose the f64 into significand and exponent, shift the significand into place,
+// saturate out of range values
+//
+// Uses parts of compiler-rt's [fp_fixuint_impl.inc](https://github.com/llvm/llvm-project/blob/main/compiler-rt/lib/builtins/fp_fixuint_impl.inc), licensed under the [Apache License v2.0 with LLVM Exceptions](https://github.com/llvm/llvm-project/blob/main/compiler-rt/LICENSE.TXT).
+// For a copy of the license, see `LICENSE-compiler-rt.txt`.
+@(private="file")
+fixint :: proc "contextless" ($T: typeid, a: f64) -> T where intrinsics.type_is_integer(T), !intrinsics.type_is_unsigned(T) {
+	BITS             :: 8 * size_of(T)
+	SIGNIFICAND_BITS :: 52
+	EXPONENT_BIAS    :: 1023
+
+	IMPLICIT_BIT     :: (u64(1) << SIGNIFICAND_BITS)
+	SIGNIFICAND_MASK :: (IMPLICIT_BIT - 1)
+
+	// Break a into sign, exponent, significand parts.
+	a_rep := transmute(u64)a
+	negative := (a_rep >> 63) != 0
+	exponent := i32((a_rep >> SIGNIFICAND_BITS) & 0x7ff) - EXPONENT_BIAS
+	significand := (a_rep & SIGNIFICAND_MASK) | IMPLICIT_BIT
+
+	// If exponent is negative, the result is zero.
+	if exponent < 0 {
+		return 0
+	}
+
+	// If the value is too large for the integer type, saturate;
+	// (the only exactly representable value with exponent BITS-1 is min(T))
+	// this deviates from clang/compiler-rt (it instead wraps from BITS-1 to BITS,
+	// that is, f64(1 << 127) would wrap to min(i128) (for T=i128)),
+	// while this saturates consistently
+	if exponent >= BITS - 1 {
+		return min(T) if negative else max(T)
+	}
+
+	// If 0 <= exponent < SIGNIFICAND_BITS, right shift to get the result.
+	// Otherwise, shift left. After saturation the magnitude is below
+	// 1 << (BITS-1), so it fits in T and negation can't overflow
+	r: T
+	if exponent < SIGNIFICAND_BITS {
+		r = T(significand >> u32(SIGNIFICAND_BITS - exponent))
+	} else {
+		r = T(significand) << u32(exponent - SIGNIFICAND_BITS)
+	}
+	return -r if negative else r
+}
 
 @(link_name="__fixunsdfti", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-fixunsdfti :: #force_no_inline proc "c" (a: f64) -> u128 {
-	// TODO(bill): implement `fixunsdfti` correctly
-	x := u64(a)
-	return u128(x)
+fixunsdfti :: proc "c" (a: f64) -> u128 {
+	return fixuint(u128, a)
 }
 
 @(link_name="__fixunsdfdi", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-fixunsdfdi :: #force_no_inline proc "c" (a: f64) -> i128 {
-	// TODO(bill): implement `fixunsdfdi` correctly
-	x := i64(a)
-	return i128(x)
+fixunsdfdi :: proc "c" (a: f64) -> u64 {
+	return fixuint(u64, a)
 }
 
+@(link_name="__fixdfti", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+fixdfti :: proc "c" (a: f64) -> i128 {
+	return fixint(i128, a)
+}
 
+@(link_name="__fixdfdi", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
+fixdfdi :: proc "c" (a: f64) -> i64 {
+	return fixint(i64, a)
+}
 
 
 @(link_name="__umodti3", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
@@ -172,46 +261,3 @@ divti3 :: proc "c" (a, b: i128) -> i128 {
 
 	return i128((udivmodti4(u128(an), u128(bn), nil) ~ u_s_a) - u_s_a) // negate if negative
 }
-
-
-@(link_name="__fixdfti", linkage=RUNTIME_LINKAGE, require=RUNTIME_REQUIRE)
-fixdfti :: proc "c" (a: u64) -> i128 {
-	significandBits :: 52
-	typeWidth       :: (size_of(u64)*8)
-	exponentBits    :: (typeWidth - significandBits - 1)
-	maxExponent     :: ((1 << exponentBits) - 1)
-	exponentBias    :: (maxExponent >> 1)
-
-	implicitBit     :: (u64(1) << significandBits)
-	significandMask :: (implicitBit - 1)
-	signBit         :: (u64(1) << (significandBits + exponentBits))
-	absMask         :: (signBit - 1)
-	exponentMask    :: (absMask ~ significandMask)
-
-	// Break a into sign, exponent, significand
-	aRep := a
-	aAbs := aRep & absMask
-	sign := i128(-1 if aRep & signBit != 0 else 1)
-	exponent := u64((aAbs >> significandBits) - exponentBias)
-	significand := u64((aAbs & significandMask) | implicitBit)
-
-	// If exponent is negative, the result is zero.
-	if exponent < 0 {
-		return 0
-	}
-
-	// If the value is too large for the integer type, saturate.
-	if exponent >= size_of(i128) * 8 {
-		return max(i128) if sign == 1 else min(i128)
-	}
-
-	// If 0 <= exponent < significandBits, right shift to get the result.
-	// Otherwise, shift left.
-	if exponent < significandBits {
-		return sign * i128(significand >> (significandBits - exponent))
-	} else {
-		return sign * (i128(significand) << (exponent - significandBits))
-	}
-
-}
-

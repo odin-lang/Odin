@@ -35,7 +35,7 @@ foreign wasi {
 
 _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	n: uint
-	err := fd_write(1, {data}, &n)
+	err := fd_write(2, {data}, &n)
 	return int(n), _OS_Errno(err)
 }
 

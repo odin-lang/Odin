@@ -27,7 +27,7 @@ when ODIN_OS == .Windows {
 }
 
 when !#exists(LIB_PATH) {
-	#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running the `build_box2d.sh` script at `" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
+	#panic("Could not find the compiled box2d libraries at \"" + LIB_PATH + "\", they can be compiled by running `\"" + ODIN_ROOT + "vendor/box2d/build_box2d.sh\"`")
 }
 
 foreign import lib {
@@ -68,6 +68,8 @@ foreign lib {
 	// Override the default assert callback
 	//	@param assertFcn a non-null assert callback
 	SetAssertFcn :: proc(assertfcn: AssertFcn) ---
+	// Get the current version of Box2D.
+	GetVersion   :: proc() -> Version ---
 
 	// Get the absolute number of system ticks. The value is platform specific.
 	GetTicks                :: proc() -> u64 ---

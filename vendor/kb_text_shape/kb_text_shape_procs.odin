@@ -1,13 +1,16 @@
 package vendor_kb_text_shape
 
 when ODIN_OS == .Windows {
-	foreign import lib {
-		"lib/kb_text_shape.lib",
-	}
+	foreign import lib "lib/kb_text_shape.lib"
 } else {
-	foreign import lib {
-		"lib/kb_text_shape.a",
+	@(private)
+	LIB_PATH :: "lib/kb_text_shape.a"
+
+	when !#exists(LIB_PATH) {
+		#panic("Could not find the compiled kb_text_shape library at \"" + LIB_PATH + "\", it can be compiled by running `\"" + ODIN_ROOT + "vendor/kb_text_shape/src/build_unix.sh\"`")
 	}
+
+	foreign import lib { LIB_PATH }
 }
 
 import "base:runtime"

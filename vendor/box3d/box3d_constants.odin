@@ -62,6 +62,10 @@ MIN_CAPSULE_LENGTH :: #force_inline proc "c" () -> f32 {
 	return LINEAR_SLOP()
 }
 
+// Minimum contact point friction weight, lower bound for speculative points. Made small
+// enough to be washed away by weights that hit 1.
+MIN_FRICTION_WEIGHT :: 1e-10
+
 // The distance between shapes where they are considered overlapped. This is needed
 // because GJK may return small positive values for overlapped shapes in degenerate
 // configurations.
@@ -121,11 +125,30 @@ TIME_TO_SLEEP :: 0.5
 // The maximum number of contact points between two touching shapes.
 MAX_MANIFOLD_POINTS :: 4
 
+// The number of iterations for gyroscopic torques.
+GYROSCOPIC_ITERATIONS :: 1
+
+// The maximum number of convex hull vertices. This is fixed for performance reasons.
+MAX_HULL_VERTICES :: 128
+
+// The maximum number of convex hull faces.
+MAX_HULL_FACES :: 128
+
+// The maximum number of convex hull edges. Full edges, not half-edges.
+MAX_HULL_EDGES :: 128
+
+// Relative tolerance used to determine if two edges are parallel.
+PARALLEL_EDGE_TOL :: 0.005
+
 // The maximum number points to use for shape cast proxies (swept point cloud).
-MAX_SHAPE_CAST_POINTS :: 64
+MAX_SHAPE_CAST_POINTS :: MAX_HULL_VERTICES
 
 // These generous limits allow for easy hashing. See b3ShapePairKey.
 SHAPE_POWER      :: 22
 CHILD_POWER      :: 64 - 2 * SHAPE_POWER
 MAX_SHAPES       :: 1 << SHAPE_POWER
 MAX_CHILD_SHAPES :: 1 << CHILD_POWER
+
+// Increase this if your application needs more accurate restitution. Doing so will
+// slow down the simulation. Must be 1 or more.
+RESTITUTION_ITERATIONS :: 1

@@ -945,5 +945,25 @@ default_assertion_contextless_failure_proc :: proc "contextless" (prefix, messag
 			print_byte('\n')
 		}
 	}
+	when ODIN_CODEPAGE_MAGIC {
+		SetConsoleOutputCP(old_console_codepage)
+	}
 	trap()
+}
+
+ODIN_CODEPAGE_MAGIC :: ODIN_OS == .Windows && #config(ODIN_CODEPAGE_MAGIC, !ODIN_BEDROCK)
+
+when ODIN_CODEPAGE_MAGIC {
+	@(private)
+	old_console_codepage: u32
+
+	@(private)
+	UTF_8 :: 65001
+}
+
+foreign import kernel32 "system:Kernel32.lib"
+@(default_calling_convention="system")
+foreign kernel32 {
+	GetConsoleOutputCP :: proc() -> u32 ---
+	SetConsoleOutputCP :: proc(codepage: u32) -> b32 ---
 }

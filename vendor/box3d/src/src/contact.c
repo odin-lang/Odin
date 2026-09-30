@@ -745,6 +745,16 @@ bool b3UpdateContact( b3World* world, int workerIndex, b3Contact* contact, b3Sha
 
 		childShapeA.type = child.type;
 
+		// Handle child material for non-meshes.
+		if ( child.type != b3_meshShape )
+		{
+			B3_ASSERT( 0 <= child.materialIndices[0] && child.materialIndices[0] < shapeA->materialCount );
+			const b3SurfaceMaterial* parentMaterials = b3GetShapeMaterials( shapeA );
+			childShapeA.material = parentMaterials[child.materialIndices[0]];
+			childShapeA.materials = NULL;
+			childShapeA.materialCount = 1;
+		}
+
 		if ( child.type == b3_capsuleShape )
 		{
 			childShapeA.capsule = child.capsule;

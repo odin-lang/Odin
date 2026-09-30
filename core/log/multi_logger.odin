@@ -48,7 +48,7 @@ multi_logger_proc :: proc(logger_data: rawptr, level: Level, text: string,
 	data := cast(^Multi_Logger_Data)logger_data
 	for log in data.loggers {
 		if level < log.lowest_level {
-			return
+			continue
 		}
 		log.procedure(log.data, level, text, log.options, location)
 	}

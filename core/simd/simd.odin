@@ -2,7 +2,7 @@
 Cross-platform `SIMD` support types and procedures.
 
 SIMD (Single Instruction Multiple Data), is a CPU hardware feature that
-introduce special registers and instructions which operate on multiple units
+introduces special registers and instructions which operate on multiple units
 of data at the same time, which enables faster data processing for
 applications with heavy computational workloads.
 
@@ -2899,7 +2899,7 @@ abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T whe
 }
 
 pairwise_add :: intrinsics.simd_pairwise_add
-pairwise_sub :: intrinsics.simd_pairwise_add
+pairwise_sub :: intrinsics.simd_pairwise_sub
 
 interleave   :: intrinsics.simd_interleave
 deinterleave :: intrinsics.simd_deinterleave

@@ -187,6 +187,20 @@ gb_internal gb_inline Slice<T> slice(Array<T> const &array, isize lo, isize hi) 
 	return out;
 }
 
+template <typename T>
+gb_internal gb_inline Slice<T> slice_lower_and_count(Slice<T> const &array, isize lo, isize count) {
+	GB_ASSERT(0 <= lo);
+	GB_ASSERT(0 <= count);
+	GB_ASSERT((array.count-lo) <= count);
+	Slice<T> out = {};
+	if (count > 0) {
+		out.data = array.data+lo;
+		out.count = count;
+	}
+	return out;
+}
+
+
 
 template <typename T>
 gb_internal void slice_ordered_remove(Slice<T> *array, isize index) {

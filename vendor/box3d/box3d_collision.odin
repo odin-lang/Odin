@@ -265,14 +265,12 @@ foreign lib {
 	// Destroy a compound shape.
 	DestroyCompound :: proc(compound: ^CompoundData) ---
 
-	// If bytes is null then this returns the number of required bytes. This clones all the
-	// data into the bytes buffer. This is expected to run offline or asynchronously.
-	// This mutates the compound to nullify pointers, leaving the compound in an unusable state.
+	// Cast the provided compound data to bytes, setting the internal pointers to null.
+	// Use this before serializing the compound bytes.
 	ConvertCompoundToBytes :: proc(compound: ^CompoundData) -> [^]u8 ---
 
-	// Convert bytes to compound. This does not clone. The bytes must remain in scope while the
-	// compound is used. This is done to improve run-time performance and allow for instancing.
-	// The bytes are mutated to fixup pointers.
+	// Cast the provided bytes to compound data, setting up internal pointers.
+	// Use this after de-serializing the compound bytes.
 	ConvertBytesToCompound :: proc(bytes: [^]u8, byteCount: c.int) -> ^CompoundData ---
 
 	/**@}*/ // compound
@@ -440,15 +438,16 @@ foreign lib {
 	// Collide two hulls.
 	CollideHulls :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr hullA: HullData, #by_ptr hullB: HullData, transformBtoA: Transform, cache: ^SATCache) ---
 
-	// Collide a capsule and a triangle.
-	CollideCapsuleAndTriangle :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr capsuleA: Capsule, #by_ptr triangleB: [3]Vec3, cache: ^SimplexCache) ---
+	// Collide a triangle and capsule. Normal points from triangle to capsule.
+	CollideTriangleAndCapsule :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr triangleA: [3]Vec3, #by_ptr capsuleB: Capsule, cache: ^SimplexCache) ---
 
-	// Collide a hull and a triangle.
-	CollideHullAndTriangle :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr hullA: HullData, v1, v2, v3: Vec3,
-	                               triangleFlags: c.int, cache: ^SATCache, enableSpeculative: bool) ---
+	// Collide a triangle and hull. Normal points from triangle to hull.
+	CollideTriangleAndHull :: proc(manifold: ^LocalManifold, capacity: c.int, v1, v2, v3: Vec3, triangleFlags: c.int,
+					#by_ptr hullB: HullData, cache: ^SATCache, enableSpeculative: bool) ---
 
-	// Collide a sphere and a triangle.
-	CollideSphereAndTriangle :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr sphereA: Sphere, #by_ptr triangleB: [3]Vec3) ---
+	// Collide a triangle and sphere. Normal points from triangle to sphere.
+	CollideTriangleAndSphere :: proc(manifold: ^LocalManifold, capacity: c.int, #by_ptr triangleA: [3]Vec3, #by_ptr sphereB: Sphere) ---
+
 
 	/**@}*/ // collision
 
@@ -513,16 +512,6 @@ GetHullEdges :: proc "c" (hull: ^HullData) -> Maybe(^HullHalfEdge) {
 	return (^HullHalfEdge)(uintptr(hull) + uintptr(hull.edgeOffset))
 }
 
-// Get read only hull faces.
-@(require_results)
-GetHullFaces :: proc "c" (hull: ^HullData) -> Maybe(^HullFace) {
-	if hull.faceOffset == 0 {
-		return nil
-	}
-
-	return (^HullFace)(uintptr(hull) + uintptr(hull.faceOffset))
-}
-
 // Get read only hull planes.
 @(require_results)
 GetHullPlanes :: proc "c" (hull: ^HullData) -> Maybe(^Plane) {
@@ -533,6 +522,38 @@ GetHullPlanes :: proc "c" (hull: ^HullData) -> Maybe(^Plane) {
 	return (^Plane)(uintptr(hull) + uintptr(hull.planeOffset))
 }
 
+// Get read only hull faces.
+@(require_results)
+GetHullFaces :: proc "c" (hull: ^HullData) -> Maybe(^HullFace) {
+	if hull.faceOffset == 0 {
+		return nil
+	}
+
+	return (^HullFace)(uintptr(hull) + uintptr(hull.faceOffset))
+}
+
+// Get read only SOA vertices. This is an array of vertices with all x values,
+// y values, and z values as separate arrays. The array lengths are padded to
+// a multiple of 4. The padded values are repeats of the first value.
+@(require_results)
+GetHullSoaVertices :: proc "c" (hull: ^HullData) -> Maybe([^]f32) {
+	if hull.soaVertexOffset == 0 {
+		return nil
+	}
+
+	return ([^]f32)(uintptr(hull) + uintptr(hull.soaVertexOffset))
+}
+
+// Get read only SOA unit normal vectors. This is an array of normals with all x values,
+// y values, and z values as separate arrays. The array lengths are padded to
+// a multiple of 4. The padded values are repeats of the first value.
+@(require_results)
+GetHullSoaNormals :: proc "c" (hull: ^HullData) -> Maybe([^]f32) {
+	if hull.soaNormalOffset == 0 {
+		return nil
+	}
+	return ([^]f32)(uintptr(hull) + uintptr(hull.soaNormalOffset))
+}
 
 // Get read only mesh BVH nodes.
 @(require_results)

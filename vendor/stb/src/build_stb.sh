@@ -1,17 +1,19 @@
 #!/usr/bin/env sh
+set -e
 
 cc=${CC:-cc}
 ar=${AR:-ar}
+ODIN_ROOT=${ODIN_ROOT:-$(cd "$(dirname "$0")/../../.." && pwd)}
 
 build_wasm() {
 	mkdir -p ../lib
-	$cc -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_image.c        -o ../lib/stb_image_wasm.o        -DSTBI_NO_STDIO
-	$cc -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_image_write.c  -o ../lib/stb_image_write_wasm.o  -DSTBI_WRITE_NO_STDIO 
-	$cc -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_image_resize.c -o ../lib/stb_image_resize_wasm.o
-	$cc -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_truetype.c     -o ../lib/stb_truetype_wasm.o
+	$cc -c -Os --target=wasm32 --sysroot="$ODIN_ROOT"/vendor/libc-shim stb_image.c        -o ../lib/stb_image_wasm.o        -DSTBI_NO_STDIO
+	$cc -c -Os --target=wasm32 --sysroot="$ODIN_ROOT"/vendor/libc-shim stb_image_write.c  -o ../lib/stb_image_write_wasm.o  -DSTBI_WRITE_NO_STDIO 
+	$cc -c -Os --target=wasm32 --sysroot="$ODIN_ROOT"/vendor/libc-shim stb_image_resize.c -o ../lib/stb_image_resize_wasm.o
+	$cc -c -Os --target=wasm32 --sysroot="$ODIN_ROOT"/vendor/libc-shim stb_truetype.c     -o ../lib/stb_truetype_wasm.o
 	# Pretends to be emscripten so stb vorbis takes the right code path for including alloca.h
-	$cc -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_vorbis.c       -o ../lib/stb_vorbis_wasm.o       -DSTB_VORBIS_NO_STDIO -D__EMSCRIPTEN__
-	$cc -c -Os --target=wasm32 --sysroot=$(shell odin root)/vendor/libc-shim stb_rect_pack.c    -o ../lib/stb_rect_pack_wasm.o
+	$cc -c -Os --target=wasm32 --sysroot="$ODIN_ROOT"/vendor/libc-shim stb_vorbis.c       -o ../lib/stb_vorbis_wasm.o       -DSTB_VORBIS_NO_STDIO -D__EMSCRIPTEN__
+	$cc -c -Os --target=wasm32 --sysroot="$ODIN_ROOT"/vendor/libc-shim stb_rect_pack.c    -o ../lib/stb_rect_pack_wasm.o
 	$cc -c -Os --target=wasm32                                          stb_sprintf.c      -o ../lib/stb_sprintf_wasm.o
 }
 
@@ -57,8 +59,10 @@ build_darwin() {
 	$cc -arch x86_64 -c -O2 -Os -fPIC stb_sprintf.c -o stb_sprintf-x86_64.o -mmacosx-version-min=10.12
 	$cc -arch arm64  -c -O2 -Os -fPIC stb_sprintf.c -o stb_sprintf-arm64.o -mmacosx-version-min=10.12
 	lipo -create stb_sprintf-x86_64.o stb_sprintf-arm64.o -output ../lib/darwin/stb_sprintf.a
-	rm *.o
+	rm ./*.o
 }
+
+cd "$ODIN_ROOT/vendor/stb/src" || exit 1
 
 case $1 in
 wasm)
@@ -68,7 +72,8 @@ unix)
 darwin)
 	build_darwin ;;
 *)
-	if [ `uname -s` == 'Darwin' ]; then
+	# Don't care about word splitting here
+	if [ $(uname -s) = 'Darwin' ]; then
 		build_darwin
 	else
 		build_unix

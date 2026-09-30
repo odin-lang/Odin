@@ -174,14 +174,21 @@ gb_internal bool json_errors(void);
 gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
-gb_internal void warning(Token const &token, char const *fmt, ...);
-gb_internal void error(Token const &token, char const *fmt, ...);
-gb_internal void error(TokenPos pos, char const *fmt, ...);
-gb_internal void error_line(char const *fmt, ...);
-gb_internal void syntax_error(Token const &token, char const *fmt, ...);
-gb_internal void syntax_error(TokenPos pos, char const *fmt, ...);
-gb_internal void syntax_warning(Token const &token, char const *fmt, ...);
-gb_internal void compiler_error(char const *fmt, ...);
+// Let the compiler check these against their arguments. 
+#if defined(__GNUC__) || defined(__clang__)
+	#define ODIN_FMT_LIKE(fmt_idx, va_idx) __attribute__((format(printf, fmt_idx, va_idx)))
+#else
+	#define ODIN_FMT_LIKE(fmt_idx, va_idx)
+#endif
+
+gb_internal void warning(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error(TokenPos pos, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error_line(char const *fmt, ...) ODIN_FMT_LIKE(1, 2);
+gb_internal void syntax_error(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void syntax_error(TokenPos pos, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void syntax_warning(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void compiler_error(char const *fmt, ...) ODIN_FMT_LIKE(1, 2);
 gb_internal void print_all_errors(void);
 
 
@@ -432,8 +439,10 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		window_close_bytes = line_length_bytes;
 	}
 
-	for (i32 i = error_start_index_graphemes; i > 0; i -= 1) {
-		if (graphemes[i].byte_index == window_open_bytes) {
+	// counts the graphemes before the error. It must not read the one at it: an error at the
+	// end of a line indexes one past the last grapheme
+	for (i32 i = error_start_index_graphemes-1; i >= 0; i -= 1) {
+		if (graphemes[i].byte_index < window_open_bytes) {
 			break;
 		}
 		squiggle_padding += graphemes[i].width;
@@ -642,7 +651,7 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		gb_exit(1);
 	}
 
-	push_error_value(pos, ErrorValue_Warning);
+	push_error_value(pos, ErrorValue_Error);
 
 	if (pos.line == 0) {
 		error_out_empty();
@@ -674,7 +683,7 @@ gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end,
 		gb_exit(1);
 	}
 
-	push_error_value(pos, ErrorValue_Warning);
+	push_error_value(pos, ErrorValue_Error);
 
 	if (pos.line == 0) {
 		error_out_empty();

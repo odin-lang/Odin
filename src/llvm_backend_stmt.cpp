@@ -1,6 +1,8 @@
 #define LB_ENABLE_BASIC_RVO    true
 #define LB_ENABLE_ADVANCED_RVO build_context.enable_rvo
 
+gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
+
 // NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
 // Returns the callee's function type if eligible for copy elision, nullptr otherwise.
 gb_internal lbFunctionType *lb_call_sret_eligible(lbProcedure *p, Ast *call_expr, Type *dst_type) {
@@ -290,7 +292,11 @@ gb_internal void lb_pop_target_list(lbProcedure *p) {
 	p->target_list = p->target_list->prev;
 }
 
-gb_internal void lb_open_scope(lbProcedure *p, Scope *s) {
+// NOTE: lifetime_scope=true means that this scope ends exactly where
+// lb_close_scope is called for it, which is what makes it safe to mark
+// named locals with llvm.lifetime.start/llvm.lifetime.end;
+// (it is NOT true for the scope a loop statement opens for its own variables)
+gb_internal void lb_open_scope(lbProcedure *p, Scope *s, bool lifetime_scope=false) {
 	lbModule *m = p->module;
 	if (m->debug_builder) {
 		LLVMMetadataRef curr_metadata = lb_get_llvm_metadata(m, s);
@@ -326,10 +332,11 @@ gb_internal void lb_open_scope(lbProcedure *p, Scope *s) {
 	p->curr_scope = s;
 	p->scope_index += 1;
 	array_add(&p->scope_stack, s);
-
+	array_add(&p->lifetime_scopes, lifetime_scope);
 }
 
 gb_internal void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node, bool pop_stack=true) {
+	GB_ASSERT(p->scope_stack.count == p->lifetime_scopes.count);
 	lb_emit_defer_stmts(p, kind, block, node);
 	GB_ASSERT(p->scope_index > 0);
 
@@ -350,6 +357,7 @@ gb_internal void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *b
 
 	p->scope_index -= 1;
 	array_pop(&p->scope_stack);
+	array_pop(&p->lifetime_scopes);
 }
 
 gb_internal void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
@@ -377,11 +385,22 @@ gb_internal void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
 
 gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValue count_ptr,
                                         lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_,
-                                        bool is_reverse, i64 unroll_count=0) {
+                                        bool is_reverse, i64 unroll_count=0, lbAddr const *soa_elem=nullptr) {
 	lbModule *m = p->module;
 
+	// when ranging over an #soa element rather than an array, expr is unused, there being no array
+	// to point at, so expr_type (the [N]T being ranged over) comes from the container's soa_elem
+	bool const is_soa_elem = soa_elem != nullptr && soa_elem->kind == lbAddr_SoaVariable;
+
 	lbValue count = {};
-	Type *expr_type = base_type(type_deref(expr.type));
+	Type *expr_type = nullptr;
+	if (is_soa_elem) {
+		Type *soa = base_type(type_deref(soa_elem->addr.type));
+		GB_ASSERT(soa->kind == Type_Struct && soa->Struct.soa_kind != StructSoa_None);
+		expr_type = base_type(soa->Struct.soa_elem);
+	} else {
+		expr_type = base_type(type_deref(expr.type));
+	}
 	switch (expr_type->kind) {
 	case Type_Array:
 		count = lb_const_int(m, t_int, expr_type->Array.count);
@@ -472,18 +491,25 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	switch (expr_type->kind) {
 	case Type_Array: {
 		if (val_type != nullptr) {
-			val = lb_emit_load(p, lb_emit_array_ep(p, expr, idx));
+			if (is_soa_elem) {
+				lbValue ptr = lb_soa_array_component_elem_ptr(p, soa_elem->addr, idx, soa_elem->soa.index, expr_type->Array.count);
+				lbAddr component = lb_addr_soa_field_elem(ptr);
+				val = lb_emit_load(p, component.addr);
+			} else {
+				val = lb_emit_load(p, lb_emit_array_ep(p, expr, idx));
+			}
 		}
 		break;
 	}
 	case Type_EnumeratedArray: {
 		if (val_type != nullptr) {
 			val = lb_emit_load(p, lb_emit_array_ep(p, expr, idx));
-			// NOTE(bill): Override the idx value for the enumeration
-			Type *index_type = expr_type->EnumeratedArray.index;
-			if (compare_exact_values(Token_NotEq, *expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
-				idx = lb_emit_arith(p, Token_Add, idx, lb_const_value(m, index_type, *expr_type->EnumeratedArray.min_value), index_type);
-			}
+		}
+		// NOTE(bill): Override the idx value for the enumeration
+		// this does not depend on the value operand, which may be blank
+		Type *index_type = expr_type->EnumeratedArray.index;
+		if (compare_exact_values(Token_NotEq, *expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
+			idx = lb_emit_arith(p, Token_Add, idx, lb_const_value(m, index_type, *expr_type->EnumeratedArray.min_value), index_type);
 		}
 		break;
 	}
@@ -1343,17 +1369,38 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			break;
 		}
 		case Type_Array: {
-			lbValue array;
+			lbValue array = {};
+			lbAddr const *soa_elem = nullptr;
 			lbAddr addr = lb_build_addr(p, expr);
 			switch (addr.kind) {
 			case lbAddr_Swizzle:
 			case lbAddr_SwizzleLarge:
+			case lbAddr_SwizzleSoa:
 				// NOTE(laytan): apply the swizzle.
 				array = lb_address_from_load(p, lb_addr_load(p, addr));
 				break;
+			case lbAddr_SoaVariable:
+				// for v in soa[i] (and other direct forms);
+				// there is no array here to range over, the element is scattered across the field
+				// arrays and has no address of its own, only a container pointer and the element
+				// index, which is what this lbAddr carries. lb_build_range_indexed uses those
+				// with the loop counter as the component index to address each component directly
+				//
+				// the element index bounds check is hoisted here,
+				// the component index is in range by construction and needs none
+				lb_emit_soa_index_bounds_check(p, addr.addr, addr.soa.index, addr.soa.index_expr);
+				soa_elem = &addr;
+				break;
 			default:
 				array = lb_addr_get_ptr(p, addr);
-				if (is_type_pointer(type_deref(array.type))) {
+				if (is_type_soa_pointer(type_deref(array.type))) {
+					// for v in p, where p is an #soa element ptr (e.g. p := &soa[i]);
+					// we need to build the soa variable from the soa ptr
+					// and then produce the soa_elem as in the lbAddr_SoaVariable case above;
+					lbValue soa_ptr = lb_emit_load(p, array);
+					addr = lb_addr_soa_variable_from_soa_ptr(p, soa_ptr);
+					soa_elem = &addr;
+				} else if (is_type_pointer(type_deref(array.type))) {
 					array = lb_emit_load(p, array);
 				}
 				break;
@@ -1361,7 +1408,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 
 			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
 			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->Array.count));
-			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
+			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse, 0, soa_elem);
 			break;
 		}
 		case Type_EnumeratedArray: {
@@ -1701,7 +1748,13 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 					slice = lb_emit_load(p, slice);
 				} else {
 					count_ptr = lb_add_local_generated(p, t_int, false).addr;
-					lb_emit_store(p, count_ptr, lb_slice_len(p, slice));
+					if (t->kind == Type_Slice) {
+						lb_emit_store(p, count_ptr, lb_slice_len(p, slice));
+					} else if (t->kind == Type_DynamicArray) {
+						lb_emit_store(p, count_ptr, lb_dynamic_array_len(p, slice));
+					} else {
+						GB_ASSERT_MSG(false, "Need to add support for this type.");
+					}
 				}
 				data_ptr = lb_emit_struct_ev(p, slice, 0);
 				break;
@@ -2055,7 +2108,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		lb_start_block(p, body);
 
 		lb_push_target_list(p, ss->label, done, nullptr, fall);
-		lb_open_scope(p, body->scope);
+		lb_open_scope(p, body->scope, true);
 		lb_build_stmt_list(p, cc->stmts);
 		lb_close_scope(p, lbDeferExit_Default, body, clause);
 		lb_pop_target_list(p);
@@ -2073,7 +2126,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		lb_start_block(p, default_block);
 
 		lb_push_target_list(p, ss->label, done, nullptr, default_fall);
-		lb_open_scope(p, default_block->scope);
+		lb_open_scope(p, default_block->scope, true);
 		lb_build_stmt_list(p, default_stmts);
 		lb_close_scope(p, lbDeferExit_Default, default_block, default_clause);
 		lb_pop_target_list(p);
@@ -2201,7 +2254,9 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	LLVMValueRef switch_instr = nullptr;
 	if (type_size_of(parent_base_type) == 0) {
 		GB_ASSERT(tag.value == nullptr);
-		switch_instr = LLVMBuildSwitch(p->builder, lb_const_bool(p->module, t_llvm_bool, false).value, else_block->block, cast(unsigned)num_cases);
+		GB_ASSERT(switch_kind == TypeSwitch_Union); // zero size only possible for union{}
+		Type *ut = type_deref(parent.type);
+		switch_instr = LLVMBuildSwitch(p->builder, lb_const_int(m, union_tag_type(ut), 0).value, else_block->block, cast(unsigned)num_cases);
 	} else {
 		GB_ASSERT(tag.value != nullptr);
 		switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
@@ -2259,7 +2314,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		ast_node(cc, CaseClause, clause);
 
 		Entity *case_entity = implicit_entity_of_node(clause);
-		lb_open_scope(p, cc->scope);
+		lb_open_scope(p, cc->scope, true);
 
 		if (cc->list.count == 0) {
 			lb_start_block(p, default_block);
@@ -2385,7 +2440,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			if (e->Variable.is_rodata) {
 				cc.is_rodata = true;
 			}
-			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, nullptr, cc);
+			value = lb_const_value(p->module, is_type_any(e->type) ? ast_value->tav.type : e->type, ast_value->tav.value, cc);
 		}
 
 		String mangled_name = {};
@@ -2439,6 +2494,22 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 				LLVMValueRef init = llvm_const_named_struct(p->module, e->type, vals.data, vals.count);
 				LLVMSetInitializer(global, init);
 			} else {
+				LLVMTypeRef expected_type = lb_type(p->module, e->type);
+				LLVMTypeRef actual_type = LLVMTypeOf(value.value);
+				GB_ASSERT_MSG(lb_sizeof(actual_type) == lb_sizeof(expected_type),
+					"size mismatch for @(static) initializer of %.*s",
+					LIT(name));
+				if (actual_type != expected_type) {
+					LLVMDeleteGlobal(global);
+					global = LLVMAddGlobal(p->module->mod, actual_type, c_name);
+					LLVMSetAlignment(global, cast(u32)type_align_of(e->type));
+					if (e->Variable.is_rodata) {
+						LLVMSetGlobalConstant(global, true);
+					}
+					if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
+						LLVMSetLinkage(global, LLVMInternalLinkage);
+					}
+				}
 				LLVMSetInitializer(global, value.value);
 			}
 		}
@@ -2540,7 +2611,9 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res, Toke
 			ret_type = cast_type;
 		}
 
-		if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
+		if (ft->ret.coerce_offsets.count > 0) {
+			ret_val = lb_coerce_fields_load(p, res, &ft->ret);
+		} else if (LLVMGetTypeKind(ret_type) == LLVMStructTypeKind) {
 			LLVMTypeRef src_type = LLVMTypeOf(ret_val);
 
 			if (p->temp_callee_return_struct_memory == nullptr) {
@@ -2610,6 +2683,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 						rw_mutex_shared_unlock(&p->module->values_mutex);
 						lb_emit_store(p, found, lb_emit_conv(p, res, e->type));
 					}
+					// lifetime ends are emitted in lb_emit_defer_stmts,
+					// but no defers run on this path, so call it explicitly
+					lb_emit_lifetime_ends(p, lbDeferExit_Return, nullptr);
 					LLVMBuildRetVoid(p->builder);
 					return;
 				}
@@ -3013,6 +3089,50 @@ gb_internal void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr
 			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
 		return;
+	} else if (lhs.kind == lbAddr_SwizzleSoa) {
+		// the three cases largely mirror each other,
+		// perhaps unify them?
+		GB_ASSERT(is_type_array(lhs_type));
+
+		// the index list may repeat components (and so be longer than 4), but the
+		// element array itself has at most 4, so distinct destinations do fit in [4];
+		// each dest is done on the first occurrence
+		bool indices_handled[4] = {};
+		i32 indices[4] = {};
+		i32 index_count = 0;
+		for (i32 index : lhs.swizzle_soa.indices) {
+			GB_ASSERT(index < 4);
+			if (indices_handled[index]) {
+				continue;
+			}
+			indices_handled[index] = true;
+			indices[index_count++] = index;
+		}
+
+		lb_emit_soa_index_bounds_check(p, lhs.addr, lhs.swizzle_soa.index, lhs.swizzle_soa.index_expr);
+
+		lbValue lhs_ptrs[4] = {};
+		lbValue x_loads[4]  = {};
+		lbValue y_loads[4]  = {};
+		lbValue ops[4]      = {};
+
+		for (i32 i = 0; i < index_count; i++) {
+			lhs_ptrs[i] = lb_soa_field_elem_ptr(p, lhs.addr, indices[i], lhs.swizzle_soa.index);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			y_loads[i].value = LLVMBuildExtractValue(p->builder, rhs.value, i, "");
+			y_loads[i].type = elem_type;
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
+		}
+		for (i32 i = 0; i < index_count; i++) {
+			lb_emit_store(p, lhs_ptrs[i], ops[i]);
+		}
+		return;
 	}
 
 
@@ -3112,7 +3232,7 @@ gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 		if (op == Token_Mul && is_type_matrix(value.type) && is_type_array(lhs_type)) {
 			lbValue old_value = lb_addr_load(p, lhs);
 			Type *type = old_value.type;
-			lbValue new_value = lb_emit_vector_mul_matrix(p, old_value, value, type);
+			lbValue new_value = lb_emit_arith_matrix(p, op, old_value, value, type, false);
 			lb_addr_store(p, lhs, new_value);
 			return;
 		}
@@ -3205,7 +3325,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			tl->is_block = true;
 		}
 
-		lb_open_scope(p, bs->scope);
+		lb_open_scope(p, bs->scope, true);
 		lb_build_stmt_list(p, bs->stmts);
 		lb_close_scope(p, lbDeferExit_Default, nullptr, node);
 
@@ -3295,7 +3415,10 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 					// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
 					// compound literal, so reusing that variable should minimize the stack wastage
 					lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
-					if (comp_lit_addr) {
+					// Only when the variable IS the literal. `x: U = []int{0}` declares a union and
+					// the literal is one of its variants, so reusing that storage would bind the
+					// variable to a bare `[]int` and never build the union at all
+					if (comp_lit_addr && are_types_identical(lb_addr_type(*comp_lit_addr), type_of_expr(vd->names[lval_index]))) {
 						if (Entity *e = entity_of_node(vd->names[lval_index])) {
 							lbValue val = comp_lit_addr->addr;
 							lb_add_entity(p->module, e, val);
@@ -3481,6 +3604,9 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 			}
 		}
 	}
+
+	// end lifetimes after the defer bodies, a defer may reference the locals
+	lb_emit_lifetime_ends(p, kind, block);
 }
 
 gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, Ast *node) {

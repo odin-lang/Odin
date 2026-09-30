@@ -252,7 +252,14 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 
 		// if we've done all our work, and there's nothing to steal, go to sleep
 		pool->tasks_available.store(Someone_Waiting);
-		if (!pool->running) { break; }
+		if (!pool->running) {
+			// do not leave the word published on the way out: a worker still on its way to
+			// futex_wait would sleep on it, and the destroyer does not broadcast again once it
+			// has committed to its first join
+			pool->tasks_available.store(Nobody_Waiting);
+			futex_broadcast(&pool->tasks_available);
+			break;
+		}
 		futex_wait(&pool->tasks_available, Someone_Waiting);
 
 		main_loop_continue:;
