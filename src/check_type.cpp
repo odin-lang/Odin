@@ -2266,8 +2266,9 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			return Subst_NoMatch;
 		}
 		if (pattern->EnumeratedArray.op || source->EnumeratedArray.op) {
-			return Subst_Unhandled; // sparse/range form, defer to the mutator
+			return Subst_Unhandled; // range (`op`) form: currently never constructed; defer if it ever is
 		}
+		// `#sparse` arrays flow through here and are handled; is_sparse is carried in subst_apply.
 		SubstResult ir = subst_unify(c, pattern->EnumeratedArray.index, source->EnumeratedArray.index, subst);
 		if (ir != Subst_Matched) {
 			return ir;
@@ -2489,9 +2490,11 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 	case Type_EnumeratedArray: {
 		Type *elem  = subst_apply(c, pattern->EnumeratedArray.elem,  source->EnumeratedArray.elem,  subst);
 		Type *index = subst_apply(c, pattern->EnumeratedArray.index, source->EnumeratedArray.index, subst);
-		return alloc_type_enumerated_array(elem, index,
+		Type *r = alloc_type_enumerated_array(elem, index,
 			pattern->EnumeratedArray.min_value, pattern->EnumeratedArray.max_value,
 			pattern->EnumeratedArray.count, pattern->EnumeratedArray.op);
+		r->EnumeratedArray.is_sparse = pattern->EnumeratedArray.is_sparse; // alloc defaults this to false
+		return r;
 	}
 	case Type_Matrix: {
 		Type *elem = subst_apply(c, pattern->Matrix.elem, source->Matrix.elem, subst);
