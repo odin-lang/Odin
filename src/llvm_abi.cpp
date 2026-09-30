@@ -160,6 +160,14 @@ gb_internal lbCallingConventionKind lb_calling_convention_kind(ProcCallingConven
 	return lb_calling_convention_map[cc];
 }
 
+gb_internal LLVMAttributeRef lb_create_nocapture_attribute(LLVMContextRef c) {
+#if LLVM_VERSION_MAJOR >= 21
+	return lb_create_enum_attribute(c, "captures", 0); // 0 == CaptureInfo::none()
+#else
+	return lb_create_enum_attribute(c, "nocapture");
+#endif
+}
+
 gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
 	if (ft == nullptr) {
 		return;
@@ -173,11 +181,7 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 	LLVMContextRef c = ft->ctx;
 	LLVMAttributeRef noalias_attr   = lb_create_enum_attribute(c, "noalias");
 	LLVMAttributeRef nonnull_attr   = lb_create_enum_attribute(c, "nonnull");
-#if LLVM_VERSION_MAJOR >= 21
-	LLVMAttributeRef nocapture_attr = lb_create_string_attribute(c, make_string_c("captures"), make_string_c("none"));
-#else
-	LLVMAttributeRef nocapture_attr = lb_create_enum_attribute(c, "nocapture");
-#endif
+	LLVMAttributeRef nocapture_attr = lb_create_nocapture_attribute(c);
 
 	unsigned arg_index = offset;
 	for (unsigned i = 0; i < arg_count; i++) {
