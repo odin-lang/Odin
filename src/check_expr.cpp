@@ -8084,16 +8084,26 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	// 	error_line(")\n");
 	// };
 
+	// A deferred untyped argument has no type of its own yet; show the expression instead of 'invalid type'.
+	auto operand_type_string = [](Operand const &o) -> gbString {
+		if (o.deferred_untyped_arg) {
+			gbString e = expr_to_string(o.expr);
+			gbString s = gb_string_append_fmt(gb_string_make(heap_allocator(), ""), "%s (untyped)", e);
+			gb_string_free(e);
+			return s;
+		}
+		return type_to_string(o.type);
+	};
 	auto print_argument_types = [&]() {
 		error_line("\tGiven argument types:\n");
 		for (Operand const &o : positional_operands) {
-			gbString type = type_to_string(o.type);
+			gbString type = operand_type_string(o);
 			defer (gb_string_free(type));
 			error_line("\t • %s\n", type);
 		}
 		for_array(i, named_operands) {
 			Operand const &o = named_operands[i];
-			gbString type = type_to_string(o.type);
+			gbString type = operand_type_string(o);
 			defer (gb_string_free(type));
 
 			if (i < ce->split_args->named.count) {
@@ -8118,6 +8128,37 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			error_line("\tNo given arguments\n");
 		} else {
 			print_argument_types();
+		}
+
+		if (positional_operands.count >= 2 && positional_operands[0].type != nullptr) {
+			Type *cont = base_type(type_deref(positional_operands[0].type));
+			Type *elem = nullptr;
+			if (cont != nullptr) {
+				if (cont->kind == Type_DynamicArray) {
+					elem = cont->DynamicArray.elem;
+				} else if (cont->kind == Type_Slice) {
+					elem = cont->Slice.elem;
+				}
+			}
+			if (elem != nullptr && !is_type_polymorphic(elem)) {
+				for (isize i = 1; i < positional_operands.count; i++) {
+					Operand src = positional_operands[i];
+					if (src.deferred_untyped_arg || src.mode == Addressing_Invalid || src.type == nullptr) {
+						continue;
+					}
+					// strict: no scalar broadcast, matching the `#no_broadcast` element parameter
+					if (check_is_assignable_to(c, &src, elem, false)) {
+						continue;
+					}
+					gbString es = type_to_string(elem);
+					gbString ss = type_to_string(src.type);
+					error_line("  \n");
+					error_line("\tSuggestion: the element type is '%s', but argument #%td is '%s'\n", es, i+1, ss);
+					gb_string_free(ss);
+					gb_string_free(es);
+					break;
+				}
+			}
 		}
 
 		if (procs.count == 0) {
@@ -8173,6 +8214,69 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 						possibly_ignore[i] = true;
 						possibly_ignore_set += 1;
 						continue;
+					}
+				}
+			}
+		}
+
+		// NOTE(bill): De-emphasise overloads whose first parameter cannot accept the first argument's container, so
+		// the "Did you mean" list stays focused. E.g. appending a value to a plain `[dynamic]T` hides the
+		// `#soa`, fixed-capacity, and `[]u8`-element `append` overloads. Only affects what is displayed.
+		if (positional_operands.count >= 1 && positional_operands[0].type != nullptr) {
+			auto container_elem = [](Type *t) -> Type * {
+				switch (t->kind) {
+				case Type_DynamicArray:              return t->DynamicArray.elem;
+				case Type_FixedCapacityDynamicArray: return t->FixedCapacityDynamicArray.elem;
+				case Type_Slice:                     return t->Slice.elem;
+				case Type_Array:                     return t->Array.elem;
+				}
+				return nullptr;
+			};
+			Type *arg0 = base_type(type_deref(positional_operands[0].type));
+			if (arg0 != nullptr && arg0->kind != Type_Generic && !is_type_polymorphic(arg0)) {
+				Type *arg0_elem = container_elem(arg0);
+				for_array(i, procs) {
+					if (possibly_ignore[i]) {
+						continue;
+					}
+					Entity *proc = procs[i];
+					Type *t = base_type(proc->type);
+					if (t == nullptr || t->kind != Type_Proc || t->Proc.param_count == 0) {
+						continue;
+					}
+					Type *p0 = base_type(t->Proc.params->Tuple.variables[0]->type);
+					if (p0->kind == Type_Pointer) {
+						p0 = base_type(p0->Pointer.elem);
+					} else if (p0->kind == Type_MultiPointer) {
+						p0 = base_type(p0->MultiPointer.elem);
+					}
+					while (p0->kind == Type_Generic && p0->Generic.specialized != nullptr) {
+						p0 = base_type(p0->Generic.specialized);
+					}
+					if (p0->kind == Type_Generic) {
+						continue; // unconstrained `$T`: cannot tell, keep it
+					}
+					bool incompatible = false;
+					if (p0->kind != arg0->kind) {
+						incompatible = true;
+					} else if (arg0_elem != nullptr) {
+						// container kinds match; reject an overload that constrains the element type to
+						// something the argument's element cannot satisfy (e.g. `$E/u8`)
+						Type *p0_elem = container_elem(p0);
+						if (p0_elem != nullptr) {
+							Type *pe = base_type(p0_elem);
+							if (pe->kind == Type_Generic && pe->Generic.specialized != nullptr) {
+								Operand src = {Addressing_Value};
+								src.type = arg0_elem;
+								if (!check_is_assignable_to(c, &src, base_type(pe->Generic.specialized), false)) {
+									incompatible = true;
+								}
+							}
+						}
+					}
+					if (incompatible) {
+						possibly_ignore[i] = true;
+						possibly_ignore_set += 1;
 					}
 				}
 			}
