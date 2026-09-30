@@ -9170,6 +9170,17 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	gb_zero_item(operand);
 	operand->expr = call;
 
+	if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0) {
+		// NOTE: which procedure of a group is called is only known once its arguments are checked
+		Entity *e = entity_of_node(call->CallExpr.proc);
+		if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.deferred_procedure.entity != nullptr) {
+			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
+			if (c->decl) {
+				c->decl->defer_used += 1;
+			}
+		}
+	}
+
 	if (result_type == t_invalid) {
 		operand->mode = Addressing_Invalid;
 		operand->type = t_invalid;
@@ -10199,6 +10210,13 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		return kind;
 	}
 
+	if (te->x->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+		error(te->x, "Procedure calls that have an associated deferred procedure are not allowed within ternary expressions");
+	}
+	if (te->y->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+		error(te->y, "Procedure calls that have an associated deferred procedure are not allowed within ternary expressions");
+	}
+
 	if (x.mode == Addressing_Type || y.mode == Addressing_Type) {
 		Ast *type_expr = (x.mode == Addressing_Type) ? x.expr : y.expr;
 		gbString type_string = expr_to_string(type_expr);
@@ -10371,6 +10389,9 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 
 	bool y_is_diverging = false;
 	check_expr_base(c, &y, default_value, left_type);
+	if (default_value->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+		error(default_value, "Procedure calls that have an associated deferred procedure are not allowed on the right-hand side of 'or_else'");
+	}
 	switch (y.mode) {
 	case Addressing_NoValue:
 		if (is_diverging_expr(y.expr)) {

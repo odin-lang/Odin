@@ -1315,6 +1315,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				} else {
 					check_expr_with_type_hint(ctx, &y, expr, x.type);
 				}
+				if (expr->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+					error(expr, "Procedure calls that have an associated deferred procedure are not allowed within case clauses");
+				}
 
 				if (x.mode == Addressing_Invalid ||
 				    y.mode == Addressing_Invalid) {
