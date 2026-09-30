@@ -187,6 +187,10 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		if (is_type_bit_set(x.type)) {
 			ExactValue ev_mask = exact_bit_set_all_set_mask(x.type);
 			lbValue mask = lb_const_value(p->module, x.type, ev_mask);
+			if (is_type_array(bit_set_to_int(x.type))) {
+				lbValue res = lb_emit_arith(p, Token_Xor, x, mask, x.type);
+				return lb_emit_conv(p, res, type);
+			}
 			cmp.value = LLVMBuildXor(p->builder, x.value, mask.value, "");
 		} else {
 			cmp.value = LLVMBuildNot(p->builder, x.value, "");
@@ -1412,6 +1416,13 @@ gb_internal lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbVal
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 
+	// NOTE: Only an array of the matrix's element type is a vector. Any other array is array programming. (See #6302)
+	Type *elem = base_array_type(is_type_matrix(lhs.type) ? lhs.type : rhs.type);
+	if ((is_type_array_like(lhs.type) && !are_types_identical(base_array_type(lhs.type), elem)) ||
+	    (is_type_array_like(rhs.type) && !are_types_identical(base_array_type(rhs.type), elem))) {
+		return lb_emit_arith_array(p, op, lhs, rhs, type);
+	}
+
 	if (op == Token_Mul && !component_wise) {
 		Type *xt = base_type(lhs.type);
 		Type *yt = base_type(rhs.type);
@@ -2115,6 +2126,36 @@ gb_internal lbValue lb_build_binary_in(lbProcedure *p, lbValue left, lbValue rig
 			GB_ASSERT(are_types_identical(left.type, key_type));
 
 			Type *it = bit_set_to_int(rt);
+
+			if (is_type_array(it)) {
+				Type *elem    = base_array_type(it);
+				i64 elem_bits = 8*type_size_of(elem);
+
+				lbValue key     = lb_emit_conv(p, left, t_int);
+				lbValue lower_v = lb_const_int(p->module, t_int, rt->BitSet.lower);
+				key = lb_emit_arith(p, Token_Sub, key, lower_v, t_int);
+
+				lbValue ebits    = lb_const_int(p->module, t_int, elem_bits);
+				lbValue elem_idx = lb_emit_arith(p, Token_Quo, key, ebits, t_int);
+				lbValue bit_idx  = lb_emit_arith(p, Token_Mod, key, ebits, t_int);
+
+				lbValue arr     = lb_emit_transmute(p, right, it);
+				lbValue arr_ptr = lb_address_from_load_or_generate_local(p, arr);
+				arr_ptr.type    = alloc_type_pointer(it);
+
+				lbValue e_ptr   = lb_emit_array_ep(p, arr_ptr, elem_idx);
+				lbValue e_val   = lb_emit_load(p, e_ptr);
+
+				lbValue shifted = lb_emit_arith(p, Token_Shr, e_val, lb_emit_conv(p, bit_idx, elem), elem);
+				lbValue masked  = lb_emit_arith(p, Token_And, shifted, lb_const_int(p->module, elem, 1), elem);
+				lbValue zero    = lb_const_int(p->module, elem, 0);
+
+				if (op == Token_in) {
+					return lb_emit_conv(p, lb_emit_comp(p, Token_NotEq, masked, zero), t_bool);
+				} else {
+					return lb_emit_conv(p, lb_emit_comp(p, Token_CmpEq, masked, zero), t_bool);
+				}
+			}
 
 			left = lb_emit_conv(p, left, it);
 			if (is_type_different_to_arch_endianness(it)) {
@@ -3429,6 +3470,29 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 
 
 
+gb_internal lbValue lb_bit_set_array_is_zero(lbProcedure *p, lbValue arr) {
+	Type *at = base_type(arr.type);
+	GB_ASSERT(at->kind == Type_Array);
+	Type *elem = at->Array.elem;
+	i64 n = at->Array.count;
+
+	lbValue acc = {};
+	acc.type = elem;
+	acc.value = LLVMBuildExtractValue(p->builder, arr.value, 0, "");
+	for (i64 i = 1; i < n; i++) {
+		lbValue e = {};
+		e.type  = elem;
+		e.value = LLVMBuildExtractValue(p->builder, arr.value, cast(unsigned)i, "");
+
+		acc = lb_emit_arith(p, Token_Or, acc, e, elem);
+	}
+
+	lbValue res = {};
+	res.type  = t_llvm_bool;
+	res.value = LLVMBuildICmp(p->builder, LLVMIntEQ, acc.value, lb_const_int(p->module, elem, 0).value, "");
+	return res;
+}
+
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
 	Type *a = core_type(left.type);
 	Type *b = core_type(right.type);
@@ -3753,6 +3817,52 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 
 	if (is_type_bit_set(a)) {
+		Type *it_backing = bit_set_to_int(a);
+		if (is_type_array(it_backing)) {
+			lbValue lhs = lb_emit_transmute(p, left, it_backing);
+			lbValue rhs = lb_emit_transmute(p, right, it_backing);
+			switch (op_kind) {
+			case Token_CmpEq:
+			case Token_NotEq:
+				{
+					lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+					lbValue equal = lb_bit_set_array_is_zero(p, diff);
+					if (op_kind == Token_NotEq) {
+						lbValue res = {};
+						res.type = t_llvm_bool;
+						res.value = LLVMBuildNot(p->builder, equal.value, "");
+						return res;
+					}
+					return equal;
+				}
+			case Token_Lt:
+			case Token_LtEq:
+				{
+					// subset: (lhs &~ rhs) == {}; strict also requires lhs != rhs
+					lbValue d = lb_emit_arith(p, Token_AndNot, lhs, rhs, it_backing);
+					lbValue res = lb_bit_set_array_is_zero(p, d);
+					if (op_kind == Token_Lt) {
+						lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+						lbValue equal = lb_bit_set_array_is_zero(p, diff);
+						res = lb_emit_arith(p, Token_AndNot, res, equal, t_llvm_bool);
+					}
+					return res;
+				}
+			case Token_Gt:
+			case Token_GtEq:
+				{
+					// superset: (rhs &~ lhs) == {}; strict also requires lhs != rhs
+					lbValue d = lb_emit_arith(p, Token_AndNot, rhs, lhs, it_backing);
+					lbValue res = lb_bit_set_array_is_zero(p, d);
+					if (op_kind == Token_Gt) {
+						lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+						lbValue equal = lb_bit_set_array_is_zero(p, diff);
+						res = lb_emit_arith(p, Token_AndNot, res, equal, t_llvm_bool);
+					}
+					return res;
+				}
+			}
+		}
 		switch (op_kind) {
 		case Token_Lt:
 		case Token_LtEq:
@@ -6074,7 +6184,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		// NOTE(bill): inline insertion sort should be good enough, right?
 		for (isize i = 1; i < values.count; i++) {
 			for (isize j = i;
-			     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+			     j > 0 && fields[j].bit_offset < fields[j-1].bit_offset;
 			     j--) {
 				auto vtmp = values[j];
 				values[j] = values[j-1];
@@ -6461,20 +6571,30 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			Type *backing = bit_set_to_int(type);
 			if (is_type_array(backing)) {
-				GB_PANIC("TODO: bit_set [N]T");
 				Type *base_it = core_array_type(backing);
 				i64 bits_per_elem = 8*type_size_of(base_it);
-				gb_unused(bits_per_elem);
-				lbValue one = lb_const_value(p->module, t_i64, exact_value_i64(1));
+				lbValue ebits = lb_const_value(p->module, t_int, exact_value_i64(bits_per_elem));
+				lbValue one = lb_const_value(p->module, base_it, exact_value_i64(1));
+
+				lbValue arr_ptr = lb_addr_get_ptr(p, v);
+				arr_ptr.type = alloc_type_pointer(backing);
+
 				for (Ast *elem : cl->elems) {
 					GB_ASSERT(elem->kind != Ast_FieldValue);
 					lbValue expr = lb_build_expr(p, elem);
 					GB_ASSERT(expr.type->kind != Type_Tuple);
 
-					lbValue e = lb_emit_conv(p, expr, t_i64);
-					e = lb_emit_arith(p, Token_Sub, e, lower, t_i64);
-					// lbValue idx = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
-					// lbValue val = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
+					lbValue e = lb_emit_conv(p, expr, t_int);
+					e = lb_emit_arith(p, Token_Sub, e, lower, t_int);
+
+					lbValue elem_idx = lb_emit_arith(p, Token_Quo, e, ebits, t_int);
+					lbValue bit_idx  = lb_emit_arith(p, Token_Mod, e, ebits, t_int);
+
+					lbValue e_ptr     = lb_emit_array_ep(p, arr_ptr, elem_idx);
+					lbValue bit       = lb_emit_arith(p, Token_Shl, one, lb_emit_conv(p, bit_idx, base_it), base_it);
+					lbValue old_value = lb_emit_load(p, e_ptr);
+					lbValue new_value = lb_emit_arith(p, Token_Or, old_value, bit, base_it);
+					lb_emit_store(p, e_ptr, new_value);
 				}
 			} else {
 				Type *it = bit_set_to_int(bt);

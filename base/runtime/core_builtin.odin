@@ -1652,7 +1652,18 @@ when MAP_ENABLED {
 // `card` returns the number of bits that are set in a bit_set—its cardinality
 @builtin
 card :: proc "contextless" (s: $S/bit_set[$E; $U]) -> int {
-	return int(intrinsics.count_ones(transmute(intrinsics.type_bit_set_underlying_type(S))s))
+	Backing :: intrinsics.type_bit_set_underlying_type(S)
+	when intrinsics.type_is_array(Backing) {
+		// bit_set backed by an array of integers: sum the population count of each element
+		backing := transmute(Backing)s
+		count := 0
+		for elem in backing {
+			count += int(intrinsics.count_ones(elem))
+		}
+		return count
+	} else {
+		return int(intrinsics.count_ones(transmute(Backing)s))
+	}
 }
 
 

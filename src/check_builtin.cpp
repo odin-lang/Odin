@@ -3951,10 +3951,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		
 		if (is_type_complex(t)) {
 			if (x->mode == Addressing_Constant) {
+				// Keep the conjugate exact: negate the imaginary component(s) as ExactValues.
 				ExactValue v = exact_value_to_complex(x->value);
-				f64 r = v.value_complex->real;
-				f64 i = -v.value_complex->imag;
-				x->value = exact_value_complex(r, i);
+				ExactValue r = v.value_complex->real;
+				ExactValue i = exact_unary_operator_value(Token_Sub, v.value_complex->imag, 0, false);
+				x->value = exact_value_complex_ev(r, i);
 				x->mode = Addressing_Constant;
 			} else {
 				x->mode = Addressing_Value;
@@ -3962,11 +3963,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		} else if (is_type_quaternion(t)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_quaternion(x->value);
-				f64 r = +v.value_quaternion->real;
-				f64 i = -v.value_quaternion->imag;
-				f64 j = -v.value_quaternion->jmag;
-				f64 k = -v.value_quaternion->kmag;
-				x->value = exact_value_quaternion(r, i, j, k);
+				ExactValue r = v.value_quaternion->real;
+				ExactValue i = exact_unary_operator_value(Token_Sub, v.value_quaternion->imag, 0, false);
+				ExactValue j = exact_unary_operator_value(Token_Sub, v.value_quaternion->jmag, 0, false);
+				ExactValue k = exact_unary_operator_value(Token_Sub, v.value_quaternion->kmag, 0, false);
+				x->value = exact_value_quaternion_ev(r, i, j, k);
 				x->mode = Addressing_Constant;
 			} else {
 				x->mode = Addressing_Value;
@@ -4594,17 +4595,24 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				operand->value.value_float = bit_cast<f64>(abs);
 				break;
 			}
+			case ExactValue_Rational: {
+				mp_int n; mp_init(&n);
+				defer (mp_clear(&n));
+				mp_abs(&operand->value.value_rational->num, &n);
+				operand->value = exact_value_rational_from_ints(&n, &operand->value.value_rational->den);
+				break;
+			}
 			case ExactValue_Complex: {
-				f64 r = operand->value.value_complex->real;
-				f64 i = operand->value.value_complex->imag;
+				f64 r = exact_value_to_f64(operand->value.value_complex->real);
+				f64 i = exact_value_to_f64(operand->value.value_complex->imag);
 				operand->value = exact_value_float(gb_sqrt(r*r + i*i));
 				break;
 			}
 			case ExactValue_Quaternion: {
-				f64 r = operand->value.value_quaternion->real;
-				f64 i = operand->value.value_quaternion->imag;
-				f64 j = operand->value.value_quaternion->jmag;
-				f64 k = operand->value.value_quaternion->kmag;
+				f64 r = exact_value_to_f64(operand->value.value_quaternion->real);
+				f64 i = exact_value_to_f64(operand->value.value_quaternion->imag);
+				f64 j = exact_value_to_f64(operand->value.value_quaternion->jmag);
+				f64 k = exact_value_to_f64(operand->value.value_quaternion->kmag);
 				operand->value = exact_value_float(gb_sqrt(r*r + i*i + j*j + k*k));
 				break;
 			}
@@ -5202,6 +5210,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = o.type;
 
 		ExactValue value = o.value;
+		if (value.kind == ExactValue_Rational) {
+			value = exact_value_to_float(value); // constant floor/ceil/round operate on the f64
+		}
 		if (value.kind == ExactValue_Integer) {
 			// do nothing
 		} else if (value.kind == ExactValue_Float) {

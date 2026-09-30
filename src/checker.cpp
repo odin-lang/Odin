@@ -1480,6 +1480,7 @@ gb_internal void init_universal(void) {
 			type = t_untyped_integer;
 			break;
 		case ExactValue_Float:
+		case ExactValue_Rational:
 			type = t_untyped_float;
 			break;
 		}
@@ -2153,7 +2154,9 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (identifier == nullptr || identifier->kind != Ast_Ident) {
 		return;
 	}
-	entity->identifier.store(identifier);
+	// NOTE: only set it once, as `$` procedure arguments are matched by this identifier
+	Ast *empty_ident = nullptr;
+	entity->identifier.compare_exchange_strong(empty_ident, identifier);
 
 	identifier->Ident.entity = entity;
 

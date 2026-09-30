@@ -300,11 +300,8 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			return;
 		}
 
-		// NOTE(Jeroen): A valid integer can never have an exponent larger than 308 (per `max(f64)`).
-		//               As an integer, not even larger than `max(u128)` which has a base 10 exponent of 38.
-		//               But we also use this path to parse float literals like those in `core:math.pow10_f64`,
-		//               so we have to stick with 1e308.
-		if (exp > 308) {
+		// NOTE(bill): Just limit the maximum exponent to bigger than the actual maximum to allow for keeping overflows
+		if (exp > 512) {
 			*success = false;
 			return;
 		}
