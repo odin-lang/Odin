@@ -1848,18 +1848,19 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 }
 
 
-// subst_unify matches a polymorphic pattern against a source PURELY (no node/entity mutation),
-// accumulating bindings; subst_apply reconstructs the instantiated type by CONSTRUCTION. Guarded by
-// PARAPOLY_VERIFY_SUBST, determine_type_from_polymorphic runs these alongside the existing in-place
-// mutation and asserts the two agree, proving the constructive path before anything relies on it.
-// Coverage is a slice (generic/basic/slice/dynamic-array/fixed [$N]$T); other kinds report
-// Subst_Unhandled and are skipped. No behavior change. This is refactor scaffolding: it runs a
-// second (constructive) match per instantiation, so set to 0 (or gate to debug) before release.
-#define PARAPOLY_VERIFY_SUBST 1
-// When 1, the substitution is authoritative for handled patterns: determine_type_from_polymorphic
-// binds the poly-scope entities from the PolySubst and returns the constructed type WITHOUT running
-// the in-place mutation. When 0, the mutation runs and the subst path only verifies against it.
-#define PARAPOLY_SUBST_AUTHORITATIVE 1
+// The substitution engine is the primary way a polymorphic parameter type is resolved:
+// `subst_unify` matches a pattern against a source PURELY (no node/entity mutation), accumulating
+// bindings; `subst_apply` reconstructs the instantiated type by CONSTRUCTION; `subst_bind_entities`
+// binds the poly-scope entities. `determine_type_from_polymorphic` uses them for every pattern the
+// engine reports `Subst_Matched` for. The in-place mutator `is_polymorphic_type_assignable` remains
+// only as a fallback for the patterns the engine leaves `Subst_Unhandled` (genuine subtyping, and the
+// `[^]<->^` handled-by-mutator case), and for the non-`modify_type` yes/no probe.
+//
+// PARAPOLY_DEBUG_VERIFY_SUBST is an off-by-default differential debug switch: it makes the old mutator
+// authoritative and asserts the engine agrees with it (constructed type + entity bindings) on every
+// instantiation. It compares types structurally via are_types_identical, so it CANNOT catch codegen
+// state the engine must still set up (e.g. a map's internal types); those need build+run tests.
+#define PARAPOLY_DEBUG_VERIFY_SUBST 0
 
 enum SubstResult : u8 {
 	Subst_Unhandled,
@@ -2467,6 +2468,7 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		Type *m = alloc_type(Type_Map);
 		m->Map.key   = subst_apply(c, pattern->Map.key,   source->Map.key,   subst);
 		m->Map.value = subst_apply(c, pattern->Map.value, source->Map.value, subst);
+		init_map_internal_types(m); // the mutator does this; without it codegen hits a t_invalid
 		return m;
 	}
 	case Type_Array: {
@@ -2645,7 +2647,7 @@ gb_internal void subst_bind_entities(PolySubst *subst) {
 	}
 }
 
-#if PARAPOLY_VERIFY_SUBST
+#if PARAPOLY_DEBUG_VERIFY_SUBST
 // Read-only: assert that the in-place mutation bound each poly-scope entity to exactly what the
 // substitution captured. This is the entity-level analogue of the apply-reproduction check; once it
 // holds everywhere, entity binding can be driven from the PolySubst and the mutation removed.
@@ -2694,7 +2696,26 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		return t_invalid;
 	}
 
-#if PARAPOLY_VERIFY_SUBST
+#if !PARAPOLY_DEBUG_VERIFY_SUBST
+	// Primary path: the substitution engine constructs the instantiation and binds the poly-scope
+	// entities. Patterns it reports Subst_Unhandled for fall through to the mutator fallback below.
+	if (modify_type) {
+		PolySubst subst = {};
+		subst.items.allocator = heap_allocator();
+		defer (array_free(&subst.items));
+		if (subst_unify(ctx, poly_type, operand.type, &subst) == Subst_Matched) {
+			Type *applied = subst_apply(ctx, poly_type, operand.type, &subst);
+			subst_bind_entities(&subst);
+			return applied;
+		}
+	}
+	// Fallback: the in-place mutator handles the deferred patterns (genuine subtyping) and the
+	// non-modify_type probe. A Subst_NoMatch also lands here and the mutator fails too -> error path.
+	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
+		return poly_type;
+	}
+#else
+	// Debug differential: the mutator is authoritative and the engine is asserted to agree with it.
 	PolySubst verify_subst = {};
 	verify_subst.items.allocator = heap_allocator();
 	defer (array_free(&verify_subst.items));
@@ -2706,19 +2727,7 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 			verify_applied = subst_apply(ctx, poly_type, operand.type, &verify_subst);
 		}
 	}
-	#if PARAPOLY_SUBST_AUTHORITATIVE
-	if (verify_ur == Subst_Matched) {
-		// Substitution is authoritative: bind the poly-scope entities and return the constructed
-		// type; the in-place mutation is not run. (A handled NoMatch falls through and the mutation
-		// will also fail, reaching the error path.)
-		subst_bind_entities(&verify_subst);
-		return verify_applied;
-	}
-	#endif
-#endif
-
 	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
-	#if PARAPOLY_VERIFY_SUBST && !PARAPOLY_SUBST_AUTHORITATIVE
 		if (verify_ur == Subst_Matched) {
 			GB_ASSERT_MSG(are_types_identical(verify_applied, poly_type),
 			              "parapoly subst mismatch: applied '%s' vs mutated '%s'",
@@ -2728,10 +2737,8 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		} else if (verify_ur == Subst_NoMatch) {
 			GB_PANIC("parapoly subst reported NoMatch but in-place match succeeded (result '%s')", type_to_string(poly_type));
 		}
-	#endif
 		return poly_type;
 	}
-#if PARAPOLY_VERIFY_SUBST && !PARAPOLY_SUBST_AUTHORITATIVE
 	if (verify_ur == Subst_Matched) {
 		GB_PANIC("parapoly subst matched but in-place match failed");
 	}

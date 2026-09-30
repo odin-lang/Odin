@@ -1475,6 +1475,11 @@ gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source
 	return false;
 }
 
+// In-place matcher: mutates `poly` to bind its polymorphic vars to `source`. This is no longer the
+// primary resolver (see the substitution engine in check_type.cpp). determine_type_from_polymorphic
+// uses it only as a fallback for the patterns the engine reports Subst_Unhandled for (genuine
+// subtyping, and the ^<->[^] case) and for the non-modify_type (no_polymorphic_errors) yes/no probe.
+// The probe keeps every kind here reachable, so these cases are not dead code.
 gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
 	o.type = source;
