@@ -545,7 +545,7 @@ foreign lib {
 	// Textures management
 	LoadTexture         :: proc(data: rawptr, width, height: c.int, format: c.int, mipmapCount: c.int) -> c.uint ---        // Load texture in GPU
 	LoadTextureDepth    :: proc(width, height: c.int, useRenderBuffer: bool) -> c.uint ---                                  // Load depth texture/renderbuffer (to be attached to fbo)
-	LoadTextureCubemap  :: proc(data: rawptr, size: c.int, format: c.int) -> c.uint ---                                     // Load texture cubemap
+	LoadTextureCubemap  :: proc(data: rawptr, size: c.int, format: c.int, mipmapCount: c.int) -> c.uint ---                                     // Load texture cubemap
 	UpdateTexture       :: proc(id: c.uint, offsetX, offsetY: c.int, width, height: c.int, format: c.int, data: rawptr) --- // Update GPU texture with new data
 	GetGlTextureFormats :: proc(format: c.int, glInternalFormat, glFormat, glType: ^c.uint) ---                             // Get OpenGL internal formats
 	GetPixelFormatName  :: proc(format: c.uint) -> cstring ---                                                              // Get name string for pixel format
