@@ -3026,11 +3026,7 @@ gb_internal void lb_add_proc_attribute_at_index_with_string(lbProcedure *p, isiz
 }
 
 gb_internal void lb_add_nocapture_proc_attribute_at_index(lbProcedure *p, isize index) {
-	#if LLVM_VERSION_MAJOR >= 21
-		lb_add_proc_attribute_at_index_with_string(p, index, make_string_c("captures"), make_string_c("none"));
-	#else
-		lb_add_proc_attribute_at_index(p, index, "nocapture");
-	#endif
+	LLVMAddAttributeAtIndex(p->value, cast(unsigned)index, lb_create_nocapture_attribute(p->module->ctx));
 }
 
 gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
