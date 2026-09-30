@@ -8204,14 +8204,69 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			}
 		}
 
+		// NOTE(bill): Missing `&`: a container argument passed by value where an overload wants a pointer
+		// to it. Detected only when the element-mismatch diagnosis did not fire. The `&x` suggestion is
+		// still printed below by the existing try-address block.
+		Ast *addr_expr = nullptr;
+		isize addr_index = -1;
+		if (diag_expr == nullptr) {
+			for (Entity *proc : procs) {
+				Type *t = base_type(proc->type);
+				if (t == nullptr || t->kind != Type_Proc || t->Proc.params == nullptr) {
+					continue;
+				}
+				isize n = gb_min(cast(isize)t->Proc.param_count, positional_operands.count);
+				for (isize i = 0; i < n; i++) {
+					Operand src = positional_operands[i];
+					if (src.deferred_untyped_arg || src.mode == Addressing_Invalid || src.type == nullptr) {
+						continue;
+					}
+					Type *dst = t->Proc.params->Tuple.variables[i]->type;
+					if (check_is_assignable_to(c, &src, dst)) {
+						continue;
+					}
+					if (check_is_assignable_to(c, &src, type_deref(dst))) {
+						addr_expr  = src.expr;
+						addr_index = i;
+						break;
+					}
+				}
+				if (addr_expr != nullptr) {
+					break;
+				}
+			}
+		}
+
 		if (diag_expr != nullptr) {
 			gbString es = type_to_string(diag_elem);
-			error(diag_expr, "'%s' expected argument #%td to be of type '%s', got '%s'", expr_name, diag_index+1, es, diag_arg_type);
 			gbString cs = type_to_string(diag_cont);
-			error_line("\t'%s' is the element type of '%s'\n", es, cs);
+			gbString label = gb_string_make(heap_allocator(), "");
+			label = gb_string_append_fmt(label, "expected '%s', found '%s'", es, diag_arg_type);
+			set_caret_label(label);
+			// secondary span under the container argument, explaining where the element type comes from
+			Ast *cont_expr = positional_operands[0].expr;
+			gbString sec = gb_string_make(heap_allocator(), "");
+			sec = gb_string_append_fmt(sec, "'%s', elements are '%s'", cs, es);
+			if (cont_expr != nullptr) {
+				set_caret_secondary(ast_token(cont_expr).pos, ast_end_pos(cont_expr), sec);
+			}
+			error(diag_expr, "mismatched argument #%td in call to '%s'", diag_index+1, expr_name);
+			gb_string_free(sec);
+			gb_string_free(label);
 			gb_string_free(cs);
 			gb_string_free(es);
 			gb_string_free(diag_arg_type);
+		} else if (addr_expr != nullptr) {
+			Operand src = positional_operands[addr_index];
+			gbString ft = type_to_string(src.type);
+			gbString ex = expr_to_string(src.expr);
+			gbString label = gb_string_make(heap_allocator(), "");
+			label = gb_string_append_fmt(label, "expected '^%s', found '%s', pass '&%s'", ft, ft, ex);
+			set_caret_label_vertical(label);
+			error(src.expr, "mismatched argument #%td in call to '%s'", addr_index+1, expr_name);
+			gb_string_free(label);
+			gb_string_free(ex);
+			gb_string_free(ft);
 		} else {
 			error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
 			if (positional_operands.count == 0 && named_operands.count == 0) {
