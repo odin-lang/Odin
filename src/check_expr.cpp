@@ -1586,12 +1586,21 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 						return is_polymorphic_type_assignable(c, poly->Array.elem, source->EnumeratedArray.elem, true, false);
 					}
 
+					// NOTE(bill): Capture the polymorphic element node ($T) before rewriting `poly`
+					// in place. Array.elem and EnumeratedArray.elem share the same union offset, so
+					// assigning EnumeratedArray.elem below would otherwise clobber the pointer to the
+					// shared $T generic node, and the element-binding recursion at the end would
+					// compare concrete-vs-concrete and never bind $T (leaving it unresolved in the
+					// procedure body). Keeping the node lets that recursion mutate it in place, just
+					// like the fixed-array branch above.
+					Type *poly_elem = poly->Array.elem;
+
 					poly->kind = Type_EnumeratedArray;
 					poly->cached_size  = -1;
 					poly->cached_align = -1;
 					poly->flags.exchange(source->flags);
 					poly->failure      = false;
-					poly->EnumeratedArray.elem      = source->EnumeratedArray.elem;
+					poly->EnumeratedArray.elem      = poly_elem;
 					poly->EnumeratedArray.index     = source->EnumeratedArray.index;
 					poly->EnumeratedArray.min_value = source->EnumeratedArray.min_value;
 					poly->EnumeratedArray.max_value = source->EnumeratedArray.max_value;
