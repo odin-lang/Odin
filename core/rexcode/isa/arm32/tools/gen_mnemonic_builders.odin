@@ -451,7 +451,7 @@ write_inst_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
 	strings.write_string(sb, " }\n")
 }
 
-// emit_ procedure: append(instructions, inst_<...>(args)). Not contextless —
+// emit_ procedure: append_elem(instructions, inst_<...>(args)). Not contextless —
 // append needs context. arm32 has no encoder-level emit_* helpers, so these
 // simply wrap the inst_ builder.
 write_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
@@ -467,7 +467,7 @@ write_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, pad: int) {
 	for p in ps {
 		fmt.sbprintf(sb, ", %s: %s", p.name, p.type)
 	}
-	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, ") { append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_byte(sb, '(')
 	for p, i in ps {
