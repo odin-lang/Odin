@@ -662,7 +662,54 @@ gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types
 };
 
 
-gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
+// NOTE(bill): Give a freshly-instantiated polymorphic record its canonical name
+// (e.g. `Foo($T=int, $N=4)`). This depends only on the record's polymorphic parameters, so it
+// must be called *before* the instantiation is published into gen_types via
+// add_polymorphic_record_entity: once published, a concurrent thread may read the name, and
+// mutating the `Named.name` String in place afterwards would be a torn read.
+gb_internal void set_polymorphic_record_instantiation_name(Type *named_type, Type *original_type) {
+	Type *bt = base_type(named_type);
+	if (bt->kind != Type_Struct && bt->kind != Type_Union) {
+		return;
+	}
+	GB_ASSERT(original_type->kind == Type_Named);
+	Entity *e = original_type->Named.type_name;
+	GB_ASSERT(e->kind == Entity_TypeName);
+
+	gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
+	s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
+
+	TypeTuple *tuple = get_record_polymorphic_params(bt);
+	if (tuple != nullptr) for_array(i, tuple->variables) {
+		Entity *v = tuple->variables[i];
+		String name = v->token.string;
+		if (i > 0) {
+			s = gb_string_append_fmt(s, ", ");
+		}
+		s = gb_string_append_fmt(s, "$%.*s", LIT(name));
+
+		if (v->kind == Entity_TypeName) {
+			if (v->type != nullptr && v->type->kind != Type_Generic) {
+				s = gb_string_append_fmt(s, "=");
+				s = write_type_to_string(s, v->type, false);
+			}
+		} else if (v->kind == Entity_Constant) {
+			if (v->Constant.value.kind != ExactValue_Invalid) {
+				s = gb_string_append_fmt(s, "=");
+				s = write_exact_value_to_string(s, v->Constant.value);
+			}
+		}
+	}
+	s = gb_string_append_fmt(s, ")");
+
+	String new_name = make_string_c(s);
+	named_type->Named.name = new_name;
+	if (named_type->Named.type_name) {
+		named_type->Named.type_name->token.string = new_name;
+	}
+}
+
+gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, GenTypesData *poly_gen_types_to_unlock) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -704,7 +751,20 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &struct_type->Struct.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
+		// Finalize the name before publishing so no concurrent reader observes a torn name.
+		set_polymorphic_record_instantiation_name(named_type, original_type_for_poly);
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+
+		// NOTE(bill): This instantiation is now published in the originating record's gen_types
+		// cache (its polymorphic params are set and signalled above), so a concurrent thread can
+		// find it via find_polymorphic_record_entity and synchronize on the fields_wait_signal
+		// below when it needs the layout. Release the caller-held gen_types mutex here, *before*
+		// checking the fields: field checking can instantiate other polymorphic records (locking
+		// their gen_types mutexes), and holding this one across that is what allows a cross-record
+		// ABBA deadlock between two mutually-recursive generic records instantiated concurrently.
+		if (poly_gen_types_to_unlock != nullptr) {
+			mutex_unlock(&poly_gen_types_to_unlock->mutex);
+		}
 	}
 
 	if (!struct_type->Struct.is_polymorphic) {
@@ -791,6 +851,8 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	union_type->Union.is_poly_specialized = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &union_type->Union.is_polymorphic);
 	if (original_type_for_poly) {
 		GB_ASSERT(named_type != nullptr);
+		// Finalize the name before publishing (see set_polymorphic_record_instantiation_name).
+		set_polymorphic_record_instantiation_name(named_type, original_type_for_poly);
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
 	}
 

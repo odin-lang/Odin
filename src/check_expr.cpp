@@ -92,7 +92,8 @@ gb_internal void     check_init_constant            (CheckerContext *c, Entity *
 gb_internal bool     check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value);
 gb_internal bool     check_procedure_type           (CheckerContext *c, Type *type, Ast *proc_type_node, Array<Operand> const *operands = nullptr);
 gb_internal void     check_struct_type              (CheckerContext *c, Type *struct_type, Ast *node, Array<Operand> *poly_operands,
-                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
+                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr,
+                                                     GenTypesData *poly_gen_types_to_unlock = nullptr);
 gb_internal void     check_union_type               (CheckerContext *c, Type *union_type, Ast *node, Array<Operand> *poly_operands,
                                                      Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
 
@@ -387,6 +388,31 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 	}
 }
 
+// NOTE(bill): Reuse an already-generated polymorphic procedure specialization `other`.
+// Records it as the result and, if its body has not been checked yet, schedules it.
+// The caller must have released `gen_procs->mutex` before calling this (it queues work).
+gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other, Ast *poly_def_node, PolyProcData *poly_proc_data) {
+	if (poly_proc_data) {
+		poly_proc_data->gen_entity = other;
+	}
+
+	DeclInfo *decl = other->decl_info;
+	if (decl->proc_checked_state != ProcCheckedState_Checked) {
+		ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
+		proc_info->file  = other->file;
+		proc_info->token = other->token;
+		proc_info->decl  = decl;
+		proc_info->type  = other->type;
+		proc_info->body  = decl->proc_lit->ProcLit.body;
+		proc_info->tags  = other->Procedure.tags;
+		proc_info->generated_from_polymorphic = true;
+		proc_info->poly_def_node = poly_def_node;
+
+		check_procedure_later(checker, proc_info);
+	}
+	return true;
+}
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -551,32 +577,27 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-
-				if (poly_proc_data) {
-					poly_proc_data->gen_entity = other;
-				}
-
-				DeclInfo *decl = other->decl_info;
-				if (decl->proc_checked_state != ProcCheckedState_Checked) {
-					ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
-					proc_info->file  = other->file;
-					proc_info->token = other->token;
-					proc_info->decl  = decl;
-					proc_info->type  = other->type;
-					proc_info->body  = decl->proc_lit->ProcLit.body;
-					proc_info->tags  = other->Procedure.tags;;
-					proc_info->generated_from_polymorphic = true;
-					proc_info->poly_def_node = poly_def_node;
-
-					check_procedure_later(nctx.checker, proc_info);
-				}
-
-				return true;
+				return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
 			}
 		}
 		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 	}
 
+
+	// NOTE(bill): The two lookups above ran under a shared lock which was then released, so a
+	// concurrent instantiation of this same specialization could have been published in the gap.
+	// Acquire the exclusive lock now and hold it across the re-check below and the array_add at the
+	// end, so that finding-then-publishing is atomic. Without this, two threads racing on the same
+	// specialization could both miss and each build and enqueue a distinct entity for it. The lock
+	// is only released here on an early return (a late-arriving duplicate); the normal path releases
+	// it after publishing. (@local-mutex)
+	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
+	for (Entity *other : gen_procs->procs) {
+		if (are_types_identical(base_type(other->type), final_proc_type)) {
+			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
+			return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
+		}
+	}
 
 	Ast *proc_lit = clone_ast(old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
@@ -648,8 +669,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 
-	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
-		array_add(&gen_procs->procs, entity);
+	// NOTE(bill): The exclusive lock has been held since just before construction (see above),
+	// so this publish is atomic with the re-check that preceded it.
+	array_add(&gen_procs->procs, entity);
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
 	ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
@@ -1604,9 +1626,13 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 				}
 				return is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
 			}
+			// NOTE(bill): Both are evaluated (not short-circuited) so their modify_type side effects
+			// are applied, but both the index and the element must match for the pattern to hold.
+			// A previous `index || elem` here over-accepted (e.g. `[Dir]$T` vs `[Other]f32`), binding
+			// `$T` and leaving the index mismatch to be reported later as a confusing assignment error.
 			bool index = is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
 			bool elem  = is_polymorphic_type_assignable(c, poly->EnumeratedArray.elem, source->EnumeratedArray.elem, true, modify_type);
-			return index || elem;
+			return index && elem;
 		}
 		return false;
 
@@ -1777,9 +1803,14 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 		return false;
 	case Type_Map:
 		if (source->kind == Type_Map) {
+			// NOTE(bill): Both are evaluated (not short-circuited) so their modify_type side effects
+			// are applied, but both the key and the value must match for the pattern to hold. A
+			// previous `key || value` here over-accepted (e.g. `map[int]$V` vs `map[string]f32`),
+			// binding `$V` and leaving the key mismatch to be reported later as a confusing
+			// assignment error, and would finalize a map that was only partially matched.
 			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
 			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
-			if (key || value) {
+			if (key && value) {
 				if (modify_type) {
 					poly->Map.lookup_result_type = nullptr;
 					init_map_internal_types(poly);
@@ -8730,7 +8761,13 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
 		mutex_lock(&found_gen_types->mutex);
-		defer (mutex_unlock(&found_gen_types->mutex));
+		// NOTE(bill): For a struct instantiation, check_struct_type releases this mutex early (right
+		// after publishing the instantiation into gen_types, before checking its fields) to avoid a
+		// cross-record ABBA deadlock between mutually-recursive generic records; it signals that by
+		// leaving `gen_types_locked` cleared below. The union path and the cache-hit path keep the
+		// mutex until the end of this scope.
+		bool gen_types_locked = true;
+		defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
 
 		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 		if (found_entity) {
@@ -8756,7 +8793,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			set_base_type(named_type, struct_type);
 
 			check_open_scope(&ctx, node);
-			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type);
+			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+			// check_struct_type released found_gen_types->mutex after publishing the instantiation.
+			gen_types_locked = false;
 			check_close_scope(&ctx);
 		} else if (bt->kind == Type_Union) {
 			Ast *node = clone_ast(bt->Union.node);
@@ -8772,45 +8811,10 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
 
-
-		bt = base_type(named_type);
-		if (bt->kind == Type_Struct || bt->kind == Type_Union) {
-			GB_ASSERT(original_type->kind == Type_Named);
-			Entity *e = original_type->Named.type_name;
-			GB_ASSERT(e->kind == Entity_TypeName);
-
-			gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
-			s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
-
-			TypeTuple *tuple = get_record_polymorphic_params(bt);
-			if (tuple != nullptr) for_array(i, tuple->variables) {
-				Entity *v = tuple->variables[i];
-				String name = v->token.string;
-				if (i > 0) {
-					s = gb_string_append_fmt(s, ", ");
-				}
-				s = gb_string_append_fmt(s, "$%.*s", LIT(name));
-
-				if (v->kind == Entity_TypeName) {
-					if (v->type != nullptr && v->type->kind != Type_Generic) {
-						s = gb_string_append_fmt(s, "=");
-						s = write_type_to_string(s, v->type, false);
-					}
-				} else if (v->kind == Entity_Constant) {
-					if (v->Constant.value.kind != ExactValue_Invalid) {
-						s = gb_string_append_fmt(s, "=");
-						s = write_exact_value_to_string(s, v->Constant.value);
-					}
-				}
-			}
-			s = gb_string_append_fmt(s, ")");
-
-			String new_name = make_string_c(s);
-			named_type->Named.name = new_name;
-			if (named_type->Named.type_name) {
-				named_type->Named.type_name->token.string = new_name;
-			}
-		}
+		// NOTE(bill): The instantiation's canonical name is now set inside
+		// check_struct_type/check_union_type (before it is published into gen_types), so that a
+		// concurrent thread which finds the in-progress struct instantiation never observes a
+		// torn name.
 
 		operand->mode = Addressing_Type;
 		operand->type = named_type;
