@@ -27,6 +27,26 @@ struct ErrorCollector {
 
 gb_global ErrorCollector global_error_collector;
 
+// Scoped, per-thread error muting. While muted, error/warning emission is suppressed but still
+// *counted*, so a caller can trial-check something (e.g. one branch of a procedure group) and learn
+// whether it would have failed without printing anything. Muting nests.
+gb_thread_local i32 global_error_mute_depth = 0;
+gb_thread_local i64 global_error_mute_count = 0;
+
+gb_internal void begin_error_mute(void) {
+	global_error_mute_depth += 1;
+}
+gb_internal void end_error_mute(void) {
+	GB_ASSERT(global_error_mute_depth > 0);
+	global_error_mute_depth -= 1;
+}
+gb_internal i64 error_mute_count(void) {
+	return global_error_mute_count;
+}
+gb_internal bool is_error_muted(void) {
+	return global_error_mute_depth > 0;
+}
+
 
 gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = ErrorValue_Error) {
 	GB_ASSERT_MSG(global_error_collector.curr_error_value_set.load() == false, "Possible race condition in error handling system, please report this with an issue");
@@ -542,6 +562,10 @@ gb_internal void error_out_coloured(char const *str, TerminalStyle style, Termin
 
 
 gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	if (global_error_mute_depth > 0) {
+		global_error_mute_count += 1;
+		return;
+	}
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
@@ -577,6 +601,10 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 		return;
 	}
 	if (global_ignore_warnings()) {
+		return;
+	}
+	if (global_error_mute_depth > 0) {
+		global_error_mute_count += 1;
 		return;
 	}
 
