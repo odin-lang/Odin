@@ -1580,22 +1580,15 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 						return is_polymorphic_type_assignable(c, poly->Array.elem, source->EnumeratedArray.elem, true, false);
 					}
 
-					// Capture $T before rewriting `poly`: Array.elem and EnumeratedArray.elem share a
-					// union offset, so the assignment below would clobber it and the elem recursion
-					// would never bind $T.
+					// Resolve `[$N]$T` to an enumerated array by constructing the concrete node
+					// (keeping the $T element node) and finalizing poly to it, rather than rewriting
+					// poly's kind and fields one at a time.
 					Type *poly_elem = poly->Array.elem;
-
-					poly->kind = Type_EnumeratedArray;
-					poly->cached_size  = -1;
-					poly->cached_align = -1;
-					poly->flags.exchange(source->flags);
-					poly->failure      = false;
-					poly->EnumeratedArray.elem      = poly_elem;
-					poly->EnumeratedArray.index     = source->EnumeratedArray.index;
-					poly->EnumeratedArray.min_value = source->EnumeratedArray.min_value;
-					poly->EnumeratedArray.max_value = source->EnumeratedArray.max_value;
-					poly->EnumeratedArray.count     = source->EnumeratedArray.count;
-					poly->EnumeratedArray.op        = source->EnumeratedArray.op;
+					Type *ea = alloc_type_enumerated_array(poly_elem, index,
+						source->EnumeratedArray.min_value, source->EnumeratedArray.max_value,
+						source->EnumeratedArray.count, source->EnumeratedArray.op);
+					ea->flags.exchange(source->flags);
+					gb_memmove(poly, ea, gb_size_of(Type));
 
 					e->kind = Entity_TypeName;
 					e->TypeName.is_type_alias = true;

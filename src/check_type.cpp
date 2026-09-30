@@ -1824,6 +1824,277 @@ gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *special
 }
 
 
+// subst_unify matches a polymorphic pattern against a source PURELY (no node/entity mutation),
+// accumulating bindings; subst_apply reconstructs the instantiated type by CONSTRUCTION. Guarded by
+// PARAPOLY_VERIFY_SUBST, determine_type_from_polymorphic runs these alongside the existing in-place
+// mutation and asserts the two agree, proving the constructive path before anything relies on it.
+// Coverage is a slice (generic/basic/slice/dynamic-array/fixed [$N]$T); other kinds report
+// Subst_Unhandled and are skipped. No behavior change. This is refactor scaffolding: it runs a
+// second (constructive) match per instantiation, so set to 0 (or gate to debug) before release.
+#define PARAPOLY_VERIFY_SUBST 1
+
+enum SubstResult { Subst_Unhandled, Subst_NoMatch, Subst_Matched };
+
+enum PolyBindKind { PolyBind_Type, PolyBind_Value, PolyBind_EnumArray };
+struct PolyBinding {
+	Entity      *key;
+	PolyBindKind kind;
+	Type        *type;  // PolyBind_Type: bound type; PolyBind_EnumArray: source EnumeratedArray
+	i64          value; // PolyBind_Value: array count
+};
+struct PolySubst {
+	PolyBinding items[64];
+	isize       count;
+};
+
+gb_internal Entity *poly_generic_entity(Type *g) {
+	GB_ASSERT(g->kind == Type_Generic);
+	if (g->Generic.scope == nullptr) {
+		return nullptr;
+	}
+	return scope_lookup(g->Generic.scope, g->Generic.interned_name, 0);
+}
+gb_internal PolyBinding *poly_subst_find(PolySubst *s, Entity *key) {
+	for (isize i = 0; i < s->count; i++) {
+		if (s->items[i].key == key) {
+			return &s->items[i];
+		}
+	}
+	return nullptr;
+}
+gb_internal bool poly_subst_add(PolySubst *s, Entity *key, PolyBinding b) {
+	if (key == nullptr) {
+		return false;
+	}
+	PolyBinding *prev = poly_subst_find(s, key);
+	if (prev != nullptr) {
+		if (prev->kind != b.kind) {
+			return false;
+		}
+		switch (b.kind) {
+		case PolyBind_Type:      return are_types_identical(prev->type, b.type);
+		case PolyBind_Value:     return prev->value == b.value;
+		case PolyBind_EnumArray: return are_types_identical(prev->type, b.type);
+		}
+		return false;
+	}
+	if (s->count >= gb_count_of(s->items)) {
+		return false;
+	}
+	b.key = key;
+	s->items[s->count++] = b;
+	return true;
+}
+gb_internal bool poly_subst_bind_type(PolySubst *s, Entity *key, Type *t) {
+	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_Type, t, 0});
+}
+gb_internal bool poly_subst_bind_value(PolySubst *s, Entity *key, i64 v) {
+	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_Value, nullptr, v});
+}
+gb_internal bool poly_subst_bind_enum_array(PolySubst *s, Entity *key, Type *ea) {
+	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_EnumArray, ea, 0});
+}
+
+gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *source, PolySubst *subst) {
+	if (pattern == nullptr || source == nullptr) {
+		return Subst_Unhandled;
+	}
+	switch (pattern->kind) {
+	case Type_Basic:
+		return are_types_identical(pattern, source) ? Subst_Matched : Subst_NoMatch;
+	case Type_Generic:
+		if (pattern->Generic.specialized != nullptr) {
+			return Subst_Unhandled;
+		}
+		return poly_subst_bind_type(subst, poly_generic_entity(pattern), default_type(source)) ? Subst_Matched : Subst_NoMatch;
+	case Type_Pointer:
+		// old code also allows struct subtyping and Pointer<->MultiPointer; only the plain elem match here
+		if (source->kind != Type_Pointer) {
+			return Subst_Unhandled;
+		}
+		if (base_type(pattern->Pointer.elem)->kind == Type_Struct) {
+			return Subst_Unhandled;
+		}
+		return subst_unify(c, pattern->Pointer.elem, source->Pointer.elem, subst);
+	case Type_MultiPointer:
+		if (source->kind != Type_MultiPointer) {
+			return Subst_Unhandled;
+		}
+		if (base_type(pattern->MultiPointer.elem)->kind == Type_Struct) {
+			return Subst_Unhandled;
+		}
+		return subst_unify(c, pattern->MultiPointer.elem, source->MultiPointer.elem, subst);
+	case Type_Slice:
+		if (source->kind != Type_Slice) {
+			return Subst_NoMatch;
+		}
+		return subst_unify(c, pattern->Slice.elem, source->Slice.elem, subst);
+	case Type_DynamicArray:
+		if (source->kind != Type_DynamicArray) {
+			return Subst_NoMatch;
+		}
+		return subst_unify(c, pattern->DynamicArray.elem, source->DynamicArray.elem, subst);
+	case Type_Map: {
+		if (source->kind != Type_Map) {
+			return Subst_NoMatch;
+		}
+		SubstResult k = subst_unify(c, pattern->Map.key, source->Map.key, subst);
+		if (k != Subst_Matched) {
+			return k;
+		}
+		return subst_unify(c, pattern->Map.value, source->Map.value, subst);
+	}
+	case Type_Array:
+		if (source->kind == Type_Array) {
+			if (pattern->Array.generic_count != nullptr) {
+				if (pattern->Array.generic_count->Generic.specialized != nullptr) {
+					return Subst_Unhandled;
+				}
+				Entity *ne = poly_generic_entity(pattern->Array.generic_count);
+				if (ne == nullptr) {
+					return Subst_Unhandled;
+				}
+				if (!poly_subst_bind_value(subst, ne, source->Array.count)) {
+					return Subst_NoMatch;
+				}
+			} else if (pattern->Array.count != source->Array.count) {
+				return Subst_NoMatch;
+			}
+			return subst_unify(c, pattern->Array.elem, source->Array.elem, subst);
+		} else if (source->kind == Type_EnumeratedArray) {
+			if (pattern->Array.generic_count == nullptr) {
+				return Subst_NoMatch;
+			}
+			if (pattern->Array.generic_count->Generic.specialized != nullptr) {
+				return Subst_Unhandled;
+			}
+			Entity *ne = poly_generic_entity(pattern->Array.generic_count);
+			if (ne == nullptr) {
+				return Subst_Unhandled;
+			}
+			if (ne->kind != Entity_TypeName) { // old only takes the enum branch when $N is unbound
+				return Subst_NoMatch;
+			}
+			if (base_type(source->EnumeratedArray.index)->kind != Type_Enum) {
+				return Subst_NoMatch;
+			}
+			if (!poly_subst_bind_enum_array(subst, ne, source)) {
+				return Subst_NoMatch;
+			}
+			return subst_unify(c, pattern->Array.elem, source->EnumeratedArray.elem, subst);
+		}
+		return Subst_Unhandled;
+	case Type_Matrix: {
+		if (source->kind != Type_Matrix) {
+			return Subst_Unhandled;
+		}
+		if (pattern->Matrix.generic_row_count != nullptr) {
+			if (pattern->Matrix.generic_row_count->Generic.specialized != nullptr) return Subst_Unhandled;
+			Entity *re = poly_generic_entity(pattern->Matrix.generic_row_count);
+			if (re == nullptr) return Subst_Unhandled;
+			if (!poly_subst_bind_value(subst, re, source->Matrix.row_count)) return Subst_NoMatch;
+		} else if (pattern->Matrix.row_count != source->Matrix.row_count) {
+			return Subst_NoMatch;
+		}
+		if (pattern->Matrix.generic_column_count != nullptr) {
+			if (pattern->Matrix.generic_column_count->Generic.specialized != nullptr) return Subst_Unhandled;
+			Entity *ce = poly_generic_entity(pattern->Matrix.generic_column_count);
+			if (ce == nullptr) return Subst_Unhandled;
+			if (!poly_subst_bind_value(subst, ce, source->Matrix.column_count)) return Subst_NoMatch;
+		} else if (pattern->Matrix.column_count != source->Matrix.column_count) {
+			return Subst_NoMatch;
+		}
+		return subst_unify(c, pattern->Matrix.elem, source->Matrix.elem, subst);
+	}
+	case Type_SimdVector:
+		if (source->kind != Type_SimdVector) {
+			return Subst_Unhandled;
+		}
+		if (pattern->SimdVector.generic_count != nullptr) {
+			if (pattern->SimdVector.generic_count->Generic.specialized != nullptr) return Subst_Unhandled;
+			Entity *ne = poly_generic_entity(pattern->SimdVector.generic_count);
+			if (ne == nullptr) return Subst_Unhandled;
+			if (!poly_subst_bind_value(subst, ne, source->SimdVector.count)) return Subst_NoMatch;
+		} else if (pattern->SimdVector.count != source->SimdVector.count) {
+			return Subst_NoMatch;
+		}
+		return subst_unify(c, pattern->SimdVector.elem, source->SimdVector.elem, subst);
+	}
+	return Subst_Unhandled;
+}
+
+gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, PolySubst *subst) {
+	switch (pattern->kind) {
+	case Type_Basic:
+		return pattern;
+	case Type_Generic: {
+		PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern));
+		GB_ASSERT(b != nullptr && b->kind == PolyBind_Type);
+		return b->type;
+	}
+	case Type_Pointer:
+		return alloc_type_pointer(subst_apply(c, pattern->Pointer.elem, subst));
+	case Type_MultiPointer:
+		return alloc_type_multi_pointer(subst_apply(c, pattern->MultiPointer.elem, subst));
+	case Type_Slice:
+		return alloc_type_slice(subst_apply(c, pattern->Slice.elem, subst));
+	case Type_DynamicArray:
+		return alloc_type_dynamic_array(subst_apply(c, pattern->DynamicArray.elem, subst));
+	case Type_Map: {
+		Type *m = alloc_type(Type_Map);
+		m->Map.key   = subst_apply(c, pattern->Map.key, subst);
+		m->Map.value = subst_apply(c, pattern->Map.value, subst);
+		return m;
+	}
+	case Type_Array: {
+		Type *elem = subst_apply(c, pattern->Array.elem, subst);
+		if (pattern->Array.generic_count != nullptr) {
+			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->Array.generic_count));
+			GB_ASSERT(b != nullptr);
+			if (b->kind == PolyBind_EnumArray) {
+				Type *ea = b->type;
+				Type *r = alloc_type_enumerated_array(elem, ea->EnumeratedArray.index,
+					ea->EnumeratedArray.min_value, ea->EnumeratedArray.max_value,
+					ea->EnumeratedArray.count, ea->EnumeratedArray.op);
+				r->flags.exchange(ea->flags);
+				return r;
+			}
+			GB_ASSERT(b->kind == PolyBind_Value);
+			return alloc_type_array(elem, b->value, nullptr);
+		}
+		return alloc_type_array(elem, pattern->Array.count, nullptr);
+	}
+	case Type_Matrix: {
+		Type *elem = subst_apply(c, pattern->Matrix.elem, subst);
+		i64 rc = pattern->Matrix.row_count;
+		i64 cc = pattern->Matrix.column_count;
+		if (pattern->Matrix.generic_row_count != nullptr) {
+			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->Matrix.generic_row_count));
+			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
+			rc = b->value;
+		}
+		if (pattern->Matrix.generic_column_count != nullptr) {
+			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->Matrix.generic_column_count));
+			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
+			cc = b->value;
+		}
+		return alloc_type_matrix(elem, rc, cc, nullptr, nullptr, pattern->Matrix.is_row_major);
+	}
+	case Type_SimdVector: {
+		Type *elem = subst_apply(c, pattern->SimdVector.elem, subst);
+		i64 count = pattern->SimdVector.count;
+		if (pattern->SimdVector.generic_count != nullptr) {
+			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->SimdVector.generic_count));
+			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
+			count = b->value;
+		}
+		return alloc_type_simd_vector(count, elem, nullptr);
+	}
+	}
+	GB_PANIC("subst_apply: unhandled kind");
+	return nullptr;
+}
+
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
@@ -1845,9 +2116,35 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		return t_invalid;
 	}
 
+#if PARAPOLY_VERIFY_SUBST
+	PolySubst verify_subst = {};
+	SubstResult verify_ur = Subst_Unhandled;
+	Type *verify_applied = nullptr;
+	if (modify_type) {
+		verify_ur = subst_unify(ctx, poly_type, operand.type, &verify_subst);
+		if (verify_ur == Subst_Matched) {
+			verify_applied = subst_apply(ctx, poly_type, &verify_subst);
+		}
+	}
+#endif
+
 	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
+	#if PARAPOLY_VERIFY_SUBST
+		if (verify_ur == Subst_Matched) {
+			GB_ASSERT_MSG(are_types_identical(verify_applied, poly_type),
+			              "parapoly subst mismatch: applied '%s' vs mutated '%s'",
+			              type_to_string(verify_applied), type_to_string(poly_type));
+		} else if (verify_ur == Subst_NoMatch) {
+			GB_PANIC("parapoly subst reported NoMatch but in-place match succeeded (result '%s')", type_to_string(poly_type));
+		}
+	#endif
 		return poly_type;
 	}
+#if PARAPOLY_VERIFY_SUBST
+	if (verify_ur == Subst_Matched) {
+		GB_PANIC("parapoly subst matched but in-place match failed");
+	}
+#endif
 	if (show_error) {
 		ERROR_BLOCK();
 		gbString pts = type_to_string(poly_type);
