@@ -11332,6 +11332,48 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		return kind;
 	}
 
+	// An untyped `{...}` against a union: infer which variant it is by trial-checking the literal against each variant (muted, on a clone).
+	// If exactly one matches, retarget to that variant and let the normal path build it (the surrounding assignment then wraps it into the union).
+	// Otherwise report a clear error.
+	if (t->kind == Type_Union && cl->type == nullptr && cl->elems.count > 0) {
+		wait_signal_until_available(&t->Union.variants_wait_signal);
+		auto matches = array_make<Type *>(temporary_allocator(), 0, t->Union.variants.count);
+		for (Type *variant : t->Union.variants) {
+			Operand trial = {};
+			i64 muted_before = error_mute_count();
+			begin_error_mute();
+			check_expr_base(c, &trial, clone_ast(node), variant);
+			end_error_mute();
+			if (trial.mode != Addressing_Invalid && error_mute_count() == muted_before) {
+				array_add(&matches, variant);
+			}
+		}
+		if (matches.count == 1) {
+			type = matches[0];
+			t = base_type(type);
+		} else {
+			gbString us = type_to_string(type);
+			if (matches.count == 0) {
+				error(node, "No variant of the union '%s' matches this compound literal", us);
+			} else {
+				ERROR_BLOCK();
+				error(node, "Ambiguous compound literal for the union '%s'; it matches %td variants:", us, matches.count);
+				for (Type *m : matches) {
+					gbString ms = type_to_string(m);
+					error_line("\t%s\n", ms);
+					gb_string_free(ms);
+				}
+				gbString first = type_to_string(matches[0]);
+				error_line("\tSuggestion: name the intended variant, e.g. '%s{...}'\n", first);
+				gb_string_free(first);
+			}
+			gb_string_free(us);
+			o->expr = node;
+			o->type = type;
+			return kind;
+		}
+	}
+
 
 	switch (t->kind) {
 	case Type_Struct:
