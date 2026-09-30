@@ -100,20 +100,15 @@ gb_internal void big_int_rem_eq(BigInt *dst, BigInt const *x);
 gb_internal bool big_int_is_neg(BigInt const *x);
 gb_internal void big_int_neg(BigInt *dst, BigInt const *x);
 
+// NOTE: libtommath allows the output to alias an input, so `dst` is not copied first
 gb_internal void big_int_add_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_add(dst, &res, x);
+	big_int_add(dst, dst, x);
 }
 gb_internal void big_int_sub_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_sub(dst, &res, x);
+	big_int_sub(dst, dst, x);
 }
 gb_internal void big_int_shl_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_shl(dst, &res, x);
+	big_int_shl(dst, dst, x);
 }
 gb_internal void big_int_shr_eq(BigInt *dst, BigInt const *x) {
 	BigInt res = {};
@@ -121,9 +116,7 @@ gb_internal void big_int_shr_eq(BigInt *dst, BigInt const *x) {
 	big_int_shr(dst, &res, x);
 }
 gb_internal void big_int_mul_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_mul(dst, &res, x);
+	big_int_mul(dst, dst, x);
 }
 gb_internal void big_int_quo_eq(BigInt *dst, BigInt const *x) {
 	BigInt res = {};
@@ -214,9 +207,6 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 
 	mp_zero(dst);
 
-	BigInt digit = {};
-	defer (big_int_dealloc(&digit));
-
 	isize i = 0;
 	isize digit_count = 0;
 	for (; i < len; i++) {
@@ -246,9 +236,8 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			digit_count += 1;
 		}
 
-		big_int_from_u64(&digit, v);
-		big_int_mul_eq(dst, &b);
-		big_int_add_eq(dst, &digit);
+		mp_mul_d(dst, cast(mp_digit)base, dst);
+		mp_add_d(dst, cast(mp_digit)v, dst);
 	}
 	if (digit_count == 0) {
 		// a base prefix with only digit separators after it, `0x_`, has no digits at all
@@ -289,7 +278,7 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 				v = u64_digit_value(r);
 			} else {
 				*success = false;
-				break;
+				return;
 			}
 			exp *= 10;
 			exp += v;
