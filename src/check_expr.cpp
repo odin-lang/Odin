@@ -13028,6 +13028,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case Ast_EnumType:
 	case Ast_MapType:
 	case Ast_BitSetType:
+	case Ast_BitFieldType:
 	case Ast_MatrixType:
 	case Ast_RelativeType:
 		o->mode = Addressing_Type;

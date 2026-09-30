@@ -891,7 +891,15 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 				}
 			} else {
 				for_array(j, variants) {
-					if (union_variant_index_types_equal(t, variants[j])) {
+					Type *other = variants[j];
+					// Distinct polymorphic type variables (e.g. `$A`, `$B`) are distinct variants even
+					// though are_types_identical treats all unbound generics as equal.
+					if (other->kind == Type_Generic && t->kind == Type_Generic &&
+					    other->Generic.specialized == nullptr && t->Generic.specialized == nullptr &&
+					    !(other->Generic.interned_name == t->Generic.interned_name)) {
+						continue;
+					}
+					if (union_variant_index_types_equal(t, other)) {
 						ok = false;
 						ERROR_BLOCK();
 						gbString str = type_to_string(t);
@@ -941,6 +949,18 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 				error(ut->align, "An empty union cannot have a custom alignment");
 			} else {
 				union_type->Union.custom_align = custom_align;
+			}
+		}
+	}
+
+	// An anonymous union with a polymorphic variant (e.g. `union{$T, int}`) is itself polymorphic.
+	// is_type_polymorphic(Union) only reads this flag (its variant loop is disabled to avoid a
+	// recursion bug), so compute it once here from the resolved variants.
+	if (!union_type->Union.is_polymorphic) {
+		for (Type *v : union_type->Union.variants) {
+			if (is_type_polymorphic(v)) {
+				union_type->Union.is_polymorphic = true;
+				break;
 			}
 		}
 	}
@@ -1140,7 +1160,10 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
 		return;
 	}
-	if (!is_valid_bit_field_backing_type(backing_type)) {
+	// A polymorphic backing (e.g. `bit_field $T {...}`) has an unknown size/endianness until it is
+	// instantiated, so the backing-dependent validations below are skipped for it.
+	bool backing_is_polymorphic = is_type_polymorphic(backing_type);
+	if (!backing_is_polymorphic && !is_valid_bit_field_backing_type(backing_type)) {
 		error(bf->backing_type, "Backing type for a bit_field must be an integer or an array of an integer");
 		return;
 	}
@@ -1149,7 +1172,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 	auto bit_sizes = array_make<u8>      (permanent_allocator(), 0, bf->fields.count);
 	auto tags      = array_make<String>  (permanent_allocator(), 0, bf->fields.count);
 
-	u64 maximum_bit_size = 8 * type_size_of(backing_type);
+	u64 maximum_bit_size = backing_is_polymorphic ? ~cast(u64)0 : 8 * type_size_of(backing_type);
 	u64 total_bit_size = 0;
 
 	for_array(i, bf->fields) {
@@ -1311,9 +1334,9 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 		return Endian_Native;
 	};
 
-	Type *backing_type_elem = core_array_type(backing_type);
-	i64 backing_type_elem_size = type_size_of(backing_type_elem);
-	EndianKind backing_type_endian_kind = determine_endian_kind(backing_type_elem);
+	Type *backing_type_elem = backing_is_polymorphic ? backing_type : core_array_type(backing_type);
+	i64 backing_type_elem_size = backing_is_polymorphic ? 0 : type_size_of(backing_type_elem);
+	EndianKind backing_type_endian_kind = backing_is_polymorphic ? Endian_Unknown : determine_endian_kind(backing_type_elem);
 	EndianKind endian_kind = Endian_Unknown;
 	for (Entity *f : fields) {
 		EndianKind field_kind = determine_endian_kind(f->type);
@@ -1924,19 +1947,21 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		}
 		return Subst_NoMatch;
 	case Type_Pointer:
-		// old code also allows struct subtyping and Pointer<->MultiPointer; only the plain elem match here
+		// Pointer<->MultiPointer conversions stay on the mutator; here only the same-kind elem match.
 		if (source->kind != Type_Pointer) {
 			return Subst_Unhandled;
 		}
-		if (base_type(pattern->Pointer.elem)->kind == Type_Struct) {
-			return Subst_Unhandled;
+		if (base_type(pattern->Pointer.elem)->kind == Type_Struct &&
+		    check_is_assignable_to_using_subtype(source->Pointer.elem, pattern->Pointer.elem, 0, false, true) > 0) {
+			return Subst_Unhandled; // genuine subtype match (no binding), handled by the mutator
 		}
 		return subst_unify(c, pattern->Pointer.elem, source->Pointer.elem, subst);
 	case Type_MultiPointer:
 		if (source->kind != Type_MultiPointer) {
 			return Subst_Unhandled;
 		}
-		if (base_type(pattern->MultiPointer.elem)->kind == Type_Struct) {
+		if (base_type(pattern->MultiPointer.elem)->kind == Type_Struct &&
+		    check_is_assignable_to_using_subtype(source->MultiPointer.elem, pattern->MultiPointer.elem) > 0) {
 			return Subst_Unhandled;
 		}
 		return subst_unify(c, pattern->MultiPointer.elem, source->MultiPointer.elem, subst);
@@ -2162,8 +2187,9 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		if (source->kind != Type_SoaPointer) {
 			return Subst_Unhandled;
 		}
-		if (base_type(pattern->SoaPointer.elem)->kind == Type_Struct) {
-			return Subst_Unhandled; // subtype path, handled by the mutator
+		if (base_type(pattern->SoaPointer.elem)->kind == Type_Struct &&
+		    check_is_assignable_to_using_subtype(source->SoaPointer.elem, pattern->SoaPointer.elem, 0, false, true) > 0) {
+			return Subst_Unhandled; // genuine subtype match (no binding), handled by the mutator
 		}
 		return subst_unify(c, pattern->SoaPointer.elem, source->SoaPointer.elem, subst);
 	case Type_FixedCapacityDynamicArray:
@@ -2441,14 +2467,30 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		// resolved type is the (already concrete) source.
 		return source;
 	case Type_BitField: {
+		Type *backing = subst_apply(c, pattern->BitField.backing_type, source->BitField.backing_type, subst);
 		Type *r = alloc_type_bit_field();
-		r->BitField.backing_type = subst_apply(c, pattern->BitField.backing_type, source->BitField.backing_type, subst);
+		r->BitField.backing_type = backing;
 		r->BitField.fields       = pattern->BitField.fields;
 		r->BitField.tags         = pattern->BitField.tags;
 		r->BitField.bit_sizes    = pattern->BitField.bit_sizes;
 		r->BitField.bit_offsets  = pattern->BitField.bit_offsets;
 		r->BitField.scope        = pattern->BitField.scope;
 		r->BitField.node         = pattern->BitField.node;
+		// The backing-size check is deferred from check_bit_field_type for a polymorphic backing; run it
+		// now that the backing is concrete.
+		if (!c->no_polymorphic_errors && !c->hide_polymorphic_errors && !is_type_polymorphic(backing)) {
+			u64 total = 0;
+			for (u8 bs : r->BitField.bit_sizes) {
+				total += bs;
+			}
+			u64 maximum = 8 * cast(u64)type_size_of(backing);
+			if (total > maximum) {
+				gbString s = type_to_string(backing);
+				error(pattern->BitField.node, "The total bit size of a bit_field's fields (%llu) must fit into its backing type's (%s) bit size of %llu",
+				      cast(unsigned long long)total, s, cast(unsigned long long)maximum);
+				gb_string_free(s);
+			}
+		}
 		return r;
 	}
 	case Type_Struct: {

@@ -2635,6 +2635,9 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 			return true;
 		}
 		break;
+
+	case Type_BitField:
+		return is_type_polymorphic(t->BitField.backing_type, or_specialized);
 	}
 	return false;
 }
