@@ -8123,23 +8123,29 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	if (valids.count == 0) {
 		ERROR_BLOCK();
 
-		error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
-		if (positional_operands.count == 0 && named_operands.count == 0) {
-			error_line("\tNo given arguments\n");
-		} else {
-			print_argument_types();
-		}
+		// element type of a container type, if any (dynamic array / slice / fixed(-capacity) array)
+		auto container_elem = [](Type *t) -> Type * {
+			if (t == nullptr) {
+				return nullptr;
+			}
+			switch (t->kind) {
+			case Type_DynamicArray:              return t->DynamicArray.elem;
+			case Type_FixedCapacityDynamicArray: return t->FixedCapacityDynamicArray.elem;
+			case Type_Slice:                     return t->Slice.elem;
+			case Type_Array:                     return t->Array.elem;
+			}
+			return nullptr;
+		};
 
+		// NOTE(bill): Check for a confident diagnosis
+		Ast *diag_expr = nullptr;
+		isize diag_index = -1;
+		Type *diag_elem = nullptr;
+		Type *diag_cont = nullptr;
+		gbString diag_arg_type = nullptr;
 		if (positional_operands.count >= 2 && positional_operands[0].type != nullptr) {
 			Type *cont = base_type(type_deref(positional_operands[0].type));
-			Type *elem = nullptr;
-			if (cont != nullptr) {
-				if (cont->kind == Type_DynamicArray) {
-					elem = cont->DynamicArray.elem;
-				} else if (cont->kind == Type_Slice) {
-					elem = cont->Slice.elem;
-				}
-			}
+			Type *elem = container_elem(cont);
 			if (elem != nullptr && !is_type_polymorphic(elem)) {
 				for (isize i = 1; i < positional_operands.count; i++) {
 					Operand src = positional_operands[i];
@@ -8150,14 +8156,30 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					if (check_is_assignable_to(c, &src, elem, false)) {
 						continue;
 					}
-					gbString es = type_to_string(elem);
-					gbString ss = type_to_string(src.type);
-					error_line("  \n");
-					error_line("\tSuggestion: the element type is '%s', but argument #%td is '%s'\n", es, i+1, ss);
-					gb_string_free(ss);
-					gb_string_free(es);
+					diag_expr     = src.expr;
+					diag_index    = i;
+					diag_elem     = elem;
+					diag_cont     = cont;
+					diag_arg_type = type_to_string(src.type);
 					break;
 				}
+			}
+		}
+
+		if (diag_expr != nullptr) {
+			gbString es = type_to_string(diag_elem);
+			error(diag_expr, "'%s' expected argument #%td to be of type '%s', got '%s'", expr_name, diag_index+1, es, diag_arg_type);
+			gbString cs = type_to_string(diag_cont);
+			error_line("\t'%s' is the element type of '%s'\n", es, cs);
+			gb_string_free(cs);
+			gb_string_free(es);
+			gb_string_free(diag_arg_type);
+		} else {
+			error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
+			if (positional_operands.count == 0 && named_operands.count == 0) {
+				error_line("\tNo given arguments\n");
+			} else {
+				print_argument_types();
 			}
 		}
 
@@ -8223,15 +8245,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		// the "Did you mean" list stays focused. E.g. appending a value to a plain `[dynamic]T` hides the
 		// `#soa`, fixed-capacity, and `[]u8`-element `append` overloads. Only affects what is displayed.
 		if (positional_operands.count >= 1 && positional_operands[0].type != nullptr) {
-			auto container_elem = [](Type *t) -> Type * {
-				switch (t->kind) {
-				case Type_DynamicArray:              return t->DynamicArray.elem;
-				case Type_FixedCapacityDynamicArray: return t->FixedCapacityDynamicArray.elem;
-				case Type_Slice:                     return t->Slice.elem;
-				case Type_Array:                     return t->Array.elem;
-				}
-				return nullptr;
-			};
 			Type *arg0 = base_type(type_deref(positional_operands[0].type));
 			if (arg0 != nullptr && arg0->kind != Type_Generic && !is_type_polymorphic(arg0)) {
 				Type *arg0_elem = container_elem(arg0);
