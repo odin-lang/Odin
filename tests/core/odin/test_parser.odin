@@ -295,3 +295,77 @@ test_parse_ternary_if_statements_with_comment :: proc(t: ^testing.T) {
 	testing.expect(t, ok, "bad parse")
 	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
 }
+
+@test
+test_parse_multiline_triple_quoted_string :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	file := ast.File{
+		fullpath = "test.odin",
+		src = `
+			package main
+
+			my_func :: proc (cond: bool, a: string, b: string) -> string {
+					_ := "Usual string"
+					out := """
+						This is a
+						multiline string
+					"""
+					return out
+			}
+		`,
+	}
+
+	p := parser.default_parser()
+
+	p.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.errorf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	p.warn = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.warnf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	ok := parser.parse_file(&p, &file)
+	testing.expect(t, ok, "bad parse")
+	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
+}
+
+@test
+test_parse_multiline_triple_ticked_string :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	file := ast.File{
+		fullpath = "test.odin",
+		src = """
+			package main
+
+			my_func :: proc (cond: bool, a: string, b: string) -> string {
+					_ := `Usual raw string`
+					out := ```
+						This is a
+						multiline raw string
+					```
+					return out
+			}
+		""",
+	}
+
+	p := parser.default_parser()
+
+	p.err = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.errorf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	p.warn = proc(pos: tokenizer.Pos, format: string, args: ..any) {
+		message := fmt.tprintf(format, ..args)
+		log.warnf("%s(%d:%d): %s", pos.file, pos.line, pos.column, message)
+	}
+
+	ok := parser.parse_file(&p, &file)
+	testing.expect(t, ok, "bad parse")
+	testing.expect(t, file.syntax_error_count == 0, "should contain zero errors")
+}

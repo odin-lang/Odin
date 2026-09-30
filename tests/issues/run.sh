@@ -33,6 +33,7 @@ $ODIN build ../test_issue_5043.odin $COMMON
 $ODIN build ../test_issue_5097.odin $COMMON
 $ODIN build ../test_issue_5097-2.odin $COMMON
 $ODIN build ../test_issue_5265.odin $COMMON
+$ODIN test ../test_issue_5318.odin $COMMON
 if [[ $($ODIN build ../test_issue_5573.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -42,6 +43,7 @@ fi
 $ODIN test ../test_issue_5699.odin $COMMON
 $ODIN test ../test_issue_6068.odin $COMMON
 $ODIN test ../test_issue_6165.odin $COMMON
+$ODIN test ../test_issue_6302.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON -o:speed
 $ODIN test ../test_issue_6396.odin $COMMON
@@ -86,11 +88,15 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+$ODIN test ../test_issue_6951_5214.odin $COMMON
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
+$ODIN run ../test_issue_7482.odin $COMMON
 $ODIN run ../test_issue_7564.odin $COMMON
+$ODIN test ../test_issue_7587.odin $COMMON
+$ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
 if [[ $($ODIN check ../test_issue_7421_tagged_duplicate.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
@@ -107,6 +113,7 @@ $ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_bool_to_be_conversion.odin $COMMON
 $ODIN test ../test_issue_bool_comparison_truthiness.odin $COMMON
 $ODIN test ../test_issue_const_array_broadcast.odin $COMMON
+$ODIN test ../test_issue_proc_constant_instantiation.odin $COMMON
 $ODIN test ../test_issue_swizzle_multi_assign.odin $COMMON
 
 $ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
@@ -155,6 +162,15 @@ else
 	exit 1
 fi
 
+$ODIN test ../test_issue_7598.odin $COMMON
+
+if [[ $($ODIN build ../test_issue_7598_all_entities_checked.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 clang -c ../test_issue_7010.c -o test_issue_7010_c.o
 $ODIN test ../test_issue_7010.odin $COMMON
 
@@ -170,6 +186,10 @@ if [[ "$(uname)" != "NetBSD" ]]; then
 else
 	$ODIN test ../test_issue_5640.odin -o:none $COMMON
 fi
+
+$ODIN test ../test_lifetime_markers.odin $COMMON -o:size -lifetime-markers
+$ODIN test ../test_lifetime_markers.odin $COMMON -o:speed -lifetime-markers
+$ODIN test ../test_issue_7547.odin $COMMON
 
 set +x
 

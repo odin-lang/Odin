@@ -26,10 +26,12 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin build ..\test_issue_5097.odin %COMMON% || exit /b
 ..\..\..\odin build ..\test_issue_5097-2.odin %COMMON% || exit /b
 ..\..\..\odin build ..\test_issue_5265.odin %COMMON% || exit /b
+..\..\..\odin test ..\test_issue_5318.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_5573.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 ..\..\..\odin test ..\test_issue_5699.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6068.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6165.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_6302.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_6240.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 ..\..\..\odin build ..\test_issue_6401.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 ..\..\..\odin test ..\test_issue_6419.odin %COMMON%  || exit /b
@@ -38,6 +40,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_6484.odin -no-entry-point %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_6753.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_6874.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+..\..\..\odin test ..\test_issue_6951_5214.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_6979.odin -no-entry-point %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7008.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b
@@ -45,6 +48,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_issue_bool_to_be_conversion.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_bool_comparison_truthiness.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_const_array_broadcast.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_proc_constant_instantiation.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_7336.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
@@ -58,6 +62,14 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_sysv_abi.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_7073-1.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 ..\..\..\odin test ..\test_issue_swizzle_multi_assign.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_lifetime_markers.odin %COMMON% -o:size -lifetime-markers  || exit /b
+..\..\..\odin test ..\test_lifetime_markers.odin %COMMON% -o:speed -lifetime-markers  || exit /b
+..\..\..\odin test ..\test_issue_7547.odin %COMMON%  || exit /b
+..\..\..\odin run ..\test_issue_7482.odin %COMMON% || exit /b
+..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local || exit /b
+..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local -o:speed || exit /b
+..\..\..\odin test ..\test_issue_7587.odin %COMMON%  || exit /b
+..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
 
 @echo off
 

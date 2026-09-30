@@ -500,7 +500,45 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 	if (big_int_is_zero(a)) {
 		return LLVMConstNull(lb_type(m, original_type));
 	}
-	
+
+	// NOTE(bill): a bit_set backed by an array of integers (e.g. `bit_set[E; [4]u64]`) is represented as an LLVM array.
+	// There for its constant value is the same bit mask as an integer-backed bit_set, split into element-sized
+	// little-endian chunks (element `i` holds bits `[i*elem_bits, (i+1)*elem_bits)`), which matches how membership
+	// and literals index into the array.
+	if (is_type_bit_set(original_type)) {
+		Type *backing = bit_set_to_int(original_type);
+		if (is_type_array(backing)) {
+			Type *elem = backing->Array.elem;
+			i64 n = backing->Array.count;
+			i64 elem_bits = 8*type_size_of(elem);
+
+			BigInt v = {};
+			big_int_init(&v, a);
+			defer (big_int_dealloc(&v));
+
+			BigInt shift = {};
+			big_int_from_u64(&shift, cast(u64)elem_bits);
+			defer (big_int_dealloc(&shift));
+
+			BigInt mask = {}; // (1 << elem_bits) - 1
+			big_int_from_u64(&mask, 1);
+			big_int_shl(&mask, &mask, &shift);
+			mp_decr(&mask);
+			defer (big_int_dealloc(&mask));
+
+			LLVMTypeRef elem_llvm = lb_type(m, elem);
+			LLVMValueRef *elems = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)n);
+			for (i64 i = 0; i < n; i++) {
+				BigInt chunk = {};
+				big_int_and(&chunk, &v, &mask);
+				elems[i] = lb_big_int_to_llvm(m, elem, &chunk);
+				big_int_dealloc(&chunk);
+				big_int_shr_eq(&v, &shift);
+			}
+			return LLVMConstArray(elem_llvm, elems, cast(unsigned)n);
+		}
+	}
+
 	BigInt val = {};
 	big_int_init(&val, a);
 
@@ -669,7 +707,7 @@ gb_internal lbValue lb_const_value_bit_field(lbModule *m, Type *type, Ast *value
 	// NOTE(bill): inline insertion sort should be good enough, right?
 	for (isize i = 1; i < values.count; i++) {
 		for (isize j = i;
-		     j > 0 && fields[i].bit_offset < fields[j].bit_offset;
+		     j > 0 && fields[j].bit_offset < fields[j-1].bit_offset;
 		     j--) {
 			auto vtmp = values[j];
 			values[j] = values[j-1];
@@ -830,7 +868,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 	bool is_local = cc.allow_local && m->curr_procedure != nullptr;
 
 
-	if (is_type_union(type) && is_type_union_constantable(type)) {
+	// A union constant needs a payload this backend can build, and the checker pins
+	// `variant_type` even for variants it cannot (`any` needs a backing global and a typeid),
+	// so ask the same question the aggregate constant paths ask.
+	if (is_type_union(type) && (is_type_union_constantable(type) ||
+	    (value.variant_type != nullptr && elem_type_can_be_constant(value.variant_type)))) {
 		Type *bt = base_type(type);
 		GB_ASSERT(bt->kind == Type_Union);
 		if (bt->Union.variants.count == 0) {
@@ -1281,6 +1323,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			res.value = lb_big_int_to_llvm(m, original_type, &value.value_integer);
 		}
 		return res;
+	case ExactValue_Rational:
+		// Round the exact rational to the target float once, then emit as a float constant.
+		value = exact_value_to_float(value);
+		/*fallthrough*/
 	case ExactValue_Float:
 		if (is_type_different_to_arch_endianness(type)) {
 			if (type->Basic.kind == Basic_f32le || type->Basic.kind == Basic_f32be) {
@@ -1307,16 +1353,16 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			LLVMValueRef values[2] = {};
 			switch (8*type_size_of(type)) {
 			case 32:
-				values[0] = lb_const_f16(m, cast(f32)value.value_complex->real);
-				values[1] = lb_const_f16(m, cast(f32)value.value_complex->imag);
+				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 64:
-				values[0] = lb_const_f32(m, cast(f32)value.value_complex->real);
-				values[1] = lb_const_f32(m, cast(f32)value.value_complex->imag);
+				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 128:
-				values[0] = LLVMConstReal(lb_type(m, t_f64), value.value_complex->real);
-				values[1] = LLVMConstReal(lb_type(m, t_f64), value.value_complex->imag);
+				values[0] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_complex->real));
+				values[1] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_complex->imag));
 				break;
 			}
 
@@ -1330,24 +1376,24 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			switch (8*type_size_of(type)) {
 			case 64:
 				// @QuaternionLayout
-				values[3] = lb_const_f16(m, cast(f32)value.value_quaternion->real);
-				values[0] = lb_const_f16(m, cast(f32)value.value_quaternion->imag);
-				values[1] = lb_const_f16(m, cast(f32)value.value_quaternion->jmag);
-				values[2] = lb_const_f16(m, cast(f32)value.value_quaternion->kmag);
+				values[3] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 128:
 				// @QuaternionLayout
-				values[3] = lb_const_f32(m, cast(f32)value.value_quaternion->real);
-				values[0] = lb_const_f32(m, cast(f32)value.value_quaternion->imag);
-				values[1] = lb_const_f32(m, cast(f32)value.value_quaternion->jmag);
-				values[2] = lb_const_f32(m, cast(f32)value.value_quaternion->kmag);
+				values[3] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 256:
 				// @QuaternionLayout
-				values[3] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->real);
-				values[0] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->imag);
-				values[1] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->jmag);
-				values[2] = LLVMConstReal(lb_type(m, t_f64), value.value_quaternion->kmag);
+				values[3] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->real));
+				values[0] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			}
 

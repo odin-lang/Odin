@@ -1815,6 +1815,14 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 		fmt_bit_set(fi, val, info.name, verb)
 
 	case runtime.Type_Info_Bit_Set:
+		if info.underlying != nil {
+			#partial switch _ in runtime.type_info_base(info.underlying).variant {
+			case runtime.Type_Info_Array:
+				fmt_bit_set_array(fi, v, type_info, name, verb)
+				return
+			}
+		}
+
 		bits: u128
 		bit_size := u128(8*type_info.size)
 
@@ -1911,6 +1919,58 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 			io.write_i64(fi.writer, i, 10, &fi.n)
 			commas += 1
 		}
+	}
+}
+
+// Formats an array-of-integers backed bit_set (e.g. `bit_set[E; [4]u64]`).
+// The bits are stored as a little-endian sequence in memory (bit `b` is bit `b%8` of byte `b/8`),
+// so they can be scanned directly regardless of how many array elements back the set.
+fmt_bit_set_array :: proc(fi: ^Info, v: any, type_info: ^runtime.Type_Info, name: string, verb: rune) {
+	info := type_info.variant.(runtime.Type_Info_Bit_Set)
+	bit_size := int(8*type_info.size)
+
+	et := runtime.type_info_base(info.elem)
+	e, is_enum := et.variant.(runtime.Type_Info_Enum)
+
+	if verb != 'w' {
+		if name != "" {
+			io.write_string(fi.writer, name, &fi.n)
+		} else {
+			reflect.write_type(fi.writer, type_info, &fi.n)
+		}
+	}
+	io.write_byte(fi.writer, '{', &fi.n)
+	defer io.write_byte(fi.writer, '}', &fi.n)
+
+	bytes := ([^]u8)(v.data)
+	commas := 0
+	loop: for bit_index in 0..<bit_size {
+		if (bytes[bit_index/8] >> uint(bit_index & 7)) & 1 == 0 {
+			continue
+		}
+		i := i64(bit_index) + info.lower
+		if commas > 0 {
+			io.write_string(fi.writer, ", ", &fi.n)
+		}
+		if is_enum {
+			enum_name: string
+			if ti_named, is_named := info.elem.variant.(runtime.Type_Info_Named); is_named {
+				enum_name = ti_named.name
+			}
+			for ev, evi in e.values {
+				if u64(ev) == u64(i) {
+					if verb == 'w' {
+						io.write_string(fi.writer, enum_name, &fi.n)
+						io.write_byte(fi.writer, '.', &fi.n)
+					}
+					io.write_string(fi.writer, e.names[evi], &fi.n)
+					commas += 1
+					continue loop
+				}
+			}
+		}
+		io.write_i64(fi.writer, i, 10, &fi.n)
+		commas += 1
 	}
 }
 

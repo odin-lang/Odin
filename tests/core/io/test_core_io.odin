@@ -19,7 +19,7 @@ _test_stream :: proc(
 	resets_on_empty: bool = false,
 	do_destroy: bool = true,
 
-	loc := #caller_location
+	loc := #caller_location,
 ) -> (passed: Passed_Tests, ok: bool) {
 	// We only test what the stream reports to support.
 

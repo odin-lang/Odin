@@ -217,7 +217,7 @@ enum AsmMismatch : u8 {
 // Accepts either a signed or an unsigned interpretation of the bit pattern, which
 // matches how the assembler treats imm fields (e.g. both 200 and -56 fit imm8).
 gb_internal bool check_asm_immediate_value_fits(ExactValue ev, i32 bits, i32 *needed_, AsmMismatch *mismatch_) {
-	if (ev.kind == ExactValue_Float) {
+	if (ev.kind == ExactValue_Float || ev.kind == ExactValue_Rational) {
 		// Try to convert it if possible to an integer
 		ev = exact_value_to_integer(ev);
 	}
