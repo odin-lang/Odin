@@ -834,7 +834,7 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 
 #undef ST_ALIGN
 }
-gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
+gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, GenTypesData *poly_gen_types_to_unlock) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -854,6 +854,16 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		// Finalize the name before publishing (see set_polymorphic_record_instantiation_name).
 		set_polymorphic_record_instantiation_name(named_type, original_type_for_poly);
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+
+		// NOTE(bill): Release the originating record's gen_types mutex now that this instantiation
+		// is published, before checking its variants (which can instantiate other polymorphic
+		// records). Holding it across variant checking is what allows a cross-record ABBA deadlock
+		// between mutually-recursive generic unions instantiated concurrently. Concurrent requesters
+		// that find this in-progress entity synchronize on variants_wait_signal (set at the end of
+		// this function) before reading its variants. Mirrors check_struct_type.
+		if (poly_gen_types_to_unlock != nullptr) {
+			mutex_unlock(&poly_gen_types_to_unlock->mutex);
+		}
 	}
 
 	if (!union_type->Union.is_polymorphic) {
@@ -951,6 +961,12 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 			}
 		}
 	}
+
+	// NOTE(bill): `variants` is now fully populated; wake any thread that found this (possibly
+	// in-progress, early-released) instantiation and is waiting to read its variants. Mirrors the
+	// struct fields_wait_signal. Set unconditionally: an unspecialized polymorphic template has no
+	// variants and is never published, so no one waits on it, but setting it is harmless.
+	wait_signal_set(&union_type->Union.variants_wait_signal);
 }
 
 gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast *node) {

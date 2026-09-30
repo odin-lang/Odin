@@ -180,6 +180,7 @@ struct TypeUnion {
 	Type *           polymorphic_params; // Type_Tuple
 	Type *           polymorphic_parent;
 	Wait_Signal      polymorphic_wait_signal;
+	Wait_Signal      variants_wait_signal; // signalled once `variants` is populated (mirrors TypeStruct.fields_wait_signal)
 
 	std::atomic<i16> tag_size;
 	bool             is_polymorphic;

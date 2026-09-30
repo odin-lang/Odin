@@ -95,7 +95,8 @@ gb_internal void     check_struct_type              (CheckerContext *c, Type *st
                                                      Type *named_type = nullptr, Type *original_type_for_poly = nullptr,
                                                      GenTypesData *poly_gen_types_to_unlock = nullptr);
 gb_internal void     check_union_type               (CheckerContext *c, Type *union_type, Ast *node, Array<Operand> *poly_operands,
-                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
+                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr,
+                                                     GenTypesData *poly_gen_types_to_unlock = nullptr);
 
 gb_internal Type *   check_init_variable            (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
@@ -8814,7 +8815,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			set_base_type(named_type, union_type);
 
 			check_open_scope(&ctx, node);
-			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type);
+			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+			// check_union_type released found_gen_types->mutex after publishing the instantiation.
+			gen_types_locked = false;
 			check_close_scope(&ctx);
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");

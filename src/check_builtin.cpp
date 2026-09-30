@@ -7004,6 +7004,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				variants[i] = alloc_type_pointer(bt->Union.variants[i]);
 			}
 			new_type->Union.variants = variants;
+			// This union is built directly (not via check_union_type), so signal that its variants
+			// are ready or a wait_signal_until_available on it would block forever.
+			wait_signal_set(&new_type->Union.variants_wait_signal);
 
 			// NOTE(bill): Is this even correct?
 			new_type->Union.node = operand->expr;
@@ -7181,6 +7184,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			}
 			merged_union->Union.variants = slice_from_array(variants);
+			// Built directly (not via check_union_type); signal that variants are ready.
+			wait_signal_set(&merged_union->Union.variants_wait_signal);
 
 			operand->mode = Addressing_Type;
 			operand->type = merged_union;
