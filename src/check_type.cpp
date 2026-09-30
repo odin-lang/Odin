@@ -1969,25 +1969,40 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			return Subst_Matched;
 		}
 		return Subst_NoMatch;
-	case Type_Pointer:
-		// Pointer<->MultiPointer conversions stay on the mutator; here only the same-kind elem match.
-		if (source->kind != Type_Pointer) {
-			return Subst_Unhandled;
+	case Type_Pointer: {
+		// A `^T` pattern also matches a `[^]T` source (the mutator allows ^<->[^] here). The subtype
+		// check mirrors the mutator: allow_polymorphic for a pointer source, plain for a multi-pointer.
+		Type *src_elem = nullptr;
+		bool allow_poly = false;
+		if (source->kind == Type_Pointer) {
+			src_elem = source->Pointer.elem;
+			allow_poly = true;
+		} else if (source->kind == Type_MultiPointer) {
+			src_elem = source->MultiPointer.elem;
+		} else {
+			return Subst_NoMatch;
 		}
 		if (base_type(pattern->Pointer.elem)->kind == Type_Struct &&
-		    check_is_assignable_to_using_subtype(source->Pointer.elem, pattern->Pointer.elem, 0, false, true) > 0) {
+		    check_is_assignable_to_using_subtype(src_elem, pattern->Pointer.elem, 0, false, allow_poly) > 0) {
 			return Subst_Unhandled; // genuine subtype match (no binding), handled by the mutator
 		}
-		return subst_unify(c, pattern->Pointer.elem, source->Pointer.elem, subst);
-	case Type_MultiPointer:
-		if (source->kind != Type_MultiPointer) {
-			return Subst_Unhandled;
+		return subst_unify(c, pattern->Pointer.elem, src_elem, subst);
+	}
+	case Type_MultiPointer: {
+		Type *src_elem = nullptr;
+		if (source->kind == Type_MultiPointer) {
+			src_elem = source->MultiPointer.elem;
+		} else if (source->kind == Type_Pointer) {
+			src_elem = source->Pointer.elem;
+		} else {
+			return Subst_NoMatch;
 		}
 		if (base_type(pattern->MultiPointer.elem)->kind == Type_Struct &&
-		    check_is_assignable_to_using_subtype(source->MultiPointer.elem, pattern->MultiPointer.elem) > 0) {
+		    check_is_assignable_to_using_subtype(src_elem, pattern->MultiPointer.elem) > 0) {
 			return Subst_Unhandled;
 		}
-		return subst_unify(c, pattern->MultiPointer.elem, source->MultiPointer.elem, subst);
+		return subst_unify(c, pattern->MultiPointer.elem, src_elem, subst);
+	}
 	case Type_Slice:
 		if (source->kind != Type_Slice) {
 			return Subst_NoMatch;
@@ -2422,10 +2437,15 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		GB_ASSERT(b != nullptr && b->kind == PolyBind_Type);
 		return b->type;
 	}
-	case Type_Pointer:
-		return alloc_type_pointer(subst_apply(c, pattern->Pointer.elem, source->Pointer.elem, subst));
-	case Type_MultiPointer:
-		return alloc_type_multi_pointer(subst_apply(c, pattern->MultiPointer.elem, source->MultiPointer.elem, subst));
+	case Type_Pointer: {
+		// result keeps the pattern's pointer kind; source may be `^` or `[^]`
+		Type *src_elem = (source->kind == Type_MultiPointer) ? source->MultiPointer.elem : source->Pointer.elem;
+		return alloc_type_pointer(subst_apply(c, pattern->Pointer.elem, src_elem, subst));
+	}
+	case Type_MultiPointer: {
+		Type *src_elem = (source->kind == Type_Pointer) ? source->Pointer.elem : source->MultiPointer.elem;
+		return alloc_type_multi_pointer(subst_apply(c, pattern->MultiPointer.elem, src_elem, subst));
+	}
 	case Type_SoaPointer:
 		return alloc_type_soa_pointer(subst_apply(c, pattern->SoaPointer.elem, source->SoaPointer.elem, subst));
 	case Type_Slice:
