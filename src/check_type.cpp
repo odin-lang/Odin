@@ -3346,24 +3346,24 @@ gb_internal void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) 
 
 
 	Type *elem = check_type_expr(ctx, mt->elem, nullptr);
-	
-	if (!is_type_valid_for_matrix_elems(elem)) {
-		if (elem == t_typeid) {
-			Entity *e = entity_of_node(mt->elem);
-			if (e && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
-				// HACK TODO(bill): This is to allow polymorphic parameters for matrix elements
-				// proc($T: typeid) -> matrix[2, 2]T
-				//
-				// THIS IS NEEDS TO BE FIXED AND NOT USE THIS HACK
-				goto type_assign;
-			}
+
+	// A `$T: typeid` param referenced by ident (e.g. proc($T: typeid) -> matrix[2,2]T) resolves to
+	// t_typeid; represent it as its Type_Generic so the element is properly polymorphic.
+	if (elem == t_typeid) {
+		Entity *e = entity_of_node(mt->elem);
+		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+			Type *gen = alloc_type_generic(ctx->scope, 0, entity_interned_name(e), nullptr);
+			gen->Generic.entity = e;
+			elem = gen;
 		}
+	}
+
+	if (!is_type_valid_for_matrix_elems(elem)) {
 		gbString s = type_to_string(elem);
 		error(column.expr, "Matrix elements types are limited to integers, floats, and complex, got %s", s);
 		gb_string_free(s);
 	}
-type_assign:;
-	
+
 	*type = alloc_type_matrix(elem, row_count, column_count, generic_row, generic_column, mt->is_row_major);
 	
 	return;
