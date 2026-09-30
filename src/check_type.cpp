@@ -869,11 +869,17 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 
 	for_array(i, ut->variants) {
 		Ast *node = ut->variants[i];
-		Type *t = check_type_expr(ctx, node, nullptr);
 		if (union_type->Union.is_polymorphic && poly_operands == nullptr) {
-			// NOTE(bill): don't add any variants if this is this is an unspecialized polymorphic record
+			// NOTE(bill): Do not check (or add) the variant type expressions of an unspecialized
+			// polymorphic union template. A variant can reference other polymorphic records,
+			// including mutually-recursive ones (`UA($T){ ^UB(T) }` / `UB($T){ ^UA(T) }`), and
+			// because unspecialized instantiations are never published into gen_types, checking them
+			// here recurses unboundedly (UA[T] -> UB[T] -> UA[T] -> ...) and overflows the stack.
+			// This mirrors check_struct_type, which skips field checking for a polymorphic record;
+			// concrete instantiations (poly_operands != nullptr) still check their variants below.
 			continue;
 		}
+		Type *t = check_type_expr(ctx, node, nullptr);
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
 			t = default_type(t);
