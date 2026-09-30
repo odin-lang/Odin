@@ -1539,6 +1539,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		bool saw_nil = false;
 		// TODO(bill): Make robust
 		Type *bt = base_type(type_deref(x.type));
+		if (bt->kind == Type_Union) {
+			wait_signal_until_available(&bt->Union.variants_wait_signal);
+		}
 
 		Type *case_type = nullptr;
 		for (Ast *type_expr : cc->list) {

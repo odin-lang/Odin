@@ -662,11 +662,8 @@ gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types
 };
 
 
-// NOTE(bill): Give a freshly-instantiated polymorphic record its canonical name
-// (e.g. `Foo($T=int, $N=4)`). This depends only on the record's polymorphic parameters, so it
-// must be called *before* the instantiation is published into gen_types via
-// add_polymorphic_record_entity: once published, a concurrent thread may read the name, and
-// mutating the `Named.name` String in place afterwards would be a torn read.
+// Set the instantiation's canonical name (e.g. `Foo($T=int)`) before it is published, so a
+// concurrent finder never observes a torn Named.name.
 gb_internal void set_polymorphic_record_instantiation_name(Type *named_type, Type *original_type) {
 	Type *bt = base_type(named_type);
 	if (bt->kind != Type_Struct && bt->kind != Type_Union) {
@@ -755,13 +752,8 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		set_polymorphic_record_instantiation_name(named_type, original_type_for_poly);
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
 
-		// NOTE(bill): This instantiation is now published in the originating record's gen_types
-		// cache (its polymorphic params are set and signalled above), so a concurrent thread can
-		// find it via find_polymorphic_record_entity and synchronize on the fields_wait_signal
-		// below when it needs the layout. Release the caller-held gen_types mutex here, *before*
-		// checking the fields: field checking can instantiate other polymorphic records (locking
-		// their gen_types mutexes), and holding this one across that is what allows a cross-record
-		// ABBA deadlock between two mutually-recursive generic records instantiated concurrently.
+		// Release before field checking to avoid a cross-record ABBA; finders wait on
+		// fields_wait_signal (set at the end).
 		if (poly_gen_types_to_unlock != nullptr) {
 			mutex_unlock(&poly_gen_types_to_unlock->mutex);
 		}
@@ -855,12 +847,8 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		set_polymorphic_record_instantiation_name(named_type, original_type_for_poly);
 		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
 
-		// NOTE(bill): Release the originating record's gen_types mutex now that this instantiation
-		// is published, before checking its variants (which can instantiate other polymorphic
-		// records). Holding it across variant checking is what allows a cross-record ABBA deadlock
-		// between mutually-recursive generic unions instantiated concurrently. Concurrent requesters
-		// that find this in-progress entity synchronize on variants_wait_signal (set at the end of
-		// this function) before reading its variants. Mirrors check_struct_type.
+		// Release before variant checking to avoid a cross-record ABBA; finders wait on
+		// variants_wait_signal (set at the end). Mirrors check_struct_type.
 		if (poly_gen_types_to_unlock != nullptr) {
 			mutex_unlock(&poly_gen_types_to_unlock->mutex);
 		}
@@ -880,13 +868,8 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	for_array(i, ut->variants) {
 		Ast *node = ut->variants[i];
 		if (union_type->Union.is_polymorphic && poly_operands == nullptr) {
-			// NOTE(bill): Do not check (or add) the variant type expressions of an unspecialized
-			// polymorphic union template. A variant can reference other polymorphic records,
-			// including mutually-recursive ones (`UA($T){ ^UB(T) }` / `UB($T){ ^UA(T) }`), and
-			// because unspecialized instantiations are never published into gen_types, checking them
-			// here recurses unboundedly (UA[T] -> UB[T] -> UA[T] -> ...) and overflows the stack.
-			// This mirrors check_struct_type, which skips field checking for a polymorphic record;
-			// concrete instantiations (poly_operands != nullptr) still check their variants below.
+			// Skip checking variant types of an unspecialized template: a variant may reference a
+			// mutually-recursive polymorphic union and recurse unboundedly. Mirrors check_struct_type.
 			continue;
 		}
 		Type *t = check_type_expr(ctx, node, nullptr);
@@ -962,10 +945,6 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		}
 	}
 
-	// NOTE(bill): `variants` is now fully populated; wake any thread that found this (possibly
-	// in-progress, early-released) instantiation and is waiting to read its variants. Mirrors the
-	// struct fields_wait_signal. Set unconditionally: an unspecialized polymorphic template has no
-	// variants and is never published, so no one waits on it, but setting it is harmless.
 	wait_signal_set(&union_type->Union.variants_wait_signal);
 }
 

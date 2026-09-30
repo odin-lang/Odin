@@ -389,9 +389,8 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 	}
 }
 
-// NOTE(bill): Reuse an already-generated polymorphic procedure specialization `other`.
-// Records it as the result and, if its body has not been checked yet, schedules it.
-// The caller must have released `gen_procs->mutex` before calling this (it queues work).
+// Reuse an existing generated specialization `other`, scheduling its body if unchecked.
+// Caller must have released gen_procs->mutex first.
 gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = other;
@@ -585,13 +584,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 
-	// NOTE(bill): The two lookups above ran under a shared lock which was then released, so a
-	// concurrent instantiation of this same specialization could have been published in the gap.
-	// Acquire the exclusive lock now and hold it across the re-check below and the array_add at the
-	// end, so that finding-then-publishing is atomic. Without this, two threads racing on the same
-	// specialization could both miss and each build and enqueue a distinct entity for it. The lock
-	// is only released here on an early return (a late-arriving duplicate); the normal path releases
-	// it after publishing. (@local-mutex)
+	// Re-check under the exclusive lock (the lookups above ran under a released shared lock) and
+	// hold it across construction + array_add so find-then-publish is atomic. (@local-mutex)
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
 	for (Entity *other : gen_procs->procs) {
 		if (are_types_identical(base_type(other->type), final_proc_type)) {
@@ -670,8 +664,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 
-	// NOTE(bill): The exclusive lock has been held since just before construction (see above),
-	// so this publish is atomic with the re-check that preceded it.
 	array_add(&gen_procs->procs, entity);
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
@@ -923,6 +915,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 	}
 
 	if (is_type_union(dst) && allow_unions) {
+		wait_signal_until_available(&dst->Union.variants_wait_signal);
 		for (Type *vt : dst->Union.variants) {
 			if (are_types_identical(vt, s)) {
 				return 1;
@@ -1587,13 +1580,9 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 						return is_polymorphic_type_assignable(c, poly->Array.elem, source->EnumeratedArray.elem, true, false);
 					}
 
-					// NOTE(bill): Capture the polymorphic element node ($T) before rewriting `poly`
-					// in place. Array.elem and EnumeratedArray.elem share the same union offset, so
-					// assigning EnumeratedArray.elem below would otherwise clobber the pointer to the
-					// shared $T generic node, and the element-binding recursion at the end would
-					// compare concrete-vs-concrete and never bind $T (leaving it unresolved in the
-					// procedure body). Keeping the node lets that recursion mutate it in place, just
-					// like the fixed-array branch above.
+					// Capture $T before rewriting `poly`: Array.elem and EnumeratedArray.elem share a
+					// union offset, so the assignment below would clobber it and the elem recursion
+					// would never bind $T.
 					Type *poly_elem = poly->Array.elem;
 
 					poly->kind = Type_EnumeratedArray;
@@ -1636,10 +1625,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 				}
 				return is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
 			}
-			// NOTE(bill): Both are evaluated (not short-circuited) so their modify_type side effects
-			// are applied, but both the index and the element must match for the pattern to hold.
-			// A previous `index || elem` here over-accepted (e.g. `[Dir]$T` vs `[Other]f32`), binding
-			// `$T` and leaving the index mismatch to be reported later as a confusing assignment error.
+			// Evaluate both (for modify_type side effects) but require both to match.
 			bool index = is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
 			bool elem  = is_polymorphic_type_assignable(c, poly->EnumeratedArray.elem, source->EnumeratedArray.elem, true, modify_type);
 			return index && elem;
@@ -1813,11 +1799,7 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 		return false;
 	case Type_Map:
 		if (source->kind == Type_Map) {
-			// NOTE(bill): Both are evaluated (not short-circuited) so their modify_type side effects
-			// are applied, but both the key and the value must match for the pattern to hold. A
-			// previous `key || value` here over-accepted (e.g. `map[int]$V` vs `map[string]f32`),
-			// binding `$V` and leaving the key mismatch to be reported later as a confusing
-			// assignment error, and would finalize a map that was only partially matched.
+			// Evaluate both (for modify_type side effects) but require both to match.
 			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
 			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
 			if (key && value) {
@@ -5470,6 +5452,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
+			wait_signal_until_available(&t->Union.variants_wait_signal);
 
 			isize count = t->Union.variants.count;
 			ValidIndexAndScore *valids = temporary_alloc_array<ValidIndexAndScore>(count);
@@ -8771,11 +8754,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
 		mutex_lock(&found_gen_types->mutex);
-		// NOTE(bill): For a struct instantiation, check_struct_type releases this mutex early (right
-		// after publishing the instantiation into gen_types, before checking its fields) to avoid a
-		// cross-record ABBA deadlock between mutually-recursive generic records; it signals that by
-		// leaving `gen_types_locked` cleared below. The union path and the cache-hit path keep the
-		// mutex until the end of this scope.
+		// check_struct_type/check_union_type release this mutex early (after publishing, before
+		// checking members) to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit
+		// path keeps it until scope end.
 		bool gen_types_locked = true;
 		defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
 
@@ -8822,11 +8803,6 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
-
-		// NOTE(bill): The instantiation's canonical name is now set inside
-		// check_struct_type/check_union_type (before it is published into gen_types), so that a
-		// concurrent thread which finds the in-progress struct instantiation never observes a
-		// torn name.
 
 		operand->mode = Addressing_Type;
 		operand->type = named_type;
@@ -9711,6 +9687,7 @@ gb_internal bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, A
 		TEMPORARY_ALLOCATOR_GUARD();
 
 		Type *union_type = base_type(th);
+		wait_signal_until_available(&union_type->Union.variants_wait_signal);
 		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
 
 		for (Type *vt : union_type->Union.variants) {
@@ -12016,6 +11993,9 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 
 	Type *src = type_deref(o->type);
 	Type *bsrc = base_type(src);
+	if (bsrc->kind == Type_Union) {
+		wait_signal_until_available(&bsrc->Union.variants_wait_signal);
+	}
 
 
 	if (ta->type != nullptr && ta->type->kind == Ast_UnaryExpr && ta->type->UnaryExpr.op.kind == Token_Question) {

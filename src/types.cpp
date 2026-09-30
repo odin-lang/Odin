@@ -3537,6 +3537,7 @@ gb_internal bool union_variant_index_types_equal(Type *v, Type *vt) {
 gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_signal_until_available(&u->Union.variants_wait_signal);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
@@ -3555,6 +3556,7 @@ gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 gb_internal bool union_is_variant_of(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_signal_until_available(&u->Union.variants_wait_signal);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];

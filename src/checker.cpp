@@ -2453,6 +2453,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		break;
 
 	case Type_Union:
+		if (bt->Union.variants_wait_signal.futex.load() == 0)
+			return;
 		if (union_tag_size(t) > 0) {
 			add_type_info_type_internal(c, union_tag_type(t));
 		} else {
