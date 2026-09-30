@@ -153,8 +153,9 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 		if (type_expr != nullptr) {
 			type = check_type_expr(ctx, type_expr, nullptr);
 			if (is_type_polymorphic(type)) {
+				// A field-level polymorphic type (e.g. `struct{x: $T}`) makes the struct polymorphic;
+				// keep the field's generic type so it can be substituted, rather than rejecting it.
 				struct_type->Struct.is_polymorphic = true;
-				type = nullptr;
 			}
 		}
 		if (type == nullptr) {
@@ -2254,13 +2255,40 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			return Subst_NoMatch;
 		}
 		return subst_unify(c, pattern->BitField.backing_type, source->BitField.backing_type, subst);
-	case Type_Struct:
-		if (source->kind == Type_Struct &&
-		    pattern->Struct.soa_kind == source->Struct.soa_kind &&
-		    pattern->Struct.soa_kind != StructSoa_None) {
+	case Type_Struct: {
+		if (source->kind != Type_Struct) {
+			return Subst_NoMatch;
+		}
+		if (pattern->Struct.soa_kind != StructSoa_None || source->Struct.soa_kind != StructSoa_None) {
+			if (pattern->Struct.soa_kind != source->Struct.soa_kind) {
+				return Subst_NoMatch;
+			}
 			return subst_unify(c, pattern->Struct.soa_elem, source->Struct.soa_elem, subst);
 		}
-		return Subst_Unhandled; // plain anonymous struct / subtype, handled by the mutator
+		// Anonymous struct with field-level polymorphism (e.g. `struct{x: $T, y: [2]T}`): match fields
+		// positionally. Record subtyping is not attempted here, so it is left to the mutator.
+		if (pattern->Struct.is_raw_union != source->Struct.is_raw_union ||
+		    pattern->Struct.is_packed != source->Struct.is_packed) {
+			return Subst_Unhandled;
+		}
+		wait_signal_until_available(&pattern->Struct.fields_wait_signal);
+		wait_signal_until_available(&source->Struct.fields_wait_signal);
+		if (pattern->Struct.fields.count != source->Struct.fields.count) {
+			return Subst_NoMatch;
+		}
+		for_array(i, pattern->Struct.fields) {
+			Entity *pf = pattern->Struct.fields[i];
+			Entity *sf = source->Struct.fields[i];
+			if (pf->token.string != sf->token.string) {
+				return Subst_NoMatch;
+			}
+			SubstResult r = subst_unify(c, pf->type, sf->type, subst);
+			if (r != Subst_Matched) {
+				return Subst_Unhandled; // field context allows assignability/subtyping, defer to the mutator
+			}
+		}
+		return Subst_Matched;
+	}
 	}
 	return Subst_Unhandled;
 }
@@ -2494,6 +2522,11 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		return r;
 	}
 	case Type_Struct: {
+		if (pattern->Struct.soa_kind == StructSoa_None) {
+			// Anonymous field-polymorphic struct: unify matched fields positionally, so the resolved
+			// type is the (already concrete) source.
+			return source;
+		}
 		Type *elem = subst_apply(c, pattern->Struct.soa_elem, source->Struct.soa_elem, subst);
 		switch (pattern->Struct.soa_kind) {
 		case StructSoa_Fixed:   return make_soa_struct_fixed(c, nullptr, pattern->Struct.node, elem, pattern->Struct.soa_count, nullptr);
