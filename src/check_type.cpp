@@ -2741,6 +2741,13 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 	bool modify_type = !ctx->no_polymorphic_errors;
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
+		if (operand.deferred_untyped_arg && !modify_type) {
+			// Probe pass (procedure-group candidate pre-check): a deferred untyped argument carries no
+			// type yet, so it cannot constrain this parameter. Treat it as a match and let the real
+			// binding pass resolve the parameter from the other arguments. If the parameter is left
+			// polymorphic there (nothing else determines it), that pass fails, as it should.
+			return poly_type;
+		}
 		if (show_error) {
 			ERROR_BLOCK();
 

@@ -6949,11 +6949,16 @@ gb_internal void materialize_deferred_untyped_arg(CheckerContext *c, Operand *o,
 	}
 
 	if (show_error) {
+		// Commit (the chosen overload): check the real node so its type is recorded exactly once.
 		check_expr_base(c, o, expr, param_type);
 	} else {
+		// Trial (procedure-group scoring): check a *clone* so the real node's cached type is never
+		// polluted across candidates that may resolve the slot to different types. Errors are muted but
+		// still counted, so a candidate that the argument does not fit is rejected without printing.
+		Ast *trial = clone_ast(expr);
 		i64 muted_before = error_mute_count();
 		begin_error_mute();
-		check_expr_base(c, o, expr, param_type);
+		check_expr_base(c, o, trial, param_type);
 		end_error_mute();
 		if (error_mute_count() != muted_before) {
 			o->mode = Addressing_Invalid;
@@ -7491,7 +7496,7 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 			} else if (!o.value.value_bool) {
 				if (print_err) {
 					ERROR_BLOCK();
-					
+
 					gbString str = expr_to_string(clause);
 					error(clause, "'where' clause evaluated to false:\n\t%s", str);
 					gb_string_free(str);
@@ -7608,6 +7613,15 @@ gb_internal bool check_named_arguments(CheckerContext *c, Type *type, Slice<Ast 
 
 			}
 			Operand o = {};
+			if (pt != nullptr && pt->is_polymorphic && type_hint == nullptr && arg_is_deferrable_untyped_expr(value)) {
+				// Defer: resolved from the poly parameter's type later (see the positional path).
+				o.mode = Addressing_Invalid;
+				o.type = t_invalid;
+				o.expr = value;
+				o.deferred_untyped_arg = true;
+				array_add(named_operands, o);
+				continue;
+			}
 			check_expr_with_type_hint(c, &o, value, type_hint);
 			if (o.mode == Addressing_Invalid) {
 				success = false;
@@ -7799,7 +7813,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				variadic_index = pt->Proc.variadic_index;
 			}
 		}
-		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
+		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_DeferUntypedArg, variadic_index);
 
 		if (check_named_arguments(c, e->type, named_args, &named_operands, true)) {
 			check_call_arguments_single(c, call, operand,
@@ -7865,7 +7879,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					if (!(pt != nullptr && is_type_proc(pt))) {
 						continue;
 					}
-					
+
 					if (pt->Proc.is_polymorphic) {
 						if (variadic_index == -1) {
 							variadic_index = pt->Proc.variadic_index;
@@ -7882,7 +7896,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 	}
 
-	check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
+	check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_DeferUntypedArg, variadic_index);
 
 	for_array(i, named_args) {
 		Ast *arg = named_args[i];
@@ -7911,6 +7925,15 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			}
 		}
 		Operand o = {};
+		if (arg_is_deferrable_untyped_expr(value) && (type_hint == nullptr || is_type_polymorphic(type_hint))) {
+			// Defer: resolved per candidate from each overload's parameter type (see the positional path).
+			o.mode = Addressing_Invalid;
+			o.type = t_invalid;
+			o.expr = value;
+			o.deferred_untyped_arg = true;
+			array_add(&named_operands, o);
+			continue;
+		}
 		check_expr_with_type_hint(c, &o, value, type_hint);
 		array_add(&named_operands, o);
 	}
