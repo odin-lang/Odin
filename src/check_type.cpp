@@ -65,6 +65,10 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 	}
 	Type *original_type = t;
 	t = base_type(type_deref(t));
+	// Promote through a constrained generic (`$P/Spec`) using its specialization's member layout.
+	if (t->kind == Type_Generic && t->Generic.specialized != nullptr) {
+		t = base_type(t->Generic.specialized);
+	}
 
 	if (t->kind == Type_Struct) {
 		for (Entity *f : t->Struct.fields) {
@@ -100,6 +104,11 @@ gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, Ast
 
 gb_internal bool does_field_type_allow_using(Type *t) {
 	t = base_type(t);
+	// A constrained generic field (`$P/Spec`) carries its member layout in the specialization, so
+	// `using`/`#subtype` can promote through it even though the generic itself is not yet concrete.
+	if (t->kind == Type_Generic && t->Generic.specialized != nullptr) {
+		t = base_type(t->Generic.specialized);
+	}
 	if (is_type_struct(t)) {
 		return true;
 	} else if (is_type_array(t)) {
