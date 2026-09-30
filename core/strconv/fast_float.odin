@@ -138,7 +138,7 @@ A fast scanner for the decimal float syntax: `[+-] digits [. digits] [(e|E) [+-]
 It skips a `_` between digits
 
 **Returns**
-- mantissa, exp: The value is `mantissa * 10^exp`. If `trunc` is true, the significant digits after the first 19 were dropped, and at least one of them was not zero.
+- mantissa, exp: The value is `mantissa * 10^exp`. If `trunc` is true, the scanner dropped the significant digits after the first 19. Then the exact value is in the range `[mantissa, mantissa + 1) * 10^exp`.
 - neg: The number has a minus sign.
 - nr: The number of bytes in the number.
 - ok: `false` if `s` is not a number
@@ -168,6 +168,9 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 		digits += more
 	}
 
+	int_digits := digits
+	digits_end := i
+
 	// Fraction part
 	if i < n && s[i] == '.' {
 		i += 1
@@ -185,13 +188,10 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 		}
 		exp = -frac_digits
 		digits += frac_digits
+		digits_end = i
 	}
 	if digits == 0 {
 		return
-	}
-	if digits > MAX_SIG_DIGITS {
-		// The mantissa may have overflowed (unless most digits are leading zeros).
-		return scan_decimal_exact(s)
 	}
 
 	// Exponent part. The first byte after `e` and the sign must be a digit.
@@ -216,6 +216,10 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 			i, x = parse_exponent_with_separators(s, i, x)
 		}
 		exp += -x if exp_neg else x
+	}
+
+	if digits > MAX_SIG_DIGITS {
+		mantissa, exp, trunc = read_significant_digits(s, int_start, digits_end, int_digits, exp + (digits - int_digits))
 	}
 
 	if mantissa == 0 {
@@ -259,154 +263,45 @@ parse_exponent_with_separators :: proc "contextless" (s: string, i: int, x: int)
 	return i, x
 }
 
-// It is only used for numbers with more than 19 digits
-scan_decimal_exact :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, neg, trunc: bool, nr: int, ok: bool) #no_bounds_check {
-	n := len(s)
-	if n == 0 {
-		return
-	}
-	neg = s[0] == '-'
-	i := int(neg || s[0] == '+')
-	if i+2 < n && s[i] == '0' && lower(s[i+1]) == 'x' {
-		return // a hex float
-	}
+/*
+Reads the first 19 significant digits of a decimal number again. The scanner uses it only
+if the number has more than 19 digits, because then the mantissa can overflow.
 
-	m:  u64 // significant digits
-	nd: int // number of significant digits in m
-	e:  int // decimal exponent
-	saw_digits := false
+**Inputs**
+- s, i: The input, and the position of the first digit before the `.`.
+- end: The position after the last digit.
+- int_digits: The number of digits before the `.`.
+- e: The exponent after the `e`, or 0.
 
-	// Integer part. Leading zeros do not count as significant digits, and `_` is skipped
-	for i+8 <= n && read8_to_u64(s, i) == 0x3030_3030_3030_3030 {
-		i += 8
-		saw_digits = true
-	}
-	for i < n && (s[i] == '0' || s[i] == '_') {
-		saw_digits ||= s[i] == '0'
+**Returns**
+- mantissa, exp: The value is `mantissa * 10^exp`, without the digits that were not read again.
+- trunc: `true` if the procedure did not read all the digits again.
+*/
+@(cold)
+read_significant_digits :: proc "contextless" (s: string, i, end, int_digits, e: int) -> (mantissa: u64, exp: int, trunc: bool) #no_bounds_check {
+	i := i
+	exp = e
+	int_left := int_digits
+	nd := 0
+	for i < end && nd < MAX_SIG_DIGITS {
+		c := s[i]
 		i += 1
-	}
-	for i+8 <= n && nd+8 <= MAX_SIG_DIGITS {
-		v := read8_to_u64(s, i)
-		if !is_made_of_eight_digits_fast(v) {
-			break
+		if c - '0' > 9 {
+			continue // a `_` or the `.`
 		}
-		m = m*100_000_000 + parse_eight_digits_unrolled(v)
-		nd += 8
-		i += 8
-		saw_digits = true
-	}
-	for i < n {
-		d := s[i] - '0'
-		if d > 9 {
-			if s[i] != '_' {
-				break
-			}
-		} else if nd < MAX_SIG_DIGITS {
-			m = m*10 + u64(d)
-			nd += 1
-			saw_digits = true
+		if int_left > 0 {
+			int_left -= 1
 		} else {
-			e += 1 // dropped digit
-			trunc ||= d != 0
+			exp -= 1
 		}
-		i += 1
+		if mantissa == 0 && c == '0' {
+			continue
+		}
+		mantissa = mantissa*10 + u64(c - '0')
+		nd += 1
 	}
-
-	// Fraction part
-	if i < n && s[i] == '.' {
-		i += 1
-		if m == 0 {
-			// Leading zeros of the fraction change only the exponent
-			for i+8 <= n && read8_to_u64(s, i) == 0x3030_3030_3030_3030 {
-				e -= 8
-				i += 8
-				saw_digits = true
-			}
-			for i < n && (s[i] == '0' || s[i] == '_') {
-				if s[i] == '0' {
-					e -= 1
-					saw_digits = true
-				}
-				i += 1
-			}
-		}
-		for i+8 <= n && nd+8 <= MAX_SIG_DIGITS {
-			v := read8_to_u64(s, i)
-			if !is_made_of_eight_digits_fast(v) {
-				break
-			}
-			m = m*100_000_000 + parse_eight_digits_unrolled(v)
-			nd += 8
-			e -= 8
-			i += 8
-			saw_digits = true
-		}
-		if i+4 <= n && nd+4 <= MAX_SIG_DIGITS {
-			v := read4_to_u32(s, i)
-			if is_made_of_four_digits_fast(v) {
-				m = m*10_000 + parse_four_digits_unrolled(v)
-				nd += 4
-				e -= 4
-				i += 4
-				saw_digits = true
-			}
-		}
-		for i < n {
-			d := s[i] - '0'
-			if d > 9 {
-				if s[i] != '_' {
-					break
-				}
-			} else if m == 0 && d == 0 {
-				e -= 1 // a leading zero of the fraction
-				saw_digits = true
-			} else if nd < MAX_SIG_DIGITS {
-				m = m*10 + u64(d)
-				nd += 1
-				e -= 1
-				saw_digits = true
-			} else {
-				trunc ||= d != 0 // dropped digit
-				saw_digits = true
-			}
-			i += 1
-		}
-	}
-	if !saw_digits {
-		return
-	}
-
-	// Exponent part. The first byte after `e` and the sign must be a digit
-	if i < n && lower(s[i]) == 'e' {
-		i += 1
-		exp_neg := false
-		if i < n && (s[i] == '+' || s[i] == '-') {
-			exp_neg = s[i] == '-'
-			i += 1
-		}
-		if i >= n || s[i] - '0' > 9 {
-			return // not a valid exponent, so not a number
-		}
-		x := 0
-		for i < n {
-			d := s[i] - '0'
-			if d > 9 {
-				if s[i] != '_' {
-					break
-				}
-			} else if x < 100_000 { // larger exponents overflow or underflow anyway
-				x = x*10 + int(d)
-			}
-			i += 1
-		}
-		e += -x if exp_neg else x
-	}
-
-	if m == 0 {
-		e = 0
-		trunc = false
-	}
-	return m, e, neg, trunc, i, true
+	exp += int_left
+	return mantissa, exp, i < end
 }
 
 // Loads 8 bytes starting at `s[i]` in little-endian order

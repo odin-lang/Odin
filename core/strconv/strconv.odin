@@ -917,7 +917,8 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 	}
 
 	// 0h string to float case
-	if len(str) > 2 && str[0] == '0' && str[1] == 'h' {
+	@(cold)
+	parse_0h :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
 		as_int: u64
 		digits: int
 		i := 2
@@ -958,15 +959,48 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 
 		switch digits {
 		case 4:
-			value = cast(T)transmute(f16)cast(u16)as_int
+			value = cast(F)transmute(f16)cast(u16)as_int
 		case 8:
-			value = cast(T)transmute(f32)cast(u32)as_int
+			value = cast(F)transmute(f32)cast(u32)as_int
 		case 16:
-			value = cast(T)transmute(f64)as_int
+			value = cast(F)transmute(f64)as_int
 		case:
 			ok = false
 		}
 		return
+	}
+
+	@(cold)
+	parse_special_or_hex :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
+		when F == f64 {
+			Bits :: u64
+			info := &_f64_info
+		} else {
+			Bits :: u32
+			info := &_f32_info
+		}
+		if f, n, special := check_special(str); special {
+			return F(f), n, true
+		}
+		mantissa: u64
+		exp:      int
+		neg, trunc: bool
+		mantissa, exp, neg, trunc, nr = scan_hex_float(str) or_return
+		b, in_range := hex_float_bits(mantissa, exp, neg, trunc, info)
+		return transmute(F)Bits(b), nr, in_range
+	}
+
+	@(cold)
+	parse_slow :: proc($F: typeid, str: string, info: ^Float_Info) -> (value: F, ok: bool) {
+		when F == f64 { Bits :: u64 } else { Bits :: u32 }
+		d: decimal.Decimal
+		decimal.set(&d, str)
+		b, overflow := decimal_to_float_bits(&d, info)
+		return transmute(F)Bits(b), !overflow
+	}
+
+	if len(str) > 2 && str[0] == '0' && str[1] == 'h' {
+		return parse_0h(T, str)
 	}
 
 	when T == f64 {
@@ -982,13 +1016,7 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 	neg, trunc: bool
 	mantissa, exp, neg, trunc, nr, ok = parse_number_string(str)
 	if !ok {
-		// Not a decimal number: try "inf", "nan" and a hexadecimal float.
-		if f, n, special := check_special(str); special {
-			return T(f), n, true
-		}
-		mantissa, exp, neg, trunc, nr = scan_hex_float(str) or_return
-		b, in_range := hex_float_bits(mantissa, exp, neg, trunc, info)
-		return transmute(T)Bits(b), nr, in_range
+		return parse_special_or_hex(T, str)
 	}
 
 	// Clinger's fast path algorithm
@@ -1048,12 +1076,7 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 		return transmute(T)Bits(b), nr, ok
 	}
 
-	// Slow path for arbitrary-precision decimal
-	d: decimal.Decimal
-	decimal.set(&d, str[:nr])
-	b, overflow := decimal_to_float_bits(&d, info)
-	value = transmute(T)Bits(b)
-	ok = !overflow
+	value, ok = parse_slow(T, str[:nr], info)
 	return
 }
 /*
