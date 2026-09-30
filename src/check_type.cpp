@@ -1953,6 +1953,34 @@ gb_internal bool subst_source_is_template_instance(Type *source, Type *spec) {
 	return false;
 }
 
+gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *source, PolySubst *subst);
+
+// Match a constraint `spec` against `source` (does `$T/spec` accept `source`?), binding spec's nested
+// vars. Mirrors check_type_specialization_to: bare template, record conformance (via the Named types),
+// an untyped source's default type, or a base-typed structural match for everything else — so unlike a
+// plain subst_unify it sees through named/distinct types (e.g. `[dynamic]$E` vs a `distinct [dynamic]V`).
+// Anything it cannot cleanly resolve (subtyping, untyped conversions, cross-kind) is deferred as
+// Subst_Unhandled to check_type_specialization_to.
+gb_internal SubstResult subst_unify_constraint(CheckerContext *c, Type *spec, Type *source, PolySubst *subst) {
+	if (source == nullptr || source == t_invalid) {
+		return Subst_Matched;
+	}
+	if (subst_source_is_template_instance(source, spec)) {
+		return Subst_Matched;
+	}
+	Type *sb = base_type(spec);
+	Type *tb = base_type(source);
+	SubstResult r;
+	if (is_type_untyped(tb)) {
+		r = subst_unify(c, spec, default_type(source), subst);
+	} else if (sb->kind == Type_Struct || sb->kind == Type_Union) {
+		r = subst_unify(c, spec, source, subst); // record conformance keeps the Named types (match params)
+	} else {
+		r = subst_unify(c, sb, tb, subst);        // general: base-typed structural match
+	}
+	return r == Subst_Matched ? Subst_Matched : Subst_Unhandled;
+}
+
 gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *source, PolySubst *subst) {
 	if (pattern == nullptr || source == nullptr) {
 		return Subst_Unhandled;
@@ -1965,15 +1993,10 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		return Subst_NoMatch;
 	case Type_Generic:
 		if (pattern->Generic.specialized != nullptr) {
-			// Constrained generic `$T/S`: bind the nested vars of `S` against the source (e.g. `$U` in
-			// `$T/Stack($U)`, or `$T`/`$E` in `$P/proc($T)->$E`), then bind T. A bare template `$T/Stack`
-			// needs no nested binding, only that the source is an instantiation of it.
-			Type *spec = pattern->Generic.specialized;
-			if (!subst_source_is_template_instance(source, spec)) {
-				SubstResult r = subst_unify(c, spec, source, subst);
-				if (r != Subst_Matched) {
-					return Subst_Unhandled;
-				}
+			// Constrained generic `$T/S`: match the constraint (binding its nested vars, e.g. `$U` in
+			// `$T/Stack($U)` or `$T`/`$E` in `$P/proc($T)->$E`), then bind T.
+			if (subst_unify_constraint(c, pattern->Generic.specialized, source, subst) != Subst_Matched) {
+				return Subst_Unhandled;
 			}
 		}
 		if (poly_subst_bind_type(subst, poly_generic_entity(pattern), default_type(source))){
@@ -2669,7 +2692,7 @@ gb_internal bool subst_check_specialization(CheckerContext *ctx, Type *specializ
 	PolySubst sub = {};
 	sub.items.allocator = heap_allocator();
 	defer (array_free(&sub.items));
-	SubstResult ur = subst_unify(ctx, specialization, type, &sub);
+	SubstResult ur = subst_unify_constraint(ctx, specialization, type, &sub);
 #if PARAPOLY_DEBUG_VERIFY_SUBST
 	// Debug: the old check is authoritative; assert the engine's short-circuit agrees with it.
 	bool old = check_type_specialization_to(ctx, specialization, type, false, modify_type, /*finalize*/false);

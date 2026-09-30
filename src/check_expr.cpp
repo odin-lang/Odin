@@ -1475,11 +1475,16 @@ gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source
 	return false;
 }
 
-// In-place matcher: mutates `poly` to bind its polymorphic vars to `source`. This is no longer the
-// primary resolver (see the substitution engine in check_type.cpp). determine_type_from_polymorphic
-// uses it only as a fallback for the patterns the engine reports Subst_Unhandled for (genuine
-// subtyping, and the ^<->[^] case) and for the non-modify_type (no_polymorphic_errors) yes/no probe.
-// The probe keeps every kind here reachable, so these cases are not dead code.
+// In-place matcher: mutates `poly` to bind its polymorphic vars to `source`. This is NOT the primary
+// resolver — the substitution engine in check_type.cpp handles determine_type_from_polymorphic (both
+// the resolve and the probe) and spec-conformance (subst_check_specialization / subst_unify_constraint),
+// and as of the constraint fix it covers those completely: instrumentation shows this matcher produces
+// no successful result in either path across the stdlib. It is still genuinely reached from:
+//   * check_distance_between_types (assignability scoring for overload resolution),
+//   * the type_is_specialization_of intrinsic (via check_type_specialization_to),
+//   * and as the never-succeeding Subst_Unhandled fallback of the two paths above (genuine subtyping and
+//     untyped/conversion cases the engine defers rather than resolves).
+// Deleting it outright would require reimplementing subtyping and conversion matching in the engine.
 gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type) {
 	Operand o = {Addressing_Value};
 	o.type = source;
