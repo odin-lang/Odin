@@ -971,23 +971,10 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 	}
 
 	@(cold)
-	parse_special_or_hex :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
-		when F == f64 {
-			Bits :: u64
-			info := &_f64_info
-		} else {
-			Bits :: u32
-			info := &_f32_info
-		}
-		if f, n, special := check_special(str); special {
-			return F(f), n, true
-		}
-		mantissa: u64
-		exp:      int
-		neg, trunc: bool
-		mantissa, exp, neg, trunc, nr = scan_hex_float(str) or_return
-		b, in_range := hex_float_bits(mantissa, exp, neg, trunc, info)
-		return transmute(F)Bits(b), nr, in_range
+	parse_special :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
+		f: f64
+		f, nr, ok = check_special(str)
+		return F(f), nr, ok
 	}
 
 	@(cold)
@@ -1016,7 +1003,13 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 	neg, trunc: bool
 	mantissa, exp, neg, trunc, nr, ok = parse_number_string(str)
 	if !ok {
-		return parse_special_or_hex(T, str)
+		// Not a decimal number: try a hexadecimal float, then "inf" and "nan".
+		mantissa, exp, neg, trunc, nr, ok = scan_hex_float(str)
+		if !ok {
+			return parse_special(T, str)
+		}
+		b, in_range := hex_float_bits(mantissa, exp, neg, trunc, info)
+		return transmute(T)Bits(b), nr, in_range
 	}
 
 	// Clinger's fast path algorithm
