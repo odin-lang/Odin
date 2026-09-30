@@ -701,7 +701,7 @@ gb_internal bool find_or_generate_polymorphic_procedure_from_parameters(CheckerC
 	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_def_node, poly_proc_data);
 }
 
-gb_internal bool check_type_specialization_to(CheckerContext *c, Type *specialization, Type *type, bool compound, bool modify_type);
+gb_internal bool check_type_specialization_to(CheckerContext *c, Type *specialization, Type *type, bool compound, bool modify_type, bool finalize = true);
 gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type);
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
 gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *y);
