@@ -8136,8 +8136,36 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			}
 			return nullptr;
 		};
+		// NOTE)(bill): resolved container base of a candidate's first parameter, through a pointer and a `$T/...`
+		// constraint, e.g. `^$T/[dynamic]$E` -> the `[dynamic]$E` base type
+		auto first_param_container_base = [](Entity *proc) -> Type * {
+			if (proc == nullptr) {
+				return nullptr;
+			}
+			Type *t = base_type(proc->type);
+			if (t == nullptr || t->kind != Type_Proc || t->Proc.param_count == 0) {
+				return nullptr;
+			}
+			Type *p0 = base_type(t->Proc.params->Tuple.variables[0]->type);
+			if (p0->kind == Type_Pointer) {
+				p0 = base_type(p0->Pointer.elem);
+			} else if (p0->kind == Type_MultiPointer) {
+				p0 = base_type(p0->MultiPointer.elem);
+			}
+			while (p0->kind == Type_Generic && p0->Generic.specialized != nullptr) {
+				p0 = base_type(p0->Generic.specialized);
+			}
+			return p0;
+		};
 
-		// NOTE(bill): Check for a confident diagnosis
+		if (procs.count == 0) {
+			procs = proc_group_entities_cloned(c, *operand);
+		}
+
+		// NOTE(bill): Confident diagnosis:
+		// A container-first call (e.g. `append`) where the container matches some overload but a later argument does not match the container's element type.
+		// Only fire when an overload actually accepts this container kind, so an unrelated group (nothing close) still gets the generic message.
+		// The relevant overloads are still listed below.
 		Ast *diag_expr = nullptr;
 		isize diag_index = -1;
 		Type *diag_elem = nullptr;
@@ -8146,7 +8174,17 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		if (positional_operands.count >= 2 && positional_operands[0].type != nullptr) {
 			Type *cont = base_type(type_deref(positional_operands[0].type));
 			Type *elem = container_elem(cont);
+			bool container_matched = false;
 			if (elem != nullptr && !is_type_polymorphic(elem)) {
+				for (Entity *proc : procs) {
+					Type *p0 = first_param_container_base(proc);
+					if (p0 != nullptr && p0->kind == cont->kind) {
+						container_matched = true;
+						break;
+					}
+				}
+			}
+			if (container_matched) {
 				for (isize i = 1; i < positional_operands.count; i++) {
 					Operand src = positional_operands[i];
 					if (src.deferred_untyped_arg || src.mode == Addressing_Invalid || src.type == nullptr) {
@@ -8181,10 +8219,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			} else {
 				print_argument_types();
 			}
-		}
-
-		if (procs.count == 0) {
-			procs = proc_group_entities_cloned(c, *operand);
 		}
 
 		// Try to reduce the list further for `$T: typeid` like parameters
@@ -8252,22 +8286,9 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					if (possibly_ignore[i]) {
 						continue;
 					}
-					Entity *proc = procs[i];
-					Type *t = base_type(proc->type);
-					if (t == nullptr || t->kind != Type_Proc || t->Proc.param_count == 0) {
-						continue;
-					}
-					Type *p0 = base_type(t->Proc.params->Tuple.variables[0]->type);
-					if (p0->kind == Type_Pointer) {
-						p0 = base_type(p0->Pointer.elem);
-					} else if (p0->kind == Type_MultiPointer) {
-						p0 = base_type(p0->MultiPointer.elem);
-					}
-					while (p0->kind == Type_Generic && p0->Generic.specialized != nullptr) {
-						p0 = base_type(p0->Generic.specialized);
-					}
-					if (p0->kind == Type_Generic) {
-						continue; // unconstrained `$T`: cannot tell, keep it
+					Type *p0 = first_param_container_base(procs[i]);
+					if (p0 == nullptr || p0->kind == Type_Generic) {
+						continue; // unconstrained `$T` or no first parameter: cannot tell, keep it
 					}
 					bool incompatible = false;
 					if (p0->kind != arg0->kind) {
