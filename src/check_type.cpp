@@ -1929,6 +1929,19 @@ gb_internal bool poly_subst_bind_enum_array(PolySubst *s, Entity *key, Type *ea)
 	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_EnumArray, ea, 0, nullptr});
 }
 
+// True when `source` is an instantiation of the bare polymorphic record template `spec` (the form a
+// `$T/Stack` constraint takes). Mirrors check_type_specialization_to's `polymorphic_parent` check.
+gb_internal bool subst_source_is_template_instance(Type *source, Type *spec) {
+	Type *sb = base_type(source);
+	if (sb->kind == Type_Struct) {
+		return sb->Struct.polymorphic_parent == spec;
+	}
+	if (sb->kind == Type_Union) {
+		return sb->Union.polymorphic_parent == spec;
+	}
+	return false;
+}
+
 gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *source, PolySubst *subst) {
 	if (pattern == nullptr || source == nullptr) {
 		return Subst_Unhandled;
@@ -1941,7 +1954,16 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		return Subst_NoMatch;
 	case Type_Generic:
 		if (pattern->Generic.specialized != nullptr) {
-			return Subst_Unhandled;
+			// Constrained generic `$T/S`: bind the nested vars of `S` against the source (e.g. `$U` in
+			// `$T/Stack($U)`, or `$T`/`$E` in `$P/proc($T)->$E`), then bind T. A bare template `$T/Stack`
+			// needs no nested binding, only that the source is an instantiation of it.
+			Type *spec = pattern->Generic.specialized;
+			if (!subst_source_is_template_instance(source, spec)) {
+				SubstResult r = subst_unify(c, spec, source, subst);
+				if (r != Subst_Matched) {
+					return Subst_Unhandled;
+				}
+			}
 		}
 		if (poly_subst_bind_type(subst, poly_generic_entity(pattern), default_type(source))){
 			return Subst_Matched;
@@ -2118,10 +2140,22 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			Type *st = s_e->type;
 			if (st->kind == Type_Generic) {
 				Entity *ge = poly_generic_entity(st);
-				if (ge == nullptr || st->Generic.specialized != nullptr) {
+				if (ge == nullptr) {
 					return Subst_Unhandled;
 				}
-				if (t_e->kind == Entity_Constant) {
+				if (st->Generic.specialized != nullptr) {
+					// Constrained record param `$T/S`: bind the nested vars of the constraint, then T.
+					Type *spec = st->Generic.specialized;
+					if (!subst_source_is_template_instance(t_e->type, spec)) {
+						SubstResult r = subst_unify(c, spec, t_e->type, subst);
+						if (r != Subst_Matched) {
+							return Subst_Unhandled;
+						}
+					}
+					if (!poly_subst_bind_type(subst, ge, default_type(t_e->type))) {
+						return Subst_NoMatch;
+					}
+				} else if (t_e->kind == Entity_Constant) {
 					if (t_e->Constant.value.kind != ExactValue_Integer) {
 						return Subst_Unhandled;
 					}
@@ -2281,6 +2315,9 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			Entity *sf = source->Struct.fields[i];
 			if (pf->token.string != sf->token.string) {
 				return Subst_NoMatch;
+			}
+			if ((pf->flags & EntityFlags_IsSubtype) != (sf->flags & EntityFlags_IsSubtype)) {
+				return Subst_NoMatch; // a `using`/subtype field must match one on the source
 			}
 			SubstResult r = subst_unify(c, pf->type, sf->type, subst);
 			if (r != Subst_Matched) {
