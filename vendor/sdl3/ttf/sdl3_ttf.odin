@@ -4,7 +4,11 @@ package sdl3_ttf
 import "core:c"
 import SDL "vendor:sdl3"
 
-when ODIN_OS == .Windows {
+SDL3_TTF_WASM_LIB :: #config(SDL3_TTF_WASM_LIB, "env.o")
+
+when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import lib { SDL3_TTF_WASM_LIB }
+} else when ODIN_OS == .Windows {
 	foreign import lib "SDL3_ttf.lib"
 } else {
 	foreign import lib "system:SDL3_ttf"
