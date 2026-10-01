@@ -3647,11 +3647,25 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	TokenPos pos = ast_token(expr).pos;
 
 	// NOTE(bill): Generate a new name
-	// parent$count
-	isize name_len = prefix_name.len + 6 + 11;
+	// parent$anon-pkg:file:offset
+	// NOTE(bill): named by position rather than a counter, as the order these are generated in varies
+	String prefix = prefix_name;
+	if (parent == nullptr) {
+		// NOTE(bill): a literal inside a polymorphic procedure exists once per instance at the same position, so name it after the enclosing procedure
+		for (DeclInfo *d = pl->decl->parent; d != nullptr; d = d->parent) {
+			Entity *pe = d->entity.load();
+			if (pe != nullptr && pe->kind == Entity_Procedure) {
+				prefix = lb_get_entity_name(m, pe);
+				break;
+			}
+		}
+	}
+	AstFile *lit_file = expr->file();
+	String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
+	String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
+	isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
 	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-	static std::atomic<i32> name_id;
-	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), 1+name_id.fetch_add(1));
+	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
 	String name = make_string((u8 *)name_text, name_len-1);
 
 	Type *type = type_of_expr(expr);

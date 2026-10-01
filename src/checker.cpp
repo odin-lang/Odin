@@ -82,18 +82,45 @@ gb_internal void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
 }
 
 
+gb_internal int entity_source_order_cmp(Entity *x, Entity *y) {
+	if (x == y) {
+		return 0;
+	}
+	int cmp = 0;
+	if (x->pkg != y->pkg) {
+		isize order_x = x->pkg ? x->pkg->order : 0;
+		isize order_y = y->pkg ? y->pkg->order : 0;
+		cmp = isize_cmp(order_x, order_y);
+		if (cmp) {
+			return cmp;
+		}
+	}
+	if (x->file != y->file) {
+		String fullpath_x = x->file ? x->file->fullpath : (String{});
+		String fullpath_y = y->file ? y->file->fullpath : (String{});
+		String file_x = filename_from_path(fullpath_x);
+		String file_y = filename_from_path(fullpath_y);
+
+		cmp = string_compare(file_x, file_y);
+		if (cmp) {
+			return cmp;
+		}
+	}
+
+	cmp = u64_cmp(x->order_in_src, y->order_in_src);
+	if (cmp) {
+		return cmp;
+	}
+	return i32_cmp(x->token.pos.offset, y->token.pos.offset);
+}
+
 gb_internal int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
 	EntityGraphNode *x = data[i];
 	EntityGraphNode *y = data[j];
-	u64 a = x->entity->order_in_src;
-	u64 b = y->entity->order_in_src;
-	if (x->dep_count < y->dep_count) {
-		return -1;
+	if (x->dep_count != y->dep_count) {
+		return x->dep_count < y->dep_count ? -1 : +1;
 	}
-	if (x->dep_count == y->dep_count) {
-		return a < b ? -1 : b > a;
-	}
-	return +1;
+	return entity_source_order_cmp(x->entity, y->entity);
 }
 
 gb_internal void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
@@ -147,10 +174,10 @@ gb_internal int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) 
 	bool xg = (x->scope->flags&ScopeFlag_Global) != 0;
 	bool yg = (y->scope->flags&ScopeFlag_Global) != 0;
 	if (xg != yg) return xg ? -1 : +1;
-	if (xg && yg) return x->pkg->id < y->pkg->id ? +1 : -1;
 	if (x->dep_count < y->dep_count) return -1;
 	if (x->dep_count > y->dep_count) return +1;
-	return 0;
+	// NOTE: a total order, so the package order does not depend on parsing or hashing order
+	return string_compare(x->pkg->fullpath, y->pkg->fullpath);
 }
 
 gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j) {
@@ -360,8 +387,9 @@ gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 		break;
 	}
 	if (c->decl && c->decl->proc_lit) {
-		// Number the scopes within a procedure body depth-first
-		scope->index = c->decl->scope_index++;
+		// NOTE: numbered by position rather than in checking order, as that order varies (e.g. with
+		// which caller instantiates a record first); 0 is the procedure's own scope
+		scope->index = node->kind == Ast_ProcType ? 0 : 1 + ast_token(node).pos.offset;
 	}
 	c->scope = scope;
 	c->state_flags |= StateFlag_bounds_check;
@@ -3246,43 +3274,44 @@ gb_internal gb_inline bool is_entity_a_dependency(Entity *e) {
 }
 
 gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, Arena *arena) {
-	PtrMap<Entity *, EntityGraphNode *> M_procs = {};
-	PtrMap<Entity *, EntityGraphNode *> M_vars  = {};
-	PtrMap<Entity *, EntityGraphNode *> M_other = {};
-
-	map_init(&M_procs, info->entities.count);
-	defer (map_destroy(&M_procs));
-
+	PtrMap<Entity *, EntityGraphNode *> M_vars = {};
 	map_init(&M_vars, info->entities.count);
 	defer (map_destroy(&M_vars));
 
-	map_init(&M_other, info->entities.count);
-	defer (map_destroy(&M_other));
-
-	for_array(i, info->entities) {
-		Entity *e = info->entities[i];
-		if (e == nullptr || !is_entity_a_dependency(e)) {
+	auto G = array_make<EntityGraphNode *>(arena_allocator(arena), 0, info->entities.count);
+	for (Entity *e : info->entities) {
+		if (e == nullptr || e->kind != Entity_Variable || !is_entity_a_dependency(e)) {
 			continue;
 		}
 		EntityGraphNode *n = arena_alloc_item<EntityGraphNode>(arena);
 		n->entity = e;
-		switch (e->kind) {
-		case Entity_Procedure: map_set(&M_procs, e, n); break;
-		case Entity_Variable:  map_set(&M_vars,  e, n); break;
-		default:               map_set(&M_other, e, n); break;
-		}
+		map_set(&M_vars, e, n);
+		array_add(&G, n);
 	}
 
-	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 1");
-	// Calculate edges for graph M
-	for (auto const &entry : M_procs) {
-		EntityGraphNode *n = entry.value;
-		Entity *e = n->entity;
+	TIME_SECTION("generate_entity_dependency_graph: Calculate edges");
 
-		DeclInfo *decl = decl_info_of_entity(e);
-		GB_ASSERT(decl != nullptr);
+	// NOTE(bill): A variable depends on every variable reachable from its declaration through procedures and constants,
+	// as its initializer may read any of them. Variables are not walked through, as they are ordered by their own edges.
+	PtrSet<Entity *> visited = {};
+	defer (ptr_set_destroy(&visited));
+	auto stack = array_make<Entity *>(heap_allocator(), 0, 64);
+	defer (array_free(&stack));
 
+	for (EntityGraphNode *n : G) {
+		ptr_set_clear(&visited);
+		array_clear(&stack);
+
+		DeclInfo *decl = decl_info_of_entity(n->entity);
+		if (decl == nullptr) {
+			continue;
+		}
 		FOR_PTR_SET(dep, decl->deps) {
+			array_add(&stack, dep);
+		}
+
+		while (stack.count > 0) {
+			Entity *dep = array_pop(&stack);
 			GB_ASSERT(dep != nullptr);
 			if (dep->flags & EntityFlag_Field) {
 				continue;
@@ -3290,65 +3319,24 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 			if (!is_entity_a_dependency(dep)) {
 				continue;
 			}
-			EntityGraphNode *m = nullptr;
-
-			switch (dep->kind) {
-			case Entity_Procedure: m = map_must_get(&M_procs, dep); break;
-			case Entity_Variable:  m = map_must_get(&M_vars,  dep); break;
-			default:               m = map_must_get(&M_other, dep); break;
-			}
-			entity_graph_node_set_add(&n->succ, m);
-			entity_graph_node_set_add(&m->pred, n);
-		}
-	}
-
-	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2a (init)");
-
-	auto G = array_make<EntityGraphNode *>(arena_allocator(arena), 0, M_procs.count + M_vars.count + M_other.count);
-
-	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2b (procs)");
-
-	for (auto const &m_entry : M_procs) {
-		EntityGraphNode *n = m_entry.value;
-
-		// Connect each pred 'p' of 'n' with each succ 's' and from
-		// the procedure node
-		FOR_PTR_SET(p, n->pred) {
-			// Ignore self-cycles
-			if (p == n) {
+			if (dep->kind == Entity_Variable) {
+				EntityGraphNode **m = map_get(&M_vars, dep);
+				if (m != nullptr) {
+					entity_graph_node_set_add(&n->succ, *m);
+					entity_graph_node_set_add(&(*m)->pred, n);
+				}
 				continue;
 			}
-			// Each succ 's' of 'n' becomes a succ of 'p', and
-			// each pred 'p' of 'n' becomes a pred of 's'
-			FOR_PTR_SET(s, n->succ) {
-				// Ignore self-cycles
-				if (s == n) {
-					continue;
-				}
-				if (p->entity->kind == Entity_Procedure &&
-				    s->entity->kind == Entity_Procedure) {
-				    	// NOTE(bill, 2020-11-15): Only care about variable initialization ordering
-				    	// TODO(bill): This is probably wrong!!!!
-					continue;
-				}
-				// IMPORTANT NOTE/TODO(bill, 2020-11-15): These three calls take the majority of the
-				// the time to process
-				entity_graph_node_set_add(&p->succ, s);
-				entity_graph_node_set_add(&s->pred, p);
-				// Remove edge to 'n'
-				entity_graph_node_set_remove(&s->pred, n);
+			if (ptr_set_update(&visited, dep)) {
+				continue;
 			}
-
-			// Remove edge to 'n'
-			entity_graph_node_set_remove(&p->succ, n);
+			DeclInfo *dep_decl = decl_info_of_entity(dep);
+			if (dep_decl != nullptr) {
+				FOR_PTR_SET(next, dep_decl->deps) {
+					array_add(&stack, next);
+				}
+			}
 		}
-	}
-
-	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2c (vars)");
-
-	for (auto const &m_entry : M_vars) {
-		EntityGraphNode *n = m_entry.value;
-		array_add(&G, n);
 	}
 
 	TIME_SECTION("generate_entity_dependency_graph: Dependency Count Checker");
@@ -3358,28 +3346,6 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		n->dep_count = n->succ.count;
 		GB_ASSERT(n->dep_count >= 0);
 	}
-
-	// f64 succ_count = 0.0;
-	// f64 pred_count = 0.0;
-	// f64 succ_capacity = 0.0;
-	// f64 pred_capacity = 0.0;
-	// f64 succ_max = 0.0;
-	// f64 pred_max = 0.0;
-	// for_array(i, G) {
-	// 	EntityGraphNode *n = G[i];
-	// 	succ_count += n->succ.entries.count;
-	// 	pred_count += n->pred.entries.count;
-	// 	succ_capacity += n->succ.entries.capacity;
-	// 	pred_capacity += n->pred.entries.capacity;
-
-	// 	succ_max = gb_max(succ_max, n->succ.entries.capacity);
-	// 	pred_max = gb_max(pred_max, n->pred.entries.capacity);
-
-	// }
-	// f64 count = cast(f64)G.count;
-	// gb_printf_err(">>>count    pred: %f succ: %f\n", pred_count/count, succ_count/count);
-	// gb_printf_err(">>>capacity pred: %f succ: %f\n", pred_capacity/count, succ_capacity/count);
-	// gb_printf_err(">>>max      pred: %f succ: %f\n", pred_max, succ_max);
 
 	return G;
 }
@@ -5342,12 +5308,13 @@ gb_internal CheckerContext *create_checker_context(Checker *c) {
 
 gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e != nullptr);
+	if (e->state == EntityState_Resolved)  {
+		// NOTE: also an alias already overridden by what it aliases, which may have no `DeclInfo`
+		return;
+	}
 	GB_ASSERT(d != nullptr);
 
 	if (d->scope != e->scope) {
-		return;
-	}
-	if (e->state == EntityState_Resolved)  {
 		return;
 	}
 
@@ -5373,13 +5340,32 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 	check_entity_decl(ctx, e, d, nullptr);
 }
 
+// for `-internal-shuffle-global-entities`
+// visit globals in a seeded random order, so that any result depending on the visiting order shows up without needing threads
+gb_internal void shuffle_global_entities(Array<Entity *> *entities, u64 seed) {
+	if (seed == 0) {
+		return;
+	}
+	u64 state = seed;
+	for (isize i = entities->count-1; i > 0; i--) {
+		state = state*6364136223846793005ull + 1442695040888963407ull;
+		isize j = cast(isize)((state >> 33) % cast(u64)(i+1));
+		Entity *tmp = (*entities)[i];
+		(*entities)[i] = (*entities)[j];
+		(*entities)[j] = tmp;
+	}
+}
+
 gb_internal void check_all_global_entities(Checker *c) {
 	in_single_threaded_checker_stage.store(true, std::memory_order_relaxed);
 
+	auto order = array_clone(heap_allocator(), c->info.entities);
+	defer (array_free(&order));
+	shuffle_global_entities(&order, build_context.internal_shuffle_global_entities);
+
 	// NOTE(bill): This must be single threaded
 	// Don't bother trying
-	for_array(i, c->info.entities) {
-		Entity *e = c->info.entities[i];
+	for (Entity *e : order) {
 		GB_ASSERT(e != nullptr);
 		if (e->flags & EntityFlag_Lazy) {
 			continue;
@@ -7537,40 +7523,7 @@ gb_internal void check_merge_queues_into_arrays(Checker *c) {
 }
 
 gb_internal GB_COMPARE_PROC(init_procedures_cmp) {
-	int cmp = 0;
-	Entity *x = *(Entity **)a;
-	Entity *y = *(Entity **)b;
-	if (x == y) {
-		cmp = 0;
-		return cmp;
-	}
-
-	if (x->pkg != y->pkg) {
-		isize order_x = x->pkg ? x->pkg->order : 0;
-		isize order_y = y->pkg ? y->pkg->order : 0;
-		cmp = isize_cmp(order_x, order_y);
-		if (cmp) {
-			return cmp;
-		}
-	}
-	if (x->file != y->file) {
-		String fullpath_x = x->file ? x->file->fullpath : (String{});
-		String fullpath_y = y->file ? y->file->fullpath : (String{});
-		String file_x = filename_from_path(fullpath_x);
-		String file_y = filename_from_path(fullpath_y);
-
-		cmp = string_compare(file_x, file_y);
-		if (cmp) {
-			return cmp;
-		}
-	}
-
-
-	cmp = u64_cmp(x->order_in_src, y->order_in_src);
-	if (cmp) {
-		return cmp;
-	}
-	return i32_cmp(x->token.pos.offset, y->token.pos.offset);
+	return entity_source_order_cmp(*(Entity **)a, *(Entity **)b);
 }
 
 gb_internal GB_COMPARE_PROC(fini_procedures_cmp) {
@@ -7776,6 +7729,10 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("add entities from packages");
 	check_merge_queues_into_arrays(c);
+
+	TIME_SECTION("sort global entities");
+	// NOTE: the queues are filled by parallel workers, so their order differs between runs
+	array_sort(c->info.entities, init_procedures_cmp);
 
 	TIME_SECTION("check all global entities");
 	check_all_global_entities(c);

@@ -427,25 +427,35 @@ gb_internal String lb_source_code_location_gen_name(lbProcedure *p, Ast *node) {
 
 
 
-gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos) {
-	lbValue loc = lb_emit_source_code_location_const(p, procedure, pos);
-	lbAddr addr = lb_add_global_generated_with_name(p->module, loc.type, loc, lb_source_code_location_gen_name(procedure, pos));
+gb_internal lbValue lb_source_code_location_global_ptr(lbModule *m, lbValue loc, String const &name) {
+	// NOTE(bill): every polymorphic instance of a procedure produces the same location under the same name.
+	// Reuse it rather than letting LLVM rename the duplicate, as which instance got the new name depended
+	// on the order the instances were generated in.
+	LLVMValueRef found = LLVMGetNamedGlobal(m->mod, alloc_cstring(temporary_allocator(), name));
+	if (found != nullptr && LLVMGetInitializer(found) == loc.value) {
+		lbValue g = {};
+		g.type = alloc_type_pointer(default_type(loc.type));
+		g.value = LLVMConstPointerCast(found, lb_type(m, g.type));
+		return g;
+	}
+	lbAddr addr = lb_add_global_generated_with_name(m, loc.type, loc, name);
 	lb_make_global_private_const(addr);
 	return addr.addr;
+}
+
+gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+	lbValue loc = lb_emit_source_code_location_const(p, procedure, pos);
+	return lb_source_code_location_global_ptr(p->module, loc, lb_source_code_location_gen_name(procedure, pos));
 }
 
 gb_internal lbValue lb_const_source_code_location_as_global_ptr(lbModule *m, String const &procedure, TokenPos const &pos) {
 	lbValue loc = lb_const_source_code_location_const(m, procedure, pos);
-	lbAddr addr = lb_add_global_generated_with_name(m, loc.type, loc, lb_source_code_location_gen_name(procedure, pos));
-	lb_make_global_private_const(addr);
-	return addr.addr;
+	return lb_source_code_location_global_ptr(m, loc, lb_source_code_location_gen_name(procedure, pos));
 }
 
 gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, Ast *node) {
 	lbValue loc = lb_emit_source_code_location_const(p, node);
-	lbAddr addr = lb_add_global_generated_with_name(p->module, loc.type, loc, lb_source_code_location_gen_name(p, node));
-	lb_make_global_private_const(addr);
-	return addr.addr;
+	return lb_source_code_location_global_ptr(p->module, loc, lb_source_code_location_gen_name(p, node));
 }
 
 

@@ -996,6 +996,9 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	} else {
 		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup(ctx->scope, ident->Ident.interned, ident->Ident.hash);
+		if (found != nullptr) {
+			found = resolve_alias_entity(ctx, found, nullptr);
+		}
 
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {

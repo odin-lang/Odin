@@ -2254,10 +2254,13 @@ gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp) {
 
 	i32 cmp = 0;
 	cmp = token_pos_cmp(x->token.pos, y->token.pos);
-	if (!cmp) {
+	if (cmp) {
 		return cmp;
 	}
-	return cmp;
+	// NOTE(bill): polymorphic instances share their declaration's token,
+	// so order them by their type, otherwise their order (and every name numbered after them)
+	// follows the checking order
+	return lb_entity_type_cmp(x, y);
 }
 
 gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, CheckerInfo *info, bool do_threading) {
