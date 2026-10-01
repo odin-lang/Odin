@@ -1865,6 +1865,11 @@ gb_internal SubstResult subst_unify_constraint(CheckerContext *c, Type *spec, Ty
 	if (is_type_untyped(tb)) {
 		r = subst_unify(c, spec, default_type(source), subst);
 	} else if (sb->kind == Type_Struct || sb->kind == Type_Union) {
+		if (tb == sb &&
+		    ((tb->kind == Type_Struct && tb->Struct.polymorphic_parent == nullptr) ||
+		     (tb->kind == Type_Union  && tb->Union.polymorphic_parent  == nullptr))) {
+			return Subst_Matched;
+		}
 		r = subst_unify(c, spec, source, subst); // record conformance keeps the Named types (match params)
 	} else {
 		r = subst_unify(c, sb, tb, subst);        // general: base-typed structural match

@@ -251,6 +251,10 @@ gb_internal void print_all_errors(void);
 typedef ERROR_OUT_PROC(ErrorOutProc);
 
 gb_internal ERROR_OUT_PROC(default_error_out_va) {
+	if (global_error_mute_depth > 0) {
+		// NOTE(bill): the error this would continue was muted, so there is no current error value
+		return;
+	}
 	char buf[4096] = {};
 	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
 	isize n = len-1;
@@ -765,10 +769,17 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 
 
 gb_internal void error_line_va(char const *fmt, va_list va) {
+	if (global_error_mute_depth > 0) {
+		return;
+	}
 	error_out_va(fmt, va);
 }
 
 gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
+	if (global_error_mute_depth > 0) {
+		global_error_mute_count += 1;
+		return;
+	}
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
