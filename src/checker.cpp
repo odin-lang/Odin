@@ -5766,6 +5766,23 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 
 		GB_ASSERT(ctx.scope == e->scope);
 
+		AttributeContext ac = {};
+		check_decl_attributes(&ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+		if (ac.require_declaration) {
+			mpsc_enqueue(&ctx.info->required_foreign_imports_through_force_queue, e);
+			add_entity_use(&ctx, nullptr, e);
+		}
+		if (ac.foreign_import_priority_index != 0) {
+			e->LibraryName.priority_index = ac.foreign_import_priority_index;
+		}
+		if (ac.ignore_duplicates) {
+			e->LibraryName.ignore_duplicates = true;
+		}
+		String extra_linker_flags = string_trim_whitespace(ac.extra_linker_flags);
+		if (extra_linker_flags.len != 0) {
+			e->LibraryName.extra_linker_flags = extra_linker_flags;
+		}
+
 		if (fl->fullpaths.count == 0) {
 			String base_dir = dir_from_path(decl->file()->fullpath);
 
@@ -5878,11 +5895,21 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(fl->library_name.pos.line != 0);
 	fl->library_name.string = library_name;
 
-	AttributeContext ac = {};
-	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
+	// NOTE(bill): Only 'export' is needed to declare the entity; the attribute values are evaluated in
+	// `check_foreign_import_fullpaths` as the globals they may name are not all collected yet
+	bool is_export = false;
+	for (Ast *attr : fl->attributes) {
+		if (attr->kind != Ast_Attribute) continue;
+		for (Ast *elem : attr->Attribute.elems) {
+			Ast *name = elem->kind == Ast_FieldValue ? elem->FieldValue.field : elem;
+			if (name->kind == Ast_Ident && name->Ident.token.string == "export") {
+				is_export = true;
+			}
+		}
+	}
 
 	Scope *scope = parent_scope;
-	if (ac.is_export) {
+	if (is_export) {
 		scope = parent_scope->parent;
 	}
 
@@ -5891,22 +5918,6 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
 	add_entity(ctx, scope, nullptr, e);
-
-
-	if (ac.require_declaration) {
-		mpsc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
-		add_entity_use(ctx, nullptr, e);
-	}
-	if (ac.foreign_import_priority_index != 0) {
-		e->LibraryName.priority_index = ac.foreign_import_priority_index;
-	}
-	if (ac.ignore_duplicates) {
-		e->LibraryName.ignore_duplicates = true;
-	}
-	String extra_linker_flags = string_trim_whitespace(ac.extra_linker_flags);
-	if (extra_linker_flags.len != 0) {
-		e->LibraryName.extra_linker_flags = extra_linker_flags;
-	}
 
 	mpsc_enqueue(&ctx->info->foreign_imports_to_check_fullpaths, e);
 

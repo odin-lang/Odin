@@ -65,8 +65,10 @@ gb_internal LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *
 	return lb_debug_location_from_token_pos(p, ast_end_token(node).pos);
 }
 
-gb_internal void lb_debug_file_line(lbModule *m, Ast *node, LLVMMetadataRef *file, unsigned *line) {
-	if (*file == nullptr) {
+// NOTE(bill): not for an anonymous type, as identical ones are interchangeable, and which one is used
+// (e.g. by a polymorphic instance) depends on the checking order
+gb_internal void lb_debug_file_line(lbModule *m, Type *type, Ast *node, LLVMMetadataRef *file, unsigned *line) {
+	if (*file == nullptr && type->kind == Type_Named) {
 		if (node) {
 			*file = lb_get_llvm_metadata(m, node->file());
 			*line = cast(unsigned)ast_token(node).pos.line;
@@ -192,7 +194,7 @@ gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &nam
 gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	GB_ASSERT(bt->kind == Type_Struct);
 
-	lb_debug_file_line(m, bt->Struct.node, &file, &line);
+	lb_debug_file_line(m, type, bt->Struct.node, &file, &line);
 
 	unsigned tag = DW_TAG_structure_type;
 	if (is_type_raw_union(bt)) {
@@ -476,7 +478,7 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
 
-	lb_debug_file_line(m, bt->Union.node, &file, &line);
+	lb_debug_file_line(m, type, bt->Union.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
@@ -560,7 +562,7 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_BitSet);
 
-	lb_debug_file_line(m, bt->BitSet.node, &file, &line);
+	lb_debug_file_line(m, type, bt->BitSet.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
@@ -641,7 +643,7 @@ gb_internal LLVMMetadataRef lb_debug_bitfield(lbModule *m, Type *type, String na
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_BitField);
 
-	lb_debug_file_line(m, bt->BitField.node, &file, &line);
+	lb_debug_file_line(m, type, bt->BitField.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
@@ -682,7 +684,7 @@ gb_internal LLVMMetadataRef lb_debug_enum(lbModule *m, Type *type, String name, 
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Enum);
 
-	lb_debug_file_line(m, bt->Enum.node, &file, &line);
+	lb_debug_file_line(m, type, bt->Enum.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);

@@ -354,6 +354,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		e->file = original_type->Named.type_name && original_type->Named.type_name->file ? original_type->Named.type_name->file : ctx->file;
 		e->pkg = pkg;
 		e->TypeName.original_type_for_parapoly = original_type;
+		e->decl_info = ctx->decl;
 		add_entity_use(ctx, node, e);
 	}
 

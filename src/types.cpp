@@ -353,7 +353,7 @@ struct Type {
 	std::atomic<i64> cached_align;
 	std::atomic<u64> canonical_hash;
 	std::atomic<u32> flags; // TypeFlag
-	bool failure;
+	std::atomic<bool> failure;
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin

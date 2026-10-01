@@ -6867,7 +6867,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 						// then the default is materialized against the concrete type (reporting a clear error if it does not fit).
 						ordered_operands[i].mode = Addressing_Invalid;
 						ordered_operands[i].type = t_invalid;
-						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+						// NOTE(bill): Check a clone, as the callee's default expression is shared by every call site.
+						ordered_operands[i].expr = clone_ast(e->Variable.param_value.original_ast_expr);
 						ordered_operands[i].deferred_untyped_arg = true;
 					} else {
 						ordered_operands[i].mode = Addressing_Value;
@@ -8802,6 +8803,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 		if (found_entity) {
+			add_declaration_dependency(c, found_entity);
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
 			return err;
@@ -8810,6 +8812,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		CheckerContext ctx = *c;
 		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
 		ctx.scope = polymorphic_record_parent_scope(original_type);
+		// NOTE(bill): the instance's members are only checked by its first use, so their dependencies are
+		// the instance's own, and each use depends on the instance instead
+		ctx.decl = make_decl_info(ctx.scope, nullptr);
 
 		if (original_type->Named.type_name && original_type->Named.type_name->file) {
 			ctx.file = original_type->Named.type_name->file;
@@ -8851,6 +8856,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
 
+		add_declaration_dependency(c, named_type->Named.type_name);
 		operand->mode = Addressing_Type;
 		operand->type = named_type;
 	}
