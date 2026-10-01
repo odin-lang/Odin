@@ -46,15 +46,20 @@ when ODIN_NO_CRT {
 		return "", -1
 	}
 
-	_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+	_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, error: Error) {
+		if key == "" {
+			return "", .Env_Var_Not_Found
+		}
 		if intrinsics.atomic_load_explicit(&_org_env_begin, .Acquire) == 0 {
 			_build_env()
 		}
 
-		if v, idx := _lookup(key); idx != -1 {
-			found = true
-			value, _ = clone_string(v, allocator)
+		v, idx := _lookup(key)
+		if idx == -1 {
+			return "", .Env_Var_Not_found
 		}
+
+		value = clone_string(v, allocator) or_return
 		return
 	}
 
@@ -254,21 +259,20 @@ when ODIN_NO_CRT {
 
 } else {
 
-	_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+	_lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, error: Error) {
 		if key == "" {
-			return
+			return "", .Env_Var_Not_found
 		}
 
 		temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
 
-		ckey := strings.clone_to_cstring(key, temp_allocator)
+		ckey := strings.clone_to_cstring(key, temp_allocator) or_return
 		cval := posix.getenv(ckey)
 		if cval == nil {
-			return
+			return "", .Env_Var_Not_found
 		}
 
-		found = true
-		value = strings.clone(string(cval), allocator) // NOTE(laytan): what if allocation fails?
+		value = strings.clone(string(cval), allocator) or_return
 
 		return
 	}
