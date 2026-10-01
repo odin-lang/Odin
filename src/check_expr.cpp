@@ -13112,6 +13112,8 @@ gb_internal ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, T
 			Type *elem_type = core_broadcastable_elem_type(type_hint);
 			if (is_type_untyped(o->type)) {
 				if (is_type_union(elem_type)) {
+					// NOTE: record it first so convert_to_typed's final update keeps a constant that becomes a value (e.g. broadcast to an array variant)
+					add_untyped(c, node, o->mode, o->type, o->value);
 					convert_to_typed(c, o, elem_type);
 				}
 			}

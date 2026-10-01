@@ -598,6 +598,7 @@ struct BuildContext {
 	bool internal_weak_monomorphization;
 	bool internal_ignore_llvm_verification;
 	bool internal_llvm_no_sroa;
+	bool internal_global_entity_graph;
 
 	bool   enable_rvo;
 

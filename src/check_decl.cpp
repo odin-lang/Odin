@@ -2137,6 +2137,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 	if (e->state == EntityState_Resolved)  {
 		return;
 	}
+	GlobalEntityTimingFrame timing_frame = global_entity_timing_begin(e);
 	if (e->flags & EntityFlag_Lazy) {
 		mutex_lock(&ctx->info->lazy_mutex);
 	}
@@ -2222,6 +2223,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 	}
 end:;
+	global_entity_timing_end(timing_frame, e);
 	// NOTE(bill): Add it to the list of checked entities
 	if (e->flags & EntityFlag_Lazy) {
 		array_add(&ctx->info->entities, e);

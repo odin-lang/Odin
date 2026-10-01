@@ -532,6 +532,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalLLVMVerification,
 	BuildFlag_InternalLLVMNoSROA,
 	BuildFlag_InternalEnableRVO,
+	BuildFlag_InternalGlobalEntityGraph,
 
 	BuildFlag_Sanitize,
 	BuildFlag_LTO,
@@ -793,6 +794,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalGlobalEntityGraph, str_lit("internal-global-entity-graph"), BuildFlagParam_None, Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
@@ -1840,6 +1842,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_InternalEnableRVO:
 							build_context.enable_rvo = true;
+							break;
+						case BuildFlag_InternalGlobalEntityGraph:
+							build_context.internal_global_entity_graph = true;
 							break;
 
 

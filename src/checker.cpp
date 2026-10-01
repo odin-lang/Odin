@@ -4599,6 +4599,7 @@ gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
 	return false;
 }
 
+#include "checker_global_graph.cpp"
 #include "check_expr.cpp"
 #include "check_builtin.cpp"
 #include "check_type.cpp"
@@ -5384,6 +5385,7 @@ gb_internal void check_all_global_entities(Checker *c) {
 			continue;
 		}
 		DeclInfo *d = e->decl_info;
+		GlobalEntityTimingFrame timing_frame = global_entity_timing_begin(e);
 		check_single_global_entity(c, e, d);
 		if (e->type != nullptr && is_type_typed(e->type)) {
 			for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
@@ -5393,6 +5395,7 @@ gb_internal void check_all_global_entities(Checker *c) {
 			(void)type_size_of(e->type);
 			(void)type_align_of(e->type);
 		}
+		global_entity_timing_end(timing_frame, e);
 	}
 
 	in_single_threaded_checker_stage.store(false, std::memory_order_relaxed);
@@ -6279,6 +6282,7 @@ gb_internal void check_import_entities(Checker *c) {
 	defer (map_destroy(&untyped));
 
 	isize min_pkg_index = 0;
+	u64 stage_start = global_import_stage_begin();
 	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
 		ImportGraphNode *node = package_order[pkg_index];
 		AstPackage *pkg = node->pkg;
@@ -6309,6 +6313,7 @@ gb_internal void check_import_entities(Checker *c) {
 		}
 		min_pkg_index = pkg_index;
 	}
+	global_import_stage_end(GlobalImportStage_CollectFileDecls, stage_start);
 
 	TIME_SECTION("check_import_entities - check delayed entities");
 	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
@@ -6316,6 +6321,7 @@ gb_internal void check_import_entities(Checker *c) {
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
 		AstPackage *pkg = node->scope->pkg;
 
+		stage_start = global_import_stage_begin();
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
@@ -6326,13 +6332,17 @@ gb_internal void check_import_entities(Checker *c) {
 			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
 			add_untyped_expressions(ctx.info, &untyped);
 		}
+		global_import_stage_end(GlobalImportStage_Imports, stage_start);
 
+		stage_start = global_import_stage_begin();
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
 			correct_type_aliases_in_scope(&ctx, pkg->scope);
 		}
+		global_import_stage_end(GlobalImportStage_TypeAliases, stage_start);
 
+		stage_start = global_import_stage_begin();
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
@@ -6354,7 +6364,9 @@ gb_internal void check_import_entities(Checker *c) {
 
 			array_clear(&f->delayed_decls_queues[AstDelayQueue_ForeignBlock]);
 		}
+		global_import_stage_end(GlobalImportStage_ForeignBlocks, stage_start);
 
+		stage_start = global_import_stage_begin();
 		for_array(i, pkg->files) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
@@ -6367,6 +6379,7 @@ gb_internal void check_import_entities(Checker *c) {
 
 			add_untyped_expressions(ctx.info, &untyped);
 		}
+		global_import_stage_end(GlobalImportStage_DelayedExprs, stage_start);
 	}
 }
 
@@ -7766,6 +7779,11 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("check all global entities");
 	check_all_global_entities(c);
+
+	if (build_context.internal_global_entity_graph) {
+		TIME_SECTION("print global entity graph");
+		print_global_entity_graph(c);
+	}
 
 	TIME_SECTION("init preload");
 	init_preload(c);
