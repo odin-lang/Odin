@@ -2622,10 +2622,122 @@ gb_internal bool subst_poly_assignable(CheckerContext *c, Type *pattern, Type *s
 	return false;
 }
 
+gb_internal bool ast_is_context_free_constant(Ast *e) {
+	if (e == nullptr) {
+		return false;
+	}
+	e = unparen_expr(e);
+	if (e == nullptr) {
+		return false;
+	}
+	switch (e->kind) {
+	case Ast_BasicLit:
+		return true;
+	case Ast_UnaryExpr:
+		return ast_is_context_free_constant(e->UnaryExpr.expr);
+	case Ast_BinaryExpr:
+		return ast_is_context_free_constant(e->BinaryExpr.left) &&
+		       ast_is_context_free_constant(e->BinaryExpr.right);
+	}
+	return false;
+}
+
+gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Type *poly_type, Ast *expr) {
+	if (expr == nullptr) {
+		return nullptr;
+	}
+	expr = unparen_expr(expr);
+	if (expr == nullptr || expr->kind != Ast_CompoundLit || expr->CompoundLit.type != nullptr) {
+		return nullptr;
+	}
+
+	Type *bt = base_type(poly_type);
+	Type *elem_pattern = nullptr;
+	switch (bt->kind) {
+	case Type_Array:
+		if (bt->Array.generic_count != nullptr) {
+			// NOTE(bill): polymorphic count (`[$N]$T`) is not currently supported
+			return nullptr;
+		}
+		elem_pattern = bt->Array.elem;
+		break;
+	case Type_Slice:        elem_pattern = bt->Slice.elem;        break;
+	case Type_DynamicArray: elem_pattern = bt->DynamicArray.elem; break;
+	default:
+		return nullptr;
+	}
+	// NOTE(bill): Only a bare `$T` element keeps determination unambiguous and construction trivial
+	if (elem_pattern == nullptr || elem_pattern->kind != Type_Generic || elem_pattern->Generic.specialized != nullptr) {
+		return nullptr;
+	}
+
+	Slice<Ast *> const &elems = expr->CompoundLit.elems;
+	if (elems.count == 0) {
+		// `{}` cannot determine an element type
+		return nullptr;
+	}
+
+
+	Type *elem_type = nullptr;
+	for (Ast *e : elems) {
+		if (!ast_is_context_free_constant(e)) {
+			return nullptr;
+		}
+		Operand o = {};
+		Ast *trial = clone_ast(e);
+		i64 muted_before = error_mute_count();
+		begin_error_mute();
+		check_expr(ctx, &o, trial);
+		end_error_mute();
+		if (o.mode == Addressing_Invalid || o.type == nullptr || o.type == t_invalid ||
+		    error_mute_count() != muted_before) {
+			return nullptr;
+		}
+		Type *et = is_type_untyped(o.type) ? default_type(o.type) : o.type;
+		if (et == nullptr || et == t_invalid || is_type_polymorphic(et)) {
+			return nullptr;
+		}
+		if (elem_type == nullptr) {
+			elem_type = et;
+		} else if (!are_types_identical(elem_type, et)) {
+			// non-homogeneous: fall back to the explicit-type error
+			return nullptr;
+		}
+	}
+	if (elem_type == nullptr) {
+		return nullptr;
+	}
+
+	Type *source = nullptr;
+	switch (bt->kind) {
+	case Type_Array:        source = alloc_type_array(elem_type, bt->Array.count, nullptr); break;
+	case Type_Slice:        source = alloc_type_slice(elem_type);                           break;
+	case Type_DynamicArray: source = alloc_type_dynamic_array(elem_type);                   break;
+	}
+	if (source == nullptr) {
+		return nullptr;
+	}
+
+	PolySubst subst = {};
+	subst.items.allocator = heap_allocator();
+	defer (array_free(&subst.items));
+	if (subst_unify(ctx, poly_type, source, &subst) != Subst_Matched) {
+		return nullptr;
+	}
+	Type *applied = subst_apply(ctx, poly_type, source, &subst);
+	subst_bind_entities(&subst);
+	return applied;
+}
+
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
+		if (operand.deferred_untyped_arg && modify_type) {
+			if (Type *determined = determine_poly_elem_from_compound_lit(ctx, poly_type, operand.expr)) {
+				return determined;
+			}
+		}
 		if (operand.deferred_untyped_arg && !modify_type) {
 			// Probe pass (procedure-group candidate pre-check): a deferred untyped argument carries no
 			// type yet, so it cannot constrain this parameter. Treat it as a match and let the real
