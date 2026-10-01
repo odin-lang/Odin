@@ -76,6 +76,6 @@ _mm512_or_si512 :: #force_inline proc "c" (a, b: __m512i) -> __m512i {
 //
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm512_xor_si512)
 @(require_results, enable_target_feature="avx512f,evex512")
-_mm512_xor_si512 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+_mm512_xor_si512 :: #force_inline proc "c" (a, b: __m512i) -> __m512i {
 	return simd.bit_xor(a, b)
 }
