@@ -7496,7 +7496,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = t_untyped_bool;
 			bool is_specialization = false;
 			if (!are_types_identical(s, t)) {
-				is_specialization = check_type_specialization_to(c, s, t, false, false);
+				is_specialization = subst_check_specialization(c, s, t, /*modify_type*/false);
 			}
 			operand->value = exact_value_bool(is_specialization);
 

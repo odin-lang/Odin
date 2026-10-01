@@ -1743,134 +1743,20 @@ gb_internal GenTypesData *gen_types_data_of_specialization(Type *specialization)
 	return nullptr;
 }
 
-gb_internal bool check_type_specialization_to_internal(CheckerContext *ctx, Type *specialization, Type *type, TypeTuple *s_tuple, TypeTuple *t_tuple, bool modify_type, bool finalize) {
-	GB_ASSERT(t_tuple->variables.count == s_tuple->variables.count);
-	for_array(i, s_tuple->variables) {
-		Entity *s_e = s_tuple->variables[i];
-		Entity *t_e = t_tuple->variables[i];
-		Type *st = s_e->type;
-		Type *tt = t_e->type;
-
-		// NOTE(bill, 2018-12-14): This is needed to override polymorphic named constants in types
-		if (st->kind == Type_Generic && t_e->kind == Entity_Constant) {
-			Entity *e = scope_lookup(st->Generic.scope, st->Generic.interned_name, 0);
-			GB_ASSERT(e != nullptr);
-			if (modify_type) {
-				e->kind = Entity_Constant;
-				e->Constant.value = t_e->Constant.value;
-				e->type = t_e->type;
-			}
-		} else {
-			if (st->kind == Type_Basic && tt->kind == Type_Basic &&
-				s_e->kind == Entity_Constant && t_e->kind == Entity_Constant) {
-				if (!compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value))
-					return false;
-			} else {
-				bool ok = is_polymorphic_type_assignable(ctx, st, tt, true, modify_type);
-				if (!ok) {
-					// TODO(bill, 2021-08-19): is this logic correct?
-					return false;
-				}
-			}
-		}
-	}
-
-	if (modify_type && finalize) {
-		// NOTE(bill): This is needed in order to change the actual type but still have the types defined within it.
-		// `specialization` may already be published in a polymorphic record's gen_types cache;
-		// finalize it under that record's (recursive) gen_types mutex so a concurrent
-		// find_polymorphic_record_entity on another thread cannot observe a torn Type.
-		GenTypesData *gen_types = gen_types_data_of_specialization(specialization);
-		if (gen_types != nullptr) mutex_lock(&gen_types->mutex);
-		gb_memmove(specialization, type, gb_size_of(Type));
-		if (gen_types != nullptr) mutex_unlock(&gen_types->mutex);
-	}
-
-	return true;
-}
-
-gb_internal bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Type *type, bool compound, bool modify_type, bool finalize) {
-	if (type == nullptr ||
-	    type == t_invalid) {
-		return true;
-	}
-
-	Type *t = base_type(type);
-	Type *s = base_type(specialization);
-	if (t->kind != s->kind) {
-		if (t->kind == Type_EnumeratedArray && s->kind == Type_Array) {
-			// Might be okay, check later
-		} else {
-			return false;
-		}
-	}
-
-	if (is_type_untyped(t)) {
-		Operand o = {Addressing_Value};
-		o.type = default_type(type);
-		bool can_convert = check_cast_internal(ctx, &o, specialization);
-		return can_convert;
-	} else if (t->kind == Type_Struct) {
-		if (t->Struct.polymorphic_parent == nullptr &&
-		    t == s) {
-			return true;
-		}
-		if (t->Struct.polymorphic_parent == specialization) {
-			return true;
-		}
-
-		if (t->Struct.polymorphic_parent == s->Struct.polymorphic_parent &&
-		    s->Struct.polymorphic_params != nullptr &&
-		    t->Struct.polymorphic_params != nullptr) {
-
-			TypeTuple *s_tuple = get_record_polymorphic_params(s);
-			TypeTuple *t_tuple = get_record_polymorphic_params(t);
-			return check_type_specialization_to_internal(ctx, specialization, type, s_tuple, t_tuple, modify_type, finalize);
-		}
-	} else if (t->kind == Type_Union) {
-		if (t->Union.polymorphic_parent == nullptr &&
-		    t == s) {
-			return true;
-		}
-		if (t->Union.polymorphic_parent == specialization) {
-			return true;
-		}
-
-		if (t->Union.polymorphic_parent == s->Union.polymorphic_parent &&
-		    s->Union.polymorphic_params != nullptr &&
-		    t->Union.polymorphic_params != nullptr) {
-
-			TypeTuple *s_tuple = get_record_polymorphic_params(s);
-			TypeTuple *t_tuple = get_record_polymorphic_params(t);
-			return check_type_specialization_to_internal(ctx, specialization, type, s_tuple, t_tuple, modify_type, finalize);
-		}
-	}
-
-	if (specialization->kind == Type_Named &&
-	    type->kind != Type_Named) {
-		return false;
-	}
-	if (is_polymorphic_type_assignable(ctx, base_type(specialization), base_type(type), compound, modify_type)) {
-		return true;
-	}
-
-	return false;
-}
-
-
-// The substitution engine is the primary way a polymorphic parameter type is resolved:
-// `subst_unify` matches a pattern against a source PURELY (no node/entity mutation), accumulating
-// bindings; `subst_apply` reconstructs the instantiated type by CONSTRUCTION; `subst_bind_entities`
-// binds the poly-scope entities. `determine_type_from_polymorphic` uses them for every pattern the
-// engine reports `Subst_Matched` for. The in-place mutator `is_polymorphic_type_assignable` remains
-// only as a fallback for the patterns the engine leaves `Subst_Unhandled` (genuine subtyping, and the
-// `[^]<->^` handled-by-mutator case), and for the non-`modify_type` yes/no probe.
+// NOTE(bill: 2026-10-01)
 //
-// PARAPOLY_DEBUG_VERIFY_SUBST is an off-by-default differential debug switch: it makes the old mutator
-// authoritative and asserts the engine agrees with it (constructed type + entity bindings) on every
-// instantiation. It compares types structurally via are_types_identical, so it CANNOT catch codegen
-// state the engine must still set up (e.g. a map's internal types); those need build+run tests.
-#define PARAPOLY_DEBUG_VERIFY_SUBST 0
+// The substitution engine is the way a polymorphic parameter type is resolved or a `$T: Constraint` specialization is checked:
+//     `subst_unify` matches a pattern against a source PURELY (no node/entity mutation), accumulating bindings
+//     `subst_apply` reconstructs the instantiated type by CONSTRUCTION
+//     `subst_bind_entities` binds the poly-scope entities
+//     `subst_unify_constraint` handles specialization conformance
+//
+//
+// The old in-place mutator (is_polymorphic_type_assignable / check_type_specialization_to)
+// has been removed a pattern the engine cannot match is a definite non-match,
+// surfaced as a call-site error rather than silently mishandled.
+// The old mutator a lovely mess of `memmove` nonsense which was quite fragile,
+// so changing it to this should make things a heck of a lot more stable in the long run.
 
 enum SubstResult : u8 {
 	Subst_Unhandled,
@@ -1941,7 +1827,7 @@ gb_internal bool poly_subst_bind_enum_array(PolySubst *s, Entity *key, Type *ea)
 }
 
 // True when `source` is an instantiation of the bare polymorphic record template `spec` (the form a
-// `$T/Stack` constraint takes). Mirrors check_type_specialization_to's `polymorphic_parent` check.
+// `$T/Stack` constraint takes), via its `polymorphic_parent` link.
 gb_internal bool subst_source_is_template_instance(Type *source, Type *spec) {
 	Type *sb = base_type(source);
 	if (sb->kind == Type_Struct) {
@@ -1956,11 +1842,11 @@ gb_internal bool subst_source_is_template_instance(Type *source, Type *spec) {
 gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *source, PolySubst *subst);
 
 // Match a constraint `spec` against `source` (does `$T/spec` accept `source`?), binding spec's nested
-// vars. Mirrors check_type_specialization_to: bare template, record conformance (via the Named types),
-// an untyped source's default type, or a base-typed structural match for everything else — so unlike a
-// plain subst_unify it sees through named/distinct types (e.g. `[dynamic]$E` vs a `distinct [dynamic]V`).
-// Anything it cannot cleanly resolve (subtyping, untyped conversions, cross-kind) is deferred as
-// Subst_Unhandled to check_type_specialization_to.
+// vars. Covers: a bare template, record conformance (via the Named types), an untyped source's default
+// type, or a base-typed structural match for everything else — so unlike a plain subst_unify it sees
+// through named/distinct types (e.g. `[dynamic]$E` vs a `distinct [dynamic]V`). Anything it cannot
+// cleanly resolve (subtyping, untyped conversions, cross-kind) is returned as Subst_Unhandled, which the
+// caller treats as a definite non-match.
 gb_internal SubstResult subst_unify_constraint(CheckerContext *c, Type *spec, Type *source, PolySubst *subst) {
 	if (source == nullptr || source == t_invalid) {
 		return Subst_Matched;
@@ -2696,10 +2582,10 @@ gb_internal void subst_bind_entities(PolySubst *subst) {
 }
 
 // Specialization-conformance check for a `$T: Constraint` record/proc parameter: does `type` conform
-// to `specialization`, binding the constraint's nested vars when modify_type? The engine short-circuits
-// a clean structural match (skipping the in-place matcher); everything else (bare templates, subtyping,
-// assignability, definite non-matches) is left to check_type_specialization_to, so behavior is
-// unchanged except that the common case no longer runs the mutator.
+// to `specialization`, binding the constraint's nested vars when modify_type? Handled entirely by the
+// substitution engine (subst_unify_constraint). A non-match is a definite non-conformance; if the engine
+// is ever incomplete for some constraint the result is a loud "does not satisfy constraint" error at the
+// call site, never a silent miscompile.
 gb_internal bool subst_check_specialization(CheckerContext *ctx, Type *specialization, Type *type, bool modify_type) {
 	if (type == nullptr || type == t_invalid) {
 		return true;
@@ -2707,50 +2593,31 @@ gb_internal bool subst_check_specialization(CheckerContext *ctx, Type *specializ
 	PolySubst sub = {};
 	sub.items.allocator = heap_allocator();
 	defer (array_free(&sub.items));
-	SubstResult ur = subst_unify_constraint(ctx, specialization, type, &sub);
-#if PARAPOLY_DEBUG_VERIFY_SUBST
-	// Debug: the old check is authoritative; assert the engine's short-circuit agrees with it.
-	bool old = check_type_specialization_to(ctx, specialization, type, false, modify_type, /*finalize*/false);
-	GB_ASSERT_MSG(ur != Subst_Matched || old, "subst_check_specialization: engine matched but check_type_specialization_to did not");
-	return old;
-#else
-	if (ur == Subst_Matched) {
+	if (subst_unify_constraint(ctx, specialization, type, &sub) == Subst_Matched) {
 		if (modify_type) {
 			subst_bind_entities(&sub);
 		}
 		return true;
 	}
-	return check_type_specialization_to(ctx, specialization, type, false, modify_type, /*finalize*/false);
-#endif
+	return false;
 }
 
-#if PARAPOLY_DEBUG_VERIFY_SUBST
-// Read-only: assert that the in-place mutation bound each poly-scope entity to exactly what the
-// substitution captured. This is the entity-level analogue of the apply-reproduction check; once it
-// holds everywhere, entity binding can be driven from the PolySubst and the mutation removed.
-gb_internal void subst_verify_entities(PolySubst *subst) {
-	for (PolyBinding &b : subst->items) {
-		Entity *e = b.key;
-		switch (b.kind) {
-		case PolyBind_Type:
-			GB_ASSERT_MSG(e->type != nullptr && are_types_identical(e->type, b.type),
-			              "parapoly subst entity type mismatch for '%.*s'", LIT(e->token.string));
-			break;
-		case PolyBind_Value:
-			GB_ASSERT_MSG(e->kind == Entity_Constant && e->Constant.value.kind == ExactValue_Integer &&
-			              big_int_to_i64(&e->Constant.value.value_integer) == b.value &&
-			              are_types_identical(e->type, b.value_type),
-			              "parapoly subst entity value mismatch for '%.*s'", LIT(e->token.string));
-			break;
-		case PolyBind_EnumArray:
-			GB_ASSERT_MSG(e->kind == Entity_TypeName && e->type != nullptr &&
-			              are_types_identical(e->type, b.type->EnumeratedArray.index),
-			              "parapoly subst entity enum-array mismatch for '%.*s'", LIT(e->token.string));
-			break;
+// Match `source` against the polymorphic `pattern` with the substitution engine. When they unify and
+// `modify_type` is set, bind the captured poly-scope entities (the side effect the old in-place matcher
+// produced); returns whether they unified. This is the subst-based replacement for the overload-scoring
+// use of is_polymorphic_type_assignable. Exposed as a plain bool for earlier unity-build translation units.
+gb_internal bool subst_poly_assignable(CheckerContext *c, Type *pattern, Type *source, bool modify_type) {
+	PolySubst subst = {};
+	subst.items.allocator = heap_allocator();
+	defer (array_free(&subst.items));
+	if (subst_unify(c, pattern, source, &subst) == Subst_Matched) {
+		if (modify_type) {
+			subst_bind_entities(&subst);
 		}
+		return true;
 	}
+	return false;
 }
-#endif
 
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
@@ -2786,17 +2653,11 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		return t_invalid;
 	}
 
-#if !PARAPOLY_DEBUG_VERIFY_SUBST
-	// Primary path: the substitution engine both resolves (modify_type) and answers the yes/no probe
-	// (!modify_type). Only a Subst_Unhandled result falls to the in-place mutator, which now serves
-	// solely as the genuine-subtyping fallback. A Subst_NoMatch is a definite non-match, so the mutator
-	// is skipped (the debug build asserts that NoMatch invariant against the mutator).
 	{
 		PolySubst subst = {};
 		subst.items.allocator = heap_allocator();
 		defer (array_free(&subst.items));
-		SubstResult ur = subst_unify(ctx, poly_type, operand.type, &subst);
-		if (ur == Subst_Matched) {
+		if (subst_unify(ctx, poly_type, operand.type, &subst) == Subst_Matched) {
 			if (modify_type) {
 				Type *applied = subst_apply(ctx, poly_type, operand.type, &subst);
 				subst_bind_entities(&subst);
@@ -2804,42 +2665,7 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 			}
 			return poly_type; // probe: matched, no construction/binding needed
 		}
-		if (ur == Subst_Unhandled &&
-		    is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
-			return poly_type;
-		}
 	}
-#else
-	// Debug differential: the mutator is authoritative and the engine is asserted to agree with it.
-	PolySubst verify_subst = {};
-	verify_subst.items.allocator = heap_allocator();
-	defer (array_free(&verify_subst.items));
-	// Run the engine for both modify_type and the probe, so the NoMatch-skips-the-mutator invariant the
-	// production path relies on is covered here too. Only construct/bind for modify_type.
-	SubstResult verify_ur = subst_unify(ctx, poly_type, operand.type, &verify_subst);
-	Type *verify_applied = nullptr;
-	if (modify_type && verify_ur == Subst_Matched) {
-		verify_applied = subst_apply(ctx, poly_type, operand.type, &verify_subst);
-	}
-	if (is_polymorphic_type_assignable(ctx, poly_type, operand.type, false, modify_type)) {
-		if (verify_ur == Subst_Matched) {
-			if (modify_type) {
-				GB_ASSERT_MSG(are_types_identical(verify_applied, poly_type),
-				              "parapoly subst mismatch: applied '%s' vs mutated '%s'",
-				              type_to_string(verify_applied), type_to_string(poly_type));
-				subst_verify_entities(&verify_subst);
-				return verify_applied;
-			}
-			return poly_type;
-		} else if (verify_ur == Subst_NoMatch) {
-			GB_PANIC("parapoly subst reported NoMatch but in-place match succeeded (result '%s')", type_to_string(poly_type));
-		}
-		return poly_type;
-	}
-	if (verify_ur == Subst_Matched) {
-		GB_PANIC("parapoly subst matched but in-place match failed");
-	}
-#endif
 	if (show_error) {
 		ERROR_BLOCK();
 		gbString pts = type_to_string(poly_type);
@@ -2875,7 +2701,7 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 				gb_string_free(os);
 			}
 		} else if (is_type_pointer(poly_type)) {
-			if (is_polymorphic_type_assignable(ctx, type_deref(poly_type), operand.type, /*compound*/false, /*modify_type*/false)) {
+			if (subst_poly_assignable(ctx, type_deref(poly_type), operand.type, /*modify_type*/false)) {
 				gbString os = expr_to_string(operand.expr);
 				error_line("\tSuggestion: Did you mean '&%s'?\n", os);
 				gb_string_free(os);
