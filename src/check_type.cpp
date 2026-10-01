@@ -1774,8 +1774,8 @@ struct PolyBinding {
 	Entity *     key;
 	PolyBindKind kind;
 	Type *       type;       // PolyBind_Type: bound type; PolyBind_EnumArray: source EnumeratedArray
-	i64          value;      // PolyBind_Value: array count
-	Type *       value_type; // PolyBind_Value: entity type the mutation gives the count constant
+	ExactValue   value;      // PolyBind_Value: the constant (array/matrix/simd count, or a record const param of any type)
+	Type *       value_type; // PolyBind_Value: entity type the binding gives the constant
 };
 struct PolySubst {
 	Array<PolyBinding> items;
@@ -1807,7 +1807,7 @@ gb_internal bool poly_subst_add(PolySubst *s, Entity *key, PolyBinding b) {
 		}
 		switch (b.kind) {
 		case PolyBind_Type:      return are_types_identical(prev->type, b.type);
-		case PolyBind_Value:     return prev->value == b.value;
+		case PolyBind_Value:     return compare_exact_values(Token_CmpEq, prev->value, b.value);
 		case PolyBind_EnumArray: return are_types_identical(prev->type, b.type);
 		}
 		return false;
@@ -1817,13 +1817,18 @@ gb_internal bool poly_subst_add(PolySubst *s, Entity *key, PolyBinding b) {
 	return true;
 }
 gb_internal bool poly_subst_bind_type(PolySubst *s, Entity *key, Type *t) {
-	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_Type, t, 0, nullptr});
+	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_Type, t, {}, nullptr});
 }
-gb_internal bool poly_subst_bind_value(PolySubst *s, Entity *key, i64 v, Type *value_type) {
+gb_internal bool poly_subst_bind_value(PolySubst *s, Entity *key, ExactValue v, Type *value_type) {
 	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_Value, nullptr, v, value_type});
 }
 gb_internal bool poly_subst_bind_enum_array(PolySubst *s, Entity *key, Type *ea) {
-	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_EnumArray, ea, 0, nullptr});
+	return poly_subst_add(s, key, PolyBinding{nullptr, PolyBind_EnumArray, ea, {}, nullptr});
+}
+// Integer payload of a PolyBind_Value used as a count (array/matrix/simd dimension).
+gb_internal i64 poly_binding_count(PolyBinding const *b) {
+	GB_ASSERT(b->kind == PolyBind_Value && b->value.kind == ExactValue_Integer);
+	return big_int_to_i64(&b->value.value_integer);
 }
 
 // True when `source` is an instantiation of the bare polymorphic record template `spec` (the form a
@@ -1953,7 +1958,7 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 				if (ne == nullptr) {
 					return Subst_Unhandled;
 				}
-				if (!poly_subst_bind_value(subst, ne, source->Array.count, t_untyped_integer)) {
+				if (!poly_subst_bind_value(subst, ne, exact_value_i64(source->Array.count), t_untyped_integer)) {
 					return Subst_NoMatch;
 				}
 			} else if (pattern->Array.count != source->Array.count) {
@@ -1995,7 +2000,7 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			if (re == nullptr) {
 				return Subst_Unhandled;
 			}
-			if (!poly_subst_bind_value(subst, re, source->Matrix.row_count, t_untyped_integer)) {
+			if (!poly_subst_bind_value(subst, re, exact_value_i64(source->Matrix.row_count), t_untyped_integer)) {
 				return Subst_NoMatch;
 			}
 		} else if (pattern->Matrix.row_count != source->Matrix.row_count) {
@@ -2009,7 +2014,7 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			if (ce == nullptr) {
 				return Subst_Unhandled;
 			}
-			if (!poly_subst_bind_value(subst, ce, source->Matrix.column_count, t_untyped_integer)) {
+			if (!poly_subst_bind_value(subst, ce, exact_value_i64(source->Matrix.column_count), t_untyped_integer)) {
 				return Subst_NoMatch;
 			}
 		} else if (pattern->Matrix.column_count != source->Matrix.column_count) {
@@ -2029,7 +2034,7 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			if (ne == nullptr) {
 				return Subst_Unhandled;
 			}
-			if (!poly_subst_bind_value(subst, ne, source->SimdVector.count, t_untyped_integer)) {
+			if (!poly_subst_bind_value(subst, ne, exact_value_i64(source->SimdVector.count), t_untyped_integer)) {
 				return Subst_NoMatch;
 			}
 		} else if (pattern->SimdVector.count != source->SimdVector.count) {
@@ -2091,10 +2096,8 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 						return Subst_NoMatch;
 					}
 				} else if (t_e->kind == Entity_Constant) {
-					if (t_e->Constant.value.kind != ExactValue_Integer) {
-						return Subst_Unhandled;
-					}
-					if (!poly_subst_bind_value(subst, ge, big_int_to_i64(&t_e->Constant.value.value_integer), t_e->type)) {
+					// A record's polymorphic constant parameter, of any type (int, string, bool, ...).
+					if (!poly_subst_bind_value(subst, ge, t_e->Constant.value, t_e->type)) {
 						return Subst_NoMatch;
 					}
 				} else {
@@ -2174,7 +2177,7 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 			if (ne == nullptr) {
 				return Subst_Unhandled;
 			}
-			if (!poly_subst_bind_value(subst, ne, source->FixedCapacityDynamicArray.capacity, t_untyped_integer)) {
+			if (!poly_subst_bind_value(subst, ne, exact_value_i64(source->FixedCapacityDynamicArray.capacity), t_untyped_integer)) {
 				return Subst_NoMatch;
 			}
 		} else if (pattern->FixedCapacityDynamicArray.capacity != source->FixedCapacityDynamicArray.capacity) {
@@ -2289,8 +2292,8 @@ gb_internal Entity *find_polymorphic_record_by_subst(GenTypesData *gt, TypeTuple
 					break;
 				}
 				if (b->kind == PolyBind_Value) {
-					if (ep->kind != Entity_Constant || ep->Constant.value.kind != ExactValue_Integer ||
-					    big_int_to_i64(&ep->Constant.value.value_integer) != b->value) {
+					if (ep->kind != Entity_Constant ||
+					    !compare_exact_values(Token_CmpEq, ep->Constant.value, b->value)) {
 						match = false;
 						break;
 					}
@@ -2379,7 +2382,7 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		if (pattern->FixedCapacityDynamicArray.generic_capacity != nullptr) {
 			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->FixedCapacityDynamicArray.generic_capacity));
 			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
-			cap = b->value;
+			cap = poly_binding_count(b);
 		}
 		return alloc_type_fixed_capacity_dynamic_array(elem, cap, nullptr);
 	}
@@ -2404,7 +2407,7 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 				return r;
 			}
 			GB_ASSERT(b->kind == PolyBind_Value);
-			return alloc_type_array(subst_apply(c, pattern->Array.elem, source->Array.elem, subst), b->value, nullptr);
+			return alloc_type_array(subst_apply(c, pattern->Array.elem, source->Array.elem, subst), poly_binding_count(b), nullptr);
 		}
 		return alloc_type_array(subst_apply(c, pattern->Array.elem, source->Array.elem, subst), pattern->Array.count, nullptr);
 	}
@@ -2424,12 +2427,12 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		if (pattern->Matrix.generic_row_count != nullptr) {
 			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->Matrix.generic_row_count));
 			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
-			rc = b->value;
+			rc = poly_binding_count(b);
 		}
 		if (pattern->Matrix.generic_column_count != nullptr) {
 			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->Matrix.generic_column_count));
 			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
-			cc = b->value;
+			cc = poly_binding_count(b);
 		}
 		return alloc_type_matrix(elem, rc, cc, nullptr, nullptr, pattern->Matrix.is_row_major);
 	}
@@ -2439,7 +2442,7 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 		if (pattern->SimdVector.generic_count != nullptr) {
 			PolyBinding *b = poly_subst_find(subst, poly_generic_entity(pattern->SimdVector.generic_count));
 			GB_ASSERT(b != nullptr && b->kind == PolyBind_Value);
-			count = b->value;
+			count = poly_binding_count(b);
 		}
 		return alloc_type_simd_vector(count, elem, nullptr);
 	}
@@ -2569,7 +2572,7 @@ gb_internal void subst_bind_entities(PolySubst *subst) {
 			break;
 		case PolyBind_Value:
 			e->kind = Entity_Constant;
-			e->Constant.value = exact_value_i64(b.value);
+			e->Constant.value = b.value;
 			e->type = b.value_type;
 			break;
 		case PolyBind_EnumArray:
