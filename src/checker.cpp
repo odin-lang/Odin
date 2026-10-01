@@ -3321,7 +3321,8 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 			}
 			if (dep->kind == Entity_Variable) {
 				EntityGraphNode **m = map_get(&M_vars, dep);
-				if (m != nullptr) {
+				// NOTE(bill): a variable naming itself, e.g. `t: struct { next: ^type_of(t) }`, is not an initialization cycle
+				if (m != nullptr && *m != n) {
 					entity_graph_node_set_add(&n->succ, *m);
 					entity_graph_node_set_add(&(*m)->pred, n);
 				}
