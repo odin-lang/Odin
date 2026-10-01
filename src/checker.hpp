@@ -564,6 +564,7 @@ struct Scope {
 	RwMutex mutex;
 	ScopeMap elements;
 	PtrSet<Scope *> imported;
+	PtrMap<u64, struct GlobalDeclSource *> *placeholders; // multi-map; names a global 'when' or 'foreign' block may declare, until all are resolved
 
 	DeclInfo *decl_info;
 
@@ -838,7 +839,6 @@ struct CheckerContext {
 	u32        stmt_flags;
 	bool       in_enum_type;
 	bool       in_proc_group;
-	bool       collect_delayed_decls;
 	bool       allow_polymorphic_types;
 	bool       disallow_polymorphic_return_types; // NOTE(zen3ger): no poly type decl in return types
 	bool       no_polymorphic_errors;

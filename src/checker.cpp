@@ -400,6 +400,8 @@ gb_internal void check_close_scope(CheckerContext *c) {
 }
 
 
+gb_internal Entity *force_scope_placeholders(Scope *s, InternedString name, u32 hash);
+
 gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash) {
 	// Entity **found = string_map_get(&s->elements, name);
 	if (hash == 0) {
@@ -408,6 +410,9 @@ gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash
 	Entity *found = scope_map_get(&s->elements, name, hash);
 	if (found) {
 		return found;
+	}
+	if (s->placeholders != nullptr) {
+		return force_scope_placeholders(s, name, hash);
 	}
 	return nullptr;
 }
@@ -428,6 +433,9 @@ gb_internal void scope_lookup_parent(Scope *scope, InternedString name, Scope **
 			if (!is_single_threaded) rw_mutex_shared_lock(&s->mutex);
 			found = scope_map_get(&s->elements, name, hash);
 			if (!is_single_threaded) rw_mutex_shared_unlock(&s->mutex);
+			if (found == nullptr && s->placeholders != nullptr) {
+				found = force_scope_placeholders(s, name, hash);
+			}
 			if (found) {
 				Entity *e = found;
 				if (gone_thru_proc) {
@@ -5127,9 +5135,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	}
 }
 
-gb_internal bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls);
-
-gb_internal bool check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
+gb_internal void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	ast_node(fb, ForeignBlockDecl, decl);
 	Ast *foreign_library = fb->foreign_library;
 
@@ -5144,11 +5150,7 @@ gb_internal bool check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	check_decl_attributes(&c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
 	ast_node(block, BlockStmt, fb->body);
-	if (c.collect_delayed_decls && (c.scope->flags&ScopeFlag_File) != 0) {
-		return collect_file_decls(&c, block->stmts);
-	}
 	check_collect_entities(&c, block->stmts);
-	return false;
 }
 
 gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
@@ -5156,7 +5158,11 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 		DeclInfo *d = e->decl_info;
 		if (d != nullptr && d->init_expr != nullptr) {
 			Ast *init = d->init_expr;
+			// NOTE: in the scope of its own file, as a package's files may bind a name differently
+			Scope *prev_scope = c->scope;
+			c->scope = d->scope;
 			Entity *alias_of = check_entity_from_ident_or_selector(c, init, true);
+			c->scope = prev_scope;
 			if (alias_of != nullptr && alias_of->kind == Entity_TypeName) {
 				e->kind = Entity_TypeName;
 				return true;
@@ -5189,7 +5195,7 @@ gb_internal bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *
 }
 
 
-gb_internal void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
+gb_internal void correct_type_aliases_in_package(CheckerContext *c, AstPackage *pkg) {
 	// NOTE(bill, 2022-02-04): This is used to solve the problem caused by type aliases
 	// of type aliases being "confused" as constants
 	//
@@ -5200,8 +5206,12 @@ gb_internal void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
 	// See @TypeAliasingProblem for more information
 	for (;;) {
 		bool corrections = false;
-		corrections |= correct_type_alias_in_scope_backwards(c, s);
-		corrections |= correct_type_alias_in_scope_forwards(c, s);
+		corrections |= correct_type_alias_in_scope_backwards(c, pkg->scope);
+		corrections |= correct_type_alias_in_scope_forwards(c, pkg->scope);
+		for (AstFile *f : pkg->files) {
+			corrections |= correct_type_alias_in_scope_backwards(c, f->scope);
+			corrections |= correct_type_alias_in_scope_forwards(c, f->scope);
+		}
 		if (!corrections) {
 			return;
 		}
@@ -5220,17 +5230,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 	for_array(decl_index, nodes) {
 		Ast *decl = nodes[decl_index];
 		if (!is_ast_decl(decl) && !is_ast_when_stmt(decl)) {
-			if (curr_file && decl->kind == Ast_ExprStmt) {
-				Ast *expr = decl->ExprStmt.expr;
-				if (expr->kind == Ast_CallExpr && expr->CallExpr.proc->kind == Ast_BasicDirective) {
-					if (c->collect_delayed_decls) {
-						if (decl->state_flags & StateFlag_BeenHandled) return;
-						decl->state_flags |= StateFlag_BeenHandled;
-						array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], expr);
-					}
-					continue;
-				}
-			}
+			// NOTE: global directives such as '#assert' are queued by `scan_global_decl_sources`
 			continue;
 		}
 
@@ -5266,9 +5266,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			if (curr_file != nullptr) {
-				array_add(&curr_file->delayed_decls_queues[AstDelayQueue_ForeignBlock], decl);
-			}
+			// NOTE: global ones are resolved like global 'when's, see `resolve_global_decl_sources`
 		case_end;
 
 		default:
@@ -5785,7 +5783,6 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 		AstFile *f = decl->file();
 
 		reset_checker_context(&ctx, f, &untyped);
-		ctx.collect_delayed_decls = false;
 
 		GB_ASSERT(ctx.scope == e->scope);
 
@@ -5935,165 +5932,6 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 
 }
 
-// Returns true if a new package is present
-gb_internal bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls);
-gb_internal bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws);
-
-gb_internal bool collect_when_stmt_from_file(CheckerContext *ctx, AstWhenStmt *ws) {
-	Operand operand = {Addressing_Invalid};
-	if (!ws->is_cond_determined) {
-		check_expr(ctx, &operand, ws->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in 'when' statement");
-		}
-		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in 'when' statement");
-		}
-
-		ws->is_cond_determined = true;
-		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
-	}
-
-	if (ws->body == nullptr || ws->body->kind != Ast_BlockStmt) {
-		error(ws->cond, "Invalid body for 'when' statement");
-	} else {
-		if (ws->determined_cond) {
-			check_collect_entities(ctx, ws->body->BlockStmt.stmts);
-			return true;
-		} else if (ws->else_stmt) {
-			switch (ws->else_stmt->kind) {
-			case Ast_BlockStmt:
-				check_collect_entities(ctx, ws->else_stmt->BlockStmt.stmts);
-				return true;
-			case Ast_WhenStmt:
-				collect_when_stmt_from_file(ctx, &ws->else_stmt->WhenStmt);
-				return true;
-			default:
-				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
-				break;
-			}
-		}
-	}
-
-	return false;
-}
-
-gb_internal bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws) {
-	Operand operand = {Addressing_Invalid};
-	if (!ws->is_cond_determined) {
-		check_expr(ctx, &operand, ws->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in 'when' statement");
-		}
-		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in 'when' statement");
-		}
-
-		ws->is_cond_determined = true;
-		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
-	}
-
-	if (ws->body == nullptr || ws->body->kind != Ast_BlockStmt) {
-		error(ws->cond, "Invalid body for 'when' statement");
-	} else {
-		if (ws->determined_cond) {
-			return collect_file_decls(ctx, ws->body->BlockStmt.stmts);
-		} else if (ws->else_stmt) {
-			switch (ws->else_stmt->kind) {
-			case Ast_BlockStmt:
-				return collect_file_decls(ctx, ws->else_stmt->BlockStmt.stmts);
-			case Ast_WhenStmt:
-				return collect_file_decls_from_when_stmt(ctx, &ws->else_stmt->WhenStmt);
-			default:
-				error(ws->else_stmt, "Invalid 'else' statement in 'when' statement");
-				break;
-			}
-		}
-	}
-
-	return false;
-}
-
-
-gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
-	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
-
-	AstFile *curr_file = ctx->scope->file;
-	GB_ASSERT(curr_file != nullptr);
-
-	if (decl->state_flags & StateFlag_BeenHandled) {
-		return false;
-	}
-
-	switch (decl->kind) {
-	case_ast_node(vd, ValueDecl, decl);
-		check_collect_value_decl(ctx, decl);
-	case_end;
-
-	case_ast_node(id, ImportDecl, decl);
-		check_add_import_decl(ctx, decl);
-	case_end;
-
-	case_ast_node(fl, ForeignImportDecl, decl);
-		check_add_foreign_import_decl(ctx, decl);
-	case_end;
-
-	case_ast_node(fb, ForeignBlockDecl, decl);
-		GB_ASSERT(ctx->collect_delayed_decls);
-		decl->state_flags |= StateFlag_BeenHandled;
-		array_add(&curr_file->delayed_decls_queues[AstDelayQueue_ForeignBlock], decl);
-	case_end;
-
-	case_ast_node(ws, WhenStmt, decl);
-		if (!ws->is_cond_determined) {
-			if (collect_when_stmt_from_file(ctx, ws)) {
-				return true;
-			}
-
-			CheckerContext nctx = *ctx;
-			nctx.collect_delayed_decls = true;
-
-			if (collect_file_decls_from_when_stmt(&nctx, ws)) {
-				return true;
-			}
-		} else {
-			CheckerContext nctx = *ctx;
-			nctx.collect_delayed_decls = true;
-
-			if (collect_file_decls_from_when_stmt(&nctx, ws)) {
-				return true;
-			}
-		}
-	case_end;
-
-	case_ast_node(es, ExprStmt, decl);
-		GB_ASSERT(ctx->collect_delayed_decls);
-		decl->state_flags |= StateFlag_BeenHandled;
-		if (es->expr->kind == Ast_CallExpr) {
-			ast_node(ce, CallExpr, es->expr);
-			if (ce->proc->kind == Ast_BasicDirective) {
-				array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], es->expr);
-			}
-		}
-	case_end;
-	}
-
-	return false;
-}
-
-gb_internal bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
-	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
-
-	for_array(i, decls) {
-		if (collect_file_decl(ctx, decls[i])) {
-			correct_type_aliases_in_scope(ctx, ctx->scope);
-			return true;
-		}
-	}
-	correct_type_aliases_in_scope(ctx, ctx->scope);
-	return false;
-}
-
 gb_internal GB_COMPARE_PROC(sort_file_by_name) {
 	AstFile const *x = *cast(AstFile const **)a;
 	AstFile const *y = *cast(AstFile const **)b;
@@ -6140,7 +5978,6 @@ gb_internal WORKER_TASK_PROC(check_collect_entities_all_worker_proc) {
 	reset_checker_context(ctx, f, untyped);
 
 	check_collect_entities(ctx, f->decls);
-	GB_ASSERT(ctx->collect_delayed_decls == false);
 
 	add_untyped_expressions(&c->info, ctx->untyped);
 
@@ -6205,6 +6042,8 @@ gb_internal void check_export_entities(Checker *c) {
 	thread_pool_wait();
 }
 
+#include "checker_global_when.cpp"
+
 gb_internal void check_import_entities(Checker *c) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
@@ -6261,101 +6100,45 @@ gb_internal void check_import_entities(Checker *c) {
 		array_add(&package_order, n);
 	}
 
-	TIME_SECTION("check_import_entities - collect file decls");
 	CheckerContext ctx = {};
 	init_checker_context(&ctx, c);
+	defer (destroy_checker_context(&ctx));
 
 	UntypedExprInfoMap untyped = {};
 	defer (map_destroy(&untyped));
 
-	isize min_pkg_index = 0;
+	TIME_SECTION("check_import_entities - imports");
+	// NOTE(bill): every import first, as resolving a 'when' may check declarations in any package
 	u64 stage_start = global_import_stage_begin();
 	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
-		ImportGraphNode *node = package_order[pkg_index];
-		AstPackage *pkg = node->pkg;
+		AstPackage *pkg = package_order[pkg_index]->pkg;
 		pkg->order = 1+pkg_index;
 
-		for_array(i, pkg->files) {
-			AstFile *f = pkg->files[i];
-
+		for (AstFile *f : pkg->files) {
 			reset_checker_context(&ctx, f, &untyped);
-			ctx.collect_delayed_decls = true;
-
-			// Check import declarations first to simplify things
 			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
 				check_add_import_decl(&ctx, decl);
 			}
 			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
-
-			if (collect_file_decls(&ctx, f->decls)) {
-				check_export_entities_in_pkg(&ctx, pkg, &untyped);
-				pkg_index = min_pkg_index-1;
-				break;
-			}
-
 			add_untyped_expressions(ctx.info, &untyped);
 		}
-		if (pkg_index < 0) {
-			continue;
-		}
-		min_pkg_index = pkg_index;
 	}
-	global_import_stage_end(GlobalImportStage_CollectFileDecls, stage_start);
+	global_import_stage_end(GlobalImportStage_Imports, stage_start);
+
+	TIME_SECTION("check_import_entities - resolve 'when' and 'foreign' blocks");
+	resolve_global_decl_sources(c, package_order);
 
 	TIME_SECTION("check_import_entities - check delayed entities");
-	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
-		ImportGraphNode *node = package_order[pkg_index];
+	for (ImportGraphNode *node : package_order) {
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
 		AstPackage *pkg = node->scope->pkg;
 
 		stage_start = global_import_stage_begin();
-		for_array(i, pkg->files) {
-			AstFile *f = pkg->files[i];
-			reset_checker_context(&ctx, f, &untyped);
-
-			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
-				check_add_import_decl(&ctx, decl);
-			}
-			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
-			add_untyped_expressions(ctx.info, &untyped);
-		}
-		global_import_stage_end(GlobalImportStage_Imports, stage_start);
-
-		stage_start = global_import_stage_begin();
-		for_array(i, pkg->files) {
-			AstFile *f = pkg->files[i];
-			reset_checker_context(&ctx, f, &untyped);
-			correct_type_aliases_in_scope(&ctx, pkg->scope);
-		}
+		correct_type_aliases_in_package(&ctx, pkg);
 		global_import_stage_end(GlobalImportStage_TypeAliases, stage_start);
 
 		stage_start = global_import_stage_begin();
-		for_array(i, pkg->files) {
-			AstFile *f = pkg->files[i];
-			reset_checker_context(&ctx, f, &untyped);
-
-			ctx.collect_delayed_decls = true;
-
-			bool will_recheck_foreign_block = false;
-			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_ForeignBlock]) {
-				if (check_add_foreign_block_decl(&ctx, decl)) {
-					pkg_index -= 1;    // Re-check package
-					will_recheck_foreign_block = true;
-					break;
-				}
-			}
-
-			if (will_recheck_foreign_block) {
-				break;
-			}
-
-			array_clear(&f->delayed_decls_queues[AstDelayQueue_ForeignBlock]);
-		}
-		global_import_stage_end(GlobalImportStage_ForeignBlocks, stage_start);
-
-		stage_start = global_import_stage_begin();
-		for_array(i, pkg->files) {
-			AstFile *f = pkg->files[i];
+		for (AstFile *f : pkg->files) {
 			reset_checker_context(&ctx, f, &untyped);
 
 			for (Ast *expr : f->delayed_decls_queues[AstDelayQueue_Expr]) {

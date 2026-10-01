@@ -13,20 +13,20 @@ struct GlobalEntityTimingFrame {
 };
 
 enum GlobalImportStagePart {
-	GlobalImportStage_CollectFileDecls,
 	GlobalImportStage_Imports,
+	GlobalImportStage_Placeholders,
+	GlobalImportStage_DeclSources,
 	GlobalImportStage_TypeAliases,
-	GlobalImportStage_ForeignBlocks,
 	GlobalImportStage_DelayedExprs,
 
 	GlobalImportStage_COUNT,
 };
 
 gb_global char const *global_import_stage_names[GlobalImportStage_COUNT] = {
-	"collect file decls ('when')",
-	"delayed imports",
+	"imports",
+	"'when' and 'foreign' placeholders",
+	"resolve 'when' and 'foreign' blocks",
 	"type alias correction",
-	"foreign blocks",
 	"delayed expressions (#assert etc.)",
 };
 

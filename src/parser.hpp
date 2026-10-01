@@ -101,7 +101,6 @@ enum AstFileFlag : u32 {
 enum AstDelayQueueKind {
 	AstDelayQueue_Import,
 	AstDelayQueue_Expr,
-	AstDelayQueue_ForeignBlock,
 	AstDelayQueue_COUNT,
 };
 
