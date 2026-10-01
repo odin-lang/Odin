@@ -2355,23 +2355,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			}
 			init_entity_foreign_library(ctx, e);
 
-			auto *fp = &ctx->checker->info.foreigns;
-			StringHashKey key = string_hash_string(name);
-			Entity **found = string_map_get(fp, key);
-			if (found) {
-				Entity *f = *found;
-				TokenPos pos = f->token.pos;
-				Type *this_type = base_type(e->type);
-				Type *other_type = base_type(f->type);
-				if (!signature_parameter_similar_enough(this_type, other_type)) {
-					error(e->token,
-					      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-					      "\tat %s",
-					      LIT(name), token_pos_to_string(pos));
-				}
-			} else {
-				string_map_set(fp, key, e);
-			}
+			add_link_name_use(ctx->info, name, e, ctx->decl, LinkNameUse_Variable);
 		} else if (e->flags & EntityFlag_Static) {
 			if (vd->values.count > 0) {
 				if (entity_count != vd->values.count) {

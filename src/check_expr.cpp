@@ -178,10 +178,10 @@ gb_internal void populate_check_did_you_mean_objc_entity(StringSet *set, Entity 
 	if (e->kind != Entity_TypeName) {
 		return;
 	}
-	if (e->TypeName.objc_metadata == nullptr) {
+	TypeNameObjCMetadata *objc_metadata = entity_objc_metadata(e);
+	if (objc_metadata == nullptr) {
 		return;
 	}
-	TypeNameObjCMetadata *objc_metadata = e->TypeName.objc_metadata;
 	Type *t = base_type(e->type);
 	GB_ASSERT(t->kind == Type_Struct);
 
@@ -210,8 +210,8 @@ gb_internal void check_did_you_mean_objc_entity(String const &name, Entity *e, b
 
 	ERROR_BLOCK();
 	GB_ASSERT(e->kind == Entity_TypeName);
-	GB_ASSERT(e->TypeName.objc_metadata != nullptr);
-	auto *objc_metadata = e->TypeName.objc_metadata;
+	auto *objc_metadata = entity_objc_metadata(e);
+	GB_ASSERT(objc_metadata != nullptr);
 	MUTEX_GUARD(objc_metadata->mutex);
 
 	StringSet set = {};
@@ -515,7 +515,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
-	bool success = check_procedure_type(&nctx, final_proc_type, pt->node, &operands);
+	// NOTE: a clone, as other threads may be instantiating the same procedure, from the same AST
+	bool success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
 
 	if (!success) {
 		return false;
@@ -655,14 +656,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	d->entity.store(entity);
 
-	AstFile *file = nullptr;
-	{
-		Scope *s = entity->scope;
-		while (s != nullptr && s->file == nullptr) {
-			file = s->file;
-			s = s->parent;
-		}
-	}
+	AstFile *file = base_entity->file;
 
 	array_add(&gen_procs->procs, entity);
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
@@ -6116,7 +6110,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				if (operand->type->kind == Type_Named &&
 				    operand->type->Named.type_name &&
 				    operand->type->Named.type_name->kind == Entity_TypeName &&
-				    operand->type->Named.type_name->TypeName.objc_metadata) {
+				    entity_objc_metadata(operand->type->Named.type_name)) {
 					check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
 				} else if (bt->kind == Type_Struct) {
 					check_did_you_mean_type(name, bt->Struct.fields);
@@ -8816,6 +8810,11 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		CheckerContext ctx = *c;
 		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
 		ctx.scope = polymorphic_record_parent_scope(original_type);
+
+		if (original_type->Named.type_name && original_type->Named.type_name->file) {
+			ctx.file = original_type->Named.type_name->file;
+			ctx.pkg = ctx.file->pkg;
+		}
 		GB_ASSERT(ctx.scope != nullptr);
 
 		Type *bt = base_type(original_type);
@@ -8830,7 +8829,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			set_base_type(named_type, struct_type);
 
 			check_open_scope(&ctx, node);
+			begin_filling_record(struct_type);
 			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+			end_filling_record(struct_type);
 			// check_struct_type released found_gen_types->mutex after publishing the instantiation.
 			gen_types_locked = false;
 			check_close_scope(&ctx);

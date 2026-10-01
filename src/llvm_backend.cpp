@@ -1576,7 +1576,13 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	auto class_impls = array_make<lbObjCGlobalClass>(temporary_allocator(), 0, 16);
 
 	// Register all class implementations unconditionally, even if not statically referenced
+	auto implementations = array_make<Entity *>(temporary_allocator(), 0, 16);
 	for (Entity *e = {}; mpsc_dequeue(&gen->info->objc_class_implementations, &e); /**/) {
+		array_add(&implementations, e);
+	}
+	array_sort(implementations, init_procedures_cmp);
+
+	for (Entity *e : implementations) {
 		GB_ASSERT(e->kind == Entity_TypeName && e->TypeName.objc_is_implementation);
 		lb_handle_objc_find_or_register_class(p, e->TypeName.objc_class_name, e->type);
 

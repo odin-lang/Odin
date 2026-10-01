@@ -246,10 +246,10 @@ gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent) {
 	s->parent = parent;
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
-		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
-		if (prev_head_child) {
-			s->next.store(prev_head_child, std::memory_order_release);
-		}
+		Scope *prev_head_child = parent->head_child.load(std::memory_order_acquire);
+		do {
+			s->next.store(prev_head_child, std::memory_order_relaxed);
+		} while (!parent->head_child.compare_exchange_weak(prev_head_child, s, std::memory_order_acq_rel, std::memory_order_acquire));
 	}
 
 	if (parent != nullptr && parent->flags & ScopeFlag_ContextDefined) {
@@ -271,6 +271,13 @@ gb_internal Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 	s->flags |= ScopeFlag_File;
 	s->file = f;
 	f->scope = s;
+
+	bool global_context = f->feature_flags_set && (f->feature_flags & OptInFeatureFlag_GlobalContext) != 0;
+	if (global_context) {
+		s->flags |= ScopeFlag_ContextDefined;
+	} else {
+		s->flags &= ~ScopeFlag_ContextDefined;
+	}
 
 	return s;
 }
@@ -425,10 +432,7 @@ gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash
 }
 
 
-gb_global std::atomic<bool> in_single_threaded_checker_stage;
-
 gb_internal void scope_lookup_parent(Scope *scope, InternedString name, Scope **scope_, Entity **entity_, u32 hash) {
-	bool is_single_threaded = in_single_threaded_checker_stage.load(std::memory_order_relaxed);
 	if (scope != nullptr) {
 		bool gone_thru_proc = false;
 		bool gone_thru_package = false;
@@ -437,9 +441,13 @@ gb_internal void scope_lookup_parent(Scope *scope, InternedString name, Scope **
 		}
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
 			Entity *found = nullptr;
-			if (!is_single_threaded) rw_mutex_shared_lock(&s->mutex);
-			found = scope_map_get(&s->elements, name, hash);
-			if (!is_single_threaded) rw_mutex_shared_unlock(&s->mutex);
+			if (s->flags & ScopeFlag_ReadOnly) {
+				found = scope_map_get(&s->elements, name, hash);
+			} else {
+				rw_mutex_shared_lock(&s->mutex);
+				found = scope_map_get(&s->elements, name, hash);
+				rw_mutex_shared_unlock(&s->mutex);
+			}
 			if (global_when_trial != nullptr) {
 				found = global_when_trial_lookup(s, name, hash, found);
 			}
@@ -490,6 +498,7 @@ gb_internal Entity *scope_insert_with_name_no_mutex(Scope *s, InternedString nam
 	if (name.value == 0) {
 		return nullptr;
 	}
+	GB_ASSERT_MSG((s->flags & ScopeFlag_ReadOnly) == 0, "%.*s", LIT(entity->token.string));
 	Entity *found = nullptr;
 	Entity *result = nullptr;
 
@@ -526,6 +535,7 @@ gb_internal Entity *scope_insert_with_name(Scope *s, InternedString name, u32 ha
 	if (name.value == 0) {
 		return nullptr;
 	}
+	GB_ASSERT_MSG((s->flags & ScopeFlag_ReadOnly) == 0, "%.*s", LIT(entity->token.string));
 	Entity *found = nullptr;
 	Entity *result = nullptr;
 
@@ -568,11 +578,7 @@ gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 	auto name = entity_interned_name(entity);
 	u32 hash = entity->interned_name_hash.load(std::memory_order_relaxed);
 	GB_ASSERT(hash != 0);
-	if (in_single_threaded_checker_stage.load(std::memory_order_relaxed)) {
-		return scope_insert_with_name_no_mutex(s, name, hash, entity);
-	} else {
-		return scope_insert_with_name(s, name, hash, entity);
-	}
+	return scope_insert_with_name(s, name, hash, entity);
 }
 
 gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
@@ -918,13 +924,9 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
 
 
 gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
-	if (in_single_threaded_checker_stage.load(std::memory_order_relaxed)) {
-		ptr_set_add(&d->deps, e);
-	} else {
-		rw_mutex_lock(&d->deps_mutex);
-		ptr_set_add(&d->deps, e);
-		rw_mutex_unlock(&d->deps_mutex);
-	}
+	rw_mutex_lock(&d->deps_mutex);
+	ptr_set_add(&d->deps, e);
+	rw_mutex_unlock(&d->deps_mutex);
 }
 gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
 	if (d == nullptr || type == nullptr) {
@@ -1649,7 +1651,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
 	map_init(&i->global_untyped);
-	string_map_init(&i->foreigns);
+	array_init(&i->link_names, heap_allocator());
 
 	type_set_init(&i->min_dep_type_info_set);
 	map_init(&i->min_dep_type_info_index_map);
@@ -1691,7 +1693,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->definitions);
 	array_free(&i->entities);
 	map_destroy(&i->global_untyped);
-	string_map_destroy(&i->foreigns);
+	array_free(&i->link_names);
 
 	type_set_destroy(&i->min_dep_type_info_set);
 	map_destroy(&i->min_dep_type_info_index_map);
@@ -1917,13 +1919,12 @@ gb_internal ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 		}
 		return nullptr;
 	} else {
+		// NOTE: read under the lock, as another thread's insert may move the entries
 		rw_mutex_shared_lock(&c->info->global_untyped_mutex);
 		ExprInfo **found = map_get(&c->info->global_untyped, expr);
+		ExprInfo *info = found ? *found : nullptr;
 		rw_mutex_shared_unlock(&c->info->global_untyped_mutex);
-		if (found) {
-			return *found;
-		}
-		return nullptr;
+		return info;
 	}
 }
 
@@ -2023,8 +2024,6 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		return;
 	}
 
-	BlockingMutex *mutex = tav_mutex_for_node(expr);
-
 	/* Previous logic:
 		BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
 		if (ctx->decl) {
@@ -2034,10 +2033,11 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		}
 	*/
 
-	mutex_lock(mutex);
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
+		BlockingMutex *mutex = tav_mutex_for_node(expr);
+		mutex_lock(mutex);
 		expr->tav.mode = mode;
 		if (type != nullptr && expr->tav.type != nullptr &&
 		    is_type_any(type) && is_type_untyped(expr->tav.type)) {
@@ -2053,13 +2053,13 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		} else if (mode == Addressing_Value && type != nullptr && is_type_proc(type)) {
 			expr->tav.value = value;
 		}
+		mutex_unlock(mutex);
 
 		expr = unparen_expr(expr);
 		if (expr == nullptr) {
 			break;
 		};
 	}
-	mutex_unlock(mutex);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -2629,7 +2629,9 @@ gb_internal void check_procedure_later(Checker *c, ProcInfo *info) {
 	if (global_procedure_body_in_worker_queue.load()) {
 		thread_pool_add_task(check_proc_info_worker_proc, info);
 	} else {
+		mutex_lock(&c->procs_to_check_mutex);
 		array_add(&c->procs_to_check, info);
+		mutex_unlock(&c->procs_to_check_mutex);
 	}
 
 	if (DEBUG_CHECK_ALL_PROCEDURES) {
@@ -3383,7 +3385,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 }
 
 
-gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d);
+gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d, UntypedExprInfoMap *untyped=nullptr);
 
 
 gb_internal Entity *find_core_entity(Checker *c, String name) {
@@ -5329,7 +5331,7 @@ gb_internal CheckerContext *create_checker_context(Checker *c) {
 	return ctx;
 }
 
-gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
+gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d, UntypedExprInfoMap *untyped) {
 	GB_ASSERT(e != nullptr);
 	if (e->state == EntityState_Resolved)  {
 		// NOTE: also an alias already overridden by what it aliases, which may have no `DeclInfo`
@@ -5352,6 +5354,7 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 	GB_ASSERT(e->pkg != nullptr);
 	ctx->decl = d;
 	ctx->scope = d->scope;
+	ctx->untyped = untyped;
 
 	if (pkg->kind == Package_Init) {
 		if (e->kind != Entity_Procedure && e->token.string == "main") {
@@ -7164,6 +7167,22 @@ gb_internal void handle_raddbg_type_view(Checker *c, RaddbgTypeView const &type_
 	array_add(&c->info.raddbg_type_views, RaddbgTypeView{type, view});
 }
 
+gb_internal GB_COMPARE_PROC(raddbg_type_view_cmp) {
+	RaddbgTypeView const *x = cast(RaddbgTypeView const *)a;
+	RaddbgTypeView const *y = cast(RaddbgTypeView const *)b;
+	Entity *xe = (x->type && x->type->kind == Type_Named) ? x->type->Named.type_name : nullptr;
+	Entity *ye = (y->type && y->type->kind == Type_Named) ? y->type->Named.type_name : nullptr;
+	if (xe != nullptr && ye != nullptr && xe != ye) {
+		return entity_source_order_cmp(xe, ye);
+	}
+	u64 xh = type_hash_canonical_type(x->type);
+	u64 yh = type_hash_canonical_type(y->type);
+	if (xh != yh) {
+		return xh < yh ? -1 : +1;
+	}
+	return string_compare(x->view, y->view);
+}
+
 gb_internal void check_objc_context_provider_procedures(Checker *c) {
 	for (Entity *e = nullptr; mpsc_dequeue(&c->procs_with_objc_context_provider_to_check, &e); /**/) {
 		GB_ASSERT(e->kind == Entity_TypeName);
@@ -7343,18 +7362,18 @@ gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
 #else
 gb_internal void check_walk_all_dependencies(DeclInfo *decl);
 
-gb_internal WORKER_TASK_PROC(check_walk_all_dependencies_worker_proc) {
-	if (data == nullptr) {
-		return 0;
-	}
-	DeclInfo *decl = cast(DeclInfo *)data;
-
+// NOTE: post-order, so a declaration has the dependencies of all those nested in it before they are added to its parent
+gb_internal void check_walk_all_dependencies_post_order(DeclInfo *decl) {
 	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
-		thread_pool_add_task(check_walk_all_dependencies_worker_proc, child);
-		check_walk_all_dependencies(child);
+		check_walk_all_dependencies_post_order(child);
 	}
-
 	add_deps_from_child_to_parent(decl);
+}
+
+gb_internal WORKER_TASK_PROC(check_walk_all_dependencies_worker_proc) {
+	if (data != nullptr) {
+		check_walk_all_dependencies_post_order(cast(DeclInfo *)data);
+	}
 	return 0;
 }
 
@@ -7487,6 +7506,17 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("export entities - post");
 	check_export_entities(c);
+
+	// NOTE: no global name is declared from here on, so their scopes are read without locking
+	for (AstPackage *pkg : c->parser->packages) {
+		pkg->scope->flags |= ScopeFlag_ReadOnly;
+		for (AstFile *f : pkg->files) {
+			f->scope->flags |= ScopeFlag_ReadOnly;
+		}
+	}
+	builtin_pkg->scope->flags    |= ScopeFlag_ReadOnly;
+	intrinsics_pkg->scope->flags |= ScopeFlag_ReadOnly;
+	config_pkg->scope->flags     |= ScopeFlag_ReadOnly;
 
 	TIME_SECTION("add entities from packages");
 	check_merge_queues_into_arrays(c);
@@ -7622,6 +7652,9 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
+	TIME_SECTION("check unique link names");
+	check_link_name_uses(c);
+
 	TIME_SECTION("check unique package names");
 	bool package_names_are_unique = check_unique_package_names(c);
 
@@ -7720,8 +7753,16 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 
 	TIME_SECTION("collate type info stuff");
-	for (RaddbgTypeView type_view; mpsc_dequeue(&c->info.raddbg_type_views_queue, &type_view); /**/) {
-		handle_raddbg_type_view(c, type_view);
+	{
+		auto views = array_make<RaddbgTypeView>(heap_allocator());
+		defer (array_free(&views));
+		for (RaddbgTypeView type_view; mpsc_dequeue(&c->info.raddbg_type_views_queue, &type_view); /**/) {
+			array_add(&views, type_view);
+		}
+		array_sort(views, raddbg_type_view_cmp);
+		for (RaddbgTypeView const &type_view : views) {
+			handle_raddbg_type_view(c, type_view);
+		}
 	}
 
 

@@ -338,7 +338,6 @@ gb_global String const type_strings[] = {
 enum TypeFlag : u32 {
 	TypeFlag_Polymorphic     = 1<<1,
 	TypeFlag_PolySpecialized = 1<<2,
-	TypeFlag_InProcessOfCheckingPolymorphic = 1<<3,
 };
 
 struct Type {
@@ -2494,11 +2493,22 @@ gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 }
 
 
+gb_internal TypeNameObjCMetadata *entity_objc_metadata(Entity *e) {
+	GB_ASSERT(e->kind == Entity_TypeName);
+	mutex_lock(&global_type_name_objc_metadata_mutex);
+	TypeNameObjCMetadata *md = e->TypeName.objc_metadata;
+	Type *original = e->TypeName.original_type_for_parapoly;
+	if (md == nullptr && original != nullptr && original->kind == Type_Named && original->Named.type_name != nullptr) {
+		md = original->Named.type_name->TypeName.objc_metadata;
+	}
+	mutex_unlock(&global_type_name_objc_metadata_mutex);
+	return md;
+}
+
+gb_internal gb_thread_local Array<Type *> is_type_polymorphic_named_stack;
+
 gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 	if (t == nullptr) {
-		return false;
-	}
-	if (t->flags & TypeFlag_InProcessOfCheckingPolymorphic) {
 		return false;
 	}
 
@@ -2508,10 +2518,18 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 
 	case Type_Named:
 		{
-			u32 flags = t->flags;
-			t->flags |= TypeFlag_InProcessOfCheckingPolymorphic;
+			Array<Type *> &stack = is_type_polymorphic_named_stack;
+			for (Type *named : stack) {
+				if (named == t) {
+					return false;
+				}
+			}
+			if (stack.allocator.proc == nullptr) {
+				array_init(&stack, heap_allocator());
+			}
+			array_add(&stack, t);
 			bool ok = is_type_polymorphic(t->Named.base, or_specialized);
-			t->flags = flags;
+			array_pop(&stack);
 			return ok;
 		}
 
@@ -3815,8 +3833,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 		if (has_type_got_objc_class_attribute(original_type) && original_type->kind == Type_Named) {
 			Entity *e = original_type->Named.type_name;
 			GB_ASSERT(e->kind == Entity_TypeName);
-			if (e->TypeName.objc_metadata) {
-				auto *md = e->TypeName.objc_metadata;
+			if (auto *md = entity_objc_metadata(e)) {
 				mutex_lock(md->mutex);
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
@@ -3907,8 +3924,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 		if (has_type_got_objc_class_attribute(original_type) && original_type->kind == Type_Named) {
 			Entity *e = original_type->Named.type_name;
 			GB_ASSERT(e->kind == Entity_TypeName);
-			if (e->TypeName.objc_metadata) {
-				auto *md = e->TypeName.objc_metadata;
+			if (auto *md = entity_objc_metadata(e)) {
 				mutex_lock(md->mutex);
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
@@ -4405,6 +4421,35 @@ gb_internal i64 type_target_max_align(void) {
 	return max_align;
 }
 
+// Polymorphic record instances being filled by this thread, which another may already have found in the cache
+gb_internal gb_thread_local Array<Type *> records_being_filled;
+
+gb_internal void begin_filling_record(Type *t) {
+	if (records_being_filled.allocator.proc == nullptr) {
+		array_init(&records_being_filled, heap_allocator());
+	}
+	array_add(&records_being_filled, t);
+}
+
+gb_internal void end_filling_record(Type *t) {
+	GB_ASSERT(records_being_filled.count > 0 && records_being_filled[records_being_filled.count-1] == t);
+	array_pop(&records_being_filled);
+}
+
+gb_internal gb_thread_local i32 lazy_mutex_depth;
+
+gb_internal void wait_for_struct_fields(Type *t) {
+	if (t->Struct.polymorphic_parent == nullptr || t->Struct.fields_wait_signal.futex.load() != 0 || lazy_mutex_depth > 0) {
+		return;
+	}
+	for (Type *r : records_being_filled) {
+		if (r == t) {
+			return;
+		}
+	}
+	wait_signal_until_available(&t->Struct.fields_wait_signal);
+}
+
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	GB_ASSERT(path != nullptr);
 	if (t->failure) {
@@ -4529,6 +4574,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Struct: {
+		wait_for_struct_fields(t);
 		if (t->Struct.custom_align > 0) {
 			return gb_max(t->Struct.custom_align, 1);
 		}
@@ -4643,6 +4689,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 gb_internal bool type_set_offsets(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
+		wait_for_struct_fields(t);
 		// if (t->Struct.are_offsets_being_processed.load()) {
 		// 	return true;
 		// }
@@ -4847,6 +4894,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 
 
 	case Type_Struct: {
+		wait_for_struct_fields(t);
 		if (t->Struct.is_raw_union) {
 			i64 count = t->Struct.fields.count;
 			i64 align = type_align_of_internal(t, path);

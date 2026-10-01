@@ -269,6 +269,20 @@ struct ProcInfo {
 };
 
 
+enum LinkNameUseKind : u8 {
+	LinkNameUse_ForeignProcedure,
+	LinkNameUse_Procedure, // exported or with a link name
+	LinkNameUse_Variable,  // foreign or exported
+};
+
+struct LinkNameUse {
+	String          name;
+	Entity *        entity;
+	DeclInfo *      decl;
+	LinkNameUseKind kind;
+};
+
+
 enum { DEFAULT_SCOPE_CAPACITY = 32 };
 
 
@@ -461,6 +475,19 @@ gb_internal Entity *scope_map_get(ScopeMap *m, InternedString key, u32 hash) {
 	}
 }
 
+// NOTE: the key must be present; never grows, so lookups that do not lock see either value
+gb_internal void scope_map_replace(ScopeMap *m, InternedString key, u32 hash, Entity *value) {
+	u32 mask = m->cap-1;
+	for (u32 pos = hash & mask;; pos = (pos + 1) & mask) {
+		ScopeMapSlot *s = &m->slots[pos];
+		GB_ASSERT(s->hash != 0);
+		if (s->hash == hash && m->keys[pos] == key) {
+			s->value = value;
+			return;
+		}
+	}
+}
+
 gb_internal void scope_map_clear(ScopeMap *m) {
 	gb_memset(m->slots, 0, gb_size_of(*m->slots) * m->cap);
 	m->count = 0;
@@ -548,6 +575,7 @@ enum ScopeFlag : i32 {
 	ScopeFlag_Type    = 1<<7,
 
 	ScopeFlag_HasBeenImported = 1<<10, // This is only applicable to file scopes
+	ScopeFlag_ReadOnly        = 1<<11, // file, package and universe scopes once every global is declared: read without locking
 
 	ScopeFlag_ContextDefined = 1<<16,
 };
@@ -761,7 +789,9 @@ struct CheckerInfo {
 	// TypeSet type_info_set;
 
 	BlockingMutex foreign_mutex; // NOT recursive
-	StringMap<Entity *> foreigns;
+	Array<struct LinkNameUse> link_names; // checked for clashes once everything is checked, see `check_link_name_uses`
+
+	BlockingMutex entry_point_mutex;
 
 	MPSCQueue<Entity *> definition_queue;
 	MPSCQueue<Entity *> entity_queue;
@@ -868,6 +898,7 @@ struct Checker {
 
 	MPSCQueue<Entity *> procs_with_deferred_to_check;
 	MPSCQueue<Entity *> procs_with_objc_context_provider_to_check;
+	BlockingMutex     procs_to_check_mutex;
 	Array<ProcInfo *> procs_to_check;
 
 	BlockingMutex nested_proc_lits_mutex;
@@ -920,6 +951,9 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 gb_internal void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
 gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e);
+
+// While a group of global entities is checked: its incomplete '#soa' types, completed by the same thread
+gb_thread_local Array<Type *> *global_group_soa_types;
 
 struct GlobalWhenTrialEntityScope {
 	struct GlobalWhenTrial *trial;

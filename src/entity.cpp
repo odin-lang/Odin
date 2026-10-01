@@ -142,6 +142,10 @@ enum ProcedureOptimizationMode : u8 {
 
 BlockingMutex global_type_name_objc_metadata_mutex;
 
+struct TypeNameObjCMetadata;
+
+gb_internal TypeNameObjCMetadata *entity_objc_metadata(struct Entity *e);
+
 struct TypeNameObjCMetadataEntry {
 	InternedString interned;
 	Entity *entity;

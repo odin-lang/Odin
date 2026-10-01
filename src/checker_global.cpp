@@ -39,6 +39,7 @@ gb_internal void global_import_stage_end(GlobalImportStagePart part, u64 start) 
 	}
 }
 
+gb_global std::atomic<bool> in_global_entity_stage; // to tell the checks of the global stage from those during 'when' resolution
 gb_global BlockingMutex global_entity_time_mutex;
 gb_global PtrMap<Entity *, GlobalEntityTime> global_entity_times;
 gb_thread_local u64 global_entity_child_ticks;
@@ -68,7 +69,7 @@ gb_internal void global_entity_timing_end(GlobalEntityTimingFrame const &f, Enti
 	u64 self  = total - gb_min(total, global_entity_child_ticks);
 	global_entity_child_ticks = f.saved_child_ticks + total;
 
-	bool in_global_loop = in_single_threaded_checker_stage.load(std::memory_order_relaxed);
+	bool in_global_loop = in_global_entity_stage.load(std::memory_order_relaxed);
 
 	MUTEX_GUARD(&global_entity_time_mutex);
 	GlobalEntityTime *found = map_get(&global_entity_times, e);
@@ -1321,9 +1322,14 @@ gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e) {
 
 // NOTE: members in a fixed order, as which member of a cycle is entered first can decide whether it checks,
 // e.g. an enum whose values are `union_variant_index`es of a union with pointers back to it
+// NOTE: a group's untyped expressions and '#soa' types are its own, so it touches no shared queue meanwhile
 gb_internal void check_global_group(Checker *c, GlobalGroupGraph *g, i32 gi) {
 	GlobalGroup *group = &g->groups[gi];
 	i32 *members = g->members.data + group->start;
+
+	UntypedExprInfoMap untyped = {};
+	auto soa_types = array_make<Type *>(heap_allocator());
+	global_group_soa_types = &soa_types;
 
 	g->current_group = gi;
 	for (i32 k = 0; k < group->count; k++) {
@@ -1334,17 +1340,27 @@ gb_internal void check_global_group(Checker *c, GlobalGroupGraph *g, i32 gi) {
 		}
 		g->current_entity = e;
 		GlobalEntityTimingFrame timing_frame = global_entity_timing_begin(e);
-		check_single_global_entity(c, e, e->decl_info);
+		check_single_global_entity(c, e, e->decl_info, &untyped);
 		if (e->type != nullptr && is_type_typed(e->type)) {
-			for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
+			for (Type *t : soa_types) {
 				complete_soa_type(c, t, false);
 			}
+			array_clear(&soa_types);
 
 			(void)type_size_of(e->type);
 			(void)type_align_of(e->type);
 		}
 		global_entity_timing_end(timing_frame, e);
 	}
+	for (Type *t : soa_types) {
+		complete_soa_type(c, t, false);
+	}
+	global_group_soa_types = nullptr;
+	array_free(&soa_types);
+
+	add_untyped_expressions(&c->info, &untyped);
+	map_destroy(&untyped);
+
 	group->done = true;
 	g->current_group = -1;
 	g->current_entity = nullptr;
@@ -1432,7 +1448,7 @@ gb_internal void destroy_global_groups(GlobalGroupGraph *g) {
 }
 
 gb_internal void check_all_global_entities(Checker *c) {
-	in_single_threaded_checker_stage.store(true, std::memory_order_relaxed);
+	in_global_entity_stage.store(true, std::memory_order_relaxed);
 
 	// NOTE(bill): the runtime types the checker looks up by name rather than through a declaration
 	init_preload(c);
@@ -1442,6 +1458,10 @@ gb_internal void check_all_global_entities(Checker *c) {
 		if (scope_lookup_current(c->info.runtime_package->scope, name, hash) != nullptr) {
 			init_core_load_directory_file(c);
 		}
+	}
+
+	for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
+		complete_soa_type(c, t, false);
 	}
 
 	TIME_SECTION("check all global entities - build groups");
@@ -1459,7 +1479,7 @@ gb_internal void check_all_global_entities(Checker *c) {
 		gb_exit(1);
 	}
 
-	in_single_threaded_checker_stage.store(false, std::memory_order_relaxed);
+	in_global_entity_stage.store(false, std::memory_order_relaxed);
 }
 
 
