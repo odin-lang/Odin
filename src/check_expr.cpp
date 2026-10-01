@@ -684,6 +684,52 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		entity->Procedure.generated_from_polymorphic = proc_info->generated_from_polymorphic;
 	}
 
+	if (base_entity->Procedure.deferred_procedure.entity != nullptr) {
+		DeferredProcedure dp = base_entity->Procedure.deferred_procedure;
+		Entity *dst = dp.entity;
+		// NOTE(bill): Skip self-deferral and chaining (both invalid, reported by check_deferred_procedures).
+		// handling them here would otherwise recurse through find_or_generate_polymorphic_procedure.
+		if (dst == nullptr || dst == base_entity || dst->Procedure.deferred_procedure.entity != nullptr) {
+			// Leave this instantiation without a deferred procedure
+			// The error is reported during validation
+		} else if (!is_type_polymorphic(dst->type)) {
+			entity->Procedure.deferred_procedure = dp;
+		} else {
+			bool by_ptr  = dp.kind == DeferredProcedure_in_by_ptr  || dp.kind == DeferredProcedure_out_by_ptr || dp.kind == DeferredProcedure_in_out_by_ptr;
+			bool use_in  = dp.kind == DeferredProcedure_in         || dp.kind == DeferredProcedure_in_by_ptr  || dp.kind == DeferredProcedure_in_out || dp.kind == DeferredProcedure_in_out_by_ptr;
+			bool use_out = dp.kind == DeferredProcedure_out        || dp.kind == DeferredProcedure_out_by_ptr || dp.kind == DeferredProcedure_in_out || dp.kind == DeferredProcedure_in_out_by_ptr;
+
+			auto dst_ops = array_make<Operand>(heap_allocator(), 0, operands.count + 4);
+			defer (array_free(&dst_ops));
+
+			if (use_in) {
+				for (Operand const &o : operands) {
+					Operand po = o;
+					if (by_ptr && po.type != nullptr) {
+						po.type = alloc_type_pointer(po.type);
+					}
+					array_add(&dst_ops, po);
+				}
+			}
+			if (use_out) {
+				Type *res = base_type(final_proc_type)->Proc.results;
+				if (res != nullptr && res->kind == Type_Tuple) {
+					for (Entity *rv : res->Tuple.variables) {
+						Operand po = {Addressing_Value};
+						po.type = by_ptr ? alloc_type_pointer(rv->type) : rv->type;
+						po.expr = ident;
+						array_add(&dst_ops, po);
+					}
+				}
+			}
+			PolyProcData dpd = {};
+			if (find_or_generate_polymorphic_procedure(&nctx, dst, nullptr, &dst_ops, poly_def_node, &dpd)) {
+				entity->Procedure.deferred_procedure.kind   = dp.kind;
+				entity->Procedure.deferred_procedure.entity = dpd.gen_entity;
+			}
+		}
+	}
+
 	// NOTE(bill): Check the newly generated procedure body
 	check_procedure_later(nctx.checker, proc_info);
 
