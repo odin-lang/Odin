@@ -4574,7 +4574,6 @@ gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
 	return false;
 }
 
-#include "checker_global_graph.cpp"
 #include "check_expr.cpp"
 #include "check_builtin.cpp"
 #include "check_type.cpp"
@@ -5339,7 +5338,6 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 	check_entity_decl(ctx, e, d, nullptr);
 }
 
-#include "checker_global_groups.cpp"
 
 gb_internal bool is_string_an_identifier(String s) {
 	isize offset = 0;
@@ -5996,7 +5994,7 @@ gb_internal void check_export_entities(Checker *c) {
 	thread_pool_wait();
 }
 
-#include "checker_global_when.cpp"
+#include "checker_global.cpp"
 
 gb_internal void check_import_entities(Checker *c) {
 	TEMPORARY_ALLOCATOR_GUARD();
@@ -7477,7 +7475,6 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	if (build_context.internal_global_entity_graph) {
 		TIME_SECTION("print global entity graph");
-		print_global_entity_graph(c);
 		print_global_groups(&global_groups);
 	}
 	destroy_global_groups(&global_groups);
