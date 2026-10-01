@@ -2653,11 +2653,14 @@ gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Typ
 
 	Type *bt = base_type(poly_type);
 	Type *elem_pattern = nullptr;
+	bool generic_count = false;
 	switch (bt->kind) {
 	case Type_Array:
 		if (bt->Array.generic_count != nullptr) {
-			// NOTE(bill): polymorphic count (`[$N]$T`) is not currently supported
-			return nullptr;
+			if (bt->Array.generic_count->Generic.specialized != nullptr) {
+				return nullptr; // a constrained count `$N/...` is out of scope
+			}
+			generic_count = true; // `[$N]...` binds N to the literal's element count
 		}
 		elem_pattern = bt->Array.elem;
 		break;
@@ -2666,53 +2669,72 @@ gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Typ
 	default:
 		return nullptr;
 	}
-	// NOTE(bill): Only a bare `$T` element keeps determination unambiguous and construction trivial
-	if (elem_pattern == nullptr || elem_pattern->kind != Type_Generic || elem_pattern->Generic.specialized != nullptr) {
+
+	// A polymorphic element must be a bare `$T` (unambiguous element determination); otherwise the only
+	// thing left to determine is a polymorphic count.
+	bool elem_is_poly = is_type_polymorphic(elem_pattern);
+	if (elem_is_poly) {
+		if (elem_pattern->kind != Type_Generic || elem_pattern->Generic.specialized != nullptr) {
+			return nullptr;
+		}
+	} else if (!generic_count) {
 		return nullptr;
 	}
 
 	Slice<Ast *> const &elems = expr->CompoundLit.elems;
 	if (elems.count == 0) {
-		// `{}` cannot determine an element type
-		return nullptr;
+		return nullptr; // `{}` determines neither an element type nor a meaningful count
 	}
 
-
-	Type *elem_type = nullptr;
-	for (Ast *e : elems) {
-		if (!ast_is_context_free_constant(e)) {
-			return nullptr;
-		}
-		Operand o = {};
-		Ast *trial = clone_ast(e);
-		i64 muted_before = error_mute_count();
-		begin_error_mute();
-		check_expr(ctx, &o, trial);
-		end_error_mute();
-		if (o.mode == Addressing_Invalid || o.type == nullptr || o.type == t_invalid ||
-		    error_mute_count() != muted_before) {
-			return nullptr;
-		}
-		Type *et = is_type_untyped(o.type) ? default_type(o.type) : o.type;
-		if (et == nullptr || et == t_invalid || is_type_polymorphic(et)) {
-			return nullptr;
+	Type *elem_type = elem_is_poly ? nullptr : elem_pattern;
+	if (elem_is_poly) {
+		// Determine the element type from the (homogeneous, context-free) elements.
+		for (Ast *e : elems) {
+			if (!ast_is_context_free_constant(e)) {
+				return nullptr;
+			}
+			Operand o = {};
+			Ast *trial = clone_ast(e);
+			i64 muted_before = error_mute_count();
+			begin_error_mute();
+			check_expr(ctx, &o, trial);
+			end_error_mute();
+			if (o.mode == Addressing_Invalid || o.type == nullptr || o.type == t_invalid ||
+			    error_mute_count() != muted_before) {
+				return nullptr;
+			}
+			Type *et = is_type_untyped(o.type) ? default_type(o.type) : o.type;
+			if (et == nullptr || et == t_invalid || is_type_polymorphic(et)) {
+				return nullptr;
+			}
+			if (elem_type == nullptr) {
+				elem_type = et;
+			} else if (!are_types_identical(elem_type, et)) {
+				return nullptr; // non-homogeneous: fall back to the explicit-type error
+			}
 		}
 		if (elem_type == nullptr) {
-			elem_type = et;
-		} else if (!are_types_identical(elem_type, et)) {
-			// non-homogeneous: fall back to the explicit-type error
 			return nullptr;
 		}
-	}
-	if (elem_type == nullptr) {
-		return nullptr;
+	} else {
+		// NOTE(bill): Count-only (`[$N]ConcreteElem`): the element content is validated later by materialize
+		for (Ast *e : elems) {
+			Ast *ue = unparen_expr(e);
+			if (ue != nullptr && ue->kind == Ast_FieldValue) {
+				return nullptr;
+			}
+		}
 	}
 
 	Type *source = nullptr;
 	switch (bt->kind) {
-	case Type_Array:        source = alloc_type_array(elem_type, bt->Array.count, nullptr); break;
-	case Type_Slice:        source = alloc_type_slice(elem_type);                           break;
-	case Type_DynamicArray: source = alloc_type_dynamic_array(elem_type);                   break;
+	case Type_Array: {
+		i64 count = generic_count ? cast(i64)elems.count : bt->Array.count;
+		source = alloc_type_array(elem_type, count, nullptr);
+		break;
+	}
+	case Type_Slice:        source = alloc_type_slice(elem_type);         break;
+	case Type_DynamicArray: source = alloc_type_dynamic_array(elem_type); break;
 	}
 	if (source == nullptr) {
 		return nullptr;
