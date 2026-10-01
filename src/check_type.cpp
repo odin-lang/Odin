@@ -2644,6 +2644,21 @@ gb_internal Type *subst_apply(CheckerContext *c, Type *pattern, Type *source, Po
 			orig = pb->Union.polymorphic_parent;
 		}
 		GB_ASSERT(orig != nullptr && p_tuple != nullptr);
+
+		// If the source is already a concrete instantiation of this same record, use it directly. This
+		// is both faster and handles records whose polymorphic argument is itself a compound type (e.g.
+		// `Pair([2]$T)` or `Pair([E]$T)`), which the substitution-based lookup below cannot reconstruct
+		// (its parameter is an array, not a bare `$T`).
+		if (source != nullptr && !is_type_polymorphic(source)) {
+			Type *sb = base_type(source);
+			Type *sorig = (sb->kind == Type_Struct) ? sb->Struct.polymorphic_parent
+			            : (sb->kind == Type_Union)  ? sb->Union.polymorphic_parent
+			            :                             nullptr;
+			if (sorig != nullptr && sorig == orig) {
+				return source;
+			}
+		}
+
 		GenTypesData *gt = ensure_polymorphic_record_entity_has_gen_types(c, orig);
 		mutex_lock(&gt->mutex);
 		Entity *found = find_polymorphic_record_by_subst(gt, p_tuple, subst);
