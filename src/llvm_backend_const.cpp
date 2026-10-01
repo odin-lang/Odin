@@ -801,14 +801,14 @@ gb_internal lbValue lb_const_value_bit_field(lbModule *m, Type *type, Ast *value
 				GB_ASSERT(mask_width > 0);
 				bits_to_set -= mask_width;
 
-				LLVMValueRef mask = lb_const_low_bits_mask(vt, mask_width);
+				LLVMValueRef mask = lb_const_low_bits_mask(lit, mask_width);
 
-				LLVMValueRef to_set = LLVMBuildAnd(m->const_dummy_builder, val, mask, "");
+				LLVMValueRef to_set = LLVMBuildIntCast2(m->const_dummy_builder, val, lit, false, "");
+				to_set = LLVMBuildAnd(m->const_dummy_builder, to_set, mask, "");
 
 				if (elem_bit_offset != 0) {
-					to_set = LLVMBuildShl(m->const_dummy_builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+					to_set = LLVMBuildShl(m->const_dummy_builder, to_set, LLVMConstInt(lit, elem_bit_offset, false), "");
 				}
-				to_set = LLVMBuildTrunc(m->const_dummy_builder, to_set, lit, "");
 
 				if (LLVMIsNull(elems[elem_idx])) {
 					elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
