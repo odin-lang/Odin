@@ -1557,27 +1557,25 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 		type = core_type(type);
 
 		if (type->kind == Type_SoaPointer) {
+			// #soa pointer is {^container, index}; index into the selected
+			// column, then keep walking remaining selection indices (e.g. `using`)
 			lbValue addr = lb_emit_struct_ep(p, e, 0);
-			lbValue index = lb_emit_struct_ep(p, e, 1);
+			lbValue soa_index = lb_emit_struct_ep(p, e, 1);
 			addr = lb_emit_load(p, addr);
-			index = lb_emit_load(p, index);
+			soa_index = lb_emit_load(p, soa_index);
 
-			i32 first_index = sel.index[0];
-			Selection sub_sel = sel;
-			sub_sel.index.data += 1;
-			sub_sel.index.count -= 1;
-
-			lbValue arr = lb_emit_struct_ep(p, addr, first_index);
+			lbValue arr = lb_emit_struct_ep(p, addr, index);
 
 			Type *t = base_type(type_deref(addr.type));
 			GB_ASSERT(is_type_soa_struct(t));
 
 			if (t->Struct.soa_kind == StructSoa_Fixed) {
-				e = lb_emit_array_ep(p, arr, index);
+				e = lb_emit_array_ep(p, arr, soa_index);
 			} else {
-				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
+				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), soa_index);
 			}
 			e.type = alloc_type_multi_pointer_to_pointer(e.type);
+			type = type_deref(e.type);
 
 		} else if (is_type_quaternion(type)) {
 			e = lb_emit_struct_ep(p, e, index);
