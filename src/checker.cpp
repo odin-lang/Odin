@@ -2453,6 +2453,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		break;
 
 	case Type_Union:
+		if (bt->Union.variants_wait_signal.futex.load() == 0)
+			return;
 		if (union_tag_size(t) > 0) {
 			add_type_info_type_internal(c, union_tag_type(t));
 		} else {
@@ -6962,8 +6964,14 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
-		if (is_type_polymorphic(src->type) || is_type_polymorphic(dst->type)) {
-			error(src->token, "'%s' cannot be used with a polymorphic procedure", attribute);
+		bool src_poly = is_type_polymorphic(src->type);
+		bool dst_poly = is_type_polymorphic(dst->type);
+		if (dst_poly && !src_poly) {
+			error(src->token, "A polymorphic deferred procedure '%.*s' requires the initial procedure '%.*s' to be polymorphic as well", LIT(dst->token.string), LIT(src->token.string));
+			continue;
+		}
+		if (dst_poly && dst_kind == DeferredProcedure_none) {
+			error(src->token, "'deferred_none' cannot be used with a polymorphic deferred procedure, as it has no inputs from which to determine its polymorphic types");
 			continue;
 		}
 
@@ -7025,7 +7033,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 				GB_ASSERT(src_params->kind == Type_Tuple);
 				GB_ASSERT(dst_params->kind == Type_Tuple);
 
-				if (are_types_identical(src_params, dst_params)) {
+				if (src_poly || dst_poly || are_types_identical(src_params, dst_params)) {
 					// Okay!
 				} else {
 					gbString s = type_to_string(src_params);
@@ -7055,7 +7063,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 				GB_ASSERT(src_results->kind == Type_Tuple);
 				GB_ASSERT(dst_params->kind == Type_Tuple);
 
-				if (are_types_identical(src_results, dst_params)) {
+				if (src_poly || dst_poly || are_types_identical(src_results, dst_params)) {
 					// Okay!
 				} else {
 					gbString s = type_to_string(src_results);
@@ -7112,7 +7120,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 				GB_ASSERT(offset == len);
 
 
-				if (are_types_identical(tsrc, dst_params)) {
+				if (src_poly || dst_poly || are_types_identical(tsrc, dst_params)) {
 					// Okay!
 				} else {
 					gbString s = type_to_string(tsrc);

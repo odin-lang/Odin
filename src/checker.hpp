@@ -85,6 +85,7 @@ struct Operand {
 	Ast *      expr;
 	BuiltinProcId  builtin_id;
 	Entity *       proc_group;
+	bool           deferred_untyped_arg; // untyped arg (`{...}`, `.Member`) whose type is resolved from a poly param later
 };
 
 

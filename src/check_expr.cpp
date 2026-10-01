@@ -92,9 +92,11 @@ gb_internal void     check_init_constant            (CheckerContext *c, Entity *
 gb_internal bool     check_representable_as_constant(CheckerContext *c, ExactValue in_value, Type *type, ExactValue *out_value);
 gb_internal bool     check_procedure_type           (CheckerContext *c, Type *type, Ast *proc_type_node, Array<Operand> const *operands = nullptr);
 gb_internal void     check_struct_type              (CheckerContext *c, Type *struct_type, Ast *node, Array<Operand> *poly_operands,
-                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
+                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr,
+                                                     GenTypesData *poly_gen_types_to_unlock = nullptr);
 gb_internal void     check_union_type               (CheckerContext *c, Type *union_type, Ast *node, Array<Operand> *poly_operands,
-                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
+                                                     Type *named_type = nullptr, Type *original_type_for_poly = nullptr,
+                                                     GenTypesData *poly_gen_types_to_unlock = nullptr);
 
 gb_internal Type *   check_init_variable            (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
@@ -387,6 +389,30 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 	}
 }
 
+// Reuse an existing generated specialization `other`, scheduling its body if unchecked.
+// Caller must have released gen_procs->mutex first.
+gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other, Ast *poly_def_node, PolyProcData *poly_proc_data) {
+	if (poly_proc_data) {
+		poly_proc_data->gen_entity = other;
+	}
+
+	DeclInfo *decl = other->decl_info;
+	if (decl->proc_checked_state != ProcCheckedState_Checked) {
+		ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
+		proc_info->file  = other->file;
+		proc_info->token = other->token;
+		proc_info->decl  = decl;
+		proc_info->type  = other->type;
+		proc_info->body  = decl->proc_lit->ProcLit.body;
+		proc_info->tags  = other->Procedure.tags;
+		proc_info->generated_from_polymorphic = true;
+		proc_info->poly_def_node = poly_def_node;
+
+		check_procedure_later(checker, proc_info);
+	}
+	return true;
+}
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -551,32 +577,22 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-
-				if (poly_proc_data) {
-					poly_proc_data->gen_entity = other;
-				}
-
-				DeclInfo *decl = other->decl_info;
-				if (decl->proc_checked_state != ProcCheckedState_Checked) {
-					ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
-					proc_info->file  = other->file;
-					proc_info->token = other->token;
-					proc_info->decl  = decl;
-					proc_info->type  = other->type;
-					proc_info->body  = decl->proc_lit->ProcLit.body;
-					proc_info->tags  = other->Procedure.tags;;
-					proc_info->generated_from_polymorphic = true;
-					proc_info->poly_def_node = poly_def_node;
-
-					check_procedure_later(nctx.checker, proc_info);
-				}
-
-				return true;
+				return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
 			}
 		}
 		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 	}
 
+
+	// Re-check under the exclusive lock (the lookups above ran under a released shared lock) and
+	// hold it across construction + array_add so find-then-publish is atomic. (@local-mutex)
+	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
+	for (Entity *other : gen_procs->procs) {
+		if (are_types_identical(base_type(other->type), final_proc_type)) {
+			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
+			return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
+		}
+	}
 
 	Ast *proc_lit = clone_ast(old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
@@ -648,8 +664,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 
-	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
-		array_add(&gen_procs->procs, entity);
+	array_add(&gen_procs->procs, entity);
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
 	ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
@@ -669,6 +684,52 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		entity->Procedure.generated_from_polymorphic = proc_info->generated_from_polymorphic;
 	}
 
+	if (base_entity->Procedure.deferred_procedure.entity != nullptr) {
+		DeferredProcedure dp = base_entity->Procedure.deferred_procedure;
+		Entity *dst = dp.entity;
+		// NOTE(bill): Skip self-deferral and chaining (both invalid, reported by check_deferred_procedures).
+		// handling them here would otherwise recurse through find_or_generate_polymorphic_procedure.
+		if (dst == nullptr || dst == base_entity || dst->Procedure.deferred_procedure.entity != nullptr) {
+			// Leave this instantiation without a deferred procedure
+			// The error is reported during validation
+		} else if (!is_type_polymorphic(dst->type)) {
+			entity->Procedure.deferred_procedure = dp;
+		} else {
+			bool by_ptr  = dp.kind == DeferredProcedure_in_by_ptr  || dp.kind == DeferredProcedure_out_by_ptr || dp.kind == DeferredProcedure_in_out_by_ptr;
+			bool use_in  = dp.kind == DeferredProcedure_in         || dp.kind == DeferredProcedure_in_by_ptr  || dp.kind == DeferredProcedure_in_out || dp.kind == DeferredProcedure_in_out_by_ptr;
+			bool use_out = dp.kind == DeferredProcedure_out        || dp.kind == DeferredProcedure_out_by_ptr || dp.kind == DeferredProcedure_in_out || dp.kind == DeferredProcedure_in_out_by_ptr;
+
+			auto dst_ops = array_make<Operand>(heap_allocator(), 0, operands.count + 4);
+			defer (array_free(&dst_ops));
+
+			if (use_in) {
+				for (Operand const &o : operands) {
+					Operand po = o;
+					if (by_ptr && po.type != nullptr) {
+						po.type = alloc_type_pointer(po.type);
+					}
+					array_add(&dst_ops, po);
+				}
+			}
+			if (use_out) {
+				Type *res = base_type(final_proc_type)->Proc.results;
+				if (res != nullptr && res->kind == Type_Tuple) {
+					for (Entity *rv : res->Tuple.variables) {
+						Operand po = {Addressing_Value};
+						po.type = by_ptr ? alloc_type_pointer(rv->type) : rv->type;
+						po.expr = ident;
+						array_add(&dst_ops, po);
+					}
+				}
+			}
+			PolyProcData dpd = {};
+			if (find_or_generate_polymorphic_procedure(&nctx, dst, nullptr, &dst_ops, poly_def_node, &dpd)) {
+				entity->Procedure.deferred_procedure.kind   = dp.kind;
+				entity->Procedure.deferred_procedure.entity = dpd.gen_entity;
+			}
+		}
+	}
+
 	// NOTE(bill): Check the newly generated procedure body
 	check_procedure_later(nctx.checker, proc_info);
 
@@ -686,8 +747,8 @@ gb_internal bool find_or_generate_polymorphic_procedure_from_parameters(CheckerC
 	return find_or_generate_polymorphic_procedure(c, base_entity, nullptr, operands, poly_def_node, poly_proc_data);
 }
 
-gb_internal bool check_type_specialization_to(CheckerContext *c, Type *specialization, Type *type, bool compound, bool modify_type);
-gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type);
+gb_internal bool subst_poly_assignable(CheckerContext *c, Type *pattern, Type *source, bool modify_type);
+gb_internal bool subst_check_specialization(CheckerContext *ctx, Type *specialization, Type *type, bool modify_type);
 gb_internal bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
 gb_internal bool check_proc_params_assignable(CheckerContext *c, Type *x, Type *y);
 
@@ -894,12 +955,13 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 
 	if (is_type_polymorphic(dst) && !is_type_polymorphic(src)) {
 		bool modify_type = !c->no_polymorphic_errors;
-		if (is_polymorphic_type_assignable(c, type, s, false, modify_type)) {
+		if (subst_poly_assignable(c, type, s, modify_type)) {
 			return 2;
 		}
 	}
 
 	if (is_type_union(dst) && allow_unions) {
+		wait_signal_until_available(&dst->Union.variants_wait_signal);
 		for (Type *vt : dst->Union.variants) {
 			if (are_types_identical(vt, s)) {
 				return 1;
@@ -1455,388 +1517,6 @@ gb_internal bool polymorphic_assign_index(Type **gt_, i64 *dst_count, i64 source
 			*gt_ = nullptr;
 		}
 		return true;
-	}
-	return false;
-}
-
-gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source, bool compound, bool modify_type) {
-	Operand o = {Addressing_Value};
-	o.type = source;
-	switch (poly->kind) {
-	case Type_Basic:
-		if (compound) return are_types_identical(poly, source);
-		return check_is_assignable_to(c, &o, poly);
-
-	case Type_Named: {
-		if (check_type_specialization_to(c, poly, source, compound, modify_type)) {
-			return true;
-		}
-		if (compound || !is_type_generic(poly)) {
-			return are_types_identical(poly, source);
-		}
-		return check_is_assignable_to(c, &o, poly);
-	}
-
-	case Type_Generic: {
-		if (poly->Generic.specialized != nullptr) {
-			Type *s = poly->Generic.specialized;
-			if (!check_type_specialization_to(c, s, source, compound, modify_type)) {
-				return false;
-			}
-		}
-		if (modify_type) {
-			Type *ds = default_type(source);
-			gb_memmove(poly, ds, gb_size_of(Type));
-		}
-		return true;
-	}
-	case Type_Pointer:
-		if (source->kind == Type_Pointer) {
-			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->Pointer.elem, /*level*/0, /*src_is_ptr*/false, /*allow_polymorphic*/true);
-			if (level > 0) {
-				return true;
-			}
-			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
-		} else if (source->kind == Type_MultiPointer) {
-			isize level = check_is_assignable_to_using_subtype(source->MultiPointer.elem, poly->Pointer.elem);
-			if (level > 0) {
-				return true;
-			}
-			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->MultiPointer.elem, true, modify_type);
-		}
-		return false;
-
-	case Type_MultiPointer:
-		if (source->kind == Type_MultiPointer) {
-			isize level = check_is_assignable_to_using_subtype(source->MultiPointer.elem, poly->MultiPointer.elem);
-			if (level > 0) {
-				return true;
-			}
-			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->MultiPointer.elem, true, modify_type);
-		} else if (source->kind == Type_Pointer) {
-			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->MultiPointer.elem);
-			if (level > 0) {
-				return true;
-			}
-			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->Pointer.elem, true, modify_type);
-		}
-		return false;
-
-	case Type_SoaPointer:
-		if (source->kind == Type_SoaPointer) {
-			isize level = check_is_assignable_to_using_subtype(source->SoaPointer.elem, poly->SoaPointer.elem, /*level*/0, /*src_is_ptr*/false, /*allow_polymorphic*/true);
-			if (level > 0) {
-				return true;
-			}
-			return is_polymorphic_type_assignable(c, poly->SoaPointer.elem, source->SoaPointer.elem, true, modify_type);
-		}
-		return false;
-
-	case Type_Array:
-		if (source->kind == Type_Array) {
-			Type *generic_count = poly->Array.generic_count;
-			i64 count = poly->Array.count;
-			if (generic_count != nullptr) {
-				if (!polymorphic_assign_index(&generic_count, &count, source->Array.count, modify_type)) {
-					return false;
-				}
-				if (modify_type) {
-					poly->Array.generic_count = generic_count;
-					poly->Array.count = count;
-				}
-			}
-			if (count == source->Array.count) {
-				return is_polymorphic_type_assignable(c, poly->Array.elem, source->Array.elem, true, modify_type);
-			}
-		} else if (source->kind == Type_EnumeratedArray) {
-			if (poly->Array.generic_count != nullptr) {
-				Type *gt = poly->Array.generic_count;
-				GB_ASSERT(gt->kind == Type_Generic);
-				Entity *e = scope_lookup(gt->Generic.scope, gt->Generic.interned_name, 0);
-				GB_ASSERT(e != nullptr);
-				if (e->kind == Entity_TypeName) {
-					Type *index = source->EnumeratedArray.index;
-					Type *it = base_type(index);
-					if (it->kind != Type_Enum) {
-						return false;
-					}
-					if (!modify_type) {
-						return is_polymorphic_type_assignable(c, poly->Array.elem, source->EnumeratedArray.elem, true, false);
-					}
-
-					poly->kind = Type_EnumeratedArray;
-					poly->cached_size  = -1;
-					poly->cached_align = -1;
-					poly->flags.exchange(source->flags);
-					poly->failure      = false;
-					poly->EnumeratedArray.elem      = source->EnumeratedArray.elem;
-					poly->EnumeratedArray.index     = source->EnumeratedArray.index;
-					poly->EnumeratedArray.min_value = source->EnumeratedArray.min_value;
-					poly->EnumeratedArray.max_value = source->EnumeratedArray.max_value;
-					poly->EnumeratedArray.count     = source->EnumeratedArray.count;
-					poly->EnumeratedArray.op        = source->EnumeratedArray.op;
-
-					e->kind = Entity_TypeName;
-					e->TypeName.is_type_alias = true;
-					e->type = index;
-
-					if (poly->EnumeratedArray.count == source->EnumeratedArray.count) {
-						return is_polymorphic_type_assignable(c, poly->EnumeratedArray.elem, source->EnumeratedArray.elem, true, modify_type);
-					}
-				}
-			}
-		}
-		return false;
-	case Type_EnumeratedArray:
-		if (source->kind == Type_EnumeratedArray) {
-			if (poly->EnumeratedArray.op != source->EnumeratedArray.op) {
-				return false;
-			}
-			if (poly->EnumeratedArray.op) {
-				if (poly->EnumeratedArray.count != source->EnumeratedArray.count) {
-					return false;
-				}
-				if (compare_exact_values(Token_NotEq, *poly->EnumeratedArray.min_value, *source->EnumeratedArray.min_value)) {
-					return false;
-				}
-				if (compare_exact_values(Token_NotEq, *poly->EnumeratedArray.max_value, *source->EnumeratedArray.max_value)) {
-					return false;
-				}
-				return is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
-			}
-			bool index = is_polymorphic_type_assignable(c, poly->EnumeratedArray.index, source->EnumeratedArray.index, true, modify_type);
-			bool elem  = is_polymorphic_type_assignable(c, poly->EnumeratedArray.elem, source->EnumeratedArray.elem, true, modify_type);
-			return index || elem;
-		}
-		return false;
-
-	case Type_DynamicArray:
-		if (source->kind == Type_DynamicArray) {
-			return is_polymorphic_type_assignable(c, poly->DynamicArray.elem, source->DynamicArray.elem, true, modify_type);
-		}
-		return false;
-
-	case Type_FixedCapacityDynamicArray:
-		if (source->kind == Type_FixedCapacityDynamicArray) {
-			Type *generic_capacity = poly->FixedCapacityDynamicArray.generic_capacity;
-			i64 capacity = poly->FixedCapacityDynamicArray.capacity;
-			if (generic_capacity != nullptr) {
-				if (!polymorphic_assign_index(&generic_capacity, &capacity, source->FixedCapacityDynamicArray.capacity, modify_type)) {
-					return false;
-				}
-				if (modify_type) {
-					poly->FixedCapacityDynamicArray.generic_capacity = generic_capacity;
-					poly->FixedCapacityDynamicArray.capacity = capacity;
-				}
-			}
-			if (capacity == source->FixedCapacityDynamicArray.capacity) {
-				return is_polymorphic_type_assignable(c, poly->FixedCapacityDynamicArray.elem, source->FixedCapacityDynamicArray.elem, true, modify_type);
-			}
-		}
-		return false;
-
-	case Type_Slice:
-		if (source->kind == Type_Slice) {
-			return is_polymorphic_type_assignable(c, poly->Slice.elem, source->Slice.elem, true, modify_type);
-		}
-		return false;
-
-	case Type_Enum:
-		return false;
-
-	case Type_BitSet:
-		if (source->kind == Type_BitSet) {
-			if (!is_type_polymorphic(poly->BitSet.elem)) {
-				if (poly->BitSet.upper != source->BitSet.upper || poly->BitSet.lower != source->BitSet.lower) {
-					return false;
-				}
-			}
-			if (!is_polymorphic_type_assignable(c, poly->BitSet.elem, source->BitSet.elem, true, modify_type)) {
-				return false;
-			}
-			
-			// For generic types like bit_set[$T] the upper and lower of the poly type will be zeroes since
-			// it could not figure that stuff out when the poly type was created.
-			if (poly->BitSet.upper == 0 && modify_type) {
-				poly->BitSet.upper = source->BitSet.upper;
-			}
-			if (poly->BitSet.lower == 0 && modify_type) {
-				poly->BitSet.lower = source->BitSet.lower;
-			}
-
-			if (poly->BitSet.underlying == nullptr) {
-				if (modify_type) {
-					poly->BitSet.underlying = source->BitSet.underlying;
-				}
-			} else if (!is_polymorphic_type_assignable(c, poly->BitSet.underlying, source->BitSet.underlying, true, modify_type)) {
-				return false;
-			}
-			return true;
-		}
-		return false;
-
-	case Type_Union:
-		if (source->kind == Type_Union) {
-			TypeUnion *x = &poly->Union;
-			TypeUnion *y = &source->Union;
-			if (x->variants.count != y->variants.count) {
-				return false;
-			}
-			for_array(i, x->variants) {
-				Type *a = x->variants[i];
-				Type *b = y->variants[i];
-				bool ok = is_polymorphic_type_assignable(c, a, b, false, modify_type);
-				if (!ok) return false;
-			}
-			return true;
-		}
-		return false;
-
-	case Type_Struct:
-		if (source->kind == Type_Struct) {
-			if (poly->Struct.soa_kind == source->Struct.soa_kind &&
-			    poly->Struct.soa_kind != StructSoa_None) {
-				bool ok = is_polymorphic_type_assignable(c, poly->Struct.soa_elem, source->Struct.soa_elem, true, modify_type);
-				if (ok) switch (source->Struct.soa_kind) {
-				case StructSoa_None:
-				default:
-					GB_PANIC("Unhandled SOA Kind");
-					break;
-				case StructSoa_Fixed:
-					if (modify_type) {
-						Type *type = make_soa_struct_fixed(c, nullptr, poly->Struct.node, poly->Struct.soa_elem, poly->Struct.soa_count, nullptr);
-						gb_memmove(poly, type, gb_size_of(*type));
-					}
-					break;
-				case StructSoa_Slice:
-					if (modify_type) {
-						Type *type = make_soa_struct_slice(c, nullptr, poly->Struct.node, poly->Struct.soa_elem);
-						gb_memmove(poly, type, gb_size_of(*type));
-					}
-					break;
-				case StructSoa_Dynamic:
-					if (modify_type) {
-						Type *type = make_soa_struct_dynamic_array(c, nullptr, poly->Struct.node, poly->Struct.soa_elem);
-						gb_memmove(poly, type, gb_size_of(*type));
-					}
-					break;
-				}
-				return ok;
-
-			}
-
-			// NOTE(bill): Check for subtypes of
-			// return check_is_assignable_to(c, &o, poly); // && is_type_subtype_of_and_allow_polymorphic(o.type, poly);
-		}
-		return false;
-
-	case Type_BitField:
-		if (source->kind == Type_BitField) {
-			return is_polymorphic_type_assignable(c, poly->BitField.backing_type, source->BitField.backing_type, true, modify_type);
-		}
-		return false;
-
-	case Type_Tuple:
-		GB_PANIC("This should never happen");
-		return false;
-	case Type_Proc:
-		if (source->kind == Type_Proc) {
-			TypeProc *x = &poly->Proc;
-			TypeProc *y = &source->Proc;
-			if (x->calling_convention != y->calling_convention) {
-				return false;
-			}
-			if (x->c_vararg != y->c_vararg) {
-				return false;
-			}
-			if (x->variadic != y->variadic) {
-				return false;
-			}
-			if (x->param_count != y->param_count) {
-				return false;
-			}
-			if (x->result_count != y->result_count) {
-				return false;
-			}
-
-			for (isize i = 0; i < x->param_count; i++) {
-				Entity *a = x->params->Tuple.variables[i];
-				Entity *b = y->params->Tuple.variables[i];
-				bool ok = is_polymorphic_type_assignable(c, a->type, b->type, false, modify_type);
-				if (!ok) return false;
-			}
-			for (isize i = 0; i < x->result_count; i++) {
-				Entity *a = x->results->Tuple.variables[i];
-				Entity *b = y->results->Tuple.variables[i];
-				bool ok = is_polymorphic_type_assignable(c, a->type, b->type, false, modify_type);
-				if (!ok) return false;
-			}
-
-			return true;
-		}
-		return false;
-	case Type_Map:
-		if (source->kind == Type_Map) {
-			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
-			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
-			if (key || value) {
-				if (modify_type) {
-					poly->Map.lookup_result_type = nullptr;
-					init_map_internal_types(poly);
-				}
-				return true;
-			}
-		}
-		return false;
-		
-	case Type_Matrix:
-		if (source->kind == Type_Matrix) {
-			Type *generic_row_count = poly->Matrix.generic_row_count;
-			Type *generic_column_count = poly->Matrix.generic_column_count;
-			i64 row_count = poly->Matrix.row_count;
-			i64 column_count = poly->Matrix.column_count;
-			if (generic_row_count != nullptr) {
-				if (!polymorphic_assign_index(&generic_row_count, &row_count, source->Matrix.row_count, modify_type)) {
-					return false;
-				}
-			}
-			if (generic_column_count != nullptr) {
-				if (!polymorphic_assign_index(&generic_column_count, &column_count, source->Matrix.column_count, modify_type)) {
-					return false;
-				}
-			}
-			if (modify_type && (poly->Matrix.generic_row_count != nullptr || poly->Matrix.generic_column_count != nullptr)) {
-				poly->Matrix.generic_row_count = generic_row_count;
-				poly->Matrix.generic_column_count = generic_column_count;
-				poly->Matrix.row_count = row_count;
-				poly->Matrix.column_count = column_count;
-				poly->Matrix.stride_in_bytes = 0;
-			}
-			if (row_count == source->Matrix.row_count &&
-			    column_count == source->Matrix.column_count) {
-				return is_polymorphic_type_assignable(c, poly->Matrix.elem, source->Matrix.elem, true, modify_type);
-			}
-		} 
-		return false;
-
-	case Type_SimdVector:
-		if (source->kind == Type_SimdVector) {
-			Type *generic_count = poly->SimdVector.generic_count;
-			i64 count = poly->SimdVector.count;
-			if (generic_count != nullptr) {
-				if (!polymorphic_assign_index(&generic_count, &count, source->SimdVector.count, modify_type)) {
-					return false;
-				}
-				if (modify_type) {
-					poly->SimdVector.generic_count = generic_count;
-					poly->SimdVector.count = count;
-				}
-			}
-			if (count == source->SimdVector.count) {
-				return is_polymorphic_type_assignable(c, poly->SimdVector.elem, source->SimdVector.elem, true, modify_type);
-			}
-		}
-		return false;
 	}
 	return false;
 }
@@ -4392,6 +4072,29 @@ gb_internal bool is_ise_expr(Ast *node) {
 	return node->kind == Ast_ImplicitSelectorExpr;
 }
 
+gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
+	if (node == nullptr) {
+		return false;
+	}
+	node = unparen_expr(node);
+	if (node == nullptr) {
+		return false;
+	}
+	switch (node->kind) {
+	case Ast_CompoundLit:
+		return node->CompoundLit.type == nullptr;
+	case Ast_ImplicitSelectorExpr:
+		return true;
+	case Ast_TernaryIfExpr:
+		return arg_is_deferrable_untyped_expr(node->TernaryIfExpr.x) &&
+		       arg_is_deferrable_untyped_expr(node->TernaryIfExpr.y);
+	case Ast_TernaryWhenExpr:
+		return arg_is_deferrable_untyped_expr(node->TernaryWhenExpr.x) &&
+		       arg_is_deferrable_untyped_expr(node->TernaryWhenExpr.y);
+	}
+	return false;
+}
+
 gb_internal bool can_use_other_type_as_type_hint(bool use_lhs_as_type_hint, Type *other_type) {
 	if (use_lhs_as_type_hint) { // RHS in this case
 		return other_type != nullptr && other_type != t_invalid && is_type_typed(other_type);
@@ -5429,6 +5132,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
+			wait_signal_until_available(&t->Union.variants_wait_signal);
 
 			isize count = t->Union.variants.count;
 			ValidIndexAndScore *valids = temporary_alloc_array<ValidIndexAndScore>(count);
@@ -6659,6 +6363,10 @@ enum UnpackFlag : u32 {
 	UnpackFlag_None       = 0,
 	UnpackFlag_AllowOk    = 1<<0,
 	UnpackFlag_AllowUndef = 1<<1,
+	// For calls to polymorphic procedures: an argument that needs a target type (`{...}`, `.Member`)
+	// with no concrete type hint is left unchecked as a deferred operand instead of erroring, to be
+	// resolved once the poly parameter's type is known (see materialize_deferred_untyped_arg).
+	UnpackFlag_DeferUntypedArg = 1<<2,
 };
 
 
@@ -6729,7 +6437,18 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 		}
 
 		Ast *rhs_expr = unparen_expr(rhs);
-		if (allow_undef && rhs_expr != nullptr && rhs_expr->kind == Ast_Uninit) {
+		bool defer_untyped_arg =
+			(flags & UnpackFlag_DeferUntypedArg) != 0 &&
+			arg_is_deferrable_untyped_expr(rhs) &&
+			(type_hint == nullptr || is_type_polymorphic(type_hint));
+		if (defer_untyped_arg) {
+			// NOTE(bill): Leave the argument unchecked; its type comes from the resolved poly parameter later.
+			// Kept as an "invalid" operand so polymorphic determination treats it as carrying no info.
+			o.mode = Addressing_Invalid;
+			o.type = t_invalid;
+			o.expr = rhs;
+			o.deferred_untyped_arg = true;
+		} else if (allow_undef && rhs_expr != nullptr && rhs_expr->kind == Ast_Uninit) {
 			// NOTE(bill): Just handle this very specific logic here
 			o.type = t_untyped_uninit;
 			o.mode = Addressing_Value;
@@ -6864,6 +6583,44 @@ gb_internal isize lookup_procedure_parameter(Type *type, String const &parameter
 	return lookup_procedure_parameter(&type->Proc, parameter_name);
 }
 
+// Resolve a deferred untyped argument (`{...}`, `.Member`) now that its parameter type is known.
+// `param_type` is the concrete (post-substitution) parameter/element type for the slot. On success the
+// operand is checked against it as if it had been written with that type; on failure it is marked
+// invalid. When !show_error the check is muted (trial scoring of a procedure-group candidate) but its
+// failure is still recorded, so the candidate can be rejected without printing anything.
+gb_internal void materialize_deferred_untyped_arg(CheckerContext *c, Operand *o, Type *param_type, bool show_error) {
+	GB_ASSERT(o->deferred_untyped_arg);
+	o->deferred_untyped_arg = false;
+	Ast *expr = o->expr;
+
+	if (param_type == nullptr || param_type == t_invalid || is_type_polymorphic(param_type)) {
+		// The slot's type could not be determined from the other arguments, so the argument is genuinely
+		// untypable here (e.g. `proc(e: $E)` called with a bare `{...}`). Leave it invalid; polymorphic
+		// determination has already reported why the type could not be resolved.
+		o->mode = Addressing_Invalid;
+		o->type = t_invalid;
+		return;
+	}
+
+	if (show_error) {
+		// Commit (the chosen overload): check the real node so its type is recorded exactly once.
+		check_expr_base(c, o, expr, param_type);
+	} else {
+		// Trial (procedure-group scoring): check a *clone* so the real node's cached type is never
+		// polluted across candidates that may resolve the slot to different types. Errors are muted but
+		// still counted, so a candidate that the argument does not fit is rejected without printing.
+		Ast *trial = clone_ast(expr);
+		i64 muted_before = error_mute_count();
+		begin_error_mute();
+		check_expr_base(c, o, trial, param_type);
+		end_error_mute();
+		if (error_mute_count() != muted_before) {
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+		}
+	}
+}
+
 gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, Ast *call,
 	Entity *entity, Type *proc_type,
 	Array<Operand> positional_operands, Array<Operand> const &named_operands,
@@ -6990,14 +6747,15 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	bool actually_variadic = false;
 
 	if (variadic) {
-		if (visited[pt->variadic_index] &&
-		    positional_operand_count < positional_operands.count) {
-			if (show_error) {
-				String name = pt->params->Tuple.variables[pt->variadic_index]->token.string;
-				error(call, "Variadic parameters already handled with a named argument '%.*s' in procedure call", LIT(name));
+		if (visited[pt->variadic_index]) {
+			if (positional_operand_count < positional_operands.count) {
+				if (show_error) {
+					String name = pt->params->Tuple.variables[pt->variadic_index]->token.string;
+					error(call, "Variadic parameters already handled with a named argument '%.*s' in procedure call", LIT(name));
+				}
+				err = CallArgumentError_DuplicateParameter;
 			}
-			err = CallArgumentError_DuplicateParameter;
-		} else if (!visited[pt->variadic_index]) {
+		} else {
 			visited[pt->variadic_index] = true;
 
 			Operand *variadic_operand = &ordered_operands[pt->variadic_index];
@@ -7032,68 +6790,87 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				*variadic_operand = o;
 			}
 		}
-
 	}
 
 	for (isize i = 0; i < pt->param_count; i++) {
-		if (!visited[i]) {
-			Entity *e = pt->params->Tuple.variables[i];
-			bool context_allocator_error = false;
-			if (e->kind == Entity_Variable) {
-				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-					if (ast_file_vet_explicit_allocators(c->file) && !checking_proc_group) {
-						// NOTE(lucas): check if we are trying to default to context.allocator or context.temp_allocator
-						if (e->Variable.param_value.original_ast_expr->kind == Ast_SelectorExpr) {
-							auto& expr = e->Variable.param_value.original_ast_expr->SelectorExpr.expr;
-							auto& selector = e->Variable.param_value.original_ast_expr->SelectorExpr.selector;
-							if (expr->kind == Ast_Implicit &&
-								expr->Implicit.string == STR_LIT("context") &&
-								selector->kind == Ast_Ident &&
-								(selector->Ident.token.string == STR_LIT("allocator") ||
-      								selector->Ident.token.string == STR_LIT("temp_allocator"))) {
-								context_allocator_error = true;
-							}
+		if (visited[i]) {
+			continue;
+		}
+		Entity *e = pt->params->Tuple.variables[i];
+		bool context_allocator_error = false;
+		if (e->kind == Entity_Variable) {
+			if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+				if (ast_file_vet_explicit_allocators(c->file) && !checking_proc_group) {
+					// NOTE(lucas): check if we are trying to default to context.allocator or context.temp_allocator
+					if (e->Variable.param_value.original_ast_expr->kind == Ast_SelectorExpr) {
+						auto& expr = e->Variable.param_value.original_ast_expr->SelectorExpr.expr;
+						auto& selector = e->Variable.param_value.original_ast_expr->SelectorExpr.selector;
+						if (expr->kind == Ast_Implicit &&
+							expr->Implicit.string == STR_LIT("context") &&
+							selector->kind == Ast_Ident &&
+							(selector->Ident.token.string == STR_LIT("allocator") ||
+								selector->Ident.token.string == STR_LIT("temp_allocator"))) {
+							context_allocator_error = true;
 						}
 					}
+				}
 
-					if (!context_allocator_error) {
+				if (!context_allocator_error) {
+					if (is_type_polymorphic(e->type) && e->Variable.param_value.kind == ParameterValue_Constant) {
+						// NOTE(bill): The parameter type is still polymorphic, so a constant default (e.g. `y: T = 0`) cannot be typed as '$T' here.
+						// Defer it like an untyped argument: determination resolves the parameter from the other arguments,
+						// then the default is materialized against the concrete type (reporting a clear error if it does not fit).
+						ordered_operands[i].mode = Addressing_Invalid;
+						ordered_operands[i].type = t_invalid;
+						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+						ordered_operands[i].deferred_untyped_arg = true;
+					} else {
 						ordered_operands[i].mode = Addressing_Value;
 						ordered_operands[i].type = e->type;
 						if (e->Variable.param_value.kind == ParameterValue_Nil)
 							ordered_operands[i].type = t_untyped_nil;
 						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
-
-						dummy_argument_count += 1;
-						score += assign_score_function(1);
-						continue;
 					}
-				}
-			}
 
-			if (show_error) {
-				if (context_allocator_error) {
-					gbString str = type_to_string(e->type);
-					error(call, "Parameter '%.*s' of type '%s' must be explicitly provided in procedure call",
-					      LIT(e->token.string), str);
-					gb_string_free(str);
-				} else if (e->kind == Entity_TypeName) {
-					error(call, "Type parameter '%.*s' is missing in procedure call",
-					      LIT(e->token.string));
-				} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
-					// Ignore
-				} else {
-					gbString str = type_to_string(e->type);
-					error(call, "Parameter '%.*s' of type '%s' is missing in procedure call",
-					      LIT(e->token.string), str);
-					gb_string_free(str);
+					dummy_argument_count += 1;
+					score += assign_score_function(1);
+					continue;
 				}
 			}
-			err = CallArgumentError_ParameterMissing;
 		}
+
+		if (show_error) {
+			if (context_allocator_error) {
+				gbString str = type_to_string(e->type);
+				error(call, "Parameter '%.*s' of type '%s' must be explicitly provided in procedure call",
+				      LIT(e->token.string), str);
+				gb_string_free(str);
+			} else if (e->kind == Entity_TypeName) {
+				error(call, "Type parameter '%.*s' is missing in procedure call",
+				      LIT(e->token.string));
+			} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
+				// Ignore
+			} else {
+				gbString str = type_to_string(e->type);
+				error(call, "Parameter '%.*s' of type '%s' is missing in procedure call",
+				      LIT(e->token.string), str);
+				gb_string_free(str);
+			}
+		}
+		err = CallArgumentError_ParameterMissing;
 	}
 
 	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error) -> i64 {
 		bool allow_array_programming = !(e && (e->flags & EntityFlag_NoBroadcast));
+		// NOTE(bill): If the parameter type is still polymorphic here, the callee was not instantiated for this call (e.g. a disabled polymorphic proc, whose body is elided).
+		// A polymorphic '$T' gives an untyped argument nothing concrete to convert to, so default it to its own type rather than reporting a nonsense "cannot convert untyped value to '$T'".
+		if (show_error && is_type_polymorphic(param_type) && o->mode != Addressing_Invalid && is_type_untyped(o->type)) {
+			Type *dt = default_type(o->type);
+			if (dt != nullptr && is_type_typed(dt)) {
+				update_untyped_expr_type(c, o->expr, dt, true);
+				o->type = dt;
+			}
+		}
 		i64 s = 0;
 		if (!check_is_assignable_to_with_score(c, o, param_type, &s, param_is_variadic, allow_array_programming)) {
 			bool ok = false;
@@ -7205,6 +6982,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 		for (isize i = 0; i < pt->param_count; i++) {
 			Operand *o = &ordered_operands[i];
+			if (o->deferred_untyped_arg) {
+				materialize_deferred_untyped_arg(c, o, pt->params->Tuple.variables[i]->type, show_error);
+			}
 			if (o->mode == Addressing_Invalid) {
 				continue;
 			}
@@ -7253,6 +7033,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 		for_array(operand_index, variadic_operands) {
 			Operand *o = &variadic_operands[operand_index];
+			Operand deferred_local;
+			if (o->deferred_untyped_arg) {
+				// `variadic_operands` aliases the shared operand buffer reused across candidates, so
+				// resolve into a local copy rather than mutating it in place.
+				deferred_local = *o;
+				materialize_deferred_untyped_arg(c, &deferred_local, vari_expand ? slice : elem, show_error);
+				o = &deferred_local;
+			}
 			if (vari_expand) {
 				t = slice;
 				if (operand_index > 0) {
@@ -7382,7 +7170,7 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 			} else if (!o.value.value_bool) {
 				if (print_err) {
 					ERROR_BLOCK();
-					
+
 					gbString str = expr_to_string(clause);
 					error(clause, "'where' clause evaluated to false:\n\t%s", str);
 					gb_string_free(str);
@@ -7499,6 +7287,15 @@ gb_internal bool check_named_arguments(CheckerContext *c, Type *type, Slice<Ast 
 
 			}
 			Operand o = {};
+			if (pt != nullptr && pt->is_polymorphic && type_hint == nullptr && arg_is_deferrable_untyped_expr(value)) {
+				// Defer: resolved from the poly parameter's type later (see the positional path).
+				o.mode = Addressing_Invalid;
+				o.type = t_invalid;
+				o.expr = value;
+				o.deferred_untyped_arg = true;
+				array_add(named_operands, o);
+				continue;
+			}
 			check_expr_with_type_hint(c, &o, value, type_hint);
 			if (o.mode == Addressing_Invalid) {
 				success = false;
@@ -7690,7 +7487,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				variadic_index = pt->Proc.variadic_index;
 			}
 		}
-		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
+		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_DeferUntypedArg, variadic_index);
 
 		if (check_named_arguments(c, e->type, named_args, &named_operands, true)) {
 			check_call_arguments_single(c, call, operand,
@@ -7756,7 +7553,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 					if (!(pt != nullptr && is_type_proc(pt))) {
 						continue;
 					}
-					
+
 					if (pt->Proc.is_polymorphic) {
 						if (variadic_index == -1) {
 							variadic_index = pt->Proc.variadic_index;
@@ -7773,7 +7570,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 	}
 
-	check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
+	check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_DeferUntypedArg, variadic_index);
 
 	for_array(i, named_args) {
 		Ast *arg = named_args[i];
@@ -7802,6 +7599,15 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			}
 		}
 		Operand o = {};
+		if (arg_is_deferrable_untyped_expr(value) && (type_hint == nullptr || is_type_polymorphic(type_hint))) {
+			// Defer: resolved per candidate from each overload's parameter type (see the positional path).
+			o.mode = Addressing_Invalid;
+			o.type = t_invalid;
+			o.expr = value;
+			o.deferred_untyped_arg = true;
+			array_add(&named_operands, o);
+			continue;
+		}
 		check_expr_with_type_hint(c, &o, value, type_hint);
 		array_add(&named_operands, o);
 	}
@@ -7952,16 +7758,26 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	// 	error_line(")\n");
 	// };
 
+	// A deferred untyped argument has no type of its own yet; show the expression instead of 'invalid type'.
+	auto operand_type_string = [](Operand const &o) -> gbString {
+		if (o.deferred_untyped_arg) {
+			gbString e = expr_to_string(o.expr);
+			gbString s = gb_string_append_fmt(gb_string_make(heap_allocator(), ""), "%s (untyped)", e);
+			gb_string_free(e);
+			return s;
+		}
+		return type_to_string(o.type);
+	};
 	auto print_argument_types = [&]() {
 		error_line("\tGiven argument types:\n");
 		for (Operand const &o : positional_operands) {
-			gbString type = type_to_string(o.type);
+			gbString type = operand_type_string(o);
 			defer (gb_string_free(type));
 			error_line("\t • %s\n", type);
 		}
 		for_array(i, named_operands) {
 			Operand const &o = named_operands[i];
-			gbString type = type_to_string(o.type);
+			gbString type = operand_type_string(o);
 			defer (gb_string_free(type));
 
 			if (i < ce->split_args->named.count) {
@@ -7981,15 +7797,157 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	if (valids.count == 0) {
 		ERROR_BLOCK();
 
-		error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
-		if (positional_operands.count == 0 && named_operands.count == 0) {
-			error_line("\tNo given arguments\n");
-		} else {
-			print_argument_types();
-		}
+		// element type of a container type, if any (dynamic array / slice / fixed(-capacity) array)
+		auto container_elem = [](Type *t) -> Type * {
+			if (t == nullptr) {
+				return nullptr;
+			}
+			switch (t->kind) {
+			case Type_DynamicArray:              return t->DynamicArray.elem;
+			case Type_FixedCapacityDynamicArray: return t->FixedCapacityDynamicArray.elem;
+			case Type_Slice:                     return t->Slice.elem;
+			case Type_Array:                     return t->Array.elem;
+			}
+			return nullptr;
+		};
+		// NOTE)(bill): resolved container base of a candidate's first parameter, through a pointer and a `$T/...`
+		// constraint, e.g. `^$T/[dynamic]$E` -> the `[dynamic]$E` base type
+		auto first_param_container_base = [](Entity *proc) -> Type * {
+			if (proc == nullptr) {
+				return nullptr;
+			}
+			Type *t = base_type(proc->type);
+			if (t == nullptr || t->kind != Type_Proc || t->Proc.param_count == 0) {
+				return nullptr;
+			}
+			Type *p0 = base_type(t->Proc.params->Tuple.variables[0]->type);
+			if (p0->kind == Type_Pointer) {
+				p0 = base_type(p0->Pointer.elem);
+			} else if (p0->kind == Type_MultiPointer) {
+				p0 = base_type(p0->MultiPointer.elem);
+			}
+			while (p0->kind == Type_Generic && p0->Generic.specialized != nullptr) {
+				p0 = base_type(p0->Generic.specialized);
+			}
+			return p0;
+		};
 
 		if (procs.count == 0) {
 			procs = proc_group_entities_cloned(c, *operand);
+		}
+
+		// NOTE(bill): Confident diagnosis:
+		// A container-first call (e.g. `append`) where the container matches some overload but a later argument does not match the container's element type.
+		// Only fire when an overload actually accepts this container kind, so an unrelated group (nothing close) still gets the generic message.
+		// The relevant overloads are still listed below.
+		Ast *diag_expr = nullptr;
+		isize diag_index = -1;
+		Type *diag_elem = nullptr;
+		Type *diag_cont = nullptr;
+		gbString diag_arg_type = nullptr;
+		if (positional_operands.count >= 2 && positional_operands[0].type != nullptr) {
+			Type *cont = base_type(type_deref(positional_operands[0].type));
+			Type *elem = container_elem(cont);
+			bool container_matched = false;
+			if (elem != nullptr && !is_type_polymorphic(elem)) {
+				for (Entity *proc : procs) {
+					Type *p0 = first_param_container_base(proc);
+					if (p0 != nullptr && p0->kind == cont->kind) {
+						container_matched = true;
+						break;
+					}
+				}
+			}
+			if (container_matched) {
+				for (isize i = 1; i < positional_operands.count; i++) {
+					Operand src = positional_operands[i];
+					if (src.deferred_untyped_arg || src.mode == Addressing_Invalid || src.type == nullptr) {
+						continue;
+					}
+					// strict: no scalar broadcast, matching the `#no_broadcast` element parameter
+					if (check_is_assignable_to(c, &src, elem, false)) {
+						continue;
+					}
+					diag_expr     = src.expr;
+					diag_index    = i;
+					diag_elem     = elem;
+					diag_cont     = cont;
+					diag_arg_type = type_to_string(src.type);
+					break;
+				}
+			}
+		}
+
+		// NOTE(bill): Missing `&`: a container argument passed by value where an overload wants a pointer
+		// to it. Detected only when the element-mismatch diagnosis did not fire. The `&x` suggestion is
+		// still printed below by the existing try-address block.
+		Ast *addr_expr = nullptr;
+		isize addr_index = -1;
+		if (diag_expr == nullptr) {
+			for (Entity *proc : procs) {
+				Type *t = base_type(proc->type);
+				if (t == nullptr || t->kind != Type_Proc || t->Proc.params == nullptr) {
+					continue;
+				}
+				isize n = gb_min(cast(isize)t->Proc.param_count, positional_operands.count);
+				for (isize i = 0; i < n; i++) {
+					Operand src = positional_operands[i];
+					if (src.deferred_untyped_arg || src.mode == Addressing_Invalid || src.type == nullptr) {
+						continue;
+					}
+					Type *dst = t->Proc.params->Tuple.variables[i]->type;
+					if (check_is_assignable_to(c, &src, dst)) {
+						continue;
+					}
+					if (check_is_assignable_to(c, &src, type_deref(dst))) {
+						addr_expr  = src.expr;
+						addr_index = i;
+						break;
+					}
+				}
+				if (addr_expr != nullptr) {
+					break;
+				}
+			}
+		}
+
+		if (diag_expr != nullptr) {
+			gbString es = type_to_string(diag_elem);
+			gbString cs = type_to_string(diag_cont);
+			gbString label = gb_string_make(heap_allocator(), "");
+			label = gb_string_append_fmt(label, "expected '%s', found '%s'", es, diag_arg_type);
+			set_caret_label(label);
+			// secondary span under the container argument, explaining where the element type comes from
+			Ast *cont_expr = positional_operands[0].expr;
+			gbString sec = gb_string_make(heap_allocator(), "");
+			sec = gb_string_append_fmt(sec, "'%s', elements are '%s'", cs, es);
+			if (cont_expr != nullptr) {
+				set_caret_secondary(ast_token(cont_expr).pos, ast_end_pos(cont_expr), sec);
+			}
+			error(diag_expr, "mismatched argument #%td in call to '%s'", diag_index+1, expr_name);
+			gb_string_free(sec);
+			gb_string_free(label);
+			gb_string_free(cs);
+			gb_string_free(es);
+			gb_string_free(diag_arg_type);
+		} else if (addr_expr != nullptr) {
+			Operand src = positional_operands[addr_index];
+			gbString ft = type_to_string(src.type);
+			gbString ex = expr_to_string(src.expr);
+			gbString label = gb_string_make(heap_allocator(), "");
+			label = gb_string_append_fmt(label, "expected '^%s', found '%s', pass '&%s'", ft, ft, ex);
+			set_caret_label_vertical(label);
+			error(src.expr, "mismatched argument #%td in call to '%s'", addr_index+1, expr_name);
+			gb_string_free(label);
+			gb_string_free(ex);
+			gb_string_free(ft);
+		} else {
+			error(operand->expr, "No procedures or ambiguous call for procedure group '%s' that match with the given arguments", expr_name);
+			if (positional_operands.count == 0 && named_operands.count == 0) {
+				error_line("\tNo given arguments\n");
+			} else {
+				print_argument_types();
+			}
 		}
 
 		// Try to reduce the list further for `$T: typeid` like parameters
@@ -8041,6 +7999,47 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 						possibly_ignore[i] = true;
 						possibly_ignore_set += 1;
 						continue;
+					}
+				}
+			}
+		}
+
+		// NOTE(bill): De-emphasise overloads whose first parameter cannot accept the first argument's container, so
+		// the "Did you mean" list stays focused. E.g. appending a value to a plain `[dynamic]T` hides the
+		// `#soa`, fixed-capacity, and `[]u8`-element `append` overloads. Only affects what is displayed.
+		if (positional_operands.count >= 1 && positional_operands[0].type != nullptr) {
+			Type *arg0 = base_type(type_deref(positional_operands[0].type));
+			if (arg0 != nullptr && arg0->kind != Type_Generic && !is_type_polymorphic(arg0)) {
+				Type *arg0_elem = container_elem(arg0);
+				for_array(i, procs) {
+					if (possibly_ignore[i]) {
+						continue;
+					}
+					Type *p0 = first_param_container_base(procs[i]);
+					if (p0 == nullptr || p0->kind == Type_Generic) {
+						continue; // unconstrained `$T` or no first parameter: cannot tell, keep it
+					}
+					bool incompatible = false;
+					if (p0->kind != arg0->kind) {
+						incompatible = true;
+					} else if (arg0_elem != nullptr) {
+						// container kinds match; reject an overload that constrains the element type to
+						// something the argument's element cannot satisfy (e.g. `$E/u8`)
+						Type *p0_elem = container_elem(p0);
+						if (p0_elem != nullptr) {
+							Type *pe = base_type(p0_elem);
+							if (pe->kind == Type_Generic && pe->Generic.specialized != nullptr) {
+								Operand src = {Addressing_Value};
+								src.type = arg0_elem;
+								if (!check_is_assignable_to(c, &src, base_type(pe->Generic.specialized), false)) {
+									incompatible = true;
+								}
+							}
+						}
+					}
+					if (incompatible) {
+						possibly_ignore[i] = true;
+						possibly_ignore_set += 1;
 					}
 				}
 			}
@@ -8364,13 +8363,17 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		Entity **lhs =  nullptr;
 		isize lhs_count = -1;
 		i32 variadic_index = -1;
+		UnpackFlags unpack_flags = UnpackFlag_None;
 		if (pt != nullptr)  {
 			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count);
 			if (pt->variadic) {
 				variadic_index = pt->variadic_index;
 			}
+			if (pt->is_polymorphic) {
+				unpack_flags |= UnpackFlag_DeferUntypedArg;
+			}
 		}
-		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, UnpackFlag_None, variadic_index);
+		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, unpack_flags, variadic_index);
 	}
 
 	if (named_args.count > 0) {
@@ -8399,9 +8402,21 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			}
 
 			Operand o = {};
-			check_expr_with_type_hint(c, &o, value, type_hint);
-			if (o.mode == Addressing_Invalid) {
-				any_failure = true;
+			bool defer_untyped_arg =
+				pt != nullptr && pt->is_polymorphic &&
+				arg_is_deferrable_untyped_expr(value) &&
+				(type_hint == nullptr || is_type_polymorphic(type_hint));
+			if (defer_untyped_arg) {
+				// Mirror the positional path: resolve the argument from the poly parameter's type later.
+				o.mode = Addressing_Invalid;
+				o.type = t_invalid;
+				o.expr = value;
+				o.deferred_untyped_arg = true;
+			} else {
+				check_expr_with_type_hint(c, &o, value, type_hint);
+				if (o.mode == Addressing_Invalid) {
+					any_failure = true;
+				}
 			}
 			array_add(&named_operands, o);
 		}
@@ -8584,25 +8599,26 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		}
 
 		for (isize i = 0; i < param_count; i++) {
-			if (!visited[i]) {
-				Entity *e = tuple->variables[i];
-				if (is_blank_ident(e->token)) {
-					continue;
-				}
-
-				if (show_error) {
-					if (e->kind == Entity_TypeName) {
-						error(call, "Type parameter '%.*s' is missing in polymorphic type call",
-						      LIT(e->token.string));
-					} else {
-						gbString str = type_to_string(e->type);
-						error(call, "Parameter '%.*s' of type '%s' is missing in polymorphic type call",
-						      LIT(e->token.string), str);
-						gb_string_free(str);
-					}
-				}
-				err = CallArgumentError_ParameterMissing;
+			if (visited[i]) {
+				continue;
 			}
+			Entity *e = tuple->variables[i];
+			if (is_blank_ident(e->token)) {
+				continue;
+			}
+
+			if (show_error) {
+				if (e->kind == Entity_TypeName) {
+					error(call, "Type parameter '%.*s' is missing in polymorphic type call",
+					      LIT(e->token.string));
+				} else {
+					gbString str = type_to_string(e->type);
+					error(call, "Parameter '%.*s' of type '%s' is missing in polymorphic type call",
+					      LIT(e->token.string), str);
+					gb_string_free(str);
+				}
+			}
+			err = CallArgumentError_ParameterMissing;
 		}
 	}
 
@@ -8730,7 +8746,11 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 	{
 		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
 		mutex_lock(&found_gen_types->mutex);
-		defer (mutex_unlock(&found_gen_types->mutex));
+		// check_struct_type/check_union_type release this mutex early (after publishing, before
+		// checking members) to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit
+		// path keeps it until scope end.
+		bool gen_types_locked = true;
+		defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
 
 		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 		if (found_entity) {
@@ -8756,7 +8776,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			set_base_type(named_type, struct_type);
 
 			check_open_scope(&ctx, node);
-			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type);
+			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+			// check_struct_type released found_gen_types->mutex after publishing the instantiation.
+			gen_types_locked = false;
 			check_close_scope(&ctx);
 		} else if (bt->kind == Type_Union) {
 			Ast *node = clone_ast(bt->Union.node);
@@ -8766,50 +8788,12 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			set_base_type(named_type, union_type);
 
 			check_open_scope(&ctx, node);
-			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type);
+			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+			// check_union_type released found_gen_types->mutex after publishing the instantiation.
+			gen_types_locked = false;
 			check_close_scope(&ctx);
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");
-		}
-
-
-		bt = base_type(named_type);
-		if (bt->kind == Type_Struct || bt->kind == Type_Union) {
-			GB_ASSERT(original_type->kind == Type_Named);
-			Entity *e = original_type->Named.type_name;
-			GB_ASSERT(e->kind == Entity_TypeName);
-
-			gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
-			s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
-
-			TypeTuple *tuple = get_record_polymorphic_params(bt);
-			if (tuple != nullptr) for_array(i, tuple->variables) {
-				Entity *v = tuple->variables[i];
-				String name = v->token.string;
-				if (i > 0) {
-					s = gb_string_append_fmt(s, ", ");
-				}
-				s = gb_string_append_fmt(s, "$%.*s", LIT(name));
-
-				if (v->kind == Entity_TypeName) {
-					if (v->type != nullptr && v->type->kind != Type_Generic) {
-						s = gb_string_append_fmt(s, "=");
-						s = write_type_to_string(s, v->type, false);
-					}
-				} else if (v->kind == Entity_Constant) {
-					if (v->Constant.value.kind != ExactValue_Invalid) {
-						s = gb_string_append_fmt(s, "=");
-						s = write_exact_value_to_string(s, v->Constant.value);
-					}
-				}
-			}
-			s = gb_string_append_fmt(s, ")");
-
-			String new_name = make_string_c(s);
-			named_type->Named.name = new_name;
-			if (named_type->Named.type_name) {
-				named_type->Named.type_name->token.string = new_name;
-			}
 		}
 
 		operand->mode = Addressing_Type;
@@ -9695,6 +9679,7 @@ gb_internal bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, A
 		TEMPORARY_ALLOCATOR_GUARD();
 
 		Type *union_type = base_type(th);
+		wait_signal_until_available(&union_type->Union.variants_wait_signal);
 		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
 
 		for (Type *vt : union_type->Union.variants) {
@@ -10195,19 +10180,30 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	Operand x = {Addressing_Invalid};
 	Operand y = {Addressing_Invalid};
-	check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
-	node->viral_state_flags |= te->x->viral_state_flags;
 
-	if (te->y != nullptr) {
+	if (te->y == nullptr) {
+		check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
+		node->viral_state_flags |= te->x->viral_state_flags;
+		error(node, "A ternary expression must have an else clause");
+		return kind;
+	}
+
+	if (type_hint == nullptr && arg_is_deferrable_untyped_expr(te->x)) {
+		check_expr_as_value_for_ternary(c, &y, te->y, nullptr);
+		node->viral_state_flags |= te->y->viral_state_flags;
+		Type *th = is_type_typed(y.type) ? y.type : nullptr;
+		check_expr_as_value_for_ternary(c, &x, te->x, th);
+		node->viral_state_flags |= te->x->viral_state_flags;
+	} else {
+		check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
+		node->viral_state_flags |= te->x->viral_state_flags;
+
 		Type *th = type_hint;
 		if (type_hint == nullptr && is_type_typed(x.type)) {
 			th = x.type;
 		}
 		check_expr_as_value_for_ternary(c, &y, te->y, th);
 		node->viral_state_flags |= te->y->viral_state_flags;
-	} else {
-		error(node, "A ternary expression must have an else clause");
-		return kind;
 	}
 
 	if (te->x->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
@@ -11020,6 +11016,48 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		o->type = type;
 		gb_string_free(str);
 		return kind;
+	}
+
+	// An untyped `{...}` against a union: infer which variant it is by trial-checking the literal against each variant (muted, on a clone).
+	// If exactly one matches, retarget to that variant and let the normal path build it (the surrounding assignment then wraps it into the union).
+	// Otherwise report a clear error.
+	if (t->kind == Type_Union && cl->type == nullptr && cl->elems.count > 0) {
+		wait_signal_until_available(&t->Union.variants_wait_signal);
+		auto matches = array_make<Type *>(temporary_allocator(), 0, t->Union.variants.count);
+		for (Type *variant : t->Union.variants) {
+			Operand trial = {};
+			i64 muted_before = error_mute_count();
+			begin_error_mute();
+			check_expr_base(c, &trial, clone_ast(node), variant);
+			end_error_mute();
+			if (trial.mode != Addressing_Invalid && error_mute_count() == muted_before) {
+				array_add(&matches, variant);
+			}
+		}
+		if (matches.count == 1) {
+			type = matches[0];
+			t = base_type(type);
+		} else {
+			gbString us = type_to_string(type);
+			if (matches.count == 0) {
+				error(node, "No variant of the union '%s' matches this compound literal", us);
+			} else {
+				ERROR_BLOCK();
+				error(node, "Ambiguous compound literal for the union '%s'; it matches %td variants:", us, matches.count);
+				for (Type *m : matches) {
+					gbString ms = type_to_string(m);
+					error_line("\t%s\n", ms);
+					gb_string_free(ms);
+				}
+				gbString first = type_to_string(matches[0]);
+				error_line("\tSuggestion: name the intended variant, e.g. '%s{...}'\n", first);
+				gb_string_free(first);
+			}
+			gb_string_free(us);
+			o->expr = node;
+			o->type = type;
+			return kind;
+		}
 	}
 
 
@@ -12000,6 +12038,9 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 
 	Type *src = type_deref(o->type);
 	Type *bsrc = base_type(src);
+	if (bsrc->kind == Type_Union) {
+		wait_signal_until_available(&bsrc->Union.variants_wait_signal);
+	}
 
 
 	if (ta->type != nullptr && ta->type->kind == Ast_UnaryExpr && ta->type->UnaryExpr.op.kind == Token_Question) {
@@ -13039,6 +13080,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case Ast_EnumType:
 	case Ast_MapType:
 	case Ast_BitSetType:
+	case Ast_BitFieldType:
 	case Ast_MatrixType:
 	case Ast_RelativeType:
 		o->mode = Addressing_Type;

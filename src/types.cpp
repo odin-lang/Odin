@@ -180,6 +180,7 @@ struct TypeUnion {
 	Type *           polymorphic_params; // Type_Tuple
 	Type *           polymorphic_parent;
 	Wait_Signal      polymorphic_wait_signal;
+	Wait_Signal      variants_wait_signal; // signalled once `variants` is populated (mirrors TypeStruct.fields_wait_signal)
 
 	std::atomic<i16> tag_size;
 	bool             is_polymorphic;
@@ -2643,6 +2644,9 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 			return true;
 		}
 		break;
+
+	case Type_BitField:
+		return is_type_polymorphic(t->BitField.backing_type, or_specialized);
 	}
 	return false;
 }
@@ -3262,7 +3266,9 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		return x->Basic.kind == y->Basic.kind;
 
 	case Type_EnumeratedArray:
-		return are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
+		return x->EnumeratedArray.count     == y->EnumeratedArray.count &&
+		       x->EnumeratedArray.is_sparse == y->EnumeratedArray.is_sparse &&
+		       are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
 		       are_types_identical(x->EnumeratedArray.elem,  y->EnumeratedArray.elem);
 
 	case Type_Array:
@@ -3545,6 +3551,7 @@ gb_internal bool union_variant_index_types_equal(Type *v, Type *vt) {
 gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_signal_until_available(&u->Union.variants_wait_signal);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
@@ -3563,6 +3570,7 @@ gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 gb_internal bool union_is_variant_of(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_signal_until_available(&u->Union.variants_wait_signal);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];

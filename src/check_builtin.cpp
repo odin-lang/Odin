@@ -7004,6 +7004,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				variants[i] = alloc_type_pointer(bt->Union.variants[i]);
 			}
 			new_type->Union.variants = variants;
+			wait_signal_set(&new_type->Union.variants_wait_signal); // built directly, not via check_union_type
 
 			// NOTE(bill): Is this even correct?
 			new_type->Union.node = operand->expr;
@@ -7181,6 +7182,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			}
 			merged_union->Union.variants = slice_from_array(variants);
+			wait_signal_set(&merged_union->Union.variants_wait_signal); // built directly, not via check_union_type
 
 			operand->mode = Addressing_Type;
 			operand->type = merged_union;
@@ -7494,7 +7496,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = t_untyped_bool;
 			bool is_specialization = false;
 			if (!are_types_identical(s, t)) {
-				is_specialization = check_type_specialization_to(c, s, t, false, false);
+				is_specialization = subst_check_specialization(c, s, t, /*modify_type*/false);
 			}
 			operand->value = exact_value_bool(is_specialization);
 
