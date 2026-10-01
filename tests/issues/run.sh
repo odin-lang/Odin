@@ -119,8 +119,29 @@ $ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_bool_to_be_conversion.odin $COMMON
 $ODIN test ../test_issue_bool_comparison_truthiness.odin $COMMON
 $ODIN test ../test_issue_const_array_broadcast.odin $COMMON
+$ODIN test ../test_issue_decl_order.odin $COMMON
+$ODIN test ../test_issue_distinct_constraint.odin $COMMON
+if [[ $($ODIN check ../test_issue_ambiguous_union_literal.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN test ../test_issue_proc_constant_instantiation.odin $COMMON
 $ODIN test ../test_issue_swizzle_multi_assign.odin $COMMON
+$ODIN test ../test_issue_global_when_order.odin $COMMON
+if [[ $($ODIN check ../test_issue_global_when_cycle.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Cyclic dependency between global") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN check ../test_issue_global_when_shadowing.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "within a global 'when' shadows") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 $ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
 if [[ $($ODIN check ../test_issue_foreign_redeclaration_mismatch.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then

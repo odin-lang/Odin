@@ -49,7 +49,13 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_issue_bool_to_be_conversion.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_bool_comparison_truthiness.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_const_array_broadcast.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_decl_order.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_distinct_constraint.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_ambiguous_union_literal.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin test ..\test_issue_proc_constant_instantiation.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_global_when_order.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_global_when_cycle.odin -no-entry-point %COMMON% 2>&1 | find /c "Cyclic dependency between global" | findstr /x "3" || exit /b
+..\..\..\odin check ..\test_issue_global_when_shadowing.odin -no-entry-point %COMMON% 2>&1 | find /c "within a global" | findstr /x "2" || exit /b
 ..\..\..\odin check ..\test_issue_7336.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
