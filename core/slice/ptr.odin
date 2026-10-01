@@ -72,8 +72,9 @@ ptr_rotate :: proc "contextless" (left: int, mid: ^$T, right: int) {
 	when size_of(T) != 0 {
 		left, mid, right := left, mid, right
 
-		// TODO(bill): Optimization with a buffer for smaller ranges
-		for left > 0 && right > 0 {
+		SWAP :: 256
+
+		for left * size_of(T) > SWAP && right * size_of(T) > SWAP {
 			if left >= right {
 				for {
 					ptr_swap_non_overlapping(ptr_sub(mid, right), mid, right * size_of(T))
@@ -95,6 +96,20 @@ ptr_rotate :: proc "contextless" (left: int, mid: ^$T, right: int) {
 					}
 				}
 			}
+		}
+
+		swap : [SWAP]byte = ---
+		start := ptr_sub(mid, left)
+		end := ptr_add(start, right)
+
+		if left <= right {
+			runtime.mem_copy(&swap, start, left * size_of(T))
+			runtime.mem_copy(start, mid, right * size_of(T))
+			runtime.mem_copy(end, &swap, left * size_of(T))
+		} else {
+			runtime.mem_copy(&swap, mid, right * size_of(T))
+			runtime.mem_copy(end, start, left * size_of(T))
+			runtime.mem_copy(start, &swap, right * size_of(T))
 		}
 	}
 }
