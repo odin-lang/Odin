@@ -10551,19 +10551,30 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	Operand x = {Addressing_Invalid};
 	Operand y = {Addressing_Invalid};
-	check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
-	node->viral_state_flags |= te->x->viral_state_flags;
 
-	if (te->y != nullptr) {
+	if (te->y == nullptr) {
+		check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
+		node->viral_state_flags |= te->x->viral_state_flags;
+		error(node, "A ternary expression must have an else clause");
+		return kind;
+	}
+
+	if (type_hint == nullptr && arg_is_deferrable_untyped_expr(te->x)) {
+		check_expr_as_value_for_ternary(c, &y, te->y, nullptr);
+		node->viral_state_flags |= te->y->viral_state_flags;
+		Type *th = is_type_typed(y.type) ? y.type : nullptr;
+		check_expr_as_value_for_ternary(c, &x, te->x, th);
+		node->viral_state_flags |= te->x->viral_state_flags;
+	} else {
+		check_expr_as_value_for_ternary(c, &x, te->x, type_hint);
+		node->viral_state_flags |= te->x->viral_state_flags;
+
 		Type *th = type_hint;
 		if (type_hint == nullptr && is_type_typed(x.type)) {
 			th = x.type;
 		}
 		check_expr_as_value_for_ternary(c, &y, te->y, th);
 		node->viral_state_flags |= te->y->viral_state_flags;
-	} else {
-		error(node, "A ternary expression must have an else clause");
-		return kind;
 	}
 
 	if (te->x->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {

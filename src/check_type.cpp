@@ -2752,15 +2752,21 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 			ERROR_BLOCK();
 
 			gbString pts = type_to_string(poly_type);
-			gbString ots = type_to_string(operand.type, true);
 			defer (gb_string_free(pts));
-			defer (gb_string_free(ots));
-			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
-
-			if (operand.mode == Addressing_Type) {
-				error_line("\tSuggestion: Are you trying to pass a type to a value parameter?\n");
+			if (operand.deferred_untyped_arg) {
+				// An untyped argument (`{...}`, `.Member`, a both-untyped ternary) whose type is not
+				// pinned by any other argument, so the polymorphic type cannot be inferred from it.
+				set_caret_label("untyped; its type cannot be determined here");
+				error(operand.expr, "Cannot infer the polymorphic type '%s' from this argument", pts);
+				error_line("\tname the type explicitly (e.g. 'T{...}'), or determine '%s' from another argument\n", pts);
+			} else {
+				gbString ots = type_to_string(operand.type, true);
+				defer (gb_string_free(ots));
+				error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+				if (operand.mode == Addressing_Type) {
+					error_line("\tSuggestion: Are you trying to pass a type to a value parameter?\n");
+				}
 			}
-
 		}
 		return t_invalid;
 	}
@@ -2825,7 +2831,17 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		gbString ots = type_to_string(operand.type, true);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
-		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+		if (poly_type->kind == Type_Generic && poly_type->Generic.specialized != nullptr) {
+			// Constrained generic (`$T/Constraint`): the argument's type does not satisfy the constraint.
+			gbString cs = type_to_string(poly_type->Generic.specialized);
+			gbString cl = gb_string_append_fmt(gb_string_make(heap_allocator(), ""), "'%s' is not a '%s'", ots, cs);
+			set_caret_label(cl);
+			error(operand.expr, "Argument's type '%s' does not satisfy the polymorphic constraint '%s'", ots, cs);
+			gb_string_free(cl);
+			gb_string_free(cs);
+		} else {
+			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
+		}
 
 		Type *pt = poly_type;
 		while (pt && pt->kind == Type_Generic && pt->Generic.specialized) {
