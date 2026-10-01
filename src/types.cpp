@@ -3257,7 +3257,9 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		return x->Basic.kind == y->Basic.kind;
 
 	case Type_EnumeratedArray:
-		return are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
+		return x->EnumeratedArray.count     == y->EnumeratedArray.count &&
+		       x->EnumeratedArray.is_sparse == y->EnumeratedArray.is_sparse &&
+		       are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
 		       are_types_identical(x->EnumeratedArray.elem,  y->EnumeratedArray.elem);
 
 	case Type_Array:
