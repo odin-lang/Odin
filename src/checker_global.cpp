@@ -83,16 +83,60 @@ gb_internal void global_entity_timing_end(GlobalEntityTimingFrame const &f, Enti
 // Global 'when's and 'foreign' blocks: every name one may declare is a placeholder in its scope, and the
 // first lookup of a placeholder resolves them, so the order of files and declarations does not matter
 
+struct GlobalDeclSourceName {
+	InternedString name;
+	Scope *        scope;
+	Ast *          decl;    // ValueDecl or ForeignImportDecl
+	bool           in_else; // within the else branch of a 'when'
+};
+
+struct GlobalWhenCycle;
+
 struct GlobalDeclSource {
 	Ast *             node; // WhenStmt or ForeignBlockDecl
 	AstFile *         file;
 	GlobalDeclSource *parent;
-	bool              in_else; // within the else branch of `parent`
+	bool              in_else;
 	bool              reachable;
 	bool              reported_cycle;
 	EntityState       state;
-	ForeignContext    foreign_context; // of a resolved 'foreign' block
+	ForeignContext    foreign_context;
+
+	Array<GlobalDeclSourceName> names;
+	GlobalWhenCycle * cycle;
+	i32               cycle_index;
+	bool              predetermined;
+	bool              predetermined_cond;
 };
+
+// A possible cycle between global 'when's, found from syntax; the branches are chosen by trying every
+// combination, see `search_global_when_cycle`
+struct GlobalWhenCycle {
+	Array<GlobalDeclSource *> sources; // in source order
+	PtrSet<Ast *>             decls;   // declarations in the cycle, whose checking depends on the choice
+	bool                      searched;
+};
+
+// One condition evaluated for one choice of branches: lookups see the declarations of the chosen
+// branches, and scratch copies of the declarations in `cycle->decls`
+struct GlobalWhenTrial {
+	GlobalWhenCycle *               cycle;
+	u32                             mask;      // bit i: `cycle->sources[i]` takes its first branch
+	u32                             reachable;
+	u32                             used;      // sources whose chosen branch a lookup found
+	isize                           real_depth; // within the check of an entity outside the trial
+	bool                            unsupported;
+	bool                            broken;    // that entity reached the cycle, which the graph missed
+	PtrMap<Ast *, Array<Entity *> *> decl_entities;
+	PtrSet<Entity *>                scratch;
+};
+
+gb_global isize global_when_cycle_count;
+gb_global isize global_when_cycle_sources;
+gb_global isize global_when_trial_count;
+
+gb_internal void find_global_when_cycles(void);
+gb_internal void search_global_when_cycle(GlobalWhenCycle *cycle);
 
 struct GlobalDeclSourceFrame {
 	GlobalDeclSource *source;
@@ -167,12 +211,20 @@ gb_internal void add_placeholder(Scope *s, InternedString name, GlobalDeclSource
 	multi_map_insert(s->placeholders, key, src);
 }
 
-gb_internal void add_placeholders(AstFile *f, u8 scopes, InternedString name, GlobalDeclSource *src) {
+gb_internal void add_placeholders(AstFile *f, u8 scopes, InternedString name, GlobalDeclSource *src, Ast *decl, bool in_else) {
+	if (name.value == 0 || name.is_blank()) {
+		return;
+	}
+	if (src->names.allocator.proc == nullptr) {
+		array_init(&src->names, heap_allocator());
+	}
 	if (scopes & PlaceholderScope_File) {
 		add_placeholder(f->scope, name, src);
+		array_add(&src->names, GlobalDeclSourceName{name, f->scope, decl, in_else});
 	}
 	if (scopes & PlaceholderScope_Pkg) {
 		add_placeholder(f->pkg->scope, name, src);
+		array_add(&src->names, GlobalDeclSourceName{name, f->pkg->scope, decl, in_else});
 	}
 }
 
@@ -231,7 +283,7 @@ gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts,
 			}
 			for (Ast *name : vd->names) {
 				if (name->kind == Ast_Ident) {
-					add_placeholders(f, scopes, name->Ident.interned, owner);
+					add_placeholders(f, scopes, name->Ident.interned, owner, decl, in_else);
 				}
 			}
 		case_end;
@@ -246,7 +298,7 @@ gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts,
 			}
 			if (library_name.len != 0) {
 				u8 scopes = has_syntactic_attribute(fl->attributes, str_lit("export")) ? PlaceholderScope_Pkg : PlaceholderScope_File;
-				add_placeholders(f, scopes, string_interner_insert(library_name), owner);
+				add_placeholders(f, scopes, string_interner_insert(library_name), owner, decl, in_else);
 			}
 		case_end;
 
@@ -360,13 +412,18 @@ gb_internal void report_global_decl_source_cycle(GlobalDeclSource *src, Interned
 	error_line("\t'%.*s' at %s\n", LIT(token.string), token_pos_to_string(token.pos));
 }
 
-gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedString needed) {
-	if (src->state == EntityState_Resolved) {
-		return;
-	}
+gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedString needed);
+
+gb_internal void resolve_global_decl_source_internal(GlobalDeclSource *src, InternedString needed) {
 	if (src->state == EntityState_InProgress) {
 		report_global_decl_source_cycle(src, needed);
 		return;
+	}
+	if (src->cycle != nullptr && !src->cycle->searched) {
+		search_global_when_cycle(src->cycle);
+		if (src->state == EntityState_Resolved) {
+			return;
+		}
 	}
 
 	GlobalDeclSource *foreign_block = nullptr;
@@ -406,16 +463,21 @@ gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedStrin
 
 	if (src->node->kind == Ast_WhenStmt) {
 		ast_node(ws, WhenStmt, src->node);
-		Operand operand = {Addressing_Invalid};
-		check_expr(&ctx, &operand, ws->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(ws->cond, "Non-boolean condition in 'when' statement");
+		if (src->predetermined) {
+			ws->is_cond_determined = true;
+			ws->determined_cond = src->predetermined_cond;
+		} else {
+			Operand operand = {Addressing_Invalid};
+			check_expr(&ctx, &operand, ws->cond);
+			if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+				error(ws->cond, "Non-boolean condition in 'when' statement");
+			}
+			if (operand.mode != Addressing_Constant) {
+				error(ws->cond, "Non-constant condition in 'when' statement");
+			}
+			ws->is_cond_determined = true;
+			ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
 		}
-		if (operand.mode != Addressing_Constant) {
-			error(ws->cond, "Non-constant condition in 'when' statement");
-		}
-		ws->is_cond_determined = true;
-		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
 		if (ws->body == nullptr || ws->body->kind != Ast_BlockStmt) {
 			error(ws->cond, "Invalid body for 'when' statement");
 		} else if (ws->else_stmt != nullptr && ws->else_stmt->kind != Ast_BlockStmt && ws->else_stmt->kind != Ast_WhenStmt) {
@@ -433,7 +495,7 @@ gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedStrin
 		src->foreign_context = ctx.foreign_context;
 	}
 
-	// NOTE: resolved before its declarations are collected, which evaluates the attributes of 'foreign import's
+	// NOTE(bill): resolved before its declarations are collected, which evaluates the attributes of 'foreign import's
 	src->state = EntityState_Resolved;
 	array_pop(&global_decl_source_stack);
 
@@ -444,11 +506,28 @@ gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedStrin
 	destroy_checker_context(&ctx);
 }
 
+gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedString needed) {
+	if (src->state == EntityState_Resolved) {
+		return;
+	}
+	GlobalWhenTrial *trial = global_when_trial;
+	i32 mute_depth = global_error_mute_depth;
+	global_when_trial = nullptr;
+	global_error_mute_depth = 0;
+	resolve_global_decl_source_internal(src, needed);
+	global_when_trial = trial;
+	global_error_mute_depth = mute_depth;
+}
+
 gb_internal Entity *force_scope_placeholders(Scope *s, InternedString name, u32 hash) {
 	PtrMap<u64, GlobalDeclSource *> *m = s->placeholders;
 	bool forced = false;
 	for (auto *e = multi_map_find_first(m, cast(u64)name.value); e != nullptr; e = multi_map_find_next(m, e)) {
 		GlobalDeclSource *src = e->value;
+		if (global_when_trial != nullptr && src->cycle == global_when_trial->cycle) {
+			// NOTE: the trial's lookup decides what these declare
+			continue;
+		}
 		if (src->state != EntityState_Resolved) {
 			if (global_decl_source_stack.count > 0) {
 				global_decl_source_stack[global_decl_source_stack.count-1].needs = name;
@@ -535,6 +614,7 @@ gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *
 			scan_global_decl_sources(f, f->decls, nullptr, false, EntityVisiblity_Public);
 		}
 	}
+	find_global_when_cycles();
 	global_import_stage_end(GlobalImportStage_Placeholders, stage_start);
 
 	stage_start = global_import_stage_begin();
@@ -635,6 +715,25 @@ gb_internal i32 global_graph_scc(i32 node_count, Array<i32> const &offsets, Arra
 	return comp_count;
 }
 
+gb_internal void global_graph_csr(i32 node_count, Array<i32> const &edge_from, Array<i32> const &edge_to, Array<i32> *offsets, Array<i32> *targets) {
+	array_init(offsets, heap_allocator(), node_count+1);
+	array_init(targets, heap_allocator(), edge_to.count);
+	for (i32 v = 0; v <= node_count; v++) {
+		(*offsets)[v] = 0;
+	}
+	for (i32 from : edge_from) {
+		(*offsets)[from+1] += 1;
+	}
+	for (i32 v = 0; v < node_count; v++) {
+		(*offsets)[v+1] += (*offsets)[v];
+	}
+	auto fill = array_clone(heap_allocator(), *offsets);
+	defer (array_free(&fill));
+	for (isize i = 0; i < edge_from.count; i++) {
+		(*targets)[fill[edge_from[i]]++] = edge_to[i];
+	}
+}
+
 gb_internal void global_graph_print_entity(Entity *e) {
 	if (e == nullptr) {
 		gb_printf_err("?");
@@ -671,10 +770,37 @@ struct GlobalGroupGraph {
 
 gb_global GlobalGroupGraph global_groups;
 
+struct GlobalPlaceholderHit {
+	Scope *        scope;
+	InternedString name;
+};
+
 struct GlobalGraphWalk {
 	Scope *scope;
 	Array<Entity *> *refs;
+	Array<GlobalPlaceholderHit> *hits; // set: before any 'when' is resolved, a lookup passing a placeholder records it
 };
+
+gb_internal Entity *global_graph_lookup(GlobalGraphWalk *w, Scope *s, Ast *ident, bool parents) {
+	InternedString name = ident->Ident.interned;
+	u32 hash = ident->Ident.hash;
+	if (w->hits == nullptr) {
+		return parents ? scope_lookup(s, name, hash) : scope_lookup_current(s, name, hash);
+	}
+	for (; s != nullptr; s = s->parent) {
+		Entity *e = scope_map_get(&s->elements, name, hash);
+		if (e != nullptr) {
+			return e;
+		}
+		if (s->placeholders != nullptr && multi_map_find_first(s->placeholders, cast(u64)name.value) != nullptr) {
+			array_add(w->hits, GlobalPlaceholderHit{s, name});
+		}
+		if (!parents) {
+			break;
+		}
+	}
+	return nullptr;
+}
 
 gb_internal void global_graph_walk(GlobalGraphWalk *w, Ast *node);
 
@@ -698,16 +824,16 @@ gb_internal void global_graph_walk(GlobalGraphWalk *w, Ast *node) {
 	}
 	switch (node->kind) {
 	case Ast_Ident:
-		global_graph_add_ref(w, scope_lookup(w->scope, node->Ident.interned, node->Ident.hash));
+		global_graph_add_ref(w, global_graph_lookup(w, w->scope, node, true));
 		break;
 
 	case Ast_SelectorExpr: {
 		Ast *expr     = node->SelectorExpr.expr;
 		Ast *selector = node->SelectorExpr.selector;
 		if (expr != nullptr && expr->kind == Ast_Ident) {
-			Entity *e = scope_lookup(w->scope, expr->Ident.interned, expr->Ident.hash);
+			Entity *e = global_graph_lookup(w, w->scope, expr, true);
 			if (e != nullptr && e->kind == Entity_ImportName && selector != nullptr && selector->kind == Ast_Ident) {
-				global_graph_add_ref(w, scope_lookup_current(e->ImportName.scope, selector->Ident.interned, selector->Ident.hash));
+				global_graph_add_ref(w, global_graph_lookup(w, e->ImportName.scope, selector, false));
 			} else {
 				global_graph_add_ref(w, e);
 			}
@@ -944,11 +1070,8 @@ gb_internal void global_graph_walk(GlobalGraphWalk *w, Ast *node) {
 	}
 }
 
-gb_internal void global_graph_walk_entity(GlobalGraphWalk *w, Entity *e, DeclInfo *d) {
-	w->scope = d->scope;
-	global_graph_walk(w, d->type_expr);
-	global_graph_walk(w, d->init_expr);
-	for (Ast *attr : d->attributes) {
+gb_internal void global_graph_walk_attribute_values(GlobalGraphWalk *w, Array<Ast *> const &attributes) {
+	for (Ast *attr : attributes) {
 		if (attr->kind != Ast_Attribute) {
 			continue;
 		}
@@ -958,6 +1081,13 @@ gb_internal void global_graph_walk_entity(GlobalGraphWalk *w, Entity *e, DeclInf
 			}
 		}
 	}
+}
+
+gb_internal void global_graph_walk_entity(GlobalGraphWalk *w, Entity *e, DeclInfo *d) {
+	w->scope = d->scope;
+	global_graph_walk(w, d->type_expr);
+	global_graph_walk(w, d->init_expr);
+	global_graph_walk_attribute_values(w, d->attributes);
 	if (e->kind == Entity_Procedure) {
 		global_graph_walk(w, e->Procedure.foreign_library_ident);
 	} else if (e->kind == Entity_Variable) {
@@ -1129,24 +1259,7 @@ gb_internal void build_global_groups(Checker *c, GlobalGroupGraph *g) {
 	}
 
 	i32 node_count = cast(i32)g->nodes.count;
-	array_init(&g->offsets, heap_allocator(), node_count+1);
-	array_init(&g->targets, heap_allocator(), edge_to.count);
-	for (i32 v = 0; v <= node_count; v++) {
-		g->offsets[v] = 0;
-	}
-	for (i32 from : edge_from) {
-		g->offsets[from+1] += 1;
-	}
-	for (i32 v = 0; v < node_count; v++) {
-		g->offsets[v+1] += g->offsets[v];
-	}
-	{
-		auto fill = array_clone(heap_allocator(), g->offsets);
-		defer (array_free(&fill));
-		for (isize i = 0; i < edge_from.count; i++) {
-			g->targets[fill[edge_from[i]]++] = edge_to[i];
-		}
-	}
+	global_graph_csr(node_count, edge_from, edge_to, &g->offsets, &g->targets);
 
 	array_init(&g->group_of, heap_allocator(), node_count);
 	i32 group_count = global_graph_scc(node_count, g->offsets, g->targets, &g->group_of);
@@ -1350,7 +1463,609 @@ gb_internal void check_all_global_entities(Checker *c) {
 }
 
 
-// -internal-global-entity-graph: the groups, weighted by the measured self time of their entities
+// NOTE(bill, 2026-10-01)
+//
+// Cycles of global 'when's: a 'when' whose condition may need what its own branch declares,
+// directly or through other 'when's. Found from syntax before anything is resolved: the nodes
+// are the 'when's and 'foreign' blocks, the declarations in their branches, and the global
+// entities their conditions reach.
+//
+// Each cycle is decided by trying every choice of its branches; exactly one choice must be consistent
+
+enum GlobalWhenNodeKind : u8 {
+	GlobalWhenNode_Source,
+	GlobalWhenNode_Decl,
+	GlobalWhenNode_Entity,
+};
+
+struct GlobalWhenNode {
+	GlobalWhenNodeKind kind;
+	GlobalDeclSource * source; // of a source or a declaration
+	Ast *              decl;
+	Entity *           entity;
+};
+
+gb_internal void find_global_when_cycles(void) {
+	auto nodes     = array_make<GlobalWhenNode>      (heap_allocator(), 0, global_decl_sources.count);
+	auto edge_from = array_make<i32>                 (heap_allocator(), 0, global_decl_sources.count);
+	auto edge_to   = array_make<i32>                 (heap_allocator(), 0, global_decl_sources.count);
+	auto refs      = array_make<Entity *>            (heap_allocator(), 0, 64);
+	auto hits      = array_make<GlobalPlaceholderHit>(heap_allocator(), 0, 16);
+	defer (array_free(&nodes));
+	defer (array_free(&edge_from));
+	defer (array_free(&edge_to));
+	defer (array_free(&refs));
+	defer (array_free(&hits));
+
+	PtrMap<void *, i32> node_of = {};
+	map_init(&node_of, 2*global_decl_sources.count);
+	defer (map_destroy(&node_of));
+
+	auto add_node = [&](void *key, GlobalWhenNode const &node) -> i32 {
+		i32 *found = map_get(&node_of, key);
+		if (found != nullptr) {
+			return *found;
+		}
+		i32 v = cast(i32)nodes.count;
+		map_set(&node_of, key, v);
+		array_add(&nodes, node);
+		return v;
+	};
+	auto add_edge = [&](i32 from, i32 to) {
+		array_add(&edge_from, from);
+		array_add(&edge_to, to);
+	};
+
+	for (GlobalDeclSource *src : global_decl_sources) {
+		add_node(src, GlobalWhenNode{GlobalWhenNode_Source, src});
+	}
+
+	GlobalGraphWalk w = {};
+	w.refs = &refs;
+	w.hits = &hits;
+	for (i32 v = 0; v < nodes.count; v++) {
+		GlobalWhenNode node = nodes[v];
+		array_clear(&refs);
+		array_clear(&hits);
+		switch (node.kind) {
+		case GlobalWhenNode_Source:
+			w.scope = node.source->file->scope;
+			if (node.source->node->kind == Ast_WhenStmt) {
+				global_graph_walk(&w, node.source->node->WhenStmt.cond);
+			} else {
+				global_graph_walk_attribute_values(&w, node.source->node->ForeignBlockDecl.attributes);
+			}
+			if (node.source->parent != nullptr) {
+				add_edge(v, *map_get(&node_of, cast(void *)node.source->parent));
+			}
+			break;
+		case GlobalWhenNode_Decl:
+			w.scope = node.source->file->scope;
+			if (node.decl->kind == Ast_ValueDecl) {
+				global_graph_walk(&w, node.decl->ValueDecl.type);
+				global_graph_walk_slice(&w, node.decl->ValueDecl.values);
+				global_graph_walk_attribute_values(&w, node.decl->ValueDecl.attributes);
+			} else if (node.decl->kind == Ast_ForeignImportDecl) {
+				global_graph_walk_attribute_values(&w, node.decl->ForeignImportDecl.attributes);
+			}
+			add_edge(v, *map_get(&node_of, cast(void *)node.source));
+			break;
+		case GlobalWhenNode_Entity:
+			global_graph_walk_entity(&w, node.entity, node.entity->decl_info);
+			break;
+		}
+
+		for (Entity *e : refs) {
+			if (e->decl_info != nullptr && e->scope != nullptr && (e->scope->flags & ScopeFlag_File) != 0) {
+				add_edge(v, add_node(e, GlobalWhenNode{GlobalWhenNode_Entity, nullptr, nullptr, e}));
+			}
+		}
+
+		// NOTE(bill):: a name that may be declared by a 'when' depends on its declarations there, and on that 'when'
+		for (GlobalPlaceholderHit const &hit : hits) {
+			PtrMap<u64, GlobalDeclSource *> *m = hit.scope->placeholders;
+			for (auto *entry = multi_map_find_first(m, cast(u64)hit.name.value); entry != nullptr; entry = multi_map_find_next(m, entry)) {
+				GlobalDeclSource *src = entry->value;
+				for (GlobalDeclSourceName const &n : src->names) {
+					if (n.name == hit.name && n.scope == hit.scope) {
+						add_edge(v, add_node(n.decl, GlobalWhenNode{GlobalWhenNode_Decl, src, n.decl}));
+					}
+				}
+			}
+		}
+	}
+
+	i32 node_count = cast(i32)nodes.count;
+	Array<i32> offsets = {};
+	Array<i32> targets = {};
+	defer (array_free(&offsets));
+	defer (array_free(&targets));
+
+	global_graph_csr(node_count, edge_from, edge_to, &offsets, &targets);
+	auto comp_of = array_make<i32>(heap_allocator(), node_count);
+	defer (array_free(&comp_of));
+
+	i32 comp_count = global_graph_scc(node_count, offsets, targets, &comp_of);
+
+	auto comp_size  = array_make<i32>              (heap_allocator(), comp_count);
+	auto comp_cycle = array_make<GlobalWhenCycle *>(heap_allocator(), comp_count);
+	defer (array_free(&comp_size));
+	defer (array_free(&comp_cycle));
+
+	for (i32 ci = 0; ci < comp_count; ci++) {
+		comp_size[ci] = 0;
+		comp_cycle[ci] = nullptr;
+	}
+	for (i32 v = 0; v < node_count; v++) {
+		comp_size[comp_of[v]] += 1;
+	}
+	auto is_cyclic = [&](i32 v) -> bool {
+		if (comp_size[comp_of[v]] > 1) {
+			return true;
+		}
+		for (i32 i = offsets[v]; i < offsets[v+1]; i++) {
+			if (targets[i] == v) {
+				return true;
+			}
+		}
+		return false;
+	};
+
+	// NOTE: sources are the first nodes, in source order
+	for (i32 v = 0; v < global_decl_sources.count; v++) {
+		if (!is_cyclic(v)) {
+			continue;
+		}
+		GlobalWhenCycle *&cycle = comp_cycle[comp_of[v]];
+		if (cycle == nullptr) {
+			cycle = permanent_alloc_item<GlobalWhenCycle>();
+			array_init(&cycle->sources, heap_allocator());
+			ptr_set_init(&cycle->decls);
+			global_when_cycle_count += 1;
+		}
+		GlobalDeclSource *src = nodes[v].source;
+		src->cycle = cycle;
+		src->cycle_index = cast(i32)cycle->sources.count;
+		array_add(&cycle->sources, src);
+		global_when_cycle_sources += 1;
+	}
+	for (i32 v = 0; v < node_count; v++) {
+		GlobalWhenCycle *cycle = comp_cycle[comp_of[v]];
+		if (cycle == nullptr) {
+			continue;
+		}
+		if (nodes[v].kind == GlobalWhenNode_Decl) {
+			ptr_set_add(&cycle->decls, nodes[v].decl);
+		} else if (nodes[v].kind == GlobalWhenNode_Entity && nodes[v].entity->decl_info->decl_node != nullptr) {
+			ptr_set_add(&cycle->decls, nodes[v].entity->decl_info->decl_node);
+		}
+	}
+}
+
+gb_internal ForeignContext global_decl_source_foreign_context(GlobalDeclSource *src) {
+	for (GlobalDeclSource *p = src; p != nullptr; p = p->parent) {
+		if (p->node->kind == Ast_ForeignBlockDecl) {
+			return p->foreign_context;
+		}
+	}
+	return {};
+}
+
+// Scratch entities for a declaration, made as `check_collect_value_decl` would but put nowhere
+gb_internal Entity *global_when_trial_entity(GlobalWhenTrial *t, Ast *decl, AstFile *file, ForeignContext const &foreign_context, InternedString name) {
+	Array<Entity *> **found = map_get(&t->decl_entities, decl);
+	Array<Entity *> *entities = found ? *found : nullptr;
+	if (entities == nullptr) {
+		entities = gb_alloc_item(heap_allocator(), Array<Entity *>);
+		array_init(entities, heap_allocator());
+		map_set(&t->decl_entities, decl, entities);
+		if (decl->kind != Ast_ValueDecl) {
+			t->unsupported = true;
+			return nullptr;
+		}
+		CheckerContext ctx = {};
+		init_checker_context(&ctx, global_checker_ptr.load(std::memory_order_relaxed));
+		UntypedExprInfoMap untyped = {};
+		reset_checker_context(&ctx, file, &untyped);
+		ctx.decl = make_decl_info(file->scope, nullptr); // not a child of the package's
+		ctx.foreign_context = foreign_context;
+		ctx.trial_entities = entities;
+		Ast *clone = clone_ast(decl);
+		clone->state_flags &= ~StateFlag_BeenHandled;
+		check_collect_value_decl(&ctx, clone);
+		map_destroy(&untyped);
+		destroy_checker_context(&ctx);
+		for (Entity *e : *entities) {
+			ptr_set_add(&t->scratch, e);
+		}
+	}
+	for (Entity *e : *entities) {
+		if (entity_interned_name(e) == name) {
+			return e;
+		}
+	}
+	t->unsupported = true;
+	return nullptr;
+}
+
+// Every scope lookup during a trial: `found` is what the scope itself holds
+gb_internal Entity *global_when_trial_lookup(Scope *s, InternedString name, u32 hash, Entity *found) {
+	GlobalWhenTrial *t = global_when_trial;
+	GlobalWhenCycle *cycle = t->cycle;
+	if (found != nullptr) {
+		DeclInfo *d = found->decl_info;
+		if (d == nullptr || d->decl_node == nullptr || !ptr_set_exists(&cycle->decls, d->decl_node) || ptr_set_exists(&t->scratch, found)) {
+			return found;
+		}
+		if (t->real_depth > 0) {
+			t->broken = true;
+			return found;
+		}
+		if ((found->kind == Entity_Procedure && found->Procedure.is_foreign) ||
+		    (found->kind == Entity_Variable  && found->Variable.is_foreign)) {
+			t->unsupported = true;
+			return found;
+		}
+		Entity *copy = global_when_trial_entity(t, d->decl_node, found->file, {}, name);
+		return copy != nullptr ? copy : found;
+	}
+	if (s->placeholders == nullptr) {
+		return nullptr;
+	}
+	PtrMap<u64, GlobalDeclSource *> *m = s->placeholders;
+	for (auto *entry = multi_map_find_first(m, cast(u64)name.value);
+	     entry != nullptr;
+	     entry = multi_map_find_next(m, entry)) {
+		GlobalDeclSource *src = entry->value;
+		if (src->cycle != cycle) {
+			continue;
+		}
+		if (t->real_depth > 0) {
+			t->broken = true;
+			return nullptr;
+		}
+		u32 bit = 1u << src->cycle_index;
+		if ((t->reachable & bit) == 0) {
+			continue;
+		}
+		bool in_else = (t->mask & bit) == 0;
+		for (GlobalDeclSourceName const &n : src->names) {
+			if (n.name == name && n.scope == s && n.in_else == in_else) {
+				// NOTE(bill): the branches around it are needed too
+				for (GlobalDeclSource *p = src; p != nullptr && p->cycle == cycle; p = p->parent) {
+					t->used |= 1u << p->cycle_index;
+				}
+				return global_when_trial_entity(t, n.decl, src->file, global_decl_source_foreign_context(src), name);
+			}
+		}
+	}
+	return nullptr;
+}
+
+// An entity outside the trial is checked for real, with errors shown; a scratch procedure is not checked,
+// as its body would be queued
+gb_internal bool global_when_trial_begin_entity(Entity *e, GlobalWhenTrialEntityScope *scope) {
+	GlobalWhenTrial *t = global_when_trial;
+	*scope = {};
+	if (ptr_set_exists(&t->scratch, e)) {
+		if (e->kind == Entity_Procedure || e->kind == Entity_AsmTemplate) {
+			t->unsupported = true;
+			e->type = t_invalid;
+			e->state = EntityState_Resolved;
+			return false;
+		}
+		return true;
+	}
+	scope->trial = t;
+	scope->mute_depth = global_error_mute_depth;
+	global_error_mute_depth = 0;
+	t->real_depth += 1;
+	return true;
+}
+
+gb_internal void global_when_trial_end_entity(GlobalWhenTrialEntityScope *scope) {
+	if (scope->trial != nullptr) {
+		scope->trial->real_depth -= 1;
+		global_error_mute_depth = scope->mute_depth;
+	}
+}
+
+enum GlobalWhenFailureKind : u8 {
+	GlobalWhenFailure_None,
+	GlobalWhenFailure_Invalid,   // Cannot be evaluated
+	GlobalWhenFailure_Disagrees, // Picks the other branch
+	GlobalWhenFailure_OwnBranch, // A chosen branch is needed to decide its own condition
+};
+
+struct GlobalWhenTrialResult {
+	GlobalWhenFailureKind failure;
+	i32  source;
+	bool value;
+	bool unsupported;
+	bool broken;
+};
+
+gb_internal GlobalWhenTrialResult try_global_when_choice(GlobalWhenCycle *cycle, u32 mask, u32 reachable) {
+	GlobalWhenTrialResult res = {};
+	i32 k = cast(i32)cycle->sources.count;
+	u32 used[32] = {};
+
+	for (i32 i = 0; i < k; i++) {
+		if ((reachable & (1u<<i)) == 0) {
+			continue;
+		}
+		GlobalDeclSource *src = cycle->sources[i];
+		ast_node(ws, WhenStmt, src->node);
+
+		GlobalWhenTrial t = {};
+		t.cycle     = cycle;
+		t.mask      = mask;
+		t.reachable = reachable;
+
+		map_init(&t.decl_entities);
+		defer ({
+			for (auto const &entry : t.decl_entities) {
+				array_free(entry.value);
+				gb_free(heap_allocator(), entry.value);
+			}
+			map_destroy(&t.decl_entities);
+		});
+
+		ptr_set_init(&t.scratch);
+		defer (ptr_set_destroy(&t.scratch));
+
+		CheckerContext ctx = {};
+		init_checker_context(&ctx, global_checker_ptr.load(std::memory_order_relaxed));
+		defer (destroy_checker_context(&ctx));
+
+		UntypedExprInfoMap untyped = {};
+		defer (map_destroy(&untyped));
+
+
+		reset_checker_context(&ctx, src->file, &untyped);
+		// so no dependency is recorded
+		ctx.decl = make_decl_info(src->file->scope, nullptr);
+		ctx.foreign_context = global_decl_source_foreign_context(src);
+
+		GlobalWhenTrial *prev = global_when_trial;
+		global_when_trial = &t;
+
+		Ast *cond = clone_ast(ws->cond);
+		i64 muted = error_mute_count();
+		begin_error_mute();
+
+		Operand o = {};
+		check_expr(&ctx, &o, cond);
+		end_error_mute();
+		global_when_trial = prev;
+		global_when_trial_count += 1;
+
+		bool ok = error_mute_count() == muted && o.mode == Addressing_Constant && o.value.kind == ExactValue_Bool;
+		used[i] = t.used;
+		res.unsupported = t.unsupported;
+		res.broken = t.broken;
+
+		if (res.unsupported || res.broken) {
+			return res;
+		}
+		if (!ok || o.value.value_bool != ((mask & (1u<<i)) != 0)) {
+			res.failure = ok ? GlobalWhenFailure_Disagrees : GlobalWhenFailure_Invalid;
+			res.source = i;
+			res.value = ok && o.value.value_bool;
+			return res;
+		}
+	}
+
+	// NOTE: the chosen branches must be decidable in some order, each from earlier ones
+	u32 decided = 0;
+	for (;;) {
+		bool progress = false;
+		for (i32 i = 0; i < k; i++) {
+			u32 bit = 1u << i;
+			if ((reachable & bit) && (decided & bit) == 0 && (used[i] & ~decided) == 0) {
+				decided |= bit;
+				progress = true;
+			}
+		}
+		if (!progress) {
+			break;
+		}
+	}
+	if (decided != reachable) {
+		res.failure = GlobalWhenFailure_OwnBranch;
+	}
+	return res;
+}
+
+gb_internal u32 global_when_cycle_reachable(GlobalWhenCycle *cycle, u32 mask, u32 unreachable) {
+	u32 reachable = 0;
+	for (i32 i = 0; i < cycle->sources.count; i++) {
+		GlobalDeclSource *src = cycle->sources[i];
+		GlobalDeclSource *p = src->parent;
+		bool r = (unreachable & (1u<<i)) == 0;
+		// NOTE(bill): a parent outside the cycle has no parent in it and its parents come first in source order
+		if (r && p != nullptr && p->cycle == cycle) {
+			u32 pb = 1u << p->cycle_index;
+			r = (reachable & pb) != 0;
+			if (p->node->kind == Ast_WhenStmt) {
+				r = r && ((mask & pb) != 0) != src->in_else;
+			}
+		}
+		if (r) {
+			reachable |= 1u << i;
+		}
+	}
+	return reachable;
+}
+
+gb_internal gbString global_when_choice_string(gbString s, GlobalWhenCycle *cycle, u32 mask, u32 reachable) {
+	for (i32 i = 0; i < cycle->sources.count; i++) {
+		u32 bit = 1u << i;
+		s = gb_string_append_fmt(s, "%s%s", i > 0 ? ", " : "", (reachable & bit) == 0 ? "unreachable" : (mask & bit) ? "taken" : "not taken");
+	}
+	return s;
+}
+
+gb_internal void error_line_global_when_sources(GlobalWhenCycle *cycle) {
+	for (GlobalDeclSource *src : cycle->sources) {
+		gbString cond = expr_to_string(src->node->WhenStmt.cond);
+		error_line("\t'when' at %s: %s\n", token_pos_to_string(src->node->WhenStmt.token.pos), cond);
+		gb_string_free(cond);
+	}
+}
+
+gb_internal void commit_global_when_cycle(GlobalWhenCycle *cycle, u32 mask, bool check_conditions) {
+	for (GlobalDeclSource *src : cycle->sources) {
+		src->predetermined = true;
+		src->predetermined_cond = (mask & (1u << src->cycle_index)) != 0;
+	}
+	for (GlobalDeclSource *src : cycle->sources) {
+		resolve_global_decl_source(src, {});
+	}
+	if (!check_conditions) {
+		return;
+	}
+	// NOTE: for real, now that every chosen branch is collected, which must give the same values
+	for (GlobalDeclSource *src : cycle->sources) {
+		if (!src->reachable) {
+			continue;
+		}
+		ast_node(ws, WhenStmt, src->node);
+
+		CheckerContext ctx = {};
+		init_checker_context(&ctx, global_checker_ptr.load(std::memory_order_relaxed));
+		defer (destroy_checker_context(&ctx));
+
+		UntypedExprInfoMap untyped = {};
+		reset_checker_context(&ctx, src->file, &untyped);
+		defer (map_destroy(&untyped));
+
+		ctx.foreign_context = global_decl_source_foreign_context(src);
+
+		Operand o = {};
+		check_expr(&ctx, &o, ws->cond);
+		if (o.mode != Addressing_Constant || o.value.kind != ExactValue_Bool || o.value.value_bool != ws->determined_cond) {
+			error(ws->token, "Internal compiler error: this global 'when' changed its branch after its cycle was decided");
+		}
+		add_untyped_expressions(ctx.info, &untyped);
+	}
+}
+
+gb_internal void search_global_when_cycle(GlobalWhenCycle *cycle) {
+	cycle->searched = true;
+	i32 k = cast(i32)cycle->sources.count;
+	for (GlobalDeclSource *src : cycle->sources) {
+		if (src->node->kind != Ast_WhenStmt) {
+			// NOTE(bill): resolved on demand where a cycle is reported as such
+			return;
+		}
+	}
+	Token token = cycle->sources[0]->node->WhenStmt.token;
+
+	i32 const MAX_SOURCES = 8; // 2^8 == 256 combinations
+	if (k > MAX_SOURCES) {
+		ERROR_BLOCK();
+		error(token, "Too many combinations of global 'when' branches: %d 'when's depend on each other, which gives 2^%d combinations, more than %d",
+		      k, k, 1 << MAX_SOURCES);
+		error_line_global_when_sources(cycle);
+		return;
+	}
+
+	// The parents outside the cycle are decided for real first
+	u32 unreachable = 0;
+	for (GlobalDeclSource *src : cycle->sources) {
+		GlobalDeclSource *p = src->parent;
+		if (p == nullptr || p->cycle == cycle) {
+			continue;
+		}
+		resolve_global_decl_source(p, {});
+		bool r = p->state == EntityState_Resolved && p->reachable;
+		if (p->node->kind == Ast_WhenStmt) {
+			r = r && p->node->WhenStmt.determined_cond != src->in_else;
+		}
+		if (!r) {
+			unreachable |= 1u << src->cycle_index;
+		}
+	}
+
+	auto consistent = array_make<u32>(heap_allocator());
+	auto failures   = array_make<GlobalWhenTrialResult>(heap_allocator());
+	auto failed     = array_make<u32>(heap_allocator());
+	defer (array_free(&consistent));
+	defer (array_free(&failures));
+	defer (array_free(&failed));
+
+	for (u32 mask = 0; mask < (1u << k); mask++) {
+		u32 reachable = global_when_cycle_reachable(cycle, mask, unreachable);
+		if (mask & ~reachable) {
+			// An unreachable 'when' is only counted as not taken
+			continue;
+		}
+		GlobalWhenTrialResult result = try_global_when_choice(cycle, mask, reachable);
+		if (result.broken) {
+			error(token, "Internal compiler error: deciding this cycle of global 'when's checked a declaration that depends on it");
+			return;
+		}
+		if (result.unsupported) {
+			// Needs a procedure or library declared in the cycle, so it is resolved on demand instead
+			return;
+		}
+		if (result.failure == GlobalWhenFailure_None) {
+			array_add(&consistent, mask);
+		} else {
+			array_add(&failures, result);
+			array_add(&failed, mask);
+		}
+	}
+
+	if (consistent.count == 1) {
+		commit_global_when_cycle(cycle, consistent[0], true);
+		return;
+	}
+
+	ERROR_BLOCK();
+	if (consistent.count == 0) {
+		error(token, "Contradictory global 'when' conditions: no choice of their branches is consistent");
+		error_line_global_when_sources(cycle);
+		for (isize i = 0; i < failed.count && i < 16; i++) {
+			GlobalWhenTrialResult const &r = failures[i];
+
+			u32 reachable = global_when_cycle_reachable(cycle, failed[i], unreachable);
+
+			gbString s = global_when_choice_string(gb_string_make(heap_allocator(), ""), cycle, failed[i], reachable);
+			defer (gb_string_free(s));
+
+			TokenPos pos = cycle->sources[r.source]->node->WhenStmt.token.pos;
+			switch (r.failure) {
+			case GlobalWhenFailure_Invalid:
+				error_line("\t[%s]: the 'when' at %s cannot be evaluated\n", s, token_pos_to_string(pos));
+				break;
+			case GlobalWhenFailure_Disagrees:
+				error_line("\t[%s]: the 'when' at %s evaluates to %s\n", s, token_pos_to_string(pos), r.value ? "true" : "false");
+				break;
+			case GlobalWhenFailure_OwnBranch:
+				error_line("\t[%s]: a taken branch is needed to decide its own condition\n", s);
+				break;
+			}
+		}
+		commit_global_when_cycle(cycle, 0, false);
+	} else {
+		error(token, "Ambiguous global 'when' conditions: %td choices of their branches are consistent", consistent.count);
+		error_line_global_when_sources(cycle);
+		for (isize i = 0; i < consistent.count; i++) {
+			u32 reachable = global_when_cycle_reachable(cycle, consistent[i], unreachable);
+			gbString s = global_when_choice_string(gb_string_make(heap_allocator(), ""), cycle, consistent[i], reachable);
+			defer (gb_string_free(s));
+
+			error_line("\tchoice %td: %s\n", i+1, s);
+		}
+		commit_global_when_cycle(cycle, consistent[0], false);
+	}
+}
+
+
+// `-internal-global-entity-graph`
+// The groups weighted by the measured self time of their entities
 
 struct GlobalGraphSortItem {
 	u64 key;
@@ -1410,11 +2125,11 @@ gb_internal void print_global_groups(GlobalGroupGraph *g) {
 	defer (array_free(&pkg_entities));
 	defer (map_destroy(&pkg_index));
 
-	u64 total_ticks = 0;
-	u64 when_ticks = 0;
-	isize untimed = 0;
-	i32 largest = -1;
-	isize cyclic = 0;
+	u64   total_ticks = 0;
+	u64   when_ticks  = 0;
+	isize untimed     = 0;
+	i32   largest     = -1;
+	isize cyclic      = 0;
 
 	mutex_lock(&global_entity_time_mutex);
 	for (auto const &entry : global_entity_times) {
@@ -1451,7 +2166,7 @@ gb_internal void print_global_groups(GlobalGroupGraph *g) {
 	}
 	mutex_unlock(&global_entity_time_mutex);
 
-	// NOTE: every dependency of a group has a lower index
+	// NOTE(bill): every dependency of a group has a lower index
 	i32 critical = -1;
 	for (i32 gi = 0; gi < group_count; gi++) {
 		seen[gi] = -1;
@@ -1488,6 +2203,7 @@ gb_internal void print_global_groups(GlobalGroupGraph *g) {
 	gb_printf_err("  critical path: %.3f ms over %d groups -> at most %.2fx speedup\n",
 	              critical_ms, critical >= 0 ? len[critical] : 0, critical_ms > 0 ? total_ms/critical_ms : 0.0);
 
+	gb_printf_err("  'when' cycles: %td (%td 'when's), %td conditions tried\n", global_when_cycle_count, global_when_cycle_sources, global_when_trial_count);
 	gb_printf_err("  check_import_entities (sequential, includes entity checks it triggers):\n");
 	for (isize i = 0; i < GlobalImportStage_COUNT; i++) {
 		gb_printf_err("    %10.3f ms  %s\n", global_graph_ms(global_import_stage_ticks[i], freq), global_import_stage_names[i]);

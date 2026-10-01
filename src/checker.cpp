@@ -387,8 +387,8 @@ gb_internal void check_open_scope(CheckerContext *c, Ast *node) {
 		break;
 	}
 	if (c->decl && c->decl->proc_lit) {
-		// NOTE: numbered by position rather than in checking order, as that order varies (e.g. with
-		// which caller instantiates a record first); 0 is the procedure's own scope
+		// NOTE(bill): numbered by position rather than in checking order, as that order varies
+		// (e.g. with which caller instantiates a record first); 0 is the procedure's own scope
 		scope->index = node->kind == Ast_ProcType ? 0 : 1 + ast_token(node).pos.offset;
 	}
 	c->scope = scope;
@@ -402,12 +402,19 @@ gb_internal void check_close_scope(CheckerContext *c) {
 
 gb_internal Entity *force_scope_placeholders(Scope *s, InternedString name, u32 hash);
 
+struct GlobalWhenTrial;
+gb_global GlobalWhenTrial *global_when_trial;
+gb_internal Entity *global_when_trial_lookup(Scope *s, InternedString name, u32 hash, Entity *found);
+
 gb_internal Entity *scope_lookup_current(Scope *s, InternedString name, u32 hash) {
 	// Entity **found = string_map_get(&s->elements, name);
 	if (hash == 0) {
 		hash = name.hash();
 	}
 	Entity *found = scope_map_get(&s->elements, name, hash);
+	if (global_when_trial != nullptr) {
+		found = global_when_trial_lookup(s, name, hash, found);
+	}
 	if (found) {
 		return found;
 	}
@@ -433,6 +440,9 @@ gb_internal void scope_lookup_parent(Scope *scope, InternedString name, Scope **
 			if (!is_single_threaded) rw_mutex_shared_lock(&s->mutex);
 			found = scope_map_get(&s->elements, name, hash);
 			if (!is_single_threaded) rw_mutex_shared_unlock(&s->mutex);
+			if (global_when_trial != nullptr) {
+				found = global_when_trial_lookup(s, name, hash, found);
+			}
 			if (found == nullptr && s->placeholders != nullptr) {
 				found = force_scope_placeholders(s, name, hash);
 			}
@@ -2093,8 +2103,8 @@ gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
 			// NOTE(bill): Error should have been handled already
 			return false;
 		}
-		// NOTE: the insertion order is a race between the files of a package, so order the pair by
-		// position; the later declaration stays the anchor, as it is the one being reported
+		// NOTE(bill): the insertion order is a race between the files of a package, so order the pair by position;
+		// the later declaration stays the anchor, as it is the one being reported
 		TokenPos first = prev->token.pos;
 		TokenPos second = pos;
 		if (second < first) {
@@ -2274,6 +2284,19 @@ gb_internal void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, En
 
 	if (!could_entity_be_lazy(e, d)) {
 		e->flags &= ~EntityFlag_Lazy;
+	}
+
+	if (c->trial_entities != nullptr) {
+		// NOTE(bill): a scratch copy for a global 'when' trial, put in no scope or queue
+		e->flags &= ~EntityFlag_Lazy;
+		e->file = c->file;
+		e->decl_info = d;
+		e->pkg = c->pkg;
+		d->entity.store(e);
+		identifier->Ident.entity = e;
+		e->identifier = identifier;
+		array_add(c->trial_entities, e);
+		return;
 	}
 
 	if (e->scope != nullptr) {
@@ -5124,7 +5147,9 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				}
 			}
 
-			check_builtin_attributes(c, e, &d->attributes);
+			if (c->trial_entities == nullptr) {
+				check_builtin_attributes(c, e, &d->attributes);
+			}
 
 			bool is_exported = entity_visibility_kind != EntityVisiblity_PrivateToFile;
 			add_entity_and_decl_info(c, name, e, d, is_exported);

@@ -850,6 +850,8 @@ struct CheckerContext {
 	u8         bit_field_bit_size;
 	Scope *    polymorphic_scope;
 
+	Array<Entity *> *trial_entities; // global declarations are collected here only, for a global 'when' trial
+
 	Ast *assignment_lhs_hint;
 	Ast *asm_template_hint;
 };
@@ -918,6 +920,13 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 gb_internal void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
 gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e);
+
+struct GlobalWhenTrialEntityScope {
+	struct GlobalWhenTrial *trial;
+	i32 mute_depth;
+};
+gb_internal bool global_when_trial_begin_entity(Entity *e, GlobalWhenTrialEntityScope *scope);
+gb_internal void global_when_trial_end_entity(GlobalWhenTrialEntityScope *scope);
 
 // -internal-global-entity-graph
 struct GlobalEntityTimingFrame {

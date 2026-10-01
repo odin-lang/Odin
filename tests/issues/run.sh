@@ -130,7 +130,14 @@ fi
 $ODIN test ../test_issue_proc_constant_instantiation.odin $COMMON
 $ODIN test ../test_issue_swizzle_multi_assign.odin $COMMON
 $ODIN test ../test_issue_global_when_order.odin $COMMON
-if [[ $($ODIN check ../test_issue_global_when_cycle.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Cyclic dependency between global") -eq 3 ]]; then
+if [[ $($ODIN check ../test_issue_global_when_cycle.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Contradictory global 'when'") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN test ../test_issue_global_when_cycle_accepted.odin $COMMON
+if [[ $($ODIN check ../test_issue_global_when_cycle_ambiguous.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Ambiguous global 'when'") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"

@@ -2140,6 +2140,11 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 	if (e->state == EntityState_Resolved)  {
 		return;
 	}
+	GlobalWhenTrialEntityScope trial_scope = {};
+	if (global_when_trial != nullptr && !global_when_trial_begin_entity(e, &trial_scope)) {
+		return;
+	}
+	defer (global_when_trial_end_entity(&trial_scope));
 	bool is_lazy = (e->flags & EntityFlag_Lazy) != 0;
 	if (is_lazy) {
 		mutex_lock(&ctx->info->lazy_mutex);

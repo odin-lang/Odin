@@ -54,7 +54,9 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_ambiguous_union_literal.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin test ..\test_issue_proc_constant_instantiation.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_global_when_order.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_global_when_cycle.odin -no-entry-point %COMMON% 2>&1 | find /c "Cyclic dependency between global" | findstr /x "3" || exit /b
+..\..\..\odin check ..\test_issue_global_when_cycle.odin -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
+..\..\..\odin test ..\test_issue_global_when_cycle_accepted.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_global_when_cycle_ambiguous.odin -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
 ..\..\..\odin check ..\test_issue_global_when_shadowing.odin -no-entry-point %COMMON% 2>&1 | find /c "within a global" | findstr /x "2" || exit /b
 ..\..\..\odin check ..\test_issue_7336.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
