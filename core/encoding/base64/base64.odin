@@ -4,8 +4,10 @@
 A secondary param can be used to supply a custom alphabet to `encode` and a matching decoding table to `decode`.
 
 If none is supplied it just uses the standard Base64 alphabet.
-In case your specific version does not use padding, you may
-truncate it from the encoded output.
+
+By default `encode` emits padding. Encode options can omit it: with
+`{.No_Padding}` the output is the canonical unpadded ("raw") form of
+RFC 4648 section 3.2, and `encoded_len` reports the shorter length.
 
 By default `decode` is lenient, accepting padded and unpadded input and not
 checking the trailing padding bits. Decode options can enable strict
@@ -145,14 +147,25 @@ Decode_Option :: enum {
 // Decode_Options is a set of Decode_Option values.
 Decode_Options :: bit_set[Decode_Option; u8]
 
-encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator) -> (encoded: string, err: runtime.Allocator_Error) #optional_allocator_error {
-	out_length := encoded_len(data)
+// Encode_Option selects optional behavior of the encode routines.
+Encode_Option :: enum {
+	// No_Padding omits the padding character from the output (RFC 4648
+	// section 3.2), producing the canonical unpadded ("raw") form.
+	// Combine with ENC_URL_TABLE for unpadded base64url, as used by JOSE.
+	No_Padding,
+}
+
+// Encode_Options is a set of Encode_Option values.
+Encode_Options :: bit_set[Encode_Option; u8]
+
+encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocator, options := Encode_Options{}) -> (encoded: string, err: runtime.Allocator_Error) #optional_allocator_error {
+	out_length := encoded_len(data, options)
 	if out_length == 0 {
 		return
 	}
 
 	out := make([]byte, out_length, allocator) or_return
-	_, ioerr := encode_impl(out, data, ENC_TBL)
+	_, ioerr := encode_impl(out, data, ENC_TBL, options)
 	assert(ioerr == nil, "encode should not IO error")
 	assert(len(out) == out_length, "buffer resized, `encoded_len` was wrong")
 
@@ -161,25 +174,25 @@ encode :: proc(data: []byte, ENC_TBL := ENC_TABLE, allocator := context.allocato
 	return
 }
 
-encode_into_buf :: proc(dst, data: []byte, ENC_TBL := ENC_TABLE) -> (encoded: []byte, err: Error) {
-	out_length := encoded_len(data)
+encode_into_buf :: proc(dst, data: []byte, ENC_TBL := ENC_TABLE, options := Encode_Options{}) -> (encoded: []byte, err: Error) {
+	out_length := encoded_len(data, options)
 	if out_length == 0 {
 		return
 	}
 
-	return encode_impl(dst, data, ENC_TBL)
+	return encode_impl(dst, data, ENC_TBL, options)
 }
 
-encode_into :: proc(w: io.Writer, data: []byte, ENC_TBL := ENC_TABLE) -> io.Error {
-	_, err := encode_impl(w, data, ENC_TBL)
+encode_into :: proc(w: io.Writer, data: []byte, ENC_TBL := ENC_TABLE, options := Encode_Options{}) -> io.Error {
+	_, err := encode_impl(w, data, ENC_TBL, options)
 	return err
 }
 
 @(private)
-encode_impl :: proc(dst: $T, data: []byte, ENC_TBL := ENC_TABLE) -> ([]byte, io.Error) where T == io.Writer || T == []byte {
+encode_impl :: proc(dst: $T, data: []byte, ENC_TBL := ENC_TABLE, options := Encode_Options{}) -> ([]byte, io.Error) where T == io.Writer || T == []byte {
 	length := len(data)
 	when T == []byte {
-		out_length := encoded_len(data)
+		out_length := encoded_len(data, options)
 		if len(dst) < out_length {
 			return nil, io.Error.Short_Buffer
 		}
@@ -191,7 +204,9 @@ encode_impl :: proc(dst: $T, data: []byte, ENC_TBL := ENC_TABLE) -> ([]byte, io.
 		buf: [4]byte
 	}
 
-	c0, c1, c2, block: int
+	// c0, c1, c2 are the group's input bytes; -1 marks a missing byte, which
+	// is how a partial (final) group is identified.
+	c0, c1, c2, block, write: int
 	for i := 0; i < length; i += 3 {
 		#no_bounds_check {
 			c0, c1, c2 = int(data[i]), -1, -1
@@ -199,18 +214,44 @@ encode_impl :: proc(dst: $T, data: []byte, ENC_TBL := ENC_TABLE) -> ([]byte, io.
 			if i + 1 < length { c1 = int(data[i + 1]) }
 			if i + 2 < length { c2 = int(data[i + 2]) }
 
+			// Pack the group into a 24-bit value, most significant input
+			// byte first; missing bytes contribute zero bits, as RFC 4648
+			// section 4 requires.
 			block = (c0 << 16) | (max(c1, 0) << 8) | max(c2, 0)
 
+			// Characters the final block carries once padding is dropped:
+			// four for a full group, two (one input byte) or three (two
+			// input bytes) for a partial one.
+			emit := 4
+			if c1 == -1 {
+				emit = 2
+			} else if c2 == -1 {
+				emit = 3
+			}
+
+			// Padded output still writes a full four-character block, with
+			// PADDING where the group ran out of input bytes.
+			write = emit
+			if .No_Padding not_in options {
+				write = 4
+			}
+
+			// The output characters, most significant six bits first;
+			// PADDING replaces the characters a partial group lacks.
 			buf[0] = ENC_TBL[block >> 18 & 63]
 			buf[1] = ENC_TBL[block >> 12 & 63]
-			buf[2] = c1 == -1 ? PADDING : ENC_TBL[block >> 6 & 63]
-			buf[3] = c2 == -1 ? PADDING : ENC_TBL[block & 63]
+			if write > 2 {
+				buf[2] = c1 == -1 ? PADDING : ENC_TBL[block >> 6 & 63]
+				if write > 3 {
+					buf[3] = c2 == -1 ? PADDING : ENC_TBL[block & 63]
+				}
+			}
 			when T == []byte {
-				buf = buf[4:]
+				buf = buf[write:]
 			}
 		}
 		when T == io.Writer {
-			if _, err := io.write_full(dst, buf[:]); err != nil {
+			if _, err := io.write_full(dst, buf[:write]); err != nil {
 				return nil, err
 			}
 		}
@@ -223,13 +264,24 @@ encode_impl :: proc(dst: $T, data: []byte, ENC_TBL := ENC_TABLE) -> ([]byte, io.
 	}
 }
 
-encoded_len :: proc(data: []byte) -> int {
+encoded_len :: proc(data: []byte, options := Encode_Options{}) -> int {
 	length := len(data)
 	if length == 0 {
 		return 0
 	}
 
-	return ((4 * length / 3) + 3) &~ 3
+	padded := ((4 * length / 3) + 3) &~ 3
+	if .No_Padding not_in options {
+		return padded
+	}
+
+	switch length % 3 {
+	case 1:
+		return padded - 2
+	case 2:
+		return padded - 1
+	}
+	return padded
 }
 
 @(private)
