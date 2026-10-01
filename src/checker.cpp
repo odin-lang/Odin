@@ -5339,53 +5339,7 @@ gb_internal void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) 
 	check_entity_decl(ctx, e, d, nullptr);
 }
 
-// for `-internal-shuffle-global-entities`
-// visit globals in a seeded random order, so that any result depending on the visiting order shows up without needing threads
-gb_internal void shuffle_global_entities(Array<Entity *> *entities, u64 seed) {
-	if (seed == 0) {
-		return;
-	}
-	u64 state = seed;
-	for (isize i = entities->count-1; i > 0; i--) {
-		state = state*6364136223846793005ull + 1442695040888963407ull;
-		isize j = cast(isize)((state >> 33) % cast(u64)(i+1));
-		Entity *tmp = (*entities)[i];
-		(*entities)[i] = (*entities)[j];
-		(*entities)[j] = tmp;
-	}
-}
-
-gb_internal void check_all_global_entities(Checker *c) {
-	in_single_threaded_checker_stage.store(true, std::memory_order_relaxed);
-
-	auto order = array_clone(heap_allocator(), c->info.entities);
-	defer (array_free(&order));
-	shuffle_global_entities(&order, build_context.internal_shuffle_global_entities);
-
-	// NOTE(bill): This must be single threaded
-	// Don't bother trying
-	for (Entity *e : order) {
-		GB_ASSERT(e != nullptr);
-		if (e->flags & EntityFlag_Lazy) {
-			continue;
-		}
-		DeclInfo *d = e->decl_info;
-		GlobalEntityTimingFrame timing_frame = global_entity_timing_begin(e);
-		check_single_global_entity(c, e, d);
-		if (e->type != nullptr && is_type_typed(e->type)) {
-			for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
-				complete_soa_type(c, t, false);
-			}
-
-			(void)type_size_of(e->type);
-			(void)type_align_of(e->type);
-		}
-		global_entity_timing_end(timing_frame, e);
-	}
-
-	in_single_threaded_checker_stage.store(false, std::memory_order_relaxed);
-}
-
+#include "checker_global_groups.cpp"
 
 gb_internal bool is_string_an_identifier(String s) {
 	isize offset = 0;
@@ -7524,7 +7478,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	if (build_context.internal_global_entity_graph) {
 		TIME_SECTION("print global entity graph");
 		print_global_entity_graph(c);
+		print_global_groups(&global_groups);
 	}
+	destroy_global_groups(&global_groups);
 
 	TIME_SECTION("init preload");
 	init_preload(c);

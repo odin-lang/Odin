@@ -603,6 +603,7 @@ struct BuildContext {
 	bool internal_llvm_no_sroa;
 	bool internal_global_entity_graph;
 	u64  internal_shuffle_global_entities; // seed, 0 = no shuffle
+	bool internal_check_global_edges;
 
 	bool   enable_rvo;
 

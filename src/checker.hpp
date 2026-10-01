@@ -917,6 +917,7 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 
 gb_internal void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
+gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e);
 gb_internal void wait_for_lazy_entity(CheckerContext *c, Entity *e);
 gb_internal Ast *remove_type_alias_clutter(Ast *node);
 gb_internal void check_const_decl(CheckerContext *c, Entity *e, Ast *type_expr, Ast *init_expr, Type *named_type);

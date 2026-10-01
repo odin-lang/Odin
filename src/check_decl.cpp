@@ -2183,6 +2183,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 			c.scope->flags &= ~ScopeFlag_ContextDefined;
 		}
 
+		global_group_check_edge(ctx, e);
 
 		e->parent_proc_decl = c.curr_proc_decl;
 		e->state = EntityState_InProgress;

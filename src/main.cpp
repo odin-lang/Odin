@@ -535,6 +535,7 @@ enum BuildFlagKind {
 	BuildFlag_InternalEnableRVO,
 	BuildFlag_InternalGlobalEntityGraph,
 	BuildFlag_InternalShuffleGlobalEntities,
+	BuildFlag_InternalCheckGlobalEdges,
 
 	BuildFlag_Sanitize,
 	BuildFlag_LTO,
@@ -799,6 +800,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalGlobalEntityGraph, str_lit("internal-global-entity-graph"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_InternalShuffleGlobalEntities, str_lit("internal-shuffle-global-entities"), BuildFlagParam_Integer, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalCheckGlobalEdges, str_lit("internal-check-global-edges"), BuildFlagParam_None, Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
@@ -1854,6 +1856,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalShuffleGlobalEntities:
 							GB_ASSERT(value.kind == ExactValue_Integer);
 							build_context.internal_shuffle_global_entities = cast(u64)big_int_to_i64(&value.value_integer);
+							break;
+						case BuildFlag_InternalCheckGlobalEdges:
+							build_context.internal_check_global_edges = true;
 							break;
 
 
