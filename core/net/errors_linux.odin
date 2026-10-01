@@ -192,6 +192,28 @@ _udp_recv_error :: proc(errno: linux.Errno) -> UDP_Recv_Error {
 	}
 }
 
+_unix_recv_error :: proc(errno: linux.Errno) -> Unix_Recv_Error {
+	assert(errno != nil)
+	_last_error = errno
+
+	#partial switch errno {
+	case .EBADF, .ENOTSOCK, .EFAULT:
+		return .Invalid_Argument
+	case .ENOTCONN:
+		return .Not_Connected
+	case .ECONNREFUSED, .ECONNRESET:
+		return .Connection_Closed
+	case .ETIMEDOUT:
+		return .Timeout
+	case .EAGAIN:
+		return .Would_Block
+	case .EINTR:
+		return .Interrupted
+	case:
+		return .Unknown
+	}
+}
+
 _tcp_send_error :: proc(errno: linux.Errno) -> TCP_Send_Error {
 	assert(errno != nil)
 	_last_error = errno
@@ -231,6 +253,34 @@ _udp_send_error :: proc(errno: linux.Errno) -> UDP_Send_Error {
 		return .Insufficient_Resources
 	case .ECONNRESET, .EPIPE:
 		return .Connection_Refused
+	case .EHOSTUNREACH:
+		return .Host_Unreachable
+	case .EHOSTDOWN:
+		return .Host_Unreachable
+	case .ENETDOWN:
+		return .Network_Unreachable
+	case .EAGAIN:
+		return .Would_Block
+	case .EINTR:
+		return .Interrupted
+	case:
+		return .Unknown
+	}
+}
+
+_unix_send_error :: proc(errno: linux.Errno) -> Unix_Send_Error {
+	assert(errno != nil)
+	_last_error = errno
+
+	#partial switch errno {
+	case .EBADF, .EACCES, .ENOTSOCK, .EFAULT, .EMSGSIZE, .EDESTADDRREQ, .EINVAL, .EISCONN, .EOPNOTSUPP:
+		return .Invalid_Argument
+	case .ENOBUFS, .ENOMEM:
+		return .Insufficient_Resources
+	case .ECONNRESET, .EPIPE:
+		return .Connection_Closed
+	case .ENOTCONN:
+		return .Not_Connected
 	case .EHOSTUNREACH:
 		return .Host_Unreachable
 	case .EHOSTDOWN:
