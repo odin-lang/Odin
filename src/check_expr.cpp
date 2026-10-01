@@ -6851,6 +6851,15 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error) -> i64 {
 		bool allow_array_programming = !(e && (e->flags & EntityFlag_NoBroadcast));
+		// NOTE(bill): If the parameter type is still polymorphic here, the callee was not instantiated for this call (e.g. a disabled polymorphic proc, whose body is elided).
+		// A polymorphic '$T' gives an untyped argument nothing concrete to convert to, so default it to its own type rather than reporting a nonsense "cannot convert untyped value to '$T'".
+		if (show_error && is_type_polymorphic(param_type) && o->mode != Addressing_Invalid && is_type_untyped(o->type)) {
+			Type *dt = default_type(o->type);
+			if (dt != nullptr && is_type_typed(dt)) {
+				update_untyped_expr_type(c, o->expr, dt, true);
+				o->type = dt;
+			}
+		}
 		i64 s = 0;
 		if (!check_is_assignable_to_with_score(c, o, param_type, &s, param_is_variadic, allow_array_programming)) {
 			bool ok = false;
