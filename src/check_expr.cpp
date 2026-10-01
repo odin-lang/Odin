@@ -6747,14 +6747,15 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	bool actually_variadic = false;
 
 	if (variadic) {
-		if (visited[pt->variadic_index] &&
-		    positional_operand_count < positional_operands.count) {
-			if (show_error) {
-				String name = pt->params->Tuple.variables[pt->variadic_index]->token.string;
-				error(call, "Variadic parameters already handled with a named argument '%.*s' in procedure call", LIT(name));
+		if (visited[pt->variadic_index]) {
+			if (positional_operand_count < positional_operands.count) {
+				if (show_error) {
+					String name = pt->params->Tuple.variables[pt->variadic_index]->token.string;
+					error(call, "Variadic parameters already handled with a named argument '%.*s' in procedure call", LIT(name));
+				}
+				err = CallArgumentError_DuplicateParameter;
 			}
-			err = CallArgumentError_DuplicateParameter;
-		} else if (!visited[pt->variadic_index]) {
+		} else {
 			visited[pt->variadic_index] = true;
 
 			Operand *variadic_operand = &ordered_operands[pt->variadic_index];
@@ -6789,74 +6790,74 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				*variadic_operand = o;
 			}
 		}
-
 	}
 
 	for (isize i = 0; i < pt->param_count; i++) {
-		if (!visited[i]) {
-			Entity *e = pt->params->Tuple.variables[i];
-			bool context_allocator_error = false;
-			if (e->kind == Entity_Variable) {
-				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-					if (ast_file_vet_explicit_allocators(c->file) && !checking_proc_group) {
-						// NOTE(lucas): check if we are trying to default to context.allocator or context.temp_allocator
-						if (e->Variable.param_value.original_ast_expr->kind == Ast_SelectorExpr) {
-							auto& expr = e->Variable.param_value.original_ast_expr->SelectorExpr.expr;
-							auto& selector = e->Variable.param_value.original_ast_expr->SelectorExpr.selector;
-							if (expr->kind == Ast_Implicit &&
-								expr->Implicit.string == STR_LIT("context") &&
-								selector->kind == Ast_Ident &&
-								(selector->Ident.token.string == STR_LIT("allocator") ||
-      								selector->Ident.token.string == STR_LIT("temp_allocator"))) {
-								context_allocator_error = true;
-							}
-						}
-					}
-
-					if (!context_allocator_error) {
-						if (is_type_polymorphic(e->type) && e->Variable.param_value.kind == ParameterValue_Constant) {
-							// NOTE(bill): The parameter type is still polymorphic, so a constant default (e.g. `y: T = 0`) cannot be typed as '$T' here.
-							// Defer it like an untyped argument: determination resolves the parameter from the other arguments,
-							// then the default is materialized against the concrete type (reporting a clear error if it does not fit).
-							ordered_operands[i].mode = Addressing_Invalid;
-							ordered_operands[i].type = t_invalid;
-							ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
-							ordered_operands[i].deferred_untyped_arg = true;
-						} else {
-							ordered_operands[i].mode = Addressing_Value;
-							ordered_operands[i].type = e->type;
-							if (e->Variable.param_value.kind == ParameterValue_Nil)
-								ordered_operands[i].type = t_untyped_nil;
-							ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
-						}
-
-						dummy_argument_count += 1;
-						score += assign_score_function(1);
-						continue;
-					}
-				}
-			}
-
-			if (show_error) {
-				if (context_allocator_error) {
-					gbString str = type_to_string(e->type);
-					error(call, "Parameter '%.*s' of type '%s' must be explicitly provided in procedure call",
-					      LIT(e->token.string), str);
-					gb_string_free(str);
-				} else if (e->kind == Entity_TypeName) {
-					error(call, "Type parameter '%.*s' is missing in procedure call",
-					      LIT(e->token.string));
-				} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
-					// Ignore
-				} else {
-					gbString str = type_to_string(e->type);
-					error(call, "Parameter '%.*s' of type '%s' is missing in procedure call",
-					      LIT(e->token.string), str);
-					gb_string_free(str);
-				}
-			}
-			err = CallArgumentError_ParameterMissing;
+		if (visited[i]) {
+			continue;
 		}
+		Entity *e = pt->params->Tuple.variables[i];
+		bool context_allocator_error = false;
+		if (e->kind == Entity_Variable) {
+			if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+				if (ast_file_vet_explicit_allocators(c->file) && !checking_proc_group) {
+					// NOTE(lucas): check if we are trying to default to context.allocator or context.temp_allocator
+					if (e->Variable.param_value.original_ast_expr->kind == Ast_SelectorExpr) {
+						auto& expr = e->Variable.param_value.original_ast_expr->SelectorExpr.expr;
+						auto& selector = e->Variable.param_value.original_ast_expr->SelectorExpr.selector;
+						if (expr->kind == Ast_Implicit &&
+							expr->Implicit.string == STR_LIT("context") &&
+							selector->kind == Ast_Ident &&
+							(selector->Ident.token.string == STR_LIT("allocator") ||
+								selector->Ident.token.string == STR_LIT("temp_allocator"))) {
+							context_allocator_error = true;
+						}
+					}
+				}
+
+				if (!context_allocator_error) {
+					if (is_type_polymorphic(e->type) && e->Variable.param_value.kind == ParameterValue_Constant) {
+						// NOTE(bill): The parameter type is still polymorphic, so a constant default (e.g. `y: T = 0`) cannot be typed as '$T' here.
+						// Defer it like an untyped argument: determination resolves the parameter from the other arguments,
+						// then the default is materialized against the concrete type (reporting a clear error if it does not fit).
+						ordered_operands[i].mode = Addressing_Invalid;
+						ordered_operands[i].type = t_invalid;
+						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+						ordered_operands[i].deferred_untyped_arg = true;
+					} else {
+						ordered_operands[i].mode = Addressing_Value;
+						ordered_operands[i].type = e->type;
+						if (e->Variable.param_value.kind == ParameterValue_Nil)
+							ordered_operands[i].type = t_untyped_nil;
+						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+					}
+
+					dummy_argument_count += 1;
+					score += assign_score_function(1);
+					continue;
+				}
+			}
+		}
+
+		if (show_error) {
+			if (context_allocator_error) {
+				gbString str = type_to_string(e->type);
+				error(call, "Parameter '%.*s' of type '%s' must be explicitly provided in procedure call",
+				      LIT(e->token.string), str);
+				gb_string_free(str);
+			} else if (e->kind == Entity_TypeName) {
+				error(call, "Type parameter '%.*s' is missing in procedure call",
+				      LIT(e->token.string));
+			} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
+				// Ignore
+			} else {
+				gbString str = type_to_string(e->type);
+				error(call, "Parameter '%.*s' of type '%s' is missing in procedure call",
+				      LIT(e->token.string), str);
+				gb_string_free(str);
+			}
+		}
+		err = CallArgumentError_ParameterMissing;
 	}
 
 	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error) -> i64 {
@@ -8598,25 +8599,26 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		}
 
 		for (isize i = 0; i < param_count; i++) {
-			if (!visited[i]) {
-				Entity *e = tuple->variables[i];
-				if (is_blank_ident(e->token)) {
-					continue;
-				}
-
-				if (show_error) {
-					if (e->kind == Entity_TypeName) {
-						error(call, "Type parameter '%.*s' is missing in polymorphic type call",
-						      LIT(e->token.string));
-					} else {
-						gbString str = type_to_string(e->type);
-						error(call, "Parameter '%.*s' of type '%s' is missing in polymorphic type call",
-						      LIT(e->token.string), str);
-						gb_string_free(str);
-					}
-				}
-				err = CallArgumentError_ParameterMissing;
+			if (visited[i]) {
+				continue;
 			}
+			Entity *e = tuple->variables[i];
+			if (is_blank_ident(e->token)) {
+				continue;
+			}
+
+			if (show_error) {
+				if (e->kind == Entity_TypeName) {
+					error(call, "Type parameter '%.*s' is missing in polymorphic type call",
+					      LIT(e->token.string));
+				} else {
+					gbString str = type_to_string(e->type);
+					error(call, "Parameter '%.*s' of type '%s' is missing in polymorphic type call",
+					      LIT(e->token.string), str);
+					gb_string_free(str);
+				}
+			}
+			err = CallArgumentError_ParameterMissing;
 		}
 	}
 
