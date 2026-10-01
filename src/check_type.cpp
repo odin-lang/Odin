@@ -3108,6 +3108,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			if (default_value != nullptr) {
 				if (type_expr != nullptr && type_expr->kind == Ast_TypeidType) {
 					error(type_expr, "A type parameter may not have a default value");
+				} else if (is_type_polymorphic(type)) {
+					// NOTE(bill): The parameter type is still polymorphic (`$T`, `[N]$T`, ...),
+					// so the default value cannot be checked against it yet.
+					// Evaluate it as a constant now without the assignment check.
+					// It is validated against the concrete parameter type when the procedure is instantiated (which re-runs this with a non-polymorphic `type`).
+					param_value = handle_parameter_value(ctx, nullptr, nullptr, default_value, true);
 				} else {
 					param_value = handle_parameter_value(ctx, type, nullptr, default_value, true);
 				}
