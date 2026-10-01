@@ -155,6 +155,7 @@ struct TypeStruct {
 	i32             soa_count;
 	StructSoaKind   soa_kind;
 	Wait_Signal     fields_wait_signal;
+	Futex           checking_thread; // 1 + the index of the thread in `check_struct_type` for it, else 0
 	BlockingMutex   soa_mutex;
 	BlockingMutex   offset_mutex; // for settings offsets
 
@@ -181,6 +182,7 @@ struct TypeUnion {
 	Type *           polymorphic_parent;
 	Wait_Signal      polymorphic_wait_signal;
 	Wait_Signal      variants_wait_signal; // signalled once `variants` is populated (mirrors TypeStruct.fields_wait_signal)
+	Futex            checking_thread;      // 1 + the index of the thread in `check_union_type` for it, else 0
 
 	std::atomic<i16> tag_size;
 	bool             is_polymorphic;
@@ -413,6 +415,7 @@ gb_internal bool is_type_simple_compare(Type *t);
 gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false);
 gb_internal Type *base_type(Type *t);
 gb_internal Type *alloc_type_multi_pointer(Type *elem);
+gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thread);
 
 gb_internal u32 type_info_flags_of_type(Type *type) {
 	if (type == nullptr) {
@@ -2477,13 +2480,13 @@ gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Struct:
-		wait_signal_until_available(&t->Struct.polymorphic_wait_signal);
+		wait_for_record_signal(&t->Struct.polymorphic_wait_signal, &t->Struct.checking_thread);
 		if (t->Struct.polymorphic_params) {
 			return &t->Struct.polymorphic_params->Tuple;
 		}
 		break;
 	case Type_Union:
-		wait_signal_until_available(&t->Union.polymorphic_wait_signal);
+		wait_for_record_signal(&t->Union.polymorphic_wait_signal, &t->Union.checking_thread);
 		if (t->Union.polymorphic_params) {
 			return &t->Union.polymorphic_params->Tuple;
 		}
@@ -3560,7 +3563,7 @@ gb_internal bool union_variant_index_types_equal(Type *v, Type *vt) {
 gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
-	wait_signal_until_available(&u->Union.variants_wait_signal);
+	wait_for_record_signal(&u->Union.variants_wait_signal, &u->Union.checking_thread);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
@@ -3579,7 +3582,7 @@ gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 gb_internal bool union_is_variant_of(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
-	wait_signal_until_available(&u->Union.variants_wait_signal);
+	wait_for_record_signal(&u->Union.variants_wait_signal, &u->Union.checking_thread);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
@@ -3770,7 +3773,7 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:
-		wait_signal_until_available(&type->Struct.fields_wait_signal);
+		wait_for_record_signal(&type->Struct.fields_wait_signal, &type->Struct.checking_thread);
 		max_count = type->Struct.fields.count;
 		break;
 	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
@@ -3782,7 +3785,7 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 
 	switch (type->kind) {
 	case Type_Struct: {
-		wait_signal_until_available(&type->Struct.fields_wait_signal);
+		wait_for_record_signal(&type->Struct.fields_wait_signal, &type->Struct.checking_thread);
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind == Entity_Variable) {
@@ -3951,7 +3954,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			// NOTE(bill): A polymorphic struct has no fields, this only hits in the case of an error
 			return sel;
 		}
-		wait_signal_until_available(&type->Struct.fields_wait_signal);
+		wait_for_record_signal(&type->Struct.fields_wait_signal, &type->Struct.checking_thread);
 		isize field_count = type->Struct.fields.count;
 		if (field_count != 0) for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];
@@ -4421,33 +4424,16 @@ gb_internal i64 type_target_max_align(void) {
 	return max_align;
 }
 
-// Polymorphic record instances being filled by this thread, which another may already have found in the cache
-gb_internal gb_thread_local Array<Type *> records_being_filled;
-
-gb_internal void begin_filling_record(Type *t) {
-	if (records_being_filled.allocator.proc == nullptr) {
-		array_init(&records_being_filled, heap_allocator());
+gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thread) {
+	if (signal->futex.load() == 0) {
+		thread_wait_for_owner(&signal->futex, 0, checking_thread->load());
 	}
-	array_add(&records_being_filled, t);
 }
-
-gb_internal void end_filling_record(Type *t) {
-	GB_ASSERT(records_being_filled.count > 0 && records_being_filled[records_being_filled.count-1] == t);
-	array_pop(&records_being_filled);
-}
-
-gb_internal gb_thread_local i32 lazy_mutex_depth;
 
 gb_internal void wait_for_struct_fields(Type *t) {
-	if (t->Struct.polymorphic_parent == nullptr || t->Struct.fields_wait_signal.futex.load() != 0 || lazy_mutex_depth > 0) {
-		return;
+	if (t->Struct.polymorphic_parent != nullptr) {
+		wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
 	}
-	for (Type *r : records_being_filled) {
-		if (r == t) {
-			return;
-		}
-	}
-	wait_signal_until_available(&t->Struct.fields_wait_signal);
 }
 
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {

@@ -955,7 +955,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 	}
 
 	if (is_type_union(dst) && allow_unions) {
-		wait_signal_until_available(&dst->Union.variants_wait_signal);
+		wait_for_record_signal(&dst->Union.variants_wait_signal, &dst->Union.checking_thread);
 		for (Type *vt : dst->Union.variants) {
 			if (are_types_identical(vt, s)) {
 				return 1;
@@ -1713,7 +1713,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	if (e->state == EntityState_Unresolved) {
 		check_entity_decl(c, e, nullptr, named_type);
 	} else {
-		wait_for_lazy_entity(c, e);
+		wait_for_entity(e);
 	}
 	switch (e->kind) {
 	case Entity_Constant:
@@ -5172,7 +5172,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
-			wait_signal_until_available(&t->Union.variants_wait_signal);
+			wait_for_record_signal(&t->Union.variants_wait_signal, &t->Union.checking_thread);
 
 			isize count = t->Union.variants.count;
 			ValidIndexAndScore *valids = temporary_alloc_array<ValidIndexAndScore>(count);
@@ -5205,9 +5205,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				first_success_index = valids[0].index;
 			}
 
-			gbString type_str = type_to_string(target_type);
-			defer (gb_string_free(type_str));
-
 			if (valid_count == 1) {
 				Type *new_type = t->Union.variants[first_success_index];
 				if (operand->mode != Addressing_Constant ||
@@ -5219,6 +5216,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				break;
 			} else if (valid_count > 1) {
 				ERROR_BLOCK();
+				gbString type_str = type_to_string(target_type);
+				defer (gb_string_free(type_str));
 
 				GB_ASSERT(first_success_index >= 0);
 				convert_untyped_error(c, operand, target_type, true);
@@ -5244,6 +5243,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				target_type = t_untyped_uninit;
 			} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 				ERROR_BLOCK();
+				gbString type_str = type_to_string(target_type);
+				defer (gb_string_free(type_str));
 
 				convert_untyped_error(c, operand, target_type, true);
 				if (count > 0) {
@@ -5746,7 +5747,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 		if (e != nullptr) {
 			// its kind and type are read by the caller
-			wait_for_lazy_entity(c, e);
+			wait_for_entity(e);
 		}
 		return e;
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
@@ -8834,9 +8835,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			set_base_type(named_type, struct_type);
 
 			check_open_scope(&ctx, node);
-			begin_filling_record(struct_type);
 			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
-			end_filling_record(struct_type);
 			// check_struct_type released found_gen_types->mutex after publishing the instantiation.
 			gen_types_locked = false;
 			check_close_scope(&ctx);
@@ -9745,7 +9744,7 @@ gb_internal bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, A
 		TEMPORARY_ALLOCATOR_GUARD();
 
 		Type *union_type = base_type(th);
-		wait_signal_until_available(&union_type->Union.variants_wait_signal);
+		wait_for_record_signal(&union_type->Union.variants_wait_signal, &union_type->Union.checking_thread);
 		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
 
 		for (Type *vt : union_type->Union.variants) {
@@ -11088,7 +11087,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	// If exactly one matches, retarget to that variant and let the normal path build it (the surrounding assignment then wraps it into the union).
 	// Otherwise report a clear error.
 	if (t->kind == Type_Union && cl->type == nullptr && cl->elems.count > 0) {
-		wait_signal_until_available(&t->Union.variants_wait_signal);
+		wait_for_record_signal(&t->Union.variants_wait_signal, &t->Union.checking_thread);
 		auto matches = array_make<Type *>(temporary_allocator(), 0, t->Union.variants.count);
 		for (Type *variant : t->Union.variants) {
 			Operand trial = {};
@@ -11156,7 +11155,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				break;
 			}
 
-			wait_signal_until_available(&t->Struct.fields_wait_signal);
+			wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
 			isize field_count = t->Struct.fields.count;
 			isize min_field_count = t->Struct.fields.count;
 			for (isize i = min_field_count-1; i >= 0; i--) {
@@ -12105,7 +12104,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 	Type *src = type_deref(o->type);
 	Type *bsrc = base_type(src);
 	if (bsrc->kind == Type_Union) {
-		wait_signal_until_available(&bsrc->Union.variants_wait_signal);
+		wait_for_record_signal(&bsrc->Union.variants_wait_signal, &bsrc->Union.checking_thread);
 	}
 
 

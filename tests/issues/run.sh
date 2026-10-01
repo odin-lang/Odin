@@ -101,6 +101,7 @@ $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
 $ODIN run ../test_issue_7482.odin $COMMON
 $ODIN run ../test_issue_7564.odin $COMMON
+$ODIN test ../test_issue_7566.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
@@ -151,6 +152,7 @@ else
 fi
 
 $ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
+$ODIN check ../test_issue_foreign_import_attributes.odin -no-entry-point $COMMON_CHECK
 if [[ $($ODIN check ../test_issue_foreign_redeclaration_mismatch.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else

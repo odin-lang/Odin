@@ -724,6 +724,9 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
+	struct_type->Struct.checking_thread.store(cast(i32)current_thread_index() + 1);
+	defer (struct_type->Struct.checking_thread.store(0));
+
 	String context = str_lit("struct");
 
 	isize min_field_count = 0;
@@ -845,6 +848,9 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, GenTypesData *poly_gen_types_to_unlock) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
+
+	union_type->Union.checking_thread.store(cast(i32)current_thread_index() + 1);
+	defer (union_type->Union.checking_thread.store(0));
 
 
 	union_type->Union.node  = node;
@@ -2254,8 +2260,8 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		    pattern->Struct.is_packed != source->Struct.is_packed) {
 			return Subst_Unhandled;
 		}
-		wait_signal_until_available(&pattern->Struct.fields_wait_signal);
-		wait_signal_until_available(&source->Struct.fields_wait_signal);
+		wait_for_record_signal(&pattern->Struct.fields_wait_signal, &pattern->Struct.checking_thread);
+		wait_for_record_signal(&source->Struct.fields_wait_signal, &source->Struct.checking_thread);
 		if (pattern->Struct.fields.count != source->Struct.fields.count) {
 			return Subst_NoMatch;
 		}
@@ -4391,7 +4397,7 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 	GB_ASSERT(old_struct->kind == Type_Struct);
 
 	if (wait_to_finish) {
-		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
+		wait_for_record_signal(&old_struct->Struct.fields_wait_signal, &old_struct->Struct.checking_thread);
 	} else {
 		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load() != 0);
 	}

@@ -849,7 +849,7 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		bool is_ptr = is_type_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
-			wait_signal_until_available(&t->Struct.fields_wait_signal);
+			wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
 
 			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
@@ -1540,7 +1540,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		// TODO(bill): Make robust
 		Type *bt = base_type(type_deref(x.type));
 		if (bt->kind == Type_Union) {
-			wait_signal_until_available(&bt->Union.variants_wait_signal);
+			wait_for_record_signal(&bt->Union.variants_wait_signal, &bt->Union.checking_thread);
 		}
 
 		Type *case_type = nullptr;

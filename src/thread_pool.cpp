@@ -174,6 +174,47 @@ gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, vo
 	return true;
 }	
 
+gb_internal bool thread_wait_for_owner(Futex *futex, Footex value, i32 owner) {
+	if (futex->load() != value) {
+		return true;
+	}
+	Thread *self = current_thread;
+	if (self != nullptr && owner > 0) {
+		i32 me = cast(i32)self->idx + 1;
+		if (owner == me) {
+			return false;
+		}
+		self->waiting_futex.store(futex);
+		self->waiting_value.store(value);
+		self->waiting_for.store(owner);
+
+		// NOTE(bill): a thread counts as waiting only while what it waits on is unchanged
+		// when it clears its own `waiting_for` only once it has woken
+		Slice<Thread> threads = self->pool->threads;
+		i32 t = owner;
+		for (isize i = 0; i <= threads.count; i++) {
+			if (t == me) {
+				self->waiting_for.store(0);
+				return false;
+			}
+			Thread *other = &threads[t-1];
+			i32 next = other->waiting_for.load();
+			Futex *f = other->waiting_futex.load();
+			if (next == 0 || f == nullptr || f->load() != other->waiting_value.load()) {
+				break;
+			}
+			t = next;
+		}
+	}
+	while (futex->load() == value) {
+		futex_wait(futex, value);
+	}
+	if (self != nullptr) {
+		self->waiting_for.store(0);
+	}
+	return true;
+}
+
 gb_internal void thread_pool_wait(ThreadPool *pool) {
 	WorkerTask task;
 

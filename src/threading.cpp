@@ -73,6 +73,10 @@ struct Thread {
 
 	struct Arena *permanent_arena;
 	struct Arena *temporary_arena;
+
+	std::atomic<std::atomic<i32> *> waiting_futex;
+	std::atomic<i32>                waiting_value;
+	std::atomic<i32>                waiting_for;
 };
 
 typedef std::atomic<i32> Futex;

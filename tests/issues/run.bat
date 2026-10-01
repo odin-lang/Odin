@@ -61,6 +61,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_7336.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin check ..\test_issue_foreign_import_attributes.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration_mismatch.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin doc ..\test_issue_asm_doc_category.odin -file 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
@@ -77,6 +78,7 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin run ..\test_issue_7482.odin %COMMON% || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local -o:speed || exit /b
+..\..\..\odin test ..\test_issue_7566.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7587.odin %COMMON%  || exit /b
 ..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
 

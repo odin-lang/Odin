@@ -210,6 +210,7 @@ struct Entity {
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
+	Futex                    checking_thread; // 1 + the index of the thread in `check_entity_decl` for it, else 0
 	std::atomic<i32>         min_dep_count;
 	Token       token;
 	Scope *     scope;

@@ -1953,15 +1953,13 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 			GB_ASSERT(p != q);
 
 			bool is_invalid = false;
+			bool different_results = false;
 
 			TokenPos pos = q->token.pos;
 
 			if (q->type == nullptr || q->type == t_invalid || invalid[k]) {
 				continue;
 			}
-
-
-			ERROR_BLOCK();
 
 			if (q->flags & EntityFlag_Disabled) {
 				continue;
@@ -1984,21 +1982,18 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 
 			if (!both_have_where_clauses) switch (kind) {
 			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				// is_invalid = true;
 				// break;
 			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure '%.*s' has the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
+				different_results = true;
 				break;
 			case ProcOverload_Polymorphic:
 				break;
@@ -2011,6 +2006,13 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 			}
 
 			if (is_invalid) {
+				// NOTE(bill): only now, as the error block is shared by every thread
+				ERROR_BLOCK();
+				if (different_results) {
+					error(p->token, "Overloaded procedure '%.*s' has the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				} else {
+					error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				}
 				error_line("\tprevious procedure at %s\n", token_pos_to_string(pos));
 				invalid[k] = true;
 			}
@@ -2177,16 +2179,25 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 		return;
 	}
 	defer (global_when_trial_end_entity(&trial_scope));
-	bool is_lazy = (e->flags & EntityFlag_Lazy) != 0;
-	if (is_lazy) {
-		mutex_lock(&ctx->info->lazy_mutex);
-		if (e->state == EntityState_Resolved) {
-			// NOTE: another thread checked it whilst this one waited
-			mutex_unlock(&ctx->info->lazy_mutex);
+
+	// NOTE(bill): checked by whichever thread claims it first; any other that needs it meanwhile waits for it
+	i32 owner = 0;
+	if (!e->checking_thread.compare_exchange_strong(owner, cast(i32)current_thread_index() + 1)) {
+		if (thread_wait_for_owner(&e->checking_thread, owner, owner)) {
 			return;
 		}
-		lazy_mutex_depth += 1;
+		// NOTE: this thread is checking it already, or the thread checking it waits for this one
+		error(e->token, "Illegal declaration cycle of `%.*s`", LIT(e->token.string));
+		return;
 	}
+	if (e->state == EntityState_Resolved) {
+		// NOTE: another thread finished it before this one claimed it
+		e->checking_thread.store(0);
+		futex_broadcast(&e->checking_thread);
+		return;
+	}
+
+	bool is_lazy = (e->flags & EntityFlag_Lazy) != 0;
 	GlobalEntityTimingFrame timing_frame = global_entity_timing_begin(e);
 
 	String name = e->token.string;
@@ -2290,20 +2301,20 @@ end:;
 	global_entity_timing_end(timing_frame, e);
 	// NOTE(bill): Add it to the list of checked entities
 	if (is_lazy) {
+		mutex_lock(&ctx->info->lazy_mutex);
 		array_add(&ctx->info->entities, e);
-		lazy_mutex_depth -= 1;
 		mutex_unlock(&ctx->info->lazy_mutex);
 	}
+	e->checking_thread.store(0);
+	futex_broadcast(&e->checking_thread);
 }
 
-// A lazy entity is only ever in progress on the thread holding `lazy_mutex`, so taking it (it is
-// recursive) waits out another thread and is a no-op on the thread that is checking it
-gb_internal void wait_for_lazy_entity(CheckerContext *ctx, Entity *e) {
-	if ((e->flags & EntityFlag_Lazy) == 0 || e->state == EntityState_Resolved) {
-		return;
+// An entity in progress on another thread is waited for, unless that thread waits for this one
+gb_internal void wait_for_entity(Entity *e) {
+	i32 owner = e->checking_thread.load();
+	if (owner != 0) {
+		thread_wait_for_owner(&e->checking_thread, owner, owner);
 	}
-	mutex_lock(&ctx->info->lazy_mutex);
-	mutex_unlock(&ctx->info->lazy_mutex);
 }
 
 

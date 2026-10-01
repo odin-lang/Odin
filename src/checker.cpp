@@ -7537,7 +7537,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	array_sort(c->info.entities, init_procedures_cmp);
 
 	TIME_SECTION("check all global entities");
+	isize entity_count = c->info.entities.count;
 	check_all_global_entities(c);
+
+	// NOTE(bill): lazy entities are added once checked, which with several threads is in no fixed order
+	gb_sort_array(c->info.entities.data + entity_count, c->info.entities.count - entity_count, init_procedures_cmp);
 
 	if (build_context.internal_global_entity_graph) {
 		TIME_SECTION("print global entity graph");

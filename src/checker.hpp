@@ -780,7 +780,7 @@ struct CheckerInfo {
 
 	BlockingMutex type_and_value_mutex;
 
-	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
+	RecursiveMutex lazy_mutex; // for adding checked lazy entities to `entities`
 
 
 	// BlockingMutex type_info_mutex; // NOT recursive
@@ -970,7 +970,7 @@ struct GlobalEntityTimingFrame {
 };
 gb_internal GlobalEntityTimingFrame global_entity_timing_begin(Entity *e);
 gb_internal void global_entity_timing_end(GlobalEntityTimingFrame const &f, Entity *e);
-gb_internal void wait_for_lazy_entity(CheckerContext *c, Entity *e);
+gb_internal void wait_for_entity(Entity *e);
 gb_internal Ast *remove_type_alias_clutter(Ast *node);
 gb_internal void check_const_decl(CheckerContext *c, Entity *e, Ast *type_expr, Ast *init_expr, Type *named_type);
 gb_internal void check_type_decl(CheckerContext *c, Entity *e, Ast *type_expr, Type *def);

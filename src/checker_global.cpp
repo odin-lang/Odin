@@ -749,27 +749,32 @@ gb_internal void global_graph_print_entity(Entity *e) {
 
 
 struct GlobalGroup {
-	i32  start; // into `GlobalGroupGraph::members`
-	i32  count;
-	bool done;
+	i32               start; // into `GlobalGroupGraph::members`
+	i32               count;
+	std::atomic<bool> done;
 };
 
 struct GlobalGroupGraph {
 	Array<Entity *>       nodes;
 	PtrMap<Entity *, i32> node_of;
-	Array<i32>            offsets; // node -> the nodes it names, as `targets[offsets[v]..offsets[v+1]]`
+	Array<i32>            offsets;           // node -> the nodes it names, as `targets[offsets[v]..<offsets[v+1]]`
 	Array<i32>            targets;
 	Array<i32>            group_of;
-	Array<GlobalGroup>    groups;  // every dependency of a group has a lower index
-	Array<i32>            members; // nodes, by group, in source order
+	Array<GlobalGroup>    groups;            // every dependency of a group has a lower index
+	Array<i32>            members;           // nodes by group in source order
 
-	bool   active;
-	i32    current_group;
-	Entity *current_entity;
-	isize  missing_edges;
+	Array<i32>            dependent_offsets; // group -> the groups that depend on it as `dependents[dependent_offsets[gi]..<dependent_offsets[gi+1]]`
+	Array<i32>            dependents;
+	std::atomic<i32> *    pending;           // per group its dependencies not yet done
+
+	Checker *          checker;
+	bool               active;
+	std::atomic<isize> missing_edges;
 };
 
 gb_global GlobalGroupGraph global_groups;
+gb_global gb_thread_local i32      global_group_current = -1;
+gb_global gb_thread_local Entity * global_group_current_entity;
 
 struct GlobalPlaceholderHit {
 	Scope *        scope;
@@ -1268,7 +1273,9 @@ gb_internal void build_global_groups(Checker *c, GlobalGroupGraph *g) {
 	array_init(&g->groups,  heap_allocator(), group_count);
 	array_init(&g->members, heap_allocator(), node_count);
 	for (i32 gi = 0; gi < group_count; gi++) {
-		g->groups[gi] = {};
+		g->groups[gi].start = 0;
+		g->groups[gi].count = 0;
+		g->groups[gi].done.store(false);
 	}
 	for (i32 v = 0; v < node_count; v++) {
 		g->groups[g->group_of[v]].count += 1;
@@ -1299,7 +1306,7 @@ gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e) {
 		}
 	} else {
 		i32 gi = g->group_of[*v];
-		if (gi == g->current_group || g->groups[gi].done) {
+		if (gi == global_group_current || g->groups[gi].done.load()) {
 			return;
 		}
 	}
@@ -1312,9 +1319,9 @@ gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e) {
 		gb_printf_err(" needs ");
 		global_graph_print_entity(e);
 		gb_printf_err(v == nullptr ? ", which is not in the graph" : "");
-		if (g->current_entity != by) {
+		if (global_group_current_entity != by) {
 			gb_printf_err(", while checking ");
-			global_graph_print_entity(g->current_entity);
+			global_graph_print_entity(global_group_current_entity);
 		}
 		gb_printf_err("\n");
 	}
@@ -1331,14 +1338,14 @@ gb_internal void check_global_group(Checker *c, GlobalGroupGraph *g, i32 gi) {
 	auto soa_types = array_make<Type *>(heap_allocator());
 	global_group_soa_types = &soa_types;
 
-	g->current_group = gi;
+	global_group_current = gi;
 	for (i32 k = 0; k < group->count; k++) {
 		Entity *e = g->nodes[members[k]];
 		if (e->flags & EntityFlag_Lazy) {
 			// NOTE: only checked when something uses it; the group orders it after what it names
 			continue;
 		}
-		g->current_entity = e;
+		global_group_current_entity = e;
 		GlobalEntityTimingFrame timing_frame = global_entity_timing_begin(e);
 		check_single_global_entity(c, e, e->decl_info, &untyped);
 		if (e->type != nullptr && is_type_typed(e->type)) {
@@ -1361,41 +1368,24 @@ gb_internal void check_global_group(Checker *c, GlobalGroupGraph *g, i32 gi) {
 	add_untyped_expressions(&c->info, &untyped);
 	map_destroy(&untyped);
 
-	group->done = true;
-	g->current_group = -1;
-	g->current_entity = nullptr;
+	group->done.store(true);
+	global_group_current = -1;
+	global_group_current_entity = nullptr;
 }
 
-// Groups in dependency order; with `-internal-shuffle-global-entities`, a random one of the groups whose
-// dependencies are done, as a parallel checker might
-gb_internal void check_global_groups(Checker *c, GlobalGroupGraph *g) {
+gb_internal void build_global_group_dependents(GlobalGroupGraph *g) {
 	i32 group_count = cast(i32)g->groups.count;
-	u64 seed = build_context.internal_shuffle_global_entities;
-	if (seed == 0) {
-		for (i32 gi = 0; gi < group_count; gi++) {
-			check_global_group(c, g, gi);
-		}
-		return;
-	}
-
-	auto dependents = array_make<Array<i32> >(heap_allocator(), group_count);
-	auto dep_count  = array_make<i32>        (heap_allocator(), group_count);
-	auto seen       = array_make<i32>        (heap_allocator(), group_count);
-	auto ready      = array_make<i32>        (heap_allocator(), 0, group_count);
-	defer ({
-		for (auto &d : dependents) {
-			array_free(&d);
-		}
-		array_free(&dependents);
-	});
-	defer (array_free(&dep_count));
+	auto edge_from = array_make<i32>(heap_allocator(), 0, group_count);
+	auto edge_to   = array_make<i32>(heap_allocator(), 0, group_count);
+	auto seen      = array_make<i32>(heap_allocator(), group_count);
+	defer (array_free(&edge_from));
+	defer (array_free(&edge_to));
 	defer (array_free(&seen));
-	defer (array_free(&ready));
 
+	g->pending = gb_alloc_array(heap_allocator(), std::atomic<i32>, group_count);
 	for (i32 gi = 0; gi < group_count; gi++) {
-		dep_count[gi] = 0;
-		dependents[gi] = {};
 		seen[gi] = -1;
+		g->pending[gi].store(0);
 	}
 	for (i32 gi = 0; gi < group_count; gi++) {
 		GlobalGroup const &group = g->groups[gi];
@@ -1405,36 +1395,79 @@ gb_internal void check_global_groups(Checker *c, GlobalGroupGraph *g) {
 				i32 dep = g->group_of[g->targets[i]];
 				if (dep != gi && seen[dep] != gi) {
 					seen[dep] = gi;
-					dep_count[gi] += 1;
-					if (dependents[dep].allocator.proc == nullptr) {
-						array_init(&dependents[dep], heap_allocator());
-					}
-					array_add(&dependents[dep], gi);
+					array_add(&edge_from, dep);
+					array_add(&edge_to, gi);
+					g->pending[gi].fetch_add(1);
 				}
 			}
 		}
-		if (dep_count[gi] == 0) {
+	}
+	global_graph_csr(group_count, edge_from, edge_to, &g->dependent_offsets, &g->dependents);
+}
+
+gb_internal void check_global_group_and_release(GlobalGroupGraph *g, i32 gi, Array<i32> *ready);
+
+gb_internal WORKER_TASK_PROC(check_global_group_worker) {
+	check_global_group_and_release(&global_groups, cast(i32)cast(intptr)data, nullptr);
+	return 0;
+}
+
+gb_internal void check_global_group_and_release(GlobalGroupGraph *g, i32 gi, Array<i32> *ready) {
+	check_global_group(g->checker, g, gi);
+	for (i32 i = g->dependent_offsets[gi]; i < g->dependent_offsets[gi+1]; i++) {
+		i32 next = g->dependents[i];
+		if (g->pending[next].fetch_sub(1) == 1) {
+			if (ready != nullptr) {
+				array_add(ready, next);
+			} else {
+				thread_pool_add_task(check_global_group_worker, cast(void *)cast(intptr)next);
+			}
+		}
+	}
+}
+
+gb_internal void check_global_groups(Checker *c, GlobalGroupGraph *g) {
+	i32 group_count = cast(i32)g->groups.count;
+	u64 seed = build_context.internal_shuffle_global_entities;
+	g->checker = c;
+
+	if (seed == 0 && (build_context.thread_count <= 1 || build_context.no_threaded_checker)) {
+		for (i32 gi = 0; gi < group_count; gi++) {
+			check_global_group(c, g, gi);
+		}
+		return;
+	}
+
+	build_global_group_dependents(g);
+
+	// NOTE: all found before any is checked, as checking one releases others
+	auto ready = array_make<i32>(heap_allocator(), 0, group_count);
+	defer (array_free(&ready));
+	for (i32 gi = 0; gi < group_count; gi++) {
+		if (g->pending[gi].load() == 0) {
 			array_add(&ready, gi);
 		}
 	}
 
-	u64 state = seed;
-	isize checked = 0;
-	while (ready.count > 0) {
-		isize i = cast(isize)(global_group_random(&state) % cast(u64)ready.count);
-		i32 gi = ready[i];
-		ready[i] = ready[ready.count-1];
-		array_pop(&ready);
-
-		check_global_group(c, g, gi);
-		checked += 1;
-		for (i32 next : dependents[gi]) {
-			if (--dep_count[next] == 0) {
-				array_add(&ready, next);
-			}
+	if (seed == 0) {
+		for (i32 gi : ready) {
+			thread_pool_add_task(check_global_group_worker, cast(void *)cast(intptr)gi);
+		}
+		thread_pool_wait();
+	} else {
+		u64 state = seed;
+		while (ready.count > 0) {
+			isize i = cast(isize)(global_group_random(&state) % cast(u64)ready.count);
+			i32 gi = ready[i];
+			ready[i] = ready[ready.count-1];
+			array_pop(&ready);
+			check_global_group_and_release(g, gi, &ready);
 		}
 	}
-	GB_ASSERT(checked == group_count);
+
+	for (i32 gi = 0; gi < group_count; gi++) {
+		GB_ASSERT(g->groups[gi].done.load());
+	}
 }
 
 gb_internal void destroy_global_groups(GlobalGroupGraph *g) {
@@ -1445,6 +1478,12 @@ gb_internal void destroy_global_groups(GlobalGroupGraph *g) {
 	array_free(&g->group_of);
 	array_free(&g->groups);
 	array_free(&g->members);
+	array_free(&g->dependent_offsets);
+	array_free(&g->dependents);
+	if (g->pending != nullptr) {
+		gb_free(heap_allocator(), g->pending);
+		g->pending = nullptr;
+	}
 }
 
 gb_internal void check_all_global_entities(Checker *c) {
@@ -1470,12 +1509,11 @@ gb_internal void check_all_global_entities(Checker *c) {
 
 	TIME_SECTION("check all global entities - check groups");
 	g->active = true;
-	g->current_group = -1;
 	check_global_groups(c, g);
 	g->active = false;
 
-	if (build_context.internal_check_global_edges && g->missing_edges > 0) {
-		gb_printf_err("%td missing global dependencies\n", g->missing_edges);
+	if (build_context.internal_check_global_edges && g->missing_edges.load() > 0) {
+		gb_printf_err("%td missing global dependencies\n", g->missing_edges.load());
 		gb_exit(1);
 	}
 
@@ -2217,7 +2255,7 @@ gb_internal void print_global_groups(GlobalGroupGraph *g) {
 	f64 critical_ms = critical >= 0 ? global_graph_ms(path[critical], freq) : 0;
 
 	gb_printf_err("Global entity groups\n");
-	gb_printf_err("  entities: %td (%td not timed), dependency edges: %td, missing edges: %td\n", g->nodes.count, untimed, g->targets.count, g->missing_edges);
+	gb_printf_err("  entities: %td (%td not timed), dependency edges: %td, missing edges: %td\n", g->nodes.count, untimed, g->targets.count, g->missing_edges.load());
 	gb_printf_err("  self time: %.3f ms in the groups, %.3f ms during 'when' resolution\n", total_ms, global_graph_ms(when_ticks, freq));
 	gb_printf_err("  groups:    %d (%td with a cycle), largest has %d entities\n", group_count, cyclic, largest >= 0 ? g->groups[largest].count : 0);
 	gb_printf_err("  critical path: %.3f ms over %d groups -> at most %.2fx speedup\n",
