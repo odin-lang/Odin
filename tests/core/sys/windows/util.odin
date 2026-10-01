@@ -252,3 +252,30 @@ utf8_to_wstring_alloc_test :: proc(t : ^testing.T) {
 	testing.expect(t, result != nil)
 	testing.expect_value(t, buf[0], 0)
 }
+
+@(test)
+utf8_wstring_multi_pointer_test :: proc(t: ^testing.T) {
+	buf: [16]u16 = ---
+	ptr := win32.utf8_to_wstring_multi_pointer_buf(buf[:], "Hello")
+	testing.expect(t, ptr != nil)
+	testing.expect_value(t, buf[5], 0)
+
+	result, err := win32.wstring_to_utf8(ptr)
+	testing.expect(t, err == .None)
+	testing.expect_value(t, result, "Hello")
+
+	ptr = win32.utf8_to_wstring_multi_pointer_alloc("World")
+	testing.expect(t, ptr != nil)
+	testing.expect_value(t, ptr[5], 0)
+
+	result, err = win32.wstring_to_utf8(ptr)
+	testing.expect(t, err == .None)
+	testing.expect_value(t, result, "World")
+
+	ptr = win32.utf8_to_wstring_multi_pointer_buf(buf[:1], "")
+	testing.expect(t, ptr != nil)
+	testing.expect_value(t, buf[0], 0)
+
+	ptr = win32.utf8_to_wstring_multi_pointer_buf(buf[:0], "")
+	testing.expect(t, ptr == nil)
+}
