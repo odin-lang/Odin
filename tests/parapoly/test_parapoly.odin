@@ -131,3 +131,171 @@ parapoly_using_constraint :: proc(t: ^testing.T) { // using on a constrained-gen
 	v.x = 42
 	testing.expect(t, pp_using(v) == 42, "using $P/PP_Base($T) + promoted-member access")
 }
+
+// --- deferred untyped-argument inference ------------------------------------------------------------
+// An untyped argument (`{...}`, `.Member`, or a ternary whose branches are both untyped) passed to a
+// polymorphic parameter whose type is only known after substitution is left unchecked and resolved
+// from that parameter's type once it is determined from the other arguments. Covers single procedures,
+// procedure groups (including the `append` builtin), variadics, named/reversed arguments, and the
+// nested/ternary/implicit-selector forms. All run through codegen.
+
+pp_def_push :: proc(a: ^[dynamic]$E, e: E)            { append(a, e) }
+pp_def_two  :: proc(a: ^[dynamic]$E, x: E, y: E)      { append(a, x); append(a, y) }
+pp_def_var  :: proc(a: ^[dynamic]$E, xs: ..E)         { for x in xs { append(a, x) } }
+pp_def_one  :: proc(a: ^[dynamic]$E, e: E)   -> string { append(a, e); return "one" }
+pp_def_many :: proc(a: ^[dynamic]$E, e: ..E) -> string { for x in e { append(a, x) }; return "many" }
+pp_def_group :: proc{pp_def_one, pp_def_many}
+
+@test
+parapoly_deferred_single :: proc(t: ^testing.T) { // untyped `{...}` resolved from a poly parameter
+	a: [dynamic][3]int; defer delete(a)
+	pp_def_push(&a, {1, 2, 3})           // positional
+	pp_def_push(a = &a, e = {4, 5, 6})   // named
+	pp_def_push(e = {7, 8, 9}, a = &a)   // reversed: literal before the determining arg
+	testing.expect(t, len(a) == 3, "single-proc deferred literal count")
+	testing.expect(t, a[0] == [3]int{1, 2, 3} && a[2] == [3]int{7, 8, 9}, "single-proc deferred literal values")
+}
+
+@test
+parapoly_deferred_multiple :: proc(t: ^testing.T) { // several untyped literals in one call
+	a: [dynamic][2]int; defer delete(a)
+	pp_def_two(&a, {1, 2}, {3, 4})           // two positional, shared elem type
+	pp_def_var(&a, {5, 6}, {7, 8}, {9, 10})  // variadic, three literals
+	testing.expect(t, len(a) == 5, "multiple deferred literals count")
+	testing.expect(t, a[1] == [2]int{3, 4} && a[4] == [2]int{9, 10}, "multiple deferred literals values")
+}
+
+@test
+parapoly_deferred_ternary :: proc(t: ^testing.T) { // both-branch-untyped ternaries as the deferred arg
+	a: [dynamic][2]int; defer delete(a)
+	c := true
+	pp_def_push(&a, c ? {1, 2} : {3, 4})                 // ?:
+	pp_def_push(&a, {5, 6} if !c else {7, 8})            // if/else
+	pp_def_push(&a, {9, 9} when ODIN_DEBUG else {8, 8})  // when (a[2], value depends on build)
+	pp_def_push(&a, c ? {1, 1} : (c ? {2, 2} : {3, 3}))  // nested
+	testing.expect(t, a[0] == [2]int{1, 2}, "ternary ?: deferred arg")
+	testing.expect(t, a[1] == [2]int{7, 8}, "ternary if/else deferred arg")
+	testing.expect(t, a[3] == [2]int{1, 1}, "nested ternary deferred arg")
+}
+
+@test
+parapoly_deferred_implicit_selector :: proc(t: ^testing.T) { // `.Member` resolved from a poly parameter
+	a: [dynamic]PP_Dir; defer delete(a)
+	c := false
+	pp_def_push(&a, .E)           // implicit selector
+	pp_def_push(&a, c ? .N : .W)  // ternary of selectors
+	testing.expect(t, a[0] == .E && a[1] == .W, "implicit-selector deferred arg")
+}
+
+@test
+parapoly_deferred_empty :: proc(t: ^testing.T) { // empty `{}` -> zero value of the resolved type
+	a: [dynamic][3]int; defer delete(a)
+	pp_def_push(&a, {})
+	testing.expect(t, a[0] == [3]int{0, 0, 0}, "empty compound literal deferred arg")
+}
+
+@test
+parapoly_deferred_append_group :: proc(t: ^testing.T) { // the `append` builtin (procedure group)
+	a: [dynamic][3]int; defer delete(a)
+	append(&a, {1, 2, 3})                   // positional -> append_elem
+	append(&a, {4, 5, 6}, {7, 8, 9})        // variadic   -> append_elems
+	append(array = &a, arg = {10, 11, 12})  // named
+	testing.expect(t, len(a) == 4, "append group deferred literal count")
+	testing.expect(t, a[0] == [3]int{1, 2, 3} && a[3] == [3]int{10, 11, 12}, "append group deferred literal values")
+}
+
+@test
+parapoly_deferred_group_ranking :: proc(t: ^testing.T) { // variadic vs non-variadic overload ranking
+	a: [dynamic][2]int; defer delete(a)
+	r1 := pp_def_group(&a, {1, 2})          // one literal -> non-variadic wins (variadic score penalty)
+	r2 := pp_def_group(&a, {3, 4}, {5, 6})  // two literals -> only the variadic overload fits the arity
+	testing.expect(t, r1 == "one", "single deferred literal picks non-variadic overload")
+	testing.expect(t, r2 == "many", "multiple deferred literals pick variadic overload")
+}
+
+@test
+parapoly_deferred_or_else :: proc(t: ^testing.T) { // or_else default self-types from the left operand
+	m := make(map[string][2]int); defer delete(m)
+	m["p"] = {1, 2}
+	a: [dynamic][2]int; defer delete(a)
+	pp_def_push(&a, m["p"]      or_else {9, 9})  // present -> {1,2}
+	pp_def_push(&a, m["absent"] or_else {7, 8})  // missing -> {7,8}
+	testing.expect(t, a[0] == [2]int{1, 2} && a[1] == [2]int{7, 8}, "or_else default resolved")
+}
+
+pp_is_sparse :: proc(x: $T) -> bool {
+	#partial switch v in type_info_of(T).variant {
+	case reflect.Type_Info_Enumerated_Array: return v.is_sparse
+	}
+	return false
+}
+
+@test
+parapoly_sparse_dense_dedup :: proc(t: ^testing.T) { // guards are_types_identical merging [E]T and #sparse[E]T
+	dense:  [PP_Dir]int
+	sparse: #sparse[PP_Dir]int
+	testing.expect(t, pp_is_sparse(dense)  == false, "[E]T instantiation is not sparse")
+	testing.expect(t, pp_is_sparse(sparse) == true,  "#sparse[E]T not merged with the dense instantiation")
+}
+
+pp_rec_arr  :: proc(x: PP_Bar([2]$T))       -> typeid { return T }
+pp_rec_earr :: proc(x: PP_Bar([PP_Dir]$T))  -> typeid { return T }
+
+@test
+parapoly_record_compound_arg :: proc(t: ^testing.T) { // record whose polymorphic argument is a compound type
+	v: PP_Bar([2]int)        // PP_Bar :: struct($X){ v: X }
+	w: PP_Bar([PP_Dir]f32)
+	testing.expect(t, pp_rec_arr(v)  == int, "Record([2]$T) determination (was a subst_apply crash)")
+	testing.expect(t, pp_rec_earr(w) == f32, "Record([E]$T) determination")
+}
+
+PP_Vec :: struct($N: int, $name: string, $signed: bool) { data: [N]int } // non-type poly const params
+pp_vec_name   :: proc(v: PP_Vec($N, $name, $signed)) -> string { return name }
+pp_vec_n      :: proc(v: PP_Vec($N, $name, $signed)) -> int    { return N }
+pp_vec_signed :: proc(v: PP_Vec($N, $name, $signed)) -> bool   { return signed }
+
+@test
+parapoly_record_nonint_const :: proc(t: ^testing.T) { // determine non-integer const params of a record arg
+	v: PP_Vec(3, "hello", true)
+	testing.expect(t, pp_vec_name(v)   == "hello", "string poly-const param determined from record arg")
+	testing.expect(t, pp_vec_n(v)      == 3,       "int poly-const param determined alongside a string one")
+	testing.expect(t, pp_vec_signed(v) == true,    "bool poly-const param determined from record arg")
+}
+
+// Tier-A: a bare compound literal determines a polymorphic ELEMENT type (`[K]$T`, `[]$T`), count fixed.
+pp_elem_arr :: proc(a: [3]$T) -> typeid { return T }
+pp_elem_sli :: proc(s: []$T)  -> typeid { return T }
+
+@test
+parapoly_elem_from_compound_lit :: proc(t: ^testing.T) {
+	testing.expect(t, pp_elem_arr({1, 2, 3})  == int, "[3]$T element determined from literal")
+	testing.expect(t, pp_elem_arr({-1, 2, 3}) == int, "[3]$T element from unary-over-literal")
+	testing.expect(t, pp_elem_sli({1, 2, 3})  == int, "[]$T element determined from literal")
+	testing.expect(t, pp_elem_sli({1.5, 2.5}) == f64, "[]$T element defaults untyped float to f64")
+}
+
+// A bare compound literal also determines a polymorphic COUNT (`[$N]$T`, `[$N]int`) from its length.
+pp_cnt_both :: proc(a: [$N]$T) -> (int, typeid) { return N, T }
+pp_cnt_int  :: proc(a: [$N]int) -> int { return N }
+
+@test
+parapoly_count_from_compound_lit :: proc(t: ^testing.T) {
+	n1, e1 := pp_cnt_both({1, 2, 3})
+	testing.expect(t, n1 == 3 && e1 == int, "[$N]$T binds N=3 and T=int from literal")
+	n2, e2 := pp_cnt_both({1.5, 2.5})
+	testing.expect(t, n2 == 2 && e2 == f64, "[$N]$T binds N=2 and T=f64 from literal")
+	testing.expect(t, pp_cnt_int({10, 20, 30, 40}) == 4, "[$N]int binds N=4 (concrete element)")
+	v := 7
+	testing.expect(t, pp_cnt_int({v, v}) == 2, "[$N]int count works with non-literal elements")
+}
+
+// A constant default value for a polymorphic parameter, validated against the concrete type at instantiation.
+pp_def :: proc(x: $T, y: T = 0) -> T { return y }
+
+@test
+parapoly_poly_param_default :: proc(t: ^testing.T) {
+	testing.expect(t, pp_def(5)      == 0,   "untyped default resolves to the concrete param type")
+	testing.expect(t, pp_def(5, 9)   == 9,   "explicit argument overrides the default")
+	testing.expect(t, pp_def(2.5)    == 0.0, "same default against a different instantiation (f64)")
+	testing.expect(t, pp_def(2.5, 3) == 3.0, "explicit float argument")
+}

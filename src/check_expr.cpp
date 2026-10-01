@@ -1592,6 +1592,45 @@ gb_internal CIdentSuggestion const c_ident_suggestions[] = {
 	{str_lit("float64_t"), str_lit("'f64'?")},
 };
 
+gb_internal Entity *resolve_alias_entity(CheckerContext *c, Entity *e, Type *named_type) {
+	if (e->kind == Entity_Constant && e->state == EntityState_Unresolved) {
+		check_entity_decl(c, e, nullptr, named_type);
+	}
+	while ((e->flags & EntityFlag_Overridden) && e->aliased_of != nullptr) {
+		e = e->aliased_of;
+	}
+	return e;
+}
+
+gb_thread_local Array<Entity *> in_progress_alias_expansions;
+
+gb_internal Type *check_in_progress_type_alias(CheckerContext *c, Entity *e) {
+	for (Entity *other : in_progress_alias_expansions) {
+		if (other == e) {
+			// NOTE(bill): an alias-only cycle, which it is to be left to the usual error
+			return nullptr;
+		}
+	}
+	DeclInfo *d = decl_info_of_entity(e);
+	if (d == nullptr || d->init_expr == nullptr) {
+		return nullptr;
+	}
+
+	CheckerContext nc = *c;
+	nc.scope = d->scope;
+	nc.decl  = d;
+	nc.type_level = 0;
+	nc.curr_proc_calling_convention = ProcCC_Contextless;
+
+	if (in_progress_alias_expansions.allocator.proc == nullptr) {
+		in_progress_alias_expansions = array_make<Entity *>(heap_allocator());
+	}
+	array_add(&in_progress_alias_expansions, e);
+	Type *t = check_type(&nc, remove_type_alias_clutter(d->init_expr));
+	array_pop(&in_progress_alias_expansions);
+	return t;
+}
+
 gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == Ast_Ident);
 	o->mode = Addressing_Invalid;
@@ -1637,6 +1676,8 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		}
 	}
 
+	e = resolve_alias_entity(c, e, named_type);
+
 	if (e->kind == Entity_ProcGroup) {
 		auto *pge = &e->ProcGroup;
 
@@ -1677,6 +1718,8 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	add_entity_use(c, n, e);
 	if (e->state == EntityState_Unresolved) {
 		check_entity_decl(c, e, nullptr, named_type);
+	} else {
+		wait_for_lazy_entity(c, e);
 	}
 	switch (e->kind) {
 	case Entity_Constant:
@@ -1758,6 +1801,9 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		}
 		if (o->type != nullptr && o->type->kind == Type_Named && o->type->Named.type_name->TypeName.is_type_alias) {
 			Type *bt = base_type(o->type);
+			if (bt == nullptr && e->state == EntityState_InProgress) {
+				bt = check_in_progress_type_alias(c, e);
+			}
 			// Keep struct aliases named so recursive fields retain their alias edge.
 			if (bt != nullptr && bt->kind != Type_Struct) {
 				o->type = bt;
@@ -5701,11 +5747,14 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 	} else */if (node->kind == Ast_Ident) {
 		Entity *e = node->Ident.entity.load();
-		if (e != nullptr) {
-			return e;
+		if (e == nullptr) {
+			e = scope_lookup(c->scope, node->Ident.interned, node->Ident.hash);
 		}
-		String name = node->Ident.token.string;
-		return scope_lookup(c->scope, node->Ident.interned, node->Ident.hash);
+		if (e != nullptr) {
+			// its kind and type are read by the caller
+			wait_for_lazy_entity(c, e);
+		}
+		return e;
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
 		if (se->token.kind == Token_ArrowRight) {
@@ -5749,6 +5798,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 					return nullptr;
 				}
 
+				entity = resolve_alias_entity(c, entity, nullptr);
 				check_entity_decl(c, entity, nullptr, nullptr);
 				if (entity->kind == Entity_ProcGroup) {
 					return entity;
@@ -5879,6 +5929,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				// return nullptr;
 			}
 
+			entity = resolve_alias_entity(c, entity, nullptr);
 			check_entity_decl(c, entity, nullptr, nullptr);
 			if (entity->kind == Entity_ProcGroup) {
 				operand->mode = Addressing_ProcGroup;
@@ -8481,11 +8532,14 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 		// NOTE(bill, 2019-10-26): Allow a cycle in the parameters but not in the fields themselves
 		auto prev_type_path = c->type_path;
+		bool prev_allow_in_progress = c->allow_in_progress_type_operand;
 
 		c->type_path = new_checker_type_path();
+		c->allow_in_progress_type_operand = true;
 		defer ({
 			destroy_checker_type_path(c->type_path);
 			c->type_path = prev_type_path;
+			c->allow_in_progress_type_operand = prev_allow_in_progress;
 		});
 
 		TEMPORARY_ALLOCATOR_GUARD();
@@ -9009,6 +9063,11 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 }
 
 gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, ProcTailing tailing, Type *type_hint) {
+	// NOTE(bill): only the direct arguments of a polymorphic record call may name a type still being checked
+	bool prev_allow_in_progress = c->allow_in_progress_type_operand;
+	c->allow_in_progress_type_operand = false;
+	defer (c->allow_in_progress_type_operand = prev_allow_in_progress);
+
 	if (proc != nullptr &&
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
@@ -13095,9 +13154,21 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 
 
+gb_internal bool is_in_progress_type_operand(CheckerContext *c, Operand *o, Ast *node) {
+	if (!c->allow_in_progress_type_operand || o->mode != Addressing_Type || o->type->kind != Type_Named) {
+		return false;
+	}
+	node = unparen_expr(node);
+	if (node == nullptr || (node->kind != Ast_Ident && node->kind != Ast_SelectorExpr)) {
+		return false;
+	}
+	Entity *e = o->type->Named.type_name;
+	return e != nullptr && e->state == EntityState_InProgress;
+}
+
 gb_internal ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = check_expr_base_internal(c, o, node, type_hint);
-	if (o->type != nullptr && core_type(o->type) == nullptr) {
+	if (o->type != nullptr && core_type(o->type) == nullptr && !is_in_progress_type_operand(c, o, node)) {
 		o->type = t_invalid;
 		gbString xs = expr_to_string(o->expr);
 		if (o->mode == Addressing_Type) {
@@ -13112,6 +13183,8 @@ gb_internal ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, T
 			Type *elem_type = core_broadcastable_elem_type(type_hint);
 			if (is_type_untyped(o->type)) {
 				if (is_type_union(elem_type)) {
+					// NOTE: record it first so convert_to_typed's final update keeps a constant that becomes a value (e.g. broadcast to an array variant)
+					add_untyped(c, node, o->mode, o->type, o->value);
 					convert_to_typed(c, o, elem_type);
 				}
 			}
@@ -13483,9 +13556,13 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		// NOTE(tf2spi):
 		// Two proc literals with the same signature output the same expr above
 		// which poses challenges for name canonicalization. Include the below
-		// discriminator with the file ID and offset to help with this.
+		// discriminator with the file and offset to help with this.
+		// NOTE: the file by package and name, not its ID, as IDs follow the order files were parsed in
 		TokenPos pos = ast_token(node).pos;
-		str = gb_string_append_fmt(str, " /* %d!%d */", pos.file_id, pos.offset);
+		AstFile *pl_file = node->file();
+		String pl_pkg  = (pl_file && pl_file->pkg) ? pl_file->pkg->name : String{};
+		String pl_name = pl_file ? filename_without_directory(pl_file->fullpath) : String{};
+		str = gb_string_append_fmt(str, " /* %.*s:%.*s!%d */", LIT(pl_pkg), LIT(pl_name), pos.offset);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);

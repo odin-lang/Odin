@@ -846,6 +846,7 @@ struct CheckerContext {
 	bool       in_polymorphic_specialization;
 	bool       allow_arrow_right_selector_expr;
 	bool       allow_c_vararg_param;
+	bool       allow_in_progress_type_operand; // a bare type name may still be being checked (polymorphic record arguments)
 	u8         bit_field_bit_size;
 	Scope *    polymorphic_scope;
 
@@ -916,6 +917,8 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 
 
 gb_internal void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
+gb_internal void wait_for_lazy_entity(CheckerContext *c, Entity *e);
+gb_internal Ast *remove_type_alias_clutter(Ast *node);
 gb_internal void check_const_decl(CheckerContext *c, Entity *e, Ast *type_expr, Ast *init_expr, Type *named_type);
 gb_internal void check_type_decl(CheckerContext *c, Entity *e, Ast *type_expr, Type *def);
 

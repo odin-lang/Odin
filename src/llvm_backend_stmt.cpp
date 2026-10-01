@@ -1,6 +1,26 @@
 #define LB_ENABLE_BASIC_RVO    true
 #define LB_ENABLE_ADVANCED_RVO build_context.enable_rvo
 
+// NOTE(bill): Orders entities by their canonical type
+gb_internal i32 lb_entity_type_cmp(Entity *x, Entity *y) {
+	if (x->type == y->type || x->type == nullptr || y->type == nullptr) {
+		return 0;
+	}
+	u64 hx = type_hash_canonical_type(x->type);
+	u64 hy = type_hash_canonical_type(y->type);
+	if (hx != hy) {
+		return hx < hy ? -1 : +1;
+	}
+	// NOTE(bill): Polymorphic instances share their declaration's token, so this is what tells them apart deterministically
+	TEMPORARY_ALLOCATOR_GUARD();
+	return string_compare(type_to_canonical_string(temporary_allocator(), x->type),
+	                      type_to_canonical_string(temporary_allocator(), y->type));
+}
+
+gb_internal GB_COMPARE_PROC(lb_polymorphic_instance_cmp) {
+	return lb_entity_type_cmp(*cast(Entity **)a, *cast(Entity **)b);
+}
+
 gb_internal LLVMValueRef lb_coerce_fields_load(lbProcedure *p, lbValue x, lbArgType const *arg);
 
 // NOTE(bill): @RVO Check if a call expression returns by sret with a return type matching dst_type.
@@ -180,14 +200,18 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			GenProcsData *gpd = e->Procedure.gen_procs;
 			if (gpd) {
 				rw_mutex_shared_lock(&gpd->mutex);
-				for (Entity *e : gpd->procs) {
+				// NOTE)bill):: build the instances by type, not in the order they were instantiated, which varies
+				TEMPORARY_ALLOCATOR_GUARD();
+				auto procs = array_clone(temporary_allocator(), gpd->procs);
+				rw_mutex_shared_unlock(&gpd->mutex);
+				array_sort(procs, lb_polymorphic_instance_cmp);
+				for (Entity *e : procs) {
 					if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 						continue;
 					}
 					DeclInfo *d = decl_info_of_entity(e);
 					lb_build_nested_proc(p, &d->proc_lit->ProcLit, e);
 				}
-				rw_mutex_shared_unlock(&gpd->mutex);
 			} else {
 				lb_build_nested_proc(p, pl, e);
 			}
@@ -2447,7 +2471,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		{
 			gbString str = gb_string_make_length(permanent_allocator(), p->name.text, p->name.len);
 			str = gb_string_appendc(str, "-");
-			str = gb_string_append_fmt(str, ".%.*s-%llu", LIT(name), cast(long long)e->id);
+			str = gb_string_append_fmt(str, ".%.*s-%d", LIT(name), e->token.pos.offset);
 			mangled_name.text = cast(u8 *)str;
 			mangled_name.len = gb_string_length(str);
 		}

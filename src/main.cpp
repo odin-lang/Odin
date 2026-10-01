@@ -532,6 +532,8 @@ enum BuildFlagKind {
 	BuildFlag_InternalLLVMVerification,
 	BuildFlag_InternalLLVMNoSROA,
 	BuildFlag_InternalEnableRVO,
+	BuildFlag_InternalGlobalEntityGraph,
+	BuildFlag_InternalShuffleGlobalEntities,
 
 	BuildFlag_Sanitize,
 	BuildFlag_LTO,
@@ -793,6 +795,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalGlobalEntityGraph, str_lit("internal-global-entity-graph"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalShuffleGlobalEntities, str_lit("internal-shuffle-global-entities"), BuildFlagParam_Integer, Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
@@ -1841,6 +1845,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalEnableRVO:
 							build_context.enable_rvo = true;
 							break;
+						case BuildFlag_InternalGlobalEntityGraph:
+							build_context.internal_global_entity_graph = true;
+							break;
+						case BuildFlag_InternalShuffleGlobalEntities:
+							GB_ASSERT(value.kind == ExactValue_Integer);
+							build_context.internal_shuffle_global_entities = cast(u64)big_int_to_i64(&value.value_integer);
+							break;
 
 
 						case BuildFlag_Sanitize:
@@ -2537,7 +2548,7 @@ gb_internal void export_dependencies(Checker *c) {
 		}
 		array_add(&load_files, cache);
 	}
-	array_sort(files, file_cache_sort_cmp);
+	array_sort(load_files, file_cache_sort_cmp);
 
 	if (build_context.export_dependencies_format == DependenciesExportMake) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);

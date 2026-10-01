@@ -996,6 +996,9 @@ gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) 
 	} else {
 		String name = ident->Ident.token.string;
 		Entity *found = scope_lookup(ctx->scope, ident->Ident.interned, ident->Ident.hash);
+		if (found != nullptr) {
+			found = resolve_alias_entity(ctx, found, nullptr);
+		}
 
 		if (found == nullptr) {
 			if (is_blank_ident(name)) {
@@ -2137,9 +2140,16 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 	if (e->state == EntityState_Resolved)  {
 		return;
 	}
-	if (e->flags & EntityFlag_Lazy) {
+	bool is_lazy = (e->flags & EntityFlag_Lazy) != 0;
+	if (is_lazy) {
 		mutex_lock(&ctx->info->lazy_mutex);
+		if (e->state == EntityState_Resolved) {
+			// NOTE: another thread checked it whilst this one waited
+			mutex_unlock(&ctx->info->lazy_mutex);
+			return;
+		}
 	}
+	GlobalEntityTimingFrame timing_frame = global_entity_timing_begin(e);
 
 	String name = e->token.string;
 
@@ -2222,11 +2232,22 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 	}
 end:;
+	global_entity_timing_end(timing_frame, e);
 	// NOTE(bill): Add it to the list of checked entities
-	if (e->flags & EntityFlag_Lazy) {
+	if (is_lazy) {
 		array_add(&ctx->info->entities, e);
 		mutex_unlock(&ctx->info->lazy_mutex);
 	}
+}
+
+// A lazy entity is only ever in progress on the thread holding `lazy_mutex`, so taking it (it is
+// recursive) waits out another thread and is a no-op on the thread that is checking it
+gb_internal void wait_for_lazy_entity(CheckerContext *ctx, Entity *e) {
+	if ((e->flags & EntityFlag_Lazy) == 0 || e->state == EntityState_Resolved) {
+		return;
+	}
+	mutex_lock(&ctx->info->lazy_mutex);
+	mutex_unlock(&ctx->info->lazy_mutex);
 }
 
 
