@@ -1677,6 +1677,8 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	add_entity_use(c, n, e);
 	if (e->state == EntityState_Unresolved) {
 		check_entity_decl(c, e, nullptr, named_type);
+	} else {
+		wait_for_lazy_entity(c, e);
 	}
 	switch (e->kind) {
 	case Entity_Constant:
@@ -5701,11 +5703,14 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 	} else */if (node->kind == Ast_Ident) {
 		Entity *e = node->Ident.entity.load();
-		if (e != nullptr) {
-			return e;
+		if (e == nullptr) {
+			e = scope_lookup(c->scope, node->Ident.interned, node->Ident.hash);
 		}
-		String name = node->Ident.token.string;
-		return scope_lookup(c->scope, node->Ident.interned, node->Ident.hash);
+		if (e != nullptr) {
+			// its kind and type are read by the caller
+			wait_for_lazy_entity(c, e);
+		}
+		return e;
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
 		ast_node(se, SelectorExpr, node);
 		if (se->token.kind == Token_ArrowRight) {
