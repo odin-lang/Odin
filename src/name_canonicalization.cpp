@@ -658,7 +658,7 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			Entity *p = e->parent_proc_decl.load(std::memory_order_relaxed)->entity;
 			write_canonical_parent_prefix(w, p);
 			type_writer_append(w, p->token.string.text, p->token.string.len);
-			if (is_type_polymorphic(p->type)) {
+			if (is_type_polymorphic_or_specialized_proc(p->type)) {
 				type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 				write_type_to_canonical_string(w, p->type);
 			}
@@ -688,7 +688,7 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 		type_writer_append(w, e->token.string.text, e->token.string.len);
 	}
 
-	if (is_type_polymorphic(e->type)) {
+	if (is_type_polymorphic_or_specialized_proc(e->type)) {
 		type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 		write_type_to_canonical_string(w, e->type);
 	}
@@ -828,7 +828,7 @@ write_base_name:
 	case Entity_AsmTemplate:
 	case Entity_Variable:
 		type_writer_append(w, e->token.string.text, e->token.string.len);
-		if (is_type_polymorphic(e->type)) {
+		if (is_type_polymorphic_or_specialized_proc(e->type)) {
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
 			write_type_to_canonical_string(w, e->type);
 		}

@@ -4071,7 +4071,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		// identical casts that cannot be foreseen or otherwise
 		// forbidden, so just skip them.
 		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
-		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig))) {
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic_or_specialized_proc(c->curr_proc_sig))) {
 			Type *src_exact = x->type;
 			Type *dst_exact = type;
 
@@ -4212,7 +4212,7 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		// identical casts that cannot be foreseen or otherwise
 		// forbidden, so just skip them.
 		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
-		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig)) &&
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic_or_specialized_proc(c->curr_proc_sig)) &&
 		    check_is_castable_to(c, &src, dst_t)) {
 			if (are_types_identical(src_t, dst_t)) {
 				gbString oper_str = expr_to_string(o->expr);
@@ -7977,7 +7977,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			CheckerContext ctx = *c;
 
 			ctx.no_polymorphic_errors = true;
-			ctx.allow_polymorphic_types = is_type_polymorphic(pt);
+			ctx.allow_polymorphic_types = is_type_polymorphic_or_specialized_proc(pt);
 			ctx.hide_polymorphic_errors = true;
 
 			bool is_a_candidate = check_call_arguments_single(&ctx, call, operand,
@@ -9543,7 +9543,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 	pt = base_type(pt);
 
-	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
+	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin && !c->in_procedure_of) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
 			ERROR_BLOCK();
 			if (c->scope->flags & ScopeFlag_File) {

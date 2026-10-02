@@ -6826,8 +6826,8 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
-		bool src_poly = is_type_polymorphic(src->type);
-		bool dst_poly = is_type_polymorphic(dst->type);
+		bool src_poly = is_type_polymorphic_or_specialized_proc(src->type);
+		bool dst_poly = is_type_polymorphic_or_specialized_proc(dst->type);
 		if (dst_poly && !src_poly) {
 			error(src->token, "A polymorphic deferred procedure '%.*s' requires the initial procedure '%.*s' to be polymorphic as well", LIT(dst->token.string), LIT(src->token.string));
 			continue;
