@@ -1,4 +1,4 @@
-#+build wasm32, wasm64p32
+#+build wasm32, wasm64p32, wasm64
 package runtime
 
 import "base:intrinsics"
