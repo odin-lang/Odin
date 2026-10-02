@@ -203,6 +203,7 @@ struct lbGenerator : LinkerData {
 
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
+	PtrMap<AstFile *, lbModule *> file_modules; // NOTE(bill): of the files of a package which is split into several modules
 	lbModule default_module;
 
 	lbModule *equal_module;
