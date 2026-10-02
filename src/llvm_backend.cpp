@@ -2210,6 +2210,11 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 		} else {
 			lb_init_global_var(m, p, e, init_expr, var);
 		}
+
+		// NOTE(bill): a block per global, as instruction selection is superlinear in the size of a block
+		lbBlock *next = lb_create_block(p, "global.init", true);
+		lb_emit_jump(p, next);
+		lb_start_block(p, next);
 	}
 	CheckerInfo *info = m->gen->info;
 
@@ -2383,6 +2388,7 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		array_sort(m->global_procedures_to_create, llvm_global_entity_cmp);
 	}
 
+	gen->modules_in_parallel = true;
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
