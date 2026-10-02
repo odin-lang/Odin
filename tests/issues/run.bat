@@ -44,6 +44,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_issue_6951_5214.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_6979.odin -no-entry-point %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7008.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_global_address_of_literal.odin %COMMON%  || exit /b
 ..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_7260.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin test ..\test_issue_bool_to_be_conversion.odin %COMMON%  || exit /b
@@ -86,6 +87,10 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_poly_using_subtype.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_global_proc_lits.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_packed_field_by_value.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_7708.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_7708_mismatch.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+..\..\..\odin test ..\test_issue_7700.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_procedure_of_specialized.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7587.odin %COMMON%  || exit /b
 ..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
 

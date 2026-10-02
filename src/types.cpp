@@ -2617,6 +2617,9 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		break;
 
 	case Type_Proc:
+		if (t->Proc.is_poly_specialized) {
+			return or_specialized;
+		}
 		if (t->Proc.is_polymorphic) {
 			return true;
 		}
@@ -2686,6 +2689,14 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		return is_type_polymorphic(t->BitField.backing_type, or_specialized);
 	}
 	return false;
+}
+
+// e.g. to name a procedure after its specialization
+gb_internal bool is_type_polymorphic_or_specialized_proc(Type *t) {
+	if (t != nullptr && t->kind == Type_Proc && t->Proc.is_poly_specialized) {
+		return true;
+	}
+	return is_type_polymorphic(t);
 }
 
 
