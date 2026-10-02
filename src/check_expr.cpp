@@ -389,6 +389,149 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 	}
 }
 
+gb_internal bool poly_specialization_shape_mismatch(Type *s, Type *o, isize depth) {
+	if (s == nullptr || o == nullptr || depth > 8) {
+		return false;
+	}
+	if (s->kind == Type_Generic) {
+		if (s->Generic.specialized == nullptr) {
+			return false;
+		}
+		s = s->Generic.specialized;
+	}
+	Type *bs = base_type(s);
+	Type *bo = base_type(o);
+	if (bs == nullptr || bo == nullptr || bs->kind == Type_Generic || bo->kind == Type_Generic) {
+		return false;
+	}
+	if (bs->kind != bo->kind) {
+		return true;
+	}
+	switch (bs->kind) {
+	case Type_Pointer:                    return poly_specialization_shape_mismatch(bs->Pointer.elem,                   bo->Pointer.elem,                   depth+1);
+	case Type_MultiPointer:               return poly_specialization_shape_mismatch(bs->MultiPointer.elem,              bo->MultiPointer.elem,              depth+1);
+	case Type_Slice:                      return poly_specialization_shape_mismatch(bs->Slice.elem,                     bo->Slice.elem,                     depth+1);
+	case Type_DynamicArray:               return poly_specialization_shape_mismatch(bs->DynamicArray.elem,              bo->DynamicArray.elem,              depth+1);
+	case Type_Array:                      return poly_specialization_shape_mismatch(bs->Array.elem,                     bo->Array.elem,                     depth+1);
+	case Type_FixedCapacityDynamicArray:  return poly_specialization_shape_mismatch(bs->FixedCapacityDynamicArray.elem, bo->FixedCapacityDynamicArray.elem, depth+1);
+	case Type_Map:
+		return poly_specialization_shape_mismatch(bs->Map.key,   bo->Map.key,   depth+1) ||
+		       poly_specialization_shape_mismatch(bs->Map.value, bo->Map.value, depth+1);
+	case Type_Struct:
+		return bs->Struct.soa_kind != bo->Struct.soa_kind;
+	}
+	return false;
+}
+
+gb_internal bool poly_candidate_cannot_match(TypeProc *pt, Array<Operand> const &operands) {
+	if (pt->params == nullptr) {
+		return false;
+	}
+	auto const &params = pt->params->Tuple.variables;
+	for (isize i = 0; i < params.count && i < operands.count; i++) {
+		if (pt->variadic && i == pt->variadic_index) {
+			continue;
+		}
+		Entity *param = params[i];
+		Operand const &o = operands[i];
+		if (param == nullptr || o.type == nullptr || o.deferred_untyped_arg || is_type_untyped(o.type)) {
+			continue;
+		}
+
+		Type *t = param->type;
+		Type *ot = o.type;
+		if (param->kind == Entity_TypeName) {
+			if (o.mode != Addressing_Type) {
+				continue;
+			}
+		} else if (param->kind == Entity_Variable) {
+			if (o.mode != Addressing_Value && o.mode != Addressing_Variable && o.mode != Addressing_Constant) {
+				continue;
+			}
+			if (t != nullptr && t->kind == Type_Pointer) {
+				Type *bot = base_type(ot);
+				if (bot == nullptr || bot->kind != Type_Pointer) {
+					continue;
+				}
+				t  = t->Pointer.elem;
+				ot = bot->Pointer.elem;
+			}
+		} else {
+			continue;
+		}
+		if (t != nullptr && t->kind == Type_Generic && t->Generic.specialized != nullptr &&
+		    poly_specialization_shape_mismatch(t, ot, 0)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal u64 type_identity_hash(Type *t, isize depth) {
+	if (t == nullptr) {
+		return 0;
+	}
+	if (t->kind == Type_Named && t->Named.type_name != nullptr && t->Named.type_name->TypeName.is_type_alias) {
+		return type_identity_hash(t->Named.base, depth);
+	}
+	u64 h = (cast(u64)t->kind + 1) * 0x9e3779b97f4a7c15ull;
+	auto mix = [&](u64 x) {
+		h ^= x + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+	};
+	if (depth > 8) {
+		return h;
+	}
+	switch (t->kind) {
+	case Type_Named: mix(cast(u64)cast(uintptr)t->Named.type_name); break;
+	case Type_Basic: mix(cast(u64)t->Basic.kind);                   break;
+
+	case Type_Pointer:                   mix(type_identity_hash(t->Pointer.elem,                   depth+1)); break;
+	case Type_MultiPointer:              mix(type_identity_hash(t->MultiPointer.elem,              depth+1)); break;
+	case Type_SoaPointer:                mix(type_identity_hash(t->SoaPointer.elem,                depth+1)); break;
+	case Type_Slice:                     mix(type_identity_hash(t->Slice.elem,                     depth+1)); break;
+	case Type_DynamicArray:              mix(type_identity_hash(t->DynamicArray.elem,              depth+1)); break;
+	case Type_FixedCapacityDynamicArray: mix(type_identity_hash(t->FixedCapacityDynamicArray.elem, depth+1)); break;
+	case Type_EnumeratedArray:           mix(type_identity_hash(t->EnumeratedArray.elem,           depth+1)); break;
+	case Type_Matrix:                    mix(type_identity_hash(t->Matrix.elem,                    depth+1)); break;
+
+	case Type_Array:
+		mix(cast(u64)t->Array.count);
+		mix(type_identity_hash(t->Array.elem, depth+1));
+		break;
+
+	case Type_Map:
+		mix(type_identity_hash(t->Map.key,   depth+1));
+		mix(type_identity_hash(t->Map.value, depth+1));
+		break;
+	}
+	return h;
+}
+
+gb_internal u64 tuple_identity_hash(Type *t) {
+	u64 h = 0x84222325cbf29ce4ull;
+	if (t != nullptr && t->kind == Type_Tuple) {
+		h ^= cast(u64)t->Tuple.variables.count * 31 + cast(u64)t->Tuple.is_packed;
+		for (Entity *e : t->Tuple.variables) {
+			h = (h ^ (cast(u64)e->kind * 0x100000001b3ull)) * 0x100000001b3ull;
+			h ^= type_identity_hash(e->type, 0) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+		}
+	}
+	return h;
+}
+
+gb_internal u64 proc_type_identity_hash(Type *t) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Proc);
+	u64 h = cast(u64)t->Proc.calling_convention;
+	h = h*31 + cast(u64)t->Proc.c_vararg;
+	h = h*31 + cast(u64)t->Proc.variadic;
+	h = h*31 + cast(u64)t->Proc.diverging;
+	h = h*31 + cast(u64)t->Proc.optional_ok;
+	h ^= tuple_identity_hash(t->Proc.params)  + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+	h ^= tuple_identity_hash(t->Proc.results) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+	return h;
+}
+
 // Reuse an existing generated specialization `other`, scheduling its body if unchecked.
 // Caller must have released gen_procs->mutex first.
 gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other, Ast *poly_def_node, PolyProcData *poly_proc_data) {
@@ -475,6 +618,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 
+	// NOTE(bill): only whilst trying a procedure group's candidates as their errors are not reported
+	if (param_operands != nullptr && old_c->no_polymorphic_errors && poly_candidate_cannot_match(&src->Proc, *param_operands)) {
+		return false;
+	}
+
 	DeclInfo *old_decl = decl_info_of_entity(base_entity);
 	if (old_decl == nullptr) {
 		return false;
@@ -534,7 +682,12 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 
-		for (Entity *other : gen_procs->procs) {
+		u64 hash = proc_type_identity_hash(final_proc_type);
+		for_array(i, gen_procs->procs) {
+			if (gen_procs->hashes[i] != hash) {
+				continue;
+			}
+			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
@@ -550,6 +703,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	} else {
 		gen_procs = permanent_alloc_item<GenProcsData>();
 		gen_procs->procs.allocator = heap_allocator();
+		gen_procs->hashes.allocator = heap_allocator();
 		base_entity->Procedure.gen_procs = gen_procs;
 		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 	}
@@ -573,8 +727,13 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			return false;
 		}
 
+		u64 hash = proc_type_identity_hash(final_proc_type);
 		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
-		for (Entity *other : gen_procs->procs) {
+		for_array(i, gen_procs->procs) {
+			if (gen_procs->hashes[i] != hash) {
+				continue;
+			}
+			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
@@ -587,9 +746,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	// Re-check under the exclusive lock (the lookups above ran under a released shared lock) and
 	// hold it across construction + array_add so find-then-publish is atomic. (@local-mutex)
+	u64 final_hash = proc_type_identity_hash(final_proc_type);
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
-	for (Entity *other : gen_procs->procs) {
-		if (are_types_identical(base_type(other->type), final_proc_type)) {
+	for_array(i, gen_procs->procs) {
+		Entity *other = gen_procs->procs[i];
+		if (gen_procs->hashes[i] == final_hash && are_types_identical(base_type(other->type), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 			return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
 		}
@@ -659,6 +820,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	AstFile *file = base_entity->file;
 
 	array_add(&gen_procs->procs, entity);
+	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
 	ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();

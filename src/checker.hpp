@@ -721,6 +721,7 @@ struct LoadDirectoryCache {
 
 struct GenProcsData {
 	Array<Entity *> procs;
+	Array<u64>      hashes; // `proc_type_identity_hash` of each of `procs`
 	RwMutex         mutex;
 };
 
