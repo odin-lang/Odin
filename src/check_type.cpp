@@ -1925,7 +1925,8 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		}
 		if (base_type(pattern->Pointer.elem)->kind == Type_Struct &&
 		    check_is_assignable_to_using_subtype(src_elem, pattern->Pointer.elem, 0, false, allow_poly) > 0) {
-			return Subst_Unhandled; // genuine subtype match (no binding), handled by the mutator
+			// NOTE(bill): a subtype, e.g. `^Expr` for `$T/^Node`, which has nothing to bind unless the pattern is polymorphic
+			return is_type_polymorphic(pattern->Pointer.elem) ? Subst_Unhandled : Subst_Matched;
 		}
 		return subst_unify(c, pattern->Pointer.elem, src_elem, subst);
 	}
@@ -1940,7 +1941,7 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		}
 		if (base_type(pattern->MultiPointer.elem)->kind == Type_Struct &&
 		    check_is_assignable_to_using_subtype(src_elem, pattern->MultiPointer.elem) > 0) {
-			return Subst_Unhandled;
+			return is_type_polymorphic(pattern->MultiPointer.elem) ? Subst_Unhandled : Subst_Matched;
 		}
 		return subst_unify(c, pattern->MultiPointer.elem, src_elem, subst);
 	}
@@ -2178,7 +2179,7 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		}
 		if (base_type(pattern->SoaPointer.elem)->kind == Type_Struct &&
 		    check_is_assignable_to_using_subtype(source->SoaPointer.elem, pattern->SoaPointer.elem, 0, false, true) > 0) {
-			return Subst_Unhandled; // genuine subtype match (no binding), handled by the mutator
+			return is_type_polymorphic(pattern->SoaPointer.elem) ? Subst_Unhandled : Subst_Matched;
 		}
 		return subst_unify(c, pattern->SoaPointer.elem, source->SoaPointer.elem, subst);
 	case Type_FixedCapacityDynamicArray:

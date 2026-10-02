@@ -104,6 +104,7 @@ $ODIN run ../test_issue_7482.odin $COMMON
 $ODIN run ../test_issue_7564.odin $COMMON
 $ODIN test ../test_issue_7316.odin $COMMON
 $ODIN test ../test_issue_7566.odin $COMMON
+$ODIN test ../test_issue_poly_using_subtype.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
