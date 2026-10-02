@@ -51,11 +51,11 @@ typedef struct TaskRingBuffer {
 	std::atomic<WorkerTask *> buffer;
 } TaskRingBuffer;
 
+// NOTE(bill, 2026-10-02): each on cache lines of its own as "thieves" take from `top` whilst the owner works at `bottom`
 typedef struct TaskQueue {
-	std::atomic<isize> top;
-	std::atomic<isize> bottom;
-
-	std::atomic<TaskRingBuffer *> ring;
+	alignas(2*GB_CACHE_LINE_SIZE) std::atomic<isize> top;
+	alignas(2*GB_CACHE_LINE_SIZE) std::atomic<isize> bottom;
+	alignas(2*GB_CACHE_LINE_SIZE) std::atomic<TaskRingBuffer *> ring;
 } TaskQueue;
 
 struct Thread {
@@ -74,7 +74,7 @@ struct Thread {
 	struct Arena *permanent_arena;
 	struct Arena *temporary_arena;
 
-	std::atomic<std::atomic<i32> *> waiting_futex;
+	alignas(2*GB_CACHE_LINE_SIZE) std::atomic<std::atomic<i32> *> waiting_futex;
 	std::atomic<i32>                waiting_value;
 	std::atomic<i32>                waiting_for;
 };

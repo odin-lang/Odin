@@ -2321,7 +2321,7 @@ gb_internal void wait_for_entity(Entity *e) {
 gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
 	if (decl && decl->parent) {
 		Scope *ps = decl->parent->scope;
-		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
+		if (ps->flags & (ScopeFlag_Pkg | ScopeFlag_Global)) {
 			return;
 		} else {
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)

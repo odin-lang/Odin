@@ -207,6 +207,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	ptr_set_init(&d->deps, 0);
 	type_set_init(&d->type_info_deps, 0);
 	d->labels.allocator = heap_allocator();
+	d->nested_to_check.allocator = heap_allocator();
 	d->variadic_reuses.allocator = heap_allocator();
 	d->variadic_reuse_max_bytes = 0;
 	d->variadic_reuse_max_align = 1;
@@ -6521,6 +6522,17 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		}
 	}
 
+	// NOTE(bill): the nested procedures that waited for this body, see `check_proc_info_worker_proc`
+	mutex_lock(&pi->decl->next_mutex);
+	Array<ProcInfo *> nested = pi->decl->nested_to_check;
+	pi->decl->nested_to_check = {};
+	pi->decl->nested_to_check.allocator = heap_allocator();
+	mutex_unlock(&pi->decl->next_mutex);
+	for (ProcInfo *nested_pi : nested) {
+		thread_pool_add_task(check_proc_info_worker_proc, nested_pi);
+	}
+	array_free(&nested);
+
 	add_untyped_expressions(&c->info, ctx.untyped);
 
 	rw_mutex_shared_lock(&ctx.decl->deps_mutex);
@@ -6682,8 +6694,18 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
 			Type *pt = base_type(parent->type);
 			if (!pt->Proc.is_polymorphic || pt->Proc.is_poly_specialized) {
-				thread_pool_add_task(check_proc_info_worker_proc, pi);
-				return 1;
+				// NOTE(bill): waits for the parent's body to be checked, which then adds it again,
+				// rather than adding itself again and again until then
+				DeclInfo *pd = pi->decl->parent;
+				mutex_lock(&pd->next_mutex);
+				bool waiting = (parent->flags & EntityFlag_ProcBodyChecked) == 0;
+				if (waiting) {
+					array_add(&pd->nested_to_check, pi);
+				}
+				mutex_unlock(&pd->next_mutex);
+				if (waiting) {
+					return 1;
+				}
 			}
 		}
 	}

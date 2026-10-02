@@ -207,9 +207,11 @@ struct VariadicReuseData {
 struct DeclInfo {
 	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
 
-	BlockingMutex next_mutex;
+	BlockingMutex next_mutex; // also used for `nested_to_check`
 	DeclInfo *    next_child;
 	DeclInfo *    next_sibling;
+
+	Array<struct ProcInfo *> nested_to_check; // nested procedures to check once this body is checked
 
 	Scope *       scope;
 
@@ -693,6 +695,8 @@ enum LoadFileTier {
 struct LoadFileCache {
 	LoadFileTier   tier;
 	bool           exists;
+
+	BlockingMutex  mutex; // for everything below
 	String         path;
 	gbFileError    file_error;
 	String         data;
@@ -706,6 +710,9 @@ struct LoadDirectoryFile {
 };
 
 struct LoadDirectoryCache {
+	bool                   loaded;
+
+	BlockingMutex          mutex; // for everything below
 	String                 path;
 	gbFileError            file_error;
 	Array<LoadFileCache *> files;

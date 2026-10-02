@@ -34,9 +34,10 @@ struct ThreadPool {
 	Slice<Thread>     threads;
 	std::atomic<bool> running;
 
-	Futex            tasks_available; // bumped to wake a sleeping worker
-	std::atomic<i32> sleeping;        // workers asleep on `tasks_available`, or about to be
-	Futex            tasks_left;
+	// NOTE: on separate cache lines, as every task changes `tasks_left`
+	alignas(2*GB_CACHE_LINE_SIZE) Futex            tasks_available; // bumped to wake a sleeping worker
+	                              std::atomic<i32> sleeping;        // workers asleep on `tasks_available`, or about to be
+	alignas(2*GB_CACHE_LINE_SIZE) Futex            tasks_left;
 };
 
 // NOTE(bill): how many times an idle worker looks for a task before sleeping, so one adding small tasks
@@ -49,7 +50,7 @@ gb_internal isize current_thread_index(void) {
 
 gb_internal void thread_pool_init(ThreadPool *pool, isize worker_count, char const *worker_name) {
 	pool->threads_allocator = permanent_allocator();
-	slice_init(&pool->threads, pool->threads_allocator, worker_count + 1);
+	pool->threads = slice_make_aligned<Thread>(pool->threads_allocator, worker_count + 1, gb_align_of(Thread));
 
 	// NOTE: this needs to be initialized before any thread starts
 	pool->running.store(true, std::memory_order_seq_cst);
