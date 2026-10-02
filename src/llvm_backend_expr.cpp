@@ -4365,7 +4365,9 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		Type *type = v.type;
 		lbAddr addr = {};
 		if (p->is_startup) {
-			addr = lb_add_global_generated_from_procedure(p, type, v);
+			// NOTE: only a constant can be the global's initializer, any other value is written by the store below
+			lbValue initializer = LLVMIsConstant(v.value) ? v : lbValue{};
+			addr = lb_add_global_generated_from_procedure(p, type, initializer);
 		} else {
 			addr = lb_add_local_generated(p, type, false);
 		}
