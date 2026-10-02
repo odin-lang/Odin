@@ -197,7 +197,7 @@ foreign lib {
 	pthread_equal :: proc(t1: pthread_t, t2: pthread_t) -> b32 ---
 
 	/*
-	Terminates the calling thread and make the given value available to any successfull join calls.
+	Terminates the calling thread and make the given value available to any successful join calls.
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_exit.html ]]
 	*/
