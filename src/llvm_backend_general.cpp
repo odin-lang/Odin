@@ -93,6 +93,9 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	m->module_name = module_name;
 	m->ctx = LLVMContextCreate();
+	lb_metadata_kind(m, ODIN_METADATA_IS_PACKED);
+	lb_metadata_kind(m, ODIN_METADATA_MIN_ALIGN);
+	lb_metadata_kind(m, ODIN_METADATA_MAX_ALIGN);
 	LLVMContextSetDiagnosticHandler(m->ctx, lb_llvm_diagnostic_handler, nullptr);
 	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
