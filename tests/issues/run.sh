@@ -101,6 +101,7 @@ $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
 $ODIN run ../test_issue_7482.odin $COMMON
 $ODIN run ../test_issue_7564.odin $COMMON
+$ODIN test ../test_issue_7316.odin $COMMON
 $ODIN test ../test_issue_7566.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON

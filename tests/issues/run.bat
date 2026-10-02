@@ -78,6 +78,7 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin run ..\test_issue_7482.odin %COMMON% || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local -o:speed || exit /b
+..\..\..\odin test ..\test_issue_7316.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7566.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7587.odin %COMMON%  || exit /b
 ..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b

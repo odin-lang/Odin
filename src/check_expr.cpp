@@ -1006,7 +1006,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		PolyProcData poly_proc_data = {};
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			Entity *e = poly_proc_data.gen_entity;
-			add_type_and_value(c, operand->expr, Addressing_Value, e->type, {});
+			add_type_and_value(c, operand->expr, Addressing_Value, e->type, exact_value_procedure(operand->expr));
 			Ast *expr = unparen_expr(operand->expr);
 			if (expr->kind == Ast_SelectorExpr) {
 				add_entity_use(c, expr->SelectorExpr.selector, e);
