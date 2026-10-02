@@ -3120,10 +3120,44 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 		p->flags |= lbProcedureFlag_WithoutMemcpyPass;
 	}
 
-	lb_verify_function(m, p, true);
-
 	MUTEX_GUARD(&m->generated_procedures_mutex);
 	array_add(&m->generated_procedures, p);
+}
+
+// NOTE(bill): Each module is verified once its procedures are generated, rather than each procedure as it is
+// generated. Verifying a procedure on its own walks every constant which uses it, which for one referenced by the
+// type info (e.g. `__$equal`) is all of the type info. Only on a failure are its procedures verified on their own,
+// to report which ones are invalid.
+gb_internal WORKER_TASK_PROC(lb_verify_generated_procedures_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	if (!LLVMVerifyModule(m->mod, LLVMReturnStatusAction, nullptr)) {
+		return 0;
+	}
+	for (lbProcedure *p : m->generated_procedures) {
+		lb_verify_function(m, p, true);
+	}
+	lb_llvm_module_verification_worker_proc(m);
+	return 0;
+}
+
+gb_internal void lb_verify_generated_procedures(lbGenerator *gen, bool do_threading) {
+	if (LLVM_IGNORE_VERIFICATION) {
+		return;
+	}
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
+		// NOTE(bill): with debug information, its procedures were never verified on their own, only the module after its passes
+		if (m->debug_builder != nullptr) {
+			continue;
+		}
+		if (do_threading) {
+			thread_pool_add_task(lb_verify_generated_procedures_worker_proc, m);
+		} else {
+			lb_verify_generated_procedures_worker_proc(m);
+		}
+	}
+	thread_pool_wait();
+	lb_exit_if_worker_failed();
 }
 
 
@@ -3772,6 +3806,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
+
+	TIME_SECTION("LLVM Verify Procedures");
+	lb_verify_generated_procedures(gen, do_threading);
 
 	TIME_SECTION("LLVM Function Pass");
 	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
