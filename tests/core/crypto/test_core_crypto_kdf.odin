@@ -7,6 +7,7 @@ import "core:crypto/argon2id"
 import "core:crypto/hash"
 import "core:crypto/hkdf"
 import "core:crypto/pbkdf2"
+import "core:crypto/scrypt"
 
 @(test)
 test_argon2id :: proc(t: ^testing.T) {
@@ -223,4 +224,148 @@ test_pbkdf2 :: proc(t: ^testing.T) {
 			dst_str,
 		)
 	}
+}
+
+@(test)
+test_scrypt :: proc(t: ^testing.T) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	tmp: [128]byte // The largest derived key in the test vectors is 77 bytes.
+
+	test_vectors := []struct {
+		password: string,
+		salt:     string,
+		N, r, p:  int,
+		dk:       string,
+	} {
+		// RFC 7914 12.
+		{
+			"",
+			"",
+			16, 1, 1,
+			"77d6576238657b203b19ca42c18a0497f16b4844e3074ae8dfdffa3fede21442fcd0069ded0948f8326a753a0fc81f17e8d3e0fb2e0d3628cf35e20c38d18906",
+		},
+		{
+			"password",
+			"NaCl",
+			1024, 8, 16,
+			"fdbabe1c9d3472007856e7190d01e9fe7c6ad7cbc8237830e77376634b3731622eaf30d92e22a3886ff109279d9830dac727afb94a83ee6d8360cbdfa2cc0640",
+		},
+		{
+			"pleaseletmein",
+			"SodiumChloride",
+			16384, 8, 1,
+			"7023bdcb3afd7348461c06cd81fd38ebfda8fbba904f8e3ea9b543f6545da1f2d5432955613f0fcf62d49705242a9af9e61e85dc0d651e40dfcf017b45575887",
+		},
+
+		// golang.org/x/crypto/scrypt.
+		{
+			"password",
+			"salt",
+			2, 10, 10,
+			"482c858e229055e62f41e0ec819a5ee18bdb87251a534f75acd95ac5e50aa15f",
+		},
+		{
+			"password",
+			"salt",
+			16, 100, 100,
+			"88bd5edb52d1dd00188772ad36171290224e74829525b18d7323a57f91963c37",
+		},
+		{
+			"this is a long \x00 password",
+			"and this is a long \x00 salt",
+			16384, 8, 1,
+			"c3f182ee2dec846e70a6942fb529985a3a09765ef04c612923b17f18555a37076deb2b9830d69de5492651e4506ae5776d96d40f67aaee37e1777b8ad5c3111432bb3b6f7e1264401879e641ae",
+		},
+		{
+			"p",
+			"s",
+			2, 1, 1,
+			"48b0d2a8a3272611984c50ebd630af52",
+		},
+	}
+	for v, i in test_vectors {
+		password := transmute([]byte)v.password
+		salt := transmute([]byte)v.salt
+		dst := tmp[:len(v.dk) / 2]
+
+		// Exercise the sanitize opt-out as well.
+		sanitize := i < len(test_vectors) - 1
+
+		err := scrypt.derive(
+			password,
+			salt,
+			v.N,
+			v.r,
+			v.p,
+			dst,
+			sanitize,
+			context.temp_allocator,
+		)
+		testing.expectf(t, err == .None, "scrypt: unexpected allocation error: %v", err)
+
+		dst_str := string(hex.encode(dst, context.temp_allocator))
+
+		testing.expectf(
+			t,
+			dst_str == v.dk,
+			"scrypt: Expected: %s for input of (%s, %s, %d, %d, %d), but got %s instead",
+			v.dk,
+			v.password,
+			v.salt,
+			v.N,
+			v.r,
+			v.p,
+			dst_str,
+		)
+	}
+}
+
+@(test)
+test_scrypt_invalid_n :: proc(t: ^testing.T) {
+	testing.expect_assert_message(t, "crypto/scrypt: N must be > 1 and a power of 2")
+
+	password := []byte{'p'}
+	salt := []byte{'s'}
+	dst: [32]byte
+
+	_ = scrypt.derive(password, salt, 7, 8, 1, dst[:])
+	testing.expect(t, false, "scrypt: expected a panic for an invalid N")
+}
+
+@(test)
+test_scrypt_invalid_r_p :: proc(t: ^testing.T) {
+	testing.expect_assert_message(t, "crypto/scrypt: r and p must be > 0")
+
+	password := []byte{'p'}
+	salt := []byte{'s'}
+	dst: [32]byte
+
+	_ = scrypt.derive(password, salt, 16, 0, 1, dst[:])
+	testing.expect(t, false, "scrypt: expected a panic for a zero r")
+}
+
+@(test)
+test_scrypt_negative_r_p :: proc(t: ^testing.T) {
+	testing.expect_assert_message(t, "crypto/scrypt: r and p must be > 0")
+
+	password := []byte{'p'}
+	salt := []byte{'s'}
+	dst: [32]byte
+
+	_ = scrypt.derive(password, salt, 16, 1, -1, dst[:])
+	testing.expect(t, false, "scrypt: expected a panic for a negative p")
+}
+
+@(test)
+test_scrypt_too_large :: proc(t: ^testing.T) {
+	testing.expect_assert_message(t, "crypto/scrypt: parameters are too large")
+
+	password := []byte{'p'}
+	salt := []byte{'s'}
+	dst: [32]byte
+	max_int := max(int)
+
+	_ = scrypt.derive(password, salt, 16, max_int / 2, max_int / 2, dst[:])
+	testing.expect(t, false, "scrypt: expected a panic for oversized parameters")
 }
