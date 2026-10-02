@@ -108,6 +108,11 @@ struct lbPadType {
 	LLVMTypeRef type;
 };
 
+struct NamedMetaDataKind {
+	String   name;
+	unsigned kind;
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -123,6 +128,9 @@ struct lbModule {
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated
 	char const *module_name;
+
+	NamedMetaDataKind metadata_kinds[4];
+	isize metadata_kind_count;
 
 	PtrMap<u64/*type hash*/, LLVMTypeRef>  types;                  // mutex: types_mutex
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
@@ -651,6 +659,7 @@ gb_internal lbValue lb_make_string_value(lbProcedure *p, Type *string_type, lbVa
 gb_internal String lb_internal_gen_name_from_type(char const *prefix, Type *type);
 
 
+gb_internal unsigned lb_metadata_kind(lbModule *m, String const &name);
 gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value);
 gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name);
 
