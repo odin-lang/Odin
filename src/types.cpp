@@ -155,6 +155,7 @@ struct TypeStruct {
 	i32             soa_count;
 	StructSoaKind   soa_kind;
 	Wait_Signal     fields_wait_signal;
+	Futex           checking_thread; // 1 + the index of the thread in `check_struct_type` for it, else 0
 	BlockingMutex   soa_mutex;
 	BlockingMutex   offset_mutex; // for settings offsets
 
@@ -180,6 +181,8 @@ struct TypeUnion {
 	Type *           polymorphic_params; // Type_Tuple
 	Type *           polymorphic_parent;
 	Wait_Signal      polymorphic_wait_signal;
+	Wait_Signal      variants_wait_signal; // signalled once `variants` is populated (mirrors TypeStruct.fields_wait_signal)
+	Futex            checking_thread;      // 1 + the index of the thread in `check_union_type` for it, else 0
 
 	std::atomic<i16> tag_size;
 	bool             is_polymorphic;
@@ -337,7 +340,6 @@ gb_global String const type_strings[] = {
 enum TypeFlag : u32 {
 	TypeFlag_Polymorphic     = 1<<1,
 	TypeFlag_PolySpecialized = 1<<2,
-	TypeFlag_InProcessOfCheckingPolymorphic = 1<<3,
 };
 
 struct Type {
@@ -353,7 +355,7 @@ struct Type {
 	std::atomic<i64> cached_align;
 	std::atomic<u64> canonical_hash;
 	std::atomic<u32> flags; // TypeFlag
-	bool failure;
+	std::atomic<bool> failure;
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin
@@ -413,6 +415,7 @@ gb_internal bool is_type_simple_compare(Type *t);
 gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false);
 gb_internal Type *base_type(Type *t);
 gb_internal Type *alloc_type_multi_pointer(Type *elem);
+gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thread);
 
 gb_internal u32 type_info_flags_of_type(Type *type) {
 	if (type == nullptr) {
@@ -1224,6 +1227,14 @@ gb_internal bool is_calling_convention_odin(ProcCallingConvention calling_conven
 	return false;
 }
 
+gb_internal bool is_calling_convention_must_tail_allowed(ProcCallingConvention calling_convention) {
+	switch (calling_convention) {
+	case ProcCC_Odin:
+		return false;
+	}
+	return true;
+}
+
 gb_internal Type *alloc_type_tuple() {
 	Type *t = alloc_type(Type_Tuple);
 	return t;
@@ -1958,6 +1969,15 @@ gb_internal Type *core_broadcastable_elem_type(Type *t) {
 	return t;
 }
 
+gb_internal i32 type_array_depth(Type *t) {
+	i32 depth = 0;
+	while (is_type_array_like(t)) {
+		t = base_array_type(t);
+		depth += 1;
+	}
+	return depth;
+}
+
 gb_internal i32 type_math_rank(Type *t) {
 	i32 rank = 0;
 	for (;;) {
@@ -2477,13 +2497,13 @@ gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Struct:
-		wait_signal_until_available(&t->Struct.polymorphic_wait_signal);
+		wait_for_record_signal(&t->Struct.polymorphic_wait_signal, &t->Struct.checking_thread);
 		if (t->Struct.polymorphic_params) {
 			return &t->Struct.polymorphic_params->Tuple;
 		}
 		break;
 	case Type_Union:
-		wait_signal_until_available(&t->Union.polymorphic_wait_signal);
+		wait_for_record_signal(&t->Union.polymorphic_wait_signal, &t->Union.checking_thread);
 		if (t->Union.polymorphic_params) {
 			return &t->Union.polymorphic_params->Tuple;
 		}
@@ -2493,11 +2513,22 @@ gb_internal TypeTuple *get_record_polymorphic_params(Type *t) {
 }
 
 
+gb_internal TypeNameObjCMetadata *entity_objc_metadata(Entity *e) {
+	GB_ASSERT(e->kind == Entity_TypeName);
+	mutex_lock(&global_type_name_objc_metadata_mutex);
+	TypeNameObjCMetadata *md = e->TypeName.objc_metadata;
+	Type *original = e->TypeName.original_type_for_parapoly;
+	if (md == nullptr && original != nullptr && original->kind == Type_Named && original->Named.type_name != nullptr) {
+		md = original->Named.type_name->TypeName.objc_metadata;
+	}
+	mutex_unlock(&global_type_name_objc_metadata_mutex);
+	return md;
+}
+
+gb_internal gb_thread_local Array<Type *> is_type_polymorphic_named_stack;
+
 gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 	if (t == nullptr) {
-		return false;
-	}
-	if (t->flags & TypeFlag_InProcessOfCheckingPolymorphic) {
 		return false;
 	}
 
@@ -2507,10 +2538,18 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 
 	case Type_Named:
 		{
-			u32 flags = t->flags;
-			t->flags |= TypeFlag_InProcessOfCheckingPolymorphic;
+			Array<Type *> &stack = is_type_polymorphic_named_stack;
+			for (Type *named : stack) {
+				if (named == t) {
+					return false;
+				}
+			}
+			if (stack.allocator.proc == nullptr) {
+				array_init(&stack, heap_allocator());
+			}
+			array_add(&stack, t);
 			bool ok = is_type_polymorphic(t->Named.base, or_specialized);
-			t->flags = flags;
+			array_pop(&stack);
 			return ok;
 		}
 
@@ -2634,6 +2673,9 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 			return true;
 		}
 		break;
+
+	case Type_BitField:
+		return is_type_polymorphic(t->BitField.backing_type, or_specialized);
 	}
 	return false;
 }
@@ -3253,7 +3295,9 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		return x->Basic.kind == y->Basic.kind;
 
 	case Type_EnumeratedArray:
-		return are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
+		return x->EnumeratedArray.count     == y->EnumeratedArray.count &&
+		       x->EnumeratedArray.is_sparse == y->EnumeratedArray.is_sparse &&
+		       are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
 		       are_types_identical(x->EnumeratedArray.elem,  y->EnumeratedArray.elem);
 
 	case Type_Array:
@@ -3536,6 +3580,7 @@ gb_internal bool union_variant_index_types_equal(Type *v, Type *vt) {
 gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_for_record_signal(&u->Union.variants_wait_signal, &u->Union.checking_thread);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
@@ -3554,6 +3599,7 @@ gb_internal i64 union_variant_index_checked(Type *u, Type *v) {
 gb_internal bool union_is_variant_of(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_for_record_signal(&u->Union.variants_wait_signal, &u->Union.checking_thread);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
@@ -3744,7 +3790,7 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 	isize max_count = 0;
 	switch (type->kind) {
 	case Type_Struct:
-		wait_signal_until_available(&type->Struct.fields_wait_signal);
+		wait_for_record_signal(&type->Struct.fields_wait_signal, &type->Struct.checking_thread);
 		max_count = type->Struct.fields.count;
 		break;
 	case Type_Tuple:    max_count = type->Tuple.variables.count; break;
@@ -3756,7 +3802,7 @@ gb_internal Selection lookup_field_from_index(Type *type, i64 index) {
 
 	switch (type->kind) {
 	case Type_Struct: {
-		wait_signal_until_available(&type->Struct.fields_wait_signal);
+		wait_for_record_signal(&type->Struct.fields_wait_signal, &type->Struct.checking_thread);
 		for (isize i = 0; i < max_count; i++) {
 			Entity *f = type->Struct.fields[i];
 			if (f->kind == Entity_Variable) {
@@ -3807,8 +3853,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 		if (has_type_got_objc_class_attribute(original_type) && original_type->kind == Type_Named) {
 			Entity *e = original_type->Named.type_name;
 			GB_ASSERT(e->kind == Entity_TypeName);
-			if (e->TypeName.objc_metadata) {
-				auto *md = e->TypeName.objc_metadata;
+			if (auto *md = entity_objc_metadata(e)) {
 				mutex_lock(md->mutex);
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
@@ -3899,8 +3944,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 		if (has_type_got_objc_class_attribute(original_type) && original_type->kind == Type_Named) {
 			Entity *e = original_type->Named.type_name;
 			GB_ASSERT(e->kind == Entity_TypeName);
-			if (e->TypeName.objc_metadata) {
-				auto *md = e->TypeName.objc_metadata;
+			if (auto *md = entity_objc_metadata(e)) {
 				mutex_lock(md->mutex);
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
@@ -3927,7 +3971,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 			// NOTE(bill): A polymorphic struct has no fields, this only hits in the case of an error
 			return sel;
 		}
-		wait_signal_until_available(&type->Struct.fields_wait_signal);
+		wait_for_record_signal(&type->Struct.fields_wait_signal, &type->Struct.checking_thread);
 		isize field_count = type->Struct.fields.count;
 		if (field_count != 0) for_array(i, type->Struct.fields) {
 			Entity *f = type->Struct.fields[i];
@@ -3963,6 +4007,10 @@ gb_internal Selection lookup_field_with_selection(Type *type_, InternedString fi
 		bool is_soa_of_array = is_soa && is_type_array(type->Struct.soa_elem);
 
 		if (is_soa_of_array) {
+			if (sel.entity == nullptr) {
+				return sel;
+			}
+
 			InternedString mapped_field_name = {};
 			String n = field_name.string();
 			     if (n == "r") mapped_field_name = string_interner_insert(str_lit("x"));
@@ -4393,6 +4441,18 @@ gb_internal i64 type_target_max_align(void) {
 	return max_align;
 }
 
+gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thread) {
+	if (signal->futex.load() == 0) {
+		thread_wait_for_owner(&signal->futex, 0, checking_thread->load());
+	}
+}
+
+gb_internal void wait_for_struct_fields(Type *t) {
+	if (t->Struct.polymorphic_parent != nullptr) {
+		wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
+	}
+}
+
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	GB_ASSERT(path != nullptr);
 	if (t->failure) {
@@ -4517,6 +4577,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Struct: {
+		wait_for_struct_fields(t);
 		if (t->Struct.custom_align > 0) {
 			return gb_max(t->Struct.custom_align, 1);
 		}
@@ -4631,6 +4692,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 gb_internal bool type_set_offsets(Type *t) {
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
+		wait_for_struct_fields(t);
 		// if (t->Struct.are_offsets_being_processed.load()) {
 		// 	return true;
 		// }
@@ -4835,6 +4897,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 
 
 	case Type_Struct: {
+		wait_for_struct_fields(t);
 		if (t->Struct.is_raw_union) {
 			i64 count = t->Struct.fields.count;
 			i64 align = type_align_of_internal(t, path);

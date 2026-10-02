@@ -27,6 +27,61 @@ struct ErrorCollector {
 
 gb_global ErrorCollector global_error_collector;
 
+// Scoped, per-thread error muting. While muted, error/warning emission is suppressed but still
+// *counted*, so a caller can trial-check something (e.g. one branch of a procedure group) and learn
+// whether it would have failed without printing anything. Muting nests.
+gb_thread_local i32 global_error_mute_depth = 0;
+gb_thread_local i64 global_error_mute_count = 0;
+
+gb_internal void begin_error_mute(void) {
+	global_error_mute_depth += 1;
+}
+gb_internal void end_error_mute(void) {
+	GB_ASSERT(global_error_mute_depth > 0);
+	global_error_mute_depth -= 1;
+}
+gb_internal i64 error_mute_count(void) {
+	return global_error_mute_count;
+}
+gb_internal bool is_error_muted(void) {
+	return global_error_mute_depth > 0;
+}
+
+// Optional annotations for the next errored source line.
+// All per-thread, so nothing leaks between concurrently-checked files.
+// `show_error_on_line` snapshots and clears them.
+//
+//   primary label, inline:                    primary label, vertical:      secondary span (always vertical):
+//     append(&x, true)                          append(x, {1,2,3})             append(&x, true)
+//                ^~~^ expected '…', found '…'          ^                              ^^  ^~~^ expected '…', found '…'
+//                                                      |                              |
+//                                                      expected '^…', pass '&x'       '[dynamic][3]int', elements are '[3]int'
+gb_thread_local char     global_caret_label_buf[512];      // primary label text
+gb_thread_local bool     global_caret_label_vertical;      // render primary label as | + text below, not inline
+gb_thread_local bool     global_caret_sec_present;         // a secondary span (to the left) is set
+gb_thread_local TokenPos global_caret_sec_pos;
+gb_thread_local TokenPos global_caret_sec_end;
+gb_thread_local char     global_caret_sec_label[512];
+
+gb_internal void set_caret_label(char const *text) {
+	global_caret_label_vertical = false;
+	if (text == nullptr) {
+		global_caret_label_buf[0] = 0;
+	} else {
+		gb_snprintf(global_caret_label_buf, gb_size_of(global_caret_label_buf), "%s", text);
+	}
+}
+gb_internal void set_caret_label_vertical(char const *text) {
+	set_caret_label(text);
+	global_caret_label_vertical = true;
+}
+gb_internal void set_caret_secondary(TokenPos pos, TokenPos end, char const *text) {
+	global_caret_sec_present = text != nullptr;
+	global_caret_sec_pos = pos;
+	global_caret_sec_end = end;
+	gb_snprintf(global_caret_sec_label, gb_size_of(global_caret_sec_label), "%s", text ? text : "");
+}
+
 
 gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = ErrorValue_Error) {
 	GB_ASSERT_MSG(global_error_collector.curr_error_value_set.load() == false, "Possible race condition in error handling system, please report this with an issue");
@@ -196,6 +251,10 @@ gb_internal void print_all_errors(void);
 typedef ERROR_OUT_PROC(ErrorOutProc);
 
 gb_internal ERROR_OUT_PROC(default_error_out_va) {
+	if (global_error_mute_depth > 0) {
+		// NOTE(bill): the error this would continue was muted, so there is no current error value
+		return;
+	}
 	char buf[4096] = {};
 	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
 	isize n = len-1;
@@ -288,6 +347,22 @@ gb_internal void terminal_reset_colours(void) {
 
 gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	get_error_value()->end = end;
+
+	// Consume the caret annotations now, so they are cleared even on an early return and can never leak
+	// onto a later error's line.
+	char caret_label[512];
+	gb_snprintf(caret_label, gb_size_of(caret_label), "%s", global_caret_label_buf);
+	bool     caret_label_vertical = global_caret_label_vertical;
+	bool     sec_present = global_caret_sec_present;
+	TokenPos sec_pos = global_caret_sec_pos;
+	TokenPos sec_end = global_caret_sec_end;
+	char sec_label[512];
+	gb_snprintf(sec_label, gb_size_of(sec_label), "%s", global_caret_sec_label);
+	global_caret_label_buf[0] = 0;
+	global_caret_label_vertical = false;
+	global_caret_sec_present = false;
+	global_caret_sec_label[0] = 0;
+
 	if (!show_error_line()) {
 		return -1;
 	}
@@ -492,13 +567,57 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		error_out(" ...");
 	}
 
-	error_out("\n\t");
-
-	for (i32 i = squiggle_padding; i > 0; i -= 1) {
-		error_out(" ");
+	// Secondary span (drawn to the left of the primary on the same line): compute its padding/width the
+	// same way as the primary's, and only draw it if it sits fully to the left within the window.
+	i32 sec_pad = 0;
+	i32 sec_len = 0;
+	bool draw_sec = sec_present && sec_pos.line == pos.line && sec_end.line == pos.line;
+	if (draw_sec) {
+		i32 sec_start_byte = error_start_index_bytes + (sec_pos.column - pos.column);
+		i32 sec_end_byte   = error_start_index_bytes + (sec_end.column - pos.column);
+		if (window_open_bytes > 0) {
+			sec_pad += 4;
+		}
+		for (i32 i = 0; i < line_length_graphemes; i += 1) {
+			if (graphemes[i].byte_index < window_open_bytes)  continue;
+			if (graphemes[i].byte_index >= sec_start_byte)    break;
+			sec_pad += graphemes[i].width;
+		}
+		for (i32 i = 0; i < line_length_graphemes; i += 1) {
+			if (graphemes[i].byte_index < sec_start_byte) continue;
+			if (graphemes[i].byte_index >= sec_end_byte)  break;
+			sec_len += graphemes[i].width;
+		}
+		if (sec_len < 1) {
+			sec_len = 1;
+		}
+		if (sec_start_byte >= error_start_index_bytes || sec_pad + sec_len > squiggle_padding) {
+			draw_sec = false; // overlaps or is not to the left; skip rather than misalign
+		}
 	}
 
+	error_out("\n\t");
+
+	i32 printed = 0;
 	terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
+	if (draw_sec) {
+		for (i32 i = sec_pad - printed; i > 0; i -= 1) {
+			error_out(" ");
+		}
+		printed = sec_pad;
+		error_out("^");
+		for (i32 k = sec_len - 2; k > 0; k -= 1) {
+			error_out("~");
+		}
+		if (sec_len >= 2) {
+			error_out("^");
+		}
+		printed += sec_len;
+	}
+
+	for (i32 i = squiggle_padding - printed; i > 0; i -= 1) {
+		error_out(" ");
+	}
 
 	if (squiggle_length > 0) {
 		error_out("^");
@@ -515,11 +634,45 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		}
 	}
 
+	if (caret_label[0] != 0 && !caret_label_vertical) {
+		terminal_set_colours(TerminalStyle_Normal, TerminalColour_Grey);
+		error_out(" %s", caret_label);
+	}
+
 	// NOTE(Feoramund): Specifically print a newline, then reset colours,
 	// instead of the other way around. Otherwise the printing mechanism
 	// will collapse the newline for reasons currently beyond my ken.
 	error_out("\n");
 	terminal_reset_colours();
+
+	// A vertical label hangs under its span: `|` then the text, aligned to the span's column. The
+	// secondary span takes priority (its label explains the primary); otherwise a vertical primary label.
+	i32 vpad = -1;
+	char const *vtext = nullptr;
+	if (draw_sec && sec_label[0] != 0) {
+		vpad = sec_pad;
+		vtext = sec_label;
+	} else if (caret_label_vertical && caret_label[0] != 0) {
+		vpad = squiggle_padding;
+		vtext = caret_label;
+	}
+	if (vpad >= 0 && vtext != nullptr && vtext[0] != 0) {
+		error_out("\t");
+		for (i32 i = vpad; i > 0; i -= 1) {
+			error_out(" ");
+		}
+		terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
+		error_out("|\n");
+		terminal_reset_colours();
+
+		error_out("\t");
+		for (i32 i = vpad; i > 0; i -= 1) {
+			error_out(" ");
+		}
+		terminal_set_colours(TerminalStyle_Normal, TerminalColour_Grey);
+		error_out("%s\n", vtext);
+		terminal_reset_colours();
+	}
 
 	return squiggle_padding;
 }
@@ -542,6 +695,10 @@ gb_internal void error_out_coloured(char const *str, TerminalStyle style, Termin
 
 
 gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	if (global_error_mute_depth > 0) {
+		global_error_mute_count += 1;
+		return;
+	}
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
@@ -579,6 +736,10 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 	if (global_ignore_warnings()) {
 		return;
 	}
+	if (global_error_mute_depth > 0) {
+		global_error_mute_count += 1;
+		return;
+	}
 
 	global_error_collector.warning_count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
@@ -608,10 +769,17 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 
 
 gb_internal void error_line_va(char const *fmt, va_list va) {
+	if (global_error_mute_depth > 0) {
+		return;
+	}
 	error_out_va(fmt, va);
 }
 
 gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
+	if (global_error_mute_depth > 0) {
+		global_error_mute_count += 1;
+		return;
+	}
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {

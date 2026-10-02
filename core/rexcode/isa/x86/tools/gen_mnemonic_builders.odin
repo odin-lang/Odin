@@ -1382,7 +1382,7 @@ generate_emit_helper_call :: proc(sb: ^strings.Builder, entry: Proc_Entry) {
 
 	case:
 		// Unknown pattern - fall back to append with inst_ call
-		strings.write_string(sb, "append(instructions, ")
+		strings.write_string(sb, "append_elem(instructions, ")
 		strings.write_string(sb, entry.proc_name)
 		strings.write_string(sb, "(")
 		for i in 0..<sig.count {
@@ -1469,7 +1469,7 @@ generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, max_name_pad
 	strings.write_string(sb, params)
 	// Reuse the (class-correct, hint-baked) inst_ builder rather than re-emitting
 	// the operands -- keeps emit_ in lockstep with inst_ and inherits the hint.
-	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, ") { append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_string(sb, "(")
 	for i in 0..<sig.count {

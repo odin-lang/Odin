@@ -317,11 +317,12 @@ enum VetFlags : u64 {
 	VetFlag_Tabs            = 1u<<9,
 	VetFlag_UnusedProcedures = 1u<<10,
 	VetFlag_ExplicitAllocators = 1u<<11,
-	VetFlag_PackedFieldAddr = 1u<<12,
+	VetFlag_WhenShadowing   = 1u<<12,
+	VetFlag_PackedFieldAddr = 1u<<13,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast,
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast|VetFlag_WhenShadowing,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
@@ -353,6 +354,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_UnusedProcedures;
 	} else if (name == "explicit-allocators") {
 		return VetFlag_ExplicitAllocators;
+	} else if (name == "when-shadowing") {
+		return VetFlag_WhenShadowing;
 	} else if (name == "packed-field-addr") {
 		return VetFlag_PackedFieldAddr;
 	}
@@ -549,6 +552,7 @@ struct BuildContext {
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_type_assert;
+	bool   lifetime_markers; // Opt-in to llvm.lifetime.* markers on scoped locals.
 	bool   dynamic_literals;  // Opt-in to `#+feature dynamic-literals` project-wide.
 	bool   no_output_files;
 	bool   no_crt;
@@ -600,6 +604,9 @@ struct BuildContext {
 	bool internal_weak_monomorphization;
 	bool internal_ignore_llvm_verification;
 	bool internal_llvm_no_sroa;
+	bool internal_global_entity_graph;
+	u64  internal_shuffle_global_entities; // seed, 0 = no shuffle
+	bool internal_check_global_edges;
 
 	bool   enable_rvo;
 
@@ -2295,14 +2302,18 @@ gb_internal bool init_build_paths(String init_filename) {
 
 	string_set_init(&bc->target_features_set, 1024);
 
-	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
+	// Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
 
-	{
-		String build_project_name  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
-		GB_ASSERT(build_project_name.len > 0);
-		bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
+	Path   main_pkg           = bc->build_paths[BuildPath_Main_Package];
+	String build_project_name = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
+
+	if (build_project_name.len == 0) {
+		// Happens when building a package at root.
+		build_project_name = str_lit("/");
 	}
+
+	bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
 
 	bool produces_output_file = false;
 	if (bc->command_kind == Command_doc && bc->cmd_doc_flags & CmdDocFlag_DocFormat) {
@@ -2460,13 +2471,14 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else {
 		Path output_path;
 
-		if (str_eq(init_filename, str_lit("."))) {
+		if (str_eq(init_filename, str_lit(".")) || str_eq(init_filename, str_lit("/"))) {
 			// We must name the output file after the current directory.
 			debugf("Output name will be created from current base name %.*s.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
 			String last_element  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
 
 			if (last_element.len == 0) {
-				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
+				String init_fullpath = path_to_full_path(ha, init_filename);
+				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(init_fullpath));
 				return false;
 			}
 			output_path.basename = copy_string(ha, bc->build_paths[BuildPath_Main_Package].basename);

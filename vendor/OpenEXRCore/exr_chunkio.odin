@@ -112,8 +112,8 @@ foreign lib {
 	 */
 	write_scanline_chunk :: proc(
 		ctxt:        context_t,
-		part_index:  int,
-		y:           int,
+		part_index:  c.int,
+		y:           c.int,
 		packed_data: rawptr,
 		packed_size: u64) -> result_t ---
 

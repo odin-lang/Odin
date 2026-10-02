@@ -227,15 +227,15 @@ _private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) 
 }
 
 /*
-	product = |a| * |b| using Karatsuba Multiplication using three half size multiplications.
+	`product = |a| * |b|` using Karatsuba Multiplication using three half size multiplications.
 
-	Let `B` represent the radix [e.g. 2**_DIGIT_BITS] and let `n` represent
+	Let `B` represent the radix [e.g. `2**_DIGIT_BITS`] and let `n` represent
 	half of the number of digits in the min(a,b)
 
-	`a` = `a1` * `B`**`n` + `a0`
-	`b` = `b`1 * `B`**`n` + `b0`
+	`a = a1 * B**n + a0`
+	`b = b1 * B**n + b0`
 
-	Then, a * b => 1b1 * B**2n + ((a1 + a0)(b1 + b0) - (a0b0 + a1b1)) * B + a0b0
+	Then, `a * b => a1b1 * B**2n + ((a1 + a0)(b1 + b0) - (a0b0 + a1b1)) * B + a0b0`
 
 	Note that a1b1 and a0b0 are used twice and only need to be computed once.
 	So in total three half size (half # of digit) multiplications are performed,
@@ -248,8 +248,8 @@ _private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) 
 	Note also that the call to `internal_mul` can end up back in this function
 	if the a0, a1, b0, or b1 are above the threshold.
 
-	This is known as divide-and-conquer and leads to the famous O(N**lg(3)) or O(N**1.584)
-	work which is asymptopically lower than the standard O(N**2) that the
+	This is known as divide-and-conquer and leads to the famous `O(N**lg(3))` or `O(N**1.584)`
+	work which is asymptopically lower than the standard `O(N**2)` that the
 	baseline/comba methods use. Generally though, the overhead of this method doesn't pay off
 	until a certain size is reached, of around 80 used DIGITs.
 */

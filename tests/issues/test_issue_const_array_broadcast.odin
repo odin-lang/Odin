@@ -67,6 +67,41 @@ const_array_broadcast_union :: proc(t: ^testing.T) {
 	testing.expect_value(t, union_local, union_global)
 }
 
+// A named untyped constant against a union hint, broadcast into an array variant, lost its
+// constant value and the backend then tried to load the constant entity as a variable.
+
+@(private="file")
+Target :: union {
+	[]Item,
+	[2]u32,
+}
+
+@(private="file")
+TARGET_SIZE :: 8192
+
+@(private="file")
+take_target :: proc(target: Target, count: u32) -> Target {
+	return target
+}
+
+@(test)
+const_array_broadcast_into_union_variant :: proc(t: ^testing.T) {
+	expected := [2]u32{TARGET_SIZE, TARGET_SIZE}
+
+	assigned: Target = TARGET_SIZE
+	testing.expect_value(t, assigned.([2]u32), expected)
+
+	named := take_target(target = TARGET_SIZE, count = 3)
+	testing.expect_value(t, named.([2]u32), expected)
+
+	positional := take_target(TARGET_SIZE*2, 3)
+	testing.expect_value(t, positional.([2]u32), [2]u32{2*TARGET_SIZE, 2*TARGET_SIZE})
+
+	elems := [2]Target{TARGET_SIZE, {}}
+	testing.expect_value(t, elems[0].([2]u32), expected)
+	testing.expect(t, elems[1] == nil, "the second element should be nil")
+}
+
 @(test)
 const_array_literals_unchanged :: proc(t: ^testing.T) {
 	// a literal for the array's own type is not a broadcast

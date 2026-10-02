@@ -7,6 +7,7 @@
 	#pragma warning(disable: 4505)
 #endif
 #include "big_int.cpp"
+#include "big_rat.cpp"
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
@@ -430,6 +431,7 @@ enum BuildFlagKind {
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_WebkitSwitchWorkaround,
 	BuildFlag_NoTypeAssert,
+	BuildFlag_LifetimeMarkers,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_DynamicLiterals,
 	BuildFlag_NoCRT,
@@ -459,6 +461,7 @@ enum BuildFlagKind {
 	BuildFlag_VetCast,
 	BuildFlag_VetPackedFieldAddr,
 	BuildFlag_VetTabs,
+	BuildFlag_VetWhenShadowing,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -531,6 +534,9 @@ enum BuildFlagKind {
 	BuildFlag_InternalLLVMVerification,
 	BuildFlag_InternalLLVMNoSROA,
 	BuildFlag_InternalEnableRVO,
+	BuildFlag_InternalGlobalEntityGraph,
+	BuildFlag_InternalShuffleGlobalEntities,
+	BuildFlag_InternalCheckGlobalEdges,
 
 	BuildFlag_Sanitize,
 	BuildFlag_LTO,
@@ -692,6 +698,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_WebkitSwitchWorkaround,  str_lit("webkit-switch-workaround"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoTypeAssert,            str_lit("no-type-assert"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_LifetimeMarkers,         str_lit("lifetime-markers"),          BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DynamicLiterals,         str_lit("dynamic-literals"),          BuildFlagParam_None,    Command__does_check);
@@ -722,6 +729,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackedFieldAddr,      str_lit("vet-packed-field-addr"),     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetWhenShadowing,        str_lit("vet-when-shadowing"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -792,6 +800,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalGlobalEntityGraph, str_lit("internal-global-entity-graph"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalShuffleGlobalEntities, str_lit("internal-shuffle-global-entities"), BuildFlagParam_Integer, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalCheckGlobalEdges, str_lit("internal-check-global-edges"), BuildFlagParam_None, Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
@@ -938,7 +949,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						case BuildFlagParam_Float:
-							if (value.kind != ExactValue_Float) {
+							if (value.kind != ExactValue_Float && value.kind != ExactValue_Rational) {
 								gb_printf_err("%.*s expected a floating pointer number, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
@@ -1394,6 +1405,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoTypeAssert:
 							build_context.no_type_assert = true;
 							break;
+						case BuildFlag_LifetimeMarkers:
+							build_context.lifetime_markers = true;
+							break;
 						case BuildFlag_NoDynamicLiterals:
 							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
 							break;
@@ -1486,6 +1500,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
 						case BuildFlag_VetPackedFieldAddr:  build_context.vet_flags |= VetFlag_PackedFieldAddr;  break;
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
+						case BuildFlag_VetWhenShadowing:    build_context.vet_flags |= VetFlag_WhenShadowing;    break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
@@ -1837,6 +1852,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_InternalEnableRVO:
 							build_context.enable_rvo = true;
+							break;
+						case BuildFlag_InternalGlobalEntityGraph:
+							build_context.internal_global_entity_graph = true;
+							break;
+						case BuildFlag_InternalShuffleGlobalEntities:
+							GB_ASSERT(value.kind == ExactValue_Integer);
+							build_context.internal_shuffle_global_entities = cast(u64)big_int_to_i64(&value.value_integer);
+							break;
+						case BuildFlag_InternalCheckGlobalEdges:
+							build_context.internal_check_global_edges = true;
 							break;
 
 
@@ -2534,7 +2559,7 @@ gb_internal void export_dependencies(Checker *c) {
 		}
 		array_add(&load_files, cache);
 	}
-	array_sort(files, file_cache_sort_cmp);
+	array_sort(load_files, file_cache_sort_cmp);
 
 	if (build_context.export_dependencies_format == DependenciesExportMake) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
@@ -3058,6 +3083,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
+		if (print_flag("-lifetime-markers")) {
+			print_usage_line(2, "Emits lifetime markers for named locals, so that locals from");
+			print_usage_line(2, "non-overlapping scopes may reuse stack.");
+			print_usage_line(2, "Requires '-o:size' or above; no effect with '-sanitize:address'.");
+			print_usage_line(2, "Warning: this applies to every package in the build; using the address");
+			print_usage_line(2, "of a local after the local's declaring scope ended can miscompile.");
+		}
+
 		if (print_flag("-linker:<string>")) {
 			print_usage_line(2, "Specify the linker to use.");
 			print_usage_line(2, "Choices:");
@@ -3386,6 +3419,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-vet-unused-imports");
 				print_usage_line(3, "-vet-shadowing");
 				print_usage_line(3, "-vet-using-stmt");
+				print_usage_line(3, "-vet-when-shadowing");
 		}
 
 		if (print_flag("-vet-cast")) {
@@ -3451,6 +3485,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet-using-stmt")) {
 			print_usage_line(2, "Checks for the use of 'using' as a statement.");
 			print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
+		}
+
+		if (print_flag("-vet-when-shadowing")) {
+			print_usage_line(2, "Checks for declarations within a global 'when' that shadow a builtin or package-level name.");
 		}
 	}
 

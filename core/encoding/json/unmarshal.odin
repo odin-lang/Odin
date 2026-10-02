@@ -358,7 +358,6 @@ unmarshal_string_token :: proc(p: ^Parser, val: any, token: Token, ti: ^reflect.
 	return false, nil
 }
 
-@(private)
 unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	token := p.curr_token

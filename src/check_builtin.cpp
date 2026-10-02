@@ -2029,7 +2029,61 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	return false;
 }
 
-gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_, LoadFileTier tier, bool use_mutex=true) {
+// NOTE(bill, 2026-10-02) The cache entry of `path` loaded to at least `tier`.
+// The map is only locked to find or add the entry, and the file is loaded under the entry's own mutex, so different files load at once.
+gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const &path, LoadFileTier tier) {
+	LoadFileCache *cache = nullptr;
+	mutex_lock(&info->load_file_mutex);
+	LoadFileCache **cache_ptr = string_map_get(&info->load_file_cache, path);
+	if (cache_ptr != nullptr) {
+		cache = *cache_ptr;
+	} else {
+		cache = permanent_alloc_item<LoadFileCache>();
+		cache->path = path;
+		string_map_init(&cache->hashes, 32);
+		string_map_set(&info->load_file_cache, path, cache);
+	}
+	mutex_unlock(&info->load_file_mutex);
+
+	MUTEX_GUARD(&cache->mutex);
+	if (tier > cache->tier) {
+		cache->tier = tier;
+
+		TEMPORARY_ALLOCATOR_GUARD();
+		char *c_str = alloc_cstring(temporary_allocator(), path);
+
+		gbFile f = {};
+		cache->file_error = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
+
+		if (cache->file_error == gbFileError_None) {
+			cache->exists = true;
+
+			switch(tier) {
+			case LoadFileTier_Exists:
+				// Nothing to do.
+				break;
+			case LoadFileTier_Contents: {
+				isize file_size = cast(isize)gb_file_size(&f);
+				if (file_size > 0) {
+					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
+					gb_file_read_at(&f, ptr, file_size, 0);
+					ptr[file_size] = '\0';
+					cache->data.text = ptr;
+					cache->data.len = file_size;
+				}
+				break;
+			}
+			default:
+				GB_PANIC("Unhandled LoadFileTier");
+				break;
+			};
+		}
+	}
+	return cache;
+}
+
+gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_, LoadFileTier tier) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
 	String builtin_name = bd->name.string;
@@ -2051,75 +2105,12 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 		}
 	}
 
-	if (use_mutex) mutex_lock(&c->info->load_file_mutex);
-	defer (if (use_mutex) mutex_unlock(&c->info->load_file_mutex));
+	LoadFileCache *cache = load_file_cache_entry(c->info, path, tier);
+	if (cache_) *cache_ = cache;
 
-	gbFileError file_error = gbFileError_None;
-	String data = {};
-	bool exists = false;
-	LoadFileTier cache_tier = LoadFileTier_Invalid;
-
-	LoadFileCache **cache_ptr = string_map_get(&c->info->load_file_cache, path);
-	LoadFileCache *cache = cache_ptr ? *cache_ptr : nullptr;
-	if (cache) {
-		file_error = cache->file_error;
-		data = cache->data;
-		exists = cache->exists;
-		cache_tier = cache->tier;
-	}
-	defer ({
-		if (cache == nullptr) {
-			LoadFileCache *new_cache = permanent_alloc_item<LoadFileCache>();
-			new_cache->path = path;
-			new_cache->data = data;
-			new_cache->file_error = file_error;
-			new_cache->exists = exists;
-			new_cache->tier = cache_tier;
-			string_map_init(&new_cache->hashes, 32);
-			string_map_set(&c->info->load_file_cache, path, new_cache);
-			if (cache_) *cache_ = new_cache;
-		} else {
-			cache->data = data;
-			cache->file_error = file_error;
-			cache->exists = exists;
-			cache->tier = cache_tier;
-			if (cache_) *cache_ = cache;
-		}
-	});
-
-	if (tier > cache_tier) {
-		cache_tier = tier;
-
-		TEMPORARY_ALLOCATOR_GUARD();
-		char *c_str = alloc_cstring(temporary_allocator(), path);
-
-		gbFile f = {};
-		file_error = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
-
-		if (file_error == gbFileError_None) {
-			exists = true;
-
-			switch(tier) {
-			case LoadFileTier_Exists:
-				// Nothing to do.
-				break;
-			case LoadFileTier_Contents: {
-				isize file_size = cast(isize)gb_file_size(&f);
-				if (file_size > 0) {
-					u8 *ptr = permanent_alloc_array<u8>(file_size+1);
-					gb_file_read_at(&f, ptr, file_size, 0);
-					ptr[file_size] = '\0';
-					data.text = ptr;
-					data.len = file_size;
-				}
-				break;
-			}
-			default:
-				GB_PANIC("Unhandled LoadFileTier");
-			};
-		}
-	}
+	mutex_lock(&cache->mutex);
+	gbFileError file_error = cache->file_error;
+	mutex_unlock(&cache->mutex);
 
 	switch (file_error) {
 	default:
@@ -2253,6 +2244,62 @@ gb_internal int file_cache_sort_cmp(void const *x, void const *y) {
 	return string_compare(a->path, b->path);
 }
 
+// NOTE(bill): a directory may hold thousands of files, which are read one at a time otherwise.
+// This thread and a few helper tasks take them in turn and this thread only waits for the ones a running helper has taken,
+// and the job is freed by whichever of them finishes with it last.
+struct LoadDirectoryPrefetch {
+	CheckerInfo *      info;
+	Array<String>      paths;
+	std::atomic<isize> next;
+	std::atomic<isize> done;
+	std::atomic<i32>   refs;
+};
+
+gb_internal void load_directory_prefetch_run(LoadDirectoryPrefetch *job) {
+	for (isize i = job->next.fetch_add(1); i < job->paths.count; i = job->next.fetch_add(1)) {
+		load_file_cache_entry(job->info, job->paths[i], LoadFileTier_Contents);
+		job->done.fetch_add(1);
+	}
+	if (job->refs.fetch_sub(1) == 1) {
+		array_free(&job->paths);
+		gb_free(heap_allocator(), job);
+	}
+}
+
+gb_internal WORKER_TASK_PROC(load_directory_prefetch_worker) {
+	load_directory_prefetch_run(cast(LoadDirectoryPrefetch *)data);
+	return 0;
+}
+
+gb_internal void load_directory_prefetch(CheckerInfo *info, Array<FileInfo> const &list) {
+	isize const FILES_PER_HELPER = 64;
+
+	LoadDirectoryPrefetch *job = gb_alloc_item(heap_allocator(), LoadDirectoryPrefetch);
+	job->info = info;
+	array_init(&job->paths, heap_allocator(), 0, list.count);
+	for (FileInfo const &fi : list) {
+		if (!fi.is_dir) {
+			array_add(&job->paths, fi.fullpath);
+		}
+	}
+	isize count = job->paths.count;
+	isize helpers = gb_min(global_thread_pool.threads.count - 1, count/FILES_PER_HELPER);
+	job->refs.store(cast(i32)(helpers + 1));
+	for (isize i = 0; i < helpers; i++) {
+		thread_pool_add_task(load_directory_prefetch_worker, job);
+	}
+
+	job->refs.fetch_add(1); // NOTE(bill): kept until every file is done
+	load_directory_prefetch_run(job);
+	while (job->done.load() < count) {
+		yield_thread();
+	}
+	if (job->refs.fetch_sub(1) == 1) {
+		array_free(&job->paths);
+		gb_free(heap_allocator(), job);
+	}
+}
+
 gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
@@ -2301,39 +2348,26 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
 		gb_unused(ok);
 	}
-	MUTEX_GUARD(&c->info->load_directory_mutex);
-
-
-	gbFileError file_error = gbFileError_None;
-
-	Array<LoadFileCache *> file_caches = {};
-
+	// NOTE(bill): the map is only locked to find or add the directory's entry which is loaded under its own mutex
+	LoadDirectoryCache *cache = nullptr;
+	mutex_lock(&c->info->load_directory_mutex);
 	LoadDirectoryCache **cache_ptr = string_map_get(&c->info->load_directory_cache, path);
-	LoadDirectoryCache *cache = cache_ptr ? *cache_ptr : nullptr;
-	if (cache) {
-		file_error = cache->file_error;
+	if (cache_ptr != nullptr) {
+		cache = *cache_ptr;
+	} else {
+		cache = permanent_alloc_item<LoadDirectoryCache>();
+		cache->path = path;
+		string_map_set(&c->info->load_directory_cache, path, cache);
 	}
-	defer ({
-		if (cache == nullptr) {
-			LoadDirectoryCache *new_cache = permanent_alloc_item<LoadDirectoryCache>();
-			new_cache->path = path;
-			new_cache->files = file_caches;
-			new_cache->file_error = file_error;
-			string_map_set(&c->info->load_directory_cache, path, new_cache);
+	map_set(&c->info->load_directory_map, call, cache);
+	mutex_unlock(&c->info->load_directory_mutex);
 
-			map_set(&c->info->load_directory_map, call, new_cache);
-		} else {
-			cache->file_error = file_error;
-
-			map_set(&c->info->load_directory_map, call, cache);
-		}
-	});
-
+	MUTEX_GUARD(&cache->mutex);
 
 	LoadDirectiveResult result = LoadDirective_Success;
 
-
-	if (cache == nullptr)  {
+	if (!cache->loaded)  {
+		cache->loaded = true;
 		Array<FileInfo> list = {};
 		ReadDirectoryError rd_err = read_directory(path, &list);
 		defer (array_free(&list));
@@ -2364,27 +2398,26 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 			return LoadDirective_Error;
 		}
 
+		load_directory_prefetch(c->info, list);
+
 		isize files_to_reserve = list.count+1; // always reserve 1
 
-		file_caches = array_make<LoadFileCache *>(heap_allocator(), 0, files_to_reserve);
-
-		mutex_lock(&c->info->load_file_mutex);
-		defer (mutex_unlock(&c->info->load_file_mutex));
+		cache->files = array_make<LoadFileCache *>(heap_allocator(), 0, files_to_reserve);
 
 		for (FileInfo fi : list) {
-			LoadFileCache *cache = nullptr;
+			LoadFileCache *file_cache = nullptr;
 			if (fi.is_dir) {
 				continue;
 			}
 
-			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &cache, LoadFileTier_Contents, /*use_mutex*/false)) {
-				array_add(&file_caches, cache);
+			if (cache_load_file_directive(c, call, fi.fullpath, err_on_not_found, &file_cache, LoadFileTier_Contents)) {
+				array_add(&cache->files, file_cache);
 			} else {
 				result = LoadDirective_Error;
 			}
 		}
 
-		array_sort(file_caches, file_cache_sort_cmp);
+		array_sort(cache->files, file_cache_sort_cmp);
 
 	}
 
@@ -2574,7 +2607,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 
 		LoadFileCache *cache = nullptr;
 		if (cache_load_file_directive(c, call, original_string, true, &cache, LoadFileTier_Contents)) {
-			MUTEX_GUARD(&c->info->load_file_mutex);
+			MUTEX_GUARD(&cache->mutex);
 			// TODO(bill): make these procedures fast :P
 			u64 hash_value = 0;
 			u64 *hash_value_ptr = string_map_get(&cache->hashes, hash_kind);
@@ -3951,10 +3984,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		
 		if (is_type_complex(t)) {
 			if (x->mode == Addressing_Constant) {
+				// Keep the conjugate exact: negate the imaginary component(s) as ExactValues.
 				ExactValue v = exact_value_to_complex(x->value);
-				f64 r = v.value_complex->real;
-				f64 i = -v.value_complex->imag;
-				x->value = exact_value_complex(r, i);
+				ExactValue r = v.value_complex->real;
+				ExactValue i = exact_unary_operator_value(Token_Sub, v.value_complex->imag, 0, false);
+				x->value = exact_value_complex_ev(r, i);
 				x->mode = Addressing_Constant;
 			} else {
 				x->mode = Addressing_Value;
@@ -3962,11 +3996,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		} else if (is_type_quaternion(t)) {
 			if (x->mode == Addressing_Constant) {
 				ExactValue v = exact_value_to_quaternion(x->value);
-				f64 r = +v.value_quaternion->real;
-				f64 i = -v.value_quaternion->imag;
-				f64 j = -v.value_quaternion->jmag;
-				f64 k = -v.value_quaternion->kmag;
-				x->value = exact_value_quaternion(r, i, j, k);
+				ExactValue r = v.value_quaternion->real;
+				ExactValue i = exact_unary_operator_value(Token_Sub, v.value_quaternion->imag, 0, false);
+				ExactValue j = exact_unary_operator_value(Token_Sub, v.value_quaternion->jmag, 0, false);
+				ExactValue k = exact_unary_operator_value(Token_Sub, v.value_quaternion->kmag, 0, false);
+				x->value = exact_value_quaternion_ev(r, i, j, k);
 				x->mode = Addressing_Constant;
 			} else {
 				x->mode = Addressing_Value;
@@ -4594,17 +4628,24 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				operand->value.value_float = bit_cast<f64>(abs);
 				break;
 			}
+			case ExactValue_Rational: {
+				mp_int n; mp_init(&n);
+				defer (mp_clear(&n));
+				mp_abs(&operand->value.value_rational->num, &n);
+				operand->value = exact_value_rational_from_ints(&n, &operand->value.value_rational->den);
+				break;
+			}
 			case ExactValue_Complex: {
-				f64 r = operand->value.value_complex->real;
-				f64 i = operand->value.value_complex->imag;
+				f64 r = exact_value_to_f64(operand->value.value_complex->real);
+				f64 i = exact_value_to_f64(operand->value.value_complex->imag);
 				operand->value = exact_value_float(gb_sqrt(r*r + i*i));
 				break;
 			}
 			case ExactValue_Quaternion: {
-				f64 r = operand->value.value_quaternion->real;
-				f64 i = operand->value.value_quaternion->imag;
-				f64 j = operand->value.value_quaternion->jmag;
-				f64 k = operand->value.value_quaternion->kmag;
+				f64 r = exact_value_to_f64(operand->value.value_quaternion->real);
+				f64 i = exact_value_to_f64(operand->value.value_quaternion->imag);
+				f64 j = exact_value_to_f64(operand->value.value_quaternion->jmag);
+				f64 k = exact_value_to_f64(operand->value.value_quaternion->kmag);
 				operand->value = exact_value_float(gb_sqrt(r*r + i*i + j*j + k*k));
 				break;
 			}
@@ -5202,6 +5243,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = o.type;
 
 		ExactValue value = o.value;
+		if (value.kind == ExactValue_Rational) {
+			value = exact_value_to_float(value); // constant floor/ceil/round operate on the f64
+		}
 		if (value.kind == ExactValue_Integer) {
 			// do nothing
 		} else if (value.kind == ExactValue_Float) {
@@ -6993,6 +7037,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				variants[i] = alloc_type_pointer(bt->Union.variants[i]);
 			}
 			new_type->Union.variants = variants;
+			wait_signal_set(&new_type->Union.variants_wait_signal); // built directly, not via check_union_type
 
 			// NOTE(bill): Is this even correct?
 			new_type->Union.node = operand->expr;
@@ -7170,6 +7215,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			}
 			merged_union->Union.variants = slice_from_array(variants);
+			wait_signal_set(&merged_union->Union.variants_wait_signal); // built directly, not via check_union_type
 
 			operand->mode = Addressing_Type;
 			operand->type = merged_union;
@@ -7483,7 +7529,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->type = t_untyped_bool;
 			bool is_specialization = false;
 			if (!are_types_identical(s, t)) {
-				is_specialization = check_type_specialization_to(c, s, t, false, false);
+				is_specialization = subst_check_specialization(c, s, t, /*modify_type*/false);
 			}
 			operand->value = exact_value_bool(is_specialization);
 

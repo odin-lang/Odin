@@ -62,6 +62,7 @@ package all
 @(require) import "core:crypto/tuplehash"
 @(require) import "core:crypto/x25519"
 @(require) import "core:crypto/x448"
+@(require) import "core:crypto/x509"
 
 @(require) import "core:debug/pe"
 @(require) import "core:debug/trace"
