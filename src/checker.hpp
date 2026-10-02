@@ -793,8 +793,9 @@ struct CheckerInfo {
 
 	BlockingMutex entry_point_mutex;
 
-	MPSCQueue<Entity *> definition_queue;
-	MPSCQueue<Entity *> entity_queue;
+	PerThreadArray<Entity *> definition_queue;
+	PerThreadArray<Entity *> entity_queue;
+	std::atomic<u64>         entities_without_file; // for their `order_in_src`
 	MPSCQueue<Entity *> required_global_variable_queue;
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
 	MPSCQueue<Entity *> foreign_imports_to_check_fullpaths;
@@ -905,7 +906,7 @@ struct Checker {
 	Array<DeclInfo *> nested_proc_lits;
 
 
-	MPSCQueue<UntypedExprInfo> global_untyped_queue;
+	PerThreadArray<UntypedExprInfo> global_untyped_queue;
 	MPSCQueue<Type *> soa_types_to_complete;
 };
 

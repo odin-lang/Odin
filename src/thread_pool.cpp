@@ -327,3 +327,56 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	return 0;
 }
 
+
+template <typename T>
+struct alignas(2*GB_CACHE_LINE_SIZE) PerThreadArraySlot {
+	Array<T> array;
+	u8       padding[2*GB_CACHE_LINE_SIZE - gb_size_of(Array<T>)];
+};
+
+template <typename T>
+struct PerThreadArray {
+	Slice<PerThreadArraySlot<T> > slots;
+};
+
+template <typename T>
+gb_internal void per_thread_array_init(PerThreadArray<T> *a, isize thread_count) {
+	isize align = gb_align_of(PerThreadArraySlot<T>);
+	a->slots = slice_make_aligned<PerThreadArraySlot<T> >(permanent_allocator(), thread_count, align);
+	GB_ASSERT((cast(uintptr)a->slots.data & (align - 1)) == 0);
+	for (PerThreadArraySlot<T> &slot : a->slots) {
+		array_init(&slot.array, heap_allocator());
+	}
+}
+
+template <typename T>
+gb_internal void per_thread_array_destroy(PerThreadArray<T> *a) {
+	for (PerThreadArraySlot<T> &slot : a->slots) {
+		array_free(&slot.array);
+	}
+}
+
+template <typename T>
+gb_internal void per_thread_array_add(PerThreadArray<T> *a, T const &value) {
+	isize index = current_thread_index();
+	GB_ASSERT(0 <= index && index < a->slots.count);
+	array_add(&a->slots[index].array, value);
+}
+
+template <typename T>
+gb_internal isize per_thread_array_count(PerThreadArray<T> *a) {
+	isize count = 0;
+	for (PerThreadArraySlot<T> &slot : a->slots) {
+		count += slot.array.count;
+	}
+	return count;
+}
+
+template <typename T>
+gb_internal void per_thread_array_gather(PerThreadArray<T> *a, Array<T> *dst) {
+	array_reserve(dst, dst->count + per_thread_array_count(a));
+	for (PerThreadArraySlot<T> &slot : a->slots) {
+		array_add_elems(dst, slot.array.data, slot.array.count);
+		array_clear(&slot.array);
+	}
+}
