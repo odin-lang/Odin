@@ -2213,7 +2213,6 @@ gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedur
 			lb_init_global_var(m, p, e, init_expr, var);
 		}
 
-		// NOTE(bill): a block per global, as instruction selection is superlinear in the size of a block
 		lbBlock *next = lb_create_block(p, "global.init", true);
 		lb_emit_jump(p, next);
 		lb_start_block(p, next);
@@ -2469,6 +2468,8 @@ gb_internal void lb_llvm_function_pass_per_function_internal(lbModule *module, l
 	lb_run_function_pass_manager(pass_manager, p, pass_manager_kind);
 }
 
+gb_internal i64 lb_module_cost(lbModule *m);
+
 gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	lbModule *m = cast(lbModule *)data;
 	{
@@ -2529,6 +2530,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 		}
 	}
 
+	m->estimated_cost = lb_module_cost(m);
 	return 0;
 }
 
@@ -2644,6 +2646,37 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 
 
 
+gb_internal Array<lbModule *> lb_modules_by_cost(lbGenerator *gen) {
+	auto modules = array_make<lbModule *>(temporary_allocator(), 0, gen->modules.count);
+	for (auto const &entry : gen->modules) {
+		array_add(&modules, entry.value);
+	}
+	array_sort(modules, [](void const *a, void const *b) -> int {
+		lbModule *x = *cast(lbModule **)a;
+		lbModule *y = *cast(lbModule **)b;
+		if (x->estimated_cost != y->estimated_cost) {
+			return x->estimated_cost > y->estimated_cost ? -1 : +1;
+		}
+		return gb_strcmp(x->module_name, y->module_name);
+	});
+	return modules;
+}
+
+gb_internal i64 lb_module_cost(lbModule *m) {
+	i64 cost = 0;
+	for (LLVMValueRef f = LLVMGetFirstFunction(m->mod); f != nullptr; f = LLVMGetNextFunction(f)) {
+		for (LLVMBasicBlockRef b = LLVMGetFirstBasicBlock(f); b != nullptr; b = LLVMGetNextBasicBlock(b)) {
+			for (LLVMValueRef i = LLVMGetFirstInstruction(b); i != nullptr; i = LLVMGetNextInstruction(i)) {
+				cost += 1;
+			}
+		}
+	}
+	for (LLVMValueRef g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
+		cost += 1;
+	}
+	return cost;
+}
+
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
@@ -2656,6 +2689,9 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
+			m->estimated_cost = m->procedures_to_generate.count.load(std::memory_order_relaxed);
+		}
+		for (lbModule *m : lb_modules_by_cost(gen)) {
 			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
 		}
 
@@ -2729,8 +2765,7 @@ gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
 
 gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
+		for (lbModule *m : lb_modules_by_cost(gen)) {
 			thread_pool_add_task(lb_llvm_function_pass_per_module, m);
 		}
 		thread_pool_wait();
@@ -2747,8 +2782,7 @@ gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
 
 gb_internal void lb_llvm_module_passes_and_verification(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
+		for (lbModule *m : lb_modules_by_cost(gen)) {
 			auto wd = permanent_alloc_item<lbLLVMModulePassWorkerData>();
 			wd->m = m;
 			wd->target_machine = m->target_machine;
@@ -2884,16 +2918,17 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 			if (lb_is_module_empty(m)) {
 				continue;
 			}
-
-			String filepath_ll = lb_filepath_ll_for_module(m);
-			String filepath_obj = lb_filepath_obj_for_module(m);
-			array_add(&gen->output_object_paths, filepath_obj);
-			array_add(&gen->output_temp_paths, filepath_ll);
-
+			array_add(&gen->output_object_paths, lb_filepath_obj_for_module(m));
+			array_add(&gen->output_temp_paths, lb_filepath_ll_for_module(m));
+		}
+		for (lbModule *m : lb_modules_by_cost(gen)) {
+			if (lb_is_module_empty(m)) {
+				continue;
+			}
 			auto *wd = permanent_alloc_item<lbLLVMEmitWorker>();
 			wd->target_machine = m->target_machine;
 			wd->code_gen_file_type = code_gen_file_type;
-			wd->filepath_obj = filepath_obj;
+			wd->filepath_obj = lb_filepath_obj_for_module(m);
 			wd->m = m;
 			thread_pool_add_task(lb_llvm_emit_worker_proc, wd);
 		}
@@ -3126,10 +3161,6 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 	array_add(&m->generated_procedures, p);
 }
 
-// NOTE(bill): Each module is verified once its procedures are generated, rather than each procedure as it is
-// generated. Verifying a procedure on its own walks every constant which uses it, which for one referenced by the
-// type info (e.g. `__$equal`) is all of the type info. Only on a failure are its procedures verified on their own,
-// to report which ones are invalid.
 gb_internal WORKER_TASK_PROC(lb_verify_generated_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
 	if (!LLVMVerifyModule(m->mod, LLVMReturnStatusAction, nullptr)) {
@@ -3146,9 +3177,7 @@ gb_internal void lb_verify_generated_procedures(lbGenerator *gen, bool do_thread
 	if (LLVM_IGNORE_VERIFICATION) {
 		return;
 	}
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		// NOTE(bill): with debug information, its procedures were never verified on their own, only the module after its passes
+	for (lbModule *m : lb_modules_by_cost(gen)) {
 		if (m->debug_builder != nullptr) {
 			continue;
 		}
@@ -3813,7 +3842,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lb_verify_generated_procedures(gen, do_threading);
 
 	TIME_SECTION("LLVM Function Pass");
-	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
+	lb_llvm_function_passes(gen, do_threading);
 
 	TIME_SECTION("LLVM Remove Unused Functions and Globals");
 	lb_remove_unused_functions_and_globals(gen);

@@ -90,6 +90,9 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 		}
 		module_name = gb_string_appendc(module_name, "$parapoly");
 	}
+	if (m->split_part > 0) {
+		module_name = gb_string_append_fmt(module_name, "$%d", m->split_part);
+	}
 
 	m->module_name = module_name;
 	m->ctx = LLVMContextCreate();
@@ -188,8 +191,6 @@ gb_internal void lb_init_module(lbModule *m, bool do_threading) {
 	}
 }
 
-// NOTE(bill): an estimate of the code generated for each file: the size of the bodies of its procedures which are used,
-// polymorphic instances included as each is generated with its procedure's file
 gb_internal i64 lb_estimate_file_code_sizes(CheckerInfo *info, PtrMap<AstFile *, i64> *sizes) {
 	i64 total = 0;
 	for (Entity *e : info->entities) {
@@ -247,7 +248,7 @@ gb_internal void lb_split_package_into_modules(lbGenerator *gen, Checker *c, Ast
 			group->pkg     = pkg;
 			group->gen     = gen;
 			group->checker = c;
-			map_set(&gen->modules, cast(void *)group, group); // point to itself just add it to the list
+			map_set(&gen->modules, cast(void *)group, group);
 			lb_init_module(group, do_threading);
 
 			if (LLVM_WEAK_MONOMORPHIZATION) {
@@ -266,6 +267,139 @@ gb_internal void lb_split_package_into_modules(lbGenerator *gen, Checker *c, Ast
 		map_set(&gen->file_modules, f, group);
 		i64 *size = map_get(file_sizes, f);
 		group_size += size ? *size : 0;
+	}
+}
+
+gb_internal lbModule *lb_module_of_file(lbGenerator *gen, AstFile *file) {
+	lbModule **found = map_get(&gen->modules, cast(void *)file);
+	if (found == nullptr) {
+		found = map_get(&gen->file_modules, file);
+	}
+	if (found == nullptr && file->pkg != nullptr) {
+		found = map_get(&gen->modules, cast(void *)file->pkg);
+	}
+	return found ? *found : &gen->default_module;
+}
+
+gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp);
+
+struct lbInstanceSize {
+	Entity *e;
+	i64     size;
+};
+
+gb_internal void lb_split_instances_into_modules(lbGenerator *gen, Checker *c, PtrMap<AstFile *, i64> *file_sizes, i64 share, bool do_threading) {
+	PtrMap<lbModule *, i64> module_sizes = {};
+	map_init(&module_sizes);
+	defer (map_destroy(&module_sizes));
+	for (auto const &entry : gen->info->packages) {
+		for (AstFile *f : entry.value->files) {
+			i64 *size = map_get(file_sizes, f);
+			lbModule *m = lb_module_of_file(gen, f);
+			i64 *total = map_get(&module_sizes, m);
+			if (total) {
+				*total += size ? *size : 0;
+			} else {
+				map_set(&module_sizes, m, size ? *size : 0);
+			}
+		}
+	}
+
+	PtrMap<lbModule *, isize> module_instances = {};
+	map_init(&module_instances);
+	defer (map_destroy(&module_instances));
+	auto instances = array_make<Array<lbInstanceSize>>(heap_allocator());
+	defer ({
+		for (auto &list : instances) {
+			array_free(&list);
+		}
+		array_free(&instances);
+	});
+	auto modules = array_make<lbModule *>(heap_allocator());
+	defer (array_free(&modules));
+
+	for (Entity *e : gen->info->entities) {
+		if (e->kind != Entity_Procedure || !e->Procedure.generated_from_polymorphic || e->file == nullptr ||
+		    e->min_dep_count.load(std::memory_order_relaxed) == 0) {
+			continue;
+		}
+		if (e->scope == nullptr || (e->scope->flags & ScopeFlag_File) == 0) {
+			continue;
+		}
+		DeclInfo *d = e->decl_info;
+		if (d == nullptr || d->proc_lit == nullptr || d->proc_lit->kind != Ast_ProcLit || d->proc_lit->ProcLit.body == nullptr) {
+			continue;
+		}
+		lbModule *m = lb_module_of_file(gen, e->file);
+		i64 *total = map_get(&module_sizes, m);
+		if (total == nullptr || *total <= share + share/2) {
+			continue;
+		}
+		Ast *body = d->proc_lit->ProcLit.body;
+		i64 size = gb_max(cast(i64)(ast_end_token(body).pos.offset - ast_token(body).pos.offset), 1);
+
+		isize *index = map_get(&module_instances, m);
+		if (index == nullptr) {
+			map_set(&module_instances, m, instances.count);
+			array_add(&instances, array_make<lbInstanceSize>(heap_allocator()));
+			array_add(&modules, m);
+			index = map_get(&module_instances, m);
+		}
+		array_add(&instances[*index], lbInstanceSize{e, size});
+	}
+
+	for_array(i, modules) {
+		lbModule *m = modules[i];
+		auto &list = instances[i];
+		i64 total = *map_get(&module_sizes, m);
+		i64 instances_size = 0;
+		for (auto const &inst : list) {
+			instances_size += inst.size;
+		}
+
+		isize part_count = cast(isize)((total + share - 1) / share);
+		if (part_count < 2) {
+			continue;
+		}
+		array_sort(list, [](void const *a, void const *b) -> int {
+			lbInstanceSize const *x = cast(lbInstanceSize const *)a;
+			lbInstanceSize const *y = cast(lbInstanceSize const *)b;
+			if (x->size != y->size) {
+				return x->size > y->size ? -1 : +1;
+			}
+			return llvm_global_entity_cmp(&x->e, &y->e);
+		});
+
+		auto parts = array_make<lbModule *>(heap_allocator(), part_count);
+		auto loads = array_make<i64>(heap_allocator(), part_count);
+		defer (array_free(&parts));
+		defer (array_free(&loads));
+		parts[0] = m;
+		loads[0] = gb_max(total - instances_size, 0);
+		for (isize k = 1; k < part_count; k++) {
+			lbModule *pm = permanent_alloc_item<lbModule>();
+			pm->file       = m->file;
+			pm->pkg        = m->pkg;
+			pm->gen        = gen;
+			pm->checker    = c;
+			pm->split_part = cast(i32)k;
+			map_set(&gen->modules, cast(void *)pm, pm);
+			lb_init_module(pm, do_threading);
+			parts[k] = pm;
+		}
+
+		for (auto const &inst : list) {
+			isize best = 0;
+			for (isize k = 1; k < part_count; k++) {
+				if (loads[k] < loads[best]) {
+					best = k;
+				}
+			}
+			loads[best] += inst.size;
+			if (best != 0) {
+				inst.e->decl_info->code_gen_module.store(parts[best], std::memory_order_relaxed);
+			}
+		}
 	}
 }
 
@@ -294,9 +428,6 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	if (USE_SEPARATE_MODULES) {
 		bool module_per_file = build_context.module_per_file && (build_context.optimization_level <= 0 || build_context.lto_kind != LTO_None);
-		// NOTE(bill): A package with much more code than an even share of all of it is generated in several modules
-		// of contiguous files, as each module is generated by one thread. The share does not depend on the number of
-		// threads, so neither do the modules.
 		PtrMap<AstFile *, i64> file_sizes = {};
 		map_init(&file_sizes, 1024);
 		i64 share = gb_max(lb_estimate_file_code_sizes(gen->info, &file_sizes) / 32, 1);
@@ -379,6 +510,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 					lb_init_module(pm, do_threading);
 				}
 			}
+		}
+
+		if (!LLVM_WEAK_MONOMORPHIZATION) {
+			lb_split_instances_into_modules(gen, c, &file_sizes, share, do_threading);
 		}
 
 		if (LLVM_WEAK_MONOMORPHIZATION) {
@@ -1234,9 +1369,6 @@ gb_internal u64 lb_gcd_u64(u64 a, u64 b) {
 }
 
 gb_internal u64 lb_known_address_alignment(lbModule *m, LLVMValueRef ptr, u64 assumed) {
-	// NOTE(bill): The alignment an address is known to have from the GEPs leading to it: within a local or a global, that
-	// of its offset from it, and none beyond a field of a packed struct, or that a struct caps its fields to, as marked on
-	// the GEP of the field. Of an address within anything else, it is `assumed`, i.e. that of the type it points to.
 
 	LLVMTargetDataRef td = LLVMGetModuleDataLayout(m->mod);
 	u64 offsets = 0;
@@ -1674,10 +1806,7 @@ gb_internal bool lb_is_type_proc_recursive(Type *t) {
 	}
 }
 
-// NOTE(bill): LLVM's fast instruction selector cannot select an aggregate load or store, and for one falls back to its
-// slow instruction selection for all of the block before it, which is superlinear in its size. When the passes do not
-// split the aggregates of a procedure first (SROA), a copy of a loaded aggregate is made of integers instead, all loaded
-// before any is stored, as the aggregate is.
+// LLVM's fast instruction selector cannot select an aggregate load or store
 // Oh, how do I love LLVM /s
 gb_internal bool lb_copies_aggregates_as_scalars(lbProcedure *p) {
 	return p->is_startup || build_context.optimization_level < 0;
@@ -1707,7 +1836,6 @@ gb_internal bool lb_try_copy_loaded_aggregate(lbProcedure *p, LLVMValueRef dst, 
 		return false;
 	}
 
-	// NOTE(bill): the memory loaded must not have been written to since
 	LLVMBasicBlockRef block = LLVMGetInsertBlock(p->builder);
 	if (block == nullptr || LLVMGetInstructionParent(load) != block) {
 		return false;
@@ -3961,8 +4089,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	e->scope = e->file->scope;
 
 	lbModule *target_module = m;
-	// NOTE(bill): a literal reached whilst generating the initializations of the globals (in the default module) is
-	// generated in its own package's module, which may only be added to before the modules are generated in parallel
+	// another module may only be added to before the modules are generated in parallel
 	if (m == &gen->default_module && parent == nullptr && !gen->modules_in_parallel) {
 		target_module = lb_module_of_expr(gen, expr);
 	}
