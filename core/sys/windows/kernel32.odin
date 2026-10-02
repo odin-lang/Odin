@@ -389,6 +389,14 @@ foreign kernel32 {
 	CompareFileTime :: proc(lpFileTime1: LPFILETIME, lpFileTime2: LPFILETIME) -> LONG ---
 
 	FindFirstFileW                  :: proc(fileName: LPCWSTR, findFileData: LPWIN32_FIND_DATAW) -> HANDLE ---
+	FindFirstFileExW                :: proc(
+		lpFileName: LPCWSTR,
+		fInfoLevelId: FINDEX_INFO_LEVELS,
+		lpFindFileData: LPVOID,
+		fSearchOp: FINDEX_SEARCH_OPS,
+		lpSearchFilter: LPVOID,
+		dwAdditionalFlags: DWORD,
+	) -> HANDLE ---
 	FindNextFileW                   :: proc(findFile: HANDLE, findFileData: LPWIN32_FIND_DATAW) -> BOOL ---
 	FindClose                       :: proc(findFile: HANDLE) -> BOOL ---
 	GetModuleHandleW                :: proc(lpModuleName: LPCWSTR) -> HMODULE ---
