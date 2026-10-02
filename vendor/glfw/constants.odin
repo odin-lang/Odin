@@ -4,6 +4,7 @@ package glfw
 GLFW_SHARED :: #config(GLFW_SHARED, false)
 
 /*** Constants ***/
+
 /* Versions */
 VERSION_MAJOR    :: 3
 VERSION_MINOR    :: 4
@@ -38,7 +39,7 @@ KEY_UNKNOWN :: -1
 KEY_SPACE         :: 32
 KEY_APOSTROPHE    :: 39  /* ' */
 KEY_COMMA         :: 44  /* , */
-KEY_MINUS         :: 45  /* - */
+KEY_MINUS         :: 45  /* `-` */
 KEY_PERIOD        :: 46  /* . */
 KEY_SLASH         :: 47  /* / */
 KEY_SEMICOLON     :: 59  /* ; */
