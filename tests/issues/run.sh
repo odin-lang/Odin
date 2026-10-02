@@ -112,6 +112,7 @@ else
 	exit 1
 fi
 $ODIN check ../test_issue_7429.odin $COMMON_CHECK
+$ODIN test ../test_issue_7430.odin $COMMON
 $ODIN test ../test_issue_7356.odin $COMMON
 $ODIN test ../test_issue_7336.odin $COMMON
 $ODIN build ../test_issue_7167.odin $COMMON

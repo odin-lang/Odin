@@ -6458,13 +6458,16 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	case Type_FixedCapacityDynamicArray: {
 		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			// NOTE: the length isn't taken from the literal's constant, which is nil when its elements can't be constant
+			lbValue dst_ptr = lb_addr_get_ptr(p, v);
+			lbValue value = lb_const_value(p->module, type, exact_value_compound(expr));
+			lb_emit_store(p, lb_emit_struct_ep(p, dst_ptr, 0), lb_emit_struct_ev(p, value, 0));
+			lb_emit_store(p, lb_emit_struct_ep(p, dst_ptr, 1), lb_const_int(p->module, t_int, cl->max_count));
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
 			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
 
-			lbValue dst_ptr = lb_addr_get_ptr(p, v);
 			for_array(i, temp_data) {
 				i32 index = cast(i32)(temp_data[i].elem_index);
 				temp_data[i].gep = lb_emit_array_epi(p, dst_ptr, index);

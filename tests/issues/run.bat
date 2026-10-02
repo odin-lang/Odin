@@ -59,6 +59,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
 ..\..\..\odin test ..\test_issue_7421.odin %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_7421_tagged_duplicate.odin %COMMON% 2>&1 | find /c "Error: Duplicate case" | findstr /x "1" || exit /b
+..\..\..\odin test ..\test_issue_7430.odin %COMMON%  || exit /b
 ..\..\..\odin build ..\test_issue_7188.odin %COMMON%  || exit /b
 clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_sysv_abi.odin %COMMON%  || exit /b
