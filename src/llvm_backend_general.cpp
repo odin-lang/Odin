@@ -1585,6 +1585,94 @@ gb_internal bool lb_is_type_proc_recursive(Type *t) {
 	}
 }
 
+// NOTE(bill): LLVM's fast instruction selector cannot select an aggregate load or store, and for one falls back to its
+// slow instruction selection for all of the block before it, which is superlinear in its size. When the passes do not
+// split the aggregates of a procedure first (SROA), a copy of a loaded aggregate is made of integers instead, all loaded
+// before any is stored, as the aggregate is.
+// Oh, how do I love LLVM /s
+gb_internal bool lb_copies_aggregates_as_scalars(lbProcedure *p) {
+	return p->is_startup || build_context.optimization_level < 0;
+}
+
+gb_internal unsigned lb_alignment_at_offset(unsigned alignment, i64 offset, i64 size) {
+	unsigned a = gb_max(alignment, 1u);
+	while (a > 1 && (offset % a) != 0) {
+		a >>= 1;
+	}
+	return cast(unsigned)gb_min(cast(i64)a, size);
+}
+
+gb_internal bool lb_try_copy_loaded_aggregate(lbProcedure *p, LLVMValueRef dst, LLVMValueRef load) {
+	enum {MAX_SCALAR_COPY_SIZE = 64};
+
+	if (load == nullptr || !LLVMIsALoadInst(load) || LLVMGetVolatile(load) || LLVMGetOrdering(load) != LLVMAtomicOrderingNotAtomic) {
+		return false;
+	}
+	LLVMTypeRef type = LLVMTypeOf(load);
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind != LLVMStructTypeKind && kind != LLVMArrayTypeKind) {
+		return false;
+	}
+	i64 size = lb_sizeof(type);
+	if (size <= 0) {
+		return false;
+	}
+
+	// NOTE(bill): the memory loaded must not have been written to since
+	LLVMBasicBlockRef block = LLVMGetInsertBlock(p->builder);
+	if (block == nullptr || LLVMGetInstructionParent(load) != block) {
+		return false;
+	}
+	isize steps = 0;
+	for (LLVMValueRef i = LLVMGetLastInstruction(block); i != load; i = LLVMGetPreviousInstruction(i)) {
+		if (i == nullptr || ++steps > 16 ||
+		    LLVMIsAStoreInst(i) || LLVMIsACallInst(i) || LLVMIsAInvokeInst(i) ||
+		    LLVMIsAAtomicRMWInst(i) || LLVMIsAAtomicCmpXchgInst(i)) {
+			return false;
+		}
+	}
+
+	LLVMContextRef ctx = p->module->ctx;
+	LLVMValueRef src = LLVMGetOperand(load, 0);
+	LLVMTypeRef i8  = LLVMInt8TypeInContext(ctx);
+	LLVMTypeRef i64_type = LLVMInt64TypeInContext(ctx);
+
+	if (size > MAX_SCALAR_COPY_SIZE) {
+		LLVMBuildMemMove(p->builder, dst, lb_try_get_alignment(dst, 1), src, LLVMGetAlignment(load), LLVMConstInt(i64_type, size, false));
+		return true;
+	}
+
+	unsigned src_alignment = LLVMGetAlignment(load);
+	unsigned dst_alignment = lb_try_get_alignment(dst, 1);
+
+	LLVMValueRef values [MAX_SCALAR_COPY_SIZE/8 + 3] = {};
+	i64          offsets[MAX_SCALAR_COPY_SIZE/8 + 3] = {};
+	i64          sizes  [MAX_SCALAR_COPY_SIZE/8 + 3] = {};
+	isize count = 0;
+	for (i64 offset = 0; offset < size; /**/) {
+		i64 n = 8;
+		while (offset + n > size) {
+			n >>= 1;
+		}
+		LLVMValueRef index = LLVMConstInt(i64_type, offset, false);
+		LLVMValueRef ptr = offset ? LLVMBuildInBoundsGEP2(p->builder, i8, src, &index, 1, "") : src;
+		LLVMValueRef v = LLVMBuildLoad2(p->builder, LLVMIntTypeInContext(ctx, cast(unsigned)(8*n)), ptr, "");
+		LLVMSetAlignment(v, lb_alignment_at_offset(src_alignment, offset, n));
+		values [count] = v;
+		offsets[count] = offset;
+		sizes  [count] = n;
+		count += 1;
+		offset += n;
+	}
+	for (isize i = 0; i < count; i++) {
+		LLVMValueRef index = LLVMConstInt(i64_type, offsets[i], false);
+		LLVMValueRef ptr = offsets[i] ? LLVMBuildInBoundsGEP2(p->builder, i8, dst, &index, 1, "") : dst;
+		LLVMValueRef s = LLVMBuildStore(p->builder, values[i], ptr);
+		LLVMSetAlignment(s, lb_alignment_at_offset(dst_alignment, offsets[i], sizes[i]));
+	}
+	return true;
+}
+
 gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 
@@ -1666,6 +1754,9 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			GB_ASSERT_MSG(are_types_identical(a, value.type), "%s != %s", type_to_string(a), type_to_string(value.type));
 		}
 
+		if (lb_copies_aggregates_as_scalars(p) && lb_try_copy_loaded_aggregate(p, ptr.value, value.value)) {
+			return;
+		}
 		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
 	}
 	// LLVMSetVolatile(instr, p->in_multi_assignment);

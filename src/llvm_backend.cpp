@@ -2147,9 +2147,11 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 
 			LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
 			lbValue src0 = lb_emit_conv(p, var.init, t);
-			LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
 			LLVMValueRef dst = var.var.value;
-			LLVMBuildStore(p->builder, src, dst);
+			if (LLVMTypeOf(src0.value) != vt || !lb_try_copy_loaded_aggregate(p, dst, src0.value)) {
+				LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
+				LLVMBuildStore(p->builder, src, dst);
+			}
 		}
 
 		var.is_initialized = true;
