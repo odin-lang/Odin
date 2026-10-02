@@ -571,6 +571,10 @@ gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v)
 			return;
 		}
 	}
+	if (v.kind == ExactValue_Typeid) {
+		write_type_to_canonical_string(w, v.value_typeid);
+		return;
+	}
 	gbString s = exact_value_to_string(v, 1<<16);
 	type_writer_append(w, s, gb_string_length(s));
 	gb_string_free(s);
@@ -654,9 +658,9 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 			Entity *p = e->parent_proc_decl.load(std::memory_order_relaxed)->entity;
 			write_canonical_parent_prefix(w, p);
 			type_writer_append(w, p->token.string.text, p->token.string.len);
-			if (is_type_polymorphic(p->type)) {
+			if (is_type_polymorphic_or_specialized_proc(proc_entity_full_type(p))) {
 				type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
-				write_type_to_canonical_string(w, p->type);
+				write_type_to_canonical_string(w, proc_entity_full_type(p));
 			}
 			type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
@@ -684,9 +688,9 @@ gb_internal void write_canonical_parent_prefix(TypeWriter *w, Entity *e) {
 		type_writer_append(w, e->token.string.text, e->token.string.len);
 	}
 
-	if (is_type_polymorphic(e->type)) {
+	if (is_type_polymorphic_or_specialized_proc(proc_entity_full_type(e))) {
 		type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
-		write_type_to_canonical_string(w, e->type);
+		write_type_to_canonical_string(w, proc_entity_full_type(e));
 	}
 	type_writer_appendc(w, CANONICAL_NAME_SEPARATOR);
 
@@ -824,9 +828,9 @@ write_base_name:
 	case Entity_AsmTemplate:
 	case Entity_Variable:
 		type_writer_append(w, e->token.string.text, e->token.string.len);
-		if (is_type_polymorphic(e->type)) {
+		if (is_type_polymorphic_or_specialized_proc(proc_entity_full_type(e))) {
 			type_writer_appendc(w, CANONICAL_TYPE_SEPARATOR);
-			write_type_to_canonical_string(w, e->type);
+			write_type_to_canonical_string(w, proc_entity_full_type(e));
 		}
 		break;
 

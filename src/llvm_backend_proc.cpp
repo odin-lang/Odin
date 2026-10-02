@@ -894,7 +894,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 	i32 guid = e->token.pos.offset;
 	if (e->decl_info != nullptr && e->decl_info->para_poly_original != nullptr) {
 		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(p->name), LIT(pd_name), guid,
-		                       cast(unsigned long long)type_hash_canonical_type(e->type));
+		                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
 	} else {
 		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(p->name), LIT(pd_name), guid);
 	}
@@ -1403,7 +1403,12 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 
 			bool by_ptr = false;
-			auto in_args = args;
+			auto in_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
+			for_array(i, args) {
+				if (i >= pt->Proc.param_count || pt->Proc.params->Tuple.variables[i]->kind == Entity_Variable) {
+					array_add(&in_args, args[i]);
+				}
+			}
 			Array<lbValue> result_as_args = {};
 			switch (kind) {
 			case DeferredProcedure_none:
@@ -5192,6 +5197,12 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		}
 	}
 
+	Type *callee_type = proc_expr->tav.type;
+	if (value.value != nullptr && callee_type != nullptr && callee_type != value.type &&
+	    is_type_proc(callee_type) && base_type(callee_type)->Proc.is_poly_specialized) {
+		value.type = callee_type;
+		proc_value_type = callee_type;
+	}
 
 	GB_ASSERT(value.value != nullptr || is_objc_call || asm_template != nullptr);
 	Type *proc_type_ = base_type(proc_value_type);

@@ -97,6 +97,7 @@ fi
 $ODIN test ../test_issue_6951_5214.odin $COMMON
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
+$ODIN test ../test_issue_global_address_of_literal.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
 $ODIN test ../test_issue_7477_7506.odin $COMMON
@@ -107,6 +108,15 @@ $ODIN test ../test_issue_7566.odin $COMMON
 $ODIN test ../test_issue_poly_using_subtype.odin $COMMON
 $ODIN test ../test_issue_global_proc_lits.odin $COMMON
 $ODIN test ../test_issue_packed_field_by_value.odin $COMMON
+$ODIN test ../test_issue_7708.odin $COMMON
+if [[ $($ODIN check ../test_issue_7708_mismatch.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN test ../test_issue_7700.odin $COMMON
+$ODIN test ../test_issue_procedure_of_specialized.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
