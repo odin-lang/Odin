@@ -2167,8 +2167,6 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedure *p) {
 	lb_begin_procedure_body(p);
 
-	lb_setup_type_info_data(m);
-
 	if (p->objc_names) {
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(m, p->objc_names->type), p->objc_names->value, nullptr, 0, "");
 	}
@@ -2679,6 +2677,9 @@ gb_internal i64 lb_module_cost(lbModule *m) {
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
+	if (m == &m->gen->default_module) {
+		lb_setup_type_info_data(m);
+	}
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
 		lb_generate_procedure(p->module, p);
 	}
@@ -2691,6 +2692,7 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 			lbModule *m = entry.value;
 			m->estimated_cost = m->procedures_to_generate.count.load(std::memory_order_relaxed);
 		}
+		gen->default_module.estimated_cost = I64_MAX;
 		for (lbModule *m : lb_modules_by_cost(gen)) {
 			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
 		}
