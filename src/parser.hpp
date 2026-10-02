@@ -106,6 +106,7 @@ enum AstDelayQueueKind {
 
 struct AstFile {
 	i32          id;
+	i32          index_in_pkg; // once the package's files are sorted by name, see `check_create_file_scopes`
 	u32          flags;
 	AstPackage * pkg;
 	Scope *      scope;

@@ -96,12 +96,17 @@ gb_internal int entity_source_order_cmp(Entity *x, Entity *y) {
 		}
 	}
 	if (x->file != y->file) {
-		String fullpath_x = x->file ? x->file->fullpath : (String{});
-		String fullpath_y = y->file ? y->file->fullpath : (String{});
-		String file_x = filename_from_path(fullpath_x);
-		String file_y = filename_from_path(fullpath_y);
+		if (x->file != nullptr && y->file != nullptr && x->file->pkg != nullptr && x->file->pkg == y->file->pkg) {
+			// NOTE(bill): the same order as by name, as a package's files are sorted by it
+			cmp = i32_cmp(x->file->index_in_pkg, y->file->index_in_pkg);
+		} else {
+			String fullpath_x = x->file ? x->file->fullpath : (String{});
+			String fullpath_y = y->file ? y->file->fullpath : (String{});
+			String file_x = filename_from_path(fullpath_x);
+			String file_y = filename_from_path(fullpath_y);
 
-		cmp = string_compare(file_x, file_y);
+			cmp = string_compare(file_x, file_y);
+		}
 		if (cmp) {
 			return cmp;
 		}
@@ -3306,32 +3311,23 @@ gb_internal gb_inline bool is_entity_a_dependency(Entity *e) {
 	return false;
 }
 
-gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, Arena *arena) {
-	PtrMap<Entity *, EntityGraphNode *> M_vars = {};
-	map_init(&M_vars, info->entities.count);
-	defer (map_destroy(&M_vars));
+struct EntityGraphEdgesChunk {
+	PtrMap<Entity *, EntityGraphNode *> *vars;
+	Slice<EntityGraphNode *>             nodes;
+};
 
-	auto G = array_make<EntityGraphNode *>(arena_allocator(arena), 0, info->entities.count);
-	for (Entity *e : info->entities) {
-		if (e == nullptr || e->kind != Entity_Variable || !is_entity_a_dependency(e)) {
-			continue;
-		}
-		EntityGraphNode *n = arena_alloc_item<EntityGraphNode>(arena);
-		n->entity = e;
-		map_set(&M_vars, e, n);
-		array_add(&G, n);
-	}
+// NOTE(bill): A variable depends on every variable reachable from its declaration through procedures and constants,
+// as its initializer may read any of them. Variables are not walked through, as they are ordered by their own edges.
+// Each node's search only reads, and only writes its own successors, so the searches run in parallel.
+gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_edges_worker) {
+	EntityGraphEdgesChunk *chunk = cast(EntityGraphEdgesChunk *)data;
 
-	TIME_SECTION("generate_entity_dependency_graph: Calculate edges");
-
-	// NOTE(bill): A variable depends on every variable reachable from its declaration through procedures and constants,
-	// as its initializer may read any of them. Variables are not walked through, as they are ordered by their own edges.
 	PtrSet<Entity *> visited = {};
 	defer (ptr_set_destroy(&visited));
 	auto stack = array_make<Entity *>(heap_allocator(), 0, 64);
 	defer (array_free(&stack));
 
-	for (EntityGraphNode *n : G) {
+	for (EntityGraphNode *n : chunk->nodes) {
 		ptr_set_clear(&visited);
 		array_clear(&stack);
 
@@ -3353,11 +3349,10 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 				continue;
 			}
 			if (dep->kind == Entity_Variable) {
-				EntityGraphNode **m = map_get(&M_vars, dep);
+				EntityGraphNode **m = map_get(chunk->vars, dep);
 				// NOTE(bill): a variable naming itself, e.g. `t: struct { next: ^type_of(t) }`, is not an initialization cycle
 				if (m != nullptr && *m != n) {
 					entity_graph_node_set_add(&n->succ, *m);
-					entity_graph_node_set_add(&(*m)->pred, n);
 				}
 				continue;
 			}
@@ -3370,6 +3365,44 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 					array_add(&stack, next);
 				}
 			}
+		}
+	}
+	return 0;
+}
+
+gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, Arena *arena) {
+	PtrMap<Entity *, EntityGraphNode *> M_vars = {};
+	map_init(&M_vars, info->entities.count);
+	defer (map_destroy(&M_vars));
+
+	auto G = array_make<EntityGraphNode *>(arena_allocator(arena), 0, info->entities.count);
+	for (Entity *e : info->entities) {
+		if (e == nullptr || e->kind != Entity_Variable || !is_entity_a_dependency(e)) {
+			continue;
+		}
+		EntityGraphNode *n = arena_alloc_item<EntityGraphNode>(arena);
+		n->entity = e;
+		map_set(&M_vars, e, n);
+		array_add(&G, n);
+	}
+
+	TIME_SECTION("generate_entity_dependency_graph: Calculate edges");
+
+	isize const CHUNK_SIZE = 32;
+	auto chunks = array_make<EntityGraphEdgesChunk>(heap_allocator(), 0, G.count/CHUNK_SIZE + 1);
+	defer (array_free(&chunks));
+	for (isize i = 0; i < G.count; i += CHUNK_SIZE) {
+		array_add(&chunks, EntityGraphEdgesChunk{&M_vars, slice(slice_from_array(G), i, gb_min(i + CHUNK_SIZE, G.count))});
+	}
+	for (EntityGraphEdgesChunk &chunk : chunks) {
+		thread_pool_add_task(generate_entity_dependency_graph_edges_worker, &chunk);
+	}
+	thread_pool_wait();
+
+	// NOTE: in the order of the nodes, so each node's predecessors are added in the order they were before
+	for (EntityGraphNode *n : G) {
+		FOR_PTR_SET(m, n->succ) {
+			entity_graph_node_set_add(&m->pred, n);
 		}
 	}
 
@@ -5940,6 +5973,7 @@ gb_internal void check_create_file_scopes(Checker *c) {
 		isize total_pkg_decl_count = 0;
 		for_array(j, pkg->files) {
 			AstFile *f = pkg->files[j];
+			f->index_in_pkg = cast(i32)j;
 			string_map_set(&c->info.files, f->fullpath, f);
 
 			create_scope_from_file(nullptr, f);
