@@ -1221,6 +1221,86 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 	return false;
 }
 
+gb_internal u64 lb_gcd_u64(u64 a, u64 b) {
+	while (b != 0) {
+		u64 t = a % b;
+		a = b;
+		b = t;
+	}
+	return a;
+}
+
+gb_internal u64 lb_known_address_alignment(lbModule *m, LLVMValueRef ptr, u64 assumed) {
+	// NOTE(bill): The alignment an address is known to have from the GEPs leading to it: within a local or a global, that
+	// of its offset from it, and none beyond a field of a packed struct, or that a struct caps its fields to, as marked on
+	// the GEP of the field. Of an address within anything else, it is `assumed`, i.e. that of the type it points to.
+
+	LLVMTargetDataRef td = LLVMGetModuleDataLayout(m->mod);
+	u64 offsets = 0;
+	for (isize depth = 0; ptr != nullptr && depth < 64; depth++) {
+		if (LLVMIsAAllocaInst(ptr) || LLVMIsAGlobalVariable(ptr)) {
+			u64 base = LLVMGetAlignment(ptr);
+			if (base == 0) {
+				base = LLVMABIAlignmentOfType(td, LLVMIsAAllocaInst(ptr) ? LLVMGetAllocatedType(ptr) : LLVMGlobalGetValueType(ptr));
+			}
+			return offsets ? lb_gcd_u64(base, offsets) : base;
+		}
+
+		bool is_instruction = LLVMIsAGetElementPtrInst(ptr) != nullptr;
+		if (!is_instruction && !(LLVMIsAConstantExpr(ptr) && LLVMGetConstOpcode(ptr) == LLVMGetElementPtr)) {
+			break;
+		}
+		if (is_instruction) {
+			if (lb_get_metadata_custom_u64(m, ptr, ODIN_METADATA_IS_PACKED)) {
+				return 1;
+			}
+			u64 max_align = lb_get_metadata_custom_u64(m, ptr, ODIN_METADATA_MAX_ALIGN);
+			if (max_align != 0) {
+				assumed = gb_min(assumed, max_align);
+			}
+		}
+
+		LLVMTypeRef t = LLVMGetGEPSourceElementType(ptr);
+		unsigned index_count = LLVMGetNumIndices(ptr);
+		for (unsigned i = 0; i < index_count; i++) {
+			LLVMValueRef index = LLVMGetOperand(ptr, i+1);
+			u64 stride = 0;
+			if (i == 0) {
+				stride = LLVMABISizeOfType(td, t);
+			} else if (LLVMGetTypeKind(t) == LLVMStructTypeKind) {
+				if (!LLVMIsAConstantInt(index)) {
+					return 1;
+				}
+				unsigned field = cast(unsigned)LLVMConstIntGetZExtValue(index);
+				offsets = lb_gcd_u64(offsets, LLVMOffsetOfElement(td, t, field));
+				t = LLVMStructGetTypeAtIndex(t, field);
+				continue;
+			} else if (LLVMGetTypeKind(t) == LLVMArrayTypeKind || LLVMGetTypeKind(t) == LLVMVectorTypeKind) {
+				t = LLVMGetElementType(t);
+				stride = LLVMABISizeOfType(td, t);
+			} else {
+				return 1;
+			}
+			if (LLVMIsAConstantInt(index)) {
+				i64 k = LLVMConstIntGetSExtValue(index);
+				offsets = lb_gcd_u64(offsets, cast(u64)(k < 0 ? -k : k) * stride);
+			} else {
+				offsets = lb_gcd_u64(offsets, stride);
+			}
+		}
+		ptr = LLVMGetOperand(ptr, 0);
+	}
+	return offsets ? lb_gcd_u64(assumed, offsets) : assumed;
+}
+
+gb_internal void lb_lower_store_alignment_to_known(lbProcedure *p, LLVMValueRef store, LLVMValueRef ptr) {
+	u64 align = LLVMGetAlignment(store);
+	u64 known = lb_known_address_alignment(p->module, ptr, align);
+	if (known < align) {
+		LLVMSetAlignment(store, cast(unsigned)known);
+	}
+}
+
 gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value) {
 	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
 
@@ -1242,6 +1322,12 @@ gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLV
 		}
 		GB_ASSERT(align <= UINT_MAX);
 		LLVMSetAlignment(result, (unsigned int)align);
+	}
+
+	u64 align = LLVMGetAlignment(result);
+	u64 known = lb_known_address_alignment(p->module, value, align);
+	if (known < align) {
+		LLVMSetAlignment(result, cast(unsigned)known);
 	}
 
 	return result;
@@ -1692,7 +1778,8 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		} else if (is_type_bit_set(a)) {
 			lb_mem_zero_ptr(p, ptr.value, a, 1);
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
-			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+			LLVMValueRef store = LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+			lb_lower_store_alignment_to_known(p, store, ptr.value);
 		} else {
 			lb_mem_zero_ptr(p, ptr.value, a, 1);
 		}
@@ -1758,6 +1845,9 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			return;
 		}
 		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
+	}
+	if (instr != nullptr) {
+		lb_lower_store_alignment_to_known(p, instr, ptr.value);
 	}
 	// LLVMSetVolatile(instr, p->in_multi_assignment);
 }

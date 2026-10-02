@@ -106,6 +106,7 @@ $ODIN test ../test_issue_7316.odin $COMMON
 $ODIN test ../test_issue_7566.odin $COMMON
 $ODIN test ../test_issue_poly_using_subtype.odin $COMMON
 $ODIN test ../test_issue_global_proc_lits.odin $COMMON
+$ODIN test ../test_issue_packed_field_by_value.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
