@@ -571,6 +571,10 @@ gb_internal void write_canonical_exact_value(TypeWriter *w, ExactValue const &v)
 			return;
 		}
 	}
+	if (v.kind == ExactValue_Typeid) {
+		write_type_to_canonical_string(w, v.value_typeid);
+		return;
+	}
 	gbString s = exact_value_to_string(v, 1<<16);
 	type_writer_append(w, s, gb_string_length(s));
 	gb_string_free(s);
