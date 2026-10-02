@@ -532,6 +532,42 @@ gb_internal u64 proc_type_identity_hash(Type *t) {
 	return h;
 }
 
+gb_internal Type *strip_poly_specialized_proc_type(Type *full) {
+	TypeProc *fp = &full->Proc;
+	auto vars = array_make<Entity *>(permanent_allocator(), 0, fp->param_count);
+	i32 variadic_index = -1;
+	if (fp->params != nullptr) {
+		for_array(i, fp->params->Tuple.variables) {
+			Entity *e = fp->params->Tuple.variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+			if (fp->variadic && i == fp->variadic_index) {
+				variadic_index = cast(i32)vars.count;
+			}
+			array_add(&vars, e);
+		}
+	}
+	Type *params = nullptr;
+	if (vars.count > 0) {
+		params = alloc_type_tuple();
+		params->Tuple.variables = slice_from_array(vars);
+	}
+
+	Type *t = alloc_type_proc(fp->scope, params, vars.count, fp->results, fp->result_count, false, fp->calling_convention);
+	t->Proc.variadic               = fp->variadic;
+	t->Proc.variadic_index         = variadic_index;
+	t->Proc.require_results        = fp->require_results;
+	t->Proc.c_vararg               = fp->c_vararg;
+	t->Proc.has_named_results      = fp->has_named_results;
+	t->Proc.diverging              = fp->diverging;
+	t->Proc.return_by_pointer      = fp->return_by_pointer;
+	t->Proc.optional_ok            = fp->optional_ok;
+	t->Proc.enable_target_feature  = fp->enable_target_feature;
+	t->Proc.require_target_feature = fp->require_target_feature;
+	return t;
+}
+
 // Reuse an existing generated specialization `other`, scheduling its body if unchecked.
 // Caller must have released gen_procs->mutex first.
 gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other, Ast *poly_def_node, PolyProcData *poly_proc_data) {
@@ -545,7 +581,7 @@ gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other
 		proc_info->file  = other->file;
 		proc_info->token = other->token;
 		proc_info->decl  = decl;
-		proc_info->type  = other->type;
+		proc_info->type  = proc_entity_full_type(other);
 		proc_info->body  = decl->proc_lit->ProcLit.body;
 		proc_info->tags  = other->Procedure.tags;
 		proc_info->generated_from_polymorphic = true;
@@ -580,7 +616,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	String name = base_entity->token.string;
 
-	Type *src = base_type(base_entity->type);
+	Type *src = base_type(proc_entity_full_type(base_entity));
 	Type *dst = nullptr;
 	if (type != nullptr) {
 		dst = base_type(type);
@@ -596,7 +632,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
 		// NOTE: polymorphic procedure check not idempotent without this
 		if (src->Proc.is_poly_specialized && base_entity->Procedure.generated_from_polymorphic) {
-			if (are_types_identical(src, dst)) {
+			if (are_types_identical(src, dst) || are_types_identical(base_type(base_entity->type), dst)) {
 				if (poly_proc_data) {
 					poly_proc_data->gen_entity = base_entity;
 				}
@@ -688,7 +724,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 				continue;
 			}
 			Entity *other = gen_procs->procs[i];
-			Type *pt = base_type(other->type);
+			Type *pt = base_type(proc_entity_full_type(other));
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
@@ -734,7 +770,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 				continue;
 			}
 			Entity *other = gen_procs->procs[i];
-			Type *pt = base_type(other->type);
+			Type *pt = base_type(proc_entity_full_type(other));
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 				return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
@@ -750,7 +786,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
 	for_array(i, gen_procs->procs) {
 		Entity *other = gen_procs->procs[i];
-		if (gen_procs->hashes[i] == final_hash && are_types_identical(base_type(other->type), final_proc_type)) {
+		if (gen_procs->hashes[i] == final_hash && are_types_identical(base_type(proc_entity_full_type(other)), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 			return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
 		}
@@ -795,7 +831,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	d->defer_use_checked = false;
 	d->para_poly_original = old_decl->entity;
 
-	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
+	Type *entity_type = final_proc_type;
+	if (final_proc_type->Proc.is_poly_specialized) {
+		entity_type = strip_poly_specialized_proc_type(final_proc_type);
+	}
+	Entity *entity = alloc_entity_procedure(nullptr, token, entity_type, tags);
 	entity->state.store(EntityState_Resolved);
 	entity->identifier = ident;
 
@@ -4071,7 +4111,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type, bool forb
 		// identical casts that cannot be foreseen or otherwise
 		// forbidden, so just skip them.
 		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
-		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig))) {
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic_or_specialized_proc(c->curr_proc_sig))) {
 			Type *src_exact = x->type;
 			Type *dst_exact = type;
 
@@ -4212,7 +4252,7 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		// identical casts that cannot be foreseen or otherwise
 		// forbidden, so just skip them.
 		if (forbid_identical && check_vet_flags(c) & VetFlag_Cast &&
-		    (c->curr_proc_sig == nullptr || !is_type_polymorphic(c->curr_proc_sig)) &&
+		    (c->curr_proc_sig == nullptr || !is_type_polymorphic_or_specialized_proc(c->curr_proc_sig)) &&
 		    check_is_castable_to(c, &src, dst_t)) {
 			if (are_types_identical(src_t, dst_t)) {
 				gbString oper_str = expr_to_string(o->expr);
@@ -7310,9 +7350,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			PolyProcData poly_proc_data = {};
 			if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
 				gen_entity = poly_proc_data.gen_entity;
-				Type *gept = base_type(gen_entity->type);
+				Type *gept = base_type(proc_entity_full_type(gen_entity));
 				GB_ASSERT(is_type_proc(gept));
-				final_proc_type = gen_entity->type;
+				final_proc_type = proc_entity_full_type(gen_entity);
 				pt = &gept->Proc;
 
 			} else {
@@ -7656,7 +7696,8 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 
 	bool return_on_failure = show_error_mode == CallArgumentErrorMode::NoErrors;
 
-	Ast *ident = operand->expr;
+	Ast *callee = unparen_expr(operand->expr);
+	Ast *ident = callee;
 	while (ident->kind == Ast_SelectorExpr) {
 		Ast *s = ident->SelectorExpr.selector;
 		ident = s;
@@ -7670,6 +7711,7 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 	}
 
 	GB_ASSERT(proc_type != nullptr);
+	Type *checked_type = proc_type;
 	proc_type = base_type(proc_type);
 	if (proc_type == t_invalid) {
 		return false;
@@ -7683,9 +7725,20 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 
 	Entity *entity_to_use = data->gen_entity != nullptr ? data->gen_entity : e;
 	if (!return_on_failure && entity_to_use != nullptr) {
+		// a specializing call's arguments include its constant parameters
+		Type *callee_type = entity_to_use->type;
+		if (data->gen_entity != nullptr) {
+			callee_type = proc_entity_full_type(data->gen_entity);
+		} else if (proc_type->Proc.is_poly_specialized) {
+			callee_type = checked_type;
+		}
 		add_entity_use(c, ident, entity_to_use);
-		update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
-		add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
+		update_untyped_expr_type(c, operand->expr, callee_type, true);
+		add_type_and_value(c, operand->expr, operand->mode, callee_type, operand->value);
+		if (callee != operand->expr) {
+			// e.g. `(foo)(x)`, as the backend calls through the unparenthesized callee
+			add_type_and_value(c, callee, operand->mode, callee_type, operand->value);
+		}
 	}
 
 	if (data->gen_entity != nullptr) {
@@ -7708,7 +7761,7 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 		} else {
 			decl->where_clauses_evaluated = true;
 			if (ok && (data->gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+				check_procedure_later(c->checker, e->file, e->token, decl, proc_entity_full_type(e), decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
 			}
 			if (is_type_proc(data->gen_entity->type)) {
 				Type *t = base_type(entity_to_use->type);
@@ -7977,7 +8030,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			CheckerContext ctx = *c;
 
 			ctx.no_polymorphic_errors = true;
-			ctx.allow_polymorphic_types = is_type_polymorphic(pt);
+			ctx.allow_polymorphic_types = is_type_polymorphic_or_specialized_proc(pt);
 			ctx.hide_polymorphic_errors = true;
 
 			bool is_a_candidate = check_call_arguments_single(&ctx, call, operand,
@@ -8635,9 +8688,11 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 		Entity *e = proc_entities[valids[0].index];
 		GB_ASSERT(e != nullptr);
+		// an entity generated by this call takes the arguments of its full signature
+		Type *e_type = valids[0].index >= procs.count ? proc_entity_full_type(e) : e->type;
 
 		check_call_arguments_single(c, call, operand,
-			e, e->type,
+			e, e_type,
 			positional_operands, named_operands,
 			CallArgumentErrorMode::ShowErrors,
 			&data, false);
@@ -9543,7 +9598,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 	pt = base_type(pt);
 
-	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin) {
+	if (pt->kind == Type_Proc && pt->Proc.calling_convention == ProcCC_Odin && !c->in_procedure_of) {
 		if ((c->scope->flags & ScopeFlag_ContextDefined) == 0) {
 			ERROR_BLOCK();
 			if (c->scope->flags & ScopeFlag_File) {

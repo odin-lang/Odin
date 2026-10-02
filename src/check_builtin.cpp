@@ -8518,8 +8518,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		{
 			Ast *call_expr = unparen_expr(ce->args[0]);
 			Operand op = {};
+			bool prev_in_procedure_of = c->in_procedure_of;
+			c->in_procedure_of = true;
 			check_expr_base(c, &op, ce->args[0], nullptr);
-			if (op.mode != Addressing_Value || call_expr == nullptr || call_expr->kind != Ast_CallExpr) {
+			c->in_procedure_of = prev_in_procedure_of;
+			bool is_call_mode = op.mode == Addressing_Value || op.mode == Addressing_NoValue || op.mode == Addressing_OptionalOk;
+			if (!is_call_mode || call_expr == nullptr || call_expr->kind != Ast_CallExpr) {
 				error(ce->args[0], "Expected a call expression for '%.*s'", LIT(builtin_name));
 				return false;
 			}
