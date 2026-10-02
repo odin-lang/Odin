@@ -2127,6 +2127,11 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 				if (r != Subst_Matched) {
 					return r; // NoMatch or Unhandled
 				}
+				// e.g. `M(1, 1, $T)` vs `M(3, 3, f64)`
+				if (s_e->kind == Entity_Constant && t_e->kind == Entity_Constant &&
+				    !compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value)) {
+					return Subst_NoMatch;
+				}
 			}
 		}
 		return Subst_Matched;

@@ -105,6 +105,13 @@ $ODIN run ../test_issue_7564.odin $COMMON
 $ODIN test ../test_issue_7316.odin $COMMON
 $ODIN test ../test_issue_7566.odin $COMMON
 $ODIN test ../test_issue_poly_using_subtype.odin $COMMON
+$ODIN test ../test_issue_7708.odin $COMMON
+if [[ $($ODIN check ../test_issue_7708_mismatch.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
