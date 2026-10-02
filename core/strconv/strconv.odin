@@ -1642,7 +1642,7 @@ Writes a quoted string representation of the input string to a given byte slice 
 - buf: The byte slice to which the quoted string will be written
 - str: The input string to be quoted
 
-!! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected
+!! ISSUE !! NOT EXPECTED -- `"\"hello\""` was expected
 
 Example:
 
