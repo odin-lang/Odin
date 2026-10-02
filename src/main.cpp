@@ -4582,7 +4582,6 @@ end_of_code_gen:;
 		show_import_graph(checker);
 	}
 
-	// NOTE(bill): e.g. `odin test -build-mode:llvm-ir` only generates the tests
 	if (run_output && build_context.build_mode == BuildMode_Executable) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));

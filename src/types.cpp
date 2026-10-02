@@ -4462,8 +4462,6 @@ gb_internal void wait_for_struct_fields(Type *t) {
 	}
 }
 
-// NOTE(bill): a polymorphic union's instance is found before its variants are checked (see `check_union_type`),
-// and until then, it has none, so its size, alignment and tag would be those of an empty union
 gb_internal void wait_for_union_variants(Type *t) {
 	if (t->Union.polymorphic_parent != nullptr) {
 		wait_for_record_signal(&t->Union.variants_wait_signal, &t->Union.checking_thread);

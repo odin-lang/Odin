@@ -125,12 +125,15 @@ struct lbModule {
 	lbModule *polymorphic_module;
 
 	CheckerInfo *info;
-	AstPackage *pkg; // possibly associated
-	AstFile *file;   // possibly associated
-	char const *module_name;
+	AstPackage * pkg;  // possibly associated
+	AstFile *    file; // possibly associated
+	char const * module_name;
 
 	NamedMetaDataKind metadata_kinds[4];
 	isize metadata_kind_count;
+
+	i64 estimated_cost;
+	i32 split_part;
 
 	PtrMap<u64/*type hash*/, LLVMTypeRef>  types;                  // mutex: types_mutex
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
@@ -211,14 +214,13 @@ struct lbGenerator : LinkerData {
 
 	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
-	PtrMap<AstFile *, lbModule *> file_modules; // NOTE(bill): of the files of a package which is split into several modules
+	PtrMap<AstFile *, lbModule *> file_modules;
 	lbModule default_module;
 
 	lbModule *equal_module;
 
 	isize used_module_count;
 
-	// NOTE(bill): set once the modules are generated in parallel, after which a module may only be added to by its own thread
 	bool modules_in_parallel;
 
 	lbProcedure *startup_runtime;
