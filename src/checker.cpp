@@ -1906,6 +1906,13 @@ gb_internal DeclInfo *decl_info_of_entity(Entity *e) {
 	return nullptr;
 }
 
+gb_internal Type *proc_entity_full_type(Entity *e) {
+	if (e->kind == Entity_Procedure && e->decl_info != nullptr && e->decl_info->gen_proc_type != nullptr) {
+		return e->decl_info->gen_proc_type;
+	}
+	return e->type;
+}
+
 // gb_internal DeclInfo *decl_info_of_ident(Ast *ident) {
 // 	return decl_info_of_entity(entity_of_node(ident));
 // }
@@ -6402,7 +6409,7 @@ gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char c
 	pi->file  = e->file;
 	pi->token = e->token;
 	pi->decl  = e->decl_info;
-	pi->type  = e->type;
+	pi->type  = proc_entity_full_type(e);
 
 	Ast *pl = e->decl_info->proc_lit;
 	GB_ASSERT(pl != nullptr);
