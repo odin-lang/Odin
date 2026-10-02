@@ -7371,8 +7371,6 @@ gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
 	}
 }
 #else
-gb_internal void check_walk_all_dependencies(DeclInfo *decl);
-
 // NOTE: post-order, so a declaration has the dependencies of all those nested in it before they are added to its parent
 gb_internal void check_walk_all_dependencies_post_order(DeclInfo *decl) {
 	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
@@ -7381,30 +7379,41 @@ gb_internal void check_walk_all_dependencies_post_order(DeclInfo *decl) {
 	add_deps_from_child_to_parent(decl);
 }
 
+// NOTE(bill): in chunks, as with a task for each entity, adding the tasks was most of the work
+struct CheckWalkDependenciesChunk {
+	DeclInfo **decls;    // either these
+	Entity **  entities; // or the declarations of these
+	isize      count;
+};
+
 gb_internal WORKER_TASK_PROC(check_walk_all_dependencies_worker_proc) {
-	if (data != nullptr) {
-		check_walk_all_dependencies_post_order(cast(DeclInfo *)data);
+	CheckWalkDependenciesChunk *chunk = cast(CheckWalkDependenciesChunk *)data;
+	for (isize i = 0; i < chunk->count; i++) {
+		DeclInfo *decl = chunk->decls != nullptr ? chunk->decls[i] : chunk->entities[i]->decl_info;
+		if (decl != nullptr) {
+			check_walk_all_dependencies_post_order(decl);
+		}
 	}
 	return 0;
 }
 
-gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
-	if (decl != nullptr) {
-		thread_pool_add_task(check_walk_all_dependencies_worker_proc, decl);
-	}
-}
-
 gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
+	isize const CHUNK_SIZE = 256;
+	auto chunks = array_make<CheckWalkDependenciesChunk>(heap_allocator(), 0, c->info.entities.count/CHUNK_SIZE + 16);
+	defer (array_free(&chunks));
+
 	mutex_lock(&c->nested_proc_lits_mutex);
-	for (DeclInfo *decl : c->nested_proc_lits) {
-		check_walk_all_dependencies(decl);
+	for (isize i = 0; i < c->nested_proc_lits.count; i += CHUNK_SIZE) {
+		array_add(&chunks, CheckWalkDependenciesChunk{c->nested_proc_lits.data + i, nullptr, gb_min(CHUNK_SIZE, c->nested_proc_lits.count - i)});
 	}
 	mutex_unlock(&c->nested_proc_lits_mutex);
-	for (Entity *e : c->info.entities) {
-		DeclInfo *decl = e->decl_info;
-		check_walk_all_dependencies(decl);
+	for (isize i = 0; i < c->info.entities.count; i += CHUNK_SIZE) {
+		array_add(&chunks, CheckWalkDependenciesChunk{nullptr, c->info.entities.data + i, gb_min(CHUNK_SIZE, c->info.entities.count - i)});
 	}
 
+	for (CheckWalkDependenciesChunk &chunk : chunks) {
+		thread_pool_add_task(check_walk_all_dependencies_worker_proc, &chunk);
+	}
 	thread_pool_wait();
 }
 #endif
