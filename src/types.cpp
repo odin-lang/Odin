@@ -2063,9 +2063,14 @@ gb_internal bool is_type_map(Type *t) {
 	return t->kind == Type_Map;
 }
 
+gb_internal void wait_for_union_variants(Type *t);
+
 gb_internal bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
+	if (t->kind == Type_Union) {
+		wait_for_union_variants(t);
+	}
 	if (t->kind == Type_Union && t->Union.variants.count == 1) {
 		Type *v = t->Union.variants[0];
 		return is_type_internally_pointer_like(v);
@@ -2077,6 +2082,9 @@ gb_internal bool is_type_union_maybe_pointer(Type *t) {
 gb_internal bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
+	if (t->kind == Type_Union) {
+		wait_for_union_variants(t);
+	}
 	if (t->kind == Type_Union && t->Union.variants.count == 1) {
 		Type *v = t->Union.variants[0];
 		if (is_type_internally_pointer_like(v)) {
@@ -3614,6 +3622,7 @@ gb_internal bool union_is_variant_of(Type *u, Type *v) {
 gb_internal i64 union_tag_size(Type *u) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_for_union_variants(u);
 	if (u->Union.tag_size > 0) {
 		return u->Union.tag_size;
 	}
@@ -4453,6 +4462,14 @@ gb_internal void wait_for_struct_fields(Type *t) {
 	}
 }
 
+// NOTE(bill): a polymorphic union's instance is found before its variants are checked (see `check_union_type`),
+// and until then, it has none, so its size, alignment and tag would be those of an empty union
+gb_internal void wait_for_union_variants(Type *t) {
+	if (t->Union.polymorphic_parent != nullptr) {
+		wait_for_record_signal(&t->Union.variants_wait_signal, &t->Union.checking_thread);
+	}
+}
+
 gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	GB_ASSERT(path != nullptr);
 	if (t->failure) {
@@ -4553,6 +4570,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		return type_align_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
+		wait_for_union_variants(t);
 		if (t->Union.variants.count == 0) {
 			return 1;
 		}
@@ -4857,6 +4875,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		return type_size_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
+		wait_for_union_variants(t);
 		if (t->Union.variants.count == 0) {
 			return 0;
 		}
