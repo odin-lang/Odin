@@ -3676,6 +3676,11 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	e->scope = e->file->scope;
 
 	lbModule *target_module = m;
+	// NOTE(bill): a literal reached whilst generating the initializations of the globals (in the default module) is
+	// generated in its own package's module, which may only be added to before the modules are generated in parallel
+	if (m == &gen->default_module && parent == nullptr && !gen->modules_in_parallel) {
+		target_module = lb_module_of_expr(gen, expr);
+	}
 	GB_ASSERT(target_module != nullptr);
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
@@ -3693,8 +3698,12 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		lbValue *found = map_get(&target_module->values, e);
 		rw_mutex_shared_unlock(&target_module->values_mutex);
 		if (found == nullptr) {
-			lbProcedure *missing_proc_in_target_module = lb_create_procedure(target_module, e, false);
-			mpsc_enqueue(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
+			lbProcedure *target_proc = lb_create_procedure(target_module, e, false);
+			if (gen->modules_in_parallel) {
+				mpsc_enqueue(&target_module->missing_procedures_to_check, target_proc);
+			} else {
+				mpsc_enqueue(&target_module->procedures_to_generate, target_proc);
+			}
 		}
 
 		lbProcedure *p = lb_create_procedure(m, e, true);

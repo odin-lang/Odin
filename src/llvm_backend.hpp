@@ -209,6 +209,9 @@ struct lbGenerator : LinkerData {
 
 	isize used_module_count;
 
+	// NOTE(bill): set once the modules are generated in parallel, after which a module may only be added to by its own thread
+	bool modules_in_parallel;
+
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
