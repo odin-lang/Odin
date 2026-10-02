@@ -178,10 +178,10 @@ gb_internal void populate_check_did_you_mean_objc_entity(StringSet *set, Entity 
 	if (e->kind != Entity_TypeName) {
 		return;
 	}
-	if (e->TypeName.objc_metadata == nullptr) {
+	TypeNameObjCMetadata *objc_metadata = entity_objc_metadata(e);
+	if (objc_metadata == nullptr) {
 		return;
 	}
-	TypeNameObjCMetadata *objc_metadata = e->TypeName.objc_metadata;
 	Type *t = base_type(e->type);
 	GB_ASSERT(t->kind == Type_Struct);
 
@@ -210,8 +210,8 @@ gb_internal void check_did_you_mean_objc_entity(String const &name, Entity *e, b
 
 	ERROR_BLOCK();
 	GB_ASSERT(e->kind == Entity_TypeName);
-	GB_ASSERT(e->TypeName.objc_metadata != nullptr);
-	auto *objc_metadata = e->TypeName.objc_metadata;
+	auto *objc_metadata = entity_objc_metadata(e);
+	GB_ASSERT(objc_metadata != nullptr);
 	MUTEX_GUARD(objc_metadata->mutex);
 
 	StringSet set = {};
@@ -389,6 +389,149 @@ gb_internal void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes,
 	}
 }
 
+gb_internal bool poly_specialization_shape_mismatch(Type *s, Type *o, isize depth) {
+	if (s == nullptr || o == nullptr || depth > 8) {
+		return false;
+	}
+	if (s->kind == Type_Generic) {
+		if (s->Generic.specialized == nullptr) {
+			return false;
+		}
+		s = s->Generic.specialized;
+	}
+	Type *bs = base_type(s);
+	Type *bo = base_type(o);
+	if (bs == nullptr || bo == nullptr || bs->kind == Type_Generic || bo->kind == Type_Generic) {
+		return false;
+	}
+	if (bs->kind != bo->kind) {
+		return true;
+	}
+	switch (bs->kind) {
+	case Type_Pointer:                    return poly_specialization_shape_mismatch(bs->Pointer.elem,                   bo->Pointer.elem,                   depth+1);
+	case Type_MultiPointer:               return poly_specialization_shape_mismatch(bs->MultiPointer.elem,              bo->MultiPointer.elem,              depth+1);
+	case Type_Slice:                      return poly_specialization_shape_mismatch(bs->Slice.elem,                     bo->Slice.elem,                     depth+1);
+	case Type_DynamicArray:               return poly_specialization_shape_mismatch(bs->DynamicArray.elem,              bo->DynamicArray.elem,              depth+1);
+	case Type_Array:                      return poly_specialization_shape_mismatch(bs->Array.elem,                     bo->Array.elem,                     depth+1);
+	case Type_FixedCapacityDynamicArray:  return poly_specialization_shape_mismatch(bs->FixedCapacityDynamicArray.elem, bo->FixedCapacityDynamicArray.elem, depth+1);
+	case Type_Map:
+		return poly_specialization_shape_mismatch(bs->Map.key,   bo->Map.key,   depth+1) ||
+		       poly_specialization_shape_mismatch(bs->Map.value, bo->Map.value, depth+1);
+	case Type_Struct:
+		return bs->Struct.soa_kind != bo->Struct.soa_kind;
+	}
+	return false;
+}
+
+gb_internal bool poly_candidate_cannot_match(TypeProc *pt, Array<Operand> const &operands) {
+	if (pt->params == nullptr) {
+		return false;
+	}
+	auto const &params = pt->params->Tuple.variables;
+	for (isize i = 0; i < params.count && i < operands.count; i++) {
+		if (pt->variadic && i == pt->variadic_index) {
+			continue;
+		}
+		Entity *param = params[i];
+		Operand const &o = operands[i];
+		if (param == nullptr || o.type == nullptr || o.deferred_untyped_arg || is_type_untyped(o.type)) {
+			continue;
+		}
+
+		Type *t = param->type;
+		Type *ot = o.type;
+		if (param->kind == Entity_TypeName) {
+			if (o.mode != Addressing_Type) {
+				continue;
+			}
+		} else if (param->kind == Entity_Variable) {
+			if (o.mode != Addressing_Value && o.mode != Addressing_Variable && o.mode != Addressing_Constant) {
+				continue;
+			}
+			if (t != nullptr && t->kind == Type_Pointer) {
+				Type *bot = base_type(ot);
+				if (bot == nullptr || bot->kind != Type_Pointer) {
+					continue;
+				}
+				t  = t->Pointer.elem;
+				ot = bot->Pointer.elem;
+			}
+		} else {
+			continue;
+		}
+		if (t != nullptr && t->kind == Type_Generic && t->Generic.specialized != nullptr &&
+		    poly_specialization_shape_mismatch(t, ot, 0)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal u64 type_identity_hash(Type *t, isize depth) {
+	if (t == nullptr) {
+		return 0;
+	}
+	if (t->kind == Type_Named && t->Named.type_name != nullptr && t->Named.type_name->TypeName.is_type_alias) {
+		return type_identity_hash(t->Named.base, depth);
+	}
+	u64 h = (cast(u64)t->kind + 1) * 0x9e3779b97f4a7c15ull;
+	auto mix = [&](u64 x) {
+		h ^= x + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+	};
+	if (depth > 8) {
+		return h;
+	}
+	switch (t->kind) {
+	case Type_Named: mix(cast(u64)cast(uintptr)t->Named.type_name); break;
+	case Type_Basic: mix(cast(u64)t->Basic.kind);                   break;
+
+	case Type_Pointer:                   mix(type_identity_hash(t->Pointer.elem,                   depth+1)); break;
+	case Type_MultiPointer:              mix(type_identity_hash(t->MultiPointer.elem,              depth+1)); break;
+	case Type_SoaPointer:                mix(type_identity_hash(t->SoaPointer.elem,                depth+1)); break;
+	case Type_Slice:                     mix(type_identity_hash(t->Slice.elem,                     depth+1)); break;
+	case Type_DynamicArray:              mix(type_identity_hash(t->DynamicArray.elem,              depth+1)); break;
+	case Type_FixedCapacityDynamicArray: mix(type_identity_hash(t->FixedCapacityDynamicArray.elem, depth+1)); break;
+	case Type_EnumeratedArray:           mix(type_identity_hash(t->EnumeratedArray.elem,           depth+1)); break;
+	case Type_Matrix:                    mix(type_identity_hash(t->Matrix.elem,                    depth+1)); break;
+
+	case Type_Array:
+		mix(cast(u64)t->Array.count);
+		mix(type_identity_hash(t->Array.elem, depth+1));
+		break;
+
+	case Type_Map:
+		mix(type_identity_hash(t->Map.key,   depth+1));
+		mix(type_identity_hash(t->Map.value, depth+1));
+		break;
+	}
+	return h;
+}
+
+gb_internal u64 tuple_identity_hash(Type *t) {
+	u64 h = 0x84222325cbf29ce4ull;
+	if (t != nullptr && t->kind == Type_Tuple) {
+		h ^= cast(u64)t->Tuple.variables.count * 31 + cast(u64)t->Tuple.is_packed;
+		for (Entity *e : t->Tuple.variables) {
+			h = (h ^ (cast(u64)e->kind * 0x100000001b3ull)) * 0x100000001b3ull;
+			h ^= type_identity_hash(e->type, 0) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+		}
+	}
+	return h;
+}
+
+gb_internal u64 proc_type_identity_hash(Type *t) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Proc);
+	u64 h = cast(u64)t->Proc.calling_convention;
+	h = h*31 + cast(u64)t->Proc.c_vararg;
+	h = h*31 + cast(u64)t->Proc.variadic;
+	h = h*31 + cast(u64)t->Proc.diverging;
+	h = h*31 + cast(u64)t->Proc.optional_ok;
+	h ^= tuple_identity_hash(t->Proc.params)  + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+	h ^= tuple_identity_hash(t->Proc.results) + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+	return h;
+}
+
 // Reuse an existing generated specialization `other`, scheduling its body if unchecked.
 // Caller must have released gen_procs->mutex first.
 gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other, Ast *poly_def_node, PolyProcData *poly_proc_data) {
@@ -475,6 +618,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 
+	// NOTE(bill): only whilst trying a procedure group's candidates as their errors are not reported
+	if (param_operands != nullptr && old_c->no_polymorphic_errors && poly_candidate_cannot_match(&src->Proc, *param_operands)) {
+		return false;
+	}
+
 	DeclInfo *old_decl = decl_info_of_entity(base_entity);
 	if (old_decl == nullptr) {
 		return false;
@@ -515,7 +663,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	// NOTE(bill): This is slightly memory leaking if the type already exists
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
-	bool success = check_procedure_type(&nctx, final_proc_type, pt->node, &operands);
+	// NOTE: a clone, as other threads may be instantiating the same procedure, from the same AST
+	bool success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
 
 	if (!success) {
 		return false;
@@ -533,7 +682,12 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 
-		for (Entity *other : gen_procs->procs) {
+		u64 hash = proc_type_identity_hash(final_proc_type);
+		for_array(i, gen_procs->procs) {
+			if (gen_procs->hashes[i] != hash) {
+				continue;
+			}
+			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
@@ -549,6 +703,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	} else {
 		gen_procs = permanent_alloc_item<GenProcsData>();
 		gen_procs->procs.allocator = heap_allocator();
+		gen_procs->hashes.allocator = heap_allocator();
 		base_entity->Procedure.gen_procs = gen_procs;
 		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 	}
@@ -572,8 +727,13 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			return false;
 		}
 
+		u64 hash = proc_type_identity_hash(final_proc_type);
 		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
-		for (Entity *other : gen_procs->procs) {
+		for_array(i, gen_procs->procs) {
+			if (gen_procs->hashes[i] != hash) {
+				continue;
+			}
+			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
@@ -586,9 +746,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	// Re-check under the exclusive lock (the lookups above ran under a released shared lock) and
 	// hold it across construction + array_add so find-then-publish is atomic. (@local-mutex)
+	u64 final_hash = proc_type_identity_hash(final_proc_type);
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
-	for (Entity *other : gen_procs->procs) {
-		if (are_types_identical(base_type(other->type), final_proc_type)) {
+	for_array(i, gen_procs->procs) {
+		Entity *other = gen_procs->procs[i];
+		if (gen_procs->hashes[i] == final_hash && are_types_identical(base_type(other->type), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 			return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
 		}
@@ -655,16 +817,10 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	d->entity.store(entity);
 
-	AstFile *file = nullptr;
-	{
-		Scope *s = entity->scope;
-		while (s != nullptr && s->file == nullptr) {
-			file = s->file;
-			s = s->parent;
-		}
-	}
+	AstFile *file = base_entity->file;
 
 	array_add(&gen_procs->procs, entity);
+	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
 	ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
@@ -961,7 +1117,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 	}
 
 	if (is_type_union(dst) && allow_unions) {
-		wait_signal_until_available(&dst->Union.variants_wait_signal);
+		wait_for_record_signal(&dst->Union.variants_wait_signal, &dst->Union.checking_thread);
 		for (Type *vt : dst->Union.variants) {
 			if (are_types_identical(vt, s)) {
 				return 1;
@@ -1012,7 +1168,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		PolyProcData poly_proc_data = {};
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			Entity *e = poly_proc_data.gen_entity;
-			add_type_and_value(c, operand->expr, Addressing_Value, e->type, {});
+			add_type_and_value(c, operand->expr, Addressing_Value, e->type, exact_value_procedure(operand->expr));
 			Ast *expr = unparen_expr(operand->expr);
 			if (expr->kind == Ast_SelectorExpr) {
 				add_entity_use(c, expr->SelectorExpr.selector, e);
@@ -1719,7 +1875,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 	if (e->state == EntityState_Unresolved) {
 		check_entity_decl(c, e, nullptr, named_type);
 	} else {
-		wait_for_lazy_entity(c, e);
+		wait_for_entity(e);
 	}
 	switch (e->kind) {
 	case Entity_Constant:
@@ -5178,7 +5334,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
-			wait_signal_until_available(&t->Union.variants_wait_signal);
+			wait_for_record_signal(&t->Union.variants_wait_signal, &t->Union.checking_thread);
 
 			isize count = t->Union.variants.count;
 			ValidIndexAndScore *valids = temporary_alloc_array<ValidIndexAndScore>(count);
@@ -5211,9 +5367,6 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				first_success_index = valids[0].index;
 			}
 
-			gbString type_str = type_to_string(target_type);
-			defer (gb_string_free(type_str));
-
 			if (valid_count == 1) {
 				Type *new_type = t->Union.variants[first_success_index];
 				if (operand->mode != Addressing_Constant ||
@@ -5225,6 +5378,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				break;
 			} else if (valid_count > 1) {
 				ERROR_BLOCK();
+				gbString type_str = type_to_string(target_type);
+				defer (gb_string_free(type_str));
 
 				GB_ASSERT(first_success_index >= 0);
 				convert_untyped_error(c, operand, target_type, true);
@@ -5250,6 +5405,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				target_type = t_untyped_uninit;
 			} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 				ERROR_BLOCK();
+				gbString type_str = type_to_string(target_type);
+				defer (gb_string_free(type_str));
 
 				convert_untyped_error(c, operand, target_type, true);
 				if (count > 0) {
@@ -5752,7 +5909,7 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		}
 		if (e != nullptr) {
 			// its kind and type are read by the caller
-			wait_for_lazy_entity(c, e);
+			wait_for_entity(e);
 		}
 		return e;
 	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
@@ -6116,7 +6273,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				if (operand->type->kind == Type_Named &&
 				    operand->type->Named.type_name &&
 				    operand->type->Named.type_name->kind == Entity_TypeName &&
-				    operand->type->Named.type_name->TypeName.objc_metadata) {
+				    entity_objc_metadata(operand->type->Named.type_name)) {
 					check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
 				} else if (bt->kind == Type_Struct) {
 					check_did_you_mean_type(name, bt->Struct.fields);
@@ -6873,7 +7030,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 						// then the default is materialized against the concrete type (reporting a clear error if it does not fit).
 						ordered_operands[i].mode = Addressing_Invalid;
 						ordered_operands[i].type = t_invalid;
-						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+						// NOTE(bill): Check a clone, as the callee's default expression is shared by every call site.
+						ordered_operands[i].expr = clone_ast(e->Variable.param_value.original_ast_expr);
 						ordered_operands[i].deferred_untyped_arg = true;
 					} else {
 						ordered_operands[i].mode = Addressing_Value;
@@ -8808,6 +8966,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
 		if (found_entity) {
+			add_declaration_dependency(c, found_entity);
 			operand->mode = Addressing_Type;
 			operand->type = found_entity->type;
 			return err;
@@ -8816,6 +8975,14 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		CheckerContext ctx = *c;
 		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
 		ctx.scope = polymorphic_record_parent_scope(original_type);
+		// NOTE(bill): the instance's members are only checked by its first use, so their dependencies are
+		// the instance's own, and each use depends on the instance instead
+		ctx.decl = make_decl_info(ctx.scope, nullptr);
+
+		if (original_type->Named.type_name && original_type->Named.type_name->file) {
+			ctx.file = original_type->Named.type_name->file;
+			ctx.pkg = ctx.file->pkg;
+		}
 		GB_ASSERT(ctx.scope != nullptr);
 
 		Type *bt = base_type(original_type);
@@ -8850,6 +9017,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
 
+		add_declaration_dependency(c, named_type->Named.type_name);
 		operand->mode = Addressing_Type;
 		operand->type = named_type;
 	}
@@ -9743,7 +9911,7 @@ gb_internal bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, A
 		TEMPORARY_ALLOCATOR_GUARD();
 
 		Type *union_type = base_type(th);
-		wait_signal_until_available(&union_type->Union.variants_wait_signal);
+		wait_for_record_signal(&union_type->Union.variants_wait_signal, &union_type->Union.checking_thread);
 		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
 
 		for (Type *vt : union_type->Union.variants) {
@@ -11086,7 +11254,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 	// If exactly one matches, retarget to that variant and let the normal path build it (the surrounding assignment then wraps it into the union).
 	// Otherwise report a clear error.
 	if (t->kind == Type_Union && cl->type == nullptr && cl->elems.count > 0) {
-		wait_signal_until_available(&t->Union.variants_wait_signal);
+		wait_for_record_signal(&t->Union.variants_wait_signal, &t->Union.checking_thread);
 		auto matches = array_make<Type *>(temporary_allocator(), 0, t->Union.variants.count);
 		for (Type *variant : t->Union.variants) {
 			Operand trial = {};
@@ -11154,7 +11322,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				break;
 			}
 
-			wait_signal_until_available(&t->Struct.fields_wait_signal);
+			wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
 			isize field_count = t->Struct.fields.count;
 			isize min_field_count = t->Struct.fields.count;
 			for (isize i = min_field_count-1; i >= 0; i--) {
@@ -12103,7 +12271,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 	Type *src = type_deref(o->type);
 	Type *bsrc = base_type(src);
 	if (bsrc->kind == Type_Union) {
-		wait_signal_until_available(&bsrc->Union.variants_wait_signal);
+		wait_for_record_signal(&bsrc->Union.variants_wait_signal, &bsrc->Union.checking_thread);
 	}
 
 

@@ -49,10 +49,19 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin test ..\test_issue_bool_to_be_conversion.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_bool_comparison_truthiness.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_const_array_broadcast.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_decl_order.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_distinct_constraint.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_ambiguous_union_literal.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin test ..\test_issue_proc_constant_instantiation.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_global_when_order.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_global_when_cycle.odin -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
+..\..\..\odin test ..\test_issue_global_when_cycle_accepted.odin %COMMON%  || exit /b
+..\..\..\odin check ..\test_issue_global_when_cycle_ambiguous.odin -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
+..\..\..\odin check ..\test_issue_global_when_shadowing.odin -no-entry-point %COMMON% 2>&1 | find /c "within a global" | findstr /x "2" || exit /b
 ..\..\..\odin check ..\test_issue_7336.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
+..\..\..\odin check ..\test_issue_foreign_import_attributes.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration_mismatch.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin check ..\test_issue_integer_literal_exponent.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin doc ..\test_issue_asm_doc_category.odin -file 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
@@ -71,6 +80,8 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin run ..\test_issue_7482.odin %COMMON% || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local || exit /b
 ..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local -o:speed || exit /b
+..\..\..\odin test ..\test_issue_7316.odin %COMMON%  || exit /b
+..\..\..\odin test ..\test_issue_7566.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_7587.odin %COMMON%  || exit /b
 ..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
 

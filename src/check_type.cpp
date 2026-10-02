@@ -349,9 +349,12 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 
 		e = alloc_entity_type_name(s, token, named_type);
 		e->state = EntityState_Resolved;
-		e->file = ctx->file;
+
+		// NOTE(bille): the generic's file as its token is not that of whichever instantiated it first
+		e->file = original_type->Named.type_name && original_type->Named.type_name->file ? original_type->Named.type_name->file : ctx->file;
 		e->pkg = pkg;
 		e->TypeName.original_type_for_parapoly = original_type;
+		e->decl_info = ctx->decl;
 		add_entity_use(ctx, node, e);
 	}
 
@@ -721,6 +724,9 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
+	struct_type->Struct.checking_thread.store(cast(i32)current_thread_index() + 1);
+	defer (struct_type->Struct.checking_thread.store(0));
+
 	String context = str_lit("struct");
 
 	isize min_field_count = 0;
@@ -770,40 +776,15 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 		}
 	}
 
-	if (!struct_type->Struct.is_polymorphic) {
-		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
-			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
-		} else {
-			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, true);
-			gb_unused(where_clause_ok);
-		}
-		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
-
-		if (st->is_simple) {
-			bool success = true;
-			for (Entity *f : struct_type->Struct.fields) {
-				if (!is_type_nearly_simple_compare(f->type)) {
-					gbString s = type_to_string(f->type);
-					error(f->token, "'struct #simple' requires all fields to be at least 'nearly simple compare', got %s", s);
-					gb_string_free(s);
-				}
-			}
-			if (success) {
-				struct_type->Struct.is_simple = true;
-			}
-		}
-
-		wait_signal_set(&struct_type->Struct.fields_wait_signal);
-	}
 
 #define ST_ALIGN(_name) if (st->_name != nullptr) {                                                \
 		if (st->is_packed) {                                                               \
 			error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
-			return;                                                                    \
-		}                                                                                  \
-		i64 align = 1;                                                                     \
-		if (check_custom_align(ctx, st->_name, &align, #_name)) {                          \
-			struct_type->Struct.custom_##_name = align;                                \
+		} else {                                                                           \
+			i64 align = 1;                                                             \
+			if (check_custom_align(ctx, st->_name, &align, #_name)) {                  \
+				struct_type->Struct.custom_##_name = align;                        \
+			}                                                                          \
 		}                                                                                  \
 	}
 
@@ -836,10 +817,40 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	}
 
 #undef ST_ALIGN
+
+	if (!struct_type->Struct.is_polymorphic) {
+		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
+			error(st->where_clauses[0], "'where' clauses can only be used on structures with polymorphic parameters");
+		} else {
+			bool where_clause_ok = evaluate_where_clauses(ctx, node, ctx->scope, &st->where_clauses, true);
+			gb_unused(where_clause_ok);
+		}
+		check_struct_fields(ctx, node, &struct_type->Struct.fields, &struct_type->Struct.tags, st->fields, min_field_count, struct_type, context);
+
+		if (st->is_simple) {
+			bool success = true;
+			for (Entity *f : struct_type->Struct.fields) {
+				if (!is_type_nearly_simple_compare(f->type)) {
+					gbString s = type_to_string(f->type);
+					error(f->token, "'struct #simple' requires all fields to be at least 'nearly simple compare', got %s", s);
+					gb_string_free(s);
+				}
+			}
+			if (success) {
+				struct_type->Struct.is_simple = true;
+			}
+		}
+
+		wait_signal_set(&struct_type->Struct.fields_wait_signal);
+	}
+
 }
 gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly, GenTypesData *poly_gen_types_to_unlock) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
+
+	union_type->Union.checking_thread.store(cast(i32)current_thread_index() + 1);
+	defer (union_type->Union.checking_thread.store(0));
 
 
 	union_type->Union.node  = node;
@@ -2249,8 +2260,8 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 		    pattern->Struct.is_packed != source->Struct.is_packed) {
 			return Subst_Unhandled;
 		}
-		wait_signal_until_available(&pattern->Struct.fields_wait_signal);
-		wait_signal_until_available(&source->Struct.fields_wait_signal);
+		wait_for_record_signal(&pattern->Struct.fields_wait_signal, &pattern->Struct.checking_thread);
+		wait_for_record_signal(&source->Struct.fields_wait_signal, &source->Struct.checking_thread);
 		if (pattern->Struct.fields.count != source->Struct.fields.count) {
 			return Subst_NoMatch;
 		}
@@ -4386,7 +4397,7 @@ gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finis
 	GB_ASSERT(old_struct->kind == Type_Struct);
 
 	if (wait_to_finish) {
-		wait_signal_until_available(&old_struct->Struct.fields_wait_signal);
+		wait_for_record_signal(&old_struct->Struct.fields_wait_signal, &old_struct->Struct.checking_thread);
 	} else {
 		GB_ASSERT(old_struct->Struct.fields_wait_signal.futex.load() != 0);
 	}
@@ -4622,6 +4633,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	if (is_complete) {
 		add_type_info_type(ctx, soa_struct);
 		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
+	} else if (global_group_soa_types != nullptr) {
+		// NOTE: no task waits on the element type, which could hold every thread of the pool
+		array_add(global_group_soa_types, soa_struct);
 	} else {
 		SoaTypeWorkerData *wd = permanent_alloc_item<SoaTypeWorkerData>();
 		wd->ctx = *ctx;

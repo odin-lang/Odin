@@ -1559,6 +1559,28 @@ gb_internal void lb_register_objc_thing(
 	}
 }
 
+gb_internal GB_COMPARE_PROC(objc_global_cmp) {
+	lbObjCGlobal const *x = cast(lbObjCGlobal const *)a;
+	lbObjCGlobal const *y = cast(lbObjCGlobal const *)b;
+	int cmp = string_compare(x->name, y->name);
+	if (cmp == 0) {
+		cmp = (x->class_impl_type != nullptr) - (y->class_impl_type != nullptr);
+	}
+	return cmp;
+}
+
+gb_internal GB_COMPARE_PROC(objc_class_type_cmp) {
+	Type *x = *cast(Type **)a;
+	Type *y = *cast(Type **)b;
+	return entity_source_order_cmp(x->Named.type_name, y->Named.type_name);
+}
+
+gb_internal GB_COMPARE_PROC(objc_method_data_cmp) {
+	ObjcMethodData const *x = cast(ObjcMethodData const *)a;
+	ObjcMethodData const *y = cast(ObjcMethodData const *)b;
+	return entity_source_order_cmp(x->proc_entity, y->proc_entity);
+}
+
 gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	if (p == nullptr) {
 		return;
@@ -1576,7 +1598,13 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	auto class_impls = array_make<lbObjCGlobalClass>(temporary_allocator(), 0, 16);
 
 	// Register all class implementations unconditionally, even if not statically referenced
+	auto implementations = array_make<Entity *>(temporary_allocator(), 0, 16);
 	for (Entity *e = {}; mpsc_dequeue(&gen->info->objc_class_implementations, &e); /**/) {
+		array_add(&implementations, e);
+	}
+	array_sort(implementations, init_procedures_cmp);
+
+	for (Entity *e : implementations) {
 		GB_ASSERT(e->kind == Entity_TypeName && e->TypeName.objc_is_implementation);
 		lb_handle_objc_find_or_register_class(p, e->TypeName.objc_class_name, e->type);
 
@@ -1606,11 +1634,18 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 		}
 	}
 
+	// NOTE(bill): the queues are filled by the codegen threads and the set is in address order, so all are sorted
+	auto class_types = array_make<Type *>(temporary_allocator(), 0, class_set.count);
 	for (auto pair : class_set) {
-		Entity *e = pair.type->Named.type_name;
+		array_add(&class_types, pair.type);
+	}
+	array_sort(class_types, objc_class_type_cmp);
+
+	for (Type *class_type : class_types) {
+		Entity *e = class_type->Named.type_name;
 		GB_ASSERT(e->kind == Entity_TypeName);
 		auto &tn = e->TypeName;
-		Type *class_impl = !tn.objc_is_implementation ? nullptr : pair.type;
+		Type *class_impl = !tn.objc_is_implementation ? nullptr : class_type;
 		lb_handle_objc_find_or_register_class(p, tn.objc_class_name, class_impl);
 
 		if (build_context.bedrock) {
@@ -1619,6 +1654,11 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	}
 	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_classes, &g); /**/) {
 		array_add(&referenced_classes, g);
+	}
+	array_sort(referenced_classes, objc_global_cmp);
+
+	for (auto &kv : m->info->objc_method_implementations) {
+		array_sort(kv.value, objc_method_data_cmp);
 	}
 
 	// Add all class globals to a map so that we can look them up dynamically
@@ -1656,7 +1696,12 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	}
 
 	// Now we can register all referenced selectors
+	auto selectors = array_make<lbObjCGlobal>(temporary_allocator());
 	for (lbObjCGlobal g = {}; mpsc_dequeue(&gen->objc_selectors, &g); /**/) {
+		array_add(&selectors, g);
+	}
+	array_sort(selectors, objc_global_cmp);
+	for (lbObjCGlobal const &g : selectors) {
 		lb_register_objc_thing(handled, m, args, class_impls, global_class_map, p, g, "sel_registerName");
 	}
 
@@ -1937,8 +1982,12 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 	}
 
 	// Register ivar offsets for any `objc_ivar_get` expressions emitted.
+	auto ivars = array_make<lbObjCGlobal>(temporary_allocator(), 0, ivar_map.count);
 	for (auto const& kv : ivar_map) {
-		lbObjCGlobal const& g = kv.value;
+		array_add(&ivars, kv.value);
+	}
+	array_sort(ivars, objc_global_cmp);
+	for (lbObjCGlobal const& g : ivars) {
 		lbAddr ivar_addr = {};
 		lbValue *found = string_map_get(&m->members, g.global_name);
 
