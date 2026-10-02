@@ -91,11 +91,11 @@ float32_exponential :: proc(lambda: f32, gen := context.random_generator) -> f32
 //
 // Required: alpha > 0 and beta > 0
 //
-//             math.pow(x, alpha-1) * math.exp(-x / beta)
-//   pdf(x) = --------------------------------------------
-//              math.gamma(alpha) * math.pow(beta, alpha)
+// 	          math.pow(x, alpha-1) * math.exp(-x / beta)
+// 	pdf(x) = --------------------------------------------
+// 	           math.gamma(alpha) * math.pow(beta, alpha)
 //
-// mean is alpha*beta, variance is math.pow(alpha*beta, 2)
+// mean is `alpha*beta`, variance is `math.pow(alpha*beta, 2)`
 @(require_results)
 float64_gamma :: proc(alpha, beta: f64, gen := context.random_generator) -> f64 {
 	if alpha <= 0 || beta <= 0 {
@@ -157,11 +157,11 @@ float64_gamma :: proc(alpha, beta: f64, gen := context.random_generator) -> f64 
 //
 // Required: alpha > 0 and beta > 0
 //
-//             math.pow(x, alpha-1) * math.exp(-x / beta)
-//   pdf(x) = --------------------------------------------
-//              math.gamma(alpha) * math.pow(beta, alpha)
+// 	          math.pow(x, alpha-1) * math.exp(-x / beta)
+// 	pdf(x) = --------------------------------------------
+// 	           math.gamma(alpha) * math.pow(beta, alpha)
 //
-// mean is alpha*beta, variance is math.pow(alpha*beta, 2)
+// mean is `alpha*beta`, variance is `math.pow(alpha*beta, 2)`
 @(require_results)
 float32_gamma :: proc(alpha, beta: f32, gen := context.random_generator) -> f32 {
 	return f32(float64_gamma(f64(alpha), f64(beta), gen))
