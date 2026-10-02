@@ -1225,6 +1225,14 @@ gb_internal bool is_calling_convention_odin(ProcCallingConvention calling_conven
 	return false;
 }
 
+gb_internal bool is_calling_convention_must_tail_allowed(ProcCallingConvention calling_convention) {
+	switch (calling_convention) {
+	case ProcCC_Odin:
+		return false;
+	}
+	return true;
+}
+
 gb_internal Type *alloc_type_tuple() {
 	Type *t = alloc_type(Type_Tuple);
 	return t;

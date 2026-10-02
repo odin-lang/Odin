@@ -9317,7 +9317,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		break;
 	case ProcTailing_must_tail:
 		is_call_tailed = true;
-		if (c->curr_proc_sig == nullptr || !are_types_identical(c->curr_proc_sig, pt)) {
+		if (pt->kind == Type_Proc && !is_calling_convention_must_tail_allowed(pt->Proc.calling_convention)) {
+			ERROR_BLOCK();
+			error(call, "'#must_tail' cannot be applied to a call of a procedure with the \"%s\" calling convention",
+			      proc_calling_convention_strings[pt->Proc.calling_convention]);
+			error_line("\tSuggestion: Use the \"preserve/none\" calling convention\n");
+		} else if (c->curr_proc_sig == nullptr || !are_types_identical(c->curr_proc_sig, pt)) {
 			ERROR_BLOCK();
 			gbString a = type_to_string(pt);
 			gbString b = type_to_string(c->curr_proc_sig);
