@@ -5759,6 +5759,134 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 
 
 
+gb_internal Ast *constant_compound_elem_node(AstCompoundLit *cl, i64 index) {
+	if (cl->elems.count == 0) {
+		return nullptr;
+	}
+	if (cl->elems[0]->kind != Ast_FieldValue) {
+		return index < cl->elems.count ? cl->elems[index] : nullptr;
+	}
+	for (Ast *elem : cl->elems) {
+		ast_node(fv, FieldValue, elem);
+		if (is_ast_range(fv->field)) {
+			ast_node(ie, BinaryExpr, fv->field);
+			i64 lo = exact_value_to_i64(ie->left->tav.value);
+			i64 hi = exact_value_to_i64(ie->right->tav.value);
+			if (ie->op.kind != Token_RangeHalf) {
+				hi += 1;
+			}
+			if (lo <= index && index < hi) {
+				return fv->value;
+			}
+		} else if (fv->field->tav.mode == Addressing_Constant && exact_value_to_i64(fv->field->tav.value) == index) {
+			return fv->value;
+		}
+	}
+	return nullptr;
+}
+
+gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selection sel, bool *success_) {
+	if (success_) *success_ = false;
+
+	Type *elem = base_type(soa->Struct.soa_elem);
+	if (sel.index.count != 1 || soa->Struct.soa_kind != StructSoa_Fixed ||
+	    value.value_compound->kind != Ast_CompoundLit ||
+	    !(elem->kind == Type_Array || (elem->kind == Type_Struct && !elem->Struct.is_raw_union))) {
+		return empty_exact_value;
+	}
+
+	i32 field_index = sel.index[0];
+	Entity *field   = soa->Struct.fields[field_index];
+
+	Type *field_elem_type = base_type(field->type)->Array.elem;
+
+	isize count   = soa->Struct.soa_count;
+	Ast *soa_node = value.value_compound;
+
+	AstFile *f = soa_node->file();
+	ast_node(cl, CompoundLit, soa_node);
+
+	auto  nodes = permanent_slice_make<Ast *>(count);
+
+	isize last     = -1;
+	bool  has_gaps = false;
+
+	for (isize i = 0; i < count; i++) {
+		Ast *en = constant_compound_elem_node(cl, i);
+		if (en == nullptr || en->tav.value.kind == ExactValue_Invalid) {
+			continue;
+		}
+		ExactValue ev = en->tav.value;
+		if (ev.kind != ExactValue_Compound || ev.value_compound->kind != Ast_CompoundLit) {
+			return empty_exact_value;
+		}
+		ast_node(ecl, CompoundLit, ev.value_compound);
+
+		Ast *fn = nullptr;
+		if (elem->kind == Type_Struct && ecl->elems.count > 0 && ecl->elems[0]->kind == Ast_FieldValue) {
+			for (Ast *e : ecl->elems) {
+				ast_node(fv, FieldValue, e);
+				if (fv->field->kind == Ast_Ident && fv->field->Ident.token.string == field->token.string) {
+					fn = fv->value;
+					break;
+				}
+			}
+		} else {
+			fn = constant_compound_elem_node(ecl, field_index);
+		}
+		if (fn == nullptr) {
+			continue;
+		}
+
+		ExactValue fvalue = fn->tav.value;
+		if (fn->tav.mode == Addressing_Type) {
+			fvalue = exact_value_typeid(fn->tav.type);
+		}
+		if (fvalue.kind == ExactValue_Invalid) {
+			continue;
+		}
+
+		Ast *node = alloc_ast_node(nullptr, fn->kind);
+		gb_memmove(node, fn, ast_node_size(fn->kind));
+		node->tav.mode  = Addressing_Constant;
+		node->tav.type  = field_elem_type;
+		node->tav.value = fvalue;
+
+		nodes[i] = node;
+		has_gaps |= last+1 != i;
+		last = i;
+	}
+
+	auto elems = array_make<Ast *>(permanent_allocator(), 0, last+1);
+	for (isize i = 0; i <= last; i++) {
+		if (!has_gaps) {
+			array_add(&elems, nodes[i]);
+		} else if (nodes[i] != nullptr) {
+			Token token = {Token_Integer};
+			token.string = copy_string(permanent_allocator(), make_string_c(gb_bprintf("%td", i)));
+			token.pos    = ast_token(nodes[i]).pos;
+
+			Ast *index = alloc_ast_node(f, Ast_BasicLit);
+			index->BasicLit.token = token;
+			index->tav.mode  = Addressing_Constant;
+			index->tav.type  = t_untyped_integer;
+			index->tav.value = exact_value_i64(i);
+
+			Token eq = {Token_Eq};
+			eq.string = str_lit("=");
+			array_add(&elems, ast_field_value(f, index, nodes[i], eq));
+		}
+	}
+
+	Ast *result = ast_compound_lit(f, nullptr, elems, cl->open, cl->close);
+	result->tav.mode  = Addressing_Constant;
+	result->tav.type  = field->type;
+	result->tav.value = exact_value_compound(result);
+
+	if (success_) *success_ = true;
+	return result->tav.value;
+}
+
 gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selection sel, bool *success_) {
 	if (operand->mode != Addressing_Constant) {
 		if (success_) *success_ = false;
@@ -5777,6 +5905,9 @@ gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *oper
 
 
 	ExactValue value = operand->value;
+	if (value.kind == ExactValue_Compound && is_type_soa_struct(operand->type)) {
+		return get_constant_soa_field(base_type(operand->type), value, sel, success_);
+	}
 	if (value.kind == ExactValue_Compound) {
 		while (sel.index.count > 0) {
 			i32 index = sel.index[0];
