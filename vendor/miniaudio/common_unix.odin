@@ -1,4 +1,4 @@
-#+build !windows
+#+build linux, darwin, netbsd, openbsd, freebsd, haiku
 package miniaudio
 
 import "core:sys/posix"
