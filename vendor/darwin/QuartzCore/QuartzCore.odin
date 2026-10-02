@@ -1,3 +1,4 @@
+#+build darwin
 // Bindings for [[ QuartzCore ; https://developer.apple.com/documentation/quartzcore ]].
 package objc_QuartzCore
 
