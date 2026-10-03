@@ -125,7 +125,7 @@ $ODIN test ../test_issue_omitted_field_union.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON -o:none
 $ODIN test ../test_issue_equal_proc_dependencies.odin $COMMON
-if [[ $($ODIN test ../test_issue_equal_proc_dependencies.odin $COMMON -build-mode:obj -show-debug-messages 2>&1 | grep -ci "missing procedure") -eq 0 ]]; then
+if [[ $($ODIN test ../test_issue_equal_proc_dependencies.odin $COMMON -build-mode:obj 2>&1 | grep -ci "Assertion Failure") -eq 0 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"

@@ -99,7 +99,7 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON% -o:none || exit /b
 ..\..\..\odin test ..\test_issue_equal_proc_dependencies.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_equal_proc_dependencies.odin %COMMON% -build-mode:obj -show-debug-messages 2>&1 | find /i /c "missing procedure" | findstr /x "0" || exit /b
+..\..\..\odin test ..\test_issue_equal_proc_dependencies.odin %COMMON% -build-mode:obj 2>&1 | find /i /c "Assertion Failure" | findstr /x "0" || exit /b
 
 @echo off
 
