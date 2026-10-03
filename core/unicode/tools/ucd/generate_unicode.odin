@@ -28,10 +28,10 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintf(writer, "%s_singles16 := [?]u16{{", name)
 		for v, count in range.single_16 {
 			if count % 8 == 0 {
-				fmt.wprintf(writer, "\n\t0x%4X,", v)
+				fmt.wprintf(writer, "\n\t0x%04X,", v)
 				continue
 			} else {
-				fmt.wprintf(writer, " 0x%4X,", v)
+				fmt.wprintf(writer, " 0x%04X,", v)
 			}
 		}
 		fmt.wprintln(writer, "\n}\n")
@@ -41,7 +41,7 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintln(writer, "@(rodata)")
 		fmt.wprintfln(writer, "%s_ranges16 := [?]u16{{", name)
 		for v in range.ranges_16 {
-			fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
+			fmt.wprintfln(writer, "\t0x%04X, 0x%04X,", v.first, v.last)
 		}
 		fmt.wprintln(writer, "}\n")
 	}
@@ -51,10 +51,10 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintf(writer, "%s_singles32 := [?]i32{{", name)
 		for v, count in range.single_32 {
 			if count % 8 == 0 {
-				fmt.wprintf(writer, "\n\t0x%4X,", v)
+				fmt.wprintf(writer, "\n\t0x%04X,", v)
 				continue
 			} else {
-				fmt.wprintf(writer, " 0x%4X,", v)
+				fmt.wprintf(writer, " 0x%04X,", v)
 			}
 		}
 		fmt.wprintln(writer, "\n}\n")
@@ -64,7 +64,7 @@ write_range_arrays :: proc(writer: io.Writer, name: string, range: Dynamic_Range
 		fmt.wprintln(writer, "@(rodata)")
 		fmt.wprintfln(writer, "%s_ranges32 := [?]i32{{", name)
 		for v in range.ranges_32 {
-			fmt.wprintfln(writer, "\t0x%4X, 0x%4X,", v.first, v.last)
+			fmt.wprintfln(writer, "\t0x%04X, 0x%04X,", v.first, v.last)
 		}
 		fmt.wprintln(writer, "}\n")
 	}

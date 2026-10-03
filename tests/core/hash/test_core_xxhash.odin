@@ -21,9 +21,9 @@ test_xxhash_zero_fixed :: proc(t: ^testing.T) {
 		xxh3_128 := xxhash.XXH3_128(b)
 
 		testing.expectf(t, xxh32    == v.xxh_32,   "[   XXH32(%03d) ] Expected: %08x, got: %08x", i, v.xxh_32,   xxh32)
-		testing.expectf(t, xxh64    == v.xxh_64,   "[   XXH64(%03d) ] Expected: %16x, got: %16x", i, v.xxh_64,   xxh64)
-		testing.expectf(t, xxh3_64  == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %16x, got: %16x", i, v.xxh3_64,  xxh3_64)
-		testing.expectf(t, xxh3_128 == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128)
+		testing.expectf(t, xxh64    == v.xxh_64,   "[   XXH64(%03d) ] Expected: %016x, got: %016x", i, v.xxh_64,   xxh64)
+		testing.expectf(t, xxh3_64  == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %016x, got: %016x", i, v.xxh3_64,  xxh3_64)
+		testing.expectf(t, xxh3_128 == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %032x, got: %032x", i, v.xxh3_128, xxh3_128)
 	}
 }
 
@@ -76,9 +76,9 @@ test_xxhash_zero_streamed_random_updates :: proc(t: ^testing.T) {
 		xxh3_128 := xxhash.XXH3_128_digest(xxh3_128_state)
 
 		testing.expectf(t, xxh32     == v.xxh_32,   "[   XXH32(%03d) ] Expected: %08x, got: %08x", i,   v.xxh_32,   xxh32)
-		testing.expectf(t, xxh64     == v.xxh_64,   "[   XXH64(%03d) ] Expected: %16x, got: %16x", i,   v.xxh_64,   xxh64)
-		testing.expectf(t, xxh3_64   == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %16x, got: %16x", i,  v.xxh3_64, xxh3_64)
-		testing.expectf(t, xxh3_128  == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128)
+		testing.expectf(t, xxh64     == v.xxh_64,   "[   XXH64(%03d) ] Expected: %016x, got: %016x", i,   v.xxh_64,   xxh64)
+		testing.expectf(t, xxh3_64   == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %016x, got: %016x", i,  v.xxh3_64, xxh3_64)
+		testing.expectf(t, xxh3_128  == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %032x, got: %032x", i, v.xxh3_128, xxh3_128)
 	}
 }
 
@@ -97,9 +97,9 @@ test_xxhash_seeded :: proc(t: ^testing.T) {
 			xxh3_128 := xxhash.XXH3_128(b, seed)
 
 			testing.expectf(t, xxh32    == v.xxh_32,   "[   XXH32(%03d) ] Expected: %08x, got: %08x", i,   v.xxh_32, xxh32)
-			testing.expectf(t, xxh64    == v.xxh_64,   "[   XXH64(%03d) ] Expected: %16x, got: %16x", i,   v.xxh_64, xxh64)
-			testing.expectf(t, xxh3_64  == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %16x, got: %16x", i, v.xxh3_64, xxh3_64)
-			testing.expectf(t, xxh3_128 == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128)
+			testing.expectf(t, xxh64    == v.xxh_64,   "[   XXH64(%03d) ] Expected: %016x, got: %016x", i,   v.xxh_64, xxh64)
+			testing.expectf(t, xxh3_64  == v.xxh3_64,  "[XXH3_64(%03d)  ] Expected: %016x, got: %016x", i, v.xxh3_64, xxh3_64)
+			testing.expectf(t, xxh3_128 == v.xxh3_128, "[XXH3_128(%03d) ] Expected: %032x, got: %032x", i, v.xxh3_128, xxh3_128)
 
 			if len(b) > xxhash.XXH3_MIDSIZE_MAX {
 				xxh3_state, _ := xxhash.XXH3_create_state()
@@ -107,14 +107,14 @@ test_xxhash_seeded :: proc(t: ^testing.T) {
 				xxhash.XXH3_64_update(xxh3_state, b)
 				xxh3_64_streamed := xxhash.XXH3_64_digest(xxh3_state)
 				xxhash.XXH3_destroy_state(xxh3_state)
-				testing.expectf(t, xxh3_64_streamed == v.xxh3_64, "[XXH3_64s(%03d) ] Expected: %16x, got: %16x", i, v.xxh3_64, xxh3_64_streamed)
+				testing.expectf(t, xxh3_64_streamed == v.xxh3_64, "[XXH3_64s(%03d) ] Expected: %016x, got: %016x", i, v.xxh3_64, xxh3_64_streamed)
 
 				xxh3_state2, _ := xxhash.XXH3_create_state()
 				xxhash.XXH3_128_reset_with_seed(xxh3_state2, seed)
 				xxhash.XXH3_128_update(xxh3_state2, b)
 				xxh3_128_streamed := xxhash.XXH3_128_digest(xxh3_state2)
 				xxhash.XXH3_destroy_state(xxh3_state2)
-				testing.expectf(t, xxh3_128_streamed == v.xxh3_128, "[XXH3_128s(%03d) ] Expected: %32x, got: %32x", i, v.xxh3_128, xxh3_128_streamed)
+				testing.expectf(t, xxh3_128_streamed == v.xxh3_128, "[XXH3_128s(%03d) ] Expected: %032x, got: %032x", i, v.xxh3_128, xxh3_128_streamed)
 			}
 		}
 	}
@@ -131,7 +131,7 @@ test_xxhash_secret :: proc(t: ^testing.T) {
 			b := buf[:i]
 
 			xxh3_128 := xxhash.XXH3_128(b, secret_bytes)
-			testing.expectf(t, xxh3_128  == v.xxh3_128_secret, "[XXH3_128(%03d)] Expected: %32x, got: %32x", i, v.xxh3_128_secret, xxh3_128)
+			testing.expectf(t, xxh3_128  == v.xxh3_128_secret, "[XXH3_128(%03d)] Expected: %032x, got: %032x", i, v.xxh3_128_secret, xxh3_128)
 		}
 	}
 }
