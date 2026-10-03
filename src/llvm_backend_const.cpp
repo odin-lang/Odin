@@ -498,7 +498,7 @@ gb_internal LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type,
 			if (is_type_proc(elem_type)) {
 				values[i] = LLVMConstPointerCast(values[i], llvm_elem_type);
 			}
-			LLVMBuildStore(p->builder, values[i], elem.value);
+			OdinLLVMBuildStore(p, values[i], elem.value);
 		}
 		return lb_addr_load(p, v).value;
 	}
@@ -1076,7 +1076,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					array_data = llvm_alloca(p, llvm_type, alignment);
 
 					LLVMValueRef local_copy = llvm_alloca(p, LLVMTypeOf(backing_array.value), alignment);
-					LLVMBuildStore(p->builder, backing_array.value, local_copy);
+					OdinLLVMBuildStore(p, backing_array.value, local_copy);
 
 					LLVMBuildMemCpy(p->builder,
 					                array_data, alignment,
@@ -1085,7 +1085,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 					);
 				} else {
 					array_data = llvm_alloca(p, LLVMTypeOf(backing_array.value), alignment);
-					LLVMBuildStore(p->builder, backing_array.value, array_data);
+					OdinLLVMBuildStore(p, backing_array.value, array_data);
 
 					array_data = LLVMBuildPointerCast(p->builder, array_data, LLVMPointerType(llvm_type, 0), "");
 				}
@@ -2109,10 +2109,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 											LLVMValueRef src = LLVMGetOperand(elem_value, 0);
 											lb_mem_copy_non_overlapping(p, {dst, t_rawptr}, {src, t_rawptr}, lb_const_int(m, t_int, sz), false);
 										} else {
-											LLVMBuildStore(p->builder, elem_value, dst);
+											OdinLLVMBuildStore(p, elem_value, dst);
 										}
 
-										values[index] = LLVMBuildLoad2(p->builder, field_llvm_type, ptr, "");
+										values[index] = OdinLLVMBuildLoad(p, field_llvm_type, ptr);
 
 										is_constant = false;
 									} else {
@@ -2191,7 +2191,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				lbAddr v = lb_add_local_generated(p, res.type, true);
 				map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, v);
 
-				LLVMBuildStore(p->builder, constant_value, v.addr.value);
+				OdinLLVMBuildStore(p, constant_value, v.addr.value);
 				for (isize i = 0; i < value_count; i++) {
 					LLVMValueRef val = old_values[i];
 					if (!LLVMIsConstant(val)) {
@@ -2203,7 +2203,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 						// 	LLVMValueRef src = LLVMGetOperand(val, 0);
 						// 	lb_mem_copy_non_overlapping(p, {dst, ptr_type}, {src, ptr_type}, lb_const_int(m, t_int, sz), false);
 						// } else {
-						LLVMBuildStore(p->builder, val, dst);
+						OdinLLVMBuildStore(p, val, dst);
 						// }
 					}
 				}
