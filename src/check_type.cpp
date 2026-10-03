@@ -4197,7 +4197,7 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		}
 
 		if (is_type_simple_compare(key)) {
-			add_package_dependency(ctx, "runtime", "default_hasher");
+			add_package_dependency(ctx, "runtime", "default_hasher_fixed");
 			return;
 		}
 

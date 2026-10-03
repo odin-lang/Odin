@@ -1377,7 +1377,6 @@ gb_internal u64 lb_gcd_u64(u64 a, u64 b) {
 }
 
 gb_internal u64 lb_known_address_alignment(lbModule *m, LLVMValueRef ptr, u64 assumed) {
-
 	LLVMTargetDataRef td = LLVMGetModuleDataLayout(m->mod);
 	u64 offsets = 0;
 	for (isize depth = 0; ptr != nullptr && depth < 64; depth++) {
