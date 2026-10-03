@@ -220,19 +220,14 @@ map_seed :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
 	return map_seed_from_map_data(map_data(m))
 }
 
-// splitmix for uintptr
 @(require_results)
 map_seed_from_map_data :: #force_inline proc "contextless" (data: uintptr) -> uintptr {
 	when size_of(uintptr) == size_of(u64) {
-		mix := data + 0x9e3779b97f4a7c15
-		mix = (mix ~ (mix >> 30)) * 0xbf58476d1ce4e5b9
-		mix = (mix ~ (mix >> 27)) * 0x94d049bb133111eb
-		return mix ~ (mix >> 31)
+		p := u128(data) * 0x94d049bb133111eb
+		return uintptr(p) ~ uintptr(p >> 64)
 	} else {
-		mix := data + 0x9e3779b9
-		mix = (mix ~ (mix >> 16)) * 0x21f0aaad
-		mix = (mix ~ (mix >> 15)) * 0x735a2d97
-		return mix ~ (mix >> 15)
+		p := u64(data) * 0x735a2d97
+		return uintptr(p) ~ uintptr(p >> 32)
 	}
 }
 
@@ -1001,7 +996,7 @@ default_hasher_fixed :: #force_inline proc "contextless" (data: rawptr, seed: ui
 
 	W :: size_of(uintptr)
 	p := uintptr(data)
-	h := seed ~ uintptr(N)
+	h := uintptr(N)
 	switch {
 	case N >= W:
 		for i := 0; i+W <= N; i += W {
@@ -1018,7 +1013,8 @@ default_hasher_fixed :: #force_inline proc "contextless" (data: rawptr, seed: ui
 		b := ([^]u8)(p)
 		h = hash_fold(h ~ (uintptr(b[0]) | uintptr(b[N/2]) << 8 | uintptr(b[N-1]) << 16), HASH_K0)
 	}
-	h = hash_fold(h, HASH_K1)
+	// the seed goes in after the key is mixed, so no key pattern can line up with the difference between two maps' seeds
+	h = hash_fold(h ~ seed, HASH_K1)
 	h &= HASH_MASK
 	return h | uintptr(h == 0)
 }
