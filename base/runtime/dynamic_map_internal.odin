@@ -1025,18 +1025,17 @@ default_hasher_fixed :: #force_inline proc "contextless" (data: rawptr, seed: ui
 
 default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
 	str := (^[]byte)(data)
-	return default_hasher(raw_data(str^), seed, len(str))
+	return default_hasher_fixed(raw_data(str^), seed, len(str))
 }
 default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
-	h := u64(seed) + INITIAL_HASH_SEED
-	if ptr := (^[^]byte)(data)^; ptr != nil {
-		for ptr[0] != 0 {
-			h = (h ~ u64(ptr[0])) * 0x100000001b3
-			ptr = ptr[1:]
+	ptr := (^[^]byte)(data)^
+	n := 0
+	if ptr != nil {
+		for ptr[n] != 0 {
+			n += 1
 		}
 	}
-	h &= HASH_MASK
-	return uintptr(h) | uintptr(uintptr(h) == 0)
+	return default_hasher_fixed(ptr, seed, n)
 }
 
 default_hasher_f64 :: proc "contextless" (f: f64, seed: uintptr) -> uintptr {
