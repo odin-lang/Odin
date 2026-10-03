@@ -2001,19 +2001,37 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
 
 	if (addr.kind == lbAddr_BitField) {
-		Type *backing_type = core_type(type_deref(addr.addr.type));
-		u64 shift = addr.bitfield.bit_offset;
-		LLVMValueRef v = nullptr;
-		if (is_type_integer(backing_type)) {
-			v = OdinLLVMBuildLoad(p, lb_type(p->module, backing_type), addr.addr.value);
-		} else {
-			LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_uintptr), shift/8, false);
-			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, t_u8), addr.addr.value, &index, 1, "");
-			shift %= 8;
-			u64 bytes = (shift + addr.bitfield.bit_size + 7)/8;
-			v = OdinLLVMBuildLoadAligned(p, LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*bytes)), ptr, 1);
+		// NOTE: an array backing is read as it is written, in whole elements. Those that fit in 64 bits are
+		// joined, so that their loads can be merged, which leaves at most one more for a field to be in
+		Type *elem = core_array_type(core_type(type_deref(addr.addr.type)));
+		LLVMTypeRef lit = lb_type(p->module, elem);
+		u64 elem_bits = 8*cast(u64)type_size_of(elem);
+		u64 begin = addr.bitfield.bit_offset;
+		u64 end = begin + addr.bitfield.bit_size;
+		u64 first = begin/elem_bits;
+		u64 count = (end + elem_bits - 1)/elem_bits - first;
+		u64 joined = gb_min(count, gb_max(64/elem_bits, 1));
+		GB_ASSERT(count <= joined + 1);
+
+		auto load = [&](u64 i, LLVMTypeRef type) -> LLVMValueRef {
+			LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_uintptr), i, false);
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lit, addr.addr.value, &index, 1, "");
+			return LLVMBuildIntCast2(p->builder, OdinLLVMBuildLoad(p, lit, ptr), type, false, "");
+		};
+
+		LLVMTypeRef wide = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(joined*elem_bits));
+		LLVMValueRef v = load(first, wide);
+		for (u64 i = 1; i < joined; i++) {
+			LLVMValueRef part = LLVMBuildShl(p->builder, load(first + i, wide), LLVMConstInt(wide, i*elem_bits, false), "");
+			v = LLVMBuildOr(p->builder, v, part, "");
 		}
-		v = LLVMBuildLShr(p->builder, v, LLVMConstInt(LLVMTypeOf(v), shift, false), "");
+		v = LLVMBuildLShr(p->builder, v, LLVMConstInt(wide, begin - first*elem_bits, false), "");
+		if (joined < count) {
+			LLVMTypeRef llvm_u64 = lb_type(p->module, t_u64);
+			LLVMValueRef offset = LLVMConstInt(llvm_u64, (first + joined)*elem_bits - begin, false);
+			v = LLVMBuildIntCast2(p->builder, v, llvm_u64, false, "");
+			v = LLVMBuildOr(p->builder, v, LLVMBuildShl(p->builder, load(first + joined, llvm_u64), offset, ""), "");
+		}
 		v = LLVMBuildTrunc(p->builder, v, LLVMIntTypeInContext(p->module->ctx, cast(unsigned)addr.bitfield.bit_size), "");
 
 		Type *t = addr.bitfield.type;
