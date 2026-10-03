@@ -491,7 +491,7 @@ setitimer :: proc "contextless" (which: ITimer_Which, new: ^ITimer_Val, old: ^IT
 
 /*
 	Returns the thread group ID of the current process.
-	Note that it doesn't return the pid, despite it's name.
+	Note that it doesn't return the pid, despite its name.
 	Available since Linux 1.0.
 */
 getpid :: proc "contextless" () -> Pid {
@@ -655,7 +655,7 @@ listen :: proc "contextless" (sock: Fd, queue_len: i32) -> (Errno) {
 }
 
 /*
-	Get socket name (aka it's bound address).
+	Get socket name (aka its bound address).
 	Available since Linux 2.0.
 */
 getsockname :: proc "contextless" (sock: Fd, addr: ^Sock_Addr_Any) -> (Errno) {
@@ -2576,7 +2576,7 @@ futex_requeue :: proc "contextless" (futex: ^Futex, op: Futex_Requeue_Type, flag
 }
 
 /*
-	Okay, for this one, see the man pages, the description for it is pretty long and very specific. It's sole.
+	Okay, for this one, see the man pages, the description for it is pretty long and very specific. Its sole
 	purpose is to allow implementing conditional values sync primitive, it seems like.
 */
 futex_wake_op :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Op_Type, flags: Futex_Flags, wakeup: i32,

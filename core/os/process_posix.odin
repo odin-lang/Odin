@@ -230,7 +230,7 @@ _process_wait :: proc(process: Process, timeout: time.Duration) -> (process_stat
 	// timeout == 0 = use waitid with WNOHANG so it returns immediately
 	// timeout >  0 = use waitid without WNOHANG so it waits indefinitely
 	//
-	// at the end use waitid to actually reap the process and get it's status
+	// at the end use waitid to actually reap the process and get its status
 
 	if timeout > 0 {
 		timeout := timeout

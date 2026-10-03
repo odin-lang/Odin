@@ -121,7 +121,7 @@ close_and_remove_accept :: proc(t: ^testing.T) {
 	}
 }
 
-// Tests that when a client calls `close` on it's socket, `recv` returns with `0, nil` (connection closed).
+// Tests that when a client calls `close` on its socket, `recv` returns with `0, nil` (connection closed).
 @(test)
 close_errors_recv :: proc(t: ^testing.T) {
 	if event_loop_guard(t) {
