@@ -689,6 +689,33 @@ map_lookup_dynamic :: #force_no_inline proc "contextless" (m: Raw_Map, #no_alias
 		d += 1
 	}
 }
+
+@(require_results)
+map_lookup_static :: #force_inline proc "contextless" (m: $T/map[$K]$V, key: ^K) -> (index: uintptr, ok: bool) {
+	rm := transmute(Raw_Map)m
+	if rm.len == 0 {
+		return
+	}
+	info := intrinsics.type_map_info(T)
+	h := info.key_hasher(key, map_seed(rm))
+	pos := map_desired_position(rm, h)
+	distance := uintptr(0)
+	mask := (uintptr(1) << map_log2_cap(rm)) - 1
+	ks, _, hs := map_kvh_data_static(m)
+	for {
+		element_hash := hs[pos]
+		if map_hash_is_empty(element_hash) {
+			return
+		} else if distance > map_probe_distance(rm, element_hash, pos) {
+			return
+		} else if element_hash == h && info.key_equal(key, rawptr(map_cell_index_static(ks, pos))) {
+			return pos, true
+		}
+		pos = (pos + 1) & mask
+		distance += 1
+	}
+}
+
 @(require_results)
 map_exists_dynamic :: #force_no_inline proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (ok: bool) {
 	if map_len(m) == 0 {
@@ -719,26 +746,36 @@ map_exists_dynamic :: #force_no_inline proc "contextless" (m: Raw_Map, #no_alias
 map_erase_dynamic :: #force_no_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (old_k, old_v: uintptr, ok: bool) {
 	index := map_lookup_dynamic(m^, info, k) or_return
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
-	hs[index] |= TOMBSTONE_MASK
 	old_k = map_cell_index_dynamic(ks, info.ks, index)
 	old_v = map_cell_index_dynamic(vs, info.vs, index)
 	m.len -= 1
 	ok = true
-
-	mask := (uintptr(1)<<map_log2_cap(m^)) - 1
-	curr_index := uintptr(index)
-	next_index := (curr_index + 1) & mask
-
-	// if the next element is empty or has zero probe distance, then any lookup
-	// will always fail on the next, so we can clear both of them
-	hash := hs[next_index]
-	if map_hash_is_empty(hash) || map_probe_distance(m^, hash, next_index) == 0 {
-		hs[curr_index] = 0
-	} else {
-		hs[curr_index] |= TOMBSTONE_MASK
-	}
-
+	map_erase_slot(m^, hs, index)
 	return
+}
+
+@(require_results)
+map_erase_static :: #force_inline proc "contextless" (m: ^$T/map[$K]$V, key: ^K) -> (old_k, old_v: uintptr, ok: bool) {
+	index := map_lookup_static(m^, key) or_return
+	ks, vs, hs := map_kvh_data_static(m^)
+	old_k = uintptr(map_cell_index_static(ks, index))
+	old_v = uintptr(map_cell_index_static(vs, index))
+	(^Raw_Map)(m).len -= 1
+	ok = true
+	map_erase_slot((^Raw_Map)(m)^, hs, index)
+	return
+}
+
+map_erase_slot :: #force_inline proc "contextless" (m: Raw_Map, hs: [^]Map_Hash, index: uintptr) {
+	mask := (uintptr(1)<<map_log2_cap(m)) - 1
+	next_index := (index + 1) & mask
+
+	hash := hs[next_index]
+	if map_hash_is_empty(hash) || map_probe_distance(m, hash, next_index) == 0 {
+		hs[index] = 0
+	} else {
+		hs[index] |= TOMBSTONE_MASK
+	}
 }
 
 map_clear_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) {
