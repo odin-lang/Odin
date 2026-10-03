@@ -192,7 +192,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 		LLVMValueRef other_global = nullptr;
 		if (ec.e->kind == Entity_Variable) {
 			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
-			if (other_global && (LLVMGetInitializer(other_global) != nullptr || LLVMIsExternallyInitialized(other_global))) {
+			if (other_global && !LLVMIsDeclaration(other_global)) {
 				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
 				if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
@@ -2164,73 +2164,130 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 }
 
 
-gb_internal void lb_create_startup_runtime_generate_body(lbModule *m, lbProcedure *p) {
-	lb_begin_procedure_body(p);
-
-	if (p->objc_names) {
-		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(m, p->objc_names->type), p->objc_names->value, nullptr, 0, "");
+gb_internal bool lb_global_variable_has_constant_init(Entity *e, DeclInfo *decl) {
+	TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
+	if (!is_type_any(e->type) && tav.mode != Addressing_Invalid && tav.value.kind != ExactValue_Invalid) {
+		return true;
 	}
-	Type *dummy_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
-	LLVMTypeRef raw_dummy_type = lb_type_internal_for_procedures_raw(m, dummy_type);
-
-	for (auto &var : *p->global_variables) {
-		if (var.is_initialized) {
-			continue;
-		}
-
-		lbModule *entity_module = m;
-
-		Entity *e = var.decl->entity;
-		GB_ASSERT(e->kind == Entity_Variable);
-		e->code_gen_module = entity_module;
-		Ast *init_expr = var.decl->init_expr;
-
-		if (init_expr == nullptr && var.init.value == nullptr) {
-			continue;
-		}
-
-		if (false && type_size_of(e->type) > 8) {
-			String ename = lb_get_entity_name(m, e);
-			gbString name = gb_string_make(permanent_allocator(), "");
-			name = gb_string_appendc(name, "__$startup$");
-			name = gb_string_append_length(name, ename.text, ename.len);
-
-			lbProcedure *dummy = lb_create_dummy_procedure(m, make_string_c(name), dummy_type);
-			dummy->is_startup = true;
-			LLVMSetVisibility(dummy->value, LLVMHiddenVisibility);
-			LLVM_SET_INTERNAL_WEAK_LINKAGE(p->value);
-
-			lb_begin_procedure_body(dummy);
-			lb_init_global_var(m, dummy, e, init_expr, var);
-			lb_end_procedure_body(dummy);
-
-			LLVMValueRef context_ptr = lb_find_or_generate_context_ptr(p).addr.value;
-			LLVMValueRef cast_ctx = LLVMBuildBitCast(p->builder, context_ptr, LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0), "");
-			LLVMBuildCall2(p->builder, raw_dummy_type, dummy->value, &cast_ctx, 1, "");
-		} else {
-			lb_init_global_var(m, p, e, init_expr, var);
-		}
-
-		lbBlock *next = lb_create_block(p, "global.init", true);
-		lb_emit_jump(p, next);
-		lb_start_block(p, next);
-	}
-	CheckerInfo *info = m->gen->info;
-
-	for (Entity *e : info->init_procedures) {
-		lbValue value = lb_find_procedure_value_from_entity(m, e);
-		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
-	}
-
-
-	lb_end_procedure_body(p);
+	return is_type_untyped_nil(tav.type);
 }
 
+gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
+	DeclInfo *decl = var->decl;
+	Entity *e = decl->entity;
 
-gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+	bool is_foreign = e->Variable.is_foreign;
+	bool is_export  = e->Variable.is_export;
+
+	String name = lb_get_entity_name(m, e);
+
+	lbValue g = {};
+	g.type = alloc_type_pointer(e->type);
+	g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+
+	if (decl->init_expr != nullptr) {
+		TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
+		if (!is_type_any(e->type)) {
+			if (tav.mode != Addressing_Invalid) {
+				if (tav.value.kind != ExactValue_Invalid) {
+					auto cc = LB_CONST_CONTEXT_DEFAULT;
+					cc.is_rodata = e->kind == Entity_Variable && e->Variable.is_rodata;
+					cc.allow_local = false;
+					cc.link_section = e->Variable.link_section;
+
+					ExactValue v = tav.value;
+					lbValue init = lb_const_value(m, e->type, v, cc);
+
+					LLVMDeleteGlobal(g.value);
+					g.value = nullptr;
+					g.value = LLVMAddGlobal(m->mod, LLVMTypeOf(init.value), alloc_cstring(permanent_allocator(), name));
+
+					LLVMSetInitializer(g.value, init.value);
+					var->is_initialized = true;
+					if (cc.is_rodata) {
+						LLVMSetGlobalConstant(g.value, true);
+					}
+				}
+			}
+		}
+		if (!var->is_initialized && is_type_untyped_nil(tav.type)) {
+			var->is_initialized = true;
+			if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+				LLVMSetGlobalConstant(g.value, true);
+			}
+		}
+	} else if (e->kind == Entity_Variable && e->Variable.is_rodata) {
+		LLVMSetGlobalConstant(g.value, true);
+	}
+
+	lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
+
+	if (is_foreign) {
+		LLVMSetLinkage(g.value, LLVMExternalLinkage);
+		LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
+		LLVMSetExternallyInitialized(g.value, true);
+		lb_add_foreign_library_path(m, e->Variable.foreign_library);
+	} else if (LLVMGetInitializer(g.value) == nullptr) {
+		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
+	}
+	if (is_export) {
+		LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
+		LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
+	} else if (!is_foreign) {
+		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
+	}
+	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
+	LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
+
+	if (e->Variable.link_section.len > 0) {
+		LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
+	}
+	if (e->flags & EntityFlag_Require) {
+		lb_append_to_compiler_used(m, g.value);
+	}
+
+	if (m->debug_builder) {
+		String global_name = e->token.string;
+		if (global_name.len != 0 && global_name != "_") {
+			LLVMMetadataRef llvm_file = lb_get_file_metadata(m, e->file);
+			LLVMMetadataRef llvm_scope = llvm_file;
+
+			LLVMBool local_to_unit = LLVMGetLinkage(g.value) == LLVMInternalLinkage;
+
+			LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+			LLVMMetadataRef llvm_decl = nullptr;
+
+			u32 align_in_bits = cast(u32)(8*type_align_of(e->type));
+
+			LLVMMetadataRef global_variable_metadata = LLVMDIBuilderCreateGlobalVariableExpression(
+				m->debug_builder, llvm_scope,
+				cast(char const *)global_name.text, global_name.len,
+				"", 0, // linkage
+				llvm_file, e->token.pos.line,
+				lb_debug_type(m, e->type),
+				local_to_unit,
+				llvm_expr,
+				llvm_decl,
+				align_in_bits
+			);
+			lb_set_llvm_metadata(m, g.value, global_variable_metadata);
+			LLVMGlobalSetMetadata(g.value, 0, global_variable_metadata);
+		}
+	}
+
+	g.value = LLVMConstPointerCast(g.value, lb_type(m, alloc_type_pointer(e->type)));
+	var->var = g;
+
+	lb_add_entity(m, e, g);
+	lb_add_member(m, name, g);
+
+	GB_ASSERT(var->is_initialized == (decl->init_expr != nullptr && lb_global_variable_has_constant_init(e, decl)));
+}
+
+gb_internal lbProcedure *lb_create_startup_procedure(lbModule *m, String const &name) {
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
-	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
+	lbProcedure *p = lb_create_dummy_procedure(m, name, proc_type);
 	p->is_startup = true;
 	if (build_context.no_plt) {
 		lb_add_attribute_to_proc(p->module, p->value, "nonlazybind");
@@ -2241,11 +2298,71 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	// Make sure shared libraries call their own runtime startup on Linux.
 	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
 	LLVM_SET_INTERNAL_WEAK_LINKAGE(p->value);
+	return p;
+}
 
-	p->global_variables = &global_variables;
-	p->objc_names       = objc_names;
+gb_internal void lb_global_init_procedure_generate_body(lbModule *m, lbProcedure *p) {
+	lb_begin_procedure_body(p);
 
-	lb_create_startup_runtime_generate_body(main_module, p);
+	for (lbGlobalVariable *var : p->global_variables) {
+		lb_init_global_var(m, p, var->decl->entity, var->decl->init_expr, *var);
+
+		lbBlock *next = lb_create_block(p, "global.init", true);
+		lb_emit_jump(p, next);
+		lb_start_block(p, next);
+	}
+
+	lb_end_procedure_body(p);
+}
+
+// A global is initialized by the module it is defined in, so each run of the init order
+// within one module gets its own procedure, and the startup calls them in that order.
+gb_internal void lb_add_global_variable_to_initialize(lbModule *m, lbGlobalVariable *var) {
+	lbGenerator *gen = m->gen;
+	lbProcedure *p = nullptr;
+	if (gen->global_init_procedures.count != 0) {
+		p = gen->global_init_procedures[gen->global_init_procedures.count-1];
+	}
+	if (p == nullptr || p->module != m) {
+		gbString name = gb_string_make(permanent_allocator(), LB_STARTUP_RUNTIME_PROC_NAME);
+		name = gb_string_append_fmt(name, "$%td", gen->global_init_procedures.count);
+
+		p = lb_create_startup_procedure(m, make_string_c(name));
+		array_init(&p->global_variables, heap_allocator());
+		p->generate_body = lb_global_init_procedure_generate_body;
+
+		string_map_set(&m->gen_procs, p->name, p);
+		mpsc_enqueue(&m->procedures_to_generate, p);
+		array_add(&gen->global_init_procedures, p);
+	}
+	array_add(&p->global_variables, var);
+}
+
+gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *objc_names) { // Startup Runtime
+	lbProcedure *p = lb_create_startup_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME));
+	p->objc_names = objc_names;
+
+	lb_begin_procedure_body(p);
+
+	if (p->objc_names) {
+		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, p->objc_names->type), p->objc_names->value, nullptr, 0, "");
+	}
+
+	for (lbProcedure *init : main_module->gen->global_init_procedures) {
+		lbValue value = {init->value, init->type};
+		if (init->module != main_module) {
+			lbProcedure *decl = lb_create_dummy_procedure(main_module, init->name, init->type);
+			value = {decl->value, decl->type};
+		}
+		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
+	}
+
+	for (Entity *e : main_module->gen->info->init_procedures) {
+		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
+		lb_emit_call(p, value, {}, ProcInlining_none, ProcTailing_none);
+	}
+
+	lb_end_procedure_body(p);
 
 	return p;
 }
@@ -2421,12 +2538,7 @@ gb_internal bool lb_is_module_empty(lbModule *m) {
 	}
 
 	for (auto g = LLVMGetFirstGlobal(m->mod); g != nullptr; g = LLVMGetNextGlobal(g)) {
-		LLVMLinkage linkage = LLVMGetLinkage(g);
-		if (linkage == LLVMExternalLinkage ||
-		    linkage == LLVMWeakAnyLinkage) {
-			continue;
-		}
-		if (!LLVMIsExternallyInitialized(g)) {
+		if (!LLVMIsDeclaration(g) && !LLVMIsExternallyInitialized(g)) {
 			return false;
 		}
 	}
@@ -2679,6 +2791,9 @@ gb_internal i64 lb_module_cost(lbModule *m) {
 
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
+	for (lbGlobalVariable *var : m->global_variables) {
+		lb_create_global_variable(m, var);
+	}
 	if (m == &m->gen->default_module) {
 		lb_setup_type_info_data(m);
 	}
@@ -2692,7 +2807,7 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 	if (do_threading) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			m->estimated_cost = m->procedures_to_generate.count.load(std::memory_order_relaxed);
+			m->estimated_cost = m->procedures_to_generate.count.load(std::memory_order_relaxed) + m->global_variables.count;
 		}
 		gen->default_module.estimated_cost = I64_MAX;
 		for (lbModule *m : lb_modules_by_cost(gen)) {
@@ -3474,15 +3589,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	isize global_variable_max_count = 0;
 	bool already_has_entry_point = false;
 
 	for (Entity *e : info->entities) {
 		String name = e->token.string;
 
-		if (e->kind == Entity_Variable) {
-			global_variable_max_count++;
-		} else if (e->kind == Entity_Procedure) {
+		if (e->kind == Entity_Procedure) {
 			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
 				GB_ASSERT(e == info->entry_point);
 			}
@@ -3504,8 +3616,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-
-	auto global_variables = array_make<lbGlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
+	// `lb_setup_type_info_data` sets its initializer
+	Entity *type_table = scope_lookup_current(info->runtime_package->scope, string_interner_insert(str_lit("type_table")));
 
 	for (DeclInfo *d : info->variable_init_order) {
 		Entity *e = d->entity;
@@ -3524,141 +3636,19 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 		GB_ASSERT(e->kind == Entity_Variable);
 
-
-		bool is_foreign = e->Variable.is_foreign;
-		bool is_export  = e->Variable.is_export;
-
-		lbModule *default_module = &gen->default_module;
-
-		lbModule *m = default_module;
-		lbModule *e_module = lb_module_of_entity(gen, e, default_module);
-
-		bool const split_globals_across_modules = false;
-		if (split_globals_across_modules) {
-			m = e_module;
+		lbModule *m = lb_module_of_entity(gen, e, default_module);
+		if (e == type_table) {
+			m = default_module;
 		}
+		e->code_gen_module = m;
 
-		String name = lb_get_entity_name(m, e);
+		lbGlobalVariable *var = permanent_alloc_item<lbGlobalVariable>();
+		var->decl = decl;
+		array_add(&m->global_variables, var);
 
-		lbGlobalVariable var = {};
-		var.decl = decl;
-
-		lbValue g = {};
-		g.type = alloc_type_pointer(e->type);
-		g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
-
-		if (decl->init_expr != nullptr) {
-			TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
-			if (!is_type_any(e->type)) {
-				if (tav.mode != Addressing_Invalid) {
-					if (tav.value.kind != ExactValue_Invalid) {
-						auto cc = LB_CONST_CONTEXT_DEFAULT;
-						cc.is_rodata = e->kind == Entity_Variable && e->Variable.is_rodata;
-						cc.allow_local = false;
-						cc.link_section = e->Variable.link_section;
-
-						ExactValue v = tav.value;
-						lbValue init = lb_const_value(m, e->type, v, cc);
-
-
-						LLVMDeleteGlobal(g.value);
-						g.value = nullptr;
-						g.value = LLVMAddGlobal(m->mod, LLVMTypeOf(init.value), alloc_cstring(permanent_allocator(), name));
-
-						LLVMSetInitializer(g.value, init.value);
-						var.is_initialized = true;
-						if (cc.is_rodata) {
-							LLVMSetGlobalConstant(g.value, true);
-						}
-					}
-				}
-			}
-			if (!var.is_initialized && is_type_untyped_nil(tav.type)) {
-				var.is_initialized = true;
-				if (e->kind == Entity_Variable && e->Variable.is_rodata) {
-					LLVMSetGlobalConstant(g.value, true);
-				}
-			}
-		} else if (e->kind == Entity_Variable && e->Variable.is_rodata) {
-			LLVMSetGlobalConstant(g.value, true);
+		if (decl->init_expr != nullptr && !lb_global_variable_has_constant_init(e, decl)) {
+			lb_add_global_variable_to_initialize(m, var);
 		}
-
-
-		lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
-
-		if (is_foreign) {
-			LLVMSetLinkage(g.value, LLVMExternalLinkage);
-			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
-			LLVMSetExternallyInitialized(g.value, true);
-			lb_add_foreign_library_path(m, e->Variable.foreign_library);
-		} else if (LLVMGetInitializer(g.value) == nullptr) {
-			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
-		}
-		if (is_export) {
-			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
-			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
-		} else if (!is_foreign) {
-			LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
-		}
-		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-		LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
-
-		if (e->Variable.link_section.len > 0) {
-			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
-		}
-		if (e->flags & EntityFlag_Require) {
-			lb_append_to_compiler_used(m, g.value);
-		}
-
-		if (m->debug_builder) {
-			String global_name = e->token.string;
-			if (global_name.len != 0 && global_name != "_") {
-				LLVMMetadataRef llvm_file = lb_get_file_metadata(m, e->file);
-				LLVMMetadataRef llvm_scope = llvm_file;
-
-				LLVMBool local_to_unit = LLVMGetLinkage(g.value) == LLVMInternalLinkage;
-
-				LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
-				LLVMMetadataRef llvm_decl = nullptr;
-
-				u32 align_in_bits = cast(u32)(8*type_align_of(e->type));
-
-				LLVMMetadataRef global_variable_metadata = LLVMDIBuilderCreateGlobalVariableExpression(
-					m->debug_builder, llvm_scope,
-					cast(char const *)global_name.text, global_name.len,
-					"", 0, // linkage
-					llvm_file, e->token.pos.line,
-					lb_debug_type(m, e->type),
-					local_to_unit,
-					llvm_expr,
-					llvm_decl,
-					align_in_bits
-				);
-				lb_set_llvm_metadata(m, g.value, global_variable_metadata);
-				LLVMGlobalSetMetadata(g.value, 0, global_variable_metadata);
-			}
-		}
-
-		if (default_module == m) {
-			g.value = LLVMConstPointerCast(g.value, lb_type(m, alloc_type_pointer(e->type)));
-
-			var.var = g;
-			array_add(&global_variables, var);
-		} else {
-			lbValue local_g = {};
-			local_g.type  = alloc_type_pointer(e->type);
-			local_g.value = LLVMAddGlobal(default_module->mod, lb_type(default_module, e->type), alloc_cstring(permanent_allocator(), name));
-			LLVMSetLinkage(local_g.value, LLVMExternalLinkage);
-
-			var.var = local_g;
-			array_add(&global_variables, var);
-
-			lb_add_entity(default_module, e, local_g);
-			lb_add_member(default_module, name, local_g);
-		}
-
-		lb_add_entity(m, e, g);
-		lb_add_member(m, name, g);
 	}
 
 	if (build_context.ODIN_DEBUG) {
@@ -3687,7 +3677,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	gen->objc_names = lb_create_objc_names(default_module);
 
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
-	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names, global_variables);
+	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names);
 
 	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
 	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);

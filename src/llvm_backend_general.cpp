@@ -164,6 +164,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	array_init(&m->global_procedures_to_create, a, 0, 1024);
 	array_init(&m->global_types_to_create, a, 0, 1024);
+	array_init(&m->global_variables, a);
 	mpsc_init(&m->missing_procedures_to_check, a);
 	map_init(&m->debug_values);
 
@@ -194,18 +195,27 @@ gb_internal void lb_init_module(lbModule *m, bool do_threading) {
 gb_internal i64 lb_estimate_file_code_sizes(CheckerInfo *info, PtrMap<AstFile *, i64> *sizes) {
 	i64 total = 0;
 	for (Entity *e : info->entities) {
-		if (e->kind != Entity_Procedure || e->file == nullptr || e->min_dep_count.load(std::memory_order_relaxed) == 0) {
+		if (e->file == nullptr || e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 			continue;
 		}
 		if (e->scope == nullptr || (e->scope->flags & ScopeFlag_File) == 0) {
 			continue;
 		}
 		DeclInfo *d = e->decl_info;
-		if (d == nullptr || d->proc_lit == nullptr || d->proc_lit->kind != Ast_ProcLit || d->proc_lit->ProcLit.body == nullptr) {
+		Ast *code = nullptr;
+		if (e->kind == Entity_Procedure) {
+			if (d != nullptr && d->proc_lit != nullptr && d->proc_lit->kind == Ast_ProcLit) {
+				code = d->proc_lit->ProcLit.body;
+			}
+		} else if (e->kind == Entity_Variable) {
+			if (d != nullptr) {
+				code = d->init_expr;
+			}
+		}
+		if (code == nullptr) {
 			continue;
 		}
-		Ast *body = d->proc_lit->ProcLit.body;
-		i64 size = gb_max(cast(i64)(ast_end_token(body).pos.offset - ast_token(body).pos.offset), 1);
+		i64 size = gb_max(cast(i64)(ast_end_token(code).pos.offset - ast_token(code).pos.offset), 1);
 		i64 *found = map_get(sizes, e->file);
 		if (found) {
 			*found += size;
@@ -426,6 +436,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_init(&gen->modules, gen->info->packages.count*2);
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
 	map_init(&gen->file_modules);
+	array_init(&gen->global_init_procedures, heap_allocator());
 
 	if (USE_SEPARATE_MODULES) {
 		bool module_per_file = build_context.module_per_file && (build_context.optimization_level <= 0 || build_context.lto_kind != LTO_None);

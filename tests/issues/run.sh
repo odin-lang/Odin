@@ -119,6 +119,8 @@ $ODIN test ../test_issue_7700.odin $COMMON
 $ODIN test ../test_issue_procedure_of_specialized.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug
 $ODIN test ../test_issue_7421.odin $COMMON
 if [[ $($ODIN check ../test_issue_7421_tagged_duplicate.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
