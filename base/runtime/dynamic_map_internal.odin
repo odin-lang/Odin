@@ -53,24 +53,45 @@ map_cell_info :: intrinsics.type_map_cell_info
 
 // Same as the above procedure but at runtime with the cell Map_Cell_Info value.
 @(require_results)
-map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, #no_alias info: ^Map_Cell_Info, index: uintptr) -> uintptr {
-	// Micro-optimize the common cases to save on integer division.
-	elements_per_cell := uintptr(info.elements_per_cell)
-	size_of_cell      := uintptr(info.size_of_cell)
-	switch elements_per_cell {
-	case 1:
-		return base + (index * size_of_cell)
-	case 2:
-		cell_index   := index >> 1
-		data_index   := index & 1
-		size_of_type := uintptr(info.size_of_type)
-		return base + (cell_index * size_of_cell) + (data_index * size_of_type)
-	case:
-		cell_index   := index / elements_per_cell
-		data_index   := index % elements_per_cell
-		size_of_type := uintptr(info.size_of_type)
-		return base + (cell_index * size_of_cell) + (data_index * size_of_type)
+map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, #no_alias info: ^Map_Cell_Info, index: uintptr) -> uintptr #no_bounds_check {
+	#assert(MAP_CACHE_LINE_SIZE == 64)
+
+	// ceil(2^64 / N) for each N = MAP_CACHE_LINE_SIZE / size_of(T) > 1
+	@(static, rodata)
+	MAP_CELL_RECIPROCALS := [MAP_CACHE_LINE_SIZE+1]u64{
+		2  = (1<<64 +  1) /  2,
+		3  = (1<<64 +  2) /  3,
+		4  = (1<<64 +  3) /  4,
+		5  = (1<<64 +  4) /  5,
+		6  = (1<<64 +  5) /  6,
+		7  = (1<<64 +  6) /  7,
+		8  = (1<<64 +  7) /  8,
+		9  = (1<<64 +  8) /  9,
+		10 = (1<<64 +  9) / 10,
+		12 = (1<<64 + 11) / 12,
+		16 = (1<<64 + 15) / 16,
+		21 = (1<<64 + 20) / 21,
+		32 = (1<<64 + 31) / 32,
+		64 = (1<<64 + 63) / 64,
 	}
+
+	// cell_index*size_of_cell + data_index*size_of_type == index*size_of_type + cell_index*padding
+
+	n       := info.elements_per_cell
+	stride  := info.size_of_cell if n == 1 else info.size_of_type
+	padding := info.size_of_cell - n*stride
+	offset  := index*stride
+	if padding != 0 {
+		r := MAP_CELL_RECIPROCALS[n]
+		when size_of(uintptr) == 8 {
+			cell_index := uintptr((u128(index)*u128(r)) >> 64) // NOTE(bill): on many platforms, this use of `u128` is actually a single instruction
+		} else {
+			lo := u64(index)*(r & 0xffff_ffff)
+			cell_index := uintptr((u64(index)*(r >> 32) + (lo >> 32)) >> 32)
+		}
+		offset += cell_index*padding
+	}
+	return base + offset
 }
 
 // Same as above procedure but with compile-time constant index.
