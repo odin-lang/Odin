@@ -984,6 +984,54 @@ default_hasher :: #force_inline proc "contextless" (data: rawptr, seed: uintptr,
 	return uintptr(h) | uintptr(uintptr(h) == 0)
 }
 
+default_hasher_fixed :: #force_inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
+	@(require_results)
+	hash_fold :: #force_inline proc "contextless" (x, y: uintptr) -> uintptr {
+		when size_of(uintptr) == 8 {
+			p := u128(x) * u128(y)
+			return uintptr(p) ~ uintptr(p >> 64)
+		} else {
+			p := u64(x) * u64(y)
+			return uintptr(p) ~ uintptr(p >> 32)
+		}
+	}
+
+	@(require_results)
+	hash_load_short :: #force_inline proc "contextless" (p: uintptr, N: int) -> uintptr {
+		when size_of(uintptr) == 8 {
+			if N >= 4 {
+				lo := intrinsics.unaligned_load((^u32)(p))
+				hi := intrinsics.unaligned_load((^u32)(p + uintptr(N-4)))
+				return uintptr(lo) | uintptr(hi) << 32
+			}
+		}
+		b := ([^]u8)(p)
+		return uintptr(b[0]) | uintptr(b[N/2]) << 8 | uintptr(b[N-1]) << 16
+	}
+
+
+	HASH_K0 :: 0x9e3779b97f4a7c15 when size_of(uintptr) == 8 else 0x9e3779b9
+	HASH_K1 :: 0xbf58476d1ce4e5b9 when size_of(uintptr) == 8 else 0x85ebca6b
+
+	W :: size_of(uintptr)
+	p := uintptr(data)
+	h := seed ~ uintptr(N)
+	if N >= W {
+		for i := 0; i+W <= N; i += W {
+			h = hash_fold(h ~ intrinsics.unaligned_load((^uintptr)(p + uintptr(i))), HASH_K0)
+		}
+		if N % W != 0 {
+			// overlap the previous word rather than read past the end
+			h = hash_fold(h ~ intrinsics.unaligned_load((^uintptr)(p + uintptr(N-W))), HASH_K0)
+		}
+	} else if N > 0 {
+		h = hash_fold(h ~ hash_load_short(p, N), HASH_K0)
+	}
+	h = hash_fold(h, HASH_K1)
+	h &= HASH_MASK
+	return h | uintptr(h == 0)
+}
+
 default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
 	str := (^[]byte)(data)
 	return default_hasher(raw_data(str^), seed, len(str))
@@ -1004,13 +1052,13 @@ default_hasher_f64 :: proc "contextless" (f: f64, seed: uintptr) -> uintptr {
 	f := f
 	buf: [size_of(f)]u8
 	if f == 0 {
-		return default_hasher(&buf, seed, size_of(buf))
+		return default_hasher_fixed(&buf, seed, size_of(buf))
 	}
 	if f != f {
 		// TODO(bill): What should the logic be for NaNs?
-		return default_hasher(&f, seed, size_of(f))
+		return default_hasher_fixed(&f, seed, size_of(f))
 	}
-	return default_hasher(&f, seed, size_of(f))
+	return default_hasher_fixed(&f, seed, size_of(f))
 }
 
 default_hasher_complex128 :: proc "contextless" (x, y: f64, seed: uintptr) -> uintptr {
