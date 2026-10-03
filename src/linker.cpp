@@ -13,6 +13,85 @@ struct LinkerData {
 gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...);
 gb_internal bool system_exec_command_line_app_output(char const *command, gbString *output);
 
+gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, ...) {
+	isize const cmd_cap = 64<<20;
+	char *cmd = gb_alloc_array(heap_allocator(), char, cmd_cap);
+	defer (gb_free(heap_allocator(), cmd));
+
+	va_list va;
+	va_start(va, fmt);
+	isize cmd_len = gb_snprintf_va(cmd, cmd_cap-1, fmt, va) - 1;
+	va_end(va);
+
+#if defined(GB_SYSTEM_WINDOWS)
+	// NOTE(bill, 2026-10-03): CreateProcessW limits the command line to 32767 UTF-16 code units so we need to pass the arguments into a response file
+	if (cmd_len >= 32767 && !build_context.print_linker_flags) {
+		char const *exe_end = cmd[0] == '"' ? gb_char_first_occurence(cmd+1, '"') : nullptr;
+		GB_ASSERT(exe_end != nullptr);
+		isize exe_len = exe_end+1 - cmd;
+
+		gbString rsp = gb_string_make_reserve(heap_allocator(), cmd_len);
+		defer (gb_string_free(rsp));
+
+		// NOTE(bill): link.exe rejects response file lines of 128 KiB or more
+		bool  in_quotes   = false;
+		bool  separate    = false;
+		isize backslashes = 0;
+		for (char const *c = cmd+exe_len; *c; c++) {
+			if (!in_quotes && (*c == ' ' || *c == '\t')) {
+				separate = gb_string_length(rsp) > 0;
+				continue;
+			}
+			if (separate) {
+				rsp = gb_string_appendc(rsp, "\n");
+				separate = false;
+			}
+			if (*c == '"' && (backslashes & 1) == 0) {
+				in_quotes = !in_quotes;
+			}
+			backslashes = *c == '\\' ? backslashes+1 : 0;
+			rsp = gb_string_append_length(rsp, c, 1);
+		}
+
+		String dir = temporary_directory(temporary_allocator());
+		if (dir.len == 0) {
+			dir = build_context.build_paths[BuildPath_Output].basename;
+		}
+
+		gbString rsp_path = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(rsp_path));
+
+		rsp_path = gb_string_append_fmt(rsp_path, "%.*s/%.*s-%u.rsp", LIT(dir), LIT(build_context.build_paths[BuildPath_Output].name), GetCurrentProcessId());
+
+		{
+			gbFile f = {};
+			if (gb_file_create(&f, rsp_path) != gbFileError_None) {
+				gb_printf_err("Failed to create linker response file: %s\n", rsp_path);
+				return -1;
+			}
+			if (build_context.linker_choice != Linker_radlink) {
+				// NOTE(bill): link.exe reads a response file without a BOM in the ANSI code page but radlink does not skip a BOM
+				gb_file_write(&f, "\xef\xbb\xbf", 3);
+			}
+			gb_file_write(&f, rsp, gb_string_length(rsp));
+			gb_file_close(&f);
+		}
+
+		if (build_context.show_system_calls) {
+			gb_printf_err("[RESPONSE FILE] %s\n%s\n\n", rsp_path, rsp);
+		}
+
+		i32 result = system_exec_command_line_app(name, "%.*s @\"%s\"", cast(int)exe_len, cmd, rsp_path);
+		if (!build_context.keep_temp_files) {
+			gb_file_remove(rsp_path);
+		}
+		return result;
+	}
+#endif
+
+	return system_exec_command_line_app(name, "%.*s", cast(int)cmd_len, cmd);
+}
+
 // No longer required not that LLVM 14 is removed(?)
 gb_internal void linker_enable_system_library_linking(LinkerData *ld) {
 	ld->needs_system_library_linked = true;
@@ -327,7 +406,7 @@ try_cross_linking:;
 
 			switch (build_context.linker_choice) {
 			case Linker_lld:
-				result = system_exec_command_line_app("msvc-lld-link",
+				result = system_exec_msvc_linker_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
@@ -349,7 +428,7 @@ try_cross_linking:;
 				}
 				break;
 			case Linker_radlink:
-				result = system_exec_command_line_app("msvc-rad-link",
+				result = system_exec_msvc_linker_app("msvc-rad-link",
 					"\"%.*s\\bin\\radlink\" %s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
@@ -412,7 +491,7 @@ try_cross_linking:;
 				}
 
 
-				result = system_exec_command_line_app("msvc-link",
+				result = system_exec_msvc_linker_app("msvc-link",
 					"\"%.*s%.*s\" %s %.*s -OUT:\"%.*s\" %s "
 					"/nologo /subsystem:%.*s "
 					"%.*s "
