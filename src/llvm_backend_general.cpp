@@ -407,6 +407,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	if (global_error_collector.count != 0) {
 		return false;
 	}
+	global_types_are_complete.store(true);
 
 	isize tc = c->parser->total_token_count;
 	if (tc < 2) {
@@ -700,20 +701,16 @@ gb_internal lbValue lb_zero(lbModule *m, Type *t) {
 	return v;
 }
 gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned index) {
-	LLVMValueRef res = agg;
-	GB_ASSERT(LLVMIsConstant(res));
-	res = LLVMBuildExtractValue(m->const_dummy_builder, res, index, "");
-	GB_ASSERT(LLVMIsConstant(res));
+	GB_ASSERT(LLVMIsConstant(agg));
+	LLVMValueRef res = LLVMGetAggregateElement(agg, index);
+	GB_ASSERT(res != nullptr);
 	return res;
 }
 
 gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned *indices, isize count) {
-	// return LLVMConstExtractValue(value, indices, count);
 	LLVMValueRef res = agg;
-	GB_ASSERT(LLVMIsConstant(res));
 	for (isize i = 0; i < count; i++) {
-		res = LLVMBuildExtractValue(m->const_dummy_builder, res, indices[i], "");
-		GB_ASSERT(LLVMIsConstant(res));
+		res = llvm_const_extract_value(m, res, indices[i]);
 	}
 	return res;
 }

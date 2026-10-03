@@ -239,6 +239,60 @@ gb_internal LLVMValueRef llvm_const_array(lbModule *m, LLVMTypeRef elem_type, LL
 	return LLVMConstArray(elem_type, values, value_count);
 }
 
+// Each constant `insertvalue` rebuilds and uniques the whole aggregate,
+// so the nested fields of a compound literal are collected and built once.
+struct lbConstAggregate {
+	LLVMValueRef      value;
+	lbConstAggregate *elems;
+	unsigned          elem_count;
+};
+
+gb_internal void lb_const_aggregate_insert(lbModule *m, lbConstAggregate *agg, LLVMValueRef base, LLVMValueRef val, unsigned *indices, isize count) {
+	if (agg->elems == nullptr) {
+		agg->value = base;
+	}
+	for (isize i = 0; i < count; i++) {
+		if (agg->elems == nullptr) {
+			LLVMTypeRef type = LLVMTypeOf(agg->value);
+			if (LLVMGetTypeKind(type) == LLVMArrayTypeKind) {
+				agg->elem_count = cast(unsigned)LLVMGetArrayLength(type);
+			} else {
+				agg->elem_count = LLVMCountStructElementTypes(type);
+			}
+			agg->elems = gb_alloc_array(temporary_allocator(), lbConstAggregate, agg->elem_count);
+			for (unsigned j = 0; j < agg->elem_count; j++) {
+				agg->elems[j].value = llvm_const_extract_value(m, agg->value, j);
+			}
+		}
+		agg = &agg->elems[indices[i]];
+	}
+	agg->value = val;
+	agg->elems = nullptr;
+}
+
+gb_internal LLVMValueRef lb_const_aggregate_build(lbModule *m, lbConstAggregate *agg) {
+	if (agg->elems == nullptr) {
+		return agg->value;
+	}
+	LLVMTypeRef type = LLVMTypeOf(agg->value);
+	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, agg->elem_count);
+	for (unsigned i = 0; i < agg->elem_count; i++) {
+		values[i] = lb_const_aggregate_build(m, &agg->elems[i]);
+	}
+	if (LLVMGetTypeKind(type) == LLVMArrayTypeKind) {
+		return llvm_const_array(m, OdinLLVMGetArrayElementType(type), values, agg->elem_count);
+	}
+	return llvm_const_named_struct_internal(m, type, values, agg->elem_count);
+}
+
+gb_internal LLVMValueRef lb_const_aggregate_take(lbModule *m, lbConstAggregate *agg, LLVMValueRef value) {
+	if (agg->elems != nullptr) {
+		value = lb_const_aggregate_build(m, agg);
+	}
+	*agg = {};
+	return value;
+}
+
 gb_internal LLVMValueRef llvm_const_slice_internal(lbModule *m, LLVMValueRef data, LLVMValueRef len) {
 	if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
 		GB_ASSERT(build_context.metrics.ptr_size == 4);
@@ -2005,6 +2059,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			bool *visited = gb_alloc_array(temporary_allocator(), bool, value_count);
 
 			if (cl->elems[0]->kind == Ast_FieldValue) {
+				lbConstAggregate *nested = gb_alloc_array(temporary_allocator(), lbConstAggregate, value_count);
+
 				isize elem_count = cl->elems.count;
 				for (isize i = 0; i < elem_count; i++) {
 					ast_node(fv, FieldValue, cl->elems[i]);
@@ -2026,6 +2082,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							GB_ASSERT_MSG(lb_sizeof(value_type) == type_size_of(f->type), "%s vs %s", LLVMPrintTypeToString(value_type), type_to_string(f->type));
 							values[index]  = value.value;
 							visited[index] = true;
+							nested[index]  = {};
 						} else {
 							if (!visited[index]) {
 								auto new_cc = cc;
@@ -2073,13 +2130,15 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 									if (LLVMIsConstant(elem_value) && LLVMIsConstant(values[index])) {
 										if (is_type_union(cv_type) || is_type_raw_union(cv_type)) {
 											force_non_named = true;
+											values[index] = lb_const_aggregate_take(m, &nested[index], values[index]);
 											values[index] = llvm_const_insert_value_with_rebuild(m, values[index], elem_value, idx_list, idx_list_len);
 										} else {
-											values[index] = llvm_const_insert_value(m, values[index], elem_value, idx_list, idx_list_len);
+											lb_const_aggregate_insert(m, &nested[index], values[index], elem_value, idx_list, idx_list_len);
 										}
 									} else if (is_local) {
 										lbProcedure *p = m->curr_procedure;
 										GB_ASSERT(p != nullptr);
+										values[index] = lb_const_aggregate_take(m, &nested[index], values[index]);
 
 										LLVMTypeRef field_llvm_type = lb_type(m, f->type);
 
@@ -2122,6 +2181,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 							}
 						}
 					}
+				}
+
+				for (unsigned i = 0; i < value_count; i++) {
+					values[i] = lb_const_aggregate_take(m, &nested[i], values[i]);
 				}
 			} else {
 				isize multiple_return_offset = 0;

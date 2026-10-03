@@ -18,6 +18,21 @@ gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef va
 	}
 }
 
+gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
+	if (f == nullptr || m->debug_builder == nullptr) {
+		return nullptr;
+	}
+	MUTEX_GUARD(&m->debug_values_mutex);
+	LLVMMetadataRef res = lb_get_llvm_metadata(m, f);
+	if (res == nullptr) {
+		res = LLVMDIBuilderCreateFile(m->debug_builder,
+			cast(char const *)f->filename.text, f->filename.len,
+			cast(char const *)f->directory.text, f->directory.len);
+		lb_set_llvm_metadata(m, f, res);
+	}
+	return res;
+}
+
 gb_internal void lb_add_raddbg_string(lbModule *m, String const &str) {
 	mpsc_enqueue(&m->gen->raddebug_section_strings, copy_string(permanent_allocator(), str));
 }
@@ -70,7 +85,7 @@ gb_internal LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *
 gb_internal void lb_debug_file_line(lbModule *m, Type *type, Ast *node, LLVMMetadataRef *file, unsigned *line) {
 	if (*file == nullptr && type->kind == Type_Named) {
 		if (node) {
-			*file = lb_get_llvm_metadata(m, node->file());
+			*file = lb_get_file_metadata(m, node->file());
 			*line = cast(unsigned)ast_token(node).pos.line;
 		}
 	}
@@ -174,7 +189,7 @@ gb_internal LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &nam
 
 	AstPackage *pkg = m->info->runtime_package;
 	GB_ASSERT(pkg->files.count != 0);
-	LLVMMetadataRef file = lb_get_llvm_metadata(m, pkg->files[0]);
+	LLVMMetadataRef file = lb_get_file_metadata(m, pkg->files[0]);
 	LLVMMetadataRef scope = file;
 
 	return LLVMDIBuilderCreateMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, field_line,
@@ -185,7 +200,7 @@ gb_internal LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &nam
 gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_in_bits, u32 align_in_bits, LLVMMetadataRef *elements, unsigned element_count) {
 	AstPackage *pkg = m->info->runtime_package;
 	GB_ASSERT(pkg->files.count != 0);
-	LLVMMetadataRef file = lb_get_llvm_metadata(m, pkg->files[0]);
+	LLVMMetadataRef file = lb_get_file_metadata(m, pkg->files[0]);
 	LLVMMetadataRef scope = file;
 
 	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
@@ -1119,7 +1134,7 @@ gb_internal LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope
 			}
 		}
 		if (scope->flags & ScopeFlag_File) {
-			found = lb_get_llvm_metadata(m, scope->file);
+			found = lb_get_file_metadata(m, scope->file);
 			if (found) {
 				return found;
 			}
@@ -1219,7 +1234,7 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 	AstFile *file = p->body->file();
 
 	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
-	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	LLVMMetadataRef llvm_file = lb_get_file_metadata(m, file);
 	GB_ASSERT(llvm_scope != nullptr);
 	if (llvm_file == nullptr) {
 		llvm_file = LLVMDIScopeGetFile(llvm_scope);
@@ -1286,7 +1301,7 @@ gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, T
 	AstFile *file = p->body->file();
 
 	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
-	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	LLVMMetadataRef llvm_file = lb_get_file_metadata(m, file);
 	GB_ASSERT(llvm_scope != nullptr);
 	if (llvm_file == nullptr) {
 		llvm_file = LLVMDIScopeGetFile(llvm_scope);
@@ -1479,7 +1494,7 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 	}
 
 	AstFile *file = label->file();
-	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	LLVMMetadataRef llvm_file = lb_get_file_metadata(m, file);
 	if (llvm_file == nullptr) {
 		debugf("llvm file not found for label\n");
 		return;
