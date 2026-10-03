@@ -118,11 +118,15 @@ struct AstFile {
 	String       directory;
 
 	Tokenizer    tokenizer;
-	Array<Token> tokens;
+	Array<Token> lookahead; // read by peeking, before the parser reaches them
+	isize        lookahead_index;
+	isize        token_count;
 	isize        curr_token_index;
-	isize        prev_token_index;
+	Token        first_token;
 	Token        curr_token;
 	Token        prev_token; // previous non-comment
+	TokenPos     invalid_token_pos;
+	Array<Token> token_edits; // for `-strip-semicolon`
 	Token        package_token;
 	String       package_name;
 
@@ -151,8 +155,6 @@ struct AstFile {
 	Ast *          curr_proc;
 	isize          error_count;
 	ParseFileError last_error;
-	f64            time_to_tokenize; // seconds
-	f64            time_to_parse;    // seconds
 
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
@@ -170,6 +172,15 @@ struct AstFile {
 
 	struct LLVMOpaqueMetadata *llvm_metadata;
 	struct LLVMOpaqueMetadata *llvm_metadata_scope;
+
+	//// Profiling /////
+
+	f64            time_to_load;        // seconds
+	f64            time_to_parse;       // seconds, tokenizing included, setting up the decls excluded
+	f64            time_to_setup_decls; // seconds, mostly finding and adding the imported packages
+	u64            cpu_time_to_load;
+	u64            cpu_time_to_parse;
+	u64            cpu_time_to_setup_decls;
 };
 
 enum AstForeignFileKind {
