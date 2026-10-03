@@ -2663,6 +2663,38 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 }
 
 
+gb_global Entity *min_dep_basic_equal_procs[Basic_COUNT];
+
+gb_internal void add_dependency_to_set_threaded(Checker *c, Entity *entity);
+
+gb_internal void add_min_dep_equal_procedures(Checker *c, Type *t) {
+	t = base_type(t);
+	if (t == nullptr || !is_type_comparable(t)) {
+		return;
+	}
+	switch (t->kind) {
+	case Type_Basic:
+		add_dependency_to_set_threaded(c, min_dep_basic_equal_procs[t->Basic.kind]);
+		break;
+	case Type_Struct:
+		for (Entity *f : t->Struct.fields) {
+			add_min_dep_equal_procedures(c, f->type);
+		}
+		break;
+	case Type_Union:
+		for (Type *v : t->Union.variants) {
+			add_min_dep_equal_procedures(c, v);
+		}
+		break;
+	case Type_Array:
+		add_min_dep_equal_procedures(c, t->Array.elem);
+		break;
+	case Type_EnumeratedArray:
+		add_min_dep_equal_procedures(c, t->EnumeratedArray.elem);
+		break;
+	}
+}
+
 gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	if (t == nullptr) {
 		return;
@@ -2780,6 +2812,9 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		for_array(i, bt->Union.variants) {
 			add_min_dep_type_info(c, bt->Union.variants[i]);
 		}
+		if (is_type_comparable(bt) && !is_type_simple_compare(bt)) {
+			add_min_dep_equal_procedures(c, bt);
+		}
 		break;
 
 	case Type_Struct:
@@ -2810,10 +2845,14 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 			Entity *f = bt->Struct.fields[i];
 			add_min_dep_type_info(c, f->type);
 		}
+		if (is_type_comparable(bt) && !is_type_simple_compare(bt)) {
+			add_min_dep_equal_procedures(c, bt);
+		}
 		break;
 
 	case Type_Map:
 		init_map_internal_types(bt);
+		add_min_dep_equal_procedures(c, bt->Map.key);
 		add_min_dep_type_info(c, bt->Map.key);
 		add_min_dep_type_info(c, bt->Map.value);
 		add_min_dep_type_info(c, t_uintptr); // hash value
@@ -3326,6 +3365,28 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("slice_expr_error_lo_hi"),
 		str_lit("multi_pointer_slice_expr_error"),
 	);
+
+
+	{ // init min dep basic equal procs
+		struct { BasicKind kind; char const *name; } const procs[] = {
+			{Basic_complex32,     "complex32_eq"},
+			{Basic_complex64,     "complex64_eq"},
+			{Basic_complex128,    "complex128_eq"},
+			{Basic_quaternion64,  "quaternion64_eq"},
+			{Basic_quaternion128, "quaternion128_eq"},
+			{Basic_quaternion256, "quaternion256_eq"},
+			{Basic_cstring,       "cstring_eq"},
+			{Basic_string,        "string_eq"},
+			{Basic_cstring16,     "cstring16_eq"},
+			{Basic_string16,      "string16_eq"},
+		};
+		for (auto const &p : procs) {
+			u32 hash = 0;
+			InternedString key = string_interner_insert(make_string_c(p.name), 0, &hash);
+			min_dep_basic_equal_procs[p.kind] = scope_lookup(c->info.runtime_package->scope, key, hash);
+		}
+	}
+
 
 	add_dependency_to_set(c, c->info.instrumentation_enter_entity);
 	add_dependency_to_set(c, c->info.instrumentation_exit_entity);

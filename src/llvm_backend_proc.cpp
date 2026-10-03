@@ -17,6 +17,11 @@ gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue sr
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
 	
+	if (!is_volatile && lb_uses_fast_isel()) {
+		lb_emit_memmove(p, dst.value, 1, src.value, 1, len.value);
+		return;
+	}
+
 	char const *name = "llvm.memmove";
 	if (!p->is_startup && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
@@ -47,7 +52,7 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 	len = lb_emit_conv(p, len, t_int);
 	
 	char const *name = "llvm.memcpy";
-	if (!p->is_startup && LLVMIsConstant(len.value)) {
+	if (!p->is_startup && !lb_uses_fast_isel() && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
 		if (const_len <= lb_max_zero_init_size()) {
 			name = "llvm.memcpy.inline";
@@ -362,13 +367,13 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 		Ast *ident = entity->identifier.load();
 		if (entity->file != nullptr) {
-			file = lb_get_llvm_metadata(m, entity->file);
+			file = lb_get_file_metadata(m, entity->file);
 			scope = file;
 		} else if (ident != nullptr && ident->file_id != 0) {
-			file = lb_get_llvm_metadata(m, ident->file());
+			file = lb_get_file_metadata(m, ident->file());
 			scope = file;
 		} else if (entity->scope != nullptr) {
-			file = lb_get_llvm_metadata(m, entity->scope->file);
+			file = lb_get_file_metadata(m, entity->scope->file);
 			scope = file;
 		}
 		GB_ASSERT_MSG(file != nullptr, "%.*s", LIT(entity->token.string));

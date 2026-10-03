@@ -188,6 +188,7 @@ struct TypeUnion {
 	bool             is_polymorphic;
 	bool             is_poly_specialized;
 	UnionTypeKind    kind;
+	std::atomic<u8>  constantable; // 0 unknown, 1 false, 2 true
 };
 
 struct TypeProc {
@@ -416,6 +417,9 @@ gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false);
 gb_internal Type *base_type(Type *t);
 gb_internal Type *alloc_type_multi_pointer(Type *elem);
 gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thread);
+
+// set once checking is done; until then a type may still be incomplete or part of an illegal cycle
+gb_global std::atomic<bool> global_types_are_complete;
 
 gb_internal u32 type_info_flags_of_type(Type *type) {
 	if (type == nullptr) {
@@ -2063,9 +2067,14 @@ gb_internal bool is_type_map(Type *t) {
 	return t->kind == Type_Map;
 }
 
+gb_internal void wait_for_union_variants(Type *t);
+
 gb_internal bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
+	if (t->kind == Type_Union) {
+		wait_for_union_variants(t);
+	}
 	if (t->kind == Type_Union && t->Union.variants.count == 1) {
 		Type *v = t->Union.variants[0];
 		return is_type_internally_pointer_like(v);
@@ -2077,6 +2086,9 @@ gb_internal bool is_type_union_maybe_pointer(Type *t) {
 gb_internal bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	t = base_type(t);
 	if (t == nullptr) { return false; }
+	if (t->kind == Type_Union) {
+		wait_for_union_variants(t);
+	}
 	if (t->kind == Type_Union && t->Union.variants.count == 1) {
 		Type *v = t->Union.variants[0];
 		if (is_type_internally_pointer_like(v)) {
@@ -2779,16 +2791,25 @@ gb_internal bool is_type_union_constantable(Type *type) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
 
-	if (bt->Union.variants.count == 0) {
-		return true;
-	}
-
-	for (Type *v : bt->Union.variants) {
-		if (!is_type_constant_type_for_unions(v)) {
-			return false;
+	bool use_cache = global_types_are_complete.load(std::memory_order_relaxed);
+	if (use_cache) {
+		u8 cached = bt->Union.constantable.load(std::memory_order_relaxed);
+		if (cached != 0) {
+			return cached == 2;
 		}
 	}
-	return true;
+
+	bool res = true;
+	for (Type *v : bt->Union.variants) {
+		if (!is_type_constant_type_for_unions(v)) {
+			res = false;
+			break;
+		}
+	}
+	if (use_cache) {
+		bt->Union.constantable.store(res ? 2 : 1, std::memory_order_relaxed);
+	}
+	return res;
 }
 
 gb_internal bool is_type_raw_union_constantable(Type *type) {
@@ -3625,6 +3646,7 @@ gb_internal bool union_is_variant_of(Type *u, Type *v) {
 gb_internal i64 union_tag_size(Type *u) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
+	wait_for_union_variants(u);
 	if (u->Union.tag_size > 0) {
 		return u->Union.tag_size;
 	}
@@ -4380,6 +4402,9 @@ gb_internal i64 type_size_of_struct_pretend_is_packed(Type *ot) {
 
 
 gb_internal i64 type_size_of(Type *t) {
+	if (t != nullptr && t->kind == Type_Named && global_types_are_complete.load(std::memory_order_relaxed)) {
+		t = base_type(t);
+	}
 	if (t == nullptr) {
 		return 0;
 	}
@@ -4422,6 +4447,9 @@ gb_internal i64 type_size_of(Type *t) {
 }
 
 gb_internal i64 type_align_of(Type *t) {
+	if (t != nullptr && t->kind == Type_Named && global_types_are_complete.load(std::memory_order_relaxed)) {
+		t = base_type(t);
+	}
 	if (t == nullptr) {
 		return 1;
 	}
@@ -4461,6 +4489,12 @@ gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thr
 gb_internal void wait_for_struct_fields(Type *t) {
 	if (t->Struct.polymorphic_parent != nullptr) {
 		wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
+	}
+}
+
+gb_internal void wait_for_union_variants(Type *t) {
+	if (t->Union.polymorphic_parent != nullptr) {
+		wait_for_record_signal(&t->Union.variants_wait_signal, &t->Union.checking_thread);
 	}
 }
 
@@ -4564,6 +4598,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		return type_align_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
+		wait_for_union_variants(t);
 		if (t->Union.variants.count == 0) {
 			return 1;
 		}
@@ -4868,6 +4903,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		return type_size_of_internal(t->Enum.base_type, path);
 
 	case Type_Union: {
+		wait_for_union_variants(t);
 		if (t->Union.variants.count == 0) {
 			return 0;
 		}

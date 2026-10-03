@@ -1211,16 +1211,18 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 	}
 
 	// Eisel-Lemire's fast float algorithm
-	fast_float: {
-		b := fast_float_compute_float(T, exp, mantissa)
-		if trunc && b != fast_float_compute_float(T, exp, mantissa+1) {
-			break fast_float
+	when FAST_FLOAT {
+		fast_float: {
+			b := fast_float_compute_float(T, exp, mantissa)
+			if trunc && b != fast_float_compute_float(T, exp, mantissa+1) {
+				break fast_float
+			}
+			ok = b >> info.mantbits != 1<<info.expbits - 1 // infinity means overflow
+			if neg {
+				b |= 1 << info.mantbits << info.expbits
+			}
+			return transmute(T)Bits(b), nr, ok
 		}
-		ok = b >> info.mantbits != 1<<info.expbits - 1 // infinity means overflow
-		if neg {
-			b |= 1 << info.mantbits << info.expbits
-		}
-		return transmute(T)Bits(b), nr, ok
 	}
 
 	// Slow path for arbitrary-precision decimal

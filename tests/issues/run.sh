@@ -106,6 +106,8 @@ $ODIN run ../test_issue_7564.odin $COMMON
 $ODIN test ../test_issue_7316.odin $COMMON
 $ODIN test ../test_issue_7566.odin $COMMON
 $ODIN test ../test_issue_poly_using_subtype.odin $COMMON
+$ODIN test ../test_issue_global_proc_lits.odin $COMMON
+$ODIN test ../test_issue_packed_field_by_value.odin $COMMON
 $ODIN test ../test_issue_7708.odin $COMMON
 if [[ $($ODIN check ../test_issue_7708_mismatch.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
@@ -118,6 +120,18 @@ $ODIN test ../test_issue_procedure_of_specialized.odin $COMMON
 $ODIN test ../test_issue_packed_field_by_value.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug
+$ODIN test ../test_issue_omitted_field_union.odin $COMMON
+$ODIN test ../test_issue_fast_isel_lowering.odin $COMMON
+$ODIN test ../test_issue_fast_isel_lowering.odin $COMMON -o:none
+$ODIN test ../test_issue_equal_proc_dependencies.odin $COMMON
+if [[ $($ODIN test ../test_issue_equal_proc_dependencies.odin $COMMON -build-mode:obj -show-debug-messages 2>&1 | grep -ci "missing procedure") -eq 0 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN test ../test_issue_7421.odin $COMMON
 if [[ $($ODIN check ../test_issue_7421_tagged_duplicate.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
