@@ -8897,7 +8897,6 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			c->allow_in_progress_type_operand = prev_allow_in_progress;
 		});
 
-		TEMPORARY_ALLOCATOR_GUARD();
 		if (is_call_expr_field_value(ce)) {
 			named_fields = true;
 			operands = array_make<Operand>(temporary_allocator(), ce->args.count);
