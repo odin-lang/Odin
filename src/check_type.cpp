@@ -4276,6 +4276,7 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	type->Map.value = value;
 
 	add_map_key_type_dependencies(ctx, key);
+	add_comparison_procedures_for_fields(ctx, key);
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);

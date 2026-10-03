@@ -59,14 +59,29 @@ gb_internal lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 }
 
 
+gb_internal unsigned lb_metadata_kind(lbModule *m, String const &name) {
+	for (isize i = 0; i < m->metadata_kind_count; i++) {
+		if (m->metadata_kinds[i].name == name) {
+			return m->metadata_kinds[i].kind;
+		}
+	}
+	unsigned kind = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	if (m->metadata_kind_count < gb_count_of(m->metadata_kinds)) {
+		m->metadata_kinds[m->metadata_kind_count].name = name;
+		m->metadata_kinds[m->metadata_kind_count].kind = kind;
+		m->metadata_kind_count += 1;
+	}
+	return kind;
+}
+
 gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value) {
-	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	unsigned md_id = lb_metadata_kind(m, name);
 	LLVMMetadataRef md = LLVMValueAsMetadata(LLVMConstInt(lb_type(m, t_u64), value, false));
 	LLVMValueRef node = LLVMMetadataAsValue(m->ctx, LLVMMDNodeInContext2(m->ctx, &md, 1));
 	LLVMSetMetadata(v_ref, md_id, node);
 }
 gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name) {
-	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	unsigned md_id = lb_metadata_kind(m, name);
 	LLVMValueRef v_md = LLVMGetMetadata(v_ref, md_id);
 	if (v_md == nullptr) {
 		return 0;
@@ -97,6 +112,27 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 		}
 	}
 
+
+	if (is_inlinable && !is_volatile && lb_uses_fast_isel()) {
+		LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr, lb_type(p->module, t_rawptr), "");
+		LLVMValueRef last = nullptr;
+		for (i64 offset = 0; offset < const_len; /**/) {
+			i64 chunk = 8;
+			while (chunk > const_len - offset) {
+				chunk >>= 1;
+			}
+			LLVMTypeRef chunk_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*chunk));
+			LLVMValueRef chunk_ptr = dst;
+			if (offset != 0) {
+				LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_int), offset, false);
+				chunk_ptr = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), dst, &index, 1, "");
+			}
+			last = LLVMBuildStore(p->builder, LLVMConstNull(chunk_type), chunk_ptr);
+			LLVMSetAlignment(last, 1);
+			offset += chunk;
+		}
+		return last;
+	}
 
 	char const *name = "llvm.memset";
 	if (is_inlinable) {
@@ -995,10 +1031,14 @@ gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
 	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
-		lbValue res = {};
-		res.value = LLVMGetOperand(value.value, 0);
-		res.type = alloc_type_pointer(value.type);
-		return res;
+		LLVMValueRef ptr = LLVMGetOperand(value.value, 0);
+		u64 align = cast(u64)type_align_of(value.type);
+		if (lb_known_address_alignment(p->module, ptr, align) >= align) {
+			lbValue res = {};
+			res.value = ptr;
+			res.type = alloc_type_pointer(value.type);
+			return res;
+		}
 	}
 
 	GB_ASSERT(is_type_typed(value.type));

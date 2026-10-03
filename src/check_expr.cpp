@@ -847,6 +847,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	entity->flags = 0;
 
 	entity->Procedure.optimization_mode = base_entity->Procedure.optimization_mode;
+	entity->Procedure.generated_from_polymorphic = true;
 
 	if (base_entity->flags & EntityFlag_Cold) {
 		entity->flags |= EntityFlag_Cold;
@@ -877,7 +878,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;
 		poly_proc_data->proc_info  = proc_info;
-		entity->Procedure.generated_from_polymorphic = proc_info->generated_from_polymorphic;
 	}
 
 	if (base_entity->Procedure.deferred_procedure.entity != nullptr) {
@@ -3309,6 +3309,17 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 		for (Entity *field : t->Struct.fields) {
 			add_comparison_procedures_for_fields(c, field->type);
 		}
+		break;
+	case Type_Union:
+		for (Type *variant : t->Union.variants) {
+			add_comparison_procedures_for_fields(c, variant);
+		}
+		break;
+	case Type_Array:
+		add_comparison_procedures_for_fields(c, t->Array.elem);
+		break;
+	case Type_EnumeratedArray:
+		add_comparison_procedures_for_fields(c, t->EnumeratedArray.elem);
 		break;
 	}
 }

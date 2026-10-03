@@ -1347,8 +1347,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
 
-							if (build_context.command != "build") {
-								gb_printf_err("'build-mode' can only be used with the 'build' command\n");
+							if (build_context.command != "build" && build_context.command != "test") {
+								gb_printf_err("'build-mode' can only be used with the 'build' and 'test' commands\n");
 								bad_flags = true;
 								break;
 							}
@@ -4582,7 +4582,7 @@ end_of_code_gen:;
 		show_import_graph(checker);
 	}
 
-	if (run_output) {
+	if (run_output && build_context.build_mode == BuildMode_Executable) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
