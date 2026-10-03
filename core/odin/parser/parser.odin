@@ -934,8 +934,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 						next_token := peek_token(p)
 						if next_token.kind == .In || next_token.kind == .Comma {
 							cond = parse_simple_stmt(p, {.In})
-							if as, ok := cond.derived_stmt.(^ast.Assign_Stmt); ok {
-								assert(as.op.kind == .In)
+							if as, ok := cond.derived_stmt.(^ast.Assign_Stmt); ok && as.op.kind == .In {
 								is_range = true
 							}
 							break general_conds
