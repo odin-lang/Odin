@@ -3310,6 +3310,17 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 			add_comparison_procedures_for_fields(c, field->type);
 		}
 		break;
+	case Type_Union:
+		for (Type *variant : t->Union.variants) {
+			add_comparison_procedures_for_fields(c, variant);
+		}
+		break;
+	case Type_Array:
+		add_comparison_procedures_for_fields(c, t->Array.elem);
+		break;
+	case Type_EnumeratedArray:
+		add_comparison_procedures_for_fields(c, t->EnumeratedArray.elem);
+		break;
 	}
 }
 

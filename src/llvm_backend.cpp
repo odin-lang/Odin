@@ -3356,15 +3356,15 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 
 gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
-	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->missing_procedures_to_check, &p); /**/) {
+	for (Entity *e = nullptr; mpsc_dequeue(&m->missing_procedures_to_check, &e); /**/) {
+		lbProcedure *p = lb_create_procedure(m, e, false);
 		if (!p->is_done.load(std::memory_order_relaxed)) {
 			debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
-			lb_generate_procedure(m, p);
 		}
-
-		for (lbProcedure *nested = nullptr; mpsc_dequeue(&m->procedures_to_generate, &nested); /**/) {
-			mpsc_enqueue(&m->missing_procedures_to_check, nested);
-		}
+		mpsc_enqueue(&m->procedures_to_generate, p);
+	}
+	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
+		lb_generate_procedure(m, p);
 	}
 	return 0;
 }
@@ -3389,9 +3389,9 @@ retry:;
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		if (m->missing_procedures_to_check.count != 0) {
+		if (m->missing_procedures_to_check.count != 0 || m->procedures_to_generate.count != 0) {
 			if (retry_count > gen->modules.count) {
-				GB_ASSERT(m->missing_procedures_to_check.count == 0);
+				GB_ASSERT(m->missing_procedures_to_check.count == 0 && m->procedures_to_generate.count == 0);
 			}
 
 			retry_count += 1;

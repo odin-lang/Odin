@@ -4041,19 +4041,14 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		return *found;
 	}
 
-	bool ignore_body = false;
-
 	lbModule *other_module = m;
 	if (USE_SEPARATE_MODULES) {
 		other_module = lb_module_of_entity(gen, e, m);
 	}
-	if (other_module == m) {
-		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
-	}
-	ignore_body = other_module != m;
+	bool ignore_body = other_module != m;
 
-	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
-	if (missing_proc == nullptr) {
+	lbProcedure *proc = lb_create_procedure(m, e, ignore_body);
+	if (proc == nullptr) {
 		// This is an unspecialized polymorphic procedure, which should not be codegen'd
 		lbValue dummy = {};
 		dummy.value = nullptr;
@@ -4061,18 +4056,28 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		return dummy;
 	}
 
-	if (ignore_body) {
-		GB_ASSERT(other_module != nullptr);
+	// NOTE(bill): Until the modules are generated in parallel, a procedure may be referenced before it is created
+	// (e.g. an @(init) procedure by the startup procedure), but after that it was missed by the frontend
+	bool missing = gen->modules_in_parallel;
+
+	if (!ignore_body) {
+		if (missing) {
+			debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
+		}
+		mpsc_enqueue(&m->procedures_to_generate, proc);
+	} else {
 		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
 		rw_mutex_shared_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
-			// THIS IS THE RACE CONDITION
-			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
-			mpsc_enqueue(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
+			if (missing) {
+				debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), other_module);
+				// another module's context may only be used by the thread generating that module
+				mpsc_enqueue(&other_module->missing_procedures_to_check, e);
+			} else {
+				mpsc_enqueue(&other_module->procedures_to_generate, lb_create_procedure(other_module, e, false));
+			}
 		}
-	} else {
-		mpsc_enqueue(&m->missing_procedures_to_check, missing_proc);
 	}
 
 	rw_mutex_shared_lock(&m->values_mutex);
@@ -4155,12 +4160,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		lbValue *found = map_get(&target_module->values, e);
 		rw_mutex_shared_unlock(&target_module->values_mutex);
 		if (found == nullptr) {
-			lbProcedure *target_proc = lb_create_procedure(target_module, e, false);
-			if (gen->modules_in_parallel) {
-				mpsc_enqueue(&target_module->missing_procedures_to_check, target_proc);
-			} else {
-				mpsc_enqueue(&target_module->procedures_to_generate, target_proc);
-			}
+			mpsc_enqueue(&target_module->procedures_to_generate, lb_create_procedure(target_module, e, false));
 		}
 
 		lbProcedure *p = lb_create_procedure(m, e, true);

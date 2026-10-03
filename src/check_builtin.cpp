@@ -8429,6 +8429,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			add_comparison_procedures_for_fields(c, type);
+
 			operand->mode = Addressing_Value;
 			operand->type = t_equal_proc;
 			break;
@@ -8477,7 +8479,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			add_map_key_type_dependencies(c, type);
+			add_map_key_type_dependencies(c, type->Map.key);
+			add_comparison_procedures_for_fields(c, type->Map.key);
 
 			operand->mode = Addressing_Value;
 			operand->type = t_map_info_ptr;
