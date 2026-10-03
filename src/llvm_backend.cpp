@@ -434,7 +434,7 @@ gb_internal lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue d
 	args[0] = data;
 	args[1] = seed;
 	args[2] = lb_const_int(p->module, t_int, type_size_of(type));
-	return lb_emit_runtime_call(p, "default_hasher", args);
+	return lb_emit_runtime_call(p, "default_hasher_fixed", args);
 }
 
 gb_internal void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value) {
@@ -928,6 +928,8 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lbBlock *slot_probe_block = lb_create_block(p, "slot-probe");
 	lbBlock *slot_next_block  = lb_create_block(p, "slot-next");
 	lbBlock *place_block      = lb_create_block(p, "place");
+	lbBlock *scan_block       = lb_create_block(p, "scan");
+	lbBlock *displace_block   = lb_create_block(p, "displace");
 
 	lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, found_ptr), found_block, check_grow_block);
 	lb_start_block(p, found_block);
@@ -974,6 +976,29 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		lbMapKVH kvh = lb_map_kvh_data_static(p, type, map);
 		lbValue h = lb_addr_load(p, hash_addr);
 
+		lbValue zero_uintptr   = lb_const_int(m, t_uintptr, 0);
+		lbValue tombstone_mask = lb_const_int(m, t_uintptr, 1ull << (8*type_size_of(t_uintptr) - 1));
+		lbValue key_size       = lb_const_int(m, t_int, type_size_of(type->Map.key));
+		lbValue value_size     = lb_const_int(m, t_int, type_size_of(type->Map.value));
+
+		auto hash_ptr_at = [&](lbValue slot) -> lbValue {
+			return lb_emit_ptr_offset(p, kvh.hs, slot);
+		};
+		auto is_empty = [&](lbValue hash) -> lbValue {
+			return lb_emit_comp(p, Token_CmpEq, hash, zero_uintptr);
+		};
+		auto is_tombstone = [&](lbValue hash) -> lbValue {
+			return lb_emit_comp(p, Token_NotEq, lb_emit_arith(p, Token_And, hash, tombstone_mask, t_uintptr), zero_uintptr);
+		};
+		// map_probe_distance inlined
+		auto probe_distance_of = [&](lbValue hash, lbValue slot) -> lbValue {
+			return lb_emit_arith(p, Token_And, lb_emit_arith(p, Token_Sub, slot, hash, t_uintptr), kvh.mask, t_uintptr);
+		};
+		auto next_slot = [&](lbAddr slot) {
+			lbValue next = lb_emit_arith(p, Token_Add, lb_addr_load(p, slot), lb_const_int(m, t_uintptr, 1), t_uintptr);
+			lb_addr_store(p, slot, lb_emit_arith(p, Token_And, next, kvh.mask, t_uintptr));
+		};
+
 		lbAddr pos = lb_add_local_generated(p, t_uintptr, false);
 		lbAddr distance = lb_add_local_generated(p, t_uintptr, true);
 		LLVM_SET_VALUE_NAME(pos.addr.value,      "slot_pos");
@@ -983,29 +1008,23 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		lb_emit_jump(p,   slot_loop_block);
 		lb_start_block(p, slot_loop_block);
 
-		lbValue element_hash = lb_emit_load(p, lb_emit_ptr_offset(p, kvh.hs, lb_addr_load(p, pos)));
+		lbValue element_hash = lb_emit_load(p, hash_ptr_at(lb_addr_load(p, pos)));
 		LLVM_SET_VALUE_NAME(element_hash.value, "slot_hash");
 
-		lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, element_hash, lb_const_int(m, t_uintptr, 0)), place_block, slot_used_block);
+		lb_emit_if(p, is_empty(element_hash), place_block, slot_used_block);
 
 		lb_start_block(p, slot_used_block);
-		{
-			lbValue tombstone_mask = lb_const_int(m, t_uintptr, 1ull << (8*type_size_of(t_uintptr) - 1));
-			lbValue tombstone = lb_emit_arith(p, Token_And, element_hash, tombstone_mask, t_uintptr);
-			lb_emit_if(p, lb_emit_comp(p, Token_NotEq, tombstone, lb_const_int(m, t_uintptr, 0)), insert_block, slot_probe_block);
-		}
+		lb_emit_if(p, is_tombstone(element_hash), insert_block, slot_probe_block);
 
 		lb_start_block(p, slot_probe_block);
 		{
-			lbValue probe_distance = lb_emit_arith(p, Token_Sub, lb_addr_load(p, pos), element_hash, t_uintptr);
-			probe_distance         = lb_emit_arith(p, Token_And, probe_distance, kvh.mask, t_uintptr);
-			lb_emit_if(p, lb_emit_comp(p, Token_Gt, lb_addr_load(p, distance), probe_distance), insert_block, slot_next_block);
+			lbValue probe_distance = probe_distance_of(element_hash, lb_addr_load(p, pos));
+			lb_emit_if(p, lb_emit_comp(p, Token_Gt, lb_addr_load(p, distance), probe_distance), scan_block, slot_next_block);
 		}
 
 		lb_start_block(p, slot_next_block);
 		{
-			lbValue pp = lb_emit_arith(p, Token_Add, lb_addr_load(p, pos), lb_const_int(m, t_uintptr, 1), t_uintptr);
-			lb_addr_store(p, pos, lb_emit_arith(p, Token_And, pp, kvh.mask, t_uintptr));
+			next_slot(pos);
 			lb_emit_increment(p, distance.addr);
 			lb_emit_jump(p, slot_loop_block);
 		}
@@ -1015,9 +1034,94 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 			lbValue slot = lb_addr_load(p, pos);
 			lbValue key_dst   = lb_map_cell_index_static(p, type->Map.key,   kvh.ks, slot);
 			lbValue value_dst = lb_map_cell_index_static(p, type->Map.value, kvh.vs, slot);
-			lb_mem_copy_non_overlapping(p, key_dst,   key_ptr,   lb_const_int(m, t_int, type_size_of(type->Map.key)));
-			lb_mem_copy_non_overlapping(p, value_dst, value_ptr, lb_const_int(m, t_int, type_size_of(type->Map.value)));
-			lb_emit_store(p, lb_emit_ptr_offset(p, kvh.hs, slot), h);
+			lb_mem_copy_non_overlapping(p, key_dst,   key_ptr,   key_size);
+			lb_mem_copy_non_overlapping(p, value_dst, value_ptr, value_size);
+			lb_emit_store(p, hash_ptr_at(slot), h);
+
+			lb_emit_increment(p, lb_map_len_ptr(p, map_ptr));
+
+			LLVMBuildRet(p->builder, lb_emit_conv(p, value_dst, t_rawptr).value);
+		}
+
+		// NOTE(bill): The entry takes over this slot.
+		// If no tombstone comes before the next empty slot, do what map_insert_hash_dynamic` does without them:
+		// carry each displaced entry on to the next slot whose entry it is poorer than, until an empty slot
+		lb_start_block(p, scan_block);
+		{
+			lbBlock *scan_loop_block = lb_create_block(p, "scan-loop");
+			lbBlock *scan_used_block = lb_create_block(p, "scan-used");
+			lbBlock *scan_next_block = lb_create_block(p, "scan-next");
+
+			lbAddr scan = lb_add_local_generated(p, t_uintptr, false);
+			lb_addr_store(p, scan, lb_addr_load(p, pos));
+
+			lb_emit_jump(p,   scan_loop_block);
+			lb_start_block(p, scan_loop_block);
+			lbValue scan_hash = lb_emit_load(p, hash_ptr_at(lb_addr_load(p, scan)));
+			lb_emit_if(p, is_empty(scan_hash), displace_block, scan_used_block);
+
+			lb_start_block(p, scan_used_block);
+			lb_emit_if(p, is_tombstone(scan_hash), insert_block, scan_next_block);
+
+			lb_start_block(p, scan_next_block);
+			next_slot(scan);
+			lb_emit_jump(p, scan_loop_block);
+		}
+
+		lb_start_block(p, displace_block);
+		{
+			lbBlock *swap_loop_block  = lb_create_block(p, "swap-loop");
+			lbBlock *swap_probe_block = lb_create_block(p, "swap-probe");
+			lbBlock *swap_block       = lb_create_block(p, "swap");
+			lbBlock *swap_next_block  = lb_create_block(p, "swap-next");
+			lbBlock *swap_place_block = lb_create_block(p, "swap-place");
+
+			lbValue value_dst = lb_map_cell_index_static(p, type->Map.value, kvh.vs, lb_addr_load(p, pos));
+
+			lbAddr carried_key   = lb_add_local_generated(p, type->Map.key,   false);
+			lbAddr carried_value = lb_add_local_generated(p, type->Map.value, false);
+			lbAddr carried_hash  = lb_add_local_generated(p, t_uintptr,       false);
+			lbAddr temp_key      = lb_add_local_generated(p, type->Map.key,   false);
+			lbAddr temp_value    = lb_add_local_generated(p, type->Map.value, false);
+			lb_mem_copy_non_overlapping(p, carried_key.addr,   key_ptr,   key_size);
+			lb_mem_copy_non_overlapping(p, carried_value.addr, value_ptr, value_size);
+			lb_addr_store(p, carried_hash, h);
+
+			auto swap_memory = [&](lbValue a, lbValue b, lbValue temp, lbValue size) {
+				lb_mem_copy_non_overlapping(p, temp, a,    size);
+				lb_mem_copy_non_overlapping(p, a,    b,    size);
+				lb_mem_copy_non_overlapping(p, b,    temp, size);
+			};
+
+			lb_emit_jump(p,   swap_loop_block);
+			lb_start_block(p, swap_loop_block);
+			lbValue slot       = lb_addr_load(p, pos);
+			lbValue key_cell   = lb_map_cell_index_static(p, type->Map.key,   kvh.ks, slot);
+			lbValue value_cell = lb_map_cell_index_static(p, type->Map.value, kvh.vs, slot);
+			lbValue slot_hash  = lb_emit_load(p, hash_ptr_at(slot));
+			lb_emit_if(p, is_empty(slot_hash), swap_place_block, swap_probe_block);
+
+			lb_start_block(p, swap_probe_block);
+			lbValue probe_distance = probe_distance_of(slot_hash, slot);
+			lb_emit_if(p, lb_emit_comp(p, Token_Gt, lb_addr_load(p, distance), probe_distance), swap_block, swap_next_block);
+
+			lb_start_block(p, swap_block);
+			swap_memory(key_cell,   carried_key.addr,   temp_key.addr,   key_size);
+			swap_memory(value_cell, carried_value.addr, temp_value.addr, value_size);
+			lb_emit_store(p, hash_ptr_at(slot), lb_addr_load(p, carried_hash));
+			lb_addr_store(p, carried_hash, slot_hash);
+			lb_addr_store(p, distance, probe_distance);
+			lb_emit_jump(p, swap_next_block);
+
+			lb_start_block(p, swap_next_block);
+			next_slot(pos);
+			lb_emit_increment(p, distance.addr);
+			lb_emit_jump(p, swap_loop_block);
+
+			lb_start_block(p, swap_place_block);
+			lb_mem_copy_non_overlapping(p, key_cell,   carried_key.addr,   key_size);
+			lb_mem_copy_non_overlapping(p, value_cell, carried_value.addr, value_size);
+			lb_emit_store(p, hash_ptr_at(slot), lb_addr_load(p, carried_hash));
 
 			lb_emit_increment(p, lb_map_len_ptr(p, map_ptr));
 
