@@ -46,6 +46,7 @@ HRGN            :: distinct HANDLE
 HRSRC           :: distinct HANDLE
 HWINSTA         :: distinct HANDLE
 HACCEL          :: distinct HANDLE
+HCOLORSPACE     :: distinct HANDLE
 BOOL            :: distinct b32
 BYTE            :: distinct u8
 BOOLEAN         :: distinct b8
@@ -1271,7 +1272,7 @@ FF_MODERN     :: 3 << 4
 FF_SCRIPT     :: 4 << 4
 FF_DECORATIVE :: 5 << 4
 
-TIMERPROC :: #type proc "system" (HWND, UINT, UINT_PTR, DWORD)
+TIMERPROC :: #type proc "system" (hWnd: HWND, uMsg: UINT, idEvent: UINT_PTR, dwTime: DWORD)
 
 WNDPROC :: #type proc "system" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
@@ -1515,29 +1516,6 @@ MFS_ENABLED   :: MF_ENABLED
 MFS_UNCHECKED :: MF_UNCHECKED
 MFS_UNHILITE  :: MF_UNHILITE
 MFS_DEFAULT   :: MF_DEFAULT
-
-// Flags for TrackPopupMenu
-TPM_LEFTBUTTON   :: 0x0000
-TPM_RIGHTBUTTON  :: 0x0002
-TPM_LEFTALIGN    :: 0x0000
-TPM_CENTERALIGN  :: 0x0004
-TPM_RIGHTALIGN   :: 0x0008
-TPM_TOPALIGN     :: 0x0000
-TPM_VCENTERALIGN :: 0x0010
-TPM_BOTTOMALIGN  :: 0x0020
-
-TPM_HORIZONTAL      :: 0x0000     /* Horz alignment matters more */
-TPM_VERTICAL        :: 0x0040     /* Vert alignment matters more */
-TPM_NONOTIFY        :: 0x0080     /* Don't send any notification msgs */
-TPM_RETURNCMD       :: 0x0100
-TPM_RECURSE         :: 0x0001
-TPM_HORPOSANIMATION :: 0x0400
-TPM_HORNEGANIMATION :: 0x0800
-TPM_VERPOSANIMATION :: 0x1000
-TPM_VERNEGANIMATION :: 0x2000
-TPM_NOANIMATION     :: 0x4000
-TPM_LAYOUTRTL       :: 0x8000
-TPM_WORKAREA        :: 0x10000
 
 // WM_NCHITTEST and MOUSEHOOKSTRUCT Mouse Position Codes
 HTERROR       :: -2
@@ -1865,6 +1843,7 @@ MB_MODEMASK :: 0x00003000
 MB_MISCMASK :: 0x0000C000
 
 // Dialog Box Command IDs
+
 IDOK       :: 1
 IDCANCEL   :: 2
 IDABORT    :: 3
@@ -2541,6 +2520,12 @@ STOCK_LAST          :: 19
 
 CLR_INVALID :: 0xFFFFFFFF
 
+RGBTRIPLE :: struct #packed {
+	rgbtBlue:    BYTE,
+	rgbtGreen:   BYTE,
+	rgbtRed:     BYTE,
+}
+
 RGBQUAD :: struct {
 	rgbBlue:     BYTE,
 	rgbGreen:    BYTE,
@@ -2593,6 +2578,11 @@ BITMAPINFOHEADER :: struct {
 
 BITMAPINFO :: struct {
 	bmiHeader: BITMAPINFOHEADER,
+
+	// NOTE: The actual length of this array is dynamic, and depends
+	//       on the number of color table entries if the bitmap uses
+	//       indexed color, OR the number of bitfields if the bitmap
+	//       header specifies a bitfield value in `biCompression`.
 	bmiColors: [1]RGBQUAD,
 }
 
