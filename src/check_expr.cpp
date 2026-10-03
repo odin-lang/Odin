@@ -11152,7 +11152,7 @@ gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<As
 						ft = bt->Array.elem;
 						break;
 					case Type_BitField:
-						// is_constant = false;
+						is_constant = false;
 						ft = bt->BitField.fields[index]->type;
 						break;
 					default:
