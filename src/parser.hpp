@@ -155,7 +155,6 @@ struct AstFile {
 	Ast *          curr_proc;
 	isize          error_count;
 	ParseFileError last_error;
-	f64            time_to_parse;    // seconds, including tokenizing
 
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
@@ -173,6 +172,15 @@ struct AstFile {
 
 	struct LLVMOpaqueMetadata *llvm_metadata;
 	struct LLVMOpaqueMetadata *llvm_metadata_scope;
+
+	//// Profiling /////
+
+	f64            time_to_load;        // seconds
+	f64            time_to_parse;       // seconds, tokenizing included, setting up the decls excluded
+	f64            time_to_setup_decls; // seconds, mostly finding and adding the imported packages
+	u64            cpu_time_to_load;
+	u64            cpu_time_to_parse;
+	u64            cpu_time_to_setup_decls;
 };
 
 enum AstForeignFileKind {

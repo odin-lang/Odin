@@ -6399,6 +6399,15 @@ gb_internal Array<Ast *> parse_stmt_list(AstFile *f) {
 }
 
 
+// Only the report of `-show-more-timings -show-debug-messages` uses a file's CPU time,
+// and getting a thread's CPU time is a system call
+gb_internal u64 parse_thread_cpu_time_now(void) {
+	if (build_context.show_debug_messages && build_context.show_more_timings) {
+		return thread_cpu_time_now();
+	}
+	return 0;
+}
+
 gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath  = string_trim_whitespace(fullpath); // Just in case
@@ -6412,7 +6421,11 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 	gb_zero_item(&f->tokenizer);
 	f->tokenizer.curr_file_id = f->id;
 
+	u64 load_start     = time_stamp_time_now();
+	u64 load_cpu_start = parse_thread_cpu_time_now();
 	TokenizerInitError err = init_tokenizer_from_fullpath(&f->tokenizer, f->fullpath, build_context.copy_file_contents);
+	f->cpu_time_to_load = parse_thread_cpu_time_now()-load_cpu_start;
+	f->time_to_load     = cast(f64)(time_stamp_time_now()-load_start)/cast(f64)time_stamp__freq();
 	if (err != TokenizerInit_None) {
 		switch (err) {
 		case TokenizerInit_Empty:
@@ -7493,6 +7506,9 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	}
 
 	u64 start = time_stamp_time_now();
+	u64 cpu_start = parse_thread_cpu_time_now();
+	u64 setup_start = 0;
+	u64 setup_cpu_start = 0;
 
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
@@ -7593,11 +7609,19 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 		f->decls = slice_from_array(decls);
 
+		setup_start     = time_stamp_time_now();
+		setup_cpu_start = parse_thread_cpu_time_now();
 		parse_setup_file_decls(p, f, base_dir, f->decls);
 	}
 
-	u64 end = time_stamp_time_now();
-	f->time_to_parse = cast(f64)(end-start)/cast(f64)time_stamp__freq();
+	u64 end     = time_stamp_time_now();
+	u64 cpu_end = parse_thread_cpu_time_now();
+	u64 setup_ticks     = setup_start     != 0 ? end-setup_start         : 0;
+	u64 setup_cpu_ticks = setup_cpu_start != 0 ? cpu_end-setup_cpu_start : 0;
+	f->time_to_parse           = cast(f64)(end-start-setup_ticks)/cast(f64)time_stamp__freq();
+	f->time_to_setup_decls     = cast(f64)setup_ticks/cast(f64)time_stamp__freq();
+	f->cpu_time_to_parse       = cpu_end-cpu_start-setup_cpu_ticks;
+	f->cpu_time_to_setup_decls = setup_cpu_ticks;
 
 	for (int i = 0; i < AstDelayQueue_COUNT; i++) {
 		array_init(f->delayed_decls_queues+i, ast_allocator(f), 0, f->delayed_decl_count);
