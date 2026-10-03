@@ -1503,23 +1503,6 @@ gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef ty
 
 // }
 
-gb_internal LLVMValueRef lb_bit_field_load_backing(lbProcedure *p, lbAddr const &addr, LLVMValueRef *ptr_, u64 *shift_) {
-	Type *backing_type = core_type(type_deref(addr.addr.type));
-	if (is_type_integer(backing_type)) {
-		*ptr_ = addr.addr.value;
-		*shift_ = addr.bitfield.bit_offset;
-		return OdinLLVMBuildLoad(p, lb_type(p->module, backing_type), addr.addr.value);
-	}
-
-	u64 shift = addr.bitfield.bit_offset % 8;
-	u64 bytes = (shift + addr.bitfield.bit_size + 7) / 8;
-	LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_uintptr), addr.bitfield.bit_offset / 8, false);
-
-	*ptr_ = LLVMBuildGEP2(p->builder, lb_type(p->module, t_u8), addr.addr.value, &index, 1, "");
-	*shift_ = shift;
-	return OdinLLVMBuildLoadAligned(p, LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*bytes)), *ptr_, 1);
-}
-
 gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	if (addr.addr.value == nullptr) {
 		return;
@@ -1536,11 +1519,6 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	}
 
 	if (addr.kind == lbAddr_BitField) {
-		LLVMValueRef ptr = nullptr;
-		u64 shift = 0;
-		LLVMValueRef backing = lb_bit_field_load_backing(p, addr, &ptr, &shift);
-		LLVMTypeRef lit = LLVMTypeOf(backing);
-
 		LLVMValueRef field = value.value;
 		if (is_type_endian_big(addr.bitfield.type)) {
 			// NOTE: a big endian field keeps the bytes of its value in big endian order
@@ -1548,14 +1526,32 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			field = LLVMBuildLShr(p->builder, field, LLVMConstInt(LLVMTypeOf(field), pad, false), "");
 		}
 
-		LLVMValueRef offset = LLVMConstInt(lit, shift, false);
-		LLVMValueRef mask = LLVMBuildShl(p->builder, lb_const_low_bits_mask(lit, addr.bitfield.bit_size), offset, "");
-		field = LLVMBuildIntCast2(p->builder, field, lit, false, "");
-		field = LLVMBuildAnd(p->builder, LLVMBuildShl(p->builder, field, offset, ""), mask, "");
+		// NOTE: an array backing is written an element at a time, as writes to different fields are
+		// only combined when they are of the same width
+		Type *elem = core_array_type(core_type(type_deref(addr.addr.type)));
+		LLVMTypeRef lit = lb_type(p->module, elem);
+		u64 elem_bits = 8*cast(u64)type_size_of(elem);
+		u64 begin = addr.bitfield.bit_offset;
+		u64 end = begin + addr.bitfield.bit_size;
 
-		LLVMValueRef rest = LLVMBuildAnd(p->builder, backing, LLVMBuildNot(p->builder, mask, ""), "");
-		LLVMValueRef store = LLVMBuildStore(p->builder, LLVMBuildOr(p->builder, rest, field, ""), ptr);
-		LLVMSetAlignment(store, LLVMGetAlignment(backing));
+		for (u64 i = begin/elem_bits; i*elem_bits < end; i++) {
+			u64 lo = gb_max(begin, i*elem_bits);
+			u64 hi = gb_min(end, (i+1)*elem_bits);
+
+			LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_uintptr), i, false);
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lit, addr.addr.value, &index, 1, "");
+			LLVMValueRef offset = LLVMConstInt(lit, lo - i*elem_bits, false);
+			LLVMValueRef mask = LLVMBuildShl(p->builder, lb_const_low_bits_mask(lit, hi - lo), offset, "");
+
+			LLVMValueRef part = LLVMBuildLShr(p->builder, field, LLVMConstInt(LLVMTypeOf(field), lo - begin, false), "");
+			part = LLVMBuildIntCast2(p->builder, part, lit, false, "");
+			part = LLVMBuildAnd(p->builder, LLVMBuildShl(p->builder, part, offset, ""), mask, "");
+
+			LLVMValueRef old = OdinLLVMBuildLoad(p, lit, ptr);
+			LLVMValueRef rest = LLVMBuildAnd(p->builder, old, LLVMBuildNot(p->builder, mask, ""), "");
+			LLVMValueRef store = LLVMBuildStore(p->builder, LLVMBuildOr(p->builder, rest, part, ""), ptr);
+			LLVMSetAlignment(store, LLVMGetAlignment(old));
+		}
 		return;
 	} else if (addr.kind == lbAddr_Map) {
 		lb_internal_dynamic_map_set(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
@@ -2005,9 +2001,18 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 	GB_ASSERT(addr.addr.value != nullptr);
 
 	if (addr.kind == lbAddr_BitField) {
-		LLVMValueRef ptr = nullptr;
-		u64 shift = 0;
-		LLVMValueRef v = lb_bit_field_load_backing(p, addr, &ptr, &shift);
+		Type *backing_type = core_type(type_deref(addr.addr.type));
+		u64 shift = addr.bitfield.bit_offset;
+		LLVMValueRef v = nullptr;
+		if (is_type_integer(backing_type)) {
+			v = OdinLLVMBuildLoad(p, lb_type(p->module, backing_type), addr.addr.value);
+		} else {
+			LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_uintptr), shift/8, false);
+			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, t_u8), addr.addr.value, &index, 1, "");
+			shift %= 8;
+			u64 bytes = (shift + addr.bitfield.bit_size + 7)/8;
+			v = OdinLLVMBuildLoadAligned(p, LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*bytes)), ptr, 1);
+		}
 		v = LLVMBuildLShr(p->builder, v, LLVMConstInt(LLVMTypeOf(v), shift, false), "");
 		v = LLVMBuildTrunc(p->builder, v, LLVMIntTypeInContext(p->module->ctx, cast(unsigned)addr.bitfield.bit_size), "");
 
