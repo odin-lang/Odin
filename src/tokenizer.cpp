@@ -348,18 +348,14 @@ gb_internal void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *ms
 	t->error_count++;
 }
 
-gb_internal void advance_to_next_rune(Tokenizer *t) {
-	if (t->curr_rune == '\n') {
-		t->column_minus_one = -1;
-		t->line_count++;
-	}
+gb_internal void advance_to_next_rune_slow(Tokenizer *t) {
 	if (t->read_curr < t->end) {
 		t->curr = t->read_curr;
 		Rune rune = *t->read_curr;
 		if (rune == 0) {
 			tokenizer_err(t, "Illegal character NUL");
 			t->read_curr++;
-		} else if (rune & 0x80) { // not ASCII
+		} else { // not ASCII
 			isize width = utf8_decode(t->read_curr, t->end-t->read_curr, &rune);
 			t->read_curr += width;
 			if (rune == GB_RUNE_INVALID && width == 1) {
@@ -367,8 +363,6 @@ gb_internal void advance_to_next_rune(Tokenizer *t) {
 			} else if (rune == GB_RUNE_BOM && t->curr-t->start > 0){
 				tokenizer_err(t, "Illegal byte order mark");
 			}
-		} else {
-			t->read_curr++;
 		}
 		t->curr_rune = rune;
 		t->column_minus_one++;
@@ -376,6 +370,24 @@ gb_internal void advance_to_next_rune(Tokenizer *t) {
 		t->curr = t->end;
 		t->curr_rune = GB_RUNE_EOF;
 	}
+}
+
+gb_internal gb_inline void advance_to_next_rune(Tokenizer *t) {
+	if (t->curr_rune == '\n') {
+		t->column_minus_one = -1;
+		t->line_count++;
+	}
+	if (t->read_curr < t->end) {
+		u8 c = *t->read_curr;
+		if (c != 0 && c < 0x80) {
+			t->curr = t->read_curr;
+			t->read_curr++;
+			t->curr_rune = c;
+			t->column_minus_one++;
+			return;
+		}
+	}
+	advance_to_next_rune_slow(t);
 }
 
 gb_internal void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void const *data, isize size) {
