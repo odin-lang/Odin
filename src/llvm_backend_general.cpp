@@ -1935,6 +1935,33 @@ gb_internal bool lb_try_copy_loaded_aggregate(lbProcedure *p, LLVMValueRef dst, 
 	return true;
 }
 
+// Apple's linker rejects the address of a symbol stored in data at an address not aligned to a pointer,
+// as a constant of a packed struct may hold
+gb_internal bool lb_const_has_misaligned_pointer(LLVMTargetDataRef td, LLVMValueRef c, u64 offset, u64 base_align) {
+	if (LLVMIsAGlobalValue(c) || LLVMIsAConstantExpr(c) || LLVMIsABlockAddress(c)) {
+		u64 ptr_size = cast(u64)build_context.ptr_size;
+		return base_align < ptr_size || offset % ptr_size != 0;
+	}
+	LLVMTypeRef t = LLVMTypeOf(c);
+	if (LLVMIsAConstantStruct(c)) {
+		unsigned n = LLVMCountStructElementTypes(t);
+		for (unsigned i = 0; i < n; i++) {
+			if (lb_const_has_misaligned_pointer(td, LLVMGetOperand(c, i), offset + LLVMOffsetOfElement(td, t, i), base_align)) {
+				return true;
+			}
+		}
+	} else if (LLVMIsAConstantArray(c)) {
+		u64 stride = LLVMABISizeOfType(td, LLVMGetElementType(t));
+		unsigned n = cast(unsigned)LLVMGetNumOperands(c);
+		for (unsigned i = 0; i < n; i++) {
+			if (lb_const_has_misaligned_pointer(td, LLVMGetOperand(c, i), offset + i*stride, base_align)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 
@@ -1983,7 +2010,8 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			                src_ptr, lb_try_get_alignment(src_ptr_original, 1),
 			                LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
-		} else if (LLVMIsConstant(value.value)) {
+		} else if (LLVMIsConstant(value.value) &&
+		           !lb_const_has_misaligned_pointer(LLVMGetModuleDataLayout(p->module->mod), value.value, 0, cast(u64)type_align_of(value.type))) {
 			lbAddr addr = lb_add_global_generated_from_procedure(p, value.type, value);
 			lb_make_global_private_const(addr);
 
