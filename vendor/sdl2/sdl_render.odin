@@ -143,4 +143,5 @@ foreign lib {
 	GL_UnbindTexture             :: proc(texture:  ^Texture) -> c.int ---
 	RenderGetMetalLayer          :: proc(renderer: ^Renderer) -> rawptr ---
 	RenderGetMetalCommandEncoder :: proc(renderer: ^Renderer) -> rawptr ---
+	RenderSetVSync               :: proc(renderer: ^Renderer, vsync: bool) -> c.int ---
 }
