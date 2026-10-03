@@ -4959,7 +4959,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 		{
 			Ast *orig = param_value.original_ast_expr;
 			if (orig->kind == Ast_BasicDirective) {
-				gbString expr = expr_to_string(call_expression, temporary_allocator());
+				gbString expr = expr_to_string(call_expression, permanent_allocator());
 				return lb_const_string(p->module, make_string_c(expr));
 			}
 
@@ -4999,7 +4999,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 				}
 			}
 
-			gbString expr = expr_to_string(target_expr, temporary_allocator());
+			gbString expr = expr_to_string(target_expr, permanent_allocator());
 			return lb_const_string(p->module, make_string_c(expr));
 		}
 

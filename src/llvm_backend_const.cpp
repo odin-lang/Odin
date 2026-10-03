@@ -1317,8 +1317,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			isize len = value.value_string.len;
 
 			if (is_type_string16(res.type) || is_type_cstring16(res.type)) {
-				TEMPORARY_ALLOCATOR_GUARD();
-				String16 s16 = string_to_string16(temporary_allocator(), value.value_string);
+				String16 s16 = string_to_string16(permanent_allocator(), value.value_string);
 				len = s16.len;
 				ptr = lb_find_or_add_entity_string16_ptr(m, s16, custom_link_section);
 			} else {

@@ -3789,6 +3789,8 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 		return;
 	}
 
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	if (p->body != nullptr) { // Build Procedure
 		m->curr_procedure = p;
 		lb_begin_procedure_body(p);
