@@ -94,17 +94,6 @@ map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, #no_a
 	return base + offset
 }
 
-// Same as above procedure but with compile-time constant index.
-@(require_results)
-map_cell_index_dynamic_const :: proc "contextless" (base: uintptr, #no_alias info: ^Map_Cell_Info, $INDEX: uintptr) -> uintptr {
-	elements_per_cell := uintptr(info.elements_per_cell)
-	size_of_cell      := uintptr(info.size_of_cell)
-	size_of_type      := uintptr(info.size_of_type)
-	cell_index        := INDEX / elements_per_cell
-	data_index        := INDEX % elements_per_cell
-	return base + (cell_index * size_of_cell) + (data_index * size_of_type)
-}
-
 // We always round the capacity to a power of two so this becomes [16]Foo, which
 // works out to [4]Cell(Foo).
 //
@@ -264,7 +253,7 @@ map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Inf
 	sk   = map_cell_index_dynamic(hs_, INFO_HS, capacity) // Skip past hs to get start of sk
 	// Need to skip past two elements in the scratch key space to get to the start
 	// of the scratch value space, of which there's only two elements as well.
-	sv = map_cell_index_dynamic_const(sk, info.ks, 2)
+	sv = map_cell_index_dynamic(sk, info.ks, 2)
 
 	hs = ([^]Map_Hash)(hs_)
 	return
@@ -562,34 +551,55 @@ map_reserve_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_
 	}
 
 	resized := map_alloc_dynamic(info, log2_min_cap, m.allocator, loc) or_return
-
-	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
-
-	// Cache these loads to avoid hitting them in the for loop.
-	n := m.len
-	for i in 0..<old_capacity {
-		hash := hs[i]
-		if map_hash_is_empty(hash) {
-			continue
-		}
-		if map_hash_is_deleted(hash) {
-			continue
-		}
-		k := map_cell_index_dynamic(ks, info.ks, i)
-		v := map_cell_index_dynamic(vs, info.vs, i)
-		hash = info.key_hasher(rawptr(k), map_seed(resized))
-		_ = map_insert_hash_dynamic(&resized, info, hash, k, v)
-		// Only need to do this comparison on each actually added pair, so do not
-		// fold it into the for loop comparator as a micro-optimization.
-		n -= 1
-		if n == 0 {
-			break
-		}
-	}
+	map_rehash_dynamic(m^, &resized, info)
 
 	map_free_dynamic(m^, info, loc) or_return
 	m.data = resized.data
 	return nil
+}
+
+// NOTE(bill): `dst` must be newly allocated, as it is assumed to have no tombstones
+map_rehash_dynamic :: proc "odin" (src: Raw_Map, #no_alias dst: ^Raw_Map, #no_alias info: ^Map_Info) {
+	ks, vs, hs, _, _ := map_kvh_data_dynamic(src, info)
+	dks, dvs, dhs, _, _ := map_kvh_data_dynamic(dst^, info)
+	mask := (uintptr(1) << map_log2_cap(dst^)) - 1
+	seed := map_seed(dst^)
+	size_of_k := info.ks.size_of_type
+	size_of_v := info.vs.size_of_type
+
+	n := src.len
+	for i in 0..<uintptr(1) << map_log2_cap(src) {
+		if n == 0 {
+			break
+		}
+		if !map_hash_is_valid(hs[i]) {
+			continue
+		}
+		n -= 1
+
+		k := map_cell_index_dynamic(ks, info.ks, i)
+		v := map_cell_index_dynamic(vs, info.vs, i)
+		h := info.key_hasher(rawptr(k), seed)
+
+		pos := h & mask
+		distance := uintptr(0)
+		for {
+			element_hash := dhs[pos]
+			if map_hash_is_empty(element_hash) || distance > map_probe_distance(dst^, element_hash, pos) {
+				break
+			}
+			pos = (pos + 1) & mask
+			distance += 1
+		}
+
+		if map_hash_is_empty(dhs[pos]) {
+			intrinsics.mem_copy_non_overlapping(rawptr(map_cell_index_dynamic(dks, info.ks, pos)), rawptr(k), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(map_cell_index_dynamic(dvs, info.vs, pos)), rawptr(v), size_of_v)
+			dhs[pos] = h
+		} else {
+			_ = map_insert_hash_dynamic(dst, info, h, k, v)
+		}
+	}
 }
 
 
@@ -622,32 +632,7 @@ map_shrink_dynamic :: #force_no_inline proc "odin" (#no_alias m: ^Raw_Map, #no_a
 	}
 
 	shrunk := map_alloc_dynamic(info, log2_capacity_new, m.allocator) or_return
-
-	capacity := uintptr(1) << log2_capacity_new
-
-	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
-
-	n := m.len
-	for i in 0..<capacity {
-		hash := hs[i]
-		if map_hash_is_empty(hash) {
-			continue
-		}
-		if map_hash_is_deleted(hash) {
-			continue
-		}
-
-		k := map_cell_index_dynamic(ks, info.ks, i)
-		v := map_cell_index_dynamic(vs, info.vs, i)
-		hash = info.key_hasher(rawptr(k), map_seed(shrunk))
-		_ = map_insert_hash_dynamic(&shrunk, info, hash, k, v)
-		// Only need to do this comparison on each actually added pair, so do not
-		// fold it into the for loop comparator as a micro-optimization.
-		n -= 1
-		if n == 0 {
-			break
-		}
-	}
+	map_rehash_dynamic(m^, &shrunk, info)
 
 	map_free_dynamic(m^, info, loc) or_return
 	m.data = shrunk.data
