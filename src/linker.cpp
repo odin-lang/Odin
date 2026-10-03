@@ -384,6 +384,10 @@ try_cross_linking:;
 
 			if (build_context.ODIN_DEBUG) {
 				link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
+				if (build_context.build_mode != BuildMode_StaticLibrary) {
+					// NOTE(bill): `/opt:ref` would also fold identical functions, which is slow and confuses the debugger
+					link_settings = gb_string_append_fmt(link_settings, " /OPT:NOICF");
+				}
 			}
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
