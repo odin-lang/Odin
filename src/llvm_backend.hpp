@@ -450,6 +450,7 @@ gb_internal lbValue lb_const_undef(lbModule *m, Type *type);
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lbConstContext cc = LB_CONST_CONTEXT_DEFAULT);
 gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value);
 gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value);
+gb_internal LLVMValueRef lb_const_low_bits_mask(LLVMTypeRef type, u64 bit_count);
 
 
 gb_internal lbAddr lb_addr(lbValue addr);

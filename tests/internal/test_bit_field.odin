@@ -95,6 +95,33 @@ bit_field_signed_fields_sign_extend :: proc(t: ^testing.T) {
 	testing.expect_value(t, w.s, 2047)
 }
 
+// and to the full width of its type, even one wider than the backing, without taking any bits of its
+// neighbours: `lo` and `hi` are set around `s`, so a read that keeps them gets the wrong value
+@(test)
+bit_field_signed_field_wider_than_backing :: proc(t: ^testing.T) {
+	S :: bit_field u16 { lo: u8 | 5, s: i32 | 3, hi: u8 | 8 }
+
+	expected := [8]i32{0, 1, 2, 3, -4, -3, -2, -1}
+	for v in u16(0) ..< 8 {
+		x := transmute(S)(0xAA00 | v << 5 | 0b10101) // hi = 0xAA, s = v, lo = 0b10101
+		testing.expect_value(t, x.s, expected[v])
+	}
+}
+
+// an array backing is laid out the same way, with fields running across its elements
+@(test)
+bit_field_array_backing :: proc(t: ^testing.T) {
+	A :: bit_field [3]u8 { lo: u8 | 4, mid: u16 | 12, hi: i8 | 8 }
+
+	a := transmute(A)[3]u8{0x5A, 0xBC, 0xF0}
+	testing.expect_value(t, a.lo, 0xA)
+	testing.expect_value(t, a.mid, 0xBC5)
+	testing.expect_value(t, a.hi, -16)
+
+	a.mid = 0x123
+	testing.expect_value(t, transmute([3]u8)a, [3]u8{0x3A, 0x12, 0xF0})
+}
+
 // A 1-bit boolean field is well formed at every backing value: the mask leaves only bit 0, so the
 // read is 0 or 1 whichever way it is tested. Wider boolean fields are legal -- any non-zero value
 // is true -- and are not covered here
