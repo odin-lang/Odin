@@ -98,7 +98,7 @@ test_fnv64_vectors :: proc(t: ^testing.T) {
 	for vector in vectors {
 		b := transmute([]u8)vector.s
 		fnv := hash.fnv64_no_a(b)
-		testing.expectf(t, fnv == vector.h, "\n\t[FNV-64(%v)] Expected: 0x%16x, got: 0x%16x", vector.s, vector.h, fnv)
+		testing.expectf(t, fnv == vector.h, "\n\t[FNV-64(%v)] Expected: 0x%016x, got: 0x%016x", vector.s, vector.h, fnv)
 	}
 
 	testing.expect_value(t, i128(#hash(vectors[0].s, "fnv64")), i128(vectors[0].h))
@@ -148,7 +148,7 @@ test_fnv64a_vectors :: proc(t: ^testing.T) {
 	for vector in vectors {
 		b := transmute([]u8)vector.s
 		fnv := hash.fnv64a(b)
-		testing.expectf(t, fnv == vector.h, "\n\t[FNV-64a(%v)] Expected: 0x%16x, got: 0x%16x", vector.s, vector.h, fnv)
+		testing.expectf(t, fnv == vector.h, "\n\t[FNV-64a(%v)] Expected: 0x%016x, got: 0x%016x", vector.s, vector.h, fnv)
 	}
 
 	testing.expect_value(t, i128(#hash(vectors[0].s, "fnv64a")), i128(vectors[0].h))
@@ -255,7 +255,7 @@ test_murmur64_vectors :: proc(t: ^testing.T) {
 	for vector in vectors {
 		b := transmute([]u8)vector.s
 		murmur := hash.murmur64a(b)
-		testing.expectf(t, murmur == vector.h, "\n\t[MURMUR-64(%v)] Expected: 0x%16x, got: 0x%16x", vector.s, vector.h, murmur)
+		testing.expectf(t, murmur == vector.h, "\n\t[MURMUR-64(%v)] Expected: 0x%016x, got: 0x%016x", vector.s, vector.h, murmur)
 	}
 
 	testing.expect_value(t, i128(#hash(vectors[0].s, "murmur64")), i128(vectors[0].h))
@@ -280,7 +280,7 @@ test_crc16_ccitt_0x1021_vectors :: proc(t: ^testing.T) {
 	for vector in vectors {
 		b := transmute([]u8)vector.s
 		crc16 := hash.crc16_ccitt_0x1021(b)
-		testing.expectf(t, crc16 == vector.h, "\n\t[CCITT CRC-16({0:q})] Expected: 0x{1:4x}, got: 0x{2:4x}", vector.s, vector.h, crc16)
+		testing.expectf(t, crc16 == vector.h, "\n\t[CCITT CRC-16({0:q})] Expected: 0x{1:04x}, got: 0x{2:04x}", vector.s, vector.h, crc16)
 	}
 }
 
@@ -321,7 +321,7 @@ test_murmur3_x86_128 :: proc(t: ^testing.T) {
 	for vector in vectors {
 		b := transmute([]u8)vector.s
 		mm3 := hash.murmur3_x86_128(b, vector.seed)
-		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X86-128(%v)] Expected: 0x%32x, got: 0x%32x", vector.s, vector.h, mm3)
+		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X86-128(%v)] Expected: 0x%032x, got: 0x%032x", vector.s, vector.h, mm3)
 	}
 }
 
@@ -342,6 +342,6 @@ test_murmur3_x64_128 :: proc(t: ^testing.T) {
 	for vector in vectors {
 		b := transmute([]u8)vector.s
 		mm3 := hash.murmur3_x64_128(b, vector.seed)
-		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X64-128(%v)] Expected: 0x%32x, got: 0x%32x", vector.s, vector.h, mm3)
+		testing.expectf(t, mm3 == vector.h, "\n\t[CCITT MURMUR3-X64-128(%v)] Expected: 0x%032x, got: 0x%032x", vector.s, vector.h, mm3)
 	}
 }

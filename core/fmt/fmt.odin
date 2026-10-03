@@ -1037,15 +1037,17 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 	}
 
 	pad_byte: byte = ' '
-	if !fi.space && !fi.minus {
-		// a left-justified field pads to the right of the digits, where a '0' would read
-		// as part of the number rather than as filler
+	if _zero_pad(fi) {
 		pad_byte = '0'
 	}
 
 	for i := 0; i < width; i += 1 {
 		io.write_byte(fi.writer, pad_byte, &fi.n)
 	}
+}
+
+_zero_pad :: #force_inline proc(fi: ^Info) -> bool {
+	return fi.zero && !fi.minus && !fi.space
 }
 // Formats an integer value with specified base, sign, bit size, and digits
 //
@@ -1074,7 +1076,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	buf: [BUF_SIZE]byte
 	start := 0
 
-	if fi.hash && !is_signed {
+	if fi.hash && !is_signed && _zero_pad(fi) {
 		switch base {
 		case 2:
 			io.write_byte(fi.writer, '0', &fi.n)
@@ -1127,12 +1129,9 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	}
 
 	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
-	if fi.plus                           { flags += {.Plus}   }
+	if fi.hash && !_zero_pad(fi) && start == 0 { flags += {.Prefix} }
+	if fi.plus                                 { flags += {.Plus}   }
 	s := strconv.write_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
-	prev_zero := fi.zero
-	defer fi.zero = prev_zero
-	fi.zero = false
 	_pad(fi, s)
 }
 // Formats an int128 value based on the provided formatting options.
@@ -1161,8 +1160,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 
 	buf: [256]byte
 	start := 0
-
-	if fi.hash && !is_signed {
+	if fi.hash && !is_signed && _zero_pad(fi) {
 		switch base {
 		case 2:
 			io.write_byte(fi.writer, '0', &fi.n)
@@ -1209,11 +1207,11 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	}
 
 	flags: strconv.Int_Flags
-	if fi.hash && !fi.zero && start == 0 { flags += {.Prefix} }
-	if fi.plus                           { flags += {.Plus}   }
+	if fi.hash && !_zero_pad(fi) && start == 0 { flags += {.Prefix} }
+	if fi.plus                                 { flags += {.Plus}   }
 	s := strconv.write_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
-	if fi.hash && fi.zero && fi.indent == 0 {
+	if fi.hash && _zero_pad(fi) && start == 0 && fi.indent == 0 {
 		c: byte = 0
 		switch base {
 		case 2:  c = 'b'
@@ -1227,9 +1225,6 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 		}
 	}
 
-	prev_zero := fi.zero
-	defer fi.zero = prev_zero
-	fi.zero = false
 	_pad(fi, s)
 }
 // Units of measurements:
@@ -1398,7 +1393,7 @@ _pad :: proc(fi: ^Info, s: string) {
 	if fi.minus { // right pad
 		io.write_string(fi.writer, s, &fi.n)
 		fmt_write_padding(fi, width)
-	} else if !fi.space && s != "" && (s[0] == '-' || s[0] == '+') {
+	} else if _zero_pad(fi) && s != "" && (s[0] == '-' || s[0] == '+') {
 		// left pad accounting for zero pad of negative number
 		io.write_byte(fi.writer, s[0], &fi.n)
 		fmt_write_padding(fi, width)
@@ -1641,6 +1636,10 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	u := u64(uintptr(p))
 	switch verb {
 	case 'p', 'v', 'w':
+		prev_zero := fi.zero
+		defer fi.zero = prev_zero
+		fi.zero = true
+
 		if !fi.hash {
 			io.write_string(fi.writer, "0x", &fi.n)
 		}
@@ -1832,6 +1831,7 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 		if as_arg && !fi.width_set {
 			fi.width_set = true
 			fi.width = int(bit_size)
+			fi.zero = true
 		}
 
 		switch bit_size {
