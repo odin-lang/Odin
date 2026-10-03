@@ -946,7 +946,11 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		Type *value_type = value.variant_type;
 		switch (value.kind) {
 		case ExactValue_Invalid:
-			return lb_const_nil(m, original_type);
+			// the zero value of a variant, e.g. a field omitted from a constant compound literal
+			if (value_type == nullptr || are_types_identical(value_type, original_type)) {
+				return lb_const_nil(m, original_type);
+			}
+			break;
 
 		case ExactValue_Compound: {
 			ast_node(cl, CompoundLit, value.value_compound);
