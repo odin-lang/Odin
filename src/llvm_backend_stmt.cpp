@@ -334,7 +334,7 @@ gb_internal void lb_open_scope(lbProcedure *p, Scope *s, bool lifetime_scope=fal
 			LLVMMetadataRef file = nullptr;
 			AstFile *ast_file = s->node->file();
 			if (ast_file != nullptr) {
-				file = lb_get_llvm_metadata(m, ast_file);
+				file = lb_get_file_metadata(m, ast_file);
 			}
 			LLVMMetadataRef scope = nullptr;
 			if (p->scope_stack.count > 0) {

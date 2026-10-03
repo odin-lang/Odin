@@ -2,6 +2,8 @@ package strconv
 
 import "core:math/bits"
 
+_ :: bits // needed for STRCONV_FAST_FLOAT=false
+
 /*
 	Eisel-Lemire decimal to binary conversion.
 
@@ -21,6 +23,12 @@ import "core:math/bits"
 	- Noble Mushtak, Daniel Lemire, "Fast Number Parsing Without Fallback",
 	  Software: Practice and Experience 53 (7), 2023. https://arxiv.org/abs/2212.06644
 */
+
+/*
+	Disable with `-define:STRCONV_FAST_FLOAT=false` to drop the Eisel-Lemire step
+	and its table.
+*/
+FAST_FLOAT :: #config(STRCONV_FAST_FLOAT, true)
 
 _SMALLEST_POWER_OF_FIVE :: -342
 

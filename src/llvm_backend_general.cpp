@@ -90,9 +90,15 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 		}
 		module_name = gb_string_appendc(module_name, "$parapoly");
 	}
+	if (m->split_part > 0) {
+		module_name = gb_string_append_fmt(module_name, "$%d", m->split_part);
+	}
 
 	m->module_name = module_name;
 	m->ctx = LLVMContextCreate();
+	lb_metadata_kind(m, ODIN_METADATA_IS_PACKED);
+	lb_metadata_kind(m, ODIN_METADATA_MIN_ALIGN);
+	lb_metadata_kind(m, ODIN_METADATA_MAX_ALIGN);
 	LLVMContextSetDiagnosticHandler(m->ctx, lb_llvm_diagnostic_handler, nullptr);
 	m->mod = LLVMModuleCreateWithNameInContext(m->module_name, m->ctx);
 	// m->debug_builder = nullptr;
@@ -158,6 +164,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 
 	array_init(&m->global_procedures_to_create, a, 0, 1024);
 	array_init(&m->global_types_to_create, a, 0, 1024);
+	array_init(&m->global_variables, a);
 	mpsc_init(&m->missing_procedures_to_check, a);
 	map_init(&m->debug_values);
 
@@ -185,10 +192,232 @@ gb_internal void lb_init_module(lbModule *m, bool do_threading) {
 	}
 }
 
+gb_internal i64 lb_estimate_file_code_sizes(CheckerInfo *info, PtrMap<AstFile *, i64> *sizes) {
+	i64 total = 0;
+	for (Entity *e : info->entities) {
+		if (e->file == nullptr || e->min_dep_count.load(std::memory_order_relaxed) == 0) {
+			continue;
+		}
+		if (e->scope == nullptr || (e->scope->flags & ScopeFlag_File) == 0) {
+			continue;
+		}
+		DeclInfo *d = e->decl_info;
+		Ast *code = nullptr;
+		if (e->kind == Entity_Procedure) {
+			if (d != nullptr && d->proc_lit != nullptr && d->proc_lit->kind == Ast_ProcLit) {
+				code = d->proc_lit->ProcLit.body;
+			}
+		} else if (e->kind == Entity_Variable) {
+			if (d != nullptr) {
+				code = d->init_expr;
+			}
+		}
+		if (code == nullptr) {
+			continue;
+		}
+		i64 size = gb_max(cast(i64)(ast_end_token(code).pos.offset - ast_token(code).pos.offset), 1);
+		i64 *found = map_get(sizes, e->file);
+		if (found) {
+			*found += size;
+		} else {
+			map_set(sizes, e->file, size);
+		}
+		total += size;
+	}
+	return total;
+}
+
+gb_internal void lb_split_package_into_modules(lbGenerator *gen, Checker *c, AstPackage *pkg, PtrMap<AstFile *, i64> *file_sizes, i64 share, bool do_threading) {
+	i64 pkg_size = 0;
+	for (AstFile *f : pkg->files) {
+		i64 *size = map_get(file_sizes, f);
+		pkg_size += size ? *size : 0;
+	}
+	if (pkg_size <= share + share/2) {
+		return;
+	}
+
+	auto files = array_make<AstFile *>(heap_allocator(), 0, pkg->files.count);
+	defer (array_free(&files));
+	for (AstFile *f : pkg->files) {
+		array_add(&files, f);
+	}
+	array_sort(files, [](void const *a, void const *b) -> int {
+		return string_compare((*cast(AstFile **)a)->fullpath, (*cast(AstFile **)b)->fullpath);
+	});
+
+	i64 group_count = (pkg_size + share - 1) / share;
+	i64 group_size_target = pkg_size / group_count;
+
+	lbModule *group = nullptr;
+	i64 group_size = 0;
+	for (AstFile *f : files) {
+		if (group == nullptr || group_size >= group_size_target) {
+			group = permanent_alloc_item<lbModule>();
+			group->file    = f;
+			group->pkg     = pkg;
+			group->gen     = gen;
+			group->checker = c;
+			map_set(&gen->modules, cast(void *)group, group);
+			lb_init_module(group, do_threading);
+
+			if (LLVM_WEAK_MONOMORPHIZATION) {
+				auto pm = permanent_alloc_item<lbModule>();
+				pm->file    = f;
+				pm->pkg     = pkg;
+				pm->gen     = gen;
+				pm->checker = c;
+				group->polymorphic_module = pm;
+				pm->polymorphic_module    = pm;
+				map_set(&gen->modules, cast(void *)pm, pm);
+				lb_init_module(pm, do_threading);
+			}
+			group_size = 0;
+		}
+		map_set(&gen->file_modules, f, group);
+		i64 *size = map_get(file_sizes, f);
+		group_size += size ? *size : 0;
+	}
+}
+
+gb_internal lbModule *lb_module_of_file(lbGenerator *gen, AstFile *file) {
+	lbModule **found = map_get(&gen->modules, cast(void *)file);
+	if (found == nullptr) {
+		found = map_get(&gen->file_modules, file);
+	}
+	if (found == nullptr && file->pkg != nullptr) {
+		found = map_get(&gen->modules, cast(void *)file->pkg);
+	}
+	return found ? *found : &gen->default_module;
+}
+
+gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp);
+
+struct lbInstanceSize {
+	Entity *e;
+	i64     size;
+};
+
+gb_internal void lb_split_instances_into_modules(lbGenerator *gen, Checker *c, PtrMap<AstFile *, i64> *file_sizes, i64 share, bool do_threading) {
+	PtrMap<lbModule *, i64> module_sizes = {};
+	map_init(&module_sizes);
+	defer (map_destroy(&module_sizes));
+	for (auto const &entry : gen->info->packages) {
+		for (AstFile *f : entry.value->files) {
+			i64 *size = map_get(file_sizes, f);
+			lbModule *m = lb_module_of_file(gen, f);
+			i64 *total = map_get(&module_sizes, m);
+			if (total) {
+				*total += size ? *size : 0;
+			} else {
+				map_set(&module_sizes, m, size ? *size : 0);
+			}
+		}
+	}
+
+	PtrMap<lbModule *, isize> module_instances = {};
+	map_init(&module_instances);
+	defer (map_destroy(&module_instances));
+	auto instances = array_make<Array<lbInstanceSize>>(heap_allocator());
+	defer ({
+		for (auto &list : instances) {
+			array_free(&list);
+		}
+		array_free(&instances);
+	});
+	auto modules = array_make<lbModule *>(heap_allocator());
+	defer (array_free(&modules));
+
+	for (Entity *e : gen->info->entities) {
+		if (e->kind != Entity_Procedure || !e->Procedure.generated_from_polymorphic || e->file == nullptr ||
+		    e->min_dep_count.load(std::memory_order_relaxed) == 0) {
+			continue;
+		}
+		if (e->scope == nullptr || (e->scope->flags & ScopeFlag_File) == 0) {
+			continue;
+		}
+		DeclInfo *d = e->decl_info;
+		if (d == nullptr || d->proc_lit == nullptr || d->proc_lit->kind != Ast_ProcLit || d->proc_lit->ProcLit.body == nullptr) {
+			continue;
+		}
+		lbModule *m = lb_module_of_file(gen, e->file);
+		i64 *total = map_get(&module_sizes, m);
+		if (total == nullptr || *total <= share + share/2) {
+			continue;
+		}
+		Ast *body = d->proc_lit->ProcLit.body;
+		i64 size = gb_max(cast(i64)(ast_end_token(body).pos.offset - ast_token(body).pos.offset), 1);
+
+		isize *index = map_get(&module_instances, m);
+		if (index == nullptr) {
+			map_set(&module_instances, m, instances.count);
+			array_add(&instances, array_make<lbInstanceSize>(heap_allocator()));
+			array_add(&modules, m);
+			index = map_get(&module_instances, m);
+		}
+		array_add(&instances[*index], lbInstanceSize{e, size});
+	}
+
+	for_array(i, modules) {
+		lbModule *m = modules[i];
+		auto &list = instances[i];
+		i64 total = *map_get(&module_sizes, m);
+		i64 instances_size = 0;
+		for (auto const &inst : list) {
+			instances_size += inst.size;
+		}
+
+		isize part_count = cast(isize)((total + share - 1) / share);
+		if (part_count < 2) {
+			continue;
+		}
+		array_sort(list, [](void const *a, void const *b) -> int {
+			lbInstanceSize const *x = cast(lbInstanceSize const *)a;
+			lbInstanceSize const *y = cast(lbInstanceSize const *)b;
+			if (x->size != y->size) {
+				return x->size > y->size ? -1 : +1;
+			}
+			return llvm_global_entity_cmp(&x->e, &y->e);
+		});
+
+		auto parts = array_make<lbModule *>(heap_allocator(), part_count);
+		auto loads = array_make<i64>(heap_allocator(), part_count);
+		defer (array_free(&parts));
+		defer (array_free(&loads));
+		parts[0] = m;
+		loads[0] = gb_max(total - instances_size, 0);
+		for (isize k = 1; k < part_count; k++) {
+			lbModule *pm = permanent_alloc_item<lbModule>();
+			pm->file       = m->file;
+			pm->pkg        = m->pkg;
+			pm->gen        = gen;
+			pm->checker    = c;
+			pm->split_part = cast(i32)k;
+			map_set(&gen->modules, cast(void *)pm, pm);
+			lb_init_module(pm, do_threading);
+			parts[k] = pm;
+		}
+
+		for (auto const &inst : list) {
+			isize best = 0;
+			for (isize k = 1; k < part_count; k++) {
+				if (loads[k] < loads[best]) {
+					best = k;
+				}
+			}
+			loads[best] += inst.size;
+			if (best != 0) {
+				inst.e->decl_info->code_gen_module.store(parts[best], std::memory_order_relaxed);
+			}
+		}
+	}
+}
+
 gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	if (global_error_collector.count != 0) {
 		return false;
 	}
+	global_types_are_complete.store(true);
 
 	isize tc = c->parser->total_token_count;
 	if (tc < 2) {
@@ -206,9 +435,15 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	map_init(&gen->modules, gen->info->packages.count*2);
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
+	map_init(&gen->file_modules);
+	array_init(&gen->global_init_procedures, heap_allocator());
 
 	if (USE_SEPARATE_MODULES) {
 		bool module_per_file = build_context.module_per_file && (build_context.optimization_level <= 0 || build_context.lto_kind != LTO_None);
+		PtrMap<AstFile *, i64> file_sizes = {};
+		map_init(&file_sizes, 1024);
+		i64 share = gb_max(lb_estimate_file_code_sizes(gen->info, &file_sizes) / 32, 1);
+
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
 			auto m = permanent_alloc_item<lbModule>();
@@ -232,6 +467,9 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			}
 
 			bool allow_for_per_file = pkg->kind == Package_Runtime || module_per_file;
+			if (!allow_for_per_file) {
+				lb_split_package_into_modules(gen, c, pkg, &file_sizes, share, do_threading);
+			}
 
 			#if 0
 			if (!allow_for_per_file) {
@@ -284,6 +522,10 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 					lb_init_module(pm, do_threading);
 				}
 			}
+		}
+
+		if (!LLVM_WEAK_MONOMORPHIZATION) {
+			lb_split_instances_into_modules(gen, c, &file_sizes, share, do_threading);
 		}
 
 		if (LLVM_WEAK_MONOMORPHIZATION) {
@@ -470,20 +712,16 @@ gb_internal lbValue lb_zero(lbModule *m, Type *t) {
 	return v;
 }
 gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned index) {
-	LLVMValueRef res = agg;
-	GB_ASSERT(LLVMIsConstant(res));
-	res = LLVMBuildExtractValue(m->const_dummy_builder, res, index, "");
-	GB_ASSERT(LLVMIsConstant(res));
+	GB_ASSERT(LLVMIsConstant(agg));
+	LLVMValueRef res = LLVMGetAggregateElement(agg, index);
+	GB_ASSERT(res != nullptr);
 	return res;
 }
 
 gb_internal LLVMValueRef llvm_const_extract_value(lbModule *m, LLVMValueRef agg, unsigned *indices, isize count) {
-	// return LLVMConstExtractValue(value, indices, count);
 	LLVMValueRef res = agg;
-	GB_ASSERT(LLVMIsConstant(res));
 	for (isize i = 0; i < count; i++) {
-		res = LLVMBuildExtractValue(m->const_dummy_builder, res, indices[i], "");
-		GB_ASSERT(LLVMIsConstant(res));
+		res = llvm_const_extract_value(m, res, indices[i]);
 	}
 	return res;
 }
@@ -572,6 +810,10 @@ gb_internal lbModule *lb_module_of_expr(lbGenerator *gen, Ast *expr) {
 		if (found) {
 			return *found;
 		}
+		found = map_get(&gen->file_modules, file);
+		if (found) {
+			return *found;
+		}
 
 		if (file->pkg) {
 			found = map_get(&gen->modules, cast(void *)file->pkg);
@@ -595,6 +837,11 @@ gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, 
 	}
 	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
+		if (found) {
+			GB_ASSERT(*found != nullptr);
+			return *found;
+		}
+		found = map_get(&gen->file_modules, e->file);
 		if (found) {
 			GB_ASSERT(*found != nullptr);
 			return *found;
@@ -1130,10 +1377,6 @@ gb_internal u64 lb_gcd_u64(u64 a, u64 b) {
 }
 
 gb_internal u64 lb_known_address_alignment(lbModule *m, LLVMValueRef ptr, u64 assumed) {
-	// NOTE(bill): The alignment an address is known to have from the GEPs leading to it: within a local or a global, that
-	// of its offset from it, and none beyond a field of a packed struct, or that a struct caps its fields to, as marked on
-	// the GEP of the field. Of an address within anything else, it is `assumed`, i.e. that of the type it points to.
-
 	LLVMTargetDataRef td = LLVMGetModuleDataLayout(m->mod);
 	u64 offsets = 0;
 	for (isize depth = 0; ptr != nullptr && depth < 64; depth++) {
@@ -1570,6 +1813,154 @@ gb_internal bool lb_is_type_proc_recursive(Type *t) {
 	}
 }
 
+// LLVM's fast instruction selector, used for unoptimized code, hands anything it cannot select
+// (such as `llvm.memmove` or the `*.inline` intrinsics) to SelectionDAG, which is far slower
+gb_internal bool lb_uses_fast_isel(void) {
+	return (build_context.optimization_level <= 0 || build_context.fast_isel) && is_arch_x86();
+}
+
+gb_internal void lb_emit_memmove(lbProcedure *p, LLVMValueRef dst, unsigned dst_align, LLVMValueRef src, unsigned src_align, LLVMValueRef len) {
+	if (!lb_uses_fast_isel()) {
+		LLVMBuildMemMove(p->builder, dst, dst_align, src, src_align, len);
+		return;
+	}
+	lbModule *m = p->module;
+	LLVMTypeRef ptr_type = lb_type(m, t_rawptr);
+	LLVMTypeRef int_type = lb_type(m, t_int);
+
+	if (LLVMIsConstant(len)) {
+		i64 size = cast(i64)LLVMConstIntGetZExtValue(len);
+		if (size == 1 || size == 2 || size == 4 || size == 8) {
+			LLVMTypeRef chunk_type = LLVMIntTypeInContext(m->ctx, cast(unsigned)(8*size));
+			LLVMValueRef value = LLVMBuildLoad2(p->builder, chunk_type, src, "");
+			LLVMSetAlignment(value, gb_max(src_align, 1u));
+			LLVMValueRef store = LLVMBuildStore(p->builder, value, dst);
+			LLVMSetAlignment(store, gb_max(dst_align, 1u));
+			return;
+		}
+	}
+
+	LLVMTypeRef params[3] = {ptr_type, ptr_type, int_type};
+	LLVMTypeRef proc_type = LLVMFunctionType(ptr_type, params, gb_count_of(params), false);
+	LLVMValueRef proc = LLVMGetNamedFunction(m->mod, "memmove");
+	if (proc == nullptr) {
+		proc = LLVMAddFunction(m->mod, "memmove", proc_type);
+	}
+	LLVMValueRef args[3] = {dst, src, LLVMBuildIntCast2(p->builder, len, int_type, false, "")};
+	LLVMBuildCall2(p->builder, proc_type, proc, args, gb_count_of(args), "");
+}
+
+// LLVM's fast instruction selector cannot select an aggregate load or store
+// Oh, how do I love LLVM /s
+gb_internal bool lb_copies_aggregates_as_scalars(lbProcedure *p) {
+	return p->is_startup || build_context.optimization_level < 0;
+}
+
+gb_internal unsigned lb_alignment_at_offset(unsigned alignment, i64 offset, i64 size) {
+	unsigned a = gb_max(alignment, 1u);
+	while (a > 1 && (offset % a) != 0) {
+		a >>= 1;
+	}
+	return cast(unsigned)gb_min(cast(i64)a, size);
+}
+
+gb_internal bool lb_try_copy_loaded_aggregate(lbProcedure *p, LLVMValueRef dst, LLVMValueRef load) {
+	enum {MAX_SCALAR_COPY_SIZE = 64};
+
+	if (load == nullptr || !LLVMIsALoadInst(load) || LLVMGetVolatile(load) || LLVMGetOrdering(load) != LLVMAtomicOrderingNotAtomic) {
+		return false;
+	}
+	LLVMTypeRef type = LLVMTypeOf(load);
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind != LLVMStructTypeKind && kind != LLVMArrayTypeKind) {
+		return false;
+	}
+	i64 size = lb_sizeof(type);
+	if (size <= 0) {
+		return false;
+	}
+
+	LLVMBasicBlockRef block = LLVMGetInsertBlock(p->builder);
+	if (block == nullptr || LLVMGetInstructionParent(load) != block) {
+		return false;
+	}
+	isize steps = 0;
+	for (LLVMValueRef i = LLVMGetLastInstruction(block); i != load; i = LLVMGetPreviousInstruction(i)) {
+		if (i == nullptr || ++steps > 16 ||
+		    LLVMIsAStoreInst(i) || LLVMIsACallInst(i) || LLVMIsAInvokeInst(i) ||
+		    LLVMIsAAtomicRMWInst(i) || LLVMIsAAtomicCmpXchgInst(i)) {
+			return false;
+		}
+	}
+
+	LLVMContextRef ctx = p->module->ctx;
+	LLVMValueRef src = LLVMGetOperand(load, 0);
+	LLVMTypeRef i8  = LLVMInt8TypeInContext(ctx);
+	LLVMTypeRef i64_type = LLVMInt64TypeInContext(ctx);
+
+	if (size > MAX_SCALAR_COPY_SIZE) {
+		lb_emit_memmove(p, dst, lb_try_get_alignment(dst, 1), src, LLVMGetAlignment(load), LLVMConstInt(i64_type, size, false));
+		return true;
+	}
+
+	unsigned src_alignment = LLVMGetAlignment(load);
+	unsigned dst_alignment = lb_try_get_alignment(dst, 1);
+
+	LLVMValueRef values [MAX_SCALAR_COPY_SIZE/8 + 3] = {};
+	i64          offsets[MAX_SCALAR_COPY_SIZE/8 + 3] = {};
+	i64          sizes  [MAX_SCALAR_COPY_SIZE/8 + 3] = {};
+	isize count = 0;
+	for (i64 offset = 0; offset < size; /**/) {
+		i64 n = 8;
+		while (offset + n > size) {
+			n >>= 1;
+		}
+		LLVMValueRef index = LLVMConstInt(i64_type, offset, false);
+		LLVMValueRef ptr = offset ? LLVMBuildInBoundsGEP2(p->builder, i8, src, &index, 1, "") : src;
+		LLVMValueRef v = LLVMBuildLoad2(p->builder, LLVMIntTypeInContext(ctx, cast(unsigned)(8*n)), ptr, "");
+		LLVMSetAlignment(v, lb_alignment_at_offset(src_alignment, offset, n));
+		values [count] = v;
+		offsets[count] = offset;
+		sizes  [count] = n;
+		count += 1;
+		offset += n;
+	}
+	for (isize i = 0; i < count; i++) {
+		LLVMValueRef index = LLVMConstInt(i64_type, offsets[i], false);
+		LLVMValueRef ptr = offsets[i] ? LLVMBuildInBoundsGEP2(p->builder, i8, dst, &index, 1, "") : dst;
+		LLVMValueRef s = LLVMBuildStore(p->builder, values[i], ptr);
+		LLVMSetAlignment(s, lb_alignment_at_offset(dst_alignment, offsets[i], sizes[i]));
+	}
+	return true;
+}
+
+// Apple's linker rejects the address of a symbol stored in data at an address not aligned to a pointer,
+// as a constant of a packed struct may hold
+gb_internal bool lb_const_has_misaligned_pointer(LLVMTargetDataRef td, LLVMValueRef c, u64 offset, u64 base_align) {
+	if (LLVMIsAGlobalValue(c) || LLVMIsAConstantExpr(c) || LLVMIsABlockAddress(c)) {
+		u64 ptr_size = cast(u64)build_context.ptr_size;
+		return base_align < ptr_size || offset % ptr_size != 0;
+	}
+	LLVMTypeRef t = LLVMTypeOf(c);
+	if (LLVMIsAConstantStruct(c)) {
+		unsigned n = LLVMCountStructElementTypes(t);
+		for (unsigned i = 0; i < n; i++) {
+			if (lb_const_has_misaligned_pointer(td, LLVMGetOperand(c, i), offset + LLVMOffsetOfElement(td, t, i), base_align)) {
+				return true;
+			}
+		}
+	} else if (LLVMIsAConstantArray(c)) {
+		u64 stride = LLVMABISizeOfType(td, LLVMGetElementType(t));
+		unsigned n = cast(unsigned)LLVMGetNumOperands(c);
+		for (unsigned i = 0; i < n; i++) {
+			if (lb_const_has_misaligned_pointer(td, LLVMGetOperand(c, i), offset + i*stride, base_align)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 
@@ -1613,12 +2004,13 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
-			LLVMBuildMemMove(p->builder,
-			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-			                 src_ptr, lb_try_get_alignment(src_ptr_original, 1),
-			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+			lb_emit_memmove(p,
+			                dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                src_ptr, lb_try_get_alignment(src_ptr_original, 1),
+			                LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
-		} else if (LLVMIsConstant(value.value)) {
+		} else if (LLVMIsConstant(value.value) &&
+		           !lb_const_has_misaligned_pointer(LLVMGetModuleDataLayout(p->module->mod), value.value, 0, cast(u64)type_align_of(value.type))) {
 			lbAddr addr = lb_add_global_generated_from_procedure(p, value.type, value);
 			lb_make_global_private_const(addr);
 
@@ -1626,10 +2018,10 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMValueRef src_ptr = addr.addr.value;
 			src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
 
-			LLVMBuildMemMove(p->builder,
-			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-			                 src_ptr, lb_try_get_alignment(src_ptr, 1),
-			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+			LLVMBuildMemCpy(p->builder,
+			                dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                src_ptr, lb_try_get_alignment(src_ptr, 1),
+			                LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		}
 	}
@@ -1652,6 +2044,9 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			GB_ASSERT_MSG(are_types_identical(a, value.type), "%s != %s", type_to_string(a), type_to_string(value.type));
 		}
 
+		if (lb_copies_aggregates_as_scalars(p) && lb_try_copy_loaded_aggregate(p, ptr.value, value.value)) {
+			return;
+		}
 		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
 	}
 	if (instr != nullptr) {
@@ -3673,19 +4068,14 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		return *found;
 	}
 
-	bool ignore_body = false;
-
 	lbModule *other_module = m;
 	if (USE_SEPARATE_MODULES) {
 		other_module = lb_module_of_entity(gen, e, m);
 	}
-	if (other_module == m) {
-		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
-	}
-	ignore_body = other_module != m;
+	bool ignore_body = other_module != m;
 
-	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
-	if (missing_proc == nullptr) {
+	lbProcedure *proc = lb_create_procedure(m, e, ignore_body);
+	if (proc == nullptr) {
 		// This is an unspecialized polymorphic procedure, which should not be codegen'd
 		lbValue dummy = {};
 		dummy.value = nullptr;
@@ -3693,18 +4083,28 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		return dummy;
 	}
 
-	if (ignore_body) {
-		GB_ASSERT(other_module != nullptr);
+	// NOTE(bill): Until the modules are generated in parallel, a procedure may be referenced before it is created
+	// (e.g. an @(init) procedure by the startup procedure), but after that it was missed by the frontend
+	bool missing = gen->modules_in_parallel;
+
+	if (!ignore_body) {
+		if (missing) {
+			debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
+		}
+		mpsc_enqueue(&m->procedures_to_generate, proc);
+	} else {
 		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
 		rw_mutex_shared_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
-			// THIS IS THE RACE CONDITION
-			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
-			mpsc_enqueue(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
+			if (missing) {
+				debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), other_module);
+				// another module's context may only be used by the thread generating that module
+				mpsc_enqueue(&other_module->missing_procedures_to_check, e);
+			} else {
+				mpsc_enqueue(&other_module->procedures_to_generate, lb_create_procedure(other_module, e, false));
+			}
 		}
-	} else {
-		mpsc_enqueue(&m->missing_procedures_to_check, missing_proc);
 	}
 
 	rw_mutex_shared_lock(&m->values_mutex);
@@ -3766,6 +4166,10 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	e->scope = e->file->scope;
 
 	lbModule *target_module = m;
+	// another module may only be added to before the modules are generated in parallel
+	if (m == &gen->default_module && parent == nullptr && !gen->modules_in_parallel) {
+		target_module = lb_module_of_expr(gen, expr);
+	}
 	GB_ASSERT(target_module != nullptr);
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
@@ -3783,8 +4187,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		lbValue *found = map_get(&target_module->values, e);
 		rw_mutex_shared_unlock(&target_module->values_mutex);
 		if (found == nullptr) {
-			lbProcedure *missing_proc_in_target_module = lb_create_procedure(target_module, e, false);
-			mpsc_enqueue(&target_module->missing_procedures_to_check, missing_proc_in_target_module);
+			mpsc_enqueue(&target_module->procedures_to_generate, lb_create_procedure(target_module, e, false));
 		}
 
 		lbProcedure *p = lb_create_procedure(m, e, true);
