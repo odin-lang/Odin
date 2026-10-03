@@ -1814,6 +1814,43 @@ gb_internal bool lb_is_type_proc_recursive(Type *t) {
 	}
 }
 
+// LLVM's fast instruction selector, used for unoptimized code, hands anything it cannot select
+// (such as `llvm.memmove` or the `*.inline` intrinsics) to SelectionDAG, which is far slower
+gb_internal bool lb_uses_fast_isel(void) {
+	return (build_context.optimization_level <= 0 || build_context.fast_isel) && is_arch_x86();
+}
+
+gb_internal void lb_emit_memmove(lbProcedure *p, LLVMValueRef dst, unsigned dst_align, LLVMValueRef src, unsigned src_align, LLVMValueRef len) {
+	if (!lb_uses_fast_isel()) {
+		LLVMBuildMemMove(p->builder, dst, dst_align, src, src_align, len);
+		return;
+	}
+	lbModule *m = p->module;
+	LLVMTypeRef ptr_type = lb_type(m, t_rawptr);
+	LLVMTypeRef int_type = lb_type(m, t_int);
+
+	if (LLVMIsConstant(len)) {
+		i64 size = cast(i64)LLVMConstIntGetZExtValue(len);
+		if (size == 1 || size == 2 || size == 4 || size == 8) {
+			LLVMTypeRef chunk_type = LLVMIntTypeInContext(m->ctx, cast(unsigned)(8*size));
+			LLVMValueRef value = LLVMBuildLoad2(p->builder, chunk_type, src, "");
+			LLVMSetAlignment(value, gb_max(src_align, 1u));
+			LLVMValueRef store = LLVMBuildStore(p->builder, value, dst);
+			LLVMSetAlignment(store, gb_max(dst_align, 1u));
+			return;
+		}
+	}
+
+	LLVMTypeRef params[3] = {ptr_type, ptr_type, int_type};
+	LLVMTypeRef proc_type = LLVMFunctionType(ptr_type, params, gb_count_of(params), false);
+	LLVMValueRef proc = LLVMGetNamedFunction(m->mod, "memmove");
+	if (proc == nullptr) {
+		proc = LLVMAddFunction(m->mod, "memmove", proc_type);
+	}
+	LLVMValueRef args[3] = {dst, src, LLVMBuildIntCast2(p->builder, len, int_type, false, "")};
+	LLVMBuildCall2(p->builder, proc_type, proc, args, gb_count_of(args), "");
+}
+
 // LLVM's fast instruction selector cannot select an aggregate load or store
 // Oh, how do I love LLVM /s
 gb_internal bool lb_copies_aggregates_as_scalars(lbProcedure *p) {
@@ -1863,7 +1900,7 @@ gb_internal bool lb_try_copy_loaded_aggregate(lbProcedure *p, LLVMValueRef dst, 
 	LLVMTypeRef i64_type = LLVMInt64TypeInContext(ctx);
 
 	if (size > MAX_SCALAR_COPY_SIZE) {
-		LLVMBuildMemMove(p->builder, dst, lb_try_get_alignment(dst, 1), src, LLVMGetAlignment(load), LLVMConstInt(i64_type, size, false));
+		lb_emit_memmove(p, dst, lb_try_get_alignment(dst, 1), src, LLVMGetAlignment(load), LLVMConstInt(i64_type, size, false));
 		return true;
 	}
 
@@ -1941,10 +1978,10 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
-			LLVMBuildMemMove(p->builder,
-			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-			                 src_ptr, lb_try_get_alignment(src_ptr_original, 1),
-			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+			lb_emit_memmove(p,
+			                dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                src_ptr, lb_try_get_alignment(src_ptr_original, 1),
+			                LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		} else if (LLVMIsConstant(value.value)) {
 			lbAddr addr = lb_add_global_generated_from_procedure(p, value.type, value);
@@ -1954,10 +1991,10 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMValueRef src_ptr = addr.addr.value;
 			src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
 
-			LLVMBuildMemMove(p->builder,
-			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-			                 src_ptr, lb_try_get_alignment(src_ptr, 1),
-			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+			LLVMBuildMemCpy(p->builder,
+			                dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                src_ptr, lb_try_get_alignment(src_ptr, 1),
+			                LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		}
 	}

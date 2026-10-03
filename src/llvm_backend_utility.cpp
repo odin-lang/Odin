@@ -113,6 +113,27 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 	}
 
 
+	if (is_inlinable && !is_volatile && lb_uses_fast_isel()) {
+		LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr, lb_type(p->module, t_rawptr), "");
+		LLVMValueRef last = nullptr;
+		for (i64 offset = 0; offset < const_len; /**/) {
+			i64 chunk = 8;
+			while (chunk > const_len - offset) {
+				chunk >>= 1;
+			}
+			LLVMTypeRef chunk_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*chunk));
+			LLVMValueRef chunk_ptr = dst;
+			if (offset != 0) {
+				LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_int), offset, false);
+				chunk_ptr = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), dst, &index, 1, "");
+			}
+			last = LLVMBuildStore(p->builder, LLVMConstNull(chunk_type), chunk_ptr);
+			LLVMSetAlignment(last, 1);
+			offset += chunk;
+		}
+		return last;
+	}
+
 	char const *name = "llvm.memset";
 	if (is_inlinable) {
 		name = "llvm.memset.inline";

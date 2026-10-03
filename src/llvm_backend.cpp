@@ -2545,6 +2545,531 @@ gb_internal bool lb_is_module_empty(lbModule *m) {
 	return true;
 }
 
+// NOTE(bill, 2026-10-03)
+//
+// LLVM's fast instruction selector cannot select a first class aggregate `load`, `store`, `insertvalue`, or `select`,
+// and hands the rest of the block to SelectionDAG.
+// SROA leaves many behind so it stores/loads the fields instead
+enum {
+	LB_SCALARIZE_MAX_LEAVES = 32,
+	LB_SCALARIZE_MAX_DEPTH  = 8,
+};
+
+struct lbAggregateLeaf {
+	unsigned path[LB_SCALARIZE_MAX_DEPTH];
+	unsigned depth;
+};
+
+struct lbScalarizedPhi {
+	LLVMValueRef aggregate;
+	unsigned     path[LB_SCALARIZE_MAX_DEPTH];
+	unsigned     depth;
+	LLVMValueRef field;
+	bool         ok;
+};
+
+struct lbFastIselLowering {
+	lbModule *     m;
+	LLVMBuilderRef builder;
+	LLVMValueRef   store;
+	Array<lbScalarizedPhi> phis;
+};
+
+gb_internal i64 lb_aggregate_path_offset(LLVMTypeRef type, unsigned const *path, unsigned depth, LLVMTypeRef *leaf_type_) {
+	i64 offset = 0;
+	for (unsigned d = 0; d < depth; d++) {
+		if (LLVMGetTypeKind(type) == LLVMStructTypeKind) {
+			bool is_packed = LLVMIsPackedStruct(type);
+			i64 field_offset = 0;
+			for (unsigned i = 0; i <= path[d]; i++) {
+				LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+				if (!is_packed) {
+					field_offset = llvm_align_formula(field_offset, lb_alignof(field));
+				}
+				if (i == path[d]) {
+					type = field;
+					break;
+				}
+				field_offset += lb_sizeof(field);
+			}
+			offset += field_offset;
+		} else {
+			type = OdinLLVMGetArrayElementType(type);
+			offset += cast(i64)path[d] * lb_sizeof(type);
+		}
+	}
+	if (leaf_type_) *leaf_type_ = type;
+	return offset;
+}
+
+gb_internal bool lb_aggregate_leaves(LLVMTypeRef type, unsigned *path, unsigned depth, lbAggregateLeaf *leaves, isize *leaf_count) {
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
+		if (depth >= LB_SCALARIZE_MAX_DEPTH) {
+			return false;
+		}
+		if (kind == LLVMStructTypeKind && LLVMIsOpaqueStruct(type)) {
+			return false;
+		}
+		unsigned count = kind == LLVMStructTypeKind ? LLVMCountStructElementTypes(type) : cast(unsigned)LLVMGetArrayLength(type);
+		for (unsigned i = 0; i < count; i++) {
+			path[depth] = i;
+			LLVMTypeRef elem = kind == LLVMStructTypeKind ? LLVMStructGetTypeAtIndex(type, i) : OdinLLVMGetArrayElementType(type);
+			if (!lb_aggregate_leaves(elem, path, depth+1, leaves, leaf_count)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	if (*leaf_count >= LB_SCALARIZE_MAX_LEAVES) {
+		return false;
+	}
+
+	lbAggregateLeaf *leaf = &leaves[(*leaf_count)++];
+	gb_memmove(leaf->path, path, depth*gb_size_of(unsigned));
+	leaf->depth = depth;
+	return true;
+}
+
+gb_internal unsigned lb_alignment_at_offset(unsigned alignment, i64 offset) {
+	unsigned a = gb_max(alignment, 1u);
+	while (offset % a != 0) {
+		a >>= 1;
+	}
+	return a;
+}
+
+gb_internal LLVMValueRef lb_aggregate_field_gep(lbModule *m, LLVMBuilderRef b, LLVMTypeRef type, LLVMValueRef ptr, unsigned const *path, unsigned depth) {
+	LLVMValueRef indices[LB_SCALARIZE_MAX_DEPTH+1] = {};
+	LLVMTypeRef i32 = LLVMInt32TypeInContext(m->ctx);
+	indices[0] = LLVMConstInt(i32, 0, false);
+	for (unsigned d = 0; d < depth; d++) {
+		indices[d+1] = LLVMConstInt(i32, path[d], false);
+	}
+	return LLVMBuildInBoundsGEP2(b, type, ptr, indices, depth+1, "");
+}
+
+// returns false if the field cannot be reached without an aggregate value, and sets `*field_` to nullptr when it is undefined
+gb_internal bool lb_aggregate_field_value(lbFastIselLowering *s, LLVMValueRef v, unsigned const *path, unsigned depth, LLVMValueRef *field_) {
+	if (depth == 0) {
+		*field_ = (LLVMIsUndef(v) || LLVMIsPoison(v)) ? nullptr : v;
+		return true;
+	}
+	if (LLVMIsUndef(v) || LLVMIsPoison(v)) {
+		*field_ = nullptr;
+		return true;
+	}
+
+	if (LLVMIsAConstant(v)) {
+		LLVMValueRef elem = LLVMGetAggregateElement(v, path[0]);
+		if (elem != nullptr) {
+			return lb_aggregate_field_value(s, elem, path+1, depth-1, field_);
+		}
+	} else if (LLVMIsAInsertValueInst(v)) {
+		unsigned n = LLVMGetNumIndices(v);
+		unsigned const *indices = LLVMGetIndices(v);
+
+		unsigned k = 0;
+		while (k < n && k < depth && indices[k] == path[k]) {
+			k += 1;
+		}
+
+		if (k == n) {
+			return lb_aggregate_field_value(s, LLVMGetOperand(v, 1), path+n, depth-n, field_);
+		} else if (k < depth) {
+			return lb_aggregate_field_value(s, LLVMGetOperand(v, 0), path, depth, field_);
+		}
+		return false;
+	} else if (LLVMIsAExtractValueInst(v)) {
+		unsigned n = LLVMGetNumIndices(v);
+		if (n + depth <= LB_SCALARIZE_MAX_DEPTH) {
+			unsigned full[LB_SCALARIZE_MAX_DEPTH];
+			gb_memmove(full, LLVMGetIndices(v), n*gb_size_of(unsigned));
+			gb_memmove(full+n, path, depth*gb_size_of(unsigned));
+			return lb_aggregate_field_value(s, LLVMGetOperand(v, 0), full, n+depth, field_);
+		}
+		return false;
+	} else if (LLVMIsASelectInst(v)) {
+		LLVMValueRef x = nullptr;
+		LLVMValueRef y = nullptr;
+		if (!lb_aggregate_field_value(s, LLVMGetOperand(v, 1), path, depth, &x) ||
+		    !lb_aggregate_field_value(s, LLVMGetOperand(v, 2), path, depth, &y)) {
+			return false;
+		}
+		if (x == nullptr || y == nullptr) {
+			*field_ = x ? x : y;
+			return true;
+		}
+		LLVMPositionBuilderBefore(s->builder, s->store);
+		LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(s->store));
+		*field_ = LLVMBuildSelect(s->builder, LLVMGetOperand(v, 0), x, y, "");
+		return true;
+	} else if (LLVMIsAPHINode(v)) {
+		for (lbScalarizedPhi const &e : s->phis) {
+			if (e.aggregate == v &&
+			    e.depth == depth &&
+			    gb_memcompare(e.path, path, depth*gb_size_of(unsigned)) == 0) {
+				*field_ = e.field;
+				return e.ok;
+			}
+		}
+
+		LLVMTypeRef field_type = nullptr;
+		lb_aggregate_path_offset(LLVMTypeOf(v), path, depth, &field_type);
+
+		LLVMPositionBuilderBefore(s->builder, v);
+		LLVMSetCurrentDebugLocation2(s->builder, nullptr);
+
+
+		// NOTE(bill): cached before its incoming values, as a loop reaches it again
+		isize index = s->phis.count;
+		lbScalarizedPhi entry = {};
+		entry.aggregate = v;
+		gb_memmove(entry.path, path, depth*gb_size_of(unsigned));
+
+		LLVMValueRef phi = LLVMBuildPhi(s->builder, field_type, "");
+		entry.depth = depth;
+		entry.field = phi;
+		entry.ok    = true;
+		array_add(&s->phis, entry);
+
+		LLVMValueRef saved_store = s->store;
+		bool ok = true;
+		unsigned incoming_count = LLVMCountIncoming(v);
+		for (unsigned k = 0; k < incoming_count; k++) {
+			LLVMBasicBlockRef block = LLVMGetIncomingBlock(v, k);
+			s->store = LLVMGetBasicBlockTerminator(block);
+			LLVMValueRef field = nullptr;
+			if (!lb_aggregate_field_value(s, LLVMGetIncomingValue(v, k), path, depth, &field)) {
+				ok = false;
+				field = nullptr;
+			}
+			if (field == nullptr) {
+				field = LLVMGetUndef(field_type);
+			}
+			LLVMAddIncoming(phi, &field, &block, 1);
+		}
+		s->store = saved_store;
+		s->phis[index].ok = ok;
+		*field_ = phi;
+		return ok;
+	} else if (LLVMIsALoadInst(v) && !LLVMGetVolatile(v) && LLVMGetOrdering(v) == LLVMAtomicOrderingNotAtomic) {
+		// NOTE(bill): Read the field where the aggregate was read, as the memory may change before the store
+		LLVMTypeRef type       = LLVMTypeOf(v);
+		LLVMTypeRef field_type = nullptr;
+		i64 offset = lb_aggregate_path_offset(type, path, depth, &field_type);
+
+		LLVMPositionBuilderBefore(s->builder, LLVMGetNextInstruction(v));
+		LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(v));
+
+		LLVMValueRef ptr   = lb_aggregate_field_gep(s->m, s->builder, type, LLVMGetOperand(v, 0), path, depth);
+		LLVMValueRef field = LLVMBuildLoad2(s->builder, field_type, ptr, "");
+		LLVMSetAlignment(field, lb_alignment_at_offset(LLVMGetAlignment(v), offset));
+
+		*field_ = field;
+		return true;
+	}
+
+	if (depth == 1) {
+		LLVMPositionBuilderBefore(s->builder, s->store);
+		LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(s->store));
+		*field_ = LLVMBuildExtractValue(s->builder, v, path[0], "");
+		return true;
+	}
+	return false;
+}
+
+gb_internal bool lb_scalarize_aggregate_store(lbFastIselLowering *s, LLVMValueRef store) {
+	LLVMValueRef value = LLVMGetOperand(store, 0);
+	LLVMValueRef ptr   = LLVMGetOperand(store, 1);
+	LLVMTypeRef  type  = LLVMTypeOf(value);
+
+	lbAggregateLeaf leaves[LB_SCALARIZE_MAX_LEAVES] = {};
+	isize leaf_count = 0;
+	unsigned path[LB_SCALARIZE_MAX_DEPTH] = {};
+
+	if (!lb_aggregate_leaves(type, path, 0, leaves, &leaf_count)) {
+		return false;
+	}
+	s->store = store;
+
+	LLVMValueRef fields[LB_SCALARIZE_MAX_LEAVES] = {};
+	for (isize i = 0; i < leaf_count; i++) {
+		if (!lb_aggregate_field_value(s, value, leaves[i].path, leaves[i].depth, &fields[i])) {
+			return false;
+		}
+	}
+
+	unsigned alignment = LLVMGetAlignment(store);
+
+	LLVMPositionBuilderBefore(s->builder, store);
+	LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(store));
+
+	for (isize i = 0; i < leaf_count; i++) {
+		if (fields[i] == nullptr) {
+			continue;
+		}
+		i64 offset = lb_aggregate_path_offset(type, leaves[i].path, leaves[i].depth, nullptr);
+		LLVMValueRef field_ptr = lb_aggregate_field_gep(s->m, s->builder, type, ptr, leaves[i].path, leaves[i].depth);
+		LLVMValueRef field_store = LLVMBuildStore(s->builder, fields[i], field_ptr);
+		LLVMSetAlignment(field_store, lb_alignment_at_offset(alignment, offset));
+	}
+	LLVMInstructionEraseFromParent(store);
+	return true;
+}
+
+gb_internal bool lb_is_aggregate_type(LLVMTypeRef type) {
+	LLVMTypeKind kind = LLVMGetTypeKind(type);
+	return kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind;
+}
+
+gb_internal bool lb_is_plain_access(LLVMValueRef inst) {
+	return !LLVMGetVolatile(inst) && LLVMGetOrdering(inst) == LLVMAtomicOrderingNotAtomic;
+}
+
+gb_internal void lb_lower_bool_select(lbFastIselLowering *s, LLVMValueRef select) {
+	LLVMValueRef c = LLVMGetOperand(select, 0);
+	LLVMValueRef x = LLVMGetOperand(select, 1);
+	LLVMValueRef y = LLVMGetOperand(select, 2);
+	if (LLVMGetTypeKind(LLVMTypeOf(c)) != LLVMIntegerTypeKind) {
+		return;
+	}
+	LLVMPositionBuilderBefore(s->builder, select);
+	LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(select));
+	LLVMValueRef t = LLVMConstInt(LLVMTypeOf(c), 1, false);
+
+	LLVMValueRef res = nullptr;
+	if (LLVMIsAConstantInt(x)) {
+		res = LLVMConstIntGetZExtValue(x) ? LLVMBuildOr(s->builder, c, y, "") : LLVMBuildAnd(s->builder, LLVMBuildXor(s->builder, c, t, ""), y, "");
+	} else if (LLVMIsAConstantInt(y)) {
+		res = LLVMConstIntGetZExtValue(y) ? LLVMBuildOr(s->builder, LLVMBuildXor(s->builder, c, t, ""), x, "") : LLVMBuildAnd(s->builder, c, x, "");
+	} else {
+		LLVMValueRef a = LLVMBuildAnd(s->builder, c, x, "");
+		LLVMValueRef b = LLVMBuildAnd(s->builder, LLVMBuildXor(s->builder, c, t, ""), y, "");
+		res = LLVMBuildOr(s->builder, a, b, "");
+	}
+	LLVMReplaceAllUsesWith(select, res);
+	LLVMInstructionEraseFromParent(select);
+}
+
+gb_internal void lb_truncate_bool_arguments(lbFastIselLowering *s, LLVMValueRef call) {
+	LLVMTypeRef i1 = LLVMInt1TypeInContext(s->m->ctx);
+	LLVMTypeRef i8 = LLVMInt8TypeInContext(s->m->ctx);
+	LLVMBasicBlockRef block = LLVMGetInstructionParent(call);
+	unsigned arg_count = LLVMGetNumArgOperands(call);
+	for (unsigned a = 0; a < arg_count; a++) {
+		LLVMValueRef arg = LLVMGetOperand(call, a);
+		if (LLVMTypeOf(arg) != i1 || LLVMIsAConstantInt(arg)) {
+			continue;
+		}
+		LLVMUseRef first_use = LLVMGetFirstUse(arg);
+		if (LLVMIsATruncInst(arg) && LLVMGetInstructionParent(arg) == block &&
+		    first_use != nullptr && LLVMGetNextUse(first_use) == nullptr) {
+			continue;
+		}
+		LLVMPositionBuilderBefore(s->builder, call);
+		LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(call));
+		LLVMValueRef byte = LLVMBuildZExt(s->builder, arg, i8, "");
+		LLVMSetOperand(call, a, LLVMBuildTrunc(s->builder, byte, i1, ""));
+	}
+}
+
+gb_internal void lb_lower_small_switch(lbFastIselLowering *s, LLVMValueRef sw) {
+	enum {MAX_CASES = 3};
+	LLVMValueRef cond = LLVMGetOperand(sw, 0);
+	unsigned case_count = (cast(unsigned)LLVMGetNumOperands(sw) - 2) / 2;
+	if (case_count == 0 || case_count > MAX_CASES || LLVMGetIntTypeWidth(LLVMTypeOf(cond)) > 64) {
+		return;
+	}
+
+	LLVMBasicBlockRef block      = LLVMGetInstructionParent(sw);
+	LLVMBasicBlockRef next_block = LLVMGetNextBasicBlock(block);
+
+	LLVMValueRef fn     = LLVMGetBasicBlockParent(block);
+	LLVMMetadataRef loc = LLVMInstructionGetDebugLoc(sw);
+
+	LLVMBasicBlockRef from[MAX_CASES+1] = {};
+	LLVMBasicBlockRef to  [MAX_CASES+1] = {};
+
+	LLVMBasicBlockRef curr = block;
+
+	LLVMPositionBuilderBefore(s->builder, sw);
+	LLVMSetCurrentDebugLocation2(s->builder, loc);
+
+	for (unsigned j = 0; j < case_count; j++) {
+		LLVMBasicBlockRef dest = LLVMGetSuccessor(sw, j+1);
+		LLVMBasicBlockRef else_block = LLVMGetSwitchDefaultDest(sw);
+		if (j+1 < case_count) {
+			if (next_block != nullptr) {
+				else_block = LLVMInsertBasicBlockInContext(s->m->ctx, next_block, "");
+			} else {
+				else_block = LLVMAppendBasicBlockInContext(s->m->ctx, fn, "");
+			}
+		}
+
+		LLVMValueRef cmp = LLVMBuildICmp(s->builder, LLVMIntEQ, cond, LLVMGetOperand(sw, 2 + 2*j), "");
+		LLVMBuildCondBr(s->builder, cmp, dest, else_block);
+
+		from[j] = curr;
+		to[j]   = dest;
+
+		if (j+1 < case_count) {
+			curr = else_block;
+			LLVMPositionBuilderAtEnd(s->builder, curr);
+			LLVMSetCurrentDebugLocation2(s->builder, loc);
+		}
+	}
+	from[case_count] = curr;
+	to  [case_count] = LLVMGetSwitchDefaultDest(sw);
+	LLVMInstructionEraseFromParent(sw);
+
+	// the incoming entries for `block` become one for each new edge
+	for (unsigned e = 0; e <= case_count; e++) {
+		bool seen = false;
+		for (unsigned k = 0; k < e; k++) {
+			seen |= to[k] == to[e];
+		}
+		if (seen) {
+			continue;
+		}
+
+		LLVMBasicBlockRef dest = to[e];
+		for (LLVMValueRef phi = LLVMGetFirstInstruction(dest); phi != nullptr && LLVMIsAPHINode(phi); /**/) {
+			LLVMValueRef next             = LLVMGetNextInstruction(phi);
+			LLVMValueRef value_from_block = nullptr;
+
+			unsigned incoming_count = LLVMCountIncoming(phi);
+			for (unsigned k = 0; k < incoming_count; k++) {
+				if (LLVMGetIncomingBlock(phi, k) == block) {
+					value_from_block = LLVMGetIncomingValue(phi, k);
+				}
+			}
+
+			if (value_from_block != nullptr) {
+				LLVMPositionBuilderBefore(s->builder, phi);
+				LLVMSetCurrentDebugLocation2(s->builder, nullptr);
+
+				LLVMValueRef new_phi = LLVMBuildPhi(s->builder, LLVMTypeOf(phi), "");
+				for (unsigned k = 0; k < incoming_count; k++) {
+					LLVMBasicBlockRef incoming_block = LLVMGetIncomingBlock(phi, k);
+					if (incoming_block != block) {
+						LLVMValueRef incoming_value = LLVMGetIncomingValue(phi, k);
+						LLVMAddIncoming(new_phi, &incoming_value, &incoming_block, 1);
+					}
+				}
+				for (unsigned k = 0; k <= case_count; k++) {
+					if (to[k] == dest) {
+						LLVMAddIncoming(new_phi, &value_from_block, &from[k], 1);
+					}
+				}
+				LLVMReplaceAllUsesWith(phi, new_phi);
+				LLVMInstructionEraseFromParent(phi);
+			}
+
+			phi = next;
+		}
+	}
+}
+
+gb_internal void lb_lower_for_fast_isel(lbModule *m) {
+	lbFastIselLowering s = {};
+	s.m = m;
+
+	s.builder = LLVMCreateBuilderInContext(m->ctx);
+	defer (LLVMDisposeBuilder(s.builder));
+
+	array_init(&s.phis, heap_allocator());
+	defer (array_free(&s.phis));
+
+	auto work = array_make<LLVMValueRef>(heap_allocator(), 0, 64);
+	defer (array_free(&work));
+
+	for (LLVMValueRef fn = LLVMGetFirstFunction(m->mod); fn != nullptr; fn = LLVMGetNextFunction(fn)) {
+		array_clear(&work);
+		array_clear(&s.phis);
+
+		for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(fn); bb != nullptr; bb = LLVMGetNextBasicBlock(bb)) {
+			for (LLVMValueRef i = LLVMGetFirstInstruction(bb); i != nullptr; i = LLVMGetNextInstruction(i)) {
+				if (LLVMIsAStoreInst(i) && lb_is_plain_access(i) && lb_is_aggregate_type(LLVMTypeOf(LLVMGetOperand(i, 0)))) {
+					array_add(&work, i);
+				}
+			}
+		}
+		for (LLVMValueRef store : work) {
+			lb_scalarize_aggregate_store(&s, store);
+		}
+
+		// NOTE(bill): A field read out of an aggregate value is read where that aggregate came from
+		array_clear(&work);
+		for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(fn); bb != nullptr; bb = LLVMGetNextBasicBlock(bb)) {
+			for (LLVMValueRef i = LLVMGetFirstInstruction(bb); i != nullptr; i = LLVMGetNextInstruction(i)) {
+				if (LLVMIsAExtractValueInst(i) && !lb_is_aggregate_type(LLVMTypeOf(i))) {
+					array_add(&work, i);
+				} else if (LLVMIsASelectInst(i) && LLVMTypeOf(i) == LLVMInt1TypeInContext(m->ctx)) {
+					array_add(&work, i);
+				} else if (LLVMIsACallInst(i)) {
+					array_add(&work, i);
+				} else if (LLVMIsASwitchInst(i)) {
+					array_add(&work, i);
+				}
+			}
+		}
+		for (LLVMValueRef i : work) {
+			if (LLVMIsASelectInst(i)) {
+				lb_lower_bool_select(&s, i);
+				continue;
+			}
+			if (LLVMIsACallInst(i)) {
+				lb_truncate_bool_arguments(&s, i);
+				continue;
+			}
+			if (LLVMIsASwitchInst(i)) {
+				lb_lower_small_switch(&s, i);
+				continue;
+			}
+			LLVMValueRef agg = LLVMGetOperand(i, 0);
+			unsigned n = LLVMGetNumIndices(i);
+			if (n > LB_SCALARIZE_MAX_DEPTH) {
+				continue;
+			}
+
+			if (!(LLVMIsAConstant(agg)        ||
+			      LLVMIsAInsertValueInst(agg) ||
+			      LLVMIsASelectInst(agg)      ||
+			      LLVMIsAPHINode(agg)         ||
+			      (LLVMIsALoadInst(agg) && lb_is_plain_access(agg)))) {
+				continue;
+			}
+
+			s.store = i;
+
+			LLVMValueRef field = nullptr;
+			if (lb_aggregate_field_value(&s, agg, LLVMGetIndices(i), n, &field) && field != nullptr) {
+				LLVMReplaceAllUsesWith(i, field);
+				LLVMInstructionEraseFromParent(i);
+			}
+		}
+
+		bool removed = true;
+		while (removed) {
+			removed = false;
+			for (LLVMBasicBlockRef bb = LLVMGetFirstBasicBlock(fn); bb != nullptr; bb = LLVMGetNextBasicBlock(bb)) {
+				for (LLVMValueRef i = LLVMGetFirstInstruction(bb); i != nullptr; /**/) {
+					LLVMValueRef next = LLVMGetNextInstruction(i);
+					if (LLVMGetFirstUse(i) == nullptr &&
+					    (LLVMIsAInsertValueInst(i) || LLVMIsAExtractValueInst(i) || LLVMIsASelectInst(i) || LLVMIsAPHINode(i) ||
+					     LLVMIsAGetElementPtrInst(i) || (LLVMIsALoadInst(i) && lb_is_plain_access(i)))) {
+						LLVMInstructionEraseFromParent(i);
+						removed = true;
+					}
+					i = next;
+				}
+			}
+		}
+	}
+}
+
 struct lbLLVMEmitWorker {
 	LLVMTargetMachineRef target_machine;
 	LLVMCodeGenFileType code_gen_file_type;
@@ -2741,6 +3266,10 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 		}
 		lb_record_worker_failure();
 		return 1;
+	}
+
+	if (lb_uses_fast_isel()) {
+		lb_lower_for_fast_isel(wd->m);
 	}
 
 	if (LLVM_IGNORE_VERIFICATION) {

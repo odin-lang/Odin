@@ -1206,6 +1206,25 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	return dt;
 }
 
+// A variable whose address is not a stack slot of its own (an argument, or an element or a pointer it refers to)
+// would have its location tracked with `DBG_VALUE`s through every block of the procedure,
+// so it is described through a stack slot holding that address instead
+gb_internal LLVMValueRef lb_debug_storage(lbProcedure *p, LLVMValueRef storage, LLVMMetadataRef *expr) {
+	bool is_argument = LLVMIsAArgument(storage) != nullptr;
+	if (!is_argument && (!LLVMIsAInstruction(storage) || LLVMIsAAllocaInst(storage))) {
+		return storage;
+	}
+	LLVMBasicBlockRef insert_block = LLVMGetInsertBlock(p->builder);
+	LLVMValueRef slot = llvm_alloca(p, LLVMTypeOf(storage), build_context.ptr_size, "");
+	LLVMPositionBuilderAtEnd(p->builder, is_argument ? p->decl_block->block : insert_block);
+	LLVMBuildStore(p->builder, storage, slot);
+	LLVMPositionBuilderAtEnd(p->builder, insert_block);
+
+	uint64_t deref = 0x06; // DW_OP_deref
+	*expr = LLVMDIBuilderCreateExpression(p->module->debug_builder, &deref, 1);
+	return slot;
+}
+
 gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token) {
 	if (p->debug_info == nullptr) {
 		return;
@@ -1264,6 +1283,7 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
+	storage = lb_debug_storage(p, storage, &llvm_expr);
 
 #if LLVM_VERSION_MAJOR <= 18
 	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
@@ -1329,6 +1349,7 @@ gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, T
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
+	storage = lb_debug_storage(p, storage, &llvm_expr);
 
 	// NOTE(bill, 2022-02-01): For parameter values, you must insert them at the end of the decl block
 	// The reason is that if the parameter is at index 0 and a pointer, there is not such things as an
