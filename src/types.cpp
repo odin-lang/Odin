@@ -188,6 +188,7 @@ struct TypeUnion {
 	bool             is_polymorphic;
 	bool             is_poly_specialized;
 	UnionTypeKind    kind;
+	std::atomic<u8>  constantable; // 0 unknown, 1 false, 2 true
 };
 
 struct TypeProc {
@@ -416,6 +417,9 @@ gb_internal Type *type_deref(Type *t, bool allow_multi_pointer=false);
 gb_internal Type *base_type(Type *t);
 gb_internal Type *alloc_type_multi_pointer(Type *elem);
 gb_internal void wait_for_record_signal(Wait_Signal *signal, Futex *checking_thread);
+
+// set once checking is done; until then a type may still be incomplete or part of an illegal cycle
+gb_global std::atomic<bool> global_types_are_complete;
 
 gb_internal u32 type_info_flags_of_type(Type *type) {
 	if (type == nullptr) {
@@ -2787,16 +2791,25 @@ gb_internal bool is_type_union_constantable(Type *type) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
 
-	if (bt->Union.variants.count == 0) {
-		return true;
-	}
-
-	for (Type *v : bt->Union.variants) {
-		if (!is_type_constant_type_for_unions(v)) {
-			return false;
+	bool use_cache = global_types_are_complete.load(std::memory_order_relaxed);
+	if (use_cache) {
+		u8 cached = bt->Union.constantable.load(std::memory_order_relaxed);
+		if (cached != 0) {
+			return cached == 2;
 		}
 	}
-	return true;
+
+	bool res = true;
+	for (Type *v : bt->Union.variants) {
+		if (!is_type_constant_type_for_unions(v)) {
+			res = false;
+			break;
+		}
+	}
+	if (use_cache) {
+		bt->Union.constantable.store(res ? 2 : 1, std::memory_order_relaxed);
+	}
+	return res;
 }
 
 gb_internal bool is_type_raw_union_constantable(Type *type) {
@@ -4389,6 +4402,9 @@ gb_internal i64 type_size_of_struct_pretend_is_packed(Type *ot) {
 
 
 gb_internal i64 type_size_of(Type *t) {
+	if (t != nullptr && t->kind == Type_Named && global_types_are_complete.load(std::memory_order_relaxed)) {
+		t = base_type(t);
+	}
 	if (t == nullptr) {
 		return 0;
 	}
@@ -4431,6 +4447,9 @@ gb_internal i64 type_size_of(Type *t) {
 }
 
 gb_internal i64 type_align_of(Type *t) {
+	if (t != nullptr && t->kind == Type_Named && global_types_are_complete.load(std::memory_order_relaxed)) {
+		t = base_type(t);
+	}
 	if (t == nullptr) {
 		return 1;
 	}

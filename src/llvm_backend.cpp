@@ -2316,6 +2316,8 @@ gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp) {
 	return lb_entity_type_cmp(x, y);
 }
 
+gb_internal Array<lbModule *> lb_modules_by_cost(lbGenerator *gen);
+
 gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, CheckerInfo *info, bool do_threading) {
 	for (Entity *e : info->entities) {
 		String  name  = e->token.string;
@@ -2385,12 +2387,12 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		lbModule *m = entry.value;
 		array_sort(m->global_types_to_create, llvm_global_entity_cmp);
 		array_sort(m->global_procedures_to_create, llvm_global_entity_cmp);
+		m->estimated_cost = m->global_types_to_create.count + m->global_procedures_to_create.count;
 	}
 
 	gen->modules_in_parallel = true;
 	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
+		for (lbModule *m : lb_modules_by_cost(gen)) {
 			thread_pool_add_task(lb_generate_procedures_and_types_per_module, m);
 		}
 	} else {
@@ -3346,14 +3348,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
 		if (m->debug_builder) { // Debug Info
-			for (auto const &file_entry : info->files) {
-				AstFile *f = file_entry.value;
-				LLVMMetadataRef res = LLVMDIBuilderCreateFile(m->debug_builder,
-					cast(char const *)f->filename.text, f->filename.len,
-					cast(char const *)f->directory.text, f->directory.len);
-				lb_set_llvm_metadata(m, f, res);
-			}
-
 			TEMPORARY_ALLOCATOR_GUARD();
 
 			gbString producer = gb_string_make(temporary_allocator(), "odin");
@@ -3382,7 +3376,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMBool debug_info_for_profiling = false;
 
 			m->debug_compile_unit = LLVMDIBuilderCreateCompileUnit(m->debug_builder, LLVMDWARFSourceLanguageC99,
-				lb_get_llvm_metadata(m, init_file),
+				lb_get_file_metadata(m, init_file),
 				producer, gb_string_length(producer),
 				is_optimized, "", 0,
 				1, split_name, gb_string_length(split_name),
@@ -3619,7 +3613,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		if (m->debug_builder) {
 			String global_name = e->token.string;
 			if (global_name.len != 0 && global_name != "_") {
-				LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, e->file);
+				LLVMMetadataRef llvm_file = lb_get_file_metadata(m, e->file);
 				LLVMMetadataRef llvm_scope = llvm_file;
 
 				LLVMBool local_to_unit = LLVMGetLinkage(g.value) == LLVMInternalLinkage;
