@@ -996,36 +996,27 @@ default_hasher_fixed :: #force_inline proc "contextless" (data: rawptr, seed: ui
 		}
 	}
 
-	@(require_results)
-	hash_load_short :: #force_inline proc "contextless" (p: uintptr, N: int) -> uintptr {
-		when size_of(uintptr) == 8 {
-			if N >= 4 {
-				lo := intrinsics.unaligned_load((^u32)(p))
-				hi := intrinsics.unaligned_load((^u32)(p + uintptr(N-4)))
-				return uintptr(lo) | uintptr(hi) << 32
-			}
-		}
-		b := ([^]u8)(p)
-		return uintptr(b[0]) | uintptr(b[N/2]) << 8 | uintptr(b[N-1]) << 16
-	}
-
-
 	HASH_K0 :: 0x9e3779b97f4a7c15 when size_of(uintptr) == 8 else 0x9e3779b9
 	HASH_K1 :: 0xbf58476d1ce4e5b9 when size_of(uintptr) == 8 else 0x85ebca6b
 
 	W :: size_of(uintptr)
 	p := uintptr(data)
 	h := seed ~ uintptr(N)
-	if N >= W {
+	switch {
+	case N >= W:
 		for i := 0; i+W <= N; i += W {
 			h = hash_fold(h ~ intrinsics.unaligned_load((^uintptr)(p + uintptr(i))), HASH_K0)
 		}
 		if N % W != 0 {
-			// overlap the previous word rather than read past the end
 			h = hash_fold(h ~ intrinsics.unaligned_load((^uintptr)(p + uintptr(N-W))), HASH_K0)
 		}
-	} else if N > 0 {
-		h = hash_fold(h ~ hash_load_short(p, N), HASH_K0)
+	case N >= 4:
+		lo := intrinsics.unaligned_load((^u32)(p))
+		hi := intrinsics.unaligned_load((^u32)(p + uintptr(N-4)))
+		h = hash_fold(h ~ uintptr(u64(lo) | u64(hi) << 32), HASH_K0)
+	case N > 0:
+		b := ([^]u8)(p)
+		h = hash_fold(h ~ (uintptr(b[0]) | uintptr(b[N/2]) << 8 | uintptr(b[N-1]) << 16), HASH_K0)
 	}
 	h = hash_fold(h, HASH_K1)
 	h &= HASH_MASK
