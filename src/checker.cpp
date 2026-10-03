@@ -3377,6 +3377,18 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("multi_pointer_slice_expr_error"),
 	);
 
+	FORCE_ADD_RUNTIME_ENTITIES(c->info.objc_class_implementations.count.load(std::memory_order_relaxed) > 0,
+		str_lit("objc_lookUpClass"),
+		str_lit("sel_registerName"),
+		str_lit("objc_allocateClassPair"),
+		str_lit("objc_registerClassPair"),
+		str_lit("class_addMethod"),
+		str_lit("class_addIvar"),
+		str_lit("class_getInstanceVariable"),
+		str_lit("ivar_getOffset"),
+		str_lit("object_getClass"),
+	);
+
 
 	{ // init min dep basic equal procs
 		struct { BasicKind kind; char const *name; } const procs[] = {

@@ -165,7 +165,6 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	array_init(&m->global_procedures_to_create, a, 0, 1024);
 	array_init(&m->global_types_to_create, a, 0, 1024);
 	array_init(&m->global_variables, a);
-	mpsc_init(&m->missing_procedures_to_check, a);
 	map_init(&m->debug_values);
 
 	string_map_init(&m->objc_classes);
@@ -4086,25 +4085,16 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 	// NOTE(bill): Until the modules are generated in parallel, a procedure may be referenced before it is created
 	// (e.g. an @(init) procedure by the startup procedure), but after that it was missed by the frontend
-	bool missing = gen->modules_in_parallel;
-
 	if (!ignore_body) {
-		if (missing) {
-			debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
-		}
+		GB_ASSERT_MSG(!gen->modules_in_parallel, "missing procedure '%.*s' (%s)", LIT(e->token.string), token_pos_to_string(e->token.pos));
 		mpsc_enqueue(&m->procedures_to_generate, proc);
 	} else {
 		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
 		rw_mutex_shared_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
-			if (missing) {
-				debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), other_module);
-				// another module's context may only be used by the thread generating that module
-				mpsc_enqueue(&other_module->missing_procedures_to_check, e);
-			} else {
-				mpsc_enqueue(&other_module->procedures_to_generate, lb_create_procedure(other_module, e, false));
-			}
+			GB_ASSERT_MSG(!gen->modules_in_parallel, "missing procedure '%.*s' (%s)", LIT(e->token.string), token_pos_to_string(e->token.pos));
+			mpsc_enqueue(&other_module->procedures_to_generate, lb_create_procedure(other_module, e, false));
 		}
 	}
 

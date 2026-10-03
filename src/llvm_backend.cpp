@@ -2441,11 +2441,12 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		Scope * scope = e->scope;
 
 		if ((scope->flags & ScopeFlag_File) == 0) {
-			continue;
+			if (e->kind != Entity_Procedure || (e->flags & EntityFlag_PolyConstArg) == 0) {
+				continue;
+			}
+		} else {
+			GB_ASSERT(scope->parent->flags & ScopeFlag_Pkg);
 		}
-
-		Scope *package_scope = scope->parent;
-		GB_ASSERT(package_scope->flags & ScopeFlag_Pkg);
 
 		switch (e->kind) {
 		case Entity_Variable:
@@ -3354,51 +3355,27 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 	lb_exit_if_worker_failed();
 }
 
-gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
+gb_internal WORKER_TASK_PROC(lb_generate_queued_procedures_worker_proc) {
 	lbModule *m = cast(lbModule *)data;
-	for (Entity *e = nullptr; mpsc_dequeue(&m->missing_procedures_to_check, &e); /**/) {
-		lbProcedure *p = lb_create_procedure(m, e, false);
-		if (!p->is_done.load(std::memory_order_relaxed)) {
-			debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
-		}
-		mpsc_enqueue(&m->procedures_to_generate, p);
-	}
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
 		lb_generate_procedure(m, p);
 	}
 	return 0;
 }
 
-gb_internal void lb_generate_missing_procedures(lbGenerator *gen, bool do_threading) {
-	isize retry_count = 0;
-retry:;
-	if (do_threading) {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			// NOTE(bill): procedures may be added during generation
-			thread_pool_add_task(lb_generate_missing_procedures_to_check_worker_proc, m);
-		}
-		thread_pool_wait();
-	} else {
-		for (auto const &entry : gen->modules) {
-			lbModule *m = entry.value;
-			// NOTE(bill): procedures may be added during generation
-			lb_generate_missing_procedures_to_check_worker_proc(m);
-		}
-	}
-
+gb_internal void lb_generate_queued_procedures(lbGenerator *gen, bool do_threading) {
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		if (m->missing_procedures_to_check.count != 0 || m->procedures_to_generate.count != 0) {
-			if (retry_count > gen->modules.count) {
-				GB_ASSERT(m->missing_procedures_to_check.count == 0 && m->procedures_to_generate.count == 0);
-			}
-
-			retry_count += 1;
-			goto retry;
+		if (do_threading) {
+			thread_pool_add_task(lb_generate_queued_procedures_worker_proc, m);
+		} else {
+			lb_generate_queued_procedures_worker_proc(m);
 		}
-		GB_ASSERT(m->missing_procedures_to_check.count == 0);
-		GB_ASSERT(m->procedures_to_generate.count == 0);
+	}
+	thread_pool_wait();
+
+	for (auto const &entry : gen->modules) {
+		GB_ASSERT(entry.value->procedures_to_generate.count == 0);
 	}
 }
 
@@ -4236,8 +4213,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lb_create_main_procedure(default_module, gen->startup_runtime, gen->cleanup_runtime);
 	}
 
-	TIME_SECTION("LLVM Procedure Generation (missing)");
-	lb_generate_missing_procedures(gen, do_threading);
+	TIME_SECTION("LLVM Procedure Generation (queued)");
+	lb_generate_queued_procedures(gen, do_threading);
 
 	if (gen->objc_names) {
 		TIME_SECTION("Finalize objc names");

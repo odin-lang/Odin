@@ -234,7 +234,8 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			lbValue *prev_value = string_map_get(&p->module->members, name);
 			if (prev_value != nullptr) {
 				// NOTE(bill): Don't do mutliple declarations in the IR
-				return;
+				lb_add_entity(p->module, e, *prev_value);
+				continue;
 			}
 
 			e->Procedure.link_name = name;

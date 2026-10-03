@@ -686,6 +686,14 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		} else {
 			try_to_add_package_dependency(c, "runtime", "_NSConcreteStackBlock");
 		}
+		for (isize i = 0; i < capture_arg_count; i++) {
+			Type *t = param_operands[i].type;
+			if (is_type_pointer(t) && is_type_objc_object(t)) {
+				try_to_add_package_dependency(c, "runtime", "_Block_object_assign");
+				try_to_add_package_dependency(c, "runtime", "_Block_object_dispose");
+				break;
+			}
+		}
 
 		*operand = poly_op;
 		operand->type = alloc_type_pointer(operand->type);

@@ -3358,6 +3358,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 							Ast *expr = unparen_expr(op.expr);
 							Entity *proc_entity = strip_entity_wrapping(expr);
 							if (proc_entity) {
+								proc_entity->flags |= EntityFlag_PolyConstArg;
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
 								valid = true;
 							} else if (expr->kind == Ast_ProcLit) {

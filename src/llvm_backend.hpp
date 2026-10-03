@@ -153,8 +153,6 @@ struct lbModule {
 	StringMap<lbProcedure *> procedures;
 	PtrMap<LLVMValueRef, Entity *> procedure_values;
 
-	MPSCQueue<Entity *> missing_procedures_to_check;
-
 	StringMap<LLVMValueRef>   const_strings;
 	String16Map<LLVMValueRef> const_string16s;
 
