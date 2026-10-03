@@ -922,14 +922,12 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lbBlock *insert_block     = lb_create_block(p, "insert");
 	lbBlock *check_has_grown_block = lb_create_block(p, "check-has-grown");
 	lbBlock *rehash_block     = lb_create_block(p, "rehash");
-	lbBlock *slot_block       = lb_create_block(p, "slot");
-	lbBlock *slot_loop_block  = lb_create_block(p, "slot-loop");
-	lbBlock *slot_used_block  = lb_create_block(p, "slot-used");
-	lbBlock *slot_probe_block = lb_create_block(p, "slot-probe");
-	lbBlock *slot_next_block  = lb_create_block(p, "slot-next");
-	lbBlock *place_block      = lb_create_block(p, "place");
-	lbBlock *scan_block       = lb_create_block(p, "scan");
-	lbBlock *displace_block   = lb_create_block(p, "displace");
+
+	// NOTE(bill): Unoptimized builds always insert through the runtime, keeping the code for each map type small
+	lbBlock *slot_block = nullptr;
+	if (build_context.optimization_level >= OptimizationLevel_Size) {
+		slot_block = lb_create_block(p, "slot");
+	}
 
 	lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, found_ptr), found_block, check_grow_block);
 	lb_start_block(p, found_block);
@@ -961,7 +959,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 		lb_start_block(p, check_has_grown_block);
 
-		lb_emit_if(p, has_grown, rehash_block, slot_block);
+		lb_emit_if(p, has_grown, rehash_block, slot_block != nullptr ? slot_block : insert_block);
 		lb_start_block(p, rehash_block);
 		lbValue key = lb_emit_load(p, key_ptr);
 		lbValue new_hash = lb_gen_map_key_hash(p, map_ptr, key, nullptr);
@@ -970,8 +968,17 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		lb_emit_jump(p, insert_block);
 	}
 
-	lb_start_block(p, slot_block);
-	{
+	if (slot_block != nullptr) {
+		lbBlock *slot_loop_block  = lb_create_block(p, "slot-loop");
+		lbBlock *slot_used_block  = lb_create_block(p, "slot-used");
+		lbBlock *slot_probe_block = lb_create_block(p, "slot-probe");
+		lbBlock *slot_next_block  = lb_create_block(p, "slot-next");
+		lbBlock *place_block      = lb_create_block(p, "place");
+		lbBlock *scan_block       = lb_create_block(p, "scan");
+		lbBlock *displace_block   = lb_create_block(p, "displace");
+
+		lb_start_block(p, slot_block);
+
 		lbValue map = lb_emit_load(p, lb_emit_conv(p, map_ptr, t_raw_map_ptr));
 		lbMapKVH kvh = lb_map_kvh_data_static(p, type, map);
 		lbValue h = lb_addr_load(p, hash_addr);

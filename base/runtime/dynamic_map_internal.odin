@@ -205,7 +205,7 @@ map_hash_is_empty :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 }
 
 @(require_results)
-map_hash_is_deleted :: #force_no_inline proc "contextless" (hash: Map_Hash) -> bool {
+map_hash_is_deleted :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 	// The MSB indicates a tombstone
 	return hash & TOMBSTONE_MASK != 0
 }
