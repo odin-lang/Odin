@@ -651,6 +651,42 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 
 #define LLVM_SET_VALUE_NAME(value, name) LLVMSetValueName2((value), (name), gb_count_of((name))-1);
 
+struct lbMapKVH {
+	lbValue mask; // capacity-1
+	lbValue ks;   // ^Key
+	lbValue vs;   // ^Value
+	lbValue hs;   // ^uintptr
+};
+
+gb_internal lbMapKVH lb_map_kvh_data_static(lbProcedure *p, Type *type, lbValue map) {
+	// NOTE(bill): This assumes that the map has been allocated already (i.e. `data != 0`)
+
+	lbModule *m = p->module;
+	lbValue one = lb_const_int(m, t_uintptr, 1);
+
+	lbValue data     = lb_emit_struct_ev(p, map, 0);
+	lbValue log2_cap = lb_emit_arith(p, Token_And, data, lb_const_int(m, t_uintptr, MAP_CACHE_LINE_SIZE-1), t_uintptr);
+	lbValue capacity = lb_emit_arith(p, Token_Shl, one, log2_cap, t_uintptr);
+	LLVM_SET_VALUE_NAME(capacity.value, "capacity");
+
+	lbMapKVH res = {};
+	res.mask = lb_emit_arith(p, Token_Sub, capacity, one, t_uintptr);
+	LLVM_SET_VALUE_NAME(res.mask.value, "mask");
+
+	lbValue ks = lb_map_data_uintptr(p, map);
+	lbValue vs = lb_map_cell_index_static(p, type->Map.key, ks, capacity);
+	lbValue hs = lb_map_cell_index_static(p, type->Map.value, vs, capacity);
+
+	res.ks = lb_emit_conv(p, ks, alloc_type_pointer(type->Map.key));
+	res.vs = lb_emit_conv(p, vs, alloc_type_pointer(type->Map.value));
+	res.hs = lb_emit_conv(p, hs, alloc_type_pointer(t_uintptr));
+
+	LLVM_SET_VALUE_NAME(res.ks.value, "ks");
+	LLVM_SET_VALUE_NAME(res.vs.value, "vs");
+	LLVM_SET_VALUE_NAME(res.hs.value, "hs");
+	return res;
+}
+
 
 gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	GB_ASSERT(!build_context.dynamic_map_calls);
@@ -695,10 +731,10 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	lbBlock *loop_block         = lb_create_block(p, "loop");
 	lbBlock *hash_block         = lb_create_block(p, "hash");
+	lbBlock *key_compare_block  = lb_create_block(p, "key_compare");
+	lbBlock *empty_block        = lb_create_block(p, "empty");
 	lbBlock *probe_block        = lb_create_block(p, "probe");
 	lbBlock *increment_block    = lb_create_block(p, "increment");
-	lbBlock *hash_compare_block = lb_create_block(p, "hash_compare");
-	lbBlock *key_compare_block  = lb_create_block(p, "key_compare");
 	lbBlock *value_block        = lb_create_block(p, "value");
 	lbBlock *nil_block          = lb_create_block(p, "nil");
 
@@ -724,32 +760,17 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	LLVM_SET_VALUE_NAME(pos.addr.value, "pos");
 	LLVM_SET_VALUE_NAME(distance.addr.value, "distance");
 
-	lbValue capacity = lb_map_cap(p, map);
-	LLVM_SET_VALUE_NAME(capacity.value, "capacity");
-	lbValue cap_minus_1 = lb_emit_arith(p, Token_Sub, capacity, lb_const_int(m, t_int, 1), t_int);
-	lbValue mask = lb_emit_conv(p, cap_minus_1, t_uintptr);
-	LLVM_SET_VALUE_NAME(mask.value, "mask");
+	// NOTE(bill): length != 0, so the map has been allocated
+	lbMapKVH kvh = lb_map_kvh_data_static(p, type, map);
+	lbValue mask = kvh.mask;
+	lbValue ks = kvh.ks;
+	lbValue vs = kvh.vs;
+	lbValue hs = kvh.hs;
 
-	{
-		// map_desired_position inlined
-		lbValue the_pos = lb_emit_arith(p, Token_And, h, mask, t_uintptr);
-		the_pos = lb_emit_conv(p, the_pos, t_uintptr);
-		lb_addr_store(p, pos, the_pos);
-	}
+	lb_addr_store(p, pos, lb_emit_arith(p, Token_And, h, mask, t_uintptr));
+
 	lbValue zero_uintptr = lb_const_int(m, t_uintptr, 0);
 	lbValue one_uintptr = lb_const_int(m, t_uintptr, 1);
-
-	lbValue ks = lb_map_data_uintptr(p, map);
-	lbValue vs = lb_map_cell_index_static(p, type->Map.key, ks, capacity);
-	lbValue hs = lb_map_cell_index_static(p, type->Map.value, vs, capacity);
-
-	ks = lb_emit_conv(p, ks, alloc_type_pointer(type->Map.key));
-	vs = lb_emit_conv(p, vs, alloc_type_pointer(type->Map.value));
-	hs = lb_emit_conv(p, hs, alloc_type_pointer(t_uintptr));
-
-	LLVM_SET_VALUE_NAME(ks.value, "ks");
-	LLVM_SET_VALUE_NAME(vs.value, "vs");
-	LLVM_SET_VALUE_NAME(hs.value, "hs");
 
 	lb_emit_jump(p, loop_block);
 	lb_start_block(p, loop_block);
@@ -757,30 +778,20 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	lbValue element_hash = lb_emit_load(p, lb_emit_ptr_offset(p, hs, lb_addr_load(p, pos)));
 	LLVM_SET_VALUE_NAME(element_hash.value, "element_hash");
 
-	{
-		// if element_hash == 0 { return nil }
-		lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, element_hash, zero_uintptr), nil_block, probe_block);
-	}
+	// `h` is never empty nor a tombstone, so check for a match first
+	lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, element_hash, h), key_compare_block, empty_block);
+
+	lb_start_block(p, empty_block);
+	lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, element_hash, zero_uintptr), nil_block, probe_block);
 
 	lb_start_block(p, probe_block);
 	{
-		// map_probe_distance inlined
-		lbValue probe_distance = lb_emit_arith(p, Token_And, h, mask, t_uintptr);
-		probe_distance = lb_emit_conv(p, probe_distance, t_uintptr);
-
-		lbValue cap = lb_emit_conv(p, capacity, t_uintptr);
-		lbValue base = lb_emit_arith(p, Token_Add, lb_addr_load(p, pos), cap, t_uintptr);
-		probe_distance = lb_emit_arith(p, Token_Sub, base, probe_distance, t_uintptr);
+		lbValue probe_distance = lb_emit_arith(p, Token_Sub, lb_addr_load(p, pos), element_hash, t_uintptr);
 		probe_distance = lb_emit_arith(p, Token_And, probe_distance, mask, t_uintptr);
 		LLVM_SET_VALUE_NAME(probe_distance.value, "probe_distance");
 
 		lbValue cond = lb_emit_comp(p, Token_Gt, lb_addr_load(p, distance), probe_distance);
-		lb_emit_if(p, cond, nil_block, hash_compare_block);
-	}
-
-	lb_start_block(p, hash_compare_block);
-	{
-		lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, element_hash, h), key_compare_block, increment_block);
+		lb_emit_if(p, cond, nil_block, increment_block);
 	}
 
 	lb_start_block(p, key_compare_block);
@@ -817,7 +828,6 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 		LLVMBuildRet(p->builder, res.value);
 	}
 
-	// gb_printf_err("%s\n", LLVMPrintValueToString(p->value));
 
 	return {p->value, p->type};
 }
@@ -912,6 +922,12 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lbBlock *insert_block     = lb_create_block(p, "insert");
 	lbBlock *check_has_grown_block = lb_create_block(p, "check-has-grown");
 	lbBlock *rehash_block     = lb_create_block(p, "rehash");
+	lbBlock *slot_block       = lb_create_block(p, "slot");
+	lbBlock *slot_loop_block  = lb_create_block(p, "slot-loop");
+	lbBlock *slot_used_block  = lb_create_block(p, "slot-used");
+	lbBlock *slot_probe_block = lb_create_block(p, "slot-probe");
+	lbBlock *slot_next_block  = lb_create_block(p, "slot-next");
+	lbBlock *place_block      = lb_create_block(p, "place");
 
 	lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, found_ptr), found_block, check_grow_block);
 	lb_start_block(p, found_block);
@@ -943,13 +959,70 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 		lb_start_block(p, check_has_grown_block);
 
-		lb_emit_if(p, has_grown, rehash_block, insert_block);
+		lb_emit_if(p, has_grown, rehash_block, slot_block);
 		lb_start_block(p, rehash_block);
 		lbValue key = lb_emit_load(p, key_ptr);
 		lbValue new_hash = lb_gen_map_key_hash(p, map_ptr, key, nullptr);
 		LLVM_SET_VALUE_NAME(new_hash.value, "new_hash");
 		lb_addr_store(p, hash_addr, new_hash);
 		lb_emit_jump(p, insert_block);
+	}
+
+	lb_start_block(p, slot_block);
+	{
+		lbValue map = lb_emit_load(p, lb_emit_conv(p, map_ptr, t_raw_map_ptr));
+		lbMapKVH kvh = lb_map_kvh_data_static(p, type, map);
+		lbValue h = lb_addr_load(p, hash_addr);
+
+		lbAddr pos = lb_add_local_generated(p, t_uintptr, false);
+		lbAddr distance = lb_add_local_generated(p, t_uintptr, true);
+		LLVM_SET_VALUE_NAME(pos.addr.value,      "slot_pos");
+		LLVM_SET_VALUE_NAME(distance.addr.value, "slot_distance");
+		lb_addr_store(p, pos, lb_emit_arith(p, Token_And, h, kvh.mask, t_uintptr));
+
+		lb_emit_jump(p,   slot_loop_block);
+		lb_start_block(p, slot_loop_block);
+
+		lbValue element_hash = lb_emit_load(p, lb_emit_ptr_offset(p, kvh.hs, lb_addr_load(p, pos)));
+		LLVM_SET_VALUE_NAME(element_hash.value, "slot_hash");
+
+		lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, element_hash, lb_const_int(m, t_uintptr, 0)), place_block, slot_used_block);
+
+		lb_start_block(p, slot_used_block);
+		{
+			lbValue tombstone_mask = lb_const_int(m, t_uintptr, 1ull << (8*type_size_of(t_uintptr) - 1));
+			lbValue tombstone = lb_emit_arith(p, Token_And, element_hash, tombstone_mask, t_uintptr);
+			lb_emit_if(p, lb_emit_comp(p, Token_NotEq, tombstone, lb_const_int(m, t_uintptr, 0)), insert_block, slot_probe_block);
+		}
+
+		lb_start_block(p, slot_probe_block);
+		{
+			lbValue probe_distance = lb_emit_arith(p, Token_Sub, lb_addr_load(p, pos), element_hash, t_uintptr);
+			probe_distance         = lb_emit_arith(p, Token_And, probe_distance, kvh.mask, t_uintptr);
+			lb_emit_if(p, lb_emit_comp(p, Token_Gt, lb_addr_load(p, distance), probe_distance), insert_block, slot_next_block);
+		}
+
+		lb_start_block(p, slot_next_block);
+		{
+			lbValue pp = lb_emit_arith(p, Token_Add, lb_addr_load(p, pos), lb_const_int(m, t_uintptr, 1), t_uintptr);
+			lb_addr_store(p, pos, lb_emit_arith(p, Token_And, pp, kvh.mask, t_uintptr));
+			lb_emit_increment(p, distance.addr);
+			lb_emit_jump(p, slot_loop_block);
+		}
+
+		lb_start_block(p, place_block);
+		{
+			lbValue slot = lb_addr_load(p, pos);
+			lbValue key_dst   = lb_map_cell_index_static(p, type->Map.key,   kvh.ks, slot);
+			lbValue value_dst = lb_map_cell_index_static(p, type->Map.value, kvh.vs, slot);
+			lb_mem_copy_non_overlapping(p, key_dst,   key_ptr,   lb_const_int(m, t_int, type_size_of(type->Map.key)));
+			lb_mem_copy_non_overlapping(p, value_dst, value_ptr, lb_const_int(m, t_int, type_size_of(type->Map.value)));
+			lb_emit_store(p, lb_emit_ptr_offset(p, kvh.hs, slot), h);
+
+			lb_emit_increment(p, lb_map_len_ptr(p, map_ptr));
+
+			LLVMBuildRet(p->builder, lb_emit_conv(p, value_dst, t_rawptr).value);
+		}
 	}
 
 	lb_start_block(p, insert_block);
