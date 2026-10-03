@@ -24,6 +24,7 @@
 #endif
 
 struct lbProcedure;
+struct lbGlobalVariable;
 
 struct lbValue {
 	LLVMValueRef value;
@@ -164,6 +165,7 @@ struct lbModule {
 	MPSCQueue<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_to_create;
 	Array<Entity *> global_types_to_create;
+	Array<lbGlobalVariable *> global_variables;
 
 	BlockingMutex generated_procedures_mutex;
 	Array<lbProcedure *> generated_procedures;
@@ -226,6 +228,8 @@ struct lbGenerator : LinkerData {
 	lbProcedure *startup_runtime;
 	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
+
+	Array<lbProcedure *> global_init_procedures;
 
 	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
 	MPSCQueue<lbObjCGlobal> objc_selectors;
@@ -401,7 +405,7 @@ struct lbProcedure {
 	Array<bool>            lifetime_scopes;
 
 	void (*generate_body)(lbModule *m, lbProcedure *p);
-	Array<lbGlobalVariable> *global_variables;
+	Array<lbGlobalVariable *> global_variables;
 	lbProcedure *objc_names;
 
 	Type *internal_gen_type; // map_set, map_get, etc.
