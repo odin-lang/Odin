@@ -915,232 +915,79 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 		}
 		return
 	}
-	parse_components :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, neg, trunc, hex: bool, i: int, ok: bool) {
-		if len(s) == 0 {
-			return
-		}
-		switch s[i] {
-		case '+': i += 1
-		case '-': i += 1; neg = true
-		}
 
-		base := u64(10)
-		MAX_MANT_DIGITS := 19
-		exp_char := byte('e')
-		// support stupid 0x1.ABp100 hex floats even if Odin doesn't
-		if i+2 < len(s) && s[i] == '0' && lower(s[i+1]) == 'x' {
-			base = 16
-			MAX_MANT_DIGITS = 16
-			i += 2
-			exp_char = 'p'
-			hex = true
-		}
-
-		underscores := false
-		saw_dot, saw_digits := false, false
-		nd := 0
-		nd_mant := 0
-		decimal_point := 0
-		trailing_zeroes_nd := -1
-		loop: for ; i < len(s); i += 1 {
-			switch c := s[i]; true {
-			case c == '_':
-				underscores = true
-				continue loop
-			case c == '.':
-				if saw_dot {
-					break loop
-				}
-				saw_dot = true
-				decimal_point = nd
-				continue loop
-
-			case '0' <= c && c <= '9':
-				saw_digits = true
-				if c == '0' {
-					if nd == 0 {
-						decimal_point -= 1
-						continue loop
-					}
-					if trailing_zeroes_nd == -1 {
-						trailing_zeroes_nd = nd
-					}
-				} else {
-					trailing_zeroes_nd = -1
-				}
-				nd += 1
-				if nd_mant < MAX_MANT_DIGITS {
-					mantissa *= base
-					mantissa += u64(c - '0')
-					nd_mant += 1
-				} else if c != '0' {
-					trunc = true
-				}
-				continue loop
-			case base == 16 && 'a' <= lower(c) && lower(c) <= 'f':
-				saw_digits = true
-				trailing_zeroes_nd = -1
-				nd += 1
-				if nd_mant < MAX_MANT_DIGITS {
-					mantissa *= 16
-					mantissa += u64(lower(c) - 'a' + 10)
-					nd_mant += 1
-				} else {
-					trunc = true
-				}
-				continue loop
-			}
-			break loop
-		}
-
-		if !saw_digits {
-			return
-		}
-		if !saw_dot {
-			decimal_point = nd
-		}
-		if trailing_zeroes_nd > 0 {
-			trailing_zeroes_nd = nd_mant - trailing_zeroes_nd
-		}
-		for /**/; trailing_zeroes_nd > 0; trailing_zeroes_nd -= 1 {
-			mantissa /= base
-			nd_mant -= 1
-			nd -= 1
-		}
-		if base == 16 {
-			decimal_point *= 4
-			nd_mant *= 4
-		}
-
-		if i < len(s) && lower(s[i]) == exp_char {
-			i += 1
-			if i >= len(s) { return }
-			exp_sign := 1
-			switch s[i] {
-			case '+': i += 1
-			case '-': i += 1; exp_sign = -1
-			}
-			if i >= len(s) || s[i] < '0' || s[i] > '9' {
-				return
-			}
-			e := 0
-			for ; i < len(s) && ('0' <= s[i] && s[i] <= '9' || s[i] == '_'); i += 1 {
-				if s[i] == '_' {
-					underscores = true
-					continue
-				}
-				if e < 1e5 {
-					e = e*10 + int(s[i]) - '0'
-				}
-			}
-			decimal_point += e * exp_sign
-		} else if base == 16 {
-			return
-		}
-
-		if mantissa != 0 {
-			exp = decimal_point - nd_mant
-		}
-		ok = true
-		return
-	}
-
-	parse_hex :: proc "contextless" (s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
-		info := &_f64_info
-
-		mantissa, exp := mantissa, exp
-
-		MAX_EXP := 1<<info.expbits + info.bias - 2
-		MIN_EXP := info.bias + 1
-		exp += int(info.mantbits)
-
-		for mantissa != 0 && mantissa >> (info.mantbits+2) == 0 {
-			mantissa <<= 1
-			exp -= 1
-		}
-		if trunc {
-			mantissa |= 1
-		}
-
-		for mantissa >> (info.mantbits+3) != 0 {
-			mantissa = mantissa>>1 | mantissa&1
-			exp += 1
-		}
-
-		// denormalize
-		for mantissa > 1 && exp < MIN_EXP-2 {
-			mantissa = mantissa>>1 | mantissa&1
-			exp += 1
-		}
-
-		round := mantissa & 3
-		mantissa >>= 2
-		round |= mantissa & 1 // round to even
-		exp += 2
-		if round == 3 {
-			mantissa += 1
-			if mantissa == 1 << (1 + info.mantbits) {
-				mantissa >>= 1
-				exp += 1
-			}
-		}
-		if mantissa>>info.mantbits == 0 {
-			// zero or denormal
-			exp = info.bias
-		}
-
-		ok := true
-		if exp > MAX_EXP {
-			// infinity or invalid
-			mantissa = 1<<info.mantbits
-			exp = MAX_EXP + 1
-			ok = false
-		}
-
-		bits := mantissa & (1<<info.mantbits - 1)
-		bits |= u64((exp-info.bias) & (1<<info.expbits - 1)) << info.mantbits
-		if neg {
-			bits |= 1 << info.mantbits << info.expbits
-		}
-		return transmute(f64)bits, ok
-	}
-
-	if len(str) > 2 && str[0] == '0' && str[1] == 'h' {
-		nr = 2
-
+	// 0h string to float case
+	@(cold)
+	parse_0h :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
 		as_int: u64
 		digits: int
-		for r in str[2:] {
-			if r == '_' {
-				nr += 1
-				continue
-			}
-			v := u64(_digit_value(r))
-			if v >= 16 {
+		i := 2
+		// Read 8 hex digits at a time, then 4 digits at a time (like "0h3c00" or groups
+		// between `_` separators), then single digits and `_` separators.
+		for i+8 <= len(str) {
+			v := read8_to_u64(str, i)
+			if !is_eight_hex_digits(v) {
 				break
 			}
-			as_int *= 16
-			as_int += v
-			digits += 1
+			as_int = as_int<<32 | parse_eight_hex_digits(v)
+			digits += 8
+			i += 8
 		}
-		nr += digits
+		for i < len(str) {
+			if i+4 <= len(str) {
+				// Four digits: pad them with "0000" and use the 8-digit code.
+				v := u64(read4_to_u32(str, i)) | 0x3030_3030 << 32
+				if is_eight_hex_digits(v) {
+					as_int = as_int<<16 | parse_eight_hex_digits(v) >> 16
+					digits += 4
+					i += 4
+					continue
+				}
+			}
+			if str[i] != '_' {
+				v := hex_digit_table[str[i]]
+				if v >= 16 {
+					break
+				}
+				as_int = as_int<<4 | u64(v)
+				digits += 1
+			}
+			i += 1
+		}
+		nr = i
 		ok = len(str) == nr
 
 		switch digits {
 		case 4:
-			value = cast(T)transmute(f16)cast(u16)as_int
+			value = cast(F)transmute(f16)cast(u16)as_int
 		case 8:
-			value = cast(T)transmute(f32)cast(u32)as_int
+			value = cast(F)transmute(f32)cast(u32)as_int
 		case 16:
-			value = cast(T)transmute(f64)as_int
+			value = cast(F)transmute(f64)as_int
 		case:
 			ok = false
 		}
 		return
 	}
 
-	if f, n, special := check_special(str); special {
-		return T(f), n, true
+	@(cold)
+	parse_special :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
+		f: f64
+		f, nr, ok = check_special(str)
+		return F(f), nr, ok
+	}
+
+	@(cold)
+	parse_slow :: proc($F: typeid, str: string, info: ^Float_Info) -> (value: F, ok: bool) {
+		when F == f64 { Bits :: u64 } else { Bits :: u32 }
+		d: decimal.Decimal
+		decimal.set(&d, str)
+		b, overflow := decimal_to_float_bits(&d, info)
+		return transmute(F)Bits(b), !overflow
+	}
+
+	if len(str) > 2 && str[0] == '0' && str[1] == 'h' {
+		return parse_0h(T, str)
 	}
 
 	when T == f64 {
@@ -1153,18 +1000,16 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 
 	mantissa: u64
 	exp:      int
-	neg, trunc, hex: bool
-	mantissa, exp, neg, trunc, hex, nr = parse_components(str) or_return
-
-	if hex {
-		f: f64
-		f, ok = parse_hex(str, mantissa, exp, neg, trunc)
-		value = T(f)
-		when T == f32 {
-			// A finite f64 can be too large for f32.
-			ok = ok && transmute(u32)value & 0x7f80_0000 != 0x7f80_0000
+	neg, trunc: bool
+	mantissa, exp, neg, trunc, nr, ok = parse_number_string(str)
+	if !ok {
+		// Not a decimal number: try a hexadecimal float, then "inf" and "nan".
+		mantissa, exp, neg, trunc, nr, ok = scan_hex_float(str)
+		if !ok {
+			return parse_special(T, str)
 		}
-		return
+		b, in_range := hex_float_bits(mantissa, exp, neg, trunc, info)
+		return transmute(T)Bits(b), nr, in_range
 	}
 
 	// Clinger's fast path algorithm
@@ -1175,7 +1020,8 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 			1e20, 1e21, 1e22,
 		}
 
-		if mantissa>>_f64_info.mantbits != 0 {
+		// Every integer up to 2^53 is an exact f64 value.
+		if mantissa > 1<<53 {
 			break clinger_fast_path
 		}
 		f := f64(mantissa)
@@ -1225,12 +1071,7 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 		}
 	}
 
-	// Slow path for arbitrary-precision decimal
-	d: decimal.Decimal
-	decimal.set(&d, str[:nr])
-	b, overflow := decimal_to_float_bits(&d, info)
-	value = transmute(T)Bits(b)
-	ok = !overflow
+	value, ok = parse_slow(T, str[:nr], info)
 	return
 }
 /*
