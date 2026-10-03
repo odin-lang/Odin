@@ -443,6 +443,33 @@ test_accept_message_from_closed_buffered_chan :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 }
 
+// Ensures that the typed send and receive procedures accept unidirectional
+// channels, not just `.Both` channels.
+@test
+test_unidirectional_chan_send_recv :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	ch, alloc_err := chan.create_buffered(chan.Chan(int), 4, context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	send_only: chan.Chan(int, .Send) = chan.as_send(ch)
+	recv_only: chan.Chan(int, .Recv) = chan.as_recv(ch)
+
+	testing.expect(t, chan.send(send_only, 32))
+	testing.expect(t, chan.try_send(send_only, 64))
+
+	result, ok := chan.recv(recv_only)
+	testing.expect_value(t, result, 32)
+	testing.expect(t, ok)
+	result, ok = chan.try_recv(recv_only)
+	testing.expect_value(t, result, 64)
+	testing.expect(t, ok)
+
+	result, ok = chan.try_recv(recv_only)
+	testing.expect(t, !ok, "channel should be empty")
+}
+
 // Ensures that if any input channel is eligible to receive or send, the try_select_raw
 // operation will process it.
 @test
