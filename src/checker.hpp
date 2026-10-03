@@ -225,6 +225,7 @@ struct DeclInfo {
 	Type *        gen_proc_type; // Precalculated
 
 	Entity *     para_poly_original;
+	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
 
 	bool                          is_using;
 	bool                          foreign_require_results;

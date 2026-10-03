@@ -568,26 +568,10 @@ gb_internal Type *strip_poly_specialized_proc_type(Type *full) {
 	return t;
 }
 
-// Reuse an existing generated specialization `other`, scheduling its body if unchecked.
-// Caller must have released gen_procs->mutex first.
-gb_internal bool reuse_gen_polymorphic_procedure(Checker *checker, Entity *other, Ast *poly_def_node, PolyProcData *poly_proc_data) {
+// Reuse an existing generated specialization `other`, whose body is checked once it is used
+gb_internal bool reuse_gen_polymorphic_procedure(Entity *other, PolyProcData *poly_proc_data) {
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = other;
-	}
-
-	DeclInfo *decl = other->decl_info;
-	if (decl->proc_checked_state != ProcCheckedState_Checked) {
-		ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
-		proc_info->file  = other->file;
-		proc_info->token = other->token;
-		proc_info->decl  = decl;
-		proc_info->type  = proc_entity_full_type(other);
-		proc_info->body  = decl->proc_lit->ProcLit.body;
-		proc_info->tags  = other->Procedure.tags;
-		proc_info->generated_from_polymorphic = true;
-		proc_info->poly_def_node = poly_def_node;
-
-		check_procedure_later(checker, proc_info);
 	}
 	return true;
 }
@@ -773,7 +757,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			Type *pt = base_type(proc_entity_full_type(other));
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-				return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
+				return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 			}
 		}
 		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
@@ -788,7 +772,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		Entity *other = gen_procs->procs[i];
 		if (gen_procs->hashes[i] == final_hash && are_types_identical(base_type(proc_entity_full_type(other)), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
-			return reuse_gen_polymorphic_procedure(nctx.checker, other, poly_def_node, poly_proc_data);
+			return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 		}
 	}
 
@@ -860,10 +844,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	AstFile *file = base_entity->file;
 
-	array_add(&gen_procs->procs, entity);
-	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
-	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
-
 	ProcInfo *proc_info = permanent_alloc_item<ProcInfo>();
 	proc_info->file  = file;
 	proc_info->token = token;
@@ -874,6 +854,12 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
 
+	// Before it can be found by another thread which could use it first
+	d->gen_proc_info.store(proc_info);
+
+	array_add(&gen_procs->procs, entity);
+	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
+	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;
@@ -925,9 +911,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			}
 		}
 	}
-
-	// NOTE(bill): Check the newly generated procedure body
-	check_procedure_later(nctx.checker, proc_info);
 
 	return true;
 }
@@ -7771,9 +7754,6 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 
 		} else {
 			decl->where_clauses_evaluated = true;
-			if (ok && (data->gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-				check_procedure_later(c->checker, e->file, e->token, decl, proc_entity_full_type(e), decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
-			}
 			if (is_type_proc(data->gen_entity->type)) {
 				Type *t = base_type(entity_to_use->type);
 				data->result_type = t->Proc.results;
