@@ -1529,6 +1529,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		// NOTE: an array backing is written an element at a time, as writes to different fields are
 		// only combined when they are of the same width
 		Type *elem = core_array_type(core_type(type_deref(addr.addr.type)));
+		lbValue elems = {addr.addr.value, alloc_type_pointer(elem)};
 		LLVMTypeRef lit = lb_type(p->module, elem);
 		u64 elem_bits = 8*cast(u64)type_size_of(elem);
 		u64 begin = addr.bitfield.bit_offset;
@@ -1538,8 +1539,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			u64 lo = gb_max(begin, i*elem_bits);
 			u64 hi = gb_min(end, (i+1)*elem_bits);
 
-			LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_uintptr), i, false);
-			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lit, addr.addr.value, &index, 1, "");
+			lbValue ptr = lb_emit_ptr_offset(p, elems, lb_const_int(p->module, t_int, i));
 			LLVMValueRef offset = LLVMConstInt(lit, lo - i*elem_bits, false);
 			LLVMValueRef mask = LLVMBuildShl(p->builder, lb_const_low_bits_mask(lit, hi - lo), offset, "");
 
@@ -1547,10 +1547,8 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 			part = LLVMBuildIntCast2(p->builder, part, lit, false, "");
 			part = LLVMBuildAnd(p->builder, LLVMBuildShl(p->builder, part, offset, ""), mask, "");
 
-			LLVMValueRef old = OdinLLVMBuildLoad(p, lit, ptr);
-			LLVMValueRef rest = LLVMBuildAnd(p->builder, old, LLVMBuildNot(p->builder, mask, ""), "");
-			LLVMValueRef store = LLVMBuildStore(p->builder, LLVMBuildOr(p->builder, rest, part, ""), ptr);
-			LLVMSetAlignment(store, LLVMGetAlignment(old));
+			LLVMValueRef rest = LLVMBuildAnd(p->builder, lb_emit_load(p, ptr).value, LLVMBuildNot(p->builder, mask, ""), "");
+			lb_emit_store(p, ptr, lbValue{LLVMBuildOr(p->builder, rest, part, ""), elem});
 		}
 		return;
 	} else if (addr.kind == lbAddr_Map) {
@@ -2004,7 +2002,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		// NOTE: an array backing is read as it is written, in whole elements. Those that fit in 64 bits are
 		// joined, so that their loads can be merged, which leaves at most one more for a field to be in
 		Type *elem = core_array_type(core_type(type_deref(addr.addr.type)));
-		LLVMTypeRef lit = lb_type(p->module, elem);
+		lbValue elems = {addr.addr.value, alloc_type_pointer(elem)};
 		u64 elem_bits = 8*cast(u64)type_size_of(elem);
 		u64 begin = addr.bitfield.bit_offset;
 		u64 end = begin + addr.bitfield.bit_size;
@@ -2013,16 +2011,15 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		u64 joined = gb_min(count, gb_max(64/elem_bits, 1));
 		GB_ASSERT(count <= joined + 1);
 
-		auto load = [&](u64 i, LLVMTypeRef type) -> LLVMValueRef {
-			LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_uintptr), i, false);
-			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lit, addr.addr.value, &index, 1, "");
-			return LLVMBuildIntCast2(p->builder, OdinLLVMBuildLoad(p, lit, ptr), type, false, "");
+		auto load = [](lbProcedure *p, lbValue elems, u64 i, LLVMTypeRef type) -> LLVMValueRef {
+			lbValue ptr = lb_emit_ptr_offset(p, elems, lb_const_int(p->module, t_int, i));
+			return LLVMBuildIntCast2(p->builder, lb_emit_load(p, ptr).value, type, false, "");
 		};
 
 		LLVMTypeRef wide = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(joined*elem_bits));
-		LLVMValueRef v = load(first, wide);
+		LLVMValueRef v = load(p, elems, first, wide);
 		for (u64 i = 1; i < joined; i++) {
-			LLVMValueRef part = LLVMBuildShl(p->builder, load(first + i, wide), LLVMConstInt(wide, i*elem_bits, false), "");
+			LLVMValueRef part = LLVMBuildShl(p->builder, load(p, elems, first + i, wide), LLVMConstInt(wide, i*elem_bits, false), "");
 			v = LLVMBuildOr(p->builder, v, part, "");
 		}
 		v = LLVMBuildLShr(p->builder, v, LLVMConstInt(wide, begin - first*elem_bits, false), "");
@@ -2030,7 +2027,7 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 			LLVMTypeRef llvm_u64 = lb_type(p->module, t_u64);
 			LLVMValueRef offset = LLVMConstInt(llvm_u64, (first + joined)*elem_bits - begin, false);
 			v = LLVMBuildIntCast2(p->builder, v, llvm_u64, false, "");
-			v = LLVMBuildOr(p->builder, v, LLVMBuildShl(p->builder, load(first + joined, llvm_u64), offset, ""), "");
+			v = LLVMBuildOr(p->builder, v, LLVMBuildShl(p->builder, load(p, elems, first + joined, llvm_u64), offset, ""), "");
 		}
 		v = LLVMBuildTrunc(p->builder, v, LLVMIntTypeInContext(p->module->ctx, cast(unsigned)addr.bitfield.bit_size), "");
 
