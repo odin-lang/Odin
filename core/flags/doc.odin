@@ -48,6 +48,7 @@ arguments should go and which are required.
 Under the `args` tag, there are the following subtags:
 
 - `name=S`: set `S` as the flag's name.
+- `short=C`: set `C` as the flag's one-character UNIX-style short name.
 - `pos=N`: place positional argument `N` into this flag.
 - `hidden`: hide this flag from the usage documentation.
 - `required`: cause verification to fail if this argument is not set.
@@ -181,8 +182,14 @@ at parse time.
 	--flag=argument
 	--flag argument
 	--flag argument (manifold-argument)
+	-f
+	-f=argument
+	-f argument
 
-`-flag` may also be substituted for `--flag`.
+Single-dash flags must be declared with the `short=C` struct subtag. Long
+flags always require two dashes. Boolean short flags may be bundled. A short
+flag that takes a value must be last in the bundle. (for e.g. -a -b -c can be
+set via -abc)
 
 Do note that map flags are not currently supported in this parsing style.
 
