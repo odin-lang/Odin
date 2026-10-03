@@ -115,6 +115,7 @@ else
 fi
 $ODIN test ../test_issue_7700.odin $COMMON
 $ODIN test ../test_issue_procedure_of_specialized.odin $COMMON
+$ODIN test ../test_issue_packed_field_by_value.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_7421.odin $COMMON
