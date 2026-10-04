@@ -6412,7 +6412,8 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath  = string_trim_whitespace(fullpath); // Just in case
 	f->filename  = remove_directory_from_path(f->fullpath);
-	f->directory = directory_from_path(f->fullpath);
+	// NOTE(bill): It's file, therefore unlike `directory_from_path`, this needs no file system query
+	f->directory = substring(f->fullpath, 0, gb_max(f->fullpath.len - f->filename.len - 1, 0));
 	set_file_path_string(f->id, f->fullpath);
 	thread_safe_set_ast_file_from_id(f->id, f);
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {

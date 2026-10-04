@@ -833,9 +833,9 @@ enum LoadedFileError {
 
 gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_file, bool copy_file_contents) {
 	LoadedFileError err = LoadedFile_None;
-	
-	if (!copy_file_contents) {
-	#if defined(GB_SYSTEM_WINDOWS)
+
+#if defined(GB_SYSTEM_WINDOWS)
+	{
 		TEMPORARY_ALLOCATOR_GUARD();
 
 		isize w_len = 0;
@@ -849,7 +849,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		HANDLE file_mapping = nullptr;
 		void *file_data = nullptr;
 		
-		handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
 			handle = nullptr;
 			goto window_handle_file_error;
@@ -871,6 +871,20 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 			memory_mapped_file->handle = nullptr;
 			memory_mapped_file->data   = nullptr;
 			memory_mapped_file->size   = 0;
+			return err;
+		}
+
+		if (copy_file_contents) {
+			u8 *data = cast(u8 *)gb_alloc(permanent_allocator(), (file_size+1+15)&~15);
+			DWORD bytes_read = 0;
+			if (!ReadFile(handle, data, cast(DWORD)file_size, &bytes_read, nullptr)) {
+				goto window_handle_file_error;
+			}
+			CloseHandle(handle);
+			data[bytes_read] = 0;
+			memory_mapped_file->handle = nullptr;
+			memory_mapped_file->data   = data;
+			memory_mapped_file->size   = cast(i32)bytes_read;
 			return err;
 		}
 
@@ -901,9 +915,10 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 			}
 			return err;
 		}
-	#endif
 	}
-	
+#else
+	gb_unused(copy_file_contents);
+
 	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, fullpath);
 
 	if (fc.size > I32_MAX) {
@@ -929,6 +944,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		}
 	}
 	return err;
+#endif
 }
 
 
