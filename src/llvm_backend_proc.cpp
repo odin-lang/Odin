@@ -40,6 +40,11 @@ gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue sr
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
 
+	if (!is_volatile && lb_uses_fast_isel()) {
+		lb_emit_memmove(p, dst.value, dst_align, src.value, src_align, len.value);
+		return;
+	}
+
 	char const *name = "llvm.memmove";
 	if (!p->is_startup && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
@@ -78,7 +83,7 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 	len = lb_emit_conv(p, len, t_int);
 
 	char const *name = "llvm.memcpy";
-	if (!p->is_startup && LLVMIsConstant(len.value)) {
+	if (!p->is_startup && !lb_uses_fast_isel() && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
 		if (const_len <= lb_max_zero_init_size()) {
 			name = "llvm.memcpy.inline";
@@ -399,13 +404,13 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 		Ast *ident = entity->identifier.load();
 		if (entity->file != nullptr) {
-			file = lb_get_llvm_metadata(m, entity->file);
+			file = lb_get_file_metadata(m, entity->file);
 			scope = file;
 		} else if (ident != nullptr && ident->file_id != 0) {
-			file = lb_get_llvm_metadata(m, ident->file());
+			file = lb_get_file_metadata(m, ident->file());
 			scope = file;
 		} else if (entity->scope != nullptr) {
-			file = lb_get_llvm_metadata(m, entity->scope->file);
+			file = lb_get_file_metadata(m, entity->scope->file);
 			scope = file;
 		}
 		GB_ASSERT_MSG(file != nullptr, "%.*s", LIT(entity->token.string));
@@ -931,7 +936,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 	i32 guid = e->token.pos.offset;
 	if (e->decl_info != nullptr && e->decl_info->para_poly_original != nullptr) {
 		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(p->name), LIT(pd_name), guid,
-		                       cast(unsigned long long)type_hash_canonical_type(e->type));
+		                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
 	} else {
 		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(p->name), LIT(pd_name), guid);
 	}
@@ -1455,7 +1460,12 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 
 			bool by_ptr = false;
-			auto in_args = args;
+			auto in_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
+			for_array(i, args) {
+				if (i >= pt->Proc.param_count || pt->Proc.params->Tuple.variables[i]->kind == Entity_Variable) {
+					array_add(&in_args, args[i]);
+				}
+			}
 			Array<lbValue> result_as_args = {};
 			switch (kind) {
 			case DeferredProcedure_none:
@@ -5017,7 +5027,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 		{
 			Ast *orig = param_value.original_ast_expr;
 			if (orig->kind == Ast_BasicDirective) {
-				gbString expr = expr_to_string(call_expression, temporary_allocator());
+				gbString expr = expr_to_string(call_expression, permanent_allocator());
 				return lb_const_string(p->module, make_string_c(expr));
 			}
 
@@ -5057,7 +5067,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 				}
 			}
 
-			gbString expr = expr_to_string(target_expr, temporary_allocator());
+			gbString expr = expr_to_string(target_expr, permanent_allocator());
 			return lb_const_string(p->module, make_string_c(expr));
 		}
 
@@ -5260,6 +5270,12 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		}
 	}
 
+	Type *callee_type = proc_expr->tav.type;
+	if (value.value != nullptr && callee_type != nullptr && callee_type != value.type &&
+	    is_type_proc(callee_type) && base_type(callee_type)->Proc.is_poly_specialized) {
+		value.type = callee_type;
+		proc_value_type = callee_type;
+	}
 
 	GB_ASSERT(value.value != nullptr || is_objc_call || asm_template != nullptr);
 	Type *proc_type_ = base_type(proc_value_type);

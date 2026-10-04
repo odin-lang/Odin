@@ -2127,6 +2127,11 @@ gb_internal SubstResult subst_unify(CheckerContext *c, Type *pattern, Type *sour
 				if (r != Subst_Matched) {
 					return r; // NoMatch or Unhandled
 				}
+				// e.g. `M(1, 1, $T)` vs `M(3, 3, f64)`
+				if (s_e->kind == Entity_Constant && t_e->kind == Entity_Constant &&
+				    !compare_exact_values(Token_CmpEq, s_e->Constant.value, t_e->Constant.value)) {
+					return Subst_NoMatch;
+				}
 			}
 		}
 		return Subst_Matched;
@@ -3353,6 +3358,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 							Ast *expr = unparen_expr(op.expr);
 							Entity *proc_entity = strip_entity_wrapping(expr);
 							if (proc_entity) {
+								proc_entity->flags |= EntityFlag_PolyConstArg;
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
 								valid = true;
 							} else if (expr->kind == Ast_ProcLit) {
@@ -4192,7 +4198,7 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		}
 
 		if (is_type_simple_compare(key)) {
-			add_package_dependency(ctx, "runtime", "default_hasher");
+			add_package_dependency(ctx, "runtime", "default_hasher_fixed");
 			return;
 		}
 
@@ -4271,6 +4277,7 @@ gb_internal void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	type->Map.value = value;
 
 	add_map_key_type_dependencies(ctx, key);
+	add_comparison_procedures_for_fields(ctx, key);
 
 	init_core_map_type(ctx->checker);
 	init_map_internal_types(type);

@@ -4364,7 +4364,9 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		Type *type = v.type;
 		lbAddr addr = {};
 		if (p->is_startup) {
-			addr = lb_add_global_generated_from_procedure(p, type, v);
+			// NOTE: only a constant can be the global's initializer, any other value is written by the store below
+			lbValue initializer = LLVMIsConstant(v.value) ? v : lbValue{};
+			addr = lb_add_global_generated_from_procedure(p, type, initializer);
 		} else {
 			addr = lb_add_local_generated(p, type, false);
 		}
@@ -4707,6 +4709,27 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(te, TernaryIfExpr, expr);
 		GB_ASSERT(te->y != nullptr);
 		Type *type = default_type(type_of_expr(expr));
+		if (lb_is_type_large_aggregate(p->module, type)) {
+			// NOTE(bill): A large aggregate needs to be selected through memory
+			// as instruction selection splits a `phi` or `select` of it per field
+			lbAddr res = lb_add_local_generated(p, type, false);
+
+			lbBlock *then  = lb_create_block(p, "if.then");
+			lbBlock *done  = lb_create_block(p, "if.done");
+			lbBlock *else_ = lb_create_block(p, "if.else");
+
+			lb_build_cond(p, te->cond, then, else_);
+			lb_start_block(p, then);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, te->x), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, else_);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, te->y), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, done);
+			return lb_addr_load(p, res);
+		}
 		if (lb_is_expr_trivial(te->x) && lb_is_expr_trivial(te->y)) {
 			lbValue cond = lb_build_expr(p, te->cond);
 			lbValue x = lb_emit_conv(p, lb_build_expr(p, te->x), type);
@@ -6780,7 +6803,15 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
-			lbAddr addr = lb_build_addr(p, se->expr);
+			lbAddr addr = {};
+			if (is_type_soa_pointer(tav.type)) {
+				// auto-deref p.bar, where p is an #soa pointer;
+				// same lowering as an explicit p^.bar so `using` paths
+				// go through lbAddr_SoaVariable instead of deep-GEP on the fat pointer
+				addr = lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, se->expr));
+			} else {
+				addr = lb_build_addr(p, se->expr);
+			}
 
 			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
 			//				 It is incoherent otherwise as Objective-C objects are zero-sized.

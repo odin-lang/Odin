@@ -823,6 +823,7 @@ gb_internal i32 exact_value_order(ExactValue const &v) {
 	case ExactValue_Pointer:
 		return 7;
 	case ExactValue_Procedure:
+	case ExactValue_Typeid:
 		return 8;
 
 	default:

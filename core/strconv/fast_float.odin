@@ -1,13 +1,17 @@
 package strconv
 
+import "base:intrinsics"
 import "core:math/bits"
 
+_ :: bits // needed for STRCONV_FAST_FLOAT=false
+
 /*
-	Eisel-Lemire decimal to binary conversion.
+	Decimal to binary float conversion: a fast scanner for decimal floats
+	and the Eisel-Lemire algorithm.
 
 	Ported from ffc.h (https://github.com/kolemannix/ffc.h)
 	Made available under the Boost Software License 1.0,
-	see LICENSE_fast_float in this package.
+	see LICENSE at the bottom of the file.
 
 	List of contributors:
 		Daniel Lemire, João Paulo Magalhaes: Original fast_float implementation
@@ -21,6 +25,12 @@ import "core:math/bits"
 	- Noble Mushtak, Daniel Lemire, "Fast Number Parsing Without Fallback",
 	  Software: Practice and Experience 53 (7), 2023. https://arxiv.org/abs/2212.06644
 */
+
+/*
+	Disable with `-define:STRCONV_FAST_FLOAT=false` to drop the Eisel-Lemire step
+	and its table.
+*/
+FAST_FLOAT :: #config(STRCONV_FAST_FLOAT, true)
 
 _SMALLEST_POWER_OF_FIVE :: -342
 
@@ -76,7 +86,7 @@ fast_float_compute_float :: proc "contextless" ($T: typeid, q: int, w: u64) -> u
 	// the error in the first product could affect them, so we refine the result with
 	// the lower half of the power of five.
 	PRECISION_MASK :: max(u64) >> (MANTISSA_EXPLICIT_BITS + 3)
-	pow5 := &_POWER_OF_FIVE_128[q - _SMALLEST_POWER_OF_FIVE]
+	pow5 := _POWER_OF_FIVE_128[q - _SMALLEST_POWER_OF_FIVE]
 	high, low := bits.mul_u64(w, pow5[0])
 	if high & PRECISION_MASK == PRECISION_MASK {
 		second_high, _ := bits.mul_u64(w, pow5[1])
@@ -125,6 +135,236 @@ fast_float_compute_float :: proc "contextless" ($T: typeid, q: int, w: u64) -> u
 		return INFINITE_POWER << MANTISSA_EXPLICIT_BITS
 	}
 	return mantissa | u64(power2) << MANTISSA_EXPLICIT_BITS
+}
+
+@(private)
+MAX_SIG_DIGITS :: 19 // 10^19 - 1 < 2^64
+
+/*
+Scans a decimal floating-point number at the start of `s`.
+A fast scanner for the decimal float syntax: `[+-] digits [. digits] [(e|E) [+-] digits]`
+It skips a `_` between digits
+
+**Returns**
+- mantissa, exp: The value is `mantissa * 10^exp`. If `trunc` is true, the scanner dropped the significant digits after the first 19. Then the exact value is in the range `[mantissa, mantissa + 1) * 10^exp`.
+- neg: The number has a minus sign.
+- nr: The number of bytes in the number.
+- ok: `false` if `s` is not a number
+*/
+parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa: u64, exp: int, neg, trunc: bool, nr: int, ok: bool) #no_bounds_check {
+	n := len(s)
+	if n == 0 {
+		return
+	}
+	// Written without branches, because the sign of the input is often unpredictable.
+	neg = s[0] == '-'
+	i := int(neg || s[0] == '+')
+	if i+2 < n && s[i] == '0' && lower(s[i+1]) == 'x' {
+		return // a hex float
+	}
+
+	// Integer part
+	int_start := i
+	for i < n && s[i] - '0' <= 9 {
+		mantissa = mantissa*10 + u64(s[i] - '0')
+		i += 1
+	}
+	digits := i - int_start
+	if i < n && s[i] == '_' {
+		more: int = ---
+		i, mantissa, more = parse_digits_with_separators(s, i, mantissa)
+		digits += more
+	}
+
+	int_digits := digits
+	digits_end := i
+
+	// Fraction part
+	if i < n && s[i] == '.' {
+		i += 1
+		frac_start := i
+		i, mantissa = loop_parse_if_eight_digits(s, i, mantissa)
+		for i < n && s[i] - '0' <= 9 {
+			mantissa = mantissa*10 + u64(s[i] - '0')
+			i += 1
+		}
+		frac_digits := i - frac_start
+		if i < n && s[i] == '_' {
+			more: int = ---
+			i, mantissa, more = parse_digits_with_separators(s, i, mantissa)
+			frac_digits += more
+		}
+		exp = -frac_digits
+		digits += frac_digits
+		digits_end = i
+	}
+	if digits == 0 {
+		return
+	}
+
+	// Exponent part. The first byte after `e` and the sign must be a digit.
+	if i < n && lower(s[i]) == 'e' {
+		i += 1
+		exp_neg := false
+		if i < n && (s[i] == '+' || s[i] == '-') {
+			exp_neg = s[i] == '-'
+			i += 1
+		}
+		if i >= n || s[i] - '0' > 9 {
+			return // not a valid exponent, so not a number
+		}
+		x := 0
+		for i < n && s[i] - '0' <= 9 {
+			if x < 100_000 { // larger exponents overflow or underflow anyway
+				x = x*10 + int(s[i] - '0')
+			}
+			i += 1
+		}
+		if i < n && s[i] == '_' {
+			i, x = parse_exponent_with_separators(s, i, x)
+		}
+		exp += -x if exp_neg else x
+	}
+
+	if digits > MAX_SIG_DIGITS {
+		mantissa, exp, trunc = read_significant_digits(s, int_start, digits_end, int_digits, exp + (digits - int_digits))
+	}
+
+	if mantissa == 0 {
+		exp = 0
+	}
+	nr, ok = i, true
+	return
+}
+
+
+// Returns the new position, the mantissa and the number of digits
+@(cold)
+parse_digits_with_separators :: proc "contextless" (s: string, i: int, mantissa: u64) -> (int, u64, int) #no_bounds_check {
+	i, mantissa := i, mantissa
+	digits := 0
+	for i < len(s) {
+		if s[i] - '0' <= 9 {
+			mantissa = mantissa*10 + u64(s[i] - '0')
+			digits += 1
+		} else if s[i] != '_' {
+			break
+		}
+		i += 1
+	}
+	return i, mantissa, digits
+}
+
+@(cold)
+parse_exponent_with_separators :: proc "contextless" (s: string, i: int, x: int) -> (int, int) #no_bounds_check {
+	i, x := i, x
+	for i < len(s) {
+		if s[i] - '0' <= 9 {
+			if x < 100_000 { // larger exponents overflow or underflow anyway
+				x = x*10 + int(s[i] - '0')
+			}
+		} else if s[i] != '_' {
+			break
+		}
+		i += 1
+	}
+	return i, x
+}
+
+/*
+Reads the first 19 significant digits of a decimal number again. The scanner uses it only
+if the number has more than 19 digits, because then the mantissa can overflow.
+
+**Inputs**
+- s, i: The input, and the position of the first digit before the `.`.
+- end: The position after the last digit.
+- int_digits: The number of digits before the `.`.
+- e: The exponent after the `e`, or 0.
+
+**Returns**
+- mantissa, exp: The value is `mantissa * 10^exp`, without the digits that were not read again.
+- trunc: `true` if the procedure did not read all the digits again.
+*/
+@(cold)
+read_significant_digits :: proc "contextless" (s: string, i, end, int_digits, e: int) -> (mantissa: u64, exp: int, trunc: bool) #no_bounds_check {
+	i := i
+	exp = e
+	int_left := int_digits
+	nd := 0
+	for i < end && nd < MAX_SIG_DIGITS {
+		c := s[i]
+		i += 1
+		if c - '0' > 9 {
+			continue // a `_` or the `.`
+		}
+		if int_left > 0 {
+			int_left -= 1
+		} else {
+			exp -= 1
+		}
+		if mantissa == 0 && c == '0' {
+			continue
+		}
+		mantissa = mantissa*10 + u64(c - '0')
+		nd += 1
+	}
+	exp += int_left
+	return mantissa, exp, i < end
+}
+
+// Loads 8 bytes starting at `s[i]` in little-endian order
+read8_to_u64 :: #force_inline proc "contextless" (s: string, i: int) -> u64 {
+	return u64(intrinsics.unaligned_load((^u64le)(&raw_data(s)[i])))
+}
+
+read4_to_u32 :: #force_inline proc "contextless" (s: string, i: int) -> u32 {
+	return u32(intrinsics.unaligned_load((^u32le)(&raw_data(s)[i])))
+}
+
+// Reports if all 8 bytes of `v` are ASCII digits
+is_made_of_eight_digits_fast :: #force_inline proc "contextless" (v: u64) -> bool {
+	return ((v + 0x4646_4646_4646_4646) | (v - 0x3030_3030_3030_3030)) & 0x8080_8080_8080_8080 == 0
+}
+
+is_made_of_four_digits_fast :: #force_inline proc "contextless" (v: u32) -> bool {
+	return ((v + 0x4646_4646) | (v - 0x3030_3030)) & 0x8080_8080 == 0
+}
+
+// Returns the new position and mantissa
+loop_parse_if_eight_digits :: #force_inline proc "contextless" (s: string, i: int, m: u64) -> (int, u64) #no_bounds_check {
+	i, m := i, m
+	for i+8 <= len(s) {
+		v := read8_to_u64(s, i)
+		if !is_made_of_eight_digits_fast(v) {
+			break
+		}
+		m = m*100_000_000 + parse_eight_digits_unrolled(v)
+		i += 8
+	}
+	if i+4 <= len(s) {
+		v := read4_to_u32(s, i)
+		if is_made_of_four_digits_fast(v) {
+			m = m*10_000 + parse_four_digits_unrolled(v)
+			i += 4
+		}
+	}
+	return i, m
+}
+
+// Converts 8 ASCII digits (the first digit in the lowest byte) to their value
+parse_eight_digits_unrolled :: #force_inline proc "contextless" (chars: u64) -> u64 {
+	MASK :: 0x0000_00ff_0000_00ff
+	MUL1 :: 0x000f_4240_0000_0064 // 100 + (1000000 << 32)
+	MUL2 :: 0x0000_2710_0000_0001 // 1 + (10000 << 32)
+	v := chars - 0x3030_3030_3030_3030
+	v = v*10 + v>>8
+	return u64(u32(((v & MASK)*MUL1 + ((v>>16) & MASK)*MUL2) >> 32))
+}
+
+parse_four_digits_unrolled :: #force_inline proc "contextless" (chars: u32) -> u64 {
+	v := chars - 0x3030_3030
+	v = v*10 + v>>8
+	return u64(((v & 0x00ff_00ff) * 0x0064_0001) >> 16)
 }
 
 // 128-bit truncated mantissas of 5^-342 to 5^308, with the most significant

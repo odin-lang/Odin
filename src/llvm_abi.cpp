@@ -243,6 +243,44 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 }
 
 
+struct lbTypeLayout {
+	i64 size;
+	i64 align;
+};
+
+gb_thread_local PtrMap<LLVMTypeRef, lbTypeLayout> lb_aggregate_layouts;
+
+gb_internal lbTypeLayout lb_aggregate_layout(LLVMTypeRef type) {
+	if (lbTypeLayout *found = map_get(&lb_aggregate_layouts, type)) {
+		return *found;
+	}
+	lbTypeLayout layout = {0, 1};
+	if (LLVMGetTypeKind(type) == LLVMArrayTypeKind) {
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
+		layout.size  = cast(i64)LLVMGetArrayLength(type) * lb_sizeof(elem);
+		layout.align = lb_alignof(elem);
+	} else {
+		GB_ASSERT(LLVMGetTypeKind(type) == LLVMStructTypeKind);
+		if (LLVMIsOpaqueStruct(type)) {
+			return layout;
+		}
+		bool is_packed = LLVMIsPackedStruct(type);
+		unsigned field_count = LLVMCountStructElementTypes(type);
+		for (unsigned i = 0; i < field_count; i++) {
+			LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
+			if (!is_packed) {
+				i64 field_align = lb_alignof(field);
+				layout.size  = llvm_align_formula(layout.size, field_align);
+				layout.align = gb_max(layout.align, field_align);
+			}
+			layout.size += lb_sizeof(field);
+		}
+		layout.size = llvm_align_formula(layout.size, layout.align);
+	}
+	map_set(&lb_aggregate_layouts, type, layout);
+	return layout;
+}
+
 gb_internal i64 lb_sizeof(LLVMTypeRef type) {
 	LLVMTypeKind kind = LLVMGetTypeKind(type);
 	switch (kind) {
@@ -262,35 +300,8 @@ gb_internal i64 lb_sizeof(LLVMTypeRef type) {
 	case LLVMPointerTypeKind:
 		return build_context.ptr_size;
 	case LLVMStructTypeKind:
-		{
-			unsigned field_count = LLVMCountStructElementTypes(type);
-			i64 offset = 0;
-			if (LLVMIsPackedStruct(type)) {
-				for (unsigned i = 0; i < field_count; i++) {
-					LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
-					offset += lb_sizeof(field);
-				}
-			} else {
-				for (unsigned i = 0; i < field_count; i++) {
-					LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
-					i64 align = lb_alignof(field);
-					offset = llvm_align_formula(offset, align);
-					offset += lb_sizeof(field);
-				}
-				offset = llvm_align_formula(offset, lb_alignof(type));
-			}
-			return offset;
-		}
-		break;
 	case LLVMArrayTypeKind:
-		{
-			LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
-			i64 elem_size = lb_sizeof(elem);
-			i64 count = LLVMGetArrayLength(type);
-			i64 size = count * elem_size;
-			return size;
-		}
-		break;
+		return lb_aggregate_layout(type).size;
 
 #if LLVM_VERSION_MAJOR < 20
 	case LLVMX86_MMXTypeKind:
@@ -330,23 +341,8 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMPointerTypeKind:
 		return build_context.ptr_size;
 	case LLVMStructTypeKind:
-		{
-			if (LLVMIsPackedStruct(type)) {
-				return 1;
-			} else {
-				unsigned field_count = LLVMCountStructElementTypes(type);
-				i64 max_align = 1;
-				for (unsigned i = 0; i < field_count; i++) {
-					LLVMTypeRef field = LLVMStructGetTypeAtIndex(type, i);
-					i64 field_align = lb_alignof(field);
-					max_align = gb_max(max_align, field_align);
-				}
-				return max_align;
-			}
-		}
-		break;
 	case LLVMArrayTypeKind:
-		return lb_alignof(OdinLLVMGetArrayElementType(type));
+		return lb_aggregate_layout(type).align;
 
 #if LLVM_VERSION_MAJOR < 20
 	case LLVMX86_MMXTypeKind:

@@ -225,6 +225,7 @@ struct DeclInfo {
 	Type *        gen_proc_type; // Precalculated
 
 	Entity *     para_poly_original;
+	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
 
 	bool                          is_using;
 	bool                          foreign_require_results;
@@ -878,6 +879,7 @@ struct CheckerContext {
 	u32        stmt_flags;
 	bool       in_enum_type;
 	bool       in_proc_group;
+	bool       in_procedure_of;
 	bool       allow_polymorphic_types;
 	bool       disallow_polymorphic_return_types; // NOTE(zen3ger): no poly type decl in return types
 	bool       no_polymorphic_errors;

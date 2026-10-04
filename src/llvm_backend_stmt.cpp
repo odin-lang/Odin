@@ -3,18 +3,20 @@
 
 // NOTE(bill): Orders entities by their canonical type
 gb_internal i32 lb_entity_type_cmp(Entity *x, Entity *y) {
-	if (x->type == y->type || x->type == nullptr || y->type == nullptr) {
+	Type *xt = proc_entity_full_type(x);
+	Type *yt = proc_entity_full_type(y);
+	if (xt == yt || xt == nullptr || yt == nullptr) {
 		return 0;
 	}
-	u64 hx = type_hash_canonical_type(x->type);
-	u64 hy = type_hash_canonical_type(y->type);
+	u64 hx = type_hash_canonical_type(xt);
+	u64 hy = type_hash_canonical_type(yt);
 	if (hx != hy) {
 		return hx < hy ? -1 : +1;
 	}
 	// NOTE(bill): Polymorphic instances share their declaration's token, so this is what tells them apart deterministically
 	TEMPORARY_ALLOCATOR_GUARD();
-	return string_compare(type_to_canonical_string(temporary_allocator(), x->type),
-	                      type_to_canonical_string(temporary_allocator(), y->type));
+	return string_compare(type_to_canonical_string(temporary_allocator(), xt),
+	                      type_to_canonical_string(temporary_allocator(), yt));
 }
 
 gb_internal GB_COMPARE_PROC(lb_polymorphic_instance_cmp) {
@@ -232,7 +234,8 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			lbValue *prev_value = string_map_get(&p->module->members, name);
 			if (prev_value != nullptr) {
 				// NOTE(bill): Don't do mutliple declarations in the IR
-				return;
+				lb_add_entity(p->module, e, *prev_value);
+				continue;
 			}
 
 			e->Procedure.link_name = name;
@@ -332,7 +335,7 @@ gb_internal void lb_open_scope(lbProcedure *p, Scope *s, bool lifetime_scope=fal
 			LLVMMetadataRef file = nullptr;
 			AstFile *ast_file = s->node->file();
 			if (ast_file != nullptr) {
-				file = lb_get_llvm_metadata(m, ast_file);
+				file = lb_get_file_metadata(m, ast_file);
 			}
 			LLVMMetadataRef scope = nullptr;
 			if (p->scope_stack.count > 0) {

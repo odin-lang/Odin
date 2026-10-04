@@ -686,6 +686,14 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		} else {
 			try_to_add_package_dependency(c, "runtime", "_NSConcreteStackBlock");
 		}
+		for (isize i = 0; i < capture_arg_count; i++) {
+			Type *t = param_operands[i].type;
+			if (is_type_pointer(t) && is_type_objc_object(t)) {
+				try_to_add_package_dependency(c, "runtime", "_Block_object_assign");
+				try_to_add_package_dependency(c, "runtime", "_Block_object_dispose");
+				break;
+			}
+		}
 
 		*operand = poly_op;
 		operand->type = alloc_type_pointer(operand->type);
@@ -5551,17 +5559,42 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			ExactValue value = arg->tav.value;
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
-			count_needed += cl->elems.count;
+			count_needed += is_type_array(arg->tav.type)
+			              ? cast(isize)get_array_type_count(arg->tav.type)
+			              : cl->elems.count;
 		}
 
 		Array<Ast *> new_elems = {};
 		array_init(&new_elems, permanent_allocator(), 0, count_needed);
+
+		CheckerContext zero_context = *c;
+		zero_context.type_hint_expr = nullptr;
 
 		for (Ast *arg : ce->args) {
 			ExactValue value = arg->tav.value;
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
 			array_add_elems(&new_elems, cl->elems.data, cl->elems.count);
+
+			if (is_type_array(arg->tav.type)) {
+				isize count = cast(isize)get_array_type_count(arg->tav.type);
+				GB_ASSERT(cl->elems.count <= count);
+				for (isize i = cl->elems.count; i < count; i++) {
+					Ast *zero = ast_compound_lit(arg->file(), nullptr, {}, cl->open, cl->close);
+					if (is_type_constant_type(elem_type)) {
+						Operand z = {};
+						check_expr_with_type_hint(&zero_context, &z, zero, elem_type);
+						if (z.mode == Addressing_Invalid) {
+							return false;
+						}
+						GB_ASSERT(z.mode == Addressing_Constant);
+						GB_ASSERT(are_types_identical(z.type, elem_type));
+					} else {
+						add_type_and_value(c, zero, Addressing_Constant, elem_type, exact_value_compound(zero));
+					}
+					array_add(&new_elems, zero);
+				}
+			}
 		}
 
 		Ast *new_compound_lit = ast_compound_lit(lhs.expr->file(), nullptr, new_elems, ast_token(lhs.expr), ast_end_token(ce->args[ce->args.count-1]));
@@ -8429,6 +8462,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
+			add_comparison_procedures_for_fields(c, type);
+
 			operand->mode = Addressing_Value;
 			operand->type = t_equal_proc;
 			break;
@@ -8477,7 +8512,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			add_map_key_type_dependencies(c, type);
+			add_map_key_type_dependencies(c, type->Map.key);
+			add_comparison_procedures_for_fields(c, type->Map.key);
 
 			operand->mode = Addressing_Value;
 			operand->type = t_map_info_ptr;
@@ -8518,8 +8554,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		{
 			Ast *call_expr = unparen_expr(ce->args[0]);
 			Operand op = {};
+			bool prev_in_procedure_of = c->in_procedure_of;
+			c->in_procedure_of = true;
 			check_expr_base(c, &op, ce->args[0], nullptr);
-			if (op.mode != Addressing_Value || call_expr == nullptr || call_expr->kind != Ast_CallExpr) {
+			c->in_procedure_of = prev_in_procedure_of;
+			bool is_call_mode = op.mode == Addressing_Value || op.mode == Addressing_NoValue || op.mode == Addressing_OptionalOk;
+			if (!is_call_mode || call_expr == nullptr || call_expr->kind != Ast_CallExpr) {
 				error(ce->args[0], "Expected a call expression for '%.*s'", LIT(builtin_name));
 				return false;
 			}

@@ -441,12 +441,21 @@ enum LTOKind : i32 {
 
 enum LinkerChoice : i32 {
 	Linker_Invalid = -1,
-	Linker_Default = 0,
+	Linker_Default = 0, // radlink on Windows
 	Linker_lld,
+	Linker_msvc,
 	Linker_radlink,
 	Linker_mold,
 
 	Linker_COUNT,
+};
+
+String linker_choices[Linker_COUNT] = {
+	str_lit("default"),
+	str_lit("lld"),
+	str_lit("msvc"),
+	str_lit("radlink"),
+	str_lit("mold"),
 };
 
 enum SourceCodeLocationInfo : u8 {
@@ -454,13 +463,6 @@ enum SourceCodeLocationInfo : u8 {
 	SourceCodeLocationInfo_Obfuscated = 1,
 	SourceCodeLocationInfo_Filename = 2,
 	SourceCodeLocationInfo_None = 3,
-};
-
-String linker_choices[Linker_COUNT] = {
-	str_lit("default"),
-	str_lit("lld"),
-	str_lit("radlink"),
-	str_lit("mold"),
 };
 
 enum IntegerDivisionByZeroKind : u8 {
