@@ -1886,7 +1886,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (str_eq_ignore_case(value.value_string, str_lit("thin"))) {
 								build_context.lto_kind = LTO_Thin;
-								if (build_context.linker_choice == Linker_Invalid || build_context.linker_choice == Linker_Default) {
+								if (build_context.linker_choice == Linker_Invalid) {
 									build_context.linker_choice = Linker_lld;
 								}
 								if (!build_context.use_separate_modules) {
@@ -3092,6 +3092,9 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Specify the linker to use.");
 			print_usage_line(2, "Choices:");
 			for (i32 i = 0; i < Linker_COUNT; i++) {
+				#if !defined(GB_SYSTEM_WINDOWS)
+				if (linker_choices[i] == "msvc") continue;
+				#endif
 				print_usage_line(3, "%.*s", LIT(linker_choices[i]));
 			}
 		}

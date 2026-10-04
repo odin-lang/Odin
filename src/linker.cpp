@@ -231,7 +231,7 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 try_cross_linking:;
 
 	#if defined(GB_SYSTEM_WINDOWS)
-		String section_name = str_lit("msvc-link");
+		String section_name = str_lit("rad-link");
 		bool is_windows = build_context.metrics.os == TargetOs_windows;
 	#else
 		String section_name = str_lit("ld-link");
@@ -247,9 +247,7 @@ try_cross_linking:;
 	#if defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_NETBSD)
 		case Linker_mold:     section_name = str_lit("mold-link"); break;
 	#endif
-	#if defined(GB_SYSTEM_WINDOWS)
-		case Linker_radlink:  section_name = str_lit("rad-link"); break;
-	#endif
+		case Linker_msvc:     section_name = str_lit("msvc-link"); break;
 		default:
 			gb_printf_err("'%.*s' linker is not supported on this platform\n", LIT(linker_choices[build_context.linker_choice]));
 			return 1;
@@ -278,7 +276,6 @@ try_cross_linking:;
 				add_path(build_context.build_paths[BuildPath_Win_SDK_UCRT_Lib].basename);
 				add_path(build_context.build_paths[BuildPath_VS_LIB].basename);
 			}
-
 
 			StringSet min_libs_set = {};
 			string_set_init(&min_libs_set, 64);
@@ -404,17 +401,44 @@ try_cross_linking:;
 				lld_lto_flags = gb_string_append_fmt(lld_lto_flags, "/opt:lldltojobs=%d ", build_context.thread_count);
 			}
 
+			String res_path = {};
+			String rc_path  = {};
+			defer (gb_free(heap_allocator(), res_path.text));
+			defer (gb_free(heap_allocator(), rc_path.text));
+
+			if (build_context.has_resource) {
+				res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
+				rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
+
+				if (build_context.build_paths[BuildPath_RC].basename == "")  {
+					debugf("Using precompiled resource %.*s\n", LIT(res_path));
+				} else {
+					debugf("Compiling resource %.*s\n", LIT(res_path));
+
+					result = system_exec_command_line_app("resource compiler",
+						"\"%.*src.exe\" /nologo /fo %.*s %.*s",
+						LIT(windows_sdk_bin_path),
+						LIT(res_path),
+						LIT(rc_path)
+					);
+
+					if (result) {
+						return result;
+					}
+				}
+			}
+
 			switch (build_context.linker_choice) {
 			case Linker_lld:
 				result = system_exec_msvc_linker_app("msvc-lld-link",
-					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
+					"\"%.*s\\bin\\lld-link\" %s %.*s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 					"%.*s "
 					"%.*s "
 					"%s "
 					"%s "
 					"",
-					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
+					LIT(build_context.ODIN_ROOT), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
 					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
 					LIT(build_context.link_flags),
@@ -427,53 +451,8 @@ try_cross_linking:;
 					return result;
 				}
 				break;
-			case Linker_radlink:
-				result = system_exec_msvc_linker_app("msvc-rad-link",
-					"\"%.*s\\bin\\radlink\" %s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
-					"%.*s "
-					"%.*s "
-					"%s "
-					"",
-					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
-					link_settings,
-					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
-					LIT(build_context.link_flags),
-					LIT(build_context.extra_linker_flags),
-					lib_str
-				);
 
-				if (result) {
-					return result;
-				}
-				break;
-			default: { // msvc
-				String res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
-				String rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
-				defer (gb_free(heap_allocator(), res_path.text));
-				defer (gb_free(heap_allocator(), rc_path.text));
-
-				if (build_context.has_resource) {
-					if (build_context.build_paths[BuildPath_RC].basename == "")  {
-						debugf("Using precompiled resource %.*s\n", LIT(res_path));
-					} else {
-						debugf("Compiling resource %.*s\n", LIT(res_path));
-
-						result = system_exec_command_line_app("msvc-link",
-							"\"%.*src.exe\" /nologo /fo %.*s %.*s",
-							LIT(windows_sdk_bin_path),
-							LIT(res_path),
-							LIT(rc_path)
-						);
-
-						if (result) {
-							return result;
-						}
-					}
-				} else {
-					res_path = {};
-				}
-
+			case Linker_msvc: {
 				String linker_name = str_lit("link.exe");
 				switch (build_context.build_mode) {
 				case BuildMode_Executable:
@@ -490,7 +469,6 @@ try_cross_linking:;
 					break;
 				}
 
-
 				result = system_exec_msvc_linker_app("msvc-link",
 					"\"%.*s%.*s\" %s %.*s -OUT:\"%.*s\" %s "
 					"/nologo /subsystem:%.*s "
@@ -505,10 +483,34 @@ try_cross_linking:;
 					LIT(build_context.extra_linker_flags),
 					lib_str
 				);
+
 				if (result) {
 					return result;
 				}
 				break;
+			}
+
+			default: { // radlink
+				result = system_exec_msvc_linker_app("msvc-rad-link",
+					"\"%.*s\\bin\\radlink\" %s %.*s -OUT:\"%.*s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
+					"%.*s "
+					"%.*s "
+					"%s "
+					"",
+					LIT(build_context.ODIN_ROOT), object_files, LIT(res_path), LIT(output_filename),
+					link_settings,
+					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
+					LIT(build_context.link_flags),
+					LIT(build_context.extra_linker_flags),
+					lib_str
+				);
+
+				if (result) {
+					return result;
+				}
+				break;
+
 			}
 			}
 		} else {
