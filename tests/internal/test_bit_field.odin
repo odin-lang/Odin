@@ -122,7 +122,7 @@ bit_field_array_backing :: proc(t: ^testing.T) {
 	testing.expect_value(t, transmute([3]u8)a, [3]u8{0x3A, 0x12, 0xF0})
 }
 
-// a field may lie across several elements of an array backing, whose size need not be a multiple of 8 bytes
+// the same in a backing of more than 8 bytes, with a field that starts in the first 8 and ends after them
 @(test)
 bit_field_array_backing_across_elements :: proc(t: ^testing.T) {
 	A :: bit_field [11]u8 { lo: u64 | 60, mid: u32 | 24, hi: i8 | 4 }
@@ -141,10 +141,10 @@ bit_field_array_backing_across_elements :: proc(t: ^testing.T) {
 bit_field_array_backing_wide_elements :: proc(t: ^testing.T) {
 	A :: bit_field [2]u128 { lo: u64 | 64, pad: u64 | 60, mid: u16 | 12, hi: u64 | 64 }
 
-	a: A
+	a := transmute(A)[2]u128{max(u128), max(u128)}
 	a.mid = 0xABC
 	a.hi  = 0x0123456789ABCDEF
-	testing.expect_value(t, transmute([2]u128)a, [2]u128{0xC << 124, 0x0123456789ABCDEF << 8 | 0xAB})
+	testing.expect_value(t, transmute([2]u128)a, [2]u128{0xCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFF0123456789ABCDEFAB})
 	testing.expect_value(t, a.mid, 0xABC)
 	testing.expect_value(t, a.hi, 0x0123456789ABCDEF)
 }
