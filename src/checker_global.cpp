@@ -14,7 +14,6 @@ enum GlobalImportStagePart {
 	GlobalImportStage_Placeholders,
 	GlobalImportStage_DeclSources,
 	GlobalImportStage_TypeAliases,
-	GlobalImportStage_DelayedExprs,
 
 	GlobalImportStage_COUNT,
 };
@@ -24,7 +23,6 @@ gb_global char const *global_import_stage_names[GlobalImportStage_COUNT] = {
 	"'when' and 'foreign' placeholders",
 	"resolve 'when' and 'foreign' blocks",
 	"type alias correction",
-	"delayed expressions (#assert etc.)",
 };
 
 gb_global u64 global_import_stage_ticks[GlobalImportStage_COUNT];

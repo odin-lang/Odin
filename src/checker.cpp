@@ -6281,29 +6281,40 @@ gb_internal void check_import_entities(Checker *c) {
 	TIME_SECTION("check_import_entities - resolve 'when' and 'foreign' blocks");
 	resolve_global_decl_sources(c, package_order);
 
-	TIME_SECTION("check_import_entities - check delayed entities");
+	TIME_SECTION("check_import_entities - correct type aliases");
+	stage_start = global_import_stage_begin();
 	for (ImportGraphNode *node : package_order) {
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
-		AstPackage *pkg = node->scope->pkg;
-
-		stage_start = global_import_stage_begin();
-		correct_type_aliases_in_package(&ctx, pkg);
-		global_import_stage_end(GlobalImportStage_TypeAliases, stage_start);
-
-		stage_start = global_import_stage_begin();
-		for (AstFile *f : pkg->files) {
-			reset_checker_context(&ctx, f, &untyped);
-
-			for (Ast *expr : f->delayed_decls_queues[AstDelayQueue_Expr]) {
-				Operand o = {};
-				check_expr(&ctx, &o, expr);
-			}
-			array_clear(&f->delayed_decls_queues[AstDelayQueue_Expr]);
-
-			add_untyped_expressions(ctx.info, &untyped);
-		}
-		global_import_stage_end(GlobalImportStage_DelayedExprs, stage_start);
+		correct_type_aliases_in_package(&ctx, node->scope->pkg);
 	}
+	global_import_stage_end(GlobalImportStage_TypeAliases, stage_start);
+}
+
+gb_internal WORKER_TASK_PROC(check_file_directives_worker_proc) {
+	AstFile *f = cast(AstFile *)data;
+	auto *wd = &collect_entity_worker_data[current_thread_index()];
+	reset_checker_context(&wd->ctx, f, &wd->untyped);
+
+	for (Ast *expr : f->delayed_decls_queues[AstDelayQueue_Expr]) {
+		Operand o = {};
+		check_expr(&wd->ctx, &o, expr);
+	}
+	array_clear(&f->delayed_decls_queues[AstDelayQueue_Expr]);
+
+	add_untyped_expressions(wd->ctx.info, &wd->untyped);
+	return 0;
+}
+
+// NOTE(bill): Any file scope directive call (`#assert`, `#panic`, etc) declares nothing (currently)
+// All get checked once every global entity has been in parallel
+gb_internal void check_file_directives(Checker *c) {
+	for (auto const &entry : c->info.files) {
+		AstFile *f = entry.value;
+		if (f->delayed_decls_queues[AstDelayQueue_Expr].count != 0) {
+			thread_pool_add_task(check_file_directives_worker_proc, f);
+		}
+	}
+	thread_pool_wait();
 }
 
 
@@ -7654,6 +7665,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check all global entities");
 	isize entity_count = c->info.entities.count;
 	check_all_global_entities(c);
+
+	TIME_SECTION("check file scope directives");
+	check_file_directives(c);
 
 	// NOTE(bill): lazy entities are added once checked, which with several threads is in no fixed order
 	gb_sort_array(c->info.entities.data + entity_count, c->info.entities.count - entity_count, init_procedures_cmp);
