@@ -1577,48 +1577,6 @@ gb_internal u64 lb_known_address_alignment(lbModule *m, LLVMValueRef ptr, u64 as
 	return offsets ? lb_gcd_u64(assumed, offsets) : assumed;
 }
 
-gb_internal void lb_lower_store_alignment_to_known(lbProcedure *p, LLVMValueRef store, LLVMValueRef ptr) {
-	u64 align = LLVMGetAlignment(store);
-	u64 known = lb_known_address_alignment(p->module, ptr, align);
-	if (known < align) {
-		LLVMSetAlignment(store, cast(unsigned)known);
-	}
-}
-
-// is_packed metadata is attached to a packed's field GEP;
-// a GEP derived from it (array element, nested struct field) doesn't
-// have it, so traverse the GEP chain up until metadata or non-GEP reached
-gb_internal u64 lb_get_is_packed_through_geps(lbModule *m, LLVMValueRef ptr) {
-	while (1) {
-		u64 is_packed = lb_get_metadata_custom_u64(m, ptr, ODIN_METADATA_IS_PACKED);
-		if (is_packed != 0 || !LLVMIsAGetElementPtrInst(ptr)) {
-			return is_packed;
-		}
-		ptr = LLVMGetOperand(ptr, 0);
-		if (!LLVMIsAInstruction(ptr)) {
-			return 0;
-		}
-	}
-}
-
-// like lb_get_is_packed_through_geps, but for max_align metadata
-gb_internal u64 lb_get_max_align_through_geps(lbModule *m, LLVMValueRef ptr) {
-	u64 cap = 0;
-	while (1) {
-		u64 align_max = lb_get_metadata_custom_u64(m, ptr, ODIN_METADATA_MAX_ALIGN);
-		if (align_max != 0 && (cap == 0 || align_max < cap)) {
-			cap = align_max;
-		}
-		if (!LLVMIsAGetElementPtrInst(ptr)) {
-			return cap;
-		}
-		ptr = LLVMGetOperand(ptr, 0);
-		if (!LLVMIsAInstruction(ptr)) {
-			return cap;
-		}
-	}
-}
-
 // adjust a load/store claimed alignment from what is known about its addr;
 // a ptr to a #packed's field may be less aligned than the field's
 // type alignment; GEP instructions carry this info as metadata;
@@ -1628,22 +1586,8 @@ gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef 
 	if (LLVMIsAInstruction(addr_ptr)) {
 		u64 align = LLVMGetAlignment(access);
 		u64 align_min = lb_get_metadata_custom_u64(m, addr_ptr, ODIN_METADATA_MIN_ALIGN);
-		u64 align_max = lb_get_max_align_through_geps(m, addr_ptr);
 		if (align_min != 0 && align < align_min) {
 			align = align_min;
-		}
-		if (align_max != 0 && align > align_max) {
-			align = align_max;
-		}
-		// #packed caps the alignment,
-		// and lb_try_get_alignment overrides any min_field_align increase
-		if (lb_get_is_packed_through_geps(m, addr_ptr) != 0) {
-			// lb_try_get_alignment may recover alignment > 1
-			unsigned addr_align = lb_try_get_alignment(m, addr_ptr, 1);
-			// 0 = unknown
-			if (addr_align > 0 && align > addr_align) {
-				align = addr_align;
-			}
 		}
 		GB_ASSERT(align <= UINT_MAX);
 		LLVMSetAlignment(access, (unsigned int)align);
@@ -1681,12 +1625,6 @@ gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLV
 	// lb_alignof applies the max_simd_align cap
 	LLVMSetAlignment(result, cast(unsigned)lb_alignof(type));
 	lb_adjust_access_alignment_from_addr(p->module, result, value);
-	u64 align = LLVMGetAlignment(result);
-	u64 known = lb_known_address_alignment(p->module, value, align);
-	if (known < align) {
-		LLVMSetAlignment(result, cast(unsigned)known);
-	}
-
 	return result;
 }
 
@@ -2214,8 +2152,7 @@ gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbVal
 		} else if (is_type_bit_set(a)) {
 			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)dst_align);
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
-			LLVMValueRef store = OdinLLVMBuildStoreAligned(p, LLVMConstNull(src_t), ptr.value, dst_align);
-			lb_lower_store_alignment_to_known(p, store, ptr.value);
+			OdinLLVMBuildStoreAligned(p, LLVMConstNull(src_t), ptr.value, dst_align);
 		} else {
 			lb_mem_zero_ptr(p, ptr.value, a, cast(unsigned)dst_align);
 		}
@@ -2286,9 +2223,6 @@ gb_internal void lb_emit_store_with_max_align(lbProcedure *p, lbValue ptr, lbVal
 			return;
 		}
 		instr = OdinLLVMBuildStoreAligned(p, value.value, ptr.value, dst_align);
-	}
-	if (instr != nullptr) {
-		lb_lower_store_alignment_to_known(p, instr, ptr.value);
 	}
 	// LLVMSetVolatile(instr, p->in_multi_assignment);
 }

@@ -3114,10 +3114,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
 					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
 
-					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
-					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
-					// src may point into a #packed or #max_field_align struct
-					lb_adjust_access_alignment_from_addr(p->module, src_vector, psrc.value);
+					LLVMValueRef src_vector = OdinLLVMBuildLoadAligned(p, src_vector_type, src_ptr, type_align_of(se));
 
 					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
 
@@ -3149,10 +3146,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
 					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
 
-					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
-					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
-					// src may point into a #packed or #max_field_align struct
-					lb_adjust_access_alignment_from_addr(p->module, src_vector, psrc.value);
+					LLVMValueRef src_vector = OdinLLVMBuildLoadAligned(p, src_vector_type, src_ptr, type_align_of(se));
 
 					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
 					LLVMValueRef dst_zero = LLVMConstNull(dst_vector_type);
