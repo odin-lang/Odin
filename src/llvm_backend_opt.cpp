@@ -949,7 +949,7 @@ gb_internal void lb_truncate_bool_arguments(lbFastIselLowering *s, LLVMValueRef 
 gb_internal void lb_lower_small_switch(lbFastIselLowering *s, LLVMValueRef sw) {
 	enum {MAX_CASES = 3};
 	LLVMValueRef cond = LLVMGetOperand(sw, 0);
-	unsigned case_count = (cast(unsigned)LLVMGetNumOperands(sw) - 2) / 2;
+	unsigned case_count = LLVMGetNumSuccessors(sw) - 1;
 	if (case_count == 0 || case_count > MAX_CASES || LLVMGetIntTypeWidth(LLVMTypeOf(cond)) > 64) {
 		return;
 	}
@@ -979,7 +979,13 @@ gb_internal void lb_lower_small_switch(lbFastIselLowering *s, LLVMValueRef sw) {
 			}
 		}
 
-		LLVMValueRef cmp = LLVMBuildICmp(s->builder, LLVMIntEQ, cond, LLVMGetOperand(sw, 2 + 2*j), "");
+#if LLVM_VERSION_MAJOR >= 22
+		// LLVM 22 keeps a switch's case values apart from its operands
+		LLVMValueRef case_value = LLVMGetSwitchCaseValue(sw, j+1);
+#else
+		LLVMValueRef case_value = LLVMGetOperand(sw, 2 + 2*j);
+#endif
+		LLVMValueRef cmp = LLVMBuildICmp(s->builder, LLVMIntEQ, cond, case_value, "");
 		LLVMBuildCondBr(s->builder, cmp, dest, else_block);
 
 		from[j] = curr;
