@@ -5359,29 +5359,6 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 	return false;
 }
 
-gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
-	bool correction = false;
-	for (u32 n = s->elements.count, i = n-1; i < n; i--) {
-		auto const &slot = s->elements.slots[i];
-		Entity *e = slot.value;
-		if (slot.hash && e != nullptr) {
-			correction |= correct_single_type_alias(c, e);
-		}
-	}
-	return correction;
-}
-gb_internal bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
-	bool correction = false;
-	for (auto const &entry : s->elements) {
-		Entity *e = entry.value;
-		if (e != nullptr) {
-			correction |= correct_single_type_alias(c, entry.value);
-		}
-	}
-	return correction;
-}
-
-
 gb_internal void correct_type_aliases_in_package(CheckerContext *c, AstPackage *pkg) {
 	// NOTE(bill, 2022-02-04): This is used to solve the problem caused by type aliases
 	// of type aliases being "confused" as constants
@@ -5391,16 +5368,34 @@ gb_internal void correct_type_aliases_in_package(CheckerContext *c, AstPackage *
 	//         C :: struct {b: ^B}
 	//
 	// See @TypeAliasingProblem for more information
-	for (;;) {
-		bool corrections = false;
-		corrections |= correct_type_alias_in_scope_backwards(c, pkg->scope);
-		corrections |= correct_type_alias_in_scope_forwards(c, pkg->scope);
-		for (AstFile *f : pkg->files) {
-			corrections |= correct_type_alias_in_scope_backwards(c, f->scope);
-			corrections |= correct_type_alias_in_scope_forwards(c, f->scope);
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	// NOTE(bill): Only a constant of an identifier can be corrected and a correction never changes what an identifier names
+	// This means that those are gathered once and corrected until a pass corrects none
+	auto candidates = array_make<Entity *>(temporary_allocator());
+	auto add_candidates = [&candidates](Scope *s) {
+		for (auto const &entry : s->elements) {
+			Entity *e = entry.value;
+			if (e != nullptr && e->kind == Entity_Constant && e->decl_info != nullptr &&
+			    e->decl_info->init_expr != nullptr && e->decl_info->init_expr->kind == Ast_Ident) {
+				array_add(&candidates, e);
+			}
 		}
-		if (!corrections) {
-			return;
+	};
+	add_candidates(pkg->scope);
+	for (AstFile *f : pkg->files) {
+		add_candidates(f->scope);
+	}
+
+	for (bool corrected = true; corrected; /**/) {
+		corrected = false;
+		for (isize i = 0; i < candidates.count; /**/) {
+			if (correct_single_type_alias(c, candidates[i])) {
+				array_unordered_remove(&candidates, i);
+				corrected = true;
+			} else {
+				i += 1;
+			}
 		}
 	}
 }
@@ -6197,6 +6192,13 @@ gb_internal void check_export_entities(Checker *c) {
 
 #include "checker_global.cpp"
 
+gb_internal WORKER_TASK_PROC(correct_type_aliases_worker_proc) {
+	AstPackage *pkg = cast(AstPackage *)data;
+	auto *wd = &collect_entity_worker_data[current_thread_index()];
+	correct_type_aliases_in_package(&wd->ctx, pkg);
+	return 0;
+}
+
 gb_internal void check_import_entities(Checker *c) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
@@ -6283,10 +6285,12 @@ gb_internal void check_import_entities(Checker *c) {
 
 	TIME_SECTION("check_import_entities - correct type aliases");
 	stage_start = global_import_stage_begin();
+
 	for (ImportGraphNode *node : package_order) {
 		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
-		correct_type_aliases_in_package(&ctx, node->scope->pkg);
+		thread_pool_add_task(correct_type_aliases_worker_proc, node->scope->pkg);
 	}
+	thread_pool_wait();
 	global_import_stage_end(GlobalImportStage_TypeAliases, stage_start);
 }
 
