@@ -12,13 +12,7 @@ extern "C" {
 #endif
 
 
-gb_internal bool rune_is_letter(Rune r) {
-	if (r < 0x80) {
-		if (r == '_') {
-			return true;
-		}
-		return ((cast(u32)r | 0x20) - 0x61) < 26;
-	}
+gb_internal bool rune_is_letter_non_ascii(Rune r) {
 	switch (utf8proc_category(r)) {
 	case UTF8PROC_CATEGORY_LU:
 	case UTF8PROC_CATEGORY_LL:
@@ -30,14 +24,24 @@ gb_internal bool rune_is_letter(Rune r) {
 	return false;
 }
 
-gb_internal bool rune_is_digit(Rune r) {
+gb_internal gb_inline bool rune_is_letter(Rune r) {
+	if (r < 0x80) {
+		if (r == '_') {
+			return true;
+		}
+		return ((cast(u32)r | 0x20) - 0x61) < 26;
+	}
+	return rune_is_letter_non_ascii(r);
+}
+
+gb_internal gb_inline bool rune_is_digit(Rune r) {
 	if (r < 0x80) {
 		return (cast(u32)r - '0') < 10;
 	}
 	return utf8proc_category(r) == UTF8PROC_CATEGORY_ND;
 }
 
-gb_internal bool rune_is_letter_or_digit(Rune r) {
+gb_internal gb_inline bool rune_is_letter_or_digit(Rune r) {
 	if (r < 0x80) {
 		if (r == '_') {
 			return true;
@@ -47,17 +51,7 @@ gb_internal bool rune_is_letter_or_digit(Rune r) {
 		}
 		return (cast(u32)r - '0') < 10;
 	}
-	switch (utf8proc_category(r)) {
-	case UTF8PROC_CATEGORY_LU:
-	case UTF8PROC_CATEGORY_LL:
-	case UTF8PROC_CATEGORY_LT:
-	case UTF8PROC_CATEGORY_LM:
-	case UTF8PROC_CATEGORY_LO:
-		return true;
-	case UTF8PROC_CATEGORY_ND:
-		return true;
-	}
-	return false;
+	return rune_is_letter_non_ascii(r) || utf8proc_category(r) == UTF8PROC_CATEGORY_ND;
 }
 
 gb_internal bool rune_is_whitespace(Rune r) {

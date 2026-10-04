@@ -489,6 +489,11 @@ gb_internal bool lb_is_type_trivial(Type *type) {
 	return false;
 }
 
+gb_internal bool lb_is_type_large_aggregate(lbModule *m, Type *type) {
+	LLVMTypeKind kind = LLVMGetTypeKind(lb_type(m, type));
+	return (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) && type_size_of(type) > 64;
+}
+
 gb_internal bool lb_is_expr_trivial(Ast *e) {
 	Type *type = default_type(type_of_expr(e));
 	if (lb_is_type_trivial(type)) {
@@ -556,6 +561,25 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 		}
 		return {};
 	} else {
+		if (lb_is_type_large_aggregate(p->module, type)) {
+			lbAddr res = lb_add_local_generated(p, type, false);
+
+			lbBlock *then  = lb_create_block(p, "or_else.then");
+			lbBlock *done  = lb_create_block(p, "or_else.done");
+			lbBlock *else_ = lb_create_block(p, "or_else.else");
+
+			lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+			lb_start_block(p, then);
+			lb_addr_store(p, res, lb_emit_conv(p, lhs, type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, else_);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, else_expr), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, done);
+			return lb_addr_load(p, res);
+		}
 		if (lb_is_type_trivial(type) && lb_is_expr_trivial(else_expr)) {
 			lbValue has_value = lb_emit_try_has_value(p, rhs);
 			lbValue then_val = lb_emit_conv(p, lhs, type);

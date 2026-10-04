@@ -2068,6 +2068,7 @@ gb_internal bool is_type_map(Type *t) {
 }
 
 gb_internal void wait_for_union_variants(Type *t);
+gb_internal void wait_for_struct_fields(Type *t);
 
 gb_internal bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
@@ -2923,6 +2924,7 @@ gb_internal bool is_type_comparable(Type *t) {
 		if (t->Struct.is_raw_union) {
 			return is_type_simple_compare(t);
 		}
+		wait_for_struct_fields(t);
 		for_array(i, t->Struct.fields) {
 			Entity *f = t->Struct.fields[i];
 			if (!is_type_comparable(f->type)) {
@@ -2984,6 +2986,7 @@ gb_internal bool is_type_simple_compare(Type *t) {
 		return is_type_simple_compare(t->Matrix.elem);
 
 	case Type_Struct:
+		wait_for_struct_fields(t);
 		if (t->Struct.is_simple) {
 			return true;
 		}
@@ -3058,6 +3061,7 @@ gb_internal bool is_type_nearly_simple_compare(Type *t) {
 		return is_type_nearly_simple_compare(t->Matrix.elem);
 
 	case Type_Struct:
+		wait_for_struct_fields(t);
 		if (t->Struct.is_simple) {
 			return true;
 		}
@@ -3155,6 +3159,9 @@ gb_internal String lookup_subtype_polymorphic_field(Type *dst, Type *src) {
 	// bool dst_is_ptr = dst != prev_dst;
 
 	GB_ASSERT(is_type_struct(src) || is_type_union(src));
+	if (src->kind == Type_Struct) {
+		wait_for_struct_fields(src);
+	}
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
 		if (f->kind == Entity_Variable && f->flags & EntityFlags_IsSubtype) {
@@ -3186,6 +3193,9 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 	// bool dst_is_ptr = dst != prev_dst;
 
 	GB_ASSERT(is_type_struct(src) || is_type_union(src));
+	if (src->kind == Type_Struct) {
+		wait_for_struct_fields(src);
+	}
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
 		if (f->kind == Entity_Variable && f->flags & EntityFlags_IsSubtype) {
@@ -5217,6 +5227,8 @@ gb_internal isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isi
 	if (!is_type_struct(src)) {
 		return 0;
 	}
+	// a polymorphic record is published for reuse before its fields are checked
+	wait_for_struct_fields(src);
 
 	bool dst_is_polymorphic = is_type_polymorphic(dst);
 
@@ -5259,6 +5271,7 @@ gb_internal bool check_is_assignable_to_using_offset_zero_subtype(Type *src, Typ
 	if (!is_type_struct(src_struct)) {
 		return false;
 	}
+	wait_for_struct_fields(src_struct);
 
 	// We check multiple fields in case of #raw_union,
 	// but exit on the first field that is not at offset 0.

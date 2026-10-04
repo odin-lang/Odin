@@ -12,6 +12,7 @@ gb_internal void check_expr(CheckerContext *c, Operand *operand, Ast *expression
 gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Type *type_hint=nullptr);
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e);
+gb_internal void check_procedure_later(Checker *c, ProcInfo *info);
 
 gb_internal bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -2204,6 +2205,16 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	}
 	add_declaration_dependency(c, entity);
 	entity->flags |= EntityFlag_Used;
+	if (entity->kind == Entity_Procedure && entity->Procedure.generated_from_polymorphic) {
+		// Check the specialization body later
+		DeclInfo *decl = entity->decl_info;
+		if (decl != nullptr) {
+			ProcInfo *pi = decl->gen_proc_info.exchange(nullptr);
+			if (pi != nullptr) {
+				check_procedure_later(c->checker, pi);
+			}
+		}
+	}
 	if (entity_has_deferred_procedure(entity)) {
 		Entity *deferred = entity->Procedure.deferred_procedure.entity;
 		if (deferred != entity) {
@@ -3364,6 +3375,18 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("slice_expr_error_hi"),
 		str_lit("slice_expr_error_lo_hi"),
 		str_lit("multi_pointer_slice_expr_error"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(c->info.objc_class_implementations.count.load(std::memory_order_relaxed) > 0,
+		str_lit("objc_lookUpClass"),
+		str_lit("sel_registerName"),
+		str_lit("objc_allocateClassPair"),
+		str_lit("objc_registerClassPair"),
+		str_lit("class_addMethod"),
+		str_lit("class_addIvar"),
+		str_lit("class_getInstanceVariable"),
+		str_lit("ivar_getOffset"),
+		str_lit("object_getClass"),
 	);
 
 
@@ -6432,60 +6455,6 @@ gb_internal void calculate_global_init_order(Checker *c) {
 	}
 }
 
-gb_internal void check_procedure_later_from_entity(Checker *c, Entity *e, char const *from_msg) {
-	if (e == nullptr || e->kind != Entity_Procedure) {
-		return;
-	}
-	if (e->Procedure.is_foreign) {
-		return;
-	}
-	if ((e->flags & EntityFlag_ProcBodyChecked) != 0) {
-		return;
-	}
-	if ((e->flags & EntityFlag_Overridden) != 0) {
-		// NOTE (zen3ger) Delay checking of a proc alias until the underlying proc is checked.
-		GB_ASSERT(e->aliased_of != nullptr);
-		GB_ASSERT(e->aliased_of->kind == Entity_Procedure);
-		if ((e->aliased_of->flags & EntityFlag_ProcBodyChecked) != 0) {
-			e->flags |= EntityFlag_ProcBodyChecked;
-			return;
-		}
-		// NOTE (zen3ger) A proc alias *does not* have a body and tags!
-		check_procedure_later(c, e->file, e->token, e->decl_info, e->type, nullptr, 0);
-		return;
-	}
-	Type *type = base_type(e->type);
-	if (type == t_invalid) {
-		return;
-	}
-	GB_ASSERT_MSG(type->kind == Type_Proc, "%s", type_to_string(e->type));
-
-	if (is_type_polymorphic(type) && !type->Proc.is_poly_specialized) {
-		return;
-	}
-
-	GB_ASSERT(e->decl_info != nullptr);
-
-	ProcInfo *pi = permanent_alloc_item<ProcInfo>();
-	pi->file  = e->file;
-	pi->token = e->token;
-	pi->decl  = e->decl_info;
-	pi->type  = proc_entity_full_type(e);
-
-	Ast *pl = e->decl_info->proc_lit;
-	GB_ASSERT(pl != nullptr);
-	pi->body  = pl->ProcLit.body;
-	pi->tags  = pl->ProcLit.tags;
-	if (pi->body == nullptr) {
-		return;
-	}
-	if (from_msg != nullptr) {
-		debugf("CHECK PROCEDURE LATER [FROM %s]! %.*s :: %s {...}\n", from_msg, LIT(e->token.string), type_to_string(e->type));
-	}
-	check_procedure_later(c, pi);
-}
-
-
 gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
 		return false;
@@ -6534,12 +6503,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	if (pt->is_polymorphic && pt->is_poly_specialized) {
 		Entity *e = pi->decl->entity;
 		GB_ASSERT(e != nullptr);
-		if ((e->flags & EntityFlag_Used) == 0) {
-			// NOTE(bill, 2019-08-31): It was never used, don't check
-			// NOTE(bill, 2023-01-02): This may need to be checked again if it is used elsewhere?
-			pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
-			return false;
-		}
+		GB_ASSERT_MSG((e->flags & EntityFlag_Used) != 0, "unused specialization '%.*s' queued for checking", LIT(name));
 	}
 
 	CheckerContext ctx = {};
@@ -6603,15 +6567,6 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 
 	add_untyped_expressions(&c->info, ctx.untyped);
 
-	rw_mutex_shared_lock(&ctx.decl->deps_mutex);
-	FOR_PTR_SET(dep, ctx.decl->deps) {
-		if (dep && dep->kind == Entity_Procedure &&
-		    (dep->flags & EntityFlag_ProcBodyChecked) == 0) {
-			check_procedure_later_from_entity(c, dep, NULL);
-		}
-	}
-	rw_mutex_shared_unlock(&ctx.decl->deps_mutex);
-
 	return true;
 }
 
@@ -6619,38 +6574,37 @@ GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
 gb_internal bool consume_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped);
 
-gb_internal void check_unchecked_bodies(Checker *c) {
-	// NOTE(2021-02-26, bill): Sanity checker
-	// This is a partial hack to make sure all procedure bodies have been checked
-	// even ones which should not exist, due to the multithreaded nature of the parser
-	// HACK TODO(2021-02-26, bill): Actually fix this race condition
-
+gb_internal void check_min_dep_bodies_were_checked(Checker *c) {
 	GB_ASSERT(c->procs_to_check.count == 0);
+	global_after_checking_procedure_bodies = true;
 
-	UntypedExprInfoMap untyped = {};
-	defer (map_destroy(&untyped));
-
-	// use the `procs_to_check` array
-	global_procedure_body_in_worker_queue = false;
+	if (any_errors()) {
+		// e.g. a body is not checked when its `where` clauses fail
+		return;
+	}
 
 	for (Entity *e : c->info.entities) {
-		if (e->min_dep_count.load(std::memory_order_relaxed) > 0) {
-			check_procedure_later_from_entity(c, e, "check_unchecked_bodies");
+		if (e->kind != Entity_Procedure || e->min_dep_count.load(std::memory_order_relaxed) == 0) {
+			continue;
 		}
-	}
-
-	if (!global_procedure_body_in_worker_queue) {
-		for_array(i, c->procs_to_check) {
-			ProcInfo *pi = c->procs_to_check[i];
-			consume_proc_info(c, pi, &untyped);
+		Entity *original = e;
+		while ((e->flags & EntityFlag_Overridden) && e->aliased_of != nullptr) {
+			e = e->aliased_of;
 		}
-		array_clear(&c->procs_to_check);
-	} else {
-		thread_pool_wait();
+		if (e->Procedure.is_foreign || (e->flags & EntityFlag_ProcBodyChecked) != 0) {
+			continue;
+		}
+		Type *type = base_type(e->type);
+		if (type == t_invalid || (is_type_polymorphic(type) && !type->Proc.is_poly_specialized)) {
+			continue;
+		}
+		DeclInfo *decl = e->decl_info;
+		if (decl == nullptr || decl->proc_lit == nullptr || decl->proc_lit->ProcLit.body == nullptr) {
+			continue;
+		}
+		GB_PANIC("the body of '%.*s' :: %s was never checked (%s)",
+		         LIT(original->token.string), type_to_string(e->type), token_pos_to_string(e->token.pos));
 	}
-
-	global_procedure_body_in_worker_queue = false;
-	global_after_checking_procedure_bodies = true;
 }
 
 gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
@@ -7774,13 +7728,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	generate_minimum_dependency_set(c, c->info.entry_point);
 
 	TIME_SECTION("check bodies have all been checked");
-	check_unchecked_bodies(c);
-
-	TIME_SECTION("check #soa types");
-	check_merge_queues_into_arrays(c);
-
-	TIME_SECTION("update minimum dependency set again");
-	generate_minimum_dependency_set_internal(c, c->info.entry_point);
+	check_min_dep_bodies_were_checked(c);
 
 	// NOTE(laytan): has to be ran after generate_minimum_dependency_set,
 	// because that collects the test procedures.
@@ -7803,9 +7751,7 @@ gb_internal void check_parsed_files(Checker *c) {
 			token.pos.column  = 1;
 			if (s->pkg->files.count > 0) {
 				AstFile *f = s->pkg->files[0];
-				if (f->tokens.count > 0) {
-					token = f->tokens[0];
-				}
+				token = f->first_token;
 			}
 
 			error(token, "Undefined entry point procedure 'main'");
