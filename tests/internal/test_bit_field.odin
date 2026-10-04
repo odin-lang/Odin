@@ -122,18 +122,31 @@ bit_field_array_backing :: proc(t: ^testing.T) {
 	testing.expect_value(t, transmute([3]u8)a, [3]u8{0x3A, 0x12, 0xF0})
 }
 
-// a field may lie across the units an array backing is read and written in, which for 12 bytes are 8 and 4
+// a field may lie across several elements of an array backing, whose size need not be a multiple of 8 bytes
 @(test)
-bit_field_array_backing_units :: proc(t: ^testing.T) {
-	A :: bit_field [12]u8 { lo: u64 | 60, mid: u16 | 12, hi: i32 | 24 }
+bit_field_array_backing_across_elements :: proc(t: ^testing.T) {
+	A :: bit_field [11]u8 { lo: u64 | 60, mid: u32 | 24, hi: i8 | 4 }
 
-	a := transmute(A)[12]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x21, 0x43, 0x65, 0x87}
+	a := transmute(A)[11]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x21, 0x43, 0xA5}
 	testing.expect_value(t, a.lo, 0x0EDCBA9876543210)
-	testing.expect_value(t, a.mid, 0x21F)
-	testing.expect_value(t, a.hi, -0x789ABD)
+	testing.expect_value(t, a.mid, 0x54321F)
+	testing.expect_value(t, a.hi, -6)
 
+	a.mid = 0x123456
+	testing.expect_value(t, transmute([11]u8)a, [11]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0x6E, 0x45, 0x23, 0xA1})
+}
+
+// the elements of an array backing may be wider than its fields
+@(test)
+bit_field_array_backing_wide_elements :: proc(t: ^testing.T) {
+	A :: bit_field [2]u128 { lo: u64 | 64, pad: u64 | 60, mid: u16 | 12, hi: u64 | 64 }
+
+	a: A
 	a.mid = 0xABC
-	testing.expect_value(t, transmute([12]u8)a, [12]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xCE, 0xAB, 0x43, 0x65, 0x87})
+	a.hi  = 0x0123456789ABCDEF
+	testing.expect_value(t, transmute([2]u128)a, [2]u128{0xC << 124, 0x0123456789ABCDEF << 8 | 0xAB})
+	testing.expect_value(t, a.mid, 0xABC)
+	testing.expect_value(t, a.hi, 0x0123456789ABCDEF)
 }
 
 // A 1-bit boolean field is well formed at every backing value: the mask leaves only bit 0, so the
