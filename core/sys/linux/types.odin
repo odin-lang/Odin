@@ -1594,7 +1594,7 @@ IO_Uring_SQE :: struct {
 	fd: Fd,
 	using __offset: struct #raw_union {
 		// Offset into file.
-		off:     u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.TIMEOUT, opcode=.ACCEPT, opcode=.CONNECT, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		off:     u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.TIMEOUT, opcode=.ACCEPT, opcode=.CONNECT, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.SOCKET, opcode=.FALLOCATE, opcode=.READ_FIXED, opcode=.WRITE_FIXED"`,
 		addr2:   u64 `raw_union_tag:"opcode=.SEND, opcode=.BIND"`,
 		using _: struct {
 			cmd_op: u32,
@@ -1604,7 +1604,7 @@ IO_Uring_SQE :: struct {
 	},
 	using __iovecs:   struct #raw_union {
 		// Pointer to buffer or iovecs.
-		addr:          u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.ACCEPT, opcode=.ASYNC_CANCEL, opcode=.LINK_TIMEOUT, opcode=.CONNECT, opcode=.MADVISE, opcode=.OPENAT, opcode=.STATX, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.BIND, opcode=.LISTEN"`,
+		addr:          u64 `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.POLL_REMOVE, opcode=.EPOLL_CTL, opcode=.SENDMSG, opcode=.RECVMSG, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.TIMEOUT_REMOVE, opcode=.ACCEPT, opcode=.ASYNC_CANCEL, opcode=.LINK_TIMEOUT, opcode=.CONNECT, opcode=.MADVISE, opcode=.OPENAT, opcode=.STATX, opcode=.READ, opcode=.WRITE, opcode=.FILES_UPDATE, opcode=.BIND, opcode=.LISTEN, opcode=.FALLOCATE, opcode=.READ_FIXED, opcode=.WRITE_FIXED, opcode=.UNLINKAT"`,
 		splice_off_in: u64 `raw_union_tag:"opcode=.SPLICE"`,
 		using _: struct {
 			level:   u32,
@@ -1613,7 +1613,7 @@ IO_Uring_SQE :: struct {
 	},
 	using __len: struct #raw_union {
 		// Buffer size or number of iovecs.
-		len:          u32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.LINK_TIMEOUT, opcode=.MADVISE, opcode=.OPENAT, opcode=.READ, opcode=.WRITE, opcode=.TEE, opcode=.FILES_UPDATE, opcode=.SOCKET"`,
+		len:          u32                     `raw_union_tag:"opcode=.READV, opcode=.WRITEV, opcode=.SPLICE, opcode=.SEND, opcode=.RECV, opcode=.TIMEOUT, opcode=.LINK_TIMEOUT, opcode=.MADVISE, opcode=.OPENAT, opcode=.READ, opcode=.WRITE, opcode=.TEE, opcode=.FILES_UPDATE, opcode=.SOCKET, opcode=.FALLOCATE, opcode=.READ_FIXED, opcode=.WRITE_FIXED"`,
 		poll_flags:   IO_Uring_Poll_Add_Flags `raw_union_tag:"opcode=.POLL_ADD, opcode=.POLL_REMOVE"`,
 		statx_mask:   Statx_Mask              `raw_union_tag:"opcode=.STATX"`,
 		epoll_ctl_op: EPoll_Ctl_Opcode        `raw_union_tag:"opcode=.EPOLL_CTL"`,
@@ -1636,7 +1636,7 @@ IO_Uring_SQE :: struct {
 		fadvise_advice:   u32                     `raw_union_tag:"opcode=.MADVISE"`,
 		splice_flags:     IO_Uring_Splice_Flags   `raw_union_tag:"opcode=.SPLICE, opcode=.TEE"`,
 		rename_flags:     u32,
-		unlink_flags:     u32,
+		unlink_flags:     u32                     `raw_union_tag:"opcode=.UNLINKAT"`,
 		hardlink_flags:   u32,
 		xattr_flags:      u32,
 		msg_ring_flags:   u32,
@@ -1646,7 +1646,7 @@ IO_Uring_SQE :: struct {
 	user_data: u64,
 	using __buffer: struct #raw_union {
 		// Index into fixed buffers, if used.
-		buf_index: u16,
+		buf_index: u16 `raw_union_tag:"opcode=.READ_FIXED, opcode=.WRITE_FIXED"`,
 		// For grouped buffer selection.
 		buf_group: u16,
 	},
@@ -1780,3 +1780,5 @@ Sched_Attr :: struct {
 Sched_Attr_Flags :: bit_set[Sched_Attr_Flag_Bits; u32]
 
 Memfd_Create_Flags :: bit_set[Memfd_Create_Flag_Bits; u32]
+
+Fallocate_Mode :: bit_set[Fallocate_Mode_Bits;u32]
