@@ -2722,7 +2722,12 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 
-	if (type_set_update_with_mutex(&c->info.min_dep_type_info_set, t, &c->info.min_dep_type_info_set_mutex)) {
+	if (t->flags.load(std::memory_order_relaxed) & TypeFlag_InMinDepTypeInfoSet) {
+		return;
+	}
+	bool exists = type_set_update_with_mutex(&c->info.min_dep_type_info_set, t, &c->info.min_dep_type_info_set_mutex);
+	t->flags.fetch_or(TypeFlag_InMinDepTypeInfoSet, std::memory_order_relaxed);
+	if (exists) {
 		return;
 	}
 
@@ -2982,11 +2987,23 @@ gb_internal bool min_dep_visit(Entity *entity) {
 	return entity->min_dep_count.fetch_add(1, std::memory_order_relaxed) == 0;
 }
 
-// NOTE(bill): a task walks from its own stack of entities, and hands half of it to a new task once it is large,
-// as with a task for each dependency, adding the tasks was most of the work
-enum { MIN_DEP_TASK_SPLIT = 256 };
+gb_internal void min_dep_push(Array<Entity *> *stack, Entity *e) {
+	if (e->min_dep_count.load(std::memory_order_relaxed) != 0) {
+		return;
+	}
+	if (e->decl_info == nullptr) {
+		(void)min_dep_visit(e);
+	} else {
+		array_add(stack, e);
+	}
+}
+
 
 gb_internal WORKER_TASK_PROC(add_dependency_to_set_worker) {
+	// NOTE(bill): a task walks from its own stack of entities, and hands half of it to a new task once it is large,
+	// as with a task for each dependency, adding the tasks was most of the work
+	enum { MIN_DEP_TASK_SPLIT = 16 };
+
 	Checker *c = global_checker_ptr.load(std::memory_order_relaxed);
 	Array<Entity *> *stack = cast(Array<Entity *> *)data;
 
@@ -3021,14 +3038,9 @@ gb_internal WORKER_TASK_PROC(add_dependency_to_set_worker) {
 				GB_ASSERT_MSG(fl->kind == Entity_LibraryName &&
 				              (fl->flags&EntityFlag_Used),
 				              "%.*s", LIT(entity->token.string));
-				array_add(stack, fl);
+				min_dep_push(stack, fl);
 			}
-		}
-
-		FOR_PTR_SET(e, decl->deps) {
-			if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
-				array_add(stack, e);
-			}
+			min_dep_push(stack, e);
 		}
 
 		if (stack->count >= MIN_DEP_TASK_SPLIT) {

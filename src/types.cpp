@@ -339,8 +339,9 @@ gb_global String const type_strings[] = {
 #undef TYPE_KIND
 
 enum TypeFlag : u32 {
-	TypeFlag_Polymorphic     = 1<<1,
-	TypeFlag_PolySpecialized = 1<<2,
+	TypeFlag_Polymorphic         = 1<<1,
+	TypeFlag_PolySpecialized     = 1<<2,
+	TypeFlag_InMinDepTypeInfoSet = 1<<3,
 };
 
 struct Type {
