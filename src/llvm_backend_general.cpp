@@ -1652,6 +1652,13 @@ gb_internal void lb_adjust_access_alignment_from_addr(lbModule *m, LLVMValueRef 
 		// global's own alignment combined with the field offset
 		LLVMSetAlignment(access, lb_try_get_alignment(m, addr_ptr, LLVMGetAlignment(access)));
 	}
+	// then lower to what the address chain proves (e.g. a byte GEP with a variable index proves align 1);
+	// every load/store builder goes through here, so this covers lb_emit_load too
+	u64 align = LLVMGetAlignment(access);
+	u64 known = lb_known_address_alignment(m, addr_ptr, align);
+	if (known > 0 && known < align) {
+		LLVMSetAlignment(access, cast(unsigned)known);
+	}
 }
 
 // cap a load/store alignment to max_align if over that;
