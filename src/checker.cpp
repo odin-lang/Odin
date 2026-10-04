@@ -7570,40 +7570,47 @@ gb_internal void check_all_scope_usages(Checker *c) {
 }
 
 
-gb_internal void check_for_type_cycles(Checker *c) {
-	// NOTE(bill): Check for illegal cyclic type declarations
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind != Entity_TypeName) {
-			continue;
-		}
-		if (e->type != nullptr && is_type_typed(e->type)) {
-			if (e->TypeName.is_type_alias) {
-				// Ignore for the time being
-			} else {
+struct CheckDefinitionCyclesChunk {
+	Entity **definitions;
+	isize    count;
+};
+
+gb_internal WORKER_TASK_PROC(check_definition_cycles_worker_proc) {
+	CheckDefinitionCyclesChunk *chunk = cast(CheckDefinitionCyclesChunk *)data;
+	for (isize i = 0; i < chunk->count; i++) {
+		Entity *e = chunk->definitions[i];
+		switch (e->kind) {
+		case Entity_TypeName:
+			// NOTE(bill): Check for illegal cyclic type declarations, which are reported when the layout is computed
+			if (e->type != nullptr && is_type_typed(e->type) && !e->TypeName.is_type_alias) {
 				(void)type_align_of(e->type);
 			}
+			break;
+		case Entity_Procedure: {
+			DeclInfo *decl = e->decl_info;
+			ast_node(pl, ProcLit, decl->proc_lit);
+			if (pl->inlining == ProcInlining_inline && ptr_set_exists(&decl->deps, e)) {
+				error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
+			}
+		} break;
 		}
 	}
+	return 0;
 }
 
-gb_internal void check_for_inline_cycles(Checker *c) {
-	for_array(i, c->info.definitions) {
-		Entity *e = c->info.definitions[i];
-		if (e->kind != Entity_Procedure) {
-			continue;
-		}
-		DeclInfo *decl = e->decl_info;
-		ast_node(pl, ProcLit, decl->proc_lit);
-		if (pl->inlining == ProcInlining_inline) {
-			FOR_PTR_SET(dep, decl->deps) {
-				if (dep == e) {
-					error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
-					break;
-				}
-			}
-		}
+gb_internal void check_for_type_and_inline_cycles(Checker *c) {
+	isize const CHUNK_SIZE = 1024;
+	Array<Entity *> const &definitions = c->info.definitions;
+	auto chunks = array_make<CheckDefinitionCyclesChunk>(heap_allocator(), 0, definitions.count/CHUNK_SIZE + 1);
+	defer (array_free(&chunks));
+
+	for (isize i = 0; i < definitions.count; i += CHUNK_SIZE) {
+		array_add(&chunks, CheckDefinitionCyclesChunk{definitions.data + i, gb_min(CHUNK_SIZE, definitions.count - i)});
 	}
+	for (CheckDefinitionCyclesChunk &chunk : chunks) {
+		thread_pool_add_task(check_definition_cycles_worker_proc, &chunk);
+	}
+	thread_pool_wait();
 }
 
 
@@ -7724,11 +7731,8 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 	check_merge_queues_into_arrays(c);
 
-	TIME_SECTION("check for type cycles");
-	check_for_type_cycles(c);
-
-	TIME_SECTION("check for inline cycles");
-	check_for_inline_cycles(c);
+	TIME_SECTION("check for type and inline cycles");
+	check_for_type_and_inline_cycles(c);
 
 	TIME_SECTION("check deferred procedures");
 	check_deferred_procedures(c);
