@@ -2550,3 +2550,14 @@ Route_Message_Flags_Bits :: enum u32 {
 	TRAP           = log2(0x8000),
 	OFFLOAD_FAILED = log2(0x20000000),
 }
+
+Fallocate_Mode_Bits :: enum {
+	KEEP_SIZE,
+	PUNCH_HOLE,
+	NO_HIDE_STALE,
+	COLLAPSE_RANGE,
+	ZERO_RANGE,
+	INSERT_RANGE,
+	UNSHARE_RANGE,
+	WRITE_ZEROES,
+}
