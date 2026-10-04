@@ -3514,7 +3514,7 @@ gb_internal void lb_add_nocapture_proc_attribute_at_index(lbProcedure *p, isize 
 	LLVMAddAttributeAtIndex(p->value, cast(unsigned)index, lb_create_nocapture_attribute(p->module->ctx));
 }
 
-gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value=0) {
+gb_internal void lb_add_attribute_to_proc(lbModule *m, LLVMValueRef proc_value, char const *name, u64 value) {
 	LLVMAddAttributeAtIndex(proc_value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(m->ctx, name, value));
 }
 
