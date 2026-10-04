@@ -122,6 +122,20 @@ bit_field_array_backing :: proc(t: ^testing.T) {
 	testing.expect_value(t, transmute([3]u8)a, [3]u8{0x3A, 0x12, 0xF0})
 }
 
+// a field may lie across the units an array backing is read and written in, which for 12 bytes are 8 and 4
+@(test)
+bit_field_array_backing_units :: proc(t: ^testing.T) {
+	A :: bit_field [12]u8 { lo: u64 | 60, mid: u16 | 12, hi: i32 | 24 }
+
+	a := transmute(A)[12]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x21, 0x43, 0x65, 0x87}
+	testing.expect_value(t, a.lo, 0x0EDCBA9876543210)
+	testing.expect_value(t, a.mid, 0x21F)
+	testing.expect_value(t, a.hi, -0x789ABD)
+
+	a.mid = 0xABC
+	testing.expect_value(t, transmute([12]u8)a, [12]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xCE, 0xAB, 0x43, 0x65, 0x87})
+}
+
 // A 1-bit boolean field is well formed at every backing value: the mask leaves only bit 0, so the
 // read is 0 or 1 whichever way it is tested. Wider boolean fields are legal -- any non-zero value
 // is true -- and are not covered here
