@@ -9,12 +9,18 @@ main :: proc() {
 	r: int
 	if x == 1 {
 		r = 1
-	} else if x == 2 {
-		r = 2
-	} else if x == 3 {
-		r = 3
-	} else if x == 4 {
-		r = 4
+	} else {
+		if x == 2 {
+			r = 2
+		} else {
+			if x == 3 {
+				r = 3
+			} else {
+				if x == 4 {
+					r = 4
+				}
+			}
+		}
 	}
 
 	fmt.println(r)
