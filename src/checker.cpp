@@ -7553,15 +7553,21 @@ gb_internal void check_all_scope_usages(Checker *c) {
 }
 
 
-struct CheckDefinitionCyclesChunk {
-	Entity **definitions;
-	isize    count;
-};
+gb_internal void add_untyped_expression_values(UntypedExprInfo *untyped, isize count) {
+	Checker *c = global_checker_ptr.load(std::memory_order_relaxed);
+	for (isize i = 0; i < count; i++) {
+		UntypedExprInfo const &u = untyped[i];
+		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
+		if (is_type_typed(u.info->type)) {
+			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
+		}
+		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
+	}
+}
 
-gb_internal WORKER_TASK_PROC(check_definition_cycles_worker_proc) {
-	CheckDefinitionCyclesChunk *chunk = cast(CheckDefinitionCyclesChunk *)data;
-	for (isize i = 0; i < chunk->count; i++) {
-		Entity *e = chunk->definitions[i];
+gb_internal void check_for_type_and_inline_cycles(Entity **definitions, isize count) {
+	for (isize i = 0; i < count; i++) {
+		Entity *e = definitions[i];
 		switch (e->kind) {
 		case Entity_TypeName:
 			// NOTE(bill): Check for illegal cyclic type declarations, which are reported when the layout is computed
@@ -7578,22 +7584,6 @@ gb_internal WORKER_TASK_PROC(check_definition_cycles_worker_proc) {
 		} break;
 		}
 	}
-	return 0;
-}
-
-gb_internal void check_for_type_and_inline_cycles(Checker *c) {
-	isize const CHUNK_SIZE = 1024;
-	Array<Entity *> const &definitions = c->info.definitions;
-	auto chunks = array_make<CheckDefinitionCyclesChunk>(heap_allocator(), 0, definitions.count/CHUNK_SIZE + 1);
-	defer (array_free(&chunks));
-
-	for (isize i = 0; i < definitions.count; i += CHUNK_SIZE) {
-		array_add(&chunks, CheckDefinitionCyclesChunk{definitions.data + i, gb_min(CHUNK_SIZE, definitions.count - i)});
-	}
-	for (CheckDefinitionCyclesChunk &chunk : chunks) {
-		thread_pool_add_task(check_definition_cycles_worker_proc, &chunk);
-	}
-	thread_pool_wait();
 }
 
 
@@ -7715,7 +7705,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check for type and inline cycles");
-	check_for_type_and_inline_cycles(c);
+	thread_pool_for_chunks(c->info.definitions.data, c->info.definitions.count, 1024, check_for_type_and_inline_cycles);
 
 	TIME_SECTION("check deferred procedures");
 	check_deferred_procedures(c);
@@ -7802,13 +7792,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	auto untyped = array_make<UntypedExprInfo>(heap_allocator());
 	defer (array_free(&untyped));
 	per_thread_array_gather(&c->global_untyped_queue, &untyped);
-	for (UntypedExprInfo const &u : untyped) {
-		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
-		if (is_type_typed(u.info->type)) {
-			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
-		}
-		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
-	}
+	thread_pool_for_chunks(untyped.data, untyped.count, 512, add_untyped_expression_values);
 
 	TIME_SECTION("initialize and check for collisions in type info array");
 	{

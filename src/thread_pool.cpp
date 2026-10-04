@@ -381,3 +381,39 @@ gb_internal void per_thread_array_gather(PerThreadArray<T> *a, Array<T> *dst) {
 		array_clear(&slot.array);
 	}
 }
+
+gb_global ThreadPool global_thread_pool;
+
+gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
+	return thread_pool_add_task(&global_thread_pool, proc, data);
+}
+gb_internal void thread_pool_wait(void) {
+	thread_pool_wait(&global_thread_pool);
+}
+
+template <typename T>
+struct ThreadPoolChunk {
+	T *   items;
+	isize count;
+	void (*proc)(T *items, isize count);
+};
+
+template <typename T>
+gb_internal WORKER_TASK_PROC(thread_pool_chunk_worker_proc) {
+	ThreadPoolChunk<T> *chunk = cast(ThreadPoolChunk<T> *)data;
+	chunk->proc(chunk->items, chunk->count);
+	return 0;
+}
+
+template <typename T>
+gb_internal void thread_pool_for_chunks(T *items, isize count, isize chunk_size, void (*proc)(T *items, isize count)) {
+	auto chunks = array_make<ThreadPoolChunk<T>>(heap_allocator(), 0, count/chunk_size + 1);
+	defer (array_free(&chunks));
+	for (isize i = 0; i < count; i += chunk_size) {
+		array_add(&chunks, ThreadPoolChunk<T>{items + i, gb_min(chunk_size, count - i), proc});
+	}
+	for (ThreadPoolChunk<T> &chunk : chunks) {
+		thread_pool_add_task(thread_pool_chunk_worker_proc<T>, &chunk);
+	}
+	thread_pool_wait();
+}
