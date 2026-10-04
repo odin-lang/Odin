@@ -434,7 +434,7 @@ gb_internal lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue d
 	args[0] = data;
 	args[1] = seed;
 	args[2] = lb_const_int(p->module, t_int, type_size_of(type));
-	return lb_emit_runtime_call(p, "default_hasher_fixed", args);
+	return lb_emit_runtime_call(p, runtime_default_hasher_fixed_name(p->module->info), args);
 }
 
 gb_internal void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value) {

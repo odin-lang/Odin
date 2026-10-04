@@ -1035,6 +1035,10 @@ gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *pa
 	add_dependency(c->info, c->decl, e);
 }
 
+gb_internal char const *runtime_default_hasher_fixed_name(CheckerInfo *info) {
+	Entity *e = scope_lookup_current(info->runtime_package->scope, string_interner_insert(str_lit("default_hasher_fixed")));
+	return e != nullptr ? "default_hasher_fixed" : "default_hasher";
+}
 
 gb_internal void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	if (e == nullptr) {
