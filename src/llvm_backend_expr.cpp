@@ -4710,8 +4710,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(te, TernaryIfExpr, expr);
 		GB_ASSERT(te->y != nullptr);
 		Type *type = default_type(type_of_expr(expr));
-		LLVMTypeKind type_kind = LLVMGetTypeKind(lb_type(p->module, type));
-		if ((type_kind == LLVMStructTypeKind || type_kind == LLVMArrayTypeKind) && type_size_of(type) > 64) {
+		if (lb_is_type_large_aggregate(p->module, type)) {
 			// NOTE(bill): A large aggregate needs to be selected through memory
 			// as instruction selection splits a `phi` or `select` of it per field
 			lbAddr res = lb_add_local_generated(p, type, false);
