@@ -5970,7 +5970,7 @@ gb_internal void check_foreign_import_fullpaths(Checker *c) {
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(file_str, str_lit(".o"))) {
 					String foreign_path = {};
-					bool ok = determine_path_from_string(nullptr, decl, base_dir, file_str, &foreign_path, /*use error not syntax_error*/true);
+					bool ok = determine_path_from_string(true, decl, base_dir, file_str, &foreign_path, /*use error not syntax_error*/true);
 					if (ok) {
 						fullpath = foreign_path;
 					}

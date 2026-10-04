@@ -6798,7 +6798,7 @@ gb_internal bool is_package_name_reserved(String const &name) {
 }
 
 
-gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
+gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
 	GB_ASSERT(path != nullptr);
 
 	void (*do_error)(Ast *, char const *, ...);
@@ -6810,8 +6810,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		do_error = &error;
 		do_warning = &warning;
 	}
-
-	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
 	String collection_name = {};
 	bool is_import_decl_path = node->kind == Ast_ImportDecl || node->kind == Ast_ForeignImportDecl;
@@ -6826,7 +6824,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 	bool has_windows_drive = false;
 #if defined(GB_SYSTEM_WINDOWS)
-	if (file_mutex == nullptr) {
+	if (in_checker) {
 		if (!is_import_decl_path &&
 		    colon_pos == 1 &&
 		    original_string.len > 2 &&
@@ -6922,10 +6920,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		}
 	}
 
-	if (file_mutex) mutex_lock(file_mutex);
-	defer (if (file_mutex) mutex_unlock(file_mutex));
-
-
 	if (node->kind == Ast_ForeignImportDecl) {
 		node->ForeignImportDecl.collection_name = collection_name;
 	}
@@ -6940,6 +6934,31 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 }
 
 
+gb_internal void parse_setup_import_decl(Parser *p, AstFile *f, String const &base_dir, Ast **decl) {
+	Ast *node = *decl;
+	ast_node(id, ImportDecl, node);
+
+	String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+	if (is_import_path_absolute(original_string)) {
+		syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+		*decl = ast_bad_decl(f, id->relpath, id->relpath);
+		return;
+	}
+
+	String import_path = {};
+	bool ok = determine_path_from_string(false, node, base_dir, original_string, &import_path);
+	if (!ok) {
+		*decl = ast_bad_decl(f, id->relpath, id->relpath);
+		return;
+	}
+	import_path = string_trim_whitespace(import_path);
+
+	id->fullpath = import_path;
+	if (is_package_name_reserved(import_path)) {
+		return;
+	}
+	try_add_import_path(p, import_path, original_string, ast_token(node).pos);
+}
 
 gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls);
 
@@ -6982,28 +7001,9 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 
 			syntax_error(node, "Only declarations are allowed at file scope, got %.*s", LIT(ast_strings[node->kind]));
 		} else if (node->kind == Ast_ImportDecl) {
-			ast_node(id, ImportDecl, node);
-
-			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
-			if (is_import_path_absolute(original_string)) {
-				syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
+			if (node->ImportDecl.fullpath.len == 0) {
+				parse_setup_import_decl(p, f, base_dir, &decls[i]);
 			}
-
-			String import_path = {};
-			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
-			if (!ok) {
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
-			}
-			import_path = string_trim_whitespace(import_path);
-
-			id->fullpath = import_path;
-			if (is_package_name_reserved(import_path)) {
-				continue;
-			}
-			try_add_import_path(p, import_path, original_string, ast_token(node).pos);
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 
@@ -7026,7 +7026,7 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(fullpath, str_lit(".o"))) {
 					String foreign_path = {};
-					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
+					bool ok = determine_path_from_string(false, node, base_dir, file_str, &foreign_path);
 					if (!ok) {
 						decls[i] = ast_bad_decl(f, fp_token, fp_token);
 						goto end;
@@ -7509,6 +7509,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	u64 cpu_start = parse_thread_cpu_time_now();
 	u64 setup_start = 0;
 	u64 setup_cpu_start = 0;
+	u64 import_ticks = 0;
+	u64 import_cpu_ticks = 0;
 
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
@@ -7604,6 +7606,13 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl || stmt->kind == Ast_ForeignBlockDecl) {
 					f->delayed_decl_count += 1;
 				}
+				if (stmt->kind == Ast_ImportDecl) {
+					u64 import_start     = time_stamp_time_now();
+					u64 import_cpu_start = parse_thread_cpu_time_now();
+					parse_setup_import_decl(p, f, base_dir, &decls[decls.count-1]);
+					import_ticks     += time_stamp_time_now()-import_start;
+					import_cpu_ticks += parse_thread_cpu_time_now()-import_cpu_start;
+				}
 			}
 		}
 
@@ -7616,8 +7625,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	u64 end     = time_stamp_time_now();
 	u64 cpu_end = parse_thread_cpu_time_now();
-	u64 setup_ticks     = setup_start     != 0 ? end-setup_start         : 0;
-	u64 setup_cpu_ticks = setup_cpu_start != 0 ? cpu_end-setup_cpu_start : 0;
+	u64 setup_ticks     = (setup_start     != 0 ? end-setup_start         : 0) + import_ticks;
+	u64 setup_cpu_ticks = (setup_cpu_start != 0 ? cpu_end-setup_cpu_start : 0) + import_cpu_ticks;
 	f->time_to_parse           = cast(f64)(end-start-setup_ticks)/cast(f64)time_stamp__freq();
 	f->time_to_setup_decls     = cast(f64)setup_ticks/cast(f64)time_stamp__freq();
 	f->cpu_time_to_parse       = cpu_end-cpu_start-setup_cpu_ticks;

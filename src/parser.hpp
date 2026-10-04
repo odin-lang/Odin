@@ -251,7 +251,6 @@ struct Parser {
 	//  * Parser
 	//  * Package
 	//  * File
-	BlockingMutex          file_decl_mutex;
 
 	BlockingMutex          file_error_mutex;
 	ParseFileErrorNode *   file_error_head;
