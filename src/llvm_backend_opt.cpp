@@ -863,6 +863,42 @@ gb_internal bool lb_is_plain_access(LLVMValueRef inst) {
 	return !LLVMGetVolatile(inst) && LLVMGetOrdering(inst) == LLVMAtomicOrderingNotAtomic;
 }
 
+gb_internal void lb_lower_large_loaded_store(lbFastIselLowering *s, LLVMValueRef store) {
+	lbModule *m = s->m;
+	LLVMValueRef load = LLVMGetOperand(store, 0);
+	LLVMValueRef ptr  = LLVMGetOperand(store, 1);
+	LLVMUseRef   use  = LLVMGetFirstUse(load);
+	if (!lb_is_plain_access(load) || LLVMGetNextUse(use) != nullptr) {
+		return;
+	}
+
+	LLVMTypeRef type = LLVMTypeOf(load);
+	LLVMTargetDataRef data_layout = LLVMGetModuleDataLayout(m->mod);
+	LLVMValueRef size = LLVMConstInt(LLVMInt64TypeInContext(m->ctx), LLVMStoreSizeOfType(data_layout, type), false);
+
+	unsigned load_alignment  = gb_max(LLVMGetAlignment(load), 1u);
+	unsigned store_alignment = gb_max(LLVMGetAlignment(store), 1u);
+	unsigned temp_alignment  = gb_max(LLVMABIAlignmentOfType(data_layout, type), load_alignment);
+
+	LLVMValueRef fn = LLVMGetBasicBlockParent(LLVMGetInstructionParent(store));
+	LLVMPositionBuilderBefore(s->builder, LLVMGetFirstInstruction(LLVMGetEntryBasicBlock(fn)));
+	LLVMSetCurrentDebugLocation2(s->builder, nullptr);
+
+	LLVMValueRef temp = LLVMBuildAlloca(s->builder, type, "");
+	LLVMSetAlignment(temp, temp_alignment);
+
+	LLVMPositionBuilderBefore(s->builder, LLVMGetNextInstruction(load));
+	LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(load));
+	LLVMBuildMemCpy(s->builder, temp, temp_alignment, LLVMGetOperand(load, 0), load_alignment, size);
+
+	LLVMPositionBuilderBefore(s->builder, store);
+	LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(store));
+	LLVMBuildMemCpy(s->builder, ptr, store_alignment, temp, temp_alignment, size);
+
+	LLVMInstructionEraseFromParent(store);
+	LLVMInstructionEraseFromParent(load);
+}
+
 gb_internal void lb_lower_bool_select(lbFastIselLowering *s, LLVMValueRef select) {
 	LLVMValueRef c = LLVMGetOperand(select, 0);
 	LLVMValueRef x = LLVMGetOperand(select, 1);
@@ -1033,7 +1069,12 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 			}
 		}
 		for (LLVMValueRef store : work) {
-			if (!lb_scalarize_aggregate_store(&s, store)) {
+			if (lb_scalarize_aggregate_store(&s, store)) {
+				continue;
+			}
+			if (LLVMIsALoadInst(LLVMGetOperand(store, 0))) {
+				lb_lower_large_loaded_store(&s, store);
+			} else {
 				lb_lower_large_constant_store(&s, store);
 			}
 		}
