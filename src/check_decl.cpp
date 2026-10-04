@@ -2425,7 +2425,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 					break;
 				}
 
-				bool is_value = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
+				bool is_value = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type) && !is_type_soa_pointer(e->type);
 				String name = e->token.string;
 				Type *t = base_type(type_deref(e->type));
 				if (t->kind == Type_Struct) {

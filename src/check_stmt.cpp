@@ -846,7 +846,7 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 	}
 
 	case Entity_Variable: {
-		bool is_ptr = is_type_pointer(e->type);
+		bool is_ptr = is_type_pointer(e->type) || is_type_soa_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
 			wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
