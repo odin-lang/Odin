@@ -7452,23 +7452,6 @@ gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.fini_procedures);
 }
 
-gb_internal void add_type_info_for_type_definitions(Checker *c) {
-	for (Entity *e : c->info.definitions) {
-		if (e->kind == Entity_TypeName && e->type != nullptr && is_type_typed(e->type)) {
-		#if 0
-			i64 align = type_align_of(e->type);
-			if (align > 0 && e->min_dep_count.load(std::memory_order_relaxed) > 0) {
-				add_type_info_type(&c->builtin_ctx, e->type);
-			}
-		#else
-			if (e->min_dep_count.load(std::memory_order_relaxed) > 0) {
-				add_type_info_type(&c->builtin_ctx, e->type);
-			}
-		#endif
-		}
-	}
-}
-
 #if 0
 gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
 	if (decl == nullptr) {
@@ -7742,9 +7725,6 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("calculate global init order");
 	calculate_global_init_order(c);
-
-	TIME_SECTION("add type info for type definitions");
-	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("update dependency tree for procedures");
