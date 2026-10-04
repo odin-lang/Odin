@@ -7658,7 +7658,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_file_directives(c);
 
 	// NOTE(bill): lazy entities are added once checked, which with several threads is in no fixed order
-	gb_sort_array(c->info.entities.data + entity_count, c->info.entities.count - entity_count, init_procedures_cmp);
+	natural_merge_sort(c->info.entities.data + entity_count, c->info.entities.count - entity_count, [](Entity *const &x, Entity *const &y) -> int {
+		return entity_source_order_cmp(x, y);
+	});
 
 	if (build_context.internal_global_entity_graph) {
 		TIME_SECTION("print global entity graph");
