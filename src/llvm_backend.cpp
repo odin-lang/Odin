@@ -2820,6 +2820,98 @@ gb_internal bool lb_scalarize_aggregate_store(lbFastIselLowering *s, LLVMValueRe
 	return true;
 }
 
+// NOTE(bill): If a a constant has too many fields to store one at a time is set or copied from a constant instead
+gb_internal void lb_lower_large_constant_store(lbFastIselLowering *s, LLVMValueRef store) {
+	lbModule *m = s->m;
+	LLVMValueRef value = LLVMGetOperand(store, 0);
+	LLVMValueRef ptr   = LLVMGetOperand(store, 1);
+	LLVMTypeRef  type  = LLVMTypeOf(value);
+
+	LLVMTargetDataRef data_layout = LLVMGetModuleDataLayout(m->mod);
+	unsigned alignment = gb_max(LLVMGetAlignment(store), 1u);
+	if (!LLVMIsAConstant(value) || lb_const_has_misaligned_pointer(data_layout, value, 0, alignment)) {
+		return;
+	}
+
+	LLVMPositionBuilderBefore(s->builder, store);
+	LLVMSetCurrentDebugLocation2(s->builder, LLVMInstructionGetDebugLoc(store));
+
+	LLVMValueRef size = LLVMConstInt(LLVMInt64TypeInContext(m->ctx), LLVMStoreSizeOfType(data_layout, type), false);
+	if (LLVMIsNull(value)) {
+		LLVMBuildMemSet(s->builder, ptr, LLVMConstInt(LLVMInt8TypeInContext(m->ctx), 0, false), size, alignment);
+		LLVMInstructionEraseFromParent(store);
+		return;
+	}
+
+	LLVMValueRef global = LLVMAddGlobal(m->mod, type, "");
+	LLVMSetInitializer(global, value);
+	LLVMSetGlobalConstant(global, true);
+	LLVMSetAlignment(global, alignment);
+
+	LLVMSetLinkage(global, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global, LLVMGlobalUnnamedAddr);
+
+	LLVMBuildMemCpy(s->builder, ptr, alignment, global, alignment, size);
+
+	LLVMInstructionEraseFromParent(store);
+}
+
+// NOTE(bill): The fast instruction selector in LLVM cannot select a call to `memmove` nor to the floating point `minnum` and `maxnum`.
+// To improve things we can them through a function of the module which calls them
+gb_internal void lb_redirect_unselectable_call(lbFastIselLowering *s, LLVMValueRef call) {
+	lbModule *m = s->m;
+
+	LLVMValueRef callee = LLVMGetCalledValue(call);
+	if (!LLVMIsAFunction(callee)) {
+		return;
+	}
+	size_t      name_len = 0;
+	char const *name_text = LLVMGetValueName2(callee, &name_len);
+	String      name = make_string(cast(u8 const *)name_text, name_len);
+
+	LLVMTypeRef fn_type = LLVMGlobalGetValueType(callee);
+	if (LLVMGetCalledFunctionType(call) != fn_type || LLVMIsFunctionVarArg(fn_type)) {
+		return;
+	}
+	unsigned     param_count = LLVMCountParamTypes(fn_type);
+	LLVMTypeKind return_kind = LLVMGetTypeKind(LLVMGetReturnType(fn_type));
+	bool is_memmove = name == "memmove" && param_count == 3 && return_kind == LLVMPointerTypeKind;
+	bool is_minmax  = (string_starts_with(name, str_lit("llvm.minnum.")) ||
+	                   string_starts_with(name, str_lit("llvm.maxnum."))) &&
+	                  (return_kind == LLVMFloatTypeKind ||
+	                   return_kind == LLVMDoubleTypeKind);
+	if (!is_memmove && !is_minmax) {
+		return;
+	}
+
+	gbString wrapper_name = gb_string_make(heap_allocator(), "__$fast_isel$");
+	wrapper_name          = gb_string_append_length(wrapper_name, name.text, name.len);
+	defer (gb_string_free(wrapper_name));
+
+	LLVMValueRef wrapper = LLVMGetNamedFunction(m->mod, wrapper_name);
+	defer (LLVMSetOperand(call, cast(unsigned)LLVMGetNumOperands(call) - 1, wrapper));
+
+	if (wrapper != nullptr) {
+		return;
+	}
+
+	LLVMCallConv cc = cast(LLVMCallConv)LLVMGetFunctionCallConv(callee);
+	wrapper = LLVMAddFunction(m->mod, wrapper_name, fn_type);
+	LLVMSetLinkage(wrapper, LLVMInternalLinkage);
+	LLVMSetFunctionCallConv(wrapper, cc);
+	lb_add_attribute_to_proc(m, wrapper, "nounwind");
+
+	LLVMValueRef params[3] = {};
+	LLVMGetParams(wrapper, params);
+
+	LLVMPositionBuilderAtEnd(s->builder, LLVMAppendBasicBlockInContext(m->ctx, wrapper, ""));
+	LLVMSetCurrentDebugLocation2(s->builder, nullptr);
+
+	LLVMValueRef inner = LLVMBuildCall2(s->builder, fn_type, callee, params, param_count, "");
+	LLVMSetInstructionCallConv(inner, cc);
+	LLVMBuildRet(s->builder, inner);
+}
+
 gb_internal bool lb_is_aggregate_type(LLVMTypeRef type) {
 	LLVMTypeKind kind = LLVMGetTypeKind(type);
 	return kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind;
@@ -2986,7 +3078,8 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 	auto work = array_make<LLVMValueRef>(heap_allocator(), 0, 64);
 	defer (array_free(&work));
 
-	for (LLVMValueRef fn = LLVMGetFirstFunction(m->mod); fn != nullptr; fn = LLVMGetNextFunction(fn)) {
+	LLVMValueRef last_fn = LLVMGetLastFunction(m->mod);
+	for (LLVMValueRef fn = LLVMGetFirstFunction(m->mod); fn != nullptr; fn = fn == last_fn ? nullptr : LLVMGetNextFunction(fn)) {
 		array_clear(&work);
 		array_clear(&s.phis);
 
@@ -2998,7 +3091,9 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 			}
 		}
 		for (LLVMValueRef store : work) {
-			lb_scalarize_aggregate_store(&s, store);
+			if (!lb_scalarize_aggregate_store(&s, store)) {
+				lb_lower_large_constant_store(&s, store);
+			}
 		}
 
 		// NOTE(bill): A field read out of an aggregate value is read where that aggregate came from
@@ -3023,6 +3118,7 @@ gb_internal void lb_lower_for_fast_isel(lbModule *m) {
 			}
 			if (LLVMIsACallInst(i)) {
 				lb_truncate_bool_arguments(&s, i);
+				lb_redirect_unselectable_call(&s, i);
 				continue;
 			}
 			if (LLVMIsASwitchInst(i)) {
