@@ -1686,6 +1686,10 @@ IO_Uring_Cmd_Flags :: bit_set[IO_Uring_Cmd_Flags_Bits; u32]
 
 IO_Uring_Splice_Flags :: bit_set[IO_Uring_Splice_Flags_Bits; u32]
 
+IO_Uring_Unlinkat_Flags :: bit_set[IO_Uring_Unlinkat_Flags_Bits;u32]
+
+IO_Uring_Fallocate_Flags :: bit_set[IO_Uring_Fallocate_Flags_Bits;u32]
+
 IO_Uring_Accept_Flags :: bit_set[IO_Uring_Accept_Flags_Bits; u16]
 
 IO_Uring_Send_Recv_Flags :: bit_set[IO_Uring_Send_Recv_Flags_Bits; u16]

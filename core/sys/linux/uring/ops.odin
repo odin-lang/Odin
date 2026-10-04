@@ -40,12 +40,30 @@ writev :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, iovs: []linux.IO_Vec, 
 	return
 }
 
-read_fixed :: proc() {
-	unimplemented()
+read_fixed :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, buf: []u8, offset: u64) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .READ_FIXED
+	sqe.fd = fd
+	sqe.addr = cast(u64)uintptr(raw_data(buf))
+	sqe.len = u32(len(buf))
+	sqe.off = offset
+	sqe.user_data = user_data
+
+	ok = true
+	return
 }
 
-write_fixed :: proc() {
-	unimplemented()
+write_fixed :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, buf: []u8, offset: u64) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .WRITE_FIXED
+	sqe.fd = fd
+	sqe.addr = cast(u64)uintptr(raw_data(buf))
+	sqe.len = u32(len(buf))
+	sqe.off = offset
+	sqe.user_data = user_data
+
+	ok = true
+	return
 }
 
 /*
@@ -452,8 +470,15 @@ where T == linux.Sock_Addr_In || T == linux.Sock_Addr_In6 || T == linux.Sock_Add
 	return
 }
 
-fallocate :: proc() {
-	unimplemented()
+fallocate :: proc(ring: ^Ring, user_data: u64, fd: linux.Fd, mode: linux.IO_Uring_Fallocate_Flags, offset: u64,len: u64,) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .FALLOCATE
+	sqe.fd = fd
+	sqe.off = offset
+	sqe.addr = len
+	sqe.len = transmute(u32)mode
+	ok = true
+	return
 }
 
 fadvise :: proc() {
@@ -696,8 +721,16 @@ renameat :: proc() {
 	unimplemented()
 }
 
-unlinkat :: proc() {
-	unimplemented()
+unlinkat :: proc(ring: ^Ring, user_data: u64, dirfd: linux.Fd, path: cstring, flags: linux.IO_Uring_Unlinkat_Flags) -> (sqe: ^linux.IO_Uring_SQE, ok: bool) {
+	sqe = get_sqe(ring) or_return
+	sqe.opcode = .UNLINKAT
+	sqe.fd = dirfd
+	sqe.addr = cast(u64)transmute(uintptr)path
+	sqe.unlink_flags = transmute(u32)flags
+	sqe.user_data = user_data
+
+	ok = true
+	return
 }
 
 mkdirat :: proc() {

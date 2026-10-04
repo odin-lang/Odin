@@ -2187,6 +2187,22 @@ IO_Uring_Splice_Flags_Bits :: enum {
 	F_FD_IN_FIXED = 31,
 }
 
+IO_Uring_Unlinkat_Flags_Bits :: enum {
+	AT_REMOVEDIR = 9,
+}
+
+IO_Uring_Fallocate_Flags_Bits :: enum {
+	FALLOC_FL_ALLOCATE_RANGE,
+	FALLOC_FL_KEEP_SIZE,
+	FALLOC_FL_PUNCH_HOLE,
+	FALLOC_FL_NO_HIDE_STALE,
+	FALLOC_FL_COLLAPSE_RANGE,
+	FALLOC_FL_ZERO_RANGE,
+	FALLOC_FL_INSERT_RANGE,
+	FALLOC_FL_UNSHARE_RANGE,
+	FALLOC_FL_WRITE_ZEROES,
+}
+
 IO_Uring_Accept_Flags_Bits :: enum {
 	MULTISHOT,
 }
