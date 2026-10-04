@@ -7643,8 +7643,12 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("sort global entities");
-	// NOTE: the queues are filled by parallel workers, so their order differs between runs
-	array_sort(c->info.entities, init_procedures_cmp);
+
+	// NOTE(bill): The queues are filled by parallel workers, meaning when their order differs between runs,
+	// but each file's entities are in source order, which a natural merge sort only has to merge
+	natural_merge_sort(c->info.entities.data, c->info.entities.count, [](Entity *const &x, Entity *const &y) -> int {
+		return entity_source_order_cmp(x, y);
+	});
 
 	TIME_SECTION("check all global entities");
 	isize entity_count = c->info.entities.count;
