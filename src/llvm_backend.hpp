@@ -557,7 +557,7 @@ gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base
 gb_internal lbValue lb_type_info(lbProcedure *p, Type *type);
 
 gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str, bool custom_link_section);
-gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);
+gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, Ast *expr, lbProcedure *parent = nullptr);
 
 gb_internal bool lb_is_const(lbValue value);
 gb_internal bool lb_is_const_or_global(lbValue value);

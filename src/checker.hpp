@@ -257,6 +257,7 @@ struct DeclInfo {
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
 	std::atomic<struct lbModule *> code_gen_module;
+	std::atomic<String *>          local_proc_name; // the backend's name for a procedure declared in a procedure body
 };
 
 // ProcInfo stores the information needed for checking a procedure

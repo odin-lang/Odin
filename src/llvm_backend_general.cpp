@@ -2441,9 +2441,73 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
 }
 
+gb_internal DeclInfo *lb_enclosing_proc_decl(DeclInfo *decl) {
+	for (DeclInfo *d = decl->parent; d != nullptr; d = d->parent) {
+		if (d->proc_lit != nullptr) {
+			return d;
+		}
+	}
+	return nullptr;
+}
+
+gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
+	String *cached = decl->local_proc_name.load();
+	if (cached != nullptr) {
+		return *cached;
+	}
+
+	String prefix = str_lit("_proclit");
+	if (DeclInfo *enclosing = lb_enclosing_proc_decl(decl)) {
+		Entity *pe = enclosing->entity.load();
+		if (pe != nullptr && !pe->Procedure.is_anonymous && lb_enclosing_proc_decl(enclosing) == nullptr) {
+			prefix = lb_get_entity_name(m, pe);
+		} else {
+			prefix = lb_local_proc_name(m, enclosing);
+		}
+	}
+
+	String name = {};
+	Entity *e = decl->entity.load();
+	if (e != nullptr && !e->Procedure.is_anonymous) {
+		// NOTE(bill): parent.name-guid, named by declaration position (and type, for polymorphic instances, which share it)
+		String pd_name = (e->flags & EntityFlag_CustomLinkName) ? e->Procedure.link_name : e->token.string;
+		isize name_len = prefix.len + 1 + pd_name.len + 1 + 10 + 1 + 16 + 1;
+		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+		i32 guid = e->token.pos.offset;
+		if (decl->para_poly_original != nullptr) {
+			name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(prefix), LIT(pd_name), guid,
+			                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
+		} else {
+			name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(prefix), LIT(pd_name), guid);
+		}
+		name = make_string(cast(u8 *)name_text, name_len-1);
+	} else {
+		// NOTE(bill): parent$anon-pkg:file:offset, named by position rather than a counter, as the order these are generated in varies
+		TokenPos pos = ast_token(decl->proc_lit).pos;
+		AstFile *lit_file = decl->proc_lit->file();
+		String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
+		String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
+		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
+		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+		name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		name = make_string(cast(u8 *)name_text, name_len-1);
+	}
+
+	String *s = permanent_alloc_item<String>();
+	*s = name;
+	if (!decl->local_proc_name.compare_exchange_strong(cached, s)) {
+		return *cached;
+	}
+	return name;
+}
+
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	GB_ASSERT(m != nullptr);
 	GB_ASSERT(e != nullptr);
+	if (e->kind == Entity_Procedure && !e->Procedure.is_foreign && e->decl_info != nullptr && e->decl_info->proc_lit != nullptr &&
+	    lb_enclosing_proc_decl(e->decl_info) != nullptr) {
+		return lb_local_proc_name(m, e->decl_info);
+	}
 	if (e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
 	} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len != 0) {
@@ -4123,7 +4187,7 @@ gb_internal void lb_set_anonymous_proc_linkage(lbModule *m, lbProcedure *p) {
 	}
 }
 
-gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
+gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, Ast *expr, lbProcedure *parent) {
 	lbGenerator *gen = m->gen;
 	lbModule *target_module = m;
 
@@ -4138,34 +4202,10 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 
 	Entity *e = pl->decl->entity.load();
 	if (e == nullptr) {
-		TokenPos pos = ast_token(expr).pos;
-
-		// NOTE(bill): Generate a new name
-		// parent$anon-pkg:file:offset
-		// NOTE(bill): named by position rather than a counter, as the order these are generated in varies
-		String prefix = prefix_name;
-		if (parent == nullptr) {
-			// NOTE(bill): a literal inside a polymorphic procedure exists once per instance at the same position, so name it after the enclosing procedure
-			for (DeclInfo *d = pl->decl->parent; d != nullptr; d = d->parent) {
-				Entity *pe = d->entity.load();
-				if (pe != nullptr && pe->kind == Entity_Procedure) {
-					prefix = lb_get_entity_name(m, pe);
-					break;
-				}
-			}
-		}
-		AstFile *lit_file = expr->file();
-		String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
-		String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
-		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
-		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
-		String name = make_string((u8 *)name_text, name_len-1);
-
 		Token token = {};
 		token.pos = ast_token(expr).pos;
 		token.kind = Token_Ident;
-		token.string = name;
+		token.string = lb_local_proc_name(m, pl->decl);
 		Entity *new_e = alloc_entity_procedure(nullptr, token, type_of_expr(expr), pl->tags);
 		new_e->file = expr->file();
 		new_e->scope = new_e->file->scope;
