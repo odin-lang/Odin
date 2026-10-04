@@ -4110,74 +4110,98 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 
 
+gb_internal void lb_set_anonymous_proc_linkage(lbModule *m, lbProcedure *p) {
+	if (!USE_SEPARATE_MODULES) {
+		return;
+	}
+	LLVMSetLinkage(p->value, LLVMWeakODRLinkage);
+	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
+	if (build_context.metrics.os != TargetOs_darwin) {
+		// Mach-O has no COMDATs, but merges weak definitions itself
+		TEMPORARY_ALLOCATOR_GUARD();
+		LLVMSetComdat(p->value, LLVMGetOrInsertComdat(m->mod, alloc_cstring(temporary_allocator(), p->name)));
+	}
+}
+
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
 	lbGenerator *gen = m->gen;
-	gb_unused(gen);
+	lbModule *target_module = m;
 
 	ast_node(pl, ProcLit, expr);
 
-	if (pl->decl->entity.load() != nullptr) {
-		return lb_find_procedure_value_from_entity(m, pl->decl->entity.load());
-	}
 
-	TokenPos pos = ast_token(expr).pos;
-
-	// NOTE(bill): Generate a new name
-	// parent$anon-pkg:file:offset
-	// NOTE(bill): named by position rather than a counter, as the order these are generated in varies
-	String prefix = prefix_name;
-	if (parent == nullptr) {
-		// NOTE(bill): a literal inside a polymorphic procedure exists once per instance at the same position, so name it after the enclosing procedure
-		for (DeclInfo *d = pl->decl->parent; d != nullptr; d = d->parent) {
-			Entity *pe = d->entity.load();
-			if (pe != nullptr && pe->kind == Entity_Procedure) {
-				prefix = lb_get_entity_name(m, pe);
-				break;
-			}
-		}
-	}
-	AstFile *lit_file = expr->file();
-	String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
-	String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
-	isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
-	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
-	String name = make_string((u8 *)name_text, name_len-1);
-
-	Type *type = type_of_expr(expr);
-
-	GB_ASSERT(pl->decl->entity == nullptr);
-	Token token = {};
-	token.pos = ast_token(expr).pos;
-	token.kind = Token_Ident;
-	token.string = name;
-	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
-	e->file = expr->file();
-	e->scope = e->file->scope;
-
-	lbModule *target_module = m;
-	// another module may only be added to before the modules are generated in parallel
+	// NOTE(bill): another module may only be added to before the modules are generated in parallel
 	if (m == &gen->default_module && parent == nullptr && !gen->modules_in_parallel) {
 		target_module = lb_module_of_expr(gen, expr);
 	}
 	GB_ASSERT(target_module != nullptr);
 
-	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	pl->decl->code_gen_module = target_module;
-	e->decl_info = pl->decl;
-	e->parent_proc_decl = pl->decl->parent;
-	e->Procedure.is_anonymous = true;
-	e->flags |= EntityFlag_ProcBodyChecked;
+	Entity *e = pl->decl->entity.load();
+	if (e == nullptr) {
+		TokenPos pos = ast_token(expr).pos;
 
-	pl->decl->entity.store(e);
+		// NOTE(bill): Generate a new name
+		// parent$anon-pkg:file:offset
+		// NOTE(bill): named by position rather than a counter, as the order these are generated in varies
+		String prefix = prefix_name;
+		if (parent == nullptr) {
+			// NOTE(bill): a literal inside a polymorphic procedure exists once per instance at the same position, so name it after the enclosing procedure
+			for (DeclInfo *d = pl->decl->parent; d != nullptr; d = d->parent) {
+				Entity *pe = d->entity.load();
+				if (pe != nullptr && pe->kind == Entity_Procedure) {
+					prefix = lb_get_entity_name(m, pe);
+					break;
+				}
+			}
+		}
+		AstFile *lit_file = expr->file();
+		String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
+		String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
+		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
+		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+		name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		String name = make_string((u8 *)name_text, name_len-1);
 
+		Token token = {};
+		token.pos = ast_token(expr).pos;
+		token.kind = Token_Ident;
+		token.string = name;
+		Entity *new_e = alloc_entity_procedure(nullptr, token, type_of_expr(expr), pl->tags);
+		new_e->file = expr->file();
+		new_e->scope = new_e->file->scope;
+		new_e->decl_info = pl->decl;
+		new_e->parent_proc_decl = pl->decl->parent;
+		new_e->Procedure.is_anonymous = true;
+		new_e->flags |= EntityFlag_ProcBodyChecked;
+
+		// NOTE: another module may be making one for the same literal at the same time
+		if (pl->decl->entity.compare_exchange_strong(e, new_e)) {
+			e = new_e;
+			pl->decl->code_gen_module = target_module;
+		}
+	}
+
+	{
+		lbValue value = {};
+		rw_mutex_shared_lock(&m->values_mutex);
+		lbValue *found = map_get(&m->values, e);
+		if (found != nullptr) {
+			value = *found;
+		}
+		rw_mutex_shared_unlock(&m->values_mutex);
+		if (value.value != nullptr) {
+			return value;
+		}
+	}
 
 	if (target_module != m) {
 		rw_mutex_shared_lock(&target_module->values_mutex);
 		lbValue *found = map_get(&target_module->values, e);
 		rw_mutex_shared_unlock(&target_module->values_mutex);
 		if (found == nullptr) {
-			mpsc_enqueue(&target_module->procedures_to_generate, lb_create_procedure(target_module, e, false));
+			lbProcedure *tp = lb_create_procedure(target_module, e, false);
+			lb_set_anonymous_proc_linkage(target_module, tp);
+			mpsc_enqueue(&target_module->procedures_to_generate, tp);
 		}
 
 		lbProcedure *p = lb_create_procedure(m, e, true);
@@ -4188,6 +4212,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		return value;
 	} else {
 		lbProcedure *p = lb_create_procedure(m, e);
+		lb_set_anonymous_proc_linkage(m, p);
 
 		lbValue value = {};
 		value.value = p->value;
@@ -4197,7 +4222,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		if (parent != nullptr) {
 			array_add(&parent->children, p);
 		} else {
-			string_map_set(&m->members, name, value);
+			string_map_set(&m->members, p->name, value);
 		}
 		return value;
 	}

@@ -16,6 +16,7 @@
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
 #include <llvm-c/Transforms/PassBuilder.h>
+#include <llvm-c/Comdat.h>
 
 
 
