@@ -143,6 +143,7 @@ struct GlobalDeclSourceFrame {
 };
 
 gb_global Array<GlobalDeclSource *>    global_decl_sources;
+gb_global bool                         global_decl_sources_resolving;
 gb_global Array<GlobalDeclSourceFrame> global_decl_source_stack;
 gb_global Array<Scope *>               global_placeholder_scopes;
 gb_global CheckerContext               global_decl_source_export_ctx;
@@ -524,6 +525,9 @@ gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedStrin
 }
 
 gb_internal Entity *force_scope_placeholders(Scope *s, InternedString name, u32 hash) {
+	if (!global_decl_sources_resolving) {
+		return nullptr;
+	}
 	PtrMap<u64, GlobalDeclSource *> *m = s->placeholders;
 	bool forced = false;
 	for (auto *e = multi_map_find_first(m, cast(u64)name.value); e != nullptr; e = multi_map_find_next(m, e)) {
@@ -616,7 +620,20 @@ gb_internal WORKER_TASK_PROC(scan_global_decl_sources_worker_proc) {
 	return 0;
 }
 
-gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *> const &package_order) {
+gb_internal Array<GlobalDeclScan> start_global_decl_scans(Checker *c, TaskGroup *group) {
+	auto scans = array_make<GlobalDeclScan>(heap_allocator(), c->parser->packages.count);
+	for (AstPackage *pkg : c->parser->packages) {
+		GlobalDeclScan *scan = &scans[pkg->id-1];
+		scan->sources            = array_make<GlobalDeclSource *>(heap_allocator());
+		scan->placeholder_scopes = array_make<Scope *>(heap_allocator());
+		GlobalDeclScanTask *task = permanent_alloc_item<GlobalDeclScanTask>();
+		*task = {scan, pkg};
+		thread_pool_add_task(group, scan_global_decl_sources_worker_proc, task);
+	}
+	return scans;
+}
+
+gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *> const &package_order, Array<GlobalDeclScan> scans) {
 	array_init(&global_decl_sources,       heap_allocator());
 	array_init(&global_decl_source_stack,  heap_allocator());
 	array_init(&global_placeholder_scopes, heap_allocator());
@@ -624,25 +641,15 @@ gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *
 	defer (destroy_checker_context(&global_decl_source_export_ctx));
 
 	u64 stage_start = global_import_stage_begin();
-	{
-		auto scans = array_make<GlobalDeclScan>(heap_allocator(), package_order.count);
-		defer (array_free(&scans));
-		TaskGroup group = {};
-		for_array(i, package_order) {
-			scans[i].sources            = array_make<GlobalDeclSource *>(heap_allocator());
-			scans[i].placeholder_scopes = array_make<Scope *>(heap_allocator());
-			GlobalDeclScanTask *task = permanent_alloc_item<GlobalDeclScanTask>();
-			*task = {&scans[i], package_order[i]->pkg};
-			thread_pool_add_task(&group, scan_global_decl_sources_worker_proc, task);
-		}
-		thread_pool_wait(&group);
-		for (GlobalDeclScan &scan : scans) {
-			array_add_elems(&global_decl_sources, scan.sources.data, scan.sources.count);
-			array_add_elems(&global_placeholder_scopes, scan.placeholder_scopes.data, scan.placeholder_scopes.count);
-			array_free(&scan.sources);
-			array_free(&scan.placeholder_scopes);
-		}
+	for (ImportGraphNode *node : package_order) {
+		GlobalDeclScan *scan = &scans[node->pkg->id-1];
+		array_add_elems(&global_decl_sources, scan->sources.data, scan->sources.count);
+		array_add_elems(&global_placeholder_scopes, scan->placeholder_scopes.data, scan->placeholder_scopes.count);
+		array_free(&scan->sources);
+		array_free(&scan->placeholder_scopes);
 	}
+	array_free(&scans);
+	global_decl_sources_resolving = true;
 	find_global_when_cycles();
 	global_import_stage_end(GlobalImportStage_Placeholders, stage_start);
 

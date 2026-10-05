@@ -6292,7 +6292,7 @@ gb_internal WORKER_TASK_PROC(check_export_entities_worker_proc) {
 }
 
 
-gb_internal void check_export_entities(Checker *c) {
+gb_internal void check_export_entities(Checker *c, TaskGroup *group) {
 	isize thread_count = global_thread_pool.threads.count;
 
 	// NOTE(bill): reuse `collect_entity_worker_data`
@@ -6305,9 +6305,8 @@ gb_internal void check_export_entities(Checker *c) {
 
 	for (auto const &entry : c->info.packages) {
 		AstPackage *pkg = entry.value;
-		thread_pool_add_task(check_export_entities_worker_proc, pkg);
+		thread_pool_add_task(group, check_export_entities_worker_proc, pkg);
 	}
-	thread_pool_wait();
 }
 
 #include "checker_global.cpp"
@@ -6334,9 +6333,13 @@ gb_internal WORKER_TASK_PROC(correct_type_aliases_worker_proc) {
 gb_internal void check_import_entities(Checker *c) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
+	TIME_SECTION("check_import_entities - export entities, scan 'when' and 'foreign' blocks, sort packages");
+	TaskGroup group = {};
+	check_export_entities(c, &group);
+	Array<GlobalDeclScan> scans = start_global_decl_scans(c, &group);
+
 	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c, temporary_allocator());
 
-	TIME_SECTION("check_import_entities - sort packages");
 	// NOTE(bill): Priority queue
 	auto pq = priority_queue_create(dep_graph, import_graph_node_cmp, import_graph_node_swap);
 
@@ -6386,25 +6389,25 @@ gb_internal void check_import_entities(Checker *c) {
 
 		array_add(&package_order, n);
 	}
+	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
+		package_order[pkg_index]->pkg->order = 1+pkg_index;
+	}
+
+	thread_pool_wait(&group);
 
 	TIME_SECTION("check_import_entities - imports");
 	// NOTE(bill): every import first, as resolving a 'when' may check declarations in any package
 	u64 stage_start = global_import_stage_begin();
-	{
-		TaskGroup group = {};
-		for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
-			AstPackage *pkg = package_order[pkg_index]->pkg;
-			pkg->order = 1+pkg_index;
-			for (AstFile *f : pkg->files) {
-				thread_pool_add_task(&group, check_add_imports_worker_proc, f);
-			}
+	for (ImportGraphNode *node : package_order) {
+		for (AstFile *f : node->pkg->files) {
+			thread_pool_add_task(&group, check_add_imports_worker_proc, f);
 		}
-		thread_pool_wait(&group);
 	}
+	thread_pool_wait(&group);
 	global_import_stage_end(GlobalImportStage_Imports, stage_start);
 
 	TIME_SECTION("check_import_entities - resolve 'when' and 'foreign' blocks");
-	resolve_global_decl_sources(c, package_order);
+	resolve_global_decl_sources(c, package_order, scans);
 
 	TIME_SECTION("check_import_entities - correct type aliases");
 	stage_start = global_import_stage_begin();
@@ -7750,6 +7753,11 @@ gb_internal void check_for_type_and_inline_cycles(Entity **definitions, isize co
 	}
 }
 
+gb_internal void check_export_entities_post(Checker *c) {
+	TaskGroup group = {};
+	check_export_entities(c, &group);
+	thread_pool_wait(&group);
+}
 
 gb_internal void check_parsed_files(Checker *c) {
 	global_checker_ptr.store(c, std::memory_order_relaxed);
@@ -7780,14 +7788,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("init worker data");
 	check_init_worker_data(c);
 
-	TIME_SECTION("export entities - pre");
-	check_export_entities(c);
-
-	// NOTE: Timing Section handled internally
+	// NOTE: Timing Section handled internally, which also exports the entities collected so far
 	check_import_entities(c);
 
 	TIME_SECTION("export entities - post");
-	check_export_entities(c);
+	check_export_entities_post(c);
 
 	// NOTE: no global name is declared from here on, so their scopes are read without locking
 	for (AstPackage *pkg : c->parser->packages) {
