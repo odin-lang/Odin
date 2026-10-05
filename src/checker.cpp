@@ -1048,6 +1048,26 @@ gb_internal void add_declaration_dependency(CheckerContext *c, Entity *e) {
 		// ignore the dependencies if it has been `@(disabled=true)`
 		return;
 	}
+	if (e->decl_info == nullptr && e->scope != nullptr && (e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg|ScopeFlag_Global)) == 0) {
+		// NOTE(bill): local variables, constants, or labels (most of what are used) has no declaration and thus depends on nothing
+		switch (e->kind) {
+		case Entity_Variable:
+			if (e->flags & EntityFlag_Static) {
+				break;
+			}
+			if (e->Variable.is_global || e->Variable.thread_local_model.len != 0) {
+				break;
+			}
+
+			if (!e->Variable.is_foreign) { // as its library is needed
+				return;
+			}
+			break;
+		case Entity_Constant:
+		case Entity_Label:
+			return;
+		}
+	}
 	if (c->decl != nullptr) {
 		add_dependency(c->info, c->decl, e);
 	}
