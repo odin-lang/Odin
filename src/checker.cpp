@@ -1703,6 +1703,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpsc_init(&i->all_procedures_queue, a);
 
 	per_thread_array_init(&i->entity_queue,     global_thread_pool.threads.count);
+	i->entities_by_file = true;
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
@@ -2371,15 +2372,27 @@ gb_internal void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, En
 	d->entity.store(e);
 
 	bool is_lazy = (e->flags & EntityFlag_Lazy) == EntityFlag_Lazy;
-	if (!is_lazy) {
-		per_thread_array_add(&info->entity_queue, e);
-	}
-
 	if (e->token.pos.file_id != 0) {
 		e->order_in_src = cast(u64)(e->token.pos.file_id)<<32 | u32(e->token.pos.offset);
 	} else {
 		GB_ASSERT(!is_lazy);
 		e->order_in_src = 1 + info->entities_without_file.fetch_add(1);
+	}
+
+	if (!is_lazy) {
+		AstFile *f = e->file;
+		if (info->entities_by_file && f != nullptr) {
+			// NOTE: only added to by the file's own collection, and then by the main thread
+			if (f->collected_entities.count > 0 && f->collected_entities[f->collected_entities.count-1]->order_in_src > e->order_in_src) {
+				f->collected_entities_out_of_order = true;
+			}
+			if (f->collected_entities.allocator.proc == nullptr) {
+				array_init(&f->collected_entities, heap_allocator(), 0, f->total_file_decl_count);
+			}
+			array_add(&f->collected_entities, e);
+		} else {
+			per_thread_array_add(&info->entity_queue, e);
+		}
 	}
 }
 
@@ -7611,6 +7624,42 @@ gb_internal void check_add_definitions_from_queues(Checker *c) {
 	per_thread_array_gather(&c->info.definition_queue, &c->info.definitions);
 }
 
+gb_internal bool check_add_entities_from_files(Checker *c) {
+	c->info.entities_by_file = false;
+	bool in_order = c->info.entities.count == 0;
+
+	auto packages = array_make<AstPackage *>(heap_allocator(), 0, c->parser->packages.count);
+	defer (array_free(&packages));
+	for (AstPackage *pkg : c->parser->packages) {
+		array_add(&packages, pkg);
+		in_order &= pkg->order > 0;
+	}
+	natural_merge_sort(packages.data, packages.count, [](AstPackage *const &x, AstPackage *const &y) -> int {
+		return isize_cmp(x->order, y->order);
+	});
+
+	isize count = 0;
+	for (AstPackage *pkg : packages) {
+		for (AstFile *f : pkg->files) {
+			count += f->collected_entities.count;
+		}
+	}
+	array_reserve(&c->info.entities, c->info.entities.count + count);
+	for (AstPackage *pkg : packages) {
+		for (AstFile *f : pkg->files) {
+			if (f->collected_entities_out_of_order) {
+				natural_merge_sort(f->collected_entities.data, f->collected_entities.count, [](Entity *const &x, Entity *const &y) -> int {
+					return entity_source_order_cmp(x, y);
+				});
+			}
+			array_add_elems(&c->info.entities, f->collected_entities.data, f->collected_entities.count);
+			array_free(&f->collected_entities);
+		}
+	}
+
+	return in_order && per_thread_array_count(&c->info.entity_queue) == 0;
+}
+
 gb_internal void check_merge_queues_into_arrays(Checker *c) {
 	for (Type *t = nullptr; mpsc_dequeue(&c->soa_types_to_complete, &t); /**/) {
 		complete_soa_type(c, t, false);
@@ -7759,15 +7808,18 @@ gb_internal void check_parsed_files(Checker *c) {
 	config_pkg->scope->flags     |= ScopeFlag_ReadOnly;
 
 	TIME_SECTION("add entities from packages");
+	bool entities_in_order = check_add_entities_from_files(c);
 	check_merge_queues_into_arrays(c);
 
-	TIME_SECTION("sort global entities");
+	if (!entities_in_order) {
+		TIME_SECTION("sort global entities");
 
-	// NOTE(bill): The queues are filled by parallel workers, meaning when their order differs between runs,
-	// but each file's entities are in source order, which a natural merge sort only has to merge
-	natural_merge_sort(c->info.entities.data, c->info.entities.count, [](Entity *const &x, Entity *const &y) -> int {
-		return entity_source_order_cmp(x, y);
-	});
+		// NOTE(bill): The queues are filled by parallel workers, meaning when their order differs between runs,
+		// but each file's entities are in source order, which a natural merge sort only has to merge
+		natural_merge_sort(c->info.entities.data, c->info.entities.count, [](Entity *const &x, Entity *const &y) -> int {
+			return entity_source_order_cmp(x, y);
+		});
+	}
 
 	TIME_SECTION("check all global entities");
 	isize entity_count = c->info.entities.count;

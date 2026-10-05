@@ -148,6 +148,7 @@ struct AstFile {
 
 	isize total_file_decl_count;
 	isize delayed_decl_count;
+
 	Slice<Ast *> decls;
 	Array<Ast *> imports; // 'import'
 	isize        directive_count;
@@ -181,6 +182,11 @@ struct AstFile {
 	u64            cpu_time_to_load;
 	u64            cpu_time_to_parse;
 	u64            cpu_time_to_setup_decls;
+
+	//// Semantic Checking /////
+
+	Array<struct Entity *> collected_entities;
+	bool                   collected_entities_out_of_order;
 };
 
 enum AstForeignFileKind {

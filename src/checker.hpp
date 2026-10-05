@@ -802,6 +802,7 @@ struct CheckerInfo {
 
 	PerThreadArray<Entity *> definition_queue;
 	PerThreadArray<Entity *> entity_queue;
+	bool                     entities_by_file; // until gathered, see `check_add_entities_from_files`
 	std::atomic<u64>         entities_without_file; // for their `order_in_src`
 	MPSCQueue<Entity *> required_global_variable_queue;
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
