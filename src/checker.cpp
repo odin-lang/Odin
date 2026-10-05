@@ -3170,20 +3170,6 @@ gb_internal void generate_minimum_dependency_set_internal(Checker *c, Entity *st
 	// auto const &add_to_set = add_dependency_to_set;
 	auto const &add_to_set = add_dependency_to_set_threaded;
 
-	{
-		// NOTE(bill): in parallel, as nearly all definitions are of locals, which add nothing
-		isize const CHUNK_SIZE = 4096;
-		auto chunks = array_make<Slice<Entity *> >(heap_allocator(), 0, c->info.definitions.count/CHUNK_SIZE + 1);
-		defer (array_free(&chunks));
-		for (isize i = 0; i < c->info.definitions.count; i += CHUNK_SIZE) {
-			array_add(&chunks, slice(slice_from_array(c->info.definitions), i, gb_min(i + CHUNK_SIZE, c->info.definitions.count)));
-		}
-		for (Slice<Entity *> &chunk : chunks) {
-			thread_pool_add_task(add_definitions_to_set_worker, &chunk);
-		}
-		thread_pool_wait();
-	}
-
 	for (Entity *e; mpsc_dequeue(&c->info.required_foreign_imports_through_force_queue, &e); /**/) {
 		array_add(&c->info.required_foreign_imports_through_force, e);
 		add_to_set(c, e);
@@ -3449,6 +3435,17 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	add_dependency_to_set(c, c->info.instrumentation_enter_entity);
 	add_dependency_to_set(c, c->info.instrumentation_exit_entity);
+
+	// NOTE(bill): This can be done in parallel as nearly all definitions are of locals which add nothing
+	isize const CHUNK_SIZE = 4096;
+	auto chunks = array_make<Slice<Entity *> >(heap_allocator(), 0, c->info.definitions.count/CHUNK_SIZE + 1);
+	defer (array_free(&chunks));
+	for (isize i = 0; i < c->info.definitions.count; i += CHUNK_SIZE) {
+		array_add(&chunks, slice(slice_from_array(c->info.definitions), i, gb_min(i + CHUNK_SIZE, c->info.definitions.count)));
+	}
+	for (Slice<Entity *> &chunk : chunks) {
+		thread_pool_add_task(add_definitions_to_set_worker, &chunk);
+	}
 
 	generate_minimum_dependency_set_internal(c, start);
 
@@ -6437,23 +6434,21 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, gbAlloc
 }
 
 
-gb_internal void calculate_global_init_order(Checker *c) {
-	CheckerInfo *info = &c->info;
+struct GlobalInitOrderData {
+	CheckerInfo *            info;
+	Array<EntityGraphNode *> dep_graph;
+};
 
-	TIME_SECTION("calculate_global_init_order: generate entity dependency graph");
-	Arena *temporary_arena = get_arena(ThreadArena_Temporary);
-	ArenaTempGuard temporary_arena_guard(temporary_arena);
+gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker) {
+	GlobalInitOrderData *order = cast(GlobalInitOrderData *)data;
+	CheckerInfo *info = order->info;
 
-	Array<EntityGraphNode *> dep_graph = generate_entity_dependency_graph(info, temporary_arena);
-
-	TIME_SECTION("calculate_global_init_order: priority queue create");
 	// NOTE(bill): Priority queue
-	auto pq = priority_queue_create(dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
+	auto pq = priority_queue_create(order->dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
 
 	PtrSet<DeclInfo *> emitted = {};
 	defer (ptr_set_destroy(&emitted));
 
-	TIME_SECTION("calculate_global_init_order: queue sort");
 	while (pq.queue.count > 0) {
 		EntityGraphNode *n = priority_queue_pop(&pq);
 		Entity *e = n->entity;
@@ -6504,6 +6499,7 @@ gb_internal void calculate_global_init_order(Checker *c) {
 		}
 		gb_printf("\n");
 	}
+	return 0;
 }
 
 gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
@@ -7751,15 +7747,22 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check objc context provider procedures");
 	check_objc_context_provider_procedures(c);
 
-	TIME_SECTION("calculate global init order");
-	calculate_global_init_order(c);
-	check_merge_queues_into_arrays(c);
+	{
+		TIME_SECTION("calculate global init order");
+		// NOTE(bill): The graph reads the dependencies before the tree update below adds to them
+		Arena *init_order_arena = get_arena(ThreadArena_Temporary);
+		ArenaTempGuard init_order_arena_guard(init_order_arena);
+		GlobalInitOrderData init_order = {&c->info, generate_entity_dependency_graph(&c->info, init_order_arena)};
+		check_merge_queues_into_arrays(c);
 
-	TIME_SECTION("update dependency tree for procedures");
-	check_update_dependency_tree_for_procedures(c);
+		TIME_SECTION("update dependency tree for procedures");
+		check_update_dependency_tree_for_procedures(c);
 
-	TIME_SECTION("generate minimum dependency set");
-	generate_minimum_dependency_set(c, c->info.entry_point);
+		TIME_SECTION("generate minimum dependency set");
+		// NOTE(bill): Only the backend reads the initialization order so it is found alongside this which waits for it
+		thread_pool_add_task(calculate_global_init_order_worker, &init_order);
+		generate_minimum_dependency_set(c, c->info.entry_point);
+	}
 
 	TIME_SECTION("check bodies have all been checked");
 	check_min_dep_bodies_were_checked(c);
