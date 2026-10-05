@@ -2169,6 +2169,7 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 
 #include "check_asm.cpp"
 
+gb_internal void add_deps_from_child_to_parent(DeclInfo *decl);
 
 gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
@@ -2296,6 +2297,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 		e->state = EntityState_Resolved;
 
+		add_deps_from_child_to_parent(d);
 	}
 end:;
 	global_entity_timing_end(timing_frame, e);

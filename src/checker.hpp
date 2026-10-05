@@ -912,9 +912,6 @@ struct Checker {
 	BlockingMutex     procs_to_check_mutex;
 	Array<ProcInfo *> procs_to_check;
 
-	BlockingMutex nested_proc_lits_mutex;
-	Array<DeclInfo *> nested_proc_lits;
-
 
 	PerThreadArray<UntypedExprInfo> global_untyped_queue;
 	MPSCQueue<Type *> soa_types_to_complete;

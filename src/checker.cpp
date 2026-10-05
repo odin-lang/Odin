@@ -1834,7 +1834,6 @@ gb_internal void init_checker(Checker *c) {
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
-	array_init(&c->nested_proc_lits, heap_allocator(), 0, 1<<20);
 
 	per_thread_array_init(&c->global_untyped_queue, global_thread_pool.threads.count);
 	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
@@ -1847,7 +1846,6 @@ gb_internal void destroy_checker(Checker *c) {
 
 	destroy_checker_context(&c->builtin_ctx);
 
-	array_free(&c->nested_proc_lits);
 	array_free(&c->procs_to_check);
 	per_thread_array_destroy(&c->global_untyped_queue);
 	mpsc_destroy(&c->soa_types_to_complete);
@@ -3024,6 +3022,8 @@ gb_internal void min_dep_push(Array<Entity *> *stack, Entity *e) {
 }
 
 
+gb_global TaskGroup min_dep_tasks;
+
 gb_internal WORKER_TASK_PROC(add_dependency_to_set_worker) {
 	// NOTE(bill): a task walks from its own stack of entities, and hands half of it to a new task once it is large,
 	// as with a task for each dependency, adding the tasks was most of the work
@@ -3075,7 +3075,7 @@ gb_internal WORKER_TASK_PROC(add_dependency_to_set_worker) {
 			array_add_elems(other, stack->data, half);
 			gb_memmove(stack->data, stack->data + half, (stack->count - half)*gb_size_of(Entity *));
 			stack->count -= half;
-			thread_pool_add_task(add_dependency_to_set_worker, other);
+			thread_pool_add_task(&min_dep_tasks, add_dependency_to_set_worker, other);
 		}
 	}
 
@@ -3092,7 +3092,7 @@ gb_internal void add_dependency_to_set_threaded(Checker *c, Entity *entity) {
 	Array<Entity *> *stack = gb_alloc_item(heap_allocator(), Array<Entity *>);
 	array_init(stack, heap_allocator(), 0, 64);
 	array_add(stack, entity);
-	thread_pool_add_task(add_dependency_to_set_worker, stack);
+	thread_pool_add_task(&min_dep_tasks, add_dependency_to_set_worker, stack);
 }
 
 
@@ -3449,12 +3449,12 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		array_add(&chunks, slice(slice_from_array(c->info.definitions), i, gb_min(i + CHUNK_SIZE, c->info.definitions.count)));
 	}
 	for (Slice<Entity *> &chunk : chunks) {
-		thread_pool_add_task(add_definitions_to_set_worker, &chunk);
+		thread_pool_add_task(&min_dep_tasks, add_definitions_to_set_worker, &chunk);
 	}
 
 	generate_minimum_dependency_set_internal(c, start);
 
-	thread_pool_wait();
+	thread_pool_wait(&min_dep_tasks);
 
 
 #undef FORCE_ADD_RUNTIME_ENTITIES
@@ -3473,10 +3473,20 @@ gb_internal gb_inline bool is_entity_a_dependency(Entity *e) {
 	return false;
 }
 
+struct GlobalInitOrderData {
+	CheckerInfo *            info;
+	Array<EntityGraphNode *> dep_graph;
+};
+
+gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker);
+
 struct EntityGraphEdgesWork {
 	PtrMap<Entity *, EntityGraphNode *> *vars;
 	Slice<EntityGraphNode *>             nodes;
 	std::atomic<isize>                   next;
+	std::atomic<isize>                   tasks_left; // NOTE(bill): the last to finish starts the initialization order
+	TaskGroup *                          group;
+	GlobalInitOrderData *                init_order;
 };
 
 // NOTE(bill): A variable depends on every variable reachable from its declaration through procedures and constants,
@@ -3494,7 +3504,10 @@ gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_edges_worker) {
 	auto stack = array_make<Entity *>(heap_allocator(), 0, 64);
 	defer (array_free(&stack));
 
-	for (;;) {
+	// NOTE: a few searches at a time, so a thread which takes one, e.g. one waiting for something else, is not held
+	// for long, and the task is pushed again while there are more
+	enum { SEARCHES_PER_TASK = 8 };
+	for (isize searches = 0; searches < SEARCHES_PER_TASK; searches++) {
 		isize index = work->next.fetch_add(1, std::memory_order_relaxed);
 		if (index >= work->nodes.count) {
 			break;
@@ -3553,6 +3566,15 @@ gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_edges_worker) {
 			}
 		}
 	}
+
+	if (work->next.load(std::memory_order_relaxed) < work->nodes.count) {
+		work->tasks_left.fetch_add(1, std::memory_order_relaxed);
+		thread_pool_add_task(work->group, generate_entity_dependency_graph_edges_worker, work);
+	}
+	if (work->tasks_left.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+		map_destroy(work->vars);
+		thread_pool_add_task(work->group, calculate_global_init_order_worker, work->init_order);
+	}
 	return 0;
 }
 
@@ -3575,7 +3597,8 @@ struct EntityGraph {
 	PtrMap<Entity *, EntityGraphNode *> vars;
 	Array<EntityGraphNode *>             nodes;
 	EntityGraphEdgesWork                 edges_work;
-	TaskGroup                            edges;
+	GlobalInitOrderData                  init_order;
+	TaskGroup                            tasks; // the edge searches, then the initialization order
 };
 
 // The nodes, one for each global variable, in the order of the entities
@@ -3615,21 +3638,22 @@ gb_internal void generate_entity_dependency_graph_nodes(EntityGraph *g, CheckerI
 	}
 }
 
-// NOTE: only started, so the edges' tasks can be first in the queue, and so first to be stolen, before other work
-gb_internal void start_generate_entity_dependency_graph_edges(EntityGraph *g) {
-	TIME_SECTION("generate_entity_dependency_graph: Calculate edges");
-
-	g->edges_work.vars  = &g->vars;
-	g->edges_work.nodes = slice_from_array(g->nodes);
-	isize task_count = gb_min(global_thread_pool.threads.count, g->nodes.count);
-	for (isize i = 0; i < task_count; i++) {
-		thread_pool_add_task(&g->edges, generate_entity_dependency_graph_edges_worker, &g->edges_work);
+gb_internal void start_calculate_global_init_order(EntityGraph *g, CheckerInfo *info) {
+	g->init_order = {info, g->nodes};
+	if (g->nodes.count == 0) {
+		map_destroy(&g->vars);
+		return;
 	}
-}
 
-gb_internal void finish_generate_entity_dependency_graph_edges(EntityGraph *g) {
-	thread_pool_wait(&g->edges);
-	map_destroy(&g->vars);
+	isize task_count = gb_min(global_thread_pool.threads.count, g->nodes.count);
+	g->edges_work.vars       = &g->vars;
+	g->edges_work.nodes      = slice_from_array(g->nodes);
+	g->edges_work.tasks_left = task_count;
+	g->edges_work.group      = &g->tasks;
+	g->edges_work.init_order = &g->init_order;
+	for (isize i = 0; i < task_count; i++) {
+		thread_pool_add_task(&g->tasks, generate_entity_dependency_graph_edges_worker, &g->edges_work);
+	}
 }
 
 
@@ -6492,11 +6516,6 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, gbAlloc
 }
 
 
-struct GlobalInitOrderData {
-	CheckerInfo *            info;
-	Array<EntityGraphNode *> dep_graph;
-};
-
 gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker) {
 	GlobalInitOrderData *order = cast(GlobalInitOrderData *)data;
 	CheckerInfo *info = order->info;
@@ -7615,77 +7634,6 @@ gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 	remove_neighbouring_duplicate_entires_from_sorted_array(&c->info.fini_procedures);
 }
 
-#if 0
-gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
-	if (decl == nullptr) {
-		return;
-	}
-	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
-		check_walk_all_dependencies(child);
-	}
-	add_deps_from_child_to_parent(decl);
-}
-
-gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
-	mutex_lock(&c->nested_proc_lits_mutex);
-	for (DeclInfo *decl : c->nested_proc_lits) {
-		check_walk_all_dependencies(decl);
-	}
-	mutex_unlock(&c->nested_proc_lits_mutex);
-	for (Entity *e : c->info.entities) {
-		DeclInfo *decl = e->decl_info;
-		check_walk_all_dependencies(decl);
-	}
-}
-#else
-// NOTE: post-order, so a declaration has the dependencies of all those nested in it before they are added to its parent
-gb_internal void check_walk_all_dependencies_post_order(DeclInfo *decl) {
-	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
-		check_walk_all_dependencies_post_order(child);
-	}
-	add_deps_from_child_to_parent(decl);
-}
-
-// NOTE(bill): in chunks, as with a task for each entity, adding the tasks was most of the work
-struct CheckWalkDependenciesChunk {
-	DeclInfo **decls;    // either these
-	Entity **  entities; // or the declarations of these
-	isize      count;
-};
-
-gb_internal WORKER_TASK_PROC(check_walk_all_dependencies_worker_proc) {
-	CheckWalkDependenciesChunk *chunk = cast(CheckWalkDependenciesChunk *)data;
-	for (isize i = 0; i < chunk->count; i++) {
-		DeclInfo *decl = chunk->decls != nullptr ? chunk->decls[i] : chunk->entities[i]->decl_info;
-		if (decl != nullptr) {
-			check_walk_all_dependencies_post_order(decl);
-		}
-	}
-	return 0;
-}
-
-gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
-	isize const CHUNK_SIZE = 256;
-	auto chunks = array_make<CheckWalkDependenciesChunk>(heap_allocator(), 0, c->info.entities.count/CHUNK_SIZE + 16);
-	defer (array_free(&chunks));
-
-	mutex_lock(&c->nested_proc_lits_mutex);
-	for (isize i = 0; i < c->nested_proc_lits.count; i += CHUNK_SIZE) {
-		array_add(&chunks, CheckWalkDependenciesChunk{c->nested_proc_lits.data + i, nullptr, gb_min(CHUNK_SIZE, c->nested_proc_lits.count - i)});
-	}
-	mutex_unlock(&c->nested_proc_lits_mutex);
-	for (isize i = 0; i < c->info.entities.count; i += CHUNK_SIZE) {
-		array_add(&chunks, CheckWalkDependenciesChunk{nullptr, c->info.entities.data + i, gb_min(CHUNK_SIZE, c->info.entities.count - i)});
-	}
-
-	TaskGroup group = {};
-	for (CheckWalkDependenciesChunk &chunk : chunks) {
-		thread_pool_add_task(&group, check_walk_all_dependencies_worker_proc, &chunk);
-	}
-	thread_pool_wait(&group);
-}
-#endif
-
 gb_internal WORKER_TASK_PROC(check_scope_usage_file_worker) {
 	Checker *c = global_checker_ptr.load(std::memory_order_relaxed);
 	AstFile *f = cast(AstFile *)data;
@@ -7880,43 +7828,33 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check objc context provider procedures");
 	check_objc_context_provider_procedures(c);
 
-	{
-		TIME_SECTION("calculate global init order");
-		// NOTE(bill): The graph reads the dependencies before the tree update below adds to them
-		Arena *init_order_arena = get_arena(ThreadArena_Temporary);
-		ArenaTempGuard init_order_arena_guard(init_order_arena);
-		EntityGraph graph = {};
-		generate_entity_dependency_graph_nodes(&graph, &c->info, init_order_arena);
-		start_generate_entity_dependency_graph_edges(&graph);
+	TIME_SECTION("generate global init order graph nodes");
+	EntityGraph graph = {};
+	generate_entity_dependency_graph_nodes(&graph, &c->info, get_arena(ThreadArena_Permanent));
 
+	{
 		// NOTE(bill): Since both only read what the procedure bodies left they can run alongside the stages below
 		// and are waited for only before what changes that
 		//
-		// When started after the graph's nodes (which then have every thread) and after its edges (which are then taken first)
-		// as they are what the stages after wait on
+		// When started after the graph's nodes (which then have every thread)
 		TIME_SECTION("start scope usages and type and inline cycles");
 		TaskGroup scope_usages = {};
 		start_check_all_scope_usages(c, &scope_usages);
 		ThreadPoolChunks<Entity *> cycle_checks = {};
 		thread_pool_start_chunks(&cycle_checks, c->info.definitions.data, c->info.definitions.count, 1024, check_for_type_and_inline_cycles);
 
-		TIME_SECTION("wait for the graph's edges");
-		finish_generate_entity_dependency_graph_edges(&graph);
-		GlobalInitOrderData init_order = {&c->info, graph.nodes};
+		// NOTE: after them, as it is waited for last, so they are taken first
+		TIME_SECTION("start global init order");
+		start_calculate_global_init_order(&graph, &c->info);
 
 		TIME_SECTION("wait for type and inline cycles");
 		thread_pool_wait_chunks(&cycle_checks);
 		check_merge_queues_into_arrays(c);
 
-		TIME_SECTION("update dependency tree for procedures");
-		check_update_dependency_tree_for_procedures(c);
-
 		TIME_SECTION("wait for scope usages");
 		thread_pool_wait(&scope_usages);
 
 		TIME_SECTION("generate minimum dependency set");
-		// NOTE(bill): Only the backend reads the initialization order so it is found alongside this which waits for it
-		thread_pool_add_task(calculate_global_init_order_worker, &init_order);
 		generate_minimum_dependency_set(c, c->info.entry_point);
 	}
 
@@ -7934,6 +7872,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	// because that collects the test procedures.
 	TIME_SECTION("check test procedures");
 	check_test_procedures(c);
+
+	TIME_SECTION("wait for global init order");
+	thread_pool_wait(&graph.tasks);
 
 	check_merge_queues_into_arrays(c);
 	thread_pool_wait();

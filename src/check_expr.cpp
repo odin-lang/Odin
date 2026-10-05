@@ -671,8 +671,10 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	CheckerContext nctx = *old_c;
 
-	Scope *scope = create_scope(info, base_entity->scope);
-	scope->flags |= ScopeFlag_Proc;
+	Scope *scope = create_scope(info, nullptr);
+	scope->parent = base_entity->scope;
+	scope->flags |= ScopeFlag_Proc | (base_entity->scope->flags & ScopeFlag_ContextDefined);
+
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
 	nctx.polymorphic_scope = scope;
@@ -13261,9 +13263,6 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 			pl->decl = decl;
 			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
-			mutex_lock(&ctx.checker->nested_proc_lits_mutex);
-			array_add(&ctx.checker->nested_proc_lits, decl);
-			mutex_unlock(&ctx.checker->nested_proc_lits_mutex);
 		}
 		check_close_scope(&ctx);
 
