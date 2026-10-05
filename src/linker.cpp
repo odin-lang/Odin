@@ -256,8 +256,6 @@ try_cross_linking:;
 		case Linker_radlink:  break; // the default on Windows
 	#endif
 		case Linker_lld:      section_name = str_lit("lld-link"); break;
-	#if defined(GB_SYSTEM_WINDOWS)
-		case Linker_radlink:  break;
 	#endif
 	#if defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_NETBSD)
 		case Linker_mold:     section_name = str_lit("mold-link"); break;
