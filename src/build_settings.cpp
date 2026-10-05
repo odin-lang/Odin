@@ -674,6 +674,8 @@ struct BuildContext {
 	String android_keystore;
 	String android_keystore_alias;
 	String android_keystore_password;
+
+	String windows_sdk_root;
 };
 
 gb_global BuildContext build_context = {0};
