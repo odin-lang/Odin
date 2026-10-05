@@ -1461,8 +1461,17 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		_fmt_float_as(fi, v, bit_size, verb, 'E', 6)
 
 	case 'h', 'H':
-		prev_fi := fi^
-		defer fi^ = prev_fi
+		prev_hash := fi.hash
+		defer fi.hash = prev_hash
+		prev_zero := fi.zero
+		defer fi.zero = prev_zero
+		prev_plus := fi.plus
+		defer fi.plus = prev_plus
+		prev_width := fi.width
+		defer fi.width = prev_width
+		prev_width_set := fi.width_set
+		defer fi.width_set = prev_width_set
+
 		fi.hash = false
 		fi.zero = true
 		fi.plus = false

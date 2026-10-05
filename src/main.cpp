@@ -544,6 +544,10 @@ enum BuildFlagKind {
 	BuildFlag_AndroidKeystoreAlias,
 	BuildFlag_AndroidKeystorePassword,
 
+#if !defined(GB_SYSTEM_WINDOWS)
+	BuildFlag_WindowsSDKRoot,
+#endif
+
 	BuildFlag_COUNT,
 };
 
@@ -810,6 +814,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
+
+#if !defined(GB_SYSTEM_WINDOWS)
+	add_flag(&build_flags, BuildFlag_WindowsSDKRoot,          str_lit("windows-sdk-root"),          BuildFlagParam_String,  Command_build);
+#endif
 
 
 	Array<String> flag_args = {};
@@ -2019,6 +2027,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.android_keystore_password = value.value_string;
 							break;
+
+					#if !defined(GB_SYSTEM_WINDOWS)
+						case BuildFlag_WindowsSDKRoot:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.windows_sdk_root = value.value_string;
+							break;
+					#endif
 						}
 					}
 
@@ -4304,6 +4319,13 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	return 1;
 	// }
 	
+#if !defined(GB_SYSTEM_WINDOWS)
+	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0) {
+		gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
+		gb_exit(1);
+	}
+#endif
+
 	// Warn about Windows i386 thread-local storage limitations
 	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
 		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
