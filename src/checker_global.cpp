@@ -1173,38 +1173,100 @@ gb_internal u64 global_group_random(u64 *state) {
 	return *state >> 33;
 }
 
-// The nodes `[lo, hi)` walked on one thread; a name that is not a node yet is kept as an entity in `refs`
-struct GlobalGraphWalkChunk {
-	GlobalGroupGraph *g;
-	i32             lo;
-	i32             hi;
-	Array<i32>      targets;
-	Array<i32>      target_ends; // per node
-	Array<Entity *> refs;
-	Array<i32>      ref_ends;    // per node
+struct GlobalGraphWalkNode {
+	i32  task;
+	i32  targets_lo;
+	i32  target_count;
+	i32  refs_lo;
+	i32  ref_count;
+	i32  first_of_decl; // set after the walk
+	bool shares_decl;   // with the node before it
+};
+
+struct GlobalGraphWalkTask {
+	GlobalGroupGraph *   g;
+	GlobalGraphWalkNode *walked;
+	std::atomic<i32> *   next;
+	i32                  node_count;
+	i32                  index;
+	Array<i32>           targets;
+	Array<Entity *>      refs;      // lazy entities which were not nodes
+	Array<i32>           ref_nodes; // the node each became after the walk, or -1
 };
 
 gb_internal WORKER_TASK_PROC(global_graph_walk_worker) {
-	GlobalGraphWalkChunk *chunk = cast(GlobalGraphWalkChunk *)data;
-	GlobalGroupGraph *g = chunk->g;
+	GlobalGraphWalkTask *task = cast(GlobalGraphWalkTask *)data;
+	GlobalGroupGraph *g = task->g;
 
 	auto refs = array_make<Entity *>(heap_allocator(), 0, 64);
 	defer (array_free(&refs));
 	GlobalGraphWalk w = {};
 	w.refs = &refs;
+
+	// NOTE: in small batches taken by every task, as a few declarations take far longer than the rest
+	i32 const BATCH_SIZE = 16;
+	for (;;) {
+		i32 lo = task->next->fetch_add(BATCH_SIZE, std::memory_order_relaxed);
+		if (lo >= task->node_count) {
+			break;
+		}
+		i32 hi = gb_min(lo + BATCH_SIZE, task->node_count);
+		for (i32 v = lo; v < hi; v++) {
+			Entity *e = g->nodes[v];
+			DeclInfo *d = e->decl_info;
+			GlobalGraphWalkNode *n = &task->walked[v];
+			n->task       = task->index;
+			n->targets_lo = cast(i32)task->targets.count;
+			n->refs_lo    = cast(i32)task->refs.count;
+
+			array_clear(&refs);
+			global_graph_walk_entity(&w, e, d);
+			for (Entity *r : refs) {
+				if (r->global_graph_node != 0) {
+					array_add(&task->targets, r->global_graph_node - 1);
+				} else if (r->flags & EntityFlag_Lazy) {
+					array_add(&task->refs, r);
+				}
+			}
+			n->target_count = cast(i32)task->targets.count - n->targets_lo;
+			n->ref_count    = cast(i32)task->refs.count - n->refs_lo;
+			n->shares_decl  = v > 0 && d->decl_node != nullptr && g->nodes[v-1]->decl_info->decl_node == d->decl_node;
+		}
+	}
+	return 0;
+}
+
+struct GlobalGraphFillChunk {
+	GlobalGroupGraph *   g;
+	GlobalGraphWalkNode *walked;
+	GlobalGraphWalkTask *tasks;
+	i32                  lo;
+	i32                  hi;
+	i32                  initial_count;
+};
+
+gb_internal WORKER_TASK_PROC(global_graph_fill_worker) {
+	GlobalGraphFillChunk *chunk = cast(GlobalGraphFillChunk *)data;
+	GlobalGroupGraph *g = chunk->g;
 	for (i32 v = chunk->lo; v < chunk->hi; v++) {
-		Entity *e = g->nodes[v];
-		array_clear(&refs);
-		global_graph_walk_entity(&w, e, e->decl_info);
-		for (Entity *r : refs) {
-			if (r->global_graph_node != 0) {
-				array_add(&chunk->targets, r->global_graph_node - 1);
-			} else if (r->flags & EntityFlag_Lazy) {
-				array_add(&chunk->refs, r);
+		GlobalGraphWalkNode const *n = &chunk->walked[v];
+		GlobalGraphWalkTask const *task = &chunk->tasks[n->task];
+		i32 *dst = g->targets.data + g->offsets[v];
+		if (n->shares_decl) {
+			*dst++ = n->first_of_decl;
+		}
+		gb_memmove(dst, task->targets.data + n->targets_lo, n->target_count*gb_size_of(i32));
+		dst += n->target_count;
+		for (i32 i = n->refs_lo; i < n->refs_lo + n->ref_count; i++) {
+			if (task->ref_nodes[i] >= 0) {
+				*dst++ = task->ref_nodes[i];
 			}
 		}
-		array_add(&chunk->target_ends, cast(i32)chunk->targets.count);
-		array_add(&chunk->ref_ends,    cast(i32)chunk->refs.count);
+		if (!n->shares_decl) {
+			for (i32 m = v+1; m < chunk->initial_count && chunk->walked[m].shares_decl; m++) {
+				*dst++ = m;
+			}
+		}
 	}
 	return 0;
 }
@@ -1271,87 +1333,152 @@ gb_internal void build_global_groups(Checker *c, GlobalGroupGraph *g) {
 	}
 
 	// NOTE: walked in parallel, as nothing writes to the scopes now
-	i32 const CHUNK_SIZE = 64;
 	i32 initial_count = cast(i32)g->nodes.count;
-	auto chunks = array_make<GlobalGraphWalkChunk>(heap_allocator(), (initial_count + CHUNK_SIZE-1)/CHUNK_SIZE);
-	defer (array_free(&chunks));
-	for (isize i = 0; i < chunks.count; i++) {
-		GlobalGraphWalkChunk *chunk = &chunks[i];
-		*chunk = {};
-		chunk->g  = g;
-		chunk->lo = cast(i32)(i*CHUNK_SIZE);
-		chunk->hi = gb_min(chunk->lo + CHUNK_SIZE, initial_count);
-		array_init(&chunk->targets,     heap_allocator(), 0, 4*CHUNK_SIZE);
-		array_init(&chunk->target_ends, heap_allocator(), 0, CHUNK_SIZE);
-		array_init(&chunk->refs,        heap_allocator(), 0);
-		array_init(&chunk->ref_ends,    heap_allocator(), 0, CHUNK_SIZE);
-		thread_pool_add_task(global_graph_walk_worker, chunk);
+	isize task_count = global_thread_pool.threads.count;
+	auto walked = array_make<GlobalGraphWalkNode>(heap_allocator(), initial_count);
+	auto tasks  = array_make<GlobalGraphWalkTask>(heap_allocator(), task_count);
+	defer (array_free(&walked));
+	defer (array_free(&tasks));
+	std::atomic<i32> next_to_walk(0);
+	bool any_refs = false;
+	{
+		TaskGroup group = {};
+		for (isize i = 0; i < task_count; i++) {
+			GlobalGraphWalkTask *task = &tasks[i];
+			*task = {};
+			task->g          = g;
+			task->walked     = walked.data;
+			task->next       = &next_to_walk;
+			task->node_count = initial_count;
+			task->index      = cast(i32)i;
+			array_init(&task->targets, heap_allocator(), 0, 2*initial_count/task_count + 64);
+			array_init(&task->refs,    heap_allocator());
+			thread_pool_add_task(&group, global_graph_walk_worker, task);
+		}
+		thread_pool_wait(&group);
+		for (GlobalGraphWalkTask &task : tasks) {
+			any_refs |= task.refs.count != 0;
+		}
 	}
-	thread_pool_wait();
 
-	auto edge_from = array_make<i32>(heap_allocator(), 0, 4*g->nodes.count);
-	auto edge_to   = array_make<i32>(heap_allocator(), 0, 4*g->nodes.count);
-	auto refs      = array_make<Entity *>(heap_allocator(), 0, 64);
-	defer (array_free(&edge_from));
-	defer (array_free(&edge_to));
+	auto later_from = array_make<i32>(heap_allocator());
+	auto later_to   = array_make<i32>(heap_allocator());
+	auto refs       = array_make<Entity *>(heap_allocator(), 0, 64);
+	defer (array_free(&later_from));
+	defer (array_free(&later_to));
 	defer (array_free(&refs));
 
-	auto add_ref = [&](i32 v, Entity *r) {
+	// NOTE: a lazy entity becomes a node once a node names it, which is decided in node order so its index does not
+	// depend on the walk
+	auto ref_node = [&](Entity *r) -> i32 {
 		if (r->global_graph_node != 0) {
-			array_add(&edge_from, v);
-			array_add(&edge_to, r->global_graph_node - 1);
+			return r->global_graph_node - 1;
 		} else if ((r->flags & EntityFlag_Lazy) && is_global_graph_node(r)) {
-			// NOTE: a lazy entity becomes a node once a node names it
-			array_add(&edge_from, v);
-			array_add(&edge_to, global_graph_add_node(g, r));
+			return global_graph_add_node(g, r);
 		}
+		return -1;
 	};
+	if (any_refs) {
+		for (GlobalGraphWalkTask &task : tasks) {
+			array_init(&task.ref_nodes, heap_allocator(), task.refs.count);
+		}
+		for (i32 v = 0; v < initial_count; v++) {
+			GlobalGraphWalkNode const *n = &walked[v];
+			GlobalGraphWalkTask *task = &tasks[n->task];
+			for (i32 i = n->refs_lo; i < n->refs_lo + n->ref_count; i++) {
+				task->ref_nodes[i] = ref_node(task->refs[i]);
+			}
+		}
+	}
 
+	i32 first_of_decl = initial_count-1;
+	while (first_of_decl > 0 && walked[first_of_decl].shares_decl) {
+		first_of_decl -= 1;
+	}
 	GlobalGraphWalk w = {};
 	w.refs = &refs;
-	i32 first_of_decl = -1;
-	for (i32 v = 0; v < g->nodes.count; v++) {
+	for (i32 v = initial_count; v < g->nodes.count; v++) {
 		Entity *e = g->nodes[v];
 		DeclInfo *d = e->decl_info;
-
-		// NOTE: entities sharing one declaration share its AST, e.g. `a, b: struct{x: int}`, so they share a group;
-		// in source order they are adjacent, and lazy ones are only checked under `lazy_mutex`
 		if (first_of_decl >= 0 && d->decl_node != nullptr && g->nodes[first_of_decl]->decl_info->decl_node == d->decl_node) {
-			array_add(&edge_from, v);
-			array_add(&edge_to,   first_of_decl);
-			array_add(&edge_from, first_of_decl);
-			array_add(&edge_to,   v);
+			array_add(&later_from, v);
+			array_add(&later_to,   first_of_decl);
+			array_add(&later_from, first_of_decl);
+			array_add(&later_to,   v);
 		} else {
 			first_of_decl = v;
 		}
-
-		if (v < initial_count) {
-			GlobalGraphWalkChunk *chunk = &chunks[v / CHUNK_SIZE];
-			i32 k = v - chunk->lo;
-			for (i32 i = k > 0 ? chunk->target_ends[k-1] : 0; i < chunk->target_ends[k]; i++) {
-				array_add(&edge_from, v);
-				array_add(&edge_to, chunk->targets[i]);
-			}
-			for (i32 i = k > 0 ? chunk->ref_ends[k-1] : 0; i < chunk->ref_ends[k]; i++) {
-				add_ref(v, chunk->refs[i]);
-			}
-		} else {
-			array_clear(&refs);
-			global_graph_walk_entity(&w, e, d);
-			for (Entity *r : refs) {
-				add_ref(v, r);
+		array_clear(&refs);
+		global_graph_walk_entity(&w, e, d);
+		for (Entity *r : refs) {
+			i32 target = ref_node(r);
+			if (target >= 0) {
+				array_add(&later_from, v);
+				array_add(&later_to,   target);
 			}
 		}
 	}
-	for (GlobalGraphWalkChunk &chunk : chunks) {
-		array_free(&chunk.targets);
-		array_free(&chunk.target_ends);
-		array_free(&chunk.refs);
-		array_free(&chunk.ref_ends);
-	}
 
 	i32 node_count = cast(i32)g->nodes.count;
-	global_graph_csr(node_count, edge_from, edge_to, &g->offsets, &g->targets);
+	array_init(&g->offsets, heap_allocator(), node_count+1);
+	gb_zero_size(g->offsets.data, (node_count+1)*gb_size_of(i32));
+	i32 first = -1;
+	for (i32 v = 0; v < initial_count; v++) {
+		GlobalGraphWalkNode *n = &walked[v];
+		if (!n->shares_decl) {
+			first = v;
+		}
+		n->first_of_decl = first;
+		i32 count = n->target_count;
+		for (i32 i = n->refs_lo; i < n->refs_lo + n->ref_count; i++) {
+			count += tasks[n->task].ref_nodes[i] >= 0;
+		}
+		if (n->shares_decl) {
+			count += 1;
+			g->offsets[first+1] += 1;
+		}
+		g->offsets[v+1] += count;
+	}
+	for (i32 from : later_from) {
+		g->offsets[from+1] += 1;
+	}
+	for (i32 v = 0; v < node_count; v++) {
+		g->offsets[v+1] += g->offsets[v];
+	}
+	array_init(&g->targets, heap_allocator(), g->offsets[node_count]);
+	{
+		TaskGroup group = {};
+		auto fill_chunks = array_make<GlobalGraphFillChunk>(heap_allocator(), task_count);
+		defer (array_free(&fill_chunks));
+		i32 per_chunk = cast(i32)((initial_count + task_count-1)/task_count);
+		for (isize i = 0; i < task_count; i++) {
+			GlobalGraphFillChunk *chunk = &fill_chunks[i];
+			chunk->g             = g;
+			chunk->walked        = walked.data;
+			chunk->tasks         = tasks.data;
+			chunk->lo            = gb_min(cast(i32)i*per_chunk, initial_count);
+			chunk->hi            = gb_min(chunk->lo + per_chunk, initial_count);
+			chunk->initial_count = initial_count;
+			thread_pool_add_task(&group, global_graph_fill_worker, chunk);
+		}
+		thread_pool_wait(&group);
+	}
+	if (later_from.count > 0) {
+		// NOTE: after each node's other edges and in their order, so filled backwards from the end of its edges
+		auto cursor = array_make<i32>(heap_allocator(), node_count);
+		defer (array_free(&cursor));
+		for (i32 v = 0; v < node_count; v++) {
+			cursor[v] = g->offsets[v+1];
+		}
+		for (isize i = later_from.count-1; i >= 0; i--) {
+			g->targets[--cursor[later_from[i]]] = later_to[i];
+		}
+	}
+	for (GlobalGraphWalkTask &task : tasks) {
+		array_free(&task.targets);
+		array_free(&task.refs);
+		array_free(&task.ref_nodes);
+	}
 
 	array_init(&g->group_of, heap_allocator(), node_count);
 	i32 group_count = global_graph_scc(node_count, g->offsets, g->targets, &g->group_of);
