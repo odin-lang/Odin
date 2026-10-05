@@ -148,13 +148,13 @@ struct AstFile {
 
 	isize total_file_decl_count;
 	isize delayed_decl_count;
+
 	Slice<Ast *> decls;
 	Array<Ast *> imports; // 'import'
 	isize        directive_count;
 
 	Ast *          curr_proc;
 	isize          error_count;
-	ParseFileError last_error;
 
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
@@ -181,6 +181,13 @@ struct AstFile {
 	u64            cpu_time_to_load;
 	u64            cpu_time_to_parse;
 	u64            cpu_time_to_setup_decls;
+
+	//// Semantic Checking /////
+
+	Array<struct Entity *> collected_entities;
+	bool                   collected_entities_out_of_order;
+
+	Array<struct Entity *> type_alias_candidates; // see `correct_type_aliases_in_package`
 };
 
 enum AstForeignFileKind {
@@ -212,6 +219,8 @@ struct AstPackage {
 	bool                  is_single_file;
 	isize                 order;
 
+	std::atomic<isize>    files_to_parse; // and one more until they are all added, see `parser_package_file_done`
+
 	BlockingMutex         files_mutex;
 	BlockingMutex         foreign_files_mutex;
 	BlockingMutex         type_and_value_mutex;
@@ -226,11 +235,6 @@ struct AstPackage {
 	bool      is_extra;
 };
 
-
-struct ParseFileErrorNode {
-	ParseFileErrorNode *next, *prev;
-	ParseFileError      err;
-};
 
 struct Parser {
 	String                 init_fullpath;
@@ -247,15 +251,7 @@ struct Parser {
 
 	std::atomic<isize>     total_seen_load_directive_count;
 
-	// TODO(bill): What should this mutex be per?
-	//  * Parser
-	//  * Package
-	//  * File
-	BlockingMutex          file_decl_mutex;
-
-	BlockingMutex          file_error_mutex;
-	ParseFileErrorNode *   file_error_head;
-	ParseFileErrorNode *   file_error_tail;
+	WorkerTaskProc *       package_parsed_proc; // if set, a task for each package once its files are parsed
 };
 
 struct ParserWorkerData {

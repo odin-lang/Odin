@@ -434,7 +434,7 @@ gb_internal lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue d
 	args[0] = data;
 	args[1] = seed;
 	args[2] = lb_const_int(p->module, t_int, type_size_of(type));
-	return lb_emit_runtime_call(p, "default_hasher_fixed", args);
+	return lb_emit_runtime_call(p, runtime_default_hasher_fixed_name(p->module->info), args);
 }
 
 gb_internal void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value) {
@@ -2983,7 +2983,7 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	for (lbGlobalVariable *var : m->global_variables) {
 		lb_create_global_variable(m, var);
 	}
-	if (m == &m->gen->default_module) {
+	if (m == &m->gen->default_module || m->type_info_members != nullptr) {
 		lb_setup_type_info_data(m);
 	}
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
@@ -2999,6 +2999,9 @@ gb_internal void lb_generate_procedures(lbGenerator *gen, bool do_threading) {
 			m->estimated_cost = m->procedures_to_generate.count.load(std::memory_order_relaxed) + m->global_variables.count;
 		}
 		gen->default_module.estimated_cost = I64_MAX;
+		for (lbModule *m : gen->type_info_modules) {
+			m->estimated_cost = I64_MAX;
+		}
 		for (lbModule *m : lb_modules_by_cost(gen)) {
 			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
 		}
@@ -3706,8 +3709,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 		{ // Type info member buffer
 			// NOTE(bill): Removes need for heap allocation by making it global memory
-			isize count = 0;
-			isize offsets_extra = 0;
+			// for each module which defines type info entries
+			isize part_count = gen->type_info_modules.count;
+			auto counts        = array_make<isize>(heap_allocator(), part_count);
+			auto offsets_extra = array_make<isize>(heap_allocator(), part_count);
+			defer (array_free(&counts));
+			defer (array_free(&offsets_extra));
 
 			for (auto const &tt : m->info->type_info_types_hash_map) {
 				Type *t = tt.type;
@@ -3719,20 +3726,21 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					continue;
 				}
 
+				isize part = index % part_count;
 				switch (t->kind) {
 				case Type_Union:
-					count += t->Union.variants.count;
+					counts[part] += t->Union.variants.count;
 					break;
 				case Type_Struct:
-					count += t->Struct.fields.count;
+					counts[part] += t->Struct.fields.count;
 					break;
 				case Type_Tuple:
-					count += t->Tuple.variables.count;
+					counts[part] += t->Tuple.variables.count;
 					break;
 				case Type_BitField:
-					count += t->BitField.fields.count;
+					counts[part] += t->BitField.fields.count;
 					// Twice is needed for the bit_offsets
-					offsets_extra += t->BitField.fields.count;
+					offsets_extra[part] += t->BitField.fields.count;
 					break;
 				}
 			}
@@ -3747,11 +3755,16 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				return lb_addr({g, alloc_type_pointer(t)});
 			};
 
-			lb_global_type_info_member_types   = global_type_info_make(m, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
-			lb_global_type_info_member_names   = global_type_info_make(m, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
-			lb_global_type_info_member_offsets = global_type_info_make(m, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count+offsets_extra);
-			lb_global_type_info_member_usings  = global_type_info_make(m, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
-			lb_global_type_info_member_tags    = global_type_info_make(m, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
+			for (lbModule *tm : gen->type_info_modules) {
+				isize count = counts[tm->type_info_part];
+				lbTypeInfoMembers *members = permanent_alloc_item<lbTypeInfoMembers>();
+				members->types   = global_type_info_make(tm, LB_TYPE_INFO_TYPES_NAME,   t_type_info_ptr, count);
+				members->names   = global_type_info_make(tm, LB_TYPE_INFO_NAMES_NAME,   t_string,        count);
+				members->offsets = global_type_info_make(tm, LB_TYPE_INFO_OFFSETS_NAME, t_uintptr,       count+offsets_extra[tm->type_info_part]);
+				members->usings  = global_type_info_make(tm, LB_TYPE_INFO_USINGS_NAME,  t_bool,          count);
+				members->tags    = global_type_info_make(tm, LB_TYPE_INFO_TAGS_NAME,    t_string,        count);
+				tm->type_info_members = members;
+			}
 		}
 	}
 

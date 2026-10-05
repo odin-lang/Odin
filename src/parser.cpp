@@ -889,7 +889,7 @@ gb_internal Ast *ast_ident(AstFile *f, Token token) {
 	Ast *result = alloc_ast_node(f, Ast_Ident);
 	result->Ident.token    = token;
 	result->Ident.hash     = string_hash(token.string);
-	result->Ident.interned = string_interner_insert(token.string);
+	result->Ident.interned = string_interner_insert(token.string, result->Ident.hash);
 	return result;
 }
 
@@ -6412,7 +6412,8 @@ gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath  = string_trim_whitespace(fullpath); // Just in case
 	f->filename  = remove_directory_from_path(f->fullpath);
-	f->directory = directory_from_path(f->fullpath);
+	// NOTE(bill): It's file, therefore unlike `directory_from_path`, this needs no file system query
+	f->directory = substring(f->fullpath, 0, gb_max(f->fullpath.len - f->filename.len - 1, 0));
 	set_file_path_string(f->id, f->fullpath);
 	thread_safe_set_ast_file_from_id(f->id, f);
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
@@ -6503,23 +6504,16 @@ gb_internal void parser_add_package(Parser *p, AstPackage *pkg) {
 
 gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile imported_file);
 
+gb_internal void parser_package_file_done(Parser *p, AstPackage *pkg) {
+	if (pkg->files_to_parse.fetch_sub(1) == 1 && p->package_parsed_proc != nullptr) {
+		thread_pool_add_task(p->package_parsed_proc, pkg);
+	}
+}
+
 gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 	ParserWorkerData *wd = cast(ParserWorkerData *)data;
 	ParseFileError err = process_imported_file(wd->parser, wd->imported_file);
-	if (err != ParseFile_None) {
-		auto *node = permanent_alloc_item<ParseFileErrorNode>();
-		node->err = err;
-
-		MUTEX_GUARD_BLOCK(&wd->parser->file_error_mutex) {
-			if (wd->parser->file_error_tail != nullptr) {
-				wd->parser->file_error_tail->next = node;
-			}
-			wd->parser->file_error_tail = node;
-			if (wd->parser->file_error_head == nullptr) {
-				wd->parser->file_error_head = node;
-			}
-		}
-	}
+	parser_package_file_done(wd->parser, wd->imported_file.pkg);
 	return cast(isize)err;
 }
 
@@ -6530,6 +6524,7 @@ gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo
 	auto wd = permanent_alloc_item<ParserWorkerData>();
 	wd->parser = p;
 	wd->imported_file = f;
+	pkg->files_to_parse.fetch_add(1);
 	thread_pool_add_task(parser_worker_proc, wd);
 }
 
@@ -6589,6 +6584,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	pkg->fullpath = path;
 	array_init(&pkg->files, permanent_allocator());
 	pkg->foreign_files.allocator = permanent_allocator();
+	pkg->files_to_parse.store(1);
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && !path_is_directory(path) && string_ends_with(path, FILE_EXT)) {
@@ -6602,6 +6598,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		pkg->is_single_file = true;
 		parser_add_package(p, pkg);
 		parser_add_file_to_process(p, pkg, fi, pos);
+		parser_package_file_done(p, pkg);
 		return pkg;
 	}
 
@@ -6685,6 +6682,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	}
 
 	parser_add_package(p, pkg);
+	parser_package_file_done(p, pkg);
 
 	return pkg;
 }
@@ -6798,7 +6796,7 @@ gb_internal bool is_package_name_reserved(String const &name) {
 }
 
 
-gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
+gb_internal bool determine_path_from_string(bool in_checker, Ast *node, String base_dir, String const &original_string, String *path, bool use_check_errors=false) {
 	GB_ASSERT(path != nullptr);
 
 	void (*do_error)(Ast *, char const *, ...);
@@ -6810,8 +6808,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		do_error = &error;
 		do_warning = &warning;
 	}
-
-	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
 
 	String collection_name = {};
 	bool is_import_decl_path = node->kind == Ast_ImportDecl || node->kind == Ast_ForeignImportDecl;
@@ -6826,7 +6822,7 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 
 	bool has_windows_drive = false;
 #if defined(GB_SYSTEM_WINDOWS)
-	if (file_mutex == nullptr) {
+	if (in_checker) {
 		if (!is_import_decl_path &&
 		    colon_pos == 1 &&
 		    original_string.len > 2 &&
@@ -6922,10 +6918,6 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 		}
 	}
 
-	if (file_mutex) mutex_lock(file_mutex);
-	defer (if (file_mutex) mutex_unlock(file_mutex));
-
-
 	if (node->kind == Ast_ForeignImportDecl) {
 		node->ForeignImportDecl.collection_name = collection_name;
 	}
@@ -6940,6 +6932,31 @@ gb_internal bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node
 }
 
 
+gb_internal void parse_setup_import_decl(Parser *p, AstFile *f, String const &base_dir, Ast **decl) {
+	Ast *node = *decl;
+	ast_node(id, ImportDecl, node);
+
+	String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
+	if (is_import_path_absolute(original_string)) {
+		syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
+		*decl = ast_bad_decl(f, id->relpath, id->relpath);
+		return;
+	}
+
+	String import_path = {};
+	bool ok = determine_path_from_string(false, node, base_dir, original_string, &import_path);
+	if (!ok) {
+		*decl = ast_bad_decl(f, id->relpath, id->relpath);
+		return;
+	}
+	import_path = string_trim_whitespace(import_path);
+
+	id->fullpath = import_path;
+	if (is_package_name_reserved(import_path)) {
+		return;
+	}
+	try_add_import_path(p, import_path, original_string, ast_token(node).pos);
+}
 
 gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls);
 
@@ -6982,28 +6999,9 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 
 			syntax_error(node, "Only declarations are allowed at file scope, got %.*s", LIT(ast_strings[node->kind]));
 		} else if (node->kind == Ast_ImportDecl) {
-			ast_node(id, ImportDecl, node);
-
-			String original_string = string_trim_whitespace(string_value_from_token(f, id->relpath));
-			if (is_import_path_absolute(original_string)) {
-				syntax_error(node, "Invalid import path: '%.*s'", LIT(original_string));
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
+			if (node->ImportDecl.fullpath.len == 0) {
+				parse_setup_import_decl(p, f, base_dir, &decls[i]);
 			}
-
-			String import_path = {};
-			bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, original_string, &import_path);
-			if (!ok) {
-				decls[i] = ast_bad_decl(f, id->relpath, id->relpath);
-				continue;
-			}
-			import_path = string_trim_whitespace(import_path);
-
-			id->fullpath = import_path;
-			if (is_package_name_reserved(import_path)) {
-				continue;
-			}
-			try_add_import_path(p, import_path, original_string, ast_token(node).pos);
 		} else if (node->kind == Ast_ForeignImportDecl) {
 			ast_node(fl, ForeignImportDecl, node);
 
@@ -7026,7 +7024,7 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 				String fullpath = file_str;
 				if (!is_arch_wasm() || string_ends_with(fullpath, str_lit(".o"))) {
 					String foreign_path = {};
-					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
+					bool ok = determine_path_from_string(false, node, base_dir, file_str, &foreign_path);
 					if (!ok) {
 						decls[i] = ast_bad_decl(f, fp_token, fp_token);
 						goto end;
@@ -7509,6 +7507,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	u64 cpu_start = parse_thread_cpu_time_now();
 	u64 setup_start = 0;
 	u64 setup_cpu_start = 0;
+	u64 import_ticks = 0;
+	u64 import_cpu_ticks = 0;
 
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
@@ -7604,6 +7604,13 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 				if (stmt->kind == Ast_WhenStmt || stmt->kind == Ast_ExprStmt || stmt->kind == Ast_ImportDecl || stmt->kind == Ast_ForeignBlockDecl) {
 					f->delayed_decl_count += 1;
 				}
+				if (stmt->kind == Ast_ImportDecl) {
+					u64 import_start     = time_stamp_time_now();
+					u64 import_cpu_start = parse_thread_cpu_time_now();
+					parse_setup_import_decl(p, f, base_dir, &decls[decls.count-1]);
+					import_ticks     += time_stamp_time_now()-import_start;
+					import_cpu_ticks += parse_thread_cpu_time_now()-import_cpu_start;
+				}
 			}
 		}
 
@@ -7616,8 +7623,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 
 	u64 end     = time_stamp_time_now();
 	u64 cpu_end = parse_thread_cpu_time_now();
-	u64 setup_ticks     = setup_start     != 0 ? end-setup_start         : 0;
-	u64 setup_cpu_ticks = setup_cpu_start != 0 ? cpu_end-setup_cpu_start : 0;
+	u64 setup_ticks     = (setup_start     != 0 ? end-setup_start         : 0) + import_ticks;
+	u64 setup_cpu_ticks = (setup_cpu_start != 0 ? cpu_end-setup_cpu_start : 0) + import_cpu_ticks;
 	f->time_to_parse           = cast(f64)(end-start-setup_ticks)/cast(f64)time_stamp__freq();
 	f->time_to_setup_decls     = cast(f64)setup_ticks/cast(f64)time_stamp__freq();
 	f->cpu_time_to_parse       = cpu_end-cpu_start-setup_cpu_ticks;
@@ -7641,7 +7648,6 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 	file->pkg = pkg;
 	file->id = cast(i32)(imported_file.index+1);
 	ParseFileError err = init_ast_file(file, fi.fullpath);
-	file->last_error = err;
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
@@ -7694,7 +7700,6 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 	bool parsed = parse_file(p, file);
 	if (file->invalid_token_pos.line != 0) {
 		end_error_mute();
-		file->last_error = ParseFile_InvalidToken;
 		return ParseFile_InvalidToken;
 	}
 
@@ -7755,6 +7760,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	}
 
 
+	p->init_fullpath = init_fullpath;
+
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
@@ -7767,7 +7774,6 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 
 		try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
-		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
 			bool ok = false;
@@ -7797,23 +7803,9 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	
 	thread_pool_wait();
 
-	for (ParseFileErrorNode *node = p->file_error_head; node != nullptr; node = node->next) {
-		if (node->err != ParseFile_None) {
-			return node->err;
-		}
-	}
-
-	for (isize i = p->packages.count-1; i >= 0; i--) {
-		AstPackage *pkg = p->packages[i];
-		for (isize j = pkg->files.count-1; j >= 0; j--) {
-			AstFile *file = pkg->files[j];
-			if (file->error_count != 0) {
-				if (file->last_error != ParseFile_None) {
-					return file->last_error;
-				}
-				return ParseFile_GeneralError;
-			}
-		}
+	// NOTE(bill): It only matters than error has occured, not which error
+	if (any_errors()) {
+		return ParseFile_GeneralError;
 	}
 
 	for (AstPackage *pkg : p->packages) {

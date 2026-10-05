@@ -14,7 +14,6 @@ enum GlobalImportStagePart {
 	GlobalImportStage_Placeholders,
 	GlobalImportStage_DeclSources,
 	GlobalImportStage_TypeAliases,
-	GlobalImportStage_DelayedExprs,
 
 	GlobalImportStage_COUNT,
 };
@@ -24,7 +23,6 @@ gb_global char const *global_import_stage_names[GlobalImportStage_COUNT] = {
 	"'when' and 'foreign' placeholders",
 	"resolve 'when' and 'foreign' blocks",
 	"type alias correction",
-	"delayed expressions (#assert etc.)",
 };
 
 gb_global u64 global_import_stage_ticks[GlobalImportStage_COUNT];
@@ -145,6 +143,7 @@ struct GlobalDeclSourceFrame {
 };
 
 gb_global Array<GlobalDeclSource *>    global_decl_sources;
+gb_global bool                         global_decl_sources_resolving;
 gb_global Array<GlobalDeclSourceFrame> global_decl_source_stack;
 gb_global Array<Scope *>               global_placeholder_scopes;
 gb_global CheckerContext               global_decl_source_export_ctx;
@@ -194,14 +193,19 @@ gb_internal bool has_syntactic_attribute(Array<Ast *> const &attributes, String 
 	return false;
 }
 
-gb_internal void add_placeholder(Scope *s, InternedString name, GlobalDeclSource *src) {
+struct GlobalDeclScan {
+	Array<GlobalDeclSource *> sources;
+	Array<Scope *>            placeholder_scopes;
+};
+
+gb_internal void add_placeholder(GlobalDeclScan *scan, Scope *s, InternedString name, GlobalDeclSource *src) {
 	if (name.value == 0 || name.is_blank()) {
 		return;
 	}
 	if (s->placeholders == nullptr) {
 		s->placeholders = permanent_alloc_item<PtrMap<u64, GlobalDeclSource *>>();
 		map_init(s->placeholders);
-		array_add(&global_placeholder_scopes, s);
+		array_add(&scan->placeholder_scopes, s);
 	}
 	u64 key = name.value;
 	for (auto *e = multi_map_find_first(s->placeholders, key); e != nullptr; e = multi_map_find_next(s->placeholders, e)) {
@@ -212,7 +216,7 @@ gb_internal void add_placeholder(Scope *s, InternedString name, GlobalDeclSource
 	multi_map_insert(s->placeholders, key, src);
 }
 
-gb_internal void add_placeholders(AstFile *f, u8 scopes, InternedString name, GlobalDeclSource *src, Ast *decl, bool in_else) {
+gb_internal void add_placeholders(GlobalDeclScan *scan, AstFile *f, u8 scopes, InternedString name, GlobalDeclSource *src, Ast *decl, bool in_else) {
 	if (name.value == 0 || name.is_blank()) {
 		return;
 	}
@@ -220,16 +224,16 @@ gb_internal void add_placeholders(AstFile *f, u8 scopes, InternedString name, Gl
 		array_init(&src->names, heap_allocator());
 	}
 	if (scopes & PlaceholderScope_File) {
-		add_placeholder(f->scope, name, src);
+		add_placeholder(scan, f->scope, name, src);
 		array_add(&src->names, GlobalDeclSourceName{name, f->scope, decl, in_else});
 	}
 	if (scopes & PlaceholderScope_Pkg) {
-		add_placeholder(f->pkg->scope, name, src);
+		add_placeholder(scan, f->pkg->scope, name, src);
 		array_add(&src->names, GlobalDeclSourceName{name, f->pkg->scope, decl, in_else});
 	}
 }
 
-gb_internal GlobalDeclSource *add_global_decl_source(Ast *node, AstFile *f, GlobalDeclSource *parent, bool in_else) {
+gb_internal GlobalDeclSource *add_global_decl_source(GlobalDeclScan *scan, Ast *node, AstFile *f, GlobalDeclSource *parent, bool in_else) {
 	GlobalDeclSource *src = permanent_alloc_item<GlobalDeclSource>();
 	src->node      = node;
 	src->file      = f;
@@ -237,31 +241,31 @@ gb_internal GlobalDeclSource *add_global_decl_source(Ast *node, AstFile *f, Glob
 	src->in_else   = in_else;
 	src->reachable = true;
 	src->state     = EntityState_Unresolved;
-	array_add(&global_decl_sources, src);
+	array_add(&scan->sources, src);
 	return src;
 }
 
-gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility);
+gb_internal void scan_global_decl_sources(GlobalDeclScan *scan, AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility);
 
-gb_internal void scan_global_when_stmt(AstFile *f, Ast *node, GlobalDeclSource *parent, bool in_else, i32 foreign_visibility) {
+gb_internal void scan_global_when_stmt(GlobalDeclScan *scan, AstFile *f, Ast *node, GlobalDeclSource *parent, bool in_else, i32 foreign_visibility) {
 	ast_node(ws, WhenStmt, node);
-	GlobalDeclSource *src = add_global_decl_source(node, f, parent, in_else);
+	GlobalDeclSource *src = add_global_decl_source(scan, node, f, parent, in_else);
 	if (ws->body != nullptr && ws->body->kind == Ast_BlockStmt) {
-		scan_global_decl_sources(f, ws->body->BlockStmt.stmts, src, false, foreign_visibility);
+		scan_global_decl_sources(scan, f, ws->body->BlockStmt.stmts, src, false, foreign_visibility);
 	}
 	if (ws->else_stmt != nullptr) {
 		switch (ws->else_stmt->kind) {
 		case Ast_BlockStmt:
-			scan_global_decl_sources(f, ws->else_stmt->BlockStmt.stmts, src, true, foreign_visibility);
+			scan_global_decl_sources(scan, f, ws->else_stmt->BlockStmt.stmts, src, true, foreign_visibility);
 			break;
 		case Ast_WhenStmt:
-			scan_global_when_stmt(f, ws->else_stmt, src, true, foreign_visibility);
+			scan_global_when_stmt(scan, f, ws->else_stmt, src, true, foreign_visibility);
 			break;
 		}
 	}
 }
 
-gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility) {
+gb_internal void scan_global_decl_sources(GlobalDeclScan *scan, AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility) {
 	// NOTE(bill): `owner == nullptr` is the file scope itself, whose other declarations are already collected
 	for (Ast *decl : stmts) {
 		switch (decl->kind) {
@@ -284,7 +288,7 @@ gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts,
 			}
 			for (Ast *name : vd->names) {
 				if (name->kind == Ast_Ident) {
-					add_placeholders(f, scopes, name->Ident.interned, owner, decl, in_else);
+					add_placeholders(scan, f, scopes, name->Ident.interned, owner, decl, in_else);
 				}
 			}
 		case_end;
@@ -299,19 +303,22 @@ gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts,
 			}
 			if (library_name.len != 0) {
 				u8 scopes = has_syntactic_attribute(fl->attributes, str_lit("export")) ? PlaceholderScope_Pkg : PlaceholderScope_File;
-				add_placeholders(f, scopes, string_interner_insert(library_name), owner, decl, in_else);
+				add_placeholders(scan, f, scopes, string_interner_insert(library_name), owner, decl, in_else);
 			}
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			GlobalDeclSource *src = add_global_decl_source(decl, f, owner, in_else);
+			if (owner == nullptr && is_foreign_block_collected_with_its_file(decl)) {
+				break;
+			}
+			GlobalDeclSource *src = add_global_decl_source(scan, decl, f, owner, in_else);
 			if (fb->body != nullptr && fb->body->kind == Ast_BlockStmt) {
-				scan_global_decl_sources(f, fb->body->BlockStmt.stmts, src, false, syntactic_visibility(fb->attributes));
+				scan_global_decl_sources(scan, f, fb->body->BlockStmt.stmts, src, false, syntactic_visibility(fb->attributes));
 			}
 		case_end;
 
 		case_ast_node(ws, WhenStmt, decl);
-			scan_global_when_stmt(f, decl, owner, in_else, foreign_visibility);
+			scan_global_when_stmt(scan, f, decl, owner, in_else, foreign_visibility);
 		case_end;
 
 		case_ast_node(es, ExprStmt, decl);
@@ -521,6 +528,9 @@ gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedStrin
 }
 
 gb_internal Entity *force_scope_placeholders(Scope *s, InternedString name, u32 hash) {
+	if (!global_decl_sources_resolving) {
+		return nullptr;
+	}
 	PtrMap<u64, GlobalDeclSource *> *m = s->placeholders;
 	bool forced = false;
 	for (auto *e = multi_map_find_first(m, cast(u64)name.value); e != nullptr; e = multi_map_find_next(m, e)) {
@@ -600,9 +610,33 @@ gb_internal void check_vet_when_shadowing(void) {
 	}
 }
 
-// Placeholders for every file, then every source resolved in package, file and source order, which
-// only matters for which errors are reported
-gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *> const &package_order) {
+struct GlobalDeclScanTask {
+	GlobalDeclScan *scan;
+	AstPackage *    pkg;
+};
+
+gb_internal WORKER_TASK_PROC(scan_global_decl_sources_worker_proc) {
+	GlobalDeclScanTask *task = cast(GlobalDeclScanTask *)data;
+	for (AstFile *f : task->pkg->files) {
+		scan_global_decl_sources(task->scan, f, f->decls, nullptr, false, EntityVisiblity_Public);
+	}
+	return 0;
+}
+
+gb_internal Array<GlobalDeclScan> start_global_decl_scans(Checker *c, TaskGroup *group) {
+	auto scans = array_make<GlobalDeclScan>(heap_allocator(), c->parser->packages.count);
+	for (AstPackage *pkg : c->parser->packages) {
+		GlobalDeclScan *scan = &scans[pkg->id-1];
+		scan->sources            = array_make<GlobalDeclSource *>(heap_allocator());
+		scan->placeholder_scopes = array_make<Scope *>(heap_allocator());
+		GlobalDeclScanTask *task = permanent_alloc_item<GlobalDeclScanTask>();
+		*task = {scan, pkg};
+		thread_pool_add_task(group, scan_global_decl_sources_worker_proc, task);
+	}
+	return scans;
+}
+
+gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *> const &package_order, Array<GlobalDeclScan> scans) {
 	array_init(&global_decl_sources,       heap_allocator());
 	array_init(&global_decl_source_stack,  heap_allocator());
 	array_init(&global_placeholder_scopes, heap_allocator());
@@ -611,10 +645,14 @@ gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *
 
 	u64 stage_start = global_import_stage_begin();
 	for (ImportGraphNode *node : package_order) {
-		for (AstFile *f : node->pkg->files) {
-			scan_global_decl_sources(f, f->decls, nullptr, false, EntityVisiblity_Public);
-		}
+		GlobalDeclScan *scan = &scans[node->pkg->id-1];
+		array_add_elems(&global_decl_sources, scan->sources.data, scan->sources.count);
+		array_add_elems(&global_placeholder_scopes, scan->placeholder_scopes.data, scan->placeholder_scopes.count);
+		array_free(&scan->sources);
+		array_free(&scan->placeholder_scopes);
 	}
+	array_free(&scans);
+	global_decl_sources_resolving = true;
 	find_global_when_cycles();
 	global_import_stage_end(GlobalImportStage_Placeholders, stage_start);
 
@@ -755,8 +793,7 @@ struct GlobalGroup {
 };
 
 struct GlobalGroupGraph {
-	Array<Entity *>       nodes;
-	PtrMap<Entity *, i32> node_of;
+	Array<Entity *>       nodes;             // a node's index is kept on its entity, see `Entity::global_graph_node`
 	Array<i32>            offsets;           // node -> the nodes it names, as `targets[offsets[v]..<offsets[v+1]]`
 	Array<i32>            targets;
 	Array<i32>            group_of;
@@ -1122,12 +1159,11 @@ gb_internal bool is_global_graph_node(Entity *e) {
 }
 
 gb_internal i32 global_graph_add_node(GlobalGroupGraph *g, Entity *e) {
-	i32 *found = map_get(&g->node_of, e);
-	if (found != nullptr) {
-		return *found;
+	if (e->global_graph_node != 0) {
+		return e->global_graph_node - 1;
 	}
 	i32 v = cast(i32)g->nodes.count;
-	map_set(&g->node_of, e, v);
+	e->global_graph_node = v + 1;
 	array_add(&g->nodes, e);
 	return v;
 }
@@ -1137,135 +1173,312 @@ gb_internal u64 global_group_random(u64 *state) {
 	return *state >> 33;
 }
 
-// The nodes `[lo, hi)` walked on one thread; a name that is not a node yet is kept as an entity in `refs`
-struct GlobalGraphWalkChunk {
-	GlobalGroupGraph *g;
-	i32             lo;
-	i32             hi;
-	Array<i32>      targets;
-	Array<i32>      target_ends; // per node
-	Array<Entity *> refs;
-	Array<i32>      ref_ends;    // per node
+struct GlobalGraphWalkNode {
+	i32  task;
+	i32  targets_lo;
+	i32  target_count;
+	i32  refs_lo;
+	i32  ref_count;
+	i32  first_of_decl; // set after the walk
+	bool shares_decl;   // with the node before it
+};
+
+struct GlobalGraphWalkTask {
+	GlobalGroupGraph *   g;
+	GlobalGraphWalkNode *walked;
+	std::atomic<i32> *   next;
+	i32                  node_count;
+	i32                  index;
+	Array<i32>           targets;
+	Array<Entity *>      refs;      // lazy entities which were not nodes
+	Array<i32>           ref_nodes; // the node each became after the walk, or -1
 };
 
 gb_internal WORKER_TASK_PROC(global_graph_walk_worker) {
-	GlobalGraphWalkChunk *chunk = cast(GlobalGraphWalkChunk *)data;
-	GlobalGroupGraph *g = chunk->g;
+	GlobalGraphWalkTask *task = cast(GlobalGraphWalkTask *)data;
+	GlobalGroupGraph *g = task->g;
 
 	auto refs = array_make<Entity *>(heap_allocator(), 0, 64);
 	defer (array_free(&refs));
 	GlobalGraphWalk w = {};
 	w.refs = &refs;
+
+	// NOTE: in small batches taken by every task, as a few declarations take far longer than the rest
+	i32 const BATCH_SIZE = 16;
+	for (;;) {
+		i32 lo = task->next->fetch_add(BATCH_SIZE, std::memory_order_relaxed);
+		if (lo >= task->node_count) {
+			break;
+		}
+		i32 hi = gb_min(lo + BATCH_SIZE, task->node_count);
+		for (i32 v = lo; v < hi; v++) {
+			Entity *e = g->nodes[v];
+			DeclInfo *d = e->decl_info;
+			GlobalGraphWalkNode *n = &task->walked[v];
+			n->task       = task->index;
+			n->targets_lo = cast(i32)task->targets.count;
+			n->refs_lo    = cast(i32)task->refs.count;
+
+			array_clear(&refs);
+			global_graph_walk_entity(&w, e, d);
+			for (Entity *r : refs) {
+				if (r->global_graph_node != 0) {
+					array_add(&task->targets, r->global_graph_node - 1);
+				} else if (r->flags & EntityFlag_Lazy) {
+					array_add(&task->refs, r);
+				}
+			}
+			n->target_count = cast(i32)task->targets.count - n->targets_lo;
+			n->ref_count    = cast(i32)task->refs.count - n->refs_lo;
+			n->shares_decl  = v > 0 && d->decl_node != nullptr && g->nodes[v-1]->decl_info->decl_node == d->decl_node;
+		}
+	}
+	return 0;
+}
+
+struct GlobalGraphFillChunk {
+	GlobalGroupGraph *   g;
+	GlobalGraphWalkNode *walked;
+	GlobalGraphWalkTask *tasks;
+	i32                  lo;
+	i32                  hi;
+	i32                  initial_count;
+};
+
+gb_internal WORKER_TASK_PROC(global_graph_fill_worker) {
+	GlobalGraphFillChunk *chunk = cast(GlobalGraphFillChunk *)data;
+	GlobalGroupGraph *g = chunk->g;
 	for (i32 v = chunk->lo; v < chunk->hi; v++) {
-		Entity *e = g->nodes[v];
-		array_clear(&refs);
-		global_graph_walk_entity(&w, e, e->decl_info);
-		for (Entity *r : refs) {
-			i32 *found = map_get(&g->node_of, r);
-			if (found != nullptr) {
-				array_add(&chunk->targets, *found);
-			} else if (r->flags & EntityFlag_Lazy) {
-				array_add(&chunk->refs, r);
+		GlobalGraphWalkNode const *n = &chunk->walked[v];
+		GlobalGraphWalkTask const *task = &chunk->tasks[n->task];
+		i32 *dst = g->targets.data + g->offsets[v];
+		if (n->shares_decl) {
+			*dst++ = n->first_of_decl;
+		}
+		gb_memmove(dst, task->targets.data + n->targets_lo, n->target_count*gb_size_of(i32));
+		dst += n->target_count;
+		for (i32 i = n->refs_lo; i < n->refs_lo + n->ref_count; i++) {
+			if (task->ref_nodes[i] >= 0) {
+				*dst++ = task->ref_nodes[i];
 			}
 		}
-		array_add(&chunk->target_ends, cast(i32)chunk->targets.count);
-		array_add(&chunk->ref_ends,    cast(i32)chunk->refs.count);
+		if (!n->shares_decl) {
+			for (i32 m = v+1; m < chunk->initial_count && chunk->walked[m].shares_decl; m++) {
+				*dst++ = m;
+			}
+		}
+	}
+	return 0;
+}
+
+struct GlobalGraphNodesChunk {
+	GlobalGroupGraph *g;
+	Slice<Entity *>   entities;
+	Array<Entity *>   nodes;
+	i32               first;
+};
+
+gb_internal WORKER_TASK_PROC(global_graph_find_nodes_worker) {
+	GlobalGraphNodesChunk *chunk = cast(GlobalGraphNodesChunk *)data;
+	for (Entity *e : chunk->entities) {
+		if ((e->flags & EntityFlag_Lazy) == 0 && is_global_graph_node(e)) {
+			array_add(&chunk->nodes, e);
+		}
+	}
+	return 0;
+}
+
+gb_internal WORKER_TASK_PROC(global_graph_number_nodes_worker) {
+	GlobalGraphNodesChunk *chunk = cast(GlobalGraphNodesChunk *)data;
+	for_array(i, chunk->nodes) {
+		Entity *e = chunk->nodes[i];
+		i32 v = chunk->first + cast(i32)i;
+		chunk->g->nodes[v] = e;
+		e->global_graph_node = v + 1;
 	}
 	return 0;
 }
 
 gb_internal void build_global_groups(Checker *c, GlobalGroupGraph *g) {
-	array_init(&g->nodes, heap_allocator(), 0, c->info.entities.count);
-	map_init(&g->node_of, c->info.entities.count);
-	for (Entity *e : c->info.entities) {
-		if ((e->flags & EntityFlag_Lazy) == 0 && is_global_graph_node(e)) {
-			global_graph_add_node(g, e);
+	isize const NODE_CHUNK_SIZE = 4096;
+	isize entity_count = c->info.entities.count;
+	auto node_chunks = array_make<GlobalGraphNodesChunk>(heap_allocator(), 0, entity_count/NODE_CHUNK_SIZE + 1);
+	defer (array_free(&node_chunks));
+	for (isize i = 0; i < entity_count; i += NODE_CHUNK_SIZE) {
+		Slice<Entity *> entities = slice(slice_from_array(c->info.entities), i, gb_min(i + NODE_CHUNK_SIZE, entity_count));
+		array_add(&node_chunks, GlobalGraphNodesChunk{g, entities, array_make<Entity *>(heap_allocator())});
+	}
+	{
+		TaskGroup group = {};
+		for (GlobalGraphNodesChunk &chunk : node_chunks) {
+			thread_pool_add_task(&group, global_graph_find_nodes_worker, &chunk);
 		}
+		thread_pool_wait(&group);
+	}
+	i32 found_count = 0;
+	for (GlobalGraphNodesChunk &chunk : node_chunks) {
+		chunk.first = found_count;
+		found_count += cast(i32)chunk.nodes.count;
+	}
+	array_init(&g->nodes, heap_allocator(), found_count, entity_count);
+	{
+		TaskGroup group = {};
+		for (GlobalGraphNodesChunk &chunk : node_chunks) {
+			thread_pool_add_task(&group, global_graph_number_nodes_worker, &chunk);
+		}
+		thread_pool_wait(&group);
+	}
+	for (GlobalGraphNodesChunk &chunk : node_chunks) {
+		array_free(&chunk.nodes);
 	}
 
 	// NOTE: walked in parallel, as nothing writes to the scopes now
-	i32 const CHUNK_SIZE = 64;
 	i32 initial_count = cast(i32)g->nodes.count;
-	auto chunks = array_make<GlobalGraphWalkChunk>(heap_allocator(), (initial_count + CHUNK_SIZE-1)/CHUNK_SIZE);
-	defer (array_free(&chunks));
-	for (isize i = 0; i < chunks.count; i++) {
-		GlobalGraphWalkChunk *chunk = &chunks[i];
-		*chunk = {};
-		chunk->g  = g;
-		chunk->lo = cast(i32)(i*CHUNK_SIZE);
-		chunk->hi = gb_min(chunk->lo + CHUNK_SIZE, initial_count);
-		array_init(&chunk->targets,     heap_allocator(), 0, 4*CHUNK_SIZE);
-		array_init(&chunk->target_ends, heap_allocator(), 0, CHUNK_SIZE);
-		array_init(&chunk->refs,        heap_allocator(), 0);
-		array_init(&chunk->ref_ends,    heap_allocator(), 0, CHUNK_SIZE);
-		thread_pool_add_task(global_graph_walk_worker, chunk);
+	isize task_count = global_thread_pool.threads.count;
+	auto walked = array_make<GlobalGraphWalkNode>(heap_allocator(), initial_count);
+	auto tasks  = array_make<GlobalGraphWalkTask>(heap_allocator(), task_count);
+	defer (array_free(&walked));
+	defer (array_free(&tasks));
+	std::atomic<i32> next_to_walk(0);
+	bool any_refs = false;
+	{
+		TaskGroup group = {};
+		for (isize i = 0; i < task_count; i++) {
+			GlobalGraphWalkTask *task = &tasks[i];
+			*task = {};
+			task->g          = g;
+			task->walked     = walked.data;
+			task->next       = &next_to_walk;
+			task->node_count = initial_count;
+			task->index      = cast(i32)i;
+			array_init(&task->targets, heap_allocator(), 0, 2*initial_count/task_count + 64);
+			array_init(&task->refs,    heap_allocator());
+			thread_pool_add_task(&group, global_graph_walk_worker, task);
+		}
+		thread_pool_wait(&group);
+		for (GlobalGraphWalkTask &task : tasks) {
+			any_refs |= task.refs.count != 0;
+		}
 	}
-	thread_pool_wait();
 
-	auto edge_from = array_make<i32>(heap_allocator(), 0, 4*g->nodes.count);
-	auto edge_to   = array_make<i32>(heap_allocator(), 0, 4*g->nodes.count);
-	auto refs      = array_make<Entity *>(heap_allocator(), 0, 64);
-	defer (array_free(&edge_from));
-	defer (array_free(&edge_to));
+	auto later_from = array_make<i32>(heap_allocator());
+	auto later_to   = array_make<i32>(heap_allocator());
+	auto refs       = array_make<Entity *>(heap_allocator(), 0, 64);
+	defer (array_free(&later_from));
+	defer (array_free(&later_to));
 	defer (array_free(&refs));
 
-	auto add_ref = [&](i32 v, Entity *r) {
-		i32 *found = map_get(&g->node_of, r);
-		if (found != nullptr) {
-			array_add(&edge_from, v);
-			array_add(&edge_to, *found);
+	// NOTE: a lazy entity becomes a node once a node names it, which is decided in node order so its index does not
+	// depend on the walk
+	auto ref_node = [&](Entity *r) -> i32 {
+		if (r->global_graph_node != 0) {
+			return r->global_graph_node - 1;
 		} else if ((r->flags & EntityFlag_Lazy) && is_global_graph_node(r)) {
-			// NOTE: a lazy entity becomes a node once a node names it
-			array_add(&edge_from, v);
-			array_add(&edge_to, global_graph_add_node(g, r));
+			return global_graph_add_node(g, r);
 		}
+		return -1;
 	};
+	if (any_refs) {
+		for (GlobalGraphWalkTask &task : tasks) {
+			array_init(&task.ref_nodes, heap_allocator(), task.refs.count);
+		}
+		for (i32 v = 0; v < initial_count; v++) {
+			GlobalGraphWalkNode const *n = &walked[v];
+			GlobalGraphWalkTask *task = &tasks[n->task];
+			for (i32 i = n->refs_lo; i < n->refs_lo + n->ref_count; i++) {
+				task->ref_nodes[i] = ref_node(task->refs[i]);
+			}
+		}
+	}
 
+	i32 first_of_decl = initial_count-1;
+	while (first_of_decl > 0 && walked[first_of_decl].shares_decl) {
+		first_of_decl -= 1;
+	}
 	GlobalGraphWalk w = {};
 	w.refs = &refs;
-	i32 first_of_decl = -1;
-	for (i32 v = 0; v < g->nodes.count; v++) {
+	for (i32 v = initial_count; v < g->nodes.count; v++) {
 		Entity *e = g->nodes[v];
 		DeclInfo *d = e->decl_info;
-
-		// NOTE: entities sharing one declaration share its AST, e.g. `a, b: struct{x: int}`, so they share a group;
-		// in source order they are adjacent, and lazy ones are only checked under `lazy_mutex`
 		if (first_of_decl >= 0 && d->decl_node != nullptr && g->nodes[first_of_decl]->decl_info->decl_node == d->decl_node) {
-			array_add(&edge_from, v);
-			array_add(&edge_to,   first_of_decl);
-			array_add(&edge_from, first_of_decl);
-			array_add(&edge_to,   v);
+			array_add(&later_from, v);
+			array_add(&later_to,   first_of_decl);
+			array_add(&later_from, first_of_decl);
+			array_add(&later_to,   v);
 		} else {
 			first_of_decl = v;
 		}
-
-		if (v < initial_count) {
-			GlobalGraphWalkChunk *chunk = &chunks[v / CHUNK_SIZE];
-			i32 k = v - chunk->lo;
-			for (i32 i = k > 0 ? chunk->target_ends[k-1] : 0; i < chunk->target_ends[k]; i++) {
-				array_add(&edge_from, v);
-				array_add(&edge_to, chunk->targets[i]);
-			}
-			for (i32 i = k > 0 ? chunk->ref_ends[k-1] : 0; i < chunk->ref_ends[k]; i++) {
-				add_ref(v, chunk->refs[i]);
-			}
-		} else {
-			array_clear(&refs);
-			global_graph_walk_entity(&w, e, d);
-			for (Entity *r : refs) {
-				add_ref(v, r);
+		array_clear(&refs);
+		global_graph_walk_entity(&w, e, d);
+		for (Entity *r : refs) {
+			i32 target = ref_node(r);
+			if (target >= 0) {
+				array_add(&later_from, v);
+				array_add(&later_to,   target);
 			}
 		}
 	}
-	for (GlobalGraphWalkChunk &chunk : chunks) {
-		array_free(&chunk.targets);
-		array_free(&chunk.target_ends);
-		array_free(&chunk.refs);
-		array_free(&chunk.ref_ends);
-	}
 
 	i32 node_count = cast(i32)g->nodes.count;
-	global_graph_csr(node_count, edge_from, edge_to, &g->offsets, &g->targets);
+	array_init(&g->offsets, heap_allocator(), node_count+1);
+	gb_zero_size(g->offsets.data, (node_count+1)*gb_size_of(i32));
+	i32 first = -1;
+	for (i32 v = 0; v < initial_count; v++) {
+		GlobalGraphWalkNode *n = &walked[v];
+		if (!n->shares_decl) {
+			first = v;
+		}
+		n->first_of_decl = first;
+		i32 count = n->target_count;
+		for (i32 i = n->refs_lo; i < n->refs_lo + n->ref_count; i++) {
+			count += tasks[n->task].ref_nodes[i] >= 0;
+		}
+		if (n->shares_decl) {
+			count += 1;
+			g->offsets[first+1] += 1;
+		}
+		g->offsets[v+1] += count;
+	}
+	for (i32 from : later_from) {
+		g->offsets[from+1] += 1;
+	}
+	for (i32 v = 0; v < node_count; v++) {
+		g->offsets[v+1] += g->offsets[v];
+	}
+	array_init(&g->targets, heap_allocator(), g->offsets[node_count]);
+	{
+		TaskGroup group = {};
+		auto fill_chunks = array_make<GlobalGraphFillChunk>(heap_allocator(), task_count);
+		defer (array_free(&fill_chunks));
+		i32 per_chunk = cast(i32)((initial_count + task_count-1)/task_count);
+		for (isize i = 0; i < task_count; i++) {
+			GlobalGraphFillChunk *chunk = &fill_chunks[i];
+			chunk->g             = g;
+			chunk->walked        = walked.data;
+			chunk->tasks         = tasks.data;
+			chunk->lo            = gb_min(cast(i32)i*per_chunk, initial_count);
+			chunk->hi            = gb_min(chunk->lo + per_chunk, initial_count);
+			chunk->initial_count = initial_count;
+			thread_pool_add_task(&group, global_graph_fill_worker, chunk);
+		}
+		thread_pool_wait(&group);
+	}
+	if (later_from.count > 0) {
+		// NOTE: after each node's other edges and in their order, so filled backwards from the end of its edges
+		auto cursor = array_make<i32>(heap_allocator(), node_count);
+		defer (array_free(&cursor));
+		for (i32 v = 0; v < node_count; v++) {
+			cursor[v] = g->offsets[v+1];
+		}
+		for (isize i = later_from.count-1; i >= 0; i--) {
+			g->targets[--cursor[later_from[i]]] = later_to[i];
+		}
+	}
+	for (GlobalGraphWalkTask &task : tasks) {
+		array_free(&task.targets);
+		array_free(&task.refs);
+		array_free(&task.ref_nodes);
+	}
 
 	array_init(&g->group_of, heap_allocator(), node_count);
 	i32 group_count = global_graph_scc(node_count, g->offsets, g->targets, &g->group_of);
@@ -1299,13 +1512,13 @@ gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e) {
 	if (!g->active) {
 		return;
 	}
-	i32 *v = map_get(&g->node_of, e);
-	if (v == nullptr) {
+	i32 v = e->global_graph_node - 1;
+	if (v < 0) {
 		if (!is_global_graph_node(e)) {
 			return;
 		}
 	} else {
-		i32 gi = g->group_of[*v];
+		i32 gi = g->group_of[v];
 		if (gi == global_group_current || g->groups[gi].done.load()) {
 			return;
 		}
@@ -1318,7 +1531,7 @@ gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e) {
 		global_graph_print_entity(by);
 		gb_printf_err(" needs ");
 		global_graph_print_entity(e);
-		gb_printf_err(v == nullptr ? ", which is not in the graph" : "");
+		gb_printf_err(v < 0 ? ", which is not in the graph" : "");
 		if (global_group_current_entity != by) {
 			gb_printf_err(", while checking ");
 			global_graph_print_entity(global_group_current_entity);
@@ -1472,7 +1685,6 @@ gb_internal void check_global_groups(Checker *c, GlobalGroupGraph *g) {
 
 gb_internal void destroy_global_groups(GlobalGroupGraph *g) {
 	array_free(&g->nodes);
-	map_destroy(&g->node_of);
 	array_free(&g->offsets);
 	array_free(&g->targets);
 	array_free(&g->group_of);

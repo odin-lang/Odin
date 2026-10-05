@@ -637,6 +637,27 @@ gb_internal String big_int_to_string(gbAllocator allocator, BigInt const *x, u64
 		return make_string(buf, 1);
 	}
 
+	if (mp_count_bits(x) <= 64) {
+		u64 magnitude = mp_get_mag_u64(x);
+		char digits[64];
+		isize digit_count = 0;
+		do {
+			digits[digit_count++] = digit_to_char(cast(u8)(magnitude % base));
+			magnitude /= base;
+		} while (magnitude != 0);
+
+		isize len = digit_count + (x->sign != MP_ZPOS ? 1 : 0);
+		u8 *text = gb_alloc_array(allocator, u8, len);
+		isize i = 0;
+		if (x->sign != MP_ZPOS) {
+			text[i++] = '-';
+		}
+		while (digit_count > 0) {
+			text[i++] = digits[--digit_count];
+		}
+		return make_string(text, len);
+	}
+
 	Array<char> buf = {};
 	array_init(&buf, allocator, 0, 32);
 
