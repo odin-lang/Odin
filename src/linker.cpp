@@ -253,10 +253,9 @@ try_cross_linking:;
 		switch (build_context.linker_choice) {
 		case Linker_Default:  break;
 	#if defined(GB_SYSTEM_WINDOWS)
-		case Linker_radlink:  break; // the default on Windows
+		case Linker_radlink:  section_name = str_lit("radlink"); break; // the default on Windows
 	#endif
 		case Linker_lld:      section_name = str_lit("lld-link"); break;
-	#endif
 	#if defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_NETBSD)
 		case Linker_mold:     section_name = str_lit("mold-link"); break;
 	#endif
