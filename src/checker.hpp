@@ -207,9 +207,7 @@ struct VariadicReuseData {
 struct DeclInfo {
 	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
 
-	BlockingMutex next_mutex; // also used for `nested_to_check`
-	DeclInfo *    next_child;
-	DeclInfo *    next_sibling;
+	BlockingMutex next_mutex; // for `nested_to_check`
 
 	Array<struct ProcInfo *> nested_to_check; // nested procedures to check once this body is checked
 

@@ -200,12 +200,6 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 
 
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
-	if (parent) {
-		mutex_lock(&parent->next_mutex);
-		d->next_sibling = parent->next_child;
-		parent->next_child = d;
-		mutex_unlock(&parent->next_mutex);
-	}
 	d->parent = parent;
 	d->scope  = scope;
 	ptr_set_init(&d->deps, 0);
@@ -6254,8 +6248,17 @@ gb_internal void check_collect_entities_all(Checker *c) {
 		map_init(&wd->untyped);
 	}
 
+	// NOTE(bill): deal with the files with the most declarations first so that the longest are not started last
+	// this should help with load balancing
+	auto files = array_make<AstFile *>(heap_allocator(), 0, c->info.files.count);
+	defer (array_free(&files));
 	for (auto const &entry : c->info.files) {
-		AstFile *f = entry.value;
+		array_add(&files, entry.value);
+	}
+	natural_merge_sort(files.data, files.count, [](AstFile *const &x, AstFile *const &y) -> int {
+		return isize_cmp(y->total_file_decl_count, x->total_file_decl_count);
+	});
+	for (AstFile *f : files) {
 		thread_pool_add_task(check_collect_entities_all_worker_proc, f);
 	}
 	thread_pool_wait();

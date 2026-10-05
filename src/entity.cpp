@@ -449,6 +449,18 @@ gb_internal bool entity_has_deferred_procedure(Entity *e) {
 
 gb_global std::atomic<u64> global_entity_id;
 
+gb_global thread_local u64 entity_id_next;
+gb_global thread_local u64 entity_id_end;
+
+gb_internal u64 next_entity_id(void) {
+	if (entity_id_next == entity_id_end) {
+		enum {ENTITY_ID_BLOCK = 1024};
+		entity_id_next = global_entity_id.fetch_add(ENTITY_ID_BLOCK, std::memory_order_relaxed);
+		entity_id_end  = entity_id_next + ENTITY_ID_BLOCK;
+	}
+	return 1 + entity_id_next++;
+}
+
 // NOTE(bill): This exists to allow for bulk allocations of entities all at once to improve performance for type generation
 #define INTERNAL_ENTITY_INIT(e_, kind_, scope_, token_, type_) do {                  \
 	(e_)->kind   = (kind_);                                                      \
@@ -456,7 +468,7 @@ gb_global std::atomic<u64> global_entity_id;
 	(e_)->scope  = (scope_);                                                     \
 	(e_)->token  = (token_);                                                     \
 	(e_)->type   = (type_);                                                      \
-	(e_)->id     = 1 + global_entity_id.fetch_add(1);                            \
+	(e_)->id     = next_entity_id();                                             \
 	if ((token_).pos.file_id) {                                                  \
 		e_->file = thread_unsafe_get_ast_file_from_id((token_).pos.file_id); \
 	}                                                                            \
