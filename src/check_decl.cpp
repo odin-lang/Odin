@@ -2319,33 +2319,29 @@ gb_internal void wait_for_entity(Entity *e) {
 
 
 gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
-	if (decl && decl->parent) {
-		Scope *ps = decl->parent->scope;
-		if (ps->flags & (ScopeFlag_Pkg | ScopeFlag_Global)) {
-			return;
-		} else {
-			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
-			// But only at the procedure level
-			rw_mutex_shared_lock(&decl->deps_mutex);
-			rw_mutex_lock(&decl->parent->deps_mutex);
+	if (decl == nullptr) {
+		return;
+	}
+	for (DeclInfo *p = decl->parent; p != nullptr && (p->scope->flags & (ScopeFlag_Pkg | ScopeFlag_Global)) == 0; p = p->parent) {
+		rw_mutex_shared_lock(&decl->deps_mutex);
+		rw_mutex_lock(&p->deps_mutex);
 
-			FOR_PTR_SET(e, decl->deps) {
-				ptr_set_add(&decl->parent->deps, e);
-			}
-
-			rw_mutex_unlock(&decl->parent->deps_mutex);
-			rw_mutex_shared_unlock(&decl->deps_mutex);
-
-			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
-			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
-
-			for (auto const &tt : decl->type_info_deps) {
-				type_set_add(&decl->parent->type_info_deps, tt);
-			}
-
-			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
-			rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
+		FOR_PTR_SET(e, decl->deps) {
+			ptr_set_add(&p->deps, e);
 		}
+
+		rw_mutex_unlock(&p->deps_mutex);
+		rw_mutex_shared_unlock(&decl->deps_mutex);
+
+		rw_mutex_shared_lock(&decl->type_info_deps_mutex);
+		rw_mutex_lock(&p->type_info_deps_mutex);
+
+		for (auto const &tt : decl->type_info_deps) {
+			type_set_add(&p->type_info_deps, tt);
+		}
+
+		rw_mutex_unlock(&p->type_info_deps_mutex);
+		rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
 	}
 }
 
