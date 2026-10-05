@@ -3,18 +3,8 @@ gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMVa
 gb_internal LLVMRelocMode get_reloc_mode();
 
 gb_global Entity *lb_global_type_info_data_entity   = {};
-gb_global lbAddr lb_global_type_info_member_types   = {};
-gb_global lbAddr lb_global_type_info_member_names   = {};
-gb_global lbAddr lb_global_type_info_member_offsets = {};
-gb_global lbAddr lb_global_type_info_member_usings  = {};
-gb_global lbAddr lb_global_type_info_member_tags    = {};
 
 gb_global isize lb_global_type_info_data_index           = 0;
-gb_global isize lb_global_type_info_member_types_index   = 0;
-gb_global isize lb_global_type_info_member_names_index   = 0;
-gb_global isize lb_global_type_info_member_offsets_index = 0;
-gb_global isize lb_global_type_info_member_usings_index  = 0;
-gb_global isize lb_global_type_info_member_tags_index    = 0;
 
 // A backend worker must not end the process: its siblings are still inside LLVM, and tearing the
 // process down under them is what turns a reported error into a crash. A failing worker records the
@@ -541,6 +531,30 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	gen->default_module.checker = c;
 	map_set(&gen->modules, cast(void *)1, &gen->default_module);
 	lb_init_module(&gen->default_module, do_threading);
+
+	// NOTE(bill): with `-use-separate-modules`, the type info is made in modules of its own of about a thousand entries each
+	// as it is a lot of data for the default module to make and to emit on its own
+	array_init(&gen->type_info_modules, heap_allocator());
+	isize type_info_part_count = 1;
+	if (USE_SEPARATE_MODULES && !build_context.no_rtti) {
+		type_info_part_count = gb_clamp(gen->info->min_dep_type_info_index_map.count / 1024, 1, 8);
+	}
+	if (type_info_part_count == 1) {
+		array_add(&gen->type_info_modules, &gen->default_module);
+	} else {
+		for (isize i = 0; i < type_info_part_count; i++) {
+			lbModule *m = permanent_alloc_item<lbModule>();
+			m->gen        = gen;
+			m->checker    = c;
+			m->split_part = cast(i32)(i+1);
+			map_set(&gen->modules, cast(void *)m, m);
+			lb_init_module(m, do_threading);
+			array_add(&gen->type_info_modules, m);
+		}
+	}
+	for_array(i, gen->type_info_modules) {
+		gen->type_info_modules[i]->type_info_part = i;
+	}
 
 	thread_pool_wait();
 
