@@ -308,6 +308,9 @@ gb_internal void scan_global_decl_sources(GlobalDeclScan *scan, AstFile *f, Slic
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
+			if (owner == nullptr && is_foreign_block_collected_with_its_file(decl)) {
+				break;
+			}
 			GlobalDeclSource *src = add_global_decl_source(scan, decl, f, owner, in_else);
 			if (fb->body != nullptr && fb->body->kind == Ast_BlockStmt) {
 				scan_global_decl_sources(scan, f, fb->body->BlockStmt.stmts, src, false, syntactic_visibility(fb->attributes));

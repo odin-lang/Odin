@@ -5466,6 +5466,29 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	}
 }
 
+gb_internal bool is_foreign_block_collected_with_its_file(Ast *decl) {
+	ast_node(fb, ForeignBlockDecl, decl);
+	if (fb->body == nullptr || fb->body->kind != Ast_BlockStmt) {
+		return false;
+	}
+	for (Ast *stmt : fb->body->BlockStmt.stmts) {
+		if (stmt->kind != Ast_ValueDecl) {
+			return false;
+		}
+	}
+	for (Ast *attr : fb->attributes) {
+		if (attr->kind != Ast_Attribute) {
+			continue;
+		}
+		for (Ast *elem : attr->Attribute.elems) {
+			if (elem->kind == Ast_FieldValue && elem->FieldValue.value != nullptr && elem->FieldValue.value->kind != Ast_BasicLit) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 gb_internal void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	ast_node(fb, ForeignBlockDecl, decl);
 	Ast *foreign_library = fb->foreign_library;
@@ -5585,7 +5608,10 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			// NOTE: global ones are resolved like global 'when's, see `resolve_global_decl_sources`
+			// NOTE(bill): other global ones are resolved like global 'when's, see `resolve_global_decl_sources`
+			if (curr_file != nullptr && is_foreign_block_collected_with_its_file(decl)) {
+				check_add_foreign_block_decl(c, decl);
+			}
 		case_end;
 
 		default:
