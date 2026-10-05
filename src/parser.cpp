@@ -108,16 +108,6 @@ gb_internal bool file_allow_newline(AstFile *f) {
 	return !is_strict;
 }
 
-gb_internal Token token_end_of_line(AstFile *f, Token tok) {
-	u8 const *start = f->tokenizer.start + tok.pos.offset;
-	u8 const *s = start;
-	while (*s && *s != '\n' && s < f->tokenizer.end) {
-		s += 1;
-	}
-	tok.pos.column += cast(i32)(s - start) - 1;
-	return tok;
-}
-
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
 	AstFile *file = thread_safe_get_ast_file_from_id(pos.file_id);
 	if (file == nullptr) {
@@ -1918,9 +1908,10 @@ gb_internal Token expect_closing_brace_of_field_list(AstFile *f) {
 	if (f->allow_newline) {
 		ok = !skip_possible_newline(f);
 	}
-	if (ok && allow_token(f, Token_Semicolon)) {
+	if (ok && f->curr_token.kind == Token_Semicolon) {
 		String p = token_to_string(token);
-		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+		syntax_error(token_pos_end(f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+		advance_token(f);
 	}
 	return expect_token(f, Token_CloseBrace);
 }
@@ -3409,7 +3400,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				capacity = parse_expr(f, false);
 			} else if (allow_token(f, Token_Comma) || allow_token(f, Token_Semicolon)) {
 				String p = token_to_string(f->prev_token);
-				syntax_error(token_end_of_line(f, f->prev_token), "Expected a semicolon, got a %.*s", LIT(p));
+				syntax_error(f->prev_token, "Expected a semicolon, got a %.*s", LIT(p));
 
 				capacity = parse_expr(f, false);
 			}
@@ -3798,7 +3789,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			underlying = parse_type(f);
 		} else if (allow_token(f, Token_Comma) || allow_token(f, Token_Semicolon)) {
 			String p = token_to_string(f->prev_token);
-			syntax_error(token_end_of_line(f, f->prev_token), "Expected a semicolon, got a %.*s", LIT(p));
+			syntax_error(f->prev_token, "Expected a semicolon, got a %.*s", LIT(p));
 
 			underlying = parse_type(f);
 		}
@@ -5086,7 +5077,7 @@ gb_internal bool allow_field_separator(AstFile *f) {
 		}
 		if (!ok) {
 			String p = token_to_string(token);
-			syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+			syntax_error(token_pos_end(f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 		}
 		advance_token(f);
 		return true;
@@ -5421,7 +5412,7 @@ gb_internal bool parse_control_statement_semicolon_separator(AstFile *f) {
 	Token tok = peek_token(f);
 	if (tok.kind != Token_OpenBrace) {
 		if (f->curr_token.kind == Token_Semicolon && f->curr_token.string != ";")  {
-			syntax_error(token_end_of_line(f, f->prev_token), "Expected ';', got newline");
+			syntax_error(token_pos_end(f->prev_token), "Expected ';', got newline");
 		}
 		return allow_token(f, Token_Semicolon);
 	}
