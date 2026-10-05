@@ -499,7 +499,6 @@ try_cross_linking:;
 
 			switch (build_context.linker_choice) {
 			case Linker_lld:
-<<<<<<< HEAD
 				{
 				#if defined(GB_SYSTEM_WINDOWS)
 					char linker_path[4096] = {0};
@@ -515,7 +514,7 @@ try_cross_linking:;
 						linker_path = "lld-link";
 					}
 				#endif
-					result = system_exec_command_line_app("lld-link",
+					result = system_exec_msvc_linker_app("lld-link",
 						"\"%s\" %s -OUT:\"%.*s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%.*s "
 						"%.*s "
@@ -531,81 +530,12 @@ try_cross_linking:;
 						lib_str,
 						lld_lto_flags
 					);
-=======
-				result = system_exec_msvc_linker_app("msvc-lld-link",
-					"\"%.*s\\bin\\lld-link\" %s %.*s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
-					"%.*s "
-					"%.*s "
-					"%s "
-					"%s "
-					"",
-					LIT(build_context.ODIN_ROOT), object_files, LIT(res_path), LIT(output_filename),
-					link_settings,
-					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
-					LIT(build_context.link_flags),
-					LIT(build_context.extra_linker_flags),
-					lib_str,
-					lld_lto_flags
-				);
->>>>>>> upstream/master
 
 					if (result) {
 						return result;
 					}
 					break;
 				}
-<<<<<<< HEAD
-			case Linker_radlink:
-				result = system_exec_command_line_app("msvc-rad-link",
-					"\"%.*s\\bin\\radlink\" %s -OUT:\"%.*s\" %s "
-					"/nologo /incremental:no /opt:ref /subsystem:%.*s "
-					"%.*s "
-					"%.*s "
-					"%s "
-					"",
-					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
-					link_settings,
-					LIT(windows_subsystem_names[build_context.ODIN_WINDOWS_SUBSYSTEM]),
-					LIT(build_context.link_flags),
-					LIT(build_context.extra_linker_flags),
-					lib_str
-				);
-
-				if (result) {
-					return result;
-				}
-				break;
-			default: { // msvc
-				String res_path = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RES]);
-				String rc_path  = quote_path(heap_allocator(), build_context.build_paths[BuildPath_RC]);
-				defer (gb_free(heap_allocator(), res_path.text));
-				defer (gb_free(heap_allocator(), rc_path.text));
-
-				if (build_context.has_resource) {
-					if (build_context.build_paths[BuildPath_RC].basename == "")  {
-						debugf("Using precompiled resource %.*s\n", LIT(res_path));
-					} else {
-						debugf("Compiling resource %.*s\n", LIT(res_path));
-
-						result = system_exec_command_line_app("msvc-link",
-							"\"%.*src.exe\" /nologo /fo %.*s %.*s",
-							LIT(windows_sdk_bin_path),
-							LIT(res_path),
-							LIT(rc_path)
-						);
-
-						if (result) {
-							return result;
-						}
-					}
-				} else {
-					res_path = {};
-				}
-=======
-				break;
->>>>>>> upstream/master
-
 			case Linker_msvc: {
 				String linker_name = str_lit("link.exe");
 				switch (build_context.build_mode) {
