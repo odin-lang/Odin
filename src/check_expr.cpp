@@ -709,7 +709,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			}
 			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(proc_entity_full_type(other));
-			if (are_types_identical(pt, final_proc_type)) {
+			// NOTE(bill): parameter names need to be included too as `typeid`s and link names include them
+			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
 				if (poly_proc_data) {
@@ -755,7 +756,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			}
 			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(proc_entity_full_type(other));
-			if (are_types_identical(pt, final_proc_type)) {
+			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 				return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 			}
@@ -770,7 +771,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
 	for_array(i, gen_procs->procs) {
 		Entity *other = gen_procs->procs[i];
-		if (gen_procs->hashes[i] == final_hash && are_types_identical(base_type(proc_entity_full_type(other)), final_proc_type)) {
+		if (gen_procs->hashes[i] == final_hash && are_types_identical_unique_tuples(base_type(proc_entity_full_type(other)), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 			return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 		}
