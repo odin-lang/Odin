@@ -4498,7 +4498,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					if (p->context_stack.count > 0) {
 						name = "type_assertion_check_with_context";
 					}
-					lb_emit_runtime_call(p, name, args);
+					lb_emit_runtime_call_unless(p, ok, name, args);
 				}
 
 				lbValue data_ptr = v;
@@ -4535,7 +4535,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					if (p->context_stack.count > 0) {
 						name = "type_assertion_check_with_context";
 					}
-					lb_emit_runtime_call(p, name, args);
+					lb_emit_runtime_call_unless(p, ok, name, args);
 				}
 
 				return lb_emit_conv(p, data_ptr, tv.type);

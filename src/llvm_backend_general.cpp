@@ -1201,6 +1201,23 @@ gb_internal bool lb_bounds_check_short_circuit(lbProcedure *p, lbValue index, lb
 	return false;
 }
 
+// NOTE: the runtime procedure does not return when `ok` is false, so it is only called then
+gb_internal void lb_emit_runtime_call_unless(lbProcedure *p, lbValue ok, char const *c_name, Array<lbValue> const &args) {
+	lbBlock *failed = lb_create_block(p, "check.failed");
+	lbBlock *done   = lb_create_block(p, "check.done");
+
+	lb_emit_if(p, ok, done, failed);
+
+	lb_start_block(p, failed);
+	lb_emit_runtime_call(p, c_name, args);
+	LLVMValueRef call = LLVMGetLastInstruction(p->curr_block->block);
+	GB_ASSERT(LLVMIsACallInst(call));
+	LLVMAddCallSiteAttribute(call, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "noreturn"));
+	LLVMBuildUnreachable(p->builder);
+
+	lb_start_block(p, done);
+}
+
 gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len) {
 	if (lb_bounds_check_short_circuit(p, index, len)) {
 		return;
@@ -1216,7 +1233,8 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 	args[3] = index;
 	args[4] = len;
 
-	lb_emit_runtime_call(p, "bounds_check_error", args);
+	lbValue ok = {LLVMBuildICmp(p->builder, LLVMIntULT, index.value, len.value, ""), t_llvm_bool};
+	lb_emit_runtime_call_unless(p, ok, "bounds_check_error", args);
 }
 
 gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValue row_index, lbValue column_index, lbValue row_count, lbValue column_count) {
@@ -1238,7 +1256,10 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 	args[5] = row_count;
 	args[6] = column_count;
 
-	lb_emit_runtime_call(p, "matrix_bounds_check_error", args);
+	LLVMValueRef row_ok    = LLVMBuildICmp(p->builder, LLVMIntULT, row_index.value,    row_count.value,    "");
+	LLVMValueRef column_ok = LLVMBuildICmp(p->builder, LLVMIntULT, column_index.value, column_count.value, "");
+	lbValue ok = {LLVMBuildAnd(p->builder, row_ok, column_ok, ""), t_llvm_bool};
+	lb_emit_runtime_call_unless(p, ok, "matrix_bounds_check_error", args);
 }
 
 
@@ -1264,7 +1285,8 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 	args[3] = low;
 	args[4] = high;
 
-	lb_emit_runtime_call(p, "multi_pointer_slice_expr_error", args);
+	lbValue ok = {LLVMBuildICmp(p->builder, LLVMIntSLE, low.value, high.value, ""), t_llvm_bool};
+	lb_emit_runtime_call_unless(p, ok, "multi_pointer_slice_expr_error", args);
 }
 
 gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
@@ -1282,6 +1304,9 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 	// }
 
 	high = lb_emit_conv(p, high, t_int);
+	len  = lb_emit_conv(p, len, t_int);
+
+	LLVMValueRef zero = LLVMConstNull(lb_type(p->module, t_int));
 
 	if (!lower_value_used) {
 		auto args = array_make<lbValue>(permanent_allocator(), 5);
@@ -1289,7 +1314,10 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		args[3] = high;
 		args[4] = len;
 
-		lb_emit_runtime_call(p, "slice_expr_error_hi", args);
+		LLVMValueRef c0 = LLVMBuildICmp(p->builder, LLVMIntSLE, zero,       high.value, "");
+		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
+		lbValue ok = {LLVMBuildAnd(p->builder, c0, c1, ""), t_llvm_bool};
+		lb_emit_runtime_call_unless(p, ok, "slice_expr_error_hi", args);
 	} else {
 		// No need to convert unless used
 		low  = lb_emit_conv(p, low, t_int);
@@ -1300,7 +1328,12 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		args[4] = high;
 		args[5] = len;
 
-		lb_emit_runtime_call(p, "slice_expr_error_lo_hi", args);
+		LLVMValueRef c0 = LLVMBuildICmp(p->builder, LLVMIntSLE, zero,       low.value,  "");
+		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, low.value,  len.value,  "");
+		LLVMValueRef c2 = LLVMBuildICmp(p->builder, LLVMIntSLE, low.value,  high.value, "");
+		LLVMValueRef c3 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
+		lbValue ok = {LLVMBuildAnd(p->builder, LLVMBuildAnd(p->builder, c0, c1, ""), LLVMBuildAnd(p->builder, c2, c3, ""), ""), t_llvm_bool};
+		lb_emit_runtime_call_unless(p, ok, "slice_expr_error_lo_hi", args);
 	}
 }
 
