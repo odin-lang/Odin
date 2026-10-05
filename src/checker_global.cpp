@@ -753,8 +753,7 @@ struct GlobalGroup {
 };
 
 struct GlobalGroupGraph {
-	Array<Entity *>       nodes;
-	PtrMap<Entity *, i32> node_of;
+	Array<Entity *>       nodes;             // a node's index is kept on its entity, see `Entity::global_graph_node`
 	Array<i32>            offsets;           // node -> the nodes it names, as `targets[offsets[v]..<offsets[v+1]]`
 	Array<i32>            targets;
 	Array<i32>            group_of;
@@ -1120,12 +1119,11 @@ gb_internal bool is_global_graph_node(Entity *e) {
 }
 
 gb_internal i32 global_graph_add_node(GlobalGroupGraph *g, Entity *e) {
-	i32 *found = map_get(&g->node_of, e);
-	if (found != nullptr) {
-		return *found;
+	if (e->global_graph_node != 0) {
+		return e->global_graph_node - 1;
 	}
 	i32 v = cast(i32)g->nodes.count;
-	map_set(&g->node_of, e, v);
+	e->global_graph_node = v + 1;
 	array_add(&g->nodes, e);
 	return v;
 }
@@ -1159,9 +1157,8 @@ gb_internal WORKER_TASK_PROC(global_graph_walk_worker) {
 		array_clear(&refs);
 		global_graph_walk_entity(&w, e, e->decl_info);
 		for (Entity *r : refs) {
-			i32 *found = map_get(&g->node_of, r);
-			if (found != nullptr) {
-				array_add(&chunk->targets, *found);
+			if (r->global_graph_node != 0) {
+				array_add(&chunk->targets, r->global_graph_node - 1);
 			} else if (r->flags & EntityFlag_Lazy) {
 				array_add(&chunk->refs, r);
 			}
@@ -1172,13 +1169,65 @@ gb_internal WORKER_TASK_PROC(global_graph_walk_worker) {
 	return 0;
 }
 
-gb_internal void build_global_groups(Checker *c, GlobalGroupGraph *g) {
-	array_init(&g->nodes, heap_allocator(), 0, c->info.entities.count);
-	map_init(&g->node_of, c->info.entities.count);
-	for (Entity *e : c->info.entities) {
+struct GlobalGraphNodesChunk {
+	GlobalGroupGraph *g;
+	Slice<Entity *>   entities;
+	Array<Entity *>   nodes;
+	i32               first;
+};
+
+gb_internal WORKER_TASK_PROC(global_graph_find_nodes_worker) {
+	GlobalGraphNodesChunk *chunk = cast(GlobalGraphNodesChunk *)data;
+	for (Entity *e : chunk->entities) {
 		if ((e->flags & EntityFlag_Lazy) == 0 && is_global_graph_node(e)) {
-			global_graph_add_node(g, e);
+			array_add(&chunk->nodes, e);
 		}
+	}
+	return 0;
+}
+
+gb_internal WORKER_TASK_PROC(global_graph_number_nodes_worker) {
+	GlobalGraphNodesChunk *chunk = cast(GlobalGraphNodesChunk *)data;
+	for_array(i, chunk->nodes) {
+		Entity *e = chunk->nodes[i];
+		i32 v = chunk->first + cast(i32)i;
+		chunk->g->nodes[v] = e;
+		e->global_graph_node = v + 1;
+	}
+	return 0;
+}
+
+gb_internal void build_global_groups(Checker *c, GlobalGroupGraph *g) {
+	isize const NODE_CHUNK_SIZE = 4096;
+	isize entity_count = c->info.entities.count;
+	auto node_chunks = array_make<GlobalGraphNodesChunk>(heap_allocator(), 0, entity_count/NODE_CHUNK_SIZE + 1);
+	defer (array_free(&node_chunks));
+	for (isize i = 0; i < entity_count; i += NODE_CHUNK_SIZE) {
+		Slice<Entity *> entities = slice(slice_from_array(c->info.entities), i, gb_min(i + NODE_CHUNK_SIZE, entity_count));
+		array_add(&node_chunks, GlobalGraphNodesChunk{g, entities, array_make<Entity *>(heap_allocator())});
+	}
+	{
+		TaskGroup group = {};
+		for (GlobalGraphNodesChunk &chunk : node_chunks) {
+			thread_pool_add_task(&group, global_graph_find_nodes_worker, &chunk);
+		}
+		thread_pool_wait(&group);
+	}
+	i32 found_count = 0;
+	for (GlobalGraphNodesChunk &chunk : node_chunks) {
+		chunk.first = found_count;
+		found_count += cast(i32)chunk.nodes.count;
+	}
+	array_init(&g->nodes, heap_allocator(), found_count, entity_count);
+	{
+		TaskGroup group = {};
+		for (GlobalGraphNodesChunk &chunk : node_chunks) {
+			thread_pool_add_task(&group, global_graph_number_nodes_worker, &chunk);
+		}
+		thread_pool_wait(&group);
+	}
+	for (GlobalGraphNodesChunk &chunk : node_chunks) {
+		array_free(&chunk.nodes);
 	}
 
 	// NOTE: walked in parallel, as nothing writes to the scopes now
@@ -1208,10 +1257,9 @@ gb_internal void build_global_groups(Checker *c, GlobalGroupGraph *g) {
 	defer (array_free(&refs));
 
 	auto add_ref = [&](i32 v, Entity *r) {
-		i32 *found = map_get(&g->node_of, r);
-		if (found != nullptr) {
+		if (r->global_graph_node != 0) {
 			array_add(&edge_from, v);
-			array_add(&edge_to, *found);
+			array_add(&edge_to, r->global_graph_node - 1);
 		} else if ((r->flags & EntityFlag_Lazy) && is_global_graph_node(r)) {
 			// NOTE: a lazy entity becomes a node once a node names it
 			array_add(&edge_from, v);
@@ -1297,13 +1345,13 @@ gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e) {
 	if (!g->active) {
 		return;
 	}
-	i32 *v = map_get(&g->node_of, e);
-	if (v == nullptr) {
+	i32 v = e->global_graph_node - 1;
+	if (v < 0) {
 		if (!is_global_graph_node(e)) {
 			return;
 		}
 	} else {
-		i32 gi = g->group_of[*v];
+		i32 gi = g->group_of[v];
 		if (gi == global_group_current || g->groups[gi].done.load()) {
 			return;
 		}
@@ -1316,7 +1364,7 @@ gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e) {
 		global_graph_print_entity(by);
 		gb_printf_err(" needs ");
 		global_graph_print_entity(e);
-		gb_printf_err(v == nullptr ? ", which is not in the graph" : "");
+		gb_printf_err(v < 0 ? ", which is not in the graph" : "");
 		if (global_group_current_entity != by) {
 			gb_printf_err(", while checking ");
 			global_graph_print_entity(global_group_current_entity);
@@ -1470,7 +1518,6 @@ gb_internal void check_global_groups(Checker *c, GlobalGroupGraph *g) {
 
 gb_internal void destroy_global_groups(GlobalGroupGraph *g) {
 	array_free(&g->nodes);
-	map_destroy(&g->node_of);
 	array_free(&g->offsets);
 	array_free(&g->targets);
 	array_free(&g->group_of);

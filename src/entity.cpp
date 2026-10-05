@@ -208,6 +208,7 @@ struct AsmTemplateEntityDecl {
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
+	i32         global_graph_node; // 1 + the index of its node in the global groups' graph, 0 if it is none
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
