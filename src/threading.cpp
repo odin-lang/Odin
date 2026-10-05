@@ -42,8 +42,9 @@ gb_internal THREAD_PROC(thread_pool_thread_proc);
 typedef WORKER_TASK_PROC(WorkerTaskProc);
 
 typedef struct WorkerTask {
-	WorkerTaskProc *do_work;
-	void           *data;
+	WorkerTaskProc *  do_work;
+	void *            data;
+	struct TaskGroup *group; // or none
 } WorkerTask;
 
 typedef struct TaskRingBuffer {

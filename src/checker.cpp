@@ -3570,11 +3570,12 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges");
 
 	EntityGraphEdgesWork work = {&M_vars, slice_from_array(G)};
+	TaskGroup group = {};
 	isize task_count = gb_min(global_thread_pool.threads.count, G.count);
 	for (isize i = 0; i < task_count; i++) {
-		thread_pool_add_task(generate_entity_dependency_graph_edges_worker, &work);
+		thread_pool_add_task(&group, generate_entity_dependency_graph_edges_worker, &work);
 	}
-	thread_pool_wait();
+	thread_pool_wait(&group);
 
 	// NOTE: in the order of the nodes, so each node's predecessors are added in the order they were before
 	for (EntityGraphNode *n : G) {
@@ -7479,7 +7480,6 @@ gb_internal void check_merge_queues_into_arrays(Checker *c) {
 	}
 	check_add_entities_from_queues(c);
 	check_add_definitions_from_queues(c);
-	thread_pool_wait();
 }
 
 gb_internal GB_COMPARE_PROC(init_procedures_cmp) {
@@ -7563,10 +7563,11 @@ gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
 		array_add(&chunks, CheckWalkDependenciesChunk{nullptr, c->info.entities.data + i, gb_min(CHUNK_SIZE, c->info.entities.count - i)});
 	}
 
+	TaskGroup group = {};
 	for (CheckWalkDependenciesChunk &chunk : chunks) {
-		thread_pool_add_task(check_walk_all_dependencies_worker_proc, &chunk);
+		thread_pool_add_task(&group, check_walk_all_dependencies_worker_proc, &chunk);
 	}
-	thread_pool_wait();
+	thread_pool_wait(&group);
 }
 #endif
 
@@ -7587,17 +7588,15 @@ gb_internal WORKER_TASK_PROC(check_scope_usage_pkg_worker) {
 
 
 
-gb_internal void check_all_scope_usages(Checker *c) {
+gb_internal void start_check_all_scope_usages(Checker *c, TaskGroup *group) {
 	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
-		thread_pool_add_task(check_scope_usage_file_worker, f);
+		thread_pool_add_task(group, check_scope_usage_file_worker, f);
 	}
 	for (auto const &entry : c->info.packages) {
 		AstPackage *pkg = entry.value;
-		thread_pool_add_task(check_scope_usage_pkg_worker, pkg);
+		thread_pool_add_task(group, check_scope_usage_pkg_worker, pkg);
 	}
-
-	thread_pool_wait();
 }
 
 
@@ -7735,10 +7734,6 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("add entities from procedure bodies");
 	check_merge_queues_into_arrays(c);
 
-	TIME_SECTION("check all scope usages");
-	check_all_scope_usages(c);
-
-
 	TIME_SECTION("add basic type information");
 	// Add "Basic" type information
 	for (isize i = 0; i < Basic_COUNT; i++) {
@@ -7758,8 +7753,13 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 	check_merge_queues_into_arrays(c);
 
-	TIME_SECTION("check for type and inline cycles");
-	thread_pool_for_chunks(c->info.definitions.data, c->info.definitions.count, 1024, check_for_type_and_inline_cycles);
+	// NOTE(bill): Since both only read what the procedure bodies left they can run alongside the stages below
+	//  and are waited for only before what changes that
+	TIME_SECTION("start scope usages and type and inline cycles");
+	TaskGroup scope_usages = {};
+	start_check_all_scope_usages(c, &scope_usages);
+	ThreadPoolChunks<Entity *> cycle_checks = {};
+	thread_pool_start_chunks(&cycle_checks, c->info.definitions.data, c->info.definitions.count, 1024, check_for_type_and_inline_cycles);
 
 	TIME_SECTION("check deferred procedures");
 	check_deferred_procedures(c);
@@ -7773,10 +7773,16 @@ gb_internal void check_parsed_files(Checker *c) {
 		Arena *init_order_arena = get_arena(ThreadArena_Temporary);
 		ArenaTempGuard init_order_arena_guard(init_order_arena);
 		GlobalInitOrderData init_order = {&c->info, generate_entity_dependency_graph(&c->info, init_order_arena)};
+
+		TIME_SECTION("wait for type and inline cycles");
+		thread_pool_wait_chunks(&cycle_checks);
 		check_merge_queues_into_arrays(c);
 
 		TIME_SECTION("update dependency tree for procedures");
 		check_update_dependency_tree_for_procedures(c);
+
+		TIME_SECTION("wait for scope usages");
+		thread_pool_wait(&scope_usages);
 
 		TIME_SECTION("generate minimum dependency set");
 		// NOTE(bill): Only the backend reads the initialization order so it is found alongside this which waits for it
