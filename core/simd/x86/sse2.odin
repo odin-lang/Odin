@@ -482,10 +482,15 @@ _mm_packus_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 _mm_extract_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> i32 {
 	return i32(simd.extract(transmute(u16x8)a, IMM8))
 }
+
+// Copy `a` to `dst`, and insert the 16-bit integer `i` into `dst` at the location specified by `imm8`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_insert_epi16)
 @(require_results, enable_target_feature="sse2")
-_mm_insert_epi16 :: #force_inline proc "c" (a: __m128i, i: i32, $IMM8: u32) -> __m128i {
-	return i32(simd.replace(transmute(u16x8)a, IMM8, i16(i)))
+_mm_insert_epi16 :: #force_inline proc "c" (a: __m128i, i: i32, $IMM8: i32) -> __m128i where 0 <= IMM8, IMM8 < 8 {
+	return transmute(__m128i)simd.replace(transmute(simd.i16x8)a, uint(IMM8), i16(i))
 }
+
 @(require_results, enable_target_feature="sse2")
 _mm_movemask_epi8 :: #force_inline proc "c" (a: __m128i) -> i32 {
 	return pmovmskb(transmute(i8x16)a)
