@@ -1066,8 +1066,12 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 
 	debugf("odin_doc_add_pkg_entries %s -> package %.*s\n", w->state ? "preparing" : "writing", LIT(pkg->name));
 
-	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.count);
-	defer (array_free(&entries));
+	struct NamedEntity {
+		String  name;
+		Entity *entity;
+	};
+	auto named = array_make<NamedEntity>(heap_allocator(), 0, w->entity_cache.count);
+	defer (array_free(&named));
 
 	for (isize i = 0; i < pkg->scope->elements.cap; i++) {
 		if (!pkg->scope->elements.slots[i].hash) {
@@ -1101,9 +1105,18 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 			continue;
 		}
 
+		array_add(&named, NamedEntity{interned.string(), e});
+	}
+	natural_merge_sort(named.data, named.count, [](NamedEntity const &x, NamedEntity const &y) -> int {
+		return string_compare(x.name, y.name);
+	});
+
+	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, named.count);
+	defer (array_free(&entries));
+	for (NamedEntity const &ne : named) {
 		OdinDocScopeEntry entry = {};
-		entry.name = odin_doc_write_string(w, interned.string());
-		entry.entity = odin_doc_add_entity(w, e);
+		entry.name = odin_doc_write_string(w, ne.name);
+		entry.entity = odin_doc_add_entity(w, ne.entity);
 		array_add(&entries, entry);
 	}
 
