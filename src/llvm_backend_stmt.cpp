@@ -2913,6 +2913,9 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 			lb_start_block(p, then);
 
 			lb_build_stmt(p, is->body);
+			if (p->debug_info != nullptr) {
+				LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, is->body));
+			}
 			lb_emit_jump(p, done);
 		} else {
 			if (is->else_stmt != nullptr) {
@@ -2922,6 +2925,9 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 				lb_open_scope(p, scope_of_node(is->else_stmt));
 				lb_build_stmt(p, is->else_stmt);
 				lb_close_scope(p, lbDeferExit_Default, nullptr, is->else_stmt);
+				if (p->debug_info != nullptr) {
+					LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, is->else_stmt));
+				}
 			}
 			lb_emit_jump(p, done);
 
@@ -2930,6 +2936,9 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		lb_start_block(p, then);
 
 		lb_build_stmt(p, is->body);
+		if (p->debug_info != nullptr) {
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, is->body));
+		}
 
 		lb_emit_jump(p, done);
 
@@ -2939,6 +2948,9 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 			lb_open_scope(p, scope_of_node(is->else_stmt));
 			lb_build_stmt(p, is->else_stmt);
 			lb_close_scope(p, lbDeferExit_Default, nullptr, is->else_stmt);
+			if (p->debug_info != nullptr) {
+				LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, is->else_stmt));
+			}
 
 			lb_emit_jump(p, done);
 		}
