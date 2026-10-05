@@ -187,30 +187,26 @@ gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *ot
 	mpsc_enqueue(&other_module->gen->entities_to_correct_linkage, lbEntityCorrection{other_module, e, cname});
 }
 
-gb_internal void lb_correct_entity_linkage(lbEntityCorrection const &ec) {
-	LLVMValueRef other_global = nullptr;
-	if (ec.e->kind == Entity_Variable) {
-		other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
-		if (other_global && !LLVMIsDeclaration(other_global)) {
-			LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
-			if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
-				LLVMSetVisibility(other_global, LLVMHiddenVisibility);
-			}
-		}
-	} else if (ec.e->kind == Entity_Procedure) {
-		other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
-		if (other_global && LLVMCountBasicBlocks(other_global) != 0) {
-			LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
-			if (!ec.e->Procedure.is_export && !ec.e->Procedure.is_foreign) {
-				LLVMSetVisibility(other_global, LLVMHiddenVisibility);
-			}
-		}
-	}
-}
-
 gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 	for (lbEntityCorrection ec = {}; mpsc_dequeue(&gen->entities_to_correct_linkage, &ec); /**/) {
-		lb_correct_entity_linkage(ec);
+		LLVMValueRef other_global = nullptr;
+		if (ec.e->kind == Entity_Variable) {
+			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
+			if (other_global && !LLVMIsDeclaration(other_global)) {
+				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
+				if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
+					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
+				}
+			}
+		} else if (ec.e->kind == Entity_Procedure) {
+			other_global = LLVMGetNamedFunction(ec.other_module->mod, ec.cname);
+			if (other_global && LLVMCountBasicBlocks(other_global) != 0) {
+				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
+				if (!ec.e->Procedure.is_export && !ec.e->Procedure.is_foreign) {
+					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
+				}
+			}
+		}
 	}
 }
 
@@ -2993,8 +2989,6 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
 		lb_generate_procedure(p->module, p);
 	}
-	// NOTE: for the order of the stages after, which the procedures left to generate predicted poorly
-	m->estimated_cost = lb_module_cost(m);
 	return 0;
 }
 
@@ -3481,70 +3475,6 @@ gb_internal void lb_verify_generated_procedures(lbGenerator *gen, bool do_thread
 	}
 	thread_pool_wait();
 	lb_exit_if_worker_failed();
-}
-
-struct lbModuleFinishWork {
-	lbModule *                m;
-	LLVMCodeGenFileType       code_gen_file_type;
-	String                    filepath_obj;
-	Array<lbEntityCorrection> linkage_corrections; // of this module's definitions
-	bool                      is_empty;
-};
-
-// NOTE(bill): every stage after the procedure generation for one module from the verification to its object as once all are generated
-// no module's stages need another's, so the threads do not wait at each stage for its slowest module
-gb_internal WORKER_TASK_PROC(lb_llvm_module_finish_worker_proc) {
-	auto w = cast(lbModuleFinishWork *)data;
-	lbModule *m = w->m;
-
-	if (!LLVM_IGNORE_VERIFICATION && m->debug_builder == nullptr) {
-		lb_verify_generated_procedures_worker_proc(m);
-	}
-	if (lb_worker_failure.load(std::memory_order_acquire)) {
-		return 0;
-	}
-
-	lb_llvm_function_pass_per_module(m);
-	if (lb_worker_failure.load(std::memory_order_acquire)) {
-		return 0;
-	}
-
-	lb_run_remove_unused_function_pass(m);
-	lb_run_remove_unused_globals_pass(m);
-
-	lbLLVMModulePassWorkerData pass_data = {m, m->target_machine, false};
-	lb_llvm_module_pass_worker_proc(&pass_data);
-	if (lb_worker_failure.load(std::memory_order_acquire)) {
-		return 0;
-	}
-
-	// NOTE(bill): After the passes, which see the definitions as they were generated
-	for (lbEntityCorrection const &ec : w->linkage_corrections) {
-		lb_correct_entity_linkage(ec);
-	}
-
-	w->is_empty = lb_is_module_empty(m);
-	if (w->is_empty) {
-		return 0;
-	}
-
-	if (build_context.keep_temp_files ||
-	    build_context.build_mode == BuildMode_LLVM_IR) {
-		char *llvm_error = nullptr;
-		defer (LLVMDisposeMessage(llvm_error));
-		String filepath_ll = lb_filepath_ll_for_module(m);
-		if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-			gb_printf_err("LLVM Error: %s\n", llvm_error);
-			lb_record_worker_failure();
-			return 1;
-		}
-	}
-	if (build_context.build_mode == BuildMode_LLVM_IR || build_context.ignore_llvm_build) {
-		return 0;
-	}
-
-	lbLLVMEmitWorker emit = {m->target_machine, w->code_gen_file_type, w->filepath_obj, m};
-	return lb_llvm_emit_worker_proc(&emit);
 }
 
 
@@ -4061,140 +3991,72 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 	lb_add_foreign_library_paths(gen);
 
+	TIME_SECTION("LLVM Verify Procedures");
+	lb_verify_generated_procedures(gen, do_threading);
+
+	TIME_SECTION("LLVM Function Pass");
+	lb_llvm_function_passes(gen, do_threading);
+
+	TIME_SECTION("LLVM Remove Unused Functions and Globals");
+	lb_remove_unused_functions_and_globals(gen);
+
+	TIME_SECTION("LLVM Module Pass and Verification");
+	lb_llvm_module_passes_and_verification(gen, do_threading);
+
+	TIME_SECTION("LLVM Correct Entity Linkage");
+	lb_correct_entity_linkage(gen);
+
+	if (build_context.build_diagnostics) {
+		lb_do_build_diagnostics(gen);
+	}
+
 	llvm_error = nullptr;
 	defer (LLVMDisposeMessage(llvm_error));
 
-	if (do_threading && !build_context.build_diagnostics) {
-		TIME_SECTION("LLVM Verification, Passes and Object Generation");
+	if (build_context.keep_temp_files ||
+	    build_context.build_mode == BuildMode_LLVM_IR) {
+		TIME_SECTION("LLVM Print Module to File");
 
-		LLVMCodeGenFileType code_gen_file_type = LLVMObjectFile;
-		if (build_context.build_mode == BuildMode_Assembly) {
-			code_gen_file_type = LLVMAssemblyFile;
-		}
-
-		auto works = array_make<lbModuleFinishWork>(heap_allocator(), 0, gen->modules.count);
-		defer (array_free(&works));
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-			array_add(&works, lbModuleFinishWork{m, code_gen_file_type, lb_filepath_obj_for_module(m), array_make<lbEntityCorrection>(heap_allocator())});
-		}
-		defer (for (lbModuleFinishWork &w : works) {
-			array_free(&w.linkage_corrections);
-		});
-
-		PtrMap<lbModule *, lbModuleFinishWork *> work_of_module = {};
-		map_init(&work_of_module, works.count);
-		defer (map_destroy(&work_of_module));
-		for (lbModuleFinishWork &w : works) {
-			map_set(&work_of_module, w.m, &w);
-		}
-		for (lbEntityCorrection ec = {}; mpsc_dequeue(&gen->entities_to_correct_linkage, &ec); /**/) {
-			lbModuleFinishWork **w = map_get(&work_of_module, ec.other_module);
-			GB_ASSERT(w != nullptr);
-			array_add(&(*w)->linkage_corrections, ec);
-		}
-
-		// The default module first, as its type info is a lot of data for its few instructions
-		gen->default_module.estimated_cost = I64_MAX;
-		TaskGroup group = {};
-		for (lbModule *m : lb_modules_by_cost(gen)) {
-			thread_pool_add_task(&group, lb_llvm_module_finish_worker_proc, *map_get(&work_of_module, m));
-		}
-		thread_pool_wait(&group);
-		lb_exit_if_worker_failed();
-
-		if (build_context.keep_temp_files ||
-		    build_context.build_mode == BuildMode_LLVM_IR) {
-			for (lbModuleFinishWork const &w : works) {
-				if (!w.is_empty) {
-					array_add(&gen->output_temp_paths, lb_filepath_ll_for_module(w.m));
-				}
+			if (lb_is_module_empty(m)) {
+				continue;
 			}
-			if (build_context.build_mode == BuildMode_LLVM_IR) {
-				return true;
+			String filepath_ll = lb_filepath_ll_for_module(m);
+			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
+				gb_printf_err("LLVM Error: %s\n", llvm_error);
+				exit_with_errors();
+				return false;
 			}
+			array_add(&gen->output_temp_paths, filepath_ll);
+
 		}
-
-		for (lbModuleFinishWork const &w : works) {
-			if (!w.is_empty) {
-				gen->used_module_count += 1;
-			}
+		if (build_context.build_mode == BuildMode_LLVM_IR) {
+			return true;
 		}
-		if (build_context.ignore_llvm_build) {
-			gb_printf_err("LLVM object generation has been ignored!\n");
-			return false;
+	}
+
+
+	////////////////////////////////////////////
+	for (auto const &entry: gen->modules) {
+		lbModule *m = entry.value;
+		if (!lb_is_module_empty(m)) {
+			gen->used_module_count += 1;
 		}
-		for (lbModuleFinishWork const &w : works) {
-			if (!w.is_empty) {
-				array_add(&gen->output_object_paths, w.filepath_obj);
-				array_add(&gen->output_temp_paths, lb_filepath_ll_for_module(w.m));
-			}
-		}
-	} else {
-		TIME_SECTION("LLVM Verify Procedures");
-		lb_verify_generated_procedures(gen, do_threading);
+	}
 
-		TIME_SECTION("LLVM Function Pass");
-		lb_llvm_function_passes(gen, do_threading);
-
-		TIME_SECTION("LLVM Remove Unused Functions and Globals");
-		lb_remove_unused_functions_and_globals(gen);
-
-		TIME_SECTION("LLVM Module Pass and Verification");
-		lb_llvm_module_passes_and_verification(gen, do_threading);
-
-		TIME_SECTION("LLVM Correct Entity Linkage");
-		lb_correct_entity_linkage(gen);
-
-		if (build_context.build_diagnostics) {
-			lb_do_build_diagnostics(gen);
-		}
-
-		if (build_context.keep_temp_files ||
-		    build_context.build_mode == BuildMode_LLVM_IR) {
-			TIME_SECTION("LLVM Print Module to File");
-
-			for (auto const &entry : gen->modules) {
-				lbModule *m = entry.value;
-				if (lb_is_module_empty(m)) {
-					continue;
-				}
-				String filepath_ll = lb_filepath_ll_for_module(m);
-				if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
-					gb_printf_err("LLVM Error: %s\n", llvm_error);
-					exit_with_errors();
-					return false;
-				}
-				array_add(&gen->output_temp_paths, filepath_ll);
-
-			}
-			if (build_context.build_mode == BuildMode_LLVM_IR) {
-				return true;
-			}
-		}
-
-
-		////////////////////////////////////////////
-		for (auto const &entry: gen->modules) {
-			lbModule *m = entry.value;
-			if (!lb_is_module_empty(m)) {
-				gen->used_module_count += 1;
-			}
-		}
-
-		gbString label_object_generation = gb_string_make(heap_allocator(), "LLVM Object Generation");
-		if (gen->used_module_count > 1) {
-			label_object_generation = gb_string_append_fmt(label_object_generation, " (%td used modules)", gen->used_module_count);
-		}
-		TIME_SECTION_WITH_LEN(label_object_generation, gb_string_length(label_object_generation));
+	gbString label_object_generation = gb_string_make(heap_allocator(), "LLVM Object Generation");
+	if (gen->used_module_count > 1) {
+		label_object_generation = gb_string_append_fmt(label_object_generation, " (%td used modules)", gen->used_module_count);
+	}
+	TIME_SECTION_WITH_LEN(label_object_generation, gb_string_length(label_object_generation));
 	
-		if (build_context.ignore_llvm_build) {
-			gb_printf_err("LLVM object generation has been ignored!\n");
-			return false;
-		}
-		if (!lb_llvm_object_generation(gen, do_threading)) {
-			return false;
-		}
+	if (build_context.ignore_llvm_build) {
+		gb_printf_err("LLVM object generation has been ignored!\n");
+		return false;
+	}
+	if (!lb_llvm_object_generation(gen, do_threading)) {
+		return false;
 	}
 
 
