@@ -3468,24 +3468,47 @@ gb_internal gb_inline bool is_entity_a_dependency(Entity *e) {
 	return false;
 }
 
-struct EntityGraphEdgesChunk {
+struct EntityGraphEdgesWork {
 	PtrMap<Entity *, EntityGraphNode *> *vars;
 	Slice<EntityGraphNode *>             nodes;
+	std::atomic<isize>                   next;
 };
 
 // NOTE(bill): A variable depends on every variable reachable from its declaration through procedures and constants,
 // as its initializer may read any of them. Variables are not walked through, as they are ordered by their own edges.
 // Each node's search only reads, and only writes its own successors, so the searches run in parallel.
 gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_edges_worker) {
-	EntityGraphEdgesChunk *chunk = cast(EntityGraphEdgesChunk *)data;
+	EntityGraphEdgesWork *work = cast(EntityGraphEdgesWork *)data;
 
 	PtrSet<Entity *> visited = {};
 	defer (ptr_set_destroy(&visited));
+	auto visited_list  = array_make<Entity *>(heap_allocator(), 0, 64);
+	auto visited_slots = array_make<isize>(heap_allocator(), 0, 64);
+	defer (array_free(&visited_list));
+	defer (array_free(&visited_slots));
 	auto stack = array_make<Entity *>(heap_allocator(), 0, 64);
 	defer (array_free(&stack));
 
-	for (EntityGraphNode *n : chunk->nodes) {
-		ptr_set_clear(&visited);
+	for (;;) {
+		isize index = work->next.fetch_add(1, std::memory_order_relaxed);
+		if (index >= work->nodes.count) {
+			break;
+		}
+		EntityGraphNode *n = work->nodes[index];
+
+		if (visited_list.count*4 < cast(isize)visited.capacity) {
+			array_clear(&visited_slots);
+			for (Entity *e : visited_list) {
+				array_add(&visited_slots, ptr_set__find(&visited, e));
+			}
+			for (isize slot : visited_slots) {
+				visited.keys[slot] = nullptr;
+			}
+			visited.count = 0;
+		} else {
+			ptr_set_clear(&visited);
+		}
+		array_clear(&visited_list);
 		array_clear(&stack);
 
 		DeclInfo *decl = decl_info_of_entity(n->entity);
@@ -3506,7 +3529,7 @@ gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_edges_worker) {
 				continue;
 			}
 			if (dep->kind == Entity_Variable) {
-				EntityGraphNode **m = map_get(chunk->vars, dep);
+				EntityGraphNode **m = map_get(work->vars, dep);
 				// NOTE(bill): a variable naming itself, e.g. `t: struct { next: ^type_of(t) }`, is not an initialization cycle
 				if (m != nullptr && *m != n) {
 					entity_graph_node_set_add(&n->succ, *m);
@@ -3516,6 +3539,7 @@ gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_edges_worker) {
 			if (ptr_set_update(&visited, dep)) {
 				continue;
 			}
+			array_add(&visited_list, dep);
 			DeclInfo *dep_decl = decl_info_of_entity(dep);
 			if (dep_decl != nullptr) {
 				FOR_PTR_SET(next, dep_decl->deps) {
@@ -3545,14 +3569,10 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges");
 
-	isize const CHUNK_SIZE = 32;
-	auto chunks = array_make<EntityGraphEdgesChunk>(heap_allocator(), 0, G.count/CHUNK_SIZE + 1);
-	defer (array_free(&chunks));
-	for (isize i = 0; i < G.count; i += CHUNK_SIZE) {
-		array_add(&chunks, EntityGraphEdgesChunk{&M_vars, slice(slice_from_array(G), i, gb_min(i + CHUNK_SIZE, G.count))});
-	}
-	for (EntityGraphEdgesChunk &chunk : chunks) {
-		thread_pool_add_task(generate_entity_dependency_graph_edges_worker, &chunk);
+	EntityGraphEdgesWork work = {&M_vars, slice_from_array(G)};
+	isize task_count = gb_min(global_thread_pool.threads.count, G.count);
+	for (isize i = 0; i < task_count; i++) {
+		thread_pool_add_task(generate_entity_dependency_graph_edges_worker, &work);
 	}
 	thread_pool_wait();
 
