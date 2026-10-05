@@ -16,6 +16,7 @@
 #include <llvm-c/BitWriter.h>
 #include <llvm-c/DebugInfo.h>
 #include <llvm-c/Transforms/PassBuilder.h>
+#include <llvm-c/Comdat.h>
 
 
 
@@ -114,6 +115,20 @@ struct NamedMetaDataKind {
 	unsigned kind;
 };
 
+struct lbTypeInfoMembers {
+	lbAddr types;
+	lbAddr names;
+	lbAddr offsets;
+	lbAddr usings;
+	lbAddr tags;
+
+	isize types_index;
+	isize names_index;
+	isize offsets_index;
+	isize usings_index;
+	isize tags_index;
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -135,6 +150,10 @@ struct lbModule {
 
 	i64 estimated_cost;
 	i32 split_part;
+
+	// This is Set if this module defines type info entries
+	lbTypeInfoMembers *type_info_members;
+	isize              type_info_part;
 
 	PtrMap<u64/*type hash*/, LLVMTypeRef>  types;                  // mutex: types_mutex
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
@@ -212,10 +231,11 @@ struct lbObjCGlobal {
 struct lbGenerator : LinkerData {
 	CheckerInfo *info;
 
-	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
+	PtrMap<void *, lbModule *>         modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
-	PtrMap<AstFile *, lbModule *> file_modules;
-	lbModule default_module;
+	PtrMap<AstFile *, lbModule *>      file_modules;
+	lbModule                           default_module;
+	Array<lbModule *>                  type_info_modules; // the will be the default module or several as the type info is a lot of data
 
 	lbModule *equal_module;
 
@@ -230,10 +250,10 @@ struct lbGenerator : LinkerData {
 	Array<lbProcedure *> global_init_procedures;
 
 	MPSCQueue<lbEntityCorrection> entities_to_correct_linkage;
-	MPSCQueue<lbObjCGlobal> objc_selectors;
-	MPSCQueue<lbObjCGlobal> objc_classes;
-	MPSCQueue<lbObjCGlobal> objc_ivars;
-	MPSCQueue<String> raddebug_section_strings;
+	MPSCQueue<lbObjCGlobal>       objc_selectors;
+	MPSCQueue<lbObjCGlobal>       objc_classes;
+	MPSCQueue<lbObjCGlobal>       objc_ivars;
+	MPSCQueue<String>             raddebug_section_strings;
 };
 
 
@@ -559,7 +579,7 @@ gb_internal void lb_fill_slice(lbProcedure *p, lbAddr const &slice, lbValue base
 gb_internal lbValue lb_type_info(lbProcedure *p, Type *type);
 
 gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str, bool custom_link_section);
-gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent = nullptr);
+gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, Ast *expr, lbProcedure *parent = nullptr);
 
 gb_internal bool lb_is_const(lbValue value);
 gb_internal bool lb_is_const_or_global(lbValue value);

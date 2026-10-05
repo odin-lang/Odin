@@ -937,6 +937,82 @@ test_soa_pointer_using_field :: proc(t: ^testing.T) {
 	testing.expect_value(t, dyn.foo[1].bar, 7)
 }
 
+// `using` on an #soa pointer, as a field, a parameter and a statement
+@(test)
+test_soa_pointer_using :: proc(t: ^testing.T) {
+	Base :: struct {
+		id:  int,
+		tag: u8,
+	}
+	Entity :: struct {
+		translation: [3]f32,
+		using base:  Base,
+		velocity:    [1]f32,
+	}
+	Player :: struct {
+		foo:          i32,
+		using entity: #soa^#soa[dynamic]Entity,
+	}
+	Boss :: struct {
+		using player: Player,
+	}
+	Fixed_Player :: struct {
+		using entity: #soa^#soa[4]Entity,
+	}
+
+	entities: #soa[dynamic]Entity
+	defer delete(entities)
+	for i in 0..<3 {
+		append_soa(&entities, Entity{base = {id = i}})
+	}
+
+	player := Player{foo = 3, entity = &entities[1]}
+	player.velocity = 2
+	player.translation.y = 9
+	player.id += 100
+	v := &player.translation
+	v.z = 7
+	pp := &player
+	pp.tag = 99
+	testing.expect_value(t, entities[1].velocity, [1]f32{2})
+	testing.expect_value(t, entities[1].translation, [3]f32{0, 9, 7})
+	testing.expect_value(t, entities[1].id, 101)
+	testing.expect_value(t, entities[1].tag, 99)
+	testing.expect_value(t, entities[0].velocity, [1]f32{0})
+	testing.expect_value(t, entities[0].id, 0)
+
+	boss := Boss{player = {entity = &entities[2]}}
+	boss.velocity = 4
+	testing.expect_value(t, entities[2].velocity, [1]f32{4})
+
+	get_id :: proc(e: #soa^#soa[dynamic]Entity) -> int {
+		return e.id
+	}
+	testing.expect_value(t, get_id(player), 101)
+	testing.expect_value(t, get_id(boss), 2)
+
+	step :: proc(using e: #soa^#soa[dynamic]Entity) {
+		velocity = 5
+		translation.x = 1
+	}
+	step(&entities[0])
+	testing.expect_value(t, entities[0].velocity, [1]f32{5})
+	testing.expect_value(t, entities[0].translation.x, 1)
+
+	step_stmt :: proc(e: #soa^#soa[dynamic]Entity) {
+		using e
+		tag = 7
+	}
+	step_stmt(&entities[0])
+	testing.expect_value(t, entities[0].tag, 7)
+
+	fixed: #soa[4]Entity
+	fp := Fixed_Player{entity = &fixed[3]}
+	fp.velocity = 6
+	testing.expect_value(t, fixed[3].velocity, [1]f32{6})
+	testing.expect_value(t, fixed[2].velocity, [1]f32{0})
+}
+
 @(test)
 test_soa_array_allocator_resize :: proc(t: ^testing.T) {
 

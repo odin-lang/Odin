@@ -677,6 +677,8 @@ struct BuildContext {
 	String android_keystore;
 	String android_keystore_alias;
 	String android_keystore_password;
+
+	String windows_sdk_root;
 };
 
 gb_global BuildContext build_context = {0};
@@ -1414,24 +1416,18 @@ gb_internal String internal_odin_root_dir(void) {
 }
 #endif
 
-gb_global BlockingMutex fullpath_mutex;
-
 #if defined(GB_SYSTEM_WINDOWS)
+// `GetFullPathNameW` is only unsafe with threads while the current directory changes, which the compiler never does
 gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 	String result = {};
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
 	defer (gb_free(heap_allocator(), string16.text));
 
-	DWORD len;
-
-	mutex_lock(&fullpath_mutex);
-
-	len = GetFullPathNameW(cast(wchar_t *)&string16[0], 0, nullptr, nullptr);
+	DWORD len = GetFullPathNameW(cast(wchar_t *)&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
 		wchar_t *text = permanent_alloc_array<wchar_t>(len+1);
 		GetFullPathNameW(cast(wchar_t *)&string16[0], len, text, nullptr);
-		mutex_unlock(&fullpath_mutex);
 
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(cast(u16 *)text, len));
@@ -1446,7 +1442,6 @@ gb_internal String path_to_fullpath(gbAllocator a, String s, bool *ok_) {
 		if (ok_) *ok_ = true;
 	} else {
 		if (ok_) *ok_ = false;
-		mutex_unlock(&fullpath_mutex);
 	}
 
 	return result;
@@ -2349,7 +2344,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			if (build_context.linker_choice == Linker_Default && find_result.vs_exe_path.len == 0) {
+			if (build_context.linker_choice == Linker_msvc && find_result.vs_exe_path.len == 0) {
 				gb_printf_err("link.exe not found.\n");
 				return false;
 			}

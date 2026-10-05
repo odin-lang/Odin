@@ -339,8 +339,9 @@ gb_global String const type_strings[] = {
 #undef TYPE_KIND
 
 enum TypeFlag : u32 {
-	TypeFlag_Polymorphic     = 1<<1,
-	TypeFlag_PolySpecialized = 1<<2,
+	TypeFlag_Polymorphic         = 1<<1,
+	TypeFlag_PolySpecialized     = 1<<2,
+	TypeFlag_InMinDepTypeInfoSet = 1<<3,
 };
 
 struct Type {
@@ -3229,64 +3230,10 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names);
 
 gb_internal bool are_types_identical(Type *x, Type *y) {
-	if (x == y) {
-		return true;
-	}
-
-	if ((x == nullptr && y != nullptr) ||
-	    (x != nullptr && y == nullptr)) {
-		return false;
-	}
-
-	if (x->kind == Type_Named) {
-		Entity *e = x->Named.type_name;
-		if (e->TypeName.is_type_alias) {
-			x = x->Named.base;
-		}
-	}
-	if (y->kind == Type_Named) {
-		Entity *e = y->Named.type_name;
-		if (e->TypeName.is_type_alias) {
-			y = y->Named.base;
-		}
-	}
-	if (x == nullptr || y == nullptr || x->kind != y->kind) {
-		return false;
-	}
-
-	// MUTEX_GUARD(&g_type_mutex);
 	return are_types_identical_internal(x, y, false);
 }
+
 gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
-	if (x == y) {
-		return true;
-	}
-
-	if (!x | !y) {
-		return false;
-	}
-
-	if (x->kind == Type_Named) {
-		Entity *e = x->Named.type_name;
-		if (e->TypeName.is_type_alias) {
-			x = x->Named.base;
-		}
-	}
-	if (y->kind == Type_Named) {
-		Entity *e = y->Named.type_name;
-		if (e->TypeName.is_type_alias) {
-			y = y->Named.base;
-		}
-	}
-	if (x->kind != y->kind) {
-		return false;
-	}
-
-	// if (x->canonical_hash && y->canonical_hash && x->canonical_hash != y->canonical_hash) {
-	// 	return false;
-	// }
-
-	// MUTEX_GUARD(&g_type_mutex);
 	return are_types_identical_internal(x, y, true);
 }
 
@@ -3311,7 +3258,6 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 	// 	return false;
 	// }
 
-	#if 0
 	if (x->kind == Type_Named) {
 		Entity *e = x->Named.type_name;
 		if (e->TypeName.is_type_alias) {
@@ -3324,14 +3270,13 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 			y = y->Named.base;
 		}
 	}
-	if (x->kind != y->kind) {
+	if (x == nullptr || y == nullptr || x->kind != y->kind) {
 		return false;
 	}
-	#endif
 
 	switch (x->kind) {
 	case Type_Generic:
-		return are_types_identical(x->Generic.specialized, y->Generic.specialized);
+		return are_types_identical_internal(x->Generic.specialized, y->Generic.specialized, check_tuple_names);
 
 	case Type_Basic:
 		return x->Basic.kind == y->Basic.kind;
@@ -3339,31 +3284,31 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 	case Type_EnumeratedArray:
 		return x->EnumeratedArray.count     == y->EnumeratedArray.count &&
 		       x->EnumeratedArray.is_sparse == y->EnumeratedArray.is_sparse &&
-		       are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
-		       are_types_identical(x->EnumeratedArray.elem,  y->EnumeratedArray.elem);
+		       are_types_identical_internal(x->EnumeratedArray.index, y->EnumeratedArray.index, check_tuple_names) &&
+		       are_types_identical_internal(x->EnumeratedArray.elem,  y->EnumeratedArray.elem, check_tuple_names);
 
 	case Type_Array:
-		return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
+		return (x->Array.count == y->Array.count) && are_types_identical_internal(x->Array.elem, y->Array.elem, check_tuple_names);
 
 	case Type_Matrix:
 		return x->Matrix.row_count == y->Matrix.row_count &&
 		       x->Matrix.column_count == y->Matrix.column_count &&
 		       x->Matrix.is_row_major == y->Matrix.is_row_major &&
-		       are_types_identical(x->Matrix.elem, y->Matrix.elem);
+		       are_types_identical_internal(x->Matrix.elem, y->Matrix.elem, check_tuple_names);
 
 	case Type_DynamicArray:
-		return are_types_identical(x->DynamicArray.elem, y->DynamicArray.elem);
+		return are_types_identical_internal(x->DynamicArray.elem, y->DynamicArray.elem, check_tuple_names);
 
 	case Type_FixedCapacityDynamicArray:
 		return (x->FixedCapacityDynamicArray.capacity == y->FixedCapacityDynamicArray.capacity) &&
-		       are_types_identical(x->FixedCapacityDynamicArray.elem, y->FixedCapacityDynamicArray.elem);
+		       are_types_identical_internal(x->FixedCapacityDynamicArray.elem, y->FixedCapacityDynamicArray.elem, check_tuple_names);
 
 	case Type_Slice:
-		return are_types_identical(x->Slice.elem, y->Slice.elem);
+		return are_types_identical_internal(x->Slice.elem, y->Slice.elem, check_tuple_names);
 
 	case Type_BitSet:
-		if (are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
-		    are_types_identical(x->BitSet.underlying, y->BitSet.underlying)) {
+		if (are_types_identical_internal(x->BitSet.elem, y->BitSet.elem, check_tuple_names) &&
+		    are_types_identical_internal(x->BitSet.underlying, y->BitSet.underlying, check_tuple_names)) {
 		    	if (is_type_enum(x->BitSet.elem)) {
 		    		return true;
 		    	}
@@ -3379,7 +3324,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		if (x->Enum.fields.count != y->Enum.fields.count) {
 			return false;
 		}
-		if (!are_types_identical(x->Enum.base_type, y->Enum.base_type)) {
+		if (!are_types_identical_internal(x->Enum.base_type, y->Enum.base_type, check_tuple_names)) {
 			return false;
 		}
 		if (x->Enum.min_value_index != y->Enum.min_value_index) {
@@ -3417,7 +3362,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 			// NOTE(bill): zeroth variant is nullptr
 			for_array(i, x->Union.variants) {
-				if (!are_types_identical(x->Union.variants[i], y->Union.variants[i])) {
+				if (!are_types_identical_internal(x->Union.variants[i], y->Union.variants[i], check_tuple_names)) {
 					return false;
 				}
 			}
@@ -3432,7 +3377,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		    x->Struct.is_all_or_none == y->Struct.is_all_or_none &&
 		    x->Struct.soa_kind == y->Struct.soa_kind &&
 		    x->Struct.soa_count == y->Struct.soa_count &&
-		    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
+		    are_types_identical_internal(x->Struct.soa_elem, y->Struct.soa_elem, check_tuple_names)) {
 
 			if (x->Struct.custom_align != y->Struct.custom_align) {
 				if (type_align_of(x) != type_align_of(y)) {
@@ -3446,7 +3391,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 				if (xf->kind != yf->kind) {
 					return false;
 				}
-				if (!are_types_identical(xf->type, yf->type)) {
+				if (!are_types_identical_internal(xf->type, yf->type, check_tuple_names)) {
 					return false;
 				}
 				if (xf->token.string != yf->token.string) {
@@ -3468,13 +3413,13 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		break;
 
 	case Type_Pointer:
-		return are_types_identical(x->Pointer.elem, y->Pointer.elem);
+		return are_types_identical_internal(x->Pointer.elem, y->Pointer.elem, check_tuple_names);
 
 	case Type_MultiPointer:
-		return are_types_identical(x->MultiPointer.elem, y->MultiPointer.elem);
+		return are_types_identical_internal(x->MultiPointer.elem, y->MultiPointer.elem, check_tuple_names);
 
 	case Type_SoaPointer:
-		return are_types_identical(x->SoaPointer.elem, y->SoaPointer.elem);
+		return are_types_identical_internal(x->SoaPointer.elem, y->SoaPointer.elem, check_tuple_names);
 
 	case Type_Named:
 		return x->Named.type_name == y->Named.type_name;
@@ -3485,7 +3430,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 			for_array(i, x->Tuple.variables) {
 				Entity *xe = x->Tuple.variables[i];
 				Entity *ye = y->Tuple.variables[i];
-				if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
+				if (xe->kind != ye->kind || !are_types_identical_internal(xe->type, ye->type, check_tuple_names)) {
 					return false;
 				}
 				if (check_tuple_names) {
@@ -3508,22 +3453,22 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		       are_types_identical_internal(x->Proc.results, y->Proc.results, check_tuple_names);
 
 	case Type_Map:
-		return are_types_identical(x->Map.key,   y->Map.key) &&
-		       are_types_identical(x->Map.value, y->Map.value);
+		return are_types_identical_internal(x->Map.key,   y->Map.key, check_tuple_names) &&
+		       are_types_identical_internal(x->Map.value, y->Map.value, check_tuple_names);
 
 	case Type_SimdVector:
 		if (x->SimdVector.count == y->SimdVector.count) {
-			return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
+			return are_types_identical_internal(x->SimdVector.elem, y->SimdVector.elem, check_tuple_names);
 		}
 		break;
 
 	case Type_BitField:
-		if (are_types_identical(x->BitField.backing_type, y->BitField.backing_type) &&
+		if (are_types_identical_internal(x->BitField.backing_type, y->BitField.backing_type, check_tuple_names) &&
 		    x->BitField.fields.count == y->BitField.fields.count) {
 			for_array(i, x->BitField.fields) {
 				Entity *a = x->BitField.fields[i];
 				Entity *b = y->BitField.fields[i];
-				if (!are_types_identical(a->type, b->type)) {
+				if (!are_types_identical_internal(a->type, b->type, check_tuple_names)) {
 					return false;
 				}
 				if (a->token.string != b->token.string) {

@@ -2169,6 +2169,7 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 
 #include "check_asm.cpp"
 
+gb_internal void add_deps_from_child_to_parent(DeclInfo *decl);
 
 gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
@@ -2236,7 +2237,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 		// NOTE: a file scope's is set from its own file and shared by every thread, see `create_scope_from_file`
 		bool set_context = (c.scope->flags & ScopeFlag_File) == 0;
-		auto prev_flags = c.scope->flags;
+		u32 prev_flags = c.scope->flags;
 		defer (if (set_context) {
 			c.scope->flags = prev_flags;
 		});
@@ -2244,7 +2245,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 			if (check_feature_flags(ctx, d->decl_node) & OptInFeatureFlag_GlobalContext) {
 				c.scope->flags |= ScopeFlag_ContextDefined;
 			} else {
-				c.scope->flags &= ~ScopeFlag_ContextDefined;
+				c.scope->flags &= ~cast(u32)ScopeFlag_ContextDefined;
 			}
 		}
 
@@ -2296,6 +2297,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 		e->state = EntityState_Resolved;
 
+		add_deps_from_child_to_parent(d);
 	}
 end:;
 	global_entity_timing_end(timing_frame, e);
@@ -2319,33 +2321,29 @@ gb_internal void wait_for_entity(Entity *e) {
 
 
 gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
-	if (decl && decl->parent) {
-		Scope *ps = decl->parent->scope;
-		if (ps->flags & (ScopeFlag_Pkg | ScopeFlag_Global)) {
-			return;
-		} else {
-			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
-			// But only at the procedure level
-			rw_mutex_shared_lock(&decl->deps_mutex);
-			rw_mutex_lock(&decl->parent->deps_mutex);
+	if (decl == nullptr) {
+		return;
+	}
+	for (DeclInfo *p = decl->parent; p != nullptr && (p->scope->flags & (ScopeFlag_Pkg | ScopeFlag_Global)) == 0; p = p->parent) {
+		rw_mutex_shared_lock(&decl->deps_mutex);
+		rw_mutex_lock(&p->deps_mutex);
 
-			FOR_PTR_SET(e, decl->deps) {
-				ptr_set_add(&decl->parent->deps, e);
-			}
-
-			rw_mutex_unlock(&decl->parent->deps_mutex);
-			rw_mutex_shared_unlock(&decl->deps_mutex);
-
-			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
-			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
-
-			for (auto const &tt : decl->type_info_deps) {
-				type_set_add(&decl->parent->type_info_deps, tt);
-			}
-
-			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
-			rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
+		FOR_PTR_SET(e, decl->deps) {
+			ptr_set_add(&p->deps, e);
 		}
+
+		rw_mutex_unlock(&p->deps_mutex);
+		rw_mutex_shared_unlock(&decl->deps_mutex);
+
+		rw_mutex_shared_lock(&decl->type_info_deps_mutex);
+		rw_mutex_lock(&p->type_info_deps_mutex);
+
+		for (auto const &tt : decl->type_info_deps) {
+			type_set_add(&p->type_info_deps, tt);
+		}
+
+		rw_mutex_unlock(&p->type_info_deps_mutex);
+		rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
 	}
 }
 
@@ -2425,7 +2423,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 					break;
 				}
 
-				bool is_value = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
+				bool is_value = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type) && !is_type_soa_pointer(e->type);
 				String name = e->token.string;
 				Type *t = base_type(type_deref(e->type));
 				if (t->kind == Type_Struct) {

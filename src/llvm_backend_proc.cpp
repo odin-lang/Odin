@@ -919,31 +919,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 		return;
 	}
 
-	// NOTE(bill): Generate a new name
-	// parent.name-guid
-	String original_name = e->token.string;
-	String pd_name = original_name;
-	if (e->Procedure.link_name.len > 0) {
-		pd_name = e->Procedure.link_name;
-	}
-
-
-	isize name_len = p->name.len + 1 + pd_name.len + 1 + 10 + 1 + 16 + 1;
-	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-
-	// NOTE(bill): named by declaration position (and type, for polymorphic instances, which share it)
-	// rather than by how many children were built before it, as that order varies
-	i32 guid = e->token.pos.offset;
-	if (e->decl_info != nullptr && e->decl_info->para_poly_original != nullptr) {
-		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(p->name), LIT(pd_name), guid,
-		                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
-	} else {
-		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(p->name), LIT(pd_name), guid);
-	}
-	String name = make_string(cast(u8 *)name_text, name_len-1);
-
-	e->Procedure.link_name = name;
-
+	// NOTE(bil): Nested procedures are named by `lb_get_entity_name` from its enclosing declarations
 	lbProcedure *nested_proc = lb_create_procedure(p->module, e);
 	if (nested_proc == nullptr) {
 		// This is an unspecialized polymorphic procedure, skip codegen

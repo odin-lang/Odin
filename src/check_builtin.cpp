@@ -2102,8 +2102,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 	} else {
 		String base_dir = dir_from_path(get_file_path_string(call->file_id));
 
-		BlockingMutex *ignore_mutex = nullptr;
-		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		bool ok = determine_path_from_string(true, call, base_dir, original_string, &path);
 		if (!ok) {
 			if (err_on_not_found) {
 				error(ce->proc, "Failed to `#%.*s` file: %.*s; invalid file or cannot be found", LIT(builtin_name), LIT(original_string));
@@ -2352,8 +2351,7 @@ gb_internal LoadDirectiveResult check_load_directory_directive(CheckerContext *c
 	} else {
 		String base_dir = dir_from_path(get_file_path_string(call->file_id));
 
-		BlockingMutex *ignore_mutex = nullptr;
-		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		bool ok = determine_path_from_string(true, call, base_dir, original_string, &path);
 		gb_unused(ok);
 	}
 	// NOTE(bill): the map is only locked to find or add the directory's entry which is loaded under its own mutex

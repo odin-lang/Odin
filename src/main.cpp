@@ -13,17 +13,10 @@
 #endif
 #include "exact_value.cpp"
 #include "build_settings.cpp"
-gb_global ThreadPool global_thread_pool;
 gb_internal void init_global_thread_pool(void) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count; // +1
 	thread_pool_init(&global_thread_pool, worker_count, "ThreadPoolWorker");
-}
-gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
-	return thread_pool_add_task(&global_thread_pool, proc, data);
-}
-gb_internal void thread_pool_wait(void) {
-	thread_pool_wait(&global_thread_pool);
 }
 
 
@@ -552,6 +545,10 @@ enum BuildFlagKind {
 	BuildFlag_AndroidKeystoreAlias,
 	BuildFlag_AndroidKeystorePassword,
 
+#if !defined(GB_SYSTEM_WINDOWS)
+	BuildFlag_WindowsSDKRoot,
+#endif
+
 	BuildFlag_COUNT,
 };
 
@@ -819,6 +816,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidKeystore,         str_lit("android-keystore"),          BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystoreAlias,    str_lit("android-keystore-alias"),    BuildFlagParam_String,  Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
+
+#if !defined(GB_SYSTEM_WINDOWS)
+	add_flag(&build_flags, BuildFlag_WindowsSDKRoot,          str_lit("windows-sdk-root"),          BuildFlagParam_String,  Command_build);
+#endif
 
 
 	Array<String> flag_args = {};
@@ -2029,6 +2030,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.android_keystore_password = value.value_string;
 							break;
+
+					#if !defined(GB_SYSTEM_WINDOWS)
+						case BuildFlag_WindowsSDKRoot:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.windows_sdk_root = value.value_string;
+							break;
+					#endif
 						}
 					}
 
@@ -4321,6 +4329,13 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	return 1;
 	// }
 	
+#if !defined(GB_SYSTEM_WINDOWS)
+	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0) {
+		gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
+		gb_exit(1);
+	}
+#endif
+
 	// Warn about Windows i386 thread-local storage limitations
 	if (build_context.metrics.arch == TargetArch_i386 && build_context.metrics.os == TargetOs_windows) {
 		gb_printf_err("Warning: Thread-local storage is disabled on Windows i386.\n");
@@ -4485,12 +4500,16 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init asm tables");
 	init_asm_tables(build_context.metrics.ptr_size);
 
+	checker->parser = parser;
+	init_checker(checker);
+
 	MAIN_TIME_SECTION("parse files");
 
 	if (!init_parser(parser)) {
 		return 1;
 	}
 	defer (destroy_parser(parser));
+	parser->package_parsed_proc = check_collect_package_entities_worker_proc;
 
 	// TODO(jeroen): Remove the `init_filename` param.
 	// Let's put that on `build_context.build_paths[0]` instead.
@@ -4503,10 +4522,8 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 		return 1;
 	}
-
-	checker->parser = parser;
-	init_checker(checker);
-	defer (destroy_checker(checker)); // this is here because of a `goto`
+	release_held_errors();
+	defer (destroy_checker(checker));
 
 	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");
