@@ -5451,6 +5451,15 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 
 			bool is_exported = entity_visibility_kind != EntityVisiblity_PrivateToFile;
 			add_entity_and_decl_info(c, name, e, d, is_exported);
+
+			if (e->kind == Entity_Constant && init->kind == Ast_Ident && c->trial_entities == nullptr &&
+			    (c->scope->flags&ScopeFlag_File) && !is_blank_ident(token)) {
+				AstFile *f = c->scope->file;
+				if (f->type_alias_candidates.allocator.proc == nullptr) {
+					array_init(&f->type_alias_candidates, heap_allocator());
+				}
+				array_add(&f->type_alias_candidates, e);
+			}
 		}
 
 		check_arity_match(c, vd, true);
@@ -5507,19 +5516,12 @@ gb_internal void correct_type_aliases_in_package(CheckerContext *c, AstPackage *
 
 	// NOTE(bill): Only a constant of an identifier can be corrected and a correction never changes what an identifier names
 	// This means that those are gathered once and corrected until a pass corrects none
+	//
+	// Each file lists its global ones as they are collected, see `check_collect_value_decl`
 	auto candidates = array_make<Entity *>(temporary_allocator());
-	auto add_candidates = [&candidates](Scope *s) {
-		for (auto const &entry : s->elements) {
-			Entity *e = entry.value;
-			if (e != nullptr && e->kind == Entity_Constant && e->decl_info != nullptr &&
-			    e->decl_info->init_expr != nullptr && e->decl_info->init_expr->kind == Ast_Ident) {
-				array_add(&candidates, e);
-			}
-		}
-	};
-	add_candidates(pkg->scope);
 	for (AstFile *f : pkg->files) {
-		add_candidates(f->scope);
+		array_add_elems(&candidates, f->type_alias_candidates.data, f->type_alias_candidates.count);
+		array_free(&f->type_alias_candidates);
 	}
 
 	for (bool corrected = true; corrected; /**/) {
@@ -6408,16 +6410,6 @@ gb_internal void check_import_entities(Checker *c) {
 
 	TIME_SECTION("check_import_entities - resolve 'when' and 'foreign' blocks");
 	resolve_global_decl_sources(c, package_order, scans);
-
-	TIME_SECTION("check_import_entities - correct type aliases");
-	stage_start = global_import_stage_begin();
-
-	for (ImportGraphNode *node : package_order) {
-		GB_ASSERT(node->scope->flags&ScopeFlag_Pkg);
-		thread_pool_add_task(correct_type_aliases_worker_proc, node->scope->pkg);
-	}
-	thread_pool_wait();
-	global_import_stage_end(GlobalImportStage_TypeAliases, stage_start);
 }
 
 gb_internal WORKER_TASK_PROC(check_file_directives_worker_proc) {
@@ -7791,6 +7783,17 @@ gb_internal void check_parsed_files(Checker *c) {
 	// NOTE: Timing Section handled internally, which also exports the entities collected so far
 	check_import_entities(c);
 
+	TIME_SECTION("correct type aliases and add entities from packages");
+	// NOTE(bill): The global entities are gathered from the files' lists whilst the type aliases are corrected which also adds none
+	TaskGroup group = {};
+	u64 stage_start = global_import_stage_begin();
+	for (AstPackage *pkg : c->parser->packages) {
+		thread_pool_add_task(&group, correct_type_aliases_worker_proc, pkg);
+	}
+	bool entities_in_order = check_add_entities_from_files(c);
+	thread_pool_wait(&group);
+	global_import_stage_end(GlobalImportStage_TypeAliases, stage_start);
+
 	TIME_SECTION("export entities - post");
 	check_export_entities_post(c);
 
@@ -7805,8 +7808,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	intrinsics_pkg->scope->flags |= ScopeFlag_ReadOnly;
 	config_pkg->scope->flags     |= ScopeFlag_ReadOnly;
 
-	TIME_SECTION("add entities from packages");
-	bool entities_in_order = check_add_entities_from_files(c);
+	TIME_SECTION("add entities from queues");
 	check_merge_queues_into_arrays(c);
 
 	if (!entities_in_order) {

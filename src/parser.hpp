@@ -186,6 +186,8 @@ struct AstFile {
 
 	Array<struct Entity *> collected_entities;
 	bool                   collected_entities_out_of_order;
+
+	Array<struct Entity *> type_alias_candidates; // see `correct_type_aliases_in_package`
 };
 
 enum AstForeignFileKind {

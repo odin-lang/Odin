@@ -4470,7 +4470,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 	checker->parser = parser;
 	init_checker(checker);
-	defer (destroy_checker(checker));
 
 	MAIN_TIME_SECTION("parse files");
 
@@ -4492,6 +4491,7 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 	release_held_errors();
+	defer (destroy_checker(checker));
 
 	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");
