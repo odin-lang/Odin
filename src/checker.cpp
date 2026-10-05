@@ -7832,6 +7832,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	EntityGraph graph = {};
 	generate_entity_dependency_graph_nodes(&graph, &c->info, get_arena(ThreadArena_Permanent));
 
+	ThreadPoolChunks<Entity *> cycle_checks = {};
 	{
 		// NOTE(bill): Since both only read what the procedure bodies left they can run alongside the stages below
 		// and are waited for only before what changes that
@@ -7840,16 +7841,11 @@ gb_internal void check_parsed_files(Checker *c) {
 		TIME_SECTION("start scope usages and type and inline cycles");
 		TaskGroup scope_usages = {};
 		start_check_all_scope_usages(c, &scope_usages);
-		ThreadPoolChunks<Entity *> cycle_checks = {};
 		thread_pool_start_chunks(&cycle_checks, c->info.definitions.data, c->info.definitions.count, 1024, check_for_type_and_inline_cycles);
 
 		// NOTE: after them, as it is waited for last, so they are taken first
 		TIME_SECTION("start global init order");
 		start_calculate_global_init_order(&graph, &c->info);
-
-		TIME_SECTION("wait for type and inline cycles");
-		thread_pool_wait_chunks(&cycle_checks);
-		check_merge_queues_into_arrays(c);
 
 		TIME_SECTION("wait for scope usages");
 		thread_pool_wait(&scope_usages);
@@ -7872,6 +7868,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	// because that collects the test procedures.
 	TIME_SECTION("check test procedures");
 	check_test_procedures(c);
+
+	TIME_SECTION("wait for type and inline cycles");
+	thread_pool_wait_chunks(&cycle_checks);
 
 	TIME_SECTION("wait for global init order");
 	thread_pool_wait(&graph.tasks);
