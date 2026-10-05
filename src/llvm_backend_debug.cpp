@@ -18,6 +18,21 @@ gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef va
 	}
 }
 
+gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
+	if (f == nullptr || m->debug_builder == nullptr) {
+		return nullptr;
+	}
+	MUTEX_GUARD(&m->debug_values_mutex);
+	LLVMMetadataRef res = lb_get_llvm_metadata(m, f);
+	if (res == nullptr) {
+		res = LLVMDIBuilderCreateFile(m->debug_builder,
+			cast(char const *)f->filename.text, f->filename.len,
+			cast(char const *)f->directory.text, f->directory.len);
+		lb_set_llvm_metadata(m, f, res);
+	}
+	return res;
+}
+
 gb_internal void lb_add_raddbg_string(lbModule *m, String const &str) {
 	mpsc_enqueue(&m->gen->raddebug_section_strings, copy_string(permanent_allocator(), str));
 }
@@ -65,10 +80,12 @@ gb_internal LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *
 	return lb_debug_location_from_token_pos(p, ast_end_token(node).pos);
 }
 
-gb_internal void lb_debug_file_line(lbModule *m, Ast *node, LLVMMetadataRef *file, unsigned *line) {
-	if (*file == nullptr) {
+// NOTE(bill): not for an anonymous type, as identical ones are interchangeable, and which one is used
+// (e.g. by a polymorphic instance) depends on the checking order
+gb_internal void lb_debug_file_line(lbModule *m, Type *type, Ast *node, LLVMMetadataRef *file, unsigned *line) {
+	if (*file == nullptr && type->kind == Type_Named) {
 		if (node) {
-			*file = lb_get_llvm_metadata(m, node->file());
+			*file = lb_get_file_metadata(m, node->file());
 			*line = cast(unsigned)ast_token(node).pos.line;
 		}
 	}
@@ -172,7 +189,7 @@ gb_internal LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &nam
 
 	AstPackage *pkg = m->info->runtime_package;
 	GB_ASSERT(pkg->files.count != 0);
-	LLVMMetadataRef file = lb_get_llvm_metadata(m, pkg->files[0]);
+	LLVMMetadataRef file = lb_get_file_metadata(m, pkg->files[0]);
 	LLVMMetadataRef scope = file;
 
 	return LLVMDIBuilderCreateMemberType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, field_line,
@@ -183,7 +200,7 @@ gb_internal LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &nam
 gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_in_bits, u32 align_in_bits, LLVMMetadataRef *elements, unsigned element_count) {
 	AstPackage *pkg = m->info->runtime_package;
 	GB_ASSERT(pkg->files.count != 0);
-	LLVMMetadataRef file = lb_get_llvm_metadata(m, pkg->files[0]);
+	LLVMMetadataRef file = lb_get_file_metadata(m, pkg->files[0]);
 	LLVMMetadataRef scope = file;
 
 	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
@@ -192,7 +209,7 @@ gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &nam
 gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	GB_ASSERT(bt->kind == Type_Struct);
 
-	lb_debug_file_line(m, bt->Struct.node, &file, &line);
+	lb_debug_file_line(m, type, bt->Struct.node, &file, &line);
 
 	unsigned tag = DW_TAG_structure_type;
 	if (is_type_raw_union(bt)) {
@@ -476,7 +493,7 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Union);
 
-	lb_debug_file_line(m, bt->Union.node, &file, &line);
+	lb_debug_file_line(m, type, bt->Union.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
@@ -560,7 +577,7 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_BitSet);
 
-	lb_debug_file_line(m, bt->BitSet.node, &file, &line);
+	lb_debug_file_line(m, type, bt->BitSet.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
@@ -641,7 +658,7 @@ gb_internal LLVMMetadataRef lb_debug_bitfield(lbModule *m, Type *type, String na
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_BitField);
 
-	lb_debug_file_line(m, bt->BitField.node, &file, &line);
+	lb_debug_file_line(m, type, bt->BitField.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
@@ -682,7 +699,7 @@ gb_internal LLVMMetadataRef lb_debug_enum(lbModule *m, Type *type, String name, 
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_Enum);
 
-	lb_debug_file_line(m, bt->Enum.node, &file, &line);
+	lb_debug_file_line(m, type, bt->Enum.node, &file, &line);
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
@@ -1117,7 +1134,7 @@ gb_internal LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope
 			}
 		}
 		if (scope->flags & ScopeFlag_File) {
-			found = lb_get_llvm_metadata(m, scope->file);
+			found = lb_get_file_metadata(m, scope->file);
 			if (found) {
 				return found;
 			}
@@ -1189,6 +1206,25 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	return dt;
 }
 
+// A variable whose address is not a stack slot of its own (an argument, or an element or a pointer it refers to)
+// would have its location tracked with `DBG_VALUE`s through every block of the procedure,
+// so it is described through a stack slot holding that address instead
+gb_internal LLVMValueRef lb_debug_storage(lbProcedure *p, LLVMValueRef storage, LLVMMetadataRef *expr) {
+	bool is_argument = LLVMIsAArgument(storage) != nullptr;
+	if (!is_argument && (!LLVMIsAInstruction(storage) || LLVMIsAAllocaInst(storage))) {
+		return storage;
+	}
+	LLVMBasicBlockRef insert_block = LLVMGetInsertBlock(p->builder);
+	LLVMValueRef slot = llvm_alloca(p, LLVMTypeOf(storage), build_context.ptr_size, "");
+	LLVMPositionBuilderAtEnd(p->builder, is_argument ? p->decl_block->block : insert_block);
+	LLVMBuildStore(p->builder, storage, slot);
+	LLVMPositionBuilderAtEnd(p->builder, insert_block);
+
+	uint64_t deref = 0x06; // DW_OP_deref
+	*expr = LLVMDIBuilderCreateExpression(p->module->debug_builder, &deref, 1);
+	return slot;
+}
+
 gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token) {
 	if (p->debug_info == nullptr) {
 		return;
@@ -1217,7 +1253,7 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 	AstFile *file = p->body->file();
 
 	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
-	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	LLVMMetadataRef llvm_file = lb_get_file_metadata(m, file);
 	GB_ASSERT(llvm_scope != nullptr);
 	if (llvm_file == nullptr) {
 		llvm_file = LLVMDIScopeGetFile(llvm_scope);
@@ -1247,6 +1283,7 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
+	storage = lb_debug_storage(p, storage, &llvm_expr);
 
 #if LLVM_VERSION_MAJOR <= 18
 	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
@@ -1284,7 +1321,7 @@ gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, T
 	AstFile *file = p->body->file();
 
 	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
-	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	LLVMMetadataRef llvm_file = lb_get_file_metadata(m, file);
 	GB_ASSERT(llvm_scope != nullptr);
 	if (llvm_file == nullptr) {
 		llvm_file = LLVMDIScopeGetFile(llvm_scope);
@@ -1312,6 +1349,7 @@ gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, T
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
+	storage = lb_debug_storage(p, storage, &llvm_expr);
 
 	// NOTE(bill, 2022-02-01): For parameter values, you must insert them at the end of the decl block
 	// The reason is that if the parameter is at index 0 and a pointer, there is not such things as an
@@ -1477,7 +1515,7 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 	}
 
 	AstFile *file = label->file();
-	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	LLVMMetadataRef llvm_file = lb_get_file_metadata(m, file);
 	if (llvm_file == nullptr) {
 		debugf("llvm file not found for label\n");
 		return;

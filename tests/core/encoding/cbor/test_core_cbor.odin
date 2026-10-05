@@ -201,7 +201,7 @@ test_marshalling :: proc(t: ^testing.T) {
 	},
 	"base64": 34("MTYgaXMgYSBuaWNlIG51bWJlcg=="),
 	"biggie": 18446744073709551615,
-	"ennieb": 512,
+	"ennieb": 2,
 	"iamint": -256,
 	"biggest": 2(h'0f951a9fd3c158afdff08ab8e0'),
 	"smallie": -18446744073709551616,
@@ -909,4 +909,54 @@ expect_streamed_encoding :: proc(t: ^testing.T, encoded: string, values: ..cbor.
 	testing.expect_value(t, err, nil, loc)
 
 	testing.expect_value(t, fmt.tprint(bytes.buffer_to_bytes(&buf)), fmt.tprint(transmute([]byte)encoded), loc)
+}
+
+
+@(test)
+test_bit_set_endianness :: proc(t: ^testing.T) {
+	check :: proc(t: ^testing.T, $Backing: typeid, wide_encoding: string) {
+		Flag :: enum { First = 0, Second = 9, Last = 12 }
+		Flags :: bit_set[Flag; Backing]
+		value := Flags{.First, .Second, .Last}
+
+		options := [2]cbor.Encoder_Flags{cbor.ENCODE_SMALL, {}}
+		for flags in options {
+			expected := flags == cbor.ENCODE_SMALL ? "\x19\x12\x01" : wide_encoding
+			data, err := cbor.marshal(value, flags)
+			defer delete(data)
+			testing.expect_value(t, err, nil)
+			testing.expect_value(t, string(data), expected)
+
+			decoded: Flags
+			uerr := cbor.unmarshal(expected, &decoded)
+			testing.expect_value(t, uerr, nil)
+			testing.expect_value(t, decoded, value)
+		}
+
+		data, err := cbor.marshal(Flags{})
+		defer delete(data)
+		testing.expect_value(t, err, nil)
+		testing.expect_value(t, string(data), "\x00")
+	}
+
+	Small_Flags :: bit_set[0..=7; u8]
+	control := Small_Flags{1, 5}
+	data, err := cbor.marshal(control)
+	defer delete(data)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, string(data), "\x18\x22")
+	decoded: Small_Flags
+	uerr := cbor.unmarshal("\x18\x22", &decoded)
+	testing.expect_value(t, uerr, nil)
+	testing.expect_value(t, decoded, control)
+
+	check(t, u16,   "\x19\x12\x01")
+	check(t, u16le, "\x19\x12\x01")
+	check(t, u16be, "\x19\x12\x01")
+	check(t, u32,   "\x1a\x00\x00\x12\x01")
+	check(t, u32le, "\x1a\x00\x00\x12\x01")
+	check(t, u32be, "\x1a\x00\x00\x12\x01")
+	check(t, u64,   "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
+	check(t, u64le, "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
+	check(t, u64be, "\x1b\x00\x00\x00\x00\x00\x00\x12\x01")
 }

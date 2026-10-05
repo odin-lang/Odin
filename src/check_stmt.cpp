@@ -846,10 +846,10 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 	}
 
 	case Entity_Variable: {
-		bool is_ptr = is_type_pointer(e->type);
+		bool is_ptr = is_type_pointer(e->type) || is_type_soa_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
-			wait_signal_until_available(&t->Struct.fields_wait_signal);
+			wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
 
 			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
@@ -1187,7 +1187,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	} else {
 		x.mode  = Addressing_Constant;
-		x.type  = t_bool;
+		x.type  = t_untyped_bool;
 		x.value = exact_value_bool(true);
 
 		Token token  = {};
@@ -1314,6 +1314,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					check_expr_or_type(ctx, &y, expr, x.type);
 				} else {
 					check_expr_with_type_hint(ctx, &y, expr, x.type);
+				}
+				if (expr->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+					error(expr, "Procedure calls that have an associated deferred procedure are not allowed within case clauses");
 				}
 
 				if (x.mode == Addressing_Invalid ||
@@ -1536,6 +1539,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		bool saw_nil = false;
 		// TODO(bill): Make robust
 		Type *bt = base_type(type_deref(x.type));
+		if (bt->kind == Type_Union) {
+			wait_for_record_signal(&bt->Union.variants_wait_signal, &bt->Union.checking_thread);
+		}
 
 		Type *case_type = nullptr;
 		for (Ast *type_expr : cc->list) {
@@ -2349,23 +2355,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			}
 			init_entity_foreign_library(ctx, e);
 
-			auto *fp = &ctx->checker->info.foreigns;
-			StringHashKey key = string_hash_string(name);
-			Entity **found = string_map_get(fp, key);
-			if (found) {
-				Entity *f = *found;
-				TokenPos pos = f->token.pos;
-				Type *this_type = base_type(e->type);
-				Type *other_type = base_type(f->type);
-				if (!signature_parameter_similar_enough(this_type, other_type)) {
-					error(e->token,
-					      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-					      "\tat %s",
-					      LIT(name), token_pos_to_string(pos));
-				}
-			} else {
-				string_map_set(fp, key, e);
-			}
+			add_link_name_use(ctx->info, name, e, ctx->decl, LinkNameUse_Variable);
 		} else if (e->flags & EntityFlag_Static) {
 			if (vd->values.count > 0) {
 				if (entity_count != vd->values.count) {

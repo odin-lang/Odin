@@ -7,6 +7,7 @@
 	#pragma warning(disable: 4505)
 #endif
 #include "big_int.cpp"
+#include "big_rat.cpp"
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif
@@ -430,6 +431,7 @@ enum BuildFlagKind {
 	BuildFlag_NoBoundsCheck,
 	BuildFlag_WebkitSwitchWorkaround,
 	BuildFlag_NoTypeAssert,
+	BuildFlag_LifetimeMarkers,
 	BuildFlag_NoDynamicLiterals,
 	BuildFlag_DynamicLiterals,
 	BuildFlag_NoCRT,
@@ -458,6 +460,7 @@ enum BuildFlagKind {
 	BuildFlag_VetSemicolon,
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
+	BuildFlag_VetWhenShadowing,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -530,6 +533,9 @@ enum BuildFlagKind {
 	BuildFlag_InternalLLVMVerification,
 	BuildFlag_InternalLLVMNoSROA,
 	BuildFlag_InternalEnableRVO,
+	BuildFlag_InternalGlobalEntityGraph,
+	BuildFlag_InternalShuffleGlobalEntities,
+	BuildFlag_InternalCheckGlobalEdges,
 
 	BuildFlag_Sanitize,
 	BuildFlag_LTO,
@@ -695,6 +701,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_WebkitSwitchWorkaround,  str_lit("webkit-switch-workaround"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoTypeAssert,            str_lit("no-type-assert"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_LifetimeMarkers,         str_lit("lifetime-markers"),          BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DynamicLiterals,         str_lit("dynamic-literals"),          BuildFlagParam_None,    Command__does_check);
@@ -724,6 +731,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetWhenShadowing,        str_lit("vet-when-shadowing"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -794,6 +802,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalLLVMVerification, str_lit("internal-ignore-llvm-verification"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalLLVMNoSROA,      str_lit("internal-llvm-no-sroa"), BuildFlagParam_None, Command_all);
 	add_flag(&build_flags, BuildFlag_InternalEnableRVO,       str_lit("internal-enable-rvo"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_InternalGlobalEntityGraph, str_lit("internal-global-entity-graph"), BuildFlagParam_None, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalShuffleGlobalEntities, str_lit("internal-shuffle-global-entities"), BuildFlagParam_Integer, Command__does_check);
+	add_flag(&build_flags, BuildFlag_InternalCheckGlobalEdges, str_lit("internal-check-global-edges"), BuildFlagParam_None, Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Sanitize,                str_lit("sanitize"),                  BuildFlagParam_String,  Command__does_build, true);
@@ -944,7 +955,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						case BuildFlagParam_Float:
-							if (value.kind != ExactValue_Float) {
+							if (value.kind != ExactValue_Float && value.kind != ExactValue_Rational) {
 								gb_printf_err("%.*s expected a floating pointer number, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
@@ -1344,8 +1355,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String str = value.value_string;
 
-							if (build_context.command != "build") {
-								gb_printf_err("'build-mode' can only be used with the 'build' command\n");
+							if (build_context.command != "build" && build_context.command != "test") {
+								gb_printf_err("'build-mode' can only be used with the 'build' and 'test' commands\n");
 								bad_flags = true;
 								break;
 							}
@@ -1399,6 +1410,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_NoTypeAssert:
 							build_context.no_type_assert = true;
+							break;
+						case BuildFlag_LifetimeMarkers:
+							build_context.lifetime_markers = true;
 							break;
 						case BuildFlag_NoDynamicLiterals:
 							gb_printf_err("Warning: Use of -no-dynamic-literals is now redundant\n");
@@ -1491,6 +1505,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetSemicolon:        build_context.vet_flags |= VetFlag_Semicolon;        break;
 						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
+						case BuildFlag_VetWhenShadowing:    build_context.vet_flags |= VetFlag_WhenShadowing;    break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
@@ -1843,6 +1858,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalEnableRVO:
 							build_context.enable_rvo = true;
 							break;
+						case BuildFlag_InternalGlobalEntityGraph:
+							build_context.internal_global_entity_graph = true;
+							break;
+						case BuildFlag_InternalShuffleGlobalEntities:
+							GB_ASSERT(value.kind == ExactValue_Integer);
+							build_context.internal_shuffle_global_entities = cast(u64)big_int_to_i64(&value.value_integer);
+							break;
+						case BuildFlag_InternalCheckGlobalEdges:
+							build_context.internal_check_global_edges = true;
+							break;
 
 
 						case BuildFlag_Sanitize:
@@ -1869,7 +1894,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (str_eq_ignore_case(value.value_string, str_lit("thin"))) {
 								build_context.lto_kind = LTO_Thin;
-								if (build_context.linker_choice == Linker_Invalid || build_context.linker_choice == Linker_Default) {
+								if (build_context.linker_choice == Linker_Invalid) {
 									build_context.linker_choice = Linker_lld;
 								}
 								if (!build_context.use_separate_modules) {
@@ -2373,6 +2398,132 @@ gb_internal void show_import_graph(Checker *c) {
 	gb_printf("}\n\n");
 }
 
+gb_internal void add_time_to_tokenize_only(AstFile *f, f64 *time, u64 *cpu_time) {
+	isize size = f->tokenizer.end - f->tokenizer.start;
+	if (size <= 0) {
+		return;
+	}
+	Tokenizer t = {};
+	t.curr_file_id = f->id;
+	init_tokenizer_with_data(&t, f->fullpath, f->tokenizer.start, size);
+
+	u64 start     = time_stamp_time_now();
+	u64 cpu_start = thread_cpu_time_now();
+	Token token = {};
+	do {
+		tokenizer_get_token(&t, &token);
+	} while (token.kind != Token_EOF && token.kind != Token_Invalid);
+	*cpu_time += thread_cpu_time_now()-cpu_start;
+	*time     += cast(f64)(time_stamp_time_now()-start)/cast(f64)time_stamp__freq();
+}
+
+gb_internal GB_COMPARE_PROC(file_cpu_time_to_parse_cmp) {
+	AstFile *x = *(AstFile **)a;
+	AstFile *y = *(AstFile **)b;
+	if (x->cpu_time_to_parse != y->cpu_time_to_parse) {
+		return x->cpu_time_to_parse > y->cpu_time_to_parse ? -1 : +1;
+	}
+	return string_compare(x->fullpath, y->fullpath);
+}
+
+gb_internal void show_parse_timings(Parser *p, Timings *t) {
+	auto all_files = array_make<AstFile *>(heap_allocator(), 0, p->packages.count*8);
+	defer (array_free(&all_files));
+	for (AstPackage *pkg : p->packages) {
+		for (AstFile *file : pkg->files) {
+			array_add(&all_files, file);
+		}
+	}
+
+	f64 cpu_freq = thread_cpu_time_freq();
+
+	isize tokens = p->total_token_count;
+	isize lines  = p->total_line_count;
+	isize total_file_size = 0;
+
+	f64 load_time          = 0;
+	f64 load_cpu_time      = 0;
+	f64 parse_time         = 0;
+	f64 parse_cpu_time     = 0;
+	f64 setup_time         = 0;
+	f64 setup_cpu_time     = 0;
+	f64 tokenize_time      = 0;
+	u64 tokenize_cpu_ticks = 0;
+
+	for (AstFile *file : all_files) {
+		total_file_size += file->tokenizer.end - file->tokenizer.start;
+		load_time       += file->time_to_load;
+		parse_time      += file->time_to_parse;
+		setup_time      += file->time_to_setup_decls;
+		load_cpu_time   += cast(f64)file->cpu_time_to_load/cpu_freq;
+		parse_cpu_time  += cast(f64)file->cpu_time_to_parse/cpu_freq;
+		setup_cpu_time  += cast(f64)file->cpu_time_to_setup_decls/cpu_freq;
+
+		add_time_to_tokenize_only(file, &tokenize_time, &tokenize_cpu_ticks);
+	}
+
+	f64 tokenize_cpu_time = cast(f64)tokenize_cpu_ticks/cpu_freq;
+
+	f64 wall_time = 0;
+	for (TimeStamp const &s : t->sections) {
+		if (s.label == "parse files") {
+			wall_time = time_stamp_as_s(s, t->freq);
+			break;
+		}
+	}
+
+	isize thread_count = gb_max(global_thread_pool.threads.count, 1);
+	f64 task_time     = load_time + parse_time + setup_time;
+	f64 task_cpu_time = load_cpu_time + parse_cpu_time + setup_cpu_time;
+	f64 mib = cast(f64)total_file_size/(1024.0*1024.0);
+
+	auto const &row = [&](char const *label, f64 time, f64 cpu_time, bool rates) {
+		gb_printf_err("    %s - %9.3f ms  %9.3f ms", label, 1.0e3*time, 1.0e3*cpu_time);
+		if (rates) {
+			f64 lines_per_second = cast(f64)lines/cpu_time;
+			char const *loc = "  LOC/s";
+			if (lines_per_second >= 1.0e6) {
+				lines_per_second /= 1.0e6;
+				loc = " MLOC/s";
+			} else if (lines_per_second >= 1.0e3) {
+				lines_per_second /= 1.0e3;
+				loc = " kLOC/s";
+			}
+			gb_printf_err("  %7.3f us/token  %7.3f us/line  %8.2f MiB/s  %7.2f%s",
+			              1.0e6*cpu_time/cast(f64)tokens, 1.0e6*cpu_time/cast(f64)lines, mib/cpu_time, lines_per_second, loc);
+		}
+		gb_printf_err("\n");
+	};
+
+	gb_printf_err("Parsing (%td files, %td lines, %td tokens, %.2f MiB, %td threads)\n", all_files.count, lines, tokens, mib, thread_count);
+	gb_printf_err("    parse files                      - %9.3f ms (wall time)\n", 1.0e3*wall_time);
+	gb_printf_err("                                         wall time   CPU time  (rates from the CPU time)\n");
+	row(          "file tasks                      ", task_time, task_cpu_time, false);
+	row(          "  loading files                 ", load_time, load_cpu_time, false);
+	row(          "  tokenizing and parsing        ", parse_time, parse_cpu_time, true);
+	row(          "  setting up decls and imports  ", setup_time, setup_cpu_time, false);
+	row(          "tokenizing alone, 1 thread      ", tokenize_time, tokenize_cpu_time, true);
+	if (build_context.thread_count == 1) {
+		row(      "parsing alone (estimated)       ", parse_time-tokenize_time, parse_cpu_time-tokenize_cpu_time, true);
+	} else {
+		gb_printf_err("    parsing alone                    - estimated with -thread-count:1\n");
+	}
+	gb_printf_err("    the file tasks kept the threads %.0f%% busy and %.0f%% of their time was spent running\n",
+	              100.0*task_time/(wall_time*cast(f64)thread_count), 100.0*task_cpu_time/task_time);
+	gb_printf_err("\n");
+
+	array_sort(all_files, file_cpu_time_to_parse_cmp);
+	gb_printf_err("Slowest files to tokenize and parse, by CPU time\n");
+	for (isize i = 0; i < gb_min(all_files.count, 8); i++) {
+		AstFile *file = all_files[i];
+		f64 cpu_time = cast(f64)file->cpu_time_to_parse/cpu_freq;
+		gb_printf_err("    %9.3f ms  %9.3f ms (wall)  %8td tokens  %7.3f us/token  %.*s\n",
+		              1.0e3*cpu_time, 1.0e3*file->time_to_parse, file->token_count,
+		              1.0e6*cpu_time/cast(f64)gb_max(file->token_count, 1), LIT(file->fullpath));
+	}
+	gb_printf_err("\n");
+}
+
 gb_internal void show_timings(Checker *c, Timings *t) {
 	Parser *p      = c->parser;
 	isize lines    = p->total_line_count;
@@ -2380,13 +2531,9 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 	isize files    = 0;
 	isize packages = p->packages.count;
 	isize total_file_size = 0;
-	f64 total_tokenizing_time = 0;
-	f64 total_parsing_time = 0;
 	for (AstPackage *pkg : p->packages) {
 		files += pkg->files.count;
 		for (AstFile *file : pkg->files) {
-			total_tokenizing_time += file->time_to_tokenize;
-			total_parsing_time += file->time_to_parse;
 			total_file_size += file->tokenizer.end - file->tokenizer.start;
 		}
 	}
@@ -2409,54 +2556,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 			gb_printf_err("Total File Size - %td\n", total_file_size);
 			gb_printf_err("\n");
 		}
-		{
-			f64 time = total_tokenizing_time;
-			gb_printf_err("Tokenization Only\n");
-			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
-			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
-			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
-			gb_printf_err("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
-			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/time);
-			gb_printf_err("MiB/s        - %.3f\n", cast(f64)(total_file_size/time)/(1024*1024));
-			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*time/cast(f64)total_file_size);
-
-			gb_printf_err("\n");
-		}
-		{
-			f64 time = total_parsing_time;
-			gb_printf_err("Parsing Only\n");
-			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/time);
-			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*time/cast(f64)lines);
-			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/time);
-			gb_printf_err("us/Token     - %.3f\n", 1.0e6*time/cast(f64)tokens);
-			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/time);
-			gb_printf_err("MiB/s        - %.3f\n", cast(f64)(total_file_size/time)/(1024*1024));
-			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*time/cast(f64)total_file_size);
-
-			gb_printf_err("\n");
-		}
-		{
-			TimeStamp ts = {};
-			for (TimeStamp const &s : t->sections) {
-				if (s.label == "parse files") {
-					ts = s;
-					break;
-				}
-			}
-			GB_ASSERT(ts.label == "parse files");
-
-			f64 parse_time = time_stamp_as_s(ts, t->freq);
-			gb_printf_err("Parse pass\n");
-			gb_printf_err("LOC/s        - %.3f\n", cast(f64)lines/parse_time);
-			gb_printf_err("us/LOC       - %.3f\n", 1.0e6*parse_time/cast(f64)lines);
-			gb_printf_err("Tokens/s     - %.3f\n", cast(f64)tokens/parse_time);
-			gb_printf_err("us/Token     - %.3f\n", 1.0e6*parse_time/cast(f64)tokens);
-			gb_printf_err("bytes/s      - %.3f\n", cast(f64)total_file_size/parse_time);
-			gb_printf_err("MiB/s        - %.3f\n", cast(f64)(total_file_size/parse_time)/(1024*1024));
-			gb_printf_err("us/bytes     - %.3f\n", 1.0e6*parse_time/cast(f64)total_file_size);
-
-			gb_printf_err("\n");
-		}
+		show_parse_timings(p, t);
 		{
 			TimeStamp ts = {};
 			TimeStamp ts_end = {};
@@ -2546,7 +2646,7 @@ gb_internal void export_dependencies(Checker *c) {
 		}
 		array_add(&load_files, cache);
 	}
-	array_sort(files, file_cache_sort_cmp);
+	array_sort(load_files, file_cache_sort_cmp);
 
 	if (build_context.export_dependencies_format == DependenciesExportMake) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
@@ -3070,10 +3170,21 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (run_or_build) {
+		if (print_flag("-lifetime-markers")) {
+			print_usage_line(2, "Emits lifetime markers for named locals, so that locals from");
+			print_usage_line(2, "non-overlapping scopes may reuse stack.");
+			print_usage_line(2, "Requires '-o:size' or above; no effect with '-sanitize:address'.");
+			print_usage_line(2, "Warning: this applies to every package in the build; using the address");
+			print_usage_line(2, "of a local after the local's declaring scope ended can miscompile.");
+		}
+
 		if (print_flag("-linker:<string>")) {
 			print_usage_line(2, "Specify the linker to use.");
 			print_usage_line(2, "Choices:");
 			for (i32 i = 0; i < Linker_COUNT; i++) {
+				#if !defined(GB_SYSTEM_WINDOWS)
+				if (linker_choices[i] == "msvc") continue;
+				#endif
 				print_usage_line(3, "%.*s", LIT(linker_choices[i]));
 			}
 		}
@@ -3398,6 +3509,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-vet-unused-imports");
 				print_usage_line(3, "-vet-shadowing");
 				print_usage_line(3, "-vet-using-stmt");
+				print_usage_line(3, "-vet-when-shadowing");
 		}
 
 		if (print_flag("-vet-cast")) {
@@ -3456,6 +3568,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet-using-stmt")) {
 			print_usage_line(2, "Checks for the use of 'using' as a statement.");
 			print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring.");
+		}
+
+		if (print_flag("-vet-when-shadowing")) {
+			print_usage_line(2, "Checks for declarations within a global 'when' that shadow a builtin or package-level name.");
 		}
 	}
 
@@ -3608,7 +3724,7 @@ gb_internal gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file
 	u8 const *file_data = file->tokenizer.start;
 	i32 prev_offset = 0;
 	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
-	for (Token const &token : file->tokens) {
+	for (Token const &token : file->token_edits) {
 		if (token.flags & (TokenFlag_Remove|TokenFlag_Replace)) {
 			i32 offset = token.pos.offset;
 			i32 to_write = offset-prev_offset;
@@ -3651,15 +3767,7 @@ gb_internal int strip_semicolons(Parser *parser) {
 
 	for (AstPackage *pkg : parser->packages) {
 		for (AstFile *file : pkg->files) {
-			bool nothing_to_change = true;
-			for (Token const &token : file->tokens) {
-				if (token.flags) {
-					nothing_to_change = false;
-					break;
-				}
-			}
-
-			if (nothing_to_change) {
+			if (file->token_edits.count == 0) {
 				continue;
 			}
 
@@ -4566,7 +4674,7 @@ end_of_code_gen:;
 		show_import_graph(checker);
 	}
 
-	if (run_output) {
+	if (run_output && build_context.build_mode == BuildMode_Executable) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 

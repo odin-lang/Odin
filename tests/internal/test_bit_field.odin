@@ -196,3 +196,19 @@ bit_field_constant_field_access :: proc(t: ^testing.T) {
 	testing.expect_value(t, v.c, FULL.c)
 	testing.expect_value(t, v.d, FULL.d)
 }
+
+// a compound literal of an array backed bit_field used to generate invalid LLVM IR for a field set from
+// a variable and would lose the high bits of a field narrower than the array's elements
+@(test)
+bit_field_array_backed_compound_literal :: proc(t: ^testing.T) {
+	BF :: bit_field [2]u16 { a: u8 | 5, b: u8 | 5 }
+
+	v := u8(31)
+	x := BF{ b = v, a = 1 }
+	testing.expect_value(t, x.a, 1)
+	testing.expect_value(t, x.b, 31)
+
+	y := BF{ b = 31, a = 1 }
+	testing.expect_value(t, y.a, 1)
+	testing.expect_value(t, y.b, 31)
+}

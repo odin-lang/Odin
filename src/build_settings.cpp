@@ -317,10 +317,11 @@ enum VetFlags : u64 {
 	VetFlag_Tabs            = 1u<<9,
 	VetFlag_UnusedProcedures = 1u<<10,
 	VetFlag_ExplicitAllocators = 1u<<11,
+	VetFlag_WhenShadowing   = 1u<<12,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
-	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast,
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt|VetFlag_Deprecated|VetFlag_Cast|VetFlag_WhenShadowing,
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
@@ -352,6 +353,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_UnusedProcedures;
 	} else if (name == "explicit-allocators") {
 		return VetFlag_ExplicitAllocators;
+	} else if (name == "when-shadowing") {
+		return VetFlag_WhenShadowing;
 	}
 	return VetFlag_NONE;
 }
@@ -435,12 +438,21 @@ enum LTOKind : i32 {
 
 enum LinkerChoice : i32 {
 	Linker_Invalid = -1,
-	Linker_Default = 0,
+	Linker_Default = 0, // radlink on Windows
 	Linker_lld,
+	Linker_msvc,
 	Linker_radlink,
 	Linker_mold,
 
 	Linker_COUNT,
+};
+
+String linker_choices[Linker_COUNT] = {
+	str_lit("default"),
+	str_lit("lld"),
+	str_lit("msvc"),
+	str_lit("radlink"),
+	str_lit("mold"),
 };
 
 enum SourceCodeLocationInfo : u8 {
@@ -448,13 +460,6 @@ enum SourceCodeLocationInfo : u8 {
 	SourceCodeLocationInfo_Obfuscated = 1,
 	SourceCodeLocationInfo_Filename = 2,
 	SourceCodeLocationInfo_None = 3,
-};
-
-String linker_choices[Linker_COUNT] = {
-	str_lit("default"),
-	str_lit("lld"),
-	str_lit("radlink"),
-	str_lit("mold"),
 };
 
 enum IntegerDivisionByZeroKind : u8 {
@@ -546,6 +551,7 @@ struct BuildContext {
 	bool   ignore_unknown_attributes;
 	bool   no_bounds_check;
 	bool   no_type_assert;
+	bool   lifetime_markers; // Opt-in to llvm.lifetime.* markers on scoped locals.
 	bool   dynamic_literals;  // Opt-in to `#+feature dynamic-literals` project-wide.
 	bool   no_output_files;
 	bool   no_crt;
@@ -597,6 +603,9 @@ struct BuildContext {
 	bool internal_weak_monomorphization;
 	bool internal_ignore_llvm_verification;
 	bool internal_llvm_no_sroa;
+	bool internal_global_entity_graph;
+	u64  internal_shuffle_global_entities; // seed, 0 = no shuffle
+	bool internal_check_global_edges;
 
 	bool   enable_rvo;
 
@@ -2339,7 +2348,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			if (build_context.linker_choice == Linker_Default && find_result.vs_exe_path.len == 0) {
+			if (build_context.linker_choice == Linker_msvc && find_result.vs_exe_path.len == 0) {
 				gb_printf_err("link.exe not found.\n");
 				return false;
 			}

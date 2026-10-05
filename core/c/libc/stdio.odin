@@ -38,7 +38,7 @@ when ODIN_OS == .Windows {
 
 	FILENAME_MAX :: 260
 
-	L_tmpnam     :: 15 // "\\" + 12 + NUL
+	L_tmpnam     :: 15 // `"\\" + 12 + NUL`
 
 	SEEK_SET     :: 0
 	SEEK_CUR     :: 1

@@ -156,6 +156,7 @@ complain if they're missing.
 Required if maps are used
 
 * `default_hasher`
+* `default_hasher_fixed`
 * `default_hasher_cstring`
 * `default_hasher_string`
 

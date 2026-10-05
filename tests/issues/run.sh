@@ -32,7 +32,14 @@ fi
 $ODIN build ../test_issue_5043.odin $COMMON
 $ODIN build ../test_issue_5097.odin $COMMON
 $ODIN build ../test_issue_5097-2.odin $COMMON
+if [[ $($ODIN check ../test_issue_5105_5569.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN build ../test_issue_5265.odin $COMMON
+$ODIN test ../test_issue_5318.odin $COMMON
 if [[ $($ODIN build ../test_issue_5573.odin $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -42,6 +49,7 @@ fi
 $ODIN test ../test_issue_5699.odin $COMMON
 $ODIN test ../test_issue_6068.odin $COMMON
 $ODIN test ../test_issue_6165.odin $COMMON
+$ODIN test ../test_issue_6302.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON
 $ODIN test ../test_issue_6344.odin $COMMON -o:speed
 $ODIN test ../test_issue_6396.odin $COMMON
@@ -86,13 +94,43 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+$ODIN test ../test_issue_6951_5214.odin $COMMON
 $ODIN check ../test_issue_6979.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_7008.odin $COMMON
+$ODIN test ../test_issue_global_address_of_literal.odin $COMMON
 $ODIN check ../test_issue_7012.odin -no-entry-point $COMMON_CHECK
 $ODIN build ../test_issue_7037.odin $COMMON -o:none
+$ODIN test ../test_issue_7477_7506.odin $COMMON
 $ODIN run ../test_issue_7482.odin $COMMON
 $ODIN run ../test_issue_7564.odin $COMMON
+$ODIN test ../test_issue_7316.odin $COMMON
+$ODIN test ../test_issue_7566.odin $COMMON
+$ODIN test ../test_issue_poly_using_subtype.odin $COMMON
+$ODIN test ../test_issue_global_proc_lits.odin $COMMON
+$ODIN test ../test_issue_packed_field_by_value.odin $COMMON
+$ODIN test ../test_issue_7708.odin $COMMON
+if [[ $($ODIN check ../test_issue_7708_mismatch.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN test ../test_issue_7700.odin $COMMON
+$ODIN test ../test_issue_procedure_of_specialized.odin $COMMON
+$ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug
+$ODIN test ../test_issue_omitted_field_union.odin $COMMON
+$ODIN test ../test_issue_fast_isel_lowering.odin $COMMON
+$ODIN test ../test_issue_fast_isel_lowering.odin $COMMON -o:none
+$ODIN test ../test_issue_equal_proc_dependencies.odin $COMMON
+if [[ $($ODIN test ../test_issue_equal_proc_dependencies.odin $COMMON -build-mode:obj 2>&1 | grep -ci "missing procedure") -eq 0 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 $ODIN test ../test_issue_7421.odin $COMMON
 if [[ $($ODIN check ../test_issue_7421_tagged_duplicate.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error: Duplicate case") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
@@ -101,6 +139,7 @@ else
 	exit 1
 fi
 $ODIN check ../test_issue_7429.odin $COMMON_CHECK
+$ODIN test ../test_issue_7430.odin $COMMON
 $ODIN test ../test_issue_7356.odin $COMMON
 $ODIN test ../test_issue_7336.odin $COMMON
 $ODIN build ../test_issue_7167.odin $COMMON
@@ -109,9 +148,39 @@ $ODIN check ../test_issue_7260.odin -no-entry-point $COMMON_CHECK
 $ODIN test ../test_issue_bool_to_be_conversion.odin $COMMON
 $ODIN test ../test_issue_bool_comparison_truthiness.odin $COMMON
 $ODIN test ../test_issue_const_array_broadcast.odin $COMMON
+$ODIN test ../test_issue_decl_order.odin $COMMON
+$ODIN test ../test_issue_distinct_constraint.odin $COMMON
+if [[ $($ODIN check ../test_issue_ambiguous_union_literal.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN test ../test_issue_proc_constant_instantiation.odin $COMMON
 $ODIN test ../test_issue_swizzle_multi_assign.odin $COMMON
+$ODIN test ../test_issue_global_when_order.odin $COMMON
+if [[ $($ODIN check ../test_issue_global_when_cycle.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Contradictory global 'when'") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+$ODIN test ../test_issue_global_when_cycle_accepted.odin $COMMON
+if [[ $($ODIN check ../test_issue_global_when_cycle_ambiguous.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Ambiguous global 'when'") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN check ../test_issue_global_when_shadowing.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "within a global 'when' shadows") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 $ODIN check ../test_issue_foreign_redeclaration.odin -no-entry-point $COMMON_CHECK
+$ODIN check ../test_issue_foreign_import_attributes.odin -no-entry-point $COMMON_CHECK
 if [[ $($ODIN check ../test_issue_foreign_redeclaration_mismatch.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -120,6 +189,13 @@ else
 fi
 
 if [[ $($ODIN check ../test_issue_ellipsis_type_call.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 10 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_integer_literal_exponent.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -181,6 +257,11 @@ if [[ "$(uname)" != "NetBSD" ]]; then
 else
 	$ODIN test ../test_issue_5640.odin -o:none $COMMON
 fi
+
+$ODIN test ../test_lifetime_markers.odin $COMMON -o:size -lifetime-markers
+$ODIN test ../test_lifetime_markers.odin $COMMON -o:speed -lifetime-markers
+$ODIN test ../test_issue_7547.odin $COMMON
+$ODIN test ../test_issue_7490.odin $COMMON
 
 set +x
 

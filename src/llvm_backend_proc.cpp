@@ -17,6 +17,11 @@ gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue sr
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
 	
+	if (!is_volatile && lb_uses_fast_isel()) {
+		lb_emit_memmove(p, dst.value, 1, src.value, 1, len.value);
+		return;
+	}
+
 	char const *name = "llvm.memmove";
 	if (!p->is_startup && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
@@ -47,7 +52,7 @@ gb_internal void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValu
 	len = lb_emit_conv(p, len, t_int);
 	
 	char const *name = "llvm.memcpy";
-	if (!p->is_startup && LLVMIsConstant(len.value)) {
+	if (!p->is_startup && !lb_uses_fast_isel() && LLVMIsConstant(len.value)) {
 		i64 const_len = cast(i64)LLVMConstIntGetSExtValue(len.value);
 		if (const_len <= lb_max_zero_init_size()) {
 			name = "llvm.memcpy.inline";
@@ -136,6 +141,8 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->context_stack.allocator     = a;
 	p->scope_stack.allocator       = a;
 	p->asan_stack_locals.allocator = a;
+	p->lifetime_locals.allocator   = a;
+	p->lifetime_scopes.allocator   = a;
 	// map_init(&p->selector_values,  0);
 	// map_init(&p->selector_addr,    0);
 	// map_init(&p->tuple_fix_map,    0);
@@ -360,13 +367,13 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 		Ast *ident = entity->identifier.load();
 		if (entity->file != nullptr) {
-			file = lb_get_llvm_metadata(m, entity->file);
+			file = lb_get_file_metadata(m, entity->file);
 			scope = file;
 		} else if (ident != nullptr && ident->file_id != 0) {
-			file = lb_get_llvm_metadata(m, ident->file());
+			file = lb_get_file_metadata(m, ident->file());
 			scope = file;
 		} else if (entity->scope != nullptr) {
-			file = lb_get_llvm_metadata(m, entity->scope->file);
+			file = lb_get_file_metadata(m, entity->scope->file);
 			scope = file;
 		}
 		GB_ASSERT_MSG(file != nullptr, "%.*s", LIT(entity->token.string));
@@ -462,6 +469,8 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->branch_blocks.allocator     = a;
 	p->context_stack.allocator     = a;
 	p->asan_stack_locals.allocator = a;
+	p->lifetime_locals.allocator   = a;
+	p->lifetime_scopes.allocator   = a;
 	map_init(&p->tuple_fix_map, 0);
 
 
@@ -471,13 +480,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
 	Type *pt = p->type;
-	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	if (selected_subtarget == Subtarget_Playdate) {
-		cc_kind = lbCallingConvention_ARM_AAPCS_VFP;
-	} else if (!is_arch_wasm()) {
-		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-	}
-	LLVMSetFunctionCallConv(p->value, cc_kind);
+	LLVMSetFunctionCallConv(p->value, lb_calling_convention_kind(pt->Proc.calling_convention));
 	lbValue proc_value = {p->value, p->type};
 	lb_add_member(m, p->name, proc_value);
 	lb_add_procedure_value(m, p);
@@ -888,11 +891,18 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 	}
 
 
-	isize name_len = p->name.len + 1 + pd_name.len + 1 + 10 + 1;
+	isize name_len = p->name.len + 1 + pd_name.len + 1 + 10 + 1 + 16 + 1;
 	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
 
-	i32 guid = cast(i32)p->children.count;
-	name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(p->name), LIT(pd_name), guid);
+	// NOTE(bill): named by declaration position (and type, for polymorphic instances, which share it)
+	// rather than by how many children were built before it, as that order varies
+	i32 guid = e->token.pos.offset;
+	if (e->decl_info != nullptr && e->decl_info->para_poly_original != nullptr) {
+		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(p->name), LIT(pd_name), guid,
+		                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
+	} else {
+		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(p->name), LIT(pd_name), guid);
+	}
 	String name = make_string(cast(u8 *)name_text, name_len-1);
 
 	e->Procedure.link_name = name;
@@ -1074,11 +1084,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
-		auto llvm_cc = lb_calling_convention_map[proc_type->Proc.calling_convention];
-		if (selected_subtarget == Subtarget_Playdate) {
-			llvm_cc = lbCallingConvention_ARM_AAPCS_VFP;
-		}
-		LLVMSetInstructionCallConv(ret, llvm_cc);
+		LLVMSetInstructionCallConv(ret, lb_calling_convention_kind(proc_type->Proc.calling_convention));
 
 		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
@@ -1402,7 +1408,12 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 
 
 			bool by_ptr = false;
-			auto in_args = args;
+			auto in_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
+			for_array(i, args) {
+				if (i >= pt->Proc.param_count || pt->Proc.params->Tuple.variables[i]->kind == Entity_Variable) {
+					array_add(&in_args, args[i]);
+				}
+			}
 			Array<lbValue> result_as_args = {};
 			switch (kind) {
 			case DeferredProcedure_none:
@@ -4948,7 +4959,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 		{
 			Ast *orig = param_value.original_ast_expr;
 			if (orig->kind == Ast_BasicDirective) {
-				gbString expr = expr_to_string(call_expression, temporary_allocator());
+				gbString expr = expr_to_string(call_expression, permanent_allocator());
 				return lb_const_string(p->module, make_string_c(expr));
 			}
 
@@ -4988,7 +4999,7 @@ gb_internal lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, 
 				}
 			}
 
-			gbString expr = expr_to_string(target_expr, temporary_allocator());
+			gbString expr = expr_to_string(target_expr, permanent_allocator());
 			return lb_const_string(p->module, make_string_c(expr));
 		}
 
@@ -5191,6 +5202,12 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 		}
 	}
 
+	Type *callee_type = proc_expr->tav.type;
+	if (value.value != nullptr && callee_type != nullptr && callee_type != value.type &&
+	    is_type_proc(callee_type) && base_type(callee_type)->Proc.is_poly_specialized) {
+		value.type = callee_type;
+		proc_value_type = callee_type;
+	}
 
 	GB_ASSERT(value.value != nullptr || is_objc_call || asm_template != nullptr);
 	Type *proc_type_ = base_type(proc_value_type);

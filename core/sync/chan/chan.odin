@@ -529,7 +529,7 @@ Example:
 	}
 */
 @(require_results)
-recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D >= .Both {
+recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where C.D >= .Both {
 	ok = recv_raw(c, &data)
 	return
 }
@@ -559,7 +559,7 @@ Example:
 	}
 */
 @(require_results)
-try_recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D >= .Both {
+try_recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where C.D >= .Both {
 	ok = try_recv_raw(c, &data)
 	return
 }

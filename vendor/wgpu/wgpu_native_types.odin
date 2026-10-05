@@ -228,9 +228,7 @@ SurfaceConfigurationExtras :: struct {
 	desiredMaximumFrameLatency: u32,
 }
 
-/**
-* Chained in `SurfaceDescriptor` to make a `Surface` wrapping a WinUI [[ SwapChainPanel ; https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.controls.swapchainpanel ]].
-*/
+// Chained in `SurfaceDescriptor` to make a `Surface` wrapping a WinUI [[ SwapChainPanel ; https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.xaml.controls.swapchainpanel ]].
 SurfaceSourceSwapChainPanel :: struct {
 	using chain: ChainedStruct,
     /**

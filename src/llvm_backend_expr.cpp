@@ -187,6 +187,10 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		if (is_type_bit_set(x.type)) {
 			ExactValue ev_mask = exact_bit_set_all_set_mask(x.type);
 			lbValue mask = lb_const_value(p->module, x.type, ev_mask);
+			if (is_type_array(bit_set_to_int(x.type))) {
+				lbValue res = lb_emit_arith(p, Token_Xor, x, mask, x.type);
+				return lb_emit_conv(p, res, type);
+			}
 			cmp.value = LLVMBuildXor(p->builder, x.value, mask.value, "");
 		} else {
 			cmp.value = LLVMBuildNot(p->builder, x.value, "");
@@ -1412,6 +1416,13 @@ gb_internal lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbVal
 gb_internal lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 
+	// NOTE: Only an array of the matrix's element type is a vector. Any other array is array programming. (See #6302)
+	Type *elem = base_array_type(is_type_matrix(lhs.type) ? lhs.type : rhs.type);
+	if ((is_type_array_like(lhs.type) && !are_types_identical(base_array_type(lhs.type), elem)) ||
+	    (is_type_array_like(rhs.type) && !are_types_identical(base_array_type(rhs.type), elem))) {
+		return lb_emit_arith_array(p, op, lhs, rhs, type);
+	}
+
 	if (op == Token_Mul && !component_wise) {
 		Type *xt = base_type(lhs.type);
 		Type *yt = base_type(rhs.type);
@@ -2115,6 +2126,36 @@ gb_internal lbValue lb_build_binary_in(lbProcedure *p, lbValue left, lbValue rig
 			GB_ASSERT(are_types_identical(left.type, key_type));
 
 			Type *it = bit_set_to_int(rt);
+
+			if (is_type_array(it)) {
+				Type *elem    = base_array_type(it);
+				i64 elem_bits = 8*type_size_of(elem);
+
+				lbValue key     = lb_emit_conv(p, left, t_int);
+				lbValue lower_v = lb_const_int(p->module, t_int, rt->BitSet.lower);
+				key = lb_emit_arith(p, Token_Sub, key, lower_v, t_int);
+
+				lbValue ebits    = lb_const_int(p->module, t_int, elem_bits);
+				lbValue elem_idx = lb_emit_arith(p, Token_Quo, key, ebits, t_int);
+				lbValue bit_idx  = lb_emit_arith(p, Token_Mod, key, ebits, t_int);
+
+				lbValue arr     = lb_emit_transmute(p, right, it);
+				lbValue arr_ptr = lb_address_from_load_or_generate_local(p, arr);
+				arr_ptr.type    = alloc_type_pointer(it);
+
+				lbValue e_ptr   = lb_emit_array_ep(p, arr_ptr, elem_idx);
+				lbValue e_val   = lb_emit_load(p, e_ptr);
+
+				lbValue shifted = lb_emit_arith(p, Token_Shr, e_val, lb_emit_conv(p, bit_idx, elem), elem);
+				lbValue masked  = lb_emit_arith(p, Token_And, shifted, lb_const_int(p->module, elem, 1), elem);
+				lbValue zero    = lb_const_int(p->module, elem, 0);
+
+				if (op == Token_in) {
+					return lb_emit_conv(p, lb_emit_comp(p, Token_NotEq, masked, zero), t_bool);
+				} else {
+					return lb_emit_conv(p, lb_emit_comp(p, Token_CmpEq, masked, zero), t_bool);
+				}
+			}
 
 			left = lb_emit_conv(p, left, it);
 			if (is_type_different_to_arch_endianness(it)) {
@@ -3011,9 +3052,9 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_array(dst) && is_type_array(src)) {
 		Type *dst_elem = base_array_type(dst);
 		Type *src_elem = base_array_type(src);
+		// NOTE: only arrays nested equally deep convert element by element, a shallower one is broadcast (See #6642)
 		if (dst->Array.count == src->Array.count &&
-		    !is_type_array_like(dst->Array.elem) &&
-		    !is_type_array_like(src->Array.elem)) {
+		    type_array_depth(dst) == type_array_depth(src)) {
 			if (are_types_identical(dst_elem, src_elem)) {
 				lbValue v = value;
 				v.type = t;
@@ -3429,6 +3470,29 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 
 
 
+gb_internal lbValue lb_bit_set_array_is_zero(lbProcedure *p, lbValue arr) {
+	Type *at = base_type(arr.type);
+	GB_ASSERT(at->kind == Type_Array);
+	Type *elem = at->Array.elem;
+	i64 n = at->Array.count;
+
+	lbValue acc = {};
+	acc.type = elem;
+	acc.value = LLVMBuildExtractValue(p->builder, arr.value, 0, "");
+	for (i64 i = 1; i < n; i++) {
+		lbValue e = {};
+		e.type  = elem;
+		e.value = LLVMBuildExtractValue(p->builder, arr.value, cast(unsigned)i, "");
+
+		acc = lb_emit_arith(p, Token_Or, acc, e, elem);
+	}
+
+	lbValue res = {};
+	res.type  = t_llvm_bool;
+	res.value = LLVMBuildICmp(p->builder, LLVMIntEQ, acc.value, lb_const_int(p->module, elem, 0).value, "");
+	return res;
+}
+
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
 	Type *a = core_type(left.type);
 	Type *b = core_type(right.type);
@@ -3753,6 +3817,52 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	}
 
 	if (is_type_bit_set(a)) {
+		Type *it_backing = bit_set_to_int(a);
+		if (is_type_array(it_backing)) {
+			lbValue lhs = lb_emit_transmute(p, left, it_backing);
+			lbValue rhs = lb_emit_transmute(p, right, it_backing);
+			switch (op_kind) {
+			case Token_CmpEq:
+			case Token_NotEq:
+				{
+					lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+					lbValue equal = lb_bit_set_array_is_zero(p, diff);
+					if (op_kind == Token_NotEq) {
+						lbValue res = {};
+						res.type = t_llvm_bool;
+						res.value = LLVMBuildNot(p->builder, equal.value, "");
+						return res;
+					}
+					return equal;
+				}
+			case Token_Lt:
+			case Token_LtEq:
+				{
+					// subset: (lhs &~ rhs) == {}; strict also requires lhs != rhs
+					lbValue d = lb_emit_arith(p, Token_AndNot, lhs, rhs, it_backing);
+					lbValue res = lb_bit_set_array_is_zero(p, d);
+					if (op_kind == Token_Lt) {
+						lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+						lbValue equal = lb_bit_set_array_is_zero(p, diff);
+						res = lb_emit_arith(p, Token_AndNot, res, equal, t_llvm_bool);
+					}
+					return res;
+				}
+			case Token_Gt:
+			case Token_GtEq:
+				{
+					// superset: (rhs &~ lhs) == {}; strict also requires lhs != rhs
+					lbValue d = lb_emit_arith(p, Token_AndNot, rhs, lhs, it_backing);
+					lbValue res = lb_bit_set_array_is_zero(p, d);
+					if (op_kind == Token_Gt) {
+						lbValue diff = lb_emit_arith(p, Token_Xor, lhs, rhs, it_backing);
+						lbValue equal = lb_bit_set_array_is_zero(p, diff);
+						res = lb_emit_arith(p, Token_AndNot, res, equal, t_llvm_bool);
+					}
+					return res;
+				}
+			}
+		}
 		switch (op_kind) {
 		case Token_Lt:
 		case Token_LtEq:
@@ -4255,7 +4365,9 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		Type *type = v.type;
 		lbAddr addr = {};
 		if (p->is_startup) {
-			addr = lb_add_global_generated_from_procedure(p, type, v);
+			// NOTE: only a constant can be the global's initializer, any other value is written by the store below
+			lbValue initializer = LLVMIsConstant(v.value) ? v : lbValue{};
+			addr = lb_add_global_generated_from_procedure(p, type, initializer);
 		} else {
 			addr = lb_add_local_generated(p, type, false);
 		}
@@ -4598,6 +4710,27 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_ast_node(te, TernaryIfExpr, expr);
 		GB_ASSERT(te->y != nullptr);
 		Type *type = default_type(type_of_expr(expr));
+		if (lb_is_type_large_aggregate(p->module, type)) {
+			// NOTE(bill): A large aggregate needs to be selected through memory
+			// as instruction selection splits a `phi` or `select` of it per field
+			lbAddr res = lb_add_local_generated(p, type, false);
+
+			lbBlock *then  = lb_create_block(p, "if.then");
+			lbBlock *done  = lb_create_block(p, "if.done");
+			lbBlock *else_ = lb_create_block(p, "if.else");
+
+			lb_build_cond(p, te->cond, then, else_);
+			lb_start_block(p, then);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, te->x), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, else_);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, te->y), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, done);
+			return lb_addr_load(p, res);
+		}
 		if (lb_is_expr_trivial(te->x) && lb_is_expr_trivial(te->y)) {
 			lbValue cond = lb_build_expr(p, te->cond);
 			lbValue x = lb_emit_conv(p, lb_build_expr(p, te->x), type);
@@ -6163,14 +6296,14 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 						GB_ASSERT(mask_width > 0);
 						bits_to_set -= mask_width;
 
-						LLVMValueRef mask = lb_const_low_bits_mask(vt, mask_width);
+						LLVMValueRef mask = lb_const_low_bits_mask(lit, mask_width);
 
-						LLVMValueRef to_set = LLVMBuildAnd(p->builder, val, mask, "");
+						LLVMValueRef to_set = LLVMBuildIntCast2(p->builder, val, lit, false, "");
+						to_set = LLVMBuildAnd(p->builder, to_set, mask, "");
 
 						if (elem_bit_offset != 0) {
-							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(vt, elem_bit_offset, false), "");
+							to_set = LLVMBuildShl(p->builder, to_set, LLVMConstInt(lit, elem_bit_offset, false), "");
 						}
-						to_set = LLVMBuildTrunc(p->builder, to_set, lit, "");
 
 						if (LLVMIsNull(elems[elem_idx])) {
 							elems[elem_idx] = to_set; // don't even bother doing `0 | to_set`
@@ -6348,13 +6481,16 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	case Type_FixedCapacityDynamicArray: {
 		if (cl->elems.count > 0) {
-			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
+			// NOTE: the length isn't taken from the literal's constant, which is nil when its elements can't be constant
+			lbValue dst_ptr = lb_addr_get_ptr(p, v);
+			lbValue value = lb_const_value(p->module, type, exact_value_compound(expr));
+			lb_emit_store(p, lb_emit_struct_ep(p, dst_ptr, 0), lb_emit_struct_ev(p, value, 0));
+			lb_emit_store(p, lb_emit_struct_ep(p, dst_ptr, 1), lb_const_int(p->module, t_int, cl->max_count));
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
 			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
 
-			lbValue dst_ptr = lb_addr_get_ptr(p, v);
 			for_array(i, temp_data) {
 				i32 index = cast(i32)(temp_data[i].elem_index);
 				temp_data[i].gep = lb_emit_array_epi(p, dst_ptr, index);
@@ -6461,20 +6597,30 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			Type *backing = bit_set_to_int(type);
 			if (is_type_array(backing)) {
-				GB_PANIC("TODO: bit_set [N]T");
 				Type *base_it = core_array_type(backing);
 				i64 bits_per_elem = 8*type_size_of(base_it);
-				gb_unused(bits_per_elem);
-				lbValue one = lb_const_value(p->module, t_i64, exact_value_i64(1));
+				lbValue ebits = lb_const_value(p->module, t_int, exact_value_i64(bits_per_elem));
+				lbValue one = lb_const_value(p->module, base_it, exact_value_i64(1));
+
+				lbValue arr_ptr = lb_addr_get_ptr(p, v);
+				arr_ptr.type = alloc_type_pointer(backing);
+
 				for (Ast *elem : cl->elems) {
 					GB_ASSERT(elem->kind != Ast_FieldValue);
 					lbValue expr = lb_build_expr(p, elem);
 					GB_ASSERT(expr.type->kind != Type_Tuple);
 
-					lbValue e = lb_emit_conv(p, expr, t_i64);
-					e = lb_emit_arith(p, Token_Sub, e, lower, t_i64);
-					// lbValue idx = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
-					// lbValue val = lb_emit_arith(p, Token_Div, e, bits_per_elem, t_i64);
+					lbValue e = lb_emit_conv(p, expr, t_int);
+					e = lb_emit_arith(p, Token_Sub, e, lower, t_int);
+
+					lbValue elem_idx = lb_emit_arith(p, Token_Quo, e, ebits, t_int);
+					lbValue bit_idx  = lb_emit_arith(p, Token_Mod, e, ebits, t_int);
+
+					lbValue e_ptr     = lb_emit_array_ep(p, arr_ptr, elem_idx);
+					lbValue bit       = lb_emit_arith(p, Token_Shl, one, lb_emit_conv(p, bit_idx, base_it), base_it);
+					lbValue old_value = lb_emit_load(p, e_ptr);
+					lbValue new_value = lb_emit_arith(p, Token_Or, old_value, bit, base_it);
+					lb_emit_store(p, e_ptr, new_value);
 				}
 			} else {
 				Type *it = bit_set_to_int(bt);
@@ -6659,7 +6805,15 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
-			lbAddr addr = lb_build_addr(p, se->expr);
+			lbAddr addr = {};
+			if (is_type_soa_pointer(tav.type)) {
+				// auto-deref p.bar, where p is an #soa pointer;
+				// same lowering as an explicit p^.bar so `using` paths
+				// go through lbAddr_SoaVariable instead of deep-GEP on the fat pointer
+				addr = lb_addr_soa_variable_from_soa_ptr(p, lb_build_expr(p, se->expr));
+			} else {
+				addr = lb_build_addr(p, se->expr);
+			}
 
 			// NOTE(harold): Only allow ivar pseudo field access on indirect selectors.
 			//				 It is incoherent otherwise as Objective-C objects are zero-sized.

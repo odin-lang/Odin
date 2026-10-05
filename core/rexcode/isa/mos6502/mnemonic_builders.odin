@@ -24,330 +24,330 @@ package rexcode_mos6502
 
 inst_adc_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ADC, imm) }
 inst_adc_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.ADC, m) }
-emit_adc_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ADC, imm)) }
-emit_adc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.ADC, m)) }
+emit_adc_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ADC, imm)) }
+emit_adc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.ADC, m)) }
 inst_and_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.AND, imm) }
 inst_and_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.AND, m) }
-emit_and_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.AND, imm)) }
-emit_and_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.AND, m)) }
+emit_and_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.AND, imm)) }
+emit_and_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.AND, m)) }
 inst_asl_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.ASL) }
 inst_asl_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.ASL, m) }
-emit_asl_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.ASL)) }
-emit_asl_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.ASL, m)) }
+emit_asl_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.ASL)) }
+emit_asl_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.ASL, m)) }
 inst_bit_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.BIT, m) }
 inst_bit_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.BIT, imm) }
-emit_bit_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.BIT, m)) }
-emit_bit_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.BIT, imm)) }
+emit_bit_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.BIT, m)) }
+emit_bit_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.BIT, imm)) }
 inst_cmp_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.CMP, imm) }
 inst_cmp_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.CMP, m) }
-emit_cmp_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.CMP, imm)) }
-emit_cmp_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.CMP, m)) }
+emit_cmp_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.CMP, imm)) }
+emit_cmp_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.CMP, m)) }
 inst_cpx_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.CPX, imm) }
 inst_cpx_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.CPX, m) }
-emit_cpx_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.CPX, imm)) }
-emit_cpx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.CPX, m)) }
+emit_cpx_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.CPX, imm)) }
+emit_cpx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.CPX, m)) }
 inst_cpy_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.CPY, imm) }
 inst_cpy_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.CPY, m) }
-emit_cpy_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.CPY, imm)) }
-emit_cpy_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.CPY, m)) }
+emit_cpy_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.CPY, imm)) }
+emit_cpy_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.CPY, m)) }
 inst_dec_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.DEC, m) }
 inst_dec_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.DEC) }
-emit_dec_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.DEC, m)) }
-emit_dec_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.DEC)) }
+emit_dec_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.DEC, m)) }
+emit_dec_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.DEC)) }
 inst_dex_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.DEX) }
-emit_dex_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.DEX)) }
+emit_dex_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.DEX)) }
 inst_dey_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.DEY) }
-emit_dey_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.DEY)) }
+emit_dey_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.DEY)) }
 inst_eor_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.EOR, imm) }
 inst_eor_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.EOR, m) }
-emit_eor_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.EOR, imm)) }
-emit_eor_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.EOR, m)) }
+emit_eor_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.EOR, imm)) }
+emit_eor_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.EOR, m)) }
 inst_inc_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.INC, m) }
 inst_inc_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.INC) }
-emit_inc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.INC, m)) }
-emit_inc_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.INC)) }
+emit_inc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.INC, m)) }
+emit_inc_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.INC)) }
 inst_inx_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.INX) }
-emit_inx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.INX)) }
+emit_inx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.INX)) }
 inst_iny_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.INY) }
-emit_iny_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.INY)) }
+emit_iny_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.INY)) }
 inst_lsr_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.LSR) }
 inst_lsr_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.LSR, m) }
-emit_lsr_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.LSR)) }
-emit_lsr_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.LSR, m)) }
+emit_lsr_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.LSR)) }
+emit_lsr_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.LSR, m)) }
 inst_ora_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ORA, imm) }
 inst_ora_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.ORA, m) }
-emit_ora_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ORA, imm)) }
-emit_ora_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.ORA, m)) }
+emit_ora_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ORA, imm)) }
+emit_ora_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.ORA, m)) }
 inst_rol_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.ROL) }
 inst_rol_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.ROL, m) }
-emit_rol_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.ROL)) }
-emit_rol_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.ROL, m)) }
+emit_rol_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.ROL)) }
+emit_rol_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.ROL, m)) }
 inst_ror_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.ROR) }
 inst_ror_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.ROR, m) }
-emit_ror_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.ROR)) }
-emit_ror_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.ROR, m)) }
+emit_ror_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.ROR)) }
+emit_ror_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.ROR, m)) }
 inst_sbc_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.SBC, imm) }
 inst_sbc_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SBC, m) }
-emit_sbc_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.SBC, imm)) }
-emit_sbc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SBC, m)) }
+emit_sbc_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.SBC, imm)) }
+emit_sbc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SBC, m)) }
 inst_bcc_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BCC, label_id) }
-emit_bcc_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BCC, label_id)) }
+emit_bcc_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BCC, label_id)) }
 inst_bcs_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BCS, label_id) }
-emit_bcs_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BCS, label_id)) }
+emit_bcs_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BCS, label_id)) }
 inst_beq_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BEQ, label_id) }
-emit_beq_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BEQ, label_id)) }
+emit_beq_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BEQ, label_id)) }
 inst_bmi_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BMI, label_id) }
-emit_bmi_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BMI, label_id)) }
+emit_bmi_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BMI, label_id)) }
 inst_bne_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BNE, label_id) }
-emit_bne_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BNE, label_id)) }
+emit_bne_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BNE, label_id)) }
 inst_bpl_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BPL, label_id) }
-emit_bpl_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BPL, label_id)) }
+emit_bpl_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BPL, label_id)) }
 inst_bvc_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BVC, label_id) }
-emit_bvc_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BVC, label_id)) }
+emit_bvc_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BVC, label_id)) }
 inst_bvs_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BVS, label_id) }
-emit_bvs_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BVS, label_id)) }
+emit_bvs_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BVS, label_id)) }
 inst_jmp_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.JMP, m) }
-emit_jmp_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.JMP, m)) }
+emit_jmp_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.JMP, m)) }
 inst_jsr_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.JSR, m) }
-emit_jsr_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.JSR, m)) }
+emit_jsr_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.JSR, m)) }
 inst_rti_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.RTI) }
-emit_rti_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.RTI)) }
+emit_rti_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.RTI)) }
 inst_rts_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.RTS) }
-emit_rts_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.RTS)) }
+emit_rts_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.RTS)) }
 inst_brk_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.BRK) }
-emit_brk_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.BRK)) }
+emit_brk_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.BRK)) }
 inst_clc_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLC) }
-emit_clc_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CLC)) }
+emit_clc_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CLC)) }
 inst_cld_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLD) }
-emit_cld_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CLD)) }
+emit_cld_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CLD)) }
 inst_cli_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLI) }
-emit_cli_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CLI)) }
+emit_cli_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CLI)) }
 inst_clv_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLV) }
-emit_clv_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CLV)) }
+emit_clv_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CLV)) }
 inst_sec_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SEC) }
-emit_sec_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SEC)) }
+emit_sec_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.SEC)) }
 inst_sed_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SED) }
-emit_sed_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SED)) }
+emit_sed_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.SED)) }
 inst_sei_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SEI) }
-emit_sei_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SEI)) }
+emit_sei_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.SEI)) }
 inst_lda_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.LDA, imm) }
 inst_lda_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.LDA, m) }
-emit_lda_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.LDA, imm)) }
-emit_lda_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.LDA, m)) }
+emit_lda_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.LDA, imm)) }
+emit_lda_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.LDA, m)) }
 inst_ldx_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.LDX, imm) }
 inst_ldx_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.LDX, m) }
-emit_ldx_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.LDX, imm)) }
-emit_ldx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.LDX, m)) }
+emit_ldx_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.LDX, imm)) }
+emit_ldx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.LDX, m)) }
 inst_ldy_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.LDY, imm) }
 inst_ldy_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.LDY, m) }
-emit_ldy_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.LDY, imm)) }
-emit_ldy_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.LDY, m)) }
+emit_ldy_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.LDY, imm)) }
+emit_ldy_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.LDY, m)) }
 inst_sta_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.STA, m) }
-emit_sta_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.STA, m)) }
+emit_sta_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.STA, m)) }
 inst_stx_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.STX, m) }
-emit_stx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.STX, m)) }
+emit_stx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.STX, m)) }
 inst_sty_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.STY, m) }
-emit_sty_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.STY, m)) }
+emit_sty_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.STY, m)) }
 inst_pha_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PHA) }
-emit_pha_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PHA)) }
+emit_pha_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PHA)) }
 inst_php_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PHP) }
-emit_php_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PHP)) }
+emit_php_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PHP)) }
 inst_pla_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PLA) }
-emit_pla_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PLA)) }
+emit_pla_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PLA)) }
 inst_plp_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PLP) }
-emit_plp_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PLP)) }
+emit_plp_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PLP)) }
 inst_tax_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.TAX) }
-emit_tax_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.TAX)) }
+emit_tax_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.TAX)) }
 inst_tay_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.TAY) }
-emit_tay_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.TAY)) }
+emit_tay_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.TAY)) }
 inst_tsx_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.TSX) }
-emit_tsx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.TSX)) }
+emit_tsx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.TSX)) }
 inst_txa_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.TXA) }
-emit_txa_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.TXA)) }
+emit_txa_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.TXA)) }
 inst_txs_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.TXS) }
-emit_txs_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.TXS)) }
+emit_txs_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.TXS)) }
 inst_tya_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.TYA) }
-emit_tya_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.TYA)) }
+emit_tya_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.TYA)) }
 inst_nop_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.NOP) }
-emit_nop_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.NOP)) }
+emit_nop_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.NOP)) }
 inst_lax_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.LAX, m) }
-emit_lax_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.LAX, m)) }
+emit_lax_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.LAX, m)) }
 inst_dcp_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.DCP, m) }
-emit_dcp_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.DCP, m)) }
+emit_dcp_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.DCP, m)) }
 inst_isc_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.ISC, m) }
-emit_isc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.ISC, m)) }
+emit_isc_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.ISC, m)) }
 inst_rla_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RLA, m) }
-emit_rla_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RLA, m)) }
+emit_rla_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RLA, m)) }
 inst_rra_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RRA, m) }
-emit_rra_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RRA, m)) }
+emit_rra_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RRA, m)) }
 inst_slo_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SLO, m) }
-emit_slo_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SLO, m)) }
+emit_slo_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SLO, m)) }
 inst_sre_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SRE, m) }
-emit_sre_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SRE, m)) }
+emit_sre_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SRE, m)) }
 inst_alr_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ALR, imm) }
-emit_alr_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ALR, imm)) }
+emit_alr_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ALR, imm)) }
 inst_anc_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ANC, imm) }
-emit_anc_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ANC, imm)) }
+emit_anc_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ANC, imm)) }
 inst_arr_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ARR, imm) }
-emit_arr_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ARR, imm)) }
+emit_arr_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ARR, imm)) }
 inst_axs_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.AXS, imm) }
-emit_axs_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.AXS, imm)) }
+emit_axs_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.AXS, imm)) }
 inst_las_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.LAS, m) }
-emit_las_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.LAS, m)) }
+emit_las_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.LAS, m)) }
 inst_ane_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ANE, imm) }
-emit_ane_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ANE, imm)) }
+emit_ane_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ANE, imm)) }
 inst_lxa_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.LXA, imm) }
-emit_lxa_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.LXA, imm)) }
+emit_lxa_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.LXA, imm)) }
 inst_sha_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SHA, m) }
-emit_sha_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SHA, m)) }
+emit_sha_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SHA, m)) }
 inst_shx_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SHX, m) }
-emit_shx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SHX, m)) }
+emit_shx_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SHX, m)) }
 inst_shy_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SHY, m) }
-emit_shy_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SHY, m)) }
+emit_shy_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SHY, m)) }
 inst_tas_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.TAS, m) }
-emit_tas_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.TAS, m)) }
+emit_tas_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.TAS, m)) }
 inst_jam_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.JAM) }
-emit_jam_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.JAM)) }
+emit_jam_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.JAM)) }
 inst_usbc_imm8   :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.USBC, imm) }
-emit_usbc_imm8   :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.USBC, imm)) }
+emit_usbc_imm8   :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.USBC, imm)) }
 inst_dop_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.DOP, imm) }
 inst_dop_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.DOP, m) }
-emit_dop_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.DOP, imm)) }
-emit_dop_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.DOP, m)) }
+emit_dop_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.DOP, imm)) }
+emit_dop_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.DOP, m)) }
 inst_top_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.TOP, m) }
-emit_top_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.TOP, m)) }
+emit_top_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.TOP, m)) }
 inst_bra_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BRA, label_id) }
-emit_bra_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BRA, label_id)) }
+emit_bra_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BRA, label_id)) }
 inst_ina_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.INA) }
-emit_ina_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.INA)) }
+emit_ina_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.INA)) }
 inst_dea_a       :: #force_inline proc "contextless" () -> Instruction { return inst_a(.DEA) }
-emit_dea_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_a(.DEA)) }
+emit_dea_a       :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_a(.DEA)) }
 inst_phx_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PHX) }
-emit_phx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PHX)) }
+emit_phx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PHX)) }
 inst_phy_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PHY) }
-emit_phy_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PHY)) }
+emit_phy_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PHY)) }
 inst_plx_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PLX) }
-emit_plx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PLX)) }
+emit_plx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PLX)) }
 inst_ply_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.PLY) }
-emit_ply_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.PLY)) }
+emit_ply_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.PLY)) }
 inst_stz_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.STZ, m) }
-emit_stz_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.STZ, m)) }
+emit_stz_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.STZ, m)) }
 inst_trb_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.TRB, m) }
-emit_trb_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.TRB, m)) }
+emit_trb_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.TRB, m)) }
 inst_tsb_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.TSB, m) }
-emit_tsb_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.TSB, m)) }
+emit_tsb_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.TSB, m)) }
 inst_stp_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.STP) }
-emit_stp_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.STP)) }
+emit_stp_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.STP)) }
 inst_wai_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.WAI) }
-emit_wai_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.WAI)) }
+emit_wai_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.WAI)) }
 inst_rmb0_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB0, m) }
-emit_rmb0_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB0, m)) }
+emit_rmb0_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB0, m)) }
 inst_rmb1_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB1, m) }
-emit_rmb1_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB1, m)) }
+emit_rmb1_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB1, m)) }
 inst_rmb2_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB2, m) }
-emit_rmb2_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB2, m)) }
+emit_rmb2_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB2, m)) }
 inst_rmb3_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB3, m) }
-emit_rmb3_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB3, m)) }
+emit_rmb3_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB3, m)) }
 inst_rmb4_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB4, m) }
-emit_rmb4_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB4, m)) }
+emit_rmb4_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB4, m)) }
 inst_rmb5_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB5, m) }
-emit_rmb5_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB5, m)) }
+emit_rmb5_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB5, m)) }
 inst_rmb6_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB6, m) }
-emit_rmb6_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB6, m)) }
+emit_rmb6_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB6, m)) }
 inst_rmb7_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.RMB7, m) }
-emit_rmb7_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.RMB7, m)) }
+emit_rmb7_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.RMB7, m)) }
 inst_smb0_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB0, m) }
-emit_smb0_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB0, m)) }
+emit_smb0_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB0, m)) }
 inst_smb1_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB1, m) }
-emit_smb1_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB1, m)) }
+emit_smb1_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB1, m)) }
 inst_smb2_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB2, m) }
-emit_smb2_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB2, m)) }
+emit_smb2_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB2, m)) }
 inst_smb3_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB3, m) }
-emit_smb3_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB3, m)) }
+emit_smb3_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB3, m)) }
 inst_smb4_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB4, m) }
-emit_smb4_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB4, m)) }
+emit_smb4_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB4, m)) }
 inst_smb5_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB5, m) }
-emit_smb5_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB5, m)) }
+emit_smb5_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB5, m)) }
 inst_smb6_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB6, m) }
-emit_smb6_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB6, m)) }
+emit_smb6_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB6, m)) }
 inst_smb7_m      :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SMB7, m) }
-emit_smb7_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SMB7, m)) }
+emit_smb7_m      :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SMB7, m)) }
 inst_bbr0_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR0, zp, label_id) }
-emit_bbr0_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR0, zp, label_id)) }
+emit_bbr0_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR0, zp, label_id)) }
 inst_bbr1_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR1, zp, label_id) }
-emit_bbr1_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR1, zp, label_id)) }
+emit_bbr1_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR1, zp, label_id)) }
 inst_bbr2_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR2, zp, label_id) }
-emit_bbr2_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR2, zp, label_id)) }
+emit_bbr2_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR2, zp, label_id)) }
 inst_bbr3_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR3, zp, label_id) }
-emit_bbr3_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR3, zp, label_id)) }
+emit_bbr3_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR3, zp, label_id)) }
 inst_bbr4_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR4, zp, label_id) }
-emit_bbr4_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR4, zp, label_id)) }
+emit_bbr4_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR4, zp, label_id)) }
 inst_bbr5_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR5, zp, label_id) }
-emit_bbr5_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR5, zp, label_id)) }
+emit_bbr5_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR5, zp, label_id)) }
 inst_bbr6_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR6, zp, label_id) }
-emit_bbr6_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR6, zp, label_id)) }
+emit_bbr6_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR6, zp, label_id)) }
 inst_bbr7_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBR7, zp, label_id) }
-emit_bbr7_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBR7, zp, label_id)) }
+emit_bbr7_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBR7, zp, label_id)) }
 inst_bbs0_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS0, zp, label_id) }
-emit_bbs0_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS0, zp, label_id)) }
+emit_bbs0_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS0, zp, label_id)) }
 inst_bbs1_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS1, zp, label_id) }
-emit_bbs1_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS1, zp, label_id)) }
+emit_bbs1_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS1, zp, label_id)) }
 inst_bbs2_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS2, zp, label_id) }
-emit_bbs2_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS2, zp, label_id)) }
+emit_bbs2_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS2, zp, label_id)) }
 inst_bbs3_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS3, zp, label_id) }
-emit_bbs3_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS3, zp, label_id)) }
+emit_bbs3_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS3, zp, label_id)) }
 inst_bbs4_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS4, zp, label_id) }
-emit_bbs4_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS4, zp, label_id)) }
+emit_bbs4_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS4, zp, label_id)) }
 inst_bbs5_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS5, zp, label_id) }
-emit_bbs5_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS5, zp, label_id)) }
+emit_bbs5_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS5, zp, label_id)) }
 inst_bbs6_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS6, zp, label_id) }
-emit_bbs6_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS6, zp, label_id)) }
+emit_bbs6_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS6, zp, label_id)) }
 inst_bbs7_zp_rel :: #force_inline proc "contextless" (zp: u8, label_id: u32) -> Instruction { return inst_zp_rel(.BBS7, zp, label_id) }
-emit_bbs7_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append(instructions, inst_zp_rel(.BBS7, zp, label_id)) }
+emit_bbs7_zp_rel :: #force_inline proc(instructions: ^[dynamic]Instruction, zp: u8, label_id: u32) { append_elem(instructions, inst_zp_rel(.BBS7, zp, label_id)) }
 inst_sxy_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SXY) }
-emit_sxy_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SXY)) }
+emit_sxy_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.SXY)) }
 inst_sax_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SAX) }
 inst_sax_m       :: #force_inline proc "contextless" (m: Memory) -> Instruction { return inst_m(.SAX, m) }
-emit_sax_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SAX)) }
-emit_sax_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append(instructions, inst_m(.SAX, m)) }
+emit_sax_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.SAX)) }
+emit_sax_m       :: #force_inline proc(instructions: ^[dynamic]Instruction, m: Memory) { append_elem(instructions, inst_m(.SAX, m)) }
 inst_say_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SAY) }
-emit_say_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SAY)) }
+emit_say_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.SAY)) }
 inst_cla_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLA) }
-emit_cla_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CLA)) }
+emit_cla_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CLA)) }
 inst_clx_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLX) }
-emit_clx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CLX)) }
+emit_clx_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CLX)) }
 inst_cly_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CLY) }
-emit_cly_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CLY)) }
+emit_cly_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CLY)) }
 inst_csh_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CSH) }
-emit_csh_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CSH)) }
+emit_csh_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CSH)) }
 inst_csl_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.CSL) }
-emit_csl_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.CSL)) }
+emit_csl_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.CSL)) }
 inst_set_none    :: #force_inline proc "contextless" () -> Instruction { return inst_none(.SET) }
-emit_set_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append(instructions, inst_none(.SET)) }
+emit_set_none    :: #force_inline proc(instructions: ^[dynamic]Instruction) { append_elem(instructions, inst_none(.SET)) }
 inst_st0_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ST0, imm) }
-emit_st0_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ST0, imm)) }
+emit_st0_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ST0, imm)) }
 inst_st1_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ST1, imm) }
-emit_st1_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ST1, imm)) }
+emit_st1_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ST1, imm)) }
 inst_st2_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.ST2, imm) }
-emit_st2_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.ST2, imm)) }
+emit_st2_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.ST2, imm)) }
 inst_tam_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.TAM, imm) }
-emit_tam_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.TAM, imm)) }
+emit_tam_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.TAM, imm)) }
 inst_tma_imm8    :: #force_inline proc "contextless" (imm: i64) -> Instruction { return inst_i(.TMA, imm) }
-emit_tma_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append(instructions, inst_i(.TMA, imm)) }
+emit_tma_imm8    :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64) { append_elem(instructions, inst_i(.TMA, imm)) }
 inst_tst_tst     :: #force_inline proc "contextless" (imm: i64, m: Memory) -> Instruction { return Instruction{mnemonic = .TST, operand_count = 2, length = 0, ops = {op_imm8(imm), op_mem(m), {}}} }
-emit_tst_tst     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, m: Memory) { append(instructions, Instruction{mnemonic = .TST, operand_count = 2, length = 0, ops = {op_imm8(imm), op_mem(m), {}}}) }
+emit_tst_tst     :: #force_inline proc(instructions: ^[dynamic]Instruction, imm: i64, m: Memory) { append_elem(instructions, Instruction{mnemonic = .TST, operand_count = 2, length = 0, ops = {op_imm8(imm), op_mem(m), {}}}) }
 inst_bsr_rel     :: #force_inline proc "contextless" (label_id: u32) -> Instruction { return inst_rel(.BSR, label_id) }
-emit_bsr_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append(instructions, inst_rel(.BSR, label_id)) }
+emit_bsr_rel     :: #force_inline proc(instructions: ^[dynamic]Instruction, label_id: u32) { append_elem(instructions, inst_rel(.BSR, label_id)) }
 inst_tii_block   :: #force_inline proc "contextless" (src, dst, length_val: u16) -> Instruction { return inst_block(.TII, src, dst, length_val) }
-emit_tii_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append(instructions, inst_block(.TII, src, dst, length_val)) }
+emit_tii_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append_elem(instructions, inst_block(.TII, src, dst, length_val)) }
 inst_tdd_block   :: #force_inline proc "contextless" (src, dst, length_val: u16) -> Instruction { return inst_block(.TDD, src, dst, length_val) }
-emit_tdd_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append(instructions, inst_block(.TDD, src, dst, length_val)) }
+emit_tdd_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append_elem(instructions, inst_block(.TDD, src, dst, length_val)) }
 inst_tin_block   :: #force_inline proc "contextless" (src, dst, length_val: u16) -> Instruction { return inst_block(.TIN, src, dst, length_val) }
-emit_tin_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append(instructions, inst_block(.TIN, src, dst, length_val)) }
+emit_tin_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append_elem(instructions, inst_block(.TIN, src, dst, length_val)) }
 inst_tia_block   :: #force_inline proc "contextless" (src, dst, length_val: u16) -> Instruction { return inst_block(.TIA, src, dst, length_val) }
-emit_tia_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append(instructions, inst_block(.TIA, src, dst, length_val)) }
+emit_tia_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append_elem(instructions, inst_block(.TIA, src, dst, length_val)) }
 inst_tai_block   :: #force_inline proc "contextless" (src, dst, length_val: u16) -> Instruction { return inst_block(.TAI, src, dst, length_val) }
-emit_tai_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append(instructions, inst_block(.TAI, src, dst, length_val)) }
+emit_tai_block   :: #force_inline proc(instructions: ^[dynamic]Instruction, src, dst, length_val: u16) { append_elem(instructions, inst_block(.TAI, src, dst, length_val)) }
 
 // =============================================================================
 // Overload Groups

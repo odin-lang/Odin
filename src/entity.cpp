@@ -76,7 +76,8 @@ enum EntityFlag : u64 {
 	EntityFlag_Init          = 1ull<<31,
 	EntityFlag_Subtype       = 1ull<<32,
 	EntityFlag_Fini          = 1ull<<33,
-	
+	EntityFlag_PolyConstArg  = 1ull<<34, // passed to a `$` parameter, so a local procedure may be called outside its parent
+
 	EntityFlag_CustomLinkName = 1ull<<40,
 	EntityFlag_CustomLinkage_Internal = 1ull<<41,
 	EntityFlag_CustomLinkage_Strong   = 1ull<<42,
@@ -142,6 +143,10 @@ enum ProcedureOptimizationMode : u8 {
 
 BlockingMutex global_type_name_objc_metadata_mutex;
 
+struct TypeNameObjCMetadata;
+
+gb_internal TypeNameObjCMetadata *entity_objc_metadata(struct Entity *e);
+
 struct TypeNameObjCMetadataEntry {
 	InternedString interned;
 	Entity *entity;
@@ -206,6 +211,7 @@ struct Entity {
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
+	Futex                    checking_thread; // 1 + the index of the thread in `check_entity_decl` for it, else 0
 	std::atomic<i32>         min_dep_count;
 	Token       token;
 	Scope *     scope;
