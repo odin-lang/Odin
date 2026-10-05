@@ -192,14 +192,19 @@ gb_internal bool has_syntactic_attribute(Array<Ast *> const &attributes, String 
 	return false;
 }
 
-gb_internal void add_placeholder(Scope *s, InternedString name, GlobalDeclSource *src) {
+struct GlobalDeclScan {
+	Array<GlobalDeclSource *> sources;
+	Array<Scope *>            placeholder_scopes;
+};
+
+gb_internal void add_placeholder(GlobalDeclScan *scan, Scope *s, InternedString name, GlobalDeclSource *src) {
 	if (name.value == 0 || name.is_blank()) {
 		return;
 	}
 	if (s->placeholders == nullptr) {
 		s->placeholders = permanent_alloc_item<PtrMap<u64, GlobalDeclSource *>>();
 		map_init(s->placeholders);
-		array_add(&global_placeholder_scopes, s);
+		array_add(&scan->placeholder_scopes, s);
 	}
 	u64 key = name.value;
 	for (auto *e = multi_map_find_first(s->placeholders, key); e != nullptr; e = multi_map_find_next(s->placeholders, e)) {
@@ -210,7 +215,7 @@ gb_internal void add_placeholder(Scope *s, InternedString name, GlobalDeclSource
 	multi_map_insert(s->placeholders, key, src);
 }
 
-gb_internal void add_placeholders(AstFile *f, u8 scopes, InternedString name, GlobalDeclSource *src, Ast *decl, bool in_else) {
+gb_internal void add_placeholders(GlobalDeclScan *scan, AstFile *f, u8 scopes, InternedString name, GlobalDeclSource *src, Ast *decl, bool in_else) {
 	if (name.value == 0 || name.is_blank()) {
 		return;
 	}
@@ -218,16 +223,16 @@ gb_internal void add_placeholders(AstFile *f, u8 scopes, InternedString name, Gl
 		array_init(&src->names, heap_allocator());
 	}
 	if (scopes & PlaceholderScope_File) {
-		add_placeholder(f->scope, name, src);
+		add_placeholder(scan, f->scope, name, src);
 		array_add(&src->names, GlobalDeclSourceName{name, f->scope, decl, in_else});
 	}
 	if (scopes & PlaceholderScope_Pkg) {
-		add_placeholder(f->pkg->scope, name, src);
+		add_placeholder(scan, f->pkg->scope, name, src);
 		array_add(&src->names, GlobalDeclSourceName{name, f->pkg->scope, decl, in_else});
 	}
 }
 
-gb_internal GlobalDeclSource *add_global_decl_source(Ast *node, AstFile *f, GlobalDeclSource *parent, bool in_else) {
+gb_internal GlobalDeclSource *add_global_decl_source(GlobalDeclScan *scan, Ast *node, AstFile *f, GlobalDeclSource *parent, bool in_else) {
 	GlobalDeclSource *src = permanent_alloc_item<GlobalDeclSource>();
 	src->node      = node;
 	src->file      = f;
@@ -235,31 +240,31 @@ gb_internal GlobalDeclSource *add_global_decl_source(Ast *node, AstFile *f, Glob
 	src->in_else   = in_else;
 	src->reachable = true;
 	src->state     = EntityState_Unresolved;
-	array_add(&global_decl_sources, src);
+	array_add(&scan->sources, src);
 	return src;
 }
 
-gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility);
+gb_internal void scan_global_decl_sources(GlobalDeclScan *scan, AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility);
 
-gb_internal void scan_global_when_stmt(AstFile *f, Ast *node, GlobalDeclSource *parent, bool in_else, i32 foreign_visibility) {
+gb_internal void scan_global_when_stmt(GlobalDeclScan *scan, AstFile *f, Ast *node, GlobalDeclSource *parent, bool in_else, i32 foreign_visibility) {
 	ast_node(ws, WhenStmt, node);
-	GlobalDeclSource *src = add_global_decl_source(node, f, parent, in_else);
+	GlobalDeclSource *src = add_global_decl_source(scan, node, f, parent, in_else);
 	if (ws->body != nullptr && ws->body->kind == Ast_BlockStmt) {
-		scan_global_decl_sources(f, ws->body->BlockStmt.stmts, src, false, foreign_visibility);
+		scan_global_decl_sources(scan, f, ws->body->BlockStmt.stmts, src, false, foreign_visibility);
 	}
 	if (ws->else_stmt != nullptr) {
 		switch (ws->else_stmt->kind) {
 		case Ast_BlockStmt:
-			scan_global_decl_sources(f, ws->else_stmt->BlockStmt.stmts, src, true, foreign_visibility);
+			scan_global_decl_sources(scan, f, ws->else_stmt->BlockStmt.stmts, src, true, foreign_visibility);
 			break;
 		case Ast_WhenStmt:
-			scan_global_when_stmt(f, ws->else_stmt, src, true, foreign_visibility);
+			scan_global_when_stmt(scan, f, ws->else_stmt, src, true, foreign_visibility);
 			break;
 		}
 	}
 }
 
-gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility) {
+gb_internal void scan_global_decl_sources(GlobalDeclScan *scan, AstFile *f, Slice<Ast *> const &stmts, GlobalDeclSource *owner, bool in_else, i32 foreign_visibility) {
 	// NOTE(bill): `owner == nullptr` is the file scope itself, whose other declarations are already collected
 	for (Ast *decl : stmts) {
 		switch (decl->kind) {
@@ -282,7 +287,7 @@ gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts,
 			}
 			for (Ast *name : vd->names) {
 				if (name->kind == Ast_Ident) {
-					add_placeholders(f, scopes, name->Ident.interned, owner, decl, in_else);
+					add_placeholders(scan, f, scopes, name->Ident.interned, owner, decl, in_else);
 				}
 			}
 		case_end;
@@ -297,19 +302,19 @@ gb_internal void scan_global_decl_sources(AstFile *f, Slice<Ast *> const &stmts,
 			}
 			if (library_name.len != 0) {
 				u8 scopes = has_syntactic_attribute(fl->attributes, str_lit("export")) ? PlaceholderScope_Pkg : PlaceholderScope_File;
-				add_placeholders(f, scopes, string_interner_insert(library_name), owner, decl, in_else);
+				add_placeholders(scan, f, scopes, string_interner_insert(library_name), owner, decl, in_else);
 			}
 		case_end;
 
 		case_ast_node(fb, ForeignBlockDecl, decl);
-			GlobalDeclSource *src = add_global_decl_source(decl, f, owner, in_else);
+			GlobalDeclSource *src = add_global_decl_source(scan, decl, f, owner, in_else);
 			if (fb->body != nullptr && fb->body->kind == Ast_BlockStmt) {
-				scan_global_decl_sources(f, fb->body->BlockStmt.stmts, src, false, syntactic_visibility(fb->attributes));
+				scan_global_decl_sources(scan, f, fb->body->BlockStmt.stmts, src, false, syntactic_visibility(fb->attributes));
 			}
 		case_end;
 
 		case_ast_node(ws, WhenStmt, decl);
-			scan_global_when_stmt(f, decl, owner, in_else, foreign_visibility);
+			scan_global_when_stmt(scan, f, decl, owner, in_else, foreign_visibility);
 		case_end;
 
 		case_ast_node(es, ExprStmt, decl);
@@ -598,8 +603,19 @@ gb_internal void check_vet_when_shadowing(void) {
 	}
 }
 
-// Placeholders for every file, then every source resolved in package, file and source order, which
-// only matters for which errors are reported
+struct GlobalDeclScanTask {
+	GlobalDeclScan *scan;
+	AstPackage *    pkg;
+};
+
+gb_internal WORKER_TASK_PROC(scan_global_decl_sources_worker_proc) {
+	GlobalDeclScanTask *task = cast(GlobalDeclScanTask *)data;
+	for (AstFile *f : task->pkg->files) {
+		scan_global_decl_sources(task->scan, f, f->decls, nullptr, false, EntityVisiblity_Public);
+	}
+	return 0;
+}
+
 gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *> const &package_order) {
 	array_init(&global_decl_sources,       heap_allocator());
 	array_init(&global_decl_source_stack,  heap_allocator());
@@ -608,9 +624,23 @@ gb_internal void resolve_global_decl_sources(Checker *c, Array<ImportGraphNode *
 	defer (destroy_checker_context(&global_decl_source_export_ctx));
 
 	u64 stage_start = global_import_stage_begin();
-	for (ImportGraphNode *node : package_order) {
-		for (AstFile *f : node->pkg->files) {
-			scan_global_decl_sources(f, f->decls, nullptr, false, EntityVisiblity_Public);
+	{
+		auto scans = array_make<GlobalDeclScan>(heap_allocator(), package_order.count);
+		defer (array_free(&scans));
+		TaskGroup group = {};
+		for_array(i, package_order) {
+			scans[i].sources            = array_make<GlobalDeclSource *>(heap_allocator());
+			scans[i].placeholder_scopes = array_make<Scope *>(heap_allocator());
+			GlobalDeclScanTask *task = permanent_alloc_item<GlobalDeclScanTask>();
+			*task = {&scans[i], package_order[i]->pkg};
+			thread_pool_add_task(&group, scan_global_decl_sources_worker_proc, task);
+		}
+		thread_pool_wait(&group);
+		for (GlobalDeclScan &scan : scans) {
+			array_add_elems(&global_decl_sources, scan.sources.data, scan.sources.count);
+			array_add_elems(&global_placeholder_scopes, scan.placeholder_scopes.data, scan.placeholder_scopes.count);
+			array_free(&scan.sources);
+			array_free(&scan.placeholder_scopes);
 		}
 	}
 	find_global_when_cycles();

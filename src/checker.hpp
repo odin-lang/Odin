@@ -567,7 +567,7 @@ gb_internal ScopeMapIterator const begin(ScopeMap const &m) noexcept {
 	return ScopeMapIterator{&m, m.slots, m.cap, index};
 }
 
-enum ScopeFlag : i32 {
+enum ScopeFlag : u32 {
 	ScopeFlag_Pkg     = 1<<1,
 	ScopeFlag_Builtin = 1<<2,
 	ScopeFlag_Global  = 1<<3,
@@ -598,7 +598,7 @@ struct Scope {
 
 	DeclInfo *decl_info;
 
-	i32             flags; // ScopeFlag
+	std::atomic<u32> flags;
 	union {
 		AstPackage *pkg;
 		AstFile *   file;

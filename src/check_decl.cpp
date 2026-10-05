@@ -2237,7 +2237,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 
 		// NOTE: a file scope's is set from its own file and shared by every thread, see `create_scope_from_file`
 		bool set_context = (c.scope->flags & ScopeFlag_File) == 0;
-		auto prev_flags = c.scope->flags;
+		u32 prev_flags = c.scope->flags;
 		defer (if (set_context) {
 			c.scope->flags = prev_flags;
 		});
@@ -2245,7 +2245,7 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 			if (check_feature_flags(ctx, d->decl_node) & OptInFeatureFlag_GlobalContext) {
 				c.scope->flags |= ScopeFlag_ContextDefined;
 			} else {
-				c.scope->flags &= ~ScopeFlag_ContextDefined;
+				c.scope->flags &= ~cast(u32)ScopeFlag_ContextDefined;
 			}
 		}
 

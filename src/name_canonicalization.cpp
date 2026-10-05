@@ -775,7 +775,7 @@ gb_internal void write_canonical_entity_name(TypeWriter *w, Entity *e) {
 			goto write_base_name;
 		}
 
-		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags, s->decl_info);
+		gb_printf_err("%s WEIRD ENTITY TYPE %s %u %p\n", token_pos_to_string(e->token.pos), type_to_string(e->type), s->flags.load(), s->decl_info);
 
 		auto const print_scope_flags = [](Scope *s) {
 			if (s->flags & ScopeFlag_Pkg)             gb_printf_err("Pkg ");

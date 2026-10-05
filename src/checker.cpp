@@ -280,7 +280,7 @@ gb_internal Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 	if (global_context) {
 		s->flags |= ScopeFlag_ContextDefined;
 	} else {
-		s->flags &= ~ScopeFlag_ContextDefined;
+		s->flags &= ~cast(u32)ScopeFlag_ContextDefined;
 	}
 
 	return s;
@@ -5787,8 +5787,7 @@ gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c
 		AstPackage *p = c->parser->packages[i];
 		for_array(j, p->files) {
 			AstFile *f = p->files[j];
-			for_array(k, f->decls) {
-				Ast *decl = f->decls[k];
+			for (Ast *decl : f->imports) {
 				add_import_dependency_node(c, decl, &M);
 			}
 		}
@@ -6205,23 +6204,35 @@ gb_internal GB_COMPARE_PROC(sort_file_by_name) {
 	return string_compare(x_name, y_name);
 }
 
+gb_internal WORKER_TASK_PROC(check_create_file_scopes_worker_proc) {
+	AstPackage *pkg = cast(AstPackage *)data;
+
+	array_sort(pkg->files, sort_file_by_name);
+
+	isize total_pkg_decl_count = 0;
+	for_array(j, pkg->files) {
+		AstFile *f = pkg->files[j];
+		f->index_in_pkg = cast(i32)j;
+
+		create_scope_from_file(nullptr, f);
+		total_pkg_decl_count += f->total_file_decl_count;
+	}
+
+	mpmc_init(&pkg->exported_entity_queue, total_pkg_decl_count);
+	return 0;
+}
+
 gb_internal void check_create_file_scopes(Checker *c) {
-	for_array(i, c->parser->packages) {
-		AstPackage *pkg = c->parser->packages[i];
+	TaskGroup group = {};
+	for (AstPackage *pkg : c->parser->packages) {
+		thread_pool_add_task(&group, check_create_file_scopes_worker_proc, pkg);
+	}
+	thread_pool_wait(&group);
 
-		array_sort(pkg->files, sort_file_by_name);
-
-		isize total_pkg_decl_count = 0;
-		for_array(j, pkg->files) {
-			AstFile *f = pkg->files[j];
-			f->index_in_pkg = cast(i32)j;
+	for (AstPackage *pkg : c->parser->packages) {
+		for (AstFile *f : pkg->files) {
 			string_map_set(&c->info.files, f->fullpath, f);
-
-			create_scope_from_file(nullptr, f);
-			total_pkg_decl_count += f->total_file_decl_count;
 		}
-
-		mpmc_init(&pkg->exported_entity_queue, total_pkg_decl_count);
 	}
 }
 
@@ -6319,6 +6330,18 @@ gb_internal void check_export_entities(Checker *c) {
 
 #include "checker_global.cpp"
 
+gb_internal WORKER_TASK_PROC(check_add_imports_worker_proc) {
+	AstFile *f = cast(AstFile *)data;
+	auto *wd = &collect_entity_worker_data[current_thread_index()];
+	reset_checker_context(&wd->ctx, f, &wd->untyped);
+	for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
+		check_add_import_decl(&wd->ctx, decl);
+	}
+	array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
+	add_untyped_expressions(wd->ctx.info, &wd->untyped);
+	return 0;
+}
+
 gb_internal WORKER_TASK_PROC(correct_type_aliases_worker_proc) {
 	AstPackage *pkg = cast(AstPackage *)data;
 	auto *wd = &collect_entity_worker_data[current_thread_index()];
@@ -6382,28 +6405,19 @@ gb_internal void check_import_entities(Checker *c) {
 		array_add(&package_order, n);
 	}
 
-	CheckerContext ctx = {};
-	init_checker_context(&ctx, c);
-	defer (destroy_checker_context(&ctx));
-
-	UntypedExprInfoMap untyped = {};
-	defer (map_destroy(&untyped));
-
 	TIME_SECTION("check_import_entities - imports");
 	// NOTE(bill): every import first, as resolving a 'when' may check declarations in any package
 	u64 stage_start = global_import_stage_begin();
-	for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
-		AstPackage *pkg = package_order[pkg_index]->pkg;
-		pkg->order = 1+pkg_index;
-
-		for (AstFile *f : pkg->files) {
-			reset_checker_context(&ctx, f, &untyped);
-			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
-				check_add_import_decl(&ctx, decl);
+	{
+		TaskGroup group = {};
+		for (isize pkg_index = 0; pkg_index < package_order.count; pkg_index++) {
+			AstPackage *pkg = package_order[pkg_index]->pkg;
+			pkg->order = 1+pkg_index;
+			for (AstFile *f : pkg->files) {
+				thread_pool_add_task(&group, check_add_imports_worker_proc, f);
 			}
-			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
-			add_untyped_expressions(ctx.info, &untyped);
 		}
+		thread_pool_wait(&group);
 	}
 	global_import_stage_end(GlobalImportStage_Imports, stage_start);
 
