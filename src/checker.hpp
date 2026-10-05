@@ -617,8 +617,8 @@ typedef PtrSet<EntityGraphNode *> EntityGraphNodeSet;
 struct EntityGraphNode {
 	Entity *entity; // Procedure, Variable, Constant
 
-	EntityGraphNodeSet pred;
-	EntityGraphNodeSet succ;
+	Slice<EntityGraphNode *> pred;
+	EntityGraphNodeSet       succ;
 	isize index; // Index in array/queue
 	isize dep_count;
 };

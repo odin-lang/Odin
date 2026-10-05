@@ -77,7 +77,6 @@ gb_internal void entity_graph_node_set_remove(EntityGraphNodeSet *s, EntityGraph
 }
 
 gb_internal void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
-	entity_graph_node_set_destroy(&n->pred);
 	entity_graph_node_set_destroy(&n->succ);
 	gb_free(a, n);
 }
@@ -127,6 +126,10 @@ gb_internal int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) 
 		return x->dep_count < y->dep_count ? -1 : +1;
 	}
 	return entity_source_order_cmp(x->entity, y->entity);
+}
+
+gb_internal int entity_graph_node_source_order_cmp(EntityGraphNode **data, isize i, isize j) {
+	return entity_source_order_cmp(data[i]->entity, data[j]->entity);
 }
 
 gb_internal void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
@@ -3625,25 +3628,8 @@ gb_internal void start_generate_entity_dependency_graph_edges(EntityGraph *g) {
 }
 
 gb_internal void finish_generate_entity_dependency_graph_edges(EntityGraph *g) {
-	Array<EntityGraphNode *> const &G = g->nodes;
-	defer (map_destroy(&g->vars));
-
 	thread_pool_wait(&g->edges);
-
-	// NOTE: in the order of the nodes, so each node's predecessors are added in the order they were before
-	for (EntityGraphNode *n : G) {
-		FOR_PTR_SET(m, n->succ) {
-			entity_graph_node_set_add(&m->pred, n);
-		}
-	}
-
-	TIME_SECTION("generate_entity_dependency_graph: Dependency Count Checker");
-	for_array(i, G) {
-		EntityGraphNode *n = G[i];
-		n->index = i;
-		n->dep_count = n->succ.count;
-		GB_ASSERT(n->dep_count >= 0);
-	}
+	map_destroy(&g->vars);
 }
 
 
@@ -6514,52 +6500,130 @@ struct GlobalInitOrderData {
 gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker) {
 	GlobalInitOrderData *order = cast(GlobalInitOrderData *)data;
 	CheckerInfo *info = order->info;
+	Array<EntityGraphNode *> const &G = order->dep_graph;
 
-	// NOTE(bill): Priority queue
-	auto pq = priority_queue_create(order->dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
+	isize edge_count = 0;
+	for (EntityGraphNode *n : G) {
+		n->index = 0;
+		n->dep_count = n->succ.count;
+		edge_count += n->succ.count;
+		FOR_PTR_SET(m, n->succ) {
+			m->pred.count += 1;
+		}
+	}
+	auto preds = array_make<EntityGraphNode *>(heap_allocator(), edge_count);
+	defer (array_free(&preds));
+	isize pred_offset = 0;
+	for (EntityGraphNode *n : G) {
+		n->pred.data = preds.data + pred_offset;
+		pred_offset += n->pred.count;
+		n->pred.count = 0;
+	}
+	for (EntityGraphNode *n : G) {
+		FOR_PTR_SET(m, n->succ) {
+			m->pred.data[m->pred.count++] = n;
+		}
+	}
 
 	PtrSet<DeclInfo *> emitted = {};
+	ptr_set_init(&emitted, G.count);
 	defer (ptr_set_destroy(&emitted));
+	array_reserve(&info->variable_init_order, G.count);
 
-	while (pq.queue.count > 0) {
-		EntityGraphNode *n = priority_queue_pop(&pq);
+	isize emitted_count = 0;
+	auto const emit = [&](EntityGraphNode *n) {
+		n->index = -1;
+		emitted_count += 1;
+
 		Entity *e = n->entity;
-
-		if (n->dep_count > 0) {
-			TEMPORARY_ALLOCATOR_GUARD();
-			auto path = find_entity_path(e, e, temporary_allocator());
-
-			if (path.count > 0) {
-				Entity *e = path[0];
-				error(e->token, "Cyclic initialization of '%.*s'", LIT(e->token.string));
-				for (isize i = path.count-1; i >= 0; i--) {
-					error(e->token, "\t'%.*s' refers to", LIT(e->token.string));
-					e = path[i];
-				}
-				error(e->token, "\t'%.*s'", LIT(e->token.string));
-			}
-		}
-
-		FOR_PTR_SET(p, n->pred) {
-			p->dep_count -= 1;
-			p->dep_count = gb_max(p->dep_count, 0);
-			priority_queue_fix(&pq, p->index);
-		}
-
 		DeclInfo *d = decl_info_of_entity(e);
 		if (e->kind != Entity_Variable) {
-			continue;
+			return;
 		}
 		// IMPORTANT NOTE(bill, 2019-08-29): Just add it regardless of the ordering
 		// because it does not need any initialization other than zero
 		// if (!decl_info_has_init(d)) {
-		// 	continue;
+		// 	return;
 		// }
 		if (ptr_set_update(&emitted, d)) {
-			continue;
+			return;
 		}
 
 		array_add(&info->variable_init_order, d);
+	};
+
+	// NOTE(bill, 2022-10-05): The order is by the dependencies left, then by the source.
+	// So without a cycle the next is the first in the source of those with none left:
+	// those with none to begin with are sorted once, and those which reach none later go into a heap rather than every node being in a priority queue
+	auto ready = array_make<EntityGraphNode *>(heap_allocator(), 0, G.count);
+	defer (array_free(&ready));
+	for (EntityGraphNode *n : G) {
+		if (n->dep_count == 0) {
+			array_add(&ready, n);
+		}
+	}
+	natural_merge_sort(ready.data, ready.count, [](EntityGraphNode *const &x, EntityGraphNode *const &y) -> int {
+		return entity_source_order_cmp(x->entity, y->entity);
+	});
+
+	auto later = priority_queue_create(array_make<EntityGraphNode *>(heap_allocator()), entity_graph_node_source_order_cmp, entity_graph_node_swap);
+	defer (array_free(&later.queue));
+	for (isize next_ready = 0; /**/; /**/) {
+		EntityGraphNode *n = nullptr;
+		if (next_ready < ready.count && (later.queue.count == 0 || entity_source_order_cmp(ready[next_ready]->entity, later.queue[0]->entity) < 0)) {
+			n = ready[next_ready++];
+		} else if (later.queue.count > 0) {
+			n = priority_queue_pop(&later);
+		} else {
+			break;
+		}
+		for (EntityGraphNode *p : n->pred) {
+			p->dep_count -= 1;
+			if (p->dep_count == 0) {
+				priority_queue_push(&later, p);
+			}
+		}
+		emit(n);
+	}
+
+	if (emitted_count < G.count) {
+		auto rest = array_make<EntityGraphNode *>(heap_allocator(), 0, G.count - emitted_count);
+		for (EntityGraphNode *n : G) {
+			if (n->index >= 0) {
+				n->index = rest.count;
+				array_add(&rest, n);
+			}
+		}
+		// NOTE(bill): Priority queue
+		auto pq = priority_queue_create(rest, entity_graph_node_cmp, entity_graph_node_swap);
+		defer (array_free(&pq.queue));
+
+		while (pq.queue.count > 0) {
+			EntityGraphNode *n = priority_queue_pop(&pq);
+			Entity *e = n->entity;
+
+			if (n->dep_count > 0) {
+				TEMPORARY_ALLOCATOR_GUARD();
+				auto path = find_entity_path(e, e, temporary_allocator());
+
+				if (path.count > 0) {
+					Entity *e = path[0];
+					error(e->token, "Cyclic initialization of '%.*s'", LIT(e->token.string));
+					for (isize i = path.count-1; i >= 0; i--) {
+						error(e->token, "\t'%.*s' refers to", LIT(e->token.string));
+						e = path[i];
+					}
+					error(e->token, "\t'%.*s'", LIT(e->token.string));
+				}
+			}
+
+			for (EntityGraphNode *p : n->pred) {
+				p->dep_count -= 1;
+				p->dep_count = gb_max(p->dep_count, 0);
+				priority_queue_fix(&pq, p->index);
+			}
+			emit(n);
+		}
 	}
 
 	if (false) {
