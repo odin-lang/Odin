@@ -2,7 +2,6 @@ package fmt
 
 import "base:intrinsics"
 import "base:runtime"
-import "core:math"
 import "core:math/bits"
 import "core:mem"
 import "core:io"
@@ -3389,21 +3388,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_bit_field(fi, v, verb, info, "")
 	}
 }
-// This proc helps keep some of the code around whether or not to print an
-// intermediate plus sign in complexes and quaternions more readable.
-@(private)
-_cq_should_print_intermediate_plus :: proc "contextless" (fi: ^Info, f: f64) -> bool {
-	if !fi.plus && f >= 0 {
-		#partial switch math.classify(f) {
-		case .Neg_Zero, .Inf:
-			// These two classes print their own signs.
-			return false
-		case:
-			return true
-		}
-	}
-	return false
-}
 // Formats a complex number based on the given formatting verb
 //
 // Inputs:
@@ -3417,9 +3401,11 @@ fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 	case 'f', 'F', 'v', 'h', 'H', 'w':
 		r, i := real(c), imag(c)
 		fmt_float(fi, r, bits/2, verb)
-		if _cq_should_print_intermediate_plus(fi, i) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
+
+		prev_plus := fi.plus
+		defer fi.plus = prev_plus
+		fi.plus = true
+
 		fmt_float(fi, i, bits/2, verb)
 		io.write_rune(fi.writer, 'i', &fi.n)
 
@@ -3443,21 +3429,16 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 
 		fmt_float(fi, r, bits/4, verb)
 
-		if _cq_should_print_intermediate_plus(fi, i) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
+		prev_plus := fi.plus
+		defer fi.plus = prev_plus
+		fi.plus = true
+
 		fmt_float(fi, i, bits/4, verb)
 		io.write_rune(fi.writer, 'i', &fi.n)
 
-		if _cq_should_print_intermediate_plus(fi, j) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
 		fmt_float(fi, j, bits/4, verb)
 		io.write_rune(fi.writer, 'j', &fi.n)
 
-		if _cq_should_print_intermediate_plus(fi, k) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
 		fmt_float(fi, k, bits/4, verb)
 		io.write_rune(fi.writer, 'k', &fi.n)
 
