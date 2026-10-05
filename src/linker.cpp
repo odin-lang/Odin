@@ -151,6 +151,11 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 		gbString inputs = gb_string_make(temporary_allocator(), "");
 		inputs = gb_string_append_fmt(inputs, "\"%.*s.o\"", LIT(output_filename));
 
+		// A package can foreign import the same object from several files (vendor:miniaudio
+		// does, once per file); passing it to wasm-ld more than once duplicates its symbols.
+		StringSet added_objects = {};
+		string_set_init(&added_objects, 64);
+		defer (string_set_destroy(&added_objects));
 
 		for (Entity *e : gen->foreign_libraries) {
 			GB_ASSERT(e->kind == Entity_LibraryName);
@@ -169,6 +174,10 @@ gb_internal i32 linker_stage(LinkerData *gen) {
 
 				if (!string_ends_with(lib, str_lit(".o"))) {
 					continue;
+				}
+
+				if (string_set_update(&added_objects, lib)) {
+					continue; // already added
 				}
 
 				inputs = gb_string_append_fmt(inputs, " \"%.*s\"", LIT(lib));

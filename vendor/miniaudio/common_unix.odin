@@ -1,4 +1,6 @@
 #+build !windows
+#+build !wasm32
+#+build !wasm64p32
 package miniaudio
 
 import "core:sys/posix"
