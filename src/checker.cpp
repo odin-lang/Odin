@@ -1684,7 +1684,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	map_init(&i->global_untyped);
 	array_init(&i->link_names, heap_allocator());
 
-	type_set_init(&i->min_dep_type_info_set);
+	per_thread_array_init(&i->min_dep_type_info_queue, global_thread_pool.threads.count);
 	map_init(&i->min_dep_type_info_index_map);
 
 	string_map_init(&i->files);
@@ -1726,7 +1726,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	map_destroy(&i->global_untyped);
 	array_free(&i->link_names);
 
-	type_set_destroy(&i->min_dep_type_info_set);
+	per_thread_array_destroy(&i->min_dep_type_info_queue);
 	map_destroy(&i->min_dep_type_info_index_map);
 
 	string_map_destroy(&i->files);
@@ -2742,14 +2742,15 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		return;
 	}
 
+	// Each `Type *` is claimed once and collected per thread, as the shared set's lock was most of the time; identical
+	// types are walked once for each `Type *` and deduplicated after the walk
 	if (t->flags.load(std::memory_order_relaxed) & TypeFlag_InMinDepTypeInfoSet) {
 		return;
 	}
-	bool exists = type_set_update_with_mutex(&c->info.min_dep_type_info_set, t, &c->info.min_dep_type_info_set_mutex);
-	t->flags.fetch_or(TypeFlag_InMinDepTypeInfoSet, std::memory_order_relaxed);
-	if (exists) {
+	if (t->flags.fetch_or(TypeFlag_InMinDepTypeInfoSet, std::memory_order_relaxed) & TypeFlag_InMinDepTypeInfoSet) {
 		return;
 	}
+	per_thread_array_add(&c->info.min_dep_type_info_queue, TypeInfoPair{t, 0});
 
 	// Add nested types
 	if (t->kind == Type_Named) {
@@ -2848,7 +2849,6 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		} else {
 			add_min_dep_type_info(c, t_type_info_ptr);
 		}
-		add_min_dep_type_info(c, bt->Union.polymorphic_params);
 		for_array(i, bt->Union.variants) {
 			add_min_dep_type_info(c, bt->Union.variants[i]);
 		}
@@ -2861,6 +2861,9 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		if (bt->Struct.scope != nullptr) {
 			for (auto const &entry : bt->Struct.scope->elements) {
 				Entity *e = entry.value;
+				if (bt->Struct.soa_kind == StructSoa_None && e->kind != Entity_Variable) {
+					continue; // polymorphic parameters, which no type info refers to
+				}
 				switch (bt->Struct.soa_kind) {
 				case StructSoa_Dynamic:
 					add_min_dep_type_info(c, t_type_info_ptr); // append_soa
@@ -2880,7 +2883,6 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 				}
 			}
 		}
-		add_min_dep_type_info(c, bt->Struct.polymorphic_params);
 		for_array(i, bt->Struct.fields) {
 			Entity *f = bt->Struct.fields[i];
 			add_min_dep_type_info(c, f->type);
@@ -3551,31 +3553,82 @@ gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_edges_worker) {
 	return 0;
 }
 
-gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, Arena *arena) {
-	PtrMap<Entity *, EntityGraphNode *> M_vars = {};
-	map_init(&M_vars, info->entities.count);
-	defer (map_destroy(&M_vars));
+struct EntityGraphVariablesChunk {
+	Slice<Entity *> entities;
+	Array<Entity *> variables;
+};
 
-	auto G = array_make<EntityGraphNode *>(arena_allocator(arena), 0, info->entities.count);
-	for (Entity *e : info->entities) {
-		if (e == nullptr || e->kind != Entity_Variable || !is_entity_a_dependency(e)) {
-			continue;
+gb_internal WORKER_TASK_PROC(generate_entity_dependency_graph_variables_worker) {
+	EntityGraphVariablesChunk *chunk = cast(EntityGraphVariablesChunk *)data;
+	for (Entity *e : chunk->entities) {
+		if (e != nullptr && e->kind == Entity_Variable && is_entity_a_dependency(e)) {
+			array_add(&chunk->variables, e);
 		}
-		EntityGraphNode *n = arena_alloc_item<EntityGraphNode>(arena);
-		n->entity = e;
-		map_set(&M_vars, e, n);
-		array_add(&G, n);
+	}
+	return 0;
+}
+
+struct EntityGraph {
+	PtrMap<Entity *, EntityGraphNode *> vars;
+	Array<EntityGraphNode *>             nodes;
+	EntityGraphEdgesWork                 edges_work;
+	TaskGroup                            edges;
+};
+
+// The nodes, one for each global variable, in the order of the entities
+gb_internal void generate_entity_dependency_graph_nodes(EntityGraph *g, CheckerInfo *info, Arena *arena) {
+	// NOTE: the entities are looked through in parallel, as reading each to find the few variables was most of the
+	// time, and the nodes are then made in the same order as before
+	isize const CHUNK_SIZE = 1024;
+	auto chunks = array_make<EntityGraphVariablesChunk>(heap_allocator(), 0, info->entities.count/CHUNK_SIZE + 1);
+	defer (array_free(&chunks));
+	for (isize i = 0; i < info->entities.count; i += CHUNK_SIZE) {
+		Slice<Entity *> entities = slice(slice_from_array(info->entities), i, gb_min(i + CHUNK_SIZE, info->entities.count));
+		array_add(&chunks, EntityGraphVariablesChunk{entities, array_make<Entity *>(heap_allocator())});
+	}
+	{
+		TaskGroup group = {};
+		for (EntityGraphVariablesChunk &chunk : chunks) {
+			thread_pool_add_task(&group, generate_entity_dependency_graph_variables_worker, &chunk);
+		}
+		thread_pool_wait(&group);
 	}
 
+	isize variable_count = 0;
+	for (EntityGraphVariablesChunk const &chunk : chunks) {
+		variable_count += chunk.variables.count;
+	}
+
+	map_init(&g->vars, variable_count);
+	g->nodes = array_make<EntityGraphNode *>(arena_allocator(arena), 0, variable_count);
+	for (EntityGraphVariablesChunk &chunk : chunks) {
+		for (Entity *e : chunk.variables) {
+			EntityGraphNode *n = arena_alloc_item<EntityGraphNode>(arena);
+			n->entity = e;
+			map_set(&g->vars, e, n);
+			array_add(&g->nodes, n);
+		}
+		array_free(&chunk.variables);
+	}
+}
+
+// NOTE: only started, so the edges' tasks can be first in the queue, and so first to be stolen, before other work
+gb_internal void start_generate_entity_dependency_graph_edges(EntityGraph *g) {
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges");
 
-	EntityGraphEdgesWork work = {&M_vars, slice_from_array(G)};
-	TaskGroup group = {};
-	isize task_count = gb_min(global_thread_pool.threads.count, G.count);
+	g->edges_work.vars  = &g->vars;
+	g->edges_work.nodes = slice_from_array(g->nodes);
+	isize task_count = gb_min(global_thread_pool.threads.count, g->nodes.count);
 	for (isize i = 0; i < task_count; i++) {
-		thread_pool_add_task(&group, generate_entity_dependency_graph_edges_worker, &work);
+		thread_pool_add_task(&g->edges, generate_entity_dependency_graph_edges_worker, &g->edges_work);
 	}
-	thread_pool_wait(&group);
+}
+
+gb_internal void finish_generate_entity_dependency_graph_edges(EntityGraph *g) {
+	Array<EntityGraphNode *> const &G = g->nodes;
+	defer (map_destroy(&g->vars));
+
+	thread_pool_wait(&g->edges);
 
 	// NOTE: in the order of the nodes, so each node's predecessors are added in the order they were before
 	for (EntityGraphNode *n : G) {
@@ -3591,8 +3644,6 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		n->dep_count = n->succ.count;
 		GB_ASSERT(n->dep_count >= 0);
 	}
-
-	return G;
 }
 
 
@@ -7612,6 +7663,12 @@ gb_internal void add_untyped_expression_values(UntypedExprInfo *untyped, isize c
 	}
 }
 
+gb_internal void hash_type_info_pairs(TypeInfoPair *pairs, isize count) {
+	for (isize i = 0; i < count; i++) {
+		pairs[i].hash = type_hash_canonical_type(pairs[i].type);
+	}
+}
+
 gb_internal void check_for_type_and_inline_cycles(Entity **definitions, isize count) {
 	for (isize i = 0; i < count; i++) {
 		Entity *e = definitions[i];
@@ -7753,14 +7810,6 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 	check_merge_queues_into_arrays(c);
 
-	// NOTE(bill): Since both only read what the procedure bodies left they can run alongside the stages below
-	//  and are waited for only before what changes that
-	TIME_SECTION("start scope usages and type and inline cycles");
-	TaskGroup scope_usages = {};
-	start_check_all_scope_usages(c, &scope_usages);
-	ThreadPoolChunks<Entity *> cycle_checks = {};
-	thread_pool_start_chunks(&cycle_checks, c->info.definitions.data, c->info.definitions.count, 1024, check_for_type_and_inline_cycles);
-
 	TIME_SECTION("check deferred procedures");
 	check_deferred_procedures(c);
 
@@ -7772,7 +7821,24 @@ gb_internal void check_parsed_files(Checker *c) {
 		// NOTE(bill): The graph reads the dependencies before the tree update below adds to them
 		Arena *init_order_arena = get_arena(ThreadArena_Temporary);
 		ArenaTempGuard init_order_arena_guard(init_order_arena);
-		GlobalInitOrderData init_order = {&c->info, generate_entity_dependency_graph(&c->info, init_order_arena)};
+		EntityGraph graph = {};
+		generate_entity_dependency_graph_nodes(&graph, &c->info, init_order_arena);
+		start_generate_entity_dependency_graph_edges(&graph);
+
+		// NOTE(bill): Since both only read what the procedure bodies left they can run alongside the stages below
+		// and are waited for only before what changes that
+		//
+		// When started after the graph's nodes (which then have every thread) and after its edges (which are then taken first)
+		// as they are what the stages after wait on
+		TIME_SECTION("start scope usages and type and inline cycles");
+		TaskGroup scope_usages = {};
+		start_check_all_scope_usages(c, &scope_usages);
+		ThreadPoolChunks<Entity *> cycle_checks = {};
+		thread_pool_start_chunks(&cycle_checks, c->info.definitions.data, c->info.definitions.count, 1024, check_for_type_and_inline_cycles);
+
+		TIME_SECTION("wait for the graph's edges");
+		finish_generate_entity_dependency_graph_edges(&graph);
+		GlobalInitOrderData init_order = {&c->info, graph.nodes};
 
 		TIME_SECTION("wait for type and inline cycles");
 		thread_pool_wait_chunks(&cycle_checks);
@@ -7789,6 +7855,13 @@ gb_internal void check_parsed_files(Checker *c) {
 		thread_pool_add_task(calculate_global_init_order_worker, &init_order);
 		generate_minimum_dependency_set(c, c->info.entry_point);
 	}
+
+	// Hashed alongside the stages below, as only the type info array reads the hashes
+	auto type_info_types = array_make<TypeInfoPair>(heap_allocator());
+	defer (array_free(&type_info_types));
+	per_thread_array_gather(&c->info.min_dep_type_info_queue, &type_info_types);
+	ThreadPoolChunks<TypeInfoPair> type_info_hashes = {};
+	thread_pool_start_chunks(&type_info_hashes, type_info_types.data, type_info_types.count, 128, hash_type_info_pairs);
 
 	TIME_SECTION("check bodies have all been checked");
 	check_min_dep_bodies_were_checked(c);
@@ -7865,13 +7938,27 @@ gb_internal void check_parsed_files(Checker *c) {
 	{
 		TEMPORARY_ALLOCATOR_GUARD();
 
-		Array<TypeInfoPair> type_info_types; // sorted after filled
-		array_init(&type_info_types, temporary_allocator());
+		thread_pool_wait_chunks(&type_info_hashes);
+		natural_merge_sort(type_info_types.data, type_info_types.count, [](TypeInfoPair const &x, TypeInfoPair const &y) -> int {
+			return x.hash < y.hash ? -1 : x.hash > y.hash;
+		});
 
-		for (auto const &tt : c->info.min_dep_type_info_set) {
-			array_add(&type_info_types, tt);
+		// identical types collected through different `Type *`s are one entry
+		isize unique_count = 0;
+		for (isize i = 0; i < type_info_types.count; i++) {
+			TypeInfoPair tt = type_info_types[i];
+			bool exists = false;
+			for (isize j = unique_count-1; j >= 0 && type_info_types[j].hash == tt.hash; j--) {
+				if (are_types_identical_unique_tuples(type_info_types[j].type, tt.type)) {
+					exists = true;
+					break;
+				}
+			}
+			if (!exists) {
+				type_info_types[unique_count++] = tt;
+			}
 		}
-		array_sort(type_info_types, type_info_pair_cmp);
+		type_info_types.count = unique_count;
 
 		array_init(&c->info.type_info_types_hash_map, heap_allocator(), type_info_types.count*2 + 1);
 		map_reserve(&c->info.min_dep_type_info_index_map, type_info_types.count);
