@@ -6504,23 +6504,16 @@ gb_internal void parser_add_package(Parser *p, AstPackage *pkg) {
 
 gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile imported_file);
 
+gb_internal void parser_package_file_done(Parser *p, AstPackage *pkg) {
+	if (pkg->files_to_parse.fetch_sub(1) == 1 && p->package_parsed_proc != nullptr) {
+		thread_pool_add_task(p->package_parsed_proc, pkg);
+	}
+}
+
 gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 	ParserWorkerData *wd = cast(ParserWorkerData *)data;
 	ParseFileError err = process_imported_file(wd->parser, wd->imported_file);
-	if (err != ParseFile_None) {
-		auto *node = permanent_alloc_item<ParseFileErrorNode>();
-		node->err = err;
-
-		MUTEX_GUARD_BLOCK(&wd->parser->file_error_mutex) {
-			if (wd->parser->file_error_tail != nullptr) {
-				wd->parser->file_error_tail->next = node;
-			}
-			wd->parser->file_error_tail = node;
-			if (wd->parser->file_error_head == nullptr) {
-				wd->parser->file_error_head = node;
-			}
-		}
-	}
+	parser_package_file_done(wd->parser, wd->imported_file.pkg);
 	return cast(isize)err;
 }
 
@@ -6531,6 +6524,7 @@ gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo
 	auto wd = permanent_alloc_item<ParserWorkerData>();
 	wd->parser = p;
 	wd->imported_file = f;
+	pkg->files_to_parse.fetch_add(1);
 	thread_pool_add_task(parser_worker_proc, wd);
 }
 
@@ -6590,6 +6584,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	pkg->fullpath = path;
 	array_init(&pkg->files, permanent_allocator());
 	pkg->foreign_files.allocator = permanent_allocator();
+	pkg->files_to_parse.store(1);
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && !path_is_directory(path) && string_ends_with(path, FILE_EXT)) {
@@ -6603,6 +6598,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		pkg->is_single_file = true;
 		parser_add_package(p, pkg);
 		parser_add_file_to_process(p, pkg, fi, pos);
+		parser_package_file_done(p, pkg);
 		return pkg;
 	}
 
@@ -6686,6 +6682,7 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	}
 
 	parser_add_package(p, pkg);
+	parser_package_file_done(p, pkg);
 
 	return pkg;
 }
@@ -7651,7 +7648,6 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 	file->pkg = pkg;
 	file->id = cast(i32)(imported_file.index+1);
 	ParseFileError err = init_ast_file(file, fi.fullpath);
-	file->last_error = err;
 
 	if (err != ParseFile_None) {
 		if (err == ParseFile_EmptyFile) {
@@ -7704,7 +7700,6 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 	bool parsed = parse_file(p, file);
 	if (file->invalid_token_pos.line != 0) {
 		end_error_mute();
-		file->last_error = ParseFile_InvalidToken;
 		return ParseFile_InvalidToken;
 	}
 
@@ -7765,6 +7760,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	}
 
 
+	p->init_fullpath = init_fullpath;
+
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
@@ -7777,7 +7774,6 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 
 		try_add_import_path(p, init_fullpath, init_fullpath, init_pos, Package_Init);
-		p->init_fullpath = init_fullpath;
 
 		if (build_context.command_kind == Command_test) {
 			bool ok = false;
@@ -7807,23 +7803,9 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	
 	thread_pool_wait();
 
-	for (ParseFileErrorNode *node = p->file_error_head; node != nullptr; node = node->next) {
-		if (node->err != ParseFile_None) {
-			return node->err;
-		}
-	}
-
-	for (isize i = p->packages.count-1; i >= 0; i--) {
-		AstPackage *pkg = p->packages[i];
-		for (isize j = pkg->files.count-1; j >= 0; j--) {
-			AstFile *file = pkg->files[j];
-			if (file->error_count != 0) {
-				if (file->last_error != ParseFile_None) {
-					return file->last_error;
-				}
-				return ParseFile_GeneralError;
-			}
-		}
+	// NOTE(bill): It only matters than error has occured, not which error
+	if (any_errors()) {
+		return ParseFile_GeneralError;
 	}
 
 	for (AstPackage *pkg : p->packages) {

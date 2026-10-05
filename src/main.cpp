@@ -4468,12 +4468,17 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init asm tables");
 	init_asm_tables(build_context.metrics.ptr_size);
 
+	checker->parser = parser;
+	init_checker(checker);
+	defer (destroy_checker(checker));
+
 	MAIN_TIME_SECTION("parse files");
 
 	if (!init_parser(parser)) {
 		return 1;
 	}
 	defer (destroy_parser(parser));
+	parser->package_parsed_proc = check_collect_package_entities_worker_proc;
 
 	// TODO(jeroen): Remove the `init_filename` param.
 	// Let's put that on `build_context.build_paths[0]` instead.
@@ -4486,10 +4491,7 @@ int main(int arg_count, char const **arg_ptr) {
 		print_all_errors();
 		return 1;
 	}
-
-	checker->parser = parser;
-	init_checker(checker);
-	defer (destroy_checker(checker)); // this is here because of a `goto`
+	release_held_errors();
 
 	if (build_context.cached && parser->total_seen_load_directive_count.load() == 0) {
 		MAIN_TIME_SECTION("check cached build (pre-semantic check)");

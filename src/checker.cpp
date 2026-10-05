@@ -1814,6 +1814,14 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 
 
 
+struct CollectEntityWorkerData {
+	Checker *c;
+	CheckerContext ctx;
+	UntypedExprInfoMap untyped;
+};
+
+gb_global CollectEntityWorkerData *collect_entity_worker_data;
+
 gb_internal void init_checker(Checker *c) {
 	gbAllocator a = heap_allocator();
 
@@ -1834,6 +1842,15 @@ gb_internal void init_checker(Checker *c) {
 	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
 
 	init_checker_context(&c->builtin_ctx, c);
+
+	isize thread_count = global_thread_pool.threads.count;
+	collect_entity_worker_data = gb_alloc_array(permanent_allocator(), CollectEntityWorkerData, thread_count);
+	for (isize i = 0; i < thread_count; i++) {
+		auto *wd = &collect_entity_worker_data[i];
+		wd->c = c;
+		init_checker_context(&wd->ctx, c);
+		map_init(&wd->untyped);
+	}
 }
 
 gb_internal void destroy_checker(Checker *c) {
@@ -6204,8 +6221,35 @@ gb_internal GB_COMPARE_PROC(sort_file_by_name) {
 	return string_compare(x_name, y_name);
 }
 
-gb_internal WORKER_TASK_PROC(check_create_file_scopes_worker_proc) {
+gb_internal WORKER_TASK_PROC(check_collect_entities_worker_proc) {
+	CollectEntityWorkerData *wd = &collect_entity_worker_data[current_thread_index()];
+
+	Checker *c = wd->c;
+	CheckerContext *ctx = &wd->ctx;
+	UntypedExprInfoMap *untyped = &wd->untyped;
+
+	AstFile *f = cast(AstFile *)data;
+	reset_checker_context(ctx, f, untyped);
+
+	global_error_hold = true;
+	check_collect_entities(ctx, f->decls);
+	global_error_hold = false;
+
+	add_untyped_expressions(&c->info, ctx->untyped);
+
+	return 0;
+}
+
+gb_internal WORKER_TASK_PROC(check_collect_package_entities_worker_proc) {
 	AstPackage *pkg = cast(AstPackage *)data;
+	Checker *c = collect_entity_worker_data[current_thread_index()].c;
+	if (any_errors()) {
+		// NOTE(bill): nothing is checked once parsing reports an error, and its declarations may be malformed
+		return 0;
+	}
+
+	Scope *scope = create_scope_from_package(&c->builtin_ctx, pkg);
+	pkg->decl_info = make_decl_info(scope, c->builtin_ctx.decl);
 
 	array_sort(pkg->files, sort_file_by_name);
 
@@ -6219,73 +6263,11 @@ gb_internal WORKER_TASK_PROC(check_create_file_scopes_worker_proc) {
 	}
 
 	mpmc_init(&pkg->exported_entity_queue, total_pkg_decl_count);
+
+	for (AstFile *f : pkg->files) {
+		thread_pool_add_task(check_collect_entities_worker_proc, f);
+	}
 	return 0;
-}
-
-gb_internal void check_create_file_scopes(Checker *c) {
-	TaskGroup group = {};
-	for (AstPackage *pkg : c->parser->packages) {
-		thread_pool_add_task(&group, check_create_file_scopes_worker_proc, pkg);
-	}
-	thread_pool_wait(&group);
-
-	for (AstPackage *pkg : c->parser->packages) {
-		for (AstFile *f : pkg->files) {
-			string_map_set(&c->info.files, f->fullpath, f);
-		}
-	}
-}
-
-struct CollectEntityWorkerData {
-	Checker *c;
-	CheckerContext ctx;
-	UntypedExprInfoMap untyped;
-};
-
-gb_global CollectEntityWorkerData *collect_entity_worker_data;
-
-gb_internal WORKER_TASK_PROC(check_collect_entities_all_worker_proc) {
-	CollectEntityWorkerData *wd = &collect_entity_worker_data[current_thread_index()];
-
-	Checker *c = wd->c;
-	CheckerContext *ctx = &wd->ctx;
-	UntypedExprInfoMap *untyped = &wd->untyped;
-
-	AstFile *f = cast(AstFile *)data;
-	reset_checker_context(ctx, f, untyped);
-
-	check_collect_entities(ctx, f->decls);
-
-	add_untyped_expressions(&c->info, ctx->untyped);
-
-	return 0;
-}
-
-gb_internal void check_collect_entities_all(Checker *c) {
-	isize thread_count = global_thread_pool.threads.count;
-
-	collect_entity_worker_data = gb_alloc_array(permanent_allocator(), CollectEntityWorkerData, thread_count);
-	for (isize i = 0; i < thread_count; i++) {
-		auto *wd = &collect_entity_worker_data[i];
-		wd->c = c;
-		init_checker_context(&wd->ctx, c);
-		map_init(&wd->untyped);
-	}
-
-	// NOTE(bill): deal with the files with the most declarations first so that the longest are not started last
-	// this should help with load balancing
-	auto files = array_make<AstFile *>(heap_allocator(), 0, c->info.files.count);
-	defer (array_free(&files));
-	for (auto const &entry : c->info.files) {
-		array_add(&files, entry.value);
-	}
-	natural_merge_sort(files.data, files.count, [](AstFile *const &x, AstFile *const &y) -> int {
-		return isize_cmp(y->total_file_decl_count, x->total_file_decl_count);
-	});
-	for (AstFile *f : files) {
-		thread_pool_add_task(check_collect_entities_all_worker_proc, f);
-	}
-	thread_pool_wait();
 }
 
 gb_internal void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
@@ -7778,9 +7760,12 @@ gb_internal void check_parsed_files(Checker *c) {
 	// Map full filepaths to Scopes
 	for_array(i, c->parser->packages) {
 		AstPackage *p = c->parser->packages[i];
-		Scope *scope = create_scope_from_package(&c->builtin_ctx, p);
-		p->decl_info = make_decl_info(scope, c->builtin_ctx.decl);
+		Scope *scope = p->scope; // made once it is parsed, see `check_collect_package_entities_worker_proc` for more information
+		GB_ASSERT(scope != nullptr);
 		string_map_set(&c->info.packages, p->fullpath, p);
+		for (AstFile *f : p->files) {
+			string_map_set(&c->info.files, f->fullpath, f);
+		}
 
 		if (scope->flags&ScopeFlag_Init) {
 			c->info.init_package = p;
@@ -7794,12 +7779,6 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("init worker data");
 	check_init_worker_data(c);
-
-	TIME_SECTION("create file scopes");
-	check_create_file_scopes(c);
-
-	TIME_SECTION("collect entities");
-	check_collect_entities_all(c);
 
 	TIME_SECTION("export entities - pre");
 	check_export_entities(c);
