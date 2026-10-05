@@ -1458,39 +1458,57 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		_fmt_float_as(fi, v, bit_size, verb, 'E', 6)
 
 	case 'h', 'H':
-		prev_hash := fi.hash
-		defer fi.hash = prev_hash
-		prev_zero := fi.zero
-		defer fi.zero = prev_zero
-		prev_plus := fi.plus
-		defer fi.plus = prev_plus
-		prev_width := fi.width
-		defer fi.width = prev_width
-		prev_width_set := fi.width_set
-		defer fi.width_set = prev_width_set
-
-		fi.hash = false
-		fi.zero = true
-		fi.plus = false
-		// force the width to always be bit_size/4 to accurately represent the number
-		fi.width = bit_size/4
-		fi.width_set = true
-
-		u: u64
-		switch bit_size {
-		case 16: u = u64(transmute(u16)f16(v))
-		case 32: u = u64(transmute(u32)f32(v))
-		case 64: u = transmute(u64)v
-		case: panic("Unhandled float size")
-		}
-
-		io.write_string(fi.writer, "0h", &fi.n)
-		_fmt_int(fi, u, 16, false, bit_size, __DIGITS_LOWER if verb == 'h' else __DIGITS_UPPER)
-
+		_fmt_float_as_hex(fi, v, bit_size, verb)
 
 	case:
 		fmt_bad_verb(fi, verb)
 	}
+}
+// Formats the underlying bit pattern of the floating-point number as an
+// unsigned hexadecimal integer.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - v: The floating-point number to format.
+// - bit_size: The size of the floating-point number in bits (16, 32, or 64).
+// - verb: The format specifier character.
+// - prefix_plus: If `true`, prefix the integer with a `+` sign.
+//
+_fmt_float_as_hex :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, prefix_plus := false) {
+	prev_hash := fi.hash
+	defer fi.hash = prev_hash
+	prev_zero := fi.zero
+	defer fi.zero = prev_zero
+	prev_plus := fi.plus
+	defer fi.plus = prev_plus
+	prev_width := fi.width
+	defer fi.width = prev_width
+	prev_width_set := fi.width_set
+	defer fi.width_set = prev_width_set
+
+	fi.hash = false
+	fi.zero = true
+	// This must be disabled always because a prefix plus would need to
+	// be printed before the "0h".
+	fi.plus = false
+	// force the width to always be bit_size/4 to accurately represent the number
+	fi.width = bit_size/4
+	fi.width_set = true
+
+	u: u64
+	switch bit_size {
+	case 16: u = u64(transmute(u16)f16(v))
+	case 32: u = u64(transmute(u32)f32(v))
+	case 64: u = transmute(u64)v
+	case: panic("Unhandled float size")
+	}
+
+	if prefix_plus {
+		io.write_rune(fi.writer, '+', &fi.n)
+	}
+
+	io.write_string(fi.writer, "0h", &fi.n)
+	_fmt_int(fi, u, 16, false, bit_size, __DIGITS_LOWER if verb == 'h' else __DIGITS_UPPER)
 }
 // Formats a string with a specific format.
 //
@@ -3392,21 +3410,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_bit_field(fi, v, verb, info, "")
 	}
 }
-// This proc helps keep some of the code around whether or not to print an
-// intermediate plus sign in complexes and quaternions more readable.
-@(private)
-_cq_should_print_intermediate_plus :: proc "contextless" (fi: ^Info, f: f64) -> bool {
-	if !fi.plus && f >= 0 {
-		#partial switch math.classify(f) {
-		case .Neg_Zero, .Inf:
-			// These two classes print their own signs.
-			return false
-		case:
-			return true
-		}
-	}
-	return false
-}
 // Formats a complex number based on the given formatting verb
 //
 // Inputs:
@@ -3420,11 +3423,8 @@ fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 	case 'f', 'F', 'v', 'h', 'H', 'w':
 		r, i := real(c), imag(c)
 		fmt_float(fi, r, bits/2, verb)
-		if _cq_should_print_intermediate_plus(fi, i) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
-		fmt_float(fi, i, bits/2, verb)
-		io.write_rune(fi.writer, 'i', &fi.n)
+
+		_fmt_imaginary_component(fi, i, bits/2, component = 'i', verb = verb)
 
 	case:
 		fmt_bad_verb(fi, verb)
@@ -3446,28 +3446,41 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 
 		fmt_float(fi, r, bits/4, verb)
 
-		if _cq_should_print_intermediate_plus(fi, i) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
-		fmt_float(fi, i, bits/4, verb)
-		io.write_rune(fi.writer, 'i', &fi.n)
-
-		if _cq_should_print_intermediate_plus(fi, j) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
-		fmt_float(fi, j, bits/4, verb)
-		io.write_rune(fi.writer, 'j', &fi.n)
-
-		if _cq_should_print_intermediate_plus(fi, k) {
-			io.write_rune(fi.writer, '+', &fi.n)
-		}
-		fmt_float(fi, k, bits/4, verb)
-		io.write_rune(fi.writer, 'k', &fi.n)
+		_fmt_imaginary_component(fi, i, bits/4, component = 'i', verb = verb)
+		_fmt_imaginary_component(fi, j, bits/4, component = 'j', verb = verb)
+		_fmt_imaginary_component(fi, k, bits/4, component = 'k', verb = verb)
 
 	case:
 		fmt_bad_verb(fi, verb)
 		return
 	}
+}
+// Format an imaginary component of a complex or quaternion, including
+// the binary operator that precedes it (`+` or `-`).
+//
+// Inputs:
+// - fi: A pointer to an Info struct containing formatting information.
+// - value: The numeric value of the imaginary component to be formatted.
+// - bit_size: The number of bits in `value` (16, 32, or 64).
+// - component: The imaginary unit of the component: `i`, `j`, or `k`.
+// - verb: The formatting verb rune ('f', 'F', 'v', 'h', 'H', 'w').
+_fmt_imaginary_component :: proc(fi: ^Info, value: f64, bit_size: int, component: rune, verb: rune) {
+	if math.is_nan(value) {
+		// Edge case: `fmt_float` will never prefix NaN with a sign.
+		// However, in this case, the '+' character is not a sign, but
+		// a binary operator.
+		str := "+NaN"
+		_pad(fi, str)
+	} else if verb == 'h' || verb == 'H' {
+		// Edge case: `fmt_float` would disable `fi.plus`.
+		_fmt_float_as_hex(fi, value, bit_size, verb, prefix_plus = true)
+	} else {
+		prev_plus := fi.plus
+		defer fi.plus = prev_plus
+		fi.plus = true
+		fmt_float(fi, value, bit_size, verb)
+	}
+	io.write_rune(fi.writer, component, &fi.n)
 }
 // Formats an argument based on its type and the given formatting verb
 //
