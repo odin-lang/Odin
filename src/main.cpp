@@ -3295,6 +3295,8 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 		if (print_flag("-out:<filepath>")) {
 			print_usage_line(2, "Sets the file name of the outputted executable.");
+			print_usage_line(2, "If -build-mode:llvm-ir is set, this must be a directory.");
+			print_usage_line(2, "If -build-mode:obj or -build-mode:asm is set, this may also be a directory.");
 			print_usage_line(2, "Example: -out:foo.exe");
 		}
 	}

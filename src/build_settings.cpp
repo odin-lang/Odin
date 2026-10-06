@@ -2462,6 +2462,17 @@ gb_internal bool init_build_paths(String init_filename) {
 				return false;
 			}
 		}
+
+		// NOTE: A directory names no file. Separate modules have names of their own.
+		// A single module is named as it would be without `-out`.
+		bool directory_allowed = build_context.build_mode == BuildMode_LLVM_IR ||
+		                         build_context.build_mode == BuildMode_Object ||
+		                         build_context.build_mode == BuildMode_Assembly;
+		if (output_is_directory && directory_allowed && !bc->use_separate_modules) {
+			Path main_package = bc->build_paths[BuildPath_Main_Package];
+			String name = main_package.name.len > 0 ? main_package.name : last_path_element(main_package.basename);
+			bc->build_paths[BuildPath_Output].name = copy_string(ha, name);
+		}
 	} else {
 		Path output_path;
 
