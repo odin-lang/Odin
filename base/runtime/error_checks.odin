@@ -84,7 +84,7 @@ slice_expr_error_hi :: proc "contextless" (file: string, line, column: i32, hi: 
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_lo_hi :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) {
-	if 0 <= lo && lo <= len && lo <= hi && hi <= len {
+	if 0 <= lo && lo <= hi && hi <= len {
 		return
 	}
 	slice_handle_error(file, line, column, lo, hi, len)

@@ -1329,10 +1329,9 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		args[5] = len;
 
 		LLVMValueRef c0 = LLVMBuildICmp(p->builder, LLVMIntSLE, zero,       low.value,  "");
-		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, low.value,  len.value,  "");
-		LLVMValueRef c2 = LLVMBuildICmp(p->builder, LLVMIntSLE, low.value,  high.value, "");
-		LLVMValueRef c3 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
-		lbValue ok = {LLVMBuildAnd(p->builder, LLVMBuildAnd(p->builder, c0, c1, ""), LLVMBuildAnd(p->builder, c2, c3, ""), ""), t_llvm_bool};
+		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, low.value,  high.value, "");
+		LLVMValueRef c2 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
+		lbValue ok = {LLVMBuildAnd(p->builder, LLVMBuildAnd(p->builder, c0, c1, ""), c2, ""), t_llvm_bool};
 		lb_emit_runtime_call_unless(p, ok, "slice_expr_error_lo_hi", args);
 	}
 }
