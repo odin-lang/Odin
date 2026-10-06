@@ -404,6 +404,10 @@ gb_internal bool poly_specialization_shape_mismatch(Type *s, Type *o, isize dept
 	if (bs == nullptr || bo == nullptr || bs->kind == Type_Generic || bo->kind == Type_Generic) {
 		return false;
 	}
+	if (bs->kind == Type_Array && bo->kind == Type_EnumeratedArray) {
+		// `[$N]$E` can bind to an enumerated array; leave it to subst_unify
+		return false;
+	}
 	if (bs->kind != bo->kind) {
 		return true;
 	}

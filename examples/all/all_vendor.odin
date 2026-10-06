@@ -42,6 +42,7 @@ package all
 @(require) import "vendor:directx/dxc"
 @(require) import "vendor:directx/d3d11"
 @(require) import "vendor:directx/d3d12"
+@(require) import "vendor:directx/d3d_compiler"
 @(require) import "vendor:directx/dxgi"
 @(require) import "vendor:commonmark"
 

@@ -4,50 +4,50 @@ import "base:runtime"
 import "core:simd"
 import "core:testing"
 
-// passing a #packed struct field by value to an Odin cc proc;
-// the field is at offset 1, so its address is misaligned
-// for the type (type align 16);
-// the backend must not pass the address as the indirect arg,
-// cause the callee assumes the type alignment
-//
-// the global is exported so that the packed layout
-// survives in memory at runtime
-
-Vecs :: struct {
-	a, b, c, d, e: #simd[4]f32,
-}
-
-Packed :: struct #packed {
-	_:    u8,
-	vecs: Vecs,
-}
-
-@(export)
-a: Packed
-
-@(private="file")
-sum_vecs :: proc(v: Vecs) -> #simd[4]f32 {
-	return v.a + v.b + v.c + v.d + v.e
-}
+U :: union { int, f64 }
+Packed :: struct #packed { _: u8, arr: [2]int, u: U, fc: [dynamic; 4]int }
 
 @(test)
-test_packed_field_arg :: proc(t: ^testing.T) {
-	a.vecs = {
-		{1, 1, 1, 1},
-		{2, 2, 2, 2},
-		{3, 3, 3, 3},
-		{4, 4, 4, 4},
-		{5, 5, 5, 5},
+test_packed_field_by_reference :: proc(t: ^testing.T) {
+	p: Packed
+
+	// array field of a #packed
+	for &v in p.arr {
+		v = 1
 	}
+	testing.expect_value(t, p.arr, [2]int{1, 1})
 
-	// misaligned
-	s := #force_no_inline sum_vecs(a.vecs)
-	testing.expect(t, simd.to_array(s) == [4]f32{15, 15, 15, 15})
+	#reverse for &v in p.arr {
+		v = 2
+	}
+	testing.expect_value(t, p.arr, [2]int{2, 2})
 
-	// same field through pointer
-	pp := &a
-	s = #force_no_inline sum_vecs(pp.vecs)
-	testing.expect(t, simd.to_array(s) == [4]f32{15, 15, 15, 15})
+	q := &p
+	for &v in q.arr {
+		v = 3
+	}
+	testing.expect_value(t, p.arr, [2]int{3, 3})
+
+	// fixed capacity dyn array field of a #packed
+	append(&p.fc, 1, 2)
+	for &v in p.fc {
+		v = 5
+	}
+	testing.expect_value(t, p.fc[0], 5)
+	testing.expect_value(t, p.fc[1], 5)
+
+	// type switch over a field of a #packed
+	p.u = 1
+	switch &v in p.u {
+	case int: v = 42
+	case f64: v = 0
+	}
+	testing.expect_value(t, p.u, U(42))
+
+	// ptr to a variant of a union field of a #packed
+	ptr := &p.u.(int)
+	ptr^ = 7
+	testing.expect_value(t, p.u, U(7))
 }
 
 

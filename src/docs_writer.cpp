@@ -40,6 +40,10 @@ struct OdinDocWriter {
 
 	OdinDocWriterItemTracker<u8> strings;
 	OdinDocWriterItemTracker<u8> blob;
+
+	// The entities of aliases of other packages' declarations, e.g. `CreateWindow :: glfw.CreateWindow`, which the scopes
+	// no longer hold once overridden by those declarations, but which still have the aliases' own visibility
+	Array<Entity *> cross_package_aliases;
 };
 
 gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e);
@@ -69,6 +73,13 @@ gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
 	odin_doc_writer_item_tracker_init(&w->types,    1);
 	odin_doc_writer_item_tracker_init(&w->strings, 16);
 	odin_doc_writer_item_tracker_init(&w->blob,    16);
+
+	array_init(&w->cross_package_aliases, heap_allocator());
+	for (Entity *e : w->info->entities) {
+		if ((e->flags & EntityFlag_Overridden) && e->aliased_of != nullptr && e->pkg != nullptr && e->aliased_of->pkg != e->pkg) {
+			array_add(&w->cross_package_aliases, e);
+		}
+	}
 }
 
 
@@ -81,6 +92,7 @@ gb_internal void odin_doc_writer_destroy(OdinDocWriter *w) {
 	map_destroy(&w->pkg_cache);
 	map_destroy(&w->entity_cache);
 	map_destroy(&w->type_cache);
+	array_free(&w->cross_package_aliases);
 }
 
 
@@ -1056,6 +1068,15 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 
 
 
+gb_internal Entity *odin_doc_alias_entity(OdinDocWriter *w, AstPackage *pkg, String const &name, Entity *target) {
+	for (Entity *e : w->cross_package_aliases) {
+		if (e->pkg == pkg && e->aliased_of == target && e->token.string == name) {
+			return e;
+		}
+	}
+	return nullptr;
+}
+
 gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWriter *w, AstPackage *pkg) {
 	if (pkg->scope == nullptr) {
 		return {};
@@ -1095,8 +1116,16 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 			// Fine
 			break;
 		}
-		if (e->pkg != pkg) {
+		if (e->pkg == nullptr) {
 			continue;
+		}
+		if (e->pkg != pkg) {
+			// NOTE: an alias of another package's declaration is documented under its own name,
+			// unless the alias itself is private, e.g. declared in a `#+private` file
+			Entity *alias = odin_doc_alias_entity(w, pkg, interned.string(), e);
+			if (alias == nullptr || !is_entity_exported(alias, true)) {
+				continue;
+			}
 		}
 		if (!is_entity_exported(e, true)) {
 			continue;
@@ -1145,6 +1174,9 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 	debugf("odin_doc_update_entities sort pkgs %s\n", w->state ? "preparing" : "writing");
 	array_sort(pkgs, cmp_ast_package_by_name);
 
+	auto pkg_indices = array_make<OdinDocPkgIndex>(heap_allocator(), 0, pkgs.count);
+	defer (array_free(&pkg_indices));
+
 	for_array(i, pkgs) {
 		gbAllocator allocator = heap_allocator();
 
@@ -1189,10 +1221,19 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 		}
 
 		doc_pkg.files = odin_write_slice(w, file_indices.data, file_indices.count);
-		doc_pkg.entries = odin_doc_add_pkg_entries(w, pkg);
 
 		if (dst) {
 			*dst = doc_pkg;
+		}
+		array_add(&pkg_indices, pkg_index);
+	}
+
+	// NOTE: only once every package is known, as an entry may be an alias of a later package's declaration,
+	// e.g. `vendor:glfw`'s `CreateWindow :: glfw.CreateWindow` of `vendor:glfw/bindings`
+	for_array(i, pkgs) {
+		OdinDocArray<OdinDocScopeEntry> entries = odin_doc_add_pkg_entries(w, pkgs[i]);
+		if (OdinDocPkg *doc_pkg = odin_doc_get_item(w, &w->pkgs, pkg_indices[i])) {
+			doc_pkg->entries = entries;
 		}
 	}
 

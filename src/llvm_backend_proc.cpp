@@ -1321,11 +1321,10 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 						}
 					} else {
 						ptr = lb_address_from_load_or_generate_local(p, x);
-						// the LLVM signature claims align(type_align_of(T)) on this param;
+						// the callee assumes ptr is aligned to type_align_of(T);
 						// an lvalue that resolves below that (e.g. a #packed field)
 						// must be copied to aligned temp
-						if (required_align > 1 &&
-						    cast(i64)lb_try_get_alignment(p->module, ptr.value, cast(unsigned)required_align) < required_align) {
+						if (cast(i64)lb_known_address_alignment(p->module, ptr.value, required_align) < required_align) {
 							ptr = lb_copy_value_to_ptr(p, x, original_type, required_align);
 						}
 					}
