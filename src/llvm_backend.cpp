@@ -3105,6 +3105,10 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		s.text += prefix.len;
 		s.len  -= prefix.len;
 	}
+	if (s.len == 0) {
+		// NOTE: `-out:<dir>` leaves the output name empty
+		s = m->info->init_package->name;
+	}
 
 	if (build_context.out_filepath.len > 0) {
 		path = concatenate_strings(permanent_allocator(), path, s);
@@ -3145,6 +3149,10 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 
 		path = gb_string_append_length(path, s.text, s.len);
 	} else {
+		if (name.len == 0) {
+			// NOTE: `-out:<dir>` leaves the output name empty
+			name = m->info->init_package->name;
+		}
 		path = gb_string_append_length(path, name.text, name.len);
 	}
 
