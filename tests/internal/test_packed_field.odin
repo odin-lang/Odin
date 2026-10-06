@@ -1,6 +1,5 @@
 package test_internal
 
-import "base:runtime"
 import "core:simd"
 import "core:testing"
 
@@ -67,9 +66,6 @@ Packed_Small :: struct #packed {
 @(export)
 p1: Packed_Small
 
-@(export)
-p2: Packed_Small
-
 @(private="file")
 swap_v :: proc(p: ^Packed_Small, x: #simd[4]f32) -> #simd[4]f32 {
 	y := p.v
@@ -86,21 +82,6 @@ test_packed_field_pointer_access :: proc(t: ^testing.T) {
 	testing.expect(t, simd.to_array(p1.v) == [4]f32{5, 6, 7, 8})
 }
 
-@(test)
-test_packed_field_direct_access :: proc(t: ^testing.T) {
-	p2.v = {9, 10, 11, 12} // store through a constant GEP
-	p2.n = -1              // scalar store at offset 17
-
-	y := p2.v              // load through a constant GEP
-	testing.expect(t, simd.to_array(y) == [4]f32{9, 10, 11, 12})
-	testing.expect(t, p2.n == -1)
-
-	p2.v = {}              // zero vector store -> lb_mem_zero_ptr's direct store path on most targets
-	p2.n = 0               // zero small store path on every target
-	testing.expect(t, simd.to_array(p2.v) == [4]f32{})
-	testing.expect(t, p2.n == 0)
-}
-
 
 // element access to an array field of a #packed
 
@@ -110,7 +91,7 @@ Packed_Array :: struct #packed {
 }
 
 @(export)
-p3: Packed_Array
+p2: Packed_Array
 
 @(private="file")
 read_elem :: proc(p: ^Packed_Array, i: int) -> #simd[4]f32 {
@@ -124,45 +105,17 @@ write_elem :: proc(p: ^Packed_Array, i: int, x: #simd[4]f32) {
 
 @(test)
 test_packed_field_array_element_access :: proc(t: ^testing.T) {
-	p3.arr[0] = {1, 2, 3, 4}
-	p3.arr[1] = {5, 6, 7, 8}
+	p2.arr[0] = {1, 2, 3, 4}
+	p2.arr[1] = {5, 6, 7, 8}
 
-	y := #force_no_inline read_elem(&p3, 0)
+	y := #force_no_inline read_elem(&p2, 0)
 	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
 
-	y = #force_no_inline read_elem(&p3, 1)
+	y = #force_no_inline read_elem(&p2, 1)
 	testing.expect(t, simd.to_array(y) == [4]f32{5, 6, 7, 8})
 
-	#force_no_inline write_elem(&p3, 0, {9, 10, 11, 12})
-	testing.expect(t, simd.to_array(p3.arr[0]) == [4]f32{9, 10, 11, 12})
-}
-
-
-// field access through ^runtime.Unaligned must compile to misalignment safe code
-
-@(export)
-p4: Packed_Small
-
-@(private="file")
-read_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32)) -> #simd[4]f32 {
-	return u.value
-}
-
-@(private="file")
-write_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32), x: #simd[4]f32) {
-	u.value = x
-}
-
-@(test)
-test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
-	p4.v = {1, 2, 3, 4}
-
-	u := (^runtime.Unaligned(#simd[4]f32))(&p4.v) // addr of field at offset 1
-	y := #force_no_inline read_wrapped(u)
-	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
-
-	#force_no_inline write_wrapped(u, {5, 6, 7, 8})
-	testing.expect(t, simd.to_array(p4.v) == [4]f32{5, 6, 7, 8})
+	#force_no_inline write_elem(&p2, 0, {9, 10, 11, 12})
+	testing.expect(t, simd.to_array(p2.arr[0]) == [4]f32{9, 10, 11, 12})
 }
 
 
@@ -215,40 +168,6 @@ test_max_field_align_derived_access :: proc(t: ^testing.T) {
 }
 
 
-// element type conversion of an array field of a #packed
-// goes through a vector load of the source array;
-// the load must not claim the element type alignment
-
-Packed_Conv :: struct #packed {
-	_:  u8,
-	a4: [4]f32, // offs 1
-}
-
-@(export)
-p5: Packed_Conv
-
-@(private="file")
-conv_float :: proc(p: ^Packed_Conv) -> [4]f64 {
-	return cast([4]f64)p.a4
-}
-
-@(private="file")
-conv_complex :: proc(p: ^Packed_Conv) -> [4]complex64 {
-	return cast([4]complex64)p.a4
-}
-
-@(test)
-test_packed_field_array_conv :: proc(t: ^testing.T) {
-	p5.a4 = {1.5, 2.5, 3.5, 4.5}
-
-	y := #force_no_inline conv_float(&p5)
-	testing.expect(t, y == [4]f64{1.5, 2.5, 3.5, 4.5})
-
-	z := #force_no_inline conv_complex(&p5)
-	testing.expect(t, z == [4]complex64{1.5, 2.5, 3.5, 4.5})
-}
-
-
 // a #min_field_align inner struct placed in a #packed outer struct;
 // the outer's #packed provides only align 1;
 // accesses must not assume the #min_field_align
@@ -263,7 +182,7 @@ Packed_Raised :: struct #packed {
 }
 
 @(export)
-p6: Packed_Raised
+p3: Packed_Raised
 
 @(private="file")
 swap_raised :: proc(p: ^Packed_Raised, x: #simd[4]f32) -> #simd[4]f32 {
@@ -274,11 +193,11 @@ swap_raised :: proc(p: ^Packed_Raised, x: #simd[4]f32) -> #simd[4]f32 {
 
 @(test)
 test_packed_field_min_align :: proc(t: ^testing.T) {
-	p6.inner.v = {1, 2, 3, 4}
+	p3.inner.v = {1, 2, 3, 4}
 
-	y := #force_no_inline swap_raised(&p6, {5, 6, 7, 8})
+	y := #force_no_inline swap_raised(&p3, {5, 6, 7, 8})
 	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
-	testing.expect(t, simd.to_array(p6.inner.v) == [4]f32{5, 6, 7, 8})
+	testing.expect(t, simd.to_array(p3.inner.v) == [4]f32{5, 6, 7, 8})
 }
 
 
@@ -303,7 +222,7 @@ Packed_Union_Helper :: struct {
 }
 
 @(export)
-p7: Packed_Union_Helper
+p4: Packed_Union_Helper
 
 @(private="file")
 swap_variant_ref :: proc(p: ^Packed_With_Union, x: #simd[4]f32) -> #simd[4]f32 {
@@ -318,12 +237,97 @@ swap_variant_ref :: proc(p: ^Packed_With_Union, x: #simd[4]f32) -> #simd[4]f32 {
 
 @(test)
 test_packed_field_union_type_switch_ref :: proc(t: ^testing.T) {
-	p7.p.u = #simd[4]f32{1, 2, 3, 4}
+	p4.p.u = #simd[4]f32{1, 2, 3, 4}
 
-	y := #force_no_inline swap_variant_ref(&p7.p, {5, 6, 7, 8})
+	y := #force_no_inline swap_variant_ref(&p4.p, {5, 6, 7, 8})
 	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
 
-	v, ok := p7.p.u.(#simd[4]f32)
+	v, ok := p4.p.u.(#simd[4]f32)
 	testing.expect(t, ok)
 	testing.expect(t, simd.to_array(v) == [4]f32{5, 6, 7, 8})
+}
+
+
+// direct loads and stores on a #packed global (the GEP folds to ConstantExpr, no metadata)
+
+@(export)
+p5: Packed_Small
+
+@(test)
+test_packed_field_direct_access :: proc(t: ^testing.T) {
+	p5.v = {9, 10, 11, 12} // store through a constant GEP
+	p5.n = -1              // scalar store at offset 17
+
+	y := p5.v              // load through a constant GEP
+	testing.expect(t, simd.to_array(y) == [4]f32{9, 10, 11, 12})
+	testing.expect(t, p5.n == -1)
+
+	p5.v = {}              // zero vector store -> lb_mem_zero_ptr's direct store path on most targets
+	p5.n = 0               // zero small store path on every target
+	testing.expect(t, simd.to_array(p5.v) == [4]f32{})
+	testing.expect(t, p5.n == 0)
+}
+
+
+// field access through ^runtime.Unaligned must compile to misalignment safe code
+
+import "base:runtime"
+
+@(export)
+p6: Packed_Small
+
+@(private="file")
+read_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32)) -> #simd[4]f32 {
+	return u.value
+}
+
+@(private="file")
+write_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32), x: #simd[4]f32) {
+	u.value = x
+}
+
+@(test)
+test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
+	p6.v = {1, 2, 3, 4}
+
+	u := (^runtime.Unaligned(#simd[4]f32))(&p6.v) // addr of field at offset 1
+	y := #force_no_inline read_wrapped(u)
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	#force_no_inline write_wrapped(u, {5, 6, 7, 8})
+	testing.expect(t, simd.to_array(p6.v) == [4]f32{5, 6, 7, 8})
+}
+
+
+// element type conversion of an array field of a #packed
+// goes through a vector load of the source array;
+// the load must not claim the element type alignment
+
+Packed_Conv :: struct #packed {
+	_:  u8,
+	a4: [4]f32, // offs 1
+}
+
+@(export)
+p7: Packed_Conv
+
+@(private="file")
+conv_float :: proc(p: ^Packed_Conv) -> [4]f64 {
+	return cast([4]f64)p.a4
+}
+
+@(private="file")
+conv_complex :: proc(p: ^Packed_Conv) -> [4]complex64 {
+	return cast([4]complex64)p.a4
+}
+
+@(test)
+test_packed_field_array_conv :: proc(t: ^testing.T) {
+	p7.a4 = {1.5, 2.5, 3.5, 4.5}
+
+	y := #force_no_inline conv_float(&p7)
+	testing.expect(t, y == [4]f64{1.5, 2.5, 3.5, 4.5})
+
+	z := #force_no_inline conv_complex(&p7)
+	testing.expect(t, z == [4]complex64{1.5, 2.5, 3.5, 4.5})
 }
