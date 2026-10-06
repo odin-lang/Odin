@@ -1276,6 +1276,13 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 						ptr = addr.addr;
 					} else {
 						ptr = lb_address_from_load_or_generate_local(p, x);
+						// the callee assumes ptr is aligned to type_align_of(T);
+						// an lvalue that resolves below that (e.g. a #packed field)
+						// must be copied to aligned temp
+						i64 required_align = type_align_of(original_type);
+						if (cast(i64)lb_known_address_alignment(p->module, ptr.value, required_align) < required_align) {
+							ptr = lb_copy_value_to_ptr(p, x, original_type, required_align);
+						}
 					}
 				} else {
 					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
