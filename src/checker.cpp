@@ -3370,11 +3370,16 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_bounds_check,
 		// Bounds checking related procedures
-		str_lit("bounds_check_error"),
-		str_lit("matrix_bounds_check_error"),
-		str_lit("slice_expr_error_hi"),
-		str_lit("slice_expr_error_lo_hi"),
-		str_lit("multi_pointer_slice_expr_error"),
+		str_lit("bounds_check_error_contextless"),
+		str_lit("bounds_check_error_with_context"),
+		str_lit("matrix_bounds_check_error_contextless"),
+		str_lit("matrix_bounds_check_error_with_context"),
+		str_lit("slice_expr_error_hi_contextless"),
+		str_lit("slice_expr_error_hi_with_context"),
+		str_lit("slice_expr_error_lo_hi_contextless"),
+		str_lit("slice_expr_error_lo_hi_with_context"),
+		str_lit("multi_pointer_slice_expr_error_contextless"),
+		str_lit("multi_pointer_slice_expr_error_with_context"),
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(c->info.objc_class_implementations.count.load(std::memory_order_relaxed) > 0,

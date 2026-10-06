@@ -62,8 +62,10 @@ to check the union tag or the underlying type of `any` before returning the
 value of the underlying type. These are not required if `-no-type-assert` is
 specified.
 
-* `type_assertion_check`
-* `type_assertion_check2` (takes in typeid)
+* `type_assertion_check_contextless`
+* `type_assertion_check_with_context`
+* `type_assertion_check2_contextless` (takes in typeid)
+* `type_assertion_check2_with_context` (takes in typeid)
 
 ### Bounds checking procedures
 
@@ -71,11 +73,16 @@ These procedures are called every time index or slicing expression are used in
 order to perform bounds-checking before the actual operation. These are not
 required if the `-no-bounds-check` option is specified.
 
-* `bounds_check_error`
-* `matrix_bounds_check_error`
-* `slice_expr_error_hi`
-* `slice_expr_error_lo_hi`
-* `multi_pointer_slice_expr_error`
+* `bounds_check_error_contextless`
+* `bounds_check_error_with_context`
+* `matrix_bounds_check_error_contextless`
+* `matrix_bounds_check_error_with_context`
+* `slice_expr_error_hi_contextless`
+* `slice_expr_error_hi_with_context`
+* `slice_expr_error_lo_hi_contextless`
+* `slice_expr_error_lo_hi_with_context`
+* `multi_pointer_slice_expr_error_contextless`
+* `multi_pointer_slice_expr_error_with_context`
 
 ### cstring calls
 

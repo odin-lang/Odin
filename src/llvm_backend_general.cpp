@@ -1216,7 +1216,11 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 	args[3] = index;
 	args[4] = len;
 
-	lb_emit_runtime_call(p, "bounds_check_error", args);
+	char const *handler = "bounds_check_error_contextless";
+	if (p->context_stack.count > 0) {
+		handler = "bounds_check_error_with_context";
+	}
+	lb_emit_runtime_call(p, handler, args);
 }
 
 gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValue row_index, lbValue column_index, lbValue row_count, lbValue column_count) {
@@ -1238,7 +1242,11 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 	args[5] = row_count;
 	args[6] = column_count;
 
-	lb_emit_runtime_call(p, "matrix_bounds_check_error", args);
+	char const *handler = "matrix_bounds_check_error_contextless";
+	if (p->context_stack.count > 0) {
+		handler = "matrix_bounds_check_error_with_context";
+	}
+	lb_emit_runtime_call(p, handler, args);
 }
 
 
@@ -1264,7 +1272,11 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 	args[3] = low;
 	args[4] = high;
 
-	lb_emit_runtime_call(p, "multi_pointer_slice_expr_error", args);
+	char const *handler = "multi_pointer_slice_expr_error_contextless";
+	if (p->context_stack.count > 0) {
+		handler = "multi_pointer_slice_expr_error_with_context";
+	}
+	lb_emit_runtime_call(p, handler, args);
 }
 
 gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
@@ -1289,7 +1301,11 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		args[3] = high;
 		args[4] = len;
 
-		lb_emit_runtime_call(p, "slice_expr_error_hi", args);
+		char const *handler = "slice_expr_error_hi_contextless";
+		if (p->context_stack.count > 0) {
+			handler = "slice_expr_error_hi_with_context";
+		}
+		lb_emit_runtime_call(p, handler, args);
 	} else {
 		// No need to convert unless used
 		low  = lb_emit_conv(p, low, t_int);
@@ -1300,7 +1316,11 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		args[4] = high;
 		args[5] = len;
 
-		lb_emit_runtime_call(p, "slice_expr_error_lo_hi", args);
+		char const *handler = "slice_expr_error_lo_hi_contextless";
+		if (p->context_stack.count > 0) {
+			handler = "slice_expr_error_lo_hi_with_context";
+		}
+		lb_emit_runtime_call(p, handler, args);
 	}
 }
 
