@@ -3457,6 +3457,16 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+#if !defined(GB_SYSTEM_WINDOWS)
+	if (build) {
+		if (print_flag("-windows-sdk-root:<string>")) {
+			print_usage_line(2, "Path to the root directory of the Windows SDK for cross-linking.");
+			print_usage_line(2, "Requires '-linker:lld' flag and 'lld-link' installation.");
+			print_usage_line(2, "Example: -windows-sdk-root:~/windows-sdk");
+		}
+	}
+#endif
+
 	if (run_or_build) {
 		if (print_flag("-target-features:<string>")) {
 			print_usage_line(2, "Specifies CPU features to enable on top of the enabled features implied by -microarch.");
