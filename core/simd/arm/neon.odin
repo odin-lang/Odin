@@ -5968,6 +5968,102 @@ vtrnq_u32 :: #force_inline proc "c" (a, b: uint32x4_t) -> uint32x4x2_t {
 	}
 }
 
+// Compare signed less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_s8)
+@(require_results, enable_target_feature = "neon")
+vclt_s8 :: #force_inline proc "c" (a, b: int8x8_t) -> uint8x8_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare signed less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_s16)
+@(require_results, enable_target_feature = "neon")
+vclt_s16 :: #force_inline proc "c" (a, b: int16x4_t) -> uint16x4_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare signed less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_s32)
+@(require_results, enable_target_feature = "neon")
+vclt_s32 :: #force_inline proc "c" (a, b: int32x2_t) -> uint32x2_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare unsigned less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_u8)
+@(require_results, enable_target_feature = "neon")
+vclt_u8 :: #force_inline proc "c" (a, b: uint8x8_t) -> uint8x8_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare unsigned less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_u16)
+@(require_results, enable_target_feature = "neon")
+vclt_u16 :: #force_inline proc "c" (a, b: uint16x4_t) -> uint16x4_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare unsigned less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_u32)
+@(require_results, enable_target_feature = "neon")
+vclt_u32 :: #force_inline proc "c" (a, b: uint32x2_t) -> uint32x2_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare signed less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_s8)
+@(require_results, enable_target_feature = "neon")
+vcltq_s8 :: #force_inline proc "c" (a, b: int8x16_t) -> uint8x16_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare signed less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_s16)
+@(require_results, enable_target_feature = "neon")
+vcltq_s16 :: #force_inline proc "c" (a, b: int16x8_t) -> uint16x8_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare signed less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_s32)
+@(require_results, enable_target_feature = "neon")
+vcltq_s32 :: #force_inline proc "c" (a, b: int32x4_t) -> uint32x4_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare unsigned less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_u8)
+@(require_results, enable_target_feature = "neon")
+vcltq_u8 :: #force_inline proc "c" (a, b: uint8x16_t) -> uint8x16_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare unsigned less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_u16)
+@(require_results, enable_target_feature = "neon")
+vcltq_u16 :: #force_inline proc "c" (a, b: uint16x8_t) -> uint16x8_t {
+	return simd.lanes_lt(a, b)
+}
+
+// Compare unsigned less than.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_u32)
+@(require_results, enable_target_feature = "neon")
+vcltq_u32 :: #force_inline proc "c" (a, b: uint32x4_t) -> uint32x4_t {
+	return simd.lanes_lt(a, b)
+}
+
 when ODIN_ARCH == .arm64 {
 	// Table Lookup.
 	//
@@ -8902,6 +8998,126 @@ when ODIN_ARCH == .arm64 {
 			c := simd.shuffle(a, b, 1, 3)
 			return simd.shuffle(c, c, 1, 0)
 		}
+	}
+
+	// Compare signed less than.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_s64)
+	@(require_results, enable_target_feature = "neon")
+	vclt_s64 :: #force_inline proc "c" (a, b: int64x1_t) -> uint64x1_t {
+		return simd.lanes_lt(a, b)
+	}
+
+	// Compare unsigned less than.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vclt_u64)
+	@(require_results, enable_target_feature = "neon")
+	vclt_u64 :: #force_inline proc "c" (a, b: uint64x1_t) -> uint64x1_t {
+		return simd.lanes_lt(a, b)
+	}
+
+	// Compare signed less than.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcltq_s64 :: #force_inline proc "c" (a, b: int64x2_t) -> uint64x2_t {
+		return simd.lanes_lt(a, b)
+	}
+
+	// Compare unsigned less than.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltq_u64)
+	@(require_results, enable_target_feature = "neon")
+	vcltq_u64 :: #force_inline proc "c" (a, b: uint64x2_t) -> uint64x2_t {
+		return simd.lanes_lt(a, b)
+	}
+
+	// Compare signed less than.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltd_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcltd_s64 :: #force_inline proc "c" (a, b: int64_t) -> uint64_t {
+		return transmute(uint64_t)simd.lanes_lt(transmute(int64x1_t)a, transmute(int64x1_t)b)
+	}
+
+	// Compare unsigned less than.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltd_u64)
+	@(require_results, enable_target_feature = "neon")
+	vcltd_u64 :: #force_inline proc "c" (a, b: uint64_t) -> uint64_t {
+		return transmute(uint64_t)simd.lanes_lt(transmute(uint64x1_t)a, transmute(uint64x1_t)b)
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltz_s8)
+	@(require_results, enable_target_feature = "neon")
+	vcltz_s8 :: #force_inline proc "c" (a: int8x8_t) -> uint8x8_t {
+		return simd.lanes_lt(a, int8x8_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltz_s16)
+	@(require_results, enable_target_feature = "neon")
+	vcltz_s16 :: #force_inline proc "c" (a: int16x4_t) -> uint16x4_t {
+		return simd.lanes_lt(a, int16x4_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltz_s32)
+	@(require_results, enable_target_feature = "neon")
+	vcltz_s32 :: #force_inline proc "c" (a: int32x2_t) -> uint32x2_t {
+		return simd.lanes_lt(a, int32x2_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltz_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcltz_s64 :: #force_inline proc "c" (a: int64x1_t) -> uint64x1_t {
+		return simd.lanes_lt(a, int64x1_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltzq_s8)
+	@(require_results, enable_target_feature = "neon")
+	vcltzq_s8 :: #force_inline proc "c" (a: int8x16_t) -> uint8x16_t {
+		return simd.lanes_lt(a, int8x16_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltzq_s16)
+	@(require_results, enable_target_feature = "neon")
+	vcltzq_s16 :: #force_inline proc "c" (a: int16x8_t) -> uint16x8_t {
+		return simd.lanes_lt(a, int16x8_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltzq_s32)
+	@(require_results, enable_target_feature = "neon")
+	vcltzq_s32 :: #force_inline proc "c" (a: int32x4_t) -> uint32x4_t {
+		return simd.lanes_lt(a, int32x4_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltzq_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcltzq_s64 :: #force_inline proc "c" (a: int64x2_t) -> uint64x2_t {
+		return simd.lanes_lt(a, int64x2_t(0))
+	}
+
+	// Compare signed less than zero.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcltzd_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcltzd_s64 :: #force_inline proc "c" (a: int64_t) -> uint64_t {
+		return transmute(uint64_t)simd.lanes_lt(transmute(int64x1_t)a, int64x1_t(0))
 	}
 }
 
