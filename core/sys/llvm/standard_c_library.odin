@@ -274,3 +274,158 @@ foreign _ {
 	@(link_name="llvm.llrint.i64.f64")
 	llrint_f64_i64 :: proc(f64) -> i64 ---
 }
+
+
+// f16 variants, on targets where LLVM supports f16
+@(default_calling_convention="none")
+foreign _ {
+	when __ODIN_LLVM_F16_SUPPORTED {
+		@(link_name="llvm.sqrt.f16")
+		sqrt_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.powi.f16.i32")
+		powi_f16 :: proc(val: f16, power: i32) -> f16 ---
+
+		@(link_name="llvm.sin.f16")
+		sin_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.cos.f16")
+		cos_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 19+
+		@(link_name="llvm.tan.f16")
+		tan_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 19+
+		@(link_name="llvm.asin.f16")
+		asin_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 19+
+		@(link_name="llvm.acos.f16")
+		acos_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 19+
+		@(link_name="llvm.atan.f16")
+		atan_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 20+
+		@(link_name="llvm.atan2.f16")
+		atan2_f16 :: proc(y, x: f16) -> f16 ---
+
+		// LLVM 19+
+		@(link_name="llvm.sinh.f16")
+		sinh_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 19+
+		@(link_name="llvm.cosh.f16")
+		cosh_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 19+
+		@(link_name="llvm.tanh.f16")
+		tanh_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 20+
+		@(link_name="llvm.sincos.f16")
+		sincos_f16 :: proc(f16) -> (sin, cos: f16) ---
+
+		@(link_name="llvm.pow.f16")
+		pow_f16 :: proc(val, power: f16) -> f16 ---
+
+		@(link_name="llvm.exp.f16")
+		exp_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.exp2.f16")
+		exp2_f16 :: proc(f16) -> f16 ---
+
+		// LLVM 18+, calls `exp10` from the C library, which Windows does not have
+		@(link_name="llvm.exp10.f16")
+		exp10_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.ldexp.f16.i32")
+		ldexp_f16 :: proc(val: f16, exp: i32) -> f16 ---
+
+		@(link_name="llvm.frexp.f16.i32")
+		frexp_f16 :: proc(val: f16) -> (fraction: f16, exp: i32) ---
+
+		@(link_name="llvm.log.f16")
+		log_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.log10.f16")
+		log10_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.log2.f16")
+		log2_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.fma.f16")
+		fma_f16 :: proc(a, b, c: f16) -> f16 ---
+
+		@(link_name="llvm.fabs.f16")
+		fabs_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.minnum.f16")
+		min_num_f16 :: proc(val0, val1: f16) -> f16 ---
+
+		@(link_name="llvm.maxnum.f16")
+		max_num_f16 :: proc(val0, val1: f16) -> f16 ---
+
+		@(link_name="llvm.minimum.f16")
+		minimum_f16 :: proc(val0, val1: f16) -> f16 ---
+
+		@(link_name="llvm.maximum.f16")
+		maximum_f16 :: proc(val0, val1: f16) -> f16 ---
+
+		// LLVM 20+, whose x86 code at -o:none and -o:minimal can return a NaN operand when the other is a constant
+		@(link_name="llvm.minimumnum.f16")
+		minimum_num_f16 :: proc(val0, val1: f16) -> f16 ---
+
+		// LLVM 20+, whose x86 code at -o:none and -o:minimal can return a NaN operand when the other is a constant
+		@(link_name="llvm.maximumnum.f16")
+		maximum_num_f16 :: proc(val0, val1: f16) -> f16 ---
+
+		@(link_name="llvm.copysign.f16")
+		copy_sign_f16 :: proc(mag, sgn: f16) -> f16 ---
+
+		@(link_name="llvm.floor.f16")
+		floor_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.ceil.f16")
+		ceil_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.trunc.f16")
+		trunc_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.rint.f16")
+		rint_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.nearbyint.f16")
+		nearby_int_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.round.f16")
+		round_f16 :: proc(f16) -> f16 ---
+
+		@(link_name="llvm.roundeven.f16")
+		round_even_f16 :: proc(f16) -> f16 ---
+
+		// LLVM can only lower these on arm64; elsewhere the f32 variants give the same results,
+		// as every f16 converts to f32 exactly
+		when ODIN_ARCH == .arm64 {
+			@(link_name="llvm.lround.i32.f16")
+			lround_f16_i32 :: proc(f16) -> i32 ---
+
+			@(link_name="llvm.lround.i64.f16")
+			lround_f16_i64 :: proc(f16) -> i64 ---
+
+			@(link_name="llvm.llround.i64.f16")
+			llround_f16_i64 :: proc(f16) -> i64 ---
+
+			@(link_name="llvm.lrint.i32.f16")
+			lrint_f16_i32 :: proc(f16) -> i32 ---
+
+			@(link_name="llvm.lrint.i64.f16")
+			lrint_f16_i64 :: proc(f16) -> i64 ---
+
+			@(link_name="llvm.llrint.i64.f16")
+			llrint_f16_i64 :: proc(f16) -> i64 ---
+		}
+	}
+}
