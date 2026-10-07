@@ -2174,6 +2174,16 @@ gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &built
 		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
 		return false;
 	}
+	if (!target_atomics_are_plain() && !is_type_lock_free(elem)) {
+		ERROR_BLOCK();
+		gbString str = type_to_string(elem);
+		error(operand->expr, "'%s' cannot be used as an atomic for '%.*s' on this target, as it is not lock-free", str, LIT(builtin_name));
+		gb_string_free(str);
+		if (build_context.metrics.arch == TargetArch_amd64 && type_size_of(elem) == 16) {
+			error_line("\tSuggestion: A 16 byte atomic needs 'cx16', e.g. with -microarch:x86-64-v2 or later\n");
+		}
+		return false;
+	}
 
 	// the address, through any conversions of it
 	Ast *ptr = unparen_expr(operand->expr);

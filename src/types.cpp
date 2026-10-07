@@ -2901,14 +2901,55 @@ gb_internal bool elem_cannot_be_constant(Type *t) {
 }
 
 
+gb_internal i64 target_max_atomic_size(void) {
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:
+		if (check_target_feature_is_enabled(str_lit("cx16"), nullptr)) {
+			return 16;
+		}
+		return 8;
+	case TargetArch_arm64:
+		return 16;
+	case TargetArch_wasm32:
+	case TargetArch_wasm64p32:
+	case TargetArch_i386:
+	case TargetArch_arm32:
+	case TargetArch_riscv64:
+		return 8;
+	}
+	return build_context.ptr_size;
+}
+
+gb_internal bool is_type_valid_atomic_type(Type *elem) {
+	elem = core_type(elem);
+	if (is_type_internally_pointer_like(elem)) {
+		return true;
+	}
+	if (elem->kind == Type_BitSet) {
+		elem = bit_set_to_int(elem);
+	}
+	if (elem->kind != Type_Basic) {
+		return false;
+	}
+	return (elem->Basic.flags & (BasicFlag_Boolean|BasicFlag_OrderedNumeric)) != 0;
+}
+
+gb_internal bool target_atomics_are_plain(void) {
+	return is_arch_wasm() && !check_target_feature_is_enabled(str_lit("atomics"), nullptr);
+}
+
 gb_internal bool is_type_lock_free(Type *t) {
 	t = core_type(t);
 	if (t == t_invalid) {
 		return false;
 	}
-	i64 sz = type_size_of(t);
-	// TODO(bill): Figure this out correctly
-	return sz <= build_context.max_align;
+	i64 size = type_size_of(t);
+	if (target_atomics_are_plain() || !is_type_valid_atomic_type(t)) {
+		return size <= build_context.max_align;
+	}
+	return size <= target_max_atomic_size() &&
+	       (size & (size-1)) == 0 &&
+	       type_align_of(t) >= size;
 }
 
 
