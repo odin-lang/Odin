@@ -960,8 +960,15 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 gb_internal void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
 gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e);
 
-// While a group of global entities is checked: its incomplete '#soa' types, completed by the same thread
-gb_thread_local Array<Type *> *global_group_soa_types;
+// Per-thread state of checking the global entities, see `check_global_group`
+struct GlobalGroupContext {
+	struct GlobalGroup *group;
+	Entity *            entity;
+	Array<Type *> *     soa_types;
+	u64                 child_ticks; // see `global_entity_timing_begin`
+};
+
+gb_global gb_thread_local GlobalGroupContext global_group_context;
 
 struct GlobalWhenTrialEntityScope {
 	struct GlobalWhenTrial *trial;

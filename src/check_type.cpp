@@ -4651,9 +4651,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	if (is_complete) {
 		add_type_info_type(ctx, soa_struct);
 		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
-	} else if (global_group_soa_types != nullptr) {
+	} else if (global_group_context.soa_types != nullptr) {
 		// NOTE: no task waits on the element type, which could hold every thread of the pool
-		array_add(global_group_soa_types, soa_struct);
+		array_add(global_group_context.soa_types, soa_struct);
 	} else {
 		SoaTypeWorkerData *wd = permanent_alloc_item<SoaTypeWorkerData>();
 		wd->ctx = *ctx;
