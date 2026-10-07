@@ -6844,7 +6844,6 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
 	global_error_context.instantiations = {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 	bool body_was_checked = check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
-	global_error_context.instantiations = prev_instantiations;
 
 	if (body_was_checked) {
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
@@ -6874,6 +6873,21 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		thread_pool_add_task(check_proc_info_worker_proc, nested_pi);
 	}
 	array_free(&nested);
+
+	if (body_was_checked) {
+		// the entry point of an executable only returns as the program ends
+		bool is_entry_point = false;
+		if (build_context.build_mode == BuildMode_Executable &&
+		    !build_context.no_entry_point &&
+		    build_context.command_kind != Command_test) {
+			Entity *e = pi->decl->entity;
+			is_entry_point = e != nullptr && e == c->info.entry_point;
+		}
+		if (!is_entry_point) {
+			check_proc_escapes(pi->type, pi->body);
+		}
+	}
+	global_error_context.instantiations = prev_instantiations;
 
 	add_untyped_expressions(&c->info, ctx.untyped);
 

@@ -2531,18 +2531,6 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	}
 	check_close_scope(ctx);
 
-	// the entry point of an executable only returns as the program ends
-	bool is_entry_point = false;
-	if (build_context.build_mode == BuildMode_Executable &&
-	    !build_context.no_entry_point &&
-	    build_context.command_kind != Command_test) {
-		Entity *proc_entity = decl->entity.load();
-		is_entry_point = proc_entity != nullptr && proc_entity == ctx->info->entry_point;
-	}
-	if (!is_entry_point) {
-		check_proc_escapes(type, body);
-	}
-
 	check_scope_usage(ctx->checker, ctx->scope, check_vet_flags(body));
 
 	add_deps_from_child_to_parent(decl);
