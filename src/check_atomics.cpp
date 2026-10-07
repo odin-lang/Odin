@@ -4,6 +4,8 @@
 // stored with relaxed ordering, orders nothing, and is warned about, unless the address of the location is taken
 // elsewhere, as it may then be accessed through it. Only loads and stores are what it would pair with, as a
 // read-modify-write asking for an ordering which nothing pairs with, e.g. to count, is harmless.
+// A call to a procedure with `@(futex=.Wait)` is a relaxed load of what its first argument points to, as the OS only
+// compares it, and one with `@(futex=.Wake)` accesses nothing; neither is taking its address elsewhere.
 // With -vet-atomic-access, a plain read of a location accessed atomically is an error, unless a lock is taken.
 
 struct AtomicUses {
@@ -478,40 +480,51 @@ gb_internal void check_atomics(Checker *c) {
 		OdinAtomicMemoryOrder failure = OdinAtomicMemoryOrder_relaxed;
 		bool reads  = true;
 		bool writes = true;
-		switch (a.id) {
-		case BuiltinProc_atomic_store:
-			explicit_order = false;
-			reads = false;
+		switch (a.futex) {
+		case ProcedureFutex_None:
+			switch (a.id) {
+			case BuiltinProc_atomic_store:
+				explicit_order = false;
+				reads = false;
+				break;
+			case BuiltinProc_atomic_store_explicit:
+				order = check_atomic_order_of(call->CallExpr.args[2]);
+				reads = false;
+				break;
+			case BuiltinProc_atomic_load:
+				explicit_order = false;
+				writes = false;
+				break;
+			case BuiltinProc_atomic_load_explicit:
+				order = check_atomic_order_of(call->CallExpr.args[1]);
+				writes = false;
+				break;
+			case BuiltinProc_atomic_add_explicit:
+			case BuiltinProc_atomic_sub_explicit:
+			case BuiltinProc_atomic_and_explicit:
+			case BuiltinProc_atomic_nand_explicit:
+			case BuiltinProc_atomic_or_explicit:
+			case BuiltinProc_atomic_xor_explicit:
+			case BuiltinProc_atomic_exchange_explicit:
+				order = check_atomic_order_of(call->CallExpr.args[2]);
+				break;
+			case BuiltinProc_atomic_compare_exchange_strong_explicit:
+			case BuiltinProc_atomic_compare_exchange_weak_explicit:
+				order   = check_atomic_order_of(call->CallExpr.args[3]);
+				failure = check_atomic_order_of(call->CallExpr.args[4]);
+				break;
+			default:
+				explicit_order = false;
+				break;
+			}
 			break;
-		case BuiltinProc_atomic_store_explicit:
-			order = check_atomic_order_of(call->CallExpr.args[2]);
-			reads = false;
-			break;
-		case BuiltinProc_atomic_load:
+		case ProcedureFutex_Wait:
 			explicit_order = false;
+			order = OdinAtomicMemoryOrder_relaxed;
 			writes = false;
 			break;
-		case BuiltinProc_atomic_load_explicit:
-			order = check_atomic_order_of(call->CallExpr.args[1]);
-			writes = false;
-			break;
-		case BuiltinProc_atomic_add_explicit:
-		case BuiltinProc_atomic_sub_explicit:
-		case BuiltinProc_atomic_and_explicit:
-		case BuiltinProc_atomic_nand_explicit:
-		case BuiltinProc_atomic_or_explicit:
-		case BuiltinProc_atomic_xor_explicit:
-		case BuiltinProc_atomic_exchange_explicit:
-			order = check_atomic_order_of(call->CallExpr.args[2]);
-			break;
-		case BuiltinProc_atomic_compare_exchange_strong_explicit:
-		case BuiltinProc_atomic_compare_exchange_weak_explicit:
-			order   = check_atomic_order_of(call->CallExpr.args[3]);
-			failure = check_atomic_order_of(call->CallExpr.args[4]);
-			break;
-		default:
-			explicit_order = false;
-			break;
+		case ProcedureFutex_Wake:
+			continue;
 		}
 
 		AtomicFences f = {};
@@ -593,7 +606,12 @@ gb_internal void check_atomics(Checker *c) {
 			char const *other = token_pos_to_string(ast_token(r.other).pos);
 			if (r.release) {
 				warning(r.site, "'%s' is written with release ordering, but it is only loaded with relaxed ordering, so the release orders nothing", str);
-				error_line("\tSuggestion: Load it with .Acquire, e.g. at %s, or write it with .Relaxed\n", other);
+				Entity *e = entity_of_node(r.other->CallExpr.proc);
+				if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.futex == ProcedureFutex_Wait) {
+					error_line("\tSuggestion: A futex wait does not acquire, so load it with .Acquire after the wait at %s, or write it with .Relaxed\n", other);
+				} else {
+					error_line("\tSuggestion: Load it with .Acquire, e.g. at %s, or write it with .Relaxed\n", other);
+				}
 			} else {
 				warning(r.site, "'%s' is read with acquire ordering, but it is only stored with relaxed ordering, so the acquire orders nothing", str);
 				error_line("\tSuggestion: Store it with .Release, e.g. at %s, or read it with .Relaxed\n", other);

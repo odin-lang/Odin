@@ -813,6 +813,19 @@ char const *OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_COUNT] = {
 
 gb_global Type *t_atomic_memory_order = nullptr;
 
+enum OdinFutexOperation : i32 {
+	OdinFutexOperation_Wait = 0,
+	OdinFutexOperation_Wake = 1,
+	OdinFutexOperation_COUNT,
+};
+
+char const *OdinFutexOperation_strings[OdinFutexOperation_COUNT] = {
+	"Wait",
+	"Wake",
+};
+
+gb_global Type *t_futex_operation = nullptr;
+
 
 
 

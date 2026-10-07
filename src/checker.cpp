@@ -1391,6 +1391,17 @@ gb_internal void init_universal(void) {
 	}
 
 	{
+		GlobalEnumValue values[OdinFutexOperation_COUNT] = {
+			{OdinFutexOperation_strings[OdinFutexOperation_Wait], OdinFutexOperation_Wait},
+			{OdinFutexOperation_strings[OdinFutexOperation_Wake], OdinFutexOperation_Wake},
+		};
+
+		add_global_enum_type(str_lit("Futex_Operation"), values, gb_count_of(values), &t_futex_operation);
+		GB_ASSERT(t_futex_operation->kind == Type_Named);
+		scope_insert(intrinsics_pkg->scope, t_futex_operation->Named.type_name);
+	}
+
+	{
 		GlobalEnumValue values[ProcCC_MAX] = {
 			{"Invalid",       ProcCC_Invalid},
 			{"Odin",          ProcCC_Odin},
@@ -4611,6 +4622,21 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			} else {
 				ac->fast_math_flags = exact_value_to_u64(ev);
 			}
+		}
+		return true;
+	} else if (name == "futex") {
+		ExactValue ev = check_decl_attribute_value(c, value, t_futex_operation);
+		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
+			// already reported
+			return true;
+		}
+		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_futex_operation)) {
+			error(elem, "Expected a constant of type 'intrinsics.Futex_Operation' for '%.*s', i.e. '.Wait' or '.Wake'", LIT(name));
+			return true;
+		}
+		switch (exact_value_to_i64(ev)) {
+		case OdinFutexOperation_Wait: ac->futex = ProcedureFutex_Wait; break;
+		case OdinFutexOperation_Wake: ac->futex = ProcedureFutex_Wake; break;
 		}
 		return true;
 	}

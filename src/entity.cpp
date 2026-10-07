@@ -140,6 +140,13 @@ enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_FavorSize,
 };
 
+// see `@(futex=...)`
+enum ProcedureFutex : u8 {
+	ProcedureFutex_None,
+	ProcedureFutex_Wait,
+	ProcedureFutex_Wake,
+};
+
 
 BlockingMutex global_type_name_objc_metadata_mutex;
 
@@ -308,6 +315,7 @@ struct Entity {
 			struct GenProcsData *gen_procs;
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
+			ProcedureFutex            futex;
 
 			u64     fast_math_flags;
 

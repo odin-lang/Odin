@@ -554,6 +554,7 @@ If the value of the futex is `expected`, this procedure blocks the execution of
 the current thread, until the futex is woken up, or until a spurious wakeup
 occurs.
 */
+@(futex=.Wait)
 futex_wait :: proc "contextless" (f: ^Futex, expected: u32) {
 	if u32(atomic_load_explicit(f, .Acquire)) != expected {
 		return
@@ -572,6 +573,7 @@ until a spurious wakeup occurs.
 
 This procedure returns `false` if the timeout was reached, `true` otherwise.
 */
+@(futex=.Wait)
 futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	if u32(atomic_load_explicit(f, .Acquire)) != expected {
 		return true
@@ -586,6 +588,7 @@ futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duratio
 /*
 Wake up a single thread waiting on a futex.
 */
+@(futex=.Wake)
 futex_signal :: proc "contextless" (f: ^Futex) {
 	_futex_signal(f)
 }
@@ -593,6 +596,7 @@ futex_signal :: proc "contextless" (f: ^Futex) {
 /*
 Wake up multiple threads waiting on a futex.
 */
+@(futex=.Wake)
 futex_broadcast :: proc "contextless" (f: ^Futex) {
 	_futex_broadcast(f)
 }

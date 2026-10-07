@@ -112,6 +112,12 @@ Atomic_Memory_Order :: enum {
 	Seq_Cst = 5,
 }
 
+// For `@(futex=...)` on a procedure, which waits on or wakes what its first parameter points to
+Futex_Operation :: enum {
+	Wait = 0, // Atomically compares it with what is expected, with no ordering, and sleeps while they are equal
+	Wake = 1, // Wakes what waits on it, without accessing it
+}
+
 atomic_type_is_lock_free :: proc($T: typeid) -> bool ---
 
 atomic_thread_fence :: proc(order: Atomic_Memory_Order) ---
