@@ -20,7 +20,7 @@ Returns:
 - err: An optional allocator error if one occured, `.None` otherwise
 */
 encode :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
-	res, err = make([]byte, len(src) * 2, allocator, loc)
+	res = make([]byte, len(src) * 2, allocator, loc) or_return
 	#no_bounds_check for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
 		res[j]   = LOWER[v>>4]
@@ -62,7 +62,7 @@ Returns:
 - err: An optional allocator error if one occured, `.None` otherwise
 */
 encode_upper :: proc(src: []byte, allocator := context.allocator, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) #optional_allocator_error {
-	res, err = make([]byte, len(src) * 2, allocator, loc)
+	res = make([]byte, len(src) * 2, allocator, loc) or_return
 	#no_bounds_check for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
 		res[j]   = UPPER[v>>4]
@@ -108,13 +108,28 @@ decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_locat
 		return
 	}
 
-	dst = make([]byte, len(src) / 2, allocator, loc)
+	err: runtime.Allocator_Error
+	dst, err = make([]byte, len(src) / 2, allocator, loc)
+	if err != nil {
+		return
+	}
+
 	#no_bounds_check for i, j := 0, 1; j < len(src); j += 2 {
 		p := src[j-1]
 		q := src[j]
 
-		a := hex_digit(p) or_return
-		b := hex_digit(q) or_return
+		a, a_ok := hex_digit(p)
+		if !a_ok {
+			delete(dst)
+			dst = nil
+			return
+		}
+		b, b_ok := hex_digit(q)
+		if !b_ok {
+			delete(dst)
+			dst = nil
+			return
+		}
 
 		dst[i] = (a << 4) | b
 		i += 1
