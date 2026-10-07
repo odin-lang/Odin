@@ -2524,6 +2524,7 @@ struct EscapeGraph {
 	Array<i32>         caller_offsets; // group -> the groups which may call it, as `callers[caller_offsets[gi]..<caller_offsets[gi+1]]`
 	Array<i32>         callers;
 	std::atomic<i32> * pending;        // per group the groups it may call which are not analysed yet
+	std::atomic<i32> * cursors;        // per procedure while `targets` is filled
 	bool               threaded;
 };
 
@@ -2727,6 +2728,39 @@ gb_internal Slice<EscapeFlow> escape_flows_of(EscapeAnalysis *ea, Entity *e) {
 	return d->escape_flows;
 }
 
+gb_internal bool escape_call_edge(CheckedCall const &call, i32 *caller, i32 *callee) {
+	DeclInfo *d = call.callee->decl_info;
+	if (call.caller->proc_info == nullptr || d == nullptr || d->proc_info == nullptr) {
+		// e.g. in a body which failed to check, or to a foreign procedure
+		return false;
+	}
+	*caller = call.caller->escape_index;
+	*callee = d->escape_index;
+	return true;
+}
+
+gb_internal void escape_graph_count_calls(CheckedCall *calls, isize count) {
+	EscapeGraph *g = &escape_graph;
+	for (isize i = 0; i < count; i++) {
+		i32 caller = 0;
+		i32 callee = 0;
+		if (escape_call_edge(calls[i], &caller, &callee)) {
+			g->cursors[caller].fetch_add(1, std::memory_order_relaxed);
+		}
+	}
+}
+
+gb_internal void escape_graph_place_calls(CheckedCall *calls, isize count) {
+	EscapeGraph *g = &escape_graph;
+	for (isize i = 0; i < count; i++) {
+		i32 caller = 0;
+		i32 callee = 0;
+		if (escape_call_edge(calls[i], &caller, &callee)) {
+			g->targets[g->cursors[caller].fetch_add(1, std::memory_order_relaxed)] = callee;
+		}
+	}
+}
+
 gb_internal WORKER_TASK_PROC(escape_group_worker) {
 	EscapeGraph *g = &escape_graph;
 	i32 gi = cast(i32)cast(intptr)data;
@@ -2787,18 +2821,31 @@ gb_internal void check_escapes(Checker *c) {
 		defer (array_free(&calls));
 		per_thread_array_gather(&c->info.checked_calls_queue, &calls);
 
-		auto edge_from = array_make<i32>(heap_allocator(), 0, calls.count);
-		auto edge_to   = array_make<i32>(heap_allocator(), 0, calls.count);
-		defer (array_free(&edge_from));
-		defer (array_free(&edge_to));
-		for (CheckedCall const &call : calls) {
-			DeclInfo *callee = call.callee->decl_info;
-			if (call.caller->proc_info != nullptr && callee != nullptr && callee->proc_info != nullptr) {
-				array_add(&edge_from, call.caller->escape_index);
-				array_add(&edge_to, callee->escape_index);
-			}
+		// the calls of each procedure are counted, and then placed after those of the procedures before it
+		g->cursors = gb_alloc_array(heap_allocator(), std::atomic<i32>, count);
+		defer (gb_free(heap_allocator(), g->cursors));
+		for (i32 v = 0; v < count; v++) {
+			g->cursors[v].store(0, std::memory_order_relaxed);
 		}
-		global_graph_csr(count, edge_from, edge_to, &g->offsets, &g->targets);
+		if (g->threaded) {
+			thread_pool_for_chunks(calls.data, calls.count, 4096, escape_graph_count_calls);
+		} else {
+			escape_graph_count_calls(calls.data, calls.count);
+		}
+
+		array_init(&g->offsets, heap_allocator(), count+1);
+		g->offsets[0] = 0;
+		for (i32 v = 0; v < count; v++) {
+			g->offsets[v+1] = g->offsets[v] + g->cursors[v].load(std::memory_order_relaxed);
+			g->cursors[v].store(g->offsets[v], std::memory_order_relaxed);
+		}
+
+		array_init(&g->targets, heap_allocator(), g->offsets[count]);
+		if (g->threaded) {
+			thread_pool_for_chunks(calls.data, calls.count, 4096, escape_graph_place_calls);
+		} else {
+			escape_graph_place_calls(calls.data, calls.count);
+		}
 	}
 
 	array_init(&g->group_of, heap_allocator(), count);
