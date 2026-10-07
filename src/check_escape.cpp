@@ -84,7 +84,7 @@ struct EscapeOuterStore {
 	Entity *     root;
 	EscapePath   path;
 	bool         exact;
-	Ast *        node;   // the left hand side, or a call storing into memory it was given
+	Ast *        node;   // the left hand side, or a call storing into memory it was given, unless what is stored is the caller's
 	EscapeOrigin dest;   // what it is stored through
 	EscapeOrigin origin; // of what is stored
 };
@@ -1910,10 +1910,18 @@ gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue
 			}
 
 			for (EscapeValueFact const &vf : v) {
-				if (vf.origin.kind == EscapeOrigin_Outer) {
-					continue;
-				}
+				s.node   = node;
 				s.origin = vf.origin;
+				switch (vf.origin.kind) {
+				case EscapeOrigin_Outer:
+					continue;
+				case EscapeOrigin_Param:
+				case EscapeOrigin_ParamLoad:
+				case EscapeOrigin_ParamDeep:
+					// never reported, only made into a flow, so where it is stored does not need telling apart
+					s.node = nullptr;
+					break;
+				}
 				bool found = false;
 				for (EscapeOuterStore const &p : ea->state.outers) {
 					if (escape_outer_eq(p, s)) {
