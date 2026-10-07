@@ -320,6 +320,7 @@ enum VetFlags : u64 {
 	VetFlag_WhenShadowing   = 1u<<12,
 	VetFlag_NilDeref        = 1u<<13,
 	VetFlag_Uninitialized   = 1u<<14,
+	VetFlag_AtomicAccess    = 1u<<15,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -361,6 +362,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_NilDeref;
 	} else if (name == "uninitialized") {
 		return VetFlag_Uninitialized;
+	} else if (name == "atomic-access") {
+		return VetFlag_AtomicAccess;
 	}
 	return VetFlag_NONE;
 }
@@ -564,6 +567,7 @@ struct BuildContext {
 	bool   no_rpath;
 	bool   no_entry_point;
 	bool   no_escape_analysis;
+	bool   no_atomic_analysis;
 	bool   no_thread_local;
 	bool   cross_compiling;
 	bool   different_os;

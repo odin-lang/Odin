@@ -2109,6 +2109,11 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_addressed) {
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
+						if (atomic_analysis_in_use()) {
+							if (Entity *e = atomic_location(expr)) {
+								per_thread_array_add(&ctx->info->checked_addresses_queue, CheckedAddress{node, e});
+							}
+						}
 					} else {
 						char const *idx_name = is_map ? "key" : (is_bit_set || i == 0) ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));

@@ -91,24 +91,38 @@ gb_internal u64 ast_file_vet_flags(AstFile *f) {
 	return 0;
 }
 
-// whether any file has `#+escape-analysis`, so that it runs for them when `-no-escape-analysis` disables it otherwise
+// whether any file has `#+escape-analysis` or `#+atomic-analysis`, so that it runs for them when disabled otherwise
 gb_global std::atomic<bool> global_escape_analysis_tagged;
+gb_global std::atomic<bool> global_atomic_analysis_tagged;
 
-gb_internal bool ast_file_escape_analysis(AstFile *f) {
+// whether a file has an analysis, which its `#+<analysis>` or `#+no-<analysis>` tag decides over the command line
+gb_internal bool ast_file_has_analysis(AstFile *f, u32 on_flag, u32 off_flag, bool disabled) {
 	if (f == nullptr) {
-		return !build_context.no_escape_analysis;
+		return !disabled;
 	}
-	if (f->flags & AstFile_EscapeAnalysis) {
+	if (f->flags & on_flag) {
 		return true;
 	}
-	if (f->flags & AstFile_NoEscapeAnalysis) {
+	if (f->flags & off_flag) {
 		return false;
 	}
-	return !build_context.no_escape_analysis;
+	return !disabled;
+}
+
+gb_internal bool ast_file_escape_analysis(AstFile *f) {
+	return ast_file_has_analysis(f, AstFile_EscapeAnalysis, AstFile_NoEscapeAnalysis, build_context.no_escape_analysis);
+}
+
+gb_internal bool ast_file_atomic_analysis(AstFile *f) {
+	return ast_file_has_analysis(f, AstFile_AtomicAnalysis, AstFile_NoAtomicAnalysis, build_context.no_atomic_analysis);
 }
 
 gb_internal bool escape_analysis_in_use(void) {
 	return !build_context.no_escape_analysis || global_escape_analysis_tagged.load(std::memory_order_relaxed);
+}
+
+gb_internal bool atomic_analysis_in_use(void) {
+	return !build_context.no_atomic_analysis || global_atomic_analysis_tagged.load(std::memory_order_relaxed);
 }
 
 gb_internal bool ast_file_vet_style(AstFile *f) {
@@ -7283,6 +7297,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags)
 			error_line("\twhen-shadowing\n");
 			error_line("\tnil-deref\n");
 			error_line("\tuninitialized\n");
+			error_line("\tatomic-access\n");
 			return vet_flags;
 		}
 	}
@@ -7511,6 +7526,13 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (lc == "no-escape-analysis") {
 		f->flags |= AstFile_NoEscapeAnalysis;
 		f->flags &= ~AstFile_EscapeAnalysis;
+	} else if (lc == "atomic-analysis") {
+		f->flags |= AstFile_AtomicAnalysis;
+		f->flags &= ~AstFile_NoAtomicAnalysis;
+		global_atomic_analysis_tagged.store(true, std::memory_order_relaxed);
+	} else if (lc == "no-atomic-analysis") {
+		f->flags |= AstFile_NoAtomicAnalysis;
+		f->flags &= ~AstFile_AtomicAnalysis;
 	} else {
 		syntax_error(tok, "Unknown tag '%.*s'", LIT(lc));
 	}

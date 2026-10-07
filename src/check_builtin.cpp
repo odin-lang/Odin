@@ -2169,6 +2169,26 @@ gb_internal bool is_valid_type_for_load(Type *type) {
 	return false;
 }
 
+// the `&x` an atomic operation's pointer is, through any conversions of it, unless it is a pointer from elsewhere
+gb_internal Ast *atomic_address_of(Ast *ptr) {
+	ptr = unparen_expr(ptr);
+	for (;;) {
+		if (ptr->kind == Ast_CallExpr && ptr->CallExpr.proc->tav.mode == Addressing_Type && ptr->CallExpr.args.count == 1) {
+			ptr = unparen_expr(ptr->CallExpr.args[0]);
+		} else if (ptr->kind == Ast_TypeCast) {
+			ptr = unparen_expr(ptr->TypeCast.expr);
+		} else if (ptr->kind == Ast_AutoCast) {
+			ptr = unparen_expr(ptr->AutoCast.expr);
+		} else {
+			break;
+		}
+	}
+	if (ptr->kind != Ast_UnaryExpr || ptr->UnaryExpr.op.kind != Token_And) {
+		return nullptr;
+	}
+	return ptr;
+}
+
 gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
 	if (!is_type_valid_atomic_type(elem)) {
 		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
@@ -2185,20 +2205,8 @@ gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &built
 		return false;
 	}
 
-	// the address, through any conversions of it
-	Ast *ptr = unparen_expr(operand->expr);
-	for (;;) {
-		if (ptr->kind == Ast_CallExpr && ptr->CallExpr.proc->tav.mode == Addressing_Type && ptr->CallExpr.args.count == 1) {
-			ptr = unparen_expr(ptr->CallExpr.args[0]);
-		} else if (ptr->kind == Ast_TypeCast) {
-			ptr = unparen_expr(ptr->TypeCast.expr);
-		} else if (ptr->kind == Ast_AutoCast) {
-			ptr = unparen_expr(ptr->AutoCast.expr);
-		} else {
-			break;
-		}
-	}
-	if (ptr->kind != Ast_UnaryExpr || ptr->UnaryExpr.op.kind != Token_And) {
+	Ast *ptr = atomic_address_of(operand->expr);
+	if (ptr == nullptr) {
 		return true;
 	}
 

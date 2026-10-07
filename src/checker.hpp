@@ -282,6 +282,17 @@ struct CheckedCall {
 	Entity *  callee;
 };
 
+struct CheckedAtomic {
+	Ast *     call;
+	DeclInfo *decl;
+	i32       id;   // BuiltinProcId
+};
+
+struct CheckedAddress {
+	Ast *   node;     // `&x`, or what is sliced or iterated by reference
+	Entity *location; // see `atomic_location`
+};
+
 
 enum LinkNameUseKind : u8 {
 	LinkNameUse_ForeignProcedure,
@@ -846,6 +857,9 @@ struct CheckerInfo {
 	PerThreadArray<ProcInfo *>   checked_bodies_queue; // for `check_escapes`
 	PerThreadArray<CheckedCall>  checked_calls_queue;  // for `check_escapes`
 
+	PerThreadArray<CheckedAtomic>  checked_atomics_queue;   // for `check_atomics`
+	PerThreadArray<CheckedAddress> checked_addresses_queue; // for `check_atomics`, what has its address taken, by `&` or otherwise
+
 	BlockingMutex instrumentation_mutex;
 	Entity *instrumentation_enter_entity;
 	Entity *instrumentation_exit_entity;
@@ -952,6 +966,7 @@ gb_internal isize        type_info_index        (CheckerInfo *info, TypeInfoPair
 
 // Will return nullptr if not found
 gb_internal Entity *entity_of_node(Ast *expr);
+gb_internal Entity *atomic_location(Ast *expr);
 
 
 // gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash=0);

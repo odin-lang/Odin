@@ -3066,6 +3066,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			o->mode = Addressing_Invalid;
 			return;
 		}
+		if (atomic_analysis_in_use()) {
+			if (Entity *e = atomic_location(o->expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
+		}
 
 		Type *soa_for_in_type = nullptr;
 		if (node->kind == Ast_UnaryExpr) {
@@ -9492,6 +9497,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
+		} else if (BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit && atomic_analysis_in_use()) {
+			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, id});
 		}
 		operand->expr = call;
 		return builtin_procs[id].kind;
@@ -12888,6 +12895,11 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
+		}
+		if (atomic_analysis_in_use() && !is_type_pointer(o->type)) {
+			if (Entity *e = atomic_location(node->SliceExpr.expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
 		}
 		o->type = alloc_type_slice(t->Array.elem);
 		break;

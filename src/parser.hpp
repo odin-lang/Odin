@@ -99,6 +99,8 @@ enum AstFileFlag : u32 {
 
 	AstFile_EscapeAnalysis   = 1<<6, // `#+escape-analysis`
 	AstFile_NoEscapeAnalysis = 1<<7, // `#+no-escape-analysis`
+	AstFile_AtomicAnalysis   = 1<<8, // `#+atomic-analysis`
+	AstFile_NoAtomicAnalysis = 1<<9, // `#+no-atomic-analysis`
 };
 
 enum AstDelayQueueKind {

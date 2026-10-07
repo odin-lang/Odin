@@ -1708,6 +1708,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_atomics_queue,   global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_addresses_queue, global_thread_pool.threads.count);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
@@ -1744,6 +1746,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	per_thread_array_destroy(&i->definition_queue);
 	per_thread_array_destroy(&i->checked_bodies_queue);
 	per_thread_array_destroy(&i->checked_calls_queue);
+	per_thread_array_destroy(&i->checked_atomics_queue);
+	per_thread_array_destroy(&i->checked_addresses_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
@@ -4935,6 +4939,7 @@ gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
 #include "check_escape.cpp"
+#include "check_atomics.cpp"
 
 
 
@@ -6874,7 +6879,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 
 	if (body_was_checked) {
 		pi->decl->proc_info = pi;
-		if (escape_analysis_in_use()) {
+		if (escape_analysis_in_use() || atomic_analysis_in_use()) {
 			per_thread_array_add(&c->info.checked_bodies_queue, pi);
 		}
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
@@ -8095,6 +8100,12 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+
+	// before the escape analysis, which takes the checked bodies
+	if (atomic_analysis_in_use()) {
+		TIME_SECTION("check atomics");
+		check_atomics(c);
+	}
 
 	if (escape_analysis_in_use()) {
 		TIME_SECTION("check escapes");
