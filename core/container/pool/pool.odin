@@ -48,7 +48,7 @@ init :: proc(p: ^Pool($T), $link_field: string, block_size: uint = DEFAULT_BLOCK
 }
 
 destroy :: proc(p: ^Pool($T)) {
-	elem := sync.atomic_exchange_explicit(&p.free_list, nil, .Acquire)
+	elem := sync.atomic_exchange_explicit(&p.free_list, nil, .Relaxed)
 
 	sync.atomic_store_explicit(&p.num_ready, 0, .Relaxed)
 
