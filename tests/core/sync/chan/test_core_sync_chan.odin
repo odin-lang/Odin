@@ -279,11 +279,11 @@ test_fail_blocking_recv_on_close :: proc(t: ^testing.T) {
 test_unbuffered_try_send_chan_contention :: proc(t: ^testing.T) {
 	testing.set_fail_timeout(t, FAIL_TIME)
 
-	start, start_alloc_err := chan.create(chan.Chan(any), context.allocator)
+	start, start_alloc_err := chan.create(chan.Chan(string), context.allocator)
 	assert(start_alloc_err == nil, "allocation failed")
 	defer chan.destroy(start)
 
-	trigger, trigger_alloc_err := chan.create(chan.Chan(any), context.allocator)
+	trigger, trigger_alloc_err := chan.create(chan.Chan(string), context.allocator)
 	assert(trigger_alloc_err == nil, "allocation failed")
 	defer chan.destroy(trigger)
 
@@ -314,8 +314,8 @@ test_unbuffered_try_send_chan_contention :: proc(t: ^testing.T) {
 		sync.wait_group_add(&wait, 1)
 		Context :: struct {
 			id: int,
-			start: chan.Chan(any),
-			trigger: chan.Chan(any),
+			start: chan.Chan(string),
+			trigger: chan.Chan(string),
 			results: chan.Chan(int),
 			ch: chan.Chan(int),
 			wg: ^sync.Wait_Group,
@@ -365,12 +365,12 @@ test_unbuffered_try_send_chan_contention :: proc(t: ^testing.T) {
 	for _ in 0..<len(contenders) {
 		if data, ok := chan.recv(start); !ok {
 			testing.expect_value(t, ok, true)
-			testing.expect_value(t, data.(string), "ready")
+			testing.expect_value(t, data, "ready")
 		}
 	}
 
 	// Fire the trigger when the test thread is ready to receive.
-	trigger_closer := thread.create_and_start_with_poly_data2(trigger, ch, proc(trigger: chan.Chan(any), ch: chan.Chan(int)) {
+	trigger_closer := thread.create_and_start_with_poly_data2(trigger, ch, proc(trigger: chan.Chan(string), ch: chan.Chan(int)) {
 		for !chan.can_send(ch) {
 			thread.yield()
 		}
@@ -577,7 +577,7 @@ test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
 	testing.set_fail_timeout(t, FAIL_TIME)
 
 	// Trigger will be used to coordinate between the thief and the try_select.
-	trigger, trigger_err := chan.create(chan.Chan(any), context.allocator)
+	trigger, trigger_err := chan.create(chan.Chan(string), context.allocator)
 
 	assert(trigger_err == nil, "allocation failed")
 	defer chan.destroy(trigger)
@@ -588,7 +588,7 @@ test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
 	// Setup the pause proc. This will be invoked after the input channels are
 	// checked for eligibility but before any channel operations are attempted.
 	chan.__try_select_raw_pause = proc() {
-		trigger := (cast(^chan.Chan(any))(__global_context_for_test))^
+		trigger := (cast(^chan.Chan(string))(__global_context_for_test))^
 
 		// Notify the thief that we are paused so that it can steal the value.
 		_ = chan.send(trigger, "signal")
@@ -606,7 +606,7 @@ test_try_select_raw_no_toctou :: proc(t: ^testing.T) {
 
 	Context :: struct {
 		recv1: chan.Chan(int),
-		trigger: chan.Chan(any),
+		trigger: chan.Chan(string),
 	}
 
 	ctx := Context{

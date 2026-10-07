@@ -3480,6 +3480,8 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 		io.write_string(fi.writer, "<nil>")
 		return
 	}
+	prev_arg := fi.arg
+	defer fi.arg = prev_arg
 	fi.arg = arg
 
 	if verb == 'T' {
