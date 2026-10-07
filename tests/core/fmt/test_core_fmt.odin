@@ -48,7 +48,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	cptr^ = {0, neg_zero}
 	check(t, "0-0i",      "%v", c)
 	cptr^ = {nan, nan}
-	check(t, "NaNNaNi",   "%v", c)
+	check(t, "NaN+NaNi",   "%v", c)
 	cptr^ = {pos_inf, pos_inf}
 	check(t, "+Inf+Infi", "%v", c)
 	cptr^ = {neg_inf, neg_inf}
@@ -60,7 +60,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	cptr^ = {1, 1}
 	check(t, "+1+1i",     "%+v", c)
 	cptr^ = {nan, nan}
-	check(t, "NaNNaNi",   "%+v", c)
+	check(t, "NaN+NaNi",   "%+v", c)
 	cptr^ = {pos_inf, pos_inf}
 	check(t, "+Inf+Infi", "%+v", c)
 	cptr^ = {neg_inf, neg_inf}
@@ -86,7 +86,7 @@ test_fmt_complex_quaternion :: proc(t: ^testing.T) {
 	qptr^ = {pos_inf, pos_inf, pos_inf, -1}
 	check(t, "-1+Infi+Infj+Infk", "%v", q)
 	qptr^ = {nan, nan, nan, -1}
-	check(t, "-1NaNiNaNjNaNk",    "%v", q)
+	check(t, "-1+NaNi+NaNj+NaNk",    "%v", q)
 }
 
 @(test)
