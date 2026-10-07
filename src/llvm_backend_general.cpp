@@ -3199,17 +3199,24 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		{
 			unsigned field_count = 0;
 
-			LLVMTypeRef fields[3] = {};
+			LLVMTypeRef fields[4] = {};
 			m->internal_type_level += 1;
 			fields[field_count++] = llvm_array_type(lb_type(m, type->FixedCapacityDynamicArray.elem), type->FixedCapacityDynamicArray.capacity);
 			m->internal_type_level -= 1;
 
-			gb_unused(type_size_of(type));
-			if (type->FixedCapacityDynamicArray.padding_needed > 0) {
-				fields[field_count++] = lb_type_padding_filler(m, type->FixedCapacityDynamicArray.padding_needed, 1); // padding
+			i64 size = type_size_of(type);
+			i64 padding = type->FixedCapacityDynamicArray.padding_needed;
+			if (padding > 0) {
+				fields[field_count++] = lb_type_padding_filler(m, padding, 1); // padding
 			}
 
 			fields[field_count++] = lb_type(m, t_int); // len
+
+			// an over-aligned elem (e.g. a matrix) needs more tail padding than LLVM's own alignment gives
+			i64 tail = size - type_size_of(type->FixedCapacityDynamicArray.elem)*type->FixedCapacityDynamicArray.capacity - padding - build_context.int_size;
+			if (tail > 0) {
+				fields[field_count++] = lb_type_padding_filler(m, tail, 1);
+			}
 
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}

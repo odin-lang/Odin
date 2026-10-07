@@ -726,13 +726,18 @@ gb_internal LLVMValueRef lb_fill_fixed_capacity_dynamic_array(lbModule *m, i64 e
 	LLVMValueRef array_len = lb_const_int(m, t_int, elem_count).value;
 
 	isize svalue_count = 0;
-	LLVMValueRef svalues[3] = {};
+	LLVMValueRef svalues[4] = {};
 	svalues[svalue_count++] = array_backing;
+	i64 size = type_size_of(bt);
 	i64 padding = bt->FixedCapacityDynamicArray.padding_needed;
 	if (padding > 0) {
 		svalues[svalue_count++] = LLVMConstNull(lb_type_padding_filler(m, padding, 1));
 	}
 	svalues[svalue_count++] = array_len;
+	i64 tail = size - type_size_of(elem_type)*capacity - padding - build_context.int_size;
+	if (tail > 0) {
+		svalues[svalue_count++] = LLVMConstNull(lb_type_padding_filler(m, tail, 1));
+	}
 
 	return llvm_const_named_struct(m, original_type, svalues, svalue_count);
 }
