@@ -1900,11 +1900,14 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 			arg = arg->BinaryExpr.left;
 		}
 
+		bool prev_in_proc_group_decl = ctx->in_proc_group_decl;
+		ctx->in_proc_group_decl = true;
 		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
 		} else if (arg->kind == Ast_SelectorExpr) {
 			e = check_selector(ctx, &o, arg, nullptr);
 		}
+		ctx->in_proc_group_decl = prev_in_proc_group_decl;
 		if (e == nullptr) {
 			error(arg, "Expected a valid entity name in procedure group, got %.*s", LIT(ast_strings[arg->kind]));
 			continue;

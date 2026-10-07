@@ -2267,6 +2267,10 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 
 	identifier->Ident.entity = entity;
 
+	if (c->in_proc_group_decl) {
+		// a call which picks this member reports it instead
+		return;
+	}
 	String dmsg = entity->deprecated_message;
 	if (dmsg.len > 0) {
 		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
