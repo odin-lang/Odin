@@ -1,0 +1,1826 @@
+// Whatever is unknown, e.g. the result of a call, is assumed to not point into the stack frame
+// An explicit conversion to 'rawptr' or 'uintptr', or a 'transmute', opts out
+
+enum EscapeStepKind : u8 {
+	EscapeStep_Invalid,
+	EscapeStep_Field,
+	EscapeStep_AnyElement,
+	EscapeStep_Deref, // only in the location of an outer store
+};
+
+struct EscapeStep {
+	EscapeStepKind kind;
+	Entity *       field;
+};
+
+// immutable once made, so paths share their steps
+typedef Slice<EscapeStep> EscapePath;
+
+struct EscapeObject {
+	Entity *entity;
+	Ast *   temp;
+};
+
+enum EscapeOriginKind : u8 {
+	EscapeOrigin_Invalid,
+	EscapeOrigin_Outer,
+	EscapeOrigin_Local,
+	EscapeOrigin_Temp,
+	EscapeOrigin_Owned, // the buffer of a local dynamic array or map, tracked as its contents
+	EscapeOrigin_Variadic,
+};
+
+struct EscapeOrigin {
+	EscapeOriginKind kind;
+	EscapeObject     obj;
+	EscapePath       path;
+};
+
+struct EscapeValueFact {
+	EscapePath   path;
+	EscapeOrigin origin;
+};
+typedef Array<EscapeValueFact> EscapeValue;
+
+struct EscapeFact {
+	EscapeObject obj;
+	EscapePath   path;
+	EscapeOrigin origin;
+};
+
+struct EscapeOuterStore {
+	Entity *     root;
+	EscapePath   path;
+	bool         exact;
+	Ast *        node;
+	EscapeOrigin origin;
+};
+
+struct EscapeState {
+	bool                    reachable;
+	Array<EscapeFact>       facts;
+	Array<EscapeOuterStore> outers;
+};
+
+enum EscapeTargetKind : u8 {
+	EscapeTarget_Invalid,
+	EscapeTarget_Labelled, // a block or if statement, which only a labelled break exits
+	EscapeTarget_Loop,
+	EscapeTarget_Switch,
+};
+
+struct EscapeTarget {
+	EscapeTargetKind kind;
+	Ast *            stmt;
+	isize            defer_depth;
+	EscapeState      breaks;
+	EscapeState      continues;
+};
+
+enum EscapeUpdateKind : u8 {
+	EscapeUpdate_Invalid,
+	EscapeUpdate_Replace,
+	EscapeUpdate_Add,
+};
+
+enum EscapeReportKind : u8 {
+	EscapeReport_Invalid,
+	EscapeReport_Return,
+	EscapeReport_Store,
+};
+
+struct EscapeAlias {
+	Entity *     e;
+	EscapeOrigin origin;
+};
+
+struct EscapeAnalysis {
+	TypeProc *           pt;
+	Entity *             variadic;
+	EscapeState          state;
+	EscapeState          fallthrough;
+	Array<Array<Ast *> > defers;
+	Array<EscapeTarget>  targets;
+	Array<EscapeAlias>   aliases;
+	Array<Ast *>         reported;
+};
+
+
+gb_internal bool escape_path_has_prefix(EscapePath const &p, EscapePath const &prefix) {
+	if (prefix.count > p.count) {
+		return false;
+	}
+	for_array(i, prefix) {
+		if (p[i].kind  != prefix[i].kind ||
+		    p[i].field != prefix[i].field) {
+			return false;
+		}
+	}
+	return true;
+}
+
+gb_internal bool escape_path_eq(EscapePath const &a, EscapePath const &b) {
+	return a.count == b.count && escape_path_has_prefix(a, b);
+}
+
+gb_internal bool escape_path_has(EscapePath const &p, EscapeStepKind kind) {
+	for (EscapeStep const &step : p) {
+		if (step.kind == kind) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal EscapePath escape_path_of(EscapeStepKind kind, Entity *field=nullptr) {
+	auto p = slice_make<EscapeStep>(temporary_allocator(), 1);
+	p[0] = {kind, field};
+	return p;
+}
+
+gb_internal EscapePath escape_path_concat(EscapePath const &p, EscapePath const &q) {
+	if (q.count == 0) {
+		return p;
+	}
+	if (p.count == 0) {
+		return q;
+	}
+	auto r = slice_make<EscapeStep>(temporary_allocator(), p.count+q.count);
+	slice_copy(&r, p);
+	slice_copy(&r, q, p.count);
+	return r;
+}
+
+gb_internal bool escape_object_eq(EscapeObject const &a, EscapeObject const &b) {
+	return a.entity == b.entity &&
+	       a.temp   == b.temp;
+}
+
+gb_internal bool escape_origin_eq(EscapeOrigin const &a, EscapeOrigin const &b) {
+	return a.kind == b.kind               &&
+	       escape_object_eq(a.obj, b.obj) &&
+	       escape_path_eq(a.path, b.path);
+}
+
+gb_internal bool escape_outer_eq(EscapeOuterStore const &a, EscapeOuterStore const &b) {
+	return a.root == b.root               &&
+	       escape_path_eq(a.path, b.path) &&
+	       a.exact == b.exact             &&
+	       a.node  == b.node              &&
+	       escape_origin_eq(a.origin, b.origin);
+}
+
+gb_internal EscapeValue escape_value(void) {
+	return array_make<EscapeValueFact>(temporary_allocator());
+}
+
+gb_internal void escape_value_add(EscapeValue *v, EscapePath const &path, EscapeOrigin const &o) {
+	for (EscapeValueFact const &f : *v) {
+		if (escape_path_eq(f.path, path) && escape_origin_eq(f.origin, o)) {
+			return;
+		}
+	}
+	array_add(v, EscapeValueFact{path, o});
+}
+
+gb_internal void escape_value_merge(EscapeValue *v, EscapeValue const &w) {
+	for (EscapeValueFact const &f : w) {
+		escape_value_add(v, f.path, f.origin);
+	}
+}
+
+gb_internal EscapeValue escape_value_of(EscapeOriginKind kind, EscapeObject const &obj, EscapePath const &path) {
+	EscapeValue v = escape_value();
+	escape_value_add(&v, {}, EscapeOrigin{kind, obj, path});
+	return v;
+}
+
+gb_internal EscapeValue escape_pointer_offset(EscapeValue const &v, EscapePath const &extra) {
+	EscapeValue w = escape_value();
+	for (EscapeValueFact const &f : v) {
+		EscapeOrigin o = f.origin;
+		if (o.kind != EscapeOrigin_Outer && o.kind != EscapeOrigin_Variadic) {
+			o.path = escape_path_concat(o.path, extra);
+		}
+		escape_value_add(&w, {}, o);
+	}
+	return w;
+}
+
+gb_internal EscapeValue escape_as_pointer(EscapeValue const &v) {
+	return escape_pointer_offset(v, {});
+}
+
+gb_internal void escape_project_into(EscapeValue *out, EscapePath const &fact_path, EscapeOrigin const &o, EscapePath const &path) {
+	if (escape_path_has_prefix(fact_path, path)) {
+		escape_value_add(out, slice(fact_path, path.count, fact_path.count), o);
+	} else if (escape_path_has_prefix(path, fact_path)) {
+		escape_value_add(out, {}, o);
+	}
+}
+
+gb_internal EscapeValue escape_value_project(EscapeValue const &v, EscapePath const &path) {
+	EscapeValue w = escape_value();
+	for (EscapeValueFact const &f : v) {
+		escape_project_into(&w, f.path, f.origin, path);
+	}
+	return w;
+}
+
+gb_internal EscapeState escape_state_unreachable(void) {
+	EscapeState s = {};
+	s.facts  = array_make<EscapeFact>(temporary_allocator());
+	s.outers = array_make<EscapeOuterStore>(temporary_allocator());
+	return s;
+}
+
+gb_internal EscapeState escape_state_clone(EscapeState const &s) {
+	EscapeState c = {};
+	c.reachable = s.reachable;
+	c.facts  = array_clone(temporary_allocator(), s.facts);
+	c.outers = array_clone(temporary_allocator(), s.outers);
+	return c;
+}
+
+gb_internal void escape_add_fact(Array<EscapeFact> *facts, EscapeFact const &f) {
+	for (EscapeFact const &g : *facts) {
+		if (escape_object_eq(f.obj, g.obj)   &&
+		    escape_path_eq(f.path, g.path) &&
+		    escape_origin_eq(f.origin, g.origin)) {
+			return;
+		}
+	}
+	array_add(facts, f);
+}
+
+gb_internal bool escape_state_join(EscapeState *dst, EscapeState const &src) {
+	if (!src.reachable) {
+		return false;
+	}
+
+	if (!dst->reachable) {
+		*dst = escape_state_clone(src);
+		return true;
+	}
+
+	bool changed = false;
+	for (EscapeFact const &f : src.facts) {
+		isize count = dst->facts.count;
+		escape_add_fact(&dst->facts, f);
+		changed |= dst->facts.count != count;
+	}
+
+	for (EscapeOuterStore const &o : src.outers) {
+		bool found = false;
+		for (EscapeOuterStore const &p : dst->outers) {
+			if (escape_outer_eq(o, p)) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			array_add(&dst->outers, o);
+			changed = true;
+		}
+	}
+	return changed;
+}
+
+
+gb_internal bool escape_type_has_pointers(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) {
+		return false;
+	}
+	switch (t->kind) {
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_rawptr:
+		case Basic_string:
+		case Basic_cstring:
+		case Basic_string16:
+		case Basic_cstring16:
+		case Basic_any:
+			return true;
+		}
+		return false;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Map:
+	case Type_SoaPointer:
+		return true;
+
+	case Type_Array:                     return escape_type_has_pointers(t->Array.elem);
+	case Type_EnumeratedArray:           return escape_type_has_pointers(t->EnumeratedArray.elem);
+	case Type_FixedCapacityDynamicArray: return escape_type_has_pointers(t->FixedCapacityDynamicArray.elem);
+	case Type_SimdVector:                return escape_type_has_pointers(t->SimdVector.elem);
+
+	case Type_Struct:
+		for (Entity *f : t->Struct.fields) {
+			if (escape_type_has_pointers(f->type)) {
+				return true;
+			}
+		}
+		return false;
+	case Type_Union:
+		for (Type *v : t->Union.variants) {
+			if (escape_type_has_pointers(v)) {
+				return true;
+			}
+		}
+		return false;
+	case Type_Tuple:
+		for (Entity *v : t->Tuple.variables) {
+			if (escape_type_has_pointers(v->type)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	return false;
+}
+
+gb_internal bool escape_type_is_plain(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) {
+		return true;
+	}
+	switch (t->kind) {
+	case Type_Basic:
+	case Type_SimdVector:
+		return !escape_type_has_pointers(t);
+
+	case Type_Enum:
+	case Type_BitSet:
+	case Type_BitField:
+	case Type_Matrix:
+	case Type_Proc:
+		return true;
+	}
+	return false;
+}
+
+gb_internal bool escape_is_local(Entity *e) {
+	return e != nullptr                  &&
+	       e->kind == Entity_Variable    &&
+	       !e->Variable.is_global        &&
+	       !e->Variable.is_foreign       &&
+	       (e->flags & EntityFlag_Static) == 0;
+}
+
+gb_internal bool escape_is_reference(Entity *e) {
+	return (e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue)) != 0 &&
+	       (e->flags & EntityFlag_Value) == 0;
+}
+
+gb_internal bool escape_is_using_field(Entity *e) {
+	return e->using_parent != nullptr &&
+	       e->using_expr   == nullptr;
+}
+
+
+gb_internal EscapeValue escape_obj_value(EscapeAnalysis *ea, EscapeObject const &obj, EscapePath const &path) {
+	EscapeValue v = escape_value();
+	for (EscapeFact const &f : ea->state.facts) {
+		if (escape_object_eq(f.obj, obj)) {
+			escape_project_into(&v, f.path, f.origin, path);
+		}
+	}
+	return v;
+}
+
+gb_internal void escape_store_obj(EscapeAnalysis *ea, EscapeObject const &obj, EscapePath const &path, EscapeValue const &v, EscapeUpdateKind update) {
+	if (update == EscapeUpdate_Replace && !escape_path_has(path, EscapeStep_AnyElement)) {
+		for (isize i = ea->state.facts.count-1; i >= 0; i--) {
+			EscapeFact const &f = ea->state.facts[i];
+			if (escape_object_eq(f.obj, obj) && escape_path_has_prefix(f.path, path)) {
+				array_unordered_remove(&ea->state.facts, i);
+			}
+		}
+	}
+	for (EscapeValueFact const &vf : v) {
+		escape_add_fact(&ea->state.facts, EscapeFact{obj, escape_path_concat(path, vf.path), vf.origin});
+	}
+}
+
+gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, Type *type) {
+	EscapeValue v = escape_value();
+	if (type != nullptr && !escape_type_has_pointers(type)) {
+		return v;
+	}
+	for (EscapeValueFact const &pf : ptr) {
+		EscapeOrigin const &o = pf.origin;
+		switch (o.kind) {
+		case EscapeOrigin_Outer:
+			escape_value_add(&v, {}, o);
+			break;
+
+		case EscapeOrigin_Variadic: {
+			// NOTE(bill): its 'any' elements are boxed in the caller's stack frame too
+			Type *elem = base_type(o.obj.entity->type);
+			if (elem->kind == Type_Slice && is_type_any(elem->Slice.elem)) {
+				escape_value_add(&v, {}, o);
+			} else {
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Outer});
+			}
+			break;
+		}
+		case EscapeOrigin_Local:
+		case EscapeOrigin_Temp:
+		case EscapeOrigin_Owned:
+			for (EscapeFact const &f : ea->state.facts) {
+				if (escape_object_eq(f.obj, o.obj)) {
+					escape_project_into(&v, f.path, f.origin, o.path);
+				}
+			}
+			break;
+
+		case EscapeOrigin_Invalid:
+			break;
+		}
+	}
+	return v;
+}
+
+gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr);
+gb_internal EscapeValue escape_addr(EscapeAnalysis *ea, Ast *expr);
+
+gb_internal void escape_visit_exits(EscapeAnalysis *ea, Ast *expr) {
+	if (expr != nullptr && (expr->viral_state_flags & (ViralStateFlag_ContainsOrReturn|ViralStateFlag_ContainsOrBreak)) != 0) {
+		escape_expr(ea, expr);
+	}
+}
+
+gb_internal void escape_forget_entity(EscapeAnalysis *ea, Entity *e) {
+	if (e == nullptr) {
+		return;
+	}
+	for (isize i = ea->state.facts.count-1; i >= 0; i--) {
+		if (ea->state.facts[i].obj.entity == e) {
+			array_unordered_remove(&ea->state.facts, i);
+		}
+	}
+}
+
+gb_internal void escape_forget(EscapeAnalysis *ea, Ast *decl) {
+	if (decl != nullptr && decl->kind == Ast_ValueDecl && decl->ValueDecl.is_mutable) {
+		for (Ast *name : decl->ValueDecl.names) {
+			escape_forget_entity(ea, entity_of_node(name));
+		}
+	}
+}
+
+gb_internal EscapeValue escape_elems_at(EscapeAnalysis *ea, EscapeValue const &addr, Type *t) {
+	EscapeValue ptr = escape_value();
+	t = base_type(t);
+	if (t == nullptr) {
+		return ptr;
+	}
+	switch (t->kind) {
+	case Type_Array:
+	case Type_EnumeratedArray:
+	case Type_FixedCapacityDynamicArray:
+	case Type_Matrix:
+		return escape_pointer_offset(addr, escape_path_of(EscapeStep_AnyElement));
+	case Type_Slice:
+	case Type_MultiPointer:
+	case Type_Basic:
+		return escape_as_pointer(escape_load(ea, addr, t));
+	case Type_DynamicArray:
+	case Type_Map:
+		for (EscapeValueFact const &f : addr) {
+			EscapeOrigin o = f.origin;
+			switch (o.kind) {
+			case EscapeOrigin_Local:
+			case EscapeOrigin_Temp:
+			case EscapeOrigin_Owned:
+				o.kind = EscapeOrigin_Owned;
+				o.path = escape_path_concat(o.path, escape_path_of(EscapeStep_AnyElement));
+				escape_value_add(&ptr, {}, o);
+				break;
+			case EscapeOrigin_Outer:
+				escape_value_add(&ptr, {}, o);
+				break;
+			}
+		}
+		return ptr;
+	}
+	return ptr;
+}
+
+gb_internal EscapeValue escape_elems_of(EscapeAnalysis *ea, Ast *x) {
+	Type *t = base_type(x->tav.type);
+	if (t == nullptr) {
+		escape_expr(ea, x);
+		return escape_value();
+	}
+	switch (t->kind) {
+	case Type_Pointer:
+		return escape_elems_at(ea, escape_as_pointer(escape_expr(ea, x)), t->Pointer.elem);
+
+	case Type_Slice:
+	case Type_MultiPointer:
+	case Type_Basic:
+		return escape_as_pointer(escape_expr(ea, x));
+	}
+	return escape_elems_at(ea, escape_addr(ea, x), t);
+}
+
+gb_internal void escape_stmt  (EscapeAnalysis *ea, Ast *node);
+gb_internal void escape_branch(EscapeAnalysis *ea, Ast *label, TokenKind kind);
+gb_internal void escape_exit  (EscapeAnalysis *ea, Ast *node,  Slice<Ast *> const &results, Array<EscapeValue> const &values);
+
+gb_internal bool escape_selector_path(Ast *se_node, EscapePath *path) {
+	ast_node(se, SelectorExpr, se_node);
+	if (se->swizzle_count > 0 || se->is_bit_field) {
+		return false;
+	}
+
+	Entity *f = entity_of_node(se->selector);
+	if (f == nullptr || f->kind != Entity_Variable) {
+		return false;
+	}
+
+	// the fields of a raw union share its storage
+	*path = {};
+	if (!is_type_raw_union(type_deref(se->expr->tav.type))) {
+		*path = escape_path_of(EscapeStep_Field, f);
+	}
+	return true;
+}
+
+gb_internal Entity *escape_package_selector(Ast *se_node) {
+	ast_node(se, SelectorExpr, se_node);
+	Entity *pkg = entity_of_node(se->expr);
+	if (pkg == nullptr || pkg->kind != Entity_ImportName) {
+		return nullptr;
+	}
+	return entity_of_node(se->selector);
+}
+
+
+gb_internal EscapeValue escape_convert(EscapeAnalysis *ea, EscapeValue const &v, Ast *expr, Type *type) {
+	if (type == nullptr || expr == nullptr || !is_type_any(type)) {
+		return v;
+	}
+
+	Type *src = expr->tav.type;
+	if (src == nullptr || is_type_any(src) || is_type_untyped_nil(src) || is_type_untyped_uninit(src)) {
+		return v;
+	}
+
+	// the backend boxes an addressable value by its address, and anything else in a stack temporary
+	if (expr->tav.mode == Addressing_Variable) {
+		return escape_addr(ea, expr);
+	}
+	escape_store_obj(ea, {nullptr, expr}, {}, v, EscapeUpdate_Replace);
+	return escape_value_of(EscapeOrigin_Temp, {nullptr, expr}, {});
+}
+
+gb_internal EscapeValue escape_ident_value(EscapeAnalysis *ea, Entity *e);
+
+gb_internal EscapeValue escape_ident_addr(EscapeAnalysis *ea, Entity *e) {
+	if (e == nullptr || e->kind != Entity_Variable) {
+		return escape_value();
+	}
+
+	if (escape_is_reference(e)) {
+		EscapeValue ptr = escape_value();
+		for (EscapeAlias const &a : ea->aliases) {
+			if (a.e == e) {
+				escape_value_add(&ptr, {}, a.origin);
+			}
+		}
+		return ptr;
+	}
+
+	if ((e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue)) != 0) {
+		return escape_value();
+	}
+
+	if (escape_is_using_field(e)) {
+		Entity *parent = e->using_parent;
+		Type *t = base_type(type_deref(parent->type));
+		Entity *field = nullptr;
+		if (t != nullptr && t->kind == Type_Struct) {
+			for (Entity *f : t->Struct.fields) {
+				if (f->token.string == e->token.string) {
+					field = f;
+					break;
+				}
+			}
+		}
+		if (field == nullptr) {
+			return escape_value();
+		}
+
+		EscapeValue base = {};
+		if (is_type_pointer(parent->type)) {
+			base = escape_ident_value(ea, parent);
+		} else {
+			base = escape_ident_addr(ea, parent);
+		}
+		return escape_pointer_offset(base, escape_path_of(EscapeStep_Field, field));
+	}
+
+	if (!escape_is_local(e)) {
+		return escape_value_of(EscapeOrigin_Outer, {}, {});
+	}
+	return escape_value_of(EscapeOrigin_Local, {e}, {});
+}
+
+gb_internal EscapeValue escape_ident_value(EscapeAnalysis *ea, Entity *e) {
+	if (e == nullptr || e->kind != Entity_Variable) {
+		return escape_value();
+	}
+
+	if (escape_is_reference(e) || escape_is_using_field(e)) {
+		return escape_load(ea, escape_ident_addr(ea, e), e->type);
+	}
+
+	if (!escape_is_local(e)) {
+		if (escape_type_has_pointers(e->type)) {
+			return escape_value_of(EscapeOrigin_Outer, {}, {});
+		}
+		return escape_value();
+	}
+
+	if ((e->flags & (EntityFlag_Param|EntityFlag_Result)) == EntityFlag_Param) {
+		// a parameter cannot be assigned to
+		if (escape_type_is_plain(e->type)) {
+			return escape_value();
+		}
+		if (e == ea->variadic) {
+			return escape_value_of(EscapeOrigin_Variadic, {e}, {});
+		}
+		return escape_value_of(EscapeOrigin_Outer, {}, {});
+	}
+	return escape_obj_value(ea, {e}, {});
+}
+
+gb_internal EscapeValue escape_variant_addr(EscapeAnalysis *ea, Ast *x) {
+	Type *t = x->tav.type;
+	if (is_type_any(t) || is_type_pointer(t)) {
+		return escape_as_pointer(escape_expr(ea, x));
+	}
+	return escape_addr(ea, x);
+}
+
+gb_internal EscapeValue escape_addr(EscapeAnalysis *ea, Ast *expr) {
+	if (expr == nullptr) {
+		return escape_value();
+	}
+
+	switch (expr->kind) {
+	case_ast_node(pe, ParenExpr, expr);
+		return escape_addr(ea, pe->expr);
+	case_end;
+
+	case_ast_node(i, Ident, expr);
+		return escape_ident_addr(ea, entity_of_node(expr));
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		if (Entity *g = escape_package_selector(expr)) {
+			return escape_ident_addr(ea, g);
+		}
+		EscapePath path = {};
+		if (!escape_selector_path(expr, &path)) {
+			escape_visit_exits(ea, se->expr);
+			return escape_value();
+		}
+		if (is_type_pointer(se->expr->tav.type)) {
+			return escape_pointer_offset(escape_expr(ea, se->expr), path);
+		}
+		return escape_pointer_offset(escape_addr(ea, se->expr), path);
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		escape_visit_exits(ea, ie->index);
+		return escape_elems_of(ea, ie->expr);
+	case_end;
+
+	case_ast_node(de, DerefExpr, expr);
+		return escape_as_pointer(escape_expr(ea, de->expr));
+	case_end;
+
+	case_ast_node(cl, CompoundLit, expr);
+		EscapeValue v = escape_expr(ea, expr);
+		escape_store_obj(ea, {nullptr, expr}, {}, v, EscapeUpdate_Replace);
+		return escape_value_of(EscapeOrigin_Temp, {nullptr, expr}, {});
+	case_end;
+
+	case_ast_node(ta, TypeAssertion, expr);
+		return escape_variant_addr(ea, ta->expr);
+	case_end;
+
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		escape_visit_exits(ea, mie->row_index);
+		escape_visit_exits(ea, mie->column_index);
+		return escape_pointer_offset(escape_addr(ea, mie->expr), escape_path_of(EscapeStep_AnyElement));
+	case_end;
+	}
+	escape_visit_exits(ea, expr);
+	return escape_value();
+}
+
+
+gb_internal bool escape_is_explicit_unsafe_conversion(Type *t) {
+	return t != nullptr && (is_type_rawptr(t) || is_type_uintptr(t));
+}
+
+gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
+	if (expr == nullptr) {
+		return escape_value();
+	}
+
+	TypeAndValue const &tav = expr->tav;
+	if (tav.mode == Addressing_Constant) {
+		if (tav.type == nullptr || !is_type_slice(tav.type) || is_load_directive_call(expr)) {
+			return escape_value();
+		}
+		if (expr->kind == Ast_CompoundLit && expr->CompoundLit.elems.count == 0) {
+			return escape_value();
+		}
+		// a constant slice uses the memory of the stack frame
+		return escape_value_of(EscapeOrigin_Temp, {nullptr, expr}, escape_path_of(EscapeStep_AnyElement));
+	}
+
+	if (tav.type != nullptr && escape_type_is_plain(tav.type) &&
+	    (expr->viral_state_flags & (ViralStateFlag_ContainsOrReturn|ViralStateFlag_ContainsOrBreak)) == 0) {
+		return escape_value();
+	}
+
+	switch (expr->kind) {
+	case_ast_node(pe, ParenExpr, expr);
+		return escape_expr(ea, pe->expr);
+	case_end;
+
+	case_ast_node(i, Ident, expr);
+		return escape_ident_value(ea, entity_of_node(expr));
+	case_end;
+
+	case_ast_node(cl, CompoundLit, expr);
+		EscapeValue v = escape_value();
+		Type *t = base_type(expr->tav.type);
+		if (t == nullptr) {
+			return v;
+		}
+		for_array(i, cl->elems) {
+			Ast *elem = cl->elems[i];
+			Ast *value = elem;
+			EscapePath path = escape_path_of(EscapeStep_AnyElement);
+			Type *elem_type = nullptr;
+			if (elem->kind == Ast_FieldValue) {
+				value = elem->FieldValue.value;
+			}
+
+			switch (t->kind) {
+			case Type_Struct: {
+				Entity *f = nullptr;
+				if (elem->kind == Ast_FieldValue) {
+					Ast *field = elem->FieldValue.field;
+					if (field->kind == Ast_Ident) {
+						for (Entity *g : t->Struct.fields) {
+							if (g->token.string == field->Ident.token.string) {
+								f = g;
+								break;
+							}
+						}
+					}
+				} else if (i < t->Struct.fields.count) {
+					f = t->Struct.fields[i];
+				}
+				if (f != nullptr && !t->Struct.is_raw_union) {
+					path = escape_path_of(EscapeStep_Field, f);
+				} else {
+					path = EscapePath{};
+				}
+
+				if (f != nullptr) {
+					elem_type = f->type;
+				}
+				break;
+			}
+
+			case Type_Array:                     elem_type = t->Array.elem;                     break;
+			case Type_EnumeratedArray:           elem_type = t->EnumeratedArray.elem;           break;
+			case Type_FixedCapacityDynamicArray: elem_type = t->FixedCapacityDynamicArray.elem; break;
+			case Type_Slice:                     elem_type = t->Slice.elem;                     break;
+			case Type_DynamicArray:              elem_type = t->DynamicArray.elem;              break;
+			case Type_Map:                       elem_type = t->Map.value;                      break;
+
+			default:
+				path = {};
+				break;
+			}
+			if (elem_type != nullptr && escape_type_is_plain(elem_type)) {
+				escape_visit_exits(ea, value);
+				continue;
+			}
+			EscapeValue ev = escape_convert(ea, escape_expr(ea, value), value, elem_type);
+			for (EscapeValueFact const &f : ev) {
+				escape_value_add(&v, escape_path_concat(path, f.path), f.origin);
+			}
+		}
+
+		if (t->kind == Type_Slice) {
+			if (cl->elems.count == 0) {
+				return escape_value();
+			}
+			escape_store_obj(ea, {nullptr, expr}, {}, v, EscapeUpdate_Add);
+			return escape_value_of(EscapeOrigin_Temp, {nullptr, expr}, escape_path_of(EscapeStep_AnyElement));
+		}
+		return v;
+	case_end;
+
+	case_ast_node(ue, UnaryExpr, expr);
+		if (ue->op.kind == Token_And) {
+			return escape_addr(ea, unparen_expr(ue->expr));
+		}
+		escape_visit_exits(ea, ue->expr);
+		return escape_value();
+	case_end;
+
+	case_ast_node(be, BinaryExpr, expr);
+		escape_visit_exits(ea, be->left);
+		escape_visit_exits(ea, be->right);
+		return escape_value();
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		if (Entity *g = escape_package_selector(expr)) {
+			return escape_ident_value(ea, g);
+		}
+		EscapePath path = {};
+		if (!escape_selector_path(expr, &path)) {
+			escape_visit_exits(ea, se->expr);
+			return escape_value();
+		}
+		if (is_type_pointer(se->expr->tav.type)) {
+			return escape_load(ea, escape_pointer_offset(escape_expr(ea, se->expr), path), tav.type);
+		}
+		return escape_value_project(escape_expr(ea, se->expr), path);
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		Type *t = base_type(ie->expr->tav.type);
+		if (t == nullptr) {
+			escape_visit_exits(ea, ie->index);
+			return escape_value();
+		}
+		switch (t->kind) {
+		case Type_Array:
+		case Type_EnumeratedArray:
+		case Type_FixedCapacityDynamicArray:
+		case Type_DynamicArray:
+		case Type_Map: {
+			EscapeValue v = escape_value_project(escape_expr(ea, ie->expr), escape_path_of(EscapeStep_AnyElement));
+			escape_visit_exits(ea, ie->index);
+			return v;
+		}
+		case Type_Pointer:
+		case Type_Slice:
+		case Type_MultiPointer: {
+			EscapeValue ptr = escape_elems_of(ea, ie->expr);
+			escape_visit_exits(ea, ie->index);
+			return escape_load(ea, ptr, tav.type);
+		}
+		}
+		escape_visit_exits(ea, ie->expr);
+		escape_visit_exits(ea, ie->index);
+		return escape_value();
+	case_end;
+
+	case_ast_node(de, DerefExpr, expr);
+		return escape_load(ea, escape_expr(ea, de->expr), tav.type);
+	case_end;
+
+	case_ast_node(se, SliceExpr, expr);
+		escape_visit_exits(ea, se->low);
+		escape_visit_exits(ea, se->high);
+		return escape_elems_of(ea, se->expr);
+	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		if (ce->proc->tav.mode == Addressing_Type) {
+			if (ce->args.count != 1) {
+				return escape_value();
+			}
+			Ast *arg = ce->args[0];
+			EscapeValue v = escape_expr(ea, arg);
+			if (escape_is_explicit_unsafe_conversion(tav.type)) {
+				return escape_value();
+			}
+			return escape_convert(ea, v, arg, tav.type);
+		}
+		if (ce->proc->tav.mode == Addressing_Builtin) {
+			Entity *e = entity_of_node(ce->proc);
+			if (e != nullptr && e->kind == Entity_Builtin &&
+			    e->Builtin.id == BuiltinProc_ptr_offset   &&
+			    ce->args.count == 2) {
+				EscapeValue v = escape_expr(ea, ce->args[0]);
+				escape_visit_exits(ea, ce->args[1]);
+				return v;
+			}
+		} else {
+			escape_visit_exits(ea, ce->proc);
+		}
+		for (Ast *arg : ce->args) {
+			if (arg->kind == Ast_FieldValue) {
+				escape_visit_exits(ea, arg->FieldValue.value);
+			} else {
+				escape_visit_exits(ea, arg);
+			}
+		}
+		return escape_value();
+	case_end;
+
+	case_ast_node(sce, SelectorCallExpr, expr);
+		return escape_expr(ea, sce->call);
+	case_end;
+
+	case_ast_node(tc, TypeCast, expr);
+		EscapeValue v = escape_expr(ea, tc->expr);
+		if (tc->token.kind == Token_transmute ||
+		    escape_is_explicit_unsafe_conversion(tav.type)) {
+			return escape_value();
+		}
+		return escape_convert(ea, v, tc->expr, tav.type);
+	case_end;
+
+	case_ast_node(ac, AutoCast, expr);
+		return escape_convert(ea, escape_expr(ea, ac->expr), ac->expr, tav.type);
+	case_end;
+
+	case_ast_node(te, TernaryIfExpr, expr);
+		escape_visit_exits(ea, te->cond);
+		EscapeValue v = escape_expr(ea, te->x);
+		escape_value_merge(&v, escape_expr(ea, te->y));
+		return v;
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, expr);
+		if (te->cond == nullptr || te->cond->tav.value.kind != ExactValue_Bool) {
+			return escape_value();
+		}
+		if (te->cond->tav.value.value_bool) {
+			return escape_expr(ea, te->x);
+		}
+		return escape_expr(ea, te->y);
+	case_end;
+
+	case_ast_node(oe, OrElseExpr, expr);
+		EscapeValue v = escape_expr(ea, oe->x);
+		escape_value_merge(&v, escape_expr(ea, oe->y));
+		return v;
+	case_end;
+
+	case_ast_node(re, OrReturnExpr, expr);
+		EscapeValue v = escape_expr(ea, re->expr);
+		EscapeState state = escape_state_clone(ea->state);
+		escape_exit(ea, expr, {}, {});
+		ea->state = state;
+		return v;
+	case_end;
+
+	case_ast_node(be, OrBranchExpr, expr);
+		EscapeValue v = escape_expr(ea, be->expr);
+		EscapeState state = escape_state_clone(ea->state);
+		switch (be->token.kind) {
+		case Token_or_break:    escape_branch(ea, be->label, Token_break);    break;
+		case Token_or_continue: escape_branch(ea, be->label, Token_continue); break;
+		default: GB_PANIC("Unhandled OrBranchExpr"); break;
+		}
+		ea->state = state;
+		return v;
+	case_end;
+
+	case_ast_node(ta, TypeAssertion, expr);
+		Type *t = ta->expr->tav.type;
+		if (is_type_any(t) || is_type_pointer(t)) {
+			return escape_load(ea, escape_variant_addr(ea, ta->expr), tav.type);
+		}
+
+		EscapeValue w = escape_value();
+		for (EscapeValueFact const &f : escape_expr(ea, ta->expr)) {
+			escape_value_add(&w, {}, f.origin);
+		}
+		return w;
+	case_end;
+
+	case_ast_node(te, TagExpr, expr);
+		return escape_expr(ea, te->expr);
+	case_end;
+
+	case_ast_node(fv, FieldValue, expr);
+		return escape_expr(ea, fv->value);
+	case_end;
+	}
+	return escape_value();
+}
+
+
+
+gb_internal bool escape_find_stack_origin(EscapeAnalysis *ea, EscapeValue const &v, EscapeOrigin *found) {
+	auto work = array_make<EscapeOrigin>(temporary_allocator());
+	for (EscapeValueFact const &f : v) {
+		array_add(&work, f.origin);
+	}
+	for (isize i = 0; i < work.count; i++) {
+		EscapeOrigin o = work[i];
+		switch (o.kind) {
+		case EscapeOrigin_Local:
+		case EscapeOrigin_Temp:
+		case EscapeOrigin_Variadic:
+			*found = o;
+			return true;
+
+		case EscapeOrigin_Owned:
+			// okay
+			break;
+		default:
+			continue;
+		}
+
+		for (EscapeFact const &f : ea->state.facts) {
+			if (!escape_object_eq(f.obj, o.obj)) {
+				continue;
+			}
+			if (!escape_path_has_prefix(f.path, o.path) && !escape_path_has_prefix(o.path, f.path)) {
+				continue;
+			}
+
+			bool seen = false;
+			for (EscapeOrigin const &w : work) {
+				if (escape_origin_eq(w, f.origin)) {
+					seen = true;
+					break;
+				}
+			}
+			if (!seen) {
+				array_add(&work, f.origin);
+			}
+		}
+	}
+	return false;
+}
+
+gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, EscapeOrigin const &o, EscapeReportKind kind) {
+	if (global_ignore_warnings()) {
+		return;
+	}
+	for (Ast *r : ea->reported) {
+		if (r == node) {
+			return;
+		}
+	}
+	array_add(&ea->reported, node);
+
+	gbString origin = gb_string_make(heap_allocator(), "");
+	defer (gb_string_free(origin));
+	switch (o.kind) {
+	case EscapeOrigin_Local: {
+		char const *description = "local variable";
+		if (o.obj.entity->flags & EntityFlag_Param) {
+			description = "parameter";
+		}
+		origin = gb_string_append_fmt(origin, "the stack memory of the %s '%.*s'", description, LIT(o.obj.entity->token.string));
+		break;
+	}
+	case EscapeOrigin_Temp: {
+		char const *description = "a temporary value";
+		if (o.obj.temp->kind == Ast_CompoundLit) {
+			description = "a compound literal";
+		}
+		origin = gb_string_append_fmt(origin, "the stack memory of %s", description);
+		break;
+	}
+	case EscapeOrigin_Variadic:
+		origin = gb_string_append_fmt(origin, "the variadic parameter '%.*s', which only lives for the duration of the call", LIT(o.obj.entity->token.string));
+		break;
+	}
+
+	ERROR_BLOCK();
+	switch (kind) {
+	case EscapeReport_Return:
+		warning(ast_token(node), "It is unsafe to return '%.*s' from a procedure, as it may refer to %s", LIT(expr_str), origin);
+		break;
+	case EscapeReport_Store:
+		warning(ast_token(node), "'%.*s' may still refer to %s after the procedure returns", LIT(expr_str), origin);
+		break;
+	default:
+		GB_PANIC("Unhandled EscapeReportKind");
+		break;
+	}
+	error_line("\tSuggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'\n");
+}
+
+gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, String name, EscapeValue const &v) {
+	EscapeOrigin o = {};
+	if (!escape_find_stack_origin(ea, v, &o)) {
+		return;
+	}
+
+	if (expr != nullptr) {
+		gbString s = expr_to_string(expr);
+		escape_report(ea, node, make_string_c(s), o, EscapeReport_Return);
+		gb_string_free(s);
+	} else {
+		escape_report(ea, node, name, o, EscapeReport_Return);
+	}
+}
+
+gb_internal void escape_run_defers(EscapeAnalysis *ea, isize depth) {
+	for (isize i = ea->defers.count-1; i >= depth; i--) {
+		Array<Ast *> defers = array_clone(temporary_allocator(), ea->defers[i]);
+		for (isize j = defers.count-1; j >= 0; j--) {
+			escape_stmt(ea, defers[j]);
+		}
+	}
+}
+
+gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &results, Array<EscapeValue> const &values) {
+	TypeProc *pt = ea->pt;
+	isize result_count = 0;
+	if (pt->results != nullptr) {
+		result_count = pt->results->Tuple.variables.count;
+	}
+	if (pt->has_named_results && values.count == result_count) {
+		for (isize i = 0; i < result_count; i++) {
+			escape_store_obj(ea, {pt->results->Tuple.variables[i]}, {}, values[i], EscapeUpdate_Replace);
+		}
+	}
+
+	escape_run_defers(ea, 0);
+
+	if (pt->has_named_results) {
+		for (isize i = 0; i < result_count; i++) {
+			Entity *e = pt->results->Tuple.variables[i];
+			Ast *at = node;
+			Ast *expr = nullptr;
+			if (i < results.count) {
+				at = results[i];
+				expr = results[i];
+			}
+			escape_report_value(ea, at, expr, e->token.string, escape_obj_value(ea, {e}, {}));
+		}
+	} else {
+		for (isize i = 0; i < values.count && i < results.count; i++) {
+			escape_report_value(ea, results[i], results[i], {}, values[i]);
+		}
+	}
+
+	for (EscapeOuterStore const &s : ea->state.outers) {
+		EscapeValue v = escape_value();
+		escape_value_add(&v, {}, s.origin);
+		EscapeOrigin o = {};
+		if (escape_find_stack_origin(ea, v, &o) && o.kind != EscapeOrigin_Variadic) {
+			gbString str = expr_to_string(s.node);
+			escape_report(ea, s.node, make_string_c(str), o, EscapeReport_Store);
+			gb_string_free(str);
+		}
+	}
+	ea->state.reachable = false;
+}
+
+// returns whether the location is exact, so that a later store to it replaces this one
+gb_internal bool escape_outer_location(Ast *lhs, Entity **root, EscapePath *path) {
+	lhs = unparen_expr(lhs);
+	*root = nullptr;
+	*path = {};
+	switch (lhs->kind) {
+	case_ast_node(i, Ident, lhs);
+		*root = entity_of_node(lhs);
+		return *root != nullptr;
+	case_end;
+	case_ast_node(se, SelectorExpr, lhs);
+		if (Entity *g = escape_package_selector(lhs)) {
+			*root = g;
+			return true;
+		}
+
+		EscapePath field = {};
+		if (!escape_selector_path(lhs, &field)) {
+			return false;
+		}
+
+		bool exact = escape_outer_location(se->expr, root, path);
+		if (is_type_pointer(se->expr->tav.type)) {
+			*path = escape_path_concat(*path, escape_path_of(EscapeStep_Deref));
+		}
+		*path = escape_path_concat(*path, field);
+		return exact;
+	case_end;
+	case_ast_node(ie, IndexExpr, lhs);
+		escape_outer_location(ie->expr, root, path);
+		*path = escape_path_concat(*path, escape_path_of(EscapeStep_AnyElement));
+		return false;
+	case_end;
+	case_ast_node(de, DerefExpr, lhs);
+		bool exact = escape_outer_location(de->expr, root, path);
+		*path = escape_path_concat(*path, escape_path_of(EscapeStep_Deref));
+		return exact;
+	case_end;
+	}
+	return false;
+}
+
+gb_internal void escape_store(EscapeAnalysis *ea, Ast *lhs, EscapeValue const &v) {
+	lhs = unparen_expr(lhs);
+	if (lhs == nullptr || is_blank_ident(lhs)) {
+		return;
+	}
+	if (lhs->kind == Ast_Ident) {
+		Entity *e = entity_of_node(lhs);
+		if (escape_is_local(e) && e->using_parent == nullptr && !escape_is_reference(e)) {
+			escape_store_obj(ea, {e}, {}, v, EscapeUpdate_Replace);
+			return;
+		}
+	}
+
+	EscapeValue ptr = escape_addr(ea, lhs);
+	// with only one place it may store to, the store replaces what that held
+	EscapeUpdateKind update = EscapeUpdate_Add;
+	if (ptr.count == 1) {
+		update = EscapeUpdate_Replace;
+	}
+	for (EscapeValueFact const &f : ptr) {
+		EscapeOrigin const &o = f.origin;
+		switch (o.kind) {
+		case EscapeOrigin_Local:
+		case EscapeOrigin_Temp:
+		case EscapeOrigin_Owned:
+			escape_store_obj(ea, o.obj, o.path, v, update);
+			break;
+
+		case EscapeOrigin_Outer: {
+			EscapeOuterStore s = {};
+			s.node  = lhs;
+			s.exact = escape_outer_location(lhs, &s.root, &s.path);
+			if (s.exact) {
+				for (isize i = ea->state.outers.count-1; i >= 0; i--) {
+					EscapeOuterStore const &p = ea->state.outers[i];
+					if (p.root == s.root && escape_path_eq(p.path, s.path)) {
+						array_unordered_remove(&ea->state.outers, i);
+					}
+				}
+			}
+
+			for (EscapeValueFact const &vf : v) {
+				if (vf.origin.kind == EscapeOrigin_Outer) {
+					continue;
+				}
+				s.origin = vf.origin;
+				bool found = false;
+				for (EscapeOuterStore const &p : ea->state.outers) {
+					if (escape_outer_eq(p, s)) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					array_add(&ea->state.outers, s);
+				}
+			}
+			break;
+		}
+		}
+	}
+}
+
+
+gb_internal isize escape_push_target(EscapeAnalysis *ea, Ast *stmt, EscapeTargetKind kind) {
+	EscapeTarget t = {};
+	t.kind        = kind;
+	t.stmt        = stmt;
+	t.defer_depth = ea->defers.count;
+	t.breaks      = escape_state_unreachable();
+	t.continues   = escape_state_unreachable();
+	array_add(&ea->targets, t);
+	return ea->targets.count-1;
+}
+
+gb_internal void escape_branch(EscapeAnalysis *ea, Ast *label, TokenKind kind) {
+	Ast *labelled = nullptr;
+	if (label != nullptr) {
+		Entity *e = entity_of_node(label);
+		if (e == nullptr || e->kind != Entity_Label) {
+			ea->state.reachable = false;
+			return;
+		}
+		labelled = e->Label.parent;
+	}
+
+	for (isize i = ea->targets.count-1; i >= 0; i--) {
+		EscapeTarget const &target = ea->targets[i];
+		if (labelled != nullptr) {
+			if (target.stmt != labelled) {
+				continue;
+			}
+		} else if (kind == Token_continue) {
+			if (target.kind != EscapeTarget_Loop) {
+				continue;
+			}
+		} else if (target.kind != EscapeTarget_Loop && target.kind != EscapeTarget_Switch) {
+			continue;
+		}
+
+		escape_run_defers(ea, target.defer_depth);
+		// the defers may have added targets, which can move them
+		if (kind == Token_continue) {
+			escape_state_join(&ea->targets[i].continues, ea->state);
+		} else {
+			escape_state_join(&ea->targets[i].breaks, ea->state);
+		}
+		break;
+	}
+
+	ea->state.reachable = false;
+}
+
+gb_internal void escape_block(EscapeAnalysis *ea, Slice<Ast *> const &stmts) {
+	array_add(&ea->defers, array_make<Ast *>(temporary_allocator()));
+	for (Ast *stmt : stmts) {
+		if (!ea->state.reachable) {
+			break;
+		}
+		escape_stmt(ea, stmt);
+	}
+
+	if (ea->state.reachable) {
+		escape_run_defers(ea, ea->defers.count-1);
+	}
+	array_pop(&ea->defers);
+
+	for (Ast *stmt : stmts) {
+		escape_forget(ea, stmt);
+	}
+}
+
+
+gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post, Ast *body, Ast *val0, Ast *val1, Ast *range) {
+	isize target_index = escape_push_target(ea, stmt, EscapeTarget_Loop);
+	isize alias_count  = ea->aliases.count;
+
+	EscapeState head = escape_state_clone(ea->state);
+	EscapeState exit = escape_state_unreachable();
+
+	enum : isize { MAX_ITERATION_COUNT = 16 };
+
+	for (isize iteration = 0; iteration < MAX_ITERATION_COUNT; iteration++) {
+		ea->state = escape_state_clone(head);
+		escape_visit_exits(ea, cond);
+
+		bool may_exit = range != nullptr;
+		if (cond != nullptr) {
+			may_exit = true;
+			if (cond->tav.mode == Addressing_Constant &&
+			    cond->tav.value.kind == ExactValue_Bool &&
+			    cond->tav.value.value_bool) {
+				may_exit = false;
+			}
+		}
+		if (may_exit) {
+			escape_state_join(&exit, ea->state);
+		}
+
+		if (range != nullptr) {
+			Ast *x = unparen_expr(range);
+			Type *t = base_type(x->tav.type);
+			Type *container = t;
+			if (t != nullptr && t->kind == Type_Pointer) {
+				container = base_type(t->Pointer.elem);
+			}
+			TypeKind container_kind = Type_Invalid;
+			if (container != nullptr) {
+				container_kind = container->kind;
+			}
+
+			switch (container_kind) {
+			case Type_Array:
+			case Type_EnumeratedArray:
+			case Type_FixedCapacityDynamicArray:
+			case Type_Slice:
+			case Type_DynamicArray:
+			case Type_Map: {
+				EscapeValue ptr = escape_elems_of(ea, x);
+				EscapeValue v = escape_load(ea, ptr, nullptr);
+				if (t->kind != Type_Pointer && t->kind != Type_Slice) {
+					// the container may not be addressable, e.g. the result of a call
+					escape_value_merge(&v, escape_value_project(escape_expr(ea, x), escape_path_of(EscapeStep_AnyElement)));
+				}
+
+				Ast *name = val0;
+				if (container_kind == Type_Map) {
+					name = val1;
+				}
+				bool by_ref = false;
+				if (name != nullptr && name->kind == Ast_UnaryExpr && name->UnaryExpr.op.kind == Token_And) {
+					name = name->UnaryExpr.expr;
+					by_ref = true;
+				}
+
+				Entity *e = nullptr;
+				if (name != nullptr) {
+					e = entity_of_node(name);
+				}
+				if (e == nullptr) {
+					break;
+				}
+
+				if (by_ref) {
+					for (EscapeValueFact const &f : ptr) {
+						array_add(&ea->aliases, EscapeAlias{e, f.origin});
+					}
+				} else {
+					escape_store_obj(ea, {e}, {}, v, EscapeUpdate_Replace);
+				}
+				break;
+			}
+			default:
+				escape_visit_exits(ea, x);
+				break;
+			}
+		}
+
+		escape_stmt(ea, body);
+		escape_state_join(&ea->state, ea->targets[target_index].continues);
+		if (ea->state.reachable && post != nullptr) {
+			escape_stmt(ea, post);
+		}
+
+		ea->aliases.count = alias_count;
+
+		Ast *vals[2] = {val0, val1};
+		for (Ast *val : vals) {
+			if (val != nullptr && val->kind == Ast_UnaryExpr) {
+				val = val->UnaryExpr.expr;
+			}
+			if (val != nullptr && val->kind == Ast_Ident) {
+				escape_forget_entity(ea, entity_of_node(val));
+			}
+		}
+		if (!escape_state_join(&head, ea->state)) {
+			break;
+		}
+	}
+	escape_state_join(&exit, ea->targets[target_index].breaks);
+	array_pop(&ea->targets);
+	ea->state = exit;
+}
+
+gb_internal void escape_switch(EscapeAnalysis *ea, Ast *stmt, Ast *body, Ast *type_switch_rhs, bool exhaustive) {
+	if (body == nullptr || body->kind != Ast_BlockStmt) {
+		return;
+	}
+
+	isize target_index = escape_push_target(ea, stmt, EscapeTarget_Switch);
+
+	EscapeValue tag     = escape_value();
+	EscapeValue tag_ptr = escape_value();
+	bool tag_by_ptr = false;
+	if (type_switch_rhs != nullptr) {
+		Type *t = type_switch_rhs->tav.type;
+
+		tag_by_ptr = is_type_any(t) || is_type_pointer(t);
+		tag        = escape_expr(ea, type_switch_rhs);
+		tag_ptr    = escape_variant_addr(ea, type_switch_rhs);
+	}
+
+	EscapeState entry = escape_state_clone(ea->state);
+	EscapeState exit  = escape_state_unreachable();
+
+	bool has_default = false;
+	ea->fallthrough = escape_state_unreachable();
+
+	ast_node(bs, BlockStmt, body);
+	for (Ast *clause : bs->stmts) {
+		if (clause->kind != Ast_CaseClause) {
+			continue;
+		}
+		ast_node(cc, CaseClause, clause);
+		if (cc->list.count == 0) {
+			has_default = true;
+		}
+		ea->state = escape_state_clone(entry);
+		escape_state_join(&ea->state, ea->fallthrough);
+		ea->fallthrough = escape_state_unreachable();
+		for (Ast *e : cc->list) {
+			escape_visit_exits(ea, e);
+		}
+		isize alias_count = ea->aliases.count;
+		if (cc->implicit_entity != nullptr) {
+			Entity *e = cc->implicit_entity;
+			if (e->flags & EntityFlag_Value) {
+				EscapeValue v = escape_value();
+				if (tag_by_ptr) {
+					v = escape_load(ea, tag_ptr, e->type);
+				} else {
+					for (EscapeValueFact const &f : tag) {
+						escape_value_add(&v, {}, f.origin);
+					}
+				}
+				escape_store_obj(ea, {e}, {}, v, EscapeUpdate_Replace);
+			} else {
+				for (EscapeValueFact const &f : tag_ptr) {
+					array_add(&ea->aliases, EscapeAlias{e, f.origin});
+				}
+			}
+		}
+		escape_block(ea, cc->stmts);
+		ea->aliases.count = alias_count;
+		escape_forget_entity(ea, cc->implicit_entity);
+		escape_state_join(&exit, ea->state);
+	}
+	if (!has_default && !exhaustive) {
+		escape_state_join(&exit, entry);
+	}
+	escape_state_join(&exit, ea->targets[target_index].breaks);
+	array_pop(&ea->targets);
+	ea->state = exit;
+}
+
+gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
+	if (node == nullptr || !ea->state.reachable) {
+		return;
+	}
+	switch (node->kind) {
+	case_ast_node(es, ExprStmt, node);
+		escape_visit_exits(ea, es->expr);
+		if (is_diverging_stmt(node)) {
+			ea->state.reachable = false;
+		}
+	case_end;
+
+	case_ast_node(vd, ValueDecl, node);
+		if (!vd->is_mutable) {
+			break;
+		}
+		if (vd->values.count == vd->names.count) {
+			for_array(i, vd->names) {
+				Entity *e = entity_of_node(vd->names[i]);
+				if (!escape_is_local(e) || escape_type_is_plain(e->type)) {
+					escape_visit_exits(ea, vd->values[i]);
+					continue;
+				}
+				EscapeValue v = escape_expr(ea, vd->values[i]);
+				escape_store_obj(ea, {e}, {}, escape_convert(ea, v, vd->values[i], e->type), EscapeUpdate_Replace);
+			}
+		} else {
+			for (Ast *value : vd->values) {
+				escape_visit_exits(ea, value);
+			}
+			for (Ast *name : vd->names) {
+				Entity *e = entity_of_node(name);
+				if (escape_is_local(e)) {
+					escape_store_obj(ea, {e}, {}, escape_value(), EscapeUpdate_Replace);
+				}
+			}
+		}
+	case_end;
+
+	case_ast_node(as, AssignStmt, node);
+		if (as->op.kind != Token_Eq) {
+			for (Ast *lhs : as->lhs) {
+				escape_visit_exits(ea, lhs);
+			}
+			for (Ast *rhs : as->rhs) {
+				escape_visit_exits(ea, rhs);
+			}
+			break;
+		}
+		if (as->lhs.count == as->rhs.count) {
+			// every value is evaluated before any is stored, as in `a, b = b, a`
+			auto values = array_make<EscapeValue>(temporary_allocator(), as->rhs.count);
+			auto stored = array_make<bool>(temporary_allocator(), as->lhs.count);
+			for_array(i, as->rhs) {
+				Ast *lhs = unparen_expr(as->lhs[i]);
+				stored[i] = !escape_type_is_plain(lhs->tav.type);
+				if (lhs->kind == Ast_SelectorExpr && is_type_raw_union(type_deref(lhs->SelectorExpr.expr->tav.type))) {
+					// a plain value stored into a raw union still overwrites its pointers
+					stored[i] = true;
+				}
+				if (stored[i]) {
+					values[i] = escape_convert(ea, escape_expr(ea, as->rhs[i]), as->rhs[i], lhs->tav.type);
+				} else {
+					escape_visit_exits(ea, as->rhs[i]);
+				}
+			}
+			for_array(i, as->lhs) {
+				if (stored[i]) {
+					escape_store(ea, as->lhs[i], values[i]);
+				}
+			}
+		} else {
+			for (Ast *rhs : as->rhs) {
+				escape_visit_exits(ea, rhs);
+			}
+			for (Ast *lhs : as->lhs) {
+				escape_store(ea, lhs, escape_value());
+			}
+		}
+	case_end;
+
+	case_ast_node(bs, BlockStmt, node);
+		if (bs->label != nullptr) {
+			isize target_index = escape_push_target(ea, node, EscapeTarget_Labelled);
+			escape_block(ea, bs->stmts);
+			escape_state_join(&ea->state, ea->targets[target_index].breaks);
+			array_pop(&ea->targets);
+		} else {
+			escape_block(ea, bs->stmts);
+		}
+	case_end;
+
+	case_ast_node(is, IfStmt, node);
+		isize target_index = -1;
+		if (is->label != nullptr) {
+			target_index = escape_push_target(ea, node, EscapeTarget_Labelled);
+		}
+
+		escape_stmt(ea, is->init);
+		escape_visit_exits(ea, is->cond);
+
+		EscapeState other = escape_state_clone(ea->state);
+		escape_stmt(ea, is->body);
+
+		EscapeState then = ea->state;
+		ea->state = other;
+		escape_stmt(ea, is->else_stmt);
+
+		escape_state_join(&ea->state, then);
+
+		if (target_index >= 0) {
+			escape_state_join(&ea->state, ea->targets[target_index].breaks);
+			array_pop(&ea->targets);
+		}
+
+		escape_forget(ea, is->init);
+	case_end;
+
+	case_ast_node(ws, WhenStmt, node);
+		if (!ws->is_cond_determined) {
+			break;
+		}
+		if (ws->determined_cond) {
+			escape_stmt(ea, ws->body);
+		} else {
+			escape_stmt(ea, ws->else_stmt);
+		}
+	case_end;
+
+	case_ast_node(rs, ReturnStmt, node);
+		isize result_count = 0;
+		if (ea->pt->results != nullptr) {
+			result_count = ea->pt->results->Tuple.variables.count;
+		}
+		auto values = array_make<EscapeValue>(temporary_allocator(), 0, result_count);
+
+		if (rs->results.count != result_count) {
+			// a bare return of named results, or the results of a single call
+			for (Ast *expr : rs->results) {
+				escape_visit_exits(ea, expr);
+			}
+			escape_exit(ea, node, {}, values);
+			break;
+		}
+
+		for_array(i, rs->results) {
+			Ast *expr = rs->results[i];
+			Entity *e = ea->pt->results->Tuple.variables[i];
+			if (escape_type_is_plain(e->type)) {
+				escape_visit_exits(ea, expr);
+				array_add(&values, escape_value());
+				continue;
+			}
+			EscapeValue v = escape_expr(ea, expr);
+			v = escape_convert(ea, v, expr, e->type);
+
+			Ast *x = unparen_expr(expr);
+			while (x->kind == Ast_CallExpr &&
+			       x->CallExpr.proc->tav.mode == Addressing_Type &&
+			       x->CallExpr.args.count == 1) {
+				Ast *arg = x->CallExpr.args[0];
+				if (arg->kind == Ast_FieldValue || !are_types_identical(arg->tav.type, x->tav.type)) {
+					break;
+				}
+				x = unparen_expr(arg);
+			}
+
+			bool already_reported = false;
+			for (Ast *r : ea->reported) {
+				already_reported |= r == expr;
+			}
+
+			Operand o = {};
+			o.mode = expr->tav.mode;
+			o.type = expr->tav.type;
+			o.expr = expr;
+			if (o.type == nullptr) {
+				o.type = e->type;
+			}
+
+			if (!already_reported && check_unsafe_return(o, o.type, x)) {
+				array_add(&ea->reported, expr);
+			}
+
+			array_add(&values, v);
+		}
+
+		escape_exit(ea, node, rs->results, values);
+	case_end;
+
+	case_ast_node(fs, ForStmt, node);
+		escape_stmt(ea, fs->init);
+		escape_loop(ea, node, fs->cond, fs->post, fs->body, nullptr, nullptr, nullptr);
+		escape_forget(ea, fs->init);
+	case_end;
+
+	case_ast_node(rs, RangeStmt, node);
+		Ast *val0 = nullptr;
+		Ast *val1 = nullptr;
+		if (rs->vals.count > 0) {
+			val0 = rs->vals[0];
+		}
+		if (rs->vals.count > 1) {
+			val1 = rs->vals[1];
+		}
+		escape_loop(ea, node, nullptr, nullptr, rs->body, val0, val1, rs->expr);
+	case_end;
+
+	case_ast_node(rs, UnrollRangeStmt, node);
+		escape_loop(ea, node, nullptr, nullptr, rs->body, rs->val0, rs->val1, rs->expr);
+	case_end;
+
+	case_ast_node(ss, SwitchStmt, node);
+		escape_stmt(ea, ss->init);
+		escape_visit_exits(ea, ss->tag);
+		bool exhaustive = false;
+		if (!ss->partial && ss->tag != nullptr) {
+			// a switch on an enum must handle every value
+			exhaustive = is_type_enum(ss->tag->tav.type);
+		}
+		escape_switch(ea, node, ss->body, nullptr, exhaustive);
+		escape_forget(ea, ss->init);
+	case_end;
+
+	case_ast_node(ss, TypeSwitchStmt, node);
+		Ast *rhs = nullptr;
+		if (ss->tag != nullptr && ss->tag->kind == Ast_AssignStmt && ss->tag->AssignStmt.rhs.count == 1) {
+			rhs = ss->tag->AssignStmt.rhs[0];
+		}
+		if (rhs == nullptr) {
+			break;
+		}
+		escape_switch(ea, node, ss->body, rhs, !ss->partial);
+	case_end;
+
+	case_ast_node(ds, DeferStmt, node);
+		if (ea->defers.count > 0) {
+			array_add(&ea->defers[ea->defers.count-1], ds->stmt);
+		}
+	case_end;
+
+	case_ast_node(bs, BranchStmt, node);
+		if (bs->token.kind == Token_fallthrough) {
+			ea->fallthrough = escape_state_clone(ea->state);
+			ea->state.reachable = false;
+		} else {
+			escape_branch(ea, bs->label, bs->token.kind);
+		}
+	case_end;
+	}
+}
+
+gb_internal void check_proc_escapes(Type *type, Ast *body) {
+	if (type == nullptr || type->kind != Type_Proc || body == nullptr || body->kind != Ast_BlockStmt) {
+		return;
+	}
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	EscapeAnalysis ea = {};
+	ea.pt       = &type->Proc;
+	ea.state    = escape_state_unreachable();
+	ea.state.reachable = true;
+
+	ea.defers   = array_make<Array<Ast *> >(temporary_allocator());
+	ea.targets  = array_make<EscapeTarget>(temporary_allocator());
+	ea.aliases  = array_make<EscapeAlias>(temporary_allocator());
+	ea.reported = array_make<Ast *>(temporary_allocator());
+
+	if (ea.pt->variadic &&
+	    !ea.pt->c_vararg &&
+	    ea.pt->params != nullptr &&
+	    ea.pt->variadic_index < ea.pt->params->Tuple.variables.count) {
+		ea.variadic = ea.pt->params->Tuple.variables[ea.pt->variadic_index];
+	}
+
+	escape_stmt(&ea, body);
+	if (ea.state.reachable) {
+		escape_exit(&ea, body, {}, {});
+	}
+}

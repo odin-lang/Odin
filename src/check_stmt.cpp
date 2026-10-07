@@ -2633,11 +2633,10 @@ gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-// NOTE(bill): This is very basic escape analysis
-// This needs to be improved tremendously, and a lot of it done during the
-// middle-end (or LLVM side) to improve checks and error messages
-void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
-	auto const unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
+gb_internal bool check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
+	bool reported = false;
+	auto const unsafe_return_error = [&reported](Operand const &o, char const *msg, Type *extra_type=nullptr) {
+		reported = true;
 		gbString s = expr_to_string(o.expr);
 		if (extra_type) {
 			gbString t = type_to_string(extra_type);
@@ -2650,13 +2649,13 @@ void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 	};
 
 	if (type == nullptr || expr == nullptr) {
-		return;
+		return false;
 	}
 
 	if (expr->kind == Ast_CompoundLit && is_type_slice(type)) {
 		ast_node(cl, CompoundLit, expr);
 		if (cl->elems.count == 0) {
-			return;
+			return false;
 		}
 		unsafe_return_error(o, "a compound literal of a slice");
 	} else if (expr->kind == Ast_UnaryExpr && expr->UnaryExpr.op.kind == Token_And) {
@@ -2689,7 +2688,7 @@ void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 		}
 	} else if (o.mode == Addressing_Constant && is_type_slice(type)) {
 		if (is_load_directive_call(o.expr)) {
-			return;
+			return false;
 		}
 
 		ERROR_BLOCK();
@@ -2702,11 +2701,12 @@ void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 				ast_node(fv, FieldValue, elem);
 				Entity *e = entity_of_node(fv->field);
 				if (e != nullptr) {
-					check_unsafe_return(o, e->type, fv->value);
+					reported |= check_unsafe_return(o, e->type, fv->value);
 				}
 			}
 		}
 	}
+	return reported;
 }
 
 gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
@@ -2768,26 +2768,6 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 			}
 		}
 	}
-
-	for (Operand &o : operands) {
-		if (o.expr == nullptr) {
-			continue;
-		}
-		Ast *expr = unparen_expr(o.expr);
-		while (expr->kind == Ast_CallExpr && expr->CallExpr.proc->tav.mode == Addressing_Type) {
-			if (expr->CallExpr.args.count != 1) {
-				break;
-			}
-			Ast *arg = expr->CallExpr.args[0];
-			if (arg->kind == Ast_FieldValue || !are_types_identical(arg->tav.type, expr->tav.type)) {
-				break;
-			}
-			expr = unparen_expr(arg);
-		}
-
-		check_unsafe_return(o, o.type, expr);
-	}
-
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {

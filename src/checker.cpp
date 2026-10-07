@@ -13,6 +13,7 @@ gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *ex
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e);
 gb_internal void check_procedure_later(Checker *c, ProcInfo *info);
+gb_internal void check_proc_escapes(Type *type, Ast *body);
 
 gb_internal bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -4907,6 +4908,7 @@ gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
 #include "name_canonicalization.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
+#include "check_escape.cpp"
 
 
 
