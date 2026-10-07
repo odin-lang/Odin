@@ -3531,10 +3531,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet")) {
 			print_usage_line(2, "Does extra checks on the code.");
 			print_usage_line(2, "Extra checks include:");
-				print_usage_line(3, "-vet-unused");
-				print_usage_line(3, "-vet-unused-variables");
-				print_usage_line(3, "-vet-unused-imports");
+				print_usage_line(3, "-vet-cast");
 				print_usage_line(3, "-vet-shadowing");
+				print_usage_line(3, "-vet-unused-imports");
+				print_usage_line(3, "-vet-unused-variables");
 				print_usage_line(3, "-vet-using-stmt");
 				print_usage_line(3, "-vet-when-shadowing");
 		}
