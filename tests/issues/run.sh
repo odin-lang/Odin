@@ -264,6 +264,7 @@ $ODIN test ../test_issue_7547.odin $COMMON
 $ODIN test ../test_issue_7490.odin $COMMON
 $ODIN test ../test_issue_7779.odin $COMMON
 $ODIN run ../test_issue_7798.odin $COMMON
+$ODIN test ../test_issue_7763.odin $COMMON
 
 set +x
 
