@@ -1109,7 +1109,8 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 	TypeProc *pt = nullptr;
 	Slice<EscapeFlow> flows = {};
 	if (ce->args.count > 0 && e != nullptr && e->kind == Entity_Procedure) {
-		Type *t = base_type(e->type);
+		// with the constant parameters of a specialization, as its arguments and summary have them
+		Type *t = base_type(proc_entity_full_type(e));
 		if (t != nullptr && t->kind == Type_Proc) {
 			pt = &t->Proc;
 			flows = escape_flows_of(ea, e);
