@@ -4003,12 +4003,11 @@ int main(int arg_count, char const **arg_ptr) {
 
 	add_collection(str_lit("base"));
 	add_collection(str_lit("core"));
-	add_collection(str_lit("vendor"));
 
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
-	
+
 	init_build_context_error_pos_style();
 
 	isize double_dash_pos = -1;
@@ -4317,7 +4316,11 @@ int main(int arg_count, char const **arg_ptr) {
 		return bundle(init_filename);
 	}
 
-	// NOTE(bill): add 'shared' directory if it is not already set
+	// NOTE(bill): add 'vendor' and 'shared' collections if they are not already set
+	if (!find_library_collection_path(str_lit("vendor"), nullptr)) {
+		add_library_collection(str_lit("vendor"),
+			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor"), nullptr));
+	}
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
 			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared"), nullptr));
@@ -4328,7 +4331,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
-	
+
 #if !defined(GB_SYSTEM_WINDOWS)
 	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0) {
 		gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
@@ -4444,13 +4447,13 @@ int main(int arg_count, char const **arg_ptr) {
 
 				return 1;
 			}
-			
+
 			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
 			String feature_str = item;
 			if (*feature_str.text != '+' && *feature_str.text != '-') {
 				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 			}
-			
+
 			// Ensure there is only a single entry for each feature in the target set.
 			// If the negative exists, override the existing value with the current one.
 			String neg_feature_str = clone_string(temporary_allocator(), feature_str);
@@ -4459,9 +4462,9 @@ int main(int arg_count, char const **arg_ptr) {
 				case '-': *neg_feature_str.text = '+'; break;
 				default: GB_ASSERT(false); break;
 			}
-			
+
 			string_set_remove(&build_context.target_features_set, neg_feature_str);
-			
+
 			string_set_add(&build_context.target_features_set, feature_str);
 		}
 	}
