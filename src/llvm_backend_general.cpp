@@ -4676,6 +4676,9 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	if (is_type_matrix(type)) {
 		alignment *= 2; // NOTE(bill): Just in case
 	}
+	if (e != nullptr && e->kind == Entity_Variable) {
+		alignment = gb_max(alignment, cast(unsigned)e->Variable.custom_align);
+	}
 
 	LLVMValueRef ptr = llvm_alloca(p, llvm_type, alignment, name);
 

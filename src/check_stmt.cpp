@@ -2287,6 +2287,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (ac.link_name.len > 0) {
 			e->Variable.link_name = ac.link_name;
 		}
+		e->Variable.custom_align = ac.align;
 
 		e->flags &= ~EntityFlag_Static;
 		if (ac.is_static) {

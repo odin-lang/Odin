@@ -123,6 +123,7 @@ struct AttributeContext {
 	String  link_section;
 	String  linkage;
 	isize   init_expr_list_count;
+	i64     align;
 	String  thread_local_model;
 	String  deprecated_message;
 	String  warning_message;

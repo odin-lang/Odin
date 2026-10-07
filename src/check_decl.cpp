@@ -1753,6 +1753,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast 
 
 	e->Variable.thread_local_model = ac.thread_local_model;
 	e->Variable.is_export = ac.is_export;
+	e->Variable.custom_align = ac.align;
 	e->flags &= ~EntityFlag_Static;
 	if (ac.is_static) {
 		error(e->token, "@(static) is not supported for global variables, nor required");

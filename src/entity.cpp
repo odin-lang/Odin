@@ -273,6 +273,7 @@ struct Entity {
 			String     link_prefix;
 			String     link_suffix;
 			String     link_section;
+			i64        custom_align;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
