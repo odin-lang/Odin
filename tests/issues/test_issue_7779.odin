@@ -7,7 +7,8 @@ import "core:encoding/hex"
 @(test)
 test_issue_7779__decode_ok :: proc(t: ^testing.T) {
 	// Make sure we don't break the OK case by accident...
-	dst, ok := hex.decode(transmute([]u8)cast(string)"abcd")
+	// Intentional leak, so we use the temp allocator.
+	dst, ok := hex.decode(transmute([]u8)cast(string)"abcd", context.temp_allocator)
 	testing.expect_value(t, ok, true)
 	testing.expect_value(t, dst[0], 0xab)
 	testing.expect_value(t, dst[1], 0xcd)
