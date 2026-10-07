@@ -3482,7 +3482,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.reports  = reports;
 
 	// in a file without it, which only gives what flows through it to those calling it
-	bool enabled = ast_file_escape_analysis(body->file());
+	bool enabled = ast_file_analysis(body->file(), AnalysisFlag_Escape);
 	ea.muted = !enabled;
 
 	u64 vet_flags = ast_file_vet_flags(body->file());
@@ -3904,11 +3904,11 @@ gb_internal void check_escapes(Checker *c) {
 
 	// when it is disabled but for some files, only their procedures and what those may call are analysed
 	array_init(&g->skipped, heap_allocator(), count);
-	if (build_context.no_escape_analysis) {
+	if ((build_context.no_analysis_flags & AnalysisFlag_Escape) != 0) {
 		auto stack = array_make<i32>(temporary_allocator(), 0, count);
 		for (i32 v = 0; v < count; v++) {
 			Ast *body = g->procs[v]->body;
-			g->skipped[v] = body == nullptr || !ast_file_escape_analysis(body->file());
+			g->skipped[v] = body == nullptr || !ast_file_analysis(body->file(), AnalysisFlag_Escape);
 			if (!g->skipped[v]) {
 				array_add(&stack, v);
 			}

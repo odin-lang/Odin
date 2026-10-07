@@ -331,12 +331,12 @@ atomic_cond_wait_with_timeout :: proc "contextless" (c: ^Atomic_Cond, m: ^Atomic
 
 
 atomic_cond_signal :: proc "contextless" (c: ^Atomic_Cond) {
-	atomic_add_explicit(&c.state, 1, .Release)
+	atomic_add_explicit(&c.state, 1, .Relaxed)
 	futex_signal(&c.state)
 }
 
 atomic_cond_broadcast :: proc "contextless" (c: ^Atomic_Cond) {
-	atomic_add_explicit(&c.state, 1, .Release)
+	atomic_add_explicit(&c.state, 1, .Relaxed)
 	futex_broadcast(&c.state)
 }
 

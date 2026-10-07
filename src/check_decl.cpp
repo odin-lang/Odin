@@ -1551,6 +1551,18 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.fast_math_flags = ac.fast_math_flags;
 
+	e->Procedure.futex = cast(ProcedureFutex)ac.futex;
+	if (ac.futex != ProcedureFutex_None) {
+		// what it waits on or wakes, which may only be known for each instantiation
+		Type *word = nullptr;
+		if (pt->param_count > 0) {
+			word = pt->params->Tuple.variables[0]->type;
+		}
+		if (word == nullptr || !is_type_pointer(word) || !(is_type_integer(type_deref(word)) || is_type_polymorphic(type_deref(word)))) {
+			error(e->token, "A procedure with @(futex) must take a pointer to an integer as its first parameter, which is what it waits on or wakes");
+		}
+	}
+
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);

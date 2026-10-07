@@ -96,9 +96,6 @@ enum AstFileFlag : u32 {
 	AstFile_IsLazy    = 1<<4,
 
 	AstFile_NoInstrumentation = 1<<5,
-
-	AstFile_EscapeAnalysis   = 1<<6, // `#+escape-analysis`
-	AstFile_NoEscapeAnalysis = 1<<7, // `#+no-escape-analysis`
 };
 
 enum AstDelayQueueKind {
@@ -135,8 +132,10 @@ struct AstFile {
 
 	u64          vet_flags;
 	u64          feature_flags;
+	u64          analysis_flags;
 	bool         vet_flags_set;
 	bool         feature_flags_set;
+	bool         analysis_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause

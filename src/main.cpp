@@ -431,6 +431,7 @@ enum BuildFlagKind {
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
 	BuildFlag_NoEscapeAnalysis,
+	BuildFlag_NoAtomicAnalysis,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_UseSingleModule,
@@ -457,6 +458,7 @@ enum BuildFlagKind {
 	BuildFlag_VetWhenShadowing,
 	BuildFlag_VetNilDeref,
 	BuildFlag_VetUninitialized,
+	BuildFlag_VetAtomicAccess,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -705,6 +707,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_NoEscapeAnalysis,        str_lit("no-escape-analysis"),        BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoAtomicAnalysis,        str_lit("no-atomic-analysis"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
@@ -731,6 +734,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetWhenShadowing,        str_lit("vet-when-shadowing"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetNilDeref,             str_lit("vet-nil-deref"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUninitialized,        str_lit("vet-uninitialized"),         BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetAtomicAccess,         str_lit("vet-atomic-access"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -1429,7 +1433,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_entry_point = true;
 							break;
 						case BuildFlag_NoEscapeAnalysis:
-							build_context.no_escape_analysis = true;
+							build_context.no_analysis_flags |= AnalysisFlag_Escape;
+							break;
+						case BuildFlag_NoAtomicAnalysis:
+							build_context.no_analysis_flags |= AnalysisFlag_Atomic;
 							break;
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
@@ -1510,6 +1517,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetWhenShadowing:    build_context.vet_flags |= VetFlag_WhenShadowing;    break;
 						case BuildFlag_VetNilDeref:         build_context.vet_flags |= VetFlag_NilDeref;         break;
 						case BuildFlag_VetUninitialized:    build_context.vet_flags |= VetFlag_Uninitialized;    break;
+						case BuildFlag_VetAtomicAccess:     build_context.vet_flags |= VetFlag_AtomicAccess;     break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
@@ -2084,6 +2092,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	if (set_flags[BuildFlag_NoEscapeAnalysis] && (set_flags[BuildFlag_VetNilDeref] || set_flags[BuildFlag_VetUninitialized])) {
 		gb_printf_err("-vet-nil-deref and -vet-uninitialized cannot be used with -no-escape-analysis, as they are part of it\n");
+		bad_flags = true;
+	}
+
+	if (set_flags[BuildFlag_NoAtomicAnalysis] && set_flags[BuildFlag_VetAtomicAccess]) {
+		gb_printf_err("-vet-atomic-access cannot be used with -no-atomic-analysis, as it is part of it\n");
 		bad_flags = true;
 	}
 
@@ -3268,9 +3281,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (check) {
+		if (print_flag("-no-atomic-analysis")) {
+			print_usage_line(2, "Disables the analysis of atomic memory orderings, except in files with '#+analysis atomic'.");
+			print_usage_line(2, "It warns where what is written with release ordering is only loaded with relaxed ordering, or the reverse.");
+			print_usage_line(2, "Cannot be used with -vet-atomic-access.");
+		}
+
 		if (print_flag("-no-escape-analysis")) {
-			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+escape-analysis'.");
-			print_usage_line(2, "Where it is disabled, by this or by '#+no-escape-analysis', only returning the address of a local or similar is an error.");
+			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+analysis escape'.");
+			print_usage_line(2, "Where it is disabled, by this or by '#+analysis !escape', only returning the address of a local or similar is an error.");
 			print_usage_line(2, "Cannot be used with -vet-nil-deref or -vet-uninitialized.");
 		}
 	}
@@ -3537,6 +3556,10 @@ gb_internal int print_show_help(String const arg0, String command, String option
 				print_usage_line(3, "-vet-unused-variables");
 				print_usage_line(3, "-vet-using-stmt");
 				print_usage_line(3, "-vet-when-shadowing");
+		}
+
+		if (print_flag("-vet-atomic-access")) {
+			print_usage_line(2, "Errs on a plain read of a variable or field which is accessed atomically elsewhere, except in procedures which take a lock.");
 		}
 
 		if (print_flag("-vet-cast")) {

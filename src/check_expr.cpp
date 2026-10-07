@@ -838,6 +838,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	entity->flags = 0;
 
 	entity->Procedure.optimization_mode = base_entity->Procedure.optimization_mode;
+	entity->Procedure.futex = base_entity->Procedure.futex;
 	entity->Procedure.generated_from_polymorphic = true;
 
 	if (base_entity->flags & EntityFlag_Cold) {
@@ -3065,6 +3066,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			}
 			o->mode = Addressing_Invalid;
 			return;
+		}
+		if (analysis_in_use(AnalysisFlag_Atomic)) {
+			if (Entity *e = check_atomic_location(o->expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
 		}
 
 		Type *soa_for_in_type = nullptr;
@@ -6600,20 +6606,6 @@ gb_internal bool is_type_normal_pointer(Type *ptr, Type **elem) {
 	return false;
 }
 
-gb_internal bool is_type_valid_atomic_type(Type *elem) {
-	elem = core_type(elem);
-	if (is_type_internally_pointer_like(elem)) {
-		return true;
-	}
-	if (elem->kind == Type_BitSet) {
-		elem = bit_set_to_int(elem);
-	}
-	if (elem->kind != Type_Basic) {
-		return false;
-	}
-	return (elem->Basic.flags & (BasicFlag_Boolean|BasicFlag_OrderedNumeric)) != 0;
-}
-
 gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **out_scope = nullptr) {
 	switch (node->kind) {
 	case_ast_node(i, Ident, node);
@@ -9506,6 +9498,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
+		} else if (BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit && analysis_in_use(AnalysisFlag_Atomic)) {
+			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, id});
 		}
 		operand->expr = call;
 		return builtin_procs[id].kind;
@@ -9567,8 +9561,11 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				c->decl->defer_used += 1;
 			}
 		}
-		if (c->curr_proc_decl != nullptr && escape_analysis_in_use()) {
+		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
 			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
+		}
+		if (callee->Procedure.futex != ProcedureFutex_None && call->CallExpr.args.count > 0 && analysis_in_use(AnalysisFlag_Atomic)) {
+			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, BuiltinProc_Invalid, callee->Procedure.futex});
 		}
 	}
 
@@ -12902,6 +12899,11 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
+		}
+		if (analysis_in_use(AnalysisFlag_Atomic) && !is_type_pointer(o->type)) {
+			if (Entity *e = check_atomic_location(node->SliceExpr.expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
 		}
 		o->type = alloc_type_slice(t->Array.elem);
 		break;

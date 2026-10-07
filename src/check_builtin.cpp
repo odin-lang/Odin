@@ -2169,13 +2169,70 @@ gb_internal bool is_valid_type_for_load(Type *type) {
 	return false;
 }
 
+// the `&x` an atomic operation's pointer is, through any conversions of it, unless it is a pointer from elsewhere
+gb_internal Ast *check_atomic_address_of(Ast *ptr) {
+	ptr = unparen_expr(ptr);
+	for (;;) {
+		if (ptr->kind == Ast_CallExpr && ptr->CallExpr.proc->tav.mode == Addressing_Type && ptr->CallExpr.args.count == 1) {
+			ptr = unparen_expr(ptr->CallExpr.args[0]);
+		} else if (ptr->kind == Ast_TypeCast) {
+			ptr = unparen_expr(ptr->TypeCast.expr);
+		} else if (ptr->kind == Ast_AutoCast) {
+			ptr = unparen_expr(ptr->AutoCast.expr);
+		} else {
+			break;
+		}
+	}
+	if (ptr->kind != Ast_UnaryExpr || ptr->UnaryExpr.op.kind != Token_And) {
+		return nullptr;
+	}
+	return ptr;
+}
+
 gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
 	if (!is_type_valid_atomic_type(elem)) {
 		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
 		return false;
 	}
-	return true;
+	if (!target_atomics_are_plain() && !is_type_lock_free(elem)) {
+		ERROR_BLOCK();
+		gbString str = type_to_string(elem);
+		error(operand->expr, "'%s' cannot be used as an atomic for '%.*s' on this target, as it is not lock-free", str, LIT(builtin_name));
+		gb_string_free(str);
+		if (build_context.metrics.arch == TargetArch_amd64 && type_size_of(elem) == 16) {
+			error_line("\tSuggestion: A 16 byte atomic needs 'cx16', e.g. with -microarch:x86-64-v2 or later\n");
+		}
+		return false;
+	}
 
+	Ast *ptr = check_atomic_address_of(operand->expr);
+	if (ptr == nullptr) {
+		return true;
+	}
+
+	// what is within a #packed struct may be at any address, where an atomic access faults on some targets
+	for (Ast *x = unparen_expr(ptr->UnaryExpr.expr); /**/; /**/) {
+		Ast *base = nullptr;
+		if (x->kind == Ast_SelectorExpr) {
+			base = x->SelectorExpr.expr;
+		} else if (x->kind == Ast_IndexExpr && is_type_array_like(x->IndexExpr.expr->tav.type)) {
+			base = x->IndexExpr.expr;
+		} else {
+			break;
+		}
+		Type *t = base_type(type_deref(base->tav.type));
+		if (t != nullptr && t->kind == Type_Struct && t->Struct.is_packed) {
+			gbString str = expr_to_string(ptr->UnaryExpr.expr);
+			error(operand->expr, "'%s' may be misaligned for '%.*s', as it is within a #packed struct", str, LIT(builtin_name));
+			gb_string_free(str);
+			return false;
+		}
+		if (is_type_pointer(base->tav.type)) {
+			break;
+		}
+		x = unparen_expr(base);
+	}
+	return true;
 }
 
 gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {

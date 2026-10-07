@@ -1391,6 +1391,17 @@ gb_internal void init_universal(void) {
 	}
 
 	{
+		GlobalEnumValue values[OdinFutexOperation_COUNT] = {
+			{OdinFutexOperation_strings[OdinFutexOperation_Wait], OdinFutexOperation_Wait},
+			{OdinFutexOperation_strings[OdinFutexOperation_Wake], OdinFutexOperation_Wake},
+		};
+
+		add_global_enum_type(str_lit("Futex_Operation"), values, gb_count_of(values), &t_futex_operation);
+		GB_ASSERT(t_futex_operation->kind == Type_Named);
+		scope_insert(intrinsics_pkg->scope, t_futex_operation->Named.type_name);
+	}
+
+	{
 		GlobalEnumValue values[ProcCC_MAX] = {
 			{"Invalid",       ProcCC_Invalid},
 			{"Odin",          ProcCC_Odin},
@@ -1708,6 +1719,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_atomics_queue,   global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_addresses_queue, global_thread_pool.threads.count);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
@@ -1744,6 +1757,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	per_thread_array_destroy(&i->definition_queue);
 	per_thread_array_destroy(&i->checked_bodies_queue);
 	per_thread_array_destroy(&i->checked_calls_queue);
+	per_thread_array_destroy(&i->checked_atomics_queue);
+	per_thread_array_destroy(&i->checked_addresses_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
@@ -4609,6 +4624,21 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			}
 		}
 		return true;
+	} else if (name == "futex") {
+		ExactValue ev = check_decl_attribute_value(c, value, t_futex_operation);
+		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
+			// already reported
+			return true;
+		}
+		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_futex_operation)) {
+			error(elem, "Expected a constant of type 'intrinsics.Futex_Operation' for '%.*s', i.e. '.Wait' or '.Wake'", LIT(name));
+			return true;
+		}
+		switch (exact_value_to_i64(ev)) {
+		case OdinFutexOperation_Wait: ac->futex = ProcedureFutex_Wait; break;
+		case OdinFutexOperation_Wake: ac->futex = ProcedureFutex_Wake; break;
+		}
+		return true;
 	}
 	return false;
 }
@@ -4935,6 +4965,7 @@ gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
 #include "check_escape.cpp"
+#include "check_atomics.cpp"
 
 
 
@@ -6874,7 +6905,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 
 	if (body_was_checked) {
 		pi->decl->proc_info = pi;
-		if (escape_analysis_in_use()) {
+		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic)) {
 			per_thread_array_add(&c->info.checked_bodies_queue, pi);
 		}
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
@@ -8096,7 +8127,13 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
-	if (escape_analysis_in_use()) {
+	// before the escape analysis, which takes the checked bodies
+	if (analysis_in_use(AnalysisFlag_Atomic)) {
+		TIME_SECTION("check atomics");
+		check_atomics(c);
+	}
+
+	if (analysis_in_use(AnalysisFlag_Escape)) {
 		TIME_SECTION("check escapes");
 		check_escapes(c);
 	}

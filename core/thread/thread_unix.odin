@@ -156,8 +156,6 @@ _join :: proc(t: ^Thread) {
 	}
 
 	posix.pthread_join(t.unix_thread, nil)
-
-	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {
