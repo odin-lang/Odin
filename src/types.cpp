@@ -2753,6 +2753,55 @@ gb_internal bool type_has_nil(Type *t) {
 	return false;
 }
 
+gb_internal char const *type_zero_value_string(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) {
+		return "{}";
+	}
+	switch (t->kind) {
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_string:
+		case Basic_string16:
+		case Basic_UntypedString:
+			return "\"\"";
+		case Basic_rawptr:
+		case Basic_cstring:
+		case Basic_cstring16:
+		case Basic_any:
+		case Basic_typeid:
+		case Basic_UntypedNil:
+			return "nil";
+		}
+		if (t->Basic.flags & BasicFlag_Boolean) {
+			return "false";
+		}
+		if (t->Basic.flags & (BasicFlag_Numeric|BasicFlag_Rune)) {
+			return "0";
+		}
+		return "{}";
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_SoaPointer:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Map:
+	case Type_Proc:
+		return "nil";
+
+	case Type_Union:
+	case Type_Struct:
+		// a union without #no_nil, or a #soa slice or dynamic array
+		if (type_has_nil(t)) {
+			return "nil";
+		}
+		return "{}";
+	}
+	// an enum or bit_set may also be 'nil', but '{}' reads better
+	return "{}";
+}
+
 gb_internal bool is_type_union_constantable(Type *type);
 
 gb_internal bool is_type_constant_type_for_unions(Type *t) {

@@ -2741,23 +2741,7 @@ gb_internal char const *zero_value_suggestion(Operand *o, Type *type) {
 	if (!is_exact_value_zero(o->value)) {
 		return nullptr;
 	}
-
-	char const *suggestion = nullptr;
-	if (is_type_string(type)) {
-		suggestion = "\"\"";
-	} else if (is_type_boolean(type)) {
-		suggestion = "false";
-	} else if (is_type_bit_set(type)) {
-		// A bit_set accepts both `nil` and `{}`. `{}` is a bit more idiomatic
-		// because `{.Something}` becomes `{}` when no bits are set.
-		suggestion = "{}";
-	} else if (type_has_nil(type)) {
-		suggestion = "nil";
-	} else {
-		suggestion = "{}";
-	}
-
-	return suggestion;
+	return type_zero_value_string(type);
 }
 
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size) {
