@@ -38,6 +38,11 @@ Info_State :: struct {
 	ignore_user_formatters: bool,
 	in_bad: bool,
 
+	// Set when formatting imaginary component(s) of complex numbers and quaternions.
+	// This forces inclusion of the sign even when it would normally be suppressed,
+	// such as for NaN values or hex formatting.
+	float_must_have_sign: bool,
+
 	width:     int,
 	prec:      int,
 	indent:    int,
@@ -1427,12 +1432,23 @@ _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: b
 	buf: [386]byte
 
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
-	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size)
+	// Leave one space in the buffer so that we can add "+" to NaN if necessary.
+	str := strconv.write_float(buf[1:], v, float_fmt, prec, bit_size)
 
-	if !fi.plus {
+	if !(fi.plus || fi.float_must_have_sign) {
 		// Strip sign from "+<value>" but not "+Inf".
 		if str[0] == '+' && str[1] != 'I' {
 			str = str[1:]
+		}
+	}
+
+	if fi.float_must_have_sign {
+		// Append plus sign if the converted string does not already have any sign.
+		if str[0] != '+' && str[0] != '-' {
+			#no_bounds_check {
+				str = str[-1:]
+			}
+			(transmute([]byte)str)[0] = '+'
 		}
 	}
 
@@ -1484,6 +1500,11 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		case 32: u = u64(transmute(u32)f32(v))
 		case 64: u = transmute(u64)v
 		case: panic("Unhandled float size")
+		}
+
+		if fi.float_must_have_sign {
+			// Needs to be printed before the "0h".
+			io.write_string(fi.writer, "+", &fi.n)
 		}
 
 		io.write_string(fi.writer, "0h", &fi.n)
@@ -3402,9 +3423,9 @@ fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 		r, i := real(c), imag(c)
 		fmt_float(fi, r, bits/2, verb)
 
-		prev_plus := fi.plus
-		defer fi.plus = prev_plus
-		fi.plus = true
+		prev_float_must_have_sign := fi.float_must_have_sign
+		defer fi.float_must_have_sign = prev_float_must_have_sign
+		fi.float_must_have_sign = true
 
 		fmt_float(fi, i, bits/2, verb)
 		io.write_rune(fi.writer, 'i', &fi.n)
@@ -3429,9 +3450,9 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 
 		fmt_float(fi, r, bits/4, verb)
 
-		prev_plus := fi.plus
-		defer fi.plus = prev_plus
-		fi.plus = true
+		prev_float_must_have_sign := fi.float_must_have_sign
+		defer fi.float_must_have_sign = prev_float_must_have_sign
+		fi.float_must_have_sign = true
 
 		fmt_float(fi, i, bits/4, verb)
 		io.write_rune(fi.writer, 'i', &fi.n)
