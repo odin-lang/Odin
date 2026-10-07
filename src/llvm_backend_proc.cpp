@@ -4116,6 +4116,14 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 		LLVMBool single_threaded = false;
 
+		// LLVM only compares integers and pointers, so a float is compared by its bits, as C does
+		LLVMTypeRef bits_type = nullptr;
+		if (is_type_float(elem)) {
+			bits_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*type_size_of(elem)));
+			old_value.value = LLVMBuildBitCast(p->builder, old_value.value, bits_type, "");
+			new_value.value = LLVMBuildBitCast(p->builder, new_value.value, bits_type, "");
+		}
+
 		LLVMValueRef value = LLVMBuildAtomicCmpXchg(
 			p->builder, address.value,
 			old_value.value, new_value.value,
@@ -4125,6 +4133,15 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		);
 		LLVMSetWeak(value, weak);
 		LLVMSetVolatile(value, true);
+
+		if (bits_type != nullptr) {
+			LLVMTypeRef fields[2] = {lb_type(p->module, elem), LLVMInt1TypeInContext(p->module->ctx)};
+			LLVMValueRef loaded = LLVMBuildBitCast(p->builder, LLVMBuildExtractValue(p->builder, value, 0, ""), fields[0], "");
+			LLVMValueRef ok     = LLVMBuildExtractValue(p->builder, value, 1, "");
+			value = LLVMGetUndef(LLVMStructTypeInContext(p->module->ctx, fields, 2, false));
+			value = LLVMBuildInsertValue(p->builder, value, loaded, 0, "");
+			value = LLVMBuildInsertValue(p->builder, value, ok, 1, "");
+		}
 
 		if (is_type_tuple(tv.type)) {
 			Type *fix_typed = alloc_type_tuple();
