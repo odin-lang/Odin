@@ -25,7 +25,8 @@ test_issue_5699_union :: proc(t: ^testing.T) {
 
 test_issue_5699_increment_any :: proc(counter: ^i32) -> any {
     counter^ += 1
-    return Issue5699_Value{0}
+    @(static) value := Issue5699_Value{0}
+    return value
 }
 
 @test
