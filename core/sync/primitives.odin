@@ -556,7 +556,7 @@ occurs.
 */
 @(futex=.Wait)
 futex_wait :: proc "contextless" (f: ^Futex, expected: u32) {
-	if u32(atomic_load_explicit(f, .Acquire)) != expected {
+	if u32(atomic_load_explicit(f, .Relaxed)) != expected {
 		return
 	}
 	ok := _futex_wait(f, expected)
@@ -575,7 +575,7 @@ This procedure returns `false` if the timeout was reached, `true` otherwise.
 */
 @(futex=.Wait)
 futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
-	if u32(atomic_load_explicit(f, .Acquire)) != expected {
+	if u32(atomic_load_explicit(f, .Relaxed)) != expected {
 		return true
 	}
 	if duration <= 0 {
