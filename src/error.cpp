@@ -34,6 +34,18 @@ gb_global ErrorCollector global_error_collector;
 
 gb_thread_local bool global_error_hold = false;
 
+struct ErrorRecordInstantiation {
+	ErrorRecordInstantiation *prev;
+	struct Ast *              site;
+	struct Type *             named_type;
+};
+
+// The polymorphic procedure instantiation whose body is being checked on this thread,
+// and the polymorphic records being instantiated within it, see `error_out_instantiations`
+gb_thread_local struct ProcInfo *         global_error_instantiation        = nullptr;
+gb_thread_local ErrorRecordInstantiation *global_error_record_instantiation = nullptr;
+gb_internal void error_out_instantiations(void); // defined in checker.cpp
+
 // Scoped, per-thread error muting. While muted, error/warning emission is suppressed but still
 // *counted*, so a caller can trial-check something (e.g. one branch of a procedure group) and learn
 // whether it would have failed without printing anything. Muting nests.
@@ -102,6 +114,10 @@ gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = Err
 gb_internal void pop_error_value(void) {
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.curr_error_value_set.load()) {
+		if ((global_error_instantiation != nullptr || global_error_record_instantiation != nullptr) &&
+		    global_error_collector.curr_error_value.kind == ErrorValue_Error) {
+			error_out_instantiations();
+		}
 		array_add(global_error_hold ? &global_error_collector.held_error_values : &global_error_collector.error_values, global_error_collector.curr_error_value);
 
 		global_error_collector.curr_error_value = {};

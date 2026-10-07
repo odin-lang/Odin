@@ -2219,10 +2219,16 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 		}
 
 		CheckerContext c = *ctx;
+		ProcInfo *prev_instantiation = global_error_instantiation;
+		ErrorRecordInstantiation *prev_record_instantiation = global_error_record_instantiation;
+		defer (global_error_instantiation = prev_instantiation);
+		defer (global_error_record_instantiation = prev_record_instantiation);
 		if (d->scope->flags & ScopeFlag_File) {
 			// NOTE(bill): a global is checked in a context of its own file, never in that of whatever needed it first,
-			// which may be in another file or package, or a procedure body.
+			// which may be in another file or package, or a procedure body (nor is it part of its instantiation).
 			// Only the cycle detection carries over.
+			global_error_instantiation = nullptr;
+			global_error_record_instantiation = nullptr;
 			CheckerTypePath *type_path = c.type_path;
 			UntypedExprInfoMap *untyped = c.untyped;
 			gb_zero_size(&c.pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));

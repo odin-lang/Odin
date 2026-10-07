@@ -268,6 +268,7 @@ struct ProcInfo {
 	u64       tags;
 	bool      generated_from_polymorphic;
 	Ast *     poly_def_node;
+	ProcInfo *poly_parent; // the instantiation whose body this was instantiated or declared in, see `error_out_instantiations`
 };
 
 

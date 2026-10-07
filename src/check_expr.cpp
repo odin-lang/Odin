@@ -860,6 +860,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->tags  = tags;
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
+	proc_info->poly_parent   = global_error_instantiation;
 
 	// Before it can be found by another thread which could use it first
 	d->gen_proc_info.store(proc_info);
@@ -9172,6 +9173,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		String generated_name = make_string_c(expr_to_string(call));
 
 		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
+		ErrorRecordInstantiation instantiation = {global_error_record_instantiation, call, named_type};
+		global_error_record_instantiation = &instantiation;
 		if (bt->kind == Type_Struct) {
 			Ast *node = clone_ast(bt->Struct.node);
 			Type *struct_type = alloc_type_struct();
@@ -9199,6 +9202,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
+		global_error_record_instantiation = instantiation.prev;
 
 		add_declaration_dependency(c, named_type->Named.type_name);
 		operand->mode = Addressing_Type;

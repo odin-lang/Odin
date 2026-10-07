@@ -2719,6 +2719,7 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 	info->type  = type;
 	info->body  = body;
 	info->tags  = tags;
+	info->poly_parent = global_error_instantiation;
 	check_procedure_later(c, info);
 }
 
@@ -6695,6 +6696,70 @@ gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker) {
 	return 0;
 }
 
+// NOTE(bill): Appends to the current error where each polymorphic instantiation it is within was instantiated
+// e.g.
+//     main.odin(9:7) instantiated as 'add($T=bool)'
+gb_internal void error_out_instantiations(void) {
+	isize const max_shown = 8;
+	isize count = 0;
+	for (ErrorRecordInstantiation *r = global_error_record_instantiation; r != nullptr; r = r->prev) {
+		if (count++ < max_shown) {
+			error_out("\t%s instantiated as '%.*s'\n", token_pos_to_string(ast_token(r->site).pos), LIT(r->named_type->Named.name));
+		}
+	}
+	for (ProcInfo *pi = global_error_instantiation; pi != nullptr; pi = pi->poly_parent) {
+		if (count++ >= max_shown) {
+			continue;
+		}
+
+		// NOTE(bill): the polymorphic parameters are the type names and constants declared before the body
+		Scope *scope = pi->type->Proc.scope;
+		i32 body_offset = ast_token(pi->body).pos.offset;
+		auto params = array_make<Entity *>(heap_allocator(), 0, 8);
+		defer (array_free(&params));
+		rw_mutex_shared_lock(&scope->mutex);
+		for (auto const &entry : scope->elements) {
+			Entity *e = entry.value;
+			if (e == nullptr || (e->kind != Entity_TypeName && e->kind != Entity_Constant) || e->token.pos.offset >= body_offset) {
+				continue;
+			}
+			array_add(&params, e);
+			for (isize j = params.count-1; j > 0 && params[j-1]->token.pos.offset > e->token.pos.offset; j--) {
+				params[j] = params[j-1];
+				params[j-1] = e;
+			}
+		}
+		rw_mutex_shared_unlock(&scope->mutex);
+
+		gbString s = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(s));
+		s = gb_string_append_fmt(s, "%.*s(", LIT(pi->token.string));
+		for_array(i, params) {
+			Entity *e = params[i];
+			s = gb_string_append_fmt(s, "%s$%.*s", i > 0 ? ", " : "", LIT(e->token.string));
+			if (e->kind == Entity_TypeName) {
+				if (e->type != nullptr && e->type->kind != Type_Generic) {
+					s = gb_string_append_fmt(s, "=");
+					s = write_type_to_string(s, e->type, false);
+				}
+			} else if (e->Constant.value.kind != ExactValue_Invalid) {
+				s = gb_string_append_fmt(s, "=");
+				s = write_exact_value_to_string(s, e->Constant.value);
+			}
+		}
+		s = gb_string_append_fmt(s, ")");
+
+		if (pi->poly_def_node != nullptr) {
+			error_out("\t%s instantiated as '%s'\n", token_pos_to_string(ast_token(pi->poly_def_node).pos), s);
+		} else {
+			error_out("\tinstantiated as '%s'\n", s);
+		}
+	}
+	if (count > max_shown) {
+		error_out("\t... and %td more\n", count - max_shown);
+	}
+}
+
 gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
 		return false;
@@ -6774,7 +6839,10 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		ctx.state_flags &= ~StateFlag_type_assert;
 	}
 
+	ProcInfo *prev_instantiation = global_error_instantiation;
+	global_error_instantiation = pi->generated_from_polymorphic ? pi : pi->poly_parent;
 	bool body_was_checked = check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+	global_error_instantiation = prev_instantiation;
 
 	if (body_was_checked) {
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
