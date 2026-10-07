@@ -2110,7 +2110,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
 						if (analysis_in_use(AnalysisFlag_Atomic)) {
-							if (Entity *e = atomic_location(expr)) {
+							if (Entity *e = check_atomic_location(expr)) {
 								per_thread_array_add(&ctx->info->checked_addresses_queue, CheckedAddress{node, e});
 							}
 						}

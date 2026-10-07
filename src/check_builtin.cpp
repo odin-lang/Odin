@@ -2170,7 +2170,7 @@ gb_internal bool is_valid_type_for_load(Type *type) {
 }
 
 // the `&x` an atomic operation's pointer is, through any conversions of it, unless it is a pointer from elsewhere
-gb_internal Ast *atomic_address_of(Ast *ptr) {
+gb_internal Ast *check_atomic_address_of(Ast *ptr) {
 	ptr = unparen_expr(ptr);
 	for (;;) {
 		if (ptr->kind == Ast_CallExpr && ptr->CallExpr.proc->tav.mode == Addressing_Type && ptr->CallExpr.args.count == 1) {
@@ -2205,7 +2205,7 @@ gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &built
 		return false;
 	}
 
-	Ast *ptr = atomic_address_of(operand->expr);
+	Ast *ptr = check_atomic_address_of(operand->expr);
 	if (ptr == nullptr) {
 		return true;
 	}

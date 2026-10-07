@@ -290,7 +290,7 @@ struct CheckedAtomic {
 
 struct CheckedAddress {
 	Ast *   node;     // `&x`, or what is sliced or iterated by reference
-	Entity *location; // see `atomic_location`
+	Entity *location; // see `check_atomic_location`
 };
 
 
@@ -966,7 +966,7 @@ gb_internal isize        type_info_index        (CheckerInfo *info, TypeInfoPair
 
 // Will return nullptr if not found
 gb_internal Entity *entity_of_node(Ast *expr);
-gb_internal Entity *atomic_location(Ast *expr);
+gb_internal Entity *check_atomic_location(Ast *expr);
 
 
 // gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash=0);

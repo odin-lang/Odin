@@ -3067,7 +3067,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			return;
 		}
 		if (analysis_in_use(AnalysisFlag_Atomic)) {
-			if (Entity *e = atomic_location(o->expr)) {
+			if (Entity *e = check_atomic_location(o->expr)) {
 				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
 			}
 		}
@@ -12897,7 +12897,7 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			return kind;
 		}
 		if (analysis_in_use(AnalysisFlag_Atomic) && !is_type_pointer(o->type)) {
-			if (Entity *e = atomic_location(node->SliceExpr.expr)) {
+			if (Entity *e = check_atomic_location(node->SliceExpr.expr)) {
 				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
 			}
 		}
