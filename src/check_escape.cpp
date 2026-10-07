@@ -1142,7 +1142,19 @@ gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, E
 		GB_PANIC("Unhandled EscapeReportKind");
 		break;
 	}
-	error_line("\tSuggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'\n");
+
+	if (kind == EscapeReport_Store) {
+		char const *zero = "{}";
+		Type *t = node->tav.type;
+		if (t != nullptr && type_has_nil(t)) {
+			zero = "nil";
+		} else if (t != nullptr && is_type_string(t)) {
+			zero = "\"\"";
+		}
+		error_line("\tSuggestion: Clear it before the procedure returns, e.g. 'defer %.*s = %s'\n", LIT(expr_str), zero);
+	} else {
+		error_line("\tSuggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'\n");
+	}
 }
 
 gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, String name, EscapeValue const &v) {
