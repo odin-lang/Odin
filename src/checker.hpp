@@ -225,6 +225,11 @@ struct DeclInfo {
 
 	Entity *     para_poly_original;
 	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
+	struct ProcInfo *proc_info; // its body, once checked
+
+	i32               escape_index; // of its body, see `EscapeGraph`
+	std::atomic<bool> escapes_analysed;
+	Slice<struct EscapeFlow> escape_flows; // see `escape_call`
 
 	bool                          is_using;
 	bool                          foreign_require_results;
@@ -269,6 +274,12 @@ struct ProcInfo {
 	u64       tags;
 	bool      generated_from_polymorphic;
 	Ast *     poly_def_node;
+	ProcInfo *poly_parent; // the instantiation whose body this was instantiated or declared in, see `error_out_instantiations`
+};
+
+struct CheckedCall {
+	DeclInfo *caller;
+	Entity *  callee;
 };
 
 
@@ -832,6 +843,9 @@ struct CheckerInfo {
 	MPSCQueue<ProcInfo *> all_procedures_queue;
 	Array<ProcInfo *> all_procedures;
 
+	PerThreadArray<ProcInfo *>   checked_bodies_queue; // for `check_escapes`
+	PerThreadArray<CheckedCall>  checked_calls_queue;  // for `check_escapes`
+
 	BlockingMutex instrumentation_mutex;
 	Entity *instrumentation_enter_entity;
 	Entity *instrumentation_exit_entity;
@@ -961,8 +975,15 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 gb_internal void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
 gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e);
 
-// While a group of global entities is checked: its incomplete '#soa' types, completed by the same thread
-gb_thread_local Array<Type *> *global_group_soa_types;
+// Per-thread state of checking the global entities, see `check_global_group`
+struct GlobalGroupContext {
+	struct GlobalGroup *group;
+	Entity *            entity;
+	Array<Type *> *     soa_types;
+	u64                 child_ticks; // see `global_entity_timing_begin`
+};
+
+gb_global gb_thread_local GlobalGroupContext global_group_context;
 
 struct GlobalWhenTrialEntityScope {
 	struct GlobalWhenTrial *trial;

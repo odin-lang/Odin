@@ -430,6 +430,7 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
+	BuildFlag_NoEscapeAnalysis,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_UseSingleModule,
@@ -454,6 +455,8 @@ enum BuildFlagKind {
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
 	BuildFlag_VetWhenShadowing,
+	BuildFlag_VetNilDeref,
+	BuildFlag_VetUninitialized,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -701,6 +704,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
+	add_flag(&build_flags, BuildFlag_NoEscapeAnalysis,        str_lit("no-escape-analysis"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
@@ -725,6 +729,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetWhenShadowing,        str_lit("vet-when-shadowing"),        BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetNilDeref,             str_lit("vet-nil-deref"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUninitialized,        str_lit("vet-uninitialized"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -1422,6 +1428,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
+						case BuildFlag_NoEscapeAnalysis:
+							build_context.no_escape_analysis = true;
+							break;
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
 							break;
@@ -1499,6 +1508,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
 						case BuildFlag_VetWhenShadowing:    build_context.vet_flags |= VetFlag_WhenShadowing;    break;
+						case BuildFlag_VetNilDeref:         build_context.vet_flags |= VetFlag_NilDeref;         break;
+						case BuildFlag_VetUninitialized:    build_context.vet_flags |= VetFlag_Uninitialized;    break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
@@ -2068,6 +2079,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	if (set_flags[BuildFlag_VetUnusedProcedures] && !set_flags[BuildFlag_VetPackages]) {
 		gb_printf_err("-vet-unused-procedures must be used with -vet-packages\n");
+		bad_flags = true;
+	}
+
+	if (set_flags[BuildFlag_NoEscapeAnalysis] && (set_flags[BuildFlag_VetNilDeref] || set_flags[BuildFlag_VetUninitialized])) {
+		gb_printf_err("-vet-nil-deref and -vet-uninitialized cannot be used with -no-escape-analysis, as they are part of it\n");
 		bad_flags = true;
 	}
 
@@ -3251,6 +3267,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (check) {
+		if (print_flag("-no-escape-analysis")) {
+			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+escape-analysis'.");
+			print_usage_line(2, "Where it is disabled, by this or by '#+no-escape-analysis', only returning the address of a local or similar is an error.");
+			print_usage_line(2, "Cannot be used with -vet-nil-deref or -vet-uninitialized.");
+		}
+	}
+
 	if (run_or_build) {
 		if (print_flag("-no-rpath")) {
 			print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
@@ -3519,6 +3543,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Errs on casting a value to its own type or using `transmute` rather than `cast`.");
 		}
 
+		if (print_flag("-vet-nil-deref")) {
+			print_usage_line(2, "Errs on dereferencing a pointer, or calling a procedure value, which is nil on every path reaching it.");
+			print_usage_line(2, "A pointer made through an explicit conversion to 'rawptr' or 'uintptr', or a 'transmute', is never assumed to be nil.");
+		}
+
 		if (print_flag("-vet-packages:<comma-separated-strings>")) {
 			print_usage_line(2, "Sets which packages by name will be vetted.");
 			print_usage_line(2, "Files with specific +vet tags will not be ignored if they are not in the packages set.");
@@ -3562,6 +3591,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Checks for unused variable declarations.");
 		}
 
+
+		if (print_flag("-vet-uninitialized")) {
+			print_usage_line(2, "Errs on reading a variable declared with '---', or a part of it, before anything is stored in it on every path reaching it.");
+			print_usage_line(2, "Taking its address, e.g. to pass it to a procedure which fills it in, counts as storing into it.");
+		}
 
 		if (print_flag("-vet-using-param")) {
 			print_usage_line(2, "Checks for the use of 'using' on procedure parameters.");

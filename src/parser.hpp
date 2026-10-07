@@ -96,6 +96,9 @@ enum AstFileFlag : u32 {
 	AstFile_IsLazy    = 1<<4,
 
 	AstFile_NoInstrumentation = 1<<5,
+
+	AstFile_EscapeAnalysis   = 1<<6, // `#+escape-analysis`
+	AstFile_NoEscapeAnalysis = 1<<7, // `#+no-escape-analysis`
 };
 
 enum AstDelayQueueKind {

@@ -2634,10 +2634,8 @@ gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-// NOTE(bill): This is very basic escape analysis
-// This needs to be improved tremendously, and a lot of it done during the
-// middle-end (or LLVM side) to improve checks and error messages
-void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
+// returning stack memory made by the returned expression itself, where the escape analysis is disabled
+gb_internal void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 	auto const unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
 		gbString s = expr_to_string(o.expr);
 		if (extra_type) {
@@ -2770,6 +2768,9 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		}
 	}
 
+	if (ast_file_escape_analysis(node->file())) {
+		return;
+	}
 	for (Operand &o : operands) {
 		if (o.expr == nullptr) {
 			continue;
@@ -2788,7 +2789,6 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 
 		check_unsafe_return(o, o.type, expr);
 	}
-
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {

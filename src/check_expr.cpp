@@ -860,6 +860,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->tags  = tags;
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
+	proc_info->poly_parent   = global_error_context.instantiations.proc;
 
 	// Before it can be found by another thread which could use it first
 	d->gen_proc_info.store(proc_info);
@@ -2740,23 +2741,7 @@ gb_internal char const *zero_value_suggestion(Operand *o, Type *type) {
 	if (!is_exact_value_zero(o->value)) {
 		return nullptr;
 	}
-
-	char const *suggestion = nullptr;
-	if (is_type_string(type)) {
-		suggestion = "\"\"";
-	} else if (is_type_boolean(type)) {
-		suggestion = "false";
-	} else if (is_type_bit_set(type)) {
-		// A bit_set accepts both `nil` and `{}`. `{}` is a bit more idiomatic
-		// because `{.Something}` becomes `{}` when no bits are set.
-		suggestion = "{}";
-	} else if (type_has_nil(type)) {
-		suggestion = "nil";
-	} else {
-		suggestion = "{}";
-	}
-
-	return suggestion;
+	return type_zero_value_string(type);
 }
 
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size) {
@@ -9177,6 +9162,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		String generated_name = make_string_c(expr_to_string(call));
 
 		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
+		ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
+		global_error_context.instantiations.records = &instantiation;
 		if (bt->kind == Type_Struct) {
 			Ast *node = clone_ast(bt->Struct.node);
 			Type *struct_type = alloc_type_struct();
@@ -9204,6 +9191,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
+		global_error_context.instantiations.records = instantiation.prev;
 
 		add_declaration_dependency(c, named_type->Named.type_name);
 		operand->mode = Addressing_Type;
@@ -9569,14 +9557,18 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	gb_zero_item(operand);
 	operand->expr = call;
 
-	if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0) {
-		// NOTE: which procedure of a group is called is only known once its arguments are checked
-		Entity *e = entity_of_node(call->CallExpr.proc);
-		if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.deferred_procedure.entity != nullptr) {
+	// NOTE: which procedure of a group is called is only known once its arguments are checked
+	Entity *callee = entity_of_node(call->CallExpr.proc);
+	if (callee != nullptr && callee->kind == Entity_Procedure) {
+		if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0 &&
+		    callee->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 			if (c->decl) {
 				c->decl->defer_used += 1;
 			}
+		}
+		if (c->curr_proc_decl != nullptr && escape_analysis_in_use()) {
+			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
 		}
 	}
 

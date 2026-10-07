@@ -13,6 +13,7 @@ gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *ex
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e);
 gb_internal void check_procedure_later(Checker *c, ProcInfo *info);
+gb_internal void check_escapes(Checker *c);
 
 gb_internal bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -1705,6 +1706,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->entity_queue,     global_thread_pool.threads.count);
 	i->entities_by_file = true;
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
@@ -1739,6 +1742,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	per_thread_array_destroy(&i->entity_queue);
 	per_thread_array_destroy(&i->definition_queue);
+	per_thread_array_destroy(&i->checked_bodies_queue);
+	per_thread_array_destroy(&i->checked_calls_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
@@ -2723,6 +2728,7 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 	info->type  = type;
 	info->body  = body;
 	info->tags  = tags;
+	info->poly_parent = global_error_context.instantiations.proc;
 	check_procedure_later(c, info);
 }
 
@@ -4928,6 +4934,7 @@ gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
 #include "name_canonicalization.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
+#include "check_escape.cpp"
 
 
 
@@ -6286,9 +6293,9 @@ gb_internal WORKER_TASK_PROC(check_collect_entities_worker_proc) {
 	AstFile *f = cast(AstFile *)data;
 	reset_checker_context(ctx, f, untyped);
 
-	global_error_hold = true;
+	global_error_context.hold = true;
 	check_collect_entities(ctx, f->decls);
-	global_error_hold = false;
+	global_error_context.hold = false;
 
 	add_untyped_expressions(&c->info, ctx->untyped);
 
@@ -6717,6 +6724,70 @@ gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker) {
 	return 0;
 }
 
+// NOTE(bill): Appends to the current error where each polymorphic instantiation it is within was instantiated
+// e.g.
+//     main.odin(9:7) instantiated as 'add($T=bool)'
+gb_internal void error_out_instantiations(void) {
+	isize const max_shown = 8;
+	isize count = 0;
+	for (ErrorRecordInstantiation *r = global_error_context.instantiations.records; r != nullptr; r = r->prev) {
+		if (count++ < max_shown) {
+			error_out("\t%s instantiated as '%.*s'\n", token_pos_to_string(ast_token(r->site).pos), LIT(r->named_type->Named.name));
+		}
+	}
+	for (ProcInfo *pi = global_error_context.instantiations.proc; pi != nullptr; pi = pi->poly_parent) {
+		if (count++ >= max_shown) {
+			continue;
+		}
+
+		// NOTE(bill): the polymorphic parameters are the type names and constants declared before the body
+		Scope *scope = pi->type->Proc.scope;
+		i32 body_offset = ast_token(pi->body).pos.offset;
+		auto params = array_make<Entity *>(heap_allocator(), 0, 8);
+		defer (array_free(&params));
+		rw_mutex_shared_lock(&scope->mutex);
+		for (auto const &entry : scope->elements) {
+			Entity *e = entry.value;
+			if (e == nullptr || (e->kind != Entity_TypeName && e->kind != Entity_Constant) || e->token.pos.offset >= body_offset) {
+				continue;
+			}
+			array_add(&params, e);
+			for (isize j = params.count-1; j > 0 && params[j-1]->token.pos.offset > e->token.pos.offset; j--) {
+				params[j] = params[j-1];
+				params[j-1] = e;
+			}
+		}
+		rw_mutex_shared_unlock(&scope->mutex);
+
+		gbString s = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(s));
+		s = gb_string_append_fmt(s, "%.*s(", LIT(pi->token.string));
+		for_array(i, params) {
+			Entity *e = params[i];
+			s = gb_string_append_fmt(s, "%s$%.*s", i > 0 ? ", " : "", LIT(e->token.string));
+			if (e->kind == Entity_TypeName) {
+				if (e->type != nullptr && e->type->kind != Type_Generic) {
+					s = gb_string_append_fmt(s, "=");
+					s = write_type_to_string(s, e->type, false);
+				}
+			} else if (e->Constant.value.kind != ExactValue_Invalid) {
+				s = gb_string_append_fmt(s, "=");
+				s = write_exact_value_to_string(s, e->Constant.value);
+			}
+		}
+		s = gb_string_append_fmt(s, ")");
+
+		if (pi->poly_def_node != nullptr) {
+			error_out("\t%s instantiated as '%s'\n", token_pos_to_string(ast_token(pi->poly_def_node).pos), s);
+		} else {
+			error_out("\tinstantiated as '%s'\n", s);
+		}
+	}
+	if (count > max_shown) {
+		error_out("\t... and %td more\n", count - max_shown);
+	}
+}
+
 gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
 		return false;
@@ -6796,9 +6867,16 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		ctx.state_flags &= ~StateFlag_type_assert;
 	}
 
+	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
+	global_error_context.instantiations = {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 	bool body_was_checked = check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+	global_error_context.instantiations = prev_instantiations;
 
 	if (body_was_checked) {
+		pi->decl->proc_info = pi;
+		if (escape_analysis_in_use()) {
+			per_thread_array_add(&c->info.checked_bodies_queue, pi);
+		}
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
@@ -8017,6 +8095,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+
+	if (escape_analysis_in_use()) {
+		TIME_SECTION("check escapes");
+		check_escapes(c);
+	}
 
 	TIME_SECTION("check unique link names");
 	check_link_name_uses(c);
