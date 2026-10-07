@@ -89,10 +89,17 @@ struct EscapeOuterStore {
 	EscapeOrigin origin; // of what is stored
 };
 
+// what is at the path within a local is nil on every path reaching here, as is all of it, with -vet-nil-deref
+struct EscapeNil {
+	Entity *   e;
+	EscapePath path;
+};
+
 struct EscapeState {
 	bool                    reachable;
 	Array<EscapeFact>       facts;
 	Array<EscapeOuterStore> outers;
+	Array<EscapeNil>        nils;
 };
 
 enum EscapeTargetKind : u8 {
@@ -122,6 +129,8 @@ enum EscapeReportKind : u8 {
 	EscapeReport_MayReturn,
 	EscapeReport_Store,
 	EscapeReport_CallStore,
+	EscapeReport_NilDeref,
+	EscapeReport_NilCall,
 };
 
 struct EscapeReport {
@@ -134,6 +143,13 @@ struct EscapeReport {
 struct EscapeAlias {
 	Entity *     e;
 	EscapeOrigin origin;
+};
+
+// a dereference, or a call through a procedure value, and whether what it goes through is nil there
+struct EscapeNilUse {
+	Ast *            ptr;
+	EscapeReportKind kind;
+	bool             nil;
 };
 
 struct EscapeAnalysis {
@@ -150,6 +166,10 @@ struct EscapeAnalysis {
 	i32                  group;   // of the procedures being analysed together, see `EscapeGraph`
 	Array<EscapeReport> *reports; // kept rather than reported, while what flows through the group may still change
 	bool                 muted;   // the entry point of an executable, which only returns as the program ends
+
+	bool                 nil_deref;   // -vet-nil-deref
+	Array<EscapeNilUse>  nil_uses;
+	Array<Entity *>      nil_escaped; // locals whose address was taken, which anything may change from then on
 };
 
 
@@ -315,6 +335,7 @@ gb_internal EscapeState escape_state_unreachable(void) {
 	EscapeState s = {};
 	s.facts  = array_make<EscapeFact>(temporary_allocator(), 0, 0);
 	s.outers = array_make<EscapeOuterStore>(temporary_allocator(), 0, 0);
+	s.nils   = array_make<EscapeNil>(temporary_allocator(), 0, 0);
 	return s;
 }
 
@@ -323,7 +344,17 @@ gb_internal EscapeState escape_state_clone(EscapeState const &s) {
 	c.reachable = s.reachable;
 	c.facts  = array_clone(temporary_allocator(), s.facts);
 	c.outers = array_clone(temporary_allocator(), s.outers);
+	c.nils   = array_clone(temporary_allocator(), s.nils);
 	return c;
+}
+
+gb_internal bool escape_nil_covered(Array<EscapeNil> const &nils, Entity *e, EscapePath const &path) {
+	for (EscapeNil const &n : nils) {
+		if (n.e == e && escape_path_has_prefix(path, n.path)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 gb_internal void escape_add_fact(Array<EscapeFact> *facts, EscapeFact const &f) {
@@ -366,6 +397,24 @@ gb_internal bool escape_state_join(EscapeState *dst, EscapeState const &src) {
 			array_add(&dst->outers, o);
 			changed = true;
 		}
+	}
+
+	// nil only where it is on both
+	if (dst->nils.count > 0) {
+		auto nils = array_make<EscapeNil>(temporary_allocator(), 0, dst->nils.count);
+		for (EscapeNil const &n : dst->nils) {
+			if (escape_nil_covered(src.nils, n.e, n.path)) {
+				array_add(&nils, n);
+			}
+		}
+		changed |= nils.count != dst->nils.count;
+		for (EscapeNil const &n : src.nils) {
+			if (escape_nil_covered(dst->nils, n.e, n.path) && !escape_nil_covered(nils, n.e, n.path)) {
+				array_add(&nils, n);
+				changed = true;
+			}
+		}
+		dst->nils = nils;
 	}
 	return changed;
 }
@@ -695,6 +744,14 @@ gb_internal void escape_visit_exits(EscapeAnalysis *ea, Ast *expr) {
 	}
 }
 
+gb_internal void escape_nil_forget(EscapeAnalysis *ea, Entity *e) {
+	for (isize i = ea->state.nils.count-1; i >= 0; i--) {
+		if (ea->state.nils[i].e == e) {
+			array_unordered_remove(&ea->state.nils, i);
+		}
+	}
+}
+
 gb_internal void escape_forget_entity(EscapeAnalysis *ea, Entity *e) {
 	if (e == nullptr) {
 		return;
@@ -704,6 +761,7 @@ gb_internal void escape_forget_entity(EscapeAnalysis *ea, Entity *e) {
 			array_unordered_remove(&ea->state.facts, i);
 		}
 	}
+	escape_nil_forget(ea, e);
 }
 
 gb_internal void escape_forget(EscapeAnalysis *ea, Ast *decl) {
@@ -811,6 +869,658 @@ gb_internal Entity *escape_package_selector(Ast *se_node) {
 		return nullptr;
 	}
 	return entity_of_node(se->selector);
+}
+
+
+// With -vet-nil-deref, what within the locals is nil on every path reaching each point is kept too: from their zero
+// values, `nil`, and the conditions comparing them to it. A dereference of what is nil there is reported, never one
+// of what only may be. Taking the address of a local, which anything may then change it through, forgets it
+
+gb_internal bool escape_type_has_nilable(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) {
+		return false;
+	}
+	switch (t->kind) {
+	case Type_Basic:
+		return t->Basic.kind == Basic_rawptr;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_Proc:
+		return true;
+
+	case Type_Array:                     return escape_type_has_nilable(t->Array.elem);
+	case Type_EnumeratedArray:           return escape_type_has_nilable(t->EnumeratedArray.elem);
+	case Type_FixedCapacityDynamicArray: return escape_type_has_nilable(t->FixedCapacityDynamicArray.elem);
+
+	case Type_Struct:
+		for (Entity *f : t->Struct.fields) {
+			if (escape_type_has_nilable(f->type)) {
+				return true;
+			}
+		}
+		return false;
+	}
+	return false;
+}
+
+gb_internal bool escape_is_nil_literal(Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr || expr->kind != Ast_Ident) {
+		return false;
+	}
+	Entity *e = entity_of_node(expr);
+	return e != nullptr && e->kind == Entity_Nil;
+}
+
+// the local, and the path within it, that an expression is without going through a pointer, which is not exact
+// when the path stands for more than the expression, e.g. any element of an array
+gb_internal bool escape_nil_location(Ast *expr, Entity **root, EscapePath *path, bool *exact) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr) {
+		return false;
+	}
+	switch (expr->kind) {
+	case_ast_node(i, Ident, expr);
+		Entity *e = entity_of_node(expr);
+		if (!escape_is_local(e) || e->using_parent != nullptr || (e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue)) != 0) {
+			return false;
+		}
+		*root  = e;
+		*path  = {};
+		*exact = true;
+		return true;
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		if (escape_package_selector(expr) != nullptr || is_type_pointer(se->expr->tav.type)) {
+			return false;
+		}
+		if (!escape_nil_location(se->expr, root, path, exact)) {
+			return false;
+		}
+		EscapePath field = {};
+		if (!escape_selector_path(expr, &field) || field.count == 0) {
+			// e.g. a field of a raw union, which shares its storage with the others
+			*exact = false;
+			return true;
+		}
+		*path = escape_path_concat(*path, field);
+		return true;
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		Type *t = base_type(ie->expr->tav.type);
+		if (t == nullptr) {
+			return false;
+		}
+		switch (t->kind) {
+		case Type_Array:
+		case Type_EnumeratedArray:
+		case Type_FixedCapacityDynamicArray:
+			if (!escape_nil_location(ie->expr, root, path, exact)) {
+				return false;
+			}
+			*path  = escape_path_concat(*path, escape_path_of(EscapeStep_AnyElement));
+			*exact = false;
+			return true;
+		}
+		return false;
+	case_end;
+	}
+	return false;
+}
+
+// the local an expression is part of, unless it is reached through a pointer or is in the buffer of a slice and such
+gb_internal Entity *escape_nil_root(Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr) {
+		return nullptr;
+	}
+	Ast *base = nullptr;
+	switch (expr->kind) {
+	case_ast_node(i, Ident, expr);
+		Entity *e = entity_of_node(expr);
+		// a field brought in by 'using', of what it was applied to
+		while (e != nullptr && e->using_parent != nullptr) {
+			if (is_type_pointer(e->using_parent->type) || is_type_soa_pointer(e->using_parent->type)) {
+				return nullptr;
+			}
+			e = e->using_parent;
+		}
+		if (escape_is_local(e)) {
+			return e;
+		}
+		return nullptr;
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		if (escape_package_selector(expr) != nullptr || is_type_pointer(se->expr->tav.type)) {
+			return nullptr;
+		}
+		return escape_nil_root(se->expr);
+	case_end;
+
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		return escape_nil_root(mie->expr);
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		base = ie->expr;
+	case_end;
+
+	case_ast_node(se, SliceExpr, expr);
+		base = se->expr;
+	case_end;
+	}
+
+	// e.g. the elements of an array, or of a #soa one
+	Type *t = nullptr;
+	if (base != nullptr) {
+		t = base_type(base->tav.type);
+	}
+	if (t == nullptr) {
+		return nullptr;
+	}
+	switch (t->kind) {
+	case Type_Array:
+	case Type_EnumeratedArray:
+	case Type_FixedCapacityDynamicArray:
+	case Type_Struct:
+		return escape_nil_root(base);
+	}
+	return nullptr;
+}
+
+gb_internal bool escape_nil_escaped(EscapeAnalysis *ea, Entity *e) {
+	for (Entity *x : ea->nil_escaped) {
+		if (x == e) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal void escape_nil_add(EscapeAnalysis *ea, Entity *e, EscapePath const &path) {
+	if (escape_nil_escaped(ea, e) || escape_nil_covered(ea->state.nils, e, path)) {
+		return;
+	}
+	array_add(&ea->state.nils, EscapeNil{e, path});
+}
+
+// what is at the path may no longer be nil, while the rest of what a fact says is nil stays so
+gb_internal void escape_nil_kill(EscapeAnalysis *ea, Entity *e, EscapePath const &path) {
+	auto pieces = array_make<EscapeNil>(temporary_allocator(), 0, 0);
+	for (isize i = ea->state.nils.count-1; i >= 0; i--) {
+		EscapeNil const n = ea->state.nils[i];
+		if (n.e != e || !(escape_path_has_prefix(n.path, path) || escape_path_has_prefix(path, n.path))) {
+			continue;
+		}
+		array_unordered_remove(&ea->state.nils, i);
+
+		// the other fields of each struct the path goes through, until it goes through something else
+		Type *t = escape_type_within(e->type, n.path);
+		for (isize j = n.path.count; j < path.count; j++) {
+			Type *bt = base_type(t);
+			if (path[j].kind != EscapeStep_Field || bt == nullptr || bt->kind != Type_Struct) {
+				break;
+			}
+			bool is_own_field = false;
+			for (Entity *f : bt->Struct.fields) {
+				is_own_field |= f == path[j].field;
+			}
+			if (!is_own_field) {
+				break;
+			}
+			for (Entity *f : bt->Struct.fields) {
+				if (f != path[j].field && escape_type_has_nilable(f->type)) {
+					array_add(&pieces, EscapeNil{e, escape_path_concat(slice(path, 0, j), escape_path_of(EscapeStep_Field, f))});
+				}
+			}
+			t = path[j].field->type;
+		}
+	}
+	for (EscapeNil const &p : pieces) {
+		escape_nil_add(ea, p.e, p.path);
+	}
+}
+
+// taking the address of a local, or of a part of it, lets anything change it later through what it was given
+gb_internal void escape_nil_escape(EscapeAnalysis *ea, Ast *expr) {
+	if (!ea->nil_deref) {
+		return;
+	}
+	Entity *root = escape_nil_root(expr);
+	if (root != nullptr && !escape_nil_escaped(ea, root)) {
+		array_add(&ea->nil_escaped, root);
+		escape_nil_forget(ea, root);
+	}
+}
+
+// back to what was nil before a part of an expression, except for what has had its address taken since
+gb_internal void escape_nil_restore(EscapeAnalysis *ea, Array<EscapeNil> const &nils) {
+	ea->state.nils = array_clone(temporary_allocator(), nils);
+	for (Entity *e : ea->nil_escaped) {
+		escape_nil_forget(ea, e);
+	}
+}
+
+gb_internal bool escape_is_explicit_unsafe_conversion(Type *t);
+
+// the paths within the value of an expression which are nil on every path reaching here
+gb_internal Array<EscapePath> escape_nil_paths(EscapeAnalysis *ea, Ast *expr) {
+	auto paths = array_make<EscapePath>(temporary_allocator(), 0, 0);
+	expr = unparen_expr(expr);
+	if (expr == nullptr) {
+		return paths;
+	}
+	if (escape_is_nil_literal(expr)) {
+		array_add(&paths, EscapePath{});
+		return paths;
+	}
+
+	switch (expr->kind) {
+	case_ast_node(cl, CompoundLit, expr);
+		// what it does not give a value is zero
+		Type *t = base_type(expr->tav.type);
+		if (!escape_type_has_nilable(t)) {
+			return paths;
+		}
+		if (cl->elems.count == 0) {
+			array_add(&paths, EscapePath{});
+			return paths;
+		}
+		if (t->kind != Type_Struct || t->Struct.is_raw_union) {
+			return paths;
+		}
+		auto values = array_make<Ast *>(temporary_allocator(), t->Struct.fields.count);
+		for (Ast *&value : values) {
+			value = nullptr;
+		}
+		for_array(i, cl->elems) {
+			Ast *elem = cl->elems[i];
+			isize index = -1;
+			if (elem->kind != Ast_FieldValue) {
+				index = i;
+			} else if (elem->FieldValue.field->kind == Ast_Ident) {
+				for_array(j, t->Struct.fields) {
+					if (t->Struct.fields[j]->token.string == elem->FieldValue.field->Ident.token.string) {
+						index = j;
+					}
+				}
+				elem = elem->FieldValue.value;
+			}
+			if (index < 0 || index >= values.count) {
+				// e.g. a field reached through 'using'
+				array_clear(&paths);
+				return paths;
+			}
+			values[index] = elem;
+		}
+		for_array(j, t->Struct.fields) {
+			Entity *f = t->Struct.fields[j];
+			if (!escape_type_has_nilable(f->type)) {
+				continue;
+			}
+			EscapePath field = escape_path_of(EscapeStep_Field, f);
+			if (values[j] == nullptr) {
+				array_add(&paths, field);
+				continue;
+			}
+			for (EscapePath const &p : escape_nil_paths(ea, values[j])) {
+				array_add(&paths, escape_path_concat(field, p));
+			}
+		}
+		return paths;
+	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		if (ce->proc->tav.mode == Addressing_Type && ce->args.count == 1 && !escape_is_explicit_unsafe_conversion(expr->tav.type)) {
+			return escape_nil_paths(ea, ce->args[0]);
+		}
+		return paths;
+	case_end;
+
+	case_ast_node(tc, TypeCast, expr);
+		if (tc->token.kind == Token_transmute || escape_is_explicit_unsafe_conversion(expr->tav.type)) {
+			return paths;
+		}
+		return escape_nil_paths(ea, tc->expr);
+	case_end;
+
+	case_ast_node(ac, AutoCast, expr);
+		return escape_nil_paths(ea, ac->expr);
+	case_end;
+	}
+
+	Entity *root = nullptr;
+	EscapePath path = {};
+	bool exact = false;
+	if (!escape_nil_location(expr, &root, &path, &exact)) {
+		return paths;
+	}
+	for (EscapeNil const &n : ea->state.nils) {
+		if (n.e != root) {
+			continue;
+		}
+		if (escape_path_has_prefix(path, n.path)) {
+			array_add(&paths, EscapePath{});
+		} else if (escape_path_has_prefix(n.path, path)) {
+			array_add(&paths, slice(n.path, path.count, n.path.count));
+		}
+	}
+	return paths;
+}
+
+// a store of a value which is nil at `paths`, taken before its statement stored anything, unless it is unknown
+gb_internal void escape_nil_store(EscapeAnalysis *ea, Ast *lhs, Array<EscapePath> const *paths) {
+	if (!ea->nil_deref) {
+		return;
+	}
+	Entity *root = nullptr;
+	EscapePath path = {};
+	bool exact = false;
+	if (!escape_nil_location(lhs, &root, &path, &exact)) {
+		// e.g. into an element of a #soa array
+		root = escape_nil_root(lhs);
+		if (root != nullptr) {
+			escape_nil_forget(ea, root);
+		}
+		return;
+	}
+	escape_nil_kill(ea, root, path);
+	if (exact && paths != nullptr) {
+		for (EscapePath const &p : *paths) {
+			escape_nil_add(ea, root, escape_path_concat(path, p));
+		}
+	}
+}
+
+// the named results are set when returning with values, before the defers run
+gb_internal void escape_nil_forget_results(EscapeAnalysis *ea) {
+	if (!ea->nil_deref || ea->pt->results == nullptr || !ea->pt->has_named_results) {
+		return;
+	}
+	for (Entity *e : ea->pt->results->Tuple.variables) {
+		escape_nil_forget(ea, e);
+	}
+}
+
+// what a condition being `truth` tells of what is nil
+gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
+	cond = unparen_expr(cond);
+	if (!ea->nil_deref || cond == nullptr) {
+		return;
+	}
+	switch (cond->kind) {
+	case_ast_node(ue, UnaryExpr, cond);
+		if (ue->op.kind == Token_Not) {
+			escape_nil_refine(ea, ue->expr, !truth);
+		}
+	case_end;
+
+	case_ast_node(be, BinaryExpr, cond);
+		switch (be->op.kind) {
+		case Token_CmpAnd:
+			if (truth) {
+				escape_nil_refine(ea, be->left,  true);
+				escape_nil_refine(ea, be->right, true);
+			}
+			break;
+		case Token_CmpOr:
+			if (!truth) {
+				escape_nil_refine(ea, be->left,  false);
+				escape_nil_refine(ea, be->right, false);
+			}
+			break;
+		case Token_CmpEq:
+		case Token_NotEq: {
+			Ast *x = be->left;
+			if (escape_is_nil_literal(x)) {
+				x = be->right;
+			} else if (!escape_is_nil_literal(be->right)) {
+				break;
+			}
+			Entity *root = nullptr;
+			EscapePath path = {};
+			bool exact = false;
+			if (!escape_nil_location(x, &root, &path, &exact)) {
+				break;
+			}
+			bool is_nil = (be->op.kind == Token_CmpEq) == truth;
+			if (!is_nil) {
+				escape_nil_kill(ea, root, path);
+			} else if (exact && escape_type_has_nilable(x->tav.type)) {
+				escape_nil_add(ea, root, path);
+			}
+			break;
+		}
+		}
+	case_end;
+	}
+}
+
+gb_internal void escape_nil_use(EscapeAnalysis *ea, Ast *ptr, EscapeReportKind kind) {
+	bool nil = false;
+	for (EscapePath const &p : escape_nil_paths(ea, ptr)) {
+		nil |= p.count == 0;
+	}
+	array_add(&ea->nil_uses, EscapeNilUse{ptr, kind, nil});
+}
+
+gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr);
+
+// the address of what an expression is, which only loads what it is reached through
+gb_internal void escape_nil_scan_addr(EscapeAnalysis *ea, Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr) {
+		return;
+	}
+	switch (expr->kind) {
+	case_ast_node(se, SelectorExpr, expr);
+		if (escape_package_selector(expr) != nullptr) {
+			return;
+		}
+		if (is_type_pointer(se->expr->tav.type)) {
+			escape_nil_scan(ea, se->expr);
+		} else {
+			escape_nil_scan_addr(ea, se->expr);
+		}
+		return;
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		Type *t = base_type(ie->expr->tav.type);
+		if (t != nullptr && (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_FixedCapacityDynamicArray)) {
+			escape_nil_scan_addr(ea, ie->expr);
+		} else {
+			escape_nil_scan(ea, ie->expr);
+		}
+		escape_nil_scan(ea, ie->index);
+		return;
+	case_end;
+
+	case_ast_node(de, DerefExpr, expr);
+		escape_nil_scan(ea, de->expr);
+		return;
+	case_end;
+	}
+	escape_nil_scan(ea, expr);
+}
+
+// checks every dereference an expression makes with what is nil before it, as nothing it does can make a local
+// nil, nor change one whose address was not taken
+gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr) {
+	if (!ea->nil_deref || expr == nullptr || expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
+		return;
+	}
+	switch (expr->kind) {
+	case_ast_node(pe, ParenExpr, expr);
+		escape_nil_scan(ea, pe->expr);
+	case_end;
+
+	case_ast_node(ue, UnaryExpr, expr);
+		if (ue->op.kind == Token_And) {
+			escape_nil_escape(ea, ue->expr);
+			escape_nil_scan_addr(ea, ue->expr);
+		} else {
+			escape_nil_scan(ea, ue->expr);
+		}
+	case_end;
+
+	case_ast_node(be, BinaryExpr, expr);
+		escape_nil_scan(ea, be->left);
+		if (be->op.kind == Token_CmpAnd || be->op.kind == Token_CmpOr) {
+			// only evaluated when the left decides nothing
+			auto nils = array_clone(temporary_allocator(), ea->state.nils);
+			escape_nil_refine(ea, be->left, be->op.kind == Token_CmpAnd);
+			escape_nil_scan(ea, be->right);
+			escape_nil_restore(ea, nils);
+		} else {
+			escape_nil_scan(ea, be->right);
+		}
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		if (escape_package_selector(expr) != nullptr) {
+			break;
+		}
+		if (is_type_pointer(se->expr->tav.type)) {
+			escape_nil_use(ea, se->expr, EscapeReport_NilDeref);
+		}
+		escape_nil_scan(ea, se->expr);
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		Type *t = base_type(ie->expr->tav.type);
+		if (t != nullptr && (t->kind == Type_Pointer || t->kind == Type_MultiPointer)) {
+			escape_nil_use(ea, ie->expr, EscapeReport_NilDeref);
+		}
+		escape_nil_scan(ea, ie->expr);
+		escape_nil_scan(ea, ie->index);
+	case_end;
+
+	case_ast_node(de, DerefExpr, expr);
+		escape_nil_use(ea, de->expr, EscapeReport_NilDeref);
+		escape_nil_scan(ea, de->expr);
+	case_end;
+
+	case_ast_node(se, SliceExpr, expr);
+		Type *t = base_type(se->expr->tav.type);
+		if (t != nullptr && (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_FixedCapacityDynamicArray)) {
+			escape_nil_escape(ea, se->expr);
+			escape_nil_scan_addr(ea, se->expr);
+		} else {
+			escape_nil_scan(ea, se->expr);
+		}
+		escape_nil_scan(ea, se->low);
+		escape_nil_scan(ea, se->high);
+	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		Ast *proc = unparen_expr(ce->proc);
+		if (proc->tav.mode != Addressing_Type) {
+			Entity *e = nullptr;
+			if (proc->kind == Ast_Ident || proc->kind == Ast_SelectorExpr) {
+				e = entity_of_node(proc);
+			}
+			if (is_type_proc(proc->tav.type) && (e == nullptr || e->kind == Entity_Variable)) {
+				escape_nil_use(ea, proc, EscapeReport_NilCall);
+			}
+			escape_nil_scan(ea, proc);
+		}
+		for (Ast *arg : ce->args) {
+			escape_nil_scan(ea, arg);
+		}
+	case_end;
+
+	case_ast_node(sce, SelectorCallExpr, expr);
+		escape_nil_scan(ea, sce->call);
+	case_end;
+
+	case_ast_node(cl, CompoundLit, expr);
+		for (Ast *elem : cl->elems) {
+			escape_nil_scan(ea, elem);
+		}
+	case_end;
+
+	case_ast_node(te, TernaryIfExpr, expr);
+		escape_nil_scan(ea, te->cond);
+		auto nils = array_clone(temporary_allocator(), ea->state.nils);
+		escape_nil_refine(ea, te->cond, true);
+		escape_nil_scan(ea, te->x);
+		escape_nil_restore(ea, nils);
+		escape_nil_refine(ea, te->cond, false);
+		escape_nil_scan(ea, te->y);
+		escape_nil_restore(ea, nils);
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, expr);
+		if (te->cond == nullptr || te->cond->tav.value.kind != ExactValue_Bool) {
+			break;
+		}
+		if (te->cond->tav.value.value_bool) {
+			escape_nil_scan(ea, te->x);
+		} else {
+			escape_nil_scan(ea, te->y);
+		}
+	case_end;
+
+	case_ast_node(oe, OrElseExpr, expr);
+		escape_nil_scan(ea, oe->x);
+		escape_nil_scan(ea, oe->y);
+	case_end;
+
+	case_ast_node(re, OrReturnExpr, expr);
+		escape_nil_scan(ea, re->expr);
+	case_end;
+
+	case_ast_node(be, OrBranchExpr, expr);
+		escape_nil_scan(ea, be->expr);
+	case_end;
+
+	case_ast_node(ta, TypeAssertion, expr);
+		if (is_type_pointer(ta->expr->tav.type)) {
+			escape_nil_use(ea, ta->expr, EscapeReport_NilDeref);
+		}
+		escape_nil_scan(ea, ta->expr);
+	case_end;
+
+	case_ast_node(tc, TypeCast, expr);
+		escape_nil_scan(ea, tc->expr);
+	case_end;
+
+	case_ast_node(ac, AutoCast, expr);
+		escape_nil_scan(ea, ac->expr);
+	case_end;
+
+	case_ast_node(te, TagExpr, expr);
+		escape_nil_scan(ea, te->expr);
+	case_end;
+
+	case_ast_node(fv, FieldValue, expr);
+		escape_nil_scan(ea, fv->value);
+	case_end;
+
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		escape_nil_scan(ea, mie->expr);
+		escape_nil_scan(ea, mie->row_index);
+		escape_nil_scan(ea, mie->column_index);
+	case_end;
+	}
+}
+
+gb_internal int escape_nil_use_cmp(void const *a, void const *b) {
+	uintptr x = cast(uintptr)(cast(EscapeNilUse const *)a)->ptr;
+	uintptr y = cast(uintptr)(cast(EscapeNilUse const *)b)->ptr;
+	if (x < y) {
+		return -1;
+	}
+	if (x > y) {
+		return +1;
+	}
+	return 0;
 }
 
 
@@ -1496,6 +2206,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	case_ast_node(re, OrReturnExpr, expr);
 		EscapeValue v = escape_expr(ea, re->expr);
 		EscapeState state = escape_state_clone(ea->state);
+		escape_nil_forget_results(ea);
 		escape_exit(ea, expr, {}, {});
 		ea->state = state;
 		return v;
@@ -1651,6 +2362,12 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 	case EscapeReport_CallStore:
 		warning(ast_token(node), "'%.*s' may keep a reference to %s after the procedure returns", LIT(expr_str), origin);
 		break;
+	case EscapeReport_NilDeref:
+		error(ast_token(node), "Dereferencing '%.*s', which is always nil here", LIT(expr_str));
+		return;
+	case EscapeReport_NilCall:
+		error(ast_token(node), "Calling '%.*s', which is always nil here", LIT(expr_str));
+		return;
 	default:
 		GB_PANIC("Unhandled EscapeReportKind");
 		break;
@@ -1703,6 +2420,31 @@ gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, S
 		gb_string_free(s);
 	} else {
 		escape_report(ea, node, name, o, kind);
+	}
+}
+
+// a use is reported only when what it goes through is nil every time it is reached, e.g. in a defer run at several exits
+gb_internal void escape_nil_report(EscapeAnalysis *ea) {
+	array_sort(ea->nil_uses, escape_nil_use_cmp);
+	for (isize i = 0; i < ea->nil_uses.count; /**/) {
+		EscapeNilUse const &use = ea->nil_uses[i];
+		bool nil = true;
+		isize j = i;
+		for (/**/; j < ea->nil_uses.count && ea->nil_uses[j].ptr == use.ptr; j++) {
+			nil &= ea->nil_uses[j].nil;
+		}
+		if (nil) {
+			gbString s = escape_expr_to_string(use.ptr);
+			EscapeReport r = {use.kind, use.ptr, make_string_c(s)};
+			if (ea->reports == nullptr) {
+				escape_report_emit(r);
+			} else {
+				r.expr_str = copy_string(permanent_allocator(), r.expr_str);
+				array_add(ea->reports, r);
+			}
+			gb_string_free(s);
+		}
+		i = j;
 	}
 }
 
@@ -1825,6 +2567,10 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 	isize result_count = 0;
 	if (pt->results != nullptr) {
 		result_count = pt->results->Tuple.variables.count;
+	}
+
+	if (values.count == result_count) {
+		escape_nil_forget_results(ea);
 	}
 
 	// what is returned is fixed before the defers run
@@ -2068,8 +2814,13 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 
 	enum : isize { MAX_ITERATION_COUNT = 16 };
 
+	// what is nil only shrinks to what holds for every iteration, so only the uses of the last round are kept
+	isize nil_use_count = ea->nil_uses.count;
+	bool settled = false;
 	for (isize iteration = 0; iteration < MAX_ITERATION_COUNT; iteration++) {
+		ea->nil_uses.count = nil_use_count;
 		ea->state = escape_state_clone(head);
+		escape_nil_scan(ea, cond);
 		escape_visit_exits(ea, cond);
 
 		bool may_exit = range != nullptr;
@@ -2081,9 +2832,15 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 				may_exit = false;
 			}
 		}
-		if (may_exit) {
+		if (may_exit && ea->nil_deref && cond != nullptr) {
+			auto nils = array_clone(temporary_allocator(), ea->state.nils);
+			escape_nil_refine(ea, cond, false);
+			escape_state_join(&exit, ea->state);
+			escape_nil_restore(ea, nils);
+		} else if (may_exit) {
 			escape_state_join(&exit, ea->state);
 		}
+		escape_nil_refine(ea, cond, true);
 
 		if (range != nullptr) {
 			Ast *x = unparen_expr(range);
@@ -2162,10 +2919,15 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 			}
 		}
 		if (!escape_state_join(&head, ea->state)) {
+			settled = true;
 			break;
 		}
 	}
 	escape_state_join(&exit, ea->targets[target_index].breaks);
+	if (!settled) {
+		ea->nil_uses.count = nil_use_count;
+		array_clear(&exit.nils);
+	}
 	array_pop(&ea->targets);
 	ea->state = exit;
 }
@@ -2207,6 +2969,7 @@ gb_internal void escape_switch(EscapeAnalysis *ea, Ast *stmt, Ast *body, Ast *ty
 		escape_state_join(&ea->state, ea->fallthrough);
 		ea->fallthrough = escape_state_unreachable();
 		for (Ast *e : cc->list) {
+			escape_nil_scan(ea, e);
 			escape_visit_exits(ea, e);
 		}
 		isize alias_count = ea->aliases.count;
@@ -2226,6 +2989,7 @@ gb_internal void escape_switch(EscapeAnalysis *ea, Ast *stmt, Ast *body, Ast *ty
 				for (EscapeValueFact const &f : tag_ptr) {
 					array_add(&ea->aliases, EscapeAlias{e, f.origin});
 				}
+				escape_nil_escape(ea, type_switch_rhs);
 			}
 		}
 		escape_block(ea, cc->stmts);
@@ -2247,6 +3011,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	}
 	switch (node->kind) {
 	case_ast_node(es, ExprStmt, node);
+		escape_nil_scan(ea, es->expr);
 		escape_visit_exits(ea, es->expr);
 		if (is_diverging_stmt(node)) {
 			ea->state.reachable = false;
@@ -2257,6 +3022,16 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		if (!vd->is_mutable) {
 			break;
 		}
+		auto nil_paths = array_make<Array<EscapePath> >(temporary_allocator(), 0, 0);
+		for (Ast *value : vd->values) {
+			escape_nil_scan(ea, value);
+		}
+		if (ea->nil_deref && vd->values.count == vd->names.count) {
+			for (Ast *value : vd->values) {
+				array_add(&nil_paths, escape_nil_paths(ea, value));
+			}
+		}
+
 		if (vd->values.count == vd->names.count) {
 			for_array(i, vd->names) {
 				Entity *e = entity_of_node(vd->names[i]);
@@ -2292,9 +3067,44 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 				escape_store_obj(ea, {e}, {}, v, EscapeUpdate_Replace);
 			}
 		}
+
+		if (ea->nil_deref) {
+			for_array(i, vd->names) {
+				Entity *e = entity_of_node(vd->names[i]);
+				if (!escape_is_local(e)) {
+					continue;
+				}
+				escape_nil_forget(ea, e);
+				if (vd->values.count == 0 && escape_type_has_nilable(e->type)) {
+					escape_nil_add(ea, e, {});
+				}
+				if (i < nil_paths.count) {
+					for (EscapePath const &p : nil_paths[i]) {
+						escape_nil_add(ea, e, p);
+					}
+				}
+			}
+		}
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
+		auto nil_paths = array_make<Array<EscapePath> >(temporary_allocator(), 0, 0);
+		for (Ast *rhs : as->rhs) {
+			escape_nil_scan(ea, rhs);
+		}
+		for (Ast *lhs : as->lhs) {
+			escape_nil_scan(ea, lhs);
+		}
+		if (as->op.kind != Token_Eq) {
+			for (Ast *lhs : as->lhs) {
+				escape_nil_store(ea, lhs, nullptr);
+			}
+		} else if (ea->nil_deref && as->lhs.count == as->rhs.count) {
+			for (Ast *rhs : as->rhs) {
+				array_add(&nil_paths, escape_nil_paths(ea, rhs));
+			}
+		}
+
 		if (as->op.kind != Token_Eq) {
 			for (Ast *lhs : as->lhs) {
 				escape_visit_exits(ea, lhs);
@@ -2347,6 +3157,14 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 				escape_store(ea, as->lhs[i], v);
 			}
 		}
+
+		for_array(i, as->lhs) {
+			Array<EscapePath> const *paths = nullptr;
+			if (i < nil_paths.count) {
+				paths = &nil_paths[i];
+			}
+			escape_nil_store(ea, as->lhs[i], paths);
+		}
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
@@ -2367,13 +3185,16 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		}
 
 		escape_stmt(ea, is->init);
+		escape_nil_scan(ea, is->cond);
 		escape_visit_exits(ea, is->cond);
 
 		EscapeState other = escape_state_clone(ea->state);
+		escape_nil_refine(ea, is->cond, true);
 		escape_stmt(ea, is->body);
 
 		EscapeState then = ea->state;
 		ea->state = other;
+		escape_nil_refine(ea, is->cond, false);
 		escape_stmt(ea, is->else_stmt);
 
 		escape_state_join(&ea->state, then);
@@ -2398,6 +3219,9 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
+		for (Ast *expr : rs->results) {
+			escape_nil_scan(ea, expr);
+		}
 		isize result_count = 0;
 		if (ea->pt->results != nullptr) {
 			result_count = ea->pt->results->Tuple.variables.count;
@@ -2460,15 +3284,29 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		if (rs->vals.count > 1) {
 			val1 = rs->vals[1];
 		}
+		escape_nil_scan(ea, rs->expr);
+		for (Ast *val : rs->vals) {
+			if (val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And) {
+				escape_nil_escape(ea, rs->expr);
+			}
+		}
 		escape_loop(ea, node, nullptr, nullptr, rs->body, val0, val1, rs->expr);
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);
+		escape_nil_scan(ea, rs->expr);
+		Ast *vals[2] = {rs->val0, rs->val1};
+		for (Ast *val : vals) {
+			if (val != nullptr && val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And) {
+				escape_nil_escape(ea, rs->expr);
+			}
+		}
 		escape_loop(ea, node, nullptr, nullptr, rs->body, rs->val0, rs->val1, rs->expr);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
 		escape_stmt(ea, ss->init);
+		escape_nil_scan(ea, ss->tag);
 		escape_visit_exits(ea, ss->tag);
 		bool exhaustive = false;
 		if (!ss->partial && ss->tag != nullptr) {
@@ -2487,6 +3325,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		if (rhs == nullptr) {
 			break;
 		}
+		escape_nil_scan(ea, rhs);
 		escape_switch(ea, node, ss->body, rhs, !ss->partial);
 	case_end;
 
@@ -2558,6 +3397,10 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
 
+	ea.nil_deref   = (ast_file_vet_flags(body->file()) & VetFlag_NilDeref) != 0;
+	ea.nil_uses    = array_make<EscapeNilUse>(temporary_allocator(), 0, 0);
+	ea.nil_escaped = array_make<Entity *>(temporary_allocator(), 0, 0);
+
 	if (ea.pt->variadic &&
 	    !ea.pt->c_vararg &&
 	    ea.pt->params != nullptr &&
@@ -2577,6 +3420,9 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	escape_stmt(&ea, body);
 	if (ea.state.reachable) {
 		escape_exit(&ea, body, {}, {});
+	}
+	if (ea.nil_deref) {
+		escape_nil_report(&ea);
 	}
 	global_error_context.instantiations = prev_instantiations;
 

@@ -7261,6 +7261,7 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags)
 			error_line("\ttabs\n");
 			error_line("\texplicit-allocators\n");
 			error_line("\twhen-shadowing\n");
+			error_line("\tnil-deref\n");
 			return vet_flags;
 		}
 	}
