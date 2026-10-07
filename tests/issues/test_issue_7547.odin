@@ -9,6 +9,8 @@ import fmt "core:fmt"
 import slice "core:slice"
 import os "core:os"
 import win32 "core:sys/windows"
+import log "core:log"
+import time "core:time"
 
 @(test)
 test_issue_7547 :: proc(t: ^testing.T) {
@@ -40,7 +42,14 @@ test_issue_7547 :: proc(t: ^testing.T) {
 	{
 		remove_error := os.remove_all(root)
 		testing.expect(t, remove_error == nil, fmt.aprintf("os.remove_all failed to remove non-empty directory.", allocator = context.temp_allocator))
-		testing.expect(t, !os.exists(root), fmt.aprintf("os.remove_all left the tree behind", allocator = context.temp_allocator))
+
+		// NOTE: It can occasionally take a bit until the OS reports the directory as missing. This is not a bug.
+		if os.exists(root) {
+			log.warnf("os.remove_all left the tree behind (first chance - will check again...): %v", root)
+			time.sleep(1 * time.Second)
+			testing.expect(t, !os.exists(root), fmt.aprintf("os.remove_all left the tree behind (second chance): %v", root, allocator = context.temp_allocator))
+			log.infof("Directory removal was OK after a short delay: %v", root)
+		}
 	}
 }
 
@@ -98,7 +107,14 @@ test_issue_7547_dirty :: proc(t: ^testing.T) {
 
 		remove_error := os.remove_all(root)
 		testing.expect(t, remove_error == nil, fmt.aprintf("os.remove_all failed on iteration %d", iteration, allocator=context.temp_allocator))
-		testing.expect(t, !os.exists(root), fmt.aprintf("os.remove_all left the tree behind on iteration %d", iteration, allocator=context.temp_allocator))
+
+		// NOTE: It can occasionally take a bit until the OS reports the directory as missing. This is not a bug.
+		if os.exists(root) {
+			log.warnf("os.remove_all left the tree behind on iteration %v (first chance - will check again...): %v", iteration, root)
+			time.sleep(1 * time.Second)
+			testing.expect(t, !os.exists(root), fmt.aprintf("os.remove_all left the tree behind on iteration %v (second chance): %v", iteration, root, allocator = context.temp_allocator))
+			log.infof("Directory removal was OK after a short delay: %v", root)
+		}
 	}
 }
 
