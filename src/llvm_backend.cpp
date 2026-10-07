@@ -2334,7 +2334,7 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 			LLVMValueRef dst = var.var.value;
 			if (LLVMTypeOf(src0.value) != vt || !lb_try_copy_loaded_aggregate(p, dst, src0.value)) {
 				LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
-				LLVMBuildStore(p->builder, src, dst);
+				OdinLLVMBuildStore(p, src, dst);
 			}
 		}
 
@@ -3367,7 +3367,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 			LLVMValueRef dst = LLVMConstInBoundsGEP2(llvm_addr_type(m, all_tests_array), all_tests_array.value, indices, gb_count_of(indices));
 			LLVMValueRef src = llvm_const_named_struct(m, t_Internal_Test, vals, gb_count_of(vals));
 
-			LLVMBuildStore(p->builder, src, dst);
+			OdinLLVMBuildStore(p, src, dst);
 		}
 
 		lbAddr all_tests_slice = lb_add_local_generated(p, slice_type, true);

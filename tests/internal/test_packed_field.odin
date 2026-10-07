@@ -246,3 +246,88 @@ test_packed_field_union_type_switch_ref :: proc(t: ^testing.T) {
 	testing.expect(t, ok)
 	testing.expect(t, simd.to_array(v) == [4]f32{5, 6, 7, 8})
 }
+
+
+// direct loads and stores on a #packed global (the GEP folds to ConstantExpr, no metadata)
+
+@(export)
+p5: Packed_Small
+
+@(test)
+test_packed_field_direct_access :: proc(t: ^testing.T) {
+	p5.v = {9, 10, 11, 12} // store through a constant GEP
+	p5.n = -1              // scalar store at offset 17
+
+	y := p5.v              // load through a constant GEP
+	testing.expect(t, simd.to_array(y) == [4]f32{9, 10, 11, 12})
+	testing.expect(t, p5.n == -1)
+
+	p5.v = {}              // zero vector store -> lb_mem_zero_ptr's direct store path on most targets
+	p5.n = 0               // zero small store path on every target
+	testing.expect(t, simd.to_array(p5.v) == [4]f32{})
+	testing.expect(t, p5.n == 0)
+}
+
+
+// field access through ^runtime.Unaligned must compile to misalignment safe code
+
+import "base:runtime"
+
+@(export)
+p6: Packed_Small
+
+@(private="file")
+read_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32)) -> #simd[4]f32 {
+	return u.value
+}
+
+@(private="file")
+write_wrapped :: proc(u: ^runtime.Unaligned(#simd[4]f32), x: #simd[4]f32) {
+	u.value = x
+}
+
+@(test)
+test_packed_field_unaligned_wrapper :: proc(t: ^testing.T) {
+	p6.v = {1, 2, 3, 4}
+
+	u := (^runtime.Unaligned(#simd[4]f32))(&p6.v) // addr of field at offset 1
+	y := #force_no_inline read_wrapped(u)
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	#force_no_inline write_wrapped(u, {5, 6, 7, 8})
+	testing.expect(t, simd.to_array(p6.v) == [4]f32{5, 6, 7, 8})
+}
+
+
+// element type conversion of an array field of a #packed
+// goes through a vector load of the source array;
+// the load must not claim the element type alignment
+
+Packed_Conv :: struct #packed {
+	_:  u8,
+	a4: [4]f32, // offs 1
+}
+
+@(export)
+p7: Packed_Conv
+
+@(private="file")
+conv_float :: proc(p: ^Packed_Conv) -> [4]f64 {
+	return cast([4]f64)p.a4
+}
+
+@(private="file")
+conv_complex :: proc(p: ^Packed_Conv) -> [4]complex64 {
+	return cast([4]complex64)p.a4
+}
+
+@(test)
+test_packed_field_array_conv :: proc(t: ^testing.T) {
+	p7.a4 = {1.5, 2.5, 3.5, 4.5}
+
+	y := #force_no_inline conv_float(&p7)
+	testing.expect(t, y == [4]f64{1.5, 2.5, 3.5, 4.5})
+
+	z := #force_no_inline conv_complex(&p7)
+	testing.expect(t, z == [4]complex64{1.5, 2.5, 3.5, 4.5})
+}

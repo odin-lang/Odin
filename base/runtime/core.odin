@@ -568,6 +568,12 @@ when !ODIN_NO_RTTI {
 	#assert(size_of(Raw_Any) == size_of(any))
 }
 
+// A view of `T` at alignment 1. `^Unaligned(T)` may point at unaligned
+// memory, e.g. the address of a field of a `#packed` struct, or of a struct
+// whose `#max_field_align` is lower than `T`'s alignment.
+// Accesses through `.value` are misalignment safe.
+Unaligned :: struct($T: typeid) #packed { value: T }
+
 Raw_Cstring :: struct {
 	data: [^]byte,
 }
