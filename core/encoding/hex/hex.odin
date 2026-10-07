@@ -120,13 +120,13 @@ decode :: proc(src: []byte, allocator := context.allocator, loc := #caller_locat
 
 		a, a_ok := hex_digit(p)
 		if !a_ok {
-			delete(dst)
+			delete(dst, allocator)
 			dst = nil
 			return
 		}
 		b, b_ok := hex_digit(q)
 		if !b_ok {
-			delete(dst)
+			delete(dst, allocator)
 			dst = nil
 			return
 		}
