@@ -1337,17 +1337,13 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 	high = lb_emit_conv(p, high, t_int);
 	len  = lb_emit_conv(p, len, t_int);
 
-	LLVMValueRef zero = LLVMConstNull(lb_type(p->module, t_int));
-
 	if (!lower_value_used) {
 		auto args = array_make<lbValue>(permanent_allocator(), 5);
 		lb_set_file_line_col(p, args, token.pos);
 		args[3] = high;
 		args[4] = len;
 
-		LLVMValueRef c0 = LLVMBuildICmp(p->builder, LLVMIntSLE, zero,       high.value, "");
-		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
-		lbValue ok = {LLVMBuildAnd(p->builder, c0, c1, ""), t_llvm_bool};
+		lbValue ok = {LLVMBuildICmp(p->builder, LLVMIntULE, high.value, len.value, ""), t_llvm_bool};
 		char const *handler = "slice_expr_error_hi_contextless";
 		if (p->context_stack.count > 0) {
 			handler = "slice_expr_error_hi_with_context";
@@ -1363,10 +1359,9 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		args[4] = high;
 		args[5] = len;
 
-		LLVMValueRef c0 = LLVMBuildICmp(p->builder, LLVMIntSLE, zero,       low.value,  "");
-		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, low.value,  high.value, "");
-		LLVMValueRef c2 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
-		lbValue ok = {LLVMBuildAnd(p->builder, LLVMBuildAnd(p->builder, c0, c1, ""), c2, ""), t_llvm_bool};
+		LLVMValueRef c0 = LLVMBuildICmp(p->builder, LLVMIntULE, low.value,  high.value, "");
+		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntULE, high.value, len.value,  "");
+		lbValue ok = {LLVMBuildAnd(p->builder, c0, c1, ""), t_llvm_bool};
 		char const *handler = "slice_expr_error_lo_hi_contextless";
 		if (p->context_stack.count > 0) {
 			handler = "slice_expr_error_lo_hi_with_context";

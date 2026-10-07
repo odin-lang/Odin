@@ -138,7 +138,7 @@ multi_pointer_slice_expr_error_with_context :: proc (file: string, line, column:
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_hi_contextless :: proc "contextless" (file: string, line, column: i32, hi: int, len: int) {
-	if 0 <= hi && hi <= len {
+	if uint(hi) <= uint(len) {
 		return
 	}
 	slice_handle_error_contextless(file, line, column, 0, hi, len)
@@ -146,7 +146,7 @@ slice_expr_error_hi_contextless :: proc "contextless" (file: string, line, colum
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_hi_with_context :: proc (file: string, line, column: i32, hi: int, len: int) {
-	if 0 <= hi && hi <= len {
+	if uint(hi) <= uint(len) {
 		return
 	}
 	slice_handle_error_with_context(file, line, column, 0, hi, len)
@@ -154,7 +154,7 @@ slice_expr_error_hi_with_context :: proc (file: string, line, column: i32, hi: i
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_lo_hi_contextless :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) {
-	if 0 <= lo && lo <= hi && hi <= len {
+	if uint(lo) <= uint(hi) && uint(hi) <= uint(len) {
 		return
 	}
 	slice_handle_error_contextless(file, line, column, lo, hi, len)
@@ -162,7 +162,7 @@ slice_expr_error_lo_hi_contextless :: proc "contextless" (file: string, line, co
 
 @(disabled=ODIN_NO_BOUNDS_CHECK)
 slice_expr_error_lo_hi_with_context :: proc (file: string, line, column: i32, lo, hi: int, len: int) {
-	if 0 <= lo && lo <= hi && hi <= len {
+	if uint(lo) <= uint(hi) && uint(hi) <= uint(len) {
 		return
 	}
 	slice_handle_error_with_context(file, line, column, lo, hi, len)
