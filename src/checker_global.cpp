@@ -519,12 +519,12 @@ gb_internal void resolve_global_decl_source(GlobalDeclSource *src, InternedStrin
 		return;
 	}
 	GlobalWhenTrial *trial = global_when_trial;
-	i32 mute_depth = global_error_mute_depth;
+	i32 mute_depth = global_error_context.mute_depth;
 	global_when_trial = nullptr;
-	global_error_mute_depth = 0;
+	global_error_context.mute_depth = 0;
 	resolve_global_decl_source_internal(src, needed);
 	global_when_trial = trial;
-	global_error_mute_depth = mute_depth;
+	global_error_context.mute_depth = mute_depth;
 }
 
 gb_internal Entity *force_scope_placeholders(Scope *s, InternedString name, u32 hash) {
@@ -2027,8 +2027,8 @@ gb_internal bool global_when_trial_begin_entity(Entity *e, GlobalWhenTrialEntity
 		return true;
 	}
 	scope->trial = t;
-	scope->mute_depth = global_error_mute_depth;
-	global_error_mute_depth = 0;
+	scope->mute_depth = global_error_context.mute_depth;
+	global_error_context.mute_depth = 0;
 	t->real_depth += 1;
 	return true;
 }
@@ -2036,7 +2036,7 @@ gb_internal bool global_when_trial_begin_entity(Entity *e, GlobalWhenTrialEntity
 gb_internal void global_when_trial_end_entity(GlobalWhenTrialEntityScope *scope) {
 	if (scope->trial != nullptr) {
 		scope->trial->real_depth -= 1;
-		global_error_mute_depth = scope->mute_depth;
+		global_error_context.mute_depth = scope->mute_depth;
 	}
 }
 

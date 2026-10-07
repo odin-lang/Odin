@@ -2719,7 +2719,7 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 	info->type  = type;
 	info->body  = body;
 	info->tags  = tags;
-	info->poly_parent = global_error_instantiation;
+	info->poly_parent = global_error_context.instantiations.proc;
 	check_procedure_later(c, info);
 }
 
@@ -6265,9 +6265,9 @@ gb_internal WORKER_TASK_PROC(check_collect_entities_worker_proc) {
 	AstFile *f = cast(AstFile *)data;
 	reset_checker_context(ctx, f, untyped);
 
-	global_error_hold = true;
+	global_error_context.hold = true;
 	check_collect_entities(ctx, f->decls);
-	global_error_hold = false;
+	global_error_context.hold = false;
 
 	add_untyped_expressions(&c->info, ctx->untyped);
 
@@ -6702,12 +6702,12 @@ gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker) {
 gb_internal void error_out_instantiations(void) {
 	isize const max_shown = 8;
 	isize count = 0;
-	for (ErrorRecordInstantiation *r = global_error_record_instantiation; r != nullptr; r = r->prev) {
+	for (ErrorRecordInstantiation *r = global_error_context.instantiations.records; r != nullptr; r = r->prev) {
 		if (count++ < max_shown) {
 			error_out("\t%s instantiated as '%.*s'\n", token_pos_to_string(ast_token(r->site).pos), LIT(r->named_type->Named.name));
 		}
 	}
-	for (ProcInfo *pi = global_error_instantiation; pi != nullptr; pi = pi->poly_parent) {
+	for (ProcInfo *pi = global_error_context.instantiations.proc; pi != nullptr; pi = pi->poly_parent) {
 		if (count++ >= max_shown) {
 			continue;
 		}
@@ -6839,10 +6839,10 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		ctx.state_flags &= ~StateFlag_type_assert;
 	}
 
-	ProcInfo *prev_instantiation = global_error_instantiation;
-	global_error_instantiation = pi->generated_from_polymorphic ? pi : pi->poly_parent;
+	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
+	global_error_context.instantiations = {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 	bool body_was_checked = check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
-	global_error_instantiation = prev_instantiation;
+	global_error_context.instantiations = prev_instantiations;
 
 	if (body_was_checked) {
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
