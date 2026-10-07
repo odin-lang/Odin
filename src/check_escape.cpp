@@ -2368,8 +2368,8 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 	EscapeOrigin const &o = r.origin;
 	EscapeReportKind kind = r.kind;
 
-	gbString origin = gb_string_make(heap_allocator(), "");
-	defer (gb_string_free(origin));
+	TEMPORARY_ALLOCATOR_GUARD();
+	gbString origin = gb_string_make(temporary_allocator(), "");
 	switch (o.kind) {
 	case EscapeOrigin_Local: {
 		char const *description = "local variable";
@@ -3528,15 +3528,16 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 		return;
 	}
 
-	auto tasks = slice_make<EscapeMemberTask>(heap_allocator(), end - start);
-	defer (slice_free(&tasks, heap_allocator()));
+	TEMPORARY_ALLOCATOR_GUARD();
+	auto tasks = slice_make<EscapeMemberTask>(temporary_allocator(), end - start);
 	for (i32 k = start; k < end; k++) {
 		EscapeMemberTask &t = tasks[k - start];
 		t = {g, g->members[k]};
 		t.stale = true;
+		// filled in by analyses on other threads, which free their own temporary memory
 		array_init(&t.reports, heap_allocator(), 0, 0);
-		array_init(&t.callees, heap_allocator(), 0, 0);
-		array_init(&t.callers, heap_allocator(), 0, 0);
+		array_init(&t.callees, temporary_allocator(), 0, 0);
+		array_init(&t.callers, temporary_allocator(), 0, 0);
 	}
 	for_array(k, tasks) {
 		for (i32 i = g->offsets[tasks[k].v]; i < g->offsets[tasks[k].v+1]; i++) {
@@ -3550,13 +3551,10 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 	}
 
 	// callees before their callers, unless they call each other
-	auto order = array_make<i32>(heap_allocator(), 0, tasks.count);
-	defer (array_free(&order));
+	auto order = array_make<i32>(temporary_allocator(), 0, tasks.count);
 	{
-		auto frames  = array_make<EscapeOrderFrame>(heap_allocator(), 0, tasks.count);
-		auto visited = array_make<bool>(heap_allocator(), tasks.count);
-		defer (array_free(&frames));
-		defer (array_free(&visited));
+		auto frames  = array_make<EscapeOrderFrame>(temporary_allocator(), 0, tasks.count);
+		auto visited = array_make<bool>(temporary_allocator(), tasks.count);
 		for_array(root, tasks) {
 			if (visited[root]) {
 				continue;
@@ -3621,8 +3619,6 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 		}
 		global_error_context.instantiations = prev_instantiations;
 		array_free(&t.reports);
-		array_free(&t.callees);
-		array_free(&t.callers);
 
 		pi->decl->escape_flows = t.flows;
 		pi->decl->escapes_analysed.store(true);
@@ -3705,8 +3701,8 @@ gb_internal void escape_for_calls(EscapeGraph *g, PerThreadArray<CheckedCall> *c
 		return;
 	}
 
-	auto chunks = array_make<ThreadPoolChunk<CheckedCall> >(heap_allocator(), 0, calls->slots.count);
-	defer (array_free(&chunks));
+	TEMPORARY_ALLOCATOR_GUARD();
+	auto chunks = array_make<ThreadPoolChunk<CheckedCall> >(temporary_allocator(), 0, calls->slots.count);
 	for (PerThreadArraySlot<CheckedCall> &slot : calls->slots) {
 		for (isize i = 0; i < slot.array.count; i += CHUNK_SIZE) {
 			array_add(&chunks, ThreadPoolChunk<CheckedCall>{slot.array.data + i, gb_min(CHUNK_SIZE, slot.array.count - i), proc});
@@ -3730,8 +3726,8 @@ gb_internal WORKER_TASK_PROC(escape_graph_find_callers) {
 		g->caller_offsets[v+1] += g->caller_offsets[v];
 	}
 
-	auto next = array_clone(heap_allocator(), g->caller_offsets);
-	defer (array_free(&next));
+	TEMPORARY_ALLOCATOR_GUARD();
+	auto next = array_clone(temporary_allocator(), g->caller_offsets);
 	array_init(&g->callers, heap_allocator(), g->targets.count);
 	for (i32 v = 0; v < count; v++) {
 		for (i32 i = g->offsets[v]; i < g->offsets[v+1]; i++) {
@@ -3774,6 +3770,8 @@ gb_internal WORKER_TASK_PROC(escape_group_worker) {
 
 // once every body is checked, as a call needs to know what its procedure does
 gb_internal void check_escapes(Checker *c) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	EscapeGraph *g = &escape_graph;
 	defer ({
 		array_free(&g->procs);
@@ -3800,13 +3798,18 @@ gb_internal void check_escapes(Checker *c) {
 	// the calls of each procedure are counted, and then placed after those of the procedures before it
 	g->cursors = slice_make<std::atomic<i32> >(heap_allocator(), count);
 	escape_for_calls(g, &c->info.checked_calls_queue, escape_graph_count_calls);
+
 	array_init(&g->offsets, heap_allocator(), count+1);
+
 	for (i32 v = 0; v < count; v++) {
 		g->offsets[v+1] = g->offsets[v] + g->cursors[v].load(std::memory_order_relaxed);
 		g->cursors[v].store(g->offsets[v], std::memory_order_relaxed);
 	}
+
 	array_init(&g->targets, heap_allocator(), g->offsets[count]);
+
 	escape_for_calls(g, &c->info.checked_calls_queue, escape_graph_place_calls);
+
 	for (PerThreadArraySlot<CheckedCall> &slot : c->info.checked_calls_queue.slots) {
 		array_clear(&slot.array);
 	}
@@ -3820,8 +3823,7 @@ gb_internal void check_escapes(Checker *c) {
 	array_init(&g->group_of, heap_allocator(), count);
 	i32 group_count = global_graph_scc(count, g->offsets, g->targets, &g->group_of);
 	{
-		auto procs = array_make<i32>(heap_allocator(), count);
-		defer (array_free(&procs));
+		auto procs = array_make<i32>(temporary_allocator(), count);
 		for (i32 v = 0; v < count; v++) {
 			procs[v] = v;
 		}
@@ -3840,8 +3842,7 @@ gb_internal void check_escapes(Checker *c) {
 	escape_for_procs(g, escape_graph_count_pending);
 
 	// all found before any is analysed, as analysing one releases others
-	auto ready = array_make<i32>(heap_allocator(), 0, group_count);
-	defer (array_free(&ready));
+	auto ready = array_make<i32>(temporary_allocator(), 0, group_count);
 	for (i32 gi = 0; gi < group_count; gi++) {
 		if (g->pending[gi].load() == 0) {
 			array_add(&ready, gi);
