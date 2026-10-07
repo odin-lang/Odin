@@ -226,7 +226,7 @@ struct DeclInfo {
 	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
 	struct ProcInfo *proc_info; // its body, once checked
 
-	Futex             escape_thread; // 1 + the index of the thread analysing the escapes of its body, else 0
+	i32               escape_index; // of its body, see `EscapeGraph`
 	std::atomic<bool> escapes_analysed;
 	Slice<struct EscapeFlow> escape_flows; // see `escape_flows_of`
 
