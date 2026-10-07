@@ -319,6 +319,7 @@ enum VetFlags : u64 {
 	VetFlag_ExplicitAllocators = 1u<<11,
 	VetFlag_WhenShadowing   = 1u<<12,
 	VetFlag_NilDeref        = 1u<<13,
+	VetFlag_Uninitialized   = 1u<<14,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -358,6 +359,8 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_WhenShadowing;
 	} else if (name == "nil-deref") {
 		return VetFlag_NilDeref;
+	} else if (name == "uninitialized") {
+		return VetFlag_Uninitialized;
 	}
 	return VetFlag_NONE;
 }

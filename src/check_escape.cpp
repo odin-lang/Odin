@@ -89,10 +89,12 @@ struct EscapeOuterStore {
 	EscapeOrigin origin; // of what is stored
 };
 
-// what is at the path within a local is nil on every path reaching here, as is all of it, with -vet-nil-deref
+// what is at the path within a local is nil on every path reaching here, as is all of it, with -vet-nil-deref; or,
+// with -vet-uninitialized, has had nothing stored in it since it was declared with `---`
 struct EscapeNil {
 	Entity *   e;
 	EscapePath path;
+	bool       uninit;
 };
 
 struct EscapeState {
@@ -131,6 +133,7 @@ enum EscapeReportKind : u8 {
 	EscapeReport_CallStore,
 	EscapeReport_NilDeref,
 	EscapeReport_NilCall,
+	EscapeReport_UninitRead,
 };
 
 struct EscapeReport {
@@ -145,11 +148,12 @@ struct EscapeAlias {
 	EscapeOrigin origin;
 };
 
-// a dereference, or a call through a procedure value, and whether what it goes through is nil there
+// a dereference, or a call through a procedure value, and whether what it goes through is nil there; or a read, and
+// whether nothing has been stored in what it reads
 struct EscapeNilUse {
 	Ast *            ptr;
 	EscapeReportKind kind;
-	bool             nil;
+	bool             definite;
 };
 
 // The procedures are analysed in the strongly connected components of what they may call, callees first,
@@ -199,9 +203,11 @@ struct EscapeAnalysis {
 	Array<EscapeReport> *reports;     // kept rather than reported, while what flows through the group may still change
 	bool                 muted;       // the entry point of an executable, which only returns as the program ends
 
-	bool                 nil_deref;   // -vet-nil-deref
+	bool                 nil_deref;    // -vet-nil-deref
+	bool                 uninit;       // -vet-uninitialized
 	Array<EscapeNilUse>  nil_uses;
-	Array<Entity *>      nil_escaped; // locals whose address was taken, which anything may change from then on
+	Array<Entity *>      nil_escaped;  // locals whose address was taken, which anything may change from then on
+	Array<Entity *>      uninit_decls; // locals declared with `---`, whose reads are kept
 };
 
 gb_global EscapeGraph escape_graph;
@@ -390,9 +396,9 @@ gb_internal EscapeState escape_state_clone(EscapeState const &s) {
 	return c;
 }
 
-gb_internal bool escape_nil_covered(Array<EscapeNil> const &nils, Entity *e, EscapePath const &path) {
+gb_internal bool escape_nil_covered(Array<EscapeNil> const &nils, Entity *e, EscapePath const &path, bool uninit) {
 	for (EscapeNil const &n : nils) {
-		if (n.e == e && escape_path_has_prefix(path, n.path)) {
+		if (n.e == e && n.uninit == uninit && escape_path_has_prefix(path, n.path)) {
 			return true;
 		}
 	}
@@ -445,13 +451,13 @@ gb_internal bool escape_state_join(EscapeState *dst, EscapeState const &src) {
 	if (dst->nils.count > 0) {
 		auto nils = array_make<EscapeNil>(temporary_allocator(), 0, dst->nils.count);
 		for (EscapeNil const &n : dst->nils) {
-			if (escape_nil_covered(src.nils, n.e, n.path)) {
+			if (escape_nil_covered(src.nils, n.e, n.path, n.uninit)) {
 				array_add(&nils, n);
 			}
 		}
 		changed |= nils.count != dst->nils.count;
 		for (EscapeNil const &n : src.nils) {
-			if (escape_nil_covered(dst->nils, n.e, n.path) && !escape_nil_covered(nils, n.e, n.path)) {
+			if (escape_nil_covered(dst->nils, n.e, n.path, n.uninit) && !escape_nil_covered(nils, n.e, n.path, n.uninit)) {
 				array_add(&nils, n);
 				changed = true;
 			}
@@ -1087,8 +1093,8 @@ gb_internal Entity *escape_nil_root(Ast *expr) {
 	return nullptr;
 }
 
-gb_internal bool escape_nil_escaped(EscapeAnalysis *ea, Entity *e) {
-	for (Entity *x : ea->nil_escaped) {
+gb_internal bool escape_entity_in(Array<Entity *> const &entities, Entity *e) {
+	for (Entity *x : entities) {
 		if (x == e) {
 			return true;
 		}
@@ -1096,11 +1102,11 @@ gb_internal bool escape_nil_escaped(EscapeAnalysis *ea, Entity *e) {
 	return false;
 }
 
-gb_internal void escape_nil_add(EscapeAnalysis *ea, Entity *e, EscapePath const &path) {
-	if (escape_nil_escaped(ea, e) || escape_nil_covered(ea->state.nils, e, path)) {
+gb_internal void escape_nil_add(EscapeAnalysis *ea, Entity *e, EscapePath const &path, bool uninit) {
+	if (escape_entity_in(ea->nil_escaped, e) || escape_nil_covered(ea->state.nils, e, path, uninit)) {
 		return;
 	}
-	array_add(&ea->state.nils, EscapeNil{e, path});
+	array_add(&ea->state.nils, EscapeNil{e, path, uninit});
 }
 
 // what is at the path may no longer be nil, while the rest of what a fact says is nil stays so
@@ -1128,25 +1134,25 @@ gb_internal void escape_nil_kill(EscapeAnalysis *ea, Entity *e, EscapePath const
 				break;
 			}
 			for (Entity *f : bt->Struct.fields) {
-				if (f != path[j].field && escape_type_has_nilable(f->type)) {
-					array_add(&pieces, EscapeNil{e, escape_path_concat(slice(path, 0, j), escape_path_of(EscapeStep_Field, f))});
+				if (f != path[j].field && (n.uninit || escape_type_has_nilable(f->type))) {
+					array_add(&pieces, EscapeNil{e, escape_path_concat(slice(path, 0, j), escape_path_of(EscapeStep_Field, f)), n.uninit});
 				}
 			}
 			t = path[j].field->type;
 		}
 	}
 	for (EscapeNil const &p : pieces) {
-		escape_nil_add(ea, p.e, p.path);
+		escape_nil_add(ea, p.e, p.path, p.uninit);
 	}
 }
 
 // taking the address of a local, or of a part of it, lets anything change it later through what it was given
 gb_internal void escape_nil_escape(EscapeAnalysis *ea, Ast *expr) {
-	if (!ea->nil_deref) {
+	if (!ea->nil_deref && !ea->uninit) {
 		return;
 	}
 	Entity *root = escape_nil_root(expr);
-	if (root != nullptr && !escape_nil_escaped(ea, root)) {
+	if (root != nullptr && !escape_entity_in(ea->nil_escaped, root)) {
 		array_add(&ea->nil_escaped, root);
 		escape_nil_forget(ea, root);
 	}
@@ -1249,7 +1255,7 @@ gb_internal Array<EscapePath> escape_nil_paths(EscapeAnalysis *ea, Ast *expr) {
 		return paths;
 	}
 	for (EscapeNil const &n : ea->state.nils) {
-		if (n.e != root) {
+		if (n.e != root || n.uninit) {
 			continue;
 		}
 		if (escape_path_has_prefix(path, n.path)) {
@@ -1263,7 +1269,7 @@ gb_internal Array<EscapePath> escape_nil_paths(EscapeAnalysis *ea, Ast *expr) {
 
 // a store of a value which is nil at `paths`, taken before its statement stored anything, unless it is unknown
 gb_internal void escape_nil_store(EscapeAnalysis *ea, Ast *lhs, Array<EscapePath> const *paths) {
-	if (!ea->nil_deref) {
+	if (!ea->nil_deref && !ea->uninit) {
 		return;
 	}
 	Entity *root = nullptr;
@@ -1280,7 +1286,7 @@ gb_internal void escape_nil_store(EscapeAnalysis *ea, Ast *lhs, Array<EscapePath
 	escape_nil_kill(ea, root, path);
 	if (exact && paths != nullptr) {
 		for (EscapePath const &p : *paths) {
-			escape_nil_add(ea, root, escape_path_concat(path, p));
+			escape_nil_add(ea, root, escape_path_concat(path, p), false);
 		}
 	}
 }
@@ -1340,7 +1346,7 @@ gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
 			if (!is_nil) {
 				escape_nil_kill(ea, root, path);
 			} else if (exact && escape_type_has_nilable(x->tav.type)) {
-				escape_nil_add(ea, root, path);
+				escape_nil_add(ea, root, path, false);
 			}
 			break;
 		}
@@ -1350,11 +1356,33 @@ gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
 }
 
 gb_internal void escape_nil_use(EscapeAnalysis *ea, Ast *ptr, EscapeReportKind kind) {
+	if (!ea->nil_deref) {
+		return;
+	}
 	bool nil = false;
 	for (EscapePath const &p : escape_nil_paths(ea, ptr)) {
 		nil |= p.count == 0;
 	}
 	array_add(&ea->nil_uses, EscapeNilUse{ptr, kind, nil});
+}
+
+// a read of what is within a local, kept when that was declared with `---`; whether it is within a local, as then
+// what it is within is not read as a whole
+gb_internal bool escape_uninit_read(EscapeAnalysis *ea, Ast *expr) {
+	if (ea->uninit_decls.count == 0) {
+		// nothing declared with `---` to read yet, and scanning what it is within finds the same dereferences
+		return false;
+	}
+	Entity *root = nullptr;
+	EscapePath path = {};
+	bool exact = false;
+	if (!escape_nil_location(expr, &root, &path, &exact)) {
+		return false;
+	}
+	if (escape_entity_in(ea->uninit_decls, root)) {
+		array_add(&ea->nil_uses, EscapeNilUse{expr, EscapeReport_UninitRead, escape_nil_covered(ea->state.nils, root, path, true)});
+	}
+	return true;
 }
 
 // the address of what an expression is, which only loads what it is reached through
@@ -1364,6 +1392,10 @@ gb_internal void escape_nil_scan_addr(EscapeAnalysis *ea, Ast *expr) {
 		return;
 	}
 	switch (expr->kind) {
+	case_ast_node(i, Ident, expr);
+		return;
+	case_end;
+
 	case_ast_node(se, SelectorExpr, expr);
 		if (escape_package_selector(expr) != nullptr) {
 			return;
@@ -1377,13 +1409,21 @@ gb_internal void escape_nil_scan_addr(EscapeAnalysis *ea, Ast *expr) {
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
+		// the elements of an array, or of a #soa one, are within it
 		Type *t = base_type(ie->expr->tav.type);
-		if (t != nullptr && (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_FixedCapacityDynamicArray)) {
+		if (t != nullptr && (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_FixedCapacityDynamicArray || t->kind == Type_Struct)) {
 			escape_nil_scan_addr(ea, ie->expr);
 		} else {
 			escape_nil_scan(ea, ie->expr);
 		}
 		escape_nil_scan(ea, ie->index);
+		return;
+	case_end;
+
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		escape_nil_scan_addr(ea, mie->expr);
+		escape_nil_scan(ea, mie->row_index);
+		escape_nil_scan(ea, mie->column_index);
 		return;
 	case_end;
 
@@ -1395,13 +1435,17 @@ gb_internal void escape_nil_scan_addr(EscapeAnalysis *ea, Ast *expr) {
 	escape_nil_scan(ea, expr);
 }
 
-// checks every dereference an expression makes with what is nil before it, as nothing it does can make a local
-// nil, nor change one whose address was not taken
+// checks every dereference and read an expression makes with what is nil, or unset, before it, as nothing it does
+// can make a local nil, nor change one whose address was not taken; reads only once something is declared with `---`
 gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr) {
-	if (!ea->nil_deref || expr == nullptr || expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
+	if ((!ea->nil_deref && ea->uninit_decls.count == 0) || expr == nullptr || expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
 		return;
 	}
 	switch (expr->kind) {
+	case_ast_node(i, Ident, expr);
+		escape_uninit_read(ea, expr);
+	case_end;
+
 	case_ast_node(pe, ParenExpr, expr);
 		escape_nil_scan(ea, pe->expr);
 	case_end;
@@ -1434,8 +1478,12 @@ gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr) {
 		}
 		if (is_type_pointer(se->expr->tav.type)) {
 			escape_nil_use(ea, se->expr, EscapeReport_NilDeref);
+			escape_nil_scan(ea, se->expr);
+		} else if (escape_uninit_read(ea, expr)) {
+			escape_nil_scan_addr(ea, se->expr);
+		} else {
+			escape_nil_scan(ea, se->expr);
 		}
-		escape_nil_scan(ea, se->expr);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, expr);
@@ -1443,7 +1491,11 @@ gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr) {
 		if (t != nullptr && (t->kind == Type_Pointer || t->kind == Type_MultiPointer)) {
 			escape_nil_use(ea, ie->expr, EscapeReport_NilDeref);
 		}
-		escape_nil_scan(ea, ie->expr);
+		if (escape_uninit_read(ea, expr)) {
+			escape_nil_scan_addr(ea, ie->expr);
+		} else {
+			escape_nil_scan(ea, ie->expr);
+		}
 		escape_nil_scan(ea, ie->index);
 	case_end;
 
@@ -1558,15 +1610,15 @@ gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr) {
 }
 
 gb_internal int escape_nil_use_cmp(void const *a, void const *b) {
-	uintptr x = cast(uintptr)(cast(EscapeNilUse const *)a)->ptr;
-	uintptr y = cast(uintptr)(cast(EscapeNilUse const *)b)->ptr;
-	if (x < y) {
-		return -1;
-	}
-	if (x > y) {
+	EscapeNilUse const *x = cast(EscapeNilUse const *)a;
+	EscapeNilUse const *y = cast(EscapeNilUse const *)b;
+	if (x->ptr != y->ptr) {
+		if (cast(uintptr)x->ptr < cast(uintptr)y->ptr) {
+			return -1;
+		}
 		return +1;
 	}
-	return 0;
+	return cast(int)x->kind - cast(int)y->kind;
 }
 
 
@@ -2412,6 +2464,9 @@ gb_internal void escape_report_emit(EscapeReport const &r) {
 	case EscapeReport_NilCall:
 		error(ast_token(node), "Calling '%.*s', which is always nil here", LIT(expr_str));
 		return;
+	case EscapeReport_UninitRead:
+		error(ast_token(node), "Reading '%.*s' before anything is stored in it", LIT(expr_str));
+		return;
 	default:
 		GB_PANIC("Unhandled EscapeReportKind");
 		break;
@@ -3098,20 +3153,26 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			}
 		}
 
-		if (ea->nil_deref) {
+		if (ea->nil_deref || ea->uninit) {
 			for_array(i, vd->names) {
 				Entity *e = entity_of_node(vd->names[i]);
 				if (!escape_is_local(e)) {
 					continue;
 				}
 				escape_nil_forget(ea, e);
-				if (vd->values.count == 0 && escape_type_has_nilable(e->type)) {
-					escape_nil_add(ea, e, {});
+				if (ea->nil_deref && vd->values.count == 0 && escape_type_has_nilable(e->type)) {
+					escape_nil_add(ea, e, {}, false);
 				}
 				if (i < nil_paths.count) {
 					for (EscapePath const &p : nil_paths[i]) {
-						escape_nil_add(ea, e, p);
+						escape_nil_add(ea, e, p, false);
 					}
+				}
+				if (ea->uninit && i < vd->values.count && unparen_expr(vd->values[i])->kind == Ast_Uninit) {
+					if (!escape_entity_in(ea->uninit_decls, e)) {
+						array_add(&ea->uninit_decls, e);
+					}
+					escape_nil_add(ea, e, {}, true);
 				}
 			}
 		}
@@ -3123,7 +3184,12 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			escape_nil_scan(ea, rhs);
 		}
 		for (Ast *lhs : as->lhs) {
-			escape_nil_scan(ea, lhs);
+			// a store into a local does not read it, unless the operator does
+			if (as->op.kind == Token_Eq && escape_nil_root(lhs) != nullptr) {
+				escape_nil_scan_addr(ea, lhs);
+			} else {
+				escape_nil_scan(ea, lhs);
+			}
 		}
 		if (as->op.kind != Token_Eq) {
 			for (Ast *lhs : as->lhs) {
@@ -3314,22 +3380,31 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		if (rs->vals.count > 1) {
 			val1 = rs->vals[1];
 		}
-		escape_nil_scan(ea, rs->expr);
+		bool by_ref = false;
 		for (Ast *val : rs->vals) {
-			if (val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And) {
-				escape_nil_escape(ea, rs->expr);
-			}
+			by_ref |= val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And;
+		}
+		// iterating a local by reference does not read it
+		if (by_ref && escape_nil_root(rs->expr) != nullptr) {
+			escape_nil_escape(ea, rs->expr);
+			escape_nil_scan_addr(ea, rs->expr);
+		} else {
+			escape_nil_scan(ea, rs->expr);
 		}
 		escape_loop(ea, node, nullptr, nullptr, rs->body, val0, val1, rs->expr);
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);
-		escape_nil_scan(ea, rs->expr);
+		bool by_ref = false;
 		Ast *vals[2] = {rs->val0, rs->val1};
 		for (Ast *val : vals) {
-			if (val != nullptr && val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And) {
-				escape_nil_escape(ea, rs->expr);
-			}
+			by_ref |= val != nullptr && val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And;
+		}
+		if (by_ref && escape_nil_root(rs->expr) != nullptr) {
+			escape_nil_escape(ea, rs->expr);
+			escape_nil_scan_addr(ea, rs->expr);
+		} else {
+			escape_nil_scan(ea, rs->expr);
 		}
 		escape_loop(ea, node, nullptr, nullptr, rs->body, rs->val0, rs->val1, rs->expr);
 	case_end;
@@ -3405,9 +3480,12 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
 
-	ea.nil_deref   = (ast_file_vet_flags(body->file()) & VetFlag_NilDeref) != 0;
-	ea.nil_uses    = array_make<EscapeNilUse>(temporary_allocator(), 0, 0);
-	ea.nil_escaped = array_make<Entity *>(temporary_allocator(), 0, 0);
+	u64 vet_flags = ast_file_vet_flags(body->file());
+	ea.nil_deref    = (vet_flags & VetFlag_NilDeref) != 0;
+	ea.uninit       = (vet_flags & VetFlag_Uninitialized) != 0;
+	ea.nil_uses     = array_make<EscapeNilUse>(temporary_allocator(), 0, 0);
+	ea.nil_escaped  = array_make<Entity *>(temporary_allocator(), 0, 0);
+	ea.uninit_decls = array_make<Entity *>(temporary_allocator(), 0, 0);
 
 	if (ea.pt->variadic &&
 	    !ea.pt->c_vararg &&
@@ -3429,17 +3507,18 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	if (ea.state.reachable) {
 		escape_exit(&ea, body, {}, {});
 	}
-	if (ea.nil_deref) {
-		// a use is reported only when what it goes through is nil every time it is reached, e.g. in a defer run at several exits
+	if (ea.nil_deref || ea.uninit) {
+		// a use is reported only when what it goes through is nil, or unset, every time it is reached, e.g. in a defer
+		// run at several exits
 		array_sort(ea.nil_uses, escape_nil_use_cmp);
 		for (isize i = 0; i < ea.nil_uses.count; /**/) {
 			EscapeNilUse const &use = ea.nil_uses[i];
-			bool nil = true;
+			bool definite = true;
 			isize j = i;
-			for (/**/; j < ea.nil_uses.count && ea.nil_uses[j].ptr == use.ptr; j++) {
-				nil &= ea.nil_uses[j].nil;
+			for (/**/; j < ea.nil_uses.count && ea.nil_uses[j].ptr == use.ptr && ea.nil_uses[j].kind == use.kind; j++) {
+				definite &= ea.nil_uses[j].definite;
 			}
-			if (nil) {
+			if (definite) {
 				gbString str = escape_expr_to_string(use.ptr);
 				EscapeReport r = {use.kind, use.ptr, make_string_c(str)};
 				if (reports == nullptr) {

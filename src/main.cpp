@@ -455,6 +455,7 @@ enum BuildFlagKind {
 	BuildFlag_VetTabs,
 	BuildFlag_VetWhenShadowing,
 	BuildFlag_VetNilDeref,
+	BuildFlag_VetUninitialized,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -727,6 +728,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetWhenShadowing,        str_lit("vet-when-shadowing"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetNilDeref,             str_lit("vet-nil-deref"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUninitialized,        str_lit("vet-uninitialized"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -1502,6 +1504,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
 						case BuildFlag_VetWhenShadowing:    build_context.vet_flags |= VetFlag_WhenShadowing;    break;
 						case BuildFlag_VetNilDeref:         build_context.vet_flags |= VetFlag_NilDeref;         break;
+						case BuildFlag_VetUninitialized:    build_context.vet_flags |= VetFlag_Uninitialized;    break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
@@ -3570,6 +3573,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Checks for unused variable declarations.");
 		}
 
+
+		if (print_flag("-vet-uninitialized")) {
+			print_usage_line(2, "Errs on reading a variable declared with '---', or a part of it, before anything is stored in it on every path reaching it.");
+			print_usage_line(2, "Taking its address, e.g. to pass it to a procedure which fills it in, counts as storing into it.");
+		}
 
 		if (print_flag("-vet-using-param")) {
 			print_usage_line(2, "Checks for the use of 'using' on procedure parameters.");
