@@ -224,6 +224,11 @@ struct DeclInfo {
 
 	Entity *     para_poly_original;
 	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
+	struct ProcInfo *proc_info; // its body, once checked
+
+	Futex             escape_thread; // 1 + the index of the thread analysing the escapes of its body, else 0
+	std::atomic<bool> escapes_analysed;
+	Slice<struct EscapeFlow> escape_flows; // see `escape_flows_of`
 
 	bool                          is_using;
 	bool                          foreign_require_results;
@@ -831,6 +836,8 @@ struct CheckerInfo {
 
 	MPSCQueue<ProcInfo *> all_procedures_queue;
 	Array<ProcInfo *> all_procedures;
+
+	PerThreadArray<ProcInfo *> checked_bodies_queue; // for `check_escapes`
 
 	BlockingMutex instrumentation_mutex;
 	Entity *instrumentation_enter_entity;

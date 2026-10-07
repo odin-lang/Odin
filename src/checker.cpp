@@ -13,7 +13,7 @@ gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *ex
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e);
 gb_internal void check_procedure_later(Checker *c, ProcInfo *info);
-gb_internal void check_proc_escapes(Type *type, Ast *body);
+gb_internal void check_escapes(Checker *c);
 
 gb_internal bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -1706,6 +1706,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->entity_queue,     global_thread_pool.threads.count);
 	i->entities_by_file = true;
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
@@ -1740,6 +1741,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	per_thread_array_destroy(&i->entity_queue);
 	per_thread_array_destroy(&i->definition_queue);
+	per_thread_array_destroy(&i->checked_bodies_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
@@ -6844,8 +6846,11 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
 	global_error_context.instantiations = {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 	bool body_was_checked = check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+	global_error_context.instantiations = prev_instantiations;
 
 	if (body_was_checked) {
+		pi->decl->proc_info = pi;
+		per_thread_array_add(&c->info.checked_bodies_queue, pi);
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
@@ -6873,21 +6878,6 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		thread_pool_add_task(check_proc_info_worker_proc, nested_pi);
 	}
 	array_free(&nested);
-
-	if (body_was_checked) {
-		// the entry point of an executable only returns as the program ends
-		bool is_entry_point = false;
-		if (build_context.build_mode == BuildMode_Executable &&
-		    !build_context.no_entry_point &&
-		    build_context.command_kind != Command_test) {
-			Entity *e = pi->decl->entity;
-			is_entry_point = e != nullptr && e == c->info.entry_point;
-		}
-		if (!is_entry_point) {
-			check_proc_escapes(pi->type, pi->body);
-		}
-	}
-	global_error_context.instantiations = prev_instantiations;
 
 	add_untyped_expressions(&c->info, ctx.untyped);
 
@@ -8079,6 +8069,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+
+	TIME_SECTION("check escapes");
+	check_escapes(c);
 
 	TIME_SECTION("check unique link names");
 	check_link_name_uses(c);

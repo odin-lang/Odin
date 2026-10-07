@@ -1056,13 +1056,6 @@ gb_internal void exit_with_errors(void) {
 }
 
 
-
-gb_internal int error_value_cmp(void const *a, void const *b) {
-	ErrorValue *x = cast(ErrorValue *)a;
-	ErrorValue *y = cast(ErrorValue *)b;
-	return token_pos_cmp(x->pos, y->pos);
-}
-
 gb_global String error_article_table[][2] = {
 	{str_lit("a "),  str_lit("bit_set literal")},
 	{str_lit("a "),  str_lit("constant declaration")},
@@ -1128,7 +1121,10 @@ gb_internal void print_all_errors(void) {
 
 	GB_ASSERT(any_errors() || any_warnings());
 
-	array_sort(global_error_collector.error_values, error_value_cmp);
+	// stable, so that of the errors at the same position, the first reported is kept, see the merging below
+	natural_merge_sort(global_error_collector.error_values.data, global_error_collector.error_values.count, [](ErrorValue const &x, ErrorValue const &y) -> int {
+		return token_pos_cmp(x.pos, y.pos);
+	});
 
 
 	{ // NOTE(bill): merge neighbouring errors
