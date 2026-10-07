@@ -13,8 +13,9 @@ test_offset :: proc(t: ^testing.T) {
 	s := new(S)
 	defer free(s)
 
-	// 4*4 f32 + dynamic len == 72
-	expect: uintptr = 4 * 4 * 4 + size_of(int)
+	// 4*4 f32 + dynamic len, rounded up to the matrix's alignment
+	A :: align_of(matrix[4, 4]f32)
+	expect: uintptr = (4 * 4 * 4 + size_of(int) + A - 1) &~ (A - 1)
 	testing.expect(t, offset_of(S, b) == expect)
 	testing.expect(t, uintptr(rawptr(&s.b)) - uintptr(rawptr(s)) == expect)
 }

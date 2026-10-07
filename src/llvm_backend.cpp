@@ -2421,7 +2421,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 	}
 	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-	LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
+	LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
 
 	if (e->Variable.link_section.len > 0) {
 		LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));

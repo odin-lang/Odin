@@ -109,7 +109,10 @@ gb_internal void lb_scan_for_sret_rvo(lbProcedure *p) {
 				Entity *e = entity_of_node(vd->names[0]);
 				if (e == ret_entity) {
 					Ast *rhs = unparen_expr(vd->values[0]);
-					if (rhs->kind == Ast_CallExpr && lb_call_sret_eligible(p, rhs, e->type)) {
+					// NOTE(bill): the caller's return slot only has the type's alignment and not @(align=N)'s
+					if (rhs->kind == Ast_CallExpr &&
+					    e->Variable.custom_align == 0 &&
+					    lb_call_sret_eligible(p, rhs, e->type)) {
 						decl_index = i;
 					}
 					goto done_scanning;
@@ -2481,7 +2484,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		char *c_name = alloc_cstring(permanent_allocator(), mangled_name);
 
 		LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_type(p->module, e->type), c_name);
-		LLVMSetAlignment(global, cast(u32)type_align_of(e->type));
+		LLVMSetAlignment(global, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
 		LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
 
 		if (e->Variable.is_rodata) {
@@ -2528,7 +2531,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 				if (actual_type != expected_type) {
 					LLVMDeleteGlobal(global);
 					global = LLVMAddGlobal(p->module->mod, actual_type, c_name);
-					LLVMSetAlignment(global, cast(u32)type_align_of(e->type));
+					LLVMSetAlignment(global, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
 					if (e->Variable.is_rodata) {
 						LLVMSetGlobalConstant(global, true);
 					}
@@ -3464,7 +3467,9 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 					// the literal is one of its variants, so reusing that storage would bind the
 					// variable to a bare `[]int` and never build the union at all
 					if (comp_lit_addr && are_types_identical(lb_addr_type(*comp_lit_addr), type_of_expr(vd->names[lval_index]))) {
-						if (Entity *e = entity_of_node(vd->names[lval_index])) {
+						Entity *e = entity_of_node(vd->names[lval_index]);
+						// NOTE(bill): the literal's storage only has the type's alignment and not @(align=N)'s
+						if (e != nullptr && e->Variable.custom_align == 0) {
 							lbValue val = comp_lit_addr->addr;
 							lb_add_entity(p->module, e, val);
 							lb_add_debug_local_variable(p, val.value, e->type, e->token);

@@ -5745,6 +5745,76 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = t_i64;
 		break;
 
+	case BuiltinProc_return_address:
+	case BuiltinProc_frame_address:
+		{
+			if (ce->args.count > 1) {
+				error(ce->args[1], "'%.*s' expects either 0 or 1 arguments, got %td", LIT(builtin_name), ce->args.count);
+				return false;
+			}
+			i64 level = 0;
+			if (ce->args.count > 0) {
+				Operand x = {};
+				check_expr(c, &x, ce->args[0]);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+				if (x.mode != Addressing_Constant || !is_type_integer(x.type)) {
+					error(x.expr, "'%.*s' expects a constant integer level", LIT(builtin_name));
+					return false;
+				}
+				// convert constant from BigInt to a type before `exact_value_to_i64`
+				convert_to_typed(c, &x, t_int);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+				level = exact_value_to_i64(x.value);
+				if (level < 0 || level > U32_MAX) {
+					error(x.expr, "'%.*s' expects a level in the range 0..=%u, got %lld", LIT(builtin_name), U32_MAX, cast(long long)level);
+					return false;
+				}
+			}
+			if (is_arch_wasm()) {
+				// wasm has no addressable return addresses, and LLVM has no frames above the current one
+				if (id == BuiltinProc_return_address) {
+					error(call, "'%.*s' is not allowed on wasm targets", LIT(builtin_name));
+					return false;
+				} else if (level > 0) {
+					error(call, "'%.*s' with a level above 0 is not allowed on wasm targets", LIT(builtin_name));
+					return false;
+				}
+			}
+			if (level > 0 &&
+			    build_context.metrics.arch == TargetArch_amd64 &&
+			    (build_context.metrics.os == TargetOs_windows || build_context.metrics.abi == TargetABI_Win64)) {
+				// frames can only be walked with the unwind tables, so LLVM ignores the level
+				error(call, "'%.*s' with a level above 0 is not allowed on Windows amd64 targets", LIT(builtin_name));
+				return false;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = t_rawptr;
+		}
+		break;
+
+	case BuiltinProc_stack_pointer:
+		operand->mode = Addressing_Value;
+		operand->type = t_rawptr;
+		break;
+
+	case BuiltinProc_address_of_return_address:
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+		case TargetArch_i386:
+		case TargetArch_arm64:
+			break;
+		default:
+			error(call, "'%.*s' is only allowed on amd64, i386, and arm64 targets", LIT(builtin_name));
+			return false;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = alloc_type_pointer(t_rawptr);
+		break;
+
 	case BuiltinProc_count_ones:
 	case BuiltinProc_count_zeros:
 	case BuiltinProc_count_trailing_zeros:

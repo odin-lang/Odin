@@ -123,6 +123,7 @@ struct AttributeContext {
 	String  link_section;
 	String  linkage;
 	isize   init_expr_list_count;
+	i64     align;
 	String  thread_local_model;
 	String  deprecated_message;
 	String  warning_message;
@@ -878,6 +879,7 @@ struct CheckerContext {
 	u32        stmt_flags;
 	bool       in_enum_type;
 	bool       in_proc_group;
+	bool       in_proc_group_decl;
 	bool       in_procedure_of;
 	bool       allow_polymorphic_types;
 	bool       disallow_polymorphic_return_types; // NOTE(zen3ger): no poly type decl in return types

@@ -2267,6 +2267,10 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 
 	identifier->Ident.entity = entity;
 
+	if (c->in_proc_group_decl) {
+		// a call which picks this member reports it instead
+		return;
+	}
 	String dmsg = entity->deprecated_message;
 	if (dmsg.len > 0) {
 		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
@@ -4651,6 +4655,24 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			}
 		} else {
 			error(elem, "Expected either no value or a string for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "align") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_Integer) {
+			error(elem, "Expected a constant integer for '%.*s'", LIT(name));
+			return true;
+		}
+		i64 align = exact_value_to_i64(ev);
+		if (ev.value_integer.used > 1 ||
+		    align < 1 ||
+		    align > (1ll<<31) ||
+		    !gb_is_power_of_two(cast(isize)align)) {
+			gbString str = exact_value_to_string(ev);
+			error(elem, "'%.*s' must be a power of 2 no greater than 2^31, got %s", LIT(name), str);
+			gb_string_free(str);
+		} else {
+			ac->align = align;
 		}
 		return true;
 	}

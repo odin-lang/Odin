@@ -160,7 +160,17 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	{
 		TEMPORARY_ALLOCATOR_GUARD();
 		char *c_link_name = alloc_cstring(temporary_allocator(), p->name);
-		p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+		// the compiler may have declared this intrinsic itself (e.g. `llvm.memset`), and a second
+		// declaration would be renamed and so no longer be the intrinsic
+		LLVMValueRef existing = nullptr;
+		if (p->is_foreign && string_starts_with(p->name, str_lit("llvm."))) {
+			existing = LLVMGetNamedFunction(m->mod, c_link_name);
+		}
+		if (existing != nullptr && LLVMGlobalGetValueType(existing) == func_type) {
+			p->value = existing;
+		} else {
+			p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+		}
 	}
 
 	lb_ensure_abi_function_type(m, p);
@@ -3667,6 +3677,42 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 			}
 
+			return res;
+		}
+
+	case BuiltinProc_return_address:
+	case BuiltinProc_frame_address:
+	case BuiltinProc_stack_pointer:
+	case BuiltinProc_address_of_return_address:
+		{
+			char const *name = nullptr;
+			switch (id) {
+			case BuiltinProc_return_address:            name = "llvm.returnaddress";          break;
+			case BuiltinProc_frame_address:             name = "llvm.frameaddress";           break;
+			case BuiltinProc_stack_pointer:             name = "llvm.stacksave";              break;
+			case BuiltinProc_address_of_return_address: name = "llvm.addressofreturnaddress"; break;
+			}
+
+			LLVMValueRef args[1] = {};
+			unsigned arg_count = 0;
+			if (id == BuiltinProc_return_address || id == BuiltinProc_frame_address) {
+				u64 level = 0;
+				if (ce->args.count > 0) {
+					level = cast(u64)exact_value_to_i64(ce->args[0]->tav.value);
+				}
+				args[arg_count++] = LLVMConstInt(lb_type(p->module, t_u32), level, false);
+			}
+
+			// whether these are overloaded on their pointer type differs between LLVM versions
+			LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
+			unsigned type_count = 0;
+			if (LLVMIntrinsicIsOverloaded(LLVMLookupIntrinsicID(name, gb_strlen(name)))) {
+				type_count = 1;
+			}
+
+			lbValue res = {};
+			res.value = lb_call_intrinsic(p, name, args, arg_count, types, type_count);
+			res.type = tv.type;
 			return res;
 		}
 

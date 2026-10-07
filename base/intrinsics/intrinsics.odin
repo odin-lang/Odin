@@ -35,6 +35,20 @@ cpu_relax          :: proc() ---
 read_cycle_counter :: proc() -> i64 ---
 read_cycle_counter_frequency :: proc() -> i64 ---
 
+// Stack and return addresses
+// `level` 0 is the current procedure, 1 its caller, and so on. An inlined procedure has no frame of its own.
+// A level above 0 follows the saved frame pointers, so it is only reliable when every frame in between keeps one,
+// and it is not allowed on Windows amd64 targets, where frames can only be walked with the unwind tables.
+
+// The address the procedure at `level` returns to. Not allowed on wasm targets.
+return_address :: proc(#const level: u32 = 0) -> rawptr ---
+// The address of the stack frame of the procedure at `level`. A level above 0 is not allowed on wasm targets.
+frame_address  :: proc(#const level: u32 = 0) -> rawptr ---
+// The current value of the stack pointer
+stack_pointer  :: proc() -> rawptr ---
+// The address of the slot holding the current procedure's return address. amd64, i386, and arm64 targets only.
+address_of_return_address :: proc() -> ^rawptr ---
+
 count_ones           :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_zeros          :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---

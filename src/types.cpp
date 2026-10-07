@@ -1608,35 +1608,6 @@ gb_internal bool is_type_matrix(Type *t) {
 	return t->kind == Type_Matrix;
 }
 
-gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
-	t = base_type(t);
-	GB_ASSERT(t->kind == Type_Matrix);
-
-	Type *elem = t->Matrix.elem;
-	i64 row_count = gb_max(t->Matrix.row_count, 1);
-	i64 column_count = gb_max(t->Matrix.column_count, 1);
-
-	bool pop = type_path_push(tp, elem);
-	if (tp->failure) {
-		return FAILURE_ALIGNMENT;
-	}
-
-	i64 elem_align = type_align_of_internal(elem, tp);
-	if (pop) type_path_pop(tp);
-
-	i64 elem_size = type_size_of(elem);
-
-
-	// NOTE(bill, 2021-10-25): The alignment strategy here is to have zero padding
-	// It would be better for performance to pad each column so that each column
-	// could be maximally aligned but as a compromise, having no padding will be
-	// beneficial to third libraries that assume no padding
-
-	gb_unused(row_count); gb_unused(column_count); gb_unused(elem_size);
-	return gb_clamp(elem_align, 1, build_context.max_simd_align);
-}
-
-
 gb_internal i64 matrix_type_stride_in_bytes(Type *t, struct TypePath *tp) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Matrix);
@@ -1674,6 +1645,27 @@ gb_internal i64 matrix_type_stride_in_elems(Type *t) {
 	GB_ASSERT(t->kind == Type_Matrix);
 	i64 stride = matrix_type_stride_in_bytes(t, nullptr);
 	return stride/gb_max(1, type_size_of(t->Matrix.elem));
+}
+
+gb_internal i64 matrix_align_of(Type *t, struct TypePath *tp) {
+	t = base_type(t);
+	GB_ASSERT(t->kind == Type_Matrix);
+
+	Type *elem = t->Matrix.elem;
+
+	bool pop = type_path_push(tp, elem);
+	if (tp->failure) {
+		return FAILURE_ALIGNMENT;
+	}
+
+	i64 elem_align = type_align_of_internal(elem, tp);
+	if (pop) type_path_pop(tp);
+
+	// NOTE(bill): Matrices have no padding, so align to the largest power of two dividing the stride,
+	// i.e. each column (row if #row_major) is aligned, capped at 16 so the layout is the same across targets
+	i64 stride = matrix_type_stride_in_bytes(t, tp);
+	i64 align = stride & -stride;
+	return gb_clamp(align, elem_align, gb_min(16, build_context.max_simd_align));
 }
 
 
