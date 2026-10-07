@@ -7210,6 +7210,11 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 						ordered_operands[i].type = e->type;
 						if (e->Variable.param_value.kind == ParameterValue_Nil)
 							ordered_operands[i].type = t_untyped_nil;
+						if (e->Variable.param_value.kind == ParameterValue_Constant) {
+							// so a `#const` parameter accepts its own default
+							ordered_operands[i].mode  = Addressing_Constant;
+							ordered_operands[i].value = e->Variable.param_value.value;
+						}
 						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
 					}
 

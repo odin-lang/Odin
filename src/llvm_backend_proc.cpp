@@ -160,7 +160,17 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	{
 		TEMPORARY_ALLOCATOR_GUARD();
 		char *c_link_name = alloc_cstring(temporary_allocator(), p->name);
-		p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+		// the compiler may have declared this intrinsic itself (e.g. `llvm.memset`), and a second
+		// declaration would be renamed and so no longer be the intrinsic
+		LLVMValueRef existing = nullptr;
+		if (p->is_foreign && string_starts_with(p->name, str_lit("llvm."))) {
+			existing = LLVMGetNamedFunction(m->mod, c_link_name);
+		}
+		if (existing != nullptr && LLVMGlobalGetValueType(existing) == func_type) {
+			p->value = existing;
+		} else {
+			p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+		}
 	}
 
 	lb_ensure_abi_function_type(m, p);
