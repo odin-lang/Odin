@@ -2613,9 +2613,10 @@ struct EscapeMemberTask {
 	EscapeGraph *       graph;
 	i32                 v;
 	bool                stale;   // as the flows of one it calls changed
-	bool                changed;
 	Slice<EscapeFlow>   flows;
 	Array<EscapeReport> reports; // of its latest analysis
+	Array<i32>          callees; // the members of the group it calls, by their index
+	Array<i32>          callers;
 };
 
 gb_internal WORKER_TASK_PROC(escape_member_worker) {
@@ -2639,6 +2640,19 @@ gb_internal void escape_analyse_members(EscapeGraph *g, Slice<EscapeMemberTask> 
 		}
 	}
 	thread_pool_wait(&group);
+}
+
+// keeps what an analysis of a member found, and when that changed, those calling it need analysing again
+gb_internal void escape_update_member(EscapeGraph *g, Slice<EscapeMemberTask> tasks, isize k) {
+	EscapeMemberTask &t = tasks[k];
+	DeclInfo *d = g->procs[t.v]->decl;
+	if (escape_flows_eq(t.flows, d->escape_flows)) {
+		return;
+	}
+	d->escape_flows = t.flows;
+	for (i32 caller : t.callers) {
+		tasks[caller].stale = true;
+	}
 }
 
 gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
@@ -2666,31 +2680,81 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 		t = {g, g->members[k]};
 		t.stale = true;
 		array_init(&t.reports, heap_allocator(), 0, 0);
+		array_init(&t.callees, heap_allocator(), 0, 0);
+		array_init(&t.callers, heap_allocator(), 0, 0);
 	}
-
-	// what each may return or store depends on the others, so they start from nothing until that settles,
-	// analysing again only those calling one whose flows changed, so the latest analysis of each was with what settled
-	bool settled = false;
-	for (isize iteration = 0; iteration < MAX_ITERATION_COUNT && !settled; iteration++) {
-		escape_analyse_members(g, tasks);
-		settled = true;
-		for (EscapeMemberTask &t : tasks) {
-			t.changed = false;
-			if (t.stale) {
-				DeclInfo *d = g->procs[t.v]->decl;
-				t.changed = !escape_flows_eq(t.flows, d->escape_flows);
-				d->escape_flows = t.flows;
-				settled &= !t.changed;
-			}
-		}
-
-		for (EscapeMemberTask &t : tasks) {
-			t.stale = false;
-			for (i32 i = g->offsets[t.v]; i < g->offsets[t.v+1]; i++) {
-				for (EscapeMemberTask const &callee : tasks) {
-					t.stale |= callee.v == g->targets[i] && callee.changed;
+	for_array(k, tasks) {
+		for (i32 i = g->offsets[tasks[k].v]; i < g->offsets[tasks[k].v+1]; i++) {
+			for_array(j, tasks) {
+				if (tasks[j].v == g->targets[i]) {
+					array_add(&tasks[k].callees, cast(i32)j);
+					array_add(&tasks[j].callers, cast(i32)k);
 				}
 			}
+		}
+	}
+
+	// callees before their callers, unless they call each other
+	auto order = array_make<i32>(heap_allocator(), 0, tasks.count);
+	defer (array_free(&order));
+	{
+		struct Frame {
+			i32   k;
+			isize next;
+		};
+		auto frames  = array_make<Frame>(heap_allocator(), 0, tasks.count);
+		auto visited = array_make<bool>(heap_allocator(), tasks.count);
+		defer (array_free(&frames));
+		defer (array_free(&visited));
+		for (bool &v : visited) {
+			v = false;
+		}
+		for_array(root, tasks) {
+			if (visited[root]) {
+				continue;
+			}
+			visited[root] = true;
+			array_add(&frames, Frame{cast(i32)root, 0});
+			while (frames.count > 0) {
+				Frame &top = frames[frames.count-1];
+				Array<i32> const &callees = tasks[top.k].callees;
+				if (top.next < callees.count) {
+					i32 callee = callees[top.next++];
+					if (!visited[callee]) {
+						visited[callee] = true;
+						array_add(&frames, Frame{callee, 0});
+					}
+					continue;
+				}
+				array_add(&order, top.k);
+				array_pop(&frames);
+			}
+		}
+	}
+
+	// what each may return or store depends on the others, so they start from nothing until that settles:
+	// all at once at first, then one at a time with what the others have so far, only those calling one whose
+	// flows changed, so the latest analysis of each was with what settled
+	escape_analyse_members(g, tasks);
+	for (EscapeMemberTask &t : tasks) {
+		t.stale = false;
+	}
+	for_array(k, tasks) {
+		escape_update_member(g, tasks, k);
+	}
+
+	bool settled = false;
+	for (isize budget = MAX_ITERATION_COUNT*tasks.count; !settled && budget > 0; /**/) {
+		settled = true;
+		for (i32 k : order) {
+			if (!tasks[k].stale) {
+				continue;
+			}
+			settled = false;
+			budget -= 1;
+			tasks[k].stale = false;
+			escape_member_worker(&tasks[k]);
+			escape_update_member(g, tasks, k);
 		}
 	}
 	if (!settled) {
@@ -2709,6 +2773,8 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 		}
 		global_error_context.instantiations = prev_instantiations;
 		array_free(&t.reports);
+		array_free(&t.callees);
+		array_free(&t.callers);
 
 		pi->decl->escape_flows = t.flows;
 		pi->decl->escapes_analysed.store(true);
