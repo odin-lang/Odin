@@ -228,7 +228,7 @@ struct DeclInfo {
 
 	i32               escape_index; // of its body, see `EscapeGraph`
 	std::atomic<bool> escapes_analysed;
-	Slice<struct EscapeFlow> escape_flows; // see `escape_flows_of`
+	Slice<struct EscapeFlow> escape_flows; // see `escape_call`
 
 	bool                          is_using;
 	bool                          foreign_require_results;
