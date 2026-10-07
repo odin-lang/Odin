@@ -69,7 +69,7 @@ gb_internal i32 system_exec_msvc_linker_app(char const *name, char const *fmt, .
 				gb_printf_err("Failed to create linker response file: %s\n", rsp_path);
 				return -1;
 			}
-			if (build_context.linker_choice != Linker_Default && build_context.linker_choice != Linker_radlink) {
+			if (build_context.linker_choice != Linker_radlink && build_context.linker_choice != Linker_Default) {
 				// NOTE(bill): link.exe reads a response file without a BOM in the ANSI code page but radlink does not skip a BOM
 				gb_file_write(&f, "\xef\xbb\xbf", 3);
 			}
@@ -252,10 +252,10 @@ try_cross_linking:;
 
 		switch (build_context.linker_choice) {
 		case Linker_Default:  break;
-		case Linker_lld:      section_name = str_lit("lld-link"); break;
 	#if defined(GB_SYSTEM_WINDOWS)
-		case Linker_radlink:  break;
+		case Linker_radlink:  section_name = str_lit("radlink"); break; // the default on Windows
 	#endif
+		case Linker_lld:      section_name = str_lit("lld-link"); break;
 	#if defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_NETBSD)
 		case Linker_mold:     section_name = str_lit("mold-link"); break;
 	#endif

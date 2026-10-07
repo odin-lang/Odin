@@ -330,20 +330,19 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		return ReadDirectory_InvalidPath;
 	}
 	{
-		char *c_str = alloc_cstring(temporary_allocator(), path);
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
-
-		switch (file_err) {
-		case gbFileError_Invalid:    return ReadDirectory_InvalidPath;
-		case gbFileError_NotExists:  return ReadDirectory_NotExists;
-		// case gbFileError_Permission: return ReadDirectory_Permission;
+		// NOTE(bill): whether it exists and whether it is a directory, can be expressed in one query
+		String16 wpath = string_to_string16(temporary_allocator(), path);
+		DWORD attributes = GetFileAttributesW(cast(wchar_t *)wpath.text);
+		if (attributes == INVALID_FILE_ATTRIBUTES) {
+			switch (GetLastError()) {
+			case ERROR_FILE_NOT_FOUND: return ReadDirectory_NotExists;
+			case ERROR_ACCESS_DENIED:  return ReadDirectory_NotDir;
+			}
+			return ReadDirectory_InvalidPath;
 		}
-	}
-
-	if (!path_is_directory(path)) {
-		return ReadDirectory_NotDir;
+		if ((attributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
+			return ReadDirectory_NotDir;
+		}
 	}
 
 
@@ -360,7 +359,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	defer (gb_free(a, wstr.text));
 
 	WIN32_FIND_DATAW file_data = {};
-	HANDLE find_file = FindFirstFileW(cast(wchar_t *)wstr.text, &file_data);
+	HANDLE find_file = FindFirstFileExW(cast(wchar_t *)wstr.text, FindExInfoBasic, &file_data, FindExSearchNameMatch, nullptr, FIND_FIRST_EX_LARGE_FETCH);
 	if (find_file == INVALID_HANDLE_VALUE) {
 		return ReadDirectory_Unknown;
 	}

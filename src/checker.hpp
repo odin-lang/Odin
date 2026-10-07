@@ -207,9 +207,7 @@ struct VariadicReuseData {
 struct DeclInfo {
 	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
 
-	BlockingMutex next_mutex; // also used for `nested_to_check`
-	DeclInfo *    next_child;
-	DeclInfo *    next_sibling;
+	BlockingMutex next_mutex; // for `nested_to_check`
 
 	Array<struct ProcInfo *> nested_to_check; // nested procedures to check once this body is checked
 
@@ -257,6 +255,7 @@ struct DeclInfo {
 
 	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
 	std::atomic<struct lbModule *> code_gen_module;
+	std::atomic<String *>          local_proc_name; // the backend's name for a procedure declared in a procedure body
 };
 
 // ProcInfo stores the information needed for checking a procedure
@@ -568,7 +567,7 @@ gb_internal ScopeMapIterator const begin(ScopeMap const &m) noexcept {
 	return ScopeMapIterator{&m, m.slots, m.cap, index};
 }
 
-enum ScopeFlag : i32 {
+enum ScopeFlag : u32 {
 	ScopeFlag_Pkg     = 1<<1,
 	ScopeFlag_Builtin = 1<<2,
 	ScopeFlag_Global  = 1<<3,
@@ -599,7 +598,7 @@ struct Scope {
 
 	DeclInfo *decl_info;
 
-	i32             flags; // ScopeFlag
+	std::atomic<u32> flags;
 	union {
 		AstPackage *pkg;
 		AstFile *   file;
@@ -616,8 +615,8 @@ typedef PtrSet<EntityGraphNode *> EntityGraphNodeSet;
 struct EntityGraphNode {
 	Entity *entity; // Procedure, Variable, Constant
 
-	EntityGraphNodeSet pred;
-	EntityGraphNodeSet succ;
+	Slice<EntityGraphNode *> pred;
+	EntityGraphNodeSet       succ;
 	isize index; // Index in array/queue
 	isize dep_count;
 };
@@ -764,9 +763,8 @@ struct CheckerInfo {
 	RwMutex minimum_dependency_type_info_mutex;
 	PtrMap</*type info hash*/u64, /*min dep index*/isize> min_dep_type_info_index_map;
 
-	RWSpinLock	    min_dep_type_info_set_mutex;
-	TypeSet             min_dep_type_info_set;
-	Array<TypeInfoPair> type_info_types_hash_map; // 2 * type_info_types.count
+	PerThreadArray<TypeInfoPair> min_dep_type_info_queue; // hashed and deduplicated after the minimum dependency set
+	Array<TypeInfoPair>          type_info_types_hash_map; // 2 * type_info_types.count
 
 
 	Array<Entity *> testing_procedures;
@@ -804,6 +802,7 @@ struct CheckerInfo {
 
 	PerThreadArray<Entity *> definition_queue;
 	PerThreadArray<Entity *> entity_queue;
+	bool                     entities_by_file; // until gathered, see `check_add_entities_from_files`
 	std::atomic<u64>         entities_without_file; // for their `order_in_src`
 	MPSCQueue<Entity *> required_global_variable_queue;
 	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
@@ -911,9 +910,6 @@ struct Checker {
 	MPSCQueue<Entity *> procs_with_objc_context_provider_to_check;
 	BlockingMutex     procs_to_check_mutex;
 	Array<ProcInfo *> procs_to_check;
-
-	BlockingMutex nested_proc_lits_mutex;
-	Array<DeclInfo *> nested_proc_lits;
 
 
 	PerThreadArray<UntypedExprInfo> global_untyped_queue;

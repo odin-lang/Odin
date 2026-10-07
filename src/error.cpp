@@ -23,9 +23,16 @@ struct ErrorCollector {
 	Array<ErrorValue> error_values;
 	ErrorValue        curr_error_value;
 	std::atomic<bool> curr_error_value_set;
+
+	// see `release_held_errors`
+	std::atomic<i64>  held_count;
+	std::atomic<i64>  held_warning_count;
+	Array<ErrorValue> held_error_values;
 };
 
 gb_global ErrorCollector global_error_collector;
+
+gb_thread_local bool global_error_hold = false;
 
 // Scoped, per-thread error muting. While muted, error/warning emission is suppressed but still
 // *counted*, so a caller can trial-check something (e.g. one branch of a procedure group) and learn
@@ -95,7 +102,7 @@ gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = Err
 gb_internal void pop_error_value(void) {
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.curr_error_value_set.load()) {
-		array_add(&global_error_collector.error_values, global_error_collector.curr_error_value);
+		array_add(global_error_hold ? &global_error_collector.held_error_values : &global_error_collector.error_values, global_error_collector.curr_error_value);
 
 		global_error_collector.curr_error_value = {};
 		global_error_collector.curr_error_value_set.store(false);
@@ -127,6 +134,7 @@ gb_internal bool any_warnings(void) {
 
 gb_internal void init_global_error_collector(void) {
 	array_init(&global_error_collector.error_values, heap_allocator());
+	array_init(&global_error_collector.held_error_values, heap_allocator());
 	array_init(&global_file_path_strings, heap_allocator(), 1, 4096);
 	array_init(&global_files,             heap_allocator(), 1, 4096);
 }
@@ -699,7 +707,7 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 		global_error_mute_count += 1;
 		return;
 	}
-	global_error_collector.count.fetch_add(1);
+	(global_error_hold ? global_error_collector.held_count : global_error_collector.count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
@@ -741,7 +749,7 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 		return;
 	}
 
-	global_error_collector.warning_count.fetch_add(1);
+	(global_error_hold ? global_error_collector.held_warning_count : global_error_collector.warning_count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);
@@ -780,7 +788,7 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 		global_error_mute_count += 1;
 		return;
 	}
-	global_error_collector.count.fetch_add(1);
+	(global_error_hold ? global_error_collector.held_count : global_error_collector.count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
@@ -1000,6 +1008,27 @@ gb_internal void compiler_error(char const *fmt, ...) {
 	gb_exit(1);
 }
 
+
+// Reports the held errors and warnings as if they had not been held, once parsing reports no errors, as otherwise they are
+// never reported
+gb_internal void release_held_errors(void) {
+	isize kept_error_count = 0;
+	for (ErrorValue const &ev : global_error_collector.held_error_values) {
+		// NOTE: as many as are printed when exiting at the error after the maximum
+		if (ev.kind == ErrorValue_Error && kept_error_count++ >= MAX_ERROR_COLLECTOR_COUNT()) {
+			continue;
+		}
+		array_add(&global_error_collector.error_values, ev);
+	}
+	array_clear(&global_error_collector.held_error_values);
+
+	global_error_collector.count.fetch_add(global_error_collector.held_count.exchange(0));
+	global_error_collector.warning_count.fetch_add(global_error_collector.held_warning_count.exchange(0));
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
+		print_all_errors();
+		gb_exit(1);
+	}
+}
 
 gb_internal void exit_with_errors(void) {
 	if (any_errors() || any_warnings()) {

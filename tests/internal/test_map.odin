@@ -385,3 +385,20 @@ test_union_key_should_not_be_hashing_specifc_variant :: proc(t: ^testing.T) {
 	testing.expect_value(t, bone_1 in m, true)
 	testing.expect_value(t, Id(bone_1) in m, true)
 }
+
+@test
+test_map_range_by_ref :: proc(t: ^testing.T) {
+	m: map[u32]int
+	defer delete(m)
+
+	m[0] = 0
+	m[1] = 0
+
+	for _, &v in m {
+		v = 1
+	}
+
+	for k, v in m {
+		testing.expectf(t, v == 1, "Expected m[%v] to be 1, got %v", k, v)
+	}
+}

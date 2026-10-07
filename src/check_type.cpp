@@ -3312,13 +3312,24 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					p->flags &= ~FieldFlag_no_capture;
 				}
 
+				Type *param_type = type;
+				if (operands == nullptr && param_type == t_typeid) {
+					// NOTE(bill): In the generic signature, a `$T: typeid` without a specialization is its own
+					// polymorphic type, as one with a specialization already is, so that `^T` or `[]T` elsewhere
+					// in the signature remain polymorphic rather than becoming `^typeid` or `[]typeid`
+					param_type = alloc_type_generic(ctx->scope, 0, name->Ident.interned, nullptr);
+				}
+
 				param = &entities_to_use[entities_to_use_index++];
-				INTERNAL_ENTITY_INIT(param, Entity_TypeName, scope, name->Ident.token, type);
+				INTERNAL_ENTITY_INIT(param, Entity_TypeName, scope, name->Ident.token, param_type);
 				param->state = EntityState_Resolved;
 				param->interned_name.store(name->Ident.interned);
 				param->interned_name_hash.store(name->Ident.hash);
 
 				param->TypeName.is_type_alias = true;
+				if (param_type != type) {
+					param_type->Generic.entity = param;
+				}
 			} else {
 				ExactValue poly_const = {};
 
@@ -4197,7 +4208,7 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		}
 
 		if (is_type_simple_compare(key)) {
-			add_package_dependency(ctx, "runtime", "default_hasher_fixed");
+			add_package_dependency(ctx, "runtime", runtime_default_hasher_fixed_name(&ctx->checker->info));
 			return;
 		}
 

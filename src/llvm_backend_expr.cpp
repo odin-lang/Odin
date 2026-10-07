@@ -4904,7 +4904,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
-		return lb_generate_anonymous_proc_lit(p->module, p->name, expr, p);
+		return lb_generate_anonymous_proc_lit(p->module, expr, p);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, expr);

@@ -3,18 +3,8 @@ gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMVa
 gb_internal LLVMRelocMode get_reloc_mode();
 
 gb_global Entity *lb_global_type_info_data_entity   = {};
-gb_global lbAddr lb_global_type_info_member_types   = {};
-gb_global lbAddr lb_global_type_info_member_names   = {};
-gb_global lbAddr lb_global_type_info_member_offsets = {};
-gb_global lbAddr lb_global_type_info_member_usings  = {};
-gb_global lbAddr lb_global_type_info_member_tags    = {};
 
 gb_global isize lb_global_type_info_data_index           = 0;
-gb_global isize lb_global_type_info_member_types_index   = 0;
-gb_global isize lb_global_type_info_member_names_index   = 0;
-gb_global isize lb_global_type_info_member_offsets_index = 0;
-gb_global isize lb_global_type_info_member_usings_index  = 0;
-gb_global isize lb_global_type_info_member_tags_index    = 0;
 
 // A backend worker must not end the process: its siblings are still inside LLVM, and tearing the
 // process down under them is what turns a reported error into a crash. A failing worker records the
@@ -542,6 +532,30 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_set(&gen->modules, cast(void *)1, &gen->default_module);
 	lb_init_module(&gen->default_module, do_threading);
 
+	// NOTE(bill): with `-use-separate-modules`, the type info is made in modules of its own of about a thousand entries each
+	// as it is a lot of data for the default module to make and to emit on its own
+	array_init(&gen->type_info_modules, heap_allocator());
+	isize type_info_part_count = 1;
+	if (USE_SEPARATE_MODULES && !build_context.no_rtti) {
+		type_info_part_count = gb_clamp(gen->info->min_dep_type_info_index_map.count / 1024, 1, 8);
+	}
+	if (type_info_part_count == 1) {
+		array_add(&gen->type_info_modules, &gen->default_module);
+	} else {
+		for (isize i = 0; i < type_info_part_count; i++) {
+			lbModule *m = permanent_alloc_item<lbModule>();
+			m->gen        = gen;
+			m->checker    = c;
+			m->split_part = cast(i32)(i+1);
+			map_set(&gen->modules, cast(void *)m, m);
+			lb_init_module(m, do_threading);
+			array_add(&gen->type_info_modules, m);
+		}
+	}
+	for_array(i, gen->type_info_modules) {
+		gen->type_info_modules[i]->type_info_part = i;
+	}
+
 	thread_pool_wait();
 
 	for (auto const &entry : gen->modules) {
@@ -788,7 +802,12 @@ gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
 		LLVMOpcode op = LLVMGetInstructionOpcode(instr);
 		switch (op) {
 		case LLVMRet:
+#if LLVM_VERSION_MAJOR >= 23
+		case LLVMCondBr:
+		case LLVMUncondBr:
+#else
 		case LLVMBr:
+#endif
 		case LLVMSwitch:
 		case LLVMIndirectBr:
 		case LLVMInvoke:
@@ -1234,7 +1253,11 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 	args[4] = len;
 
 	lbValue ok = {LLVMBuildICmp(p->builder, LLVMIntULT, index.value, len.value, ""), t_llvm_bool};
-	lb_emit_runtime_call_unless(p, ok, "bounds_check_error", args);
+	char const *handler = "bounds_check_error_contextless";
+	if (p->context_stack.count > 0) {
+		handler = "bounds_check_error_with_context";
+	}
+	lb_emit_runtime_call_unless(p, ok, handler, args);
 }
 
 gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValue row_index, lbValue column_index, lbValue row_count, lbValue column_count) {
@@ -1259,7 +1282,11 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 	LLVMValueRef row_ok    = LLVMBuildICmp(p->builder, LLVMIntULT, row_index.value,    row_count.value,    "");
 	LLVMValueRef column_ok = LLVMBuildICmp(p->builder, LLVMIntULT, column_index.value, column_count.value, "");
 	lbValue ok = {LLVMBuildAnd(p->builder, row_ok, column_ok, ""), t_llvm_bool};
-	lb_emit_runtime_call_unless(p, ok, "matrix_bounds_check_error", args);
+	char const *handler = "matrix_bounds_check_error_contextless";
+	if (p->context_stack.count > 0) {
+		handler = "matrix_bounds_check_error_with_context";
+	}
+	lb_emit_runtime_call_unless(p, ok, handler, args);
 }
 
 
@@ -1286,7 +1313,11 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 	args[4] = high;
 
 	lbValue ok = {LLVMBuildICmp(p->builder, LLVMIntSLE, low.value, high.value, ""), t_llvm_bool};
-	lb_emit_runtime_call_unless(p, ok, "multi_pointer_slice_expr_error", args);
+	char const *handler = "multi_pointer_slice_expr_error_contextless";
+	if (p->context_stack.count > 0) {
+		handler = "multi_pointer_slice_expr_error_with_context";
+	}
+	lb_emit_runtime_call_unless(p, ok, handler, args);
 }
 
 gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
@@ -1317,7 +1348,11 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		LLVMValueRef c0 = LLVMBuildICmp(p->builder, LLVMIntSLE, zero,       high.value, "");
 		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
 		lbValue ok = {LLVMBuildAnd(p->builder, c0, c1, ""), t_llvm_bool};
-		lb_emit_runtime_call_unless(p, ok, "slice_expr_error_hi", args);
+		char const *handler = "slice_expr_error_hi_contextless";
+		if (p->context_stack.count > 0) {
+			handler = "slice_expr_error_hi_with_context";
+		}
+		lb_emit_runtime_call_unless(p, ok, handler, args);
 	} else {
 		// No need to convert unless used
 		low  = lb_emit_conv(p, low, t_int);
@@ -1332,7 +1367,11 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		LLVMValueRef c1 = LLVMBuildICmp(p->builder, LLVMIntSLE, low.value,  high.value, "");
 		LLVMValueRef c2 = LLVMBuildICmp(p->builder, LLVMIntSLE, high.value, len.value,  "");
 		lbValue ok = {LLVMBuildAnd(p->builder, LLVMBuildAnd(p->builder, c0, c1, ""), c2, ""), t_llvm_bool};
-		lb_emit_runtime_call_unless(p, ok, "slice_expr_error_lo_hi", args);
+		char const *handler = "slice_expr_error_lo_hi_contextless";
+		if (p->context_stack.count > 0) {
+			handler = "slice_expr_error_lo_hi_with_context";
+		}
+		lb_emit_runtime_call_unless(p, ok, handler, args);
 	}
 }
 
@@ -2473,9 +2512,73 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
 }
 
+gb_internal DeclInfo *lb_enclosing_proc_decl(DeclInfo *decl) {
+	for (DeclInfo *d = decl->parent; d != nullptr; d = d->parent) {
+		if (d->proc_lit != nullptr) {
+			return d;
+		}
+	}
+	return nullptr;
+}
+
+gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
+	String *cached = decl->local_proc_name.load();
+	if (cached != nullptr) {
+		return *cached;
+	}
+
+	String prefix = str_lit("_proclit");
+	if (DeclInfo *enclosing = lb_enclosing_proc_decl(decl)) {
+		Entity *pe = enclosing->entity.load();
+		if (pe != nullptr && !pe->Procedure.is_anonymous && lb_enclosing_proc_decl(enclosing) == nullptr) {
+			prefix = lb_get_entity_name(m, pe);
+		} else {
+			prefix = lb_local_proc_name(m, enclosing);
+		}
+	}
+
+	String name = {};
+	Entity *e = decl->entity.load();
+	if (e != nullptr && !e->Procedure.is_anonymous) {
+		// NOTE(bill): parent.name-guid, named by declaration position (and type, for polymorphic instances, which share it)
+		String pd_name = (e->flags & EntityFlag_CustomLinkName) ? e->Procedure.link_name : e->token.string;
+		isize name_len = prefix.len + 1 + pd_name.len + 1 + 10 + 1 + 16 + 1;
+		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+		i32 guid = e->token.pos.offset;
+		if (decl->para_poly_original != nullptr) {
+			name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(prefix), LIT(pd_name), guid,
+			                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
+		} else {
+			name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(prefix), LIT(pd_name), guid);
+		}
+		name = make_string(cast(u8 *)name_text, name_len-1);
+	} else {
+		// NOTE(bill): parent$anon-pkg:file:offset, named by position rather than a counter, as the order these are generated in varies
+		TokenPos pos = ast_token(decl->proc_lit).pos;
+		AstFile *lit_file = decl->proc_lit->file();
+		String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
+		String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
+		isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
+		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+		name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
+		name = make_string(cast(u8 *)name_text, name_len-1);
+	}
+
+	String *s = permanent_alloc_item<String>();
+	*s = name;
+	if (!decl->local_proc_name.compare_exchange_strong(cached, s)) {
+		return *cached;
+	}
+	return name;
+}
+
 gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	GB_ASSERT(m != nullptr);
 	GB_ASSERT(e != nullptr);
+	if (e->kind == Entity_Procedure && !e->Procedure.is_foreign && e->decl_info != nullptr && e->decl_info->proc_lit != nullptr &&
+	    lb_enclosing_proc_decl(e->decl_info) != nullptr) {
+		return lb_local_proc_name(m, e->decl_info);
+	}
 	if (e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
 	} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len != 0) {
@@ -4142,74 +4245,74 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 
 
-gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
+gb_internal void lb_set_anonymous_proc_linkage(lbModule *m, lbProcedure *p) {
+	if (!USE_SEPARATE_MODULES) {
+		return;
+	}
+	LLVMSetLinkage(p->value, LLVMWeakODRLinkage);
+	LLVMSetVisibility(p->value, LLVMHiddenVisibility);
+	if (build_context.metrics.os != TargetOs_darwin) {
+		// Mach-O has no COMDATs, but merges weak definitions itself
+		TEMPORARY_ALLOCATOR_GUARD();
+		LLVMSetComdat(p->value, LLVMGetOrInsertComdat(m->mod, alloc_cstring(temporary_allocator(), p->name)));
+	}
+}
+
+gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, Ast *expr, lbProcedure *parent) {
 	lbGenerator *gen = m->gen;
-	gb_unused(gen);
+	lbModule *target_module = m;
 
 	ast_node(pl, ProcLit, expr);
 
-	if (pl->decl->entity.load() != nullptr) {
-		return lb_find_procedure_value_from_entity(m, pl->decl->entity.load());
-	}
 
-	TokenPos pos = ast_token(expr).pos;
-
-	// NOTE(bill): Generate a new name
-	// parent$anon-pkg:file:offset
-	// NOTE(bill): named by position rather than a counter, as the order these are generated in varies
-	String prefix = prefix_name;
-	if (parent == nullptr) {
-		// NOTE(bill): a literal inside a polymorphic procedure exists once per instance at the same position, so name it after the enclosing procedure
-		for (DeclInfo *d = pl->decl->parent; d != nullptr; d = d->parent) {
-			Entity *pe = d->entity.load();
-			if (pe != nullptr && pe->kind == Entity_Procedure) {
-				prefix = lb_get_entity_name(m, pe);
-				break;
-			}
-		}
-	}
-	AstFile *lit_file = expr->file();
-	String lit_pkg  = (lit_file && lit_file->pkg) ? lit_file->pkg->name : str_lit("");
-	String lit_name = lit_file ? filename_without_directory(lit_file->fullpath) : str_lit("");
-	isize name_len = prefix.len + lit_pkg.len + lit_name.len + 6 + 2 + 11 + 1;
-	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%.*s:%.*s:%d", LIT(prefix), LIT(lit_pkg), LIT(lit_name), pos.offset);
-	String name = make_string((u8 *)name_text, name_len-1);
-
-	Type *type = type_of_expr(expr);
-
-	GB_ASSERT(pl->decl->entity == nullptr);
-	Token token = {};
-	token.pos = ast_token(expr).pos;
-	token.kind = Token_Ident;
-	token.string = name;
-	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
-	e->file = expr->file();
-	e->scope = e->file->scope;
-
-	lbModule *target_module = m;
-	// another module may only be added to before the modules are generated in parallel
+	// NOTE(bill): another module may only be added to before the modules are generated in parallel
 	if (m == &gen->default_module && parent == nullptr && !gen->modules_in_parallel) {
 		target_module = lb_module_of_expr(gen, expr);
 	}
 	GB_ASSERT(target_module != nullptr);
 
-	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	pl->decl->code_gen_module = target_module;
-	e->decl_info = pl->decl;
-	e->parent_proc_decl = pl->decl->parent;
-	e->Procedure.is_anonymous = true;
-	e->flags |= EntityFlag_ProcBodyChecked;
+	Entity *e = pl->decl->entity.load();
+	if (e == nullptr) {
+		Token token = {};
+		token.pos = ast_token(expr).pos;
+		token.kind = Token_Ident;
+		token.string = lb_local_proc_name(m, pl->decl);
+		Entity *new_e = alloc_entity_procedure(nullptr, token, type_of_expr(expr), pl->tags);
+		new_e->file = expr->file();
+		new_e->scope = new_e->file->scope;
+		new_e->decl_info = pl->decl;
+		new_e->parent_proc_decl = pl->decl->parent;
+		new_e->Procedure.is_anonymous = true;
+		new_e->flags |= EntityFlag_ProcBodyChecked;
 
-	pl->decl->entity.store(e);
+		// NOTE: another module may be making one for the same literal at the same time
+		if (pl->decl->entity.compare_exchange_strong(e, new_e)) {
+			e = new_e;
+			pl->decl->code_gen_module = target_module;
+		}
+	}
 
+	{
+		lbValue value = {};
+		rw_mutex_shared_lock(&m->values_mutex);
+		lbValue *found = map_get(&m->values, e);
+		if (found != nullptr) {
+			value = *found;
+		}
+		rw_mutex_shared_unlock(&m->values_mutex);
+		if (value.value != nullptr) {
+			return value;
+		}
+	}
 
 	if (target_module != m) {
 		rw_mutex_shared_lock(&target_module->values_mutex);
 		lbValue *found = map_get(&target_module->values, e);
 		rw_mutex_shared_unlock(&target_module->values_mutex);
 		if (found == nullptr) {
-			mpsc_enqueue(&target_module->procedures_to_generate, lb_create_procedure(target_module, e, false));
+			lbProcedure *tp = lb_create_procedure(target_module, e, false);
+			lb_set_anonymous_proc_linkage(target_module, tp);
+			mpsc_enqueue(&target_module->procedures_to_generate, tp);
 		}
 
 		lbProcedure *p = lb_create_procedure(m, e, true);
@@ -4220,6 +4323,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		return value;
 	} else {
 		lbProcedure *p = lb_create_procedure(m, e);
+		lb_set_anonymous_proc_linkage(m, p);
 
 		lbValue value = {};
 		value.value = p->value;
@@ -4229,7 +4333,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 		if (parent != nullptr) {
 			array_add(&parent->children, p);
 		} else {
-			string_map_set(&m->members, name, value);
+			string_map_set(&m->members, p->name, value);
 		}
 		return value;
 	}

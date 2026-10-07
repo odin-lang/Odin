@@ -1385,6 +1385,23 @@ gb_internal void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx
 	lb_add_debug_local_variable(p, ptr, t_context, token);
 }
 
+gb_internal void lb_add_debug_info_static_variable(lbProcedure *p, Entity *e, LLVMValueRef global) {
+	if (p->debug_info == nullptr) {
+		return;
+	}
+	LLVMMetadataRef global_variable_metadata = LLVMDIBuilderCreateGlobalVariableExpression(
+		p->module->debug_builder, p->debug_info,
+		cast(char const *)e->token.string.text, cast(size_t)e->token.string.len,
+		"", 0, // linkage
+		lb_get_file_metadata(p->module, e->file), cast(unsigned)e->token.pos.line,
+		lb_debug_type(p->module, e->type),
+		true, // local to unit
+		LLVMDIBuilderCreateExpression(p->module->debug_builder, nullptr, 0),
+		nullptr,
+		cast(u32)(8*type_align_of(e->type))
+	);
+	LLVMGlobalSetMetadata(global, 0, global_variable_metadata);
+}
 
 gb_internal String lb_debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
 	String name = e->token.string;

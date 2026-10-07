@@ -2445,7 +2445,6 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	lb_close_scope(p, lbDeferExit_Default, done, ss->body);
 }
 
-
 gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		lbValue value = {};
@@ -2490,7 +2489,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		}
 
 		if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
-			LLVMSetLinkage(global, LLVMInternalLinkage);
+			LLVM_SET_INTERNAL_WEAK_LINKAGE(global);
 		}
 
 		if (value.value != nullptr) {
@@ -2508,7 +2507,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 				}
 				
 				if (!lb_apply_thread_local_model(var_global_ref, e->Variable.thread_local_model)) {
-					LLVMSetLinkage(var_global_ref, LLVMInternalLinkage);
+					LLVM_SET_INTERNAL_WEAK_LINKAGE(var_global_ref);
 				}
 
 				auto vals = array_make<LLVMValueRef>(temporary_allocator(), 0, 3);
@@ -2534,18 +2533,20 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 						LLVMSetGlobalConstant(global, true);
 					}
 					if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
-						LLVMSetLinkage(global, LLVMInternalLinkage);
+						LLVM_SET_INTERNAL_WEAK_LINKAGE(global);
 					}
 				}
 				LLVMSetInitializer(global, value.value);
 			}
 		}
 
+		lb_add_debug_info_static_variable(p, e, global);
 		lbValue global_val = {global, alloc_type_pointer(e->type)};
 		lb_add_entity(p->module, e, global_val);
 		lb_add_member(p->module, mangled_name, global_val);
 	}
 }
+
 gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
 	isize init_count = dst_values->count;
 	Type *t = src_value.type;
@@ -2903,7 +2904,12 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		bool const_cond = LLVMConstIntGetZExtValue(cond.value) != 0;
 
 		LLVMValueRef if_instr = LLVMGetLastInstruction(p->curr_block->block);
+#if LLVM_VERSION_MAJOR >= 23
+		GB_ASSERT((LLVMGetInstructionOpcode(if_instr) == LLVMUncondBr) ||
+                  (LLVMGetInstructionOpcode(if_instr) == LLVMCondBr));
+#else
 		GB_ASSERT(LLVMGetInstructionOpcode(if_instr) == LLVMBr);
+#endif
 		GB_ASSERT(LLVMIsConditional(if_instr));
 		LLVMInstructionEraseFromParent(if_instr);
 

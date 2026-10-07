@@ -404,6 +404,10 @@ gb_internal bool poly_specialization_shape_mismatch(Type *s, Type *o, isize dept
 	if (bs == nullptr || bo == nullptr || bs->kind == Type_Generic || bo->kind == Type_Generic) {
 		return false;
 	}
+	if (bs->kind == Type_Array && bo->kind == Type_EnumeratedArray) {
+		// `[$N]$E` can bind to an enumerated array; leave it to subst_unify
+		return false;
+	}
 	if (bs->kind != bo->kind) {
 		return true;
 	}
@@ -671,8 +675,10 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	CheckerContext nctx = *old_c;
 
-	Scope *scope = create_scope(info, base_entity->scope);
-	scope->flags |= ScopeFlag_Proc;
+	Scope *scope = create_scope(info, nullptr);
+	scope->parent = base_entity->scope;
+	scope->flags |= ScopeFlag_Proc | (base_entity->scope->flags & ScopeFlag_ContextDefined);
+
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
 	nctx.polymorphic_scope = scope;
@@ -709,7 +715,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			}
 			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(proc_entity_full_type(other));
-			if (are_types_identical(pt, final_proc_type)) {
+			// NOTE(bill): parameter names need to be included too as `typeid`s and link names include them
+			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
 				if (poly_proc_data) {
@@ -755,7 +762,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			}
 			Entity *other = gen_procs->procs[i];
 			Type *pt = base_type(proc_entity_full_type(other));
-			if (are_types_identical(pt, final_proc_type)) {
+			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 				return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 			}
@@ -770,7 +777,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
 	for_array(i, gen_procs->procs) {
 		Entity *other = gen_procs->procs[i];
-		if (gen_procs->hashes[i] == final_hash && are_types_identical(base_type(proc_entity_full_type(other)), final_proc_type)) {
+		if (gen_procs->hashes[i] == final_hash && are_types_identical_unique_tuples(base_type(proc_entity_full_type(other)), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 			return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 		}
@@ -13260,9 +13267,6 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 			pl->decl = decl;
 			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
-			mutex_lock(&ctx.checker->nested_proc_lits_mutex);
-			array_add(&ctx.checker->nested_proc_lits, decl);
-			mutex_unlock(&ctx.checker->nested_proc_lits_mutex);
 		}
 		check_close_scope(&ctx);
 
