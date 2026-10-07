@@ -9552,14 +9552,18 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	gb_zero_item(operand);
 	operand->expr = call;
 
-	if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0) {
-		// NOTE: which procedure of a group is called is only known once its arguments are checked
-		Entity *e = entity_of_node(call->CallExpr.proc);
-		if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.deferred_procedure.entity != nullptr) {
+	// NOTE: which procedure of a group is called is only known once its arguments are checked
+	Entity *callee = entity_of_node(call->CallExpr.proc);
+	if (callee != nullptr && callee->kind == Entity_Procedure) {
+		if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0 &&
+		    callee->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 			if (c->decl) {
 				c->decl->defer_used += 1;
 			}
+		}
+		if (c->curr_proc_decl != nullptr) {
+			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
 		}
 	}
 

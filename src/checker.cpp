@@ -1707,6 +1707,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	i->entities_by_file = true;
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
@@ -1742,6 +1743,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	per_thread_array_destroy(&i->entity_queue);
 	per_thread_array_destroy(&i->definition_queue);
 	per_thread_array_destroy(&i->checked_bodies_queue);
+	per_thread_array_destroy(&i->checked_calls_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);

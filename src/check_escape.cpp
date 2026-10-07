@@ -124,6 +124,13 @@ enum EscapeReportKind : u8 {
 	EscapeReport_CallStore,
 };
 
+struct EscapeReport {
+	EscapeReportKind kind;
+	Ast *            node;
+	String           expr_str;
+	EscapeOrigin     origin;
+};
+
 struct EscapeAlias {
 	Entity *     e;
 	EscapeOrigin origin;
@@ -140,8 +147,9 @@ struct EscapeAnalysis {
 	Array<Ast *>         reported;
 	Array<EscapeFlow>    flows;
 	struct EscapeGraph * graph;
-	i32                  group; // of the procedures being analysed together, see `EscapeGraph`
-	bool                 muted; // e.g. the entry point of an executable, which only returns as the program ends
+	i32                  group;   // of the procedures being analysed together, see `EscapeGraph`
+	Array<EscapeReport> *reports; // kept rather than reported, while what flows through the group may still change
+	bool                 muted;   // the entry point of an executable, which only returns as the program ends
 };
 
 
@@ -1599,16 +1607,11 @@ gb_internal gbString escape_expr_to_string(Ast *expr) {
 	return s;
 }
 
-gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, EscapeOrigin const &o, EscapeReportKind kind) {
-	if (ea->muted || (kind != EscapeReport_Return && global_ignore_warnings())) {
-		return;
-	}
-	for (Ast *r : ea->reported) {
-		if (r == node) {
-			return;
-		}
-	}
-	array_add(&ea->reported, node);
+gb_internal void escape_report_emit(EscapeReport const &r) {
+	Ast *node = r.node;
+	String expr_str = r.expr_str;
+	EscapeOrigin const &o = r.origin;
+	EscapeReportKind kind = r.kind;
 
 	gbString origin = gb_string_make(heap_allocator(), "");
 	defer (gb_string_free(origin));
@@ -1658,6 +1661,28 @@ gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, E
 	} else {
 		error_line("\tSuggestion: If this is intended, make it explicit with a conversion to 'rawptr' or 'uintptr', or a 'transmute'\n");
 	}
+}
+
+gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, EscapeOrigin const &o, EscapeReportKind kind) {
+	if (ea->muted || (kind != EscapeReport_Return && global_ignore_warnings())) {
+		return;
+	}
+	for (Ast *r : ea->reported) {
+		if (r == node) {
+			return;
+		}
+	}
+	array_add(&ea->reported, node);
+
+	EscapeReport r = {kind, node, expr_str, o};
+	if (ea->reports == nullptr) {
+		escape_report_emit(r);
+		return;
+	}
+	// kept beyond this analysis and its temporary memory
+	r.expr_str    = copy_string(permanent_allocator(), expr_str);
+	r.origin.path = {};
+	array_add(ea->reports, r);
 }
 
 gb_internal void escape_report_value(EscapeAnalysis *ea, Ast *node, Ast *expr, String name, EscapeValue const &v) {
@@ -2504,7 +2529,12 @@ struct EscapeGraph {
 
 gb_global EscapeGraph escape_graph;
 
-gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, bool report) {
+gb_internal ErrorInstantiations escape_instantiations_of(ProcInfo *pi) {
+	return {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
+}
+
+// `reports` keeps what it reports rather than reporting it, when not null
+gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<EscapeReport> *reports) {
 	ProcInfo *pi = g->procs[v];
 	Type *type = pi->type;
 	Ast *body = pi->body;
@@ -2525,7 +2555,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, bool report)
 	ea.flows    = array_make<EscapeFlow>(temporary_allocator(), 0, 0);
 	ea.graph    = g;
 	ea.group    = g->group_of[v];
-	ea.muted    = !report;
+	ea.reports  = reports;
 
 	if (ea.pt->variadic &&
 	    !ea.pt->c_vararg &&
@@ -2534,8 +2564,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, bool report)
 		ea.variadic = ea.pt->params->Tuple.variables[ea.pt->variadic_index];
 	}
 
-	if (report &&
-	    build_context.build_mode == BuildMode_Executable &&
+	if (build_context.build_mode == BuildMode_Executable &&
 	    !build_context.no_entry_point &&
 	    build_context.command_kind != Command_test) {
 		Entity *e = pi->decl->entity.load();
@@ -2543,7 +2572,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, bool report)
 	}
 
 	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
-	global_error_context.instantiations = {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
+	global_error_context.instantiations = escape_instantiations_of(pi);
 	escape_stmt(&ea, body);
 	if (ea.state.reachable) {
 		escape_exit(&ea, body, {}, {});
@@ -2580,32 +2609,33 @@ gb_internal bool escape_flows_eq(Slice<EscapeFlow> const &a, Slice<EscapeFlow> c
 }
 
 struct EscapeMemberTask {
-	EscapeGraph *     graph;
-	i32               v;
-	bool              report;
-	Slice<EscapeFlow> flows;
+	EscapeGraph *       graph;
+	i32                 v;
+	bool                stale;   // as the flows of one it calls changed
+	bool                changed;
+	Slice<EscapeFlow>   flows;
+	Array<EscapeReport> reports; // of its latest analysis
 };
 
 gb_internal WORKER_TASK_PROC(escape_member_worker) {
 	EscapeMemberTask *t = cast(EscapeMemberTask *)data;
-	t->flows = escape_analyse(t->graph, t->v, t->report);
+	array_clear(&t->reports);
+	t->flows = escape_analyse(t->graph, t->v, &t->reports);
 	return 0;
 }
 
-// each is analysed with the flows the others had before, so the order they are analysed in does not matter
-gb_internal void escape_analyse_members(EscapeGraph *g, Slice<EscapeMemberTask> tasks, bool report) {
-	for (EscapeMemberTask &t : tasks) {
-		t.report = report;
-	}
-	if (!g->threaded || tasks.count == 1) {
-		for (EscapeMemberTask &t : tasks) {
-			escape_member_worker(&t);
-		}
-		return;
-	}
+// each stale one is analysed with the flows the others had before, so the order they are analysed in does not matter
+gb_internal void escape_analyse_members(EscapeGraph *g, Slice<EscapeMemberTask> tasks) {
 	TaskGroup group = {};
 	for (EscapeMemberTask &t : tasks) {
-		thread_pool_add_task(&group, escape_member_worker, &t);
+		if (!t.stale) {
+			continue;
+		}
+		if (g->threaded) {
+			thread_pool_add_task(&group, escape_member_worker, &t);
+		} else {
+			escape_member_worker(&t);
+		}
 	}
 	thread_pool_wait(&group);
 }
@@ -2623,7 +2653,7 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 	}
 	if (!recursive) {
 		DeclInfo *d = g->procs[first]->decl;
-		d->escape_flows = escape_analyse(g, first, true);
+		d->escape_flows = escape_analyse(g, first, nullptr);
 		d->escapes_analysed.store(true);
 		return;
 	}
@@ -2631,28 +2661,56 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 	auto tasks = slice_make<EscapeMemberTask>(heap_allocator(), end - start);
 	defer (slice_free(&tasks, heap_allocator()));
 	for (i32 k = start; k < end; k++) {
-		tasks[k - start] = {g, g->members[k]};
+		EscapeMemberTask &t = tasks[k - start];
+		t = {g, g->members[k]};
+		t.stale = true;
+		array_init(&t.reports, heap_allocator(), 0, 0);
 	}
 
-	// what each may return or store depends on the others, so they start from nothing until that settles
-	for (isize iteration = 0; iteration < MAX_ITERATION_COUNT; iteration++) {
-		escape_analyse_members(g, tasks, false);
-		bool changed = false;
-		for (EscapeMemberTask const &t : tasks) {
-			DeclInfo *d = g->procs[t.v]->decl;
-			changed |= !escape_flows_eq(t.flows, d->escape_flows);
-			d->escape_flows = t.flows;
+	// what each may return or store depends on the others, so they start from nothing until that settles,
+	// analysing again only those calling one whose flows changed, so the latest analysis of each was with what settled
+	bool settled = false;
+	for (isize iteration = 0; iteration < MAX_ITERATION_COUNT && !settled; iteration++) {
+		escape_analyse_members(g, tasks);
+		settled = true;
+		for (EscapeMemberTask &t : tasks) {
+			t.changed = false;
+			if (t.stale) {
+				DeclInfo *d = g->procs[t.v]->decl;
+				t.changed = !escape_flows_eq(t.flows, d->escape_flows);
+				d->escape_flows = t.flows;
+				settled &= !t.changed;
+			}
 		}
-		if (!changed) {
-			break;
+
+		for (EscapeMemberTask &t : tasks) {
+			t.stale = false;
+			for (i32 i = g->offsets[t.v]; i < g->offsets[t.v+1]; i++) {
+				for (EscapeMemberTask const &callee : tasks) {
+					t.stale |= callee.v == g->targets[i] && callee.changed;
+				}
+			}
 		}
 	}
+	if (!settled) {
+		for (EscapeMemberTask &t : tasks) {
+			t.stale = true;
+		}
+		escape_analyse_members(g, tasks);
+	}
 
-	escape_analyse_members(g, tasks, true);
-	for (EscapeMemberTask const &t : tasks) {
-		DeclInfo *d = g->procs[t.v]->decl;
-		d->escape_flows = t.flows;
-		d->escapes_analysed.store(true);
+	for (EscapeMemberTask &t : tasks) {
+		ProcInfo *pi = g->procs[t.v];
+		ErrorInstantiations prev_instantiations = global_error_context.instantiations;
+		global_error_context.instantiations = escape_instantiations_of(pi);
+		for (EscapeReport const &r : t.reports) {
+			escape_report_emit(r);
+		}
+		global_error_context.instantiations = prev_instantiations;
+		array_free(&t.reports);
+
+		pi->decl->escape_flows = t.flows;
+		pi->decl->escapes_analysed.store(true);
 	}
 }
 
@@ -2663,45 +2721,10 @@ gb_internal Slice<EscapeFlow> escape_flows_of(EscapeAnalysis *ea, Entity *e) {
 		return {};
 	}
 	if (!d->escapes_analysed.load() && ea->graph->group_of[d->escape_index] != ea->group) {
-		// not one of its dependencies, which should not happen
+		// not a call the checker recorded, which should not happen
 		return {};
 	}
 	return d->escape_flows;
-}
-
-gb_internal bool escape_callee_index(Entity *e, i32 *index) {
-	if (e == nullptr || e->kind != Entity_Procedure || e->decl_info == nullptr || e->decl_info->proc_info == nullptr) {
-		return false;
-	}
-	*index = e->decl_info->escape_index;
-	return true;
-}
-
-gb_internal void escape_graph_count_callees(ProcInfo **procs, isize count) {
-	EscapeGraph *g = &escape_graph;
-	for (isize k = 0; k < count; k++) {
-		DeclInfo *d = procs[k]->decl;
-		i32 callee_count = 0;
-		FOR_PTR_SET(e, d->deps) {
-			i32 w = 0;
-			callee_count += escape_callee_index(e, &w);
-		}
-		g->offsets[d->escape_index+1] = callee_count;
-	}
-}
-
-gb_internal void escape_graph_fill_callees(ProcInfo **procs, isize count) {
-	EscapeGraph *g = &escape_graph;
-	for (isize k = 0; k < count; k++) {
-		DeclInfo *d = procs[k]->decl;
-		i32 next = g->offsets[d->escape_index];
-		FOR_PTR_SET(e, d->deps) {
-			i32 w = 0;
-			if (escape_callee_index(e, &w)) {
-				g->targets[next++] = w;
-			}
-		}
-	}
 }
 
 gb_internal WORKER_TASK_PROC(escape_group_worker) {
@@ -2759,21 +2782,23 @@ gb_internal void check_escapes(Checker *c) {
 
 	g->threaded = !build_context.no_threaded_checker && build_context.thread_count > 1;
 
-	array_init(&g->offsets, heap_allocator(), count+1);
-	g->offsets[0] = 0;
-	if (g->threaded) {
-		thread_pool_for_chunks(g->procs.data, count, 256, escape_graph_count_callees);
-	} else {
-		escape_graph_count_callees(g->procs.data, count);
-	}
-	for (i32 v = 0; v < count; v++) {
-		g->offsets[v+1] += g->offsets[v];
-	}
-	array_init(&g->targets, heap_allocator(), g->offsets[count]);
-	if (g->threaded) {
-		thread_pool_for_chunks(g->procs.data, count, 256, escape_graph_fill_callees);
-	} else {
-		escape_graph_fill_callees(g->procs.data, count);
+	{
+		auto calls = array_make<CheckedCall>(heap_allocator());
+		defer (array_free(&calls));
+		per_thread_array_gather(&c->info.checked_calls_queue, &calls);
+
+		auto edge_from = array_make<i32>(heap_allocator(), 0, calls.count);
+		auto edge_to   = array_make<i32>(heap_allocator(), 0, calls.count);
+		defer (array_free(&edge_from));
+		defer (array_free(&edge_to));
+		for (CheckedCall const &call : calls) {
+			DeclInfo *callee = call.callee->decl_info;
+			if (call.caller->proc_info != nullptr && callee != nullptr && callee->proc_info != nullptr) {
+				array_add(&edge_from, call.caller->escape_index);
+				array_add(&edge_to, callee->escape_index);
+			}
+		}
+		global_graph_csr(count, edge_from, edge_to, &g->offsets, &g->targets);
 	}
 
 	array_init(&g->group_of, heap_allocator(), count);

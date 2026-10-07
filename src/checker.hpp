@@ -276,6 +276,11 @@ struct ProcInfo {
 	ProcInfo *poly_parent; // the instantiation whose body this was instantiated or declared in, see `error_out_instantiations`
 };
 
+struct CheckedCall {
+	DeclInfo *caller;
+	Entity *  callee;
+};
+
 
 enum LinkNameUseKind : u8 {
 	LinkNameUse_ForeignProcedure,
@@ -837,7 +842,8 @@ struct CheckerInfo {
 	MPSCQueue<ProcInfo *> all_procedures_queue;
 	Array<ProcInfo *> all_procedures;
 
-	PerThreadArray<ProcInfo *> checked_bodies_queue; // for `check_escapes`
+	PerThreadArray<ProcInfo *>   checked_bodies_queue; // for `check_escapes`
+	PerThreadArray<CheckedCall>  checked_calls_queue;  // for `check_escapes`
 
 	BlockingMutex instrumentation_mutex;
 	Entity *instrumentation_enter_entity;
