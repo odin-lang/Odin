@@ -1172,8 +1172,13 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 
 		switch (bt->kind) {
 		default: {
+			// NOTE: a named type reached again while lowering its own base, as in `Bar :: proc(p: ^Bar)`, is cut to `rawptr`
+			if (ptr_set_update(&m->debug_types_in_progress, type)) {
+				return lb_debug_type(m, t_rawptr);
+			}
 			u32 align_in_bits = 8*cast(u32)type_align_of(type);
 			LLVMMetadataRef debug_bt = lb_debug_type(m, bt);
+			ptr_set_remove(&m->debug_types_in_progress, type);
 			LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(
 				m->debug_builder,
 				debug_bt,

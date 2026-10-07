@@ -3417,12 +3417,8 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Proc:
-		{
-			LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
-			gb_unused(proc_raw_type);
-			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
-		}
-		break;
+		// NOTE: the signature is not lowered here, as a parameter like `[]S` in `S :: proc(s: []S)` would recurse forever
+		return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
 	case Type_BitSet:
 		{
 			Type *ut = bit_set_to_int(type);
@@ -3515,8 +3511,7 @@ gb_internal lbFunctionType *lb_get_function_type(lbModule *m, Type *pt) {
 	lbFunctionType **ft_found = nullptr;
 	ft_found = map_get(&m->function_type_map, pt);
 	if (!ft_found) {
-		LLVMTypeRef llvm_proc_type = lb_type(m, pt);
-		gb_unused(llvm_proc_type);
+		lb_type_internal_for_procedures_raw(m, pt);
 		ft_found = map_get(&m->function_type_map, pt);
 	}
 	GB_ASSERT(ft_found != nullptr);
@@ -3530,8 +3525,7 @@ gb_internal void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 	}
 	lbFunctionType **ft_found = map_get(&m->function_type_map, p->type);
 	if (ft_found == nullptr) {
-		LLVMTypeRef llvm_proc_type = lb_type(p->module, p->type);
-		gb_unused(llvm_proc_type);
+		lb_type_internal_for_procedures_raw(p->module, p->type);
 		ft_found = map_get(&m->function_type_map, p->type);
 	}
 	GB_ASSERT(ft_found != nullptr);
