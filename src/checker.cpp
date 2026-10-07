@@ -6852,7 +6852,9 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 
 	if (body_was_checked) {
 		pi->decl->proc_info = pi;
-		per_thread_array_add(&c->info.checked_bodies_queue, pi);
+		if (!build_context.no_escape_analysis) {
+			per_thread_array_add(&c->info.checked_bodies_queue, pi);
+		}
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
@@ -8072,8 +8074,10 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
-	TIME_SECTION("check escapes");
-	check_escapes(c);
+	if (!build_context.no_escape_analysis) {
+		TIME_SECTION("check escapes");
+		check_escapes(c);
+	}
 
 	TIME_SECTION("check unique link names");
 	check_link_name_uses(c);

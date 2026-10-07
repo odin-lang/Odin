@@ -430,6 +430,7 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
+	BuildFlag_NoEscapeAnalysis,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_UseSingleModule,
@@ -703,6 +704,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
+	add_flag(&build_flags, BuildFlag_NoEscapeAnalysis,        str_lit("no-escape-analysis"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
@@ -1426,6 +1428,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
+						case BuildFlag_NoEscapeAnalysis:
+							build_context.no_escape_analysis = true;
+							break;
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
 							break;
@@ -2074,6 +2079,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	if (set_flags[BuildFlag_VetUnusedProcedures] && !set_flags[BuildFlag_VetPackages]) {
 		gb_printf_err("-vet-unused-procedures must be used with -vet-packages\n");
+		bad_flags = true;
+	}
+
+	if (set_flags[BuildFlag_NoEscapeAnalysis] && (set_flags[BuildFlag_VetNilDeref] || set_flags[BuildFlag_VetUninitialized])) {
+		gb_printf_err("-vet-nil-deref and -vet-uninitialized cannot be used with -no-escape-analysis, as they are part of it\n");
 		bad_flags = true;
 	}
 
@@ -3254,6 +3264,13 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	if (check && command != "test") {
 		if (print_flag("-no-entry-point")) {
 			print_usage_line(2, "Removes default requirement of an entry point (e.g. main procedure).");
+		}
+	}
+
+	if (check) {
+		if (print_flag("-no-escape-analysis")) {
+			print_usage_line(2, "Disables the escape analysis of stack memory, including the error for returning the address of a local.");
+			print_usage_line(2, "Cannot be used with -vet-nil-deref or -vet-uninitialized.");
 		}
 	}
 
