@@ -292,22 +292,43 @@ gb_internal ERROR_OUT_PROC(default_error_out_va) {
 		return;
 	}
 	char buf[4096] = {};
-	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
+	char *text = buf;
+	isize cap = gb_size_of(buf);
+	isize len = 0;
+	for (;;) {
+		va_list args;
+		va_copy(args, va);
+		len = gb_snprintf_va(text, cap, fmt, args);
+		va_end(args);
+		if (len >= 0) {
+			break;
+		}
+		// it did not fit, and `gb_snprintf_va` does not say how much space it needs
+		if (text != buf) {
+			gb_free(heap_allocator(), text);
+		}
+		cap *= 2;
+		text = gb_alloc_array(heap_allocator(), char, cap);
+	}
 	isize n = len-1;
 
 	if (n > 0) {
 		ErrorValue *ev = get_error_value();
 		if (terse_errors()) {
 			for (isize i = 0; i < n && !ev->seen_newline; i++) {
-				u8 c = cast(u8)buf[i];
+				u8 c = cast(u8)text[i];
 				if (c == '\n') {
 					ev->seen_newline = true;
 				}
 				array_add(&ev->msg, c);
 			}
 		} else {
-			array_add_elems(&ev->msg, (u8 *)buf, n);
+			array_add_elems(&ev->msg, (u8 *)text, n);
 		}
+	}
+
+	if (text != buf) {
+		gb_free(heap_allocator(), text);
 	}
 }
 
