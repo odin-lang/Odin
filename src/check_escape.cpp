@@ -513,9 +513,28 @@ gb_internal bool escape_is_reference(Entity *e) {
 	       (e->flags & EntityFlag_Value) == 0;
 }
 
+// a field brought in by 'using', of a parameter, a variable, or `x.y` for `using x.y`
 gb_internal bool escape_is_using_field(Entity *e) {
-	return e->using_parent != nullptr &&
-	       e->using_expr   == nullptr;
+	return e->using_parent != nullptr;
+}
+
+// the path of a field brought in by 'using' within what it was applied to, unless it is reached through another
+gb_internal bool escape_using_path(Entity *e, EscapePath *path) {
+	Type *t = base_type(type_deref(e->using_parent->type));
+	if (t == nullptr || t->kind != Type_Struct) {
+		return false;
+	}
+	for (Entity *f : t->Struct.fields) {
+		if (f->token.string == e->token.string) {
+			// the fields of a raw union share its storage
+			*path = {};
+			if (!t->Struct.is_raw_union) {
+				*path = escape_path_of(EscapeStep_Field, f);
+			}
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -924,7 +943,7 @@ gb_internal bool escape_nil_location(Ast *expr, Entity **root, EscapePath *path,
 	switch (expr->kind) {
 	case_ast_node(i, Ident, expr);
 		Entity *e = entity_of_node(expr);
-		if (!escape_is_local(e) || e->using_parent != nullptr || (e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue)) != 0) {
+		if (!escape_is_local(e) || escape_is_using_field(e) || (e->flags & (EntityFlag_ForValue|EntityFlag_SwitchValue)) != 0) {
 			return false;
 		}
 		*root  = e;
@@ -982,10 +1001,13 @@ gb_internal Entity *escape_nil_root(Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Ident, expr);
 		Entity *e = entity_of_node(expr);
-		// a field brought in by 'using', of what it was applied to
-		while (e != nullptr && e->using_parent != nullptr) {
+		if (e != nullptr && escape_is_using_field(e)) {
+			// a field brought in by 'using' is part of what it was applied to
 			if (is_type_pointer(e->using_parent->type) || is_type_soa_pointer(e->using_parent->type)) {
 				return nullptr;
+			}
+			if (e->using_expr != nullptr) {
+				return escape_nil_root(e->using_expr);
 			}
 			e = e->using_parent;
 		}
@@ -1564,28 +1586,24 @@ gb_internal EscapeValue escape_ident_addr(EscapeAnalysis *ea, Entity *e) {
 	}
 
 	if (escape_is_using_field(e)) {
-		Entity *parent = e->using_parent;
-		Type *t = base_type(type_deref(parent->type));
-		Entity *field = nullptr;
-		if (t != nullptr && t->kind == Type_Struct) {
-			for (Entity *f : t->Struct.fields) {
-				if (f->token.string == e->token.string) {
-					field = f;
-					break;
-				}
-			}
-		}
-		if (field == nullptr) {
+		EscapePath path = {};
+		if (!escape_using_path(e, &path)) {
 			return escape_value();
 		}
 
+		// through what it was applied to, which only a parameter has no expression for
+		Entity *parent = e->using_parent;
 		EscapeValue base = {};
-		if (is_type_pointer(parent->type)) {
+		if (e->using_expr != nullptr && is_type_pointer(parent->type)) {
+			base = escape_expr(ea, e->using_expr);
+		} else if (e->using_expr != nullptr) {
+			base = escape_addr(ea, e->using_expr);
+		} else if (is_type_pointer(parent->type)) {
 			base = escape_ident_value(ea, parent);
 		} else {
 			base = escape_ident_addr(ea, parent);
 		}
-		return escape_pointer_offset(base, escape_path_of(EscapeStep_Field, field));
+		return escape_pointer_offset(base, path);
 	}
 
 	if (!escape_is_local(e)) {
@@ -2620,8 +2638,25 @@ gb_internal bool escape_outer_location(Ast *lhs, Entity **root, EscapePath *path
 	*path = {};
 	switch (lhs->kind) {
 	case_ast_node(i, Ident, lhs);
-		*root = entity_of_node(lhs);
-		return *root != nullptr;
+		Entity *e = entity_of_node(lhs);
+		EscapePath field = {};
+		if (e == nullptr || !escape_is_using_field(e) || !escape_using_path(e, &field)) {
+			*root = e;
+			return *root != nullptr;
+		}
+
+		// the same as the selector through what it was applied to
+		bool exact = true;
+		if (e->using_expr != nullptr) {
+			exact = escape_outer_location(e->using_expr, root, path);
+		} else {
+			*root = e->using_parent;
+		}
+		if (is_type_pointer(e->using_parent->type)) {
+			*path = escape_path_concat(*path, escape_path_of(EscapeStep_Deref));
+		}
+		*path = escape_path_concat(*path, field);
+		return exact;
 	case_end;
 	case_ast_node(se, SelectorExpr, lhs);
 		if (Entity *g = escape_package_selector(lhs)) {
@@ -2662,7 +2697,7 @@ gb_internal void escape_store(EscapeAnalysis *ea, Ast *lhs, EscapeValue const &v
 	}
 	if (lhs->kind == Ast_Ident) {
 		Entity *e = entity_of_node(lhs);
-		if (escape_is_local(e) && e->using_parent == nullptr && !escape_is_reference(e)) {
+		if (escape_is_local(e) && !escape_is_using_field(e) && !escape_is_reference(e)) {
 			escape_store_obj(ea, {e}, {}, v, EscapeUpdate_Replace);
 			return;
 		}
