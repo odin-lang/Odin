@@ -6879,7 +6879,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 
 	if (body_was_checked) {
 		pi->decl->proc_info = pi;
-		if (escape_analysis_in_use() || atomic_analysis_in_use()) {
+		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic)) {
 			per_thread_array_add(&c->info.checked_bodies_queue, pi);
 		}
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
@@ -8102,12 +8102,12 @@ gb_internal void check_parsed_files(Checker *c) {
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
 	// before the escape analysis, which takes the checked bodies
-	if (atomic_analysis_in_use()) {
+	if (analysis_in_use(AnalysisFlag_Atomic)) {
 		TIME_SECTION("check atomics");
 		check_atomics(c);
 	}
 
-	if (escape_analysis_in_use()) {
+	if (analysis_in_use(AnalysisFlag_Escape)) {
 		TIME_SECTION("check escapes");
 		check_escapes(c);
 	}

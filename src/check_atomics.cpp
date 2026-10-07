@@ -396,7 +396,7 @@ gb_internal void atomic_check_bodies(ProcInfo **procs, isize count) {
 	for (isize i = 0; i < count; i++) {
 		ProcInfo *pi = procs[i];
 		Ast *body = pi->body;
-		if (body == nullptr || !ast_file_atomic_analysis(body->file()) || (ast_file_vet_flags(body->file()) & VetFlag_AtomicAccess) == 0) {
+		if (body == nullptr || !ast_file_analysis(body->file(), AnalysisFlag_Atomic) || (ast_file_vet_flags(body->file()) & VetFlag_AtomicAccess) == 0) {
 			continue;
 		}
 		AtomicScan s = {};
@@ -529,7 +529,7 @@ gb_internal void check_atomics(Checker *c) {
 			uses.escaped = e->Variable.is_foreign || e->Variable.is_export;
 		}
 		// seq_cst, by default or not, is not asked for as acquire or release ordering is, so it is never reported
-		bool reported = explicit_order && order != OdinAtomicMemoryOrder_seq_cst && ast_file_atomic_analysis(call->file());
+		bool reported = explicit_order && order != OdinAtomicMemoryOrder_seq_cst && ast_file_analysis(call->file(), AnalysisFlag_Atomic);
 		atomic_first(&uses.first, call);
 		if (reads && !writes) {
 			atomic_first(&uses.load, call);

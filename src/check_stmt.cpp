@@ -2109,7 +2109,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_addressed) {
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
-						if (atomic_analysis_in_use()) {
+						if (analysis_in_use(AnalysisFlag_Atomic)) {
 							if (Entity *e = atomic_location(expr)) {
 								per_thread_array_add(&ctx->info->checked_addresses_queue, CheckedAddress{node, e});
 							}
@@ -2773,7 +2773,7 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		}
 	}
 
-	if (ast_file_escape_analysis(node->file())) {
+	if (ast_file_analysis(node->file(), AnalysisFlag_Escape)) {
 		return;
 	}
 	for (Operand &o : operands) {

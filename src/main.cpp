@@ -1433,10 +1433,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.no_entry_point = true;
 							break;
 						case BuildFlag_NoEscapeAnalysis:
-							build_context.no_escape_analysis = true;
+							build_context.no_analysis_flags |= AnalysisFlag_Escape;
 							break;
 						case BuildFlag_NoAtomicAnalysis:
-							build_context.no_atomic_analysis = true;
+							build_context.no_analysis_flags |= AnalysisFlag_Atomic;
 							break;
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
@@ -3282,14 +3282,14 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (check) {
 		if (print_flag("-no-atomic-analysis")) {
-			print_usage_line(2, "Disables the analysis of atomic memory orderings, except in files with '#+atomic-analysis'.");
+			print_usage_line(2, "Disables the analysis of atomic memory orderings, except in files with '#+analysis atomic'.");
 			print_usage_line(2, "It warns where what is written with release ordering is only loaded with relaxed ordering, or the reverse.");
 			print_usage_line(2, "Cannot be used with -vet-atomic-access.");
 		}
 
 		if (print_flag("-no-escape-analysis")) {
-			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+escape-analysis'.");
-			print_usage_line(2, "Where it is disabled, by this or by '#+no-escape-analysis', only returning the address of a local or similar is an error.");
+			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+analysis escape'.");
+			print_usage_line(2, "Where it is disabled, by this or by '#+analysis !escape', only returning the address of a local or similar is an error.");
 			print_usage_line(2, "Cannot be used with -vet-nil-deref or -vet-uninitialized.");
 		}
 	}

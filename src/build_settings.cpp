@@ -329,6 +329,23 @@ enum VetFlags : u64 {
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
 
+enum AnalysisFlags : u64 {
+	AnalysisFlag_NONE   = 0,
+	AnalysisFlag_Escape = 1u<<0,
+	AnalysisFlag_Atomic = 1u<<1,
+
+	AnalysisFlag_All = AnalysisFlag_Escape|AnalysisFlag_Atomic,
+};
+
+u64 get_analysis_flag_from_name(String const &name) {
+	if (name == "escape") {
+		return AnalysisFlag_Escape;
+	} else if (name == "atomic") {
+		return AnalysisFlag_Atomic;
+	}
+	return AnalysisFlag_NONE;
+}
+
 u64 get_vet_flag_from_name(String const &name) {
 	if (name == "unused") {
 		return VetFlag_Unused;
@@ -566,8 +583,7 @@ struct BuildContext {
 	bool   no_crt;
 	bool   no_rpath;
 	bool   no_entry_point;
-	bool   no_escape_analysis;
-	bool   no_atomic_analysis;
+	u64    no_analysis_flags; // AnalysisFlags, by -no-<name>-analysis
 	bool   no_thread_local;
 	bool   cross_compiling;
 	bool   different_os;

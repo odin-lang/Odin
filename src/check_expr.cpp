@@ -3066,7 +3066,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			o->mode = Addressing_Invalid;
 			return;
 		}
-		if (atomic_analysis_in_use()) {
+		if (analysis_in_use(AnalysisFlag_Atomic)) {
 			if (Entity *e = atomic_location(o->expr)) {
 				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
 			}
@@ -9497,7 +9497,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
-		} else if (BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit && atomic_analysis_in_use()) {
+		} else if (BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit && analysis_in_use(AnalysisFlag_Atomic)) {
 			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, id});
 		}
 		operand->expr = call;
@@ -9560,7 +9560,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				c->decl->defer_used += 1;
 			}
 		}
-		if (c->curr_proc_decl != nullptr && escape_analysis_in_use()) {
+		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
 			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
 		}
 	}
@@ -12896,7 +12896,7 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->expr = node;
 			return kind;
 		}
-		if (atomic_analysis_in_use() && !is_type_pointer(o->type)) {
+		if (analysis_in_use(AnalysisFlag_Atomic) && !is_type_pointer(o->type)) {
 			if (Entity *e = atomic_location(node->SliceExpr.expr)) {
 				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
 			}
