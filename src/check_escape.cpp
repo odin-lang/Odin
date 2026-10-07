@@ -167,6 +167,7 @@ struct EscapeGraph {
 	Array<i32>                group_of;
 	Array<i32>                group_offsets;  // group -> its procedures, as `members[group_offsets[gi]..<group_offsets[gi+1]]`
 	Array<i32>                members;        // every group a group may call has a lower index
+	Array<bool>               skipped;        // per procedure, neither in a file with the escape analysis nor called from one
 	Slice<std::atomic<i32> >  pending;        // per group its calls to procedures of other groups which are not analysed yet
 	Slice<std::atomic<i32> >  cursors;        // per procedure while `targets` is filled
 	bool                      threaded;
@@ -3480,9 +3481,13 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
 
+	// in a file without it, which only gives what flows through it to those calling it
+	bool enabled = ast_file_escape_analysis(body->file());
+	ea.muted = !enabled;
+
 	u64 vet_flags = ast_file_vet_flags(body->file());
-	ea.nil_deref    = (vet_flags & VetFlag_NilDeref) != 0;
-	ea.uninit       = (vet_flags & VetFlag_Uninitialized) != 0;
+	ea.nil_deref    = enabled && (vet_flags & VetFlag_NilDeref) != 0;
+	ea.uninit       = enabled && (vet_flags & VetFlag_Uninitialized) != 0;
 	ea.nil_uses     = array_make<EscapeNilUse>(temporary_allocator(), 0, 0);
 	ea.nil_escaped  = array_make<Entity *>(temporary_allocator(), 0, 0);
 	ea.uninit_decls = array_make<Entity *>(temporary_allocator(), 0, 0);
@@ -3498,7 +3503,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	    !build_context.no_entry_point &&
 	    build_context.command_kind != Command_test) {
 		Entity *e = pi->decl->entity.load();
-		ea.muted = e != nullptr && e == global_checker_ptr.load(std::memory_order_relaxed)->info.entry_point;
+		ea.muted |= e != nullptr && e == global_checker_ptr.load(std::memory_order_relaxed)->info.entry_point;
 	}
 
 	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
@@ -3596,6 +3601,9 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 	i32 end   = g->group_offsets[gi+1];
 
 	i32 first = g->members[start];
+	if (g->skipped[first]) {
+		return;
+	}
 	bool recursive = end - start > 1;
 	for (i32 i = g->offsets[first]; i < g->offsets[first+1]; i++) {
 		recursive |= g->targets[i] == first;
@@ -3861,6 +3869,7 @@ gb_internal void check_escapes(Checker *c) {
 		array_free(&g->group_of);
 		array_free(&g->group_offsets);
 		array_free(&g->members);
+		array_free(&g->skipped);
 		slice_free(&g->pending, heap_allocator());
 		slice_free(&g->cursors, heap_allocator());
 		*g = {};
@@ -3891,6 +3900,29 @@ gb_internal void check_escapes(Checker *c) {
 
 	for (PerThreadArraySlot<CheckedCall> &slot : c->info.checked_calls_queue.slots) {
 		array_clear(&slot.array);
+	}
+
+	// when it is disabled but for some files, only their procedures and what those may call are analysed
+	array_init(&g->skipped, heap_allocator(), count);
+	if (build_context.no_escape_analysis) {
+		auto stack = array_make<i32>(temporary_allocator(), 0, count);
+		for (i32 v = 0; v < count; v++) {
+			Ast *body = g->procs[v]->body;
+			g->skipped[v] = body == nullptr || !ast_file_escape_analysis(body->file());
+			if (!g->skipped[v]) {
+				array_add(&stack, v);
+			}
+		}
+		while (stack.count > 0) {
+			i32 v = array_pop(&stack);
+			for (i32 i = g->offsets[v]; i < g->offsets[v+1]; i++) {
+				i32 w = g->targets[i];
+				if (g->skipped[w]) {
+					g->skipped[w] = false;
+					array_add(&stack, w);
+				}
+			}
+		}
 	}
 
 	// only needed to release the groups when threaded, and found meanwhile

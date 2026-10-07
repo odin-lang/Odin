@@ -3269,7 +3269,8 @@ gb_internal int print_show_help(String const arg0, String command, String option
 
 	if (check) {
 		if (print_flag("-no-escape-analysis")) {
-			print_usage_line(2, "Disables the escape analysis of stack memory, including the error for returning the address of a local.");
+			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+escape-analysis'.");
+			print_usage_line(2, "Where it is disabled, by this or by '#+no-escape-analysis', only returning the address of a local or similar is an error.");
 			print_usage_line(2, "Cannot be used with -vet-nil-deref or -vet-uninitialized.");
 		}
 	}

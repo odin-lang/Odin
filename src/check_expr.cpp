@@ -9562,7 +9562,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				c->decl->defer_used += 1;
 			}
 		}
-		if (c->curr_proc_decl != nullptr && !build_context.no_escape_analysis) {
+		if (c->curr_proc_decl != nullptr && escape_analysis_in_use()) {
 			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
 		}
 	}
