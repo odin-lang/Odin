@@ -3670,6 +3670,42 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return res;
 		}
 
+	case BuiltinProc_return_address:
+	case BuiltinProc_frame_address:
+	case BuiltinProc_stack_pointer:
+	case BuiltinProc_address_of_return_address:
+		{
+			char const *name = nullptr;
+			switch (id) {
+			case BuiltinProc_return_address:            name = "llvm.returnaddress";          break;
+			case BuiltinProc_frame_address:             name = "llvm.frameaddress";           break;
+			case BuiltinProc_stack_pointer:             name = "llvm.stacksave";              break;
+			case BuiltinProc_address_of_return_address: name = "llvm.addressofreturnaddress"; break;
+			}
+
+			LLVMValueRef args[1] = {};
+			unsigned arg_count = 0;
+			if (id == BuiltinProc_return_address || id == BuiltinProc_frame_address) {
+				u64 level = 0;
+				if (ce->args.count > 0) {
+					level = cast(u64)exact_value_to_i64(ce->args[0]->tav.value);
+				}
+				args[arg_count++] = LLVMConstInt(lb_type(p->module, t_u32), level, false);
+			}
+
+			// whether these are overloaded on their pointer type differs between LLVM versions
+			LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
+			unsigned type_count = 0;
+			if (LLVMIntrinsicIsOverloaded(LLVMLookupIntrinsicID(name, gb_strlen(name)))) {
+				type_count = 1;
+			}
+
+			lbValue res = {};
+			res.value = lb_call_intrinsic(p, name, args, arg_count, types, type_count);
+			res.type = tv.type;
+			return res;
+		}
+
 	case BuiltinProc_count_trailing_zeros:
 		return lb_emit_count_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 	case BuiltinProc_count_leading_zeros:
