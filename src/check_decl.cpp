@@ -1270,10 +1270,14 @@ gb_internal GB_COMPARE_PROC(link_name_use_cmp) {
 	if (cmp != 0) {
 		return cmp;
 	}
+	if (x->kind != y->kind) {
+		// NOTE(sobex): sort Procedure before ForeignProcedure
+		return i32_cmp(y->kind, x->kind);
+	}
 	if (x->entity != y->entity) {
 		return entity_source_order_cmp(x->entity, y->entity);
 	}
-	return i32_cmp(x->kind, y->kind);
+	return 0;
 }
 gb_internal void check_link_name_uses(Checker *c) {
 	auto &uses = c->info.link_names;
@@ -1318,7 +1322,7 @@ gb_internal void check_link_name_uses(Checker *c) {
 				}
 			} else if (!signature_parameter_similar_enough(this_type, other_type)) {
 				error(u->decl->proc_lit,
-				      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
+				      "Foreign entity '%.*s' declared elsewhere with a different type\n"
 				      "\tat %s",
 				      LIT(name), token_pos_to_string(pos));
 			}
