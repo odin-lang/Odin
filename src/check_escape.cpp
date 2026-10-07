@@ -27,25 +27,38 @@ enum EscapeOriginKind : u8 {
 	EscapeOrigin_Outer,
 	EscapeOrigin_Local,
 	EscapeOrigin_Temp,
-	EscapeOrigin_Owned, // the buffer of a local dynamic array or map, tracked as its contents
+	EscapeOrigin_Owned,     // the buffer of a local dynamic array or map, tracked as its contents
 	EscapeOrigin_Variadic,
 	EscapeOrigin_Param,     // what the pointers a parameter holds at its path point to, which is the caller's
-	EscapeOrigin_ParamLoad, // what is reached by loading through them
+	EscapeOrigin_ParamLoad, // what the pointers loaded once through them point to
+	EscapeOrigin_ParamDeep, // what is reached by loading through them more than once
 };
 
+// where the buffer of a dynamic array or map is loaded through it
 enum EscapeFlowKind : u8 {
 	EscapeFlow_Invalid,
 	EscapeFlow_Value, // the pointers of the argument, or offsets of them
-	EscapeFlow_Load,  // the pointers loaded through them
+	EscapeFlow_Load,  // the pointers loaded once through them
+	EscapeFlow_Deep,  // the pointers loaded more than once through them
 };
 
-// what an argument holds at a path may reach a result of the call at a path
+enum EscapeFlowTargetKind : u8 {
+	EscapeFlowTarget_Invalid,
+	EscapeFlowTarget_Result,
+	EscapeFlowTarget_Pointee, // what an argument points to
+	EscapeFlowTarget_Loaded,  // what a pointer loaded once through an argument points to
+	EscapeFlowTarget_Deep,    // what is reached by loading through an argument more than once
+	EscapeFlowTarget_Outer,   // e.g. a global
+};
+
+// what an argument holds at a path may reach a result of the call, or be stored where it outlives the call
 struct EscapeFlow {
-	EscapeFlowKind kind;
-	isize          result;
-	isize          param;
-	EscapePath     result_path;
-	EscapePath     param_path;
+	EscapeFlowKind       kind;
+	isize                param;
+	EscapePath           param_path;
+	EscapeFlowTargetKind target;
+	isize                target_index; // of the result, or of the argument it is stored through
+	EscapePath           target_path;  // within the result, or of the pointer within that argument
 };
 
 struct EscapeOrigin {
@@ -71,8 +84,9 @@ struct EscapeOuterStore {
 	Entity *     root;
 	EscapePath   path;
 	bool         exact;
-	Ast *        node;
-	EscapeOrigin origin;
+	Ast *        node;   // the left hand side, or a call storing into memory it was given
+	EscapeOrigin dest;   // what it is stored through
+	EscapeOrigin origin; // of what is stored
 };
 
 struct EscapeState {
@@ -107,6 +121,7 @@ enum EscapeReportKind : u8 {
 	EscapeReport_Return, // definitely, so an error
 	EscapeReport_MayReturn,
 	EscapeReport_Store,
+	EscapeReport_CallStore,
 };
 
 struct EscapeAlias {
@@ -190,6 +205,7 @@ gb_internal bool escape_outer_eq(EscapeOuterStore const &a, EscapeOuterStore con
 	       escape_path_eq(a.path, b.path) &&
 	       a.exact == b.exact             &&
 	       a.node  == b.node              &&
+	       escape_origin_eq(a.dest,   b.dest) &&
 	       escape_origin_eq(a.origin, b.origin);
 }
 
@@ -226,6 +242,16 @@ gb_internal EscapeValue escape_value_of(EscapeOriginKind kind, EscapeObject cons
 	return v;
 }
 
+gb_internal isize escape_path_deref_index(EscapePath const &p) {
+	for_array(i, p) {
+		if (p[i].kind == EscapeStep_Deref) {
+			return i;
+		}
+	}
+	return p.count;
+}
+
+
 gb_internal EscapeValue escape_pointer_offset(EscapeValue const &v, EscapePath const &extra) {
 	EscapeValue w = escape_value();
 	for (EscapeValueFact const &f : v) {
@@ -234,6 +260,12 @@ gb_internal EscapeValue escape_pointer_offset(EscapeValue const &v, EscapePath c
 		case EscapeOrigin_Local:
 		case EscapeOrigin_Temp:
 		case EscapeOrigin_Owned:
+			o.path = escape_path_concat(o.path, extra);
+			break;
+		case EscapeOrigin_Param:
+			if (extra.count > 0 && escape_path_deref_index(o.path) == o.path.count) {
+				o.path = escape_path_concat(o.path, escape_path_of(EscapeStep_Deref));
+			}
 			o.path = escape_path_concat(o.path, extra);
 			break;
 		}
@@ -248,7 +280,7 @@ gb_internal EscapeValue escape_as_pointer(EscapeValue const &v) {
 
 // what a parameter holds at a path within what it holds at another
 gb_internal EscapeOrigin escape_origin_within(EscapeOrigin o, EscapePath const &path, isize from) {
-	if (o.kind == EscapeOrigin_Param) {
+	if (o.kind == EscapeOrigin_Param && escape_path_deref_index(o.path) == o.path.count) {
 		o.path = escape_path_concat(o.path, slice(path, from, path.count));
 	}
 	return o;
@@ -439,6 +471,82 @@ gb_internal EscapeValue escape_obj_value(EscapeAnalysis *ea, EscapeObject const 
 	return v;
 }
 
+// the type of what is at a path within a value of a type, if known, e.g. not when the path was made through a cast
+gb_internal Type *escape_type_within(Type *t, EscapePath const &path) {
+	for (EscapeStep const &step : path) {
+		Type *bt = base_type(t);
+		if (bt == nullptr) {
+			return nullptr;
+		}
+		if (step.kind == EscapeStep_Field) {
+			if (bt->kind != Type_Struct) {
+				return nullptr;
+			}
+			bool is_own_field = false;
+			for (Entity *field : bt->Struct.fields) {
+				is_own_field |= field == step.field;
+			}
+			if (!is_own_field) {
+				return nullptr;
+			}
+			t = step.field->type;
+			continue;
+		}
+		switch (bt->kind) {
+		case Type_Array:                     t = bt->Array.elem;                     break;
+		case Type_EnumeratedArray:           t = bt->EnumeratedArray.elem;           break;
+		case Type_FixedCapacityDynamicArray: t = bt->FixedCapacityDynamicArray.elem; break;
+		case Type_Slice:                     t = bt->Slice.elem;                     break;
+		case Type_DynamicArray:              t = bt->DynamicArray.elem;              break;
+		case Type_Map:                       t = bt->Map.value;                      break;
+		case Type_Matrix:                    t = bt->Matrix.elem;                    break;
+		default:
+			return nullptr;
+		}
+	}
+	return t;
+}
+
+gb_internal Type *escape_type_at(EscapeObject const &obj, EscapePath const &path) {
+	if (obj.entity != nullptr) {
+		return escape_type_within(obj.entity->type, path);
+	}
+	if (obj.temp != nullptr) {
+		return escape_type_within(obj.temp->tav.type, path);
+	}
+	return nullptr;
+}
+
+// what a value of the type points to, e.g. the elements of a slice
+gb_internal Type *escape_pointee_type(Type *t) {
+	t = base_type(t);
+	if (t == nullptr) {
+		return nullptr;
+	}
+	switch (t->kind) {
+	case Type_Pointer:      return t->Pointer.elem;
+	case Type_MultiPointer: return t->MultiPointer.elem;
+	case Type_Slice:        return t->Slice.elem;
+	case Type_DynamicArray: return t->DynamicArray.elem;
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_string:
+		case Basic_cstring:
+		case Basic_string16:
+		case Basic_cstring16:
+			return t_u8;
+		}
+		return nullptr;
+	}
+	return nullptr;
+}
+
+// whether what a value of the type points to cannot hold pointers, e.g. the bytes of a `[]u8`
+gb_internal bool escape_points_to_plain(Type *t) {
+	Type *pointee = escape_pointee_type(t);
+	return pointee != nullptr && !escape_type_has_pointers(pointee);
+}
+
 // a store to a field overwrites only that part of a fact for more of the value, so it is kept for the other fields
 gb_internal bool escape_split_fact(EscapeFact const &f, Type *type, EscapePath const &path, Array<EscapeFact> *pieces) {
 	auto split = array_make<EscapeFact>(temporary_allocator(), 0, 0);
@@ -475,13 +583,7 @@ gb_internal bool escape_split_fact(EscapeFact const &f, Type *type, EscapePath c
 
 gb_internal void escape_store_obj(EscapeAnalysis *ea, EscapeObject const &obj, EscapePath const &path, EscapeValue const &v, EscapeUpdateKind update) {
 	if (update == EscapeUpdate_Replace && !escape_path_has(path, EscapeStep_AnyElement)) {
-		Type *type = nullptr;
-		if (obj.entity != nullptr) {
-			type = obj.entity->type;
-		} else if (obj.temp != nullptr) {
-			type = obj.temp->tav.type;
-		}
-
+		Type *type = escape_type_at(obj, {});
 		auto pieces = array_make<EscapeFact>(temporary_allocator(), 0, 0);
 		for (isize i = ea->state.facts.count-1; i >= 0; i--) {
 			EscapeFact const &f = ea->state.facts[i];
@@ -503,6 +605,15 @@ gb_internal void escape_store_obj(EscapeAnalysis *ea, EscapeObject const &obj, E
 	}
 }
 
+// what loading through a pointer of the caller's memory gives
+gb_internal EscapeOrigin escape_param_loaded(EscapeOrigin o) {
+	switch (o.kind) {
+	case EscapeOrigin_Param:     o.kind = EscapeOrigin_ParamLoad; break;
+	case EscapeOrigin_ParamLoad: o.kind = EscapeOrigin_ParamDeep; break;
+	}
+	return o;
+}
+
 gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, Type *type) {
 	EscapeValue v = escape_value();
 	if (type != nullptr && !escape_type_has_pointers(type)) {
@@ -521,7 +632,8 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 			if (elem->kind == Type_Slice && is_type_any(elem->Slice.elem)) {
 				escape_value_add(&v, {}, o);
 			} else {
-				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Outer});
+				// its elements are the caller's arguments
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_ParamLoad, o.obj, o.path});
 			}
 			break;
 		}
@@ -543,7 +655,8 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 
 		case EscapeOrigin_Param:
 		case EscapeOrigin_ParamLoad:
-			escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_ParamLoad, o.obj, o.path});
+		case EscapeOrigin_ParamDeep:
+			escape_value_add(&v, {}, escape_param_loaded(o));
 			break;
 
 		case EscapeOrigin_Invalid:
@@ -556,9 +669,20 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr);
 gb_internal EscapeValue escape_addr(EscapeAnalysis *ea, Ast *expr);
 
+gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call);
+gb_internal Ast *escape_call_of(Ast *expr);
+gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update);
+
 gb_internal void escape_visit_exits(EscapeAnalysis *ea, Ast *expr) {
-	if (expr != nullptr && (expr->viral_state_flags & (ViralStateFlag_ContainsOrReturn|ViralStateFlag_ContainsOrBreak)) != 0) {
+	if (expr == nullptr) {
+		return;
+	}
+	if ((expr->viral_state_flags & (ViralStateFlag_ContainsOrReturn|ViralStateFlag_ContainsOrBreak)) != 0) {
 		escape_expr(ea, expr);
+		return;
+	}
+	if (Ast *call = escape_call_of(expr)) {
+		escape_call(ea, call);
 	}
 }
 
@@ -620,7 +744,8 @@ gb_internal EscapeValue escape_elems_at(EscapeAnalysis *ea, EscapeValue const &a
 				break;
 			case EscapeOrigin_Param:
 			case EscapeOrigin_ParamLoad:
-				escape_value_add(&ptr, {}, EscapeOrigin{EscapeOrigin_ParamLoad, o.obj, o.path});
+			case EscapeOrigin_ParamDeep:
+				escape_value_add(&ptr, {}, escape_param_loaded(o));
 				break;
 			}
 		}
@@ -852,12 +977,45 @@ gb_internal bool escape_is_explicit_unsafe_conversion(Type *t) {
 
 gb_internal Slice<EscapeFlow> escape_flows_of(EscapeAnalysis *ea, Entity *e);
 
+// loading through the pointers once, as the callee does, where a dynamic array or map holds the pointer to its buffer
+gb_internal EscapeValue escape_load_once(EscapeAnalysis *ea, EscapeValue const &ptr) {
+	EscapeValue v = escape_value();
+	for (EscapeValueFact const &f : ptr) {
+		EscapeOrigin o = f.origin;
+		switch (o.kind) {
+		case EscapeOrigin_Local:
+		case EscapeOrigin_Temp:
+		case EscapeOrigin_Owned: {
+			Type *t = base_type(escape_type_at(o.obj, o.path));
+
+			bool holds_buffer = t != nullptr && (t->kind == Type_DynamicArray || t->kind == Type_Map);
+
+			if (holds_buffer && !(o.kind == EscapeOrigin_Local && escape_is_param(o.obj.entity))) {
+				o.kind = EscapeOrigin_Owned;
+				o.path = escape_path_concat(o.path, escape_path_of(EscapeStep_AnyElement));
+				escape_value_add(&v, {}, o);
+				continue;
+			}
+			break;
+		}
+		}
+
+		EscapeValue single = escape_value();
+		escape_value_add(&single, {}, o);
+		for (EscapeValueFact const &g : escape_load(ea, single, nullptr)) {
+			escape_value_add(&v, g.path, g.origin);
+		}
+	}
+	return v;
+}
+
+// what is loaded through the pointers of a value, at any depth
 gb_internal EscapeValue escape_reachable(EscapeAnalysis *ea, EscapeValue const &v) {
 	EscapeValue reached  = escape_value();
 	EscapeValue frontier = escape_as_pointer(v);
 	while (frontier.count > 0) {
 		EscapeValue next = escape_value();
-		for (EscapeValueFact const &f : escape_load(ea, frontier, nullptr)) {
+		for (EscapeValueFact const &f : escape_load_once(ea, frontier)) {
 			isize count = reached.count;
 			escape_value_add(&reached, {}, f.origin);
 			if (reached.count != count) {
@@ -869,10 +1027,29 @@ gb_internal EscapeValue escape_reachable(EscapeAnalysis *ea, EscapeValue const &
 	return reached;
 }
 
+// the path of a parameter's origin is where in its value the pointer is, then a deref and the offset into what it points to
+gb_internal EscapeValue escape_arg_pointers(EscapeValue const &arg, Type *type, EscapePath const &path, Type **pointee) {
+	isize deref = escape_path_deref_index(path);
+	EscapePath value_path = slice(path, 0, deref);
+	EscapePath offset = {};
+	if (deref < path.count) {
+		offset = slice(path, deref+1, path.count);
+	}
+	*pointee = escape_type_within(escape_pointee_type(escape_type_within(type, value_path)), offset);
+	if (*pointee == nullptr) {
+		// e.g. the offset was made through a cast in the callee
+		offset = {};
+	}
+	return escape_pointer_offset(escape_as_pointer(escape_value_project(arg, value_path)), offset);
+}
+
 gb_internal bool escape_param_index_of_arg(TypeProc *pt, Ast *arg, isize position, isize *index) {
 	if (arg->kind != Ast_FieldValue) {
 		*index = position;
-		return position < pt->param_count;
+		if (pt->variadic && position > pt->variadic_index) {
+			*index = pt->variadic_index;
+		}
+		return *index < pt->param_count;
 	}
 	Ast *name = arg->FieldValue.field;
 	if (name->kind != Ast_Ident || pt->params == nullptr) {
@@ -891,29 +1068,79 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 	ast_node(ce, CallExpr, call);
 	escape_visit_exits(ea, ce->proc);
 
+	Entity *e = nullptr;
+	Ast *proc = unparen_expr(ce->proc);
+	if (proc->kind == Ast_Ident || proc->kind == Ast_SelectorExpr) {
+		e = entity_of_node(proc);
+	}
+
+	Array<EscapeValue> results = {};
+	if (e != nullptr && e->kind == Entity_Builtin) {
+		results = array_make<EscapeValue>(temporary_allocator(), 0, 1);
+		switch (e->Builtin.id) {
+		case BuiltinProc_ptr_offset:
+			if (ce->args.count == 2) {
+				array_add(&results, escape_expr(ea, ce->args[0]));
+				escape_visit_exits(ea, ce->args[1]);
+				return results;
+			}
+			break;
+		case BuiltinProc_raw_data:
+			if (ce->args.count == 1) {
+				array_add(&results, escape_elems_of(ea, ce->args[0]));
+				return results;
+			}
+			break;
+		case BuiltinProc_mem_copy:
+		case BuiltinProc_mem_copy_non_overlapping:
+			if (ce->args.count == 3) {
+				EscapeValue dst = escape_as_pointer(escape_expr(ea, ce->args[0]));
+				EscapeValue src = escape_as_pointer(escape_expr(ea, ce->args[1]));
+				escape_visit_exits(ea, ce->args[2]);
+				if (!escape_points_to_plain(ce->args[1]->tav.type)) {
+					escape_store_through(ea, call, dst, escape_load(ea, src, nullptr), EscapeUpdate_Add);
+				}
+				return results;
+			}
+			break;
+		}
+	}
+
 	TypeProc *pt = nullptr;
 	Slice<EscapeFlow> flows = {};
-	Ast *proc = unparen_expr(ce->proc);
-	if (ce->args.count > 0 && (proc->kind == Ast_Ident || proc->kind == Ast_SelectorExpr)) {
-		Entity *e = entity_of_node(proc);
-		Type *t = nullptr;
-		if (e != nullptr && e->kind == Entity_Procedure) {
-			t = base_type(e->type);
-		}
+	if (ce->args.count > 0 && e != nullptr && e->kind == Entity_Procedure) {
+		Type *t = base_type(e->type);
 		if (t != nullptr && t->kind == Type_Proc) {
 			pt = &t->Proc;
 			flows = escape_flows_of(ea, e);
 		}
 	}
-
-	Array<EscapeValue> results = {};
-	if (flows.count > 0) {
-		results = array_make<EscapeValue>(temporary_allocator(), pt->result_count);
-		for (EscapeValue &r : results) {
-			r = escape_value();
+	if (flows.count == 0) {
+		for (Ast *arg : ce->args) {
+			if (arg->kind == Ast_FieldValue) {
+				arg = arg->FieldValue.value;
+			}
+			escape_visit_exits(ea, arg);
 		}
+		return {};
 	}
 
+	results = array_make<EscapeValue>(temporary_allocator(), pt->result_count);
+	for (EscapeValue &r : results) {
+		r = escape_value();
+	}
+
+	// the value of each argument which a flow involves
+	auto args  = array_make<EscapeValue>(temporary_allocator(), pt->param_count);
+	auto types = array_make<Type *>(temporary_allocator(), pt->param_count);
+	auto given = array_make<bool>(temporary_allocator(), pt->param_count);
+	for_array(i, args) {
+		args[i]  = escape_value();
+		types[i] = nullptr;
+		given[i] = false;
+	}
+
+	bool packs_variadic = pt->variadic && !pt->c_vararg && ce->ellipsis.pos.line == 0;
 	for_array(i, ce->args) {
 		Ast *arg = ce->args[i];
 		Ast *value = arg;
@@ -922,30 +1149,90 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 		}
 
 		isize index = 0;
-		bool flows_out = false;
-		if (flows.count > 0 && escape_param_index_of_arg(pt, arg, i, &index)) {
+		bool involved = false;
+		if (escape_param_index_of_arg(pt, arg, i, &index)) {
 			for (EscapeFlow const &flow : flows) {
-				flows_out |= flow.param == index;
+				involved |= flow.param == index;
+				switch (flow.target) {
+				case EscapeFlowTarget_Pointee:
+				case EscapeFlowTarget_Loaded:
+				case EscapeFlowTarget_Deep:
+					involved |= flow.target_index == index;
+					break;
+				}
 			}
 		}
-		if (!flows_out) {
+		if (!involved) {
 			escape_visit_exits(ea, value);
 			continue;
 		}
 
-		Entity *param = pt->params->Tuple.variables[index];
-		EscapeValue v = escape_convert(ea, escape_expr(ea, value), value, param->type);
-		for (EscapeFlow const &flow : flows) {
-			if (flow.param != index) {
-				continue;
+		Type *type = pt->params->Tuple.variables[index]->type;
+		given[index] = true;
+		types[index] = value->tav.type;
+		if (packs_variadic && index == pt->variadic_index && arg->kind != Ast_FieldValue) {
+			types[index] = type;
+			// these are passed in a slice in the stack frame of this procedure
+			Type *slice = base_type(type);
+			Type *elem = nullptr;
+			if (slice->kind == Type_Slice) {
+				elem = slice->Slice.elem;
 			}
-			EscapeValue part = escape_value_project(v, flow.param_path);
-			if (flow.kind == EscapeFlow_Load) {
-				part = escape_reachable(ea, part);
+			EscapeValue v = escape_convert(ea, escape_expr(ea, value), value, elem);
+			escape_store_obj(ea, {nullptr, call}, escape_path_of(EscapeStep_AnyElement), v, EscapeUpdate_Add);
+			args[index] = escape_value_of(EscapeOrigin_Temp, {nullptr, call}, escape_path_of(EscapeStep_AnyElement));
+			continue;
+		}
+		args[index] = escape_convert(ea, escape_expr(ea, value), value, type);
+	}
+
+	for (EscapeFlow const &flow : flows) {
+		if (!given[flow.param]) {
+			continue;
+		}
+		EscapeValue v = {};
+		if (flow.kind == EscapeFlow_Value && escape_path_deref_index(flow.param_path) == flow.param_path.count) {
+			v = escape_value_project(args[flow.param], flow.param_path);
+		} else {
+			Type *pointee = nullptr;
+			v = escape_arg_pointers(args[flow.param], types[flow.param], flow.param_path, &pointee);
+			if (flow.kind != EscapeFlow_Value) {
+				if (pointee != nullptr && !escape_type_has_pointers(pointee)) {
+					continue;
+				}
+				v = escape_load_once(ea, v);
 			}
-			for (EscapeValueFact const &f : part) {
-				escape_value_add(&results[flow.result], escape_path_concat(flow.result_path, f.path), f.origin);
+			if (flow.kind == EscapeFlow_Deep) {
+				v = escape_reachable(ea, v);
 			}
+		}
+
+		switch (flow.target) {
+		case EscapeFlowTarget_Result:
+			for (EscapeValueFact const &f : v) {
+				escape_value_add(&results[flow.target_index], escape_path_concat(flow.target_path, f.path), f.origin);
+			}
+			break;
+
+		case EscapeFlowTarget_Pointee:
+		case EscapeFlowTarget_Loaded:
+		case EscapeFlowTarget_Deep:
+			if (given[flow.target_index]) {
+				Type *pointee = nullptr;
+				EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
+				if (flow.target != EscapeFlowTarget_Pointee) {
+					ptr = escape_as_pointer(escape_load_once(ea, ptr));
+				}
+				if (flow.target == EscapeFlowTarget_Deep) {
+					ptr = escape_reachable(ea, ptr);
+				}
+				escape_store_through(ea, call, ptr, v, EscapeUpdate_Add);
+			}
+			break;
+
+		case EscapeFlowTarget_Outer:
+			escape_store_through(ea, call, escape_value_of(EscapeOrigin_Outer, {}, {}), v, EscapeUpdate_Add);
+			break;
 		}
 	}
 	return results;
@@ -982,6 +1269,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 
 	if (tav.type != nullptr && escape_type_is_plain(tav.type) &&
 	    (expr->viral_state_flags & (ViralStateFlag_ContainsOrReturn|ViralStateFlag_ContainsOrBreak)) == 0) {
+		escape_visit_exits(ea, expr);
 		return escape_value();
 	}
 
@@ -1147,16 +1435,6 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 				return escape_value();
 			}
 			return escape_convert(ea, v, arg, tav.type);
-		}
-		if (ce->proc->tav.mode == Addressing_Builtin) {
-			Entity *e = entity_of_node(ce->proc);
-			if (e != nullptr && e->kind == Entity_Builtin &&
-			    e->Builtin.id == BuiltinProc_ptr_offset   &&
-			    ce->args.count == 2) {
-				EscapeValue v = escape_expr(ea, ce->args[0]);
-				escape_visit_exits(ea, ce->args[1]);
-				return v;
-			}
 		}
 		Array<EscapeValue> results = escape_call(ea, expr);
 		if (results.count > 0) {
@@ -1365,6 +1643,9 @@ gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, E
 	case EscapeReport_Store:
 		warning(ast_token(node), "'%.*s' may still refer to %s after the procedure returns", LIT(expr_str), origin);
 		break;
+	case EscapeReport_CallStore:
+		warning(ast_token(node), "'%.*s' may keep a reference to %s after the procedure returns", LIT(expr_str), origin);
+		break;
 	default:
 		GB_PANIC("Unhandled EscapeReportKind");
 		break;
@@ -1407,52 +1688,85 @@ gb_internal void escape_run_defers(EscapeAnalysis *ea, isize depth) {
 	}
 }
 
-gb_internal void escape_add_flows(EscapeAnalysis *ea, isize result_index, EscapeValue const &v) {
-	TypeProc *pt = ea->pt;
+gb_internal bool escape_param_index(TypeProc *pt, Entity *e, isize *index) {
 	if (pt->params == nullptr) {
-		return;
+		return false;
 	}
+	for_array(i, pt->params->Tuple.variables) {
+		if (pt->params->Tuple.variables[i] == e) {
+			*index = i;
+			return true;
+		}
+	}
+	// e.g. 'context'
+	return false;
+}
+
+// a flow from the parameter whose memory the origin is
+gb_internal bool escape_flow_from(TypeProc *pt, EscapeOrigin const &o, EscapeFlow *flow) {
+	switch (o.kind) {
+	case EscapeOrigin_Param:     flow->kind = EscapeFlow_Value; break;
+	case EscapeOrigin_ParamLoad: flow->kind = EscapeFlow_Load;  break;
+	case EscapeOrigin_ParamDeep: flow->kind = EscapeFlow_Deep;  break;
+	default:
+		return false;
+	}
+	flow->param_path = o.path;
+	return escape_param_index(pt, o.obj.entity, &flow->param);
+}
+
+gb_internal void escape_add_flow(EscapeAnalysis *ea, EscapeFlow const &flow) {
+	for (EscapeFlow const &g : ea->flows) {
+		if (g.kind         == flow.kind         &&
+		    g.param        == flow.param        &&
+		    g.target       == flow.target       &&
+		    g.target_index == flow.target_index &&
+		    escape_path_eq(g.param_path,  flow.param_path) &&
+		    escape_path_eq(g.target_path, flow.target_path)) {
+			return;
+		}
+	}
+	array_add(&ea->flows, flow);
+}
+
+gb_internal void escape_add_result_flows(EscapeAnalysis *ea, isize result_index, EscapeValue const &v) {
 	for (EscapeValueFact const &f : v) {
 		EscapeFlow flow = {};
-		switch (f.origin.kind) {
-		case EscapeOrigin_Param:     flow.kind = EscapeFlow_Value; break;
-		case EscapeOrigin_ParamLoad: flow.kind = EscapeFlow_Load;  break;
-		}
-		if (flow.kind == EscapeFlow_Invalid) {
-			continue;
-		}
-		flow.result      = result_index;
-		flow.result_path = f.path;
-		flow.param_path  = f.origin.path;
-
-		bool is_param = false;
-		for_array(i, pt->params->Tuple.variables) {
-			if (pt->params->Tuple.variables[i] == f.origin.obj.entity) {
-				flow.param = i;
-				is_param = true;
-				break;
-			}
-		}
-		if (!is_param) {
-			// e.g. 'context'
-			continue;
-		}
-
-		bool found = false;
-		for (EscapeFlow const &g : ea->flows) {
-			if (g.kind   == flow.kind   &&
-			    g.result == flow.result &&
-			    g.param  == flow.param  &&
-			    escape_path_eq(g.result_path, flow.result_path) &&
-			    escape_path_eq(g.param_path,  flow.param_path)) {
-				found = true;
-				break;
-			}
-		}
-		if (!found) {
-			array_add(&ea->flows, flow);
+		if (escape_flow_from(ea->pt, f.origin, &flow)) {
+			flow.target       = EscapeFlowTarget_Result;
+			flow.target_index = result_index;
+			flow.target_path  = f.path;
+			escape_add_flow(ea, flow);
 		}
 	}
+}
+
+gb_internal void escape_add_store_flow(EscapeAnalysis *ea, EscapeOuterStore const &s) {
+	EscapeFlow flow = {};
+	if (!escape_flow_from(ea->pt, s.origin, &flow)) {
+		return;
+	}
+	switch (s.dest.kind) {
+	case EscapeOrigin_Outer:     flow.target = EscapeFlowTarget_Outer;   break;
+	case EscapeOrigin_Param:     flow.target = EscapeFlowTarget_Pointee; break;
+	case EscapeOrigin_ParamLoad: flow.target = EscapeFlowTarget_Loaded;  break;
+	case EscapeOrigin_ParamDeep: flow.target = EscapeFlowTarget_Deep;    break;
+	default:
+		return;
+	}
+	if (flow.target != EscapeFlowTarget_Outer) {
+		flow.target_path = s.dest.path;
+		if (!escape_param_index(ea->pt, s.dest.obj.entity, &flow.target_index)) {
+			return;
+		}
+	}
+	if (flow.target == EscapeFlowTarget_Pointee &&
+	    flow.target_index == flow.param &&
+	    escape_path_eq(flow.target_path, flow.param_path)) {
+		// storing it back into the memory it came from cannot make anything outlive it
+		return;
+	}
+	escape_add_flow(ea, flow);
 }
 
 gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &results, Array<EscapeValue> const &values) {
@@ -1470,26 +1784,32 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 				result = results[i];
 			}
 			escape_report_value(ea, result, result, {}, values[i]);
-			escape_add_flows(ea, i, values[i]);
+			escape_add_result_flows(ea, i, values[i]);
 		}
 	} else if (pt->has_named_results) {
 		for_array(i, pt->results->Tuple.variables) {
 			Entity *e = pt->results->Tuple.variables[i];
 			EscapeValue v = escape_obj_value(ea, {e}, {});
 			escape_report_value(ea, node, nullptr, e->token.string, v);
-			escape_add_flows(ea, i, v);
+			escape_add_result_flows(ea, i, v);
 		}
 	}
 
 	escape_run_defers(ea, 0);
 
 	for (EscapeOuterStore const &s : ea->state.outers) {
+		escape_add_store_flow(ea, s);
+
 		EscapeValue v = escape_value();
 		escape_value_add(&v, {}, s.origin);
 		EscapeOrigin o = {};
 		if (escape_find_stack_origin(ea, v, &o) && o.kind != EscapeOrigin_Variadic) {
+			EscapeReportKind kind = EscapeReport_Store;
+			if (s.node->kind == Ast_CallExpr) {
+				kind = EscapeReport_CallStore;
+			}
 			gbString str = escape_expr_to_string(s.node);
-			escape_report(ea, s.node, make_string_c(str), o, EscapeReport_Store);
+			escape_report(ea, s.node, make_string_c(str), o, kind);
 			gb_string_free(str);
 		}
 	}
@@ -1557,6 +1877,11 @@ gb_internal void escape_store(EscapeAnalysis *ea, Ast *lhs, EscapeValue const &v
 	if (ptr.count == 1) {
 		update = EscapeUpdate_Replace;
 	}
+	escape_store_through(ea, lhs, ptr, v, update);
+}
+
+// `node` is the left hand side, or a call storing into memory it was given
+gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue const &ptr, EscapeValue const &v, EscapeUpdateKind update) {
 	for (EscapeValueFact const &f : ptr) {
 		EscapeOrigin const &o = f.origin;
 		switch (o.kind) {
@@ -1568,10 +1893,12 @@ gb_internal void escape_store(EscapeAnalysis *ea, Ast *lhs, EscapeValue const &v
 
 		case EscapeOrigin_Outer:
 		case EscapeOrigin_Param:
-		case EscapeOrigin_ParamLoad: {
+		case EscapeOrigin_ParamLoad:
+		case EscapeOrigin_ParamDeep: {
 			EscapeOuterStore s = {};
-			s.node  = lhs;
-			s.exact = escape_outer_location(lhs, &s.root, &s.path);
+			s.node  = node;
+			s.dest  = o;
+			s.exact = escape_outer_location(node, &s.root, &s.path);
 			if (s.exact) {
 				for (isize i = ea->state.outers.count-1; i >= 0; i--) {
 					EscapeOuterStore const &p = ea->state.outers[i];
@@ -1582,11 +1909,7 @@ gb_internal void escape_store(EscapeAnalysis *ea, Ast *lhs, EscapeValue const &v
 			}
 
 			for (EscapeValueFact const &vf : v) {
-				switch (vf.origin.kind) {
-				case EscapeOrigin_Outer:
-				case EscapeOrigin_Param:
-				case EscapeOrigin_ParamLoad:
-					// not the stack memory of this procedure
+				if (vf.origin.kind == EscapeOrigin_Outer) {
 					continue;
 				}
 				s.origin = vf.origin;
@@ -2172,7 +2495,7 @@ gb_internal void escape_analyse(DeclInfo *d, isize depth) {
 	auto flows = permanent_slice_make<EscapeFlow>(ea.flows.count);
 	for_array(i, ea.flows) {
 		flows[i] = ea.flows[i];
-		flows[i].result_path = slice_clone(permanent_allocator(), ea.flows[i].result_path);
+		flows[i].target_path = slice_clone(permanent_allocator(), ea.flows[i].target_path);
 		flows[i].param_path  = slice_clone(permanent_allocator(), ea.flows[i].param_path);
 	}
 	d->escape_flows = flows;
