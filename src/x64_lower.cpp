@@ -280,6 +280,15 @@ gb_internal void xb_load_xmm(xbLower *L, u8 x, xbOpnd m, i32 size) {
 		xb_movd_x_rm(a, 4, x, xb_r(R10));
 		break;
 	case 4: xb_movs_x_rm(a, 4, x, m); break;
+	case 6: {
+		// three f16s: movss the low four bytes, then pinsrw x, [m+4], 2
+		xb_movs_x_rm(a, 4, x, m);
+		xbOpnd m2 = m;
+		m2.disp += 4;
+		xb_enc(a, XB_P66|XB_0F, 0xC4, x, m2, 1);
+		xb_b(a, 2);
+		break;
+	}
 	case 8: xb_movs_x_rm(a, 8, x, m); break;
 	case 16: xb_movups_x_m(a, x, m); break;
 	default:
@@ -295,6 +304,16 @@ gb_internal void xb_store_xmm(xbLower *L, xbOpnd m, u8 x, i32 size) {
 		xb_mov_rm_r(a, 2, m, R10);
 		break;
 	case 4: xb_movs_rm_x(a, 4, m, x); break;
+	case 6: {
+		xb_movs_rm_x(a, 4, m, x);
+		// pextrw r10d, x, 2
+		xb_enc(a, XB_P66|XB_0F, 0xC5, R10, xb_r(x));
+		xb_b(a, 2);
+		xbOpnd m2 = m;
+		m2.disp += 4;
+		xb_mov_rm_r(a, 2, m2, R10);
+		break;
+	}
 	case 8: xb_movs_rm_x(a, 8, m, x); break;
 	case 16: xb_movups_m_x(a, m, x); break;
 	default:
