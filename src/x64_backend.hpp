@@ -518,6 +518,8 @@ struct xbModule {
 	// entities this backend compiles, so LLVM only declares them
 	PtrSet<Entity *>  handled;
 	PtrSet<Entity *>  defined_procs; // every procedure entity this backend has emitted
+	PtrMap<Entity *, String> entity_names;
+	StringMap<Entity *> name_owners;
 	// procedure entities discovered while compiling (nested procedures, etc.)
 	Array<Entity *>   proc_queue;
 	PtrSet<Entity *>  proc_queued;

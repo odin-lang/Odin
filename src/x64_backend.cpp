@@ -65,7 +65,23 @@ gb_internal void xb_log_fallback(xbModule *m, char const *what, String name, Tok
 }
 
 gb_internal String xb_entity_name(xbModule *m, Entity *e) {
-	return lb_get_entity_name(&m->gen->default_module, e);
+	String *cached = map_get(&m->entity_names, e);
+	if (cached) return *cached;
+	String name = lb_get_entity_name(&m->gen->default_module, e);
+	if (e->kind == Entity_Procedure && !e->Procedure.is_foreign && !e->Procedure.is_export) {
+		Entity **owner = string_map_get(&m->name_owners, name);
+		if (owner == nullptr) {
+			string_map_set(&m->name_owners, name, e);
+		} else if ((*owner)->token.pos.file_id != e->token.pos.file_id) {
+			// file-private procedures of the same name in one package get the same name from LLVM
+			String file = filename_without_directory(get_file_path_string(e->token.pos.file_id));
+			gbString s = gb_string_make_length(permanent_allocator(), name.text, name.len);
+			s = gb_string_append_fmt(s, "$%.*s", LIT(file));
+			name = make_string(cast(u8 *)s, gb_string_length(s));
+		}
+	}
+	map_set(&m->entity_names, e, name);
+	return name;
 }
 
 
@@ -317,6 +333,8 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	map_init(&m->file_ids);
 	ptr_set_init(&m->handled);
 	ptr_set_init(&m->defined_procs);
+	map_init(&m->entity_names);
+	string_map_init(&m->name_owners);
 	ptr_set_init(&m->foreign_libs_set);
 	m->foreign_libs = array_make<Entity *>(heap_allocator(), 0, 16);
 	ptr_set_init(&m->proc_queued);
