@@ -190,7 +190,6 @@ enum xbAbbrev {
 	xbAbbrev_Var,
 	xbAbbrev_BaseType,
 	xbAbbrev_PointerType,
-	xbAbbrev_VoidPointerType,
 	xbAbbrev_StructType,
 	xbAbbrev_Member,
 	xbAbbrev_ArrayType,
@@ -206,6 +205,8 @@ enum xbAbbrev {
 	xbAbbrev_SubroutineType,
 	xbAbbrev_SubprogramRet,
 	xbAbbrev_SubprogramRetNoChildren,
+	xbAbbrev_NamedPointerType,
+	xbAbbrev_Enumerator64,
 };
 
 gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
@@ -293,9 +294,10 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 		XDW_AT_byte_size, XDW_FORM_data1,
 		XDW_AT_type, XDW_FORM_ref4,
 	});
-	abbrev(xbAbbrev_VoidPointerType, XDW_TAG_pointer_type, false, {
+	abbrev(xbAbbrev_NamedPointerType, XDW_TAG_pointer_type, false, {
 		XDW_AT_name, XDW_FORM_string,
 		XDW_AT_byte_size, XDW_FORM_data1,
+		XDW_AT_type, XDW_FORM_ref4,
 	});
 	abbrev(xbAbbrev_StructType, XDW_TAG_structure_type, true, {
 		XDW_AT_name, XDW_FORM_string,
@@ -325,6 +327,10 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 	abbrev(xbAbbrev_Enumerator, XDW_TAG_enumerator, false, {
 		XDW_AT_name, XDW_FORM_string,
 		XDW_AT_const_value, XDW_FORM_sdata,
+	});
+	abbrev(xbAbbrev_Enumerator64, XDW_TAG_enumerator, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_const_value, XDW_FORM_data8,
 	});
 	abbrev(xbAbbrev_UnionType, XDW_TAG_union_type, true, {
 		XDW_AT_name, XDW_FORM_string,
@@ -369,6 +375,7 @@ struct xbDwarfTypes {
 	u32 void_ptr;
 	u32 byte_type;
 	isize cu_start;
+	CheckerInfo *checker;
 };
 
 gb_internal u32 xb_dwarf_type_ref(xbDwarfTypes *dt, Type *t) {
@@ -413,6 +420,58 @@ gb_internal void xb_dwarf_write_struct_like(xbDwarfTypes *dt, Type *t, String na
 	xbb_u8(b, 0);
 }
 
+// a pointer to a character type, `char` or `wchar_t` like LLVM's: the pointer, then the typedef and base type it points to
+gb_internal void xb_dwarf_char_pointer(xbDwarfTypes *dt, char const *name, char const *char_name, i64 char_size) {
+	Array<u8> *b = dt->info;
+	if (name != nullptr) {
+		xbb_uleb(b, xbAbbrev_NamedPointerType);
+		xbb_cstr(b, name);
+	} else {
+		xbb_uleb(b, xbAbbrev_PointerType);
+	}
+	xbb_u8(b, 8);
+	xbb_u32(b, cast(u32)(b->count + 4 - dt->cu_start));
+	xbb_uleb(b, xbAbbrev_Typedef);
+	xbb_cstr(b, char_name);
+	xbb_u32(b, cast(u32)(b->count + 4 - dt->cu_start));
+	xbb_uleb(b, xbAbbrev_BaseType);
+	xbb_cstr(b, char_name);
+	xbb_u8(b, XDW_ATE_unsigned);
+	xbb_uleb(b, cast(u64)char_size);
+}
+
+struct xbDwarfNamedType {
+	String name;
+	Type * type;
+};
+
+gb_internal GB_COMPARE_PROC(xb_dwarf_named_type_cmp) {
+	return string_compare((cast(xbDwarfNamedType const *)a)->name, (cast(xbDwarfNamedType const *)b)->name);
+}
+
+// `typeid` as an enum of the type table by canonical name, like lb_debug_typeid_enum
+gb_internal void xb_dwarf_typeid_enum(xbDwarfTypes *dt, CheckerInfo *info) {
+	Array<u8> *b = dt->info;
+	auto types = array_make<xbDwarfNamedType>(heap_allocator(), 0, info->type_info_types_hash_map.count);
+	for (TypeInfoPair const &tt : info->type_info_types_hash_map) {
+		if (tt.type != nullptr && tt.type != t_invalid) {
+			array_add(&types, xbDwarfNamedType{type_to_canonical_string(temporary_allocator(), tt.type), tt.type});
+		}
+	}
+	array_sort(types, xb_dwarf_named_type_cmp);
+	xbb_uleb(b, xbAbbrev_EnumType);
+	xbb_cstr(b, "typeid");
+	xb_dwarf_type_ref(dt, t_u64);
+	xbb_uleb(b, 8);
+	for (xbDwarfNamedType const &nt : types) {
+		xbb_uleb(b, xbAbbrev_Enumerator64);
+		xbb_str(b, nt.name);
+		xbb_u64(b, type_hash_canonical_type(nt.type));
+	}
+	xbb_u8(b, 0);
+	array_free(&types);
+}
+
 gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 	Array<u8> *b = dt->info;
 	map_set(&dt->offsets, t, cast(u32)b->count);
@@ -442,22 +501,44 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		case Basic_f16be: case Basic_f32be: case Basic_f64be:
 			enc = XDW_ATE_float; break;
 		case Basic_rawptr:
-			xbb_uleb(b, xbAbbrev_VoidPointerType);
-			xbb_str(b, name);
-			xbb_u8(b, 8);
+			xb_dwarf_char_pointer(dt, "rawptr", "void", 1);
 			return;
 		case Basic_cstring:
-			xbb_uleb(b, xbAbbrev_PointerType);
-			xbb_u8(b, 8);
-			xb_dwarf_type_ref(dt, t_u8);
+			xb_dwarf_char_pointer(dt, "cstring", "char", 1);
+			return;
+		case Basic_cstring16:
+			xb_dwarf_char_pointer(dt, "cstring16", "wchar_t", 2);
 			return;
 		case Basic_string:
 			xb_dwarf_write_struct_like(dt, bt, name, {{"data", t_u8_ptr}, {"len", t_int}});
 			return;
+		case Basic_string16: {
+			// the data is a `wchar_t` pointer, written after the struct
+			xbb_uleb(b, xbAbbrev_StructType);
+			xbb_str(b, name);
+			xbb_uleb(b, 16);
+			xbb_uleb(b, xbAbbrev_Member);
+			xbb_cstr(b, "data");
+			isize data_ref = b->count;
+			xbb_u32(b, 0);
+			xbb_uleb(b, 0);
+			xbb_uleb(b, xbAbbrev_Member);
+			xbb_cstr(b, "len");
+			xb_dwarf_type_ref(dt, t_int);
+			xbb_uleb(b, 8);
+			xbb_u8(b, 0);
+			xbb_patch_u32(b, data_ref, cast(u32)(b->count - dt->cu_start));
+			xb_dwarf_char_pointer(dt, nullptr, "wchar_t", 2);
+			return;
+		}
 		case Basic_any:
 			xb_dwarf_write_struct_like(dt, bt, name, {{"data", t_rawptr}, {"id", t_typeid}});
 			return;
 		case Basic_typeid:
+			if (!build_context.no_rtti) {
+				xb_dwarf_typeid_enum(dt, dt->checker);
+				return;
+			}
 			enc = XDW_ATE_unsigned; break;
 		default:
 			if (bt->Basic.flags & BasicFlag_Integer) {
@@ -521,6 +602,20 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 	case Type_DynamicArray:
 		xb_dwarf_write_struct_like(dt, bt, name, {{"data", alloc_type_pointer(bt->DynamicArray.elem)}, {"len", t_int}, {"cap", t_int}, {"allocator", t_allocator}});
 		return;
+	case Type_FixedCapacityDynamicArray:
+		xbb_uleb(b, xbAbbrev_StructType);
+		xbb_str(b, name);
+		xbb_uleb(b, cast(u64)type_size_of(bt));
+		xbb_uleb(b, xbAbbrev_Member);
+		xbb_cstr(b, "data");
+		xb_dwarf_type_ref(dt, alloc_type_array(bt->FixedCapacityDynamicArray.elem, bt->FixedCapacityDynamicArray.capacity));
+		xbb_uleb(b, 0);
+		xbb_uleb(b, xbAbbrev_Member);
+		xbb_cstr(b, "len");
+		xb_dwarf_type_ref(dt, t_int);
+		xbb_uleb(b, cast(u64)type_offset_of(bt, 1));
+		xbb_u8(b, 0);
+		return;
 	case Type_Enum: {
 		xbb_uleb(b, xbAbbrev_EnumType);
 		xbb_str(b, name);
@@ -540,7 +635,6 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		GB_ASSERT(bt->kind == Type_Struct);
 		/*fallthrough*/
 	case Type_Struct: {
-		if (bt->Struct.soa_kind != StructSoa_None) break;
 		if (bt->Struct.fields.count == 0) {
 			xbb_uleb(b, xbAbbrev_EmptyStructType);
 			xbb_str(b, name);
@@ -562,11 +656,11 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		return;
 	}
 	case Type_Union: {
-		// {variants..., tag}
-		xbb_uleb(b, xbAbbrev_StructType);
+		// {tag, v<n>...} like lb_debug_union, which the pretty printers rely on
+		xbb_uleb(b, xbAbbrev_UnionType);
 		xbb_str(b, name);
 		xbb_uleb(b, cast(u64)type_size_of(bt));
-		if (bt->Union.variants.count > 0 && !is_type_union_maybe_pointer(bt) && type_size_of(bt) > 0) {
+		if (!is_type_union_maybe_pointer(bt) && type_size_of(bt) > 0) {
 			xbb_uleb(b, xbAbbrev_Member);
 			xbb_cstr(b, "tag");
 			xb_dwarf_type_ref(dt, union_tag_type(bt));
@@ -576,7 +670,6 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		isize first = (is_type_union_maybe_pointer(bt) || bt->Union.kind == UnionType_no_nil) ? 0 : 1;
 		for_array(i, bt->Union.variants) {
 			Type *v = bt->Union.variants[i];
-			if (type_size_of(v) == 0) continue;
 			char buf[32] = {};
 			gb_snprintf(buf, gb_size_of(buf), "v%td", first+i);
 			xbb_uleb(b, xbAbbrev_Member);
@@ -596,6 +689,26 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 			xbb_uleb(b, xbAbbrev_Typedef);
 			xbb_str(b, name);
 			xb_dwarf_type_ref(dt, bit_set_to_int(bt));
+			return;
+		}
+		if (elem->kind == Type_Enum && type_size_of(bt) <= 8) {
+			// a flag enum, like lb_debug_bitset, which DWARF debuggers show as `A | C`
+			xbb_uleb(b, xbAbbrev_EnumType);
+			xbb_str(b, name);
+			xb_dwarf_type_ref(dt, bit_set_to_int(bt));
+			xbb_uleb(b, cast(u64)type_size_of(bt));
+			u64 bits = 0;
+			for (Entity *f : elem->Enum.fields) {
+				i64 val = exact_value_to_i64(f->Constant.value);
+				if (val < bt->BitSet.lower || bt->BitSet.upper < val) continue;
+				u64 flag = 1ull << cast(u64)(val - bt->BitSet.lower);
+				if (bits & flag) continue; // an alias
+				bits |= flag;
+				xbb_uleb(b, xbAbbrev_Enumerator);
+				xbb_str(b, f->token.string);
+				xbb_sleb(b, cast(i64)flag);
+			}
+			xbb_u8(b, 0);
 			return;
 		}
 		xbb_uleb(b, xbAbbrev_UnionType);
@@ -898,6 +1011,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 
 			isize start = b->count;
 			dt.cu_start = start;
+			dt.checker = m->info;
 			xbb_u32(b, 0); // unit length
 			xbb_u16(b, 4); // version
 			xbExtraReloc ra = {b->count, xbOut_DebugAbbrev, XB_R_X86_64_32, 0};
