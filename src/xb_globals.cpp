@@ -274,21 +274,6 @@ gb_internal void xb_build_startup(xbModule *m) {
 	m->owns_startup = true;
 }
 
-gb_internal void xb_empty_body(xbProc *p) {}
-
-// When LLVM makes nothing at all, the startup's call to the Objective-C setup needs a target.
-// Class implementations are registered there, so a program with any is left to LLVM.
-gb_internal void xb_build_objc_names_stub(xbModule *m) {
-	if (m->info->objc_class_implementations.count.load(std::memory_order_relaxed) > 0) {
-		m->complete = false;
-		return;
-	}
-	char const *reason = nullptr;
-	if (!xb_build_runtime_proc(m, str_lit("__$init_objc_names"), xb_empty_body, &reason, ProcCC_CDecl)) {
-		m->complete = false;
-	}
-}
-
 ////////////////////////////////////////////////////////////////
 // The test runner's main, a port of lb_create_main_procedure for `odin test`
 ////////////////////////////////////////////////////////////////

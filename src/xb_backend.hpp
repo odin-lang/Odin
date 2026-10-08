@@ -135,7 +135,7 @@ enum xbOp : u8 {
 	xbOp_AtomicRmw,   // dst = old [mem]; [mem] = old <aux> a
 	xbOp_AtomicCas,   // dst = old [mem]; if old == a { [mem] = b }; dst2 (c) = success
 
-	xbOp_ReadCycleCounter,
+	xbOp_ReadCycleCounter, // imm = 1: its frequency, arm64 only
 	xbOp_CpuRelax,
 	xbOp_Prefetch,
 	xbOp_StackPointer, // dst = rsp
@@ -558,6 +558,21 @@ struct xbStats {
 	StringMap<isize> fail_reasons;
 };
 
+// Objective-C selectors, classes and ivar offsets, each a global named like LLVM's that
+// the Objective-C setup fills in at startup.
+enum xbObjcKind : u8 {
+	xbObjc_Selector,
+	xbObjc_Class,
+	xbObjc_Ivar,
+	xbObjc_COUNT,
+};
+
+struct xbObjcGlobal {
+	String name;
+	i32    sym;
+	Type * class_type; // a class with @(objc_implement), or an ivar's class
+};
+
 struct xbModule {
 	CheckerInfo *     info;
 	struct lbGenerator *gen;
@@ -607,6 +622,10 @@ struct xbModule {
 	bool              complete; // nothing is left for LLVM
 	PtrSet<Entity *>  foreign_libs_set;
 	Array<Entity *>   foreign_libs;
+
+	Array<xbObjcGlobal> objc_globals[xbObjc_COUNT];
+	StringMap<i32>      objc_global_map[xbObjc_COUNT];
+	i32                 objc_block_count;
 };
 
 gb_internal bool xb_is_enabled(void);
@@ -633,6 +652,7 @@ gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_ar
 gb_internal void a64_check_proc(xbProc *p);
 gb_internal void a64_lower_proc(xbProc *p);
 gb_internal bool a64_write_macho(xbModule *m, String path);
+gb_internal i32 a64_vec_intrinsic_index(String name, isize *args);
 
 // A bump allocator for everything that only lives while one procedure family is
 // compiled. Reset keeps the memory, so the pages stay mapped. Memory comes back zeroed.

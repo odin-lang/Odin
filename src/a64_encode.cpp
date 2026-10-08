@@ -453,6 +453,57 @@ gb_internal void a64_addv8b(xbAsm *a, u8 vd, u8 vn) {
 	a64_emit(a, 0x0E31B800 | (cast(u32)vn << 5) | vd);
 }
 
+// The crypto instructions behind LLVM's intrinsics, on whole q registers. The first operand
+// is also the result (vd), the others are vn and vm; a unary one reads vn and writes vd.
+struct a64VecIntrinsic {
+	char const *name;
+	u32  opcode;
+	u8   args;
+	bool unary;
+};
+
+gb_global a64VecIntrinsic const a64_vec_intrinsics[] = {
+	{"llvm.aarch64.crypto.aese",      0x4E284800, 2},
+	{"llvm.aarch64.crypto.aesd",      0x4E285800, 2},
+	{"llvm.aarch64.crypto.aesmc",     0x4E286800, 1, true},
+	{"llvm.aarch64.crypto.aesimc",    0x4E287800, 1, true},
+	{"llvm.aarch64.crypto.sha1c",     0x5E000000, 3},
+	{"llvm.aarch64.crypto.sha1p",     0x5E001000, 3},
+	{"llvm.aarch64.crypto.sha1m",     0x5E002000, 3},
+	{"llvm.aarch64.crypto.sha1h",     0x5E280800, 1, true},
+	{"llvm.aarch64.crypto.sha1su0",   0x5E003000, 3},
+	{"llvm.aarch64.crypto.sha1su1",   0x5E281800, 2},
+	{"llvm.aarch64.crypto.sha256h",   0x5E004000, 3},
+	{"llvm.aarch64.crypto.sha256h2",  0x5E005000, 3},
+	{"llvm.aarch64.crypto.sha256su0", 0x5E282800, 2},
+	{"llvm.aarch64.crypto.sha256su1", 0x5E006000, 3},
+	{"llvm.aarch64.crypto.sha512h",   0xCE608000, 3},
+	{"llvm.aarch64.crypto.sha512h2",  0xCE608400, 3},
+	{"llvm.aarch64.crypto.sha512su0", 0xCEC08000, 2},
+	{"llvm.aarch64.crypto.sha512su1", 0xCE608800, 3},
+};
+
+// xbOp_Vec128 keeps the index in its u8 aux
+static_assert(gb_count_of(a64_vec_intrinsics) <= 256, "");
+
+gb_internal i32 a64_vec_intrinsic_index(String name, isize *args) {
+	for (isize i = 0; i < gb_count_of(a64_vec_intrinsics); i++) {
+		if (name == make_string_c(a64_vec_intrinsics[i].name)) {
+			*args = a64_vec_intrinsics[i].args;
+			return cast(i32)i;
+		}
+	}
+	return -1;
+}
+
+// the intrinsic on v16 (vd), v17 (vn) and v18 (vm)
+gb_internal void a64_vec_intrinsic(xbAsm *a, i32 index) {
+	a64VecIntrinsic const &e = a64_vec_intrinsics[index];
+	u32 n = e.unary ? 16 : 17;
+	u32 m = e.args == 3 ? 18u << 16 : 0;
+	a64_emit(a, e.opcode | m | (n << 5) | 16);
+}
+
 ////////////////////////////////////////////////////////////////
 // Control flow and system
 ////////////////////////////////////////////////////////////////

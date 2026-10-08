@@ -1,9 +1,10 @@
 // Lowering: xb IR -> arm64 machine code.
 //
 // Registers come from xb_alloc_regs (xb_analysis.cpp). An interval takes x0-x8, v0-v7 or v20-v31
-// when no call happens in it, x19-x28 or d8-d15 otherwise. The rest live in 8 byte stack slots. A constant with one definition is materialized at
-// each use, or becomes the instruction's immediate. A compare whose only use is the next branch,
-// select or test against zero only sets the flags.
+// when no call happens in it, x19-x28 or d8-d15 otherwise. The rest live in 8 byte stack slots.
+// A constant with one definition is materialized at each use, or becomes the instruction's
+// immediate; a frame address is computed at each use, or becomes the access's offset. A compare
+// whose only use is the next branch, select or test against zero only sets the flags.
 //
 // The scratch registers are x9-x15, x16 for addresses and x17 for large offsets, and
 // v16-v19 for floats.
@@ -48,6 +49,8 @@ struct a64Lower {
 	Array<u8>   clean;    // vreg -> its register holds 0 or 1
 	Array<i8>   local_reg;
 	Array<i32>  via;      // vreg -> the local whose register it shares, or -1
+	Array<u8>   remat;    // vreg -> defined once as a frame address, computed at each use from rmem
+	Array<xbMem> rmem;
 	u32         pairs;    // the saved callee saved pairs, as compact unwind flags
 	i32         frame_size;
 	i32         max_call_stack;
@@ -70,14 +73,14 @@ struct a64Addr {
 	i64 off;
 };
 
-// The x86 operations, which have no arm64 form; the procedure goes to LLVM.
+// The x86 operations, which have no arm64 form; the procedure goes to LLVM. On arm64,
+// xbOp_Vec128 is one of a64_vec_intrinsics.
 gb_internal void a64_check_proc(xbProc *p) {
 	for (xbBlock *b : p->order) {
 		for (xbInstr const &in : b->instrs) {
 			switch (in.op) {
 			case xbOp_Cpuid:
 			case xbOp_Xgetbv:
-			case xbOp_Vec128:
 			case xbOp_Valgrind:
 				XB_UNSUPPORTED(p, "arm64 operation");
 				break;
@@ -155,7 +158,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	xbProc *p = L->p;
 
 	// x0-x8 and v0-v7, v20-v31 are caller saved, x19-x28 and d8-d15 callee saved
-	xbRegPools pools = {0x1ff, 0x1ff80000, 0xfff000ff, 0x0000ff00, false};
+	xbRegPools pools = {0x1ff, 0x1ff80000, 0xfff000ff, 0x0000ff00, 0};
 	xbRegAlloc R = {};
 	xb_alloc_regs(p, &R, pools, a64RegTarget{});
 	L->uses      = R.uses;
@@ -166,6 +169,8 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	L->clean     = R.clean;
 	L->local_reg = R.local_reg;
 	L->via       = R.via;
+	L->remat     = R.remat;
+	L->rmem      = R.rmem;
 	L->max_call_stack = R.max_call_stack;
 	L->sp_moves  = R.sp_moves;
 
@@ -231,6 +236,8 @@ gb_internal bool a64_is_const(a64Lower *L, u32 v, i64 *value) {
 	return true;
 }
 
+gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch=A64_TA);
+
 // An x register holding v: its own, or `scratch` loaded with it. Narrow values come
 // extended as `ext` asks; with xbExt_None only the low `size` bytes mean anything.
 gb_internal u8 a64_src(a64Lower *L, u32 v, u8 scratch, i32 size, xbExtKind ext) {
@@ -239,6 +246,11 @@ gb_internal u8 a64_src(a64Lower *L, u32 v, u8 scratch, i32 size, xbExtKind ext) 
 	bool extend = size < 8 && ext != xbExt_None;
 	if (L->is_const[v]) {
 		a64_mov_imm(a, scratch, cast(u64)a64_ext_value(L->cval[v], size, ext));
+		return scratch;
+	}
+	if (L->remat[v]) {
+		a64Addr m = a64_mem(L, L->rmem[v], scratch);
+		a64_add_imm(a, scratch, m.base, m.off);
 		return scratch;
 	}
 	i8 r = L->reg[v];
@@ -330,7 +342,7 @@ gb_internal void a64_putf(a64Lower *L, u32 v, u8 vr, i32 size) {
 }
 
 // A base register and offset for an IR memory reference. May clobber `scratch` and x17.
-gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch=A64_TA) {
+gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch) {
 	xbAsm *a = &L->a;
 	a64Addr r = {};
 	switch (m.kind) {
@@ -351,6 +363,12 @@ gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch=A64_TA) {
 		r.off = 16 + m.offset;
 		return r;
 	case xbMem_Reg:
+		if (L->remat[m.base]) {
+			// the frame address folds into the access
+			xbMem f = L->rmem[m.base];
+			f.offset += m.offset;
+			return a64_mem(L, f, scratch);
+		}
 		r.base = a64_src(L, m.base, scratch, 8, xbExt_None);
 		r.off = m.offset;
 		return r;
@@ -671,6 +689,7 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Lea: {
+		if (L->remat[in.dst]) break;
 		u8 d = a64_dst(L, in.dst, A64_T0);
 		// a symbol's address goes right into d
 		a64Addr m = a64_mem(L, in.mem, d);
@@ -1052,8 +1071,21 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		break;
 	case xbOp_ReadCycleCounter: {
 		u8 d = a64_dst(L, in.dst, A64_T0);
-		a64_emit(a, 0xD53BE040 | d); // mrs xd, cntvct_el0
+		if (in.imm) {
+			a64_emit(a, 0xD53BE000 | d); // mrs xd, cntfrq_el0
+		} else {
+			a64_emit(a, 0xD53BE040 | d); // mrs xd, cntvct_el0
+		}
 		a64_put(L, in.dst, d);
+		break;
+	}
+	case xbOp_Vec128: {
+		a64_ldr_fp(a, 16, 16, a64_src(L, in.a, A64_TA, 8, xbExt_None), 0);
+		a64_ldr_fp(a, 16, 17, a64_src(L, in.b, A64_TA, 8, xbExt_None), 0);
+		if (in.c) a64_ldr_fp(a, 16, 18, a64_src(L, in.c, A64_TA, 8, xbExt_None), 0);
+		a64_vec_intrinsic(a, in.aux);
+		a64Addr m = a64_mem(L, in.mem);
+		a64_str_fp(a, 16, 16, m.base, m.off);
 		break;
 	}
 	case xbOp_StackPointer: {
@@ -1298,6 +1330,8 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 	defer (array_free(&L.clean));
 	defer (array_free(&L.local_reg));
 	defer (array_free(&L.via));
+	defer (array_free(&L.remat));
+	defer (array_free(&L.rmem));
 
 	a64_lower_layout(&L);
 

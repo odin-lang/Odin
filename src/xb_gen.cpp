@@ -1068,6 +1068,9 @@ gb_internal xbValue xb_simd_neg(xbProc *p, xbValue x, Type *type);
 gb_internal xbValue xb_simd_not(xbProc *p, xbValue x, Type *type);
 gb_internal xbValue xb_build_builtin_simd_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id);
 gb_internal xbValue xb_build_builtin_vector_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id);
+gb_internal xbValue xb_build_objc_builtin(xbProc *p, Ast *expr, BuiltinProcId id);
+gb_internal xbValue xb_objc_auto_send(xbProc *p, Ast *expr, Slice<xbValue> arg_values);
+gb_internal xbValue xb_objc_ivar_ptr(xbProc *p, xbValue self);
 
 // int -> int of possibly different width
 gb_internal u32 xb_int_resize(xbProc *p, u32 v, xbType from, xbType to, bool from_signed) {

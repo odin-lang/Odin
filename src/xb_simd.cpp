@@ -791,7 +791,7 @@ gb_internal xbValue xb_build_builtin_simd_proc(xbProc *p, Ast *expr, TypeAndValu
 	case BuiltinProc_simd_approx_recip_sqrt: {
 		xbType st = xb_simd_st(p, elem);
 		xbMem a = xb_simd_mem(p, arg0);
-		if (st == xbType_F32) {
+		if (st == xbType_F32 && !xb_is_arm64()) {
 			// rcpps/rsqrtps on four lanes at a time, whose approximations only the hardware gives
 			i64 count = xb_simd_count(vt);
 			if (count >= 16 && check_target_feature_is_enabled(str_lit("avx512vl"), nullptr)) {
@@ -821,6 +821,10 @@ gb_internal xbValue xb_build_builtin_simd_proc(xbProc *p, Ast *expr, TypeAndValu
 			u32 x = xb_simd_lane_reg(p, vt, a, i);
 			if (id == BuiltinProc_simd_approx_recip) {
 				return xb_binop(p, xbOp_FDiv, st, xb_fconst(p, st, 1.0), x);
+			}
+			if (st != xbType_F64) {
+				// LLVM guesses only for f64
+				return xb_binop(p, xbOp_FDiv, st, xb_fconst(p, st, 1.0), xb_unop(p, xbOp_Sqrt, st, x));
 			}
 			// the magic constant guess and one Newton-Raphson step, as LLVM builds it
 			u32 half = xb_binop(p, xbOp_FMul, st, x, xb_fconst(p, st, 0.5));
