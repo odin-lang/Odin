@@ -884,6 +884,14 @@ gb_internal LLVMMetadataRef lb_debug_typeid_enum(lbModule *m) {
 	);
 }
 
+// NOTE: gdb reads a `wchar_t` as UTF-32 on Linux, but a 16-bit UTF character as UTF-16; CodeView knows `wchar_t` as UTF-16
+gb_internal LLVMMetadataRef lb_debug_char16_type(lbModule *m) {
+	if (build_context.metrics.os == TargetOs_windows) {
+		return lb_debug_type_basic_type(m, str_lit("wchar_t"), 16, LLVMDWARFTypeEncoding_Unsigned);
+	}
+	return lb_debug_type_basic_type(m, str_lit("char16_t"), 16, LLVMDWARFTypeEncoding_Utf);
+}
+
 gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
@@ -1034,8 +1042,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_string16:
 			{
 				// NOTE(bill): size_of(^u16) <= size_of(int)
-				// The data is `^wchar_t`, as `cstring16` is, so that debuggers show it as text
-				LLVMMetadataRef char_type = lb_debug_type_basic_type(m, str_lit("wchar_t"), 16, LLVMDWARFTypeEncoding_Unsigned);
+				// The data is a pointer to a UTF-16 character, as `cstring16` is, so that debuggers show it as text
+				LLVMMetadataRef char_type = lb_debug_char16_type(m);
 				LLVMMetadataRef file = lb_get_file_metadata(m, m->info->runtime_package->files[0]);
 
 				LLVMMetadataRef elements[2] = {};
@@ -1047,8 +1055,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			}
 		case Basic_cstring16:
 			{
-				LLVMMetadataRef char_type = lb_debug_type_basic_type(m, str_lit("wchar_t"), 16, LLVMDWARFTypeEncoding_Unsigned);
-				return LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, "cstring16", 7);
+				LLVMMetadataRef char_type = lb_debug_char16_type(m);
+				return LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, "cstring16", 9);
 			}
 
 		case Basic_any:
