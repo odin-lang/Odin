@@ -333,6 +333,9 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 
 			if chunk_count == digits_per_chunk || len(input) == 0 {
 				// Submit chunk.
+				// NOTE(bplu4t2f): Maybe this could be optimized further. For any given input digit,
+				//                 we can predict exactly where it will go in the output, eliminating
+				//                 the need for shl + add.
 				if res.used == 0 {
 					internal_set(res, chunk_value) or_return
 				} else {
