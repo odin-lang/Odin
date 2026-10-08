@@ -378,6 +378,13 @@ gb_internal void a64_bcond_skip(xbAsm *a, a64Cond c) {
 	a64_emit(a, 0x54000000 | (2u << 5) | c);
 }
 
+// b.cond to an already known position
+gb_internal void a64_bcond_to(xbAsm *a, a64Cond c, i64 target) {
+	i64 delta = (target - xb_pos(a)) / 4;
+	GB_ASSERT(delta >= -(1ll<<18) && delta < (1ll<<18));
+	a64_emit(a, 0x54000000 | ((cast(u32)delta & 0x7ffff) << 5) | c);
+}
+
 gb_internal void a64_bl_sym(xbAsm *a, i32 sym) {
 	xb_add_reloc(a->m, xbSection_Text, xbReloc_A64_Branch26, xb_pos(a), sym, 0);
 	a64_emit(a, 0x94000000);
@@ -393,6 +400,42 @@ gb_internal void a64_ret(xbAsm *a) {
 
 gb_internal void a64_brk(xbAsm *a, u16 imm) {
 	a64_emit(a, 0xD4200000 | (cast(u32)imm << 5));
+}
+
+////////////////////////////////////////////////////////////////
+// Atomics, all sequentially consistent; every Apple cpu has the LSE instructions
+////////////////////////////////////////////////////////////////
+
+// ldar: load-acquire of `size` bytes at [xn], zero extended
+gb_internal void a64_ldar(xbAsm *a, i32 size, u8 rt, u8 rn) {
+	a64_emit(a, 0x08DFFC00 | (a64_size_log2(size) << 30) | (cast(u32)rn << 5) | rt);
+}
+
+// stlr: store-release of the low `size` bytes of xt at [xn]
+gb_internal void a64_stlr(xbAsm *a, i32 size, u8 rt, u8 rn) {
+	a64_emit(a, 0x089FFC00 | (a64_size_log2(size) << 30) | (cast(u32)rn << 5) | rt);
+}
+
+enum a64LseOp : u32 {
+	A64_LDADD = 0x0000,
+	A64_LDCLR = 0x1000, // [xn] &= ~xs
+	A64_LDEOR = 0x2000,
+	A64_LDSET = 0x3000, // [xn] |= xs
+	A64_SWP   = 0x8000,
+};
+
+// xt = old [xn]; [xn] = old op xs, with acquire and release
+gb_internal void a64_lse(xbAsm *a, a64LseOp op, i32 size, u8 rs, u8 rt, u8 rn) {
+	a64_emit(a, 0x38E00000 | op | (a64_size_log2(size) << 30) | (cast(u32)rs << 16) | (cast(u32)rn << 5) | rt);
+}
+
+// casal: if [xn] == xs { [xn] = xt }; xs = old [xn]
+gb_internal void a64_casal(xbAsm *a, i32 size, u8 rs, u8 rt, u8 rn) {
+	a64_emit(a, 0x08E0FC00 | (a64_size_log2(size) << 30) | (cast(u32)rs << 16) | (cast(u32)rn << 5) | rt);
+}
+
+gb_internal void a64_dmb_ish(xbAsm *a) {
+	a64_emit(a, 0xD5033BBF);
 }
 
 // xd = the page of `sym`, the low 12 bits come from the following instruction

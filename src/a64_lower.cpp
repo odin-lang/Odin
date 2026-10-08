@@ -45,19 +45,11 @@ struct a64Addr {
 	i64 off;
 };
 
-// The operations the arm64 lowering does not have yet; the procedure goes to LLVM.
+// The x86 operations, which have no arm64 form; the procedure goes to LLVM.
 gb_internal void a64_check_proc(xbProc *p) {
 	for (xbBlock *b : p->order) {
 		for (xbInstr const &in : b->instrs) {
 			switch (in.op) {
-			case xbOp_AtomicFence:
-			case xbOp_AtomicLoad:
-			case xbOp_AtomicStore:
-			case xbOp_AtomicRmw:
-			case xbOp_AtomicCas:
-				XB_UNSUPPORTED(p, "arm64 atomics");
-				break;
-			case xbOp_Syscall:
 			case xbOp_Cpuid:
 			case xbOp_Xgetbv:
 			case xbOp_Vec128:
@@ -767,6 +759,79 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		a64_lsl_imm(a, A64_T0, A64_T0, shift);
 		a64_add_imm(a, A64_SP, A64_T0, -args_area);
 		a64_put(L, in.dst, A64_T0);
+		break;
+	}
+	case xbOp_AtomicFence:
+		a64_dmb_ish(a);
+		break;
+	case xbOp_AtomicLoad: {
+		a64Addr m = a64_mem(L, in.mem);
+		a64_add_imm(a, A64_TA, m.base, m.off);
+		a64_ldar(a, size, A64_T0, A64_TA);
+		a64_put(L, in.dst, A64_T0);
+		break;
+	}
+	case xbOp_AtomicStore: {
+		a64_get(L, A64_T0, in.a, size, xbExt_None);
+		a64Addr m = a64_mem(L, in.mem);
+		a64_add_imm(a, A64_TA, m.base, m.off);
+		a64_stlr(a, size, A64_T0, A64_TA);
+		break;
+	}
+	case xbOp_AtomicRmw: {
+		xbRmwOp op = cast(xbRmwOp)in.aux;
+		a64_get(L, A64_T1, in.a, size, xbExt_Zero);
+		a64Addr m = a64_mem(L, in.mem);
+		a64_add_imm(a, A64_TA, m.base, m.off);
+		switch (op) {
+		case xbRmw_Xchg: a64_lse(a, A64_SWP, size, A64_T1, A64_T0, A64_TA); break;
+		case xbRmw_Add:  a64_lse(a, A64_LDADD, size, A64_T1, A64_T0, A64_TA); break;
+		case xbRmw_Or:   a64_lse(a, A64_LDSET, size, A64_T1, A64_T0, A64_TA); break;
+		case xbRmw_Xor:  a64_lse(a, A64_LDEOR, size, A64_T1, A64_T0, A64_TA); break;
+		case xbRmw_Sub:
+			a64_alu(a, A64_SUB, A64_T1, XZR, A64_T1);
+			a64_lse(a, A64_LDADD, size, A64_T1, A64_T0, A64_TA);
+			break;
+		case xbRmw_And:
+			a64_alu(a, A64_ORN, A64_T1, XZR, A64_T1);
+			a64_lse(a, A64_LDCLR, size, A64_T1, A64_T0, A64_TA);
+			break;
+		case xbRmw_Nand: {
+			// no instruction for it: a compare and swap loop
+			a64_ldr(a, size, false, A64_T0, A64_TA, 0);
+			i64 loop = xb_pos(a);
+			a64_mov(a, A64_T2, A64_T0);
+			a64_alu(a, A64_AND, A64_T3, A64_T0, A64_T1);
+			a64_alu(a, A64_ORN, A64_T3, XZR, A64_T3);
+			a64_casal(a, size, A64_T2, A64_T3, A64_TA);
+			a64_cmp(a, A64_T2, A64_T0);
+			a64_mov(a, A64_T0, A64_T2);
+			a64_bcond_to(a, A64_NE, loop);
+			break;
+		}
+		}
+		a64_put(L, in.dst, A64_T0);
+		break;
+	}
+	case xbOp_AtomicCas: {
+		a64_get(L, A64_T0, in.a, size, xbExt_Zero);
+		a64_get(L, A64_T1, in.b, size, xbExt_Zero);
+		a64Addr m = a64_mem(L, in.mem);
+		a64_add_imm(a, A64_TA, m.base, m.off);
+		a64_mov(a, A64_T2, A64_T0);
+		a64_casal(a, size, A64_T2, A64_T1, A64_TA);
+		a64_cmp(a, A64_T2, A64_T0);
+		a64_cset(a, A64_T0, A64_EQ);
+		a64_put(L, in.dst, A64_T2);
+		a64_put(L, in.c, A64_T0);
+		break;
+	}
+	case xbOp_Syscall: {
+		// Darwin: the number in x16, the arguments in x0-x5, the result in x0
+		xbCall const &c = p->calls[cast(isize)in.imm];
+		a64_lower_call(L, c, true);
+		a64_emit(a, 0xD4001001); // svc #0x80
+		a64_put(L, c.result_vreg, X0);
 		break;
 	}
 	case xbOp_MulHiU:

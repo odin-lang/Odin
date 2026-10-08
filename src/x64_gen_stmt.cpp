@@ -1725,8 +1725,9 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_syscall: {
 		if (ce->args.count > 7) XB_UNSUPPORTED(p, "syscall arg count");
 		if (xb_is_win64()) XB_UNSUPPORTED(p, "syscall on windows");
-		if (xb_is_arm64()) XB_UNSUPPORTED(p, "syscall on arm64");
-		u8 const regs[7] = {RAX, RDI, RSI, RDX, R10, R8, R9};
+		u8 const x86_regs[7] = {RAX, RDI, RSI, RDX, R10, R8, R9};
+		u8 const arm64_regs[7] = {16, 0, 1, 2, 3, 4, 5}; // Darwin
+		u8 const *regs = xb_is_arm64() ? arm64_regs : x86_regs;
 		auto args = array_make<xbCallArg>(xb_allocator(), 0, ce->args.count);
 		for_array(i, ce->args) {
 			xbValue v = xb_emit_conv(p, xb_build_expr(p, ce->args[i]), t_uintptr);
