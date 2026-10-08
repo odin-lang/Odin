@@ -1294,6 +1294,22 @@ gb_internal LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope
 	}
 }
 
+// NOTE: gdb looks a declared enum up by name and stops at the first declaration it finds rather than the definition,
+// and it cannot look up a declared type whose name starts with `#`, so on DWARF these are defined in every module
+// which uses them, as clang does with enums
+gb_internal bool lb_debug_type_is_defined_everywhere(Type *bt) {
+	if (build_context.metrics.os == TargetOs_windows) {
+		return false;
+	}
+	switch (bt->kind) {
+	case Type_Enum:   return true;
+	case Type_BitSet: return lb_debug_bit_set_is_flag_enum(bt);
+	case Type_Struct: return bt->Struct.soa_kind != StructSoa_None;
+	case Type_Basic:  return bt->Basic.kind == Basic_typeid;
+	}
+	return false;
+}
+
 gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	GB_ASSERT(type != nullptr);
 
@@ -1352,7 +1368,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	Array<lbModule *> const &types_modules = m->gen->debug_types_modules;
 	String record_name = {};
 	lbModule *owner = nullptr;
-	if (is_record && types_modules.count != 0 && record_bt->kind != Type_Tuple) {
+	if (is_record && types_modules.count != 0 && record_bt->kind != Type_Tuple && !lb_debug_type_is_defined_everywhere(record_bt)) {
 		record_name = type_to_canonical_string(temporary_allocator(), type);
 		owner = types_modules[string_hash(record_name) % types_modules.count];
 	}
