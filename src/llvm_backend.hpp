@@ -855,7 +855,7 @@ gb_global char const *llvm_linkage_strings[] = {
 #define ODIN_METADATA_MIN_ALIGN str_lit("odin-min-align")
 #define ODIN_METADATA_MAX_ALIGN str_lit("odin-max-align")
 
-// x64 debug backend (x64_backend.cpp)
+// fast backend (xb_backend.cpp)
 gb_internal bool xb_owns_startup(void);
 gb_internal bool xb_owns_type_info(void);
 gb_internal bool xb_owns_test_main(void);

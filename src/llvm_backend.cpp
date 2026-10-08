@@ -32,7 +32,7 @@
 #include "llvm_backend_asm.cpp"
 
 gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp);
-#include "x64_backend.cpp"
+#include "xb_backend.cpp"
 
 gb_internal String get_default_microarchitecture() {
 	String default_march = str_lit("generic");

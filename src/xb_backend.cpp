@@ -1,23 +1,25 @@
-// Driver for the x64 debug backend.
+// Driver for the fast backend (`-backend:fast`).
 //
 // Runs after the LLVM backend has collected the procedures to generate and
 // before it builds any bodies. Every procedure compiled here is only declared
 // on the LLVM side.
 
-#include "x64_backend.hpp"
+#include "xb_backend.hpp"
 #include "x64_encode.cpp"
 #include "x64_abi.cpp"
-#include "x64_gen.cpp"
-#include "x64_const.cpp"
-#include "x64_gen_expr.cpp"
+#include "xb_gen.cpp"
+#include "xb_const.cpp"
+#include "xb_gen_expr.cpp"
 #include "x64_asm.cpp"
-#include "x64_gen_stmt.cpp"
-#include "x64_gen_procs.cpp"
-#include "x64_simd.cpp"
+#include "xb_gen_stmt.cpp"
+#include "xb_gen_procs.cpp"
+#include "xb_simd.cpp"
+#include "xb_analysis.cpp"
 #include "x64_lower.cpp"
 #include "x64_win64.cpp"
-#include "x64_type_info.cpp"
-#include "x64_globals.cpp"
+#include "xb_type_info.cpp"
+#include "xb_globals.cpp"
+#include "xb_dwarf.cpp"
 #include "x64_elf.cpp"
 #include "x64_coff.cpp"
 #include "a64_abi.cpp"
