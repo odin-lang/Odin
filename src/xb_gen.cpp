@@ -360,6 +360,16 @@ gb_internal u32 xb_convop(xbProc *p, xbOp op, xbType dst, xbType src, u32 a) {
 	return i.dst;
 }
 
+gb_internal u32 xb_fma(xbProc *p, xbType t, u32 a, u32 b, u32 c) {
+	xbInstr i = xb_instr(xbOp_Fma, t);
+	i.dst = xb_new_vreg(p, t);
+	i.a = a;
+	i.b = b;
+	i.c = c;
+	xb_emit(p, i);
+	return i.dst;
+}
+
 gb_internal u32 xb_select(xbProc *p, xbType t, u32 cond, u32 a, u32 b) {
 	xbInstr i = xb_instr(xbOp_Select, t);
 	i.dst = xb_new_vreg(p, t);

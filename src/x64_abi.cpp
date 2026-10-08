@@ -408,6 +408,8 @@ gb_internal xbLType *xb_ltype(Type *type) {
 // Port of lbAbiAmd64SysV
 ////////////////////////////////////////////////////////////////
 
+gb_internal i32 xb_x86_vector_width(void);
+
 namespace xbSysV {
 	enum RegClass {
 		RegClass_NoClass,
@@ -879,9 +881,10 @@ namespace xbSysV {
 					t = xbType_F64;
 				}
 				if (vec_bytes > 16) {
-					// without AVX, LLVM splits a wider vector into consecutive xmm registers
-					for (i64 k = 0; k < vec_bytes; k += 16) {
-						add_piece(xbType_V128, 16, true, 16);
+					// LLVM splits a wider vector into consecutive registers: xmm, ymm with AVX, zmm with AVX-512
+					i32 width = cast(i32)gb_min(cast(i64)xb_x86_vector_width(), vec_bytes);
+					for (i64 k = 0; k < vec_bytes; k += width) {
+						add_piece(xbType_V128, width, true, width);
 					}
 				} else {
 					add_piece(t, cast(i32)vec_bytes, true, gb_clamp(vec_size, 1, build_context.max_simd_align));
@@ -1184,6 +1187,30 @@ gb_internal bool xb_abi_assign_ret(xbAbiFunc *f, xbAbiArg *arg, Array<xbAbiPiece
 	return true;
 }
 
+// The widest vector register the target features give: 16 (xmm), 32 (ymm) or 64 (zmm).
+// A feature implies the ones under it, as in LLVM, so `-target-features:avx2` has ymm too.
+gb_internal i32 xb_x86_vector_width(void) {
+	static i32 width = 0;
+	if (width != 0) return width;
+	bool avx = false, avx512 = false;
+	for (String const &entry : build_context.target_features_set) {
+		String f = entry;
+		if (string_starts_with(f, '-')) continue;
+		if (string_starts_with(f, '+')) f = substring(f, 1, f.len);
+		if (string_starts_with(f, str_lit("avx512")) || string_starts_with(f, str_lit("avx10"))) {
+			avx512 = true;
+		}
+		if (string_starts_with(f, str_lit("avx")) || f == "fma" || f == "fma4" || f == "xop" || f == "f16c" ||
+		    f == "vaes" || f == "vpclmulqdq" || f == "sha512" || f == "sm3" || f == "sm4") {
+			avx = true;
+		}
+	}
+	if (string_set_exists(&build_context.target_features_set, str_lit("-avx512f"))) avx512 = false;
+	if (string_set_exists(&build_context.target_features_set, str_lit("-avx")))     avx = avx512 = false;
+	width = avx512 ? 64 : avx ? 32 : 16;
+	return width;
+}
+
 // Returns nullptr when the signature uses something this backend does not support yet.
 gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 	Type *pt = base_type(proc_type);
@@ -1311,10 +1338,9 @@ gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 		}
 	}
 	f->ret_type = ret_type;
-	if (ret_type != nullptr && is_type_simd_vector(ret_type) && type_size_of(ret_type) > 16 &&
-	    check_target_feature_is_enabled(str_lit("avx"), nullptr)) {
-		// with AVX, LLVM returns a wide vector in ymm/zmm registers, which this backend does not use
-		*reason = "avx vector return";
+	if (ret_type != nullptr && is_type_simd_vector(ret_type) && type_size_of(ret_type) >= 64 && xb_x86_vector_width() == 64) {
+		// zmm, or ymm pairs when LLVM's tuning for the cpu prefers 256 bit vectors
+		*reason = "avx-512 vector return";
 		return nullptr;
 	}
 

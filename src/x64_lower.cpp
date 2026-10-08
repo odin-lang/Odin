@@ -458,19 +458,7 @@ gb_internal void xb_load_xmm(xbLower *L, u8 x, xbOpnd m, i32 size) {
 	}
 	case 8: xb_movs_x_rm(a, 8, x, m); break;
 	case 16: xb_movups_x_m(a, x, m); break;
-	case 6: {
-		// three f16s: assembled in the red zone, m may use R11
-		xbOpnd hi = m;
-		hi.disp += 4;
-		xbOpnd tmp = xb_m(RSP, -8);
-		xb_load_ext(a, 2, false, R10, hi);
-		xb_shift_imm(a, 4, 8, xb_r(R10), 32);
-		xb_mov_rm_r(a, 8, tmp, R10);
-		xb_load_ext(a, 4, false, R10, m);
-		xb_mov_rm_r(a, 4, tmp, R10);
-		xb_movs_x_rm(a, 8, x, tmp);
-		break;
-	}
+	case 32: case 64: xb_vmovups_wide(a, size, true, x, m); break;
 	default:
 		GB_PANIC("bad xmm load size %d", size);
 	}
@@ -496,15 +484,7 @@ gb_internal void xb_store_xmm(xbLower *L, xbOpnd m, u8 x, i32 size) {
 	}
 	case 8: xb_movs_rm_x(a, 8, m, x); break;
 	case 16: xb_movups_m_x(a, m, x); break;
-	case 6: {
-		xbOpnd hi = m;
-		hi.disp += 4;
-		xb_movd_rm_x(a, 8, xb_r(R10), x);
-		xb_mov_rm_r(a, 4, m, R10);
-		xb_shift_imm(a, 5, 8, xb_r(R10), 32);
-		xb_mov_rm_r(a, 2, hi, R10);
-		break;
-	}
+	case 32: case 64: xb_vmovups_wide(a, size, false, x, m); break;
 	default:
 		GB_PANIC("bad xmm store size %d", size);
 	}
@@ -726,21 +706,12 @@ gb_internal void xb_lower_call(xbLower *L, xbCall const &c, bool is_ret) {
 
 // vmovups ymm <-> [rax]
 gb_internal void xb_vmovups256_rax(xbAsm *a, bool load, u8 x) {
-	xb_b(a, 0xC4);
-	xb_b(a, cast(u8)(((x & 8) ? 0 : 0x80) | 0x60 | 1));
-	xb_b(a, 0x7C);
-	xb_b(a, load ? 0x10 : 0x11);
-	xb_b(a, cast(u8)((x & 7) << 3));
+	xb_vmovups_wide(a, 32, load, x, xb_m(RAX, 0));
 }
 
 // vmovups zmm <-> [rax]
 gb_internal void xb_vmovups512_rax(xbAsm *a, bool load, u8 x) {
-	xb_b(a, 0x62);
-	xb_b(a, cast(u8)(((x & 8) ? 0 : 0x80) | 0x71));
-	xb_b(a, 0x7C);
-	xb_b(a, 0x48);
-	xb_b(a, load ? 0x10 : 0x11);
-	xb_b(a, cast(u8)((x & 7) << 3));
+	xb_vmovups_wide(a, 64, load, x, xb_m(RAX, 0));
 }
 
 gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
@@ -994,6 +965,12 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	}
 	case xbOp_Sqrt:
 		xb_sse_scalar(a, SSE_SQRT, size, 0, xb_slot(L, in.a));
+		xb_movs_rm_x(a, size, xb_slot(L, in.dst), 0);
+		break;
+	case xbOp_Fma:
+		xb_movs_x_rm(a, size, 0, xb_slot(L, in.a));
+		xb_movs_x_rm(a, size, 1, xb_slot(L, in.b));
+		xb_vfmadd213_s(a, size, 0, 1, xb_slot(L, in.c));
 		xb_movs_rm_x(a, size, xb_slot(L, in.dst), 0);
 		break;
 	case xbOp_Neg:

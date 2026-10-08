@@ -53,6 +53,7 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 		f(in.c, false);
 		break;
 	case xbOp_Select:
+	case xbOp_Fma:
 		f(in.a, false);
 		f(in.b, false);
 		f(in.c, false);
@@ -180,6 +181,7 @@ gb_internal bool xb_op_is_pure(xbOp op) {
 	case xbOp_FTrunc:
 	case xbOp_Bitcast:
 	case xbOp_Select:
+	case xbOp_Fma:
 		return true;
 	}
 	return false;

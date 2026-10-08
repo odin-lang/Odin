@@ -132,6 +132,9 @@ gb_internal u32 xb_simd_libc_call(xbProc *p, char const *name, Type *ft, u32 *ar
 gb_internal u32 xb_simd_fma(xbProc *p, Type *ft, u32 a, u32 b, u32 c) {
 	xbType st = xb_scalar_type(ft);
 	if (st != xbType_F32 && st != xbType_F64) XB_UNSUPPORTED(p, "fma type");
+	if (!xb_is_arm64() && check_target_feature_is_enabled(str_lit("fma"), nullptr)) {
+		return xb_fma(p, st, a, b, c);
+	}
 	u32 args[3] = {a, b, c};
 	return xb_simd_libc_call(p, st == xbType_F32 ? "fmaf" : "fma", st == xbType_F32 ? t_f32 : t_f64, args, 3);
 }

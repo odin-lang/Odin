@@ -16,7 +16,7 @@ enum xbType : u8 {
 	xbType_I64,
 	xbType_F32,
 	xbType_F64,
-	xbType_V128, // only used for ABI pieces: a whole xmm register
+	xbType_V128, // only used for ABI pieces: a whole vector register, xmm, ymm or zmm by the piece size
 	xbType_COUNT,
 };
 
@@ -142,6 +142,7 @@ enum xbOp : u8 {
 	xbOp_FrameAddress, // dst = rbp
 	xbOp_ReturnAddress,
 	xbOp_Sqrt,        // dst = sqrt(a)
+	xbOp_Fma,         // dst = a*b + c rounded once, only with the fma target feature
 	xbOp_Bswap,
 	xbOp_Popcount,
 	xbOp_Ctz,         // count trailing zeros, defined for zero

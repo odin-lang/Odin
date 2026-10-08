@@ -3,7 +3,7 @@ package test_internal
 import "core:simd"
 import "core:testing"
 
-// Vectors wider than 16 bytes are returned split across xmm0-xmm3, or through a hidden
+// Vectors wider than 16 bytes are returned split across xmm0-xmm3 (ymm with AVX), or through a hidden
 // pointer when even that is not enough, and passed in memory.
 
 @(private="file")

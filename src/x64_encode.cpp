@@ -95,6 +95,45 @@ enum : u32 {
 	XB_0F3A   = 1<<8,
 };
 
+// modrm [sib] [disp]. EVEX scales an 8-bit displacement by `disp8_scale`.
+gb_internal void xb_enc_modrm(xbAsm *a, u8 reg, xbOpnd rm, i32 imm_size, i32 disp8_scale=1) {
+	u8 r = reg & 7;
+	if (!rm.is_mem) {
+		xb_b(a, cast(u8)(0xC0 | (r<<3) | (rm.reg & 7)));
+		return;
+	}
+	if (rm.reg == XB_RIP) {
+		xb_b(a, cast(u8)(0x00 | (r<<3) | 5));
+		i64 at = xb_pos(a);
+		xb_u32(a, 0);
+		GB_ASSERT(rm.sym >= 0);
+		// rip points past the immediate when there is one
+		xb_add_reloc(a->m, xbSection_Text, rm.reloc, at, rm.sym, cast(i64)rm.disp - 4 - imm_size);
+		return;
+	}
+	u8 base = rm.reg & 7;
+	i32 disp = rm.disp;
+	u8 mod = 0;
+	if (disp == 0 && base != 5) {
+		mod = 0;
+	} else if (disp % disp8_scale == 0 && disp/disp8_scale >= -128 && disp/disp8_scale <= 127) {
+		mod = 1;
+	} else {
+		mod = 2;
+	}
+	if (base == 4) {
+		xb_b(a, cast(u8)((mod<<6) | (r<<3) | 4));
+		xb_b(a, 0x24);
+	} else {
+		xb_b(a, cast(u8)((mod<<6) | (r<<3) | base));
+	}
+	if (mod == 1) {
+		xb_b(a, cast(u8)cast(i8)(disp/disp8_scale));
+	} else if (mod == 2) {
+		xb_u32(a, cast(u32)disp);
+	}
+}
+
 // Encodes [prefixes] [REX] opcode modrm [sib] [disp]. `imm_size` is the number of
 // immediate bytes the caller writes afterwards, needed for rip-relative addends.
 gb_internal void xb_enc(xbAsm *a, u32 flags, u8 opcode, u8 reg, xbOpnd rm, i32 imm_size=0) {
@@ -124,41 +163,28 @@ gb_internal void xb_enc(xbAsm *a, u32 flags, u8 opcode, u8 reg, xbOpnd rm, i32 i
 	if (flags & XB_0F38) { xb_b(a, 0x0F); xb_b(a, 0x38); }
 	if (flags & XB_0F3A) { xb_b(a, 0x0F); xb_b(a, 0x3A); }
 	xb_b(a, opcode);
+	xb_enc_modrm(a, reg, rm, imm_size);
+}
 
-	u8 r = reg & 7;
-	if (!rm.is_mem) {
-		xb_b(a, cast(u8)(0xC0 | (r<<3) | (rm.reg & 7)));
-		return;
-	}
-	if (rm.reg == XB_RIP) {
-		xb_b(a, cast(u8)(0x00 | (r<<3) | 5));
-		i64 at = xb_pos(a);
-		xb_u32(a, 0);
-		GB_ASSERT(rm.sym >= 0);
-		// rip points past the immediate when there is one
-		xb_add_reloc(a->m, xbSection_Text, rm.reloc, at, rm.sym, cast(i64)rm.disp - 4 - imm_size);
-		return;
-	}
-	u8 base = rm.reg & 7;
-	i32 disp = rm.disp;
-	u8 mod = 0;
-	if (disp == 0 && base != 5) {
-		mod = 0;
-	} else if (disp >= -128 && disp <= 127) {
-		mod = 1;
+// vmovups between ymm (VEX.256) or zmm (EVEX.512) and memory
+gb_internal void xb_vmovups_wide(xbAsm *a, i32 size, bool load, u8 x, xbOpnd m) {
+	GB_ASSERT(m.is_mem && x < 16);
+	u8 not_r = (x & 8) ? 0 : 0x80;
+	u8 not_b = (m.reg != XB_RIP && (m.reg & 8)) ? 0 : 0x20;
+	if (size == 32) {
+		xb_b(a, 0xC4);
+		xb_b(a, cast(u8)(not_r | 0x40 | not_b | 0x01)); // ~R ~X ~B, map 0F
+		xb_b(a, 0x7C);                                   // W0, no vvvv, L=256, no prefix
+		xb_b(a, load ? 0x10 : 0x11);
+		xb_enc_modrm(a, x, m, 0);
 	} else {
-		mod = 2;
-	}
-	if (base == 4) {
-		xb_b(a, cast(u8)((mod<<6) | (r<<3) | 4));
-		xb_b(a, 0x24);
-	} else {
-		xb_b(a, cast(u8)((mod<<6) | (r<<3) | base));
-	}
-	if (mod == 1) {
-		xb_b(a, cast(u8)cast(i8)disp);
-	} else if (mod == 2) {
-		xb_u32(a, cast(u32)disp);
+		GB_ASSERT(size == 64);
+		xb_b(a, 0x62);
+		xb_b(a, cast(u8)(not_r | 0x40 | not_b | 0x10 | 0x01)); // ~R ~X ~B ~R', map 0F
+		xb_b(a, 0x7C);                                          // W0, no vvvv, no prefix
+		xb_b(a, 0x48);                                          // L'L=512, ~V'
+		xb_b(a, load ? 0x10 : 0x11);
+		xb_enc_modrm(a, x, m, 0, 64);
 	}
 }
 
@@ -366,6 +392,16 @@ gb_internal void xb_movups_x_m(xbAsm *a, u8 xmm, xbOpnd m) {
 }
 gb_internal void xb_movups_m_x(xbAsm *a, xbOpnd m, u8 xmm) {
 	xb_enc(a, XB_0F, 0x11, xmm, m);
+}
+// vfmadd213ss/sd xmm, xmm_v, xmm/m: xmm = xmm_v*xmm + rm
+gb_internal void xb_vfmadd213_s(xbAsm *a, i32 size, u8 xmm, u8 xmm_v, xbOpnd rm) {
+	u8 not_r = (xmm & 8) ? 0 : 0x80;
+	u8 not_b = (rm.reg != XB_RIP && (rm.reg & 8)) ? 0 : 0x20;
+	xb_b(a, 0xC4);
+	xb_b(a, cast(u8)(not_r | 0x40 | not_b | 0x02));                       // ~R ~X ~B, map 0F38
+	xb_b(a, cast(u8)((size == 8 ? 0x80 : 0) | ((~xmm_v & 15) << 3) | 0x01)); // W, ~vvvv, LIG, 66
+	xb_b(a, 0xA9);
+	xb_enc_modrm(a, xmm, rm, 0);
 }
 // movd/movq xmm, r/m32/64
 gb_internal void xb_movd_x_rm(xbAsm *a, i32 size, u8 xmm, xbOpnd rm) {

@@ -200,7 +200,7 @@ gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason
 			return nullptr;
 		}
 		if (lt->kind == xbLT_Vector && lt->size > 16) {
-			if (check_target_feature_is_enabled(str_lit("avx"), nullptr)) {
+			if (xb_x86_vector_width() > 16) {
 				// with AVX, LLVM returns a wide vector in ymm/zmm registers, which this backend does not use
 				*reason = "avx vector return";
 				return nullptr;
