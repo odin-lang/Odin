@@ -93,9 +93,6 @@ gb_internal void lb_run_fast_float_math_pass(lbProcedure *p) {
 }
 
 gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
-	unsigned debug_declare_id = LLVMLookupIntrinsicID("llvm.dbg.declare", 16);
-	GB_ASSERT(debug_declare_id != 0);
-
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;

@@ -971,22 +971,19 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	lbValue lower = lb_build_expr(p, node->left);
 	lbValue upper = {}; // initialized each time in the loop
 
-	lbAddr value;
+	// NOTE: the counters are unnamed, as `lb_store_range_stmt_val` declares the loop's variables each iteration
+	Type *value_type = lower.type;
 	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(val0);
-		value = lb_add_local(p, val0_type, e, false);
-	} else {
-		value = lb_add_local_generated(p, lower.type, false);
+		value_type = val0_type;
 	}
+	lbAddr value = lb_add_local_generated(p, value_type, false);
 	lb_addr_store(p, value, lower);
 
-	lbAddr index;
+	Type *index_type = t_int;
 	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(val1);
-		index = lb_add_local(p, val1_type, e, false);
-	} else {
-		index = lb_add_local_generated(p, t_int, false);
+		index_type = val1_type;
 	}
+	lbAddr index = lb_add_local_generated(p, index_type, false);
 	lb_addr_store(p, index, lb_const_int(m, t_int, 0));
 
 	lbBlock *loop = lb_create_block(p, "for.interval.loop");
@@ -1303,6 +1300,12 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 		if (e != nullptr) {
 			lbAddr soa_val = lb_addr_soa_variable(array.addr, lb_addr_load(p, index), nullptr);
 			map_set(&p->module->soa_values, e, soa_val);
+			if (p->debug_info != nullptr && rs->vals[0]->kind == Ast_Ident) {
+				// NOTE(bill): the element has no memory of its own meaning a debugger is given a copy made each iteration
+				lbAddr copy = lb_add_local_generated(p, val_types[0], false);
+				lb_addr_store(p, copy, lb_addr_load(p, soa_val));
+				lb_add_debug_local_variable(p, copy.addr.value, val_types[0], e->token);
+			}
 		}
 	}
 	if (val_types[1]) {

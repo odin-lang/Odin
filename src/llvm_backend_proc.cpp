@@ -364,7 +364,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
-	if (m->debug_builder) { // Debug Information
+	if (m->debug_builder && p->body != nullptr) { // Debug Information
 		Type *bt = base_type(p->type);
 
 		unsigned line = cast(unsigned)entity->token.pos.line;
@@ -390,33 +390,35 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 		// LLVMBool is_local_to_unit = !entity->Procedure.is_export;
 		LLVMBool is_local_to_unit = false;
-		LLVMBool is_definition = p->body != nullptr;
+		LLVMBool is_definition = true;
 		unsigned scope_line = line;
 		u32 flags = LLVMDIFlagStaticMember;
-		LLVMBool is_optimized = false;
+		LLVMBool is_optimized = build_context.optimization_level > OptimizationLevel_Minimal && entity->Procedure.optimization_mode != ProcedureOptimizationMode_None;
 		if (bt->Proc.diverging) {
 			flags |= LLVMDIFlagNoReturn;
 		}
-		if (p->body == nullptr) {
-			flags |= LLVMDIFlagPrototyped;
-			is_optimized = false;
+
+		// NOTE(bill): exported, foreign and custom link names are what a user knows the procedure by
+		String debug_name = p->name;
+		gbString name = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(name));
+		DeclInfo *decl = entity->decl_info;
+		if (!entity->Procedure.is_export && !entity->Procedure.is_foreign && (entity->flags & EntityFlag_CustomLinkName) == 0 &&
+		    decl != nullptr && decl->proc_lit != nullptr) {
+			name = lb_debug_append_proc_name(name, decl);
+			debug_name = make_string(cast(u8 *)name, gb_string_length(name));
 		}
 
-		if (p->body != nullptr) {
-			// String debug_name = entity->token.string.text;
-			String debug_name = p->name;
-
-			p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
-				cast(char const *)debug_name.text, debug_name.len,
-				cast(char const *)p->name.text, p->name.len,
-				file, line, type,
-				is_local_to_unit, is_definition,
-				scope_line, cast(LLVMDIFlags)flags, is_optimized
-			);
-			GB_ASSERT(p->debug_info != nullptr);
-			LLVMSetSubprogram(p->value, p->debug_info);
-			lb_set_llvm_metadata(m, p, p->debug_info);
-		}
+		p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
+			cast(char const *)debug_name.text, debug_name.len,
+			cast(char const *)p->name.text, p->name.len,
+			file, line, type,
+			is_local_to_unit, is_definition,
+			scope_line, cast(LLVMDIFlags)flags, is_optimized
+		);
+		GB_ASSERT(p->debug_info != nullptr);
+		LLVMSetSubprogram(p->value, p->debug_info);
+		lb_set_llvm_metadata(m, p, p->debug_info);
 	}
 
 	if (p->body && entity->pkg && ((entity->pkg->kind == Package_Normal) || (entity->pkg->kind == Package_Init))) {

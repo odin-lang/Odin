@@ -184,6 +184,89 @@ gb_internal u64 fnv64a(void const *data, isize len, u64 seed=0xcbf29ce484222325u
 	return h;
 }
 
+gb_internal void md5_block(u32 h[4], u8 const *block) {
+	gb_local_persist u32 const K[64] = {
+		0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+		0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+		0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+		0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+		0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+		0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+		0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+		0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+	};
+	gb_local_persist u32 const R[64] = {
+		7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+		5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
+		4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+		6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+	};
+
+	u32 w[16];
+	for (isize i = 0; i < 16; i++) {
+		w[i] = block[4*i] | (block[4*i+1] << 8) | (block[4*i+2] << 16) | (cast(u32)block[4*i+3] << 24);
+	}
+
+	u32 a = h[0];
+	u32 b = h[1];
+	u32 c = h[2];
+	u32 d = h[3];
+
+	for (isize i = 0; i < 64; i++) {
+		u32 f = 0;
+		isize g = 0;
+		switch (i / 16) {
+		case 0: f = (b & c) | (~b & d); g = i;              break;
+		case 1: f = (d & b) | (~d & c); g = (5*i + 1) % 16; break;
+		case 2: f = b ^ c ^ d;          g = (3*i + 5) % 16; break;
+		case 3: f = c ^ (b | ~d);       g = (7*i) % 16;     break;
+		}
+		u32 x = a + f + K[i] + w[g];
+		a = d;
+		d = c;
+		c = b;
+		b += (x << R[i]) | (x >> (32 - R[i]));
+	}
+	h[0] += a;
+	h[1] += b;
+	h[2] += c;
+	h[3] += d;
+}
+
+// RFC 1321
+gb_internal void md5(void const *data, isize len, u8 digest[16]) {
+	u8 const *bytes = cast(u8 const *)data;
+	u32 h[4] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476};
+	isize i = 0;
+	for (; i+64 <= len; i += 64) {
+		md5_block(h, bytes+i);
+	}
+
+	// the rest, a one bit, zeros to 56 bytes of a block, then the length in bits
+	isize rest = len - i;
+	u8 tail[128] = {};
+	gb_memmove(tail, bytes+i, rest);
+	tail[rest] = 0x80;
+
+	isize tail_len = 64;
+	if (rest >= 56) {
+		tail_len = 128;
+	}
+
+	u64 bit_len = 8*cast(u64)len;
+	for (isize j = 0; j < 8; j++) {
+		tail[tail_len-8+j] = cast(u8)(bit_len >> (8*j));
+	}
+
+	for (isize j = 0; j < tail_len; j += 64) {
+		md5_block(h, tail+j);
+	}
+
+	for (isize j = 0; j < 16; j++) {
+		digest[j] = cast(u8)(h[j/4] >> (8*(j%4)));
+	}
+}
+
 gb_internal u64 u64_digit_value(Rune r) {
 	switch (r) {
 	case '0': return 0;

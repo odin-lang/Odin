@@ -80,6 +80,9 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 		}
 		module_name = gb_string_appendc(module_name, "$parapoly");
 	}
+	if (m->is_debug_types_module) {
+		module_name = gb_string_appendc(module_name, "$debug_types");
+	}
 	if (m->split_part > 0) {
 		module_name = gb_string_append_fmt(module_name, "$%d", m->split_part);
 	}
@@ -119,11 +122,12 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 			break;
 
 		case TargetOs_darwin:
-			// NOTE(bill): Darwin only supports DWARF2 (that I know of)
+		case TargetOs_linux:
+			// NOTE: other targets keep LLVM's default, DWARF 4
 			LLVMAddModuleFlag(m->mod,
 				LLVMModuleFlagBehaviorWarning,
 				"Dwarf Version", 13,
-				LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 2, true)));
+				LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 5, true)));
 			break;
 		}
 		m->debug_builder = LLVMCreateDIBuilder(m->mod);
@@ -156,6 +160,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	array_init(&m->global_types_to_create, a, 0, 1024);
 	array_init(&m->global_variables, a);
 	map_init(&m->debug_values);
+	array_init(&m->debug_type_frames, a);
 
 	string_map_init(&m->objc_classes);
 	string_map_init(&m->objc_selectors);
@@ -556,6 +561,22 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		gen->type_info_modules[i]->type_info_part = i;
 	}
 
+	array_init(&gen->debug_types_modules, heap_allocator());
+	if (build_context.ODIN_DEBUG && USE_SEPARATE_MODULES) {
+		isize const debug_types_module_count = 8;
+		for (isize i = 0; i < debug_types_module_count; i++) {
+			lbModule *m = permanent_alloc_item<lbModule>();
+			m->gen        = gen;
+			m->checker    = c;
+			m->split_part = cast(i32)(i+1);
+			m->is_debug_types_module = true;
+			mpsc_init(&m->debug_homed_types, heap_allocator());
+			map_set(&gen->modules, cast(void *)m, m);
+			lb_init_module(m, do_threading);
+			array_add(&gen->debug_types_modules, m);
+		}
+	}
+
 	thread_pool_wait();
 
 	for (auto const &entry : gen->modules) {
@@ -569,6 +590,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	mpsc_init(&gen->objc_classes, heap_allocator());
 	mpsc_init(&gen->objc_ivars, heap_allocator());
 	mpsc_init(&gen->raddebug_section_strings, heap_allocator());
+	mpsc_init(&gen->raddebug_generated_views, heap_allocator());
 
 	return true;
 }
@@ -3417,12 +3439,8 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Proc:
-		{
-			LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
-			gb_unused(proc_raw_type);
-			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
-		}
-		break;
+		// NOTE: the signature is not lowered here, as a parameter like `[]S` in `S :: proc(s: []S)` would recurse forever
+		return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
 	case Type_BitSet:
 		{
 			Type *ut = bit_set_to_int(type);
@@ -3515,8 +3533,7 @@ gb_internal lbFunctionType *lb_get_function_type(lbModule *m, Type *pt) {
 	lbFunctionType **ft_found = nullptr;
 	ft_found = map_get(&m->function_type_map, pt);
 	if (!ft_found) {
-		LLVMTypeRef llvm_proc_type = lb_type(m, pt);
-		gb_unused(llvm_proc_type);
+		lb_type_internal_for_procedures_raw(m, pt);
 		ft_found = map_get(&m->function_type_map, pt);
 	}
 	GB_ASSERT(ft_found != nullptr);
@@ -3530,8 +3547,7 @@ gb_internal void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 	}
 	lbFunctionType **ft_found = map_get(&m->function_type_map, p->type);
 	if (ft_found == nullptr) {
-		LLVMTypeRef llvm_proc_type = lb_type(p->module, p->type);
-		gb_unused(llvm_proc_type);
+		lb_type_internal_for_procedures_raw(p->module, p->type);
 		ft_found = map_get(&m->function_type_map, p->type);
 	}
 	GB_ASSERT(ft_found != nullptr);
