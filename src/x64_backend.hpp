@@ -148,6 +148,10 @@ enum xbOp : u8 {
 	xbOp_Syscall,     // imm = index into proc->calls (args only)
 	xbOp_MulOvf,      // dst = a * b, c = overflowed; aux = 1 if signed
 	xbOp_MulHiU,      // dst = high 64 bits of the unsigned product a * b
+	xbOp_Cpuid,       // [mem] = eax, ebx, ecx, edx of cpuid(eax = a, ecx = b)
+	xbOp_Xgetbv,      // [mem] = eax, edx of xgetbv(ecx = a)
+	xbOp_Valgrind,    // dst = valgrind client request(default = a, args = [b])
+	xbOp_Alloca,      // dst = a bytes of fresh stack memory aligned to imm
 
 	xbOp_COUNT,
 };
@@ -320,6 +324,8 @@ struct xbLocal {
 	i64 size;
 	i64 align;
 	i32 frame_offset;
+	i64 over_align; // > 16: frame_offset holds a pointer into an aligned spot of the raw area
+	i32 raw_offset;
 };
 
 struct xbParamIn {

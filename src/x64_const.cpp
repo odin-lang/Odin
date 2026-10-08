@@ -6,8 +6,11 @@ struct xbConstBuf {
 	Array<u8>      bytes;
 	Array<xbReloc> relocs; // offsets are relative to the start of `bytes`
 	bool           writable;
+	bool           proc_lits; // may compile procedure literals, only outside of any procedure
 	char const *   fail;
 };
+
+gb_internal i32 xb_compile_data_proc_lit(xbModule *m, Ast *expr, char const **reason);
 
 gb_internal i32 xb_const_global(xbModule *m, Type *type, ExactValue value, bool writable, char const **reason);
 
@@ -233,7 +236,12 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 		for (;;) {
 			Ast *expr = unparen_expr(value.value_procedure);
 			if (expr->kind == Ast_ProcLit) {
-				return xb_cb_fail(b, "procedure literal in constant data");
+				if (!b->proc_lits) return xb_cb_fail(b, "procedure literal in constant data");
+				char const *reason = nullptr;
+				i32 sym = xb_compile_data_proc_lit(m, expr, &reason);
+				if (sym < 0) return xb_cb_fail(b, reason);
+				xb_cb_reloc(b, off, sym, 0);
+				return true;
 			}
 			Entity *e = entity_from_expr(expr);
 			if (e == nullptr) return xb_cb_fail(b, "procedure constant");

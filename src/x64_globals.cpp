@@ -48,6 +48,7 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 	if (value.kind != ExactValue_Invalid) {
 		b.m = m;
 		b.writable = true;
+		b.proc_lits = true;
 		b.bytes = array_make<u8>(heap_allocator(), size, size);
 		gb_zero_size(b.bytes.data, size);
 		b.relocs = array_make<xbReloc>(heap_allocator(), 0, 4);
@@ -158,6 +159,10 @@ gb_internal void xb_define_globals(xbModule *m) {
 			ptr_set_add(&m->handled, e);
 		} else {
 			xb_stat_fail(m, reason ? reason : "global");
+			if (m->verbose) {
+				String name = xb_entity_name(m, e);
+				gb_printf_err("xb: global fallback %.*s: %s\n", LIT(name), reason);
+			}
 		}
 	}
 }
