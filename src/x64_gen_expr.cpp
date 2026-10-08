@@ -1149,15 +1149,23 @@ gb_internal void xb_file_line_col(xbProc *p, TokenPos pos, xbValue *out) {
 
 gb_internal void xb_emit_bounds_check(xbProc *p, Token token, u32 index, u32 len) {
 	if (xb_bounds_check_disabled(p)) return;
-	xbValue args[5] = {};
-	xb_file_line_col(p, token.pos, args);
-	args[3] = xb_value_reg(t_int, index);
-	args[4] = xb_value_reg(t_int, len);
 	char const *handler = "bounds_check_error_contextless";
 	if (p->context_stack.count > 0) {
 		handler = "bounds_check_error_with_context";
 	}
+	// the runtime repeats this compare, the fast path just skips the call
+	xbBlock *fail = xb_new_block(p);
+	xbBlock *ok = xb_new_block(p);
+	fail->cold = true;
+	xb_branch(p, xb_cmp(p, xbCond_UGE, xbType_I64, index, len), fail, ok);
+	xb_start_block(p, fail);
+	xbValue args[5] = {};
+	xb_file_line_col(p, token.pos, args);
+	args[3] = xb_value_reg(t_int, index);
+	args[4] = xb_value_reg(t_int, len);
 	xb_emit_runtime_call(p, handler, xb_args(args, 5));
+	xb_jump(p, ok);
+	xb_start_block(p, ok);
 }
 
 gb_internal u32 xb_build_index_int(xbProc *p, Ast *index_expr) {
