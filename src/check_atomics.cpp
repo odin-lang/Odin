@@ -707,6 +707,48 @@ gb_internal int check_atomic_report_cmp(void const *a, void const *b) {
 	return cast(int)x->kind - cast(int)y->kind;
 }
 
+gb_internal void check_atomic_add_syncs(AtomicScan *s, Ast *call, Entity *callee, Entity *proc, bool deferred) {
+	AtomicSync sync = {};
+	sync.call     = call;
+	sync.deferred = deferred;
+	if (proc->Procedure.synchronizes != OdinAtomicMemoryOrder_relaxed) {
+		sync.arms   = slice_from_array(array_clone(temporary_allocator(), s->arms));
+		sync.order  = cast(OdinAtomicMemoryOrder)proc->Procedure.synchronizes;
+		sync.shared = proc->Procedure.synchronizes_shared;
+		if (Ast *arg = check_atomic_call_argument(call, callee, 0)) {
+			sync.object = check_atomic_object(arg);
+		}
+		array_add(&s->syncs, sync);
+		return;
+	}
+	if (proc->decl_info == nullptr) {
+		return;
+	}
+	if (s->inferring != nullptr && ptr_set_exists(s->inferring, proc->decl_info)) {
+		check_atomic_infer(s->inferring, proc->decl_info);
+	}
+	Slice<AtomicEffect> *effects = map_get(&atomic_effects, proc->decl_info);
+	if (effects == nullptr) {
+		return;
+	}
+	for (AtomicEffect const &effect : *effects) {
+		sync.arms   = slice_from_array(array_clone(temporary_allocator(), s->arms));
+		sync.order  = effect.order;
+		sync.shared = effect.shared;
+		sync.object = effect.object;
+		if (effect.param >= 0) {
+			sync.object = {};
+			if (Ast *arg = check_atomic_call_argument(call, callee, effect.param)) {
+				AtomicObject o = check_atomic_object(arg);
+				if (o.root != nullptr) {
+					sync.object = AtomicObject{o.root, concatenate_strings(temporary_allocator(), o.path, effect.object.path)};
+				}
+			}
+		}
+		array_add(&s->syncs, sync);
+	}
+}
+
 // the plain reads within a statement or an expression, of which only the address is used when `addr`
 gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 	if (node == nullptr || node->tav.mode == Addressing_Constant || node->tav.mode == Addressing_Type) {
@@ -810,40 +852,18 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 				e = entity_of_node(proc);
 			}
 			if (e != nullptr && e->kind == Entity_Procedure) {
-				AtomicSync sync = {};
-				sync.call     = node;
-				sync.deferred = s->place.deferred;
-				if (e->Procedure.synchronizes != OdinAtomicMemoryOrder_relaxed) {
-					sync.arms   = slice_from_array(array_clone(temporary_allocator(), s->arms));
-					sync.order  = cast(OdinAtomicMemoryOrder)e->Procedure.synchronizes;
-					sync.shared = e->Procedure.synchronizes_shared;
-					if (Ast *arg = check_atomic_call_argument(node, e, 0)) {
-						sync.object = check_atomic_object(arg);
+				check_atomic_add_syncs(s, node, e, e, s->place.deferred);
+
+				DeferredProcedure dp = e->Procedure.deferred_procedure;
+				switch (dp.kind) {
+				case DeferredProcedure_in:
+				case DeferredProcedure_in_out:
+				case DeferredProcedure_in_by_ptr:
+				case DeferredProcedure_in_out_by_ptr:
+					if (dp.entity != nullptr && dp.entity->kind == Entity_Procedure) {
+						check_atomic_add_syncs(s, node, e, dp.entity, true);
 					}
-					array_add(&s->syncs, sync);
-				} else if (e->decl_info != nullptr) {
-					if (s->inferring != nullptr && ptr_set_exists(s->inferring, e->decl_info)) {
-						check_atomic_infer(s->inferring, e->decl_info);
-					}
-					if (Slice<AtomicEffect> *effects = map_get(&atomic_effects, e->decl_info)) {
-						for (AtomicEffect const &effect : *effects) {
-							sync.arms   = slice_from_array(array_clone(temporary_allocator(), s->arms));
-							sync.order  = effect.order;
-							sync.shared = effect.shared;
-							sync.object = effect.object;
-							if (effect.param >= 0) {
-								// within what is passed for it
-								sync.object = {};
-								if (Ast *arg = check_atomic_call_argument(node, e, effect.param)) {
-									AtomicObject o = check_atomic_object(arg);
-									if (o.root != nullptr) {
-										sync.object = AtomicObject{o.root, concatenate_strings(temporary_allocator(), o.path, effect.object.path)};
-									}
-								}
-							}
-							array_add(&s->syncs, sync);
-						}
-					}
+					break;
 				}
 			}
 			check_atomic_scan(s, proc, false);

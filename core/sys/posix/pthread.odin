@@ -174,6 +174,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_create.html ]]
 	*/
+	@(synchronizes=.Release)
 	pthread_create :: proc(
 		thread:        ^pthread_t,
 		attr:          ^pthread_attr_t,

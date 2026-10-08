@@ -159,6 +159,7 @@ foreign kernel32 {
 		lpBytesReturned: LPDWORD,
 		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL ---
+	@(synchronizes=.Release)
 	CreateThread :: proc(
 		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
 		dwStackSize: SIZE_T,
@@ -201,6 +202,7 @@ foreign kernel32 {
 	) -> DWORD_PTR ---
 
 	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCWSTR) -> HANDLE ---
+	@(synchronizes=.Release)
 	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---
 
 	CreateWaitableTimerW :: proc(
@@ -419,6 +421,7 @@ foreign kernel32 {
 		dwDesiredAccess: DWORD,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	@(synchronizes=.Release)
 	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	@(synchronizes=.Acquire)
 	WaitForMultipleObjects :: proc(

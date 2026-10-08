@@ -451,6 +451,7 @@ Example:
 		assert(! chan.send(c, 2))
 	}
 */
+@(synchronizes=.Release)
 send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where C.D <= .Both {
 	data := data
 	ok = send_raw(c, &data)
@@ -483,7 +484,7 @@ Example:
 		assert(!chan.try_send(c, 2), "the buffer is already full")
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Release)
 try_send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where C.D <= .Both {
 	data := data
 	ok = try_send_raw(c, &data)
@@ -528,7 +529,7 @@ Example:
 		assert(!ok, "the channel is closed")
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where C.D >= .Both {
 	ok = recv_raw(c, &data)
 	return
@@ -558,7 +559,7 @@ Example:
 		assert(!ok, "there is not value to read")
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 try_recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where C.D >= .Both {
 	ok = try_recv_raw(c, &data)
 	return
@@ -602,7 +603,7 @@ Example:
 		assert(! chan.send_raw(c, &value))
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Release)
 send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 	if c == nil {
 		return
@@ -692,7 +693,7 @@ Example:
 		assert(! chan.recv_raw(c, &value))
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 	if c == nil {
 		return
@@ -772,7 +773,7 @@ Example:
 		assert(!chan.try_send_raw(c, &value), "the buffer is already full")
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Release)
 try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 	if c == nil {
 		return false
@@ -835,7 +836,7 @@ Example:
 		assert(!chan.try_recv_raw(c, &value))
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	if c == nil {
 		return false

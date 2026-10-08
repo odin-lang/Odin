@@ -39,6 +39,7 @@ This procedure atomically increments a number to the specified wait group's
 internal counter by a specified amount. This operation can be done on any
 thread.
 */
+@(synchronizes=.Release)
 wait_group_add :: proc "contextless" (wg: ^Wait_Group, delta: int) {
 	if delta == 0 {
 		return
