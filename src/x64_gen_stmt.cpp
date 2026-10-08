@@ -2917,6 +2917,16 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		xbVar v = {};
 		v.mem = xb_mem(xbMem_Sym, cast(u32)sym);
 		map_set(&p->vars, e, v);
+
+		if (!is_blank_ident(e->token.string)) {
+			xbDebugVar dv = {};
+			dv.name = e->token.string;
+			dv.type = e->type;
+			dv.local = -1;
+			dv.sym = sym;
+			dv.line = e->token.pos.line;
+			array_add(&p->debug_vars, dv);
+		}
 	}
 }
 
@@ -3293,6 +3303,13 @@ gb_internal void xb_begin_proc(xbProc *p) {
 	if (abi->is_odin_cc) {
 		i32 l = xb_param_ptr_local(p, abi, abi->context);
 		xb_push_context(p, xb_mem(xbMem_Local, cast(u32)l), true);
+		xbDebugVar dv = {};
+		dv.name = str_lit("context");
+		dv.type = t_context;
+		dv.local = l;
+		dv.by_ref = true;
+		dv.line = p->entity ? p->entity->token.pos.line : 0;
+		array_add(&p->debug_vars, dv);
 		p->context_stack[p->context_stack.count-1].scope_index = -1;
 		p->context_stack[p->context_stack.count-1].uses = 1;
 	}

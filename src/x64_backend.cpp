@@ -244,6 +244,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	}
 	m->relocs = array_make<xbReloc>(heap_allocator(), 0, 1<<14);
 	m->proc_debug = array_make<xbProcDebug>(heap_allocator(), 0, 1024);
+	m->global_debug = array_make<xbGlobalDebug>(heap_allocator(), 0, 256);
 	m->lines = array_make<xbLineEntry>(heap_allocator(), 0, 1<<14);
 	m->files = array_make<String>(heap_allocator(), 0, 64);
 	map_init(&m->file_ids);

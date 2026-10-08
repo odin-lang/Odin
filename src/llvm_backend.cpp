@@ -2688,7 +2688,8 @@ gb_internal void lb_create_global_procedures_and_types(lbGenerator *gen, Checker
 		case Entity_Procedure:
 			break;
 		case Entity_Constant:
-			if (build_context.ODIN_DEBUG) {
+			// the x64 backend describes them all itself
+			if (build_context.ODIN_DEBUG && !xb_is_enabled()) {
 				lb_add_debug_info_for_global_constant_from_entity(gen, e);
 			}
 			break;
@@ -4029,7 +4030,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	if (build_context.ODIN_DEBUG) {
+	if (build_context.ODIN_DEBUG && !xb_is_enabled()) {
 		for (auto const &entry : builtin_pkg->scope->elements) {
 			Entity *e = entry.value;
 			lb_add_debug_info_for_global_constant_from_entity(gen, e);
