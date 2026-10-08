@@ -549,6 +549,12 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
+// NOTE(bill): DWARF debuggers show a flag enum as `A | C`, but the RAD Debugger only names a value that is exactly one enumerator.
+// CodeView keeps the union of one-bit members.
+gb_internal bool lb_debug_bit_set_is_flag_enum(Type *bt) {
+	return build_context.metrics.os != TargetOs_windows && base_type(bt->BitSet.elem)->kind == Type_Enum && type_size_of(bt) <= 8;
+}
+
 gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	Type *bt = base_type(type);
 	GB_ASSERT(bt->kind == Type_BitSet);
@@ -557,6 +563,34 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
+
+	if (lb_debug_bit_set_is_flag_enum(bt)) {
+		Type *elem = base_type(bt->BitSet.elem);
+		auto enumerators = array_make<LLVMMetadataRef>(temporary_allocator(), 0, elem->Enum.fields.count);
+		u64 bits = 0;
+		for (Entity *f : elem->Enum.fields) {
+			i64 val = exact_value_to_i64(f->Constant.value);
+			if (val < bt->BitSet.lower || bt->BitSet.upper < val) {
+				continue;
+			}
+			u64 flag = 1ull << cast(u64)(val - bt->BitSet.lower);
+			if (bits & flag) {
+				// an alias of an earlier field, as debuggers only show disjoint values as flags
+				continue;
+			}
+			bits |= flag;
+			String field_name = f->token.string;
+			array_add(&enumerators, LLVMDIBuilderCreateEnumerator(m->debug_builder,
+				cast(char const *)field_name.text, cast(size_t)field_name.len, cast(i64)flag, true
+			));
+		}
+		LLVMMetadataRef final_decl = LLVMDIBuilderCreateEnumerationType(m->debug_builder, scope,
+			cast(char const *)name.text, cast(size_t)name.len, file, line, size_in_bits, align_in_bits,
+			enumerators.data, cast(unsigned)enumerators.count, lb_debug_type(m, bit_set_to_int(bt))
+		);
+		lb_set_llvm_metadata(m, type, final_decl);
+		return final_decl;
+	}
 
 	LLVMMetadataRef bit_set_field_type = lb_debug_type(m, t_bool);
 
@@ -717,6 +751,44 @@ gb_internal LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &
 #endif
 }
 
+struct lbDebugNamedType {
+	String name;
+	Type * type;
+};
+
+gb_internal GB_COMPARE_PROC(lb_debug_named_type_cmp) {
+	lbDebugNamedType const *x = cast(lbDebugNamedType const *)a;
+	lbDebugNamedType const *y = cast(lbDebugNamedType const *)b;
+	return string_compare(x->name, y->name);
+}
+
+// NOTE(bill): `typeid` is an enum of every type in the type table, named by its canonical name.
+// Meaning that a debugger shows which type a `typeid` is.
+gb_internal LLVMMetadataRef lb_debug_typeid_enum(lbModule *m) {
+	auto types = array_make<lbDebugNamedType>(heap_allocator(), 0, m->info->type_info_types_hash_map.count);
+	defer (array_free(&types));
+	for (TypeInfoPair const &tt : m->info->type_info_types_hash_map) {
+		if (tt.type != nullptr && tt.type != t_invalid) {
+			array_add(&types, lbDebugNamedType{type_to_canonical_string(temporary_allocator(), tt.type), tt.type});
+		}
+	}
+	array_sort(types, lb_debug_named_type_cmp);
+
+	auto enumerators = array_make<LLVMMetadataRef>(heap_allocator(), 0, types.count);
+	defer (array_free(&enumerators));
+	for (lbDebugNamedType const &t : types) {
+		array_add(&enumerators, LLVMDIBuilderCreateEnumerator(m->debug_builder,
+			cast(char const *)t.name.text, cast(size_t)t.name.len,
+			cast(i64)type_hash_canonical_type(t.type), true
+		));
+	}
+	String name = str_lit("typeid");
+	return LLVMDIBuilderCreateEnumerationType(m->debug_builder, nullptr,
+		cast(char const *)name.text, cast(size_t)name.len, nullptr, 0, 64, 64,
+		enumerators.data, cast(unsigned)enumerators.count, lb_debug_type(m, t_u64)
+	);
+}
+
 gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
@@ -760,7 +832,10 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_uintptr: return lb_debug_type_basic_type(m, str_lit("uintptr"), ptr_bits, LLVMDWARFTypeEncoding_Unsigned);
 
 		case Basic_typeid:
-			return lb_debug_type_basic_type(m, str_lit("typeid"), 64, LLVMDWARFTypeEncoding_Unsigned);
+			if (build_context.no_rtti) {
+				return lb_debug_type_basic_type(m, str_lit("typeid"), 64, LLVMDWARFTypeEncoding_Unsigned);
+			}
+			return lb_debug_typeid_enum(m);
 
 		// Endian Specific Types
 		case Basic_i16le:  return lb_debug_type_basic_type(m, str_lit("i16le"),  16,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
@@ -1162,6 +1237,16 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	case Type_Tuple:
 		is_record = record_bt->Tuple.variables.count != 1;
 		break;
+	case Type_Basic:
+		// NOTE(bill): the `typeid` debug-info enum is as mahussive as the type table
+		// This means we defined once like the record/any types or else its `id` differs between the module defining `typeid` and the rest
+		if (type->kind == Type_Basic) {
+			switch (type->Basic.kind) {
+			case Basic_typeid: is_record = !build_context.no_rtti; break;
+			case Basic_any:    is_record = true;                   break;
+			}
+		}
+		break;
 	}
 
 	Array<lbModule *> const &types_modules = m->gen->debug_types_modules;
@@ -1182,11 +1267,21 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 			}
 			break;
 		case Type_Union:
+			tag = DW_TAG_union_type;
+			break;
 		case Type_BitSet:
 			tag = DW_TAG_union_type;
+			if (lb_debug_bit_set_is_flag_enum(record_bt)) {
+				tag = DW_TAG_enumeration_type;
+			}
 			break;
 		case Type_Enum:
 			tag = DW_TAG_enumeration_type;
+			break;
+		case Type_Basic:
+			if (record_bt->Basic.kind == Basic_typeid) {
+				tag = DW_TAG_enumeration_type;
+			}
 			break;
 		}
 
@@ -1684,22 +1779,11 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 #endif
 }
 
-struct lbDebugHomedType {
-	String name;
-	Type * type;
-};
-
-gb_internal GB_COMPARE_PROC(lb_debug_homed_type_cmp) {
-	lbDebugHomedType const *x = cast(lbDebugHomedType const *)a;
-	lbDebugHomedType const *y = cast(lbDebugHomedType const *)b;
-	return string_compare(x->name, y->name);
-}
-
 struct lbDebugTypesPart {
 	lbModule *m;
 	isize     pending; // how many of the queued types this round defines
 	StringSet seen;
-	Array<lbDebugHomedType> homed;
+	Array<lbDebugNamedType> homed;
 };
 
 gb_internal WORKER_TASK_PROC(lb_debug_define_homed_types_worker_proc) {
@@ -1715,10 +1799,10 @@ gb_internal WORKER_TASK_PROC(lb_debug_define_homed_types_worker_proc) {
 		GB_ASSERT(ok);
 		String name = type_to_canonical_string(permanent_allocator(), type);
 		if (!string_set_update(&part->seen, name)) {
-			array_add(&part->homed, lbDebugHomedType{name, type});
+			array_add(&part->homed, lbDebugNamedType{name, type});
 		}
 	}
-	gb_sort_array(part->homed.data+first, part->homed.count-first, lb_debug_homed_type_cmp);
+	gb_sort_array(part->homed.data+first, part->homed.count-first, lb_debug_named_type_cmp);
 	for (isize i = first; i < part->homed.count; i++) {
 		lb_debug_type(m, part->homed[i].type);
 	}
@@ -1731,7 +1815,7 @@ gb_internal WORKER_TASK_PROC(lb_debug_types_anchor_worker_proc) {
 	if (part->homed.count == 0) {
 		return 0;
 	}
-	array_sort(part->homed, lb_debug_homed_type_cmp);
+	array_sort(part->homed, lb_debug_named_type_cmp);
 
 	char anchor_name[32] = {};
 	isize anchor_name_len = gb_snprintf(anchor_name, gb_size_of(anchor_name), "__$debug_types$%d", m->split_part) - 1;
@@ -1740,7 +1824,7 @@ gb_internal WORKER_TASK_PROC(lb_debug_types_anchor_worker_proc) {
 
 	auto members = array_make<LLVMMetadataRef>(heap_allocator(), 0, part->homed.count);
 	defer (array_free(&members));
-	for (lbDebugHomedType const &h : part->homed) {
+	for (lbDebugNamedType const &h : part->homed) {
 		LLVMMetadataRef pointer = LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, h.type), ptr_bits, ptr_bits, 0, nullptr, 0);
 		array_add(&members, LLVMDIBuilderCreateMemberType(m->debug_builder, file,
 			cast(char const *)h.name.text, h.name.len, file, 0,

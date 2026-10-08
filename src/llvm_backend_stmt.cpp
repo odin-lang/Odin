@@ -1300,6 +1300,12 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 		if (e != nullptr) {
 			lbAddr soa_val = lb_addr_soa_variable(array.addr, lb_addr_load(p, index), nullptr);
 			map_set(&p->module->soa_values, e, soa_val);
+			if (p->debug_info != nullptr && rs->vals[0]->kind == Ast_Ident) {
+				// NOTE(bill): the element has no memory of its own meaning a debugger is given a copy made each iteration
+				lbAddr copy = lb_add_local_generated(p, val_types[0], false);
+				lb_addr_store(p, copy, lb_addr_load(p, soa_val));
+				lb_add_debug_local_variable(p, copy.addr.value, val_types[0], e->token);
+			}
 		}
 	}
 	if (val_types[1]) {
