@@ -18,6 +18,7 @@
 #include "x64_type_info.cpp"
 #include "x64_globals.cpp"
 #include "x64_elf.cpp"
+#include "x64_coff.cpp"
 
 gb_global xbModule *xb_module = nullptr;
 gb_global f64 xb_time_build = 0;
@@ -207,6 +208,8 @@ gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root) {
 			s->flags = xbSymbolFlag_Global | xbSymbolFlag_Func;
 			if (!pe->Procedure.is_export) {
 				s->flags |= xbSymbolFlag_Hidden;
+			} else {
+				s->flags |= xbSymbolFlag_Export;
 			}
 			if (pe->flags & (EntityFlag_CustomLinkage_Weak|EntityFlag_CustomLinkage_LinkOnce)) {
 				s->flags |= xbSymbolFlag_Weak;
@@ -269,7 +272,7 @@ gb_internal String xb_object_path(lbGenerator *gen) {
 		dir = build_context.build_paths[BuildPath_Output].basename;
 	}
 	gbString path = gb_string_make_length(heap_allocator(), dir.text, dir.len);
-	path = gb_string_append_fmt(path, "/odin-x64-%p.o", gen);
+	path = gb_string_append_fmt(path, "/odin-x64-%p.%s", gen, xb_is_win64() ? "obj" : "o");
 	return make_string(cast(u8 *)path, gb_string_length(path));
 }
 
@@ -369,7 +372,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	if (m->stats.procs_compiled > 0 || m->stats.globals_defined > 0) {
 		m->object_path = xb_object_path(gen);
 		f64 t0 = gb_time_now();
-		if (!xb_write_object(m, m->object_path)) {
+		if (!(xb_is_win64() ? xb_write_coff(m, m->object_path) : xb_write_object(m, m->object_path))) {
 			gb_exit(1);
 		}
 		xb_time_write += gb_time_now() - t0;

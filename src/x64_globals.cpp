@@ -78,6 +78,7 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 	// weak like LLVM's, so each package's object may carry a copy
 	s->flags |= xbSymbolFlag_Global;
 	if (!e->Variable.is_export) s->flags |= xbSymbolFlag_Weak;
+	else s->flags |= xbSymbolFlag_Export;
 	if (tls) s->flags |= xbSymbolFlag_TLS;
 
 	if (build_context.ODIN_DEBUG && !is_blank_ident(e->token.string)) {
