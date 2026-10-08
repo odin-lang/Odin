@@ -465,7 +465,7 @@ Example:
 
 	write_rune_example :: proc() {
 		builder := strings.builder_make()
-		strings.write_rune(&builder, 'ä')     // 2 None
+		strings.write_rune(&builder, 'ä')       // 2 None
 		strings.write_rune(&builder, 'b')       // 1 None
 		fmt.println(strings.to_string(builder)) // -> äb
 	}
@@ -475,8 +475,16 @@ Output:
 	äb
 
 */
-write_rune :: proc(b: ^Builder, r: rune) -> (res: int, err: io.Error) {
-	return io.write_rune(to_writer(b), r)
+write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int) {
+	n0 := len(b.buf)
+	if r < utf8.RUNE_SELF {
+		append(&b.buf, cast(byte)r, loc)
+	} else {
+		buf, w := utf8.encode_rune(r)
+		append(&b.buf, ..buf[:w], loc=loc)
+	}
+	n1 := len(b.buf)
+	return n1-n0
 }
 /*
 Appends a quoted rune to the Builder and returns the number of bytes written
@@ -498,7 +506,7 @@ Example:
 	write_quoted_rune_example :: proc() {
 		builder := strings.builder_make()
 		strings.write_string(&builder, "abc")      // 3
-		strings.write_quoted_rune(&builder, 'ä') // 4
+		strings.write_quoted_rune(&builder, 'ä')   // 4
 		strings.write_string(&builder, "abc")      // 3
 		fmt.println(strings.to_string(builder))    // -> abc'ä'abc
 	}
