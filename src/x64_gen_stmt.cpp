@@ -612,7 +612,7 @@ gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 			XB_UNSUPPORTED(p, "objc call");
 		}
 		if (proc_entity->kind == Entity_AsmTemplate) {
-			XB_UNSUPPORTED(p, "asm template call");
+			return xb_build_asm_call(p, proc_entity, ce);
 		}
 		if (proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_foreign &&
 		    base_type(proc_entity->type)->Proc.calling_convention == ProcCC_None &&

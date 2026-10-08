@@ -155,6 +155,12 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 		f(in.dst, true);
 		f(in.c, true);
 		break;
+	case xbOp_Asm: {
+		xbAsmBlock const &blk = p->asms[cast(isize)in.imm];
+		for (xbAsmIo const &io : blk.inputs) f(io.vreg, false);
+		for (xbAsmIo const &io : blk.outputs) f(io.vreg, io.kind != xbAsmIo_XmmMem);
+		break;
+	}
 	case xbOp_Call:
 	case xbOp_Ret:
 	case xbOp_Syscall: {
@@ -987,6 +993,59 @@ gb_internal void xb_lower_call(xbLower *L, xbCall const &c, bool is_ret) {
 	}
 }
 
+// vmovups ymm <-> [rax]
+gb_internal void xb_vmovups256_rax(xbAsm *a, bool load, u8 x) {
+	xb_b(a, 0xC4);
+	xb_b(a, cast(u8)(((x & 8) ? 0 : 0x80) | 0x60 | 1));
+	xb_b(a, 0x7C);
+	xb_b(a, load ? 0x10 : 0x11);
+	xb_b(a, cast(u8)((x & 7) << 3));
+}
+
+gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
+	xbAsm *a = &L->a;
+	i32 save_base = blk.save_local >= 0 ? L->p->locals[blk.save_local].frame_offset : 0;
+	i32 k = 0;
+	for (u8 r = 0; r < 16; r++) {
+		if (blk.save_regs & (1u << r)) xb_mov_rm_r(a, 8, xb_m(RBP, save_base + 8*k++), r);
+	}
+	// vector inputs first, they go through rax
+	for (xbAsmIo const &io : blk.inputs) {
+		if (io.kind != xbAsmIo_XmmMem) continue;
+		xb_mov_r_rm(a, 8, RAX, xb_slot(L, io.vreg));
+		if (io.size == 32) xb_vmovups256_rax(a, true, io.reg);
+		else xb_load_xmm(L, io.reg, xb_m(RAX, 0), io.size);
+	}
+	for (xbAsmIo const &io : blk.inputs) {
+		if (io.kind == xbAsmIo_Xmm) xb_load_xmm(L, io.reg, xb_slot(L, io.vreg), io.size);
+	}
+	for (xbAsmIo const &io : blk.inputs) {
+		if (io.kind == xbAsmIo_Gpr) xb_load_gpr(L, io.reg, io.vreg, io.size, io.sign ? xbExt_Sign : xbExt_Zero);
+	}
+	xb_bytes(a, blk.code.data, blk.code.count);
+	// gpr outputs first, then the flags, before anything changes them, then vectors through rax
+	for (xbAsmIo const &io : blk.outputs) {
+		if (io.kind == xbAsmIo_Gpr) xb_store_gpr(L, io.vreg, io.reg, io.size);
+		if (io.kind == xbAsmIo_Xmm) xb_store_xmm(L, xb_slot(L, io.vreg), io.reg, io.size);
+	}
+	for (xbAsmIo const &io : blk.outputs) {
+		if (io.kind != xbAsmIo_Flag) continue;
+		xb_setcc(a, cast(xbCC)io.reg, RAX);
+		xb_load_ext(a, 1, false, RAX, xb_r(RAX));
+		xb_store_gpr(L, io.vreg, RAX, io.size);
+	}
+	for (xbAsmIo const &io : blk.outputs) {
+		if (io.kind != xbAsmIo_XmmMem) continue;
+		xb_mov_r_rm(a, 8, RAX, xb_slot(L, io.vreg));
+		if (io.size == 32) xb_vmovups256_rax(a, false, io.reg);
+		else xb_store_xmm(L, xb_m(RAX, 0), io.reg, io.size);
+	}
+	k = 0;
+	for (u8 r = 0; r < 16; r++) {
+		if (blk.save_regs & (1u << r)) xb_mov_r_rm(a, 8, r, xb_m(RBP, save_base + 8*k++));
+	}
+}
+
 gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	xbAsm *a = &L->a;
 	xbProc *p = L->p;
@@ -1603,6 +1662,9 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_movups_m_x(a, xb_mem_opnd(L, in.mem, R11), xmm1);
 		break;
 	}
+	case xbOp_Asm:
+		xb_lower_asm(L, p->asms[cast(isize)in.imm]);
+		break;
 	case xbOp_TlsAddr: {
 		// the exact general dynamic sequence, which the linker may rewrite into a cheaper model
 		xb_b(a, 0x66);

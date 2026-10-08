@@ -687,7 +687,7 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 			if (flags & WriteOperandFlag_Negate) {
 				val = -val;
 			}
-			write_int(cast(int)val);
+			write_i64(val);
 			break;
 		}
 		case ExactValue_Float:

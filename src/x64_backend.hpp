@@ -157,6 +157,7 @@ enum xbOp : u8 {
 	xbOp_TlsAddr,     // dst = this thread's address of the thread local symbol imm, a call to __tls_get_addr
 	xbOp_FToHalf,     // dst(i16) = f16 bits of a(aux float type), rounded by the cpu; arm64 only
 	xbOp_HalfToF,     // dst(f32) = the f16 bits a; arm64 only
+	xbOp_Asm,         // inline asm template: imm = index into proc->asms
 
 	xbOp_COUNT,
 };
@@ -316,6 +317,34 @@ struct xbCall {
 	i32              stack_size;
 	i32              sse_count;   // for C varargs: number of xmm registers used, else -1
 	u32              result_vreg; // for syscalls
+};
+
+////////////////////////////////////////////////////////////////
+// Inline asm
+////////////////////////////////////////////////////////////////
+
+enum xbAsmIoKind : u8 {
+	xbAsmIo_Gpr,    // vreg <-> gpr
+	xbAsmIo_Xmm,    // float vreg <-> xmm
+	xbAsmIo_XmmMem, // `size` bytes at the pointer vreg <-> xmm/ymm
+	xbAsmIo_Flag,   // output only: the condition `reg` (an xbCC) as 0 or 1
+};
+
+struct xbAsmIo {
+	xbAsmIoKind kind;
+	u8          reg;
+	u8          size;
+	bool        sign;
+	u32         vreg;
+};
+
+// An asm template call: the operands live in fixed registers around the encoded bytes.
+struct xbAsmBlock {
+	Slice<u8>      code;
+	Slice<xbAsmIo> inputs;
+	Slice<xbAsmIo> outputs;
+	u16            save_regs;  // callee saved gprs the template touches, bit = register number
+	i32            save_local; // frame local they are saved in, or -1
 };
 
 ////////////////////////////////////////////////////////////////

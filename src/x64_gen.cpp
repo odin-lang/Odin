@@ -124,6 +124,7 @@ struct xbProc {
 	Array<xbType>     vregs;
 	Array<xbLocal>    locals;
 	Array<xbCall>     calls;
+	Array<xbAsmBlock> asms;
 	Array<xbParamIn>  params_in;
 
 	PtrMap<Entity *, xbVar> vars;

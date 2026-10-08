@@ -10,6 +10,7 @@
 #include "x64_gen.cpp"
 #include "x64_const.cpp"
 #include "x64_gen_expr.cpp"
+#include "x64_asm.cpp"
 #include "x64_gen_stmt.cpp"
 #include "x64_gen_procs.cpp"
 #include "x64_simd.cpp"
@@ -121,6 +122,7 @@ gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	p->order = array_make<xbBlock *>(xb_allocator(), 0, 32);
 	p->locals = array_make<xbLocal>(xb_allocator(), 0, 32);
 	p->calls = array_make<xbCall>(xb_allocator(), 0, 32);
+	p->asms = array_make<xbAsmBlock>(xb_allocator(), 0, 0);
 	p->params_in = array_make<xbParamIn>(xb_allocator(), 0, 8);
 	p->context_stack = array_make<xbContextEntry>(xb_allocator(), 0, 4);
 	p->defers = array_make<xbDefer>(xb_allocator(), 0, 4);
