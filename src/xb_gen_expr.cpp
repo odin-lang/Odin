@@ -1651,20 +1651,9 @@ gb_internal bool xb_is_numeric_scalar(Type *t) {
 	return st != xbType_None;
 }
 
-// the value of a vreg defined by a constant in the current block
+// the value of a vreg defined by a constant
 gb_internal bool xb_vreg_const(xbProc *p, u32 v, i64 *out) {
-	if (p->curr == nullptr) return false;
-	for (isize i = p->curr->instrs.count-1; i >= 0; i--) {
-		xbInstr const &in = p->curr->instrs[i];
-		if (in.dst == v) {
-			if (in.op == xbOp_IConst) {
-				*out = in.imm;
-				return true;
-			}
-			return false;
-		}
-	}
-	return false;
+	return xb_known(p, v, out);
 }
 
 gb_internal IntegerDivisionByZeroKind xb_division_by_zero_behaviour(xbProc *p) {

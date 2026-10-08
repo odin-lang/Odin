@@ -1,11 +1,14 @@
 // Lowering: xb IR -> arm64 machine code.
 //
-// A vreg that lives inside one block gets a register for its whole life: x0-x8, v0-v7 or
-// v20-v31 when no call happens in that time, x19-x28 or d8-d15 otherwise. Every other vreg
-// lives in an 8 byte stack slot. A constant with one definition is materialized at each
-// use, or becomes the instruction's immediate. Scalar locals that loops use live in x19
-// and up, like on x64. A compare whose only use is the next branch, select or test
-// against zero only sets the flags.
+// Registers come from a linear scan over intervals in the block order. A vreg that lives inside
+// one block has an interval from its definition to its last use. The other vregs and the scalar
+// locals whose address is never taken get one interval that covers every point where a
+// liveness analysis finds them live; a local that is a debug variable keeps its register in all
+// of its scope. An interval takes x0-x8, v0-v7 or v20-v31 when no call happens in it, x19-x28 or
+// d8-d15 otherwise; a parameter stays in the register it arrives in or moves to a callee saved
+// one. The rest live in 8 byte stack slots. A constant with one definition is materialized at
+// each use, or becomes the instruction's immediate. A compare whose only use is the next branch,
+// select or test against zero only sets the flags.
 //
 // The scratch registers are x9-x15, x16 for addresses and x17 for large offsets, and
 // v16-v19 for floats.
@@ -44,7 +47,7 @@ enum : i8 {
 	A64_VREG  = 32,
 };
 
-gb_global u8 const a64_promote_regs[6] = {X19, X20, X21, X22, X23, X24};
+enum : u32 { A64_LOCAL_ITEM = 0x80000000u };
 
 struct a64Lower {
 	xbProc *    p;
@@ -57,6 +60,7 @@ struct a64Lower {
 	Array<u8>   in_block; // vreg -> defined once, and only read later in the same block
 	Array<u8>   clean;    // vreg -> its register holds 0 or 1
 	Array<i8>   local_reg;
+	Array<i32>  via;      // vreg -> the local whose register it shares, or -1
 	u32         pairs;    // the saved callee saved pairs, as compact unwind flags
 	i32         frame_size;
 	i32         max_call_stack;
@@ -138,44 +142,22 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	xbProc *p = L->p;
 	isize vreg_count = p->vregs.count;
 
-	// A leaf calls nothing, so its locals can use x0-x8, a parameter the register it
-	// arrives in. Elsewhere they take callee saved registers.
-	bool leaf = true;
-	for (xbBlock *b : p->order) {
-		for (xbInstr const &in : b->instrs) {
-			if (a64_clobbers(in) && in.op != xbOp_Ret) leaf = false;
-		}
-	}
+	// Promotable scalar locals get live intervals like the vregs, a parameter's starting in the
+	// register it arrives in
 	L->local_reg = array_make<i8>(heap_allocator(), p->locals.count);
 	for (isize i = 0; i < p->locals.count; i++) L->local_reg[i] = A64_NOREG;
 	Array<i32> ranked = {};
-	xb_rank_promotable_locals(p, 16, 1, 2, &ranked);
+	xb_rank_promotable_locals(p, 16, 1, 0, &ranked, true, true);
 	defer (array_free(&ranked));
-	if (ranked.count > gb_count_of(a64_promote_regs)) ranked.count = gb_count_of(a64_promote_regs);
-	u32 local_x = 0;
-	if (leaf) {
-		for (xbParamIn const &in : p->params_in) {
-			if (in.loc != xbLoc_Gpr || in.dst.kind != xbMem_Local) continue;
-			for (i32 l : ranked) {
-				if (l == in.dst.base) {
-					L->local_reg[l] = cast(i8)in.reg;
-					local_x |= 1u << in.reg;
-				}
-			}
-		}
-		for (i32 l : ranked) {
-			if (L->local_reg[l] != A64_NOREG) continue;
-			u32 r = 0;
-			while (r <= X8 && (local_x & (1u << r))) r++;
-			if (r > X8) break;
-			L->local_reg[l] = cast(i8)r;
-			local_x |= 1u << r;
-		}
-	} else {
-		for (isize i = 0; i < ranked.count; i++) {
-			L->local_reg[ranked[i]] = cast(i8)a64_promote_regs[i];
-			local_x |= 1u << a64_promote_regs[i];
-		}
+	auto arrive = array_make<i8>(heap_allocator(), p->locals.count); // a parameter's register
+	defer (array_free(&arrive));
+	for (isize i = 0; i < p->locals.count; i++) arrive[i] = A64_NOREG;
+	auto is_param = array_make<bool>(heap_allocator(), p->locals.count);
+	defer (array_free(&is_param));
+	for (xbParamIn const &in : p->params_in) {
+		if (in.dst.kind != xbMem_Local) continue;
+		is_param[in.dst.base] = true;
+		if (in.loc == xbLoc_Gpr) arrive[in.dst.base] = cast(i8)in.reg;
 	}
 
 	auto block = array_make<i32>(heap_allocator(), vreg_count);
@@ -217,7 +199,11 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	L->cval = array_make<i64>(heap_allocator(), vreg_count);
 	L->in_block = array_make<u8>(heap_allocator(), vreg_count);
 	L->clean = array_make<u8>(heap_allocator(), vreg_count);
-	for (isize i = 0; i < vreg_count; i++) L->reg[i] = A64_NOREG;
+	L->via = array_make<i32>(heap_allocator(), vreg_count);
+	for (isize i = 0; i < vreg_count; i++) {
+		L->reg[i] = A64_NOREG;
+		L->via[i] = -1;
+	}
 
 	i32 linear = 0;
 	L->max_call_stack = 0;
@@ -281,80 +267,405 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 		L->in_block[v] = defs[v] == 1 && !multi[v] && (first_use[v] < 0 || first_use[v] > def_pos[v]);
 	}
 
-	// registers for the vregs that live inside one block, first come first served
+	// The other int and float vregs get one interval in the block order that covers every point
+	// where a liveness analysis finds them live.
+	isize bc = p->order.count;
+	auto gid = array_make<i32>(heap_allocator(), vreg_count);
+	defer (array_free(&gid));
+	// an item is a vreg, or a local with A64_LOCAL_ITEM set
+	auto gvreg = array_make<u32>(heap_allocator(), 0, 64);
+	defer (array_free(&gvreg));
+	auto lgid = array_make<i32>(heap_allocator(), p->locals.count);
+	defer (array_free(&lgid));
+	for (isize i = 0; i < p->locals.count; i++) lgid[i] = -1;
+	for (int pass = 0; pass < 2; pass++) {
+		for (i32 l : ranked) {
+			if (is_param[l] != (pass == 0)) continue;
+			lgid[l] = cast(i32)gvreg.count;
+			array_add(&gvreg, A64_LOCAL_ITEM | cast(u32)l);
+		}
+	}
+	for (isize v = 1; v < vreg_count; v++) {
+		gid[v] = -1;
+		xbType t = p->vregs[v];
+		if (L->in_block[v] || defs[v] == 0 || L->is_const[v] || (!xb_type_is_int(t) && !xb_type_is_float(t))) continue;
+		gid[v] = cast(i32)gvreg.count;
+		array_add(&gvreg, cast(u32)v);
+	}
+	isize gn = gvreg.count;
+	auto glo = array_make<i32>(heap_allocator(), gn);
+	auto ghi = array_make<i32>(heap_allocator(), gn);
+	auto glo_def = array_make<bool>(heap_allocator(), gn); // the interval starts where an instruction writes it
+	auto gstart = array_make<i32>(heap_allocator(), 0, gn); // global ids by the start of their interval
+	defer (array_free(&glo));
+	defer (array_free(&ghi));
+	defer (array_free(&glo_def));
+	defer (array_free(&gstart));
+	if (gn > 0 && bc > 0) {
+		auto bstart   = array_make<i32>(heap_allocator(), bc);
+		auto bend     = array_make<i32>(heap_allocator(), bc);
+		auto succ     = array_make<i32>(heap_allocator(), 2*bc);
+		auto opos     = array_make<i32>(heap_allocator(), p->blocks.count);
+		defer (array_free(&bstart));
+		defer (array_free(&bend));
+		defer (array_free(&succ));
+		defer (array_free(&opos));
+		// per block, whether an item is read there before it is written (gen) or is written (kill)
+		struct Event { i32 id; i32 block; bool kill; };
+		auto events = array_make<Event>(heap_allocator(), 0, 4*gn);
+		auto ev_block = array_make<i32>(heap_allocator(), gn); // the block of the item's last event
+		auto ev_state = array_make<u8>(heap_allocator(), gn);  // 1: gen noted, 2: killed
+		defer (array_free(&events));
+		defer (array_free(&ev_block));
+		defer (array_free(&ev_state));
+		for (isize i = 0; i < gn; i++) {
+			glo[i] = INT32_MAX;
+			ghi[i] = -1;
+			ev_block[i] = -1;
+		}
+		for (isize bi = 0; bi < bc; bi++) opos[p->order[bi]->index] = cast(i32)bi;
+		for (xbParamIn const &in : p->params_in) {
+			if (in.dst.kind != xbMem_Local || lgid[in.dst.base] < 0) continue;
+			i32 id = lgid[in.dst.base];
+			glo[id] = 0;
+			ghi[id] = 0;
+		}
+
+		// the positions each debug scope covers
+		isize sn = p->debug_scope_parent.count;
+		auto smin = array_make<i32>(heap_allocator(), sn);
+		auto smax = array_make<i32>(heap_allocator(), sn);
+		defer (array_free(&smin));
+		defer (array_free(&smax));
+		for (isize i = 0; i < sn; i++) {
+			smin[i] = INT32_MAX;
+			smax[i] = -1;
+		}
+
+		linear = 0;
+		for (isize bi = 0; bi < bc; bi++) {
+			xbBlock *b = p->order[bi];
+			i32 scope = b->debug_scope;
+			succ[2*bi] = succ[2*bi+1] = -1;
+			bstart[bi] = linear;
+			for (xbInstr const &in : b->instrs) {
+				if (in.op == xbOp_Scope) scope = cast(i32)in.imm;
+				if (scope >= 0 && scope < sn) {
+					smin[scope] = gb_min(smin[scope], linear);
+					smax[scope] = gb_max(smax[scope], linear);
+				}
+				auto note = [&](i32 id, bool is_def) {
+					if (ev_block[id] != bi) {
+						ev_block[id] = cast(i32)bi;
+						ev_state[id] = 0;
+					}
+					if (is_def) {
+						if (!(ev_state[id] & 2)) {
+							Event e = {id, cast(i32)bi, true};
+							array_add(&events, e);
+						}
+						ev_state[id] |= 2;
+					} else if (ev_state[id] == 0) {
+						Event e = {id, cast(i32)bi, false};
+						array_add(&events, e);
+						ev_state[id] = 1;
+					}
+					if (linear < glo[id]) {
+						glo[id] = linear;
+						glo_def[id] = is_def;
+					} else if (linear == glo[id] && !is_def) {
+						glo_def[id] = false;
+					}
+					if (linear > ghi[id]) ghi[id] = linear;
+				};
+				bool local = (in.op == xbOp_Load || in.op == xbOp_Store) && in.mem.kind == xbMem_Local && lgid[in.mem.base] >= 0;
+				if (local && in.op == xbOp_Load) note(lgid[in.mem.base], false);
+				xbCall const *call = nullptr;
+				if (in.op == xbOp_Call || in.op == xbOp_Ret || in.op == xbOp_Syscall) call = &p->calls[cast(isize)in.imm];
+				if (call) {
+					for (xbCallArg const &arg : call->args) {
+						if (arg.kind == xbCallArg_GprMem && arg.mem.kind == xbMem_Local && lgid[arg.mem.base] >= 0) note(lgid[arg.mem.base], false);
+					}
+				}
+				// an instruction names the vregs it reads before the ones it writes
+				xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
+					if (v != 0 && gid[v] >= 0) note(gid[v], is_def);
+				});
+				if (local && in.op == xbOp_Store) note(lgid[in.mem.base], true);
+				if (call) {
+					for (xbCallRet const &r : call->rets) {
+						if (r.dst.kind == xbMem_Local && lgid[r.dst.base] >= 0) note(lgid[r.dst.base], true);
+					}
+				}
+				if (in.op == xbOp_Jump) {
+					succ[2*bi] = cast(i32)in.imm;
+				} else if (in.op == xbOp_Branch) {
+					succ[2*bi] = cast(i32)in.imm;
+					succ[2*bi+1] = cast(i32)in.c;
+				}
+				linear++;
+			}
+			bend[bi] = linear - 1;
+			for (isize s = 2*bi; s < 2*bi+2; s++) {
+				if (succ[s] >= 0) succ[s] = p->blocks[succ[s]]->placed ? opos[succ[s]] : -1;
+			}
+		}
+
+		// Each item is live into the blocks that read it first, and from there back through the
+		// predecessors until the blocks that write it.
+		auto pred_start = array_make<i32>(heap_allocator(), bc+1);
+		auto preds      = array_make<i32>(heap_allocator(), 2*bc);
+		defer (array_free(&pred_start));
+		defer (array_free(&preds));
+		for (isize s = 0; s < 2*bc; s++) if (succ[s] >= 0) pred_start[succ[s]+1]++;
+		for (isize i = 0; i < bc; i++) pred_start[i+1] += pred_start[i];
+		{
+			auto fill = array_make<i32>(heap_allocator(), bc);
+			defer (array_free(&fill));
+			for (isize s = 0; s < 2*bc; s++) {
+				if (succ[s] >= 0) preds[pred_start[succ[s]] + fill[succ[s]]++] = cast(i32)(s/2);
+			}
+		}
+		auto ev_start = array_make<i32>(heap_allocator(), gn+1);
+		auto by_id    = array_make<i32>(heap_allocator(), events.count);
+		defer (array_free(&ev_start));
+		defer (array_free(&by_id));
+		for (Event const &e : events) ev_start[e.id+1]++;
+		for (isize i = 0; i < gn; i++) ev_start[i+1] += ev_start[i];
+		{
+			auto fill = array_make<i32>(heap_allocator(), gn);
+			defer (array_free(&fill));
+			for (isize i = 0; i < events.count; i++) by_id[ev_start[events[i].id] + fill[events[i].id]++] = cast(i32)i;
+		}
+		// marks hold id+1 for the item being walked
+		auto kill_mark = array_make<i32>(heap_allocator(), bc);
+		auto in_mark   = array_make<i32>(heap_allocator(), bc);
+		auto out_mark  = array_make<i32>(heap_allocator(), bc);
+		auto stack     = array_make<i32>(heap_allocator(), 0, 64);
+		defer (array_free(&kill_mark));
+		defer (array_free(&in_mark));
+		defer (array_free(&out_mark));
+		defer (array_free(&stack));
+		for (i32 id = 0; id < gn; id++) {
+			i32 mark = id + 1;
+			stack.count = 0;
+			for (i32 k = ev_start[id]; k < ev_start[id+1]; k++) {
+				Event const &e = events[by_id[k]];
+				if (e.kill) kill_mark[e.block] = mark;
+				else        array_add(&stack, e.block);
+			}
+			for (i32 bi : stack) in_mark[bi] = mark;
+			while (stack.count > 0) {
+				i32 bi = array_pop(&stack);
+				if (bstart[bi] <= glo[id]) {
+					glo[id] = bstart[bi];
+					glo_def[id] = false;
+				}
+				for (i32 k = pred_start[bi]; k < pred_start[bi+1]; k++) {
+					i32 pb = preds[k];
+					if (out_mark[pb] != mark) {
+						out_mark[pb] = mark;
+						ghi[id] = gb_max(ghi[id], bend[pb]);
+					}
+					if (kill_mark[pb] != mark && in_mark[pb] != mark) {
+						in_mark[pb] = mark;
+						array_add(&stack, pb);
+					}
+				}
+			}
+		}
+		// Copies between a promoted local and a vreg in one block. A load's vreg reads the local's
+		// register while nothing writes the local. A vreg whose only use is a store to the local is
+		// computed right in its register, when nothing reads or writes the local in between.
+		auto alias_end = array_make<i32>(heap_allocator(), p->locals.count); // last read through an alias
+		defer (array_free(&alias_end));
+		for (isize i = 0; i < p->locals.count; i++) alias_end[i] = -1;
+		auto local_of = [&](xbMem const &m) -> i32 {
+			return m.kind == xbMem_Local && lgid[m.base] >= 0 ? cast(i32)m.base : -1;
+		};
+		auto writes = [&](xbInstr const &n, i32 l) -> bool {
+			if (n.op == xbOp_Store) return local_of(n.mem) == l;
+			if (n.op == xbOp_Call) {
+				for (xbCallRet const &r : p->calls[cast(isize)n.imm].rets) if (local_of(r.dst) == l) return true;
+			}
+			return false;
+		};
+		auto reads = [&](xbInstr const &n, i32 l) -> bool {
+			if (n.op == xbOp_Load) return local_of(n.mem) == l;
+			if (n.op == xbOp_Call || n.op == xbOp_Ret || n.op == xbOp_Syscall) {
+				for (xbCallArg const &arg : p->calls[cast(isize)n.imm].args) {
+					if (arg.kind == xbCallArg_GprMem && local_of(arg.mem) == l) return true;
+				}
+			}
+			return false;
+		};
+		for (isize bi = 0; bi < bc; bi++) {
+			xbBlock *b = p->order[bi];
+			for (isize i = 0; i < b->instrs.count; i++) {
+				xbInstr const &in = b->instrs[i];
+				i32 pos = bstart[bi] + cast(i32)i;
+				if (in.op == xbOp_Load) {
+					i32 l = local_of(in.mem);
+					u32 v = in.dst;
+					if (l < 0 || v == 0 || !L->in_block[v] || L->uses[v] == 0 || last_use[v] - pos > 256) continue;
+					bool ok = true;
+					for (isize j = i+1; ok && j <= i + (last_use[v] - pos); j++) ok = !writes(b->instrs[j], l);
+					if (!ok) continue;
+					L->via[v] = l;
+					alias_end[l] = gb_max(alias_end[l], last_use[v]);
+					ghi[lgid[l]] = gb_max(ghi[lgid[l]], last_use[v]);
+				} else if (in.op == xbOp_Store) {
+					i32 l = local_of(in.mem);
+					u32 v = in.a;
+					if (l < 0 || v == 0 || !L->in_block[v] || L->uses[v] != 1 || L->is_const[v] || L->via[v] >= 0 ||
+					    !xb_type_is_int(p->vregs[v]) || pos - def_pos[v] > 256 || alias_end[l] >= def_pos[v]) continue;
+					isize d = def_pos[v] - bstart[bi];
+					bool ok = true;
+					for (isize j = d; ok && j < i; j++) ok = !reads(b->instrs[j], l) && (j == d || !writes(b->instrs[j], l));
+					if (!ok) continue;
+					L->via[v] = l;
+					i32 id = lgid[l];
+					if (def_pos[v] < glo[id]) {
+						glo[id] = def_pos[v];
+						glo_def[id] = true;
+					}
+				}
+			}
+		}
+
+		// A debug variable keeps its register in all of its scope, the code where a debugger shows
+		// it. Scopes are made after their parents.
+		for (isize i = sn-1; i > 0; i--) {
+			i32 up = p->debug_scope_parent[i];
+			if (up < 0 || smax[i] < 0) continue;
+			smin[up] = gb_min(smin[up], smin[i]);
+			smax[up] = gb_max(smax[up], smax[i]);
+		}
+		for (xbDebugVar const &v : p->debug_vars) {
+			if (v.local < 0 || lgid[v.local] < 0 || v.scope < 0 || v.scope >= sn || smax[v.scope] < 0) continue;
+			i32 id = lgid[v.local];
+			if (smin[v.scope] <= glo[id]) {
+				glo[id] = smin[v.scope];
+				glo_def[id] = false;
+			}
+			ghi[id] = gb_max(ghi[id], smax[v.scope]);
+		}
+
+		// ordered by start, a counting sort
+		auto first = array_make<i32>(heap_allocator(), linear+1);
+		defer (array_free(&first));
+		for (isize i = 0; i < gn; i++) {
+			if (ghi[i] >= 0) first[glo[i]+1]++;
+		}
+		for (i32 i = 0; i < linear; i++) first[i+1] += first[i];
+		array_resize(&gstart, first[linear]);
+		for (isize i = 0; i < gn; i++) {
+			if (ghi[i] >= 0) gstart[first[glo[i]]++] = cast(i32)i;
+		}
+	}
+
+	// registers for the vregs, first come first served
 	u32 const caller_x = 0x1ff;                       // x0-x8
 	u32 const callee_x = 0x1ff80000;                  // x19-x28
 	u32 const caller_v = 0xfff000ff;                  // v0-v7, v20-v31
 	u32 const callee_v = 0x0000ff00;                  // v8-v15
-	u32 free_x = (caller_x | callee_x) & ~local_x;
+	u32 free_x = caller_x | callee_x;
 	u32 free_v = caller_v | callee_v;
 	u32 used_x = 0, used_v = 0;
-	struct Active { u32 v; i32 end; };
-	auto active = array_make<Active>(heap_allocator(), 0, 32);
+	// the vregs and locals holding a register, listed under the position after their last
+	struct Active { u32 v; i32 next; };
+	auto active = array_make<Active>(heap_allocator(), 0, 64);
+	auto expire = array_make<i32>(heap_allocator(), clobbers.count + 1);
 	defer (array_free(&active));
+	defer (array_free(&expire));
+	for (i32 &e : expire) e = -1;
+	// gives v a register for [now, end] if one is free, a callee saved one when `calls`
+	auto take = [&](u32 v, i32 end, bool calls) {
+		bool is_local = (v & A64_LOCAL_ITEM) != 0;
+		i32 l = cast(i32)(v & ~A64_LOCAL_ITEM);
+		bool fp = !is_local && xb_type_is_float(p->vregs[v]);
+		u32 *free = fp ? &free_v : &free_x;
+		u32 pool = fp ? (calls ? callee_v : caller_v | callee_v)
+		              : (calls ? callee_x : caller_x | callee_x);
+		if (is_local && is_param[l]) {
+			// the prologue moves a parameter into a register no other parameter arrives in
+			pool = callee_x;
+			i8 w = arrive[l];
+			if (w >= 0 && !calls && (*free & (1u << w))) pool = 1u << w;
+		}
+		u32 avail = *free & pool;
+		if (avail == 0) return;
+		// the caller saved ones first, they cost no save; from the top, where calls
+		// want the fewest arguments
+		u32 caller = avail & (fp ? caller_v : caller_x);
+		u32 r = 0;
+		if (caller) {
+			r = 31;
+			while ((caller & (1u << r)) == 0) r--;
+		} else {
+			while ((avail & (1u << r)) == 0) r++;
+		}
+		*free &= ~(1u << r);
+		if (fp) {
+			used_v |= 1u << r;
+			L->reg[v] = cast(i8)(A64_VREG + r);
+		} else if (is_local) {
+			used_x |= 1u << r;
+			L->local_reg[l] = cast(i8)r;
+		} else {
+			used_x |= 1u << r;
+			L->reg[v] = cast(i8)r;
+		}
+		Active act = {v, expire[end+1]};
+		expire[end+1] = cast(i32)active.count;
+		array_add(&active, act);
+	};
+	isize gs = 0;
 	linear = 0;
 	for (xbBlock *b : p->order) {
 		for (xbInstr const &in : b->instrs) {
-			for (isize k = 0; k < active.count; k++) {
-				if (active[k].end >= linear) continue;
-				i8 r = L->reg[active[k].v];
+			for (i32 k = expire[linear]; k >= 0; k = active[k].next) {
+				u32 v = active[k].v;
+				i8 r = (v & A64_LOCAL_ITEM) ? L->local_reg[v & ~A64_LOCAL_ITEM] : L->reg[v];
 				if (r >= A64_VREG) free_v |= 1u << (r - A64_VREG);
 				else               free_x |= 1u << r;
-				array_unordered_remove(&active, k);
-				k--;
+			}
+			while (gs < gstart.count && glo[gstart[gs]] == linear) {
+				i32 id = gstart[gs++];
+				// a call that defines v writes it afterwards
+				take(gvreg[id], ghi[id], clobbers[ghi[id]+1] - clobbers[linear + (glo_def[id] ? 1 : 0)] > 0);
 			}
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
 				if (v == 0 || !is_def || !L->in_block[v] || L->is_const[v] || L->reg[v] != A64_NOREG) return;
 				xbType t = p->vregs[v];
 				if (!xb_type_is_int(t) && !xb_type_is_float(t)) return;
+				if (L->via[v] >= 0 && L->local_reg[L->via[v]] >= 0) {
+					L->reg[v] = L->local_reg[L->via[v]];
+					return;
+				}
 				i32 end = last_use[v] >= 0 ? last_use[v] : linear;
-				// a call that defines v writes it afterwards
-				bool calls = clobbers[end+1] - clobbers[linear+1] > 0;
-				u32 *free = xb_type_is_float(t) ? &free_v : &free_x;
 				// read only as an argument, before that call: right in the argument register
 				i8 w = want[v];
 				if (w >= 0 && L->uses[v] == 1 && clobbers[end] - clobbers[linear+1] == 0 &&
 				    (w >= A64_VREG) == xb_type_is_float(t)) {
+					u32 *free = xb_type_is_float(t) ? &free_v : &free_x;
 					u32 bit = 1u << (w >= A64_VREG ? w - A64_VREG : w);
 					if (*free & bit) {
 						*free &= ~bit;
 						L->reg[v] = w;
-						Active act = {v, end};
+						Active act = {v, expire[end+1]};
+						expire[end+1] = cast(i32)active.count;
 						array_add(&active, act);
 						return;
 					}
 				}
-				u32 pool = xb_type_is_float(t) ? (calls ? callee_v : caller_v | callee_v)
-				                               : (calls ? callee_x : caller_x | callee_x);
-				u32 avail = *free & pool;
-				if (avail == 0) return;
-				// the caller saved ones first, they cost no save; from the top, where calls
-				// want the fewest arguments
-				u32 caller = avail & (xb_type_is_float(t) ? caller_v : caller_x);
-				u32 r = 0;
-				if (caller) {
-					r = 31;
-					while ((caller & (1u << r)) == 0) r--;
-				} else {
-					while ((avail & (1u << r)) == 0) r++;
-				}
-				*free &= ~(1u << r);
-				if (xb_type_is_float(t)) {
-					used_v |= 1u << r;
-					L->reg[v] = cast(i8)(A64_VREG + r);
-				} else {
-					used_x |= 1u << r;
-					L->reg[v] = cast(i8)r;
-				}
-				Active act = {v, end};
-				array_add(&active, act);
+				take(v, end, clobbers[end+1] - clobbers[linear+1] > 0);
 			});
 			linear++;
 		}
 	}
 
 	L->pairs = 0;
-	used_x |= local_x;
 	for (u32 k = 0; k < 5; k++) {
 		if (used_x & (3u << (X19 + 2*k))) L->pairs |= 1u << k;
 	}
@@ -392,11 +703,11 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 					array_add(&to_free, v);
 				}
 			});
-			for (u32 v : to_free) {
+			for (isize i = 0; i < to_free.count; i++) {
 				// a vreg may appear twice in one instruction
 				bool dup = false;
-				for (i32 s : free_slots) if (s == L->slot[v]) { dup = true; break; }
-				if (!dup) array_add(&free_slots, L->slot[v]);
+				for (isize j = 0; j < i; j++) if (to_free[j] == to_free[i]) { dup = true; break; }
+				if (!dup) array_add(&free_slots, L->slot[to_free[i]]);
 			}
 			linear++;
 		}
@@ -721,9 +1032,14 @@ gb_internal void a64_lower_call(a64Lower *L, xbCall const &c, bool is_ret) {
 			a64_getf(L, arg.reg, arg.vreg, xb_type_size(arg.type));
 			break;
 		case xbCallArg_GprMem: {
-			a64Addr src = a64_mem(L, arg.mem);
 			xbExtKind ext = arg.ext;
 			if (arg.size < 4 && ext == xbExt_None) ext = xbExt_Zero;
+			if (arg.mem.kind == xbMem_Local && L->local_reg[arg.mem.base] >= 0) {
+				// the register is callee saved, the call is in its interval
+				a64_extend(a, ext == xbExt_Sign, arg.size, arg.reg, cast(u8)L->local_reg[arg.mem.base]);
+				break;
+			}
+			a64Addr src = a64_mem(L, arg.mem);
 			a64_load_bytes(L, arg.reg, src, arg.size, ext);
 			break;
 		}
@@ -743,6 +1059,10 @@ gb_internal void a64_lower_call(a64Lower *L, xbCall const &c, bool is_ret) {
 		a64_blr(a, a64_src(L, c.target_vreg, A64_TA, 8, xbExt_None));
 	}
 	for (xbCallRet const &r : c.rets) {
+		if (r.dst.kind == xbMem_Local && L->local_reg[r.dst.base] >= 0) {
+			a64_extend(a, false, r.size, cast(u8)L->local_reg[r.dst.base], r.reg);
+			return;
+		}
 		a64Addr dst = a64_mem(L, r.dst);
 		if (r.loc == xbLoc_Gpr) {
 			a64_store_bytes(L, dst, r.reg, r.size);
@@ -840,6 +1160,19 @@ gb_internal void a64_compare_result(a64Lower *L, xbInstr const &in, a64Cond c) {
 	a64_put(L, in.dst, d);
 }
 
+// A logical immediate for k as a `size` byte operand, whose higher bytes mean nothing: k
+// itself, zero extended, or repeated across the register.
+gb_internal i32 a64_logical_imm_any(u64 k, i32 size) {
+	i32 enc = a64_logical_imm(k);
+	if (enc >= 0 || size >= 8) return enc;
+	u64 low = k & ((1ull << (8*size)) - 1);
+	enc = a64_logical_imm(low);
+	if (enc >= 0) return enc;
+	u64 rep = low;
+	for (i32 w = 8*size; w < 64; w *= 2) rep |= rep << w;
+	return a64_logical_imm(rep);
+}
+
 gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 	xbAsm *a = &L->a;
 	xbProc *p = L->p;
@@ -847,6 +1180,8 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 	i64 k = 0;
 	switch (in.op) {
 	case xbOp_Nop:
+		if (in.imm == 1) a64_emit(a, 0xD503201F);
+		break;
 	case xbOp_Scope:
 		break;
 	case xbOp_Loc: {
@@ -866,9 +1201,10 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Lea: {
-		a64Addr m = a64_mem(L, in.mem);
 		u8 d = a64_dst(L, in.dst, A64_T0);
-		a64_add_imm(a, d, m.base, m.off);
+		// a symbol's address goes right into d
+		a64Addr m = a64_mem(L, in.mem, d);
+		if (m.base != d || m.off != 0) a64_add_imm(a, d, m.base, m.off);
 		a64_put(L, in.dst, d);
 		break;
 	}
@@ -959,8 +1295,11 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		}
 		u8 d = a64_dst(L, in.dst, A64_T0);
 		u8 ra = a64_src(L, x, A64_T0, size, xbExt_None);
+		i32 enc = -1;
 		if ((in.op == xbOp_Add || in.op == xbOp_Sub) && a64_is_const(L, y, &k) && a64_addsub_imm_ok(k)) {
 			a64_addsub_imm(a, in.op == xbOp_Sub, false, d, ra, k);
+		} else if (in.op != xbOp_Add && in.op != xbOp_Sub && a64_is_const(L, y, &k) && (enc = a64_logical_imm_any(cast(u64)k, size)) >= 0) {
+			a64_logical_imm_op(a, op, d, ra, enc);
 		} else {
 			a64_alu(a, op, d, ra, a64_src(L, y, A64_T1, size, xbExt_None));
 		}
@@ -1488,6 +1827,7 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 	defer (array_free(&L.in_block));
 	defer (array_free(&L.clean));
 	defer (array_free(&L.local_reg));
+	defer (array_free(&L.via));
 
 	a64_lower_layout(&L);
 
@@ -1547,7 +1887,7 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 		}
 		}
 	}
-	// after the others, whose registers a leaf's locals may take
+	// the promoted ones stay in the register they arrive in or move to a callee saved one
 	for (xbParamIn const &in : p->params_in) {
 		if (in.dst.kind != xbMem_Local || L.local_reg[in.dst.base] < 0) continue;
 		u8 lr = cast(u8)L.local_reg[in.dst.base];
@@ -1658,6 +1998,8 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 	dbg.vars = array_make<xbDebugVar>(heap_allocator(), 0, p->debug_vars.count);
 	dbg.scope_parent = array_make<i32>(heap_allocator(), 0, p->debug_scope_parent.count);
 	array_add_elems(&dbg.scope_parent, p->debug_scope_parent.data, p->debug_scope_parent.count);
+	dbg.inline_sites = array_make<xbInlineSite>(heap_allocator(), 0, p->inline_sites.count);
+	array_add_elems(&dbg.inline_sites, p->inline_sites.data, p->inline_sites.count);
 	for (xbDebugVar v : p->debug_vars) {
 		if (v.local >= 0) {
 			xbLocal const &l = p->locals[v.local];

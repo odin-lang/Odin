@@ -108,6 +108,13 @@ struct xbSelectorCache {
 	xbAddr  addr;
 };
 
+// What the builder knows of a vreg's value. Every vreg has one definition.
+struct xbVregInfo {
+	i64  k;     // the constant, sign extended from the type's width
+	u64  umax;  // the largest value the vreg can hold, zero extended
+	bool is_k;
+};
+
 struct xbProc {
 	xbModule *  m;
 	Entity *    entity;
@@ -124,6 +131,7 @@ struct xbProc {
 	Array<xbBlock *>  order;
 	xbBlock *         curr;
 	Array<xbType>     vregs;
+	Array<xbVregInfo> vinfo;
 	Array<xbLocal>    locals;
 	Array<xbCall>     calls;
 	Array<xbAsmBlock> asms;
@@ -154,6 +162,7 @@ struct xbProc {
 
 	Array<xbDebugVar> debug_vars;
 	Array<i32>        debug_scope_parent;
+	Array<xbInlineSite> inline_sites;
 	i32               debug_scope;
 	struct xbFamily * family;
 	struct xbInline * inl; // the innermost #force_inline body being built, or nullptr
@@ -165,6 +174,9 @@ struct xbInline {
 	Entity *  caller;  // the procedure the body is built into, itself maybe inlined
 	xbMem     result;  // the returns store the results here
 	xbBlock * exit;    // and jump here
+	i32       exits;   // the jumps to exit
+	xbBlock * exit_from; // the block of the last one
+	xbInlineSite site; // for the debug info, its scope set when the body starts
 };
 
 // A procedure and every procedure declared inside it. They are compiled together,
@@ -207,7 +219,61 @@ gb_internal u32 xb_new_vreg(xbProc *p, xbType t) {
 	GB_ASSERT(t != xbType_None);
 	u32 r = cast(u32)p->vregs.count;
 	array_add(&p->vregs, t);
+	// a rolled back inline body leaves stale entries
+	if (p->vinfo.count > r) p->vinfo.count = r;
+	while (p->vinfo.count < r) {
+		xbVregInfo none = {0, ~0ull, false};
+		array_add(&p->vinfo, none);
+	}
+	xbVregInfo info = {0, ~0ull, false};
+	array_add(&p->vinfo, info);
 	return r;
+}
+
+////////////////////////////////////////////////////////////////
+// Folding. Every vreg has one definition that comes before its uses, so what is known of
+// it holds at every use.
+////////////////////////////////////////////////////////////////
+
+gb_internal u64 xb_width_mask(xbType t) {
+	i32 size = xb_type_size(t);
+	return size >= 8 ? ~0ull : (1ull << (8*size)) - 1;
+}
+
+// v as the `t` value it is, sign extended
+gb_internal i64 xb_fold_norm(xbType t, i64 v) {
+	i32 size = xb_type_size(t);
+	if (size >= 8) return v;
+	u32 sh = cast(u32)(64 - 8*size);
+	return cast(i64)(cast(u64)v << sh) >> sh;
+}
+
+gb_internal bool xb_known(xbProc *p, u32 v, i64 *out) {
+	if (v == 0 || v >= p->vinfo.count || !p->vinfo[v].is_k) return false;
+	*out = p->vinfo[v].k;
+	return true;
+}
+
+// the largest value v can hold, unsigned
+gb_internal u64 xb_umax(xbProc *p, u32 v) {
+	if (v == 0 || v >= p->vinfo.count) return ~0ull;
+	xbType t = p->vregs[v];
+	if (!xb_type_is_int(t)) return ~0ull;
+	xbVregInfo const &i = p->vinfo[v];
+	if (i.is_k) return cast(u64)i.k & xb_width_mask(t);
+	return gb_min(i.umax, xb_width_mask(t));
+}
+
+gb_internal void xb_note_umax(xbProc *p, u32 v, u64 umax) {
+	if (v != 0 && v < p->vinfo.count) p->vinfo[v].umax = umax;
+}
+
+gb_internal bool xb_is_pow2(u64 v, u32 *log2) {
+	if (v == 0 || (v & (v - 1)) != 0) return false;
+	u32 n = 0;
+	while ((1ull << n) != v) n++;
+	*log2 = n;
+	return true;
 }
 
 gb_internal xbBlock *xb_new_block(xbProc *p) {
@@ -278,6 +344,10 @@ gb_internal u32 xb_iconst(xbProc *p, xbType t, i64 v) {
 	i.dst = xb_new_vreg(p, t);
 	i.imm = v;
 	xb_emit(p, i);
+	if (xb_type_is_int(t)) {
+		p->vinfo[i.dst].is_k = true;
+		p->vinfo[i.dst].k = xb_fold_norm(t, v);
+	}
 	return i.dst;
 }
 
@@ -309,7 +379,10 @@ gb_internal u32 xb_lea(xbProc *p, xbMem mem) {
 	return i.dst;
 }
 
+gb_internal u32 xb_stored_value(xbProc *p, xbType t, xbMem m);
+
 gb_internal u32 xb_load(xbProc *p, xbType t, xbMem mem) {
+	if (u32 v = xb_stored_value(p, t, mem)) return v;
 	xbInstr i = xb_instr(xbOp_Load, t);
 	i.dst = xb_new_vreg(p, t);
 	i.mem = mem;
@@ -324,16 +397,116 @@ gb_internal void xb_store(xbProc *p, xbType t, xbMem mem, u32 v) {
 	xb_emit(p, i);
 }
 
+// The x86 shifts, which the lowerings copy: narrow values shift as 32 bits, the count masked.
+gb_internal i64 xb_fold_shift(xbOp op, xbType t, i64 x, i64 c) {
+	i32 size = xb_type_size(t);
+	u32 n = cast(u32)(c & (size == 8 ? 63 : 31));
+	u64 ux = cast(u64)x & xb_width_mask(t);
+	switch (op) {
+	case xbOp_Shl:  return cast(i64)(ux << n);
+	case xbOp_LShr: return cast(i64)(ux >> n);
+	case xbOp_AShr: return xb_fold_norm(t, x) >> n;
+	}
+	return 0;
+}
+
 gb_internal u32 xb_binop(xbProc *p, xbOp op, xbType t, u32 a, u32 b) {
+	if (xb_type_is_int(t)) {
+		i64 x = 0, y = 0;
+		bool kx = xb_known(p, a, &x);
+		bool ky = xb_known(p, b, &y);
+		u64 mask = xb_width_mask(t);
+		u64 ux = cast(u64)x & mask, uy = cast(u64)y & mask;
+		if (kx && ky) {
+			bool ok = true;
+			i64 r = 0;
+			switch (op) {
+			case xbOp_Add: r = cast(i64)(cast(u64)x + cast(u64)y); break;
+			case xbOp_Sub: r = cast(i64)(cast(u64)x - cast(u64)y); break;
+			case xbOp_Mul: r = cast(i64)(cast(u64)x * cast(u64)y); break;
+			case xbOp_And: r = x & y; break;
+			case xbOp_Or:  r = x | y; break;
+			case xbOp_Xor: r = x ^ y; break;
+			case xbOp_Shl:
+			case xbOp_LShr:
+			case xbOp_AShr: r = xb_fold_shift(op, t, x, y); break;
+			case xbOp_UDiv: ok = uy != 0; if (ok) r = cast(i64)(ux / uy); break;
+			case xbOp_URem: ok = uy != 0; if (ok) r = cast(i64)(ux % uy); break;
+			case xbOp_SDiv: ok = y != 0 && !(y == -1 && x == xb_fold_norm(t, cast(i64)(1ull << (8*xb_type_size(t)-1)))); if (ok) r = x / y; break;
+			case xbOp_SRem: ok = y != 0 && !(y == -1 && x == xb_fold_norm(t, cast(i64)(1ull << (8*xb_type_size(t)-1)))); if (ok) r = x % y; break;
+			default: ok = false; break;
+			}
+			if (ok) return xb_iconst(p, t, xb_fold_norm(t, r));
+		}
+		// x op identity
+		if (ky) {
+			switch (op) {
+			case xbOp_Add: case xbOp_Sub: case xbOp_Or: case xbOp_Xor:
+			case xbOp_Shl: case xbOp_LShr: case xbOp_AShr:
+				if (y == 0) return a;
+				break;
+			case xbOp_Mul:
+			case xbOp_UDiv:
+			case xbOp_SDiv:
+				if (y == 1) return a;
+				break;
+			case xbOp_And:
+				if (uy == mask) return a;
+				if (y == 0) return b;
+				break;
+			}
+			u32 n = 0;
+			if (xb_is_pow2(uy, &n)) {
+				if (op == xbOp_Mul)  return xb_binop(p, xbOp_Shl, t, a, xb_iconst(p, t, n));
+				if (op == xbOp_UDiv) return xb_binop(p, xbOp_LShr, t, a, xb_iconst(p, t, n));
+				if (op == xbOp_URem) return xb_binop(p, xbOp_And, t, a, xb_iconst(p, t, xb_fold_norm(t, cast(i64)(uy - 1))));
+			}
+		}
+		if (kx) {
+			switch (op) {
+			case xbOp_Add: case xbOp_Or: case xbOp_Xor:
+				if (x == 0) return b;
+				break;
+			case xbOp_Mul:
+				if (x == 1) return b;
+				break;
+			case xbOp_And:
+				if (ux == mask) return b;
+				if (x == 0) return a;
+				break;
+			}
+			u32 n = 0;
+			if (op == xbOp_Mul && xb_is_pow2(ux, &n)) return xb_binop(p, xbOp_Shl, t, b, xb_iconst(p, t, n));
+		}
+	}
 	xbInstr i = xb_instr(op, t);
 	i.dst = xb_new_vreg(p, t);
 	i.a = a;
 	i.b = b;
 	xb_emit(p, i);
+	if (xb_type_is_int(t)) {
+		i64 y = 0;
+		switch (op) {
+		case xbOp_And:
+			xb_note_umax(p, i.dst, gb_min(xb_umax(p, a), xb_umax(p, b)));
+			break;
+		case xbOp_LShr:
+			if (xb_known(p, b, &y) && y >= 0 && y < 8*xb_type_size(t)) xb_note_umax(p, i.dst, xb_umax(p, a) >> y);
+			break;
+		case xbOp_URem:
+			if (xb_known(p, b, &y) && (cast(u64)y & xb_width_mask(t)) != 0) xb_note_umax(p, i.dst, (cast(u64)y & xb_width_mask(t)) - 1);
+			break;
+		}
+	}
 	return i.dst;
 }
 
 gb_internal u32 xb_unop(xbProc *p, xbOp op, xbType t, u32 a) {
+	i64 x = 0;
+	if (xb_type_is_int(t) && xb_known(p, a, &x)) {
+		if (op == xbOp_Neg) return xb_iconst(p, t, xb_fold_norm(t, cast(i64)(0ull - cast(u64)x)));
+		if (op == xbOp_Not) return xb_iconst(p, t, xb_fold_norm(t, ~x));
+	}
 	xbInstr i = xb_instr(op, t);
 	i.dst = xb_new_vreg(p, t);
 	i.a = a;
@@ -341,22 +514,75 @@ gb_internal u32 xb_unop(xbProc *p, xbOp op, xbType t, u32 a) {
 	return i.dst;
 }
 
+// a <cond> b when it is known, -1 otherwise
+gb_internal i32 xb_fold_cmp(xbProc *p, xbCond cond, xbType t, u32 a, u32 b) {
+	if (!xb_type_is_int(t)) return -1;
+	i64 x = 0, y = 0;
+	bool kx = xb_known(p, a, &x);
+	bool ky = xb_known(p, b, &y);
+	u64 mask = xb_width_mask(t);
+	if (kx && ky) {
+		u64 ux = cast(u64)x & mask, uy = cast(u64)y & mask;
+		switch (cond) {
+		case xbCond_EQ:  return x == y;
+		case xbCond_NE:  return x != y;
+		case xbCond_SLT: return x < y;
+		case xbCond_SLE: return x <= y;
+		case xbCond_SGT: return x > y;
+		case xbCond_SGE: return x >= y;
+		case xbCond_ULT: return ux < uy;
+		case xbCond_ULE: return ux <= uy;
+		case xbCond_UGT: return ux > uy;
+		case xbCond_UGE: return ux >= uy;
+		}
+		return -1;
+	}
+	// a value below a constant bound, like a masked shift count
+	if (ky) {
+		u64 uy = cast(u64)y & mask;
+		u64 hi = xb_umax(p, a);
+		if (cond == xbCond_ULT && hi < uy)  return 1;
+		if (cond == xbCond_UGE && hi < uy)  return 0;
+		if (cond == xbCond_ULE && hi <= uy) return 1;
+		if (cond == xbCond_UGT && hi <= uy) return 0;
+	}
+	return -1;
+}
+
 gb_internal u32 xb_cmp(xbProc *p, xbCond cond, xbType t, u32 a, u32 b) {
+	i32 known = xb_fold_cmp(p, cond, t, a, b);
+	if (known >= 0) return xb_iconst(p, xbType_I8, known);
+	// a bool tested against zero is itself
+	i64 y = 0;
+	if (t == xbType_I8 && cond == xbCond_NE && xb_known(p, b, &y) && y == 0 && xb_umax(p, a) <= 1) return a;
 	xbInstr i = xb_instr(xb_type_is_float(t) ? xbOp_FCmp : xbOp_ICmp, t);
 	i.aux = cond;
 	i.dst = xb_new_vreg(p, xbType_I8);
 	i.a = a;
 	i.b = b;
 	xb_emit(p, i);
+	xb_note_umax(p, i.dst, 1);
 	return i.dst;
 }
 
 gb_internal u32 xb_convop(xbProc *p, xbOp op, xbType dst, xbType src, u32 a) {
+	i64 x = 0;
+	if (xb_type_is_int(dst) && xb_type_is_int(src) && xb_known(p, a, &x)) {
+		switch (op) {
+		case xbOp_Zext:  return xb_iconst(p, dst, xb_fold_norm(dst, cast(i64)(cast(u64)x & xb_width_mask(src))));
+		case xbOp_Sext:
+		case xbOp_Trunc: return xb_iconst(p, dst, xb_fold_norm(dst, x));
+		}
+	}
 	xbInstr i = xb_instr(op, dst);
 	i.aux = src;
 	i.dst = xb_new_vreg(p, dst);
 	i.a = a;
 	xb_emit(p, i);
+	if (xb_type_is_int(dst) && xb_type_is_int(src)) {
+		if (op == xbOp_Zext)  xb_note_umax(p, i.dst, xb_umax(p, a));
+		if (op == xbOp_Trunc) xb_note_umax(p, i.dst, gb_min(xb_umax(p, a), xb_width_mask(dst)));
+	}
 	return i.dst;
 }
 
@@ -371,12 +597,16 @@ gb_internal u32 xb_fma(xbProc *p, xbType t, u32 a, u32 b, u32 c) {
 }
 
 gb_internal u32 xb_select(xbProc *p, xbType t, u32 cond, u32 a, u32 b) {
+	i64 c = 0;
+	if (xb_known(p, cond, &c)) return (c & 0xff) != 0 ? a : b;
+	if (a == b) return a;
 	xbInstr i = xb_instr(xbOp_Select, t);
 	i.dst = xb_new_vreg(p, t);
 	i.a = cond;
 	i.b = a;
 	i.c = b;
 	xb_emit(p, i);
+	if (xb_type_is_int(t)) xb_note_umax(p, i.dst, gb_max(xb_umax(p, a), xb_umax(p, b)));
 	return i.dst;
 }
 
@@ -407,6 +637,11 @@ gb_internal void xb_jump(xbProc *p, xbBlock *target) {
 
 gb_internal void xb_branch(xbProc *p, u32 cond, xbBlock *then_, xbBlock *else_) {
 	if (xb_curr_terminated(p)) return;
+	i64 c = 0;
+	if (xb_known(p, cond, &c)) {
+		xb_jump(p, (c & 0xff) != 0 ? then_ : else_);
+		return;
+	}
 	xbInstr i = xb_instr(xbOp_Branch);
 	i.a = cond;
 	i.imm = then_->index;
@@ -872,8 +1107,10 @@ gb_internal bool xb_op_is_pure(xbOp op);
 // The vreg stored to the frame local `m` earlier in the current block, if nothing since may
 // have written it, or 0.
 gb_internal u32 xb_stored_value(xbProc *p, xbType t, xbMem m) {
-	if (p->curr == nullptr || m.kind != xbMem_Local) return 0;
-	for (isize i = p->curr->instrs.count-1; i >= 0; i--) {
+	if (p->curr == nullptr || m.kind != xbMem_Local || xb_curr_terminated(p)) return 0;
+	// a short look back keeps long blocks linear
+	isize stop = gb_max(p->curr->instrs.count - 64, 0);
+	for (isize i = p->curr->instrs.count-1; i >= stop; i--) {
 		xbInstr const &in = p->curr->instrs[i];
 		switch (in.op) {
 		case xbOp_Nop:

@@ -780,6 +780,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	i32 size = xb_type_size(in.type);
 	switch (in.op) {
 	case xbOp_Nop:
+		if (in.imm == 1) xb_b(a, 0x90);
 		break;
 	case xbOp_Loc: {
 		xbLineEntry e = {};
@@ -1521,6 +1522,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 }
 
 gb_internal void xb_lower_proc(xbProc *p) {
+	xb_cleanup_proc(p);
 	if (xb_is_arm64()) {
 		a64_lower_proc(p);
 		return;
@@ -1701,6 +1703,8 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	dbg.vars = array_make<xbDebugVar>(heap_allocator(), 0, p->debug_vars.count);
 	dbg.scope_parent = array_make<i32>(heap_allocator(), 0, p->debug_scope_parent.count);
 	array_add_elems(&dbg.scope_parent, p->debug_scope_parent.data, p->debug_scope_parent.count);
+	dbg.inline_sites = array_make<xbInlineSite>(heap_allocator(), 0, p->inline_sites.count);
+	array_add_elems(&dbg.inline_sites, p->inline_sites.data, p->inline_sites.count);
 	for (xbDebugVar v : p->debug_vars) {
 		if (v.local >= 0) {
 			xbLocal const &l = p->locals[v.local];

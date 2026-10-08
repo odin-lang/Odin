@@ -2340,6 +2340,14 @@ gb_internal xbMem xb_result_ptr_mem(xbProc *p, i32 local) {
 	return xb_mem(xbMem_Reg, xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)local)), 0);
 }
 
+// leaves the #force_inline body being built
+gb_internal void xb_inline_exit(xbProc *p) {
+	if (xb_curr_terminated(p)) return;
+	xb_jump(p, p->inl->exit);
+	p->inl->exits += 1;
+	p->inl->exit_from = p->curr;
+}
+
 gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_results, TokenPos pos) {
 	xbAbiFunc *abi = p->abi;
 	TypeProc *pt = &base_type(p->type)->Proc;
@@ -2348,7 +2356,7 @@ gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_resu
 		xb_emit_defer_stmts(p, true, nullptr, pos);
 		if (!xb_curr_terminated(p)) {
 			if (p->inl != nullptr) {
-				xb_jump(p, p->inl->exit);
+				xb_inline_exit(p);
 			} else {
 				xb_emit_ret(p, {});
 			}
@@ -4092,7 +4100,7 @@ gb_internal void xb_inline_return(xbProc *p, Array<xbValue> &results, TokenPos p
 	}
 	xb_emit_defer_stmts(p, true, nullptr, pos);
 	if (!xb_curr_terminated(p)) {
-		xb_jump(p, p->inl->exit);
+		xb_inline_exit(p);
 	}
 }
 
@@ -4105,9 +4113,11 @@ gb_internal void xb_inline_body(xbProc *p, Entity *e, Slice<xbValue> args) {
 		array_add(&p->branch_blocks, bb);
 	}
 
-	// the body's variables get a lexical scope of their own
+	// the body's variables get a lexical scope of their own, which the debug info makes a frame
 	array_add(&p->debug_scope_parent, p->debug_scope);
 	xb_set_debug_scope(p, cast(i32)p->debug_scope_parent.count-1);
+	p->inl->site.scope = p->debug_scope;
+	array_add(&p->inline_sites, p->inl->site);
 	xb_set_debug_loc(p, e->token.pos);
 
 	if (pt->params != nullptr) {
@@ -4135,7 +4145,7 @@ gb_internal void xb_inline_body(xbProc *p, Entity *e, Slice<xbValue> args) {
 	if (!xb_curr_terminated(p)) {
 		if (pt->result_count == 0) {
 			xb_emit_defer_stmts(p, true, nullptr, xb_defer_pos(body));
-			if (!xb_curr_terminated(p)) xb_jump(p, p->inl->exit);
+			if (!xb_curr_terminated(p)) xb_inline_exit(p);
 		} else {
 			xb_unreachable(p);
 		}
@@ -4147,7 +4157,7 @@ struct xbInlineSave {
 	xbBlock *curr;
 	isize    curr_instrs;
 	isize    blocks, order, vregs, locals, calls, asms;
-	isize    debug_vars, debug_scope_parent, branch_blocks, selector_cache, context_stack;
+	isize    debug_vars, debug_scope_parent, inline_sites, branch_blocks, selector_cache, context_stack;
 	Array<xbDefer> defers;
 	xbTargetList *targets;
 	isize    scope_index;
@@ -4176,6 +4186,7 @@ gb_internal void xb_inline_restore(xbProc *p, xbInlineSave const &s, bool rollba
 		p->asms.count = s.asms;
 		p->debug_vars.count = s.debug_vars;
 		p->debug_scope_parent.count = s.debug_scope_parent;
+		p->inline_sites.count = s.inline_sites;
 		p->file_id = s.file_id;
 		p->last_line = s.last_line;
 		p->last_column = s.last_column;
@@ -4225,6 +4236,7 @@ gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, A
 	s.asms = p->asms.count;
 	s.debug_vars = p->debug_vars.count;
 	s.debug_scope_parent = p->debug_scope_parent.count;
+	s.inline_sites = p->inline_sites.count;
 	s.branch_blocks = p->branch_blocks.count;
 	s.selector_cache = p->selector_cache.count;
 	s.context_stack = p->context_stack.count;
@@ -4268,6 +4280,20 @@ gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, A
 	Type *rt = reduce_tuple_to_single_type(pt->results);
 	if (rt != nullptr) inl.result = xb_add_local(p, rt, false);
 	inl.exit = xb_new_block(p);
+	inl.site.name = xb_entity_name(p->m, e);
+	inl.site.decl_file = e->token.pos.file_id > 0 ? xb_file_id(p->m, e->token.pos.file_id) : 0;
+	inl.site.decl_line = e->token.pos.line;
+	inl.site.call_file = p->file_id;
+	inl.site.call_line = gb_max(p->last_line, 0);
+	inl.site.call_column = gb_max(p->last_column, 0);
+	if (call_expr != nullptr) {
+		TokenPos pos = ast_token(call_expr).pos;
+		if (pos.file_id > 0 && pos.line > 0) {
+			inl.site.call_file = xb_file_id(p->m, pos.file_id);
+			inl.site.call_line = pos.line;
+			inl.site.call_column = pos.column;
+		}
+	}
 
 	p->inl = &inl;
 	p->entity = e;
@@ -4279,14 +4305,43 @@ gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, A
 	p->state_flags = 0;
 	p->branch_location_pos = {};
 
+	if (build_context.ODIN_DEBUG) {
+		// the call's line needs code before the body's, or a debugger cannot stop there
+		xbInstr nop = xb_instr(xbOp_Nop);
+		nop.imm = 1;
+		xb_emit(p, nop);
+	}
 	xb_inline_body(p, e, args);
 
 	xb_inline_restore(p, s, false);
 	// the caller's code after the call has its own line row and scope
 	p->last_line = -1;
-	xb_start_block(p, inl.exit);
+	// Code after a terminator, like the end of the body's scope after its return, goes to a
+	// block that is never placed.
+	xbBlock *b = inl.exit_from;
+	if (inl.exits == 1 && p->order.count > 0 && p->order[p->order.count-1] == b && b->instrs.count > 0 &&
+	    b->instrs[b->instrs.count-1].op == xbOp_Jump && b->instrs[b->instrs.count-1].imm == inl.exit->index) {
+		// the body's one return ends it: the caller goes on in the same block, where loads see
+		// what the return stored
+		b->instrs.count -= 1;
+		p->curr = b;
+	} else {
+		xb_start_block(p, inl.exit);
+	}
 	xb_set_debug_scope(p, s.debug_scope);
-	if (call_expr != nullptr) xb_set_debug_loc(p, ast_token(call_expr).pos);
+	if (call_expr != nullptr) {
+		xb_set_debug_loc(p, ast_token(call_expr).pos);
+	} else if (s.last_line > 0) {
+		// a call the compiler made goes on at the caller's line
+		p->last_line = s.last_line;
+		p->last_column = s.last_column;
+		p->file_id = s.file_id;
+		xbInstr loc = xb_instr(xbOp_Loc);
+		loc.imm = s.last_line;
+		loc.a = cast(u32)s.file_id;
+		loc.b = cast(u32)s.last_column;
+		xb_emit(p, loc);
+	}
 
 	if (pt->diverging) {
 		xb_unreachable(p);

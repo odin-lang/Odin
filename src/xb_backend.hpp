@@ -63,7 +63,7 @@ gb_internal gb_inline xbMem xb_mem_offset(xbMem m, i64 offset) {
 }
 
 enum xbOp : u8 {
-	xbOp_Nop,
+	xbOp_Nop,        // imm = 1: a machine nop
 	xbOp_Loc,        // source line marker: imm = line, a = file id
 	xbOp_Scope,      // debug scope marker: the code after it belongs to scope imm
 
@@ -414,7 +414,7 @@ struct xbDebugVar {
 	i32    line;
 	i32    file_id;
 	i32    sym;        // @(static): the symbol of its storage, used when local < 0
-	bool   in_reg;     // the variable lives in dwarf_reg for the whole procedure
+	bool   in_reg;     // the variable, or with by_ref its address, is in dwarf_reg wherever a debugger shows it
 	u8     dwarf_reg;
 	i32    scope;      // lexical scope, 0 is the procedure
 };
@@ -508,6 +508,17 @@ enum xbSectionSym {
 	xbSectionSym_COUNT,
 };
 
+// A #force_inline body built into its caller, whose code is the lexical scope `scope`.
+struct xbInlineSite {
+	i32    scope;
+	String name;       // the callee's, like a procedure's
+	i32    decl_file;
+	i32    decl_line;
+	i32    call_file;
+	i32    call_line;
+	i32    call_column;
+};
+
 struct xbProcDebug {
 	String  name;
 	String  link_name;
@@ -520,6 +531,7 @@ struct xbProcDebug {
 	i32     line_entry_count;
 	Array<xbDebugVar> vars;
 	Array<i32>        scope_parent; // per lexical scope, scope 0 is the procedure's
+	Array<xbInlineSite> inline_sites;
 	Array<xbScopeMark> scope_marks;
 	Type *  type;
 	bool    naked; // no frame, the cfa stays rsp+8

@@ -64,6 +64,7 @@ enum {
 	XDW_TAG_base_type        = 0x24,
 	XDW_TAG_enumerator       = 0x28,
 	XDW_TAG_subprogram       = 0x2e,
+	XDW_TAG_inlined_subroutine = 0x1d,
 	XDW_TAG_variable         = 0x34,
 
 	XDW_CHILDREN_no  = 0,
@@ -92,6 +93,13 @@ enum {
 	XDW_AT_data_bit_offset = 0x6b,
 	XDW_AT_ranges          = 0x55,
 	XDW_AT_linkage_name    = 0x6e,
+	XDW_AT_inline          = 0x20,
+	XDW_AT_abstract_origin = 0x31,
+	XDW_AT_call_column     = 0x57,
+	XDW_AT_call_file       = 0x58,
+	XDW_AT_call_line       = 0x59,
+
+	XDW_INL_declared_inlined = 3,
 
 	XDW_FORM_addr         = 0x01,
 	XDW_FORM_data2        = 0x05,
@@ -120,6 +128,7 @@ enum {
 	XDW_OP_fbreg = 0x91,
 	XDW_OP_reg0  = 0x50,
 	XDW_OP_reg6  = 0x56,
+	XDW_OP_breg0 = 0x70,
 	XDW_OP_call_frame_cfa = 0x9c,
 
 	XDW_LANG_C99 = 0x0c,
@@ -153,6 +162,9 @@ enum xbAbbrev {
 	xbAbbrev_Enumerator64,
 	xbAbbrev_LexicalBlock,
 	xbAbbrev_LexicalBlockRanges,
+	xbAbbrev_AbstractSubprogram,
+	xbAbbrev_InlinedSubroutine,
+	xbAbbrev_InlinedSubroutineRanges,
 };
 
 gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
@@ -313,6 +325,28 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 	});
 	abbrev(xbAbbrev_LexicalBlockRanges, XDW_TAG_lexical_block, true, {
 		XDW_AT_ranges, XDW_FORM_sec_offset,
+	});
+	// a #force_inline procedure, which inlined_subroutine entries refer to
+	abbrev(xbAbbrev_AbstractSubprogram, XDW_TAG_subprogram, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_decl_file, XDW_FORM_udata,
+		XDW_AT_decl_line, XDW_FORM_udata,
+		XDW_AT_inline, XDW_FORM_data1,
+	});
+	abbrev(xbAbbrev_InlinedSubroutine, XDW_TAG_inlined_subroutine, true, {
+		XDW_AT_abstract_origin, XDW_FORM_ref4,
+		XDW_AT_low_pc, XDW_FORM_addr,
+		XDW_AT_high_pc, XDW_FORM_data4,
+		XDW_AT_call_file, XDW_FORM_udata,
+		XDW_AT_call_line, XDW_FORM_udata,
+		XDW_AT_call_column, XDW_FORM_udata,
+	});
+	abbrev(xbAbbrev_InlinedSubroutineRanges, XDW_TAG_inlined_subroutine, true, {
+		XDW_AT_abstract_origin, XDW_FORM_ref4,
+		XDW_AT_ranges, XDW_FORM_sec_offset,
+		XDW_AT_call_file, XDW_FORM_udata,
+		XDW_AT_call_line, XDW_FORM_udata,
+		XDW_AT_call_column, XDW_FORM_udata,
 	});
 	xbb_u8(b, 0);
 }
@@ -749,6 +783,7 @@ struct xbDwarfScopes {
 	Array<i32> kid, sib;             // the first block inside a block, the next block beside it
 	Array<i32> head, tail;           // per scope: its code ranges, a list in `pool`
 	Array<i32> var_head, var_tail, var_next; // the variables a block holds, in order
+	Array<i32> site;                 // per scope: its index in inline_sites, or -1
 	Array<Range> pool;
 };
 
@@ -763,13 +798,21 @@ gb_internal void xb_dwarf_scopes(xbDwarfScopes *sc, xbProcDebug const &pd, i32 l
 	array_resize(&sc->var_head, n);
 	array_resize(&sc->var_tail, n);
 	array_resize(&sc->var_next, pd.vars.count);
+	array_resize(&sc->site, n);
 	sc->pool.count = 0;
 	for (isize s = 0; s < n; s++) {
-		sc->eff[s] = 0; // 1 here: the scope has variables of its own
-		sc->kid[s] = sc->sib[s] = sc->head[s] = sc->tail[s] = sc->var_head[s] = sc->var_tail[s] = -1;
+		sc->eff[s] = 0; // 1 here: the scope has variables of its own, or is an inlined body
+		sc->kid[s] = sc->sib[s] = sc->head[s] = sc->tail[s] = sc->var_head[s] = sc->var_tail[s] = sc->site[s] = -1;
 	}
 	for (xbDebugVar const &v : pd.vars) {
 		if (v.scope < n) sc->eff[v.scope] = 1;
+	}
+	for_array(i, pd.inline_sites) {
+		i32 s = pd.inline_sites[i].scope;
+		if (s > 0 && s < n) {
+			sc->eff[s] = 1;
+			sc->site[s] = cast(i32)i;
+		}
 	}
 	// the code of a scope, with its nested scopes' and its cold blocks', so it may be in pieces
 	auto const &marks = pd.scope_marks;
@@ -1020,6 +1063,21 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 			}
 		}
 
+		// one abstract entry per inlined procedure, by name
+		StringMap<u32> abstract_dies = {};
+		string_map_init(&abstract_dies);
+		for (xbProcDebug const &pd : m->proc_debug) {
+			for (xbInlineSite const &site : pd.inline_sites) {
+				if (string_map_get(&abstract_dies, site.name) != nullptr) continue;
+				string_map_set(&abstract_dies, site.name, cast(u32)(b->count - start));
+				xbb_uleb(b, xbAbbrev_AbstractSubprogram);
+				xbb_str(b, site.name);
+				xbb_uleb(b, cast(u64)gb_max(site.decl_file, 1));
+				xbb_uleb(b, cast(u64)gb_max(site.decl_line, 0));
+				xbb_u8(b, XDW_INL_declared_inlined);
+			}
+		}
+
 		auto emit_var = [&](xbDebugVar const &v) {
 			xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
 			xbb_str(b, v.name);
@@ -1030,7 +1088,10 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 				return;
 			}
 			Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
-			if (v.in_reg) {
+			if (v.in_reg && v.by_ref) {
+				xbb_u8(&expr, cast(u8)(XDW_OP_breg0 + v.dwarf_reg));
+				xbb_sleb(&expr, 0);
+			} else if (v.in_reg) {
 				xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
 			} else {
 				// the frame pointer is the frame base
@@ -1055,20 +1116,35 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 		sc.var_head = array_make<i32>(heap_allocator(), 0, 0);
 		sc.var_tail = array_make<i32>(heap_allocator(), 0, 0);
 		sc.var_next = array_make<i32>(heap_allocator(), 0, 0);
+		sc.site = array_make<i32>(heap_allocator(), 0, 0);
 		sc.pool = array_make<xbDwarfScopes::Range>(heap_allocator(), 0, 0);
 		// a block's variables, then its blocks, nested like the scopes
 		auto emit_block = [&](auto &self, xbProcDebug const &pd, i32 s) -> void {
 			for (i32 i = sc.var_head[s]; i >= 0; i = sc.var_next[i]) emit_var(pd.vars[i]);
 			for (i32 c = sc.kid[s]; c >= 0; c = sc.sib[c]) {
 				xbDwarfScopes::Range const &r = sc.pool[sc.head[c]];
+				xbInlineSite const *site = sc.site[c] >= 0 ? &pd.inline_sites[sc.site[c]] : nullptr;
+				auto origin = [&]() {
+					u32 *at = string_map_get(&abstract_dies, site->name);
+					GB_ASSERT(at != nullptr);
+					xbb_u32(b, *at);
+				};
+				auto call_site = [&]() {
+					xbb_uleb(b, cast(u64)gb_max(site->call_file, 1));
+					xbb_uleb(b, cast(u64)gb_max(site->call_line, 0));
+					xbb_uleb(b, cast(u64)gb_max(site->call_column, 0));
+				};
 				if (r.next < 0) {
-					xbb_uleb(b, xbAbbrev_LexicalBlock);
+					xbb_uleb(b, site ? xbAbbrev_InlinedSubroutine : xbAbbrev_LexicalBlock);
+					if (site) origin();
 					xbDwarfAddr a = {b->count, -1, pd.start + r.lo};
 					array_add(&d->info_addrs, a);
 					xbb_u64(b, 0);
 					xbb_u32(b, cast(u32)(r.hi - r.lo));
+					if (site) call_site();
 				} else {
-					xbb_uleb(b, xbAbbrev_LexicalBlockRanges);
+					xbb_uleb(b, site ? xbAbbrev_InlinedSubroutineRanges : xbAbbrev_LexicalBlockRanges);
+					if (site) origin();
 					array_add(&d->ranges_refs, b->count);
 					xbb_u32(b, cast(u32)d->ranges.count);
 					// offsets from the unit's low_pc, the start of the text section
@@ -1078,6 +1154,7 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 					}
 					xbb_u64(&d->ranges, 0);
 					xbb_u64(&d->ranges, 0);
+					if (site) call_site();
 				}
 				self(self, pd, c);
 				xbb_u8(b, 0);
@@ -1085,7 +1162,7 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 		};
 
 		for (xbProcDebug const &pd : m->proc_debug) {
-			bool has_children = pd.vars.count > 0;
+			bool has_children = pd.vars.count > 0 || pd.inline_sites.count > 0;
 			// the single result, so `finish` shows it
 			Type *ret = nullptr;
 			Type *pt = pd.type ? base_type(pd.type) : nullptr;
@@ -1119,6 +1196,8 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 		array_free(&sc.eff); array_free(&sc.kid); array_free(&sc.sib);
 		array_free(&sc.head); array_free(&sc.tail); array_free(&sc.pool);
 		array_free(&sc.var_head); array_free(&sc.var_tail); array_free(&sc.var_next);
+		array_free(&sc.site);
+		string_map_destroy(&abstract_dies);
 
 		// types, written after their first use
 		for (isize i = 0; i < dt.queue.count; i++) {

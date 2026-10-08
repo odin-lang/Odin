@@ -104,6 +104,47 @@ gb_internal void a64_alu(xbAsm *a, a64AluOp op, u8 rd, u8 rn, u8 rm, a64Shift sh
 	a64_emit(a, (1u<<31) | op | (cast(u32)shift << 22) | (cast(u32)rm << 16) | (amount << 10) | (cast(u32)rn << 5) | rd);
 }
 
+// The N:immr:imms fields that encode v as a 64 bit logical immediate, or -1. Such an immediate
+// is a run of ones, rotated, repeated in elements of 2 to 64 bits.
+gb_internal i32 a64_logical_imm(u64 v) {
+	if (v == 0 || v == ~0ull) return -1;
+	u32 size = 64;
+	while (size > 2) {
+		u32 half = size / 2;
+		u64 mask = (1ull << half) - 1;
+		if ((v & mask) != ((v >> half) & mask)) break;
+		size = half;
+	}
+	u64 emask = size == 64 ? ~0ull : (1ull << size) - 1;
+	u64 e = v & emask;
+	// rotate right until the ones start at bit 0 and end before a zero at the top
+	u32 rot = 0;
+	auto ror = [&](u64 x, u32 r) -> u64 {
+		if (r == 0) return x;
+		return ((x >> r) | (x << (size - r))) & emask;
+	};
+	while (rot < size) {
+		u64 x = ror(e, rot);
+		if ((x & 1) && !(x >> (size - 1) & 1)) {
+			u32 ones = 0;
+			while (ones < size && (x >> ones & 1)) ones++;
+			if ((x >> ones) != 0) return -1; // not one run
+			u32 immr = (size - rot) % size;
+			u32 imms = ((~(size*2 - 1) & 0x3f) | (ones - 1)) & 0x3f;
+			u32 n = size == 64 ? 1 : 0;
+			return cast(i32)((n << 12) | (immr << 6) | imms);
+		}
+		rot++;
+	}
+	return -1;
+}
+
+// rd = rn op #imm, 64 bit, with `enc` from a64_logical_imm
+gb_internal void a64_logical_imm_op(xbAsm *a, a64AluOp op, u8 rd, u8 rn, i32 enc) {
+	u32 opc = op == A64_AND ? 0x92000000u : op == A64_ORR ? 0xB2000000u : 0xD2000000u;
+	a64_emit(a, opc | (cast(u32)enc << 10) | (cast(u32)rn << 5) | rd);
+}
+
 // cmp xn, xm
 gb_internal void a64_cmp(xbAsm *a, u8 rn, u8 rm) {
 	a64_alu(a, A64_SUBS, XZR, rn, rm);

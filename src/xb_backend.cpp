@@ -120,6 +120,9 @@ gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	p->name = name;
 	p->vregs = array_make<xbType>(xb_allocator(), 0, 256);
 	array_add(&p->vregs, xbType_None); // vreg 0 is invalid
+	p->vinfo = array_make<xbVregInfo>(xb_allocator(), 0, 256);
+	xbVregInfo none = {0, ~0ull, false};
+	array_add(&p->vinfo, none);
 	p->blocks = array_make<xbBlock *>(xb_allocator(), 0, 32);
 	p->order = array_make<xbBlock *>(xb_allocator(), 0, 32);
 	p->locals = array_make<xbLocal>(xb_allocator(), 0, 32);
@@ -132,6 +135,7 @@ gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	p->selector_cache = array_make<xbSelectorCache>(xb_allocator(), 0, 0);
 	p->debug_vars = array_make<xbDebugVar>(xb_allocator(), 0, 16);
 	p->debug_scope_parent = array_make<i32>(xb_allocator(), 0, 8);
+	p->inline_sites = array_make<xbInlineSite>(xb_allocator(), 0, 0);
 	array_add(&p->debug_scope_parent, -1);
 	map_init(&p->vars);
 	p->file_id = -1;

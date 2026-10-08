@@ -191,7 +191,23 @@ gb_internal bool xb_op_is_pure(xbOp op) {
 // every access is a plain whole-value int load or store, so nothing can see its memory.
 // Each access weighs `loop_weight` inside a loop and `other_weight` elsewhere, and a
 // local needs more than `min_weight`.
-gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other_weight, i32 min_weight, Array<i32> *ranked) {
+struct xbRankedLocal { i32 weight; i32 index; };
+
+// heavier first, then in order
+gb_internal GB_COMPARE_PROC(xb_ranked_local_cmp) {
+	xbRankedLocal const *x = cast(xbRankedLocal const *)a;
+	xbRankedLocal const *y = cast(xbRankedLocal const *)b;
+	if (x->weight != y->weight) return x->weight > y->weight ? -1 : 1;
+	return x->index < y->index ? -1 : x->index > y->index;
+}
+
+// With `call_mem`, a call may read a local as a whole register argument, and a call with one
+// result may write it to one. With `by_ref_reg`, a local can hold a debug variable's address.
+gb_internal bool xb_call_mem_is_local(xbProc *p, xbMem const &m, i32 size) {
+	return m.kind == xbMem_Local && m.offset == 0 && p->locals[m.base].size == size;
+}
+
+gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other_weight, i32 min_weight, Array<i32> *ranked, bool call_mem=false, bool by_ref_reg=false) {
 	*ranked = array_make<i32>(heap_allocator(), 0, 8);
 	isize n = p->locals.count;
 	if (n == 0) return;
@@ -257,9 +273,20 @@ gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other
 			case xbOp_Syscall: {
 				xbCall const &c = p->calls[cast(isize)in.imm];
 				for (xbCallArg const &arg : c.args) {
-					if (arg.kind != xbCallArg_Gpr && arg.kind != xbCallArg_Xmm && arg.kind != xbCallArg_Stack) bad(arg.mem);
+					if (arg.kind == xbCallArg_Gpr || arg.kind == xbCallArg_Xmm || arg.kind == xbCallArg_Stack) continue;
+					if (call_mem && arg.kind == xbCallArg_GprMem && xb_call_mem_is_local(p, arg.mem, arg.size)) {
+						weight[arg.mem.base] += in_loop[bi] ? loop_weight : other_weight;
+						continue;
+					}
+					bad(arg.mem);
 				}
-				for (xbCallRet const &r : c.rets) bad(r.dst);
+				for (xbCallRet const &r : c.rets) {
+					if (call_mem && in.op == xbOp_Call && c.rets.count == 1 && r.loc == xbLoc_Gpr && xb_call_mem_is_local(p, r.dst, r.size)) {
+						weight[r.dst.base] += in_loop[bi] ? loop_weight : other_weight;
+						continue;
+					}
+					bad(r.dst);
+				}
 				break;
 			}
 			}
@@ -272,16 +299,183 @@ gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other
 		if (!plain) ok[in.dst.base] = false;
 	}
 	for (xbDebugVar const &v : p->debug_vars) {
-		if (v.local >= 0 && v.by_ref) ok[v.local] = false;
+		if (v.local >= 0 && v.by_ref && !(by_ref_reg && v.frame_offset_fixup == 0)) ok[v.local] = false;
 	}
 
-	for (;;) {
-		isize best = -1;
-		for (isize i = 0; i < n; i++) {
-			if (ok[i] && weight[i] > min_weight && (best < 0 || weight[i] > weight[best])) best = i;
-		}
-		if (best < 0) break;
-		array_add(ranked, cast(i32)best);
-		ok[best] = false;
+	auto order = array_make<xbRankedLocal>(heap_allocator(), 0, n);
+	defer (array_free(&order));
+	for (isize i = 0; i < n; i++) {
+		if (!ok[i] || weight[i] <= min_weight) continue;
+		xbRankedLocal r = {weight[i], cast(i32)i};
+		array_add(&order, r);
 	}
+	gb_sort_array(order.data, order.count, xb_ranked_local_cmp);
+	for (xbRankedLocal const &r : order) array_add(ranked, r.index);
+}
+
+// Removes what the builder leaves unused: pure values and frame loads that nothing reads,
+// stores to frame locals that nothing reads, and stores that a later store in the same block
+// overwrites before anything can read them. A debugger may look at a debug variable's local at
+// any time, so its stores stay.
+gb_internal void xb_cleanup_proc(xbProc *p) {
+	isize vn = p->vregs.count;
+	isize ln = p->locals.count;
+	isize bc = p->order.count;
+	struct At { i32 block; i32 instr; };
+	auto uses = array_make<i32>(heap_allocator(), vn);
+	auto def_at = array_make<At>(heap_allocator(), vn);
+	auto keep = array_make<bool>(heap_allocator(), ln);  // a debug variable's local
+	auto reads = array_make<i32>(heap_allocator(), ln);  // the instructions that may read the local
+	auto stores = array_make<At>(heap_allocator(), 0, 64); // stores to locals that may be dead
+	auto has_store = array_make<bool>(heap_allocator(), bc);
+	auto work = array_make<u32>(heap_allocator(), 0, 64);
+	defer (array_free(&uses));
+	defer (array_free(&def_at));
+	defer (array_free(&keep));
+	defer (array_free(&reads));
+	defer (array_free(&stores));
+	defer (array_free(&has_store));
+	defer (array_free(&work));
+	for (xbDebugVar const &v : p->debug_vars) {
+		if (v.local >= 0) keep[v.local] = true;
+	}
+	auto local_of = [&](xbMem const &m) -> i32 {
+		return m.kind == xbMem_Local ? cast(i32)m.base : -1;
+	};
+	for (isize bi = 0; bi < bc; bi++) {
+		xbBlock *b = p->order[bi];
+		for (isize ii = 0; ii < b->instrs.count; ii++) {
+			xbInstr const &in = b->instrs[ii];
+			if (in.op == xbOp_Asm) return; // its memory operands are not followed
+			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
+				if (v == 0) return;
+				if (is_def) {
+					At at = {cast(i32)bi, cast(i32)ii};
+					def_at[v] = at;
+				} else {
+					uses[v]++;
+				}
+			});
+			switch (in.op) {
+			case xbOp_Store:
+			case xbOp_MemZero: {
+				i32 l = local_of(in.mem);
+				if (l >= 0 && !keep[l] && !(in.flags & xbInstrFlag_Volatile)) {
+					At at = {cast(i32)bi, cast(i32)ii};
+					array_add(&stores, at);
+					has_store[bi] = true;
+				}
+				break;
+			}
+			case xbOp_Call:
+			case xbOp_Ret:
+			case xbOp_Syscall:
+				for (xbCallArg const &arg : p->calls[cast(isize)in.imm].args) {
+					if (arg.kind != xbCallArg_Gpr && arg.kind != xbCallArg_Xmm && arg.kind != xbCallArg_Stack) {
+						i32 l = local_of(arg.mem);
+						if (l >= 0) reads[l]++;
+					}
+				}
+				break;
+			default: {
+				i32 l = local_of(in.mem);
+				if (l >= 0) reads[l]++;
+				break;
+			}
+			}
+		}
+	}
+
+	auto kill = [&](xbInstr *in) {
+		xb_for_each_vreg(p, *in, [&](u32 v, bool is_def) {
+			if (v != 0 && !is_def && --uses[v] == 0) array_add(&work, v);
+		});
+		if (in->op == xbOp_Load) {
+			i32 l = local_of(in->mem);
+			if (l >= 0) reads[l]--;
+		}
+		*in = xb_instr(xbOp_Nop);
+	};
+	auto dead_value = [&](xbInstr const &in) -> bool {
+		if (in.dst == 0 || uses[in.dst] != 0) return false;
+		if (xb_op_is_pure(in.op)) return true;
+		return in.op == xbOp_Load && (in.mem.kind == xbMem_Local || in.mem.kind == xbMem_Incoming) &&
+		       !(in.flags & xbInstrFlag_Volatile);
+	};
+	auto drain = [&]() {
+		while (work.count > 0) {
+			u32 v = array_pop(&work);
+			At at = def_at[v];
+			xbInstr *in = &p->order[at.block]->instrs[at.instr];
+			if (in->dst == v && dead_value(*in)) kill(in);
+		}
+	};
+	for (u32 v = 1; v < vn; v++) {
+		if (uses[v] == 0) array_add(&work, v);
+	}
+	drain();
+
+	// the locals that nothing reads any more
+	for (At at : stores) {
+		xbInstr *in = &p->order[at.block]->instrs[at.instr];
+		if (in->op != xbOp_Store && in->op != xbOp_MemZero) continue;
+		if (reads[local_of(in->mem)] == 0) kill(in);
+	}
+	drain();
+
+	// Stores that a later one in the block overwrites first. Going back, `covered` holds the
+	// bytes the stores after this point write, below offset 64, of the locals nothing read since.
+	struct Cover { i32 local; u64 bytes; };
+	auto covered = array_make<Cover>(heap_allocator(), 0, 16);
+	defer (array_free(&covered));
+	for (isize bi = 0; bi < bc; bi++) {
+		if (!has_store[bi]) continue;
+		xbBlock *b = p->order[bi];
+		covered.count = 0;
+		for (isize ii = b->instrs.count-1; ii >= 0; ii--) {
+			xbInstr &in = b->instrs[ii];
+			switch (in.op) {
+			case xbOp_Nop:
+			case xbOp_Loc:
+			case xbOp_Scope:
+			case xbOp_Jump:
+			case xbOp_Branch:
+			case xbOp_Lea:
+				continue;
+			case xbOp_Store:
+			case xbOp_MemZero: {
+				i32 l = local_of(in.mem);
+				i64 size = in.op == xbOp_Store ? xb_type_size(in.type) : in.imm;
+				if (l < 0 || keep[l] || (in.flags & xbInstrFlag_Volatile) || in.mem.offset < 0 || in.mem.offset + size > 64) continue;
+				u64 bytes = (size >= 64 ? ~0ull : ((1ull << size) - 1)) << in.mem.offset;
+				isize k = 0;
+				while (k < covered.count && covered[k].local != l) k++;
+				if (k == covered.count) {
+					Cover c = {l, 0};
+					array_add(&covered, c);
+				}
+				if ((covered[k].bytes & bytes) == bytes) {
+					kill(&in);
+				} else {
+					covered[k].bytes |= bytes;
+				}
+				continue;
+			}
+			case xbOp_Load: {
+				i32 l = local_of(in.mem);
+				if (l >= 0) {
+					for (isize k = 0; k < covered.count; k++) {
+						if (covered[k].local == l) covered[k].bytes = 0;
+					}
+					continue;
+				}
+				covered.count = 0; // through a pointer, it may read any local whose address is known
+				continue;
+			}
+			}
+			if (xb_op_is_pure(in.op)) continue;
+			covered.count = 0;
+		}
+	}
+	drain();
 }
