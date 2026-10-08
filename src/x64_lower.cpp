@@ -1002,6 +1002,16 @@ gb_internal void xb_vmovups256_rax(xbAsm *a, bool load, u8 x) {
 	xb_b(a, cast(u8)((x & 7) << 3));
 }
 
+// vmovups zmm <-> [rax]
+gb_internal void xb_vmovups512_rax(xbAsm *a, bool load, u8 x) {
+	xb_b(a, 0x62);
+	xb_b(a, cast(u8)(((x & 8) ? 0 : 0x80) | 0x71));
+	xb_b(a, 0x7C);
+	xb_b(a, 0x48);
+	xb_b(a, load ? 0x10 : 0x11);
+	xb_b(a, cast(u8)((x & 7) << 3));
+}
+
 gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
 	xbAsm *a = &L->a;
 	i32 save_base = blk.save_local >= 0 ? L->p->locals[blk.save_local].frame_offset : 0;
@@ -1009,11 +1019,13 @@ gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
 	for (u8 r = 0; r < 16; r++) {
 		if (blk.save_regs & (1u << r)) xb_mov_rm_r(a, 8, xb_m(RBP, save_base + 8*k++), r);
 	}
+	if (blk.rbp_local >= 0) xb_mov_rm_r(a, 8, xb_m(RBP, L->p->locals[blk.rbp_local].frame_offset), RBP);
 	// vector inputs first, they go through rax
 	for (xbAsmIo const &io : blk.inputs) {
 		if (io.kind != xbAsmIo_XmmMem) continue;
 		xb_mov_r_rm(a, 8, RAX, xb_slot(L, io.vreg));
-		if (io.size == 32) xb_vmovups256_rax(a, true, io.reg);
+		if (io.size == 64) xb_vmovups512_rax(a, true, io.reg);
+		else if (io.size == 32) xb_vmovups256_rax(a, true, io.reg);
 		else xb_load_xmm(L, io.reg, xb_m(RAX, 0), io.size);
 	}
 	for (xbAsmIo const &io : blk.inputs) {
@@ -1022,10 +1034,23 @@ gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
 	for (xbAsmIo const &io : blk.inputs) {
 		if (io.kind == xbAsmIo_Gpr) xb_load_gpr(L, io.reg, io.vreg, io.size, io.sign ? xbExt_Sign : xbExt_Zero);
 	}
-	xb_bytes(a, blk.code.data, blk.code.count);
+	// mov ah, [rbp + slot]: no REX, so the reg field names the high byte
+	for (xbAsmIo const &io : blk.inputs) {
+		if (io.kind == xbAsmIo_Gpr8H) xb_enc(a, 0, 0x8A, io.reg, xb_slot(L, io.vreg));
+	}
+	auto code = array_make<u8>(heap_allocator(), 0, blk.pool.count + 16);
+	bool fits = xb_asm_layout(blk.items, blk.pool, blk.label_count, xb_pos(a), &code);
+	GB_ASSERT(fits);
+	xb_bytes(a, code.data, code.count);
+	array_free(&code);
+	if (blk.rbp_local >= 0) {
+		// rbp is not the frame yet, rsp is back where it was
+		xb_mov_r_rm(a, 8, RBP, xb_m(RSP, L->frame_size + L->p->locals[blk.rbp_local].frame_offset));
+	}
 	// gpr outputs first, then the flags, before anything changes them, then vectors through rax
 	for (xbAsmIo const &io : blk.outputs) {
 		if (io.kind == xbAsmIo_Gpr) xb_store_gpr(L, io.vreg, io.reg, io.size);
+		if (io.kind == xbAsmIo_Gpr8H) xb_enc(a, 0, 0x88, io.reg, xb_slot(L, io.vreg));
 		if (io.kind == xbAsmIo_Xmm) xb_store_xmm(L, xb_slot(L, io.vreg), io.reg, io.size);
 	}
 	for (xbAsmIo const &io : blk.outputs) {
@@ -1037,7 +1062,8 @@ gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
 	for (xbAsmIo const &io : blk.outputs) {
 		if (io.kind != xbAsmIo_XmmMem) continue;
 		xb_mov_r_rm(a, 8, RAX, xb_slot(L, io.vreg));
-		if (io.size == 32) xb_vmovups256_rax(a, false, io.reg);
+		if (io.size == 64) xb_vmovups512_rax(a, false, io.reg);
+		else if (io.size == 32) xb_vmovups256_rax(a, false, io.reg);
 		else xb_store_xmm(L, xb_m(RAX, 0), io.reg, io.size);
 	}
 	k = 0;
@@ -1806,8 +1832,11 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	xb_lower_layout(&L);
 
 	xbAsm *a = &L.a;
-	// 16 byte aligned procedure starts
-	while (a->code->count % 16 != 0) {
+	// 16 byte aligned procedure starts, more when an asm template aligns its code
+	i64 proc_align = 16;
+	for (xbAsmBlock const &blk : p->asms) proc_align = gb_max(proc_align, cast(i64)blk.align);
+	m->section_align[xbSection_Text] = gb_max(m->section_align[xbSection_Text], proc_align);
+	while (a->code->count % proc_align != 0) {
 		xb_b(a, 0xCC);
 	}
 	L.proc_start = xb_pos(a);

@@ -26,6 +26,7 @@ struct xbAsmOpnd {
 	i8  index; // memory: index register, -1 if none
 	u8  scale;
 	u8  seg;   // memory: segment override prefix byte, 0 if none
+	bool rip;  // memory: relative to the label `imm`, plus disp
 	i32 disp;
 	i64 imm;   // the immediate, or the label index
 };
@@ -56,6 +57,9 @@ gb_internal u16 xb_asm_slot_class(Asm_amd64::OperandType t) {
 	case Asm_amd64::OP_YMM:
 	case Asm_amd64::OP_YMM_M256:
 		return Asm_amd64::REG_CLASS_YMM;
+	case Asm_amd64::OP_ZMM:
+	case Asm_amd64::OP_ZMM_M512:
+		return Asm_amd64::REG_CLASS_ZMM;
 	}
 	return 0;
 }
@@ -74,8 +78,34 @@ gb_internal bool xb_asm_lookup_reg(String name, u16 *cls, u8 *hw) {
 	return true;
 }
 
+// The memory size an EVEX disp8 is scaled by, 0 to use a disp32: the whole operand, as
+// no broadcast can be written, except for an element at a time.
+gb_internal i32 xb_asm_evex_disp_scale(Asm_amd64::Encoding const &form, Asm_amd64::OperandType t) {
+	using A = Asm_amd64;
+	switch (form.mnemonic) {
+	case A::M_VPCOMPRESSD: case A::M_VPCOMPRESSQ: case A::M_VCOMPRESSPS: case A::M_VCOMPRESSPD:
+	case A::M_VPEXPANDD:   case A::M_VPEXPANDQ:   case A::M_VEXPANDPS:   case A::M_VEXPANDPD:
+		return ((form.flags >> 6) & 3) == 2 ? 8 : 4;
+	case A::M_VPMOVQB: case A::M_VPMOVSQB: case A::M_VPMOVUSQB:
+		// the 128-bit form stores two bytes, not the m32 the table says
+		if (((form.flags >> 8) & 3) == 1) return 2;
+		break;
+	}
+	switch (t) {
+	case A::OP_M8:   return 1;
+	case A::OP_M16:  return 2;
+	case A::OP_M32:  case A::OP_XMM_M32:  return 4;
+	case A::OP_M64:  case A::OP_XMM_M64:  return 8;
+	case A::OP_M128: case A::OP_XMM_M128: return 16;
+	case A::OP_M256: case A::OP_YMM_M256: return 32;
+	case A::OP_M512: case A::OP_ZMM_M512: return 64;
+	}
+	return 0;
+}
+
 // Encodes one instruction of `form`; `ops` are its explicit operands in source order.
-// A label operand gets a zero displacement at `*rel_at`. Returns why it failed, or nullptr.
+// A label operand, or a label relative memory operand, gets its rel32 at `*rel_at`
+// (holding the memory operand's displacement). Returns why it failed, or nullptr.
 gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd const *ops, isize op_count, u8 *out, i32 *len_, i32 *rel_at_) {
 	using A = Asm_amd64;
 	u32 fl = form.flags;
@@ -91,8 +121,17 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 	bool only_32   = ((fl >> 17) & 1) != 0;
 	u32 addr_size  = (fl >> 18) & 3;
 	if (only_32) return "32-bit only form";
-	if (vex_type == 2) return "evex form";
 	if (vex_type == 3) return "xop form";
+	switch (form.mnemonic) {
+	case A::M_VGATHERDPS:  case A::M_VGATHERDPD:  case A::M_VGATHERQPS:  case A::M_VGATHERQPD:
+	case A::M_VPGATHERDD:  case A::M_VPGATHERDQ:  case A::M_VPGATHERQD:  case A::M_VPGATHERQQ:
+	case A::M_VPSCATTERDD: case A::M_VPSCATTERDQ: case A::M_VPSCATTERQD: case A::M_VPSCATTERQQ:
+	case A::M_VSCATTERDPS: case A::M_VSCATTERDPD: case A::M_VSCATTERQPS: case A::M_VSCATTERQPD:
+		// a vector index (and a mask, for the EVEX ones) the operands cannot spell
+		return "vsib form";
+	}
+	bool evex = vex_type == 2;
+	*rel_at_ = -1;
 
 	xbAsmOpnd const *slot[4] = {};
 	for (isize i = 0; i < op_count; i++) {
@@ -140,8 +179,8 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 			break;
 		}
 		if (o != nullptr && o->kind == xbAsmOpnd_Reg) {
-			if (o->hw >= 16) return "register above 15";
-			if (o->cls == A::REG_CLASS_ZMM || o->cls == A::REG_CLASS_K || o->cls == A::REG_CLASS_BND) return "register class";
+			if (o->hw >= 16 && !evex) return "register above 15";
+			if (o->cls == A::REG_CLASS_BND) return "register class";
 		}
 	}
 
@@ -155,7 +194,32 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 	if (addr_size == 1) return "16-bit address size";
 	if (addr_size == 2) emit(0x67);
 
-	if (vex_type == 1) {
+	if (evex) {
+		if (esc == 0 || opr >= 0) return "evex form";
+		// registers 16..31 take R' (reg), X (r/m) and V' (vvvv)
+		u8 r = 1, r2 = 1, x = 1, b = 1, vvvv = 0xF, v2 = 1;
+		if (rg >= 0) {
+			r  = (slot[rg]->hw & 8)  ? 0 : 1;
+			r2 = (slot[rg]->hw & 16) ? 0 : 1;
+		}
+		if (mr >= 0) {
+			xbAsmOpnd const *o = slot[mr];
+			if (o->kind == xbAsmOpnd_Reg && (o->hw & 8))  b = 0;
+			if (o->kind == xbAsmOpnd_Reg && (o->hw & 16)) x = 0;
+			if (o->kind == xbAsmOpnd_Mem && o->base >= 0 && (o->base & 8)) b = 0;
+			if (o->kind == xbAsmOpnd_Mem && o->index >= 0 && (o->index & 8)) x = 0;
+		}
+		if (vv >= 0) {
+			vvvv = cast(u8)(~slot[vv]->hw & 0xF);
+			v2 = (slot[vv]->hw & 16) ? 0 : 1;
+		}
+		u8 ll = vex_l == 3 ? 2 : vex_l == 2 ? 1 : 0;
+		u8 w = vex_w == 2 ? 1 : 0;
+		emit(0x62);
+		emit(cast(u8)((r << 7) | (x << 6) | (b << 5) | (r2 << 4) | esc));
+		emit(cast(u8)((w << 7) | (vvvv << 3) | 0x04 | mprefix));
+		emit(cast(u8)((ll << 5) | (v2 << 3)));
+	} else if (vex_type == 1) {
 		if (esc == 0 || opr >= 0) return "vex form";
 		if (vex_l == 3) return "512-bit form";
 		u8 r = 1, x = 1, b = 1, vvvv = 0xF;
@@ -231,6 +295,10 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 		xbAsmOpnd const *o = slot[mr];
 		if (o->kind == xbAsmOpnd_Reg) {
 			emit(cast(u8)(0xC0 | (reg_field << 3) | (o->hw & 7)));
+		} else if (o->rip) {
+			emit(cast(u8)(0x05 | (reg_field << 3)));
+			*rel_at_ = n;
+			emit32(cast(u32)o->disp);
 		} else if (o->base < 0 && o->index < 0) {
 			emit(cast(u8)(0x04 | (reg_field << 3)));
 			emit(0x25);
@@ -240,13 +308,17 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 			u8 base = has_base ? (o->base & 7) : 5;
 			bool need_sib = o->index >= 0 || base == 4;
 			i32 disp = o->disp;
+			// EVEX scales a disp8 by the memory size
+			i32 scale8 = evex ? xb_asm_evex_disp_scale(form, form.ops[mr]) : 1;
+			i32 disp8 = scale8 != 0 ? disp / scale8 : 0;
+			bool fits8 = disp == 0 || (scale8 != 0 && disp % scale8 == 0 && disp8 >= -128 && disp8 <= 127);
 			u8 mod = 0;
 			i32 dsize = 0;
 			if (!has_base) {
 				mod = 0; dsize = 4;
 			} else if (disp == 0 && base != 5) {
 				mod = 0; dsize = 0;
-			} else if (disp >= -128 && disp <= 127) {
+			} else if (fits8) {
 				mod = 1; dsize = 1;
 			} else {
 				mod = 2; dsize = 4;
@@ -259,7 +331,7 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 			} else {
 				emit(cast(u8)((mod << 6) | (reg_field << 3) | base));
 			}
-			if (dsize == 1) emit(cast(u8)cast(i8)disp);
+			if (dsize == 1) emit(cast(u8)cast(i8)disp8);
 			if (dsize == 4) emit32(cast(u32)disp);
 		}
 	} else if (form.ext >= 0xC0 && (esc != 0 || (form.opcode >= 0xD8 && form.opcode <= 0xDF))) {
@@ -268,7 +340,6 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 		emit(m);
 	}
 
-	*rel_at_ = -1;
 	for (i32 s = 0; s < 4 && form.ops[s] != A::OP_NONE; s++) {
 		xbAsmOpnd const *o = slot[s];
 		i32 size = 0;
@@ -293,28 +364,19 @@ gb_internal char const *xb_asm_encode(Asm_amd64::Encoding const &form, xbAsmOpnd
 	return nullptr;
 }
 
-// One piece of the template's code: plain bytes, a label, or a branch to a label,
-// which starts short and grows to its rel32 form when the target is out of range.
-struct xbAsmItem {
-	enum Kind : u8 { Bytes, Label, Branch };
-	Kind kind;
-	bool is_long;
-	i32  label;
-	i32  start,      len,      rel_at;      // in the byte pool; the short form of a branch
-	i32  long_start, long_len, long_rel_at; // the rel32 form, len 0 if none
-	i32  offset;
-};
-
 struct xbAsmBuild {
 	xbProc *p;
 	Entity *tmpl;
 	Array<AsmTemplateEntityDecl> *decls;
 	Slice<i8>   reg;     // per decl: its register, -1 if none
-	Slice<bool> is_vec;  // per decl: an xmm/ymm register
+	Slice<bool> is_vec;  // per decl: an xmm/ymm/zmm register
+	Slice<bool> high;    // per decl: ah, ch, dh or bh, `reg` being 4..7
 	Slice<i64>  imm;     // per decl: immediate value
 	Array<String> labels;
 	Array<u8>   pool;
 	Array<xbAsmItem> items;
+	i32         align;
+	bool        writes_rbp;
 };
 
 gb_internal i32 xb_asm_decl_index(xbAsmBuild *b, Entity *e) {
@@ -376,15 +438,28 @@ gb_internal char const *xb_asm_mem_opnd(xbAsmBuild *b, AstAsmMemoryOperand *m, x
 	o->base = -1;
 	o->index = -1;
 	o->scale = 1;
+	// the checker only allows #pre and #post on arm64
 	if (m->kind != AsmMemoryOperand_Default) return "asm pre/post memory operand";
 	auto const &cl = m->classify;
-	if (cl.label != nullptr) return "asm label memory operand";
+	i64 disp = cl.has_disp_const ? cl.disp_total : 0;
 	for (Ast *t : m->terms) {
 		// a $ immediate displacement is not in the classification
 		if (t->kind == Ast_AsmMemoryTerm && t->AsmMemoryTerm.scale == nullptr && t->AsmMemoryTerm.operand->kind == Ast_Ident) {
 			i32 di = xb_asm_decl_index(b, entity_of_node(t->AsmMemoryTerm.operand));
-			if (di >= 0 && (*b->decls)[di].kind == AsmTemplateEntityDecl_Immediate) return "asm immediate displacement";
+			if (di >= 0 && (*b->decls)[di].kind == AsmTemplateEntityDecl_Immediate) {
+				disp += t->AsmMemoryTerm.op.kind == Token_Sub ? -b->imm[di] : b->imm[di];
+			}
 		}
+	}
+	if (disp < -0x80000000ll || disp > 0x7fffffffll) return "asm memory displacement";
+	o->disp = cast(i32)disp;
+	if (cl.label != nullptr) {
+		// a label is always relative to rip, the checker allows no registers with it
+		if (cl.label->kind != Ast_AsmLabelDecl || cl.base != nullptr || cl.index != nullptr) return "asm label memory operand";
+		i32 li = xb_asm_label_index(b, cl.label->AsmLabelDecl.name);
+		if (li < 0) return "asm label";
+		o->rip = true;
+		o->imm = li;
 	}
 	if (m->segment_override != nullptr) {
 		u16 cls = 0; u8 hw = 0;
@@ -409,10 +484,6 @@ gb_internal char const *xb_asm_mem_opnd(xbAsmBuild *b, AstAsmMemoryOperand *m, x
 			if (s != 1 && s != 2 && s != 4 && s != 8) return "asm memory scale";
 			o->scale = cast(u8)s;
 		}
-	}
-	if (cl.has_disp_const) {
-		if (cl.disp_total < -0x80000000ll || cl.disp_total > 0x7fffffffll) return "asm memory displacement";
-		o->disp = cast(i32)cl.disp_total;
 	}
 	return nullptr;
 }
@@ -440,6 +511,10 @@ gb_internal char const *xb_asm_opnds(xbAsmBuild *b, AstAsmInstruction *in, Asm_a
 			u16 cls = xb_asm_slot_class(t);
 			if (cls == 0) return "asm operand slot";
 			if (xb_asm_is_gpr_class(cls) == b->is_vec[di]) return "asm operand class";
+			if (b->high[di]) {
+				if (cls != Asm_amd64::REG_CLASS_GPR8) return "asm operand class";
+				cls = Asm_amd64::REG_CLASS_GPR8H;
+			}
 			o->kind = xbAsmOpnd_Reg;
 			o->cls = cls;
 			o->hw = cast(u8)b->reg[di];
@@ -511,6 +586,30 @@ gb_internal void xb_asm_add_bytes(xbAsmBuild *b, u8 const *data, i32 n) {
 	array_add(&b->items, it);
 }
 
+// `count` bytes of nops, the same ones the LLVM assembler pads with.
+gb_internal void xb_asm_nops(Array<u8> *out, i64 count) {
+	static u8 const nops[10][10] = {
+		{0x90},
+		{0x66, 0x90},
+		{0x0F, 0x1F, 0x00},
+		{0x0F, 0x1F, 0x40, 0x00},
+		{0x0F, 0x1F, 0x44, 0x00, 0x00},
+		{0x66, 0x0F, 0x1F, 0x44, 0x00, 0x00},
+		{0x0F, 0x1F, 0x80, 0x00, 0x00, 0x00, 0x00},
+		{0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{0x66, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+		{0x66, 0x2E, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00},
+	};
+	while (count > 0) {
+		// up to 15 bytes each, the ones past 10 as 0x66 prefixes
+		i64 n = gb_min(count, 15);
+		for (i64 k = 10; k < n; k++) array_add(out, cast(u8)0x66);
+		i64 rest = gb_min(n, 10);
+		array_add_elems(out, nops[rest-1], rest);
+		count -= n;
+	}
+}
+
 gb_internal void xb_asm_encode_body(xbAsmBuild *b) {
 	xbProc *p = b->p;
 	AstAsmTemplate *at = &b->tmpl->AsmTemplate.node->AsmTemplate;
@@ -538,15 +637,30 @@ gb_internal void xb_asm_encode_body(xbAsmBuild *b) {
 					u8 v = cast(u8)exact_value_to_i64(ev);
 					xb_asm_add_bytes(b, &v, 1);
 				}
-			} else if ((name == "skip" || name == "nop") && dir->operands.count == 1) {
+			} else if ((name == "skip" || name == "nop" || name == "align") && dir->operands.count == 1) {
 				ExactValue ev = exact_value_to_integer(dir->operands[0]->tav.value);
 				if (ev.kind != ExactValue_Integer) XB_UNSUPPORTED(p, xb_asm_reason("asm directive", name));
 				i64 count = exact_value_to_i64(ev);
 				if (count < 0 || count > 4096) XB_UNSUPPORTED(p, xb_asm_reason("asm directive", name));
-				u8 fill = name == "nop" ? 0x90 : 0x00;
-				for (i64 k = 0; k < count; k++) xb_asm_add_bytes(b, &fill, 1);
+				if (name == "align") {
+					// the padding depends on where the code lands, the layout works it out
+					i32 align = count > 1 ? 1 << floor_log2(cast(u64)count) : 1;
+					if (align == 1) break;
+					xbAsmItem it = {};
+					it.kind = xbAsmItem::Align;
+					it.label = align;
+					array_add(&b->items, it);
+					b->align = gb_max(b->align, align);
+					break;
+				}
+				auto fill = array_make<u8>(xb_allocator(), 0, count);
+				if (name == "nop") {
+					xb_asm_nops(&fill, count);
+				} else {
+					for (i64 k = 0; k < count; k++) array_add(&fill, cast(u8)0);
+				}
+				xb_asm_add_bytes(b, fill.data, cast(i32)fill.count);
 			} else {
-				// align needs the final address, which is only known while lowering
 				XB_UNSUPPORTED(p, xb_asm_reason("asm directive", name));
 			}
 			break;
@@ -586,7 +700,20 @@ gb_internal void xb_asm_encode_body(xbAsmBuild *b) {
 			if (label_k < 0) {
 				why = xb_asm_encode(form, ops, in->operands.count, code, &len, &rel_at);
 				if (why) XB_UNSUPPORTED(p, xb_asm_reason("asm instruction", name));
-				xb_asm_add_bytes(b, code, len);
+				if (rel_at < 0) {
+					xb_asm_add_bytes(b, code, len);
+					break;
+				}
+				// a label relative memory operand
+				xbAsmItem it = {};
+				it.kind = xbAsmItem::Branch;
+				it.is_long = true;
+				for (xbAsmOpnd const &o : ops) {
+					if (o.kind == xbAsmOpnd_Mem && o.rip) it.label = cast(i32)o.imm;
+				}
+				it.long_start = cast(i32)b->pool.count; it.long_len = len; it.long_rel_at = rel_at;
+				array_add_elems(&b->pool, code, len);
+				array_add(&b->items, it);
 				break;
 			}
 
@@ -623,50 +750,70 @@ gb_internal void xb_asm_encode_body(xbAsmBuild *b) {
 	}
 }
 
-// Lays the items out, growing short branches that cannot reach, and returns the code.
-gb_internal Slice<u8> xb_asm_layout(xbAsmBuild *b) {
-	auto label_off = slice_make<i32>(xb_allocator(), b->labels.count);
+// Lays the items out at code offset `start`, growing short branches that cannot reach.
+// A negative start pads every #align fully, more than any start needs, so a layout that
+// fits then fits anywhere. Returns false when a branch has no rel32 form to grow into.
+gb_internal bool xb_asm_layout(Slice<xbAsmItem> items, Slice<u8> pool, i32 label_count, i64 start, Array<u8> *code) {
+	auto label_off = slice_make<i32>(xb_allocator(), label_count);
+	auto offset    = slice_make<i32>(xb_allocator(), items.count);
+	auto is_long   = slice_make<bool>(xb_allocator(), items.count);
+	for_array(i, items) is_long[i] = items[i].is_long;
+	auto pad = [&](isize i, i32 off) -> i32 {
+		i32 align = items[i].label;
+		if (start < 0) return align - 1;
+		return cast(i32)((align - (start + off) % align) % align);
+	};
 	for (;;) {
 		i32 off = 0;
-		for (xbAsmItem &it : b->items) {
-			it.offset = off;
+		for_array(i, items) {
+			xbAsmItem const &it = items[i];
+			offset[i] = off;
 			switch (it.kind) {
 			case xbAsmItem::Label:  label_off[it.label] = off; break;
 			case xbAsmItem::Bytes:  off += it.len; break;
-			case xbAsmItem::Branch: off += it.is_long ? it.long_len : it.len; break;
+			case xbAsmItem::Align:  off += pad(i, off); break;
+			case xbAsmItem::Branch: off += is_long[i] ? it.long_len : it.len; break;
 			}
 		}
 		bool changed = false;
-		for (xbAsmItem &it : b->items) {
-			if (it.kind != xbAsmItem::Branch || it.is_long) continue;
-			i32 d = label_off[it.label] - (it.offset + it.len);
+		for_array(i, items) {
+			xbAsmItem const &it = items[i];
+			if (it.kind != xbAsmItem::Branch || is_long[i]) continue;
+			i32 d = label_off[it.label] - (offset[i] + it.len);
 			if (d < -128 || d > 127) {
-				if (it.long_len == 0) XB_UNSUPPORTED(b->p, "asm short branch out of range");
-				it.is_long = true;
+				if (it.long_len == 0) return false;
+				is_long[i] = true;
 				changed = true;
 			}
 		}
 		if (!changed) break;
 	}
-	auto code = array_make<u8>(xb_allocator(), 0, b->pool.count);
-	for (xbAsmItem const &it : b->items) {
+	if (code == nullptr) return true;
+	for_array(i, items) {
+		xbAsmItem const &it = items[i];
 		if (it.kind == xbAsmItem::Bytes) {
-			array_add_elems(&code, b->pool.data + it.start, it.len);
+			array_add_elems(code, pool.data + it.start, it.len);
+		} else if (it.kind == xbAsmItem::Align) {
+			xb_asm_nops(code, pad(i, offset[i]));
 		} else if (it.kind == xbAsmItem::Branch) {
-			i32 start  = it.is_long ? it.long_start  : it.start;
-			i32 len    = it.is_long ? it.long_len    : it.len;
-			i32 rel_at = it.is_long ? it.long_rel_at : it.rel_at;
-			isize at = code.count;
-			array_add_elems(&code, b->pool.data + start, len);
-			i32 d = label_off[it.label] - (it.offset + len);
-			if (it.is_long) {
-				gb_memmove(code.data + at + rel_at, &d, 4);
+			i32 at     = cast(i32)code->count;
+			i32 from   = is_long[i] ? it.long_start  : it.start;
+			i32 len    = is_long[i] ? it.long_len    : it.len;
+			i32 rel_at = is_long[i] ? it.long_rel_at : it.rel_at;
+			array_add_elems(code, pool.data + from, len);
+			i32 d = label_off[it.label] - (offset[i] + len);
+			if (is_long[i]) {
+				// a memory operand's displacement is already there
+				i32 v = 0;
+				gb_memmove(&v, code->data + at + rel_at, 4);
+				v += d;
+				gb_memmove(code->data + at + rel_at, &v, 4);
 			} else {
-				code.data[at + rel_at] = cast(u8)cast(i8)d;
+				code->data[at + rel_at] = cast(u8)cast(i8)d;
 			}
 		}
 	}
-	return slice_from_array(code);
+	return true;
 }
 
 gb_internal u16 xb_asm_clobber_bits_to_gprs(u16 bits) {
@@ -685,7 +832,8 @@ gb_internal u16 xb_asm_clobber_bits_to_gprs(u16 bits) {
 }
 
 // Every register the template names, clobbers or uses implicitly, so none of them
-// is handed to an operand. rsp and rbp must not be written.
+// is handed to an operand. Writing rbp has it saved around the template; rsp is the
+// template's own business, everything around it is addressed from rbp.
 gb_internal void xb_asm_fixed_regs(xbAsmBuild *b, u16 *gprs, u16 *xmms) {
 	xbProc *p = b->p;
 	auto mark = [&](String name, bool written) {
@@ -696,13 +844,11 @@ gb_internal void xb_asm_fixed_regs(xbAsmBuild *b, u16 *gprs, u16 *xmms) {
 			hw -= 4;
 		}
 		if (xb_asm_is_gpr_class(cls)) {
-			if (written && (hw == RSP || hw == RBP)) XB_UNSUPPORTED(p, "asm writes rsp or rbp");
+			if (written && hw == RBP) b->writes_rbp = true;
 			*gprs |= cast(u16)(1u << hw);
-		} else if (cls == Asm_amd64::REG_CLASS_XMM || cls == Asm_amd64::REG_CLASS_YMM) {
-			if (hw >= 16) XB_UNSUPPORTED(p, xb_asm_reason("asm register", name));
-			*xmms |= cast(u16)(1u << hw);
-		} else if (cls == Asm_amd64::REG_CLASS_ZMM || cls == Asm_amd64::REG_CLASS_K) {
-			XB_UNSUPPORTED(p, xb_asm_reason("asm register", name));
+		} else if (cls == Asm_amd64::REG_CLASS_XMM || cls == Asm_amd64::REG_CLASS_YMM || cls == Asm_amd64::REG_CLASS_ZMM) {
+			// 16..31 are never handed out, and no vector register is callee saved
+			if (hw < 16) *xmms |= cast(u16)(1u << hw);
 		}
 	};
 	// the registers named inside an operand
@@ -745,15 +891,23 @@ gb_internal void xb_asm_fixed_regs(xbAsmBuild *b, u16 *gprs, u16 *xmms) {
 			walk(in->operands[k], written, walk);
 		}
 		u16 implicit = cast(u16)cl.implicit_rd | cast(u16)cl.implicit_wr;
-		if (cast(u16)cl.implicit_wr & Asm_amd64::ClobberReg_RBP) XB_UNSUPPORTED(p, "asm writes rsp or rbp");
+		if (cast(u16)cl.implicit_wr & Asm_amd64::ClobberReg_RBP) b->writes_rbp = true;
 		*gprs |= xb_asm_clobber_bits_to_gprs(implicit);
 		if (implicit & Asm_amd64::ClobberReg_XMM0) *xmms |= 1;
 	}
 	for (String const &name : b->tmpl->AsmTemplate.clobber_registers_set) {
+		// the checker adds "<reg>" for a register outside its clobber names, next to the register itself
+		if (name == "<reg>") continue;
 		mark(name, true);
 	}
 	for (AsmTemplateEntityDecl const &d : *b->decls) {
-		if (d.pin.len != 0 && d.pin_flag.len == 0) mark(d.pin, true);
+		if (d.pin.len == 0 || d.pin_flag.len != 0) continue;
+		u16 cls = 0; u8 hw = 0;
+		// an operand cannot live in the registers that hold the frame
+		if (xb_asm_lookup_reg(d.pin, &cls, &hw) && xb_asm_is_gpr_class(cls) && (hw == RSP || hw == RBP)) {
+			XB_UNSUPPORTED(p, "asm operand pinned to rsp or rbp");
+		}
+		mark(d.pin, true);
 	}
 }
 
@@ -779,8 +933,8 @@ gb_internal void xb_asm_assign_regs(xbAsmBuild *b, u16 *gprs_used) {
 		if (d.pin.len != 0) {
 			u16 cls = 0; u8 hw = 0;
 			xb_asm_lookup_reg(d.pin, &cls, &hw);
-			if (cls == Asm_amd64::REG_CLASS_GPR8H) XB_UNSUPPORTED(p, "asm high byte pin");
-			b->is_vec[i] = !xb_asm_is_gpr_class(cls);
+			b->high[i] = cls == Asm_amd64::REG_CLASS_GPR8H;
+			b->is_vec[i] = !xb_asm_is_gpr_class(cls) && !b->high[i];
 			b->reg[i] = cast(i8)hw;
 		} else if (d.reg_class == AsmRegClass_Integer) {
 			for (u8 r : gpr_order) {
@@ -803,7 +957,7 @@ gb_internal void xb_asm_assign_regs(xbAsmBuild *b, u16 *gprs_used) {
 		} else {
 			XB_UNSUPPORTED(p, "asm register class");
 		}
-		if (b->is_vec[i] ? size > 32 : size > 8) XB_UNSUPPORTED(p, "asm operand size");
+		if (b->is_vec[i] ? size > 64 : size > (b->high[i] ? 1 : 8)) XB_UNSUPPORTED(p, "asm operand size");
 	}
 	// views and tied inputs follow their source to the register it got
 	for_array(i, decls) {
@@ -820,6 +974,9 @@ gb_internal void xb_asm_assign_regs(xbAsmBuild *b, u16 *gprs_used) {
 		}
 		b->reg[i] = b->reg[r];
 		b->is_vec[i] = b->is_vec[r];
+		b->high[i] = b->high[r];
+		// a width view of ah is not a register
+		if (b->high[i] && r != i && decls[i].view_of >= 0) XB_UNSUPPORTED(p, "asm high byte view");
 	}
 	*gprs_used = used;
 }
@@ -864,6 +1021,7 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 	isize nd = b.decls->count;
 	b.reg    = slice_make<i8>(xb_allocator(), nd);
 	b.is_vec = slice_make<bool>(xb_allocator(), nd);
+	b.high   = slice_make<bool>(xb_allocator(), nd);
 	b.imm    = slice_make<i64>(xb_allocator(), nd);
 	b.labels = array_make<String>(xb_allocator(), 0, 4);
 	b.pool   = array_make<u8>(xb_allocator(), 0, 64);
@@ -911,7 +1069,9 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 	u16 gprs_used = 0;
 	xb_asm_assign_regs(&b, &gprs_used);
 	xb_asm_encode_body(&b);
-	Slice<u8> code = xb_asm_layout(&b);
+	Slice<xbAsmItem> items = slice_from_array(b.items);
+	Slice<u8> pool = slice_from_array(b.pool);
+	if (!xb_asm_layout(items, pool, cast(i32)b.labels.count, -1, nullptr)) XB_UNSUPPORTED(p, "asm short branch out of range");
 
 	Type *results = pt->Proc.results;
 	isize result_count = results ? results->Tuple.variables.count : 0;
@@ -932,7 +1092,7 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 			i64 size = type_size_of(t);
 			if (!b.is_vec[i]) {
 				if (st == xbType_None || xb_type_is_float(st)) XB_UNSUPPORTED(p, "asm operand type");
-				io.kind = xbAsmIo_Gpr;
+				io.kind = b.high[i] ? xbAsmIo_Gpr8H : xbAsmIo_Gpr;
 				io.size = cast(u8)xb_type_size(st);
 				io.sign = xb_type_is_signed(t);
 				io.vreg = xb_value_to_reg(p, v);
@@ -941,7 +1101,7 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 				io.size = cast(u8)xb_type_size(st);
 				io.vreg = xb_value_to_reg(p, v);
 			} else {
-				if (size != 2 && size != 4 && size != 8 && size != 16 && size != 32) XB_UNSUPPORTED(p, "asm operand type");
+				if (size != 2 && size != 4 && size != 8 && size != 16 && size != 32 && size != 64) XB_UNSUPPORTED(p, "asm operand type");
 				io.kind = xbAsmIo_XmmMem;
 				io.size = cast(u8)size;
 				io.vreg = xb_lea(p, xb_value_to_mem(p, v));
@@ -969,7 +1129,7 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 				v = xb_value_reg(t, io.vreg);
 			} else if (!b.is_vec[i]) {
 				if (st == xbType_None || xb_type_is_float(st)) XB_UNSUPPORTED(p, "asm operand type");
-				io.kind = xbAsmIo_Gpr;
+				io.kind = b.high[i] ? xbAsmIo_Gpr8H : xbAsmIo_Gpr;
 				io.size = cast(u8)xb_type_size(st);
 				io.vreg = xb_new_vreg(p, st);
 				v = xb_value_reg(t, io.vreg);
@@ -979,7 +1139,7 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 				io.vreg = xb_new_vreg(p, st);
 				v = xb_value_reg(t, io.vreg);
 			} else {
-				if (size != 2 && size != 4 && size != 8 && size != 16 && size != 32) XB_UNSUPPORTED(p, "asm operand type");
+				if (size != 2 && size != 4 && size != 8 && size != 16 && size != 32 && size != 64) XB_UNSUPPORTED(p, "asm operand type");
 				xbMem m = xb_add_local(p, t, false);
 				io.kind = xbAsmIo_XmmMem;
 				io.size = cast(u8)size;
@@ -992,7 +1152,10 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 	}
 
 	xbAsmBlock blk = {};
-	blk.code = code;
+	blk.items = items;
+	blk.pool = pool;
+	blk.label_count = cast(i32)b.labels.count;
+	blk.align = b.align;
 	blk.inputs = slice_from_array(inputs);
 	blk.outputs = slice_from_array(outputs);
 	u16 callee_saved = (1u << RBX) | (1u << R12) | (1u << R13) | (1u << R14) | (1u << R15);
@@ -1002,6 +1165,7 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 	if (blk.save_regs != 0) {
 		blk.save_local = xb_add_local_raw(p, 8*gb_count_set_bits(blk.save_regs), 8);
 	}
+	blk.rbp_local = b.writes_rbp ? xb_add_local_raw(p, 8, 8) : -1;
 	array_add(&p->asms, blk);
 	xbInstr in = xb_instr(xbOp_Asm);
 	in.imm = p->asms.count-1;

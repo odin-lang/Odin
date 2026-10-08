@@ -278,6 +278,15 @@ gb_internal bool check_asm_immediate_value_fits(ExactValue ev, i32 bits, i32 *ne
 // On mismatch, fills *mismatch_ for a precise diagnostic. `slot` here is the
 // resolved OperandType at the correct (implicit-skipped) slot.
 template <typename AsmCtx>
+gb_internal bool asm_register_is_mask(AsmCtx *asm_ctx, String name) {
+	return false;
+}
+gb_internal bool asm_register_is_mask(Asm_amd64 *asm_ctx, String name) {
+	auto r = asm_ctx->register_lookup(name);
+	return r != Asm_amd64::REG_INVALID && asm_ctx->reg_class(asm_ctx->register_codes[r]) == Asm_amd64::REG_CLASS_K;
+}
+
+template <typename AsmCtx>
 gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot, Operand const *operand,
                                               AsmMismatch *mismatch_, i32 *want_bits_, i32 *got_bits_) {
 	if (mismatch_) *mismatch_ = AsmMismatch_None;
@@ -315,6 +324,18 @@ gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::
 			return false;
 		}
 		return true;
+	}
+
+	// An opmask register has no Odin type of its own (it is typed as an integer), so it
+	// fills an opmask slot whatever its width, and nothing else.
+	bool is_mask_reg = operand->expr != nullptr && operand->expr->kind == Ast_AsmRegister &&
+	                   asm_register_is_mask(asm_ctx, operand->expr->AsmRegister.name.string);
+	if (is_mask_reg) {
+		if (want_class == AsmRegClass_Mask) {
+			return true;
+		}
+		if (mismatch_) *mismatch_ = AsmMismatch_Class;
+		return false;
 	}
 
 	// A pure-label / sizeless slot imposes no reg width/class.

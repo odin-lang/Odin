@@ -325,8 +325,9 @@ struct xbCall {
 
 enum xbAsmIoKind : u8 {
 	xbAsmIo_Gpr,    // vreg <-> gpr
+	xbAsmIo_Gpr8H,  // u8 vreg <-> ah, ch, dh or bh (`reg` 4..7)
 	xbAsmIo_Xmm,    // float vreg <-> xmm
-	xbAsmIo_XmmMem, // `size` bytes at the pointer vreg <-> xmm/ymm
+	xbAsmIo_XmmMem, // `size` bytes at the pointer vreg <-> xmm/ymm/zmm
 	xbAsmIo_Flag,   // output only: the condition `reg` (an xbCC) as 0 or 1
 };
 
@@ -338,13 +339,30 @@ struct xbAsmIo {
 	u32         vreg;
 };
 
-// An asm template call: the operands live in fixed registers around the encoded bytes.
+// One piece of a template's code: plain bytes, a label, an alignment, or a label
+// reference. A branch starts short and grows to its rel32 form when the target is out
+// of range; a rip relative memory operand only has the rel32 form.
+struct xbAsmItem {
+	enum Kind : u8 { Bytes, Label, Align, Branch };
+	Kind kind;
+	bool is_long;
+	i32  label;                             // the label, or the alignment of an Align
+	i32  start,      len,      rel_at;      // in the byte pool; the short form of a branch
+	i32  long_start, long_len, long_rel_at; // the rel32 form, len 0 if none
+};
+
+// An asm template call: the operands live in fixed registers around the encoded bytes,
+// which are laid out where they land, for #align.
 struct xbAsmBlock {
-	Slice<u8>      code;
-	Slice<xbAsmIo> inputs;
-	Slice<xbAsmIo> outputs;
-	u16            save_regs;  // callee saved gprs the template touches, bit = register number
-	i32            save_local; // frame local they are saved in, or -1
+	Slice<xbAsmItem> items;
+	Slice<u8>        pool;
+	i32              label_count;
+	i32              align;      // the largest #align, 0 if none
+	Slice<xbAsmIo>   inputs;
+	Slice<xbAsmIo>   outputs;
+	u16              save_regs;  // callee saved gprs the template touches, bit = register number
+	i32              save_local; // frame local they are saved in, or -1
+	i32              rbp_local;  // frame local rbp is saved in when the template writes it, or -1
 };
 
 ////////////////////////////////////////////////////////////////

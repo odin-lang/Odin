@@ -1502,7 +1502,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	u64 const SHF_WRITE = 1, SHF_ALLOC = 2, SHF_EXEC = 4, SHF_MERGE = 0x10, SHF_STRINGS = 0x20, SHF_INFO_LINK = 0x40, SHF_TLS = 0x400;
 	u32 const SHT_PROGBITS = 1, SHT_SYMTAB = 2, SHT_STRTAB = 3, SHT_RELA = 4, SHT_NOBITS = 8;
 	auto align_of = [&](xbSection s) -> u64 { return cast(u64)gb_max(m->section_align[s], cast(i64)16); };
-	set(xbOut_Text,        SHT_PROGBITS, SHF_ALLOC|SHF_EXEC, 16);
+	set(xbOut_Text,        SHT_PROGBITS, SHF_ALLOC|SHF_EXEC, align_of(xbSection_Text));
 	set(xbOut_Rodata,      SHT_PROGBITS, SHF_ALLOC, align_of(xbSection_Rodata));
 	set(xbOut_Data,        SHT_PROGBITS, SHF_ALLOC|SHF_WRITE, align_of(xbSection_Data));
 	set(xbOut_Bss,         SHT_NOBITS,   SHF_ALLOC|SHF_WRITE, align_of(xbSection_Bss));
