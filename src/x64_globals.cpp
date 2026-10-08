@@ -80,7 +80,14 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 
 	if (build_context.ODIN_DEBUG && !is_blank_ident(e->token.string)) {
 		xbGlobalDebug g = {};
-		g.name = e->token.string;
+		// named like LLVM's: `pkg::name`, or the link name of an exported one
+		g.name = s->name;
+		if (!e->Variable.is_export && (e->flags & EntityFlag_CustomLinkName) == 0 && e->file != nullptr) {
+			gbString name = lb_debug_append_name_prefix(gb_string_make(heap_allocator(), ""), e->file, e);
+			name = gb_string_append_length(name, e->token.string.text, e->token.string.len);
+			g.name = copy_string(permanent_allocator(), make_string(cast(u8 *)name, gb_string_length(name)));
+			gb_string_free(name);
+		}
 		g.type = e->type;
 		g.sym = sym;
 		g.file_id = xb_file_id(m, e->token.pos.file_id);

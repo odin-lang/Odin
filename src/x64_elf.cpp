@@ -880,8 +880,14 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	if (debug) {
 		xb_add_debug_constants(m);
 		xb_dwarf_abbrevs(&sec[xbOut_DebugAbbrev]);
-		String cwd = {};
-		{
+		// the compilation directory is the entry file's, like LLVM's, so debuggers show its files by their short names
+		String cwd = m->info->init_package->files[0]->directory;
+		if (Entity *entry_point = m->info->entry_point) {
+			if (Ast *ident = entry_point->identifier.load()) {
+				if (ident->file_id) cwd = ident->file()->directory;
+			}
+		}
+		if (cwd.len == 0) {
 			char buf[4096] = {};
 			if (getcwd(buf, gb_size_of(buf)-1) != nullptr) {
 				cwd = copy_string(permanent_allocator(), make_string_c(buf));
