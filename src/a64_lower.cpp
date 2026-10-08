@@ -6,9 +6,12 @@
 // liveness analysis finds them live; a local that is a debug variable keeps its register in all
 // of its scope. An interval takes x0-x8, v0-v7 or v20-v31 when no call happens in it, x19-x28 or
 // d8-d15 otherwise; a parameter stays in the register it arrives in or moves to a callee saved
-// one. The rest live in 8 byte stack slots. A constant with one definition is materialized at
-// each use, or becomes the instruction's immediate. A compare whose only use is the next branch,
-// select or test against zero only sets the flags.
+// one. When none is free, the interval takes the register of an active one that costs less in
+// memory for each position it covers, references weighted by the loops around them. The rest
+// live in 8 byte stack slots. A constant with one definition is materialized at each use, or
+// becomes the instruction's immediate; a frame address is computed at each use, or becomes the
+// access's offset. A compare whose only use is the next branch, select or test against zero
+// only sets the flags.
 //
 // The scratch registers are x9-x15, x16 for addresses and x17 for large offsets, and
 // v16-v19 for floats.
@@ -61,6 +64,8 @@ struct a64Lower {
 	Array<u8>   clean;    // vreg -> its register holds 0 or 1
 	Array<i8>   local_reg;
 	Array<i32>  via;      // vreg -> the local whose register it shares, or -1
+	Array<u8>   remat;    // vreg -> defined once as a frame address, computed at each use from rmem
+	Array<xbMem> rmem;
 	u32         pairs;    // the saved callee saved pairs, as compact unwind flags
 	i32         frame_size;
 	i32         max_call_stack;
@@ -200,9 +205,38 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	L->in_block = array_make<u8>(heap_allocator(), vreg_count);
 	L->clean = array_make<u8>(heap_allocator(), vreg_count);
 	L->via = array_make<i32>(heap_allocator(), vreg_count);
+	L->remat = array_make<u8>(heap_allocator(), vreg_count);
+	L->rmem = array_make<xbMem>(heap_allocator(), vreg_count);
 	for (isize i = 0; i < vreg_count; i++) {
 		L->reg[i] = A64_NOREG;
 		L->via[i] = -1;
+	}
+
+	// a reference costs 8 times more for each loop around it; a loop is a jump back to or
+	// before its block
+	auto bweight = array_make<i64>(heap_allocator(), p->blocks.count);
+	auto vweight = array_make<i64>(heap_allocator(), vreg_count);
+	defer (array_free(&bweight));
+	defer (array_free(&vweight));
+	{
+		isize bc = p->order.count;
+		auto pos = array_make<isize>(heap_allocator(), p->blocks.count);
+		auto depth = array_make<i32>(heap_allocator(), bc);
+		defer (array_free(&pos));
+		defer (array_free(&depth));
+		for (isize i = 0; i < bc; i++) pos[p->order[i]->index] = i;
+		for (isize i = 0; i < bc; i++) {
+			for (xbInstr const &in : p->order[i]->instrs) {
+				i32 targets[2] = {-1, -1};
+				if (in.op == xbOp_Jump) targets[0] = cast(i32)in.imm;
+				if (in.op == xbOp_Branch) { targets[0] = cast(i32)in.imm; targets[1] = cast(i32)in.c; }
+				for (i32 t : targets) {
+					if (t < 0 || !p->blocks[t]->placed || pos[t] > i) continue;
+					for (isize k = pos[t]; k <= i; k++) depth[k]++;
+				}
+			}
+		}
+		for (isize i = 0; i < bc; i++) bweight[p->order[i]->index] = 1ll << (3*gb_min(depth[i], 6));
 	}
 
 	i32 linear = 0;
@@ -212,6 +246,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 		for (xbInstr const &in : b->instrs) {
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
 				if (v == 0) return;
+				vweight[v] += bweight[b->index];
 				if (block[v] < 0) {
 					block[v] = b->index;
 				} else if (block[v] != b->index) {
@@ -223,6 +258,10 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 					if (in.op == xbOp_IConst && xb_type_is_int(p->vregs[v])) {
 						L->is_const[v] = true;
 						L->cval[v] = in.imm;
+					}
+					if (in.op == xbOp_Lea && ((in.mem.kind == xbMem_Local && p->locals[in.mem.base].over_align <= 16) || in.mem.kind == xbMem_Incoming)) {
+						L->remat[v] = true;
+						L->rmem[v] = in.mem;
 					}
 					if ((in.op == xbOp_ICmp || in.op == xbOp_FCmp) || (in.op == xbOp_Load && in.type == xbType_I8)) {
 						L->clean[v] = true;
@@ -263,6 +302,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 		if (defs[v] != 1) {
 			L->is_const[v] = false;
 			L->clean[v] = false;
+			L->remat[v] = false;
 		}
 		L->in_block[v] = defs[v] == 1 && !multi[v] && (first_use[v] < 0 || first_use[v] > def_pos[v]);
 	}
@@ -276,7 +316,9 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	auto gvreg = array_make<u32>(heap_allocator(), 0, 64);
 	defer (array_free(&gvreg));
 	auto lgid = array_make<i32>(heap_allocator(), p->locals.count);
+	auto lweight = array_make<i64>(heap_allocator(), p->locals.count);
 	defer (array_free(&lgid));
+	defer (array_free(&lweight));
 	for (isize i = 0; i < p->locals.count; i++) lgid[i] = -1;
 	for (int pass = 0; pass < 2; pass++) {
 		for (i32 l : ranked) {
@@ -288,7 +330,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	for (isize v = 1; v < vreg_count; v++) {
 		gid[v] = -1;
 		xbType t = p->vregs[v];
-		if (L->in_block[v] || defs[v] == 0 || L->is_const[v] || (!xb_type_is_int(t) && !xb_type_is_float(t))) continue;
+		if (L->in_block[v] || defs[v] == 0 || L->is_const[v] || L->remat[v] || (!xb_type_is_int(t) && !xb_type_is_float(t))) continue;
 		gid[v] = cast(i32)gvreg.count;
 		array_add(&gvreg, cast(u32)v);
 	}
@@ -355,6 +397,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 					smax[scope] = gb_max(smax[scope], linear);
 				}
 				auto note = [&](i32 id, bool is_def) {
+					if (gvreg[id] & A64_LOCAL_ITEM) lweight[gvreg[id] & ~A64_LOCAL_ITEM] += bweight[b->index];
 					if (ev_block[id] != bi) {
 						ev_block[id] = cast(i32)bi;
 						ev_state[id] = 0;
@@ -517,7 +560,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 				} else if (in.op == xbOp_Store) {
 					i32 l = local_of(in.mem);
 					u32 v = in.a;
-					if (l < 0 || v == 0 || !L->in_block[v] || L->uses[v] != 1 || L->is_const[v] || L->via[v] >= 0 ||
+					if (l < 0 || v == 0 || !L->in_block[v] || L->uses[v] != 1 || L->is_const[v] || L->remat[v] || L->via[v] >= 0 ||
 					    !xb_type_is_int(p->vregs[v]) || pos - def_pos[v] > 256 || alias_end[l] >= def_pos[v]) continue;
 					isize d = def_pos[v] - bstart[bi];
 					bool ok = true;
@@ -573,8 +616,17 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	u32 free_v = caller_v | callee_v;
 	u32 used_x = 0, used_v = 0;
 	// the vregs and locals holding a register, listed under the position after their last
-	struct Active { u32 v; i32 next; };
+	struct Active { u32 v; i32 next; bool dead; i32 len; };
 	auto active = array_make<Active>(heap_allocator(), 0, 64);
+	// the active entry holding each x register, and each v register at 32 + n
+	i32 owner[64];
+	for (i32 &o : owner) o = -1;
+	// a local whose register a vreg shares keeps it
+	auto shared = array_make<bool>(heap_allocator(), p->locals.count);
+	defer (array_free(&shared));
+	auto weight_of = [&](u32 v) -> i64 {
+		return (v & A64_LOCAL_ITEM) ? lweight[v & ~A64_LOCAL_ITEM] : vweight[v];
+	};
 	auto expire = array_make<i32>(heap_allocator(), clobbers.count + 1);
 	defer (array_free(&active));
 	defer (array_free(&expire));
@@ -594,6 +646,33 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 			if (w >= 0 && !calls && (*free & (1u << w))) pool = 1u << w;
 		}
 		u32 avail = *free & pool;
+		if (avail == 0) {
+			// the register of the active item that costs least in memory for each position it
+			// covers, when that is less than v's
+			i64 w = weight_of(v);
+			i64 wl = end - linear + 1;
+			i32 best = -1;
+			for (u32 r = 0; r < 32; r++) {
+				if (!(pool & (1u << r))) continue;
+				i32 k = owner[(fp ? 32 : 0) + r];
+				if (k < 0) continue;
+				u32 y = active[k].v;
+				if ((y & A64_LOCAL_ITEM) && shared[y & ~A64_LOCAL_ITEM]) continue;
+				i64 wy = weight_of(y);
+				i64 ly = active[k].len;
+				if (wy*wl < w*ly) { w = wy; wl = ly; best = k; }
+			}
+			if (best >= 0) {
+				u32 y = active[best].v;
+				i8 r = (y & A64_LOCAL_ITEM) ? L->local_reg[y & ~A64_LOCAL_ITEM] : L->reg[y];
+				if (y & A64_LOCAL_ITEM) L->local_reg[y & ~A64_LOCAL_ITEM] = A64_NOREG;
+				else                    L->reg[y] = A64_NOREG;
+				active[best].dead = true;
+				owner[r] = -1;
+				*free |= 1u << (r >= A64_VREG ? r - A64_VREG : r);
+				avail = *free & pool;
+			}
+		}
 		if (avail == 0) return;
 		// the caller saved ones first, they cost no save; from the top, where calls
 		// want the fewest arguments
@@ -616,7 +695,8 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 			used_x |= 1u << r;
 			L->reg[v] = cast(i8)r;
 		}
-		Active act = {v, expire[end+1]};
+		owner[(fp ? 32 : 0) + r] = cast(i32)active.count;
+		Active act = {v, expire[end+1], false, end - linear + 1};
 		expire[end+1] = cast(i32)active.count;
 		array_add(&active, act);
 	};
@@ -625,8 +705,10 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 	for (xbBlock *b : p->order) {
 		for (xbInstr const &in : b->instrs) {
 			for (i32 k = expire[linear]; k >= 0; k = active[k].next) {
+				if (active[k].dead) continue;
 				u32 v = active[k].v;
 				i8 r = (v & A64_LOCAL_ITEM) ? L->local_reg[v & ~A64_LOCAL_ITEM] : L->reg[v];
+				owner[r] = -1;
 				if (r >= A64_VREG) free_v |= 1u << (r - A64_VREG);
 				else               free_x |= 1u << r;
 			}
@@ -636,11 +718,12 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 				take(gvreg[id], ghi[id], clobbers[ghi[id]+1] - clobbers[linear + (glo_def[id] ? 1 : 0)] > 0);
 			}
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
-				if (v == 0 || !is_def || !L->in_block[v] || L->is_const[v] || L->reg[v] != A64_NOREG) return;
+				if (v == 0 || !is_def || !L->in_block[v] || L->is_const[v] || L->remat[v] || L->reg[v] != A64_NOREG) return;
 				xbType t = p->vregs[v];
 				if (!xb_type_is_int(t) && !xb_type_is_float(t)) return;
 				if (L->via[v] >= 0 && L->local_reg[L->via[v]] >= 0) {
 					L->reg[v] = L->local_reg[L->via[v]];
+					shared[L->via[v]] = true;
 					return;
 				}
 				i32 end = last_use[v] >= 0 ? last_use[v] : linear;
@@ -653,6 +736,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 					if (*free & bit) {
 						*free &= ~bit;
 						L->reg[v] = w;
+						owner[w] = cast(i32)active.count;
 						Active act = {v, expire[end+1]};
 						expire[end+1] = cast(i32)active.count;
 						array_add(&active, act);
@@ -686,7 +770,7 @@ gb_internal void a64_lower_layout(a64Lower *L) {
 		for (xbInstr const &in : b->instrs) {
 			to_free.count = 0;
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
-				if (v == 0 || L->reg[v] != A64_NOREG || L->is_const[v]) return;
+				if (v == 0 || L->reg[v] != A64_NOREG || L->is_const[v] || L->remat[v]) return;
 				if (is_def) {
 					i32 s = 0;
 					if (!cross[v] && free_slots.count > 0) {
@@ -761,6 +845,8 @@ gb_internal bool a64_is_const(a64Lower *L, u32 v, i64 *value) {
 	return true;
 }
 
+gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch=A64_TA);
+
 // An x register holding v: its own, or `scratch` loaded with it. Narrow values come
 // extended as `ext` asks; with xbExt_None only the low `size` bytes mean anything.
 gb_internal u8 a64_src(a64Lower *L, u32 v, u8 scratch, i32 size, xbExtKind ext) {
@@ -769,6 +855,11 @@ gb_internal u8 a64_src(a64Lower *L, u32 v, u8 scratch, i32 size, xbExtKind ext) 
 	bool extend = size < 8 && ext != xbExt_None;
 	if (L->is_const[v]) {
 		a64_mov_imm(a, scratch, cast(u64)a64_ext_value(L->cval[v], size, ext));
+		return scratch;
+	}
+	if (L->remat[v]) {
+		a64Addr m = a64_mem(L, L->rmem[v], scratch);
+		a64_add_imm(a, scratch, m.base, m.off);
 		return scratch;
 	}
 	i8 r = L->reg[v];
@@ -860,7 +951,7 @@ gb_internal void a64_putf(a64Lower *L, u32 v, u8 vr, i32 size) {
 }
 
 // A base register and offset for an IR memory reference. May clobber `scratch` and x17.
-gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch=A64_TA) {
+gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch) {
 	xbAsm *a = &L->a;
 	a64Addr r = {};
 	switch (m.kind) {
@@ -881,6 +972,12 @@ gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch=A64_TA) {
 		r.off = 16 + m.offset;
 		return r;
 	case xbMem_Reg:
+		if (L->remat[m.base]) {
+			// the frame address folds into the access
+			xbMem f = L->rmem[m.base];
+			f.offset += m.offset;
+			return a64_mem(L, f, scratch);
+		}
 		r.base = a64_src(L, m.base, scratch, 8, xbExt_None);
 		r.off = m.offset;
 		return r;
@@ -1201,6 +1298,7 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Lea: {
+		if (L->remat[in.dst]) break;
 		u8 d = a64_dst(L, in.dst, A64_T0);
 		// a symbol's address goes right into d
 		a64Addr m = a64_mem(L, in.mem, d);
@@ -1828,6 +1926,8 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 	defer (array_free(&L.clean));
 	defer (array_free(&L.local_reg));
 	defer (array_free(&L.via));
+	defer (array_free(&L.remat));
+	defer (array_free(&L.rmem));
 
 	a64_lower_layout(&L);
 
