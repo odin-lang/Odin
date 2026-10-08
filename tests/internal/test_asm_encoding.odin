@@ -1,6 +1,7 @@
 #+build amd64
 package test_internal
 
+import "core:sys/info"
 import "core:testing"
 
 // A spread of mnemonics and operand shapes, so both backends must agree on the encoding
@@ -221,4 +222,91 @@ asm_encoding_branches :: proc(t: ^testing.T) {
 	testing.expect_value(t, far_skip(5), u64(6))
 	testing.expect_value(t, count_bits(0xF0F0), u64(8))
 	testing.expect_value(t, raw_bytes(), u32(2))
+}
+
+@(test)
+asm_encoding_avx512 :: proc(t: ^testing.T) {
+	features := info.cpu_features()
+	if .avx512f not_in features || .avx512vl not_in features {
+		return
+	}
+	// EVEX forms, registers 16..31, opmask registers and scaled disp8s
+	tern    :: asm(a: #simd[4]u32, b: #simd[4]u32, c: #simd[4]u32) -> (r: #simd[4]u32) [a -> r] { vpternlogd r, b, c, 0x96 }
+	rol     :: asm(a: #simd[4]u32) -> (r: #simd[4]u32) { vprold r, a, 8 }
+	upper   :: asm(a: #simd[4]u32, b: #simd[4]u32) -> (r: #simd[4]u32) [#clobber %xmm20, #clobber %xmm31] {
+		vmovdqu32 %xmm20, a; vmovdqu32 %xmm31, b; vpternlogd %xmm20, %xmm31, %xmm31, 0x3C; vmovdqu32 r, %xmm20
+	}
+	xor512  :: asm(p: ^[16]u32, q: ^[32]u32) [#clobber %zmm1, #clobber %zmm17, #clobber memory] {
+		vmovdqu32 %zmm1, [p]; vmovdqu32 %zmm17, [q + 64]; vpternlogd %zmm1, %zmm17, %zmm17, 0x3C; vmovdqu32 [p], %zmm1
+	}
+	eq_mask :: asm(a: #simd[4]u32, b: #simd[4]u32) -> (r: u32) [#clobber %k1] { vpcmpd %k1, a, b, 0; kmovw r, %k1 }
+	knot    :: asm(a: u32) -> (r: u32) [#clobber %k2, #clobber %k3] { kmovw %k2, a; knotw %k3, %k2; kmovw r, %k3 }
+	compress :: asm(p: [^]u32, a: #simd[4]u32) [#clobber memory] { vpcompressd [p + 8], a }
+	narrow  :: asm(p: [^]u8, a: #simd[2]u64) [#clobber memory] { vpmovqb [p + 6], a }
+
+	testing.expect_value(t, tern({1, 2, 4, 8}, {3, 3, 3, 3}, {5, 5, 5, 5}), #simd[4]u32{7, 4, 2, 14})
+	testing.expect_value(t, rol({0x11223344, 1, 0x80000000, 0}), #simd[4]u32{0x22334411, 0x100, 0x80, 0})
+	testing.expect_value(t, upper({1, 2, 3, 4}, {1, 1, 1, 1}), #simd[4]u32{0, 3, 2, 5})
+	p: [16]u32
+	q: [32]u32
+	for i in 0..<16 {
+		p[i] = u32(i)
+		q[16 + i] = 1
+	}
+	xor512(&p, &q)
+	testing.expect_value(t, p[0], u32(1))
+	testing.expect_value(t, p[15], u32(14))
+	testing.expect_value(t, eq_mask({1, 2, 3, 4}, {1, 0, 3, 0}), u32(0b0101))
+	testing.expect_value(t, knot(0x00F0), u32(0xFF0F))
+	buf: [8]u32
+	compress(raw_data(buf[:]), {7, 8, 9, 10})
+	testing.expect_value(t, buf, [8]u32{0, 0, 7, 8, 9, 10, 0, 0})
+	bytes: [10]u8
+	narrow(raw_data(bytes[:]), {0x1FF, 0x2EE})
+	testing.expect_value(t, bytes, [10]u8{0, 0, 0, 0, 0, 0, 0xFF, 0xEE, 0, 0})
+}
+
+@(test)
+asm_encoding_layout :: proc(t: ^testing.T) {
+	aligned   :: asm() -> (r: u64) { lea r, [.here]; #nop 3; #align 64; .here: }
+	aligned2  :: asm(a: u64) -> (r: u64) [a -> r] { add r, 1; #align 16; add r, 2; #align 32; add r, 3 }
+	table     :: asm(i: u64) -> (r: u32) [t: u64] { lea t, [.tbl]; mov r, [t + i*4]:u32; jmp .out; .tbl: #byte 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0; .out: }
+	data      :: asm() -> (r: u64) { mov r, [.d + 2]:u64; jmp .o; .d: #byte 1, 2, 3, 4, 5, 6, 7, 8, 9, 10; .o: }
+	at_offset :: asm(p: [^]u64, $n: int) -> (r: u64) { mov r, [p + n] }
+	below     :: asm(p: [^]u64, $n: int) -> (r: u64) { mov r, [p - n + 24] }
+
+	testing.expect_value(t, aligned() % 64, u64(0))
+	testing.expect_value(t, aligned2(0), u64(6))
+	testing.expect_value(t, table(2), u32(3))
+	testing.expect_value(t, data(), u64(0x0A09080706050403))
+	a := [4]u64{1, 2, 3, 4}
+	testing.expect_value(t, at_offset(raw_data(a[:]), 16), u64(3))
+	testing.expect_value(t, below(raw_data(a[:]), 8), u64(3))
+}
+
+@(test)
+asm_encoding_high_byte :: proc(t: ^testing.T) {
+	add_high :: asm(a: u8, b: u8) -> (r: u8) [a -> r = %ah, b = %bh] { add r, b }
+	read_ch  :: asm(a: u8) -> (r: u32) [a = %ch] { movzx r, a }
+	write_dh :: asm() -> (r: u8) [r = %dh] { mov r, 9 }
+
+	testing.expect_value(t, add_high(3, 4), u8(7))
+	testing.expect_value(t, read_ch(200), u32(200))
+	testing.expect_value(t, write_dh(), u8(9))
+}
+
+@(test)
+asm_encoding_frame_registers :: proc(t: ^testing.T) {
+	// the template moves rsp itself, and puts it back
+	own_stack :: asm(a: u64) -> (r: u64) [s: u64] {
+		lea s, [%rsp - 64]; mov %rsp, s; push a; pop r; lea s, [%rsp + 64]; mov %rsp, s; cmp s, %rsp
+	}
+	// rbp holds the frame, so it is saved around the template
+	via_rbp :: asm(a: u64) -> (r: u64) [#clobber %rbp] { mov %rbp, a; add %rbp, 5; mov r, %rbp }
+
+	total: u64
+	for i in u64(0)..<4 {
+		total += own_stack(i) + via_rbp(i)
+	}
+	testing.expect_value(t, total, u64(2*6 + 4*5))
 }
