@@ -45,7 +45,7 @@ _MM_FLUSH_ZERO_OFF    :: 0x0000
 
 @(require_results, enable_target_feature="sse")
 _mm_add_ss :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return addss(a, b)
+	return simd.replace(a, 0, simd.extract(a, 0) + simd.extract(b, 0))
 }
 @(require_results, enable_target_feature="sse")
 _mm_add_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
@@ -54,7 +54,7 @@ _mm_add_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
 
 @(require_results, enable_target_feature="sse")
 _mm_sub_ss :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return subss(a, b)
+	return simd.replace(a, 0, simd.extract(a, 0) - simd.extract(b, 0))
 }
 @(require_results, enable_target_feature="sse")
 _mm_sub_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
@@ -63,7 +63,7 @@ _mm_sub_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
 
 @(require_results, enable_target_feature="sse")
 _mm_mul_ss :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return mulss(a, b)
+	return simd.replace(a, 0, simd.extract(a, 0) * simd.extract(b, 0))
 }
 @(require_results, enable_target_feature="sse")
 _mm_mul_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
@@ -72,7 +72,7 @@ _mm_mul_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
 
 @(require_results, enable_target_feature="sse")
 _mm_div_ss :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return divss(a, b)
+	return simd.replace(a, 0, simd.extract(a, 0) / simd.extract(b, 0))
 }
 @(require_results, enable_target_feature="sse")
 _mm_div_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
@@ -80,12 +80,12 @@ _mm_div_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
 }
 
 @(require_results, enable_target_feature="sse")
-_mm_sqrt_ss :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	return sqrtss(a)
+_mm_sqrt_ss :: #force_inline proc "c" (a: __m128) -> __m128 {
+	return simd.replace(a, 0, intrinsics.sqrt(simd.extract(a, 0)))
 }
 @(require_results, enable_target_feature="sse")
 _mm_sqrt_ps :: #force_inline proc "c" (a: __m128) -> __m128 {
-	return sqrtps(a)
+	return simd.sqrt(a)
 }
 
 @(require_results, enable_target_feature="sse")
@@ -306,7 +306,7 @@ _mm_cvtss_f32 :: #force_inline proc "c" (a: __m128) -> f32 {
 
 @(require_results, enable_target_feature="sse")
 _mm_cvtsi32_ss :: #force_inline proc "c" (a: __m128, b: i32) -> __m128 {
-	return cvtsi2ss(a, b)
+	return simd.replace(a, 0, f32(b))
 }
 _mm_cvt_si2ss :: _mm_cvtsi32_ss
 
@@ -527,25 +527,13 @@ when ODIN_ARCH == .amd64 {
 	}
 	@(require_results, enable_target_feature="sse")
 	_mm_cvtsi64_ss :: #force_inline proc "c"(a: __m128, b: i64) -> __m128 {
-		return cvtsi642ss(a, b)
+		return simd.replace(a, 0, f32(b))
 	}
 }
 
 
 @(private, default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.x86.sse.add.ss")
-	addss       :: proc(a, b: __m128) -> __m128 ---
-	@(link_name="llvm.x86.sse.sub.ss")
-	subss       :: proc(a, b: __m128) -> __m128 ---
-	@(link_name="llvm.x86.sse.mul.ss")
-	mulss       :: proc(a, b: __m128) -> __m128 ---
-	@(link_name="llvm.x86.sse.div.ss")
-	divss       :: proc(a, b: __m128) -> __m128 ---
-	@(link_name="llvm.x86.sse.sqrt.ss")
-	sqrtss      :: proc(a: __m128) -> __m128 ---
-	@(link_name="llvm.x86.sse.sqrt.ps")
-	sqrtps      :: proc(a: __m128) -> __m128 ---
 	@(link_name="llvm.x86.sse.rcp.ss")
 	rcpss       :: proc(a: __m128) -> __m128 ---
 	@(link_name="llvm.x86.sse.rcp.ps")
@@ -594,8 +582,6 @@ foreign _ {
 	cvtss2si    :: proc(a: __m128) -> i32 ---
 	@(link_name="llvm.x86.sse.cvttss2si")
 	cvttss2si   :: proc(a: __m128) -> i32 ---
-	@(link_name="llvm.x86.sse.cvtsi2ss")
-	cvtsi2ss    :: proc(a: __m128, b: i32) -> __m128 ---
 	@(link_name="llvm.x86.sse.sfence")
 	sfence      :: proc() ---
 	@(link_name="llvm.x86.sse.stmxcsr")
@@ -613,6 +599,4 @@ foreign _ {
 	cvtss2si64  :: proc(a: __m128) -> i64 ---
 	@(link_name="llvm.x86.sse.cvttss2si64")
 	cvttss2si64 :: proc(a: __m128) -> i64 ---
-	@(link_name="llvm.x86.sse.cvtsi642ss")
-	cvtsi642ss  :: proc(a: __m128, b: i64) -> __m128 ---
 }
