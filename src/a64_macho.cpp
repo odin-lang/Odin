@@ -154,6 +154,7 @@ enum a64OutSection {
 	a64Out_DebugAbbrev,
 	a64Out_DebugInfo,
 	a64Out_DebugLine,
+	a64Out_DebugRanges,
 	a64Out_CompactUnwind,
 	a64Out_Bss,        // the zerofill sections come last
 	a64Out_ThreadBss,
@@ -374,7 +375,8 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		sec[a64Out_DebugAbbrev] = d.abbrev;
 		sec[a64Out_DebugInfo] = d.info;
 		sec[a64Out_DebugLine] = d.line;
-		for (i32 i = a64Out_DebugAbbrev; i <= a64Out_DebugLine; i++) {
+		sec[a64Out_DebugRanges] = d.ranges;
+		for (i32 i = a64Out_DebugAbbrev; i <= a64Out_DebugRanges; i++) {
 			sec_size[i] = sec[i].count;
 		}
 		auto add = [&](i32 sect, xbDwarfAddr const &a) {
@@ -437,6 +439,7 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		{"__debug_abbrev", "__DWARF", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
 		{"__debug_info",   "__DWARF", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
 		{"__debug_line",   "__DWARF", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
+		{"__debug_ranges", "__DWARF", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
 		{"__compact_unwind", "__LD", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
 		{"__bss",         "__DATA", A64_S_ZEROFILL, true},
 		{"__thread_bss",  "__DATA", A64_S_THREAD_LOCAL_ZEROFILL, true},

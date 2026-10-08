@@ -945,6 +945,7 @@ gb_internal void a64_lower_proc(xbProc *p) {
 	dbg.line_entry_start = cast(i32)m->lines.count;
 	dbg.type = p->type;
 	dbg.saved_regs = array_make<xbProcDebug::SavedReg>(heap_allocator(), 0, 0);
+	dbg.scope_marks = array_make<xbScopeMark>(heap_allocator(), 0, 16);
 
 	// prologue
 	a64_emit(a, 0xA9BF7BFD); // stp x29, x30, [sp, #-16]!
@@ -1000,8 +1001,15 @@ gb_internal void a64_lower_proc(xbProc *p) {
 		xbBlock *b = order[bi];
 		i32 next_block = bi+1 < order.count ? order[bi+1]->index : -1;
 		b->code_offset = cast(i32)xb_pos(a);
+		xbScopeMark mark = {cast(i32)(xb_pos(a) - L.proc_start), b->debug_scope, b->cold};
+		array_add(&dbg.scope_marks, mark);
 		for (isize i = 0; i < b->instrs.count; i++) {
 			xbInstr const &in = b->instrs[i];
+			if (in.op == xbOp_Scope) {
+				xbScopeMark mark = {cast(i32)(xb_pos(a) - L.proc_start), cast(i32)in.imm, b->cold};
+				array_add(&dbg.scope_marks, mark);
+				continue;
+			}
 			// a jump to the next block is a fallthrough
 			if (in.op == xbOp_Jump && i+1 == b->instrs.count && cast(i32)in.imm == next_block) {
 				continue;
@@ -1023,6 +1031,8 @@ gb_internal void a64_lower_proc(xbProc *p) {
 
 	// debug variables, now that frame offsets are known
 	dbg.vars = array_make<xbDebugVar>(heap_allocator(), 0, p->debug_vars.count);
+	dbg.scope_parent = array_make<i32>(heap_allocator(), 0, p->debug_scope_parent.count);
+	array_add_elems(&dbg.scope_parent, p->debug_scope_parent.data, p->debug_scope_parent.count);
 	for (xbDebugVar v : p->debug_vars) {
 		if (v.local >= 0) {
 			xbLocal const &l = p->locals[v.local];

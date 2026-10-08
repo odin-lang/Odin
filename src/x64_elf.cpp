@@ -89,6 +89,7 @@ enum xbOutSection {
 	xbOut_DebugAbbrev,
 	xbOut_DebugInfo,
 	xbOut_DebugLine,
+	xbOut_DebugRanges,
 	xbOut_DebugGdbScripts,
 	xbOut_NoteStack,
 	xbOut_RelaText,
@@ -112,6 +113,7 @@ enum {
 	XDW_TAG_array_type       = 0x01,
 	XDW_TAG_enumeration_type = 0x04,
 	XDW_TAG_formal_parameter = 0x05,
+	XDW_TAG_lexical_block    = 0x0b,
 	XDW_TAG_member           = 0x0d,
 	XDW_TAG_pointer_type     = 0x0f,
 	XDW_TAG_compile_unit     = 0x11,
@@ -149,6 +151,7 @@ enum {
 	XDW_AT_frame_base      = 0x40,
 	XDW_AT_type            = 0x49,
 	XDW_AT_data_bit_offset = 0x6b,
+	XDW_AT_ranges          = 0x55,
 	XDW_AT_linkage_name    = 0x6e,
 
 	XDW_FORM_addr         = 0x01,
@@ -208,6 +211,8 @@ enum xbAbbrev {
 	xbAbbrev_SubprogramRetNoChildren,
 	xbAbbrev_NamedPointerType,
 	xbAbbrev_Enumerator64,
+	xbAbbrev_LexicalBlock,
+	xbAbbrev_LexicalBlockRanges,
 };
 
 gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
@@ -361,6 +366,13 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 		XDW_AT_type, XDW_FORM_ref4,
 		XDW_AT_external, XDW_FORM_flag_present,
 		XDW_AT_const_value, XDW_FORM_sdata,
+	});
+	abbrev(xbAbbrev_LexicalBlock, XDW_TAG_lexical_block, true, {
+		XDW_AT_low_pc, XDW_FORM_addr,
+		XDW_AT_high_pc, XDW_FORM_data4,
+	});
+	abbrev(xbAbbrev_LexicalBlockRanges, XDW_TAG_lexical_block, true, {
+		XDW_AT_ranges, XDW_FORM_sec_offset,
 	});
 	xbb_u8(b, 0);
 }
@@ -813,11 +825,93 @@ struct xbDwarf {
 	Array<u8> abbrev;
 	Array<u8> info;
 	Array<u8> line;
+	Array<u8> ranges;
 	Array<xbDwarfAddr> info_addrs;
 	Array<xbDwarfAddr> line_addrs;
+	Array<isize> ranges_refs; // in .debug_info, the offsets into .debug_ranges, which ELF relocates
 	isize abbrev_offset_at; // in .debug_info, the offsets into .debug_abbrev and .debug_line
 	isize stmt_list_at;
 };
+
+// The lexical blocks of a procedure. Like LLVM, a scope gets one when it has variables of its
+// own and code; otherwise its variables and blocks go to the parent's block.
+struct xbDwarfScopes {
+	struct Range { i32 lo, hi, next; };
+	Array<i32> eff;                  // per scope: the scope whose block holds its variables
+	Array<i32> kid, sib;             // the first block inside a block, the next block beside it
+	Array<i32> head, tail;           // per scope: its code ranges, a list in `pool`
+	Array<i32> var_head, var_tail, var_next; // the variables a block holds, in order
+	Array<Range> pool;
+};
+
+gb_internal void xb_dwarf_scopes(xbDwarfScopes *sc, xbProcDebug const &pd, i32 len) {
+	isize n = gb_max(pd.scope_parent.count, cast(isize)1);
+	auto parent = [&](i32 s) -> i32 { return s < pd.scope_parent.count ? pd.scope_parent[s] : -1; };
+	array_resize(&sc->eff, n);
+	array_resize(&sc->kid, n);
+	array_resize(&sc->sib, n);
+	array_resize(&sc->head, n);
+	array_resize(&sc->tail, n);
+	array_resize(&sc->var_head, n);
+	array_resize(&sc->var_tail, n);
+	array_resize(&sc->var_next, pd.vars.count);
+	sc->pool.count = 0;
+	for (isize s = 0; s < n; s++) {
+		sc->eff[s] = 0; // 1 here: the scope has variables of its own
+		sc->kid[s] = sc->sib[s] = sc->head[s] = sc->tail[s] = sc->var_head[s] = sc->var_tail[s] = -1;
+	}
+	for (xbDebugVar const &v : pd.vars) {
+		if (v.scope < n) sc->eff[v.scope] = 1;
+	}
+	// the code of a scope, with its nested scopes' and its cold blocks', so it may be in pieces
+	auto const &marks = pd.scope_marks;
+	for_array(k, marks) {
+		i32 lo = marks[k].code_offset;
+		i32 hi = k+1 < marks.count ? marks[k+1].code_offset : len;
+		if (hi <= lo) continue;
+		for (i32 s = marks[k].scope; s > 0; s = parent(s)) {
+			if (sc->eff[s] == 0) continue;
+			i32 t = sc->tail[s];
+			if (t >= 0 && sc->pool[t].hi == lo) {
+				sc->pool[t].hi = hi;
+				continue;
+			}
+			xbDwarfScopes::Range r = {lo, hi, -1};
+			i32 at = cast(i32)sc->pool.count;
+			array_add(&sc->pool, r);
+			if (t >= 0) sc->pool[t].next = at; else sc->head[s] = at;
+			sc->tail[s] = at;
+		}
+	}
+	// parents first, by the ids; kids are linked in reverse, then put back in order
+	sc->eff[0] = 0;
+	for (isize s = 1; s < n; s++) {
+		i32 pe = sc->eff[parent(cast(i32)s)];
+		if (sc->eff[s] == 1 && sc->head[s] >= 0) {
+			sc->eff[s] = cast(i32)s;
+			sc->sib[s] = sc->kid[pe];
+			sc->kid[pe] = cast(i32)s;
+		} else {
+			sc->eff[s] = pe;
+		}
+	}
+	for (isize s = 0; s < n; s++) {
+		i32 prev = -1;
+		for (i32 c = sc->kid[s]; c >= 0; ) {
+			i32 next = sc->sib[c];
+			sc->sib[c] = prev;
+			prev = c;
+			c = next;
+		}
+		sc->kid[s] = prev;
+	}
+	for_array(i, pd.vars) {
+		i32 s = pd.vars[i].scope < n ? sc->eff[pd.vars[i].scope] : 0;
+		sc->var_next[i] = -1;
+		if (sc->var_tail[s] >= 0) sc->var_next[sc->var_tail[s]] = cast(i32)i; else sc->var_head[s] = cast(i32)i;
+		sc->var_tail[s] = cast(i32)i;
+	}
+}
 
 // DW_AT_location of a symbol's storage: its address, or its offset in the thread's TLS block.
 // On macOS the symbol of a thread local is its TLV descriptor, which lldb resolves with form_tls_address.
@@ -835,6 +929,8 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 	d->abbrev = array_make<u8>(heap_allocator(), 0, 4096);
 	d->info = array_make<u8>(heap_allocator(), 0, 1<<16);
 	d->line = array_make<u8>(heap_allocator(), 0, 1<<16);
+	d->ranges = array_make<u8>(heap_allocator(), 0, 0);
+	d->ranges_refs = array_make<isize>(heap_allocator(), 0, 0);
 	d->info_addrs = array_make<xbDwarfAddr>(heap_allocator(), 0, 256);
 	d->line_addrs = array_make<xbDwarfAddr>(heap_allocator(), 0, 256);
 	u8 const frame_reg = xb_is_arm64() ? XDW_OP_reg0 + 29 : XDW_OP_reg6; // x29 or rbp
@@ -1011,6 +1107,70 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 			}
 		}
 
+		auto emit_var = [&](xbDebugVar const &v) {
+			xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
+			xbb_str(b, v.name);
+			if (v.local < 0) {
+				xb_dwarf_symbol_location(m, b, &d->info_addrs, v.sym);
+				xbb_uleb(b, cast(u64)gb_max(v.line, 0));
+				xb_dwarf_type_ref(&dt, v.type);
+				return;
+			}
+			Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
+			if (v.in_reg) {
+				xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
+			} else {
+				// the frame pointer is the frame base
+				xbb_u8(&expr, XDW_OP_fbreg);
+				xbb_sleb(&expr, v.frame_offset_fixup);
+				if (v.by_ref) {
+					xbb_u8(&expr, XDW_OP_deref);
+				}
+			}
+			xbb_uleb(b, cast(u64)expr.count);
+			xbb_bytes(b, expr.data, expr.count);
+			array_free(&expr);
+			xbb_uleb(b, cast(u64)gb_max(v.line, 0));
+			xb_dwarf_type_ref(&dt, v.type);
+		};
+		xbDwarfScopes sc = {};
+		sc.eff = array_make<i32>(heap_allocator(), 0, 0);
+		sc.kid = array_make<i32>(heap_allocator(), 0, 0);
+		sc.sib = array_make<i32>(heap_allocator(), 0, 0);
+		sc.head = array_make<i32>(heap_allocator(), 0, 0);
+		sc.tail = array_make<i32>(heap_allocator(), 0, 0);
+		sc.var_head = array_make<i32>(heap_allocator(), 0, 0);
+		sc.var_tail = array_make<i32>(heap_allocator(), 0, 0);
+		sc.var_next = array_make<i32>(heap_allocator(), 0, 0);
+		sc.pool = array_make<xbDwarfScopes::Range>(heap_allocator(), 0, 0);
+		// a block's variables, then its blocks, nested like the scopes
+		auto emit_block = [&](auto &self, xbProcDebug const &pd, i32 s) -> void {
+			for (i32 i = sc.var_head[s]; i >= 0; i = sc.var_next[i]) emit_var(pd.vars[i]);
+			for (i32 c = sc.kid[s]; c >= 0; c = sc.sib[c]) {
+				xbDwarfScopes::Range const &r = sc.pool[sc.head[c]];
+				if (r.next < 0) {
+					xbb_uleb(b, xbAbbrev_LexicalBlock);
+					xbDwarfAddr a = {b->count, -1, pd.start + r.lo};
+					array_add(&d->info_addrs, a);
+					xbb_u64(b, 0);
+					xbb_u32(b, cast(u32)(r.hi - r.lo));
+				} else {
+					xbb_uleb(b, xbAbbrev_LexicalBlockRanges);
+					array_add(&d->ranges_refs, b->count);
+					xbb_u32(b, cast(u32)d->ranges.count);
+					// offsets from the unit's low_pc, the start of the text section
+					for (i32 k = sc.head[c]; k >= 0; k = sc.pool[k].next) {
+						xbb_u64(&d->ranges, cast(u64)(pd.start + sc.pool[k].lo));
+						xbb_u64(&d->ranges, cast(u64)(pd.start + sc.pool[k].hi));
+					}
+					xbb_u64(&d->ranges, 0);
+					xbb_u64(&d->ranges, 0);
+				}
+				self(self, pd, c);
+				xbb_u8(b, 0);
+			}
+		};
+
 		for (xbProcDebug const &pd : m->proc_debug) {
 			bool has_children = pd.vars.count > 0;
 			// the single result, so `finish` shows it
@@ -1037,35 +1197,15 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 			xbb_uleb(b, cast(u64)gb_max(pd.line, 0));
 			if (ret) xb_dwarf_type_ref(&dt, ret);
 			if (has_children) {
-				for (xbDebugVar const &v : pd.vars) {
-					xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
-					xbb_str(b, v.name);
-					if (v.local < 0) {
-						xb_dwarf_symbol_location(m, b, &d->info_addrs, v.sym);
-						xbb_uleb(b, cast(u64)gb_max(v.line, 0));
-						xb_dwarf_type_ref(&dt, v.type);
-						continue;
-					}
-					Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
-					if (v.in_reg) {
-						xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
-					} else {
-						// the frame pointer is the frame base
-						xbb_u8(&expr, XDW_OP_fbreg);
-						xbb_sleb(&expr, v.frame_offset_fixup);
-						if (v.by_ref) {
-							xbb_u8(&expr, XDW_OP_deref);
-						}
-					}
-					xbb_uleb(b, cast(u64)expr.count);
-					xbb_bytes(b, expr.data, expr.count);
-					array_free(&expr);
-					xbb_uleb(b, cast(u64)gb_max(v.line, 0));
-					xb_dwarf_type_ref(&dt, v.type);
-				}
+				xb_dwarf_scopes(&sc, pd, cast(i32)(pd.end - pd.start));
+				emit_block(emit_block, pd, 0);
 				xbb_u8(b, 0);
 			}
 		}
+
+		array_free(&sc.eff); array_free(&sc.kid); array_free(&sc.sib);
+		array_free(&sc.head); array_free(&sc.tail); array_free(&sc.pool);
+		array_free(&sc.var_head); array_free(&sc.var_tail); array_free(&sc.var_next);
 
 		// types, written after their first use
 		for (isize i = 0; i < dt.queue.count; i++) {
@@ -1155,10 +1295,17 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 		sec[xbOut_DebugAbbrev] = d.abbrev;
 		sec[xbOut_DebugInfo] = d.info;
 		sec[xbOut_DebugLine] = d.line;
+		sec[xbOut_DebugRanges] = d.ranges;
 		xbExtraReloc ra = {d.abbrev_offset_at, xbOut_DebugAbbrev, XB_R_X86_64_32, 0};
 		xbExtraReloc rs = {d.stmt_list_at, xbOut_DebugLine, XB_R_X86_64_32, 0};
 		array_add(&info_relocs, ra);
 		array_add(&info_relocs, rs);
+		for (isize at : d.ranges_refs) {
+			u32 off = 0;
+			gb_memmove(&off, d.info.data + at, 4);
+			xbExtraReloc r = {at, xbOut_DebugRanges, XB_R_X86_64_32, off};
+			array_add(&info_relocs, r);
+		}
 		for (xbDwarfAddr const &a : d.info_addrs) {
 			if (a.sym < 0) {
 				xbExtraReloc r = {a.offset, xbOut_Text, XB_R_X86_64_64, a.addend};
@@ -1200,7 +1347,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	array_add(&syms, null_sym);
 
 	i32 section_sym[xbOut_COUNT] = {};
-	xbOutSection sym_sections[] = {xbOut_Text, xbOut_Rodata, xbOut_Data, xbOut_Bss, xbOut_TData, xbOut_TBss, xbOut_EhFrame, xbOut_DebugAbbrev, xbOut_DebugInfo, xbOut_DebugLine};
+	xbOutSection sym_sections[] = {xbOut_Text, xbOut_Rodata, xbOut_Data, xbOut_Bss, xbOut_TData, xbOut_TBss, xbOut_EhFrame, xbOut_DebugAbbrev, xbOut_DebugInfo, xbOut_DebugLine, xbOut_DebugRanges};
 	for (xbOutSection s : sym_sections) {
 		xbElfSym es = {};
 		es.st_info = (0 << 4) | 3; // local, section
@@ -1324,7 +1471,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 
 	// section headers
 	char const *names[xbOut_COUNT] = {
-		"", ".text", ".rodata", ".data", ".bss", ".tdata", ".tbss", ".eh_frame", ".debug_abbrev", ".debug_info", ".debug_line", ".debug_gdb_scripts",
+		"", ".text", ".rodata", ".data", ".bss", ".tdata", ".tbss", ".eh_frame", ".debug_abbrev", ".debug_info", ".debug_line", ".debug_ranges", ".debug_gdb_scripts",
 		".note.GNU-stack", ".rela.text", ".rela.data", ".rela.rodata", ".rela.tdata", ".rela.eh_frame",
 		".rela.debug_info", ".rela.debug_line", ".symtab", ".strtab", ".shstrtab",
 	};
@@ -1358,6 +1505,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	set(xbOut_DebugAbbrev, SHT_PROGBITS, 0, 1);
 	set(xbOut_DebugInfo,   SHT_PROGBITS, 0, 1);
 	set(xbOut_DebugLine,   SHT_PROGBITS, 0, 1);
+	set(xbOut_DebugRanges, SHT_PROGBITS, 0, 1);
 	set(xbOut_DebugGdbScripts, SHT_PROGBITS, SHF_MERGE|SHF_STRINGS, 1, 1);
 	set(xbOut_NoteStack,   SHT_PROGBITS, 0, 1);
 	set(xbOut_RelaText,      SHT_RELA, SHF_INFO_LINK, 8, 24, xbOut_Symtab, xbOut_Text);
