@@ -89,6 +89,7 @@ enum xbOutSection {
 	xbOut_DebugAbbrev,
 	xbOut_DebugInfo,
 	xbOut_DebugLine,
+	xbOut_DebugGdbScripts,
 	xbOut_NoteStack,
 	xbOut_RelaText,
 	xbOut_RelaData,
@@ -1002,6 +1003,23 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 		}
 	}
 
+	// the gdb pretty printers, the same entry LLVM writes (see `debug_gdb_scripts` in llvm_backend.cpp), so the linker merges the two
+	if (debug) {
+		String script_path = concatenate_strings(temporary_allocator(), odin_root_dir(), str_lit("base/runtime/odin_debugger.py"));
+		gbFileContents fc = gb_file_read_contents(heap_allocator(), false, alloc_cstring(temporary_allocator(), script_path));
+		if (fc.data != nullptr) {
+			Array<u8> *b = &sec[xbOut_DebugGdbScripts];
+			xbb_u8(b, 4); // an entry of kind 4 is the script's name, a newline, then its text
+			xbb_bytes(b, "odin_debugger.py\n", 17);
+			for (isize i = 0; i < fc.size; i++) {
+				u8 c = (cast(u8 *)fc.data)[i];
+				if (c != '\r') xbb_u8(b, c);
+			}
+			xbb_u8(b, 0);
+			gb_file_free_contents(&fc);
+		}
+	}
+
 	// symbols: null, section symbols, then globals
 	auto strtab = array_make<u8>(heap_allocator(), 0, 4096);
 	xbb_u8(&strtab, 0);
@@ -1134,7 +1152,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 
 	// section headers
 	char const *names[xbOut_COUNT] = {
-		"", ".text", ".rodata", ".data", ".bss", ".tdata", ".tbss", ".eh_frame", ".debug_abbrev", ".debug_info", ".debug_line",
+		"", ".text", ".rodata", ".data", ".bss", ".tdata", ".tbss", ".eh_frame", ".debug_abbrev", ".debug_info", ".debug_line", ".debug_gdb_scripts",
 		".note.GNU-stack", ".rela.text", ".rela.data", ".rela.rodata", ".rela.tdata", ".rela.eh_frame",
 		".rela.debug_info", ".rela.debug_line", ".symtab", ".strtab", ".shstrtab",
 	};
@@ -1155,7 +1173,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 		sh[s].sh_link = link;
 		sh[s].sh_info = info;
 	};
-	u64 const SHF_WRITE = 1, SHF_ALLOC = 2, SHF_EXEC = 4, SHF_INFO_LINK = 0x40, SHF_TLS = 0x400;
+	u64 const SHF_WRITE = 1, SHF_ALLOC = 2, SHF_EXEC = 4, SHF_MERGE = 0x10, SHF_STRINGS = 0x20, SHF_INFO_LINK = 0x40, SHF_TLS = 0x400;
 	u32 const SHT_PROGBITS = 1, SHT_SYMTAB = 2, SHT_STRTAB = 3, SHT_RELA = 4, SHT_NOBITS = 8;
 	auto align_of = [&](xbSection s) -> u64 { return cast(u64)gb_max(m->section_align[s], cast(i64)16); };
 	set(xbOut_Text,        SHT_PROGBITS, SHF_ALLOC|SHF_EXEC, 16);
@@ -1168,6 +1186,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	set(xbOut_DebugAbbrev, SHT_PROGBITS, 0, 1);
 	set(xbOut_DebugInfo,   SHT_PROGBITS, 0, 1);
 	set(xbOut_DebugLine,   SHT_PROGBITS, 0, 1);
+	set(xbOut_DebugGdbScripts, SHT_PROGBITS, SHF_MERGE|SHF_STRINGS, 1, 1);
 	set(xbOut_NoteStack,   SHT_PROGBITS, 0, 1);
 	set(xbOut_RelaText,      SHT_RELA, SHF_INFO_LINK, 8, 24, xbOut_Symtab, xbOut_Text);
 	set(xbOut_RelaData,      SHT_RELA, SHF_INFO_LINK, 8, 24, xbOut_Symtab, xbOut_Data);
