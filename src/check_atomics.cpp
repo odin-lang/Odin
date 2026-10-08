@@ -1,31 +1,63 @@
-// The analysis of atomic memory orderings, after every procedure body is checked. Each atomic operation on `&x` is
-// on a location: a global, a static, or a field for every value of its struct, as which value it is cannot be known.
-// What is written with release ordering but only loaded with relaxed ordering, or read with acquire ordering but only
-// stored with relaxed ordering, orders nothing, and is warned about, unless the address of the location is taken
-// elsewhere, as it may then be accessed through it. Only loads and stores are what it would pair with, as a
-// read-modify-write asking for an ordering which nothing pairs with, e.g. to count, is harmless.
-// A call to a procedure with `@(futex=.Wait)` is a relaxed load of what it waits on, as the OS only compares it, and
-// one with `@(futex=.Wake)` accesses nothing; neither is taking its address elsewhere.
-// A relaxed read acquires when an acquire fence may be reached after it: later in its procedure, in the same loop, in
-// a `defer`, in what its procedure calls after it, directly or not, or in a procedure which calls its own before the
-// fence. A relaxed write releases, likewise, when a release fence may be reached before it.
-// Also warned about: a weak compare-exchange whose second result is not used, as it may fail even when the value
-// matches; a futex woken before the procedure waking it writes it, as what waits on it may sleep again; and with an
-// unpaired ordering, an `atomic_signal_fence` where an `atomic_thread_fence` would pair, as it only orders against a
-// signal handler on the same thread.
-// Atomics on a local whose address is only taken by them are warned about too, as nothing else can access it, so they
-// order nothing; `volatile_*` is probably what is meant, to keep the accesses, or it is a copy of what is shared.
-// A location accessed with `volatile_*` and atomically is warned about, as a volatile access is not atomic.
-// Atomics on a @(thread_local) whose address is not taken are warned about, as only its own thread can access it.
-// A store followed by a load of something else, with the reverse elsewhere, as in Dekker's algorithm, is warned about
-// unless .Seq_Cst orders each, as acquire and release ordering lets both loads read what was there before.
-// The same location accessed atomically with different sizes is warned about, as C11 leaves it undefined.
-// With -vet-atomic-access, a plain read or write of a location accessed atomically is an error, unless a call before it
-// to a procedure with `@(synchronizes=...)` acquires something which no call since releases, as within a lock, or for
-// a write, a call after it releases something which no call since acquires, as starting a thread does. Only calls in
-// branches which enclose it count, and deferred ones do not, and a call on what is not known, e.g. a lock without
-// arguments, may release anything. `@(synchronizes_shared=...)`, as on a shared lock, only synchronizes reads. What a procedure without either synchronizes is inferred from what it calls: what it releases
-// before it acquires it, as unlocking does, and what it acquires but does not release by some return, as locking does.
+// NOTE(bill, 2026-10-08): Atomic memory ordering analysis
+//
+// Odin's atomics are modelled after the C11 atomics and threads memory model.
+// Odin is also designed around futexes, which C11 does not have, as Odin is targeting modern systems and pretty
+// much all modern systems have them and are designed around them too.
+//
+// This atomic analysis looks for atomics which cannot do what they ask for under that model.
+// It runs once after every procedure body has been checked.
+//
+// Atomics are tracked per location, which is one of the following:
+// - a global variables
+// - a `@(static)`
+// - a `@(thread_local)`
+// - a struct field (one location shared by every value of that struct)
+//
+// The analysis will warn if one of the following things occur:
+// - A release store which only relaxed loads read, or an acquire load of what only relaxed stores write, as nothing
+//   pairs with it (read-modify-writes, e.g. counters, are fine, and thus is a location whose address escapes)
+// - A weak compare-exchange whose `ok` is ignored, as it can fail even when the value matches
+// - A futex woken before it is written, as the waiter may go back to sleep
+// - An `atomic_signal_fence` where an `atomic_thread_fence` would pair, as it only orders within its own thread
+// - Atomics on a local which nothing else can reach (`volatile_*` was probably meant)
+// - Atomics on a @(thread_local) whose address is never taken, as only its own thread can see it
+// - Mixing `volatile_*` and atomic accesses of the same location, as a volatile access is not atomic
+// - Dekker-style store-then-load pairs, unless .Seq_Cst orders both sides
+// - Accessing the same location atomically with different sizes, which C11 leaves undefined
+//
+// A relaxed load acquires if an acquire fence may come after it:
+//     Later in the procedure, in the same loop, in a `defer`, in a callee, or in a caller after the call).
+//
+// A relaxed store releases if a release fence may come before it.
+//
+// The analysis utilizes specific attributes to check for things.
+// NOTE: None of these attributes affect code generation.
+//
+// @(futex=.Wait) / @(futex=.Wake), taking an `intrinsics.Futex_Operation`
+// - The futex word is the first parameter, or the one named with @(futex_parameter="name")
+//   - The parameter must also be a pointer to an integer (or a polymorphic type)
+// - A wait is a relaxed load of the word, as the OS only compares it, and a wake accesses nothing
+// - Neither escapes the word, nor counts towards the "atomics on a local" warning
+//
+// @(synchronizes=...), taking an `intrinsics.Atomic_Memory_Order` except for .Relaxed
+// - The procedure acts as that ordering on its first argument, e.g. .Acquire for a lock, .Release for an unlock or
+//   starting a thread, .Acq_Rel for a barrier
+// - Only used by -vet-atomic-access, where a plain (non-atomic) read or write of an atomic location is an error,
+//   unless it is:
+//   - After an acquire with no release of the same object since, or
+//   - A write before a release with no acquire of the same object in between
+// - Only calls which are not deferred, in branches enclosing the access, count
+// - An object is a variable and a field path (`&s.m` is `s` and `.m`), and two match when one contains the other
+// - An object which cannot be worked out, e.g. a lock without arguments, may be anything
+// - A try-lock is taken to always acquire
+// - What a @(deferred_in=...) procedure defers, e.g. a guard's unlock, counts as a deferred call
+//
+// @(synchronizes_shared=...), as @(synchronizes=...) but for the shared side of a reader-writer lock
+// - A shared acquire only covers plain reads, and a shared release publishes no writes
+//
+// A procedure with neither has one inferred from what it calls, releasing something before acquiring it is a release (an unlock).
+// Still holding something when it returns is an acquire (a lock).
+// An explicit attribute always wins.
 
 struct AtomicUses {
 	Ast *first;        // the first atomic operation of each, by position
