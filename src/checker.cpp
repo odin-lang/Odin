@@ -4639,6 +4639,14 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		case OdinFutexOperation_Wake: ac->futex = ProcedureFutex_Wake; break;
 		}
 		return true;
+	} else if (name == "futex_parameter") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String || ev.value_string.len == 0) {
+			error(elem, "Expected the name of a parameter for '%.*s'", LIT(name));
+		} else {
+			ac->futex_parameter = ev.value_string;
+		}
+		return true;
 	}
 	return false;
 }

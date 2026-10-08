@@ -1552,14 +1552,25 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.fast_math_flags = ac.fast_math_flags;
 
 	e->Procedure.futex = cast(ProcedureFutex)ac.futex;
+	if (ac.futex == ProcedureFutex_None && ac.futex_parameter.len != 0) {
+		error(e->token, "@(futex_parameter) can only be used with @(futex)");
+	}
 	if (ac.futex != ProcedureFutex_None) {
-		// what it waits on or wakes, which may only be known for each instantiation
-		Type *word = nullptr;
+		Entity *param = nullptr;
 		if (pt->param_count > 0) {
-			word = pt->params->Tuple.variables[0]->type;
+			for_array(i, pt->params->Tuple.variables) {
+				Entity *v = pt->params->Tuple.variables[i];
+				if (ac.futex_parameter.len == 0 || v->token.string == ac.futex_parameter) {
+					param = v;
+					e->Procedure.futex_parameter = cast(i32)i;
+					break;
+				}
+			}
 		}
-		if (word == nullptr || !is_type_pointer(word) || !(is_type_integer(type_deref(word)) || is_type_polymorphic(type_deref(word)))) {
-			error(e->token, "A procedure with @(futex) must take a pointer to an integer as its first parameter, which is what it waits on or wakes");
+		if (param == nullptr && ac.futex_parameter.len != 0) {
+			error(e->token, "@(futex_parameter) names '%.*s', which is not a parameter of '%.*s'", LIT(ac.futex_parameter), LIT(e->token.string));
+		} else if (param == nullptr || !is_type_pointer(param->type) || !(is_type_integer(type_deref(param->type)) || is_type_polymorphic(type_deref(param->type)))) {
+			error(e->token, "A procedure with @(futex) must take a pointer to an integer as its first parameter, or the one @(futex_parameter) names, which is what it waits on or wakes");
 		}
 	}
 

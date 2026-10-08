@@ -316,6 +316,7 @@ struct Entity {
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
 			ProcedureFutex            futex;
+			i32                       futex_parameter; // the index of what `futex` waits on or wakes
 
 			u64     fast_math_flags;
 

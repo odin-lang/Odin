@@ -167,7 +167,8 @@ struct AttributeContext {
 
 	u64 fast_math_flags;
 
-	u8 futex; // ProcedureFutex
+	u8     futex; // ProcedureFutex
+	String futex_parameter;
 
 	bool   raddbg_type_view;
 	String raddbg_type_view_string;
@@ -287,7 +288,7 @@ struct CheckedCall {
 struct CheckedAtomic {
 	Ast *          call;
 	DeclInfo *     decl;
-	i32            id;    // BuiltinProcId, of an atomic intrinsic
+	i32            id;    // BuiltinProcId, of an atomic or volatile intrinsic
 	u8             futex; // ProcedureFutex, or of a call to a procedure with `@(futex=...)`
 };
 
