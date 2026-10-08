@@ -4,8 +4,8 @@
 // stored with relaxed ordering, orders nothing, and is warned about, unless the address of the location is taken
 // elsewhere, as it may then be accessed through it. Only loads and stores are what it would pair with, as a
 // read-modify-write asking for an ordering which nothing pairs with, e.g. to count, is harmless.
-// A call to a procedure with `@(futex=.Wait)` is a relaxed load of what its first argument points to, as the OS only
-// compares it, and one with `@(futex=.Wake)` accesses nothing; neither is taking its address elsewhere.
+// A call to a procedure with `@(futex=.Wait)` is a relaxed load of what it waits on, as the OS only compares it, and
+// one with `@(futex=.Wake)` accesses nothing; neither is taking its address elsewhere.
 // A relaxed read acquires when an acquire fence may be reached after it: later in its procedure, in the same loop, in
 // a `defer`, or in a procedure which calls its own, directly or not, before the fence. A relaxed write releases,
 // likewise, when a release fence may be reached before it.
@@ -201,6 +201,38 @@ gb_internal void check_atomic_address_taken(AtomicScan *s, Ast *expr) {
 			local->addressed += 1;
 		}
 	}
+}
+
+gb_internal Ast *check_atomic_call_address(Ast *call) {
+	ast_node(ce, CallExpr, call);
+	Ast *arg = nullptr;
+	Entity *e = entity_of_node(ce->proc);
+	if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.futex != ProcedureFutex_None) {
+		Type *pt = base_type(e->type);
+		isize index = e->Procedure.futex_parameter;
+		if (pt->kind != Type_Proc || pt->Proc.params == nullptr || index >= pt->Proc.params->Tuple.variables.count) {
+			return nullptr;
+		}
+		String name = pt->Proc.params->Tuple.variables[index]->token.string;
+		for (Ast *a : ce->args) {
+			if (a->kind != Ast_FieldValue) {
+				continue;
+			}
+			Ast *field = a->FieldValue.field;
+			if (field->kind == Ast_Ident && field->Ident.token.string == name) {
+				arg = a->FieldValue.value;
+			}
+		}
+		if (arg == nullptr && index < ce->args.count && ce->args[index]->kind != Ast_FieldValue) {
+			arg = ce->args[index];
+		}
+	} else if (ce->args.count > 0) {
+		arg = ce->args[0];
+	}
+	if (arg == nullptr) {
+		return nullptr;
+	}
+	return check_atomic_address_of(arg);
 }
 
 gb_internal void check_atomic_first(Ast **site, Ast *call) {
@@ -729,7 +761,7 @@ gb_internal void check_atomics(Checker *c) {
 		}
 		if (a.id == BuiltinProc_volatile_load || a.id == BuiltinProc_volatile_store) {
 			// NOTE(bill): the access is not atomic nor taking its address elsewhere
-			Ast *ptr = check_atomic_address_of(a.call->CallExpr.args[0]);
+			Ast *ptr = check_atomic_call_address(a.call);
 			if (ptr == nullptr) {
 				continue;
 			}
@@ -745,7 +777,7 @@ gb_internal void check_atomics(Checker *c) {
 			continue;
 		}
 		Ast *call = a.call;
-		Ast *ptr = check_atomic_address_of(call->CallExpr.args[0]);
+		Ast *ptr = check_atomic_call_address(call);
 		if (ptr == nullptr) {
 			continue;
 		}
@@ -1003,14 +1035,14 @@ gb_internal void check_atomics(Checker *c) {
 				continue;
 			}
 			if (r.kind == AtomicReport_Local) {
-				Entity *l = check_atomic_local(check_atomic_address_of(r.site->CallExpr.args[0])->UnaryExpr.expr);
+				Entity *l = check_atomic_local(check_atomic_call_address(r.site)->UnaryExpr.expr);
 				warning(r.site, "The address of '%.*s' is only taken by atomic operations, so nothing else can access it, and they order nothing", LIT(l->token.string));
 				error_line("\tSuggestion: To keep its accesses from being optimized away, use 'volatile_load' and 'volatile_store', which order nothing between threads\n");
 				error_line("\t            If it is meant to be shared, it may be a copy of what is\n");
 				continue;
 			}
 
-			gbString str = expr_to_string(check_atomic_address_of(r.site->CallExpr.args[0])->UnaryExpr.expr);
+			gbString str = expr_to_string(check_atomic_call_address(r.site)->UnaryExpr.expr);
 			char const *other = token_pos_to_string(ast_token(r.other).pos);
 
 			AtomicProcedure *p = nullptr;

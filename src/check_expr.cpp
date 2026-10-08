@@ -839,6 +839,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	entity->Procedure.optimization_mode = base_entity->Procedure.optimization_mode;
 	entity->Procedure.futex = base_entity->Procedure.futex;
+	entity->Procedure.futex_parameter = base_entity->Procedure.futex_parameter;
 	entity->Procedure.generated_from_polymorphic = true;
 
 	if (base_entity->flags & EntityFlag_Cold) {

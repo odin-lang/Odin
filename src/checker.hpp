@@ -167,7 +167,8 @@ struct AttributeContext {
 
 	u64 fast_math_flags;
 
-	u8 futex; // ProcedureFutex
+	u8     futex; // ProcedureFutex
+	String futex_parameter;
 
 	bool   raddbg_type_view;
 	String raddbg_type_view_string;
