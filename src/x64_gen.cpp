@@ -31,6 +31,7 @@ enum xbAddrKind : u8 {
 	xbAddr_Discard,
 	xbAddr_SoaVariable, // element `index` of the #soa container at `mem`
 	xbAddr_Swizzle,     // elements `swizzle_indices` of the array at `mem`
+	xbAddr_SwizzleSoa,  // components `soa_swizzle` of the array element `index` of the #soa container at `mem`
 };
 
 struct xbAddr {
@@ -54,6 +55,8 @@ struct xbAddr {
 	u8         swizzle_count;
 	u8         swizzle_indices; // 2 bits per element
 	Type *     swizzle_elem;
+	// SwizzleSoa (with the SoaVariable fields)
+	Slice<i32> soa_swizzle;
 };
 
 struct xbVar {
