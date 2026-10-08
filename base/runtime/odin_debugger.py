@@ -1,7 +1,10 @@
 # Pretty printers for Odin types in gdb and lldb
 #
-#   gdb:  source <odin>/misc/odin_debugger.py
-#   lldb: command script import <odin>/misc/odin_debugger.py
+#   gdb:  source <odin>/base/runtime/odin_debugger.py
+#   lldb: command script import <odin>/base/runtime/odin_debugger.py
+#
+# gdb also loads it by itself from the `.debug_gdb_scripts` section of an ELF binary built with `-debug`,
+# once that binary's directory is trusted, with `add-auto-load-safe-path <directory>`
 #
 # Shown: `string`, `string16`, slices, dynamic arrays (and fixed capacity ones), maps as their entries,
 # and unions as the variant they hold, or `nil`.
@@ -243,7 +246,11 @@ if gdb is not None:
 			return _GdbArray(val, kind)
 		return None
 
-	gdb.pretty_printers.append(_gdb_lookup)
+	# NOTE: loaded from a binary's `.debug_gdb_scripts` section, the printers belong to that binary
+	if gdb.current_objfile() is not None:
+		gdb.current_objfile().pretty_printers.append(_gdb_lookup)
+	else:
+		gdb.pretty_printers.append(_gdb_lookup)
 
 
 ################################################################################

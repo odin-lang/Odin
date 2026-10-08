@@ -3864,6 +3864,40 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	if (build_context.ODIN_DEBUG) {
+		// NOTE(bill): gdb runs the pretty printers of `base/runtime/odin_debugger.py` from the `.debug_gdb_scripts` section of an ELF binary,
+		// once the user trusts its directory; lldb reads no such section.
+		// The section is written in assembly, as a global cannot be made a section that is never loaded into memory,
+		// which is what keeps the linker from dropping it, and lets it merge the copies of several objects.
+		if (build_context.metrics.os != TargetOs_windows && build_context.metrics.os != TargetOs_darwin && !is_arch_wasm()) {
+			String path = concatenate_strings(temporary_allocator(), odin_root_dir(), str_lit("base/runtime/odin_debugger.py"));
+			gbFileContents fc = gb_file_read_contents(heap_allocator(), false, alloc_cstring(temporary_allocator(), path));
+			if (fc.data != nullptr) {
+				// an entry of kind 4 is the script's name, a newline, then its text
+				gbString s = gb_string_make(heap_allocator(), ".pushsection \".debug_gdb_scripts\", \"MS\", %progbits, 1\n.byte 4\n.ascii \"odin_debugger.py\\n\"\n.ascii \"");
+				defer (gb_string_free(s));
+				for (isize i = 0; i < fc.size; i++) {
+					u8 c = (cast(u8 *)fc.data)[i];
+					switch (c) {
+					case '\r': break;
+					case '\n': s = gb_string_appendc(s, "\\n\"\n.ascii \""); break;
+					case '\t': s = gb_string_appendc(s, "\\t");  break;
+					case '\\': s = gb_string_appendc(s, "\\\\"); break;
+					case '"':  s = gb_string_appendc(s, "\\\""); break;
+					default:
+						if (c < 0x20 || c >= 0x7f) {
+							s = gb_string_append_fmt(s, "\\%03o", c);
+						} else {
+							s = gb_string_append_length(s, &c, 1);
+						}
+						break;
+					}
+				}
+				s = gb_string_appendc(s, "\"\n.byte 0\n.popsection\n");
+				gb_file_free_contents(&fc);
+				LLVMAppendModuleInlineAsm(default_module->mod, s, gb_string_length(s));
+			}
+		}
+
 		// Custom `.raddbg` section for its debugger
 		if (build_context.metrics.os == TargetOs_windows) {
 			lbModule *m = default_module;
