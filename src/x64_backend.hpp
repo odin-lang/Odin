@@ -481,6 +481,7 @@ struct xbModule {
 	String            object_path;
 	i64               limit; // for bisecting: compile at most this many procedures, -1 for all
 	bool              verbose;
+	TokenPos          fail_pos; // where the last XB_UNSUPPORTED happened
 	bool              owns_startup; // __$startup_runtime and __$cleanup_runtime are made here
 	bool              owns_type_info;
 	bool              owns_test_main;

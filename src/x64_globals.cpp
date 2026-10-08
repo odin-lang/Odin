@@ -159,10 +159,7 @@ gb_internal void xb_define_globals(xbModule *m) {
 			ptr_set_add(&m->handled, e);
 		} else {
 			xb_stat_fail(m, reason ? reason : "global");
-			if (m->verbose) {
-				String name = xb_entity_name(m, e);
-				gb_printf_err("xb: global fallback %.*s: %s\n", LIT(name), reason);
-			}
+			xb_log_fallback(m, "global", xb_entity_name(m, e), e->token.pos, reason);
 		}
 	}
 }
@@ -252,12 +249,12 @@ gb_internal void xb_build_startup(xbModule *m) {
 	// cleanup first: if the startup fails, LLVM's weak copy of the cleanup is the same
 	if (!xb_build_runtime_proc(m, str_lit("__$cleanup_runtime"), xb_cleanup_body, &reason)) {
 		xb_stat_fail(m, reason ? reason : "cleanup");
-		if (m->verbose) gb_printf_err("xb: cleanup left to LLVM: %s\n", reason);
+		xb_log_fallback(m, "runtime procedure", str_lit("__$cleanup_runtime"), {}, reason);
 		return;
 	}
 	if (!xb_build_runtime_proc(m, str_lit("__$startup_runtime"), xb_startup_body, &reason)) {
 		xb_stat_fail(m, reason ? reason : "startup");
-		if (m->verbose) gb_printf_err("xb: startup left to LLVM: %s\n", reason);
+		xb_log_fallback(m, "runtime procedure", str_lit("__$startup_runtime"), {}, reason);
 		return;
 	}
 	m->owns_startup = true;
@@ -377,5 +374,5 @@ gb_internal void xb_build_test_main(xbModule *m) {
 		}
 	}
 	xb_stat_fail(m, reason ? reason : "test main");
-	if (m->verbose) gb_printf_err("xb: test main left to LLVM: %s\n", reason);
+	xb_log_fallback(m, "procedure", str_lit("main (test runner)"), {}, reason);
 }

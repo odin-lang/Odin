@@ -46,6 +46,18 @@ gb_internal bool xb_owns_type_info(void) {
 	return xb_module != nullptr && xb_module->owns_type_info;
 }
 
+// always printed: what fell back to LLVM, where, and why
+gb_internal void xb_log_fallback(xbModule *m, char const *what, String name, TokenPos fallback_pos, char const *reason) {
+	TokenPos pos = m->fail_pos.line > 0 ? m->fail_pos : fallback_pos;
+	m->fail_pos = {};
+	String file = pos.file_id > 0 ? get_file_path_string(pos.file_id) : str_lit("");
+	if (file.len > 0) {
+		gb_printf_err("%.*s(%d:%d) x64 backend: %s %.*s falls back to LLVM: %s\n", LIT(file), pos.line, pos.column, what, LIT(name), reason ? reason : "unknown");
+	} else {
+		gb_printf_err("x64 backend: %s %.*s falls back to LLVM: %s\n", what, LIT(name), reason ? reason : "unknown");
+	}
+}
+
 gb_internal String xb_entity_name(xbModule *m, Entity *e) {
 	return lb_get_entity_name(&m->gen->default_module, e);
 }
@@ -94,6 +106,7 @@ gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	p->debug_vars = array_make<xbDebugVar>(xb_allocator(), 0, 16);
 	map_init(&p->vars);
 	p->file_id = -1;
+	m->fail_pos = {};
 	return p;
 }
 
@@ -337,9 +350,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 			}
 		} else {
 			xb_stat_fail(m, reason ? reason : "unknown");
-			if (m->verbose) {
-				gb_printf_err("xb: fallback %.*s: %s\n", LIT(name), reason);
-			}
+			xb_log_fallback(m, "procedure", name, e->token.pos, reason);
 		}
 	}
 

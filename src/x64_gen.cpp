@@ -169,6 +169,8 @@ gb_internal Slice<xbValue> xb_args(xbValue *data, isize count) {
 [[noreturn]] gb_internal void xb_unsupported(xbProc *p, char const *reason, Ast *node) {
 	p->fail_reason = reason;
 	p->fail_node = node;
+	Ast *at = node ? node : p->curr_stmt;
+	if (at != nullptr) p->m->fail_pos = ast_token(at).pos;
 	longjmp(*p->bail, 1);
 }
 
@@ -637,6 +639,7 @@ gb_internal i32 xb_symbol(xbModule *m, String name) {
 }
 
 gb_internal String xb_entity_name(xbModule *m, Entity *e);
+gb_internal void xb_log_fallback(xbModule *m, char const *what, String name, TokenPos fallback_pos, char const *reason);
 
 // the linker needs every foreign library a foreign entity comes from
 gb_internal void xb_note_foreign_library(xbModule *m, Entity *lib) {

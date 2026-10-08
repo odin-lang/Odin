@@ -537,7 +537,7 @@ gb_internal void xb_build_type_info(xbModule *m) {
 		m->owns_type_info = true;
 	} else {
 		xb_stat_fail(m, reason ? reason : "type info");
-		if (m->verbose) gb_printf_err("xb: type info left to LLVM: %s\n", reason);
+		xb_log_fallback(m, "global", str_lit("type info table"), {}, reason);
 	}
 	xb_arena_reset();
 }
