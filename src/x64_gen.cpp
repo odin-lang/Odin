@@ -144,6 +144,7 @@ struct xbProc {
 
 	i32         file_id;
 	i32         last_line;
+	i32         last_column;
 	u16         state_flags;
 	Ast *       curr_stmt;
 	TokenPos    branch_location_pos; // where the running defers were triggered, for #branch_location
@@ -212,6 +213,15 @@ gb_internal void xb_start_block(xbProc *p, xbBlock *b) {
 	b->debug_scope = p->debug_scope;
 	array_add(&p->order, b);
 	p->curr = b;
+	// a block starts its own line row, so a debugger's step stops where a jump lands, as at a loop's head
+	if (p->last_line > 0) {
+		xbInstr i = {};
+		i.op = xbOp_Loc;
+		i.imm = p->last_line;
+		i.a = cast(u32)p->file_id;
+		i.b = cast(u32)p->last_column;
+		array_add(&b->instrs, i);
+	}
 }
 
 gb_internal bool xb_is_terminator(xbOp op) {

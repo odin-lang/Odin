@@ -21,6 +21,7 @@ gb_internal void xb_set_debug_loc(xbProc *p, TokenPos pos) {
 	i32 file_id = xb_file_id(p->m, pos.file_id);
 	if (pos.line == p->last_line && file_id == p->file_id) return;
 	p->last_line = pos.line;
+	p->last_column = pos.column;
 	p->file_id = file_id;
 	xbInstr i = xb_instr(xbOp_Loc);
 	i.imm = pos.line;
