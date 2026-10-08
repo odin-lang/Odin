@@ -4,7 +4,8 @@
 #   lldb: command script import <odin>/base/runtime/odin_debugger.py
 #
 # gdb also loads it by itself from the `.debug_gdb_scripts` section of an ELF binary built with `-debug`,
-# once that binary's directory is trusted, with `add-auto-load-safe-path <directory>`
+# once that binary's directory is trusted, with `add-auto-load-safe-path <directory>`, and lldb from the dSYM
+# of a macOS binary built with `-debug`, once `settings set target.load-script-from-symbol-file true`
 #
 # Shown: `string`, `string16`, slices, dynamic arrays (and fixed capacity ones), maps as their entries,
 # and unions as the variant they hold, or `nil`.
