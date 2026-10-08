@@ -1351,8 +1351,21 @@ gb_internal xbAddr xb_build_addr_index_expr(xbProc *p, Ast *expr) {
 		u32 ptr = xb_ptr_add_scaled(p, xb_value_to_reg(p, v), index, type_size_of(elem));
 		return xb_addr(elem, xb_mem(xbMem_Reg, ptr, 0));
 	}
-	case Type_FixedCapacityDynamicArray:
-		XB_UNSUPPORTED(p, "fixed capacity dynamic array index");
+	case Type_FixedCapacityDynamicArray: {
+		xbMem base = {};
+		if (deref) {
+			base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, ie->expr)), 0);
+		} else {
+			base = xb_addr_mem(p, xb_build_addr(p, ie->expr));
+		}
+		u32 array = xb_lea(p, base);
+		Type *elem = t->FixedCapacityDynamicArray.elem;
+		u32 index = xb_build_index_int(p, ie->index);
+		u32 len = xb_load(p, xbType_I64, xb_mem(xbMem_Reg, array, cast(i32)type_offset_of(t, 1)));
+		xb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		u32 ptr = xb_ptr_add_scaled(p, array, index, type_size_of(elem));
+		return xb_addr(elem, xb_mem(xbMem_Reg, ptr, 0));
+	}
 	}
 	XB_UNSUPPORTED(p, "index expression");
 	return {};
@@ -3155,6 +3168,19 @@ gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 		u32 n = xb_binop(p, xbOp_Sub, xbType_I64, hi, lo);
 		return xb_make_slice_value(p, type, d, n);
 	}
+	case Type_FixedCapacityDynamicArray: {
+		xbMem base = {};
+		if (deref) {
+			base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, se->expr)), 0);
+		} else {
+			base = xb_build_addr_mem(p, se->expr);
+		}
+		data = xb_lea(p, base);
+		// the length is read before the indices are evaluated
+		len = xb_load(p, xbType_I64, xb_mem_offset(base, type_offset_of(t, 1)));
+		elem_size = type_size_of(t->FixedCapacityDynamicArray.elem);
+		break;
+	}
 	default:
 		XB_UNSUPPORTED(p, "slice expression");
 	}
@@ -3166,6 +3192,11 @@ gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 	bool skip_check = false;
 	if (t->kind == Type_Array && low_const && high_const) {
 		skip_check = true; // checked at compile time
+	}
+	if (t->kind == Type_FixedCapacityDynamicArray) {
+		// LLVM skips the check when both indices are constants, as it does for arrays
+		skip_check = (se->low == nullptr && se->high == nullptr) ||
+		             (se->low != nullptr && se->high != nullptr && low_const && high_const);
 	}
 	if (!skip_check) {
 		xb_emit_slice_bounds_check(p, se->open, lo, hi, len, se->low != nullptr);
@@ -3290,11 +3321,15 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 	case Type_Array:
 	case Type_EnumeratedArray:
 	case Type_SimdVector:
-	case Type_Slice: {
+	case Type_Slice:
+	case Type_FixedCapacityDynamicArray: {
 		Type *et = nullptr;
 		i64 count = 0;
 		ExactValue min_value = exact_value_i64(0);
-		if (bt->kind == Type_Array) {
+		if (bt->kind == Type_FixedCapacityDynamicArray) {
+			et = bt->FixedCapacityDynamicArray.elem;
+			count = bt->FixedCapacityDynamicArray.capacity;
+		} else if (bt->kind == Type_Array) {
 			et = bt->Array.elem;
 			count = bt->Array.count;
 		} else if (bt->kind == Type_SimdVector) {
@@ -3345,6 +3380,9 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 		}
 		if (bt->kind == Type_Slice) {
 			return xb_make_slice_value(p, type, xb_lea(p, m), xb_iconst(p, xbType_I64, count));
+		}
+		if (bt->kind == Type_FixedCapacityDynamicArray) {
+			xb_store(p, xbType_I64, xb_mem_offset(m, type_offset_of(bt, 1)), xb_iconst(p, xbType_I64, cl->max_count));
 		}
 		return xb_value_mem(type, m);
 	}

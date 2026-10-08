@@ -507,6 +507,39 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 			}
 			return xb_cb_array_elems(b, value.value_compound, elem, type->Array.count, 0, stride, off);
 		}
+		if (is_type_fixed_capacity_dynamic_array(type)) {
+			// the elements as an array, then the length the literal implies
+			Type *elem = type->FixedCapacityDynamicArray.elem;
+			i64 capacity = type->FixedCapacityDynamicArray.capacity;
+			ast_node(cl, CompoundLit, value.value_compound);
+			if (cl->elems.count == 0 || !elem_type_can_be_constant(elem)) return true;
+			i64 stride = type_size_of(elem);
+			i64 len = 0;
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				for (Ast *e : cl->elems) {
+					ast_node(fv, FieldValue, e);
+					i64 last = 0;
+					if (is_ast_range(fv->field)) {
+						ast_node(ie, BinaryExpr, fv->field);
+						last = exact_value_to_i64(ie->right->tav.value) - (ie->op.kind == Token_RangeHalf ? 1 : 0);
+					} else {
+						last = exact_value_to_i64(fv->field->tav.value);
+					}
+					len = gb_max(len, last+1);
+				}
+				if (!xb_cb_array_elems(b, value.value_compound, elem, capacity, 0, stride, off)) return false;
+			} else if (are_types_identical(value.value_compound->tav.type, elem)) {
+				for (i64 i = 0; i < capacity; i++) {
+					if (!xb_cb_write(b, elem, value, off + i*stride)) return false;
+				}
+				len = capacity;
+			} else {
+				if (!xb_cb_array_elems(b, value.value_compound, elem, capacity, 0, stride, off)) return false;
+				len = cl->elems.count;
+			}
+			xb_cb_int(b, off + type_offset_of(type, 1), 8, cast(u64)len, false);
+			return true;
+		}
 		if (is_type_simd_vector(type)) {
 			Type *elem = type->SimdVector.elem;
 			return xb_cb_array_elems(b, value.value_compound, elem, type->SimdVector.count, 0, type_size_of(elem), off);

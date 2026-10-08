@@ -992,6 +992,10 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 			i64 off = (id == BuiltinProc_cap && is_type_dynamic_array(t)) ? 16 : 8;
 			return xb_emit_conv(p, xb_value_reg(t_int, xb_load(p, xbType_I64, xb_mem_offset(m, off))), tv.type);
 		}
+		if (is_type_fixed_capacity_dynamic_array(t) && id == BuiltinProc_len) {
+			xbMem m = xb_value_to_mem(p, v);
+			return xb_emit_conv(p, xb_value_reg(t_int, xb_load(p, xbType_I64, xb_mem_offset(m, cast(i32)type_offset_of(t, 1)))), tv.type);
+		}
 		{
 			gbString r = gb_string_make(permanent_allocator(), "len of ");
 			r = gb_string_appendc(r, type_to_string(t));
@@ -1083,12 +1087,14 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_raw_data: {
 		xbValue v = xb_build_expr(p, ce->args[0]);
 		Type *t = base_type(v.type);
-		if (is_type_pointer(t)) XB_UNSUPPORTED(p, "raw_data pointer");
+		if (is_type_pointer(t) || is_type_multi_pointer(t)) {
+			return xb_value_reg(tv.type, xb_value_to_reg(p, v));
+		}
 		if (is_type_string(t) || is_type_slice(t) || is_type_dynamic_array(t)) {
 			xbMem m = xb_value_to_mem(p, v);
 			return xb_value_reg(tv.type, xb_load(p, xbType_I64, m));
 		}
-		if (is_type_cstring(t)) {
+		if (is_type_cstring(t) || is_type_cstring16(t)) {
 			return xb_value_reg(tv.type, xb_value_to_reg(p, v));
 		}
 		XB_UNSUPPORTED(p, "raw_data of type");
@@ -2584,6 +2590,26 @@ gb_internal void xb_build_range_indexed(xbProc *p, AstRangeStmt *rs) {
 			nullptr, nullptr);
 		return;
 	}
+	case Type_FixedCapacityDynamicArray: {
+		// the elements live inline, the length is read on every iteration
+		xbAddr addr = xb_build_addr(p, expr);
+		if (addr.kind != xbAddr_Default) XB_UNSUPPORTED(p, "range over special addr");
+		xbMem array = addr.mem;
+		if (is_type_pointer(addr.type)) {
+			array = xb_mem(xbMem_Reg, xb_load(p, xbType_I64, array), 0);
+		}
+		i32 base_local = xb_add_local_raw(p, 8, 8);
+		xb_store(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)base_local), xb_lea(p, array));
+		Type *elem = et->FixedCapacityDynamicArray.elem;
+		i64 stride = type_size_of(elem);
+		i64 len_offset = type_offset_of(et, 1);
+		auto base = [&]() { return xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)base_local)); };
+		xb_build_range_indexed_loop(p, rs, elem,
+			[&]() { return xb_load(p, xbType_I64, xb_mem(xbMem_Reg, base(), cast(i32)len_offset)); },
+			[&](u32 idx) { return xb_ptr_add_scaled(p, base(), idx, stride); },
+			nullptr, nullptr);
+		return;
+	}
 	case Type_Slice: {
 		xbValue v = xb_build_expr(p, expr);
 		i32 count_local = -1;
@@ -3017,7 +3043,8 @@ gb_internal void xb_build_range_stmt(xbProc *p, AstRangeStmt *rs) {
 				xb_build_range_tuple(p, rs);
 			} else if (is_type_string(t) && !is_type_string16(t) && !is_type_cstring(t)) {
 				xb_build_range_string(p, rs);
-			} else if (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_Slice || t->kind == Type_DynamicArray) {
+			} else if (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_Slice || t->kind == Type_DynamicArray ||
+			           t->kind == Type_FixedCapacityDynamicArray) {
 				xb_build_range_indexed(p, rs);
 			} else if (t->kind == Type_BitSet) {
 				xb_build_range_bit_set(p, rs, t);
