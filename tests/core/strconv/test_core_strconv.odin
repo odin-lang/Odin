@@ -268,6 +268,56 @@ test_parse_int_overflow :: proc(t: ^testing.T) {
 		_, ok = strconv.parse_uint("18446744073709551616")
 		testing.expect_value(t, ok, false)
 	}
+	{
+		// Cases reported in issue #7608.
+		_, ok := strconv.parse_u64("36893488147419103232")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_u64("18446744073709551616", 10)
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_u64_maybe_prefixed("0xffffffffffffffffff")
+		testing.expect_value(t, ok, false)
+		_, ok = strconv.parse_int("99999999999999999999")
+		testing.expect_value(t, ok, false)
+	}
+}
+
+@(test)
+test_parse_int_underscore_only :: proc(t: ^testing.T) {
+	for s in ([]string{"_", "__", "+_", "-_", "0x_", "0b__"}) {
+		_, ok_i64 := strconv.parse_i64(s)
+		testing.expectf(t, !ok_i64, "parse_i64(%q) should fail", s)
+		_, ok_u64 := strconv.parse_u64(s)
+		testing.expectf(t, !ok_u64, "parse_u64(%q) should fail", s)
+		_, ok_i128 := strconv.parse_i128(s)
+		testing.expectf(t, !ok_i128, "parse_i128(%q) should fail", s)
+		_, ok_u128 := strconv.parse_u128(s)
+		testing.expectf(t, !ok_u128, "parse_u128(%q) should fail", s)
+		_, ok_int := strconv.parse_int(s)
+		testing.expectf(t, !ok_int, "parse_int(%q) should fail", s)
+		_, ok_uint := strconv.parse_uint(s)
+		testing.expectf(t, !ok_uint, "parse_uint(%q) should fail", s)
+	}
+	for s in ([]string{"_", "__", "+_", "-_"}) {
+		_, ok_i64 := strconv.parse_i64(s, 10)
+		testing.expectf(t, !ok_i64, "parse_i64(%q, 10) should fail", s)
+		_, ok_u64 := strconv.parse_u64(s, 10)
+		testing.expectf(t, !ok_u64, "parse_u64(%q, 10) should fail", s)
+		_, ok_i128 := strconv.parse_i128(s, 10)
+		testing.expectf(t, !ok_i128, "parse_i128(%q, 10) should fail", s)
+		_, ok_u128 := strconv.parse_u128(s, 10)
+		testing.expectf(t, !ok_u128, "parse_u128(%q, 10) should fail", s)
+	}
+
+	// Underscores alongside at least one digit are still accepted.
+	v, ok := strconv.parse_u64("_1_")
+	testing.expect_value(t, v, 1)
+	testing.expect_value(t, ok, true)
+	v, ok = strconv.parse_u64("0x_ff")
+	testing.expect_value(t, v, 0xff)
+	testing.expect_value(t, ok, true)
+	iv, iok := strconv.parse_i64("-1_000", 10)
+	testing.expect_value(t, iv, -1000)
+	testing.expect_value(t, iok, true)
 }
 
 test_float_hex :: proc(t: ^testing.T) {

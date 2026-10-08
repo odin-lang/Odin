@@ -93,7 +93,7 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -116,9 +116,11 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 			value = value*i64(base) + v
 		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -180,7 +182,7 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -203,9 +205,11 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 			value = value*base + v
 		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -252,7 +256,7 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		s = s[1:]
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -267,10 +271,12 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		}
 		value = value*u64(base) + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -327,7 +333,7 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		}
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -342,10 +348,12 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		}
 		value = value*base + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -487,7 +495,7 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -510,9 +518,11 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 			value = value*i128(base) + v
 		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -574,7 +584,7 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -597,9 +607,11 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 			value = value*base + v
 		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -645,7 +657,7 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		s = s[1:]
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -660,10 +672,12 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		}
 		value = value*u128(base) + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -717,7 +731,7 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		}
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -732,10 +746,12 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		}
 		value = value*base + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
