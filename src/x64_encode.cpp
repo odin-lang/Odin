@@ -229,8 +229,9 @@ gb_internal void xb_mov_r_imm(xbAsm *a, u8 reg, u64 imm) {
 gb_internal void xb_load_ext(xbAsm *a, i32 size, bool is_signed, u8 reg, xbOpnd rm) {
 	switch (size) {
 	case 1:
-		if (is_signed) xb_enc(a, XB_W|XB_0F, 0xBE, reg, rm);
-		else           xb_enc(a, XB_0F,      0xB6, reg, rm);
+		// XB_BYTE: a REX prefix makes sil and dil reachable as the source
+		if (is_signed) xb_enc(a, XB_BYTE|XB_W|XB_0F, 0xBE, reg, rm);
+		else           xb_enc(a, XB_BYTE|XB_0F,      0xB6, reg, rm);
 		break;
 	case 2:
 		if (is_signed) xb_enc(a, XB_W|XB_0F, 0xBF, reg, rm);

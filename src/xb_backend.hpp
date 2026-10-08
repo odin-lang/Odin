@@ -577,6 +577,10 @@ struct xbModule {
 	Array<String>      files;
 	PtrMap<AstFile *, i32> file_ids;
 
+	// x86-64: the module's memmove and memset for sizes known at run time, symbol + 1, 0 until emitted
+	i32               x64_move_helper;
+	i32               x64_set_helper;
+
 	// entities this backend compiles, so LLVM only declares them
 	PtrSet<Entity *>  handled;
 	PtrSet<Entity *>  defined_procs; // every procedure entity this backend has emitted

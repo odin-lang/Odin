@@ -563,8 +563,9 @@ gb_internal void xb_cv_addr(xbCoffWriter *w, Array<u8> *b, i32 sym, i64 text_off
 }
 
 gb_internal u16 xb_cv_reg_of_dwarf(u8 dwarf_reg) {
-	// rbx is 3 in DWARF, r12..r15 are themselves
-	if (dwarf_reg == 3) return 329;
+	// DWARF numbers rax, rdx, rcx, rbx, rsi, rdi, rbp, rsp, then r8..r15
+	static u16 const low[8] = {328, 331, 330, 329, 332, 333, 334, 335};
+	if (dwarf_reg < 8) return low[dwarf_reg];
 	return cast(u16)(336 + (dwarf_reg - 8));
 }
 
@@ -719,6 +720,16 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 				at = xb_cv_sym_begin(b, tls ? XCV_S_LTHREAD32 : XCV_S_LDATA32);
 				xbb_u32(b, type_of(v.type, false));
 				xb_cv_addr(w, b, v.sym, 0);
+				xb_cv_name(b, v.name);
+				xb_cv_sym_end(b, at);
+				return;
+			}
+			if (v.in_reg && v.by_ref) {
+				// the register holds the variable's address: it is at [reg+0]
+				at = xb_cv_sym_begin(b, XCV_S_REGREL32);
+				xbb_u32(b, 0);
+				xbb_u32(b, type_of(v.type, false));
+				xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
 				xb_cv_name(b, v.name);
 				xb_cv_sym_end(b, at);
 				return;

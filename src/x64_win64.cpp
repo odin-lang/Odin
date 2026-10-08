@@ -374,7 +374,7 @@ gb_internal void xb_win64_prologue(xbLower *L, xbProcDebug *dbg) {
 	pushes[n++] = RSI;
 	pushes[n++] = RDI;
 	for (i32 i = 0; i < L->saved_count; i++) {
-		pushes[n++] = xb_promote_regs[i];
+		pushes[n++] = L->saved[i];
 	}
 	bool pad = (n % 2) != 0;
 	i64 total = 8*(1 + n) + (pad ? 8 : 0) + L->frame_size;
@@ -425,7 +425,7 @@ gb_internal void xb_win64_epilogue(xbLower *L) {
 	// lea rsp, [rbp + pad]: an epilogue form the unwinder recognizes
 	xb_lea(a, RSP, xb_m(RBP, L->win_pad ? 8 : 0));
 	for (i32 i = L->saved_count-1; i >= 0; i--) {
-		xb_pop(a, xb_promote_regs[i]);
+		xb_pop(a, L->saved[i]);
 	}
 	xb_pop(a, RDI);
 	xb_pop(a, RSI);
