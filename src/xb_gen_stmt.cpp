@@ -30,6 +30,11 @@ gb_internal void xb_set_debug_loc(xbProc *p, TokenPos pos) {
 	xb_emit(p, i);
 }
 
+// The closing brace of a body, which LLVM gives the jump out of it so a debugger stops there
+gb_internal void xb_set_debug_end_loc(xbProc *p, Ast *node) {
+	if (node != nullptr && !xb_curr_terminated(p)) xb_set_debug_loc(p, ast_end_token(node).pos);
+}
+
 ////////////////////////////////////////////////////////////////
 // Calls
 ////////////////////////////////////////////////////////////////
@@ -2434,6 +2439,7 @@ gb_internal void xb_build_if_stmt(xbProc *p, Ast *node) {
 
 	xb_start_block(p, then_);
 	xb_build_stmt(p, is->body);
+	xb_set_debug_end_loc(p, is->body);
 	xb_jump(p, done);
 
 	if (is->else_stmt != nullptr) {
@@ -2441,6 +2447,7 @@ gb_internal void xb_build_if_stmt(xbProc *p, Ast *node) {
 		xb_open_scope(p);
 		xb_build_stmt(p, is->else_stmt);
 		xb_close_scope(p, is->else_stmt);
+		xb_set_debug_end_loc(p, is->else_stmt);
 		xb_jump(p, done);
 	}
 	if (is->label != nullptr) {
@@ -2466,6 +2473,8 @@ gb_internal void xb_build_for_stmt(xbProc *p, Ast *node) {
 	xb_jump(p, loop);
 	xb_start_block(p, loop);
 	if (fs->cond != nullptr) {
+		// expressions set no position of their own
+		xb_set_debug_loc(p, ast_token(fs->cond).pos);
 		xbValue c = xb_build_expr(p, fs->cond);
 		xb_branch(p, xb_to_bool_reg(p, c), body, done);
 	} else {
@@ -2475,6 +2484,7 @@ gb_internal void xb_build_for_stmt(xbProc *p, Ast *node) {
 	xb_start_block(p, body);
 	xb_build_stmt(p, fs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, fs->body);
 	xb_jump(p, post);
 	if (fs->post != nullptr) {
 		xb_start_block(p, post);
@@ -2574,6 +2584,7 @@ gb_internal void xb_build_range_interval(xbProc *p, AstRangeStmt *rs, Ast *expr)
 	xb_push_target_list(p, rs->label, done, continue_block, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	if (check != nullptr) {
 		xb_jump(p, check);
 		xb_start_block(p, check);
@@ -2638,6 +2649,7 @@ gb_internal void xb_build_range_indexed_loop(xbProc *p, AstRangeStmt *rs, Type *
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -2818,6 +2830,7 @@ gb_internal void xb_build_range_string(xbProc *p, AstRangeStmt *rs) {
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -2851,6 +2864,7 @@ gb_internal void xb_build_range_tuple(xbProc *p, AstRangeStmt *rs) {
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -2890,6 +2904,7 @@ gb_internal void xb_build_range_enum(xbProc *p, AstRangeStmt *rs, Type *enum_typ
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -2974,6 +2989,7 @@ gb_internal void xb_build_range_map(xbProc *p, AstRangeStmt *rs, Type *type) {
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -3033,6 +3049,7 @@ gb_internal void xb_build_range_bit_set_128(xbProc *p, AstRangeStmt *rs, Type *e
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -3074,6 +3091,7 @@ gb_internal void xb_build_range_bit_set(xbProc *p, AstRangeStmt *rs, Type *et) {
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -3135,6 +3153,7 @@ gb_internal void xb_build_range_soa(xbProc *p, AstRangeStmt *rs) {
 	xb_push_target_list(p, rs->label, done, loop, nullptr);
 	xb_build_stmt(p, rs->body);
 	xb_pop_target_list(p);
+	xb_set_debug_end_loc(p, rs->body);
 	xb_jump(p, loop);
 	xb_start_block(p, done);
 }
@@ -3209,9 +3228,12 @@ gb_internal void xb_build_switch_stmt(xbProc *p, AstSwitchStmt *ss) {
 		}
 	}
 
-	// tests, in order
+	// tests, in order. LLVM makes a jump table of constant integer cases, all on the switch's line,
+	// other tests belong to their case's line
+	bool trivial = lb_switch_stmt_can_be_trivial_jump_table(ss, nullptr);
 	for_array(i, clauses) {
 		ast_node(cc, CaseClause, clauses[i]);
+		if (!trivial && cc->list.count > 0) xb_set_debug_loc(p, ast_token(clauses[i]).pos);
 		for (Ast *expr : cc->list) {
 			expr = unparen_expr(expr);
 			xbBlock *next = xb_new_block(p);
@@ -3401,6 +3423,7 @@ gb_internal void xb_build_type_switch_stmt(xbProc *p, AstTypeSwitchStmt *ss) {
 		Entity *case_entity = implicit_entity_of_node(clause);
 		xb_open_scope(p);
 		xb_start_block(p, bodies[i]);
+		xb_set_debug_loc(p, ast_token(clause).pos);
 		u32 pp = xb_load(p, xbType_I64, parent_ptr_mem);
 		xbValue pptr = xb_value_reg(alloc_type_pointer(parent_base_type), pp);
 		if (cc->list.count == 0) {
@@ -3935,6 +3958,7 @@ gb_internal void xb_end_proc(xbProc *p) {
 	TypeProc *pt = &base_type(p->type)->Proc;
 	if (!xb_curr_terminated(p)) {
 		if (pt->result_count == 0) {
+			xb_set_debug_end_loc(p, p->body);
 			xb_emit_defer_stmts(p, true, nullptr, xb_defer_pos(p->body));
 			if (!xb_curr_terminated(p)) {
 				xb_emit_ret(p, {});
