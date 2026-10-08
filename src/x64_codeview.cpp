@@ -814,6 +814,7 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
 			// the prologue gets the declaration's line, debuggers look up the entry address
 			add_line(gb_max(pd.file_id, 1), 0, pd.line, 0);
+			if (pd.prologue_end > 0) add_line(gb_max(pd.file_id, 1), cast(u32)pd.prologue_end, pd.line, 0);
 		}
 		for (i32 i = 0; i < pd.line_entry_count; i++) {
 			xbLineEntry const &e = m->lines[pd.line_entry_start + i];

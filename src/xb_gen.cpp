@@ -285,14 +285,15 @@ gb_internal xbBlock *xb_new_block(xbProc *p) {
 	return b;
 }
 
-gb_internal void xb_start_block(xbProc *p, xbBlock *b) {
+gb_internal void xb_start_block(xbProc *p, xbBlock *b, bool line_row=true) {
 	GB_ASSERT(!b->placed);
 	b->placed = true;
 	b->debug_scope = p->debug_scope;
 	array_add(&p->order, b);
 	p->curr = b;
-	// a block starts its own line row, so a debugger's step stops where a jump lands, as at a loop's head
-	if (p->last_line > 0) {
+	// a block starts its own line row, so a debugger's step stops where a jump lands, as at a loop's head;
+	// without one it goes on in the row before, like LLVM loop heads that start with a reload of no line
+	if (line_row && p->last_line > 0) {
 		xbInstr i = {};
 		i.op = xbOp_Loc;
 		i.imm = p->last_line;

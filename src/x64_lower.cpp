@@ -1944,6 +1944,11 @@ gb_internal void xb_lower_proc(xbProc *p) {
 			xb_load_ext(a, in.size, false, lr, xb_m(RBP, L.incoming_base + in.stack_offset));
 		}
 	}
+	// like LLVM's prologue_end, on the declaration's line: a breakpoint on the procedure stops here, its parameters in place
+	if (build_context.ODIN_DEBUG && dbg.line > 0 && !p->naked) {
+		dbg.prologue_end = cast(i32)(xb_pos(a) - L.proc_start);
+		xb_b(a, 0x90);
+	}
 
 	// constants materialized at their uses and unread pure values emit nothing
 	auto skipped = [&](xbInstr const &n) -> bool {
@@ -1979,8 +1984,10 @@ gb_internal void xb_lower_proc(xbProc *p) {
 				array_add(&dbg.scope_marks, mark);
 				continue;
 			}
-			// a jump to the next block is a fallthrough
-			if (in.op == xbOp_Jump && i+1 == b->instrs.count && cast(i32)in.imm == next_block) {
+			// a jump to the next block is a fallthrough, but like LLVM's a block with no other code keeps it for
+			// its line, except the first, which LLVM fills with the parameters' stores
+			if (in.op == xbOp_Jump && i+1 == b->instrs.count && cast(i32)in.imm == next_block &&
+			    !(build_context.ODIN_DEBUG && bi > 0 && xb_pos(a) == b->code_offset)) {
 				continue;
 			}
 			if (skipped(in)) continue;

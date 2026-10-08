@@ -531,6 +531,7 @@ struct xbProcDebug {
 	i32     line;
 	i32     line_entry_start;
 	i32     line_entry_count;
+	i32     prologue_end; // code offset of the nop that ends the prologue on the declaration's line, 0: none
 	Array<xbDebugVar> vars;
 	Array<i32>        scope_parent; // per lexical scope, scope 0 is the procedure's
 	Array<xbInlineSite> inline_sites;

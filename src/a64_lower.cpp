@@ -1402,6 +1402,12 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 			a64_ldr(a, in.size, false, lr, A64_FP, 16 + in.stack_offset);
 		}
 	}
+	// like LLVM's prologue_end, on the declaration's line: a breakpoint on the procedure stops here, its parameters in place
+	i32 prologue_end = 0;
+	if (build_context.ODIN_DEBUG && p->entity != nullptr && p->entity->token.pos.line > 0 && !p->naked) {
+		prologue_end = cast(i32)(xb_pos(a) - L.proc_start);
+		a64_emit(a, 0xD503201F); // nop
+	}
 
 	// constants materialized at their uses and unread pure values emit nothing
 	auto skipped = [&](xbInstr const &n) -> bool {
@@ -1438,8 +1444,10 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 				array_add(&scope_marks, mark);
 				continue;
 			}
-			// a jump to the next block is a fallthrough
-			if (in.op == xbOp_Jump && i+1 == b->instrs.count && cast(i32)in.imm == next_block) {
+			// a jump to the next block is a fallthrough, but like LLVM's a block with no other code keeps it for
+			// its line, except the first, which LLVM fills with the parameters' stores
+			if (in.op == xbOp_Jump && i+1 == b->instrs.count && cast(i32)in.imm == next_block &&
+			    !(build_context.ODIN_DEBUG && bi > 0 && xb_pos(a) == b->code_offset)) {
 				continue;
 			}
 			if (skipped(in)) continue;
@@ -1486,6 +1494,7 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 	dbg.line_entry_count = cast(i32)(m->lines.count - line_entry_start);
 	dbg.type = p->type;
 	dbg.saved_at = saved_at;
+	dbg.prologue_end = prologue_end;
 	dbg.scope_marks = scope_marks;
 	sym->size = dbg.end - dbg.start;
 

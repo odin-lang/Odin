@@ -985,6 +985,13 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 				xbb_sleb(b, pd.line - cur_line);
 				cur_line = pd.line;
 				xbb_u8(b, 1);
+				if (pd.prologue_end > 0) {
+					xbb_u8(b, 2); // advance_pc
+					xbb_uleb(b, cast(u64)pd.prologue_end);
+					cur_addr = pd.prologue_end;
+					xbb_u8(b, 10); // set_prologue_end
+					xbb_u8(b, 1);
+				}
 			}
 			for (i32 i = 0; i < pd.line_entry_count; i++) {
 				xbLineEntry const &e = m->lines[pd.line_entry_start + i];

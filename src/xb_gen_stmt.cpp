@@ -2776,22 +2776,21 @@ gb_internal void xb_build_for_stmt(xbProc *p, Ast *node) {
 	if (fs->init != nullptr) {
 		xb_build_stmt(p, fs->init);
 	}
-	xbBlock *loop = xb_new_block(p);
 	xbBlock *body = xb_new_block(p);
 	xbBlock *done = xb_new_block(p);
+	// like LLVM's, a loop without a condition goes straight back to its body
+	xbBlock *loop = fs->cond != nullptr ? xb_new_block(p) : body;
 	xbBlock *post = loop;
 	if (fs->post != nullptr) {
 		post = xb_new_block(p);
 	}
 	xb_jump(p, loop);
-	xb_start_block(p, loop);
 	if (fs->cond != nullptr) {
+		xb_start_block(p, loop);
 		// expressions set no position of their own
 		xb_set_debug_loc(p, ast_token(fs->cond).pos);
 		xbValue c = xb_build_expr(p, fs->cond);
 		xb_branch(p, xb_to_bool_reg(p, c), body, done);
-	} else {
-		xb_jump(p, body);
 	}
 	xb_push_target_list(p, fs->label, done, post, nullptr);
 	xb_start_block(p, body);
@@ -2842,6 +2841,38 @@ gb_internal void xb_store_range_var(xbProc *p, Ast *name, xbValue v) {
 	xb_store_value(p, m, xb_emit_conv(p, v, e->type));
 }
 
+// LLVM keeps a parameter as a value, not a stack slot, so a loop head reading one starts by reloading it
+gb_internal bool xb_expr_reads_param(Ast *expr) {
+	if (expr == nullptr) return false;
+	if (type_and_value_of_expr(expr).mode == Addressing_Constant) return false;
+	switch (expr->kind) {
+	case Ast_Ident: {
+		Entity *e = entity_of_node(expr);
+		return e != nullptr && e->kind == Entity_Variable && (e->flags & EntityFlag_Param) != 0 && type_size_of(e->type) > 0;
+	}
+	case Ast_ParenExpr:     return xb_expr_reads_param(expr->ParenExpr.expr);
+	case Ast_UnaryExpr:     return xb_expr_reads_param(expr->UnaryExpr.expr);
+	case Ast_DerefExpr:     return xb_expr_reads_param(expr->DerefExpr.expr);
+	case Ast_SelectorExpr:  return xb_expr_reads_param(expr->SelectorExpr.expr);
+	case Ast_TypeAssertion: return xb_expr_reads_param(expr->TypeAssertion.expr);
+	case Ast_TypeCast:      return xb_expr_reads_param(expr->TypeCast.expr);
+	case Ast_AutoCast:      return xb_expr_reads_param(expr->AutoCast.expr);
+	case Ast_BinaryExpr:    return xb_expr_reads_param(expr->BinaryExpr.left) || xb_expr_reads_param(expr->BinaryExpr.right);
+	case Ast_IndexExpr:     return xb_expr_reads_param(expr->IndexExpr.expr) || xb_expr_reads_param(expr->IndexExpr.index);
+	case Ast_SliceExpr:
+		return xb_expr_reads_param(expr->SliceExpr.expr) || xb_expr_reads_param(expr->SliceExpr.low) || xb_expr_reads_param(expr->SliceExpr.high);
+	case Ast_TernaryIfExpr:
+		return xb_expr_reads_param(expr->TernaryIfExpr.x) || xb_expr_reads_param(expr->TernaryIfExpr.cond) || xb_expr_reads_param(expr->TernaryIfExpr.y);
+	case Ast_CallExpr:
+		if (xb_expr_reads_param(expr->CallExpr.proc)) return true;
+		for (Ast *arg : expr->CallExpr.args) {
+			if (xb_expr_reads_param(arg)) return true;
+		}
+		return false;
+	}
+	return false;
+}
+
 gb_internal void xb_build_range_interval(xbProc *p, AstRangeStmt *rs, Ast *expr) {
 	ast_node(ie, BinaryExpr, expr);
 	Ast *val0 = rs->vals.count > 0 ? xb_strip_and_prefix(rs->vals[0]) : nullptr;
@@ -2875,7 +2906,7 @@ gb_internal void xb_build_range_interval(xbProc *p, AstRangeStmt *rs, Ast *expr)
 	xbBlock *body = xb_new_block(p);
 	xbBlock *done = xb_new_block(p);
 	xb_jump(p, loop);
-	xb_start_block(p, loop);
+	xb_start_block(p, loop, !xb_expr_reads_param(ie->right));
 
 	// the upper bound is evaluated on every iteration
 	xbValue upper = xb_build_expr(p, ie->right);
@@ -2919,7 +2950,7 @@ gb_internal void xb_build_range_interval(xbProc *p, AstRangeStmt *rs, Ast *expr)
 // The loop skeleton shared by arrays, slices and dynamic arrays. `get_count`
 // produces the length in the current block, `get_elem` the element pointer.
 template <typename CountFn, typename ElemFn>
-gb_internal void xb_build_range_indexed_loop(xbProc *p, AstRangeStmt *rs, Type *elem_type, CountFn const &get_count, ElemFn const &get_elem, Type *enum_index_type, ExactValue *enum_min) {
+gb_internal void xb_build_range_indexed_loop(xbProc *p, AstRangeStmt *rs, Type *elem_type, CountFn const &get_count, ElemFn const &get_elem, Type *enum_index_type, ExactValue *enum_min, bool live_count=false) {
 	Ast *val0 = rs->vals.count > 0 ? xb_strip_and_prefix(rs->vals[0]) : nullptr;
 	Ast *val1 = rs->vals.count > 1 ? xb_strip_and_prefix(rs->vals[1]) : nullptr;
 	xbMem index_mem = xb_add_local(p, t_int, false);
@@ -2929,7 +2960,8 @@ gb_internal void xb_build_range_indexed_loop(xbProc *p, AstRangeStmt *rs, Type *
 	if (!rs->reverse) {
 		xb_store(p, xbType_I64, index_mem, xb_iconst(p, xbType_I64, -1));
 		xb_jump(p, loop);
-		xb_start_block(p, loop);
+		// LLVM reads the length through a pointer it took before the loop
+		xb_start_block(p, loop, !live_count);
 		u32 incr = xb_binop(p, xbOp_Add, xbType_I64, xb_load(p, xbType_I64, index_mem), xb_iconst(p, xbType_I64, 1));
 		xb_store(p, xbType_I64, index_mem, incr);
 		u32 count = get_count();
@@ -3027,7 +3059,7 @@ gb_internal void xb_build_range_indexed(xbProc *p, AstRangeStmt *rs) {
 		xb_build_range_indexed_loop(p, rs, elem,
 			[&]() { return xb_load(p, xbType_I64, xb_mem_offset(arr(), 8)); },
 			[&](u32 idx) { return xb_ptr_add_scaled(p, xb_load(p, xbType_I64, arr()), idx, stride); },
-			nullptr, nullptr);
+			nullptr, nullptr, true);
 		return;
 	}
 	case Type_FixedCapacityDynamicArray: {
@@ -3047,7 +3079,7 @@ gb_internal void xb_build_range_indexed(xbProc *p, AstRangeStmt *rs) {
 		xb_build_range_indexed_loop(p, rs, elem,
 			[&]() { return xb_load(p, xbType_I64, xb_mem(xbMem_Reg, base(), cast(i32)len_offset)); },
 			[&](u32 idx) { return xb_ptr_add_scaled(p, base(), idx, stride); },
-			nullptr, nullptr);
+			nullptr, nullptr, true);
 		return;
 	}
 	case Type_Slice: {
@@ -3074,7 +3106,7 @@ gb_internal void xb_build_range_indexed(xbProc *p, AstRangeStmt *rs) {
 				return xb_load(p, xbType_I64, xb_mem_offset(sm, 8));
 			},
 			[&](u32 idx) { return xb_ptr_add_scaled(p, xb_load(p, xbType_I64, sm), idx, stride); },
-			nullptr, nullptr);
+			nullptr, nullptr, count_local >= 0);
 		return;
 	}
 	default:
@@ -3102,7 +3134,8 @@ gb_internal void xb_build_range_string(xbProc *p, AstRangeStmt *rs) {
 	if (!rs->reverse) {
 		xb_store(p, xbType_I64, offset_mem, xb_iconst(p, xbType_I64, 0));
 		xb_jump(p, loop);
-		xb_start_block(p, loop);
+		// LLVM compares with the length it took before the loop
+		xb_start_block(p, loop, false);
 		u32 off = xb_load(p, xbType_I64, offset_mem);
 		xb_branch(p, xb_cmp(p, xbCond_SLT, xbType_I64, off, xb_load(p, xbType_I64, xb_mem_offset(str, 8))), body, done);
 	} else {
@@ -3262,7 +3295,10 @@ gb_internal void xb_build_range_map(xbProc *p, AstRangeStmt *rs, Type *type) {
 	xbBlock *body = xb_new_block(p);
 	xbBlock *done = xb_new_block(p);
 	xb_jump(p, loop);
-	xb_start_block(p, loop);
+	// LLVM reads the map through its address, a reload unless it is a local's or a global's stack slot or symbol
+	Entity *me = expr->kind == Ast_Ident ? entity_of_node(expr) : nullptr;
+	bool slot = me != nullptr && me->kind == Entity_Variable && (me->flags & EntityFlag_Param) == 0 && !is_type_pointer(me->type);
+	xb_start_block(p, loop, slot);
 	u32 incr = xb_binop(p, xbOp_Add, xbType_I64, xb_load(p, xbType_I64, index_mem), xb_iconst(p, xbType_I64, 1));
 	xb_store(p, xbType_I64, index_mem, incr);
 	auto capacity = [&](u32 data) {
@@ -3436,7 +3472,8 @@ gb_internal void xb_build_range_soa(xbProc *p, AstRangeStmt *rs) {
 	if (!rs->reverse) {
 		xb_store(p, xbType_I64, index_mem, xb_iconst(p, xbType_I64, -1));
 		xb_jump(p, loop);
-		xb_start_block(p, loop);
+		// LLVM compares with the length it took before the loop, a constant for a fixed #soa array
+		xb_start_block(p, loop, base_type(t)->Struct.soa_kind == StructSoa_Fixed);
 		u32 incr = xb_binop(p, xbOp_Add, xbType_I64, xb_load(p, xbType_I64, index_mem), xb_iconst(p, xbType_I64, 1));
 		xb_store(p, xbType_I64, index_mem, incr);
 		xb_branch(p, xb_cmp(p, xbCond_SLT, xbType_I64, incr, xb_load(p, xbType_I64, count_mem)), body, done);
@@ -4107,6 +4144,8 @@ gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
 		}
 		GB_ASSERT(block != nullptr);
 		xb_emit_defer_stmts(p, false, block, xb_defer_pos(node));
+		// the next case's body may follow right after, with no jump left on this line
+		if (bs->token.kind == Token_fallthrough) xb_debug_line_nop(p);
 		xb_jump(p, block);
 	case_end;
 
