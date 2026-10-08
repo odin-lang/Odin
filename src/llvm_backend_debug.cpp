@@ -1479,6 +1479,45 @@ gb_internal void lb_add_debug_info_static_variable(lbProcedure *p, Entity *e, LL
 	LLVMGlobalSetMetadata(global, 0, global_variable_metadata);
 }
 
+// `pkg::`, or `pkg::[file.odin]::` for what only its own file can see
+gb_internal gbString lb_debug_append_name_prefix(gbString s, AstFile *file, Entity *e) {
+	AstPackage *pkg = file->pkg;
+	s = gb_string_append_length(s, pkg->name.text, pkg->name.len);
+	s = gb_string_appendc(s, "::");
+	if (e == nullptr || scope_lookup_current(pkg->scope, entity_interned_name(e)) != e) {
+		String file_name = filename_without_directory(file->fullpath);
+		s = gb_string_append_fmt(s, "[%.*s]::", LIT(file_name));
+	}
+	return s;
+}
+
+// NOTE(bill): the name a user types for a procedure: `pkg::name`, `pkg::outer::inner`, or `pkg::outer::proc@42` for a literal.
+// Every instance of a polymorphic procedure shares its name; if they ever need telling apart,
+// the template style `pkg::name<T>` is the option, once each debugger is checked with it.
+gb_internal gbString lb_debug_append_proc_name(gbString s, DeclInfo *decl) {
+	Entity *e = decl->entity.load();
+	bool is_literal = e == nullptr || e->Procedure.is_anonymous;
+	if (DeclInfo *enclosing = lb_enclosing_proc_decl(decl)) {
+		s = lb_debug_append_proc_name(s, enclosing);
+		s = gb_string_appendc(s, "::");
+	} else {
+		Entity *named = nullptr;
+		if (!is_literal) {
+			named = e;
+			if (decl->para_poly_original != nullptr) {
+				named = decl->para_poly_original;
+			}
+		}
+		s = lb_debug_append_name_prefix(s, decl->proc_lit->file(), named);
+	}
+	if (is_literal) {
+		s = gb_string_append_fmt(s, "proc@%d", ast_token(decl->proc_lit).pos.line);
+	} else {
+		s = gb_string_append_length(s, e->token.string.text, e->token.string.len);
+	}
+	return s;
+}
+
 gb_internal String lb_debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
 	String name = e->token.string;
 	if (e->pkg && e->pkg->name.len > 0) {

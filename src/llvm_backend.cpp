@@ -2433,6 +2433,20 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 	if (m->debug_builder) {
 		String global_name = e->token.string;
 		if (global_name.len != 0 && global_name != "_") {
+			gbString name = gb_string_make(heap_allocator(), "");
+			defer (gb_string_free(name));
+			if (e->Variable.is_foreign || e->Variable.is_export || (e->flags & EntityFlag_CustomLinkName)) {
+				size_t link_name_len = 0;
+				char const *link_name = LLVMGetValueName2(g.value, &link_name_len);
+				name = gb_string_append_length(name, link_name, link_name_len);
+			} else {
+				if (e->file != nullptr) {
+					name = lb_debug_append_name_prefix(name, e->file, e);
+				}
+				name = gb_string_append_length(name, global_name.text, global_name.len);
+			}
+			global_name = make_string(cast(u8 *)name, gb_string_length(name));
+
 			LLVMMetadataRef llvm_file = lb_get_file_metadata(m, e->file);
 			LLVMMetadataRef llvm_scope = llvm_file;
 

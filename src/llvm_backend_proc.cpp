@@ -398,8 +398,16 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			flags |= LLVMDIFlagNoReturn;
 		}
 
-		// String debug_name = entity->token.string.text;
+		// NOTE(bill): exported, foreign and custom link names are what a user knows the procedure by
 		String debug_name = p->name;
+		gbString name = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(name));
+		DeclInfo *decl = entity->decl_info;
+		if (!entity->Procedure.is_export && !entity->Procedure.is_foreign && (entity->flags & EntityFlag_CustomLinkName) == 0 &&
+		    decl != nullptr && decl->proc_lit != nullptr) {
+			name = lb_debug_append_proc_name(name, decl);
+			debug_name = make_string(cast(u8 *)name, gb_string_length(name));
+		}
 
 		p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
 			cast(char const *)debug_name.text, debug_name.len,
