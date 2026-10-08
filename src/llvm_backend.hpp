@@ -129,6 +129,13 @@ struct lbTypeInfoMembers {
 	isize tags_index;
 };
 
+// A type whose debug info is being lowered, innermost last
+struct lbDebugTypeFrame {
+	Type *type;
+	bool  is_record;  // CodeView can refer back to it with a forward reference
+	isize lowest_cut; // the lowest frame cut back to while lowering this type
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -196,7 +203,7 @@ struct lbModule {
 
 	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
-	PtrSet<Type *> debug_types_in_progress;
+	Array<lbDebugTypeFrame> debug_type_frames;
 
 
 	StringMap<lbAddr> objc_classes;
@@ -802,6 +809,7 @@ enum {
 	DW_TAG_array_type       = 1,
 	DW_TAG_enumeration_type = 4,
 	DW_TAG_structure_type   = 19,
+	DW_TAG_typedef          = 22,
 	DW_TAG_union_type       = 23,
 	DW_TAG_vector_type      = 259,
 	DW_TAG_subroutine_type  = 21,

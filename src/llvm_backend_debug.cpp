@@ -92,9 +92,6 @@ gb_internal void lb_debug_file_line(lbModule *m, Type *type, Ast *node, LLVMMeta
 }
 
 gb_internal LLVMMetadataRef lb_debug_procedure_parameters(lbModule *m, Type *type) {
-	if (is_type_proc(type)) {
-		return lb_debug_type(m, t_rawptr);
-	}
 	if (type->kind == Type_Tuple && type->Tuple.variables.count == 1) {
 		return lb_debug_procedure_parameters(m, type->Tuple.variables[0]->type);
 	}
@@ -126,9 +123,6 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 	bool return_is_tuple = false;
 	if (type->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
-		if (is_type_proc(single_ret)) {
-			single_ret = t_rawptr;
-		}
 		if (is_type_tuple(single_ret) && is_calling_convention_odin(type->Proc.calling_convention)) {
 			LLVMTypeRef actual = lb_type_internal_for_procedures_raw(m, type);
 			actual = LLVMGetReturnType(actual);
@@ -203,7 +197,7 @@ gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &nam
 	LLVMMetadataRef file = lb_get_file_metadata(m, pkg->files[0]);
 	LLVMMetadataRef scope = file;
 
-	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, cast(char const *)name.text, name.len);
 }
 
 // NOTE: only a named type can contain itself, so only it needs a placeholder for its members to refer to
@@ -214,7 +208,7 @@ gb_internal LLVMMetadataRef lb_debug_placeholder(lbModule *m, Type *type, unsign
 	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
 		m->debug_builder, tag,
 		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
+		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, cast(char const *)name.text, cast(size_t)name.len
 	);
 	lb_set_llvm_metadata(m, type, temp_forward_decl);
 	return temp_forward_decl;
@@ -281,7 +275,7 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 			LLVMDIFlagZero,
 			elements, element_count,
 			0,
-			"", 0
+			cast(char const *)name.text, cast(size_t)name.len
 		);
 	} else {
 		 final_decl = LLVMDIBuilderCreateStructType(
@@ -294,7 +288,7 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 			elements, element_count,
 			0,
 			nullptr,
-			"", 0
+			cast(char const *)name.text, cast(size_t)name.len
 		);
 	}
 
@@ -347,7 +341,7 @@ gb_internal LLVMMetadataRef lb_debug_slice(lbModule *m, Type *type, String name,
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
 	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
@@ -418,7 +412,7 @@ gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, Stri
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
 	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
@@ -472,7 +466,7 @@ gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, T
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
 	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
@@ -549,7 +543,7 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 		elements,
 		element_count,
 		0,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
 	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
@@ -630,7 +624,7 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 		elements,
 		element_count,
 		0,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 	lb_set_llvm_metadata(m, type, final_decl);
 	return final_decl;
@@ -671,7 +665,7 @@ gb_internal LLVMMetadataRef lb_debug_bitfield(lbModule *m, Type *type, String na
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 	lb_set_llvm_metadata(m, type, final_decl);
 	return final_decl;
@@ -1091,7 +1085,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			elements, 1,
 			0,
 			nullptr,
-			"", 0
+			name, gb_string_length(name)
 		);
 
 		return final_decl;
@@ -1127,12 +1121,60 @@ gb_internal LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope
 
 gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	GB_ASSERT(type != nullptr);
+
+	MUTEX_GUARD(&m->debug_values_mutex);
+
 	LLVMMetadataRef found = lb_get_llvm_metadata(m, type);
 	if (found != nullptr) {
+		// NOTE: CodeView can only refer back to a type through a forward reference to a record, so a loop made only of
+		// procedure, pointer and array types, as in `Bar :: proc(p: ^Bar)`, is cut to `rawptr` where it closes
+		if (type->kind == Type_Named && build_context.metrics.os == TargetOs_windows) {
+			for (isize i = m->debug_type_frames.count-1; i >= 0; i--) {
+				lbDebugTypeFrame const &frame = m->debug_type_frames[i];
+				if (frame.is_record) {
+					break;
+				}
+				if (frame.type == type) {
+					lbDebugTypeFrame *top = &m->debug_type_frames[m->debug_type_frames.count-1];
+					top->lowest_cut = gb_min(top->lowest_cut, i);
+					return lb_debug_type(m, t_rawptr);
+				}
+			}
+		}
 		return found;
 	}
 
-	MUTEX_GUARD(&m->debug_values_mutex);
+	bool is_record = false;
+	Type *record_bt = base_type(type);
+	switch (record_bt->kind) {
+	case Type_Struct:
+	case Type_Union:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_FixedCapacityDynamicArray:
+	case Type_Map:
+	case Type_BitSet:
+	case Type_BitField:
+	case Type_Enum:
+	case Type_Matrix:
+		is_record = true;
+		break;
+	case Type_Tuple:
+		is_record = record_bt->Tuple.variables.count != 1;
+		break;
+	}
+
+	isize frame_index = m->debug_type_frames.count;
+	array_add(&m->debug_type_frames, lbDebugTypeFrame{type, is_record, frame_index});
+	defer ({
+		lbDebugTypeFrame frame = array_pop(&m->debug_type_frames);
+		if (frame.lowest_cut < frame_index) {
+			// NOTE: holds a cut back to a type still being lowered, so it only stands for that loop and is not kept
+			map_remove(&m->debug_values, cast(void *)type);
+			lbDebugTypeFrame *parent = &m->debug_type_frames[m->debug_type_frames.count-1];
+			parent->lowest_cut = gb_min(parent->lowest_cut, frame.lowest_cut);
+		}
+	});
 
 	if (type->kind == Type_Named) {
 		LLVMMetadataRef file = nullptr;
@@ -1154,21 +1196,20 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 
 		switch (bt->kind) {
 		default: {
-			// NOTE: a named type reached again while lowering its own base, as in `Bar :: proc(p: ^Bar)`, is cut to `rawptr`
-			if (ptr_set_update(&m->debug_types_in_progress, type)) {
-				return lb_debug_type(m, t_rawptr);
-			}
 			u32 align_in_bits = 8*cast(u32)type_align_of(type);
+			// NOTE: only a type whose base is not basic can be reached again while lowering its base, as in `Bar :: proc(p: ^Bar)`
+			LLVMMetadataRef temp_forward_decl = nullptr;
+			if (bt->kind != Type_Basic) {
+				temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_typedef, name, scope, file, line, 8*cast(u64)type_size_of(type), align_in_bits);
+			}
 			LLVMMetadataRef debug_bt = lb_debug_type(m, bt);
-			ptr_set_remove(&m->debug_types_in_progress, type);
 			LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(
 				m->debug_builder,
 				debug_bt,
 				cast(char const *)name.text, cast(size_t)name.len,
 				file, line, scope, align_in_bits
 			);
-			lb_set_llvm_metadata(m, type, final_decl);
-			return final_decl;
+			return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 		}
 
 		case Type_Map: {

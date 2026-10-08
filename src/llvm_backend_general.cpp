@@ -119,11 +119,12 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 			break;
 
 		case TargetOs_darwin:
-			// NOTE(bill): Darwin only supports DWARF2 (that I know of)
+		case TargetOs_linux:
+			// NOTE: other targets keep LLVM's default, DWARF 4
 			LLVMAddModuleFlag(m->mod,
 				LLVMModuleFlagBehaviorWarning,
 				"Dwarf Version", 13,
-				LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 2, true)));
+				LLVMValueAsMetadata(LLVMConstInt(LLVMInt32TypeInContext(m->ctx), 5, true)));
 			break;
 		}
 		m->debug_builder = LLVMCreateDIBuilder(m->mod);
@@ -156,6 +157,7 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	array_init(&m->global_types_to_create, a, 0, 1024);
 	array_init(&m->global_variables, a);
 	map_init(&m->debug_values);
+	array_init(&m->debug_type_frames, a);
 
 	string_map_init(&m->objc_classes);
 	string_map_init(&m->objc_selectors);
