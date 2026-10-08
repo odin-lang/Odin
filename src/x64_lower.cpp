@@ -4,6 +4,11 @@
 // block that defines them) share slots. Instructions load their operands into
 // scratch registers, compute, and store the result back.
 //
+// Three peepholes skip some of the slot traffic:
+//   - a result whose only use is the next instruction stays in rax (`keep`/`pend`)
+//   - a small constant whose every use can take an immediate is never materialized
+//   - a compare whose only use is the next branch only sets the flags
+//
 // Frame:
 //   [rbp+16 ...]  incoming stack arguments
 //   [rbp+8]       return address
@@ -20,6 +25,25 @@ struct xbLower {
 	struct Fixup { i64 at; i32 block; };
 	Array<Fixup> fixups;
 	i64         proc_start;
+
+	struct VregInfo {
+		i32  uses;
+		i32  defs;
+		bool cross;
+		bool imm_candidate; // defined once by an IConst that fits a sign-extended imm32
+		bool folded;        // and every use takes it as an immediate
+		i64  imm;
+	};
+	Array<VregInfo> vinfo;
+
+	u32  keep;        // the current instruction leaves this vreg in rax instead of its slot
+	u32  pend;        // the vreg the previous instruction left in a register
+	u8   pend_reg;
+	bool pend_used;
+	bool fuse_branch; // the current compare only sets the flags for the next branch
+	u32  flags_vreg;  // the compare result the flags hold
+	xbCC flags_cc;
+	i32  next_block;  // the block placed right after the current branch, or -1
 };
 
 template <typename F>
@@ -155,6 +179,106 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 	}
 }
 
+gb_internal bool xb_op_commutes(xbOp op) {
+	return op == xbOp_Add || op == xbOp_And || op == xbOp_Or || op == xbOp_Xor || op == xbOp_Mul;
+}
+
+// Whether `in` can take the constant `v` as an immediate in every place it reads it.
+gb_internal bool xb_imm_ok(xbLower *L, xbInstr const &in, u32 v) {
+	auto cand = [&](u32 x) { return x != 0 && L->vinfo[x].imm_candidate; };
+	switch (in.op) {
+	case xbOp_Add:
+	case xbOp_And:
+	case xbOp_Or:
+	case xbOp_Xor:
+	case xbOp_Mul:
+		// only one side can be an immediate, the lowering swaps it into b
+		if (in.a == in.b) return false;
+		return v == in.b || !cand(in.b);
+	case xbOp_Sub:
+	case xbOp_ICmp:
+	case xbOp_Shl:
+	case xbOp_LShr:
+	case xbOp_AShr:
+		return v == in.b && in.a != v;
+	case xbOp_Store:
+		return v == in.a && !(in.mem.kind == xbMem_Reg && in.mem.base == v) && !xb_type_is_float(in.type);
+	}
+	return false;
+}
+
+// Whether `in` can read `v` from rax, where the instruction before it left it.
+gb_internal bool xb_rax_ok(xbInstr const &in, u32 v) {
+	bool mem_base = in.mem.kind == xbMem_Reg && in.mem.base == v;
+	switch (in.op) {
+	case xbOp_Add:
+	case xbOp_Sub:
+	case xbOp_And:
+	case xbOp_Or:
+	case xbOp_Xor:
+	case xbOp_Mul:
+	case xbOp_SDiv:
+	case xbOp_SRem:
+	case xbOp_UDiv:
+	case xbOp_URem:
+	case xbOp_Shl:
+	case xbOp_LShr:
+	case xbOp_AShr:
+	case xbOp_ICmp:
+		return v == in.a || v == in.b;
+	case xbOp_Neg:
+	case xbOp_Not:
+	case xbOp_Zext:
+	case xbOp_Sext:
+	case xbOp_Trunc:
+	case xbOp_Bitcast:
+	case xbOp_Copy:
+	case xbOp_Branch:
+		return v == in.a;
+	case xbOp_Store:
+		return mem_base || (v == in.a && !xb_type_is_float(in.type));
+	case xbOp_Load:
+	case xbOp_AtomicLoad:
+	case xbOp_Lea:
+		return mem_base;
+	}
+	return false;
+}
+
+// Whether the lowering of `in` ends with its gpr result in a register it can leave in rax.
+gb_internal bool xb_can_keep(xbInstr const &in) {
+	switch (in.op) {
+	case xbOp_Load:
+	case xbOp_AtomicLoad:
+		return !xb_type_is_float(in.type);
+	case xbOp_Lea:
+	case xbOp_Copy:
+	case xbOp_Add:
+	case xbOp_Sub:
+	case xbOp_And:
+	case xbOp_Or:
+	case xbOp_Xor:
+	case xbOp_Mul:
+	case xbOp_SDiv:
+	case xbOp_SRem:
+	case xbOp_UDiv:
+	case xbOp_URem:
+	case xbOp_Shl:
+	case xbOp_LShr:
+	case xbOp_AShr:
+	case xbOp_Neg:
+	case xbOp_Not:
+	case xbOp_ICmp:
+	case xbOp_Zext:
+	case xbOp_Sext:
+	case xbOp_Trunc:
+	case xbOp_Bitcast:
+	case xbOp_Select:
+		return true;
+	}
+	return false;
+}
+
 gb_internal void xb_lower_layout(xbLower *L) {
 	xbProc *p = L->p;
 	i32 cur = 0;
@@ -183,15 +307,22 @@ gb_internal void xb_lower_layout(xbLower *L) {
 		last_use[i] = -1;
 	}
 
+	L->vinfo = array_make<xbLower::VregInfo>(heap_allocator(), vreg_count);
 	i32 linear = 0;
 	L->max_call_stack = 0;
 	for (xbBlock *b : p->order) {
 		for (xbInstr const &in : b->instrs) {
+			if (in.op == xbOp_IConst && in.dst != 0 && in.imm >= -0x80000000ll && in.imm <= 0x7fffffffll) {
+				L->vinfo[in.dst].imm_candidate = true;
+				L->vinfo[in.dst].imm = in.imm;
+			}
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
 				if (v == 0) return;
 				if (is_def) {
+					L->vinfo[v].defs++;
 					def_block[v] = b->index;
 				} else {
+					L->vinfo[v].uses++;
 					if (def_block[v] != b->index) cross[v] = true;
 					last_use[v] = linear;
 				}
@@ -200,6 +331,20 @@ gb_internal void xb_lower_layout(xbLower *L) {
 				L->max_call_stack = gb_max(L->max_call_stack, p->calls[cast(isize)in.imm].stack_size);
 			}
 			linear++;
+		}
+	}
+
+	for (isize v = 0; v < vreg_count; v++) {
+		L->vinfo[v].cross = cross[v];
+		if (L->vinfo[v].defs != 1) L->vinfo[v].imm_candidate = false;
+		L->vinfo[v].folded = L->vinfo[v].imm_candidate;
+	}
+	for (xbBlock *b : p->order) {
+		for (xbInstr const &in : b->instrs) {
+			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
+				if (v == 0 || is_def || !L->vinfo[v].folded) return;
+				if (!xb_imm_ok(L, in, v)) L->vinfo[v].folded = false;
+			});
 		}
 	}
 
@@ -248,7 +393,62 @@ gb_internal void xb_lower_layout(xbLower *L) {
 
 gb_internal xbOpnd xb_slot(xbLower *L, u32 v) {
 	GB_ASSERT(v != 0);
+	GB_ASSERT(v != L->pend && v != L->flags_vreg && !L->vinfo[v].folded);
 	return xb_m(RBP, L->slot[v]);
+}
+
+gb_internal bool xb_is_pend(xbLower *L, u32 v) {
+	return v != 0 && v == L->pend;
+}
+
+gb_internal bool xb_is_imm(xbLower *L, u32 v) {
+	return v != 0 && L->vinfo[v].folded;
+}
+
+gb_internal i32 xb_imm(xbLower *L, u32 v) {
+	GB_ASSERT(xb_is_imm(L, v));
+	return cast(i32)L->vinfo[v].imm;
+}
+
+// Frees rax when the instruction needs it before it reads the pending value.
+gb_internal void xb_pend_to_rcx(xbLower *L) {
+	if (L->pend != 0 && L->pend_reg == RAX) {
+		xb_mov_r_rm(&L->a, 8, RCX, xb_r(RAX));
+		L->pend_reg = RCX;
+	}
+}
+
+// The vreg as an operand: its slot, or the register holding it.
+gb_internal xbOpnd xb_src(xbLower *L, u32 v) {
+	if (xb_is_pend(L, v)) {
+		L->pend_used = true;
+		return xb_r(L->pend_reg);
+	}
+	return xb_slot(L, v);
+}
+
+// mov reg, v without extension, `size` bytes
+gb_internal void xb_get_raw(xbLower *L, u8 reg, u32 v, i32 size) {
+	if (xb_is_pend(L, v)) {
+		L->pend_used = true;
+		if (reg != L->pend_reg) xb_mov_r_rm(&L->a, 8, reg, xb_r(L->pend_reg));
+		return;
+	}
+	xb_mov_r_rm(&L->a, size, reg, xb_slot(L, v));
+}
+
+gb_internal void xb_store_gpr(xbLower *L, u32 v, u8 reg, i32 size);
+
+// Defines `v` from `reg`: into its slot, or left in rax for the next instruction.
+gb_internal void xb_def_gpr(xbLower *L, u32 v, u8 reg, i32 size) {
+	if (v != 0 && v == L->keep) {
+		if (reg != RAX) xb_mov_r_rm(&L->a, 8, RAX, xb_r(reg));
+		L->pend = v;
+		L->pend_reg = RAX;
+		L->keep = 0;
+		return;
+	}
+	xb_store_gpr(L, v, reg, size);
 }
 
 // A machine memory operand for an IR memory reference. May clobber `scratch`.
@@ -266,7 +466,7 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 	case xbMem_Incoming:
 		return xb_m(RBP, 16 + m.offset);
 	case xbMem_Reg:
-		xb_mov_r_rm(a, 8, scratch, xb_slot(L, m.base));
+		xb_mov_r_rm(a, 8, scratch, xb_src(L, m.base));
 		return xb_m(scratch, m.offset);
 	case xbMem_Sym: {
 		xbSymbol *s = &L->p->m->symbols[m.base];
@@ -306,6 +506,27 @@ gb_internal void xb_load_gpr(xbLower *L, u8 reg, u32 v, i32 size, xbExtKind ext)
 
 gb_internal void xb_store_gpr(xbLower *L, u32 v, u8 reg, i32 size) {
 	xb_mov_rm_r(&L->a, size, xb_slot(L, v), reg);
+}
+
+// Like xb_load_gpr, but the value may be pending in a register. A 4 byte signed
+// value is sign extended to 64 bits.
+gb_internal void xb_get_gpr(xbLower *L, u8 reg, u32 v, i32 size, xbExtKind ext) {
+	bool sgn = ext == xbExt_Sign;
+	if (xb_is_pend(L, v)) {
+		L->pend_used = true;
+		u8 src = L->pend_reg;
+		if (size == 8) {
+			if (reg != src) xb_mov_r_rm(&L->a, 8, reg, xb_r(src));
+		} else {
+			xb_load_ext(&L->a, size, sgn, reg, xb_r(src));
+		}
+		return;
+	}
+	if (size == 4 && sgn) {
+		xb_load_ext(&L->a, 4, true, reg, xb_slot(L, v));
+		return;
+	}
+	xb_load_gpr(L, reg, v, size, ext);
 }
 
 gb_internal void xb_load_xmm(xbLower *L, u8 x, xbOpnd m, i32 size) {
@@ -611,6 +832,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	}
 	case xbOp_IConst:
 	case xbOp_FConst: {
+		if (in.op == xbOp_IConst && xb_is_imm(L, in.dst)) break;
 		i64 v = in.imm;
 		if (v >= -0x80000000ll && v <= 0x7fffffffll) {
 			// mov qword [slot], simm32
@@ -625,7 +847,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	case xbOp_Lea: {
 		xbOpnd m = xb_mem_opnd(L, in.mem, R11);
 		xb_lea(a, RAX, m);
-		xb_store_gpr(L, in.dst, RAX, 8);
+		xb_def_gpr(L, in.dst, RAX, 8);
 		break;
 	}
 	case xbOp_Load:
@@ -636,7 +858,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 			xb_movs_rm_x(a, size, xb_slot(L, in.dst), 0);
 		} else {
 			xb_load_ext(a, size, false, RAX, m);
-			xb_store_gpr(L, in.dst, RAX, 8);
+			xb_def_gpr(L, in.dst, RAX, 8);
 		}
 		break;
 	}
@@ -645,9 +867,19 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 			xb_movs_x_rm(a, size, 0, xb_slot(L, in.a));
 			xbOpnd m = xb_mem_opnd(L, in.mem, R11);
 			xb_movs_rm_x(a, size, m, 0);
-		} else {
-			xb_mov_r_rm(a, size, RAX, xb_slot(L, in.a));
+		} else if (xb_is_imm(L, in.a)) {
 			xbOpnd m = xb_mem_opnd(L, in.mem, R11);
+			// mov rm, imm, sign extended for qwords
+			xb_enc(a, xb_size_flags(size), size == 1 ? 0xC6 : 0xC7, 0, m, gb_min(size, 4));
+			switch (size) {
+			case 1: xb_b(a, cast(u8)xb_imm(L, in.a)); break;
+			case 2: xb_u16(a, cast(u16)xb_imm(L, in.a)); break;
+			default: xb_u32(a, cast(u32)xb_imm(L, in.a)); break;
+			}
+		} else {
+			// the address only clobbers r11, so a pending value stays in rax
+			xbOpnd m = xb_mem_opnd(L, in.mem, R11);
+			xb_get_raw(L, RAX, in.a, size);
 			xb_mov_rm_r(a, size, m, RAX);
 		}
 		break;
@@ -660,8 +892,8 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Copy:
-		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.a));
-		xb_store_gpr(L, in.dst, RAX, 8);
+		xb_get_raw(L, RAX, in.a, 8);
+		xb_def_gpr(L, in.dst, RAX, 8);
 		break;
 
 	case xbOp_Add:
@@ -677,17 +909,41 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		case xbOp_Or:  op = ALU_OR;  break;
 		case xbOp_Xor: op = ALU_XOR; break;
 		}
-		xb_mov_r_rm(a, size, RAX, xb_slot(L, in.a));
-		xb_alu_r_rm(a, op, size, RAX, xb_slot(L, in.b));
-		xb_store_gpr(L, in.dst, RAX, size);
+		u32 x = in.a;
+		u32 y = in.b;
+		if (xb_op_commutes(in.op) && (xb_is_imm(L, x) || (xb_is_pend(L, y) && !xb_is_pend(L, x)))) {
+			gb_swap(u32, x, y);
+		}
+		if (xb_is_pend(L, y)) xb_pend_to_rcx(L);
+		xb_get_raw(L, RAX, x, size);
+		if (xb_is_imm(L, y)) {
+			xb_alu_rm_imm(a, op, size, xb_r(RAX), xb_imm(L, y));
+		} else {
+			xb_alu_r_rm(a, op, size, RAX, xb_src(L, y));
+		}
+		xb_def_gpr(L, in.dst, RAX, size);
 		break;
 	}
 	case xbOp_Mul: {
 		i32 s = gb_max(size, 4);
-		xb_load_gpr(L, RAX, in.a, size, xbExt_Zero);
-		xb_load_gpr(L, RCX, in.b, size, xbExt_Zero);
-		xb_imul_r_rm(a, s, RAX, xb_r(RCX));
-		xb_store_gpr(L, in.dst, RAX, size);
+		u32 x = in.a;
+		u32 y = in.b;
+		if (xb_is_imm(L, x) || (xb_is_pend(L, y) && !xb_is_pend(L, x))) {
+			gb_swap(u32, x, y);
+		}
+		xb_get_gpr(L, RAX, x, size, xbExt_Zero);
+		if (xb_is_imm(L, y)) {
+			// imul rax, rax, imm
+			i32 imm = xb_imm(L, y);
+			bool small = imm >= -128 && imm <= 127;
+			xb_enc(a, xb_size_flags(s), small ? 0x6B : 0x69, RAX, xb_r(RAX));
+			if (small) xb_b(a, cast(u8)cast(i8)imm);
+			else       xb_u32(a, cast(u32)imm);
+		} else {
+			xb_get_gpr(L, RCX, y, size, xbExt_Zero);
+			xb_imul_r_rm(a, s, RAX, xb_r(RCX));
+		}
+		xb_def_gpr(L, in.dst, RAX, size);
 		break;
 	}
 	case xbOp_SDiv:
@@ -696,8 +952,9 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	case xbOp_URem: {
 		bool sgn = in.op == xbOp_SDiv || in.op == xbOp_SRem;
 		i32 s = gb_max(size, 4);
-		xb_load_gpr(L, RAX, in.a, size, sgn ? xbExt_Sign : xbExt_Zero);
-		xb_load_gpr(L, RCX, in.b, size, sgn ? xbExt_Sign : xbExt_Zero);
+		if (xb_is_pend(L, in.b)) xb_pend_to_rcx(L);
+		xb_get_gpr(L, RAX, in.a, size, sgn ? xbExt_Sign : xbExt_Zero);
+		xb_get_gpr(L, RCX, in.b, size, sgn ? xbExt_Sign : xbExt_Zero);
 		if (sgn) {
 			xb_sign_extend_rdx(a, s);
 			xb_grp3(a, 7, s, xb_r(RCX));
@@ -706,18 +963,24 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 			xb_grp3(a, 6, s, xb_r(RCX));
 		}
 		bool rem = in.op == xbOp_SRem || in.op == xbOp_URem;
-		xb_store_gpr(L, in.dst, rem ? RDX : RAX, size);
+		xb_def_gpr(L, in.dst, rem ? RDX : RAX, size);
 		break;
 	}
 	case xbOp_Shl:
 	case xbOp_LShr:
 	case xbOp_AShr: {
 		i32 s = gb_max(size, 4);
-		xb_load_gpr(L, RAX, in.a, size, in.op == xbOp_AShr ? xbExt_Sign : xbExt_Zero);
-		xb_mov_r_rm(a, 4, RCX, xb_slot(L, in.b));
 		u8 n = in.op == xbOp_Shl ? 4 : (in.op == xbOp_LShr ? 5 : 7);
-		xb_shift_cl(a, n, s, xb_r(RAX));
-		xb_store_gpr(L, in.dst, RAX, size);
+		if (xb_is_pend(L, in.b)) xb_pend_to_rcx(L);
+		xb_get_gpr(L, RAX, in.a, size, in.op == xbOp_AShr ? xbExt_Sign : xbExt_Zero);
+		if (xb_is_imm(L, in.b)) {
+			// the cpu masks an immediate count like it masks cl
+			xb_shift_imm(a, n, s, xb_r(RAX), cast(u8)xb_imm(L, in.b));
+		} else {
+			xb_get_raw(L, RCX, in.b, 4);
+			xb_shift_cl(a, n, s, xb_r(RAX));
+		}
+		xb_def_gpr(L, in.dst, RAX, size);
 		break;
 	}
 	case xbOp_FAdd:
@@ -742,9 +1005,9 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		break;
 	case xbOp_Neg:
 	case xbOp_Not:
-		xb_mov_r_rm(a, size, RAX, xb_slot(L, in.a));
+		xb_get_raw(L, RAX, in.a, size);
 		xb_grp3(a, in.op == xbOp_Neg ? 3 : 2, size, xb_r(RAX));
-		xb_store_gpr(L, in.dst, RAX, size);
+		xb_def_gpr(L, in.dst, RAX, size);
 		break;
 	case xbOp_FNeg:
 		if (size == 4) {
@@ -760,11 +1023,26 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		break;
 	case xbOp_ICmp: {
 		xbCond c = cast(xbCond)in.aux;
-		xb_mov_r_rm(a, size, RAX, xb_slot(L, in.a));
-		xb_alu_r_rm(a, ALU_CMP, size, RAX, xb_slot(L, in.b));
+		if (xb_is_imm(L, in.b)) {
+			// cmp [slot], imm needs no load
+			xbOpnd lhs = xb_is_pend(L, in.a) ? xb_src(L, in.a) : xb_slot(L, in.a);
+			xb_alu_rm_imm(a, ALU_CMP, size, lhs, xb_imm(L, in.b));
+		} else if (xb_is_pend(L, in.b)) {
+			// cmp [slot], reg
+			u8 r = xb_src(L, in.b).reg;
+			xb_enc(a, xb_size_flags(size), size == 1 ? 0x38 : 0x39, r, xb_slot(L, in.a));
+		} else {
+			xb_get_raw(L, RAX, in.a, size);
+			xb_alu_r_rm(a, ALU_CMP, size, RAX, xb_src(L, in.b));
+		}
+		if (L->fuse_branch) {
+			L->flags_vreg = in.dst;
+			L->flags_cc = xb_cc_for(c);
+			break;
+		}
 		xb_setcc(a, xb_cc_for(c), RAX);
 		xb_load_ext(a, 1, false, RAX, xb_r(RAX));
-		xb_store_gpr(L, in.dst, RAX, 1);
+		xb_def_gpr(L, in.dst, RAX, 1);
 		break;
 	}
 	case xbOp_FCmp: {
@@ -807,17 +1085,14 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	case xbOp_Zext:
 	case xbOp_Sext: {
 		xbType src = cast(xbType)in.aux;
-		xb_load_gpr(L, RAX, in.a, xb_type_size(src), in.op == xbOp_Sext ? xbExt_Sign : xbExt_Zero);
-		if (xb_type_size(src) == 4 && in.op == xbOp_Sext) {
-			xb_load_ext(a, 4, true, RAX, xb_slot(L, in.a));
-		}
-		xb_store_gpr(L, in.dst, RAX, 8);
+		xb_get_gpr(L, RAX, in.a, xb_type_size(src), in.op == xbOp_Sext ? xbExt_Sign : xbExt_Zero);
+		xb_def_gpr(L, in.dst, RAX, 8);
 		break;
 	}
 	case xbOp_Trunc:
 	case xbOp_Bitcast:
-		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.a));
-		xb_store_gpr(L, in.dst, RAX, 8);
+		xb_get_raw(L, RAX, in.a, 8);
+		xb_def_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_SIToF: {
 		xbType src = cast(xbType)in.aux;
@@ -894,7 +1169,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.c));
 		xb_alu_rm_imm(a, ALU_CMP, 1, xb_slot(L, in.a), 0);
 		xb_cmov(a, CC_NE, 8, RAX, xb_slot(L, in.b));
-		xb_store_gpr(L, in.dst, RAX, 8);
+		xb_def_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_MemCopy:
 	case xbOp_MemMove:
@@ -967,14 +1242,28 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Branch: {
-		xb_alu_rm_imm(a, ALU_CMP, 1, xb_slot(L, in.a), 0);
-		i64 at = xb_jcc32(a, CC_NE);
-		xbLower::Fixup f1 = {at, cast(i32)in.imm};
+		xbCC cc = CC_NE;
+		if (in.a == L->flags_vreg) {
+			cc = L->flags_cc;
+		} else if (xb_is_pend(L, in.a)) {
+			u8 r = xb_src(L, in.a).reg;
+			xb_test_rm_r(a, 1, xb_r(r), r);
+		} else {
+			xb_alu_rm_imm(a, ALU_CMP, 1, xb_slot(L, in.a), 0);
+		}
+		i32 t = cast(i32)in.imm;
+		i32 f = cast(i32)in.c;
+		// x86 condition codes come in pairs that differ in the low bit
+		if (t == L->next_block) {
+			gb_swap(i32, t, f);
+			cc = cast(xbCC)(cc ^ 1);
+		}
+		xbLower::Fixup f1 = {xb_jcc32(a, cc), t};
 		array_add(&L->fixups, f1);
-		xb_b(a, 0xE9);
-		xbLower::Fixup f2 = {xb_pos(a), cast(i32)in.c};
-		xb_u32(a, 0);
-		array_add(&L->fixups, f2);
+		if (f != L->next_block) {
+			xbLower::Fixup f2 = {xb_jmp32(a), f};
+			array_add(&L->fixups, f2);
+		}
 		break;
 	}
 	case xbOp_Ret:
@@ -1231,6 +1520,7 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	L.fixups = array_make<xbLower::Fixup>(heap_allocator(), 0, 64);
 	defer (array_free(&L.fixups));
 	defer (array_free(&L.slot));
+	defer (array_free(&L.vinfo));
 
 	xb_lower_layout(&L);
 
@@ -1291,20 +1581,58 @@ gb_internal void xb_lower_proc(xbProc *p) {
 		}
 	}
 
-	for (xbBlock *b : p->order) {
+	// the next instruction that emits code, nothing in between touches rax or the flags
+	auto next_code = [&](xbBlock *b, isize i) -> isize {
+		for (isize j = i+1; j < b->instrs.count; j++) {
+			xbInstr const &n = b->instrs[j];
+			if (n.op == xbOp_Loc || n.op == xbOp_Nop) continue;
+			if (n.op == xbOp_IConst && xb_is_imm(&L, n.dst)) continue;
+			return j;
+		}
+		return -1;
+	};
+
+	for (isize bi = 0; bi < p->order.count; bi++) {
+		xbBlock *b = p->order[bi];
+		i32 next_block = bi+1 < p->order.count ? p->order[bi+1]->index : -1;
 		b->code_offset = cast(i32)xb_pos(a);
 		for (isize i = 0; i < b->instrs.count; i++) {
 			xbInstr const &in = b->instrs[i];
 			// a jump to the next block is a fallthrough
-			if (in.op == xbOp_Jump && i+1 == b->instrs.count) {
-				isize bi = 0;
-				for (; bi < p->order.count; bi++) if (p->order[bi] == b) break;
-				if (bi+1 < p->order.count && p->order[bi+1]->index == cast(i32)in.imm) {
-					continue;
+			if (in.op == xbOp_Jump && i+1 == b->instrs.count && cast(i32)in.imm == next_block) {
+				continue;
+			}
+			if (in.op == xbOp_Loc || in.op == xbOp_Nop) {
+				xb_lower_instr(&L, in);
+				continue;
+			}
+			if (in.op == xbOp_IConst && xb_is_imm(&L, in.dst)) continue;
+
+			L.keep = 0;
+			L.fuse_branch = false;
+			L.next_block = i+1 == b->instrs.count ? next_block : -1;
+			isize j = next_code(b, i);
+			xbLower::VregInfo const *d = in.dst ? &L.vinfo[in.dst] : nullptr;
+			if (j >= 0 && d && d->uses == 1 && d->defs == 1 && !d->cross) {
+				xbInstr const &n = b->instrs[j];
+				if (in.op == xbOp_ICmp && n.op == xbOp_Branch && n.a == in.dst) {
+					L.fuse_branch = true;
+				} else if (xb_can_keep(in) && xb_rax_ok(n, in.dst)) {
+					L.keep = in.dst;
 				}
 			}
+
+			u32 pend = L.pend;
+			L.pend_used = false;
 			xb_lower_instr(&L, in);
+			GB_ASSERT_MSG(L.keep == 0, "xb: op %d did not leave its result in rax", in.op);
+			if (pend != 0) {
+				GB_ASSERT_MSG(L.pend_used, "xb: op %d did not read the pending value", in.op);
+				if (L.pend == pend) L.pend = 0;
+			}
+			if (in.op == xbOp_Branch) L.flags_vreg = 0;
 		}
+		GB_ASSERT(L.pend == 0 && L.flags_vreg == 0);
 	}
 	for (auto const &f : L.fixups) {
 		xbBlock *target = p->blocks[f.block];
