@@ -25,7 +25,21 @@ struct xbWin64Class {
 	xbAbiPiece piece;
 	bool       copy;
 	bool       unsupported;
+	i32        parts;     // Indirect vector: pointers passed, one per legal vector part
+	i32        part_size;
 };
+
+// The widest vector LLVM keeps whole for an element size; wider ones are split into parts.
+gb_internal i32 xb_win64_legal_vector_size(i64 elem_size) {
+	if (check_target_feature_is_enabled(str_lit("avx512f"), nullptr) &&
+	    (elem_size >= 4 || check_target_feature_is_enabled(str_lit("avx512bw"), nullptr))) {
+		return 64;
+	}
+	if (check_target_feature_is_enabled(str_lit("avx"), nullptr)) {
+		return 32;
+	}
+	return 16;
+}
 
 gb_internal xbType xb_win64_int_type(i64 size) {
 	if (size <= 1) return xbType_I8;
@@ -57,19 +71,32 @@ gb_internal xbWin64Class xb_win64_classify(xbLType *lt, bool is_return) {
 			break;
 		}
 		break;
-	case xbLT_Vector:
-		if (!is_return && lt->size == 8 && lt->elem->kind == xbLT_Int) {
+	case xbLT_Vector: {
+		// what LLVM's type legalization does with the vector lbAbi386::non_struct leaves alone
+		xbLType *elem = lt->elem;
+		if (!is_return && lt->size == 8 && elem->kind == xbLT_Int) {
 			set(xbType_I64, 8, xbLoc_Gpr);
-		} else if (is_return && lt->size == 16) {
-			set(xbType_V128, 16, xbLoc_Xmm);
-		} else if (!is_return && lt->size >= 16) {
-			// LLVM passes vectors by pointer to an aligned copy
+		} else if (lt->count == 1 && elem->kind != xbLT_Half) {
+			// a single element vector is scalarized
+			c = xb_win64_classify(elem, is_return);
+		} else if (is_return) {
+			// widened or split into xmm0-xmm3, the caller decides how many it can take
+			if (lt->size > 16) {
+				c.kind = xbArg_Indirect;
+			} else {
+				set(lt->size == 16 ? xbType_V128 : lt->size == 8 ? xbType_F64 : xbType_F32, cast(i32)lt->size, xbLoc_Xmm);
+			}
+		} else {
+			// widened to a legal vector or split into legal parts, each passed by pointer to an aligned copy
+			i32 legal = xb_win64_legal_vector_size(elem->size);
 			c.kind = xbArg_Indirect;
 			c.copy = true;
-		} else {
-			c.unsupported = true;
+			c.part_size = cast(i32)gb_min(lt->size, cast(i64)legal);
+			c.part_size = gb_max(c.part_size, 16);
+			c.parts = cast(i32)((lt->size + c.part_size - 1) / c.part_size);
 		}
 		break;
+	}
 	case xbLT_Int:
 		if (lt->bits <= 64) {
 			set(xb_win64_int_type(lt->size), cast(i32)lt->size, xbLoc_Gpr);
@@ -142,6 +169,7 @@ gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason
 	// results
 	xbWin64Class ret = {};
 	ret.kind = xbArg_Ignore;
+	i32 ret_parts = 0;
 	if (pt->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(pt->Proc.results);
 		if (is_type_proc(single_ret)) {
@@ -170,6 +198,18 @@ gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason
 		if (ret.unsupported) {
 			*reason = "win64 abi return";
 			return nullptr;
+		}
+		if (lt->kind == xbLT_Vector && lt->size > 16) {
+			if (check_target_feature_is_enabled(str_lit("avx"), nullptr)) {
+				// with AVX, LLVM returns a wide vector in ymm/zmm registers, which this backend does not use
+				*reason = "avx vector return";
+				return nullptr;
+			}
+			// split into 16 byte parts in xmm0-xmm3, or demoted to sret when more
+			ret_parts = cast(i32)(lt->size / 16);
+			if (ret_parts <= 4) {
+				ret.kind = xbArg_Direct;
+			}
 		}
 		f->ret_type = ret_type;
 		f->ret.type = ret_type;
@@ -208,6 +248,15 @@ gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason
 				break;
 			case xbArg_Indirect:
 				xb_win64_add_pointer_arg(f, &s, &arg);
+				if (c.parts > 0 && !(e->flags & EntityFlag_ByPtr)) {
+					arg.copy_part = c.part_size;
+					for (i32 i = 1; i < c.parts; i++) {
+						xbAbiPiece p = f->pieces[arg.piece_index];
+						xb_win64_place(&s, &p);
+						array_add(&f->pieces, p);
+					}
+					arg.piece_count = c.parts;
+				}
 				break;
 			case xbArg_Direct:
 				arg.piece_index = cast(i32)f->pieces.count;
@@ -234,7 +283,19 @@ gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason
 	f->xmm_count = s.slot;
 	f->stack_size = 32 + 8*gb_max(s.slot - 4, 0);
 
-	if (ret.kind == xbArg_Direct) {
+	if (ret.kind == xbArg_Direct && ret_parts > 0) {
+		f->ret.piece_index = cast(i32)f->pieces.count;
+		f->ret.piece_count = ret_parts;
+		for (i32 i = 0; i < ret_parts; i++) {
+			xbAbiPiece p = {};
+			p.type = xbType_V128;
+			p.size = 16;
+			p.src_offset = 16*i;
+			p.loc = xbLoc_Xmm;
+			p.reg = cast(u8)i;
+			array_add(&f->pieces, p);
+		}
+	} else if (ret.kind == xbArg_Direct) {
 		xbAbiPiece p = ret.piece;
 		p.reg = p.loc == xbLoc_Gpr ? cast(u8)RAX : cast(u8)0;
 		f->ret.piece_index = cast(i32)f->pieces.count;

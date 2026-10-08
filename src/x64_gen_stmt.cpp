@@ -79,9 +79,9 @@ gb_internal void xb_add_piece_arg(xbProc *p, Array<xbCallArg> *out, xbAbiPiece c
 	array_add(out, a);
 }
 
-gb_internal void xb_add_ptr_arg(xbProc *p, Array<xbCallArg> *out, xbAbiFunc *abi, xbAbiArg const &arg, u32 ptr) {
-	GB_ASSERT(arg.piece_count == 1);
-	xbAbiPiece const &piece = abi->pieces[arg.piece_index];
+gb_internal void xb_add_ptr_arg(xbProc *p, Array<xbCallArg> *out, xbAbiFunc *abi, xbAbiArg const &arg, u32 ptr, i32 part=0) {
+	GB_ASSERT(part < arg.piece_count);
+	xbAbiPiece const &piece = abi->pieces[arg.piece_index+part];
 	xbCallArg a = {};
 	a.type = xbType_I64;
 	a.size = 8;
@@ -145,6 +145,15 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 				}
 				break;
 			case xbArg_Indirect: {
+				if (arg.copy_part > 0) {
+					i32 l = xb_add_local_raw(p, arg.copy_part*arg.piece_count, arg.copy_part);
+					xbMem m = xb_mem(xbMem_Local, cast(u32)l);
+					xb_store_value(p, m, v);
+					for (i32 i = 0; i < arg.piece_count; i++) {
+						xb_add_ptr_arg(p, &call_args, abi, arg, xb_lea(p, xb_mem_offset(m, i*arg.copy_part)), i);
+					}
+					break;
+				}
 				u32 ptr = xb_arg_address(p, v, abi->is_odin_cc && !arg.copy);
 				xb_add_ptr_arg(p, &call_args, abi, arg, ptr);
 				break;
@@ -3731,9 +3740,9 @@ gb_internal void xb_param_in(xbProc *p, xbAbiPiece const &piece, xbMem dst) {
 	array_add(&p->params_in, in);
 }
 
-gb_internal i32 xb_param_ptr_local(xbProc *p, xbAbiFunc *abi, xbAbiArg const &arg) {
+gb_internal i32 xb_param_ptr_local(xbProc *p, xbAbiFunc *abi, xbAbiArg const &arg, i32 part=0) {
 	i32 l = xb_add_local_raw(p, 8, 8);
-	xb_param_in(p, abi->pieces[arg.piece_index], xb_mem(xbMem_Local, cast(u32)l));
+	xb_param_in(p, abi->pieces[arg.piece_index+part], xb_mem(xbMem_Local, cast(u32)l));
 	return l;
 }
 
@@ -3791,8 +3800,21 @@ gb_internal void xb_begin_proc(xbProc *p) {
 				break;
 			}
 			case xbArg_Indirect: {
-				i32 l = xb_param_ptr_local(p, abi, arg);
 				i64 sz = type_size_of(e->type);
+				if (arg.piece_count > 1) {
+					// a vector split into parts, each behind its own pointer
+					xbMem m = xb_add_local(p, e->type, false);
+					for (i32 i = 0; i < arg.piece_count; i++) {
+						i32 pl = xb_param_ptr_local(p, abi, arg, i);
+						i64 off = i*arg.copy_part;
+						xb_memcopy(p, xb_mem_offset(m, off), xb_mem(xbMem_Reg, xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)pl)), 0), gb_min(cast(i64)arg.copy_part, sz - off));
+					}
+					xbVar v = {m, false};
+					map_set(&p->vars, e, v);
+					if (named) xb_add_debug_var(p, e, m, false, true);
+					break;
+				}
+				i32 l = xb_param_ptr_local(p, abi, arg);
 				if (abi->is_odin_cc && sz <= 16) {
 					// callee copy, like the LLVM backend
 					xbMem m = xb_add_local(p, e->type, false);

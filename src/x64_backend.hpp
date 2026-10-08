@@ -249,6 +249,7 @@ struct xbAbiArg {
 	i32        byval_size;
 	i32        byval_align;
 	bool       copy;      // Indirect: always pass a copy, the callee may write to it
+	i32        copy_part; // Indirect: the copy is split into parts this big and aligned, one pointer piece each
 };
 
 struct xbAbiFunc {
