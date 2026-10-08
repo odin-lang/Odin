@@ -36,6 +36,10 @@ struct xbLower {
 	};
 	Array<VregInfo> vinfo;
 
+	Array<i8>   local_reg;   // local -> callee saved register holding it, or -1
+	i32         saved_count;
+	i32         save_offset[5];
+
 	u32  keep;        // the current instruction leaves this vreg in rax instead of its slot
 	u32  pend;        // the vreg the previous instruction left in a register
 	u8   pend_reg;
@@ -321,6 +325,109 @@ gb_internal bool xb_op_is_pure(xbOp op) {
 	return false;
 }
 
+gb_global u8 const xb_promote_regs[5] = {RBX, R12, R13, R14, R15};
+
+// Moves scalar locals that loops use into callee saved registers. A local
+// qualifies when every access is a plain whole-value int load or store, so
+// nothing can see its memory.
+gb_internal void xb_promote_locals(xbLower *L) {
+	xbProc *p = L->p;
+	isize n = p->locals.count;
+	L->local_reg = array_make<i8>(heap_allocator(), n);
+	for (isize i = 0; i < n; i++) L->local_reg[i] = -1;
+	L->saved_count = 0;
+	if (n == 0) return;
+
+	auto ok = array_make<bool>(heap_allocator(), n);
+	auto weight = array_make<i32>(heap_allocator(), n);
+	defer (array_free(&ok));
+	defer (array_free(&weight));
+	for (isize i = 0; i < n; i++) {
+		xbLocal const &l = p->locals[i];
+		ok[i] = l.over_align <= 16 && (l.size == 1 || l.size == 2 || l.size == 4 || l.size == 8);
+	}
+	auto bad = [&](xbMem const &m) {
+		if (m.kind == xbMem_Local) ok[m.base] = false;
+	};
+
+	// a block is in a loop when a later block jumps back to or before it
+	isize bc = p->order.count;
+	auto pos = array_make<isize>(heap_allocator(), p->blocks.count);
+	auto in_loop = array_make<bool>(heap_allocator(), bc);
+	defer (array_free(&pos));
+	defer (array_free(&in_loop));
+	for (isize i = 0; i < bc; i++) pos[p->order[i]->index] = i;
+	for (isize i = 0; i < bc; i++) {
+		for (xbInstr const &in : p->order[i]->instrs) {
+			i32 targets[2] = {-1, -1};
+			if (in.op == xbOp_Jump) targets[0] = cast(i32)in.imm;
+			if (in.op == xbOp_Branch) { targets[0] = cast(i32)in.imm; targets[1] = cast(i32)in.c; }
+			for (i32 t : targets) {
+				if (t < 0 || !p->blocks[t]->placed) continue;
+				for (isize k = pos[t]; k <= i && pos[t] <= i; k++) in_loop[k] = true;
+			}
+		}
+	}
+
+	for (isize bi = 0; bi < bc; bi++) {
+		for (xbInstr const &in : p->order[bi]->instrs) {
+			switch (in.op) {
+			case xbOp_Load:
+			case xbOp_Store: {
+				if (in.mem.kind != xbMem_Local) break;
+				xbLocal const &l = p->locals[in.mem.base];
+				bool plain = in.mem.offset == 0 && xb_type_is_int(in.type) && xb_type_size(in.type) == l.size &&
+				             !(in.flags & xbInstrFlag_Volatile);
+				if (!plain) ok[in.mem.base] = false;
+				if (in_loop[bi]) weight[in.mem.base]++;
+				break;
+			}
+			case xbOp_Lea:
+			case xbOp_AtomicLoad:
+			case xbOp_AtomicStore:
+			case xbOp_MemZero:
+			case xbOp_Prefetch:
+			case xbOp_AtomicRmw:
+			case xbOp_AtomicCas:
+			case xbOp_Cpuid:
+			case xbOp_Xgetbv:
+			case xbOp_Vec128:
+				bad(in.mem);
+				break;
+			case xbOp_Call:
+			case xbOp_Ret:
+			case xbOp_Syscall: {
+				xbCall const &c = p->calls[cast(isize)in.imm];
+				for (xbCallArg const &arg : c.args) {
+					if (arg.kind != xbCallArg_Gpr && arg.kind != xbCallArg_Xmm && arg.kind != xbCallArg_Stack) bad(arg.mem);
+				}
+				for (xbCallRet const &r : c.rets) bad(r.dst);
+				break;
+			}
+			}
+		}
+	}
+	for (xbParamIn const &in : p->params_in) {
+		if (in.dst.kind != xbMem_Local) continue;
+		bool plain = (in.loc == xbLoc_Gpr || (in.loc == xbLoc_Stack && in.type != xbType_V128)) &&
+		             in.dst.offset == 0 && in.size == p->locals[in.dst.base].size;
+		if (!plain) ok[in.dst.base] = false;
+	}
+	for (xbDebugVar const &v : p->debug_vars) {
+		if (v.local >= 0 && v.by_ref) ok[v.local] = false;
+	}
+
+	// the heaviest loop users get the registers
+	while (L->saved_count < gb_count_of(xb_promote_regs)) {
+		isize best = -1;
+		for (isize i = 0; i < n; i++) {
+			if (ok[i] && L->local_reg[i] < 0 && weight[i] > 0 && (best < 0 || weight[i] > weight[best])) best = i;
+		}
+		if (best < 0) break;
+		L->local_reg[best] = cast(i8)xb_promote_regs[L->saved_count++];
+	}
+}
+
 gb_internal void xb_lower_layout(xbLower *L) {
 	xbProc *p = L->p;
 	i32 cur = 0;
@@ -335,6 +442,11 @@ gb_internal void xb_lower_layout(xbLower *L) {
 		}
 		cur = cast(i32)xb_lt_align_formula(cur + l.size, l.align);
 		l.frame_offset = -cur;
+	}
+	cur = cast(i32)xb_lt_align_formula(cur, 8);
+	for (i32 i = 0; i < L->saved_count; i++) {
+		cur += 8;
+		L->save_offset[i] = -cur;
 	}
 
 	isize vreg_count = p->vregs.count;
@@ -498,6 +610,10 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 	xbAsm *a = &L->a;
 	switch (m.kind) {
 	case xbMem_Local: {
+		if (L->local_reg[m.base] >= 0) {
+			GB_ASSERT(m.offset == 0);
+			return xb_r(cast(u8)L->local_reg[m.base]);
+		}
 		xbLocal const &l = L->p->locals[m.base];
 		if (l.over_align > 16) {
 			xb_mov_r_rm(a, 8, scratch, xb_m(RBP, l.frame_offset));
@@ -921,8 +1037,12 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		} else {
 			// the address only clobbers r11, so a pending value stays in rax
 			xbOpnd m = xb_mem_opnd(L, in.mem, R11);
-			xb_get_raw(L, RAX, in.a, size);
-			xb_mov_rm_r(a, size, m, RAX);
+			if (!m.is_mem) {
+				xb_get_raw(L, m.reg, in.a, size);
+			} else {
+				xb_get_raw(L, RAX, in.a, size);
+				xb_mov_rm_r(a, size, m, RAX);
+			}
 		}
 		break;
 	}
@@ -1310,6 +1430,9 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	}
 	case xbOp_Ret:
 		xb_lower_call(L, p->calls[cast(isize)in.imm], true);
+		for (i32 i = 0; i < L->saved_count; i++) {
+			xb_mov_r_rm(a, 8, xb_promote_regs[i], xb_m(RBP, L->save_offset[i]));
+		}
 		xb_leave(a);
 		xb_ret(a);
 		break;
@@ -1563,7 +1686,9 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	defer (array_free(&L.fixups));
 	defer (array_free(&L.slot));
 	defer (array_free(&L.vinfo));
+	defer (array_free(&L.local_reg));
 
+	xb_promote_locals(&L);
 	xb_lower_layout(&L);
 
 	xbAsm *a = &L.a;
@@ -1595,6 +1720,15 @@ gb_internal void xb_lower_proc(xbProc *p) {
 		xb_enc(a, XB_W, 0x81, 5, xb_r(RSP), 4); // sub rsp, imm32
 		xb_u32(a, cast(u32)L.frame_size);
 	}
+	dbg.saved_regs = array_make<xbProcDebug::SavedReg>(heap_allocator(), 0, L.saved_count);
+	for (i32 i = 0; i < L.saved_count; i++) {
+		u8 r = xb_promote_regs[i];
+		xb_mov_rm_r(a, 8, xb_m(RBP, L.save_offset[i]), r);
+		// dwarf numbers rbx 3, r12..r15 as themselves
+		xbProcDebug::SavedReg s = {r == RBX ? 3 : cast(i32)r, L.save_offset[i]};
+		array_add(&dbg.saved_regs, s);
+	}
+	dbg.saved_at = cast(i32)(xb_pos(a) - L.proc_start);
 	for (xbLocal const &l : p->locals) {
 		if (l.over_align <= 16) continue;
 		// lea r11, [rbp + raw + align-1]; and r11, -align; mov [rbp + slot], r11
@@ -1707,6 +1841,11 @@ gb_internal void xb_lower_proc(xbProc *p) {
 				v.by_ref = true;
 			}
 			v.frame_offset_fixup += l.frame_offset;
+			if (L.local_reg[v.local] >= 0) {
+				u8 r = cast(u8)L.local_reg[v.local];
+				v.in_reg = true;
+				v.dwarf_reg = r == RBX ? 3 : r;
+			}
 		}
 		array_add(&dbg.vars, v);
 	}

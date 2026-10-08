@@ -173,6 +173,7 @@ enum {
 	XDW_OP_const8u = 0x0e,
 	XDW_OP_GNU_push_tls_address = 0xe0,
 	XDW_OP_fbreg = 0x91,
+	XDW_OP_reg0  = 0x50,
 	XDW_OP_reg6  = 0x56,
 
 	XDW_LANG_C99 = 0x0c,
@@ -742,6 +743,19 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 			xbb_u8(b, 0x80 | 6); xbb_uleb(b, 2);    // rbp at cfa-16
 			xbb_u8(b, 0x40 | 3);                    // advance 3 (mov rbp, rsp)
 			xbb_u8(b, 0x0d); xbb_uleb(b, 6);        // def_cfa_register rbp
+			if (pd.saved_regs.count > 0) {
+				u32 delta = cast(u32)(pd.saved_at - 4);
+				if (delta < 64) {
+					xbb_u8(b, cast(u8)(0x40 | delta)); // advance_loc
+				} else {
+					xbb_u8(b, 0x03); xbb_u8(b, cast(u8)delta); xbb_u8(b, cast(u8)(delta >> 8)); // advance_loc2
+				}
+				for (auto const &s : pd.saved_regs) {
+					// saved at rbp+off, the cfa is rbp+16
+					xbb_u8(b, cast(u8)(0x80 | s.dwarf_reg));
+					xbb_uleb(b, cast(u64)((16 - s.frame_offset) / 8));
+				}
+			}
 			xbb_align(b, 8);
 			xbb_patch_u32(b, fde_start, cast(u32)(b->count - fde_start - 4));
 		}
@@ -952,11 +966,15 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 							continue;
 						}
 						Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
-						// rbp is the frame base
-						xbb_u8(&expr, XDW_OP_fbreg);
-						xbb_sleb(&expr, v.frame_offset_fixup);
-						if (v.by_ref) {
-							xbb_u8(&expr, XDW_OP_deref);
+						if (v.in_reg) {
+							xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
+						} else {
+							// rbp is the frame base
+							xbb_u8(&expr, XDW_OP_fbreg);
+							xbb_sleb(&expr, v.frame_offset_fixup);
+							if (v.by_ref) {
+								xbb_u8(&expr, XDW_OP_deref);
+							}
 						}
 						xbb_uleb(b, cast(u64)expr.count);
 						xbb_bytes(b, expr.data, expr.count);
