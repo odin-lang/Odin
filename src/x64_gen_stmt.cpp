@@ -1668,6 +1668,15 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 			if (ltv.mode != Addressing_Constant) XB_UNSUPPORTED(p, "non-constant frame level");
 			level = exact_value_to_i64(ltv.value);
 		}
+		if (id == BuiltinProc_return_address && level == 0) {
+			// found from the frame layout: a Win64 prologue pushes more than rbp
+			xbInstr i = xb_instr(xbOp_ReturnAddress, xbType_I64);
+			i.dst = xb_new_vreg(p, xbType_I64);
+			xb_emit(p, i);
+			return xb_value_reg(tv.type, i.dst);
+		}
+		// a Win64 frame does not start with the saved rbp
+		if (level > 0 && xb_is_win64()) XB_UNSUPPORTED(p, "frame level on windows");
 		// walk the saved frame pointers
 		xbInstr i = xb_instr(xbOp_FrameAddress, xbType_I64);
 		i.dst = xb_new_vreg(p, xbType_I64);
@@ -1682,10 +1691,11 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		return xb_value_reg(tv.type, xb_load(p, xbType_I64, xb_mem(xbMem_Reg, fa, 8)));
 	}
 	case BuiltinProc_address_of_return_address: {
-		xbInstr i = xb_instr(xbOp_FrameAddress, xbType_I64);
+		xbInstr i = xb_instr(xbOp_ReturnAddress, xbType_I64);
+		i.imm = 1; // the slot's address
 		i.dst = xb_new_vreg(p, xbType_I64);
 		xb_emit(p, i);
-		return xb_value_reg(tv.type, xb_ptr_add_const(p, i.dst, 8));
+		return xb_value_reg(tv.type, i.dst);
 	}
 	case BuiltinProc_expect:
 	case BuiltinProc_likely:

@@ -1483,7 +1483,11 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_store_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_ReturnAddress:
-		xb_mov_r_rm(a, 8, RAX, xb_m(RBP, L->incoming_base - 8));
+		if (in.imm) {
+			xb_lea(a, RAX, xb_m(RBP, L->incoming_base - 8));
+		} else {
+			xb_mov_r_rm(a, 8, RAX, xb_m(RBP, L->incoming_base - 8));
+		}
 		xb_store_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_AtomicRmw: {
