@@ -1865,7 +1865,7 @@ gb_internal xbValue xb_emit_union_wrap(xbProc *p, Type *union_type, Type *varian
 ////////////////////////////////////////////////////////////////
 
 gb_internal void xb_build_stmt(xbProc *p, Ast *node);
-gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target);
+gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos);
 
 gb_internal void xb_open_scope(xbProc *p) {
 	p->scope_index += 1;
@@ -1873,7 +1873,19 @@ gb_internal void xb_open_scope(xbProc *p) {
 
 gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d);
 
-gb_internal void xb_close_scope(xbProc *p) {
+// The position #branch_location reports for the defers run when leaving at `node`, as LLVM picks it
+gb_internal TokenPos xb_defer_pos(Ast *node) {
+	if (node == nullptr) return {};
+	if (node->kind == Ast_BlockStmt || node->kind == Ast_CaseClause) {
+		return ast_end_token(node).pos;
+	}
+	return ast_token(node).pos;
+}
+
+gb_internal void xb_close_scope(xbProc *p, Ast *node) {
+	TokenPos prev_pos = p->branch_location_pos;
+	p->branch_location_pos = xb_defer_pos(node);
+	defer (p->branch_location_pos = prev_pos);
 	// run the defers of this scope
 	while (p->defers.count > 0) {
 		xbDefer d = p->defers[p->defers.count-1];
@@ -1914,7 +1926,10 @@ gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d) {
 	p->context_stack.count = prev;
 }
 
-gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target) {
+gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos) {
+	TokenPos prev_pos = p->branch_location_pos;
+	p->branch_location_pos = pos;
+	defer (p->branch_location_pos = prev_pos);
 	isize i = p->defers.count;
 	while (i --> 0) {
 		xbDefer const &d = p->defers[i];
@@ -2160,7 +2175,7 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 }
 
 gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &results, TokenPos pos);
-gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named);
+gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named, TokenPos pos);
 
 gb_internal void xb_emit_ret(xbProc *p, xbMem direct_result) {
 	xbAbiFunc *abi = p->abi;
@@ -2205,7 +2220,7 @@ gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_resu
 	TypeProc *pt = &base_type(p->type)->Proc;
 	isize return_count = pt->result_count;
 	if (return_count == 0) {
-		xb_emit_defer_stmts(p, true, nullptr);
+		xb_emit_defer_stmts(p, true, nullptr, pos);
 		if (!xb_curr_terminated(p)) {
 			xb_emit_ret(p, {});
 		}
@@ -2228,11 +2243,11 @@ gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_resu
 			array_add(&results, xb_load_value(p, e->type, found->mem));
 		}
 	}
-	xb_return_with_results(p, results, return_results.count != 0);
+	xb_return_with_results(p, results, return_results.count != 0, pos);
 }
 
 // Writes the results out, runs the defers and returns.
-gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named) {
+gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named, TokenPos pos) {
 	xbAbiFunc *abi = p->abi;
 	TypeProc *pt = &base_type(p->type)->Proc;
 	isize return_count = pt->result_count;
@@ -2291,7 +2306,7 @@ gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool
 		xb_store_value(p, direct, xb_emit_conv(p, last, last_type));
 	}
 
-	xb_emit_defer_stmts(p, true, nullptr);
+	xb_emit_defer_stmts(p, true, nullptr, pos);
 	if (!xb_curr_terminated(p)) {
 		xb_emit_ret(p, direct);
 	}
@@ -2325,14 +2340,14 @@ gb_internal void xb_build_if_stmt(xbProc *p, Ast *node) {
 		xb_start_block(p, else_);
 		xb_open_scope(p);
 		xb_build_stmt(p, is->else_stmt);
-		xb_close_scope(p);
+		xb_close_scope(p, is->else_stmt);
 		xb_jump(p, done);
 	}
 	if (is->label != nullptr) {
 		xb_pop_target_list(p);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, node);
 }
 
 gb_internal void xb_build_for_stmt(xbProc *p, Ast *node) {
@@ -2367,7 +2382,7 @@ gb_internal void xb_build_for_stmt(xbProc *p, Ast *node) {
 		xb_jump(p, loop);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, node);
 }
 
 gb_internal Ast *xb_strip_and_prefix(Ast *ident) {
@@ -3058,7 +3073,7 @@ gb_internal void xb_build_range_stmt(xbProc *p, AstRangeStmt *rs) {
 			}
 		}
 	}
-	xb_close_scope(p);
+	xb_close_scope(p, is_ast_range(expr) ? expr->BinaryExpr.left : rs->body);
 }
 
 gb_internal void xb_build_switch_stmt(xbProc *p, AstSwitchStmt *ss) {
@@ -3130,12 +3145,12 @@ gb_internal void xb_build_switch_stmt(xbProc *p, AstSwitchStmt *ss) {
 		xb_push_target_list(p, ss->label, done, nullptr, fall);
 		xb_open_scope(p);
 		xb_build_stmt_list(p, cc->stmts);
-		xb_close_scope(p);
+		xb_close_scope(p, clauses[i]);
 		xb_pop_target_list(p);
 		xb_jump(p, done);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, ss->body);
 }
 
 gb_internal void xb_bind_var(xbProc *p, Entity *e, xbMem mem, bool indirect) {
@@ -3324,12 +3339,12 @@ gb_internal void xb_build_type_switch_stmt(xbProc *p, AstTypeSwitchStmt *ss) {
 		}
 		xb_push_target_list(p, ss->label, done, nullptr, nullptr);
 		xb_build_stmt_list(p, cc->stmts);
-		xb_close_scope(p);
+		xb_close_scope(p, clause);
 		xb_pop_target_list(p);
 		xb_jump(p, done);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, ss->body);
 }
 
 gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
@@ -3458,7 +3473,7 @@ gb_internal void xb_build_unroll_range_stmt(xbProc *p, AstUnrollRangeStmt *rs) {
 			XB_UNSUPPORTED(p, "#unroll over type");
 		}
 	}
-	xb_close_scope(p);
+	xb_close_scope(p, rs->body);
 }
 
 gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
@@ -3516,7 +3531,7 @@ gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
 		}
 		xb_open_scope(p);
 		xb_build_stmt_list(p, bs->stmts);
-		xb_close_scope(p);
+		xb_close_scope(p, node);
 		if (done != nullptr) {
 			xb_jump(p, done);
 			xb_start_block(p, done);
@@ -3636,7 +3651,7 @@ gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
 			}
 		}
 		GB_ASSERT(block != nullptr);
-		xb_emit_defer_stmts(p, false, block);
+		xb_emit_defer_stmts(p, false, block, xb_defer_pos(node));
 		xb_jump(p, block);
 	case_end;
 
@@ -3800,7 +3815,7 @@ gb_internal void xb_end_proc(xbProc *p) {
 	TypeProc *pt = &base_type(p->type)->Proc;
 	if (!xb_curr_terminated(p)) {
 		if (pt->result_count == 0) {
-			xb_emit_defer_stmts(p, true, nullptr);
+			xb_emit_defer_stmts(p, true, nullptr, xb_defer_pos(p->body));
 			if (!xb_curr_terminated(p)) {
 				xb_emit_ret(p, {});
 			}

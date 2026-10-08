@@ -129,7 +129,6 @@ gb_internal xbProc *xb_build_proc(xbModule *m, Entity *e, xbFamily *family, char
 	if (pt->Proc.calling_convention == ProcCC_Naked) XB_UNSUPPORTED(p, "naked procedure");
 	if (e->Procedure.link_section.len != 0) XB_UNSUPPORTED(p, "link section");
 	if (e->Procedure.has_instrumentation && m->info->instrumentation_enter_entity != nullptr) XB_UNSUPPORTED(p, "instrumentation");
-	if (e->Procedure.uses_branch_location) XB_UNSUPPORTED(p, "branch location");
 	if (build_context.sanitizer_flags != 0) XB_UNSUPPORTED(p, "sanitizers");
 	if (e->flags & EntityFlag_CustomLinkage_Internal) XB_UNSUPPORTED(p, "internal linkage");
 

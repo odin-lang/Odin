@@ -146,6 +146,7 @@ struct xbProc {
 	i32         last_line;
 	u16         state_flags;
 	Ast *       curr_stmt;
+	TokenPos    branch_location_pos; // where the running defers were triggered, for #branch_location
 
 	Array<xbDebugVar> debug_vars;
 	struct xbFamily * family;

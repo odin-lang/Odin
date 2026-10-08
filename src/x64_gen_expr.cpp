@@ -3566,9 +3566,9 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 // or_return, or_else, or_break, or_continue
 ////////////////////////////////////////////////////////////////
 
-gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named);
+gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named, TokenPos pos);
 gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &results, TokenPos pos);
-gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target);
+gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos);
 gb_internal xbBranchBlocks xb_lookup_branch_blocks(xbProc *p, Ast *ident);
 
 gb_internal void xb_emit_try_lhs_rhs(xbProc *p, Ast *arg, TypeAndValue const &tv, xbValue *lhs_, xbValue *rhs_) {
@@ -3631,7 +3631,7 @@ gb_internal xbValue xb_emit_or_return(xbProc *p, Ast *arg, TypeAndValue const &t
 			GB_ASSERT(tuple->variables.count == 1);
 			auto results = array_make<xbValue>(xb_allocator(), 0, 1);
 			array_add(&results, rhs);
-			xb_return_with_results(p, results, false);
+			xb_return_with_results(p, results, false, ast_token(arg).pos);
 			array_free(&results);
 		}
 	}
@@ -3711,7 +3711,7 @@ gb_internal xbValue xb_emit_or_branch(xbProc *p, Ast *expr, TypeAndValue const &
 	xbBlock *else_ = xb_new_block(p);
 	xb_branch(p, xb_emit_try_has_value(p, rhs), then_, else_);
 	xb_start_block(p, else_);
-	xb_emit_defer_stmts(p, false, block);
+	xb_emit_defer_stmts(p, false, block, ast_token(expr).pos);
 	xb_jump(p, block);
 	xb_start_block(p, then_);
 	return lhs;
@@ -3863,6 +3863,13 @@ gb_internal xbValue xb_build_expr_internal(xbProc *p, Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Implicit, expr);
 		return xb_addr_load(p, xb_build_addr(p, expr));
+	case_end;
+
+	case_ast_node(bd, BasicDirective, expr);
+		if (bd->name.string == "branch_location") {
+			return xb_source_code_location(p, p->entity->token.string, p->branch_location_pos);
+		}
+		XB_UNSUPPORTED(p, "basic directive");
 	case_end;
 
 	case_ast_node(u, Uninit, expr);
