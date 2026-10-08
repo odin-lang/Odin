@@ -121,3 +121,27 @@ simd_x86_intrinsic_signatures_sse2 :: proc(t: ^testing.T) {
 	// aux is written from IA32_TSC_AUX, which the OS sets to the CPU number.
 	testing.expect(t, aux != 0xdead_beef)
 }
+
+// These did not compile.
+
+@(test)
+simd_x86_avx_wrappers :: proc(t: ^testing.T) {
+	if .avx not_in info.cpu_features() {
+		return
+	}
+	simd_x86_avx_wrappers_avx(t)
+}
+
+@(private="file", enable_target_feature="sse,sse2,avx")
+simd_x86_avx_wrappers_avx :: proc(t: ^testing.T) {
+	a := x86.__m256d{1.5, -1.5, 2.5, -2.5}
+	b := x86.__m256d{10, 20, 30, 40}
+	testing.expect_value(t, transmute([4]f64)x86._mm256_round_pd(a, x86._MM_FROUND_TO_NEG_INF), [4]f64{1, -2, 2, -3})
+	testing.expect_value(t, transmute([4]f64)x86._mm256_blend_pd(a, b, 0b0110), [4]f64{1.5, 20, 30, -2.5})
+	testing.expect_value(t, transmute([4]f64)x86._mm256_permute2f128_pd(a, b, 0x21), [4]f64{2.5, -2.5, 10, 20})
+	testing.expect_value(t, transmute([2]f64)x86._mm_permute_pd(x86.__m128d{1, 2}, 0b01), [2]f64{2, 1})
+	testing.expect_value(t, transmute([4]f32)x86._mm_permute_ps(x86.__m128{1, 2, 3, 4}, 0x1b), [4]f32{4, 3, 2, 1})
+
+	f := x86.__m256{1, 2, 3, 4, 5, 6, 7, 8}
+	testing.expect_value(t, transmute([8]f32)x86._mm256_dp_ps(f, f, 0xf1), [8]f32{30, 0, 0, 0, 174, 0, 0, 0})
+}

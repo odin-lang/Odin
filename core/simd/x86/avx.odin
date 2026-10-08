@@ -205,7 +205,7 @@ _mm256_div_pd :: #force_inline proc "c" (a, b: __m256d) -> __m256d {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_round_pd)
 @(require_results, enable_target_feature="avx")
 _mm256_round_pd :: #force_inline proc "c" (a: __m256d, $ROUNDING: u8) -> __m256d where ROUNDING < 16 {
-	return llvm_roundpd256(a, ROUNDING)
+	return llvm_roundpd256(a, u32(ROUNDING))
 }
 
 // Rounds packed double-precision (64-bit) floating point elements in `a`
@@ -277,7 +277,7 @@ _mm256_sqrt_pd :: #force_inline proc "c" (a: __m256d) -> __m256d {
 //
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_blend_pd)
 @(require_results, enable_target_feature="avx")
-_mm256_blend_pd :: #force_inline proc "c" (a, b: __m256d, $IIM4: u32) -> __m256d where IMM4 < 16 {
+_mm256_blend_pd :: #force_inline proc "c" (a, b: __m256d, $IMM4: u32) -> __m256d where IMM4 < 16 {
 	return intrinsics.simd_shuffle(
 		a,
 		b,
@@ -332,7 +332,7 @@ _mm256_blendv_ps :: #force_inline proc "c" (a, b: __m256, c: __m256) -> __m256 {
 //
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_dp_ps)
 @(require_results, enable_target_feature="avx")
-_mm256_dp_ps :: #force_inline proc "c" (a, b: __m256, $IMM8: i8) -> __m256 {
+_mm256_dp_ps :: #force_inline proc "c" (a, b: __m256, $IMM8: u8) -> __m256 {
 	return llvm_vdpps(a, b, IMM8)
 }
 
@@ -650,7 +650,7 @@ _mm256_permute_ps :: #force_inline proc "c" (a: __m256, $IMM8: u8) -> __m256 {
 }
 
 // Shuffles single-precision (32-bit) floating-point elements in `a` using the control in `imm8`.
-@(require_results, enable_target_feature="avx")
+@(require_results, enable_target_feature="sse,avx")
 _mm_permute_ps :: #force_inline proc "c" (a: __m128, $IMM8: u8) -> __m128 {
 	return intrinsics.simd_shuffle(
 		a,
@@ -692,7 +692,7 @@ _mm256_permute_pd :: #force_inline proc "c" (a: __m256d, $IMM4: u8) -> __m256d w
 }
 
 // Shuffles double-precision (64-bit) floating-point elements in `a` using the control in `imm8`.
-@(require_results, enable_target_feature="avx")
+@(require_results, enable_target_feature="sse2,avx")
 _mm_permute_pd :: #force_inline proc "c" (a: __m128d, $IMM2: u8) -> __m128d where IMM2 < 4 {
 	return intrinsics.simd_shuffle(
 		a,
@@ -717,7 +717,7 @@ _mm256_permute2f128_ps :: #force_inline proc "c" (a, b: __m256, $IMM8: u8) -> __
 // Shuffles 256 bits (composed of 4 packed double-precision (64-bit) floating-point elements) selected by `imm8` from `a` and `b`.
 @(require_results, enable_target_feature="avx")
 _mm256_permute2f128_pd :: #force_inline proc "c" (a, b: __m256d, $IMM8: u8) -> __m256d {
-	_mm256_castsi256_pd(_mm256_permute2f128_si256(
+	return _mm256_castsi256_pd(_mm256_permute2f128_si256(
 		_mm256_castpd_si256(a),
 		_mm256_castpd_si256(b),
 		IMM8,
