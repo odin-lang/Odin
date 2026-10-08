@@ -177,7 +177,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 
 	i32 stack_size = abi->stack_size;
 	i32 sse_count = -1;
-	if (abi->c_vararg && xb_is_win64()) {
+	if (abi->c_vararg && xb_is_win64() && abi->cc != ProcCC_SysV) {
 		stack_size = xb_win64_varargs(p, abi, &call_args, args, arg_index);
 	} else if (abi->c_vararg) {
 		i32 gpr = abi->gpr_count;
