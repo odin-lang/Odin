@@ -828,7 +828,7 @@ _mm_cvtsd_si32 :: #force_inline proc "c" (a: __m128d) -> i32 {
 	return cvtsd2si(a)
 }
 @(require_results, enable_target_feature="sse2")
-_mm_cvtsd_ss :: #force_inline proc "c" (a, b: __m128d) -> __m128 {
+_mm_cvtsd_ss :: #force_inline proc "c" (a: __m128, b: __m128d) -> __m128 {
 	return cvtsd2ss(a, b)
 }
 @(require_results, enable_target_feature="sse2")
@@ -836,8 +836,8 @@ _mm_cvtsd_f64 :: #force_inline proc "c" (a: __m128d) -> f64 {
 	return simd.extract(a, 0)
 }
 @(require_results, enable_target_feature="sse2")
-_mm_cvtss_sd :: #force_inline proc "c" (a, b: __m128) -> __m128d {
-	return cvtss2sd(a, b)
+_mm_cvtss_sd :: #force_inline proc "c" (a: __m128d, b: __m128) -> __m128d {
+	return simd.replace(a, 0, f64(simd.extract(b, 0)))
 }
 @(require_results, enable_target_feature="sse2")
 _mm_cvttpd_epi32 :: #force_inline proc "c" (a: __m128d) -> __m128i {
@@ -1166,9 +1166,7 @@ foreign _ {
 	@(link_name="llvm.x86.sse2.cvtsd2si")
 	cvtsd2si   :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvtsd2ss")
-	cvtsd2ss   :: proc(a, b: __m128d) -> __m128 ---
-	@(link_name="llvm.x86.sse2.cvtss2sd")
-	cvtss2sd   :: proc(a, b: __m128) -> __m128d ---
+	cvtsd2ss   :: proc(a: __m128, b: __m128d) -> __m128 ---
 	@(link_name="llvm.x86.sse2.cvttpd2dq")
 	cvttpd2dq  :: proc(a: __m128d) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.cvttsd2si")

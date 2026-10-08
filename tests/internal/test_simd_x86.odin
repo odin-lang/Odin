@@ -97,3 +97,27 @@ simd_x86_removed_intrinsics_sse :: proc(t: ^testing.T) {
 	testing.expect_value(t, x86._addcarryx_u64(1, 5, 6, &out64), 0)
 	testing.expect_value(t, out64, 12)
 }
+
+// These declared their intrinsics with the wrong types, which LLVM rejected.
+
+@(test)
+simd_x86_intrinsic_signatures :: proc(t: ^testing.T) {
+	simd_x86_intrinsic_signatures_sse2(t)
+}
+
+@(private="file", enable_target_feature="sse,sse2")
+simd_x86_intrinsic_signatures_sse2 :: proc(t: ^testing.T) {
+	testing.expect_value(t, transmute([4]f32)x86._mm_cvtsd_ss(x86.__m128{1, 2, 3, 4}, x86.__m128d{0.1, 9}), [4]f32{0.1, 2, 3, 4})
+	testing.expect_value(t, transmute([4]f32)x86._mm_cvtsd_ss(x86.__m128{1, 2, 3, 4}, x86.__m128d{-1e300, 9}), [4]f32{math.NEG_INF_F32, 2, 3, 4})
+	testing.expect_value(t, transmute([2]f64)x86._mm_cvtss_sd(x86.__m128d{1, 2}, x86.__m128{1.5, 7, 8, 9}), [2]f64{1.5, 2})
+
+	data: [64]u8
+	x86._mm_prefetch(&data, x86._MM_HINT_T0)
+	x86._mm_prefetch(&data, x86._MM_HINT_ET0)
+
+	aux: u32 = 0xdead_beef
+	tsc := x86.__rdtscp(&aux)
+	testing.expect(t, tsc != 0)
+	// aux is written from IA32_TSC_AUX, which the OS sets to the CPU number.
+	testing.expect(t, aux != 0xdead_beef)
+}

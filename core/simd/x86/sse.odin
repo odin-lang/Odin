@@ -489,7 +489,11 @@ _MM_SET_ROUNDING_MODE :: #force_inline proc "c" (x: u32) {
 
 @(enable_target_feature="sse")
 _mm_prefetch :: #force_inline proc "c" (p: rawptr, $STRATEGY: u32) {
-	prefetch(p, (STRATEGY>>2)&1, STRATEGY&3, 1)
+	when (STRATEGY >> 2) & 1 == 1 {
+		intrinsics.prefetch_write_data(p, i32(STRATEGY & 3))
+	} else {
+		intrinsics.prefetch_read_data(p, i32(STRATEGY & 3))
+	}
 }
 
 
@@ -588,8 +592,6 @@ foreign _ {
 	stmxcsr     :: proc(p: rawptr) ---
 	@(link_name="llvm.x86.sse.ldmxcsr")
 	ldmxcsr     :: proc(p: rawptr) ---
-	@(link_name="llvm.prefetch")
-	prefetch    :: proc(p: rawptr, #const rw, loc, ty: u32) ---
 	@(link_name="llvm.x86.sse.cmp.ss")
 	cmpss       :: proc(a, b: __m128, #const imm8: u8) -> __m128 ---
 
