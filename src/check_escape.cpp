@@ -2018,6 +2018,10 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 					continue;
 				}
 				v = escape_load_once(ea, v);
+				if (pointee == nullptr) {
+					// NOTE(bill): the paths of what is loaded are of another type, which could otherwise nest without end in a loop
+					v = escape_as_pointer(v);
+				}
 			}
 			if (flow.kind == EscapeFlow_Deep) {
 				v = escape_reachable(ea, v);
