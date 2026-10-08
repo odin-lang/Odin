@@ -454,17 +454,8 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 			ast_node(cl, CompoundLit, value.value_compound);
 			i64 stride = type_size_of(elem);
 			Type *lit_type = value.value_compound->tav.type;
-			// a literal of an element type, at any depth of a nested array, is spread over the elements
-			bool spread = false;
-			if (lit_type != nullptr && !is_type_array(lit_type)) {
-				for (Type *e = elem; e != nullptr; e = is_type_array(e) ? base_type(e)->Array.elem : nullptr) {
-					if (are_types_identical(base_type(lit_type), base_type(e))) {
-						spread = true;
-						break;
-					}
-				}
-			}
-			if (spread) {
+			// a literal of an element type (at any depth, or a variant of a union element) is spread over the elements
+			if (lit_type != nullptr && lb_const_value_is_broadcast(elem, lit_type)) {
 				for (i64 i = 0; i < type->Array.count; i++) {
 					if (!xb_cb_write(b, elem, value, off + i*stride)) return false;
 				}

@@ -819,8 +819,8 @@ namespace xbSysV {
 			return xbType_I64;
 		};
 		auto int_align = [](i64 bytes) -> i64 {
-			// alignment of iN for odd N follows lb_alignof: clamp((N+7)/8, 1, max_align)
-			return gb_clamp(bytes, 1, build_context.max_align);
+			// the offsets come from LLVM's data layout, where an odd iN takes the alignment of the next larger iN (i24: 4, i48: 8)
+			return gb_clamp(next_pow2(bytes), 1, 8);
 		};
 
 		if (type->kind == xbLT_Vector && sz == 8 && reg_classes.count == 1 && is_sse(reg_classes[0])) {
