@@ -75,6 +75,7 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 	s->flags |= xbSymbolFlag_Global;
 	// hidden like LLVM's, so a shared object may reach it directly
 	if (!e->Variable.is_export) s->flags |= xbSymbolFlag_Weak | xbSymbolFlag_Hidden;
+	else s->flags |= xbSymbolFlag_Export;
 	if (tls) s->flags |= xbSymbolFlag_TLS;
 
 	if (build_context.ODIN_DEBUG && !is_blank_ident(e->token.string)) {
@@ -323,6 +324,11 @@ gb_internal void xb_test_main_body(xbProc *p) {
 
 gb_internal void xb_build_test_main(xbModule *m) {
 	if (build_context.command_kind != Command_test) return;
+	if (xb_is_win64() && (build_context.no_crt || build_context.build_mode == BuildMode_DynamicLibrary)) {
+		// LLVM's has another name and signature there
+		xb_stat_fail(m, "test main without the crt");
+		return;
+	}
 	// the runtime may bring its own entry point
 	for (Entity *e : m->info->entities) {
 		if (e->kind != Entity_Procedure || e->pkg == nullptr || e->pkg->kind != Package_Runtime) continue;

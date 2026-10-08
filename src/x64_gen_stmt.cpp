@@ -145,7 +145,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 				}
 				break;
 			case xbArg_Indirect: {
-				u32 ptr = xb_arg_address(p, v, abi->is_odin_cc);
+				u32 ptr = xb_arg_address(p, v, abi->is_odin_cc && !arg.copy);
 				xb_add_ptr_arg(p, &call_args, abi, arg, ptr);
 				break;
 			}
@@ -177,7 +177,9 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 
 	i32 stack_size = abi->stack_size;
 	i32 sse_count = -1;
-	if (abi->c_vararg) {
+	if (abi->c_vararg && xb_is_win64()) {
+		stack_size = xb_win64_varargs(p, abi, &call_args, args, arg_index);
+	} else if (abi->c_vararg) {
 		i32 gpr = abi->gpr_count;
 		i32 xmm = abi->xmm_count;
 		i32 stack = abi->stack_size;
@@ -1688,6 +1690,7 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		return {};
 	case BuiltinProc_syscall: {
 		if (ce->args.count > 7) XB_UNSUPPORTED(p, "syscall arg count");
+		if (xb_is_win64()) XB_UNSUPPORTED(p, "syscall on windows");
 		u8 const regs[7] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 		auto args = array_make<xbCallArg>(xb_allocator(), 0, ce->args.count);
 		for_array(i, ce->args) {
@@ -1710,6 +1713,29 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		i.imm = p->calls.count-1;
 		xb_emit(p, i);
 		return xb_value_reg(t_uintptr, c.result_vreg);
+	}
+	case BuiltinProc_constant_utf16_cstring: {
+		// encoded like the LLVM backend's, invalid runes become U+FFFD
+		String value = type_and_value_of_expr(ce->args[0]).value.value_string;
+		auto buf = array_make<u16>(xb_allocator(), 0, value.len + 1);
+		while (value.len > 0) {
+			Rune r = 0;
+			isize w = gb_utf8_decode(value.text, value.len, &r);
+			value.text += w;
+			value.len  -= w;
+			if ((0 <= r && r < 0xd800) || (0xe000 <= r && r < 0x10000)) {
+				array_add(&buf, cast(u16)r);
+			} else if (0x10000 <= r && r <= 0x10ffff) {
+				r -= 0x10000;
+				array_add(&buf, cast(u16)(0xd800 + ((r>>10)&0x3ff)));
+				array_add(&buf, cast(u16)(0xdc00 + (r&0x3ff)));
+			} else {
+				array_add(&buf, cast(u16)0xfffd);
+			}
+		}
+		array_add(&buf, cast(u16)0);
+		i32 sym = xb_rodata(p->m, buf.data, buf.count*2, 2);
+		return xb_value_reg(default_type(tv.type), xb_lea(p, xb_mem(xbMem_Sym, cast(u32)sym)));
 	}
 	case BuiltinProc_type_map_info: {
 		i32 sym = xb_map_info_sym(p, ce->args[0]->tav.type);
