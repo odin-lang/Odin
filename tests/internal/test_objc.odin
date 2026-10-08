@@ -15,3 +15,11 @@ objc_send_registers_names :: proc(t: ^testing.T) {
 	testing.expect_value(t, s->odinString(), "hello")
 	testing.expect_value(t, intrinsics.objc_send(NS.UInteger, s, "length"), 5)
 }
+
+@(test)
+objc_register_class_names_the_class :: proc(t: ^testing.T) {
+	cls := intrinsics.objc_register_class("OdinTestRegisteredClass")
+	testing.expect(t, cls != nil)
+	testing.expect_value(t, string(NS.class_getName(cls)), "OdinTestRegisteredClass")
+	testing.expect_value(t, intrinsics.objc_find_class("OdinTestRegisteredClass"), cls)
+}
