@@ -272,7 +272,9 @@ $ODIN test ../test_issue_7547.odin $COMMON -debug
 $ODIN test ../test_issue_7490.odin $COMMON
 $ODIN test ../test_issue_7779.odin $COMMON
 $ODIN run ../test_issue_7798.odin $COMMON
+$ODIN test ../test_issue_7763.odin $COMMON
 $ODIN test ../test_issue_disabled_proc_value.odin $COMMON -disable-assert
+$ODIN test ../test_issue_loaded_pointer_alignment.odin $COMMON -o:speed
 
 if [[ $($ODIN check ../test_issue_atomic_orderings.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 13 ]]; then
 	echo "SUCCESSFUL 1/1"
