@@ -339,15 +339,13 @@ gb_internal bool xb_op_is_pure(xbOp op) {
 
 gb_global u8 const xb_promote_regs[5] = {RBX, R12, R13, R14, R15};
 
-// Moves scalar locals that loops use into callee saved registers. A local
-// qualifies when every access is a plain whole-value int load or store, so
-// nothing can see its memory.
-gb_internal void xb_promote_locals(xbLower *L) {
-	xbProc *p = L->p;
+// The scalar locals that can live in a register, heaviest first. A local qualifies when
+// every access is a plain whole-value int load or store, so nothing can see its memory.
+// Each access weighs `loop_weight` inside a loop and `other_weight` elsewhere, and a
+// local needs more than `min_weight`.
+gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other_weight, i32 min_weight, Array<i32> *ranked) {
+	*ranked = array_make<i32>(heap_allocator(), 0, 8);
 	isize n = p->locals.count;
-	L->local_reg = array_make<i8>(heap_allocator(), n);
-	for (isize i = 0; i < n; i++) L->local_reg[i] = -1;
-	L->saved_count = 0;
 	if (n == 0) return;
 
 	auto ok = array_make<bool>(heap_allocator(), n);
@@ -391,7 +389,7 @@ gb_internal void xb_promote_locals(xbLower *L) {
 				bool plain = in.mem.offset == 0 && xb_type_is_int(in.type) && xb_type_size(in.type) == l.size &&
 				             !(in.flags & xbInstrFlag_Volatile);
 				if (!plain) ok[in.mem.base] = false;
-				if (in_loop[bi]) weight[in.mem.base]++;
+				weight[in.mem.base] += in_loop[bi] ? loop_weight : other_weight;
 				break;
 			}
 			case xbOp_Lea:
@@ -429,15 +427,32 @@ gb_internal void xb_promote_locals(xbLower *L) {
 		if (v.local >= 0 && v.by_ref) ok[v.local] = false;
 	}
 
-	// the heaviest loop users get the registers
-	while (L->saved_count < gb_count_of(xb_promote_regs)) {
+	for (;;) {
 		isize best = -1;
 		for (isize i = 0; i < n; i++) {
-			if (ok[i] && L->local_reg[i] < 0 && weight[i] > 0 && (best < 0 || weight[i] > weight[best])) best = i;
+			if (ok[i] && weight[i] > min_weight && (best < 0 || weight[i] > weight[best])) best = i;
 		}
 		if (best < 0) break;
-		L->local_reg[best] = cast(i8)xb_promote_regs[L->saved_count++];
+		array_add(ranked, cast(i32)best);
+		ok[best] = false;
 	}
+}
+
+// Moves the scalar locals that loops use most into the callee saved registers `regs`,
+// and returns how many it used.
+gb_internal i32 xb_promote_locals(xbProc *p, Array<i8> *local_reg, u8 const *regs, i32 reg_count) {
+	isize n = p->locals.count;
+	*local_reg = array_make<i8>(heap_allocator(), n);
+	for (isize i = 0; i < n; i++) (*local_reg)[i] = -1;
+	Array<i32> ranked = {};
+	xb_rank_promotable_locals(p, 1, 0, 0, &ranked);
+	defer (array_free(&ranked));
+	i32 used = 0;
+	for (i32 l : ranked) {
+		if (used == reg_count) break;
+		(*local_reg)[l] = cast(i8)regs[used++];
+	}
+	return used;
 }
 
 gb_internal void xb_lower_layout(xbLower *L) {
@@ -1828,7 +1843,7 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	defer (array_free(&L.vinfo));
 	defer (array_free(&L.local_reg));
 
-	xb_promote_locals(&L);
+	L.saved_count = xb_promote_locals(p, &L.local_reg, xb_promote_regs, gb_count_of(xb_promote_regs));
 	xb_lower_layout(&L);
 
 	xbAsm *a = &L.a;

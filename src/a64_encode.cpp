@@ -133,6 +133,28 @@ gb_internal void a64_add_imm(xbAsm *a, u8 rd, u8 rn, i64 imm) {
 	}
 }
 
+gb_internal bool a64_addsub_imm_ok(i64 v) {
+	if (v == INT64_MIN) return false;
+	u64 m = cast(u64)(v < 0 ? -v : v);
+	return m < 4096 || ((m & 0xfff) == 0 && m < (1u<<24));
+}
+
+// rd = rn + v, or rn - v when `sub`; `flags` sets the flags, with rd 31 as xzr (cmp, cmn).
+// Otherwise register 31 is sp. A negative v flips the operation.
+gb_internal void a64_addsub_imm(xbAsm *a, bool sub, bool flags, u8 rd, u8 rn, i64 v) {
+	GB_ASSERT(a64_addsub_imm_ok(v));
+	if (v < 0) {
+		sub = !sub;
+		v = -v;
+	}
+	u32 w = (sub ? 0xD1000000 : 0x91000000) | (flags ? 1u<<29 : 0);
+	if (v >= 4096) {
+		w |= 1u<<22;
+		v >>= 12;
+	}
+	a64_emit(a, w | (cast(u32)v << 10) | (cast(u32)rn << 5) | rd);
+}
+
 // xd = xn * xm
 gb_internal void a64_mul(xbAsm *a, u8 rd, u8 rn, u8 rm) {
 	a64_emit(a, 0x9B007C00 | (cast(u32)rm << 16) | (cast(u32)rn << 5) | rd);
@@ -172,6 +194,29 @@ gb_internal void a64_lsl_imm(xbAsm *a, u8 rd, u8 rn, u32 sh) {
 
 gb_internal void a64_lsr_imm(xbAsm *a, u8 rd, u8 rn, u32 sh) {
 	a64_bfm(a, false, rd, rn, sh, 63);
+}
+
+// lsl, lsr or asr by a constant. A 64 bit shift masks it by 63; anything narrower
+// shifts as 32 bits and masks it by 31, like the variable forms.
+gb_internal void a64_shift_imm(xbAsm *a, a64Shift kind, i32 size, u8 rd, u8 rn, u32 sh) {
+	if (size == 8) {
+		sh &= 63;
+		switch (kind) {
+		case A64_LSL: a64_bfm(a, false, rd, rn, (64 - sh) & 63, 63 - sh); break;
+		case A64_LSR: a64_bfm(a, false, rd, rn, sh, 63); break;
+		case A64_ASR: a64_bfm(a, true, rd, rn, sh, 63); break;
+		}
+		return;
+	}
+	sh &= 31;
+	u32 immr = kind == A64_LSL ? (32 - sh) & 31 : sh;
+	u32 imms = kind == A64_LSL ? 31 - sh : 31;
+	a64_emit(a, (kind == A64_ASR ? 0x13000000 : 0x53000000) | (immr << 16) | (imms << 10) | (cast(u32)rn << 5) | rd);
+}
+
+// tst wn, #0xff: NE when the low byte is not zero
+gb_internal void a64_tst_byte(xbAsm *a, u8 rn) {
+	a64_emit(a, 0x72001C1F | (cast(u32)rn << 5));
 }
 
 // sign or zero extends the low `size` bytes of xn into xd
@@ -283,6 +328,13 @@ gb_internal void a64_str_fp(xbAsm *a, i32 size, u8 vt, u8 rn, i64 off) {
 	a64_ldst_raw(a, true, A64_STR, size, vt, rn, off);
 }
 
+// stp or ldp of two x registers, or two d registers when `fp`, at [xn + off]
+gb_internal void a64_pair(xbAsm *a, bool fp, bool load, u8 rt1, u8 rt2, u8 rn, i32 off) {
+	GB_ASSERT(off % 8 == 0 && off >= -512 && off <= 504);
+	u32 w = (fp ? 0x6D000000 : 0xA9000000) | (load ? 1u<<22 : 0);
+	a64_emit(a, w | ((cast(u32)(off / 8) & 0x7f) << 15) | (cast(u32)rt2 << 10) | (cast(u32)rn << 5) | rt1);
+}
+
 ////////////////////////////////////////////////////////////////
 // Floating point
 ////////////////////////////////////////////////////////////////
@@ -340,6 +392,16 @@ gb_internal void a64_fmov_from_fp(xbAsm *a, u8 xd, u8 vn) {
 	a64_emit(a, 0x9E660000 | (cast(u32)vn << 5) | xd);
 }
 
+// fmov dd, dn: the low 64 bits, which hold any scalar
+gb_internal void a64_fmov_reg(xbAsm *a, u8 vd, u8 vn) {
+	a64_emit(a, 0x1E604000 | (cast(u32)vn << 5) | vd);
+}
+
+// fcsel dd, dn, dm, cond
+gb_internal void a64_fcsel(xbAsm *a, u8 vd, u8 vn, u8 vm, a64Cond c) {
+	a64_emit(a, 0x1E600C00 | (cast(u32)vm << 16) | (cast(u32)c << 12) | (cast(u32)vn << 5) | vd);
+}
+
 // cnt vd.8b, vn.8b
 gb_internal void a64_cnt8b(xbAsm *a, u8 vd, u8 vn) {
 	a64_emit(a, 0x0E205800 | (cast(u32)vn << 5) | vd);
@@ -376,6 +438,30 @@ gb_internal void a64_cb_skip(xbAsm *a, bool nonzero, u8 rt) {
 // b.cond over the next instruction
 gb_internal void a64_bcond_skip(xbAsm *a, a64Cond c) {
 	a64_emit(a, 0x54000000 | (2u << 5) | c);
+}
+
+// b.cond, or cbz/cbnz wt, with the offset patched in later; returns where
+gb_internal i64 a64_bcond(xbAsm *a, a64Cond c) {
+	i64 at = xb_pos(a);
+	a64_emit(a, 0x54000000 | c);
+	return at;
+}
+
+gb_internal i64 a64_cb(xbAsm *a, bool nonzero, u8 rt) {
+	i64 at = xb_pos(a);
+	a64_emit(a, (nonzero ? 0x35000000 : 0x34000000) | rt);
+	return at;
+}
+
+// Patches the 19 bit offset of a b.cond or cbz/cbnz; false when the target is out of range.
+gb_internal bool a64_patch_imm19(xbAsm *a, i64 at, i64 target) {
+	i64 delta = (target - at) / 4;
+	if (delta < -(1ll<<18) || delta >= (1ll<<18)) return false;
+	u32 w = 0;
+	gb_memmove(&w, a->code->data + at, 4);
+	w = (w & ~(0x7ffffu << 5)) | ((cast(u32)delta & 0x7ffff) << 5);
+	xb_patch_u32(a, at, w);
+	return true;
 }
 
 // b.cond to an already known position

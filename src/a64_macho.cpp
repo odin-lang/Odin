@@ -348,7 +348,8 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		array_add(&sec_relocs[to], ar);
 	}
 
-	// one compact unwind entry per procedure: every frame is the standard x29/x30 record
+	// one compact unwind entry per procedure: every frame is the standard x29/x30 record,
+	// with the callee saved pairs right below it
 	for (xbProcDebug const &pd : m->proc_debug) {
 		Array<u8> *cu = &sec[a64Out_CompactUnwind];
 		i64 at = cu->count;
@@ -356,6 +357,11 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		gb_zero_size(cu->data + at, 32);
 		u32 length = cast(u32)(pd.end - pd.start);
 		u32 encoding = A64_UNWIND_ARM64_MODE_FRAME;
+		for (auto const &s : pd.saved_regs) {
+			// dwarf x19-x28, then d8-d15 as 72-79
+			if (s.dwarf_reg >= 19 && s.dwarf_reg <= 28) encoding |= 1u << ((s.dwarf_reg - 19) / 2);
+			if (s.dwarf_reg >= 72 && s.dwarf_reg <= 79) encoding |= 0x100u << ((s.dwarf_reg - 72) / 2);
+		}
 		gb_memmove(cu->data + at + 8, &length, 4);
 		gb_memmove(cu->data + at + 12, &encoding, 4);
 		GB_ASSERT(sym_out[pd.sym] >= 0);
