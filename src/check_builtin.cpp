@@ -2189,6 +2189,59 @@ gb_internal Ast *check_atomic_address_of(Ast *ptr) {
 	return ptr;
 }
 
+gb_internal i64 check_atomic_address_alignment(Ast *x) {
+	x = unparen_expr(x);
+	switch (x->kind) {
+	case_ast_node(i, Ident, x);
+		Entity *e = entity_of_node(x);
+		if (e != nullptr && e->kind == Entity_Variable) {
+			return gb_max(type_align_of(e->type), e->Variable.custom_align);
+		}
+	case_end;
+
+	case_ast_node(se, SelectorExpr, x);
+		Entity *pkg = entity_of_node(se->expr);
+		if (pkg != nullptr && pkg->kind == Entity_ImportName) {
+			return check_atomic_address_alignment(se->selector);
+		}
+		if (se->swizzle_count > 0 || se->is_bit_field) {
+			break;
+		}
+		Type *t = type_deref(se->expr->tav.type);
+		Selection sel = lookup_field(t, se->selector->Ident.interned, false);
+		if (sel.entity == nullptr || sel.indirect) {
+			break;
+		}
+		i64 align = type_align_of(t);
+		if (!is_type_pointer(se->expr->tav.type)) {
+			align = check_atomic_address_alignment(se->expr);
+		}
+		i64 offset = type_offset_of_from_selection(t, sel);
+		if (offset != 0) {
+			align = gb_min(align, offset & -offset);
+		}
+		return align;
+	case_end;
+
+	case_ast_node(ie, IndexExpr, x);
+		Type *t = base_type(ie->expr->tav.type);
+		if (t == nullptr || t->kind != Type_Array) {
+			break;
+		}
+		i64 align = check_atomic_address_alignment(ie->expr);
+		i64 offset = type_size_of(t->Array.elem);
+		if (ie->index->tav.mode == Addressing_Constant) {
+			offset *= exact_value_to_i64(ie->index->tav.value);
+		}
+		if (offset != 0) {
+			align = gb_min(align, offset & -offset);
+		}
+		return align;
+	case_end;
+	}
+	return type_align_of(x->tav.type);
+}
+
 gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
 	if (!is_type_valid_atomic_type(elem)) {
 		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
@@ -2231,6 +2284,17 @@ gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &built
 			break;
 		}
 		x = unparen_expr(base);
+	}
+
+	// e.g. a `u32` converted to a `^u64`, which an atomic access faults on, or splits, when misaligned
+	i64 align = check_atomic_address_alignment(ptr->UnaryExpr.expr);
+	if (align < type_size_of(elem)) {
+		gbString str = expr_to_string(ptr->UnaryExpr.expr);
+		gbString type_str = type_to_string(elem);
+		error(operand->expr, "'%s' may be misaligned for '%.*s' of '%s', as it is only known to be %lld byte aligned", str, LIT(builtin_name), type_str, cast(long long)align);
+		gb_string_free(type_str);
+		gb_string_free(str);
+		return false;
 	}
 	return true;
 }
