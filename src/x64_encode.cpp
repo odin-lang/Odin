@@ -420,3 +420,182 @@ gb_internal void xb_bswap(xbAsm *a, i32 size, u8 reg) {
 	xb_b(a, 0x0F);
 	xb_b(a, cast(u8)(0xC8 + (reg & 7)));
 }
+
+// How an x86 vector intrinsic maps onto its 128-bit SSE instruction
+enum xbVecForm : u8 {
+	xbVecForm_Binary,   // op xmm1(a), xmm2(b)
+	xbVecForm_Unary,    // op xmm1(a), xmm2(a): the scalar forms keep the upper lanes of a
+	xbVecForm_Xmm0,     // op xmm1(a), xmm2(b), with c implicitly in xmm0
+	xbVecForm_ShiftImm, // op /ext xmm1(a), imm8
+	xbVecForm_ToGpr,    // op eax, xmm1(a): the result is a scalar
+	xbVecForm_Flags,    // op xmm1(a), xmm2(b): the result is the condition in ext
+};
+
+// ext of xbVecForm_Flags: an xbCC, possibly combined with the parity flag
+enum : u8 {
+	xbVecCond_AndNP = 0x10, // and not unordered
+	xbVecCond_OrP   = 0x20, // or unordered
+	xbVecCond_Swap  = 0x40, // compares b with a
+};
+
+struct xbVecIntrinsic {
+	char const *name;
+	u32 flags;
+	u8  opcode;
+	xbVecForm form;
+	u8  ext;  // the modrm reg field of xbVecForm_ShiftImm, the condition of xbVecForm_Flags
+	bool imm; // the last argument is a constant imm8
+};
+
+gb_global xbVecIntrinsic const xb_vec_intrinsics[] = {
+	{"llvm.x86.ssse3.pshuf.b.128",   XB_P66|XB_0F38, 0x00, xbVecForm_Binary},
+	{"llvm.x86.sha1msg1",            XB_0F38,        0xC9, xbVecForm_Binary},
+	{"llvm.x86.sha1msg2",            XB_0F38,        0xCA, xbVecForm_Binary},
+	{"llvm.x86.sha1nexte",           XB_0F38,        0xC8, xbVecForm_Binary},
+	{"llvm.x86.sha1rnds4",           XB_0F3A,        0xCC, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sha256msg1",          XB_0F38,        0xCC, xbVecForm_Binary},
+	{"llvm.x86.sha256msg2",          XB_0F38,        0xCD, xbVecForm_Binary},
+	{"llvm.x86.sha256rnds2",         XB_0F38,        0xCB, xbVecForm_Xmm0},
+
+	{"llvm.x86.aesni.aesenc",          XB_P66|XB_0F38, 0xDC, xbVecForm_Binary},
+	{"llvm.x86.aesni.aesenclast",      XB_P66|XB_0F38, 0xDD, xbVecForm_Binary},
+	{"llvm.x86.aesni.aesdec",          XB_P66|XB_0F38, 0xDE, xbVecForm_Binary},
+	{"llvm.x86.aesni.aesdeclast",      XB_P66|XB_0F38, 0xDF, xbVecForm_Binary},
+	{"llvm.x86.aesni.aesimc",          XB_P66|XB_0F38, 0xDB, xbVecForm_Unary},
+	{"llvm.x86.aesni.aeskeygenassist", XB_P66|XB_0F3A, 0xDF, xbVecForm_Unary, 0, true},
+	{"llvm.x86.pclmulqdq",             XB_P66|XB_0F3A, 0x44, xbVecForm_Binary, 0, true},
+
+	{"llvm.x86.sse.max.ss",   XB_PF3|XB_0F, 0x5F, xbVecForm_Binary},
+	{"llvm.x86.sse.max.ps",   XB_0F,        0x5F, xbVecForm_Binary},
+	{"llvm.x86.sse.min.ss",   XB_PF3|XB_0F, 0x5D, xbVecForm_Binary},
+	{"llvm.x86.sse.min.ps",   XB_0F,        0x5D, xbVecForm_Binary},
+	{"llvm.x86.sse.rcp.ss",   XB_PF3|XB_0F, 0x53, xbVecForm_Unary},
+	{"llvm.x86.sse.rcp.ps",   XB_0F,        0x53, xbVecForm_Unary},
+	{"llvm.x86.sse.rsqrt.ss", XB_PF3|XB_0F, 0x52, xbVecForm_Unary},
+	{"llvm.x86.sse.rsqrt.ps", XB_0F,        0x52, xbVecForm_Unary},
+	{"llvm.x86.sse.cmp.ss",   XB_PF3|XB_0F, 0xC2, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sse.cmp.ps",   XB_0F,        0xC2, xbVecForm_Binary, 0, true},
+
+	{"llvm.x86.sse2.pavg.b",        XB_P66|XB_0F, 0xE0, xbVecForm_Binary},
+	{"llvm.x86.sse2.pavg.w",        XB_P66|XB_0F, 0xE3, xbVecForm_Binary},
+	{"llvm.x86.sse2.pmadd.wd",      XB_P66|XB_0F, 0xF5, xbVecForm_Binary},
+	{"llvm.x86.sse2.pmulh.w",       XB_P66|XB_0F, 0xE5, xbVecForm_Binary},
+	{"llvm.x86.sse2.pmulhu.w",      XB_P66|XB_0F, 0xE4, xbVecForm_Binary},
+	{"llvm.x86.sse2.psad.bw",       XB_P66|XB_0F, 0xF6, xbVecForm_Binary},
+	{"llvm.x86.sse2.psll.w",        XB_P66|XB_0F, 0xF1, xbVecForm_Binary},
+	{"llvm.x86.sse2.psll.d",        XB_P66|XB_0F, 0xF2, xbVecForm_Binary},
+	{"llvm.x86.sse2.psll.q",        XB_P66|XB_0F, 0xF3, xbVecForm_Binary},
+	{"llvm.x86.sse2.psrl.w",        XB_P66|XB_0F, 0xD1, xbVecForm_Binary},
+	{"llvm.x86.sse2.psrl.d",        XB_P66|XB_0F, 0xD2, xbVecForm_Binary},
+	{"llvm.x86.sse2.psrl.q",        XB_P66|XB_0F, 0xD3, xbVecForm_Binary},
+	{"llvm.x86.sse2.psra.w",        XB_P66|XB_0F, 0xE1, xbVecForm_Binary},
+	{"llvm.x86.sse2.psra.d",        XB_P66|XB_0F, 0xE2, xbVecForm_Binary},
+	{"llvm.x86.sse2.pslli.w",       XB_P66|XB_0F, 0x71, xbVecForm_ShiftImm, 6, true},
+	{"llvm.x86.sse2.pslli.d",       XB_P66|XB_0F, 0x72, xbVecForm_ShiftImm, 6, true},
+	{"llvm.x86.sse2.pslli.q",       XB_P66|XB_0F, 0x73, xbVecForm_ShiftImm, 6, true},
+	{"llvm.x86.sse2.psrli.w",       XB_P66|XB_0F, 0x71, xbVecForm_ShiftImm, 2, true},
+	{"llvm.x86.sse2.psrli.d",       XB_P66|XB_0F, 0x72, xbVecForm_ShiftImm, 2, true},
+	{"llvm.x86.sse2.psrli.q",       XB_P66|XB_0F, 0x73, xbVecForm_ShiftImm, 2, true},
+	{"llvm.x86.sse2.psrai.w",       XB_P66|XB_0F, 0x71, xbVecForm_ShiftImm, 4, true},
+	{"llvm.x86.sse2.psrai.d",       XB_P66|XB_0F, 0x72, xbVecForm_ShiftImm, 4, true},
+	{"llvm.x86.sse2.cvtps2dq",      XB_P66|XB_0F, 0x5B, xbVecForm_Unary},
+	{"llvm.x86.sse2.cvttps2dq",     XB_PF3|XB_0F, 0x5B, xbVecForm_Unary},
+	{"llvm.x86.sse2.cvtpd2ps",      XB_P66|XB_0F, 0x5A, xbVecForm_Unary},
+	{"llvm.x86.sse2.cvtpd2dq",      XB_PF2|XB_0F, 0xE6, xbVecForm_Unary},
+	{"llvm.x86.sse2.cvttpd2dq",     XB_P66|XB_0F, 0xE6, xbVecForm_Unary},
+	{"llvm.x86.sse2.packsswb.128",  XB_P66|XB_0F, 0x63, xbVecForm_Binary},
+	{"llvm.x86.sse2.packssdw.128",  XB_P66|XB_0F, 0x6B, xbVecForm_Binary},
+	{"llvm.x86.sse2.packuswb.128",  XB_P66|XB_0F, 0x67, xbVecForm_Binary},
+	{"llvm.x86.sse2.max.sd",        XB_PF2|XB_0F, 0x5F, xbVecForm_Binary},
+	{"llvm.x86.sse2.max.pd",        XB_P66|XB_0F, 0x5F, xbVecForm_Binary},
+	{"llvm.x86.sse2.min.sd",        XB_PF2|XB_0F, 0x5D, xbVecForm_Binary},
+	{"llvm.x86.sse2.min.pd",        XB_P66|XB_0F, 0x5D, xbVecForm_Binary},
+	{"llvm.x86.sse2.cmp.sd",        XB_PF2|XB_0F, 0xC2, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sse2.cmp.pd",        XB_P66|XB_0F, 0xC2, xbVecForm_Binary, 0, true},
+
+	{"llvm.x86.sse3.addsub.ps", XB_PF2|XB_0F, 0xD0, xbVecForm_Binary},
+	{"llvm.x86.sse3.addsub.pd", XB_P66|XB_0F, 0xD0, xbVecForm_Binary},
+	{"llvm.x86.sse3.hadd.ps",   XB_PF2|XB_0F, 0x7C, xbVecForm_Binary},
+	{"llvm.x86.sse3.hadd.pd",   XB_P66|XB_0F, 0x7C, xbVecForm_Binary},
+	{"llvm.x86.sse3.hsub.ps",   XB_PF2|XB_0F, 0x7D, xbVecForm_Binary},
+	{"llvm.x86.sse3.hsub.pd",   XB_P66|XB_0F, 0x7D, xbVecForm_Binary},
+
+	{"llvm.x86.ssse3.phadd.w.128",     XB_P66|XB_0F38, 0x01, xbVecForm_Binary},
+	{"llvm.x86.ssse3.phadd.d.128",     XB_P66|XB_0F38, 0x02, xbVecForm_Binary},
+	{"llvm.x86.ssse3.phadd.sw.128",    XB_P66|XB_0F38, 0x03, xbVecForm_Binary},
+	{"llvm.x86.ssse3.pmadd.ub.sw.128", XB_P66|XB_0F38, 0x04, xbVecForm_Binary},
+	{"llvm.x86.ssse3.phsub.w.128",     XB_P66|XB_0F38, 0x05, xbVecForm_Binary},
+	{"llvm.x86.ssse3.phsub.d.128",     XB_P66|XB_0F38, 0x06, xbVecForm_Binary},
+	{"llvm.x86.ssse3.phsub.sw.128",    XB_P66|XB_0F38, 0x07, xbVecForm_Binary},
+	{"llvm.x86.ssse3.psign.b.128",     XB_P66|XB_0F38, 0x08, xbVecForm_Binary},
+	{"llvm.x86.ssse3.psign.w.128",     XB_P66|XB_0F38, 0x09, xbVecForm_Binary},
+	{"llvm.x86.ssse3.psign.d.128",     XB_P66|XB_0F38, 0x0A, xbVecForm_Binary},
+	{"llvm.x86.ssse3.pmul.hr.sw.128",  XB_P66|XB_0F38, 0x0B, xbVecForm_Binary},
+
+	{"llvm.x86.sse41.pblendvb",   XB_P66|XB_0F38, 0x10, xbVecForm_Xmm0},
+	{"llvm.x86.sse41.blendvps",   XB_P66|XB_0F38, 0x14, xbVecForm_Xmm0},
+	{"llvm.x86.sse41.blendvpd",   XB_P66|XB_0F38, 0x15, xbVecForm_Xmm0},
+	{"llvm.x86.sse41.packusdw",   XB_P66|XB_0F38, 0x2B, xbVecForm_Binary},
+	{"llvm.x86.sse41.phminposuw", XB_P66|XB_0F38, 0x41, xbVecForm_Unary},
+	{"llvm.x86.sse41.round.ps",   XB_P66|XB_0F3A, 0x08, xbVecForm_Unary,  0, true},
+	{"llvm.x86.sse41.round.pd",   XB_P66|XB_0F3A, 0x09, xbVecForm_Unary,  0, true},
+	{"llvm.x86.sse41.round.ss",   XB_P66|XB_0F3A, 0x0A, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sse41.round.sd",   XB_P66|XB_0F3A, 0x0B, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sse41.insertps",   XB_P66|XB_0F3A, 0x21, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sse41.dpps",       XB_P66|XB_0F3A, 0x40, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sse41.dppd",       XB_P66|XB_0F3A, 0x41, xbVecForm_Binary, 0, true},
+	{"llvm.x86.sse41.mpsadbw",    XB_P66|XB_0F3A, 0x42, xbVecForm_Binary, 0, true},
+
+	{"llvm.x86.sse.movmsk.ps",       XB_0F,              0x50, xbVecForm_ToGpr},
+	{"llvm.x86.sse2.movmsk.pd",      XB_P66|XB_0F,       0x50, xbVecForm_ToGpr},
+	{"llvm.x86.sse2.pmovmskb.128",   XB_P66|XB_0F,       0xD7, xbVecForm_ToGpr},
+	{"llvm.x86.sse.cvtss2si",        XB_PF3|XB_0F,       0x2D, xbVecForm_ToGpr},
+	{"llvm.x86.sse.cvttss2si",       XB_PF3|XB_0F,       0x2C, xbVecForm_ToGpr},
+	{"llvm.x86.sse.cvtss2si64",      XB_PF3|XB_0F|XB_W,  0x2D, xbVecForm_ToGpr},
+	{"llvm.x86.sse.cvttss2si64",     XB_PF3|XB_0F|XB_W,  0x2C, xbVecForm_ToGpr},
+	{"llvm.x86.sse2.cvtsd2si",       XB_PF2|XB_0F,       0x2D, xbVecForm_ToGpr},
+	{"llvm.x86.sse2.cvttsd2si",      XB_PF2|XB_0F,       0x2C, xbVecForm_ToGpr},
+	{"llvm.x86.sse2.cvtsd2si64",     XB_PF2|XB_0F|XB_W,  0x2D, xbVecForm_ToGpr},
+	{"llvm.x86.sse2.cvttsd2si64",    XB_PF2|XB_0F|XB_W,  0x2C, xbVecForm_ToGpr},
+
+	// the conditions LLVM's X86 lowering picks for each predicate
+	{"llvm.x86.sse.comieq.ss",    XB_0F,        0x2F, xbVecForm_Flags, CC_E|xbVecCond_AndNP},
+	{"llvm.x86.sse.comineq.ss",   XB_0F,        0x2F, xbVecForm_Flags, CC_NE|xbVecCond_OrP},
+	{"llvm.x86.sse.comigt.ss",    XB_0F,        0x2F, xbVecForm_Flags, CC_A},
+	{"llvm.x86.sse.comige.ss",    XB_0F,        0x2F, xbVecForm_Flags, CC_AE},
+	{"llvm.x86.sse.comilt.ss",    XB_0F,        0x2F, xbVecForm_Flags, CC_A|xbVecCond_Swap},
+	{"llvm.x86.sse.comile.ss",    XB_0F,        0x2F, xbVecForm_Flags, CC_AE|xbVecCond_Swap},
+	{"llvm.x86.sse.ucomieq.ss",   XB_0F,        0x2E, xbVecForm_Flags, CC_E|xbVecCond_AndNP},
+	{"llvm.x86.sse.ucomineq.ss",  XB_0F,        0x2E, xbVecForm_Flags, CC_NE|xbVecCond_OrP},
+	{"llvm.x86.sse.ucomigt.ss",   XB_0F,        0x2E, xbVecForm_Flags, CC_A},
+	{"llvm.x86.sse.ucomige.ss",   XB_0F,        0x2E, xbVecForm_Flags, CC_AE},
+	{"llvm.x86.sse.ucomilt.ss",   XB_0F,        0x2E, xbVecForm_Flags, CC_A|xbVecCond_Swap},
+	{"llvm.x86.sse.ucomile.ss",   XB_0F,        0x2E, xbVecForm_Flags, CC_AE|xbVecCond_Swap},
+	{"llvm.x86.sse2.comieq.sd",   XB_P66|XB_0F, 0x2F, xbVecForm_Flags, CC_E|xbVecCond_AndNP},
+	{"llvm.x86.sse2.comineq.sd",  XB_P66|XB_0F, 0x2F, xbVecForm_Flags, CC_NE|xbVecCond_OrP},
+	{"llvm.x86.sse2.comigt.sd",   XB_P66|XB_0F, 0x2F, xbVecForm_Flags, CC_A},
+	{"llvm.x86.sse2.comige.sd",   XB_P66|XB_0F, 0x2F, xbVecForm_Flags, CC_AE},
+	{"llvm.x86.sse2.comilt.sd",   XB_P66|XB_0F, 0x2F, xbVecForm_Flags, CC_A|xbVecCond_Swap},
+	{"llvm.x86.sse2.comile.sd",   XB_P66|XB_0F, 0x2F, xbVecForm_Flags, CC_AE|xbVecCond_Swap},
+	{"llvm.x86.sse2.ucomieq.sd",  XB_P66|XB_0F, 0x2E, xbVecForm_Flags, CC_E|xbVecCond_AndNP},
+	{"llvm.x86.sse2.ucomineq.sd", XB_P66|XB_0F, 0x2E, xbVecForm_Flags, CC_NE|xbVecCond_OrP},
+	{"llvm.x86.sse2.ucomigt.sd",  XB_P66|XB_0F, 0x2E, xbVecForm_Flags, CC_A},
+	{"llvm.x86.sse2.ucomige.sd",  XB_P66|XB_0F, 0x2E, xbVecForm_Flags, CC_AE},
+	{"llvm.x86.sse2.ucomilt.sd",  XB_P66|XB_0F, 0x2E, xbVecForm_Flags, CC_A|xbVecCond_Swap},
+	{"llvm.x86.sse2.ucomile.sd",  XB_P66|XB_0F, 0x2E, xbVecForm_Flags, CC_AE|xbVecCond_Swap},
+	{"llvm.x86.sse41.ptestz",     XB_P66|XB_0F38, 0x17, xbVecForm_Flags, CC_E},
+	{"llvm.x86.sse41.ptestc",     XB_P66|XB_0F38, 0x17, xbVecForm_Flags, CC_B},
+	{"llvm.x86.sse41.ptestnzc",   XB_P66|XB_0F38, 0x17, xbVecForm_Flags, CC_A},
+};
+
+// xbOp_Vec128 keeps the index in its u8 aux
+static_assert(gb_count_of(xb_vec_intrinsics) <= 256, "");
+
+gb_internal i32 xb_vec_intrinsic_index(String name) {
+	for (isize i = 0; i < gb_count_of(xb_vec_intrinsics); i++) {
+		if (name == make_string_c(xb_vec_intrinsics[i].name)) {
+			return cast(i32)i;
+		}
+	}
+	return -1;
+}

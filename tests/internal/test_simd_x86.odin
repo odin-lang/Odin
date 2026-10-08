@@ -145,3 +145,46 @@ simd_x86_avx_wrappers_avx :: proc(t: ^testing.T) {
 	f := x86.__m256{1, 2, 3, 4, 5, 6, 7, 8}
 	testing.expect_value(t, transmute([8]f32)x86._mm256_dp_ps(f, f, 0xf1), [8]f32{30, 0, 0, 0, 174, 0, 0, 0})
 }
+
+// x86 intrinsics with no portable form run as their own instruction. The expected values come
+// from the LLVM backend.
+
+@(private="file")
+bits :: proc(v: x86.__m128i) -> [2]u64 {
+	return transmute([2]u64)v
+}
+
+@(test, enable_target_feature="sse2,sse4.1,aes,pclmul")
+simd_x86_vector_intrinsics :: proc(t: ^testing.T) {
+	a := transmute(x86.__m128i)[2]u64{0x0123456789abcdef, 0x80007fff0001ff80}
+	b := transmute(x86.__m128i)[2]u64{0xfedcba9876543210, 0x0000000280017f05}
+
+	testing.expect_value(t, bits(x86._mm_aesenc_si128(a, b)),            [2]u64{0x4a7b11779f5178b6, 0x67427eb7845ed7f7})
+	testing.expect_value(t, bits(x86._mm_aesdeclast_si128(a, b)),        [2]u64{0xac8e3a927f5d5971, 0xf2327d7fba0f173f})
+	testing.expect_value(t, bits(x86._mm_aeskeygenassist_si128(a, 0x1b)), [2]u64{0x857c26757c266e85, 0x16cd63c9cd63d216})
+	testing.expect_value(t, bits(x86._mm_clmulepi64_si128(a, b, 0x10)),  [2]u64{0xe819c54fd9fddf53, 0x2d7292f})
+	testing.expect_value(t, bits(x86._mm_srli_epi64(a, 7)),              [2]u64{0x2468acf13579b, 0x10000fffe0003ff})
+	// a count past the element width clears it
+	testing.expect_value(t, bits(x86._mm_slli_epi64(a, 70)),             [2]u64{0, 0})
+}
+
+@(test, enable_target_feature="sse2,sse4.1")
+simd_x86_scalar_intrinsics :: proc(t: ^testing.T) {
+	a := transmute(x86.__m128i)[2]u64{0x0123456789abcdef, 0x80007fff0001ff80}
+	b := transmute(x86.__m128i)[2]u64{0xfedcba9876543210, 0x0000000280017f05}
+	testing.expect_value(t, x86._mm_movemask_epi8(a), 37647)
+	testing.expect_value(t, x86._mm_testz_si128(a, b), 0)
+	testing.expect_value(t, x86._mm_testc_si128(a, a), 1)
+
+	// an unordered comparison is neither equal nor less
+	nan := transmute(f64)u64(0x7ff8000000000000)
+	x := x86.__m128d{nan, 0}
+	y := x86.__m128d{1, 0}
+	testing.expect_value(t, x86._mm_comieq_sd(x, y), 0)
+	testing.expect_value(t, x86._mm_comineq_sd(x, y), 1)
+	testing.expect_value(t, x86._mm_comilt_sd(y, x), 0)
+	testing.expect_value(t, x86._mm_ucomige_sd(y, y), 1)
+
+	testing.expect_value(t, x86._mm_cvtsd_si32(x86.__m128d{2.5, 0}), 2)
+	testing.expect_value(t, x86._mm_cvttsd_si32(x86.__m128d{-2.7, 0}), -2)
+}

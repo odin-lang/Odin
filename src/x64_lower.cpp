@@ -1544,29 +1544,39 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Vec128: {
-		struct VecEnc { u32 flags; u8 opcode; };
-		static VecEnc const encs[] = {
-			{XB_P66|XB_0F38, 0x00}, // pshufb
-			{XB_0F38, 0xC9},        // sha1msg1
-			{XB_0F38, 0xCA},        // sha1msg2
-			{XB_0F38, 0xC8},        // sha1nexte
-			{XB_0F3A, 0xCC},        // sha1rnds4, imm8
-			{XB_0F38, 0xCC},        // sha256msg1
-			{XB_0F38, 0xCD},        // sha256msg2
-			{XB_0F38, 0xCB},        // sha256rnds2, k in xmm0
-		};
-		VecEnc e = encs[in.aux];
+		xbVecIntrinsic const &e = xb_vec_intrinsics[in.aux];
 		u8 const xmm1 = 1, xmm2 = 2;
 		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.a));
 		xb_movups_x_m(a, xmm1, xb_m(RAX, 0));
-		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.b));
-		xb_movups_x_m(a, xmm2, xb_m(RAX, 0));
-		if (in.c) {
-			xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.c));
-			xb_movups_x_m(a, 0, xb_m(RAX, 0));
+		if (e.form == xbVecForm_ShiftImm) {
+			xb_enc(a, e.flags, e.opcode, e.ext, xb_r(xmm1), 1);
+		} else if (e.form == xbVecForm_ToGpr) {
+			xb_enc(a, e.flags, e.opcode, RAX, xb_r(xmm1));
+			xb_mov_rm_r(a, (e.flags & XB_W) ? 8 : 4, xb_mem_opnd(L, in.mem, R11), RAX);
+			break;
+		} else if (e.form == xbVecForm_Flags) {
+			xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.b));
+			xb_movups_x_m(a, xmm2, xb_m(RAX, 0));
+			bool swap = (e.ext & xbVecCond_Swap) != 0;
+			xb_enc(a, e.flags, e.opcode, swap ? xmm2 : xmm1, xb_r(swap ? xmm1 : xmm2));
+			xb_setcc(a, cast(xbCC)(e.ext & 0xF), RAX);
+			if (e.ext & (xbVecCond_AndNP|xbVecCond_OrP)) {
+				xb_setcc(a, (e.ext & xbVecCond_AndNP) ? CC_NP : CC_P, RCX);
+				xb_alu_r_rm(a, (e.ext & xbVecCond_AndNP) ? ALU_AND : ALU_OR, 1, RAX, xb_r(RCX));
+			}
+			xb_load_ext(a, 1, false, RAX, xb_r(RAX));
+			xb_mov_rm_r(a, 4, xb_mem_opnd(L, in.mem, R11), RAX);
+			break;
+		} else {
+			xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.b));
+			xb_movups_x_m(a, xmm2, xb_m(RAX, 0));
+			if (e.form == xbVecForm_Xmm0) {
+				xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.c));
+				xb_movups_x_m(a, 0, xb_m(RAX, 0));
+			}
+			xb_enc(a, e.flags, e.opcode, xmm1, xb_r(xmm2), e.imm ? 1 : 0);
 		}
-		xb_enc(a, e.flags, e.opcode, xmm1, xb_r(xmm2));
-		if (in.aux == xbVec_Sha1Rnds4) xb_b(a, cast(u8)in.imm);
+		if (e.imm) xb_b(a, cast(u8)in.imm);
 		xb_movups_m_x(a, xb_mem_opnd(L, in.mem, R11), xmm1);
 		break;
 	}

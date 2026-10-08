@@ -406,47 +406,61 @@ gb_internal xbValue xb_handle_param_value(xbProc *p, Type *parameter_type, Param
 // Calls to LLVM intrinsics declared as foreign procedures. At -O0 LLVM turns the libm
 // ones into plain calls to the C library, and so does this.
 // x86 vector intrinsics with no portable form run as the instruction itself, as LLVM does
+gb_internal xbValue xb_emit_vec128(xbProc *p, i32 index, u32 a, u32 b, u32 c, u8 imm, Type *result_type) {
+	xbInstr in = xb_instr(xbOp_Vec128);
+	in.aux = cast(u8)index;
+	in.a = a;
+	in.b = b;
+	in.c = c;
+	in.imm = imm;
+	in.mem = xb_add_local(p, result_type, false);
+	xb_emit(p, in);
+	return xb_value_mem(result_type, in.mem);
+}
+
 gb_internal bool xb_build_x86_vec_intrinsic(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
-	struct VecIntrinsic { char const *name; xbVecOp op; isize vec_args; };
-	static VecIntrinsic const table[] = {
-		{"llvm.x86.ssse3.pshuf.b.128", xbVec_Pshufb,      2},
-		{"llvm.x86.sha1msg1",          xbVec_Sha1Msg1,    2},
-		{"llvm.x86.sha1msg2",          xbVec_Sha1Msg2,    2},
-		{"llvm.x86.sha1nexte",         xbVec_Sha1Nexte,   2},
-		{"llvm.x86.sha1rnds4",         xbVec_Sha1Rnds4,   2},
-		{"llvm.x86.sha256msg1",        xbVec_Sha256Msg1,  2},
-		{"llvm.x86.sha256msg2",        xbVec_Sha256Msg2,  2},
-		{"llvm.x86.sha256rnds2",       xbVec_Sha256Rnds2, 3},
-	};
-	VecIntrinsic const *v = nullptr;
-	for (VecIntrinsic const &t : table) {
-		if (name == make_string_c(t.name)) {
-			v = &t;
-			break;
-		}
+	i32 index = xb_vec_intrinsic_index(name);
+	if (index < 0) return false;
+	xbVecIntrinsic const &v = xb_vec_intrinsics[index];
+	isize vec_args = 2;
+	switch (v.form) {
+	case xbVecForm_Unary:    vec_args = 1; break;
+	case xbVecForm_ShiftImm: vec_args = 1; break;
+	case xbVecForm_Xmm0:     vec_args = 3; break;
+	case xbVecForm_Binary:   vec_args = 2; break;
+	case xbVecForm_ToGpr:    vec_args = 1; break;
+	case xbVecForm_Flags:    vec_args = 2; break;
 	}
-	if (v == nullptr) return false;
-	if (type_size_of(result_type) != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
+	bool scalar_result = v.form == xbVecForm_ToGpr || v.form == xbVecForm_Flags;
+	i64 result_size = type_size_of(result_type);
+	if (scalar_result ? (result_size != 4 && result_size != 8) : result_size != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
+	if (ce->args.count != vec_args + (v.imm ? 1 : 0)) XB_UNSUPPORTED(p, "llvm intrinsic");
 
 	u32 ptrs[3] = {};
-	for (isize i = 0; i < v->vec_args; i++) {
+	for (isize i = 0; i < vec_args; i++) {
 		xbValue x = xb_build_expr(p, ce->args[i]);
 		if (type_size_of(x.type) != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
 		ptrs[i] = xb_lea(p, xb_address_from_load_or_generate_local(p, x));
 	}
-	xbInstr in = xb_instr(xbOp_Vec128);
-	in.aux = cast(u8)v->op;
-	in.a = ptrs[0];
-	in.b = ptrs[1];
-	in.c = ptrs[2];
-	if (v->op == xbVec_Sha1Rnds4) {
-		TypeAndValue tv = type_and_value_of_expr(ce->args[2]);
+	if (vec_args == 1) ptrs[1] = ptrs[0];
+	u8 imm = 0;
+	if (v.imm) {
+		TypeAndValue tv = type_and_value_of_expr(ce->args[vec_args]);
 		if (tv.value.kind != ExactValue_Integer) XB_UNSUPPORTED(p, "llvm intrinsic");
-		in.imm = exact_value_to_i64(tv.value) & 3;
+		i64 k = exact_value_to_i64(tv.value);
+		if (v.form == xbVecForm_ShiftImm) {
+			// every count past the element width gives the same result
+			k = gb_clamp(k, 0, 255);
+		} else if (v.opcode == 0xC2 && (k < 0 || k > 7)) {
+			// the predicates past 7 only exist in the VEX encoding
+			XB_UNSUPPORTED(p, "llvm intrinsic");
+		}
+		imm = cast(u8)k;
 	}
-	in.mem = xb_add_local(p, result_type, false);
-	xb_emit(p, in);
-	*res = xb_value_mem(result_type, in.mem);
+	*res = xb_emit_vec128(p, index, ptrs[0], ptrs[1], ptrs[2], imm, result_type);
+	if (scalar_result) {
+		*res = xb_value_reg(result_type, xb_load(p, xb_scalar_type(result_type), res->mem));
+	}
 	return true;
 }
 
