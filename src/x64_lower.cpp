@@ -61,6 +61,7 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 	switch (in.op) {
 	case xbOp_Nop:
 	case xbOp_Loc:
+	case xbOp_Scope:
 	case xbOp_Jump:
 	case xbOp_Unreachable:
 	case xbOp_Trap:
@@ -1482,7 +1483,11 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_store_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_ReturnAddress:
-		xb_mov_r_rm(a, 8, RAX, xb_m(RBP, L->incoming_base - 8));
+		if (in.imm) {
+			xb_lea(a, RAX, xb_m(RBP, L->incoming_base - 8));
+		} else {
+			xb_mov_r_rm(a, 8, RAX, xb_m(RBP, L->incoming_base - 8));
+		}
 		xb_store_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_AtomicRmw: {
@@ -1755,6 +1760,7 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	// prologue
 	L.incoming_base = 16;
 	dbg.saved_regs = array_make<xbProcDebug::SavedReg>(heap_allocator(), 0, L.saved_count);
+	dbg.scope_marks = array_make<xbScopeMark>(heap_allocator(), 0, 16);
 	if (xb_is_win64()) {
 		xb_win64_prologue(&L, &dbg);
 	} else {
@@ -1810,7 +1816,7 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	auto next_code = [&](xbBlock *b, isize i) -> isize {
 		for (isize j = i+1; j < b->instrs.count; j++) {
 			xbInstr const &n = b->instrs[j];
-			if (n.op == xbOp_Loc || n.op == xbOp_Nop || skipped(n)) continue;
+			if (n.op == xbOp_Loc || n.op == xbOp_Scope || n.op == xbOp_Nop || skipped(n)) continue;
 			return j;
 		}
 		return -1;
@@ -1826,8 +1832,15 @@ gb_internal void xb_lower_proc(xbProc *p) {
 		xbBlock *b = order[bi];
 		i32 next_block = bi+1 < order.count ? order[bi+1]->index : -1;
 		b->code_offset = cast(i32)xb_pos(a);
+		xbScopeMark mark = {cast(i32)(xb_pos(a) - L.proc_start), b->debug_scope, b->cold};
+		array_add(&dbg.scope_marks, mark);
 		for (isize i = 0; i < b->instrs.count; i++) {
 			xbInstr const &in = b->instrs[i];
+			if (in.op == xbOp_Scope) {
+				xbScopeMark mark = {cast(i32)(xb_pos(a) - L.proc_start), cast(i32)in.imm, b->cold};
+				array_add(&dbg.scope_marks, mark);
+				continue;
+			}
 			// a jump to the next block is a fallthrough
 			if (in.op == xbOp_Jump && i+1 == b->instrs.count && cast(i32)in.imm == next_block) {
 				continue;
@@ -1876,6 +1889,8 @@ gb_internal void xb_lower_proc(xbProc *p) {
 
 	// debug variables, now that frame offsets are known
 	dbg.vars = array_make<xbDebugVar>(heap_allocator(), 0, p->debug_vars.count);
+	dbg.scope_parent = array_make<i32>(heap_allocator(), 0, p->debug_scope_parent.count);
+	array_add_elems(&dbg.scope_parent, p->debug_scope_parent.data, p->debug_scope_parent.count);
 	for (xbDebugVar v : p->debug_vars) {
 		if (v.local >= 0) {
 			xbLocal const &l = p->locals[v.local];

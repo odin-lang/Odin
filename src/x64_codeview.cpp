@@ -37,6 +37,7 @@ enum : u16 {
 	XCV_S_LTHREAD32   = 0x1112,
 	XCV_S_GTHREAD32   = 0x1113,
 	XCV_S_GPROC32     = 0x1110,
+	XCV_S_BLOCK32     = 0x1103,
 	XCV_S_COMPILE3    = 0x113c,
 
 	XCV_DEBUG_S_SYMBOLS    = 0xf1,
@@ -69,8 +70,10 @@ enum : u32 {
 	XCV_T_RCHAR   = 0x70,
 	XCV_T_INT4    = 0x74,
 	XCV_T_UINT4   = 0x75,
-	XCV_T_64PVOID = 0x603,
+	XCV_T_CHAR32  = 0x7b,
+	XCV_T_64PUCHAR = 0x620,
 	XCV_T_64PRCHAR = 0x670,
+	XCV_T_64PWCHAR = 0x671,
 };
 
 struct xbCv {
@@ -260,8 +263,10 @@ gb_internal u32 xb_cv_basic(Type *bt) {
 	case Basic_f16: case Basic_f16le: case Basic_f16be: return XCV_T_REAL16;
 	case Basic_f32: case Basic_f32le: case Basic_f32be: return XCV_T_REAL32;
 	case Basic_f64: case Basic_f64le: case Basic_f64be: return XCV_T_REAL64;
-	case Basic_rawptr: return XCV_T_64PVOID;
+	case Basic_rawptr: return XCV_T_64PUCHAR; // LLVM's rawptr points to an 8 bit "void"
 	case Basic_cstring: return XCV_T_64PRCHAR;
+	case Basic_cstring16: return XCV_T_64PWCHAR;
+	case Basic_rune: return XCV_T_CHAR32;
 	case Basic_typeid: return XCV_T_UQUAD;
 	}
 	if (bt->Basic.flags & BasicFlag_Integer) {
@@ -290,7 +295,8 @@ gb_internal bool xb_cv_is_record(Type *bt) {
 	case Type_BitField:
 		return bt->BitField.fields.count > 0;
 	case Type_Basic:
-		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_any;
+		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_any || bt->Basic.kind == Basic_string16 ||
+		       is_type_complex(bt) || is_type_quaternion(bt);
 	}
 	return false;
 }
@@ -404,6 +410,14 @@ gb_internal void xb_cv_define(xbCv *cv, Type *t) {
 	case Type_Basic:
 		if (bt->Basic.kind == Basic_string) {
 			add_struct_like({{"data", t_u8_ptr}, {"len", t_int}});
+		} else if (bt->Basic.kind == Basic_string16) {
+			add_struct_like({{"data", t_u16_ptr}, {"len", t_int}});
+		} else if (is_type_complex(bt)) {
+			Type *e = base_complex_elem_type(bt);
+			add_struct_like({{"real", e}, {"imag", e}});
+		} else if (is_type_quaternion(bt)) {
+			Type *e = base_complex_elem_type(bt);
+			add_struct_like({{"imag", e}, {"jmag", e}, {"kmag", e}, {"real", e}});
 		} else {
 			add_struct_like({{"data", t_rawptr}, {"id", t_typeid}});
 		}
@@ -554,6 +568,71 @@ gb_internal u16 xb_cv_reg_of_dwarf(u8 dwarf_reg) {
 	return cast(u16)(336 + (dwarf_reg - 8));
 }
 
+// Where each lexical scope's code is, and which scopes get a block. Like LLVM, a scope
+// without variables of its own, or whose code is interleaved with a sibling's, gets no
+// block: its variables and blocks go to the parent.
+struct xbCvScopes {
+	Array<i32> lo, hi;     // the hull of the scope's code, cold code left out
+	Array<i32> eff;        // the scope whose block holds the scope's variables
+	Array<Array<i32>> kids; // the blocks directly inside a block
+};
+
+gb_internal void xb_cv_scopes_free(xbCvScopes *sc) {
+	for (auto &k : sc->kids) array_free(&k);
+	array_free(&sc->lo); array_free(&sc->hi); array_free(&sc->eff); array_free(&sc->kids);
+}
+
+gb_internal xbCvScopes xb_cv_scopes(xbProcDebug const &pd, u32 len) {
+	xbCvScopes sc = {};
+	isize n = gb_max(pd.scope_parent.count, cast(isize)1);
+	auto parent = [&](i32 s) -> i32 { return s < pd.scope_parent.count ? pd.scope_parent[s] : -1; };
+	sc.lo = array_make<i32>(heap_allocator(), n, n);
+	sc.hi = array_make<i32>(heap_allocator(), n, n);
+	sc.eff = array_make<i32>(heap_allocator(), n, n);
+	sc.kids = array_make<Array<i32>>(heap_allocator(), n, n);
+	for (isize s = 0; s < n; s++) {
+		sc.lo[s] = I32_MAX;
+		sc.hi[s] = 0;
+		sc.kids[s] = array_make<i32>(heap_allocator(), 0, 0);
+	}
+	auto const &marks = pd.scope_marks;
+	for_array(k, marks) {
+		i32 lo = marks[k].code_offset;
+		i32 hi = k+1 < marks.count ? marks[k+1].code_offset : cast(i32)len;
+		if (marks[k].cold || hi <= lo) continue;
+		for (i32 s = marks[k].scope; s >= 0; s = parent(s)) {
+			sc.lo[s] = gb_min(sc.lo[s], lo);
+			sc.hi[s] = gb_max(sc.hi[s], hi);
+		}
+	}
+	// whether t is s or inside it, a scope's id is above its parent's
+	auto inside = [&](i32 t, i32 s) -> bool {
+		while (t > s) t = parent(t);
+		return t == s;
+	};
+	auto own = array_make<i32>(heap_allocator(), n, n);
+	for (isize s = 0; s < n; s++) own[s] = 0;
+	for (xbDebugVar const &v : pd.vars) {
+		if (v.scope < n) own[v.scope] += 1;
+	}
+	// parents first, by the ids
+	for (isize s = 0; s < n; s++) {
+		bool ok = s == 0 || (own[s] > 0 && sc.lo[s] < sc.hi[s]);
+		for_array(k, marks) {
+			if (!ok || s == 0) break;
+			i32 lo = marks[k].code_offset;
+			i32 hi = k+1 < marks.count ? marks[k+1].code_offset : cast(i32)len;
+			if (marks[k].cold || hi <= lo || hi <= sc.lo[s] || lo >= sc.hi[s]) continue;
+			i32 t = marks[k].scope;
+			if (!inside(t, cast(i32)s) && !inside(cast(i32)s, t)) ok = false;
+		}
+		sc.eff[s] = ok ? cast(i32)s : sc.eff[parent(cast(i32)s)];
+		if (ok && s > 0) array_add(&sc.kids[sc.eff[parent(cast(i32)s)]], cast(i32)s);
+	}
+	array_free(&own);
+	return sc;
+}
+
 gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 	xbModule *m = w->m;
 	xbCv cv_ = {};
@@ -632,7 +711,8 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		xbb_u32(b, (2u << 14) | (2u << 16)); // locals and parameters off rbp
 		xb_cv_sym_end(b, at);
 
-		for (xbDebugVar const &v : pd.vars) {
+		auto emit_var = [&](xbDebugVar const &v) {
+			isize at = 0;
 			if (v.local < 0) {
 				xbSymbol const &s = m->symbols[v.sym];
 				bool tls = (s.flags & xbSymbolFlag_TLS) != 0;
@@ -641,7 +721,7 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 				xb_cv_addr(w, b, v.sym, 0);
 				xb_cv_name(b, v.name);
 				xb_cv_sym_end(b, at);
-				continue;
+				return;
 			}
 			if (v.in_reg) {
 				at = xb_cv_sym_begin(b, XCV_S_REGISTER);
@@ -649,7 +729,7 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 				xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
 				xb_cv_name(b, v.name);
 				xb_cv_sym_end(b, at);
-				continue;
+				return;
 			}
 			at = xb_cv_sym_begin(b, XCV_S_REGREL32);
 			xbb_u32(b, cast(u32)v.frame_offset_fixup);
@@ -657,7 +737,28 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 			xbb_u16(b, XCV_AMD64_RBP);
 			xb_cv_name(b, v.name);
 			xb_cv_sym_end(b, at);
-		}
+		};
+		xbCvScopes sc = xb_cv_scopes(pd, len);
+		// a lexical block per scope that has variables, nested like the scopes
+		auto emit_scope = [&](auto &self, i32 s) -> void {
+			for (xbDebugVar const &v : pd.vars) {
+				if (sc.eff[v.scope] == s) emit_var(v);
+			}
+			for (i32 c : sc.kids[s]) {
+				isize at = xb_cv_sym_begin(b, XCV_S_BLOCK32);
+				xbb_u32(b, 0); // parent, end: lld-link fills them in
+				xbb_u32(b, 0);
+				xbb_u32(b, cast(u32)(sc.hi[c] - sc.lo[c]));
+				xb_cv_addr(w, b, -1, pd.start + sc.lo[c]);
+				xb_cv_name(b, str_lit(""));
+				xb_cv_sym_end(b, at);
+				self(self, c);
+				at = xb_cv_sym_begin(b, XCV_S_END);
+				xb_cv_sym_end(b, at);
+			}
+		};
+		emit_scope(emit_scope, 0);
+		xb_cv_scopes_free(&sc);
 		at = xb_cv_sym_begin(b, XCV_S_END);
 		xb_cv_sym_end(b, at);
 		xb_cv_subsection_end(b, ss);
@@ -665,41 +766,47 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		// lines, one block per run of the same file
 		ss = xb_cv_subsection_begin(b, XCV_DEBUG_S_LINES);
 		xb_cv_addr(w, b, -1, pd.start);
-		xbb_u16(b, 0); // no columns
+		xbb_u16(b, 1); // CV_LINES_HAVE_COLUMNS
 		xbb_u32(b, len);
-		struct Line { u32 offset; i32 line; };
+		struct Line { u32 offset; i32 line; i32 column; };
 		auto lines = array_make<Line>(heap_allocator(), 0, pd.line_entry_count + 1);
 		i32 file = gb_max(pd.file_id, 1);
 		auto flush = [&]() {
 			if (lines.count == 0) return;
 			xbb_u32(b, cast(u32)(8*(file-1))); // the file's entry in the checksums
 			xbb_u32(b, cast(u32)lines.count);
-			xbb_u32(b, cast(u32)(12 + 8*lines.count));
+			xbb_u32(b, cast(u32)(12 + 12*lines.count));
+			// not marked as statements, like LLVM
 			for (Line const &l : lines) {
 				xbb_u32(b, l.offset);
-				xbb_u32(b, (cast(u32)gb_max(l.line, 0) & 0xffffff) | 0x80000000u);
+				xbb_u32(b, cast(u32)gb_max(l.line, 0) & 0xffffff);
+			}
+			for (Line const &l : lines) {
+				xbb_u16(b, cast(u16)gb_clamp(l.column, 0, 0xffff));
+				xbb_u16(b, 0);
 			}
 			lines.count = 0;
 		};
-		auto add_line = [&](i32 f, u32 offset, i32 line) {
+		auto add_line = [&](i32 f, u32 offset, i32 line, i32 column) {
 			if (f != file) {
 				flush();
 				file = f;
 			}
 			if (lines.count > 0 && lines[lines.count-1].offset == offset) {
 				lines[lines.count-1].line = line;
+				lines[lines.count-1].column = column;
 				return;
 			}
-			Line l = {offset, line};
+			Line l = {offset, line, column};
 			array_add(&lines, l);
 		};
 		if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
 			// the prologue gets the declaration's line, debuggers look up the entry address
-			add_line(gb_max(pd.file_id, 1), 0, pd.line);
+			add_line(gb_max(pd.file_id, 1), 0, pd.line, 0);
 		}
 		for (i32 i = 0; i < pd.line_entry_count; i++) {
 			xbLineEntry const &e = m->lines[pd.line_entry_start + i];
-			add_line(e.file_id, cast(u32)e.code_offset, e.line);
+			add_line(e.file_id, cast(u32)e.code_offset, e.line, e.column);
 		}
 		flush();
 		array_free(&lines);

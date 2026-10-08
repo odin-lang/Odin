@@ -79,9 +79,9 @@ gb_internal void xb_add_piece_arg(xbProc *p, Array<xbCallArg> *out, xbAbiPiece c
 	array_add(out, a);
 }
 
-gb_internal void xb_add_ptr_arg(xbProc *p, Array<xbCallArg> *out, xbAbiFunc *abi, xbAbiArg const &arg, u32 ptr) {
-	GB_ASSERT(arg.piece_count == 1);
-	xbAbiPiece const &piece = abi->pieces[arg.piece_index];
+gb_internal void xb_add_ptr_arg(xbProc *p, Array<xbCallArg> *out, xbAbiFunc *abi, xbAbiArg const &arg, u32 ptr, i32 part=0) {
+	GB_ASSERT(part < arg.piece_count);
+	xbAbiPiece const &piece = abi->pieces[arg.piece_index+part];
 	xbCallArg a = {};
 	a.type = xbType_I64;
 	a.size = 8;
@@ -145,7 +145,16 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 				}
 				break;
 			case xbArg_Indirect: {
-				u32 ptr = xb_arg_address(p, v, abi->is_odin_cc && !arg.copy);
+				if (arg.copy_part > 0) {
+					i32 l = xb_add_local_raw(p, arg.copy_part*arg.piece_count, arg.copy_part);
+					xbMem m = xb_mem(xbMem_Local, cast(u32)l);
+					xb_store_value(p, m, v);
+					for (i32 i = 0; i < arg.piece_count; i++) {
+						xb_add_ptr_arg(p, &call_args, abi, arg, xb_lea(p, xb_mem_offset(m, i*arg.copy_part)), i);
+					}
+					break;
+				}
+				u32 ptr = xb_arg_address(p, v, is_calling_convention_odin(abi->cc) && !arg.copy);
 				xb_add_ptr_arg(p, &call_args, abi, arg, ptr);
 				break;
 			}
@@ -177,7 +186,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 
 	i32 stack_size = abi->stack_size;
 	i32 sse_count = -1;
-	if (abi->c_vararg && xb_is_win64()) {
+	if (abi->c_vararg && xb_is_win64() && abi->cc != ProcCC_SysV) {
 		stack_size = xb_win64_varargs(p, abi, &call_args, args, arg_index);
 	} else if (abi->c_vararg) {
 		i32 gpr = abi->gpr_count;
@@ -1659,6 +1668,15 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 			if (ltv.mode != Addressing_Constant) XB_UNSUPPORTED(p, "non-constant frame level");
 			level = exact_value_to_i64(ltv.value);
 		}
+		if (id == BuiltinProc_return_address && level == 0) {
+			// found from the frame layout: a Win64 prologue pushes more than rbp
+			xbInstr i = xb_instr(xbOp_ReturnAddress, xbType_I64);
+			i.dst = xb_new_vreg(p, xbType_I64);
+			xb_emit(p, i);
+			return xb_value_reg(tv.type, i.dst);
+		}
+		// a Win64 frame does not start with the saved rbp
+		if (level > 0 && xb_is_win64()) XB_UNSUPPORTED(p, "frame level on windows");
 		// walk the saved frame pointers
 		xbInstr i = xb_instr(xbOp_FrameAddress, xbType_I64);
 		i.dst = xb_new_vreg(p, xbType_I64);
@@ -1673,10 +1691,11 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		return xb_value_reg(tv.type, xb_load(p, xbType_I64, xb_mem(xbMem_Reg, fa, 8)));
 	}
 	case BuiltinProc_address_of_return_address: {
-		xbInstr i = xb_instr(xbOp_FrameAddress, xbType_I64);
+		xbInstr i = xb_instr(xbOp_ReturnAddress, xbType_I64);
+		i.imm = 1; // the slot's address
 		i.dst = xb_new_vreg(p, xbType_I64);
 		xb_emit(p, i);
-		return xb_value_reg(tv.type, xb_ptr_add_const(p, i.dst, 8));
+		return xb_value_reg(tv.type, i.dst);
 	}
 	case BuiltinProc_expect:
 	case BuiltinProc_likely:
@@ -1913,8 +1932,17 @@ gb_internal xbValue xb_emit_union_wrap(xbProc *p, Type *union_type, Type *varian
 gb_internal void xb_build_stmt(xbProc *p, Ast *node);
 gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos);
 
+gb_internal void xb_set_debug_scope(xbProc *p, i32 scope) {
+	p->debug_scope = scope;
+	xbInstr i = xb_instr(xbOp_Scope);
+	i.imm = scope;
+	xb_emit(p, i);
+}
+
 gb_internal void xb_open_scope(xbProc *p) {
 	p->scope_index += 1;
+	array_add(&p->debug_scope_parent, p->debug_scope);
+	xb_set_debug_scope(p, cast(i32)p->debug_scope_parent.count-1);
 }
 
 gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d);
@@ -1948,6 +1976,7 @@ gb_internal void xb_close_scope(xbProc *p, Ast *node) {
 		}
 	}
 	p->scope_index -= 1;
+	xb_set_debug_scope(p, p->debug_scope_parent[p->debug_scope]);
 }
 
 gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d) {
@@ -2037,6 +2066,7 @@ gb_internal void xb_add_debug_var(xbProc *p, Entity *e, xbMem mem, bool by_ref, 
 	v.by_ref = by_ref;
 	v.is_param = is_param;
 	v.line = e->token.pos.line;
+	v.scope = p->debug_scope;
 	array_add(&p->debug_vars, v);
 }
 
@@ -3731,9 +3761,9 @@ gb_internal void xb_param_in(xbProc *p, xbAbiPiece const &piece, xbMem dst) {
 	array_add(&p->params_in, in);
 }
 
-gb_internal i32 xb_param_ptr_local(xbProc *p, xbAbiFunc *abi, xbAbiArg const &arg) {
+gb_internal i32 xb_param_ptr_local(xbProc *p, xbAbiFunc *abi, xbAbiArg const &arg, i32 part=0) {
 	i32 l = xb_add_local_raw(p, 8, 8);
-	xb_param_in(p, abi->pieces[arg.piece_index], xb_mem(xbMem_Local, cast(u32)l));
+	xb_param_in(p, abi->pieces[arg.piece_index+part], xb_mem(xbMem_Local, cast(u32)l));
 	return l;
 }
 
@@ -3791,9 +3821,22 @@ gb_internal void xb_begin_proc(xbProc *p) {
 				break;
 			}
 			case xbArg_Indirect: {
-				i32 l = xb_param_ptr_local(p, abi, arg);
 				i64 sz = type_size_of(e->type);
-				if (abi->is_odin_cc && sz <= 16) {
+				if (arg.piece_count > 1) {
+					// a vector split into parts, each behind its own pointer
+					xbMem m = xb_add_local(p, e->type, false);
+					for (i32 i = 0; i < arg.piece_count; i++) {
+						i32 pl = xb_param_ptr_local(p, abi, arg, i);
+						i64 off = i*arg.copy_part;
+						xb_memcopy(p, xb_mem_offset(m, off), xb_mem(xbMem_Reg, xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)pl)), 0), gb_min(cast(i64)arg.copy_part, sz - off));
+					}
+					xbVar v = {m, false};
+					map_set(&p->vars, e, v);
+					if (named) xb_add_debug_var(p, e, m, false, true);
+					break;
+				}
+				i32 l = xb_param_ptr_local(p, abi, arg);
+				if (is_calling_convention_odin(abi->cc) && sz <= 16) {
 					// callee copy, like the LLVM backend
 					xbMem m = xb_add_local(p, e->type, false);
 					xb_memcopy(p, m, xb_mem(xbMem_Reg, xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)l)), 0), sz);

@@ -149,6 +149,8 @@ struct xbProc {
 	TokenPos    branch_location_pos; // where the running defers were triggered, for #branch_location
 
 	Array<xbDebugVar> debug_vars;
+	Array<i32>        debug_scope_parent;
+	i32               debug_scope;
 	struct xbFamily * family;
 };
 
@@ -207,6 +209,7 @@ gb_internal xbBlock *xb_new_block(xbProc *p) {
 gb_internal void xb_start_block(xbProc *p, xbBlock *b) {
 	GB_ASSERT(!b->placed);
 	b->placed = true;
+	b->debug_scope = p->debug_scope;
 	array_add(&p->order, b);
 	p->curr = b;
 }

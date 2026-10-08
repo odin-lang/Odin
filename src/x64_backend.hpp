@@ -65,6 +65,7 @@ gb_internal gb_inline xbMem xb_mem_offset(xbMem m, i64 offset) {
 enum xbOp : u8 {
 	xbOp_Nop,
 	xbOp_Loc,        // source line marker: imm = line, a = file id
+	xbOp_Scope,      // debug scope marker: the code after it belongs to scope imm
 
 	xbOp_IConst,     // dst = imm
 	xbOp_FConst,     // dst = bits(imm)
@@ -249,6 +250,7 @@ struct xbAbiArg {
 	i32        byval_size;
 	i32        byval_align;
 	bool       copy;      // Indirect: always pass a copy, the callee may write to it
+	i32        copy_part; // Indirect: the copy is split into parts this big and aligned, one pointer piece each
 };
 
 struct xbAbiFunc {
@@ -320,6 +322,7 @@ struct xbBlock {
 	bool           placed;
 	bool           cold;  // placed after the rest of the procedure
 	isize          scope_index;
+	i32            debug_scope; // the lexical scope the block starts in
 	Array<xbInstr> instrs;
 	i32            code_offset;
 };
@@ -360,6 +363,14 @@ struct xbDebugVar {
 	i32    sym;        // @(static): the symbol of its storage, used when local < 0
 	bool   in_reg;     // the variable lives in dwarf_reg for the whole procedure
 	u8     dwarf_reg;
+	i32    scope;      // lexical scope, 0 is the procedure
+};
+
+// From code_offset on, until the next one, the code belongs to a lexical scope.
+struct xbScopeMark {
+	i32  code_offset;
+	i32  scope;
+	bool cold;
 };
 
 // A global variable or constant, for DWARF.
@@ -447,6 +458,8 @@ struct xbProcDebug {
 	i32     line_entry_start;
 	i32     line_entry_count;
 	Array<xbDebugVar> vars;
+	Array<i32>        scope_parent; // per lexical scope, scope 0 is the procedure's
+	Array<xbScopeMark> scope_marks;
 	Type *  type;
 	// callee saved registers spilled by the prologue, for the unwinder
 	struct SavedReg { i32 dwarf_reg; i32 frame_offset; };

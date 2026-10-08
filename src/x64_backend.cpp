@@ -107,6 +107,8 @@ gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	p->branch_blocks = array_make<xbBranchBlocks>(xb_allocator(), 0, 0);
 	p->selector_cache = array_make<xbSelectorCache>(xb_allocator(), 0, 0);
 	p->debug_vars = array_make<xbDebugVar>(xb_allocator(), 0, 16);
+	p->debug_scope_parent = array_make<i32>(xb_allocator(), 0, 8);
+	array_add(&p->debug_scope_parent, -1);
 	map_init(&p->vars);
 	p->file_id = -1;
 	m->fail_pos = {};

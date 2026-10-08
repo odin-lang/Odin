@@ -514,6 +514,17 @@ try_cross_linking:;
 						linker_path = "lld-link";
 					}
 				#endif
+					if (build_context.build_mode == BuildMode_StaticLibrary) {
+						// lld-link's lib.exe mode, which takes none of the linker's options
+						result = system_exec_msvc_linker_app("lld-link",
+							"\"%s\" /lib /nologo %s -OUT:\"%.*s\"",
+							linker_path, object_files, LIT(output_filename)
+						);
+						if (result) {
+							return result;
+						}
+						break;
+					}
 					result = system_exec_msvc_linker_app("lld-link",
 						"\"%s\" %s -OUT:\"%.*s\" %s "
 						"/nologo /incremental:no /opt:ref /subsystem:%.*s "
