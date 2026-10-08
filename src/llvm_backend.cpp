@@ -3911,9 +3911,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lb_finalize_objc_names(gen, gen->objc_names);
 	}
 
-	if (gen->debug_types_module != nullptr) {
-		TIME_SECTION("LLVM Debug Types Module");
-		lb_debug_generate_types_module(gen);
+	if (gen->debug_types_modules.count != 0) {
+		TIME_SECTION("LLVM Debug Types Modules");
+		lb_debug_generate_types_modules(gen, do_threading);
 	}
 
 	if (build_context.ODIN_DEBUG) {
