@@ -13,6 +13,8 @@
 // matches; a futex woken before the procedure waking it writes it, as what waits on it may sleep again; and with an
 // unpaired ordering, an `atomic_signal_fence` where an `atomic_thread_fence` would pair, as it only orders against a
 // signal handler on the same thread.
+// Atomics on a local whose address is only taken by them are warned about too, as nothing else can access it, so they
+// order nothing; `volatile_*` is probably what is meant, to keep the accesses, or it is a copy of what is shared.
 // With -vet-atomic-access, a plain read of a location accessed atomically is an error, unless a lock is taken.
 
 struct AtomicUses {
@@ -40,6 +42,13 @@ struct AtomicProcedure {
 	PtrMap<Ast *, AtomicPlace> places;          // of each call within it
 };
 
+struct AtomicLocal {
+	DeclInfo *decl;
+	i32       count;
+	i32       addressed;
+	Ast *     first;
+};
+
 struct AtomicSite {
 	Entity *  location;
 	Ast *     call;
@@ -51,6 +60,7 @@ enum AtomicReportKind {
 	AtomicReport_Acquire,     // read with acquire ordering, which nothing releases
 	AtomicReport_WeakIgnored, // a weak compare-exchange whose second result is not used
 	AtomicReport_WakeEarly,   // a futex woken before it is written
+	AtomicReport_Local,       // atomics on a local which nothing else can access
 };
 
 struct AtomicReport {
@@ -65,6 +75,8 @@ struct AtomicScan {
 
 	PtrMap<Ast *, AtomicPlace> *places; // NULL when not used
 	AtomicPlace                 place;
+
+	PtrMap<Entity *, AtomicLocal> *locals; // NULL when not used
 };
 
 gb_global PtrMap<Entity *, AtomicUses> atomic_uses;
@@ -128,6 +140,62 @@ gb_internal Entity *check_atomic_location(Ast *expr) {
 
 		default:
 			return nullptr;
+		}
+	}
+}
+
+gb_internal Entity *check_atomic_local(Ast *expr) {
+	for (;;) {
+		expr = unparen_expr(expr);
+		switch (expr->kind) {
+		case_ast_node(i, Ident, expr);
+			Entity *e = entity_of_node(expr);
+			if (e == nullptr || e->kind != Entity_Variable) {
+				return nullptr;
+			}
+			if (e->using_parent != nullptr) {
+				// a field brought in by `using`, within what it was applied to, unless that is a pointer
+				if (is_type_pointer(e->using_parent->type)) {
+					return nullptr;
+				}
+				e = e->using_parent;
+			}
+			if ((e->flags & EntityFlag_Param) != 0 || !is_entity_local_variable(e)) {
+				return nullptr;
+			}
+			return e;
+		case_end;
+
+		case_ast_node(se, SelectorExpr, expr);
+			if (is_type_pointer(se->expr->tav.type)) {
+				return nullptr;
+			}
+			expr = se->expr;
+		case_end;
+
+		case_ast_node(ie, IndexExpr, expr);
+			Type *t = base_type(ie->expr->tav.type);
+			if (t == nullptr || (t->kind != Type_Array && t->kind != Type_EnumeratedArray && t->kind != Type_FixedCapacityDynamicArray)) {
+				return nullptr;
+			}
+			expr = ie->expr;
+		case_end;
+
+		default:
+			return nullptr;
+		}
+	}
+}
+
+gb_internal void check_atomic_address_taken(AtomicScan *s, Ast *expr) {
+	// by `&`, slicing, or iterating by reference
+	// which a call like `x->f()` is too, as `&x` is its first argument
+	if (s->locals == nullptr) {
+		return;
+	}
+	if (Entity *l = check_atomic_local(expr)) {
+		if (AtomicLocal *local = map_get(s->locals, l)) {
+			local->addressed += 1;
 		}
 	}
 }
@@ -266,6 +334,9 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 	case_end;
 
 	case_ast_node(ue, UnaryExpr, node);
+		if (ue->op.kind == Token_And) {
+			check_atomic_address_taken(s, ue->expr);
+		}
 		check_atomic_scan(s, ue->expr, ue->op.kind == Token_And);
 	case_end;
 
@@ -308,6 +379,9 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 	case_end;
 
 	case_ast_node(se, SliceExpr, node);
+		if (is_type_array_like(se->expr->tav.type)) {
+			check_atomic_address_taken(s, se->expr);
+		}
 		check_atomic_scan(s, se->expr, is_type_array_like(se->expr->tav.type));
 		check_atomic_scan(s, se->low,  false);
 		check_atomic_scan(s, se->high, false);
@@ -334,6 +408,10 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 
 	case_ast_node(sce, SelectorCallExpr, node);
 		check_atomic_scan(s, sce->call, false);
+	case_end;
+
+	case_ast_node(el, Ellipsis, node);
+		check_atomic_scan(s, el->expr, false);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
@@ -460,6 +538,9 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 		for (Ast *val : rs->vals) {
 			by_ref |= val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And;
 		}
+		if (by_ref && is_type_array_like(rs->expr->tav.type)) {
+			check_atomic_address_taken(s, rs->expr);
+		}
 		check_atomic_scan(s, rs->expr, by_ref && is_type_array_like(rs->expr->tav.type));
 		check_atomic_scan(s, rs->body, false);
 	case_end;
@@ -469,6 +550,9 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 		Ast *vals[2] = {rs->val0, rs->val1};
 		for (Ast *val : vals) {
 			by_ref |= val != nullptr && val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And;
+		}
+		if (by_ref && is_type_array_like(rs->expr->tav.type)) {
+			check_atomic_address_taken(s, rs->expr);
 		}
 		check_atomic_scan(s, rs->init, false);
 		check_atomic_scan(s, rs->expr, by_ref && is_type_array_like(rs->expr->tav.type));
@@ -628,6 +712,10 @@ gb_internal void check_atomics(Checker *c) {
 	ptr_set_init(&operated, atomics.count);
 	defer (ptr_set_destroy(&operated));
 
+	PtrMap<Entity *, AtomicLocal> locals = {};
+	map_init(&locals, 0);
+	defer (map_destroy(&locals));
+
 	for (CheckedAtomic const &a : atomics) {
 		if (a.id == BuiltinProc_atomic_thread_fence || a.id == BuiltinProc_atomic_signal_fence) {
 			continue;
@@ -638,6 +726,23 @@ gb_internal void check_atomics(Checker *c) {
 			continue;
 		}
 		ptr_set_add(&operated, ptr);
+
+		// NOTE(bill): this means it not a "true" futex
+		// as waiting with a timeout on what nothing wakes is deliberate
+		Entity *l = nullptr;
+		if (a.futex == ProcedureFutex_None) {
+			l = check_atomic_local(ptr->UnaryExpr.expr);
+		}
+		if (l != nullptr && a.decl != nullptr) {
+			AtomicLocal local = {};
+			local.decl = a.decl;
+			if (AtomicLocal *found = map_get(&locals, l)) {
+				local = *found;
+			}
+			local.count += 1;
+			check_atomic_first(&local.first, call);
+			map_set(&locals, l, local);
+		}
 		Entity *e = check_atomic_location(ptr->UnaryExpr.expr);
 		if (e == nullptr) {
 			continue;
@@ -832,6 +937,24 @@ gb_internal void check_atomics(Checker *c) {
 			}
 		}
 
+		PtrSet<DeclInfo *> walked = {};
+		for (auto const &entry : locals) {
+			DeclInfo *decl = entry.value.decl;
+			if (decl->proc_info == nullptr || ptr_set_update(&walked, decl)) {
+				continue;
+			}
+			AtomicScan s = {};
+			s.reads = array_make<Ast *>(temporary_allocator(), 0, 0);
+			s.locals = &locals;
+			check_atomic_scan(&s, decl->proc_info->body, false);
+		}
+		ptr_set_destroy(&walked);
+		for (auto const &entry : locals) {
+			if (entry.value.addressed == entry.value.count && ast_file_analysis(entry.value.first->file(), AnalysisFlag_Atomic)) {
+				array_add(&reports, AtomicReport{AtomicReport_Local, entry.value.first, nullptr});
+			}
+		}
+
 		// NOTE(bill): In order and once for what is at the same place in each instantiation of a polymorphic procedure
 		array_sort(reports, check_atomic_report_cmp);
 		for_array(i, reports) {
@@ -846,6 +969,13 @@ gb_internal void check_atomics(Checker *c) {
 				warning(r.site, "'%s' may fail even when the value matches, so only its second result says whether it stored", name);
 				error_line("\tSuggestion: Use its second result, or the strong form when it is not retried\n");
 				gb_string_free(name);
+				continue;
+			}
+			if (r.kind == AtomicReport_Local) {
+				Entity *l = check_atomic_local(check_atomic_address_of(r.site->CallExpr.args[0])->UnaryExpr.expr);
+				warning(r.site, "The address of '%.*s' is only taken by atomic operations, so nothing else can access it, and they order nothing", LIT(l->token.string));
+				error_line("\tSuggestion: To keep its accesses from being optimized away, use 'volatile_load' and 'volatile_store', which order nothing between threads\n");
+				error_line("\t            If it is meant to be shared, it may be a copy of what is\n");
 				continue;
 			}
 
@@ -886,6 +1016,7 @@ gb_internal void check_atomics(Checker *c) {
 				error_line("\tSuggestion: Wake it after the write at %s\n", other);
 				break;
 			case AtomicReport_WeakIgnored:
+			case AtomicReport_Local:
 				break;
 			}
 			gb_string_free(str);
