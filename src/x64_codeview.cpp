@@ -70,8 +70,10 @@ enum : u32 {
 	XCV_T_RCHAR   = 0x70,
 	XCV_T_INT4    = 0x74,
 	XCV_T_UINT4   = 0x75,
-	XCV_T_64PVOID = 0x603,
+	XCV_T_CHAR32  = 0x7b,
+	XCV_T_64PUCHAR = 0x620,
 	XCV_T_64PRCHAR = 0x670,
+	XCV_T_64PWCHAR = 0x671,
 };
 
 struct xbCv {
@@ -261,8 +263,10 @@ gb_internal u32 xb_cv_basic(Type *bt) {
 	case Basic_f16: case Basic_f16le: case Basic_f16be: return XCV_T_REAL16;
 	case Basic_f32: case Basic_f32le: case Basic_f32be: return XCV_T_REAL32;
 	case Basic_f64: case Basic_f64le: case Basic_f64be: return XCV_T_REAL64;
-	case Basic_rawptr: return XCV_T_64PVOID;
+	case Basic_rawptr: return XCV_T_64PUCHAR; // LLVM's rawptr points to an 8 bit "void"
 	case Basic_cstring: return XCV_T_64PRCHAR;
+	case Basic_cstring16: return XCV_T_64PWCHAR;
+	case Basic_rune: return XCV_T_CHAR32;
 	case Basic_typeid: return XCV_T_UQUAD;
 	}
 	if (bt->Basic.flags & BasicFlag_Integer) {
@@ -291,7 +295,8 @@ gb_internal bool xb_cv_is_record(Type *bt) {
 	case Type_BitField:
 		return bt->BitField.fields.count > 0;
 	case Type_Basic:
-		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_any;
+		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_any || bt->Basic.kind == Basic_string16 ||
+		       is_type_complex(bt) || is_type_quaternion(bt);
 	}
 	return false;
 }
@@ -405,6 +410,14 @@ gb_internal void xb_cv_define(xbCv *cv, Type *t) {
 	case Type_Basic:
 		if (bt->Basic.kind == Basic_string) {
 			add_struct_like({{"data", t_u8_ptr}, {"len", t_int}});
+		} else if (bt->Basic.kind == Basic_string16) {
+			add_struct_like({{"data", t_u16_ptr}, {"len", t_int}});
+		} else if (is_type_complex(bt)) {
+			Type *e = base_complex_elem_type(bt);
+			add_struct_like({{"real", e}, {"imag", e}});
+		} else if (is_type_quaternion(bt)) {
+			Type *e = base_complex_elem_type(bt);
+			add_struct_like({{"imag", e}, {"jmag", e}, {"kmag", e}, {"real", e}});
 		} else {
 			add_struct_like({{"data", t_rawptr}, {"id", t_typeid}});
 		}
