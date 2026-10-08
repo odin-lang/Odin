@@ -177,11 +177,13 @@ gb_internal bool xb_family_build(xbModule *m, xbFamily *family, Entity *root, ch
 		String name = xb_entity_name(m, fe);
 		i32 *existing = string_map_get(&m->symbol_map, name);
 		if (existing && m->symbols[*existing].section != xbSection_Undef) {
-			if (fe == root) {
+			if (fe == root && !ptr_set_exists(&m->defined_procs, fe)) {
 				*reason = "duplicate symbol";
 				return false;
 			}
-			continue; // an anonymous procedure another family already compiled
+			// already compiled with the family of the procedure it is nested in, or another
+			// family's copy of an anonymous procedure
+			continue;
 		}
 		f64 t0 = gb_time_now();
 		xbProc *p = xb_build_proc(m, fe, family, reason);
@@ -203,6 +205,7 @@ gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root) {
 		xbSymbol *s = &m->symbols[p->sym];
 		if (pe != nullptr) {
 			if (s->section != xbSection_Undef) continue;
+			ptr_set_add(&m->defined_procs, pe);
 			s->flags = xbSymbolFlag_Global | xbSymbolFlag_Func;
 			if (!pe->Procedure.is_export) {
 				s->flags |= xbSymbolFlag_Hidden;
@@ -289,6 +292,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	m->files = array_make<String>(heap_allocator(), 0, 64);
 	map_init(&m->file_ids);
 	ptr_set_init(&m->handled);
+	ptr_set_init(&m->defined_procs);
 	ptr_set_init(&m->foreign_libs_set);
 	m->foreign_libs = array_make<Entity *>(heap_allocator(), 0, 16);
 	ptr_set_init(&m->proc_queued);

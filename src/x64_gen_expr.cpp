@@ -144,7 +144,11 @@ gb_internal xbValue xb_proc_lit_value(xbProc *p, Ast *expr, Type *type) {
 				break;
 			}
 		}
-		if (!inside) XB_UNSUPPORTED(p, "procedure literal of another procedure");
+		if (!inside) {
+			// passed as a constant to a polymorphic procedure: a weak copy here, as LLVM makes one
+			ptr_set_add(&p->family->on_demand, e);
+			ptr_set_add(&p->family->roots, pl->decl);
+		}
 	}
 	xb_family_add(p->family, e);
 	i32 sym = xb_entity_symbol(p, e);
@@ -461,8 +465,8 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 					break;
 				}
 			}
-			if (!inside) XB_UNSUPPORTED(p, "reference to a nested procedure of another procedure");
-			xb_family_add(p->family, e);
+			// one passed as a constant to a polymorphic procedure is generated with its own family
+			if (inside) xb_family_add(p->family, e);
 		} else if (e->min_dep_count.load(std::memory_order_relaxed) == 0 && d->proc_lit->ProcLit.body != nullptr) {
 			// nothing else generates it, so it comes along
 			if ((e->flags & EntityFlag_ProcBodyChecked) == 0) XB_UNSUPPORTED(p, "unchecked procedure");
