@@ -234,13 +234,6 @@ foreign libc {
 	scanf     :: proc(format: cstring, #c_vararg args: ..any) -> int ---
 	snprintf  :: proc(s: [^]char, n: size_t, format: cstring, #c_vararg args: ..any) -> int ---
 	sscanf    :: proc(s, format: cstring, #c_vararg args: ..any) -> int ---
-	vfprintf  :: proc(stream: ^FILE, format: cstring, arg: ^va_list) -> int ---
-	vfscanf   :: proc(stream: ^FILE, format: cstring, arg: ^va_list) -> int ---
-	vprintf   :: proc(format: cstring, arg: ^va_list) -> int ---
-	vscanf    :: proc(format: cstring, arg: ^va_list) -> int ---
-	vsnprintf :: proc(s: [^]char, n: size_t, format: cstring, arg: ^va_list) -> int ---
-	vsprintf  :: proc(s: [^]char, format: cstring, arg: ^va_list) -> int ---
-	vsscanf   :: proc(s, format: cstring, arg: ^va_list) -> int ---
 
 	// 7.21.7 Character input/output functions
 	fgetc     :: proc(stream: ^FILE) -> int ---
@@ -372,4 +365,44 @@ to_stream :: proc(file: ^FILE) -> io.Stream {
 		data      = file,
 		procedure = stream_proc,
 	}
+}
+
+// The v* procedures take a pointer to the va_list on every target, see va_list_arg.
+@(default_calling_convention="c", private)
+foreign libc {
+	@(link_name="vfprintf")  _vfprintf  :: proc(stream: ^FILE, format: cstring, arg: va_list_arg) -> int ---
+	@(link_name="vfscanf")   _vfscanf   :: proc(stream: ^FILE, format: cstring, arg: va_list_arg) -> int ---
+	@(link_name="vprintf")   _vprintf   :: proc(format: cstring, arg: va_list_arg) -> int ---
+	@(link_name="vscanf")    _vscanf    :: proc(format: cstring, arg: va_list_arg) -> int ---
+	@(link_name="vsnprintf") _vsnprintf :: proc(s: [^]char, n: size_t, format: cstring, arg: va_list_arg) -> int ---
+	@(link_name="vsprintf")  _vsprintf  :: proc(s: [^]char, format: cstring, arg: va_list_arg) -> int ---
+	@(link_name="vsscanf")   _vsscanf   :: proc(s, format: cstring, arg: va_list_arg) -> int ---
+}
+
+vfprintf :: #force_inline proc "c" (stream: ^FILE, format: cstring, arg: ^va_list) -> int {
+	return _vfprintf(stream, format, va_list_arg_from(arg))
+}
+
+vfscanf :: #force_inline proc "c" (stream: ^FILE, format: cstring, arg: ^va_list) -> int {
+	return _vfscanf(stream, format, va_list_arg_from(arg))
+}
+
+vprintf :: #force_inline proc "c" (format: cstring, arg: ^va_list) -> int {
+	return _vprintf(format, va_list_arg_from(arg))
+}
+
+vscanf :: #force_inline proc "c" (format: cstring, arg: ^va_list) -> int {
+	return _vscanf(format, va_list_arg_from(arg))
+}
+
+vsnprintf :: #force_inline proc "c" (s: [^]char, n: size_t, format: cstring, arg: ^va_list) -> int {
+	return _vsnprintf(s, n, format, va_list_arg_from(arg))
+}
+
+vsprintf :: #force_inline proc "c" (s: [^]char, format: cstring, arg: ^va_list) -> int {
+	return _vsprintf(s, format, va_list_arg_from(arg))
+}
+
+vsscanf :: #force_inline proc "c" (s, format: cstring, arg: ^va_list) -> int {
+	return _vsscanf(s, format, va_list_arg_from(arg))
 }
