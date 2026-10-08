@@ -2260,6 +2260,16 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (entity == nullptr) {
 		return;
 	}
+	if ((entity->flags & EntityFlag_Disabled) && identifier != nullptr && c->decl != nullptr) {
+		// calls to a disabled procedure are dropped, but its value may still be taken
+		Ast *node = unparen_expr(identifier);
+		Ast *callee = c->call_proc_hint;
+		bool is_callee = node == callee ||
+		                 (callee != nullptr && callee->kind == Ast_SelectorExpr && node == unparen_expr(callee->SelectorExpr.selector));
+		if (!is_callee) {
+			add_dependency(c->info, c->decl, entity);
+		}
+	}
 	add_declaration_dependency(c, entity);
 	entity->flags |= EntityFlag_Used;
 	if (entity->kind == Entity_Procedure && entity->Procedure.generated_from_polymorphic) {

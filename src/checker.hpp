@@ -928,6 +928,7 @@ struct CheckerContext {
 
 	Ast *assignment_lhs_hint;
 	Ast *asm_template_hint;
+	Ast *call_proc_hint; // the callee of the call being checked
 };
 
 gb_internal u64 check_vet_flags(CheckerContext *c);

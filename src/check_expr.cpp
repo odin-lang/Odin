@@ -9423,6 +9423,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	c->allow_in_progress_type_operand = false;
 	defer (c->allow_in_progress_type_operand = prev_allow_in_progress);
 
+	Ast *prev_call_proc_hint = c->call_proc_hint;
+	c->call_proc_hint = unparen_expr(proc != nullptr ? proc : operand->expr);
+	defer (c->call_proc_hint = prev_call_proc_hint);
+
 	if (proc != nullptr &&
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
