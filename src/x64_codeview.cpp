@@ -706,7 +706,7 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		xbb_u32(b, cast(u32)pd.win_alloc_size);
 		xbb_u32(b, 0);
 		xbb_u32(b, 0);
-		xbb_u32(b, cast(u32)(8*pd.win_push_count));
+		xbb_u32(b, cast(u32)(8*pd.win_push_count + 16*pd.win_xmm_count));
 		xbb_u32(b, 0);
 		xbb_u16(b, 0);
 		xbb_u32(b, (2u << 14) | (2u << 16)); // locals and parameters off rbp

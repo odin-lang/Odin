@@ -1,11 +1,11 @@
 // Lowering: xb IR -> x86-64 machine code.
 //
 // Registers come from xb_alloc_regs (xb_analysis.cpp). An interval takes rsi, rdi, r8, r9 or
-// xmm4-xmm15 when no call happens in it, rbx or r12-r15 otherwise. On Win64 rsi and rdi are
-// callee saved too, and only xmm4 and xmm5 are taken, so no xmm register needs saving. The rest
-// live in 8 byte stack slots. A constant with one definition is materialized at each use, or
-// becomes the instruction's immediate. A compare whose only use is the next branch, select or
-// test against zero only sets the flags.
+// xmm4-xmm15 when no call happens in it, rbx or r12-r15 otherwise. On Win64 rsi, rdi and
+// xmm6-xmm15 are callee saved too, a float interval with a call in it takes one of the latter.
+// The rest live in 8 byte stack slots. A constant with one definition is materialized at each
+// use, or becomes the instruction's immediate. A compare whose only use is the next branch,
+// select or test against zero only sets the flags.
 //
 // The scratch registers are rax, rcx, rdx, r10 and r11 (r11 for addresses), and xmm0-xmm3.
 // Copies and sets of a size known at run time call small helpers that only write scratch registers.
@@ -38,6 +38,8 @@ struct xbLower {
 	Array<i64>  cval;
 	Array<u8>   in_block; // vreg -> defined once, and only read later in the same block
 	Array<i8>   local_reg;
+	Array<u8>   remat;    // vreg -> defined once as a frame address, computed at each use from rmem
+	Array<xbMem> rmem;
 	u32         used_x;   // the gprs xb_alloc_regs handed out
 	i32         frame_size;
 	i32         max_call_stack;
@@ -49,7 +51,9 @@ struct xbLower {
 	i32         saved_count;
 	i32         save_offset[8]; // SysV: their rbp offsets
 	i32         incoming_base;  // rbp offset of the incoming stack arguments
-	bool        win_pad;        // Win64: the prologue pads with `sub rsp, 8`
+	u8          saved_v[10];    // Win64: callee saved xmm registers the prologue saves
+	i32         saved_v_count;
+	i32         win_area;       // Win64: bytes between rbp and the pushes, the pad and the xmm saves
 
 	i32         next_block;  // the block placed right after the current branch, or -1
 	bool        fuse;        // the current compare only sets the flags for the next instruction
@@ -108,9 +112,9 @@ gb_internal void xb_lower_layout(xbLower *L) {
 	u32 const r8_r9 = (1u << R8) | (1u << R9);
 	xbRegPools pools = {};
 	if (win) {
-		pools = {r8_r9, rbx_r12_r15 | si_di, 0x0030, 0, true, 3};
+		pools = {r8_r9, rbx_r12_r15 | si_di, 0x0030, 0xffc0, 3};
 	} else {
-		pools = {r8_r9 | si_di, rbx_r12_r15, 0xfff0, 0, true, 3};
+		pools = {r8_r9 | si_di, rbx_r12_r15, 0xfff0, 0, 3};
 	}
 	if (p->naked) pools = {};
 	xbRegAlloc R = {};
@@ -122,6 +126,8 @@ gb_internal void xb_lower_layout(xbLower *L) {
 	L->cval      = R.cval;
 	L->in_block  = R.in_block;
 	L->local_reg = R.local_reg;
+	L->remat     = R.remat;
+	L->rmem      = R.rmem;
 	L->used_x    = R.used_x;
 	L->max_call_stack = R.max_call_stack;
 	array_free(&R.clean);
@@ -132,6 +138,12 @@ gb_internal void xb_lower_layout(xbLower *L) {
 	u8 const order[5] = {RBX, R12, R13, R14, R15};
 	for (u8 r : order) {
 		if (R.used_x & (1u << r)) L->saved[L->saved_count++] = r;
+	}
+	L->saved_v_count = 0;
+	if (win) {
+		for (u8 r = 6; r < 16; r++) {
+			if (R.used_v & (1u << r)) L->saved_v[L->saved_v_count++] = r;
+		}
 	}
 	i32 cur = 0;
 	if (!win) {
@@ -195,7 +207,7 @@ gb_internal bool x64_imm(xbLower *L, u32 v, i32 size, i32 *imm) {
 }
 
 gb_internal xbOpnd x64_slot(xbLower *L, u32 v) {
-	GB_ASSERT(v != 0 && L->reg[v] == XB_NOREG && !L->is_const[v]);
+	GB_ASSERT(v != 0 && L->reg[v] == XB_NOREG && !L->is_const[v] && !L->remat[v]);
 	return xb_m(RBP, L->slot[v]);
 }
 
@@ -212,6 +224,9 @@ gb_internal void x64_movaps(xbAsm *a, u8 x, u8 y) {
 	if (x != y) xb_enc(a, XB_0F, 0x28, x, xb_r(y));
 }
 
+// A machine memory operand for an IR memory reference. May clobber `scratch`.
+gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11);
+
 // A gpr holding v: its own, or `scratch` loaded with it. Narrow values come extended as `ext`
 // asks; with xbExt_None only the low `size` bytes mean anything.
 gb_internal u8 x64_src(xbLower *L, u32 v, u8 scratch, i32 size, xbExtKind ext) {
@@ -223,6 +238,10 @@ gb_internal u8 x64_src(xbLower *L, u32 v, u8 scratch, i32 size, xbExtKind ext) {
 		u64 u = cast(u64)x64_ext_value(k, size, ext);
 		if (!extend && size <= 4) u = cast(u32)u; // the short form
 		xb_mov_r_imm(a, scratch, u);
+		return scratch;
+	}
+	if (L->remat[v]) {
+		xb_lea(a, scratch, xb_mem_opnd(L, L->rmem[v], scratch));
 		return scratch;
 	}
 	i8 r = L->reg[v];
@@ -247,8 +266,9 @@ gb_internal void x64_get(xbLower *L, u8 reg, u32 v, i32 size, xbExtKind ext) {
 
 // v as an operand of a `size` byte instruction: its register or slot, or `scratch` loaded with it.
 gb_internal xbOpnd x64_opnd(xbLower *L, u32 v, u8 scratch, i32 size) {
-	i8 r = v != 0 && !L->is_const[v] ? L->reg[v] : XB_NOREG;
-	if (v != 0 && !L->is_const[v] && r == XB_NOREG) return x64_slot(L, v);
+	bool computed = v == 0 || L->is_const[v] || L->remat[v];
+	i8 r = !computed ? L->reg[v] : XB_NOREG;
+	if (!computed && r == XB_NOREG) return x64_slot(L, v);
 	if (r != XB_NOREG && r < XB_FREG) return xb_r(cast(u8)r);
 	return xb_r(x64_src(L, v, scratch, size, xbExt_None));
 }
@@ -323,7 +343,7 @@ gb_internal void x64_putf(xbLower *L, u32 v, u8 x, i32 size) {
 }
 
 // A machine memory operand for an IR memory reference. May clobber `scratch`.
-gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
+gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 	xbAsm *a = &L->a;
 	switch (m.kind) {
 	case xbMem_Local: {
@@ -338,6 +358,12 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 	case xbMem_Incoming:
 		return xb_m(RBP, L->incoming_base + cast(i32)m.offset);
 	case xbMem_Reg:
+		if (L->remat[m.base]) {
+			// the frame address folds into the access
+			xbMem f = L->rmem[m.base];
+			f.offset += m.offset;
+			return xb_mem_opnd(L, f, scratch);
+		}
 		return xb_m(x64_src(L, m.base, scratch, 8, xbExt_None), cast(i32)m.offset);
 	case xbMem_Sym: {
 		xbSymbol *s = &L->p->m->symbols[m.base];
@@ -895,6 +921,11 @@ gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
 	for (u8 r = 0; r < 16; r++) {
 		if (blk.save_regs & (1u << r)) xb_mov_rm_r(a, 8, xb_m(RBP, save_base + 8*k++), r);
 	}
+	i32 xmm_base = blk.xmm_save_local >= 0 ? L->p->locals[blk.xmm_save_local].frame_offset : 0;
+	k = 0;
+	for (u8 r = 0; r < 16; r++) {
+		if (blk.save_xmms & (1u << r)) xb_movups_m_x(a, xb_m(RBP, xmm_base + 16*k++), r);
+	}
 	if (blk.rbp_local >= 0) xb_mov_rm_r(a, 8, xb_m(RBP, L->p->locals[blk.rbp_local].frame_offset), RBP);
 	// vector inputs first, they go through rax
 	for (xbAsmIo const &io : blk.inputs) {
@@ -950,6 +981,10 @@ gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
 	k = 0;
 	for (u8 r = 0; r < 16; r++) {
 		if (blk.save_regs & (1u << r)) xb_mov_r_rm(a, 8, r, xb_m(RBP, save_base + 8*k++));
+	}
+	k = 0;
+	for (u8 r = 0; r < 16; r++) {
+		if (blk.save_xmms & (1u << r)) xb_movups_x_m(a, r, xb_m(RBP, xmm_base + 16*k++));
 	}
 }
 
@@ -1053,6 +1088,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Lea: {
+		if (L->remat[in.dst]) break;
 		u8 d = x64_dst(L, in.dst, RAX);
 		xbOpnd m = xb_mem_opnd(L, in.mem, R11);
 		if (m.is_mem && m.reg != XB_RIP && m.disp == 0) {
@@ -1847,6 +1883,8 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	defer (array_free(&L.cval));
 	defer (array_free(&L.in_block));
 	defer (array_free(&L.local_reg));
+	defer (array_free(&L.remat));
+	defer (array_free(&L.rmem));
 
 	xb_lower_layout(&L);
 

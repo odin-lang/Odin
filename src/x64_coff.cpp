@@ -76,6 +76,7 @@ enum : u8 {
 	XB_UWOP_ALLOC_LARGE = 1,
 	XB_UWOP_ALLOC_SMALL = 2,
 	XB_UWOP_SET_FPREG   = 3,
+	XB_UWOP_SAVE_XMM128 = 8,
 };
 
 gb_internal void xb_coff_unwind(xbCoffWriter *w) {
@@ -87,32 +88,40 @@ gb_internal void xb_coff_unwind(xbCoffWriter *w) {
 		u32 info_at = cast(u32)xdata->count;
 
 		// the codes undo the prologue, so they are listed last operation first
-		u16 codes[24] = {};
+		u16 codes[48] = {};
 		i32 n = 0;
 		auto code = [&](u8 at, u8 op, u8 info) {
 			codes[n++] = cast(u16)(at | (op << 8) | (info << 12));
 		};
-		if (pd.win_alloc_at != 0) {
-			u32 size = cast(u32)pd.win_alloc_size;
+		auto alloc = [&](u8 at, u32 size) {
 			if (size <= 128) {
-				code(pd.win_alloc_at, XB_UWOP_ALLOC_SMALL, cast(u8)(size/8 - 1));
+				code(at, XB_UWOP_ALLOC_SMALL, cast(u8)(size/8 - 1));
 			} else if (size <= 512*1024 - 8) {
-				code(pd.win_alloc_at, XB_UWOP_ALLOC_LARGE, 0);
+				code(at, XB_UWOP_ALLOC_LARGE, 0);
 				codes[n++] = cast(u16)(size/8);
 			} else {
-				code(pd.win_alloc_at, XB_UWOP_ALLOC_LARGE, 1);
+				code(at, XB_UWOP_ALLOC_LARGE, 1);
 				codes[n++] = cast(u16)(size & 0xffff);
 				codes[n++] = cast(u16)(size >> 16);
 			}
+		};
+		// the xmm saves are at rbp + 16*i, rbp being the frame base (frame offset 0)
+		for (i32 i = pd.win_xmm_count-1; i >= 0; i--) {
+			code(pd.win_xmm_at[i], XB_UWOP_SAVE_XMM128, pd.win_xmm_reg[i]);
+			codes[n++] = cast(u16)i;
+		}
+		if (pd.win_alloc_at != 0) {
+			alloc(pd.win_alloc_at, cast(u32)pd.win_alloc_size);
 		}
 		code(pd.win_setfp_at, XB_UWOP_SET_FPREG, 0);
 		if (pd.win_pad_at != 0) {
-			code(pd.win_pad_at, XB_UWOP_ALLOC_SMALL, 0);
+			alloc(pd.win_pad_at, cast(u32)pd.win_pad_size);
 		}
 		for (i32 i = pd.win_push_count-1; i >= 0; i--) {
 			code(pd.win_push_at[i], XB_UWOP_PUSH_NONVOL, pd.win_push_reg[i]);
 		}
 		u8 prolog_size = pd.win_alloc_at != 0 ? pd.win_alloc_at : pd.win_setfp_at;
+		if (pd.win_xmm_count > 0) prolog_size = pd.win_xmm_at[pd.win_xmm_count-1];
 
 		xbb_u8(xdata, 1); // version 1, no flags
 		xbb_u8(xdata, prolog_size);

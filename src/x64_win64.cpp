@@ -8,11 +8,12 @@
 //
 // Frame:
 //   [rbp+incoming_base ...]  incoming stack arguments (the shadow area first)
-//   [rbp ...]                saved rbp, rsi, rdi, promoted registers (pushed), pad
+//   [...]                    saved rbp, rsi, rdi, promoted registers (pushed), pad
+//   [rbp ...]                saved xmm registers
 //   [rbp-N ...]              locals and vreg slots
 //   [rsp ...]                outgoing arguments, the shadow area first
-// rbp is set after the pushes, so the unwinder finds every saved register from
-// it even after an alloca moved rsp.
+// rbp is set after the pushes and the xmm save area, so the unwinder finds every
+// saved register from it even after an alloca moved rsp.
 
 gb_internal bool xb_is_win64(void) {
 	return build_context.metrics.os == TargetOs_windows;
@@ -377,7 +378,8 @@ gb_internal void xb_win64_prologue(xbLower *L, xbProcDebug *dbg) {
 		pushes[n++] = L->saved[i];
 	}
 	bool pad = (n % 2) != 0;
-	i64 total = 8*(1 + n) + (pad ? 8 : 0) + L->frame_size;
+	i32 area = (pad ? 8 : 0) + 16*L->saved_v_count;
+	i64 total = 8*(1 + n) + area + L->frame_size;
 
 	if (total >= 4096) {
 		// touch every page from the top down before rsp moves past it, like __chkstk
@@ -403,8 +405,9 @@ gb_internal void xb_win64_prologue(xbLower *L, xbProcDebug *dbg) {
 		dbg->win_push_count += 1;
 	}
 	dbg->win_pad_at = 0;
-	if (pad) {
-		xb_alu_rm_imm(a, ALU_SUB, 8, xb_r(RSP), 8);
+	dbg->win_pad_size = area;
+	if (area > 0) {
+		xb_alu_rm_imm(a, ALU_SUB, 8, xb_r(RSP), area);
 		dbg->win_pad_at = here();
 	}
 	xb_mov_rm_r(a, 8, xb_r(RBP), RSP);
@@ -416,14 +419,24 @@ gb_internal void xb_win64_prologue(xbLower *L, xbProcDebug *dbg) {
 		xb_u32(a, cast(u32)L->frame_size);
 		dbg->win_alloc_at = here();
 	}
-	L->win_pad = pad;
-	L->incoming_base = 16 + 8*n + (pad ? 8 : 0);
+	// rbp is 16 byte aligned
+	dbg->win_xmm_count = L->saved_v_count;
+	for (i32 i = 0; i < L->saved_v_count; i++) {
+		xb_enc(a, XB_0F, 0x29, L->saved_v[i], xb_m(RBP, 16*i)); // movaps [rbp + 16*i], xmm
+		dbg->win_xmm_reg[i] = L->saved_v[i];
+		dbg->win_xmm_at[i] = here();
+	}
+	L->win_area = area;
+	L->incoming_base = 16 + 8*n + area;
 }
 
 gb_internal void xb_win64_epilogue(xbLower *L) {
 	xbAsm *a = &L->a;
-	// lea rsp, [rbp + pad]: an epilogue form the unwinder recognizes
-	xb_lea(a, RSP, xb_m(RBP, L->win_pad ? 8 : 0));
+	for (i32 i = 0; i < L->saved_v_count; i++) {
+		xb_enc(a, XB_0F, 0x28, L->saved_v[i], xb_m(RBP, 16*i)); // movaps xmm, [rbp + 16*i]
+	}
+	// lea rsp, [rbp + area]: an epilogue form the unwinder recognizes
+	xb_lea(a, RSP, xb_m(RBP, L->win_area));
 	for (i32 i = L->saved_count-1; i >= 0; i--) {
 		xb_pop(a, L->saved[i]);
 	}

@@ -363,6 +363,8 @@ struct xbAsmBlock {
 	Slice<xbAsmIo>   outputs;
 	u16              save_regs;  // callee saved gprs the template touches, bit = register number
 	i32              save_local; // frame local they are saved in, or -1
+	u16              save_xmms;  // Win64: callee saved xmm registers the template touches
+	i32              xmm_save_local;
 	i32              rbp_local;  // frame local rbp is saved in when the template writes it, or -1
 };
 
@@ -542,11 +544,16 @@ struct xbProcDebug {
 	struct SavedReg { i32 dwarf_reg; i32 frame_offset; };
 	Array<SavedReg> saved_regs;
 	i32     saved_at; // code offset right after the spills
-	// Win64 prologue, for the unwind info: pushes, an optional `sub rsp, 8`, `mov rbp, rsp`, `sub rsp, N`
+	// Win64 prologue, for the unwind info: pushes, an optional `sub rsp, pad + xmm saves`,
+	// `mov rbp, rsp`, `sub rsp, N`, then `movaps [rbp + 16*i], xmm`
 	u8      win_push_reg[8];
 	u8      win_push_at[8];
 	i32     win_push_count;
 	u8      win_pad_at;     // 0: no pad
+	i32     win_pad_size;   // the pad and the xmm save area
+	u8      win_xmm_reg[10];
+	u8      win_xmm_at[10];
+	i32     win_xmm_count;
 	u8      win_setfp_at;
 	u8      win_alloc_at;   // 0: no allocation
 	i32     win_alloc_size;

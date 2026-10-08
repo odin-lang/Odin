@@ -847,7 +847,7 @@ gb_internal void xb_asm_fixed_regs(xbAsmBuild *b, u16 *gprs, u16 *xmms) {
 			if (written && hw == RBP) b->writes_rbp = true;
 			*gprs |= cast(u16)(1u << hw);
 		} else if (cls == Asm_amd64::REG_CLASS_XMM || cls == Asm_amd64::REG_CLASS_YMM || cls == Asm_amd64::REG_CLASS_ZMM) {
-			// 16..31 are never handed out, and no vector register is callee saved
+			// 16..31 are never handed out, nor callee saved
 			if (hw < 16) *xmms |= cast(u16)(1u << hw);
 		}
 	};
@@ -913,7 +913,7 @@ gb_internal void xb_asm_fixed_regs(xbAsmBuild *b, u16 *gprs, u16 *xmms) {
 
 // Gives every operand a register: its pin, or a free one. Tied inputs share their
 // output's, width views their source's.
-gb_internal void xb_asm_assign_regs(xbAsmBuild *b, u16 *gprs_used) {
+gb_internal void xb_asm_assign_regs(xbAsmBuild *b, u16 *gprs_used, u16 *xmms_used) {
 	xbProc *p = b->p;
 	u16 gprs = 0, xmms = 0;
 	xb_asm_fixed_regs(b, &gprs, &xmms);
@@ -979,6 +979,7 @@ gb_internal void xb_asm_assign_regs(xbAsmBuild *b, u16 *gprs_used) {
 		if (b->high[i] && r != i && decls[i].view_of >= 0) XB_UNSUPPORTED(p, "asm high byte view");
 	}
 	*gprs_used = used;
+	*xmms_used = xmms;
 }
 
 gb_internal bool xb_asm_imm_arg(Ast *arg, Type *t, i64 *out) {
@@ -1066,8 +1067,8 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 		build_arg(lookup_procedure_parameter(&pt->Proc, fv->field->Ident.token.string));
 	}
 
-	u16 gprs_used = 0;
-	xb_asm_assign_regs(&b, &gprs_used);
+	u16 gprs_used = 0, xmms_used = 0;
+	xb_asm_assign_regs(&b, &gprs_used, &xmms_used);
 	xb_asm_encode_body(&b);
 	Slice<xbAsmItem> items = slice_from_array(b.items);
 	Slice<u8> pool = slice_from_array(b.pool);
@@ -1165,6 +1166,11 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 	blk.save_local = -1;
 	if (blk.save_regs != 0) {
 		blk.save_local = xb_add_local_raw(p, 8*gb_count_set_bits(blk.save_regs), 8);
+	}
+	blk.save_xmms = xb_is_win64() && !p->naked ? xmms_used & 0xffc0 : 0;
+	blk.xmm_save_local = -1;
+	if (blk.save_xmms != 0) {
+		blk.xmm_save_local = xb_add_local_raw(p, 16*gb_count_set_bits(blk.save_xmms), 16);
 	}
 	blk.rbp_local = b.writes_rbp ? xb_add_local_raw(p, 8, 8) : -1;
 	array_add(&p->asms, blk);
