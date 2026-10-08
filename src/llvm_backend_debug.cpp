@@ -51,6 +51,22 @@ gb_internal void lb_add_raddbg_string(lbModule *m, char const *a, char const *b,
 	mpsc_enqueue(&m->gen->raddebug_section_strings, str);
 }
 
+gb_internal void lb_add_raddbg_generated_view(lbModule *m, String const &type_name, gbString expr) {
+	// NOTE(bill): a RAD Debugger type view of one type, for what a generic view cannot match
+
+	if (string_contains_char(type_name, '"') || string_contains_char(type_name, '\\')) {
+		// it cannot be quoted in the section
+		return;
+	}
+	gbString s = gb_string_make(heap_allocator(), "type_view: {type: \"");
+	defer (gb_string_free(s));
+	s = gb_string_append_length(s, type_name.text, type_name.len);
+	s = gb_string_appendc(s, "\", expr: \"");
+	s = gb_string_append_length(s, expr, gb_string_length(expr));
+	s = gb_string_appendc(s, "\"}");
+	mpsc_enqueue(&m->gen->raddebug_generated_views, copy_string(permanent_allocator(), make_string(cast(u8 *)s, gb_string_length(s))));
+}
+
 
 
 gb_internal LLVMMetadataRef lb_get_current_debug_scope(lbProcedure *p) {
@@ -290,6 +306,26 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 			nullptr,
 			cast(char const *)name.text, cast(size_t)name.len
 		);
+	}
+
+	if (build_context.metrics.os == TargetOs_windows && (bt->Struct.soa_kind == StructSoa_Slice || bt->Struct.soa_kind == StructSoa_Dynamic)) {
+		// NOTE(bill): the RAD Debugger then shows each field of a #soa slice or dynamic array as an array of its length
+		isize field_count = bt->Struct.fields.count - 1;
+		if (bt->Struct.soa_kind == StructSoa_Dynamic) {
+			field_count = bt->Struct.fields.count - 3;
+		}
+		gbString expr = gb_string_make(heap_allocator(), "rows($");
+		defer (gb_string_free(expr));
+		for_array(j, bt->Struct.fields) {
+			String fname = bt->Struct.fields[j]->token.string;
+			if (j >= field_count) {
+				expr = gb_string_append_fmt(expr, ", %.*s", LIT(fname));
+			} else if (!is_blank_ident(fname)) {
+				expr = gb_string_append_fmt(expr, ", array(%.*s, __$len)", LIT(fname));
+			}
+		}
+		expr = gb_string_appendc(expr, ")");
+		lb_add_raddbg_generated_view(m, name, expr);
 	}
 
 	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
@@ -545,6 +581,17 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 		0,
 		cast(char const *)name.text, cast(size_t)name.len
 	);
+
+	if (build_context.metrics.os == TargetOs_windows && index_offset > 0) {
+		// NOTE(bill): the RAD Debugger then shows the variant the tag picks
+		gbString expr = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(expr));
+		for_array(j, bt->Union.variants) {
+			expr = gb_string_append_fmt(expr, "tag == %td ? v%td : ", variant_offset+j, variant_offset+j);
+		}
+		expr = gb_string_appendc(expr, "$");
+		lb_add_raddbg_generated_view(m, name, expr);
+	}
 
 	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
@@ -939,9 +986,14 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_string16:
 			{
 				// NOTE(bill): size_of(^u16) <= size_of(int)
+				// The data is `^wchar_t`, as `cstring16` is, so that debuggers show it as text
+				LLVMMetadataRef char_type = lb_debug_type_basic_type(m, str_lit("wchar_t"), 16, LLVMDWARFTypeEncoding_Unsigned);
+				LLVMMetadataRef file = lb_get_file_metadata(m, m->info->runtime_package->files[0]);
 
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_u16_ptr, 0);
+				elements[0] = LLVMDIBuilderCreateMemberType(m->debug_builder, file, "data", 4, file, 1, ptr_bits, ptr_bits, 0, LLVMDIFlagZero,
+					LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, nullptr, 0)
+				);
 				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, int_bits);
 				return lb_debug_basic_struct(m, str_lit("string16"), 2*int_bits, int_bits, elements, gb_count_of(elements));
 			}

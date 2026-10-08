@@ -268,6 +268,7 @@ struct lbGenerator : LinkerData {
 	MPSCQueue<lbObjCGlobal>       objc_classes;
 	MPSCQueue<lbObjCGlobal>       objc_ivars;
 	MPSCQueue<String>             raddebug_section_strings;
+	MPSCQueue<String>             raddebug_generated_views;
 };
 
 

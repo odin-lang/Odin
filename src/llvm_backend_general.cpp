@@ -590,6 +590,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	mpsc_init(&gen->objc_classes, heap_allocator());
 	mpsc_init(&gen->objc_ivars, heap_allocator());
 	mpsc_init(&gen->raddebug_section_strings, heap_allocator());
+	mpsc_init(&gen->raddebug_generated_views, heap_allocator());
 
 	return true;
 }

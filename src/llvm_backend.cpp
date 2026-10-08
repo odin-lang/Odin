@@ -3942,6 +3942,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 			lb_add_raddbg_string(m, "type_view: {type: \"[]?\",        expr: \"array(data, len)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"string\",     expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"string16\",   expr: \"array(data, len)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic;?]?\", expr: \"rows($, array(data, len), len)\"}");
 
@@ -4003,6 +4004,20 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				s = gb_string_appendc(s, "\"}");
 
 				lb_add_raddbg_string(m, s);
+			}
+
+			{
+				// NOTE(bill): the generated views come from many threads, so they are sorted to keep the section the same each build,
+				// and they go last, as the first view matching a type is the one used, so that a user's own view wins
+				auto generated = array_make<String>(heap_allocator(), 0, gen->raddebug_generated_views.count.load());
+				defer (array_free(&generated));
+				for (String str = {}; mpsc_dequeue(&gen->raddebug_generated_views, &str); /**/) {
+					array_add(&generated, str);
+				}
+				array_sort(generated, string_cmp);
+				for (String const &str : generated) {
+					lb_add_raddbg_string(m, str);
+				}
 			}
 
 			TEMPORARY_ALLOCATOR_GUARD();
