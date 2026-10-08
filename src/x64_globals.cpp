@@ -4,6 +4,7 @@ gb_internal void xb_family_init(xbFamily *family, DeclInfo *root_decl);
 gb_internal void xb_family_destroy(xbFamily *family);
 gb_internal bool xb_family_build(xbModule *m, xbFamily *family, Entity *root, char const **reason);
 gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root);
+gb_internal bool xb_compile_proc(xbModule *m, Entity *e, char const **reason);
 
 // Global variables: storage and constant data, for the same set of globals LLVM creates.
 // Globals with a non-constant initializer start zeroed, the startup code fills them in.

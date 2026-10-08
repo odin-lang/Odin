@@ -103,6 +103,7 @@ gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	p->context_stack = array_make<xbContextEntry>(xb_allocator(), 0, 4);
 	p->defers = array_make<xbDefer>(xb_allocator(), 0, 4);
 	p->branch_blocks = array_make<xbBranchBlocks>(xb_allocator(), 0, 0);
+	p->selector_cache = array_make<xbSelectorCache>(xb_allocator(), 0, 0);
 	p->debug_vars = array_make<xbDebugVar>(xb_allocator(), 0, 16);
 	map_init(&p->vars);
 	p->file_id = -1;

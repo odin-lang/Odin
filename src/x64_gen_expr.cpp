@@ -20,6 +20,7 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 gb_internal xbValue xb_source_code_location(xbProc *p, String proc_name, TokenPos pos);
 gb_internal xbAddr  xb_emit_any_cast_addr(xbProc *p, xbValue value, Type *type, TokenPos pos);
 gb_internal xbValue xb_emit_union_cast(xbProc *p, xbValue value, Type *type, TokenPos pos);
+gb_internal xbValue xb_make_slice_value(xbProc *p, Type *t, u32 data, u32 len);
 
 gb_internal Entity *xb_lookup_runtime_entity(xbModule *m, char const *name) {
 	AstPackage *pkg = m->info->runtime_package;
@@ -85,7 +86,22 @@ gb_internal xbValue xb_const_string(xbProc *p, String s, Type *t) {
 		xb_store(p, xbType_I64, xb_mem_offset(m, 8), xb_iconst(p, xbType_I64, s.len));
 		return xb_value_mem(t, m);
 	}
-	if (is_type_array(bt) || is_type_u8_slice(bt)) {
+	if (is_type_slice(bt)) {
+		// the bytes of the string in read-only data, like lb_find_or_add_entity_string_byte_slice_with_type
+		Type *elem = bt->Slice.elem;
+		i64 elem_size = gb_max(type_size_of(elem), cast(i64)1);
+		u32 ptr = 0;
+		if (s.len == 0) {
+			ptr = xb_iconst(p, xbType_I64, 0);
+		} else if (is_type_u8(elem)) {
+			ptr = xb_lea(p, xb_mem(xbMem_Sym, xb_string_literal(p->m, s)));
+		} else {
+			i64 align = gb_max(type_align_of(elem), cast(i64)MINIMUM_SLICE_ALIGNMENT);
+			ptr = xb_lea(p, xb_mem(xbMem_Sym, xb_rodata(p->m, s.text, s.len, align)));
+		}
+		return xb_make_slice_value(p, t, ptr, xb_iconst(p, xbType_I64, s.len/elem_size));
+	}
+	if (is_type_array(bt)) {
 		XB_UNSUPPORTED(p, "string constant as array");
 	}
 	XB_UNSUPPORTED(p, "string constant type");
@@ -221,7 +237,7 @@ gb_internal xbValue xb_const_value(xbProc *p, Type *type, ExactValue value) {
 		if (sym >= 0) {
 			xbMem local = xb_add_local(p, type, false);
 			xb_memcopy(p, local, xb_mem(xbMem_Sym, cast(u32)sym), type_size_of(type));
-			return xb_value_mem(type, local);
+			return xb_load_value(p, type, local);
 		}
 	}
 
@@ -367,7 +383,7 @@ gb_internal xbValue xb_const_value(xbProc *p, Type *type, ExactValue value) {
 				if (sym >= 0) {
 					xbMem local = xb_add_local(p, type, false);
 					xb_memcopy(p, local, xb_mem(xbMem_Sym, cast(u32)sym), type_size_of(type));
-					return xb_value_mem(type, local);
+					return xb_load_value(p, type, local);
 				}
 			}
 			XB_UNSUPPORTED(p, reason ? reason : "startup constant");
@@ -385,12 +401,12 @@ gb_internal xbValue xb_const_value(xbProc *p, Type *type, ExactValue value) {
 				xb_memcopy(p, local, xb_mem(xbMem_Sym, cast(u32)sym), type_size_of(arr));
 				return xb_make_slice_value(p, type, xb_lea(p, local), xb_iconst(p, xbType_I64, count));
 			}
-		} else if (!is_type_bit_set(bt)) {
+		} else if (!is_type_bit_set(bt) || st == xbType_None) {
 			i32 sym = xb_const_global(p->m, type, value, false, &reason);
 			if (sym >= 0) {
 				xbMem local = xb_add_local(p, type, false);
 				xb_memcopy(p, local, xb_mem(xbMem_Sym, cast(u32)sym), type_size_of(type));
-				return xb_value_mem(type, local);
+				return xb_load_value(p, type, local);
 			}
 		}
 		if (is_type_struct(bt) || is_type_array(bt) || is_type_enumerated_array(bt) || is_type_simd_vector(bt) || is_type_slice(bt) || is_type_bit_set(bt)) {
@@ -795,6 +811,100 @@ gb_internal xbMem xb_swizzle_gather(xbProc *p, xbAddr const &addr) {
 	return res;
 }
 
+// lb_copy_bits: copies size_bits (<= 64) bits, numbered little endian, from src at src_bit to dst at dst_bit
+gb_internal void xb_copy_bits(xbProc *p, xbMem dst, xbMem src, i64 dst_bit, i64 src_bit, i64 size_bits) {
+	if (size_bits == 0) return;
+	GB_ASSERT(size_bits <= 64);
+	i64 src_byte  = src_bit >> 3;
+	i64 dst_byte  = dst_bit >> 3;
+	i64 src_shift = src_bit & 7;
+	i64 dst_shift = dst_bit & 7;
+	i64 src_need  = (src_shift + size_bits + 7) >> 3;
+	i64 dst_need  = (dst_shift + size_bits + 7) >> 3;
+	u64 mask = size_bits < 64 ? (cast(u64)1 << size_bits) - 1 : ~cast(u64)0;
+
+	// gather the field into the low bits of a u64
+	u32 bits = 0;
+	for (i64 i = 0; i < src_need; i++) {
+		u32 byte = xb_load(p, xbType_I8, xb_mem_offset(src, src_byte + i));
+		byte = xb_int_resize(p, byte, xbType_I8, xbType_I64, false);
+		if (i*8 > src_shift) {
+			byte = xb_binop(p, xbOp_Shl, xbType_I64, byte, xb_i64(p, i*8 - src_shift));
+		} else if (i*8 < src_shift) {
+			byte = xb_binop(p, xbOp_LShr, xbType_I64, byte, xb_i64(p, src_shift - i*8));
+		}
+		bits = bits ? xb_binop(p, xbOp_Or, xbType_I64, bits, byte) : byte;
+	}
+	if (size_bits < 64) {
+		bits = xb_binop(p, xbOp_And, xbType_I64, bits, xb_i64(p, cast(i64)mask));
+	}
+
+	// scatter it, each byte a masked read-modify-write
+	for (i64 i = 0; i < dst_need; i++) {
+		u32 contrib = bits;
+		u64 byte_mask = 0;
+		if (i*8 >= dst_shift) {
+			i64 sh = i*8 - dst_shift;
+			if (sh) contrib = xb_binop(p, xbOp_LShr, xbType_I64, bits, xb_i64(p, sh));
+			byte_mask = (mask >> sh) & 0xff;
+		} else {
+			i64 sh = dst_shift - i*8;
+			contrib = xb_binop(p, xbOp_Shl, xbType_I64, bits, xb_i64(p, sh));
+			byte_mask = (mask << sh) & 0xff;
+		}
+		contrib = xb_int_resize(p, contrib, xbType_I64, xbType_I8, false);
+		xbMem at = xb_mem_offset(dst, dst_byte + i);
+		if (byte_mask == 0xff) {
+			xb_store(p, xbType_I8, at, contrib);
+			continue;
+		}
+		contrib = xb_binop(p, xbOp_And, xbType_I8, contrib, xb_iconst(p, xbType_I8, cast(i64)byte_mask));
+		u32 old = xb_binop(p, xbOp_And, xbType_I8, xb_load(p, xbType_I8, at), xb_iconst(p, xbType_I8, cast(i64)(~byte_mask & 0xff)));
+		xb_store(p, xbType_I8, at, xb_binop(p, xbOp_Or, xbType_I8, old, contrib));
+	}
+}
+
+gb_internal void xb_check_bit_field_type(xbProc *p, Type *t) {
+	if (is_type_endian_big(t) || is_type_different_to_arch_endianness(t) || xb_scalar_type(t) == xbType_None) {
+		XB_UNSUPPORTED(p, "endian bit field");
+	}
+}
+
+// lb_addr_load of a bit field
+gb_internal xbValue xb_bit_field_load(xbProc *p, xbAddr const &addr) {
+	Type *t = addr.type;
+	xb_check_bit_field_type(p, t);
+	Type *ct = core_type(t);
+	xbType st = xb_scalar_type(t);
+	xbMem dst = xb_add_local(p, t, true);
+	xb_copy_bits(p, dst, addr.mem, 0, addr.bit_offset, addr.bit_size);
+	u32 r = xb_load(p, st, dst);
+	if (!is_type_unsigned(ct) && !is_type_boolean(ct)) {
+		// sign extension: (r ~ m) - m, m = 1<<(bit_size-1)
+		u32 m = xb_iconst(p, st, cast(i64)(cast(u64)1 << (addr.bit_size-1)));
+		r = xb_binop(p, xbOp_Sub, st, xb_binop(p, xbOp_Xor, st, r, m), m);
+	}
+	return xb_value_reg(t, r);
+}
+
+gb_internal void xb_bit_field_store(xbProc *p, xbAddr const &addr, xbValue v) {
+	xb_check_bit_field_type(p, addr.type);
+	xbMem src = xb_address_from_load_or_generate_local(p, xb_emit_conv(p, v, addr.type));
+	xb_copy_bits(p, addr.mem, src, addr.bit_offset, 0, addr.bit_size);
+}
+
+gb_internal xbAddr xb_addr_bit_field(xbMem mem, Type *bf, isize index) {
+	bf = base_type(bf);
+	GB_ASSERT(bf->kind == Type_BitField);
+	xbAddr a = {};
+	a.kind = xbAddr_BitField;
+	a.type = bf->BitField.fields[index]->type;
+	a.mem = mem;
+	a.bit_offset = bf->BitField.bit_offsets[index];
+	a.bit_size = bf->BitField.bit_sizes[index];
+	return a;
+}
+
 gb_internal xbValue xb_addr_load(xbProc *p, xbAddr const &addr) {
 	switch (addr.kind) {
 	case xbAddr_Swizzle:
@@ -817,9 +927,8 @@ gb_internal xbValue xb_addr_load(xbProc *p, xbAddr const &addr) {
 		}
 		return xb_load_value(p, type, mem);
 	}
-	case xbAddr_BitField: {
-		XB_UNSUPPORTED(p, "bit field load");
-	}
+	case xbAddr_BitField:
+		return xb_bit_field_load(p, addr);
 	case xbAddr_SoaVariable:
 		return xb_soa_load(p, addr);
 	case xbAddr_SwizzleSoa:
@@ -852,6 +961,9 @@ gb_internal void xb_addr_store(xbProc *p, xbAddr const &addr, xbValue v) {
 		return;
 	case xbAddr_SwizzleSoa:
 		xb_soa_swizzle_store(p, addr, v);
+		return;
+	case xbAddr_BitField:
+		xb_bit_field_store(p, addr, v);
 		return;
 	case xbAddr_Map: {
 		u32 map_ptr = xb_load(p, xbType_I64, addr.mem);
@@ -1130,8 +1242,23 @@ gb_internal xbAddr xb_build_addr_index_expr(xbProc *p, Ast *expr) {
 	auto index_tv = type_and_value_of_expr(ie->index);
 
 	switch (t->kind) {
-	case Type_Matrix:
-		XB_UNSUPPORTED(p, "matrix index");
+	case Type_Matrix: {
+		// a row of a #row_major matrix, else a column
+		xbMem base = {};
+		if (deref) {
+			base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, ie->expr)), 0);
+		} else {
+			base = xb_build_addr_mem(p, ie->expr);
+		}
+		u32 index = xb_build_index_int(p, ie->index);
+		i64 bounds_len = t->Matrix.is_row_major ? t->Matrix.row_count : t->Matrix.column_count;
+		i64 stride = matrix_type_stride_in_bytes(t, nullptr);
+		if (index_tv.mode != Addressing_Constant) {
+			xb_emit_bounds_check(p, ast_token(ie->index), index, xb_iconst(p, xbType_I64, bounds_len));
+		}
+		u32 ptr = xb_ptr_add_scaled(p, xb_lea(p, base), index, stride);
+		return xb_addr(result_type, xb_mem(xbMem_Reg, ptr, 0));
+	}
 	case Type_Array:
 	case Type_EnumeratedArray: {
 		xbMem base = {};
@@ -1223,11 +1350,41 @@ gb_internal xbAddr xb_build_addr_index_expr(xbProc *p, Ast *expr) {
 	return {};
 }
 
-gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
-	expr = unparen_expr(expr);
-	if (expr->state_flags & StateFlag_SelectorCallExpr) {
-		XB_UNSUPPORTED(p, "selector call expression");
+// takes the cached evaluation of `expr` out of the selector call cache
+gb_internal xbSelectorCache *xb_selector_cache_find(xbProc *p, Ast *expr, bool is_addr) {
+	for (xbSelectorCache &c : p->selector_cache) {
+		if (c.expr == expr && c.is_addr == is_addr) return &c;
 	}
+	return nullptr;
+}
+
+gb_internal void xb_selector_cache_remove(xbProc *p, xbSelectorCache *c) {
+	*c = p->selector_cache[p->selector_cache.count-1];
+	array_pop(&p->selector_cache);
+}
+
+gb_internal xbAddr xb_build_addr_internal(xbProc *p, Ast *expr);
+
+gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
+	if ((expr->state_flags & StateFlag_SelectorCallExpr) == 0) {
+		return xb_build_addr_internal(p, expr);
+	}
+	if (xbSelectorCache *c = xb_selector_cache_find(p, expr, true)) {
+		xbAddr a = c->addr;
+		xb_selector_cache_remove(p, c);
+		return a;
+	}
+	xbAddr a = xb_build_addr_internal(p, expr);
+	xbSelectorCache c = {};
+	c.expr = expr;
+	c.is_addr = true;
+	c.addr = a;
+	array_add(&p->selector_cache, c);
+	return a;
+}
+
+gb_internal xbAddr xb_build_addr_internal(xbProc *p, Ast *expr) {
+	expr = unparen_expr(expr);
 	switch (expr->kind) {
 	case_ast_node(i, Implicit, expr);
 		if (i->kind == Token_context) {
@@ -1299,7 +1456,19 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 		Selection sel = lookup_field(tav.type, selector, false);
 		GB_ASSERT(sel.entity != nullptr);
 		if (sel.pseudo_field) XB_UNSUPPORTED(p, "pseudo field");
-		if (sel.is_bit_field) XB_UNSUPPORTED(p, "bit field selector");
+		if (sel.is_bit_field) {
+			// walk to the bit_field, the last index is its field
+			Selection sub = sel;
+			sub.index.count -= 1;
+			xbAddr base = xb_build_addr(p, se->expr);
+			if (base.kind != xbAddr_Default) XB_UNSUPPORTED(p, "bit field of special addr");
+			xbAddr bf = base;
+			if (sub.index.count > 0) bf = xb_emit_deep_field(p, base.type, base.mem, sub);
+			if (is_type_pointer(bf.type)) {
+				bf = xb_addr(type_deref(bf.type), xb_mem(xbMem_Reg, xb_load(p, xbType_I64, bf.mem), 0));
+			}
+			return xb_addr_bit_field(bf.mem, bf.type, sel.index[sel.index.count-1]);
+		}
 		Type *deref_type = type_deref(tav.type);
 		if (tav.type->kind == Type_Pointer && deref_type->kind == Type_Named && deref_type->Named.type_name->TypeName.objc_ivar) {
 			XB_UNSUPPORTED(p, "objc ivar");
@@ -1333,6 +1502,40 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 
 	case_ast_node(ie, IndexExpr, expr);
 		return xb_build_addr_index_expr(p, expr);
+	case_end;
+
+	case_ast_node(ie, MatrixIndexExpr, expr);
+		Type *t = base_type(type_of_expr(ie->expr));
+		bool deref = is_type_pointer(t);
+		t = base_type(type_deref(t));
+		xbMem base = {};
+		if (deref) {
+			base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, ie->expr)), 0);
+		} else {
+			base = xb_build_addr_mem(p, ie->expr);
+		}
+		u32 row = xb_build_index_int(p, ie->row_index);
+		u32 column = xb_build_index_int(p, ie->column_index);
+		i64 stride = matrix_type_stride_in_elems(t);
+		u32 index = 0;
+		if (t->Matrix.is_row_major) {
+			index = xb_binop(p, xbOp_Add, xbType_I64, column, xb_binop(p, xbOp_Mul, xbType_I64, row, xb_i64(p, stride)));
+		} else {
+			index = xb_binop(p, xbOp_Add, xbType_I64, row, xb_binop(p, xbOp_Mul, xbType_I64, column, xb_i64(p, stride)));
+		}
+		if ((ie->row_index->tav.mode != Addressing_Constant || ie->column_index->tav.mode != Addressing_Constant) && !xb_bounds_check_disabled(p)) {
+			xbValue args[7] = {};
+			xb_file_line_col(p, ast_token(ie->row_index).pos, args);
+			args[3] = xb_value_reg(t_int, row);
+			args[4] = xb_value_reg(t_int, column);
+			args[5] = xb_value_reg(t_int, xb_i64(p, t->Matrix.row_count));
+			args[6] = xb_value_reg(t_int, xb_i64(p, t->Matrix.column_count));
+			char const *handler = p->context_stack.count > 0 ? "matrix_bounds_check_error_with_context" : "matrix_bounds_check_error_contextless";
+			xb_emit_runtime_call(p, handler, xb_args(args, 7));
+		}
+		Type *elem = t->Matrix.elem;
+		u32 ptr = xb_ptr_add_scaled(p, xb_lea(p, base), index, type_size_of(elem));
+		return xb_addr(elem, xb_mem(xbMem_Reg, ptr, 0));
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
@@ -1543,6 +1746,253 @@ gb_internal xbValue xb_emit_arith_array(xbProc *p, TokenKind op, xbValue x, xbVa
 	return xb_value_mem(type, res);
 }
 
+////////////////////////////////////////////////////////////////
+// Matrices, held in memory. Float sums are added in the same order as LLVM's
+// (vector shuffles in the SIMD paths, a running sum otherwise) so results match bit for bit.
+////////////////////////////////////////////////////////////////
+
+gb_internal xbMem xb_matrix_elem_mem(xbMem m, Type *mt, i64 row, i64 column) {
+	mt = base_type(mt);
+	return xb_mem_offset(m, matrix_indices_to_offset(mt, row, column)*type_size_of(mt->Matrix.elem));
+}
+
+gb_internal xbValue xb_matrix_ev(xbProc *p, xbMem m, Type *mt, i64 row, i64 column) {
+	return xb_load_value(p, base_type(mt)->Matrix.elem, xb_matrix_elem_mem(m, mt, row, column));
+}
+
+// lb_is_matrix_simdable
+gb_internal bool xb_matrix_simdable(Type *t, bool ignore_layout) {
+	Type *mt = base_type(t);
+	Type *elem = core_type(mt->Matrix.elem);
+	if (is_type_complex(elem)) return false;
+	if (is_type_different_to_arch_endianness(elem)) return false;
+	if (type_align_of(t) < 16) return false;
+	if ((mt->Matrix.row_count & 1) && (mt->Matrix.column_count & 1)) return false;
+	if (mt->Matrix.is_row_major && !ignore_layout) return false;
+	if (xb_is_f16(elem)) return false;
+	return true;
+}
+
+// lb_emit_mul_add without fused multiply-add: a*b + c
+gb_internal xbValue xb_mul_add(xbProc *p, xbValue a, xbValue b, xbValue c, Type *t) {
+	if (is_type_float(t) && !is_type_different_to_arch_endianness(t) && type_size_of(t) != 2 &&
+	    check_target_feature_is_enabled(str_lit("fma"), nullptr)) {
+		XB_UNSUPPORTED(p, "fused multiply-add");
+	}
+	return xb_emit_arith(p, Token_Add, xb_emit_arith(p, Token_Mul, a, b, t), c, t);
+}
+
+// llvm_vector_mul_pairwise_reduce_add over the products
+gb_internal xbValue xb_sum_pairwise(xbProc *p, xbValue *v, i64 k, Type *t) {
+	while (k > 1) {
+		i64 half = k/2;
+		for (i64 j = 0; j < half; j++) {
+			v[j] = xb_emit_arith(p, Token_Add, v[2*j], v[2*j+1], t);
+		}
+		if (k & 1) v[half] = v[k-1];
+		k = (k+1)/2;
+	}
+	return v[0];
+}
+
+// llvm_vector_reduce_add: halving shuffles, a non power of two length splits off its tail
+gb_internal xbValue xb_sum_shuffle(xbProc *p, xbValue *v, i64 n, Type *t) {
+	auto reduce = [&](xbValue *w, i64 len) -> xbValue {
+		for (; len > 1; len /= 2) {
+			for (i64 i = 0; i < len/2; i++) {
+				w[i] = xb_emit_arith(p, Token_Add, w[i], w[i + len/2], t);
+			}
+		}
+		return w[0];
+	};
+	i64 lower = prev_pow2(n);
+	if (lower == n) return reduce(v, n);
+	i64 upper = n - lower;
+	i64 expanded = upper == 1 ? 1 : next_pow2(upper);
+	auto w = array_make<xbValue>(xb_allocator(), expanded, expanded);
+	for (i64 i = 0; i < expanded; i++) {
+		w[i] = i < upper ? v[lower+i] : xb_zero_value(p, t);
+	}
+	xbValue lo = reduce(v, lower);
+	xbValue hi = reduce(w.data, expanded);
+	return xb_emit_arith(p, Token_Add, lo, hi, t);
+}
+
+gb_internal xbValue xb_emit_matrix_mul(xbProc *p, xbValue lhs, xbValue rhs, Type *type) {
+	Type *xt = base_type(lhs.type);
+	Type *yt = base_type(rhs.type);
+	GB_ASSERT(xt->Matrix.is_row_major == yt->Matrix.is_row_major);
+	Type *elem = xt->Matrix.elem;
+	i64 outer_rows = xt->Matrix.row_count;
+	i64 inner = xt->Matrix.column_count;
+	i64 outer_columns = yt->Matrix.column_count;
+	bool simd = xb_matrix_simdable(xt, true);
+	bool square = outer_rows == outer_columns && outer_rows == inner && (inner & 1) == 0;
+	if (simd && !square && xt->Matrix.is_row_major && matrix_type_stride_in_elems(xt) != matrix_type_stride_in_elems(yt)) {
+		// LLVM reads the right side with the left side's stride here
+		XB_UNSUPPORTED(p, "row major matrix multiply");
+	}
+	xbMem a = xb_address_from_load_or_generate_local(p, lhs);
+	xbMem b = xb_address_from_load_or_generate_local(p, rhs);
+	xbMem res = xb_add_local(p, type, false);
+	auto terms = array_make<xbValue>(xb_allocator(), inner, inner);
+	for (i64 i = 0; i < outer_rows; i++) {
+		for (i64 j = 0; j < outer_columns; j++) {
+			xbValue sum = {};
+			if (simd) {
+				for (i64 k = 0; k < inner; k++) {
+					terms[k] = xb_emit_arith(p, Token_Mul, xb_matrix_ev(p, a, xt, i, k), xb_matrix_ev(p, b, yt, k, j), elem);
+				}
+				sum = square ? xb_sum_pairwise(p, terms.data, inner, elem) : xb_sum_shuffle(p, terms.data, inner, elem);
+			} else {
+				sum = xb_zero_value(p, elem);
+				for (i64 k = 0; k < inner; k++) {
+					sum = xb_mul_add(p, xb_matrix_ev(p, a, xt, i, k), xb_matrix_ev(p, b, yt, k, j), sum, elem);
+				}
+			}
+			xb_store_value(p, xb_matrix_elem_mem(res, type, i, j), sum);
+		}
+	}
+	return xb_value_mem(type, res);
+}
+
+// matrix * column vector, or row vector * matrix
+gb_internal xbValue xb_emit_matrix_vector_mul(xbProc *p, xbValue lhs, xbValue rhs, Type *type, bool vector_first) {
+	Type *mt = base_type(vector_first ? rhs.type : lhs.type);
+	Type *elem = mt->Matrix.elem;
+	i64 stride = type_size_of(elem);
+	xbMem m = xb_address_from_load_or_generate_local(p, vector_first ? rhs : lhs);
+	xbMem v = xb_address_from_load_or_generate_local(p, vector_first ? lhs : rhs);
+	i64 count = vector_first ? mt->Matrix.column_count : mt->Matrix.row_count;
+	i64 inner = vector_first ? mt->Matrix.row_count : mt->Matrix.column_count;
+	bool simd = !mt->Matrix.is_row_major && xb_matrix_simdable(mt, false);
+	xbMem res = xb_add_local(p, type, false);
+	auto terms = array_make<xbValue>(xb_allocator(), inner, inner);
+	for (i64 i = 0; i < count; i++) {
+		xbValue sum = {};
+		if (!simd) sum = xb_zero_value(p, elem);
+		for (i64 k = 0; k < inner; k++) {
+			xbValue me = vector_first ? xb_matrix_ev(p, m, mt, k, i) : xb_matrix_ev(p, m, mt, i, k);
+			xbValue ve = xb_load_value(p, elem, xb_mem_offset(v, k*stride));
+			xbValue x = vector_first ? ve : me;
+			xbValue y = vector_first ? me : ve;
+			if (simd) {
+				terms[k] = xb_emit_arith(p, Token_Mul, x, y, elem);
+			} else {
+				sum = xb_mul_add(p, x, y, sum, elem);
+			}
+		}
+		if (simd) sum = xb_sum_pairwise(p, terms.data, inner, elem);
+		xb_store_value(p, xb_mem_offset(res, i*stride), sum);
+	}
+	return xb_value_mem(type, res);
+}
+
+// the matrix's elements as an array, for element-wise operations
+gb_internal xbValue xb_matrix_as_array(xbProc *p, xbValue v) {
+	Type *mt = base_type(v.type);
+	Type *at = alloc_type_array(mt->Matrix.elem, matrix_type_total_internal_elems(mt));
+	GB_ASSERT(type_size_of(at) == type_size_of(mt));
+	return xb_value_mem(at, xb_value_to_mem(p, v));
+}
+
+// lb_emit_arith_matrix
+gb_internal xbValue xb_emit_arith_matrix(xbProc *p, TokenKind op, xbValue lhs, xbValue rhs, Type *type, bool component_wise) {
+	Type *elem = base_array_type(is_type_matrix(lhs.type) ? lhs.type : rhs.type);
+	if ((is_type_array_like(lhs.type) && !are_types_identical(base_array_type(lhs.type), elem)) ||
+	    (is_type_array_like(rhs.type) && !are_types_identical(base_array_type(rhs.type), elem))) {
+		return xb_emit_arith_array(p, op, lhs, rhs, type);
+	}
+	if (op == Token_Mul && !component_wise) {
+		Type *xt = base_type(lhs.type);
+		Type *yt = base_type(rhs.type);
+		if (xt->kind == Type_Matrix) {
+			if (yt->kind == Type_Matrix) return xb_emit_matrix_mul(p, lhs, rhs, type);
+			if (is_type_array_like(yt)) return xb_emit_matrix_vector_mul(p, lhs, rhs, type, false);
+			XB_UNSUPPORTED(p, "matrix multiply");
+		}
+		if (is_type_array_like(xt)) return xb_emit_matrix_vector_mul(p, lhs, rhs, type, true);
+		// scalar * matrix
+		xbValue r = xb_matrix_as_array(p, rhs);
+		xbValue res = xb_emit_arith_array(p, op, xb_emit_conv(p, lhs, r.type), r, r.type);
+		res.type = type;
+		return res;
+	}
+	if (is_type_matrix(lhs.type)) {
+		rhs = xb_emit_conv(p, rhs, lhs.type);
+	} else {
+		lhs = xb_emit_conv(p, lhs, rhs.type);
+	}
+	xbValue a = xb_matrix_as_array(p, lhs);
+	xbValue b = xb_matrix_as_array(p, rhs);
+	if (token_is_comparison(op)) {
+		return xb_emit_conv(p, xb_emit_comp(p, op, a, b), type);
+	}
+	xbValue res = xb_emit_arith_array(p, op, a, b, a.type);
+	res.type = type;
+	return res;
+}
+
+// lb_emit_matrix_transpose
+gb_internal xbValue xb_emit_matrix_transpose(xbProc *p, xbValue m, Type *type) {
+	if (is_type_array(m.type)) {
+		if (type_math_rank(m.type) != 2) {
+			m.type = type;
+			return m;
+		}
+		// [n][k]T -> [k][n]T
+		Type *src_col = base_type(m.type)->Array.elem;
+		Type *dst_col = base_type(type)->Array.elem;
+		Type *e = base_type(src_col)->Array.elem;
+		i64 n = get_array_type_count(m.type);
+		i64 k = get_array_type_count(type);
+		i64 es = type_size_of(e);
+		xbMem src = xb_address_from_load_or_generate_local(p, m);
+		xbMem dst = xb_add_local(p, type, false);
+		for (i64 j = 0; j < k; j++) {
+			for (i64 i = 0; i < n; i++) {
+				xbValue v = xb_load_value(p, e, xb_mem_offset(src, i*type_size_of(src_col) + j*es));
+				xb_store_value(p, xb_mem_offset(dst, j*type_size_of(dst_col) + i*es), v);
+			}
+		}
+		return xb_value_mem(type, dst);
+	}
+	Type *mt = base_type(m.type);
+	Type *rt = base_type(type);
+	if (rt->kind == Type_Matrix && rt->Matrix.is_row_major != mt->Matrix.is_row_major) {
+		// the same bytes read the other way
+		xbValue r = xb_value_copy_to_temp(p, m);
+		r.type = type;
+		return r;
+	}
+	xbMem src = xb_address_from_load_or_generate_local(p, m);
+	xbMem dst = xb_add_local(p, type, true);
+	for (i64 j = 0; j < mt->Matrix.column_count; j++) {
+		for (i64 i = 0; i < mt->Matrix.row_count; i++) {
+			xb_store_value(p, xb_matrix_elem_mem(dst, type, j, i), xb_matrix_ev(p, src, mt, i, j));
+		}
+	}
+	return xb_value_mem(type, dst);
+}
+
+gb_internal xbValue xb_emit_outer_product(xbProc *p, xbValue a, xbValue b, Type *type) {
+	Type *mt = base_type(type);
+	Type *elem = mt->Matrix.elem;
+	Type *ae = base_array_type(a.type);
+	Type *be = base_array_type(b.type);
+	xbMem am = xb_address_from_load_or_generate_local(p, a);
+	xbMem bm = xb_address_from_load_or_generate_local(p, b);
+	xbMem dst = xb_add_local(p, type, true);
+	for (i64 j = 0; j < mt->Matrix.column_count; j++) {
+		for (i64 i = 0; i < mt->Matrix.row_count; i++) {
+			xbValue x = xb_load_value(p, ae, xb_mem_offset(am, i*type_size_of(ae)));
+			xbValue y = xb_load_value(p, be, xb_mem_offset(bm, j*type_size_of(be)));
+			xb_store_value(p, xb_matrix_elem_mem(dst, type, i, j), xb_emit_arith(p, Token_Mul, x, y, elem));
+		}
+	}
+	return xb_value_mem(type, dst);
+}
+
 gb_internal xbValue xb_emit_arith(xbProc *p, TokenKind op, xbValue x, xbValue y, Type *type) {
 	Type *bt = core_type(type);
 	if (is_type_complex(bt)) {
@@ -1592,6 +2042,9 @@ gb_internal xbValue xb_emit_arith(xbProc *p, TokenKind op, xbValue x, xbValue y,
 		else XB_UNSUPPORTED(p, "quaternion operation");
 		xbValue args[2] = {x, y};
 		return xb_emit_conv(p, xb_emit_runtime_call(p, name, xb_args(args, 2)), type);
+	}
+	if (!is_type_array_like(x.type) && !is_type_array_like(y.type) && (is_type_matrix(x.type) || is_type_matrix(y.type))) {
+		return xb_emit_arith_matrix(p, op, x, y, type, false);
 	}
 	if (is_type_array_like(bt) || is_type_simd_vector(bt)) {
 		return xb_emit_arith_array(p, op, x, y, type);
@@ -1725,6 +2178,121 @@ gb_internal xbValue xb_cmp_zero(xbProc *p, TokenKind op, xbType st, u32 r) {
 	return xb_value_reg(t_llvm_bool, xb_cmp(p, c, st, r, xb_iconst(p, st, 0)));
 }
 
+////////////////////////////////////////////////////////////////
+// bit_sets that do not fit a register (or are not in the native byte order),
+// handled in memory a chunk at a time; bitwise operations ignore byte order
+////////////////////////////////////////////////////////////////
+
+gb_internal bool xb_bit_set_in_memory(Type *t) {
+	return is_type_bit_set(t) && xb_scalar_type(t) == xbType_None;
+}
+
+// calls f(offset, chunk type) for the chunks of a value of `size` bytes
+template <typename F>
+gb_internal void xb_for_chunks(i64 size, F const &f) {
+	i64 off = 0;
+	while (off < size) {
+		i64 left = size - off;
+		xbType t = left >= 8 ? xbType_I64 : left >= 4 ? xbType_I32 : left >= 2 ? xbType_I16 : xbType_I8;
+		f(off, t);
+		off += xb_type_size(t);
+	}
+}
+
+// res = x <op> y, a chunk at a time
+gb_internal xbValue xb_bit_set_mem_op(xbProc *p, TokenKind op, xbValue x, xbValue y, Type *type) {
+	xbMem a = xb_value_to_mem(p, xb_emit_conv(p, x, type));
+	xbMem b = xb_value_to_mem(p, xb_emit_conv(p, y, type));
+	xbMem res = xb_add_local(p, type, false);
+	xb_for_chunks(type_size_of(type), [&](i64 off, xbType t) {
+		u32 l = xb_load(p, t, xb_mem_offset(a, off));
+		u32 r = xb_load(p, t, xb_mem_offset(b, off));
+		u32 v = 0;
+		switch (op) {
+		case Token_Add: case Token_Or:     v = xb_binop(p, xbOp_Or,  t, l, r); break;
+		case Token_Sub: case Token_AndNot: v = xb_binop(p, xbOp_And, t, l, xb_unop(p, xbOp_Not, t, r)); break;
+		case Token_And:                    v = xb_binop(p, xbOp_And, t, l, r); break;
+		case Token_Xor:                    v = xb_binop(p, xbOp_Xor, t, l, r); break;
+		default: XB_UNSUPPORTED(p, "bit_set op");
+		}
+		xb_store(p, t, xb_mem_offset(res, off), v);
+	});
+	return xb_value_mem(type, res);
+}
+
+// whether every bit of (x &~ y) is zero, or of (x ~ y) when `xor`
+gb_internal u32 xb_bit_set_mem_none(xbProc *p, xbMem a, xbMem b, i64 size, bool xor_) {
+	u32 acc = 0;
+	xb_for_chunks(size, [&](i64 off, xbType t) {
+		u32 l = xb_load(p, t, xb_mem_offset(a, off));
+		u32 r = xb_load(p, t, xb_mem_offset(b, off));
+		u32 d = xor_ ? xb_binop(p, xbOp_Xor, t, l, r) : xb_binop(p, xbOp_And, t, l, xb_unop(p, xbOp_Not, t, r));
+		d = xb_int_resize(p, d, t, xbType_I64, false);
+		acc = acc ? xb_binop(p, xbOp_Or, xbType_I64, acc, d) : d;
+	});
+	return xb_cmp(p, xbCond_EQ, xbType_I64, acc, xb_i64(p, 0));
+}
+
+gb_internal xbValue xb_bit_set_mem_comp(xbProc *p, TokenKind op, xbValue left, xbValue right, Type *type) {
+	i64 size = type_size_of(type);
+	xbMem a = xb_value_to_mem(p, left);
+	xbMem b = xb_value_to_mem(p, right);
+	u32 res = 0;
+	switch (op) {
+	case Token_CmpEq:
+	case Token_NotEq:
+		res = xb_bit_set_mem_none(p, a, b, size, true);
+		if (op == Token_NotEq) res = xb_binop(p, xbOp_Xor, xbType_I8, res, xb_iconst(p, xbType_I8, 1));
+		return xb_value_reg(t_llvm_bool, res);
+	case Token_Lt:
+	case Token_LtEq:
+		res = xb_bit_set_mem_none(p, a, b, size, false); // subset
+		break;
+	case Token_Gt:
+	case Token_GtEq:
+		res = xb_bit_set_mem_none(p, b, a, size, false); // superset
+		break;
+	}
+	if (op == Token_Lt || op == Token_Gt) {
+		u32 equal = xb_bit_set_mem_none(p, a, b, size, true);
+		res = xb_binop(p, xbOp_And, xbType_I8, res, xb_binop(p, xbOp_Xor, xbType_I8, equal, xb_iconst(p, xbType_I8, 1)));
+	}
+	return xb_value_reg(t_llvm_bool, res);
+}
+
+// The byte holding bit `k` of a bit_set in memory; bit k&7 of it. k must be in range.
+gb_internal u32 xb_bit_set_byte_index(xbProc *p, Type *bs, u32 k) {
+	Type *it = bit_set_to_int(bs);
+	u32 byte = xb_binop(p, xbOp_LShr, xbType_I64, k, xb_i64(p, 3));
+	if (is_type_array(it)) {
+		Type *et = base_array_type(it);
+		if (type_size_of(et) > 1 && is_type_different_to_arch_endianness(et)) {
+			// LLVM mixes up the byte order of these
+			XB_UNSUPPORTED(p, "bit_set of endian array");
+		}
+		return byte;
+	}
+	if (type_size_of(it) > 1 && is_type_different_to_arch_endianness(it)) {
+		byte = xb_binop(p, xbOp_Sub, xbType_I64, xb_i64(p, type_size_of(it)-1), byte);
+	}
+	return byte;
+}
+
+// the key's bit number, and whether it lies within the set
+gb_internal u32 xb_bit_set_key_bit(xbProc *p, Type *bs, xbValue key, u32 *in_range) {
+	Type *bt = base_type(bs);
+	Type *key_type = bt->BitSet.elem;
+	xbValue kv = xb_emit_conv(p, key, key_type);
+	xbType kt = xb_scalar_type(key_type);
+	if (kt == xbType_None || xb_type_is_float(kt)) XB_UNSUPPORTED(p, "bit_set key type");
+	u32 k = xb_int_resize(p, xb_value_to_reg(p, kv), kt, xbType_I64, xb_type_is_signed(key_type));
+	if (bt->BitSet.lower != 0) {
+		k = xb_binop(p, xbOp_Sub, xbType_I64, k, xb_i64(p, bt->BitSet.lower));
+	}
+	*in_range = xb_cmp(p, xbCond_ULT, xbType_I64, k, xb_i64(p, 8*type_size_of(bs)));
+	return k;
+}
+
 gb_internal xbValue xb_emit_comp_against_nil(xbProc *p, TokenKind op, xbValue x) {
 	Type *t = x.type;
 	Type *bt = base_type(t);
@@ -1761,7 +2329,10 @@ gb_internal xbValue xb_emit_comp_against_nil(xbProc *p, TokenKind op, xbValue x)
 	}
 	case Type_BitSet: {
 		xbType st = xb_scalar_type(t);
-		if (st == xbType_None) XB_UNSUPPORTED(p, "large bit_set nil comparison");
+		if (st == xbType_None) {
+			xbValue zero = xb_zero_value(p, t);
+			return xb_bit_set_mem_comp(p, op, x, zero, t);
+		}
 		return xb_cmp_zero(p, op, st, xb_value_to_reg(p, x));
 	}
 	case Type_Slice:
@@ -1941,7 +2512,9 @@ gb_internal xbValue xb_emit_comp(xbProc *p, TokenKind op, xbValue left, xbValue 
 
 	if (is_type_bit_set(a)) {
 		xbType st = xb_scalar_type(a);
-		if (st == xbType_None) XB_UNSUPPORTED(p, "large bit_set comparison");
+		if (st == xbType_None) {
+			return xb_bit_set_mem_comp(p, op, left, xb_emit_conv(p, right, left.type), left.type);
+		}
 		if (is_type_different_to_arch_endianness(bit_set_to_int(a))) XB_UNSUPPORTED(p, "endian bit_set");
 		u32 l = xb_value_to_reg(p, left);
 		u32 r = xb_value_to_reg(p, right);
@@ -2007,23 +2580,21 @@ gb_internal xbValue xb_emit_comp(xbProc *p, TokenKind op, xbValue left, xbValue 
 }
 
 // a && b, a || b
-gb_internal xbValue xb_build_logical_binary(xbProc *p, Ast *expr) {
-	ast_node(be, BinaryExpr, expr);
-	Type *type = default_type(type_of_expr(expr));
+gb_internal xbValue xb_emit_logical_binary(xbProc *p, TokenKind op, Ast *left, Ast *right, Type *type) {
 	xbMem res = xb_add_local(p, t_bool, false);
 	xbBlock *rhs = xb_new_block(p);
 	xbBlock *done = xb_new_block(p);
 
-	xbValue l = xb_build_expr(p, be->left);
+	xbValue l = xb_build_expr(p, left);
 	u32 lc = xb_to_bool_reg(p, l);
 	xb_store(p, xbType_I8, res, lc);
-	if (be->op.kind == Token_CmpAnd) {
+	if (op == Token_CmpAnd) {
 		xb_branch(p, lc, rhs, done);
 	} else {
 		xb_branch(p, lc, done, rhs);
 	}
 	xb_start_block(p, rhs);
-	xbValue r = xb_build_expr(p, be->right);
+	xbValue r = xb_build_expr(p, right);
 	u32 rc = xb_to_bool_reg(p, r);
 	xb_store(p, xbType_I8, res, rc);
 	xb_jump(p, done);
@@ -2035,6 +2606,12 @@ gb_internal xbValue xb_build_logical_binary(xbProc *p, Ast *expr) {
 gb_internal xbValue xb_build_binary_expr(xbProc *p, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 	TypeAndValue tv = type_and_value_of_expr(expr);
+
+	if (is_type_matrix(be->left->tav.type) || is_type_matrix(be->right->tav.type)) {
+		xbValue left = xb_build_expr(p, be->left);
+		xbValue right = xb_build_expr(p, be->right);
+		return xb_emit_arith_matrix(p, be->op.kind, left, right, default_type(tv.type), false);
+	}
 
 	switch (be->op.kind) {
 	case Token_Add:
@@ -2054,7 +2631,7 @@ gb_internal xbValue xb_build_binary_expr(xbProc *p, Ast *expr) {
 		if (is_type_bit_set(bt)) {
 			// set operations on the backing integer
 			xbType st = xb_scalar_type(type);
-			if (st == xbType_None) XB_UNSUPPORTED(p, "large bit_set op");
+			if (st == xbType_None) return xb_bit_set_mem_op(p, be->op.kind, left, right, type);
 			u32 a = xb_value_to_reg(p, xb_emit_conv(p, left, type));
 			u32 b = xb_value_to_reg(p, xb_emit_conv(p, right, type));
 			switch (be->op.kind) {
@@ -2093,16 +2670,13 @@ gb_internal xbValue xb_build_binary_expr(xbProc *p, Ast *expr) {
 		}
 		if (left.kind == xbValue_Invalid) left = xb_build_expr(p, be->left);
 		if (right.kind == xbValue_Invalid) right = xb_build_expr(p, be->right);
-		if (is_type_bit_set(core_type(left.type)) && be->op.kind != Token_CmpEq && be->op.kind != Token_NotEq) {
-			XB_UNSUPPORTED(p, "bit_set subset comparison");
-		}
 		xbValue cmp = xb_emit_comp(p, be->op.kind, left, right);
 		Type *type = default_type(tv.type);
 		return xb_emit_conv(p, cmp, type);
 	}
 	case Token_CmpAnd:
 	case Token_CmpOr:
-		return xb_build_logical_binary(p, expr);
+		return xb_emit_logical_binary(p, be->op.kind, be->left, be->right, default_type(tv.type));
 	case Token_in:
 	case Token_not_in: {
 		xbValue left = xb_build_expr(p, be->left);
@@ -2110,10 +2684,23 @@ gb_internal xbValue xb_build_binary_expr(xbProc *p, Ast *expr) {
 		if (is_type_pointer(rt)) rt = base_type(type_deref(rt));
 		if (rt->kind == Type_BitSet) {
 			xbValue right = xb_build_expr(p, be->right);
-			if (is_type_pointer(right.type)) XB_UNSUPPORTED(p, "in pointer to bit_set");
+			if (is_type_pointer(right.type)) {
+				right = xb_load_value(p, type_deref(right.type), xb_mem_from_ptr(p, right));
+			}
 			Type *key_type = rt->BitSet.elem;
 			xbType st = xb_scalar_type(rt);
-			if (st == xbType_None) XB_UNSUPPORTED(p, "large bit_set in");
+			if (st == xbType_None) {
+				u32 in_range = 0;
+				u32 k = xb_bit_set_key_bit(p, rt, left, &in_range);
+				u32 byte = xb_select(p, xbType_I64, in_range, xb_bit_set_byte_index(p, rt, k), xb_i64(p, 0));
+				u32 ptr = xb_binop(p, xbOp_Add, xbType_I64, xb_lea(p, xb_value_to_mem(p, right)), byte);
+				u32 bits = xb_load(p, xbType_I8, xb_mem(xbMem_Reg, ptr, 0));
+				u32 shift = xb_int_resize(p, xb_binop(p, xbOp_And, xbType_I64, k, xb_i64(p, 7)), xbType_I64, xbType_I8, false);
+				u32 bit = xb_binop(p, xbOp_And, xbType_I8, xb_binop(p, xbOp_LShr, xbType_I8, bits, shift), xb_iconst(p, xbType_I8, 1));
+				u32 res = xb_binop(p, xbOp_And, xbType_I8, bit, in_range);
+				if (be->op.kind == Token_not_in) res = xb_binop(p, xbOp_Xor, xbType_I8, res, xb_iconst(p, xbType_I8, 1));
+				return xb_emit_conv(p, xb_value_reg(t_llvm_bool, res), default_type(tv.type));
+			}
 			xbValue key = xb_emit_conv(p, left, key_type);
 			xbType kt = xb_scalar_type(key_type);
 			u32 k = xb_int_resize(p, xb_value_to_reg(p, key), kt, xbType_I64, xb_type_is_signed(key_type));
@@ -2218,6 +2805,62 @@ gb_internal xbValue xb_build_address_of_type_assertion(xbProc *p, Ast *expr) {
 	return xb_value_reg(tv.type, data_ptr);
 }
 
+gb_internal xbValue xb_emit_arith_matrix(xbProc *p, TokenKind op, xbValue x, xbValue y, Type *type, bool component_wise);
+
+// lb_emit_unary_arith's negation: floats flip their sign, aggregates negate each element
+gb_internal xbValue xb_emit_neg(xbProc *p, xbValue x, Type *type) {
+	if (is_type_matrix(type)) {
+		return xb_emit_arith_matrix(p, Token_Sub, xb_zero_value(p, type), x, type, true);
+	}
+	if (is_type_array_like(type)) {
+		Type *elem = base_type(type)->kind == Type_Array ? base_type(type)->Array.elem : base_type(type)->EnumeratedArray.elem;
+		i64 count = get_array_type_count(type);
+		if (count > 64) {
+			if (is_type_integer(base_array_type(type))) {
+				return xb_emit_arith_array(p, Token_Sub, xb_zero_value(p, type), x, type);
+			}
+			XB_UNSUPPORTED(p, "negation of a long array");
+		}
+		i64 stride = type_size_of(elem);
+		xbMem src = xb_address_from_load_or_generate_local(p, x);
+		xbMem res = xb_add_local(p, type, false);
+		for (i64 i = 0; i < count; i++) {
+			xbValue e = xb_load_value(p, elem, xb_mem_offset(src, i*stride));
+			xb_store_value(p, xb_mem_offset(res, i*stride), xb_emit_neg(p, e, elem));
+		}
+		return xb_value_mem(type, res);
+	}
+	if (is_type_complex(type) || is_type_quaternion(type)) {
+		isize n = is_type_complex(type) ? 2 : 4;
+		xbValue parts[4] = {};
+		Type *ft = base_complex_elem_type(core_type(type));
+		for (isize i = 0; i < n; i++) {
+			parts[i] = xb_emit_neg(p, xb_complex_part(p, x, i), ft);
+		}
+		return xb_complex_build(p, type, parts, n);
+	}
+	if (xb_is_f16(type)) {
+		xbMem m = xb_add_local(p, type, false);
+		u32 bits = xb_load(p, xbType_I16, xb_value_to_mem(p, x));
+		i64 sign = is_type_different_to_arch_endianness(type) ? 0x0080 : 0x8000;
+		xb_store(p, xbType_I16, m, xb_binop(p, xbOp_Xor, xbType_I16, bits, xb_iconst(p, xbType_I16, sign)));
+		return xb_value_mem(type, m);
+	}
+	if (is_type_float(type) && is_type_different_to_arch_endianness(type)) {
+		Type *pt = integer_endian_type_to_platform_type(type);
+		return xb_emit_conv(p, xb_emit_neg(p, xb_emit_conv(p, x, pt), pt), type);
+	}
+	if (xb_is_int128(type) || is_type_different_to_arch_endianness(type)) {
+		return xb_emit_arith(p, Token_Sub, xb_zero_value(p, type), x, type);
+	}
+	xbType st = xb_scalar_type(type);
+	if (st == xbType_None) XB_UNSUPPORTED(p, "negate aggregate");
+	if (xb_type_is_float(st)) {
+		return xb_value_reg(type, xb_unop(p, xbOp_FNeg, st, xb_value_to_reg(p, x)));
+	}
+	return xb_value_reg(type, xb_unop(p, xbOp_Neg, st, xb_value_to_reg(p, x)));
+}
+
 gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 	ast_node(ue, UnaryExpr, expr);
 	TypeAndValue tv = type_and_value_of_expr(expr);
@@ -2284,33 +2927,7 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 		if (is_type_simd_vector(type)) {
 			return xb_simd_neg(p, x, type);
 		}
-		if (is_type_array_like(type)) {
-			return xb_emit_arith_array(p, Token_Sub, xb_zero_value(p, type), x, type);
-		}
-		if (is_type_complex(type) || is_type_quaternion(type)) {
-			isize n = is_type_complex(type) ? 2 : 4;
-			xbValue parts[4] = {};
-			Type *ft = base_complex_elem_type(core_type(type));
-			for (isize i = 0; i < n; i++) {
-				parts[i] = xb_emit_arith(p, Token_Sub, xb_zero_value(p, ft), xb_complex_part(p, x, i), ft);
-			}
-			return xb_complex_build(p, type, parts, n);
-		}
-		if (xb_is_int128(type) || is_type_different_to_arch_endianness(type) || xb_is_f16(type)) {
-			if (xb_is_f16(type)) {
-				xbMem m = xb_add_local(p, type, false);
-				u32 bits = xb_load(p, xbType_I16, xb_value_to_mem(p, x));
-				xb_store(p, xbType_I16, m, xb_binop(p, xbOp_Xor, xbType_I16, bits, xb_iconst(p, xbType_I16, 0x8000)));
-				return xb_value_mem(type, m);
-			}
-			return xb_emit_arith(p, Token_Sub, xb_zero_value(p, type), x, type);
-		}
-		xbType st = xb_scalar_type(type);
-		if (st == xbType_None) XB_UNSUPPORTED(p, "negate aggregate");
-		if (xb_type_is_float(st)) {
-			return xb_value_reg(type, xb_unop(p, xbOp_FNeg, st, xb_value_to_reg(p, x)));
-		}
-		return xb_value_reg(type, xb_unop(p, xbOp_Neg, st, xb_value_to_reg(p, x)));
+		return xb_emit_neg(p, x, type);
 	}
 	case Token_Xor: {
 		xbValue x = xb_emit_conv(p, xb_build_expr(p, ue->expr), type);
@@ -2568,6 +3185,25 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 		return xb_value_mem(type, xb_add_local(p, type, true));
 	}
 
+	if (is_type_bit_field(type)) {
+		// every value first, then each field's bits into the zeroed backing
+		Type *bf = base_type(type);
+		auto values = array_make<xbValue>(xb_allocator(), 0, cl->elems.count);
+		auto indices = array_make<isize>(xb_allocator(), 0, cl->elems.count);
+		for (Ast *elem : cl->elems) {
+			ast_node(fv, FieldValue, elem);
+			Selection sel = lookup_field(bf, fv->field->Ident.interned, false);
+			GB_ASSERT(sel.is_bit_field && sel.index.count == 1);
+			array_add(&values, xb_emit_conv(p, xb_build_expr(p, fv->value), sel.entity->type));
+			array_add(&indices, cast(isize)sel.index[0]);
+		}
+		xbMem m = xb_add_local(p, type, true);
+		for_array(i, values) {
+			xb_bit_field_store(p, xb_addr_bit_field(m, bf, indices[i]), values[i]);
+		}
+		return xb_load_value(p, type, m);
+	}
+
 	switch (bt->kind) {
 	case Type_Struct: {
 		if (bt->Struct.soa_kind != StructSoa_None) {
@@ -2615,8 +3251,19 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 				ast_node(fv, FieldValue, elem);
 				sel = lookup_field(bt, fv->field->Ident.interned, false);
 				GB_ASSERT(sel.entity != nullptr);
-				if (sel.is_bit_field) XB_UNSUPPORTED(p, "bit field compound literal");
 				value_expr = fv->value;
+				if (sel.is_bit_field) {
+					// a bit_field's field reached through `using`
+					xbValue v = xb_emit_conv(p, xb_build_expr(p, value_expr), sel.entity->type);
+					Selection sub = sel;
+					sub.index.count -= 1;
+					xbAddr bf = xb_emit_deep_field(p, type, m, sub);
+					if (is_type_pointer(bf.type)) {
+						bf = xb_addr(type_deref(bf.type), xb_mem(xbMem_Reg, xb_load(p, xbType_I64, bf.mem), 0));
+					}
+					xb_bit_field_store(p, xb_addr_bit_field(bf.mem, bf.type, sel.index[sel.index.count-1]), v);
+					continue;
+				}
 				xbAddr a = xb_emit_deep_field(p, type, m, sel);
 				xbValue v = xb_build_expr(p, value_expr);
 				if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
@@ -2690,6 +3337,37 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 		}
 		if (bt->kind == Type_Slice) {
 			return xb_make_slice_value(p, type, xb_lea(p, m), xb_iconst(p, xbType_I64, count));
+		}
+		return xb_value_mem(type, m);
+	}
+	case Type_Matrix: {
+		// elements are written in row major order
+		xbMem m = xb_add_local(p, type, true);
+		Type *et = bt->Matrix.elem;
+		i64 es = type_size_of(et);
+		i64 elem_index = 0;
+		for (Ast *elem : cl->elems) {
+			if (elem->kind == Ast_FieldValue) {
+				ast_node(fv, FieldValue, elem);
+				xbValue v = xb_emit_conv(p, xb_build_expr(p, fv->value), et);
+				i64 lo = 0, hi = 0;
+				if (is_ast_range(fv->field)) {
+					ast_node(ie, BinaryExpr, fv->field);
+					lo = exact_value_to_i64(ie->left->tav.value);
+					hi = exact_value_to_i64(ie->right->tav.value);
+					if (ie->op.kind != Token_RangeHalf) hi += 1;
+				} else {
+					lo = exact_value_to_i64(fv->field->tav.value);
+					hi = lo + 1;
+				}
+				for (i64 k = lo; k < hi; k++) {
+					xb_store_value(p, xb_mem_offset(m, matrix_row_major_index_to_offset(bt, k)*es), v);
+				}
+			} else {
+				xbValue v = xb_build_expr(p, elem);
+				if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
+				xb_store_value(p, xb_mem_offset(m, matrix_row_major_index_to_offset(bt, elem_index++)*es), xb_emit_conv(p, v, et));
+			}
 		}
 		return xb_value_mem(type, m);
 	}
@@ -2788,7 +3466,20 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 		break;
 	case Type_BitSet: {
 		xbType st = xb_scalar_type(type);
-		if (st == xbType_None) XB_UNSUPPORTED(p, "large bit_set literal");
+		if (st == xbType_None) {
+			// set each element's bit in memory
+			xbMem m = xb_add_local(p, type, true);
+			for (Ast *elem : cl->elems) {
+				u32 in_range = 0;
+				u32 k = xb_bit_set_key_bit(p, type, xb_build_expr(p, elem), &in_range);
+				u32 byte = xb_select(p, xbType_I64, in_range, xb_bit_set_byte_index(p, type, k), xb_i64(p, 0));
+				u32 shift = xb_int_resize(p, xb_binop(p, xbOp_And, xbType_I64, k, xb_i64(p, 7)), xbType_I64, xbType_I8, false);
+				u32 bit = xb_binop(p, xbOp_Shl, xbType_I8, in_range, shift);
+				xbMem at = xb_mem(xbMem_Reg, xb_binop(p, xbOp_Add, xbType_I64, xb_lea(p, m), byte), 0);
+				xb_store(p, xbType_I8, at, xb_binop(p, xbOp_Or, xbType_I8, xb_load(p, xbType_I8, at), bit));
+			}
+			return xb_value_mem(type, m);
+		}
 		u32 acc = xb_iconst(p, st, 0);
 		Type *et = bt->BitSet.elem;
 		for (Ast *elem : cl->elems) {
@@ -3161,6 +3852,10 @@ gb_internal xbValue xb_build_expr_internal(xbProc *p, Ast *expr) {
 		return xb_addr_load(p, xb_build_addr(p, expr));
 	case_end;
 
+	case_ast_node(ie, MatrixIndexExpr, expr);
+		return xb_addr_load(p, xb_build_addr(p, expr));
+	case_end;
+
 	case_ast_node(se, SliceExpr, expr);
 		return xb_build_slice_expr(p, expr);
 	case_end;
@@ -3200,6 +3895,11 @@ gb_internal xbValue xb_build_expr_internal(xbProc *p, Ast *expr) {
 
 	case_ast_node(ce, CallExpr, expr);
 		return xb_build_call_expr(p, expr);
+	case_end;
+
+	case_ast_node(se, SelectorCallExpr, expr);
+		GB_ASSERT(se->modified_call);
+		return xb_build_call_expr(p, se->call);
 	case_end;
 
 	case_ast_node(pl, ProcLit, expr);
@@ -3253,8 +3953,24 @@ gb_internal xbValue xb_build_expr(xbProc *p, Ast *expr) {
 		}
 		p->state_flags = out;
 	}
-	if (expr->state_flags & StateFlag_SelectorCallExpr) {
-		XB_UNSUPPORTED(p, "selector call expression");
+	if ((expr->state_flags & StateFlag_SelectorCallExpr) == 0) {
+		return xb_build_expr_internal(p, expr);
 	}
-	return xb_build_expr_internal(p, expr);
+	if (xbSelectorCache *c = xb_selector_cache_find(p, expr, false)) {
+		xbValue v = c->value;
+		xb_selector_cache_remove(p, c);
+		return v;
+	}
+	if (xbSelectorCache *c = xb_selector_cache_find(p, expr, true)) {
+		xbAddr a = c->addr;
+		xb_selector_cache_remove(p, c);
+		return xb_addr_load(p, a);
+	}
+	xbValue v = xb_build_expr_internal(p, expr);
+	xbSelectorCache c = {};
+	c.expr = expr;
+	// a snapshot, like LLVM's loaded value
+	c.value = v.kind == xbValue_Mem ? xb_value_copy_to_temp(p, v) : v;
+	array_add(&p->selector_cache, c);
+	return v;
 }

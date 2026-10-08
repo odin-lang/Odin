@@ -99,6 +99,14 @@ struct xbContextEntry {
 	isize uses;
 };
 
+// a selector call `x->f()` is `x.f(x)`, and `x` must be evaluated only once
+struct xbSelectorCache {
+	Ast *   expr;
+	bool    is_addr;
+	xbValue value;
+	xbAddr  addr;
+};
+
 struct xbProc {
 	xbModule *  m;
 	Entity *    entity;
@@ -124,6 +132,7 @@ struct xbProc {
 	isize                   scope_index;
 	xbTargetList *          targets;
 	Array<xbBranchBlocks>   branch_blocks;
+	Array<xbSelectorCache>  selector_cache;
 
 	i32         sret_local;
 	Array<i32>  split_ret_locals;
@@ -435,6 +444,7 @@ gb_internal xbType xb_scalar_type(Type *t) {
 		return xb_scalar_type(t->Enum.base_type);
 	case Type_BitSet: {
 		Type *backing = bit_set_to_int(t);
+		if (is_type_array(backing)) backing = base_array_type(backing);
 		if (is_type_different_to_arch_endianness(backing) || is_type_endian_big(backing)) {
 			return xbType_None;
 		}
@@ -1150,6 +1160,9 @@ gb_internal xbValue xb_float_to_int(xbProc *p, xbValue v, Type *t) {
 }
 
 gb_internal xbValue xb_union_conv(xbProc *p, xbValue v, Type *t, bool *ok);
+gb_internal xbMem   xb_matrix_elem_mem(xbMem m, Type *mt, i64 row, i64 column);
+gb_internal xbValue xb_matrix_ev(xbProc *p, xbMem m, Type *mt, i64 row, i64 column);
+gb_internal xbValue xb_const_value(xbProc *p, Type *type, ExactValue value);
 gb_internal xbAddr xb_emit_deep_field(xbProc *p, Type *type, xbMem mem, Selection const &sel);
 
 // A port of lb_emit_conv, in the same order.
@@ -1285,6 +1298,13 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 
 	// integer -> boolean
 	if (is_type_integer(src) && is_type_boolean(dst)) {
+		if (xb_is_int128(src) && ds != xbType_None) {
+			// any bit set, in either byte order
+			xbPair pr = xb_pair_of(p, v);
+			u32 any = xb_binop(p, xbOp_Or, xbType_I64, pr.lo, pr.hi);
+			u32 b = xb_cmp(p, xbCond_NE, xbType_I64, any, xb_i64(p, 0));
+			return xb_emit_conv(p, xb_value_reg(t_llvm_bool, b), t);
+		}
 		if (ss == xbType_None || ds == xbType_None) XB_UNSUPPORTED(p, "wide integer to bool");
 		u32 b = xb_cmp(p, xbCond_NE, ss, xb_value_to_reg(p, v), xb_iconst(p, ss, 0));
 		return xb_emit_conv(p, xb_value_reg(t_llvm_bool, b), t);
@@ -1345,7 +1365,7 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 		xbValue parts[4] = {xb_complex_part(p, v, 1), zero, zero, xb_complex_part(p, v, 0)};
 		return xb_complex_build(p, t, parts, 4);
 	}
-	if (is_type_complex(src) || is_type_complex(dst) || is_type_quaternion(src) || is_type_quaternion(dst)) {
+	if ((is_type_complex(src) || is_type_complex(dst) || is_type_quaternion(src) || is_type_quaternion(dst)) && !is_type_any(dst)) {
 		XB_UNSUPPORTED(p, "complex conversion");
 	}
 
@@ -1478,8 +1498,55 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 		return xb_value_mem(t, dm);
 	}
 
-	if (is_type_matrix(dst) || is_type_matrix(src)) {
-		XB_UNSUPPORTED(p, "matrix conversion");
+	if (is_type_matrix(dst) && !is_type_matrix(src)) {
+		// a scalar becomes the diagonal
+		Type *elem = base_array_type(dst);
+		xbValue e = xb_emit_conv(p, v, elem);
+		if (e.kind == xbValue_Mem) e = xb_value_copy_to_temp(p, e);
+		xbValue zero = xb_zero_value(p, elem);
+		xbMem m = xb_add_local(p, t, false);
+		for (i64 j = 0; j < dst->Matrix.column_count; j++) {
+			for (i64 i = 0; i < dst->Matrix.row_count; i++) {
+				xb_store_value(p, xb_matrix_elem_mem(m, dst, i, j), i == j ? e : zero);
+			}
+		}
+		return xb_value_mem(t, m);
+	}
+	if (is_type_matrix(dst) && is_type_matrix(src)) {
+		xbMem m = xb_add_local(p, t, true);
+		xbMem sm = xb_address_from_load_or_generate_local(p, v);
+		Type *de = dst->Matrix.elem;
+		if (dst->Matrix.row_count == src->Matrix.row_count && dst->Matrix.column_count == src->Matrix.column_count) {
+			for (i64 j = 0; j < dst->Matrix.column_count; j++) {
+				for (i64 i = 0; i < dst->Matrix.row_count; i++) {
+					xb_store_value(p, xb_matrix_elem_mem(m, dst, i, j), xb_emit_conv(p, xb_matrix_ev(p, sm, src, i, j), de));
+				}
+			}
+		} else if (is_matrix_square(dst)) {
+			// the top left corner, the rest of the identity
+			for (i64 j = 0; j < dst->Matrix.column_count; j++) {
+				for (i64 i = 0; i < dst->Matrix.row_count; i++) {
+					if (i < src->Matrix.row_count && j < src->Matrix.column_count) {
+						xb_store_value(p, xb_matrix_elem_mem(m, dst, i, j), xb_emit_conv(p, xb_matrix_ev(p, sm, src, i, j), de));
+					} else if (i == j) {
+						xb_store_value(p, xb_matrix_elem_mem(m, dst, i, j), xb_const_value(p, de, exact_value_i64(1)));
+					}
+				}
+			}
+		} else {
+			// the same elements in column major order
+			i64 count = src->Matrix.row_count*src->Matrix.column_count;
+			Type *se = src->Matrix.elem;
+			if (are_types_identical(base_type(de), base_type(se)) && type_size_of(dst) == type_size_of(src)) {
+				xb_memcopy(p, m, sm, type_size_of(dst));
+			} else {
+				for (i64 i = 0; i < count; i++) {
+					xbValue e = xb_load_value(p, se, xb_mem_offset(sm, matrix_column_major_index_to_offset(src, i)*type_size_of(se)));
+					xb_store_value(p, xb_mem_offset(m, matrix_column_major_index_to_offset(dst, i)*type_size_of(de)), xb_emit_conv(p, e, de));
+				}
+			}
+		}
+		return xb_value_mem(t, m);
 	}
 
 	if (is_type_any(dst)) {
