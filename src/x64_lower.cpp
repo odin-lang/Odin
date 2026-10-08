@@ -644,7 +644,8 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 			xb_enc(a, XB_W, 0x03, scratch, xb_m_sym(cast(i32)m.base, 0, xbReloc_GOTTPOFF));
 			return xb_m(scratch, m.offset);
 		}
-		bool preemptible = (s->flags & xbSymbolFlag_Export) && build_context.build_mode == BuildMode_DynamicLibrary;
+		bool preemptible = (s->flags & xbSymbolFlag_Export) &&
+		                   (build_context.build_mode == BuildMode_DynamicLibrary || build_context.reloc_mode == RelocMode_PIC);
 		if (((s->flags & xbSymbolFlag_Foreign) && s->section == xbSection_Undef) || preemptible) {
 			// mov scratch, [rip + sym@GOTPCREL]
 			xb_enc(a, XB_W, 0x8B, scratch, xb_m_sym(cast(i32)m.base, 0, xbReloc_REX_GOTPCRELX));

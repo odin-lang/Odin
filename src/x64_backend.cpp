@@ -265,6 +265,16 @@ gb_internal i32 xb_compile_data_proc_lit(xbModule *m, Ast *expr, char const **re
 }
 
 gb_internal String xb_object_path(lbGenerator *gen) {
+	if (build_context.build_mode == BuildMode_Object) {
+		// one of the outputs, next to the objects of LLVM's modules
+		Path out = build_context.build_paths[BuildPath_Output];
+		bool is_dir = path_is_directory(out);
+		String name = is_dir ? gen->info->init_package->name : out.name;
+		String ext = is_dir ? str_lit("obj") : out.ext;
+		gbString path = gb_string_make_length(heap_allocator(), out.basename.text, out.basename.len);
+		path = gb_string_append_fmt(path, "/%.*s-x64.%.*s", LIT(name), LIT(ext));
+		return make_string(cast(u8 *)path, gb_string_length(path));
+	}
 	String dir = temporary_directory(permanent_allocator());
 	if (dir.len == 0) {
 		dir = build_context.build_paths[BuildPath_Output].basename;
