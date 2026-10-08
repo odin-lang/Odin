@@ -393,7 +393,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		LLVMBool is_definition = true;
 		unsigned scope_line = line;
 		u32 flags = LLVMDIFlagStaticMember;
-		LLVMBool is_optimized = false;
+		LLVMBool is_optimized = build_context.optimization_level > OptimizationLevel_Minimal && entity->Procedure.optimization_mode != ProcedureOptimizationMode_None;
 		if (bt->Proc.diverging) {
 			flags |= LLVMDIFlagNoReturn;
 		}

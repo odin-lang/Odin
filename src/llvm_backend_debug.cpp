@@ -18,6 +18,36 @@ gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef va
 	}
 }
 
+#if LLVM_VERSION_MAJOR >= 22
+// NOTE(bill): with the source's checksum, a debugger can tell when the file it shows is not the one that was compiled.
+// MD5 is the only kind a DWARF 5 line table holds, and it holds none unless every file has one.
+gb_internal String lb_debug_file_checksum(AstFile *f) {
+	String *checksum = f->debug_checksum.load();
+	if (checksum == nullptr) {
+		u8 digest[16] = {};
+		md5(f->tokenizer.start, f->tokenizer.end - f->tokenizer.start, digest);
+
+		u8 *hex = gb_alloc_array(permanent_allocator(), u8, 32);
+		for (isize i = 0; i < 16; i++) {
+			hex[2*i+0] = "0123456789abcdef"[digest[i] >> 4];
+			hex[2*i+1] = "0123456789abcdef"[digest[i] & 15];
+		}
+
+		String *s = permanent_alloc_item<String>();
+		*s = make_string(hex, 32);
+		if (f->debug_checksum.compare_exchange_strong(checksum, s)) {
+			checksum = s;
+		}
+	}
+	return *checksum;
+}
+
+gb_internal WORKER_TASK_PROC(lb_debug_file_checksum_worker_proc) {
+	lb_debug_file_checksum(cast(AstFile *)data);
+	return 0;
+}
+#endif
+
 gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
 	if (f == nullptr || m->debug_builder == nullptr) {
 		return nullptr;
@@ -25,9 +55,18 @@ gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
 	MUTEX_GUARD(&m->debug_values_mutex);
 	LLVMMetadataRef res = lb_get_llvm_metadata(m, f);
 	if (res == nullptr) {
+	#if LLVM_VERSION_MAJOR >= 22
+		String checksum = lb_debug_file_checksum(f);
+		res = LLVMDIBuilderCreateFileWithChecksum(m->debug_builder,
+			cast(char const *)f->filename.text, f->filename.len,
+			cast(char const *)f->directory.text, f->directory.len,
+			CSK_MD5, cast(char const *)checksum.text, checksum.len,
+			nullptr, 0);
+	#else
 		res = LLVMDIBuilderCreateFile(m->debug_builder,
 			cast(char const *)f->filename.text, f->filename.len,
 			cast(char const *)f->directory.text, f->directory.len);
+	#endif
 		lb_set_llvm_metadata(m, f, res);
 	}
 	return res;

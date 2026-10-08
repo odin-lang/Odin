@@ -2872,6 +2872,13 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
 	defer (LLVMDisposePassBuilderOptions(pb_options));
 
+	if (build_context.ODIN_DEBUG && build_context.optimization_level >= OptimizationLevel_Minimal) {
+		// NOTE(bill): assignment tracking follows each variable's stores through the optimizations, so more of them keep
+		// a location; it must run first, and it sets the `debug-info-assignment-tracking` module flag itself.
+		// It is a function pass, wrapped so the pipeline is still parsed as one of module passes.
+		array_add(&passes, "function(declare-to-assign)");
+	}
+
 	#include "llvm_backend_passes.cpp"
 
 	// asan - Linux, Darwin, Windows
@@ -3523,6 +3530,18 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
+
+#if LLVM_VERSION_MAJOR >= 22
+	if (build_context.ODIN_DEBUG) {
+		// NOTE(bill): the files are hashed for their debug info on the thread pool, while the stages below are mostly on one thread.
+		// Nothing waits for them: a file not hashed yet when its debug info is made is hashed then.
+		for (auto const &entry : info->packages) {
+			for (AstFile *f : entry.value->files) {
+				thread_pool_add_task(lb_debug_file_checksum_worker_proc, f);
+			}
+		}
+	}
+#endif
 
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64: 
