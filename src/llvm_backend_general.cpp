@@ -4199,7 +4199,7 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	}
 	bool ignore_body = other_module != m;
 
-	lbProcedure *proc = lb_create_procedure(m, e, ignore_body);
+	lbProcedure *proc = lb_create_procedure(m, e, ignore_body || xb_handles(e));
 	if (proc == nullptr) {
 		// This is an unspecialized polymorphic procedure, which should not be codegen'd
 		lbValue dummy = {};
@@ -4210,7 +4210,9 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 	// NOTE(bill): Until the modules are generated in parallel, a procedure may be referenced before it is created
 	// (e.g. an @(init) procedure by the startup procedure), but after that it was missed by the frontend
-	if (!ignore_body) {
+	if (xb_handles(e)) {
+		// compiled by the x64 backend, only declared here
+	} else if (!ignore_body) {
 		GB_ASSERT_MSG(!gen->modules_in_parallel, "missing procedure '%.*s' (%s)", LIT(e->token.string), token_pos_to_string(e->token.pos));
 		mpsc_enqueue(&m->procedures_to_generate, proc);
 	} else {

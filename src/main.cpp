@@ -520,6 +520,7 @@ enum BuildFlagKind {
 
 	// internal use only
 	BuildFlag_InternalFastISel,
+	BuildFlag_Backend,
 	BuildFlag_InternalIgnoreLazy,
 	BuildFlag_InternalIgnoreLLVMBuild,
 	BuildFlag_InternalIgnorePanic,
@@ -794,6 +795,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DisableInitFini,         str_lit("disable-init-fini"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_InternalFastISel,        str_lit("internal-fast-isel"),        BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_Backend,                 str_lit("backend"),                   BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnorePanic,     str_lit("internal-ignore-panic"),     BuildFlagParam_None,    Command_all);
@@ -1835,6 +1837,22 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_InternalFastISel:
 							build_context.fast_isel = true;
 							break;
+						case BuildFlag_Backend: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String b = value.value_string;
+							if (b == "llvm") {
+								build_context.backend = Backend_LLVM;
+							} else if (b == "x64") {
+								build_context.backend = Backend_X64;
+							} else {
+								gb_printf_err("Invalid backend for -backend:<string>, got %.*s\n", LIT(b));
+								gb_printf_err("Valid backends:\n");
+								gb_printf_err("\tllvm\n");
+								gb_printf_err("\tx64 (unoptimized linux_amd64 builds; falls back to LLVM per procedure)\n");
+								bad_flags = true;
+							}
+							break;
+						}
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
 							break;

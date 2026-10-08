@@ -31,6 +31,9 @@
 #include "llvm_backend_proc.cpp"
 #include "llvm_backend_asm.cpp"
 
+gb_internal GB_COMPARE_PROC(llvm_global_entity_cmp);
+#include "x64_backend.cpp"
+
 gb_internal String get_default_microarchitecture() {
 	String default_march = str_lit("generic");
 	if (build_context.metrics.arch == TargetArch_amd64) {
@@ -2281,6 +2284,9 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 		if (init.value == nullptr) {
 			LLVMTypeRef global_type = llvm_addr_type(p->module, var.var);
 			if (is_type_untyped_nil(init.type)) {
+				if (xb_handles(e)) {
+					return true; // already zero
+				}
 				LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
 				var.is_initialized = true;
 
@@ -2294,7 +2300,7 @@ gb_internal bool lb_init_global_var(lbModule *m, lbProcedure *p, Entity *e, Ast 
 
 		if (is_type_any(e->type)) {
 			var.init = init;
-		} else if (lb_is_const_or_global(init)) {
+		} else if (lb_is_const_or_global(init) && !xb_handles(e)) {
 			if (!var.is_initialized) {
 				if (is_type_proc(init.type)) {
 					init.value = LLVMConstPointerCast(init.value, lb_type(p->module, init.type));
@@ -2376,6 +2382,19 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 	lbValue g = {};
 	g.type = alloc_type_pointer(e->type);
 	g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+
+	if (xb_handles(e)) {
+		// the x64 backend defines it, this is only a declaration
+		LLVMSetLinkage(g.value, LLVMExternalLinkage);
+		lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
+		LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
+		var->is_initialized = decl->init_expr != nullptr && lb_global_variable_has_constant_init(e, decl);
+		g.value = LLVMConstPointerCast(g.value, lb_type(m, alloc_type_pointer(e->type)));
+		var->var = g;
+		lb_add_entity(m, e, g);
+		lb_add_member(m, name, g);
+		return;
+	}
 
 	if (decl->init_expr != nullptr) {
 		TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
@@ -2613,7 +2632,11 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 
 	for (Entity *e : m->global_procedures_to_create) {
 		(void)lb_get_entity_name(m, e);
-		mpsc_enqueue(&m->procedures_to_generate, lb_create_procedure(m, e));
+		// procedures the x64 backend compiled are only declared here
+		lbProcedure *p = lb_create_procedure(m, e, xb_handles(e));
+		if (p != nullptr) {
+			mpsc_enqueue(&m->procedures_to_generate, p);
+		}
 	}
 	return 0;
 }
@@ -3012,7 +3035,7 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	for (lbGlobalVariable *var : m->global_variables) {
 		lb_create_global_variable(m, var);
 	}
-	if (m == &m->gen->default_module || m->type_info_members != nullptr) {
+	if ((m == &m->gen->default_module || m->type_info_members != nullptr) && !xb_owns_type_info()) {
 		lb_setup_type_info_data(m);
 	}
 	for (lbProcedure *p = nullptr; mpsc_dequeue(&m->procedures_to_generate, &p); /**/) {
@@ -3865,6 +3888,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	// queued after the x64 backend, which may make the startup itself
+	auto vars_to_initialize = array_make<lbGlobalVariable *>(heap_allocator(), 0, 64);
+	defer (array_free(&vars_to_initialize));
+
 	// `lb_setup_type_info_data` sets its initializer
 	Entity *type_table = scope_lookup_current(info->runtime_package->scope, string_interner_insert(str_lit("type_table")));
 
@@ -3896,7 +3923,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		array_add(&m->global_variables, var);
 
 		if (decl->init_expr != nullptr && !lb_global_variable_has_constant_init(e, decl)) {
-			lb_add_global_variable_to_initialize(m, var);
+			array_add(&vars_to_initialize, var);
 		}
 	}
 
@@ -3956,14 +3983,50 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	if (xb_is_enabled()) {
+		TIME_SECTION("x64 Backend Code Gen");
+		xb_generate(gen);
+
+		if (xb_is_complete()) {
+			// everything is in the x64 backend's object, LLVM has nothing left to do
+			for (Entity *e : info->required_foreign_imports_through_force) {
+				lb_add_foreign_library_path(default_module, e);
+			}
+			xb_add_object(gen);
+			array_sort(gen->foreign_libraries, foreign_library_cmp);
+			return true;
+		}
+	}
+
 	TIME_SECTION("LLVM Runtime Objective-C Names Creation");
 	gen->objc_names = lb_create_objc_names(default_module);
 
-	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
-	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names);
+	if (xb_owns_type_info()) {
+		// the x64 backend defines the table, so this is only a declaration
+		LLVMSetInitializer(lb_global_type_info_data_ptr(default_module).value, nullptr);
+	}
 
-	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
-	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
+	// declarations only, for a test main to call
+	lbProcedure *startup_runtime_decl = nullptr;
+	lbProcedure *cleanup_runtime_decl = nullptr;
+	if (xb_owns_startup()) {
+		GB_ASSERT(gen->objc_names == nullptr);
+		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+		startup_runtime_decl = lb_create_dummy_procedure(default_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
+		cleanup_runtime_decl = lb_create_dummy_procedure(default_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);
+	} else {
+		for (lbGlobalVariable *var : vars_to_initialize) {
+			lb_add_global_variable_to_initialize(var->decl->entity.load(std::memory_order_relaxed)->code_gen_module.load(std::memory_order_relaxed), var);
+		}
+
+		TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
+		gen->startup_runtime = lb_create_startup_runtime(default_module, gen->objc_names);
+		startup_runtime_decl = gen->startup_runtime;
+
+		TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
+		gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
+		cleanup_runtime_decl = gen->cleanup_runtime;
+	}
 
 
 	if (build_context.ODIN_DEBUG) {
@@ -3983,9 +4046,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Procedure Generation");
 	lb_generate_procedures(gen, do_threading);
 
-	if (build_context.command_kind == Command_test && !already_has_entry_point) {
+	if (build_context.command_kind == Command_test && !already_has_entry_point && !xb_owns_test_main()) {
 		TIME_SECTION("LLVM main");
-		lb_create_main_procedure(default_module, gen->startup_runtime, gen->cleanup_runtime);
+		lb_create_main_procedure(default_module, startup_runtime_decl, cleanup_runtime_decl);
 	}
 
 	TIME_SECTION("LLVM Procedure Generation (queued)");
@@ -4251,6 +4314,8 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	array_sort(gen->foreign_libraries, foreign_library_cmp);
+
+	xb_add_object(gen);
 
 	return true;
 }

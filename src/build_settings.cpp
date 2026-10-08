@@ -462,6 +462,11 @@ enum LTOKind : i32 {
 	LTO_Thin_Files,
 };
 
+enum BackendKind : u8 {
+	Backend_LLVM,
+	Backend_X64, // the x64 debug backend, LLVM handles what it cannot
+};
+
 enum LinkerChoice : i32 {
 	Linker_Invalid = -1,
 	Linker_Default = 0, // radlink on Windows
@@ -609,6 +614,7 @@ struct BuildContext {
 	bool   has_ansi_terminal_colours;
 
 	bool   fast_isel;
+	BackendKind backend;
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
 	bool   ignore_panic;
@@ -2127,6 +2133,27 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 
 	if (build_context.use_single_module) {
 		bc->use_separate_modules = false;
+	}
+
+	if (bc->backend == Backend_X64) {
+		if (bc->metrics.arch != TargetArch_amd64 || bc->metrics.os != TargetOs_linux) {
+			gb_printf_err("-backend:x64 is only supported for linux_amd64 for now\n");
+			gb_exit(1);
+		}
+		if (bc->optimization_level > 0) {
+			gb_printf_err("-backend:x64 is only for unoptimized builds, use -o:none or -o:minimal\n");
+			gb_exit(1);
+		}
+		if (bc->build_mode != BuildMode_Executable && bc->build_mode != BuildMode_DynamicLibrary) {
+			gb_printf_err("-backend:x64 only supports -build-mode:exe, -build-mode:test and -build-mode:dll\n");
+			gb_exit(1);
+		}
+		if (bc->lto_kind != LTO_None) {
+			gb_printf_err("-backend:x64 cannot be used with -lto\n");
+			gb_exit(1);
+		}
+		// objects from both backends are linked together, which needs external symbols
+		bc->use_separate_modules = true;
 	}
 
 	if (bc->lto_kind == LTO_Thin || bc->lto_kind == LTO_Thin_Files) {
