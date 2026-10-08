@@ -828,6 +828,15 @@ gb_internal LLVMMetadataRef lb_debug_enum(lbModule *m, Type *type, String name, 
 }
 
 gb_internal LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 size_in_bits, LLVMDWARFTypeEncoding encoding, LLVMDIFlags flags = LLVMDIFlagZero) {
+	if ((flags & LLVMDIFlagBigEndian) && build_context.metrics.os == TargetOs_windows) {
+		// NOTE: CodeView has no endianness and drops the names of basic types and typedefs, so a big endian type is
+		// an empty enum of its bits, which keeps its name for a view to swap the bytes
+		if (encoding == LLVMDWARFTypeEncoding_Float) {
+			encoding = LLVMDWARFTypeEncoding_Unsigned;
+		}
+		LLVMMetadataRef bits = LLVMDIBuilderCreateBasicType(m->debug_builder, cast(char const *)name.text, name.len, size_in_bits, encoding, LLVMDIFlagZero);
+		return LLVMDIBuilderCreateEnumerationType(m->debug_builder, nullptr, cast(char const *)name.text, name.len, nullptr, 0, size_in_bits, cast(u32)size_in_bits, nullptr, 0, bits);
+	}
 	LLVMMetadataRef basic_type = LLVMDIBuilderCreateBasicType(m->debug_builder, cast(char const *)name.text, name.len, size_in_bits, encoding, flags);
 #if 1
 	LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(m->debug_builder, basic_type, cast(char const *)name.text, name.len, nullptr, 0, nullptr, cast(u32)size_in_bits);

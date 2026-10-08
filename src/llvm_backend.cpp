@@ -3999,6 +3999,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic;?]?\", expr: \"rows($, array(data, len), len)\"}");
 
+			// big endian integers, see `lb_debug_type_basic_type`
+			lb_add_raddbg_string(m, "type_view: {type: \"i16be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"u16be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"i32be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"u32be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"i64be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"u64be\", expr: \"bswap $\"}");
+
 			// column major matrices
 			lb_add_raddbg_string(m, "type_view: {type: \"matrix[1, ?]?\",  expr: \"columns($.data, $[0])\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"matrix[2, ?]?\",  expr: \"columns($.data, $[0], $[1])\"}");
