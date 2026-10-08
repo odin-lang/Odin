@@ -250,6 +250,9 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	map_set(&c->info->objc_msgSend_types, call, data);
 	mutex_unlock(&c->info->objc_objc_msgSend_mutex);
 
+	// the Objective-C setup looks up the receiver's class and the selector of every message
+	try_to_add_package_dependency(c, "runtime", "objc_lookUpClass");
+	try_to_add_package_dependency(c, "runtime", "sel_registerName");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
