@@ -481,15 +481,31 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 	return xb_value_reg(e->type, xb_lea(p, m));
 }
 
+// A thread local's storage. An executable reaches it from the thread pointer (initial exec),
+// anything else may be loaded with dlopen, so it asks __tls_get_addr (general dynamic) like LLVM.
+gb_internal xbMem xb_tls_mem(xbProc *p, i32 sym) {
+	if (build_context.build_mode == BuildMode_Executable) {
+		return xb_mem(xbMem_Sym, cast(u32)sym);
+	}
+	i32 get_addr = xb_symbol(p->m, str_lit("__tls_get_addr"));
+	p->m->symbols[get_addr].flags |= xbSymbolFlag_Func | xbSymbolFlag_Foreign;
+	xbInstr in = xb_instr(xbOp_TlsAddr);
+	in.type = xbType_I64;
+	in.imm = sym;
+	in.dst = xb_new_vreg(p, xbType_I64);
+	xb_emit(p, in);
+	return xb_mem(xbMem_Reg, in.dst, 0);
+}
+
 gb_internal xbMem xb_global_mem(xbProc *p, Entity *e) {
 	GB_ASSERT(e->kind == Entity_Variable);
-	if (e->Variable.thread_local_model.len != 0 && build_context.build_mode != BuildMode_Executable) {
-		XB_UNSUPPORTED(p, "thread local variable outside an executable");
-	}
 	if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 		XB_UNSUPPORTED(p, "unreferenced global");
 	}
 	i32 sym = xb_entity_symbol(p, e);
+	if (e->Variable.thread_local_model.len != 0) {
+		return xb_tls_mem(p, sym);
+	}
 	return xb_mem(xbMem_Sym, sym);
 }
 
@@ -534,6 +550,9 @@ gb_internal xbAddr xb_build_addr_from_entity(xbProc *p, Entity *e, Ast *expr) {
 		if (e->flags & EntityFlag_Static) {
 			i32 *sym = map_get(&p->family->statics, e);
 			if (sym == nullptr) XB_UNSUPPORTED(p, "static local variable");
+			if (e->Variable.thread_local_model.len != 0) {
+				return xb_addr(e->type, xb_tls_mem(p, *sym));
+			}
 			return xb_addr(e->type, xb_mem(xbMem_Sym, cast(u32)*sym));
 		}
 		return xb_addr(e->type, xb_global_mem(p, e));

@@ -666,11 +666,13 @@ gb_internal i32 xb_entity_symbol(xbProc *p, Entity *e) {
 	xbSymbol *s = &p->m->symbols[sym];
 	if (e->kind == Entity_Procedure) {
 		s->flags |= xbSymbolFlag_Func;
+		if (e->Procedure.is_export) s->flags |= xbSymbolFlag_Export;
 		if (e->Procedure.is_foreign) {
 			s->flags |= xbSymbolFlag_Foreign;
 			xb_note_foreign_library(p->m, e->Procedure.foreign_library);
 		}
 	} else if (e->kind == Entity_Variable) {
+		if (e->Variable.is_export) s->flags |= xbSymbolFlag_Export;
 		if (e->Variable.is_foreign) {
 			s->flags |= xbSymbolFlag_Foreign;
 			xb_note_foreign_library(p->m, e->Variable.foreign_library);

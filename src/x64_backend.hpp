@@ -153,6 +153,7 @@ enum xbOp : u8 {
 	xbOp_Vec128,      // [mem] = x86 vector instruction xb_vec_intrinsics[aux] on [a], [b], [c]; a, b, c are pointers, imm = immediate
 	xbOp_Valgrind,    // dst = valgrind client request(default = a, args = [b])
 	xbOp_Alloca,      // dst = a bytes of fresh stack memory aligned to imm
+	xbOp_TlsAddr,     // dst = this thread's address of the thread local symbol imm, a call to __tls_get_addr
 
 	xbOp_COUNT,
 };
@@ -392,6 +393,7 @@ enum xbSymbolFlag : u8 {
 	xbSymbolFlag_Hidden  = 1<<3,
 	xbSymbolFlag_Foreign = 1<<4, // defined outside the executable, reach data through the GOT
 	xbSymbolFlag_TLS     = 1<<5,
+	xbSymbolFlag_Export  = 1<<6, // default visibility, so a shared object reaches it through the GOT
 };
 
 struct xbSymbol {
@@ -412,6 +414,7 @@ enum xbRelocKind : u8 {
 	xbReloc_Abs32,
 	xbReloc_TPOFF32,
 	xbReloc_GOTTPOFF,
+	xbReloc_TLSGD,
 };
 
 struct xbReloc {

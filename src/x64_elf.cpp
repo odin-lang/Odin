@@ -11,6 +11,7 @@ enum : u32 {
 	XB_R_X86_64_GOTPCREL      = 9,
 	XB_R_X86_64_32            = 10,
 	XB_R_X86_64_DTPOFF64      = 17,
+	XB_R_X86_64_TLSGD         = 19,
 	XB_R_X86_64_GOTTPOFF      = 22,
 	XB_R_X86_64_TPOFF32       = 23,
 	XB_R_X86_64_GOTPCRELX     = 41,
@@ -1093,6 +1094,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 		case xbReloc_Abs32:         type = XB_R_X86_64_32; break;
 		case xbReloc_TPOFF32:       type = XB_R_X86_64_TPOFF32; break;
 		case xbReloc_GOTTPOFF:      type = XB_R_X86_64_GOTTPOFF; break;
+		case xbReloc_TLSGD:         type = XB_R_X86_64_TLSGD; break;
 		}
 		xbElfRela er = {};
 		er.r_offset = cast(u64)r.offset;

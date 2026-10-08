@@ -3353,7 +3353,6 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		Entity *e = entity_of_node(ident);
 		bool tls = e->Variable.thread_local_model.len != 0;
-		if (tls && build_context.build_mode != BuildMode_Executable) XB_UNSUPPORTED(p, "thread local static outside an executable");
 		xbSection sec = tls ? xbSection_TData : xbSection_Data;
 		i64 size = gb_max(type_size_of(e->type), cast(i64)1);
 		i64 align = gb_max(gb_max(type_align_of(e->type), cast(i64)e->Variable.custom_align), cast(i64)1);
@@ -3384,9 +3383,12 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		s->size = size;
 		s->flags = tls ? (xbSymbolFlag_Global | xbSymbolFlag_Hidden | xbSymbolFlag_TLS) : 0;
 
-		xbVar v = {};
-		v.mem = xb_mem(xbMem_Sym, cast(u32)sym);
-		map_set(&p->vars, e, v);
+		if (!tls) {
+			// a thread local's address is asked for at each use, see xb_tls_mem
+			xbVar v = {};
+			v.mem = xb_mem(xbMem_Sym, cast(u32)sym);
+			map_set(&p->vars, e, v);
+		}
 		map_set(&p->family->statics, e, sym);
 
 		if (!is_blank_ident(e->token.string)) {

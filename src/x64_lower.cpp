@@ -139,6 +139,9 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 		f(in.b, false);
 		f(in.dst, true);
 		break;
+	case xbOp_TlsAddr:
+		f(in.dst, true);
+		break;
 	case xbOp_Alloca:
 		f(in.a, false);
 		f(in.dst, true);
@@ -641,7 +644,8 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 			xb_enc(a, XB_W, 0x03, scratch, xb_m_sym(cast(i32)m.base, 0, xbReloc_GOTTPOFF));
 			return xb_m(scratch, m.offset);
 		}
-		if ((s->flags & xbSymbolFlag_Foreign) && s->section == xbSection_Undef) {
+		bool preemptible = (s->flags & xbSymbolFlag_Export) && build_context.build_mode == BuildMode_DynamicLibrary;
+		if (((s->flags & xbSymbolFlag_Foreign) && s->section == xbSection_Undef) || preemptible) {
 			// mov scratch, [rip + sym@GOTPCREL]
 			xb_enc(a, XB_W, 0x8B, scratch, xb_m_sym(cast(i32)m.base, 0, xbReloc_REX_GOTPCRELX));
 			return xb_m(scratch, m.offset);
@@ -1578,6 +1582,17 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		}
 		if (e.imm) xb_b(a, cast(u8)in.imm);
 		xb_movups_m_x(a, xb_mem_opnd(L, in.mem, R11), xmm1);
+		break;
+	}
+	case xbOp_TlsAddr: {
+		// the exact general dynamic sequence, which the linker may rewrite into a cheaper model
+		xb_b(a, 0x66);
+		xb_enc(a, XB_W, 0x8D, RDI, xb_m_sym(cast(i32)in.imm, 0, xbReloc_TLSGD));
+		xb_b(a, 0x66);
+		xb_b(a, 0x66);
+		xb_b(a, 0x48);
+		xb_call_sym(a, xb_symbol(L->p->m, str_lit("__tls_get_addr")));
+		xb_store_gpr(L, in.dst, RAX, 8);
 		break;
 	}
 	case xbOp_Valgrind:
