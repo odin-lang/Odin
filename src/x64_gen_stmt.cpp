@@ -406,47 +406,61 @@ gb_internal xbValue xb_handle_param_value(xbProc *p, Type *parameter_type, Param
 // Calls to LLVM intrinsics declared as foreign procedures. At -O0 LLVM turns the libm
 // ones into plain calls to the C library, and so does this.
 // x86 vector intrinsics with no portable form run as the instruction itself, as LLVM does
+gb_internal xbValue xb_emit_vec128(xbProc *p, i32 index, u32 a, u32 b, u32 c, u8 imm, Type *result_type) {
+	xbInstr in = xb_instr(xbOp_Vec128);
+	in.aux = cast(u8)index;
+	in.a = a;
+	in.b = b;
+	in.c = c;
+	in.imm = imm;
+	in.mem = xb_add_local(p, result_type, false);
+	xb_emit(p, in);
+	return xb_value_mem(result_type, in.mem);
+}
+
 gb_internal bool xb_build_x86_vec_intrinsic(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
-	struct VecIntrinsic { char const *name; xbVecOp op; isize vec_args; };
-	static VecIntrinsic const table[] = {
-		{"llvm.x86.ssse3.pshuf.b.128", xbVec_Pshufb,      2},
-		{"llvm.x86.sha1msg1",          xbVec_Sha1Msg1,    2},
-		{"llvm.x86.sha1msg2",          xbVec_Sha1Msg2,    2},
-		{"llvm.x86.sha1nexte",         xbVec_Sha1Nexte,   2},
-		{"llvm.x86.sha1rnds4",         xbVec_Sha1Rnds4,   2},
-		{"llvm.x86.sha256msg1",        xbVec_Sha256Msg1,  2},
-		{"llvm.x86.sha256msg2",        xbVec_Sha256Msg2,  2},
-		{"llvm.x86.sha256rnds2",       xbVec_Sha256Rnds2, 3},
-	};
-	VecIntrinsic const *v = nullptr;
-	for (VecIntrinsic const &t : table) {
-		if (name == make_string_c(t.name)) {
-			v = &t;
-			break;
-		}
+	i32 index = xb_vec_intrinsic_index(name);
+	if (index < 0) return false;
+	xbVecIntrinsic const &v = xb_vec_intrinsics[index];
+	isize vec_args = 2;
+	switch (v.form) {
+	case xbVecForm_Unary:    vec_args = 1; break;
+	case xbVecForm_ShiftImm: vec_args = 1; break;
+	case xbVecForm_Xmm0:     vec_args = 3; break;
+	case xbVecForm_Binary:   vec_args = 2; break;
+	case xbVecForm_ToGpr:    vec_args = 1; break;
+	case xbVecForm_Flags:    vec_args = 2; break;
 	}
-	if (v == nullptr) return false;
-	if (type_size_of(result_type) != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
+	bool scalar_result = v.form == xbVecForm_ToGpr || v.form == xbVecForm_Flags;
+	i64 result_size = type_size_of(result_type);
+	if (scalar_result ? (result_size != 4 && result_size != 8) : result_size != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
+	if (ce->args.count != vec_args + (v.imm ? 1 : 0)) XB_UNSUPPORTED(p, "llvm intrinsic");
 
 	u32 ptrs[3] = {};
-	for (isize i = 0; i < v->vec_args; i++) {
+	for (isize i = 0; i < vec_args; i++) {
 		xbValue x = xb_build_expr(p, ce->args[i]);
 		if (type_size_of(x.type) != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
 		ptrs[i] = xb_lea(p, xb_address_from_load_or_generate_local(p, x));
 	}
-	xbInstr in = xb_instr(xbOp_Vec128);
-	in.aux = cast(u8)v->op;
-	in.a = ptrs[0];
-	in.b = ptrs[1];
-	in.c = ptrs[2];
-	if (v->op == xbVec_Sha1Rnds4) {
-		TypeAndValue tv = type_and_value_of_expr(ce->args[2]);
+	if (vec_args == 1) ptrs[1] = ptrs[0];
+	u8 imm = 0;
+	if (v.imm) {
+		TypeAndValue tv = type_and_value_of_expr(ce->args[vec_args]);
 		if (tv.value.kind != ExactValue_Integer) XB_UNSUPPORTED(p, "llvm intrinsic");
-		in.imm = exact_value_to_i64(tv.value) & 3;
+		i64 k = exact_value_to_i64(tv.value);
+		if (v.form == xbVecForm_ShiftImm) {
+			// every count past the element width gives the same result
+			k = gb_clamp(k, 0, 255);
+		} else if (v.opcode == 0xC2 && (k < 0 || k > 7)) {
+			// the predicates past 7 only exist in the VEX encoding
+			XB_UNSUPPORTED(p, "llvm intrinsic");
+		}
+		imm = cast(u8)k;
 	}
-	in.mem = xb_add_local(p, result_type, false);
-	xb_emit(p, in);
-	*res = xb_value_mem(result_type, in.mem);
+	*res = xb_emit_vec128(p, index, ptrs[0], ptrs[1], ptrs[2], imm, result_type);
+	if (scalar_result) {
+		*res = xb_value_reg(result_type, xb_load(p, xb_scalar_type(result_type), res->mem));
+	}
 	return true;
 }
 
@@ -485,7 +499,6 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 	xbType st = xb_scalar_type(ct);
 	u32 args[3] = {};
 	if (n > gb_count_of(args)) XB_UNSUPPORTED(p, "llvm intrinsic");
-	if (base == "fmuladd" && ft == t_f16) XB_UNSUPPORTED(p, "llvm intrinsic");
 	for (isize i = 0; i < n; i++) {
 		xbValue v = xb_build_expr(p, ce->args[i]);
 		v = xb_emit_conv(p, xb_emit_conv(p, v, ft), ct);
@@ -496,7 +509,11 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 		// only fused when the target has fma
 		if (check_target_feature_is_enabled(str_lit("fma"), nullptr)) XB_UNSUPPORTED(p, "llvm intrinsic fmuladd with fma");
 		u32 m = xb_binop(p, xbOp_FMul, st, args[0], args[1]);
-		return xb_value_reg(result_type, xb_binop(p, xbOp_FAdd, st, m, args[2]));
+		if (ft == t_f16) {
+			// LLVM rounds the product to f16 before the add
+			m = xb_value_to_reg(p, xb_f16_to_f32(p, xb_float_to_f16(p, xb_value_reg(ct, m), t_f16)));
+		}
+		return xb_emit_conv(p, xb_value_reg(ct, xb_binop(p, xbOp_FAdd, st, m, args[2])), result_type);
 	}
 	if (base == "sqrt" && n == 1) {
 		return xb_emit_conv(p, xb_value_reg(ct, xb_unop(p, xbOp_Sqrt, st, args[0])), result_type);
@@ -934,6 +951,28 @@ gb_internal void xb_build_soa_copy_from_slice(xbProc *p, AstCallExpr *ce) {
 // Builtins
 ////////////////////////////////////////////////////////////////
 
+// minnum/maxnum of two floats: `a` when it compares so or `b` is a NaN, else `b`.
+// An f16 is compared as f32 and keeps its own bits.
+gb_internal xbValue xb_float_pick(xbProc *p, Type *t, xbValue a, xbValue b, bool is_max) {
+	if (xb_is_f16(t)) {
+		u32 af = xb_value_to_reg(p, xb_f16_to_f32(p, a));
+		u32 bf = xb_value_to_reg(p, xb_f16_to_f32(p, b));
+		u32 pick_a = xb_cmp(p, is_max ? xbCond_FGT : xbCond_FLT, xbType_F32, af, bf);
+		u32 b_nan = xb_cmp(p, xbCond_FNE, xbType_F32, bf, bf);
+		u32 cond = xb_binop(p, xbOp_Or, xbType_I8, pick_a, b_nan);
+		u32 ab = xb_value_to_reg(p, xb_emit_transmute(p, a, t_u16));
+		u32 bb = xb_value_to_reg(p, xb_emit_transmute(p, b, t_u16));
+		return xb_emit_transmute(p, xb_value_reg(t_u16, xb_select(p, xbType_I16, cond, ab, bb)), t);
+	}
+	xbType st = xb_scalar_type(t);
+	u32 ar = xb_value_to_reg(p, a);
+	u32 br = xb_value_to_reg(p, b);
+	u32 pick_a = xb_cmp(p, is_max ? xbCond_FGT : xbCond_FLT, st, ar, br);
+	u32 r = xb_select(p, st, pick_a, ar, br);
+	u32 b_nan = xb_cmp(p, xbCond_FNE, st, br, br);
+	return xb_value_reg(t, xb_select(p, st, b_nan, ar, r));
+}
+
 gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
 	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
@@ -977,6 +1016,10 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 			xbMem m = xb_value_to_mem(p, v);
 			i64 off = (id == BuiltinProc_cap && is_type_dynamic_array(t)) ? 16 : 8;
 			return xb_emit_conv(p, xb_value_reg(t_int, xb_load(p, xbType_I64, xb_mem_offset(m, off))), tv.type);
+		}
+		if (is_type_fixed_capacity_dynamic_array(t) && id == BuiltinProc_len) {
+			xbMem m = xb_value_to_mem(p, v);
+			return xb_emit_conv(p, xb_value_reg(t_int, xb_load(p, xbType_I64, xb_mem_offset(m, cast(i32)type_offset_of(t, 1)))), tv.type);
 		}
 		{
 			gbString r = gb_string_make(permanent_allocator(), "len of ");
@@ -1047,19 +1090,16 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		// max then min, like lb_emit_clamp
 		Type *t = default_type(tv.type);
 		xbType st = xb_scalar_type(t);
-		if (st == xbType_None) XB_UNSUPPORTED(p, "clamp type");
+		if (st == xbType_None && !xb_is_f16(t)) XB_UNSUPPORTED(p, "clamp type");
 		xbValue x = xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t);
 		xbValue lo = xb_emit_conv(p, xb_build_expr(p, ce->args[1]), t);
 		xbValue hi = xb_emit_conv(p, xb_build_expr(p, ce->args[2]), t);
 		auto pick = [&](xbValue a, xbValue b, bool is_max) -> xbValue {
+			if (xb_is_f16(t) || xb_type_is_float(st)) {
+				return xb_float_pick(p, t, a, b, is_max);
+			}
 			u32 ar = xb_value_to_reg(p, a);
 			u32 br = xb_value_to_reg(p, b);
-			if (xb_type_is_float(st)) {
-				u32 pick_a = xb_cmp(p, is_max ? xbCond_FGT : xbCond_FLT, st, ar, br);
-				u32 r = xb_select(p, st, pick_a, ar, br);
-				u32 b_nan = xb_cmp(p, xbCond_FNE, st, br, br);
-				return xb_value_reg(t, xb_select(p, st, b_nan, ar, r));
-			}
 			bool sgn = xb_type_is_signed(t);
 			xbCond c = is_max ? (sgn ? xbCond_SGT : xbCond_UGT) : (sgn ? xbCond_SLT : xbCond_ULT);
 			return xb_value_reg(t, xb_select(p, st, xb_cmp(p, c, st, ar, br), ar, br));
@@ -1069,12 +1109,14 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_raw_data: {
 		xbValue v = xb_build_expr(p, ce->args[0]);
 		Type *t = base_type(v.type);
-		if (is_type_pointer(t)) XB_UNSUPPORTED(p, "raw_data pointer");
+		if (is_type_pointer(t) || is_type_multi_pointer(t)) {
+			return xb_value_reg(tv.type, xb_value_to_reg(p, v));
+		}
 		if (is_type_string(t) || is_type_slice(t) || is_type_dynamic_array(t)) {
 			xbMem m = xb_value_to_mem(p, v);
 			return xb_value_reg(tv.type, xb_load(p, xbType_I64, m));
 		}
-		if (is_type_cstring(t)) {
+		if (is_type_cstring(t) || is_type_cstring16(t)) {
 			return xb_value_reg(tv.type, xb_value_to_reg(p, v));
 		}
 		XB_UNSUPPORTED(p, "raw_data of type");
@@ -1083,19 +1125,12 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_max: {
 		Type *t = default_type(tv.type);
 		xbType st = xb_scalar_type(t);
-		if (st == xbType_None || ce->args.count < 2) XB_UNSUPPORTED(p, "min/max");
+		if ((st == xbType_None && !xb_is_f16(t)) || ce->args.count < 2) XB_UNSUPPORTED(p, "min/max");
 		xbValue acc = xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t);
 		for (isize i = 1; i < ce->args.count; i++) {
 			xbValue b = xb_emit_conv(p, xb_build_expr(p, ce->args[i]), t);
-			if (xb_type_is_float(st)) {
-				// minnum/maxnum: a NaN operand gives the other operand
-				u32 ar = xb_value_to_reg(p, acc);
-				u32 br = xb_value_to_reg(p, b);
-				u32 pick_a = xb_cmp(p, id == BuiltinProc_min ? xbCond_FLT : xbCond_FGT, st, ar, br);
-				u32 r = xb_select(p, st, pick_a, ar, br);
-				u32 b_nan = xb_cmp(p, xbCond_FNE, st, br, br);
-				r = xb_select(p, st, b_nan, ar, r);
-				acc = xb_value_reg(t, r);
+			if (xb_is_f16(t) || xb_type_is_float(st)) {
+				acc = xb_float_pick(p, t, acc, b, id == BuiltinProc_max);
 				continue;
 			}
 			bool sgn = xb_type_is_signed(t);
@@ -1547,6 +1582,11 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_sqrt: {
 		Type *t = default_type(tv.type);
 		xbType st = xb_scalar_type(t);
+		if (xb_is_f16(t)) {
+			// in f32, which rounds to the same f16
+			xbValue x = xb_f16_to_f32(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t));
+			return xb_float_to_f16(p, xb_value_reg(t_f32, xb_unop(p, xbOp_Sqrt, xbType_F32, xb_value_to_reg(p, x))), t);
+		}
 		if (!xb_type_is_float(st)) XB_UNSUPPORTED(p, "sqrt type");
 		u32 x = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t));
 		return xb_value_reg(t, xb_unop(p, xbOp_Sqrt, st, x));
@@ -1845,7 +1885,7 @@ gb_internal xbValue xb_emit_union_wrap(xbProc *p, Type *union_type, Type *varian
 ////////////////////////////////////////////////////////////////
 
 gb_internal void xb_build_stmt(xbProc *p, Ast *node);
-gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target);
+gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos);
 
 gb_internal void xb_open_scope(xbProc *p) {
 	p->scope_index += 1;
@@ -1853,7 +1893,19 @@ gb_internal void xb_open_scope(xbProc *p) {
 
 gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d);
 
-gb_internal void xb_close_scope(xbProc *p) {
+// The position #branch_location reports for the defers run when leaving at `node`, as LLVM picks it
+gb_internal TokenPos xb_defer_pos(Ast *node) {
+	if (node == nullptr) return {};
+	if (node->kind == Ast_BlockStmt || node->kind == Ast_CaseClause) {
+		return ast_end_token(node).pos;
+	}
+	return ast_token(node).pos;
+}
+
+gb_internal void xb_close_scope(xbProc *p, Ast *node) {
+	TokenPos prev_pos = p->branch_location_pos;
+	p->branch_location_pos = xb_defer_pos(node);
+	defer (p->branch_location_pos = prev_pos);
 	// run the defers of this scope
 	while (p->defers.count > 0) {
 		xbDefer d = p->defers[p->defers.count-1];
@@ -1894,7 +1946,10 @@ gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d) {
 	p->context_stack.count = prev;
 }
 
-gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target) {
+gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos) {
+	TokenPos prev_pos = p->branch_location_pos;
+	p->branch_location_pos = pos;
+	defer (p->branch_location_pos = prev_pos);
 	isize i = p->defers.count;
 	while (i --> 0) {
 		xbDefer const &d = p->defers[i];
@@ -2027,7 +2082,11 @@ gb_internal void xb_check_nested_decls(xbProc *p, Slice<Ast *> const &stmts) {
 				xb_family_add(p->family, e);
 			}
 		} else if (stmt->kind == Ast_ForeignBlockDecl) {
-			XB_UNSUPPORTED(p, "nested foreign block");
+			// foreign procedures only need their symbols; variables would need more
+			ast_node(fb, ForeignBlockDecl, stmt);
+			for (Ast *decl : fb->body->BlockStmt.stmts) {
+				if (decl->kind == Ast_ValueDecl && decl->ValueDecl.is_mutable) XB_UNSUPPORTED(p, "nested foreign variable");
+			}
 		}
 	}
 }
@@ -2140,7 +2199,7 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 }
 
 gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &results, TokenPos pos);
-gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named);
+gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named, TokenPos pos);
 
 gb_internal void xb_emit_ret(xbProc *p, xbMem direct_result) {
 	xbAbiFunc *abi = p->abi;
@@ -2185,7 +2244,7 @@ gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_resu
 	TypeProc *pt = &base_type(p->type)->Proc;
 	isize return_count = pt->result_count;
 	if (return_count == 0) {
-		xb_emit_defer_stmts(p, true, nullptr);
+		xb_emit_defer_stmts(p, true, nullptr, pos);
 		if (!xb_curr_terminated(p)) {
 			xb_emit_ret(p, {});
 		}
@@ -2208,11 +2267,11 @@ gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_resu
 			array_add(&results, xb_load_value(p, e->type, found->mem));
 		}
 	}
-	xb_return_with_results(p, results, return_results.count != 0);
+	xb_return_with_results(p, results, return_results.count != 0, pos);
 }
 
 // Writes the results out, runs the defers and returns.
-gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named) {
+gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named, TokenPos pos) {
 	xbAbiFunc *abi = p->abi;
 	TypeProc *pt = &base_type(p->type)->Proc;
 	isize return_count = pt->result_count;
@@ -2271,7 +2330,7 @@ gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool
 		xb_store_value(p, direct, xb_emit_conv(p, last, last_type));
 	}
 
-	xb_emit_defer_stmts(p, true, nullptr);
+	xb_emit_defer_stmts(p, true, nullptr, pos);
 	if (!xb_curr_terminated(p)) {
 		xb_emit_ret(p, direct);
 	}
@@ -2305,14 +2364,14 @@ gb_internal void xb_build_if_stmt(xbProc *p, Ast *node) {
 		xb_start_block(p, else_);
 		xb_open_scope(p);
 		xb_build_stmt(p, is->else_stmt);
-		xb_close_scope(p);
+		xb_close_scope(p, is->else_stmt);
 		xb_jump(p, done);
 	}
 	if (is->label != nullptr) {
 		xb_pop_target_list(p);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, node);
 }
 
 gb_internal void xb_build_for_stmt(xbProc *p, Ast *node) {
@@ -2347,7 +2406,7 @@ gb_internal void xb_build_for_stmt(xbProc *p, Ast *node) {
 		xb_jump(p, loop);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, node);
 }
 
 gb_internal Ast *xb_strip_and_prefix(Ast *ident) {
@@ -2570,6 +2629,26 @@ gb_internal void xb_build_range_indexed(xbProc *p, AstRangeStmt *rs) {
 			nullptr, nullptr);
 		return;
 	}
+	case Type_FixedCapacityDynamicArray: {
+		// the elements live inline, the length is read on every iteration
+		xbAddr addr = xb_build_addr(p, expr);
+		if (addr.kind != xbAddr_Default) XB_UNSUPPORTED(p, "range over special addr");
+		xbMem array = addr.mem;
+		if (is_type_pointer(addr.type)) {
+			array = xb_mem(xbMem_Reg, xb_load(p, xbType_I64, array), 0);
+		}
+		i32 base_local = xb_add_local_raw(p, 8, 8);
+		xb_store(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)base_local), xb_lea(p, array));
+		Type *elem = et->FixedCapacityDynamicArray.elem;
+		i64 stride = type_size_of(elem);
+		i64 len_offset = type_offset_of(et, 1);
+		auto base = [&]() { return xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)base_local)); };
+		xb_build_range_indexed_loop(p, rs, elem,
+			[&]() { return xb_load(p, xbType_I64, xb_mem(xbMem_Reg, base(), cast(i32)len_offset)); },
+			[&](u32 idx) { return xb_ptr_add_scaled(p, base(), idx, stride); },
+			nullptr, nullptr);
+		return;
+	}
 	case Type_Slice: {
 		xbValue v = xb_build_expr(p, expr);
 		i32 count_local = -1;
@@ -2611,6 +2690,8 @@ gb_internal void xb_build_range_string(xbProc *p, AstRangeStmt *rs) {
 		s = xb_load_value(p, type_deref(s.type), xb_mem_from_ptr(p, s));
 	}
 	if (is_type_untyped(s.type)) s = xb_emit_conv(p, s, default_type(s.type));
+	bool is16 = is_type_string16(s.type);
+	Type *str_type = is16 ? t_string16 : t_string;
 	xbMem str = xb_value_copy_to_temp(p, s).mem;
 	xbMem offset_mem = xb_add_local(p, t_int, false);
 
@@ -2637,17 +2718,17 @@ gb_internal void xb_build_range_string(xbProc *p, AstRangeStmt *rs) {
 	xbValue res = {};
 	u32 idx = 0;
 	if (!rs->reverse) {
-		xbValue rest = xb_make_slice_value(p, t_string, xb_binop(p, xbOp_Add, xbType_I64, base, off), xb_binop(p, xbOp_Sub, xbType_I64, len, off));
+		xbValue rest = xb_make_slice_value(p, str_type, xb_ptr_add_scaled(p, base, off, is16 ? 2 : 1), xb_binop(p, xbOp_Sub, xbType_I64, len, off));
 		xbValue args[1] = {rest};
-		res = xb_emit_runtime_call(p, "string_decode_rune", xb_args(args, 1));
+		res = xb_emit_runtime_call(p, is16 ? "string16_decode_rune" : "string_decode_rune", xb_args(args, 1));
 		Type *ft = nullptr;
 		u32 w = xb_load(p, xbType_I64, xb_mem_offset(res.mem, type_offset_of(res.type, 1, &ft)));
 		xb_store(p, xbType_I64, offset_mem, xb_binop(p, xbOp_Add, xbType_I64, off, w));
 		idx = off;
 	} else {
-		xbValue prefix = xb_make_slice_value(p, t_string, base, off);
+		xbValue prefix = xb_make_slice_value(p, str_type, base, off);
 		xbValue args[1] = {prefix};
-		res = xb_emit_runtime_call(p, "string_decode_last_rune", xb_args(args, 1));
+		res = xb_emit_runtime_call(p, is16 ? "string16_decode_last_rune" : "string_decode_last_rune", xb_args(args, 1));
 		Type *ft = nullptr;
 		u32 w = xb_load(p, xbType_I64, xb_mem_offset(res.mem, type_offset_of(res.type, 1, &ft)));
 		u32 next = xb_binop(p, xbOp_Sub, xbType_I64, off, w);
@@ -3001,9 +3082,10 @@ gb_internal void xb_build_range_stmt(xbProc *p, AstRangeStmt *rs) {
 				xb_build_range_soa(p, rs);
 			} else if (t->kind == Type_Tuple) {
 				xb_build_range_tuple(p, rs);
-			} else if (is_type_string(t) && !is_type_string16(t) && !is_type_cstring(t)) {
+			} else if (is_type_string(t) && !is_type_cstring(t) && !is_type_cstring16(t)) {
 				xb_build_range_string(p, rs);
-			} else if (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_Slice || t->kind == Type_DynamicArray) {
+			} else if (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_Slice || t->kind == Type_DynamicArray ||
+			           t->kind == Type_FixedCapacityDynamicArray) {
 				xb_build_range_indexed(p, rs);
 			} else if (t->kind == Type_BitSet) {
 				xb_build_range_bit_set(p, rs, t);
@@ -3017,7 +3099,7 @@ gb_internal void xb_build_range_stmt(xbProc *p, AstRangeStmt *rs) {
 			}
 		}
 	}
-	xb_close_scope(p);
+	xb_close_scope(p, is_ast_range(expr) ? expr->BinaryExpr.left : rs->body);
 }
 
 gb_internal void xb_build_switch_stmt(xbProc *p, AstSwitchStmt *ss) {
@@ -3089,12 +3171,12 @@ gb_internal void xb_build_switch_stmt(xbProc *p, AstSwitchStmt *ss) {
 		xb_push_target_list(p, ss->label, done, nullptr, fall);
 		xb_open_scope(p);
 		xb_build_stmt_list(p, cc->stmts);
-		xb_close_scope(p);
+		xb_close_scope(p, clauses[i]);
 		xb_pop_target_list(p);
 		xb_jump(p, done);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, ss->body);
 }
 
 gb_internal void xb_bind_var(xbProc *p, Entity *e, xbMem mem, bool indirect) {
@@ -3283,12 +3365,12 @@ gb_internal void xb_build_type_switch_stmt(xbProc *p, AstTypeSwitchStmt *ss) {
 		}
 		xb_push_target_list(p, ss->label, done, nullptr, nullptr);
 		xb_build_stmt_list(p, cc->stmts);
-		xb_close_scope(p);
+		xb_close_scope(p, clause);
 		xb_pop_target_list(p);
 		xb_jump(p, done);
 	}
 	xb_start_block(p, done);
-	xb_close_scope(p);
+	xb_close_scope(p, ss->body);
 }
 
 gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
@@ -3297,7 +3379,6 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		Entity *e = entity_of_node(ident);
 		bool tls = e->Variable.thread_local_model.len != 0;
-		if (tls && build_context.build_mode != BuildMode_Executable) XB_UNSUPPORTED(p, "thread local static outside an executable");
 		xbSection sec = tls ? xbSection_TData : xbSection_Data;
 		i64 size = gb_max(type_size_of(e->type), cast(i64)1);
 		i64 align = gb_max(gb_max(type_align_of(e->type), cast(i64)e->Variable.custom_align), cast(i64)1);
@@ -3328,9 +3409,12 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		s->size = size;
 		s->flags = tls ? (xbSymbolFlag_Global | xbSymbolFlag_Hidden | xbSymbolFlag_TLS) : 0;
 
-		xbVar v = {};
-		v.mem = xb_mem(xbMem_Sym, cast(u32)sym);
-		map_set(&p->vars, e, v);
+		if (!tls) {
+			// a thread local's address is asked for at each use, see xb_tls_mem
+			xbVar v = {};
+			v.mem = xb_mem(xbMem_Sym, cast(u32)sym);
+			map_set(&p->vars, e, v);
+		}
 		map_set(&p->family->statics, e, sym);
 
 		if (!is_blank_ident(e->token.string)) {
@@ -3417,7 +3501,7 @@ gb_internal void xb_build_unroll_range_stmt(xbProc *p, AstUnrollRangeStmt *rs) {
 			XB_UNSUPPORTED(p, "#unroll over type");
 		}
 	}
-	xb_close_scope(p);
+	xb_close_scope(p, rs->body);
 }
 
 gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
@@ -3457,6 +3541,8 @@ gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
 	case_end;
+	case_ast_node(fb, ForeignBlockDecl, node);
+	case_end;
 	case_ast_node(us, UsingStmt, node);
 	case_end;
 	case_ast_node(ws, WhenStmt, node);
@@ -3475,7 +3561,7 @@ gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
 		}
 		xb_open_scope(p);
 		xb_build_stmt_list(p, bs->stmts);
-		xb_close_scope(p);
+		xb_close_scope(p, node);
 		if (done != nullptr) {
 			xb_jump(p, done);
 			xb_start_block(p, done);
@@ -3595,7 +3681,7 @@ gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
 			}
 		}
 		GB_ASSERT(block != nullptr);
-		xb_emit_defer_stmts(p, false, block);
+		xb_emit_defer_stmts(p, false, block, xb_defer_pos(node));
 		xb_jump(p, block);
 	case_end;
 
@@ -3759,7 +3845,7 @@ gb_internal void xb_end_proc(xbProc *p) {
 	TypeProc *pt = &base_type(p->type)->Proc;
 	if (!xb_curr_terminated(p)) {
 		if (pt->result_count == 0) {
-			xb_emit_defer_stmts(p, true, nullptr);
+			xb_emit_defer_stmts(p, true, nullptr, xb_defer_pos(p->body));
 			if (!xb_curr_terminated(p)) {
 				xb_emit_ret(p, {});
 			}

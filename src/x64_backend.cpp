@@ -129,7 +129,6 @@ gb_internal xbProc *xb_build_proc(xbModule *m, Entity *e, xbFamily *family, char
 	if (pt->Proc.calling_convention == ProcCC_Naked) XB_UNSUPPORTED(p, "naked procedure");
 	if (e->Procedure.link_section.len != 0) XB_UNSUPPORTED(p, "link section");
 	if (e->Procedure.has_instrumentation && m->info->instrumentation_enter_entity != nullptr) XB_UNSUPPORTED(p, "instrumentation");
-	if (e->Procedure.uses_branch_location) XB_UNSUPPORTED(p, "branch location");
 	if (build_context.sanitizer_flags != 0) XB_UNSUPPORTED(p, "sanitizers");
 	if (e->flags & EntityFlag_CustomLinkage_Internal) XB_UNSUPPORTED(p, "internal linkage");
 
@@ -177,11 +176,13 @@ gb_internal bool xb_family_build(xbModule *m, xbFamily *family, Entity *root, ch
 		String name = xb_entity_name(m, fe);
 		i32 *existing = string_map_get(&m->symbol_map, name);
 		if (existing && m->symbols[*existing].section != xbSection_Undef) {
-			if (fe == root) {
+			if (fe == root && !ptr_set_exists(&m->defined_procs, fe)) {
 				*reason = "duplicate symbol";
 				return false;
 			}
-			continue; // an anonymous procedure another family already compiled
+			// already compiled with the family of the procedure it is nested in, or another
+			// family's copy of an anonymous procedure
+			continue;
 		}
 		f64 t0 = gb_time_now();
 		xbProc *p = xb_build_proc(m, fe, family, reason);
@@ -203,6 +204,7 @@ gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root) {
 		xbSymbol *s = &m->symbols[p->sym];
 		if (pe != nullptr) {
 			if (s->section != xbSection_Undef) continue;
+			ptr_set_add(&m->defined_procs, pe);
 			s->flags = xbSymbolFlag_Global | xbSymbolFlag_Func;
 			if (!pe->Procedure.is_export) {
 				s->flags |= xbSymbolFlag_Hidden;
@@ -263,6 +265,16 @@ gb_internal i32 xb_compile_data_proc_lit(xbModule *m, Ast *expr, char const **re
 }
 
 gb_internal String xb_object_path(lbGenerator *gen) {
+	if (build_context.build_mode == BuildMode_Object) {
+		// one of the outputs, next to the objects of LLVM's modules
+		Path out = build_context.build_paths[BuildPath_Output];
+		bool is_dir = path_is_directory(out);
+		String name = is_dir ? gen->info->init_package->name : out.name;
+		String ext = is_dir ? str_lit("obj") : out.ext;
+		gbString path = gb_string_make_length(heap_allocator(), out.basename.text, out.basename.len);
+		path = gb_string_append_fmt(path, "/%.*s-x64.%.*s", LIT(name), LIT(ext));
+		return make_string(cast(u8 *)path, gb_string_length(path));
+	}
 	String dir = temporary_directory(permanent_allocator());
 	if (dir.len == 0) {
 		dir = build_context.build_paths[BuildPath_Output].basename;
@@ -289,6 +301,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	m->files = array_make<String>(heap_allocator(), 0, 64);
 	map_init(&m->file_ids);
 	ptr_set_init(&m->handled);
+	ptr_set_init(&m->defined_procs);
 	ptr_set_init(&m->foreign_libs_set);
 	m->foreign_libs = array_make<Entity *>(heap_allocator(), 0, 16);
 	ptr_set_init(&m->proc_queued);

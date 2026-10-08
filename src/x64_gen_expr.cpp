@@ -144,7 +144,11 @@ gb_internal xbValue xb_proc_lit_value(xbProc *p, Ast *expr, Type *type) {
 				break;
 			}
 		}
-		if (!inside) XB_UNSUPPORTED(p, "procedure literal of another procedure");
+		if (!inside) {
+			// passed as a constant to a polymorphic procedure: a weak copy here, as LLVM makes one
+			ptr_set_add(&p->family->on_demand, e);
+			ptr_set_add(&p->family->roots, pl->decl);
+		}
 	}
 	xb_family_add(p->family, e);
 	i32 sym = xb_entity_symbol(p, e);
@@ -461,8 +465,8 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 					break;
 				}
 			}
-			if (!inside) XB_UNSUPPORTED(p, "reference to a nested procedure of another procedure");
-			xb_family_add(p->family, e);
+			// one passed as a constant to a polymorphic procedure is generated with its own family
+			if (inside) xb_family_add(p->family, e);
 		} else if (e->min_dep_count.load(std::memory_order_relaxed) == 0 && d->proc_lit->ProcLit.body != nullptr) {
 			// nothing else generates it, so it comes along
 			if ((e->flags & EntityFlag_ProcBodyChecked) == 0) XB_UNSUPPORTED(p, "unchecked procedure");
@@ -477,15 +481,31 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 	return xb_value_reg(e->type, xb_lea(p, m));
 }
 
+// A thread local's storage. An executable reaches it from the thread pointer (initial exec),
+// anything else may be loaded with dlopen, so it asks __tls_get_addr (general dynamic) like LLVM.
+gb_internal xbMem xb_tls_mem(xbProc *p, i32 sym) {
+	if (build_context.build_mode == BuildMode_Executable) {
+		return xb_mem(xbMem_Sym, cast(u32)sym);
+	}
+	i32 get_addr = xb_symbol(p->m, str_lit("__tls_get_addr"));
+	p->m->symbols[get_addr].flags |= xbSymbolFlag_Func | xbSymbolFlag_Foreign;
+	xbInstr in = xb_instr(xbOp_TlsAddr);
+	in.type = xbType_I64;
+	in.imm = sym;
+	in.dst = xb_new_vreg(p, xbType_I64);
+	xb_emit(p, in);
+	return xb_mem(xbMem_Reg, in.dst, 0);
+}
+
 gb_internal xbMem xb_global_mem(xbProc *p, Entity *e) {
 	GB_ASSERT(e->kind == Entity_Variable);
-	if (e->Variable.thread_local_model.len != 0 && build_context.build_mode != BuildMode_Executable) {
-		XB_UNSUPPORTED(p, "thread local variable outside an executable");
-	}
 	if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {
 		XB_UNSUPPORTED(p, "unreferenced global");
 	}
 	i32 sym = xb_entity_symbol(p, e);
+	if (e->Variable.thread_local_model.len != 0) {
+		return xb_tls_mem(p, sym);
+	}
 	return xb_mem(xbMem_Sym, sym);
 }
 
@@ -530,6 +550,9 @@ gb_internal xbAddr xb_build_addr_from_entity(xbProc *p, Entity *e, Ast *expr) {
 		if (e->flags & EntityFlag_Static) {
 			i32 *sym = map_get(&p->family->statics, e);
 			if (sym == nullptr) XB_UNSUPPORTED(p, "static local variable");
+			if (e->Variable.thread_local_model.len != 0) {
+				return xb_addr(e->type, xb_tls_mem(p, *sym));
+			}
 			return xb_addr(e->type, xb_mem(xbMem_Sym, cast(u32)*sym));
 		}
 		return xb_addr(e->type, xb_global_mem(p, e));
@@ -1084,6 +1107,14 @@ gb_internal xbAddr xb_emit_deep_field(xbProc *p, Type *type, xbMem mem, Selectio
 			} else if (is_type_complex(bt)) {
 				ft = base_complex_elem_type(bt);
 				off = index * type_size_of(ft);
+			} else if (is_type_quaternion(bt)) {
+				// @QuaternionLayout: x, y, z, w; `xyz` (index -1) is the first three as an array
+				ft = base_complex_elem_type(bt);
+				if (index < 0) {
+					ft = alloc_type_array(ft, 3);
+				} else {
+					off = index * type_size_of(ft);
+				}
 			} else {
 				XB_UNSUPPORTED(p, "basic field");
 			}
@@ -1351,8 +1382,21 @@ gb_internal xbAddr xb_build_addr_index_expr(xbProc *p, Ast *expr) {
 		u32 ptr = xb_ptr_add_scaled(p, xb_value_to_reg(p, v), index, type_size_of(elem));
 		return xb_addr(elem, xb_mem(xbMem_Reg, ptr, 0));
 	}
-	case Type_FixedCapacityDynamicArray:
-		XB_UNSUPPORTED(p, "fixed capacity dynamic array index");
+	case Type_FixedCapacityDynamicArray: {
+		xbMem base = {};
+		if (deref) {
+			base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, ie->expr)), 0);
+		} else {
+			base = xb_addr_mem(p, xb_build_addr(p, ie->expr));
+		}
+		u32 array = xb_lea(p, base);
+		Type *elem = t->FixedCapacityDynamicArray.elem;
+		u32 index = xb_build_index_int(p, ie->index);
+		u32 len = xb_load(p, xbType_I64, xb_mem(xbMem_Reg, array, cast(i32)type_offset_of(t, 1)));
+		xb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		u32 ptr = xb_ptr_add_scaled(p, array, index, type_size_of(elem));
+		return xb_addr(elem, xb_mem(xbMem_Reg, ptr, 0));
+	}
 	}
 	XB_UNSUPPORTED(p, "index expression");
 	return {};
@@ -2942,6 +2986,14 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 		if (is_type_simd_vector(type)) {
 			return xb_simd_not(p, x, type);
 		}
+		if (is_type_bit_set(type)) {
+			// flips the bits of the set's values, like LLVM
+			xbValue mask = xb_const_value(p, type, exact_bit_set_all_set_mask(type));
+			if (xb_bit_set_in_memory(type)) {
+				return xb_bit_set_mem_op(p, Token_Xor, x, mask, type);
+			}
+			return xb_emit_arith(p, Token_Xor, x, mask, type);
+		}
 		if (is_type_array_like(type)) {
 			Type *elem = base_array_type(type);
 			xbValue ones = xb_emit_conv(p, xb_value_reg(elem, xb_iconst(p, xb_scalar_type(elem) == xbType_None ? xbType_I64 : xb_scalar_type(elem), -1)), type);
@@ -2955,17 +3007,6 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 		}
 		xbType st = xb_scalar_type(type);
 		if (st == xbType_None || xb_type_is_float(st)) XB_UNSUPPORTED(p, "complement type");
-		if (is_type_bit_set(type)) {
-			// only the bits of the set
-			Type *bt = core_type(type);
-			i64 bits = bt->BitSet.upper - bt->BitSet.lower + 1;
-			u32 r = xb_unop(p, xbOp_Not, st, xb_value_to_reg(p, x));
-			if (bits < 8*xb_type_size(st)) {
-				u64 mask = (bits >= 64) ? ~cast(u64)0 : ((cast(u64)1 << bits) - 1);
-				r = xb_binop(p, xbOp_And, st, r, xb_iconst(p, st, cast(i64)mask));
-			}
-			return xb_value_reg(type, r);
-		}
 		return xb_value_reg(type, xb_unop(p, xbOp_Not, st, xb_value_to_reg(p, x)));
 	}
 	case Token_Not: {
@@ -3155,6 +3196,19 @@ gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 		u32 n = xb_binop(p, xbOp_Sub, xbType_I64, hi, lo);
 		return xb_make_slice_value(p, type, d, n);
 	}
+	case Type_FixedCapacityDynamicArray: {
+		xbMem base = {};
+		if (deref) {
+			base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, se->expr)), 0);
+		} else {
+			base = xb_build_addr_mem(p, se->expr);
+		}
+		data = xb_lea(p, base);
+		// the length is read before the indices are evaluated
+		len = xb_load(p, xbType_I64, xb_mem_offset(base, type_offset_of(t, 1)));
+		elem_size = type_size_of(t->FixedCapacityDynamicArray.elem);
+		break;
+	}
 	default:
 		XB_UNSUPPORTED(p, "slice expression");
 	}
@@ -3166,6 +3220,11 @@ gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 	bool skip_check = false;
 	if (t->kind == Type_Array && low_const && high_const) {
 		skip_check = true; // checked at compile time
+	}
+	if (t->kind == Type_FixedCapacityDynamicArray) {
+		// LLVM skips the check when both indices are constants, as it does for arrays
+		skip_check = (se->low == nullptr && se->high == nullptr) ||
+		             (se->low != nullptr && se->high != nullptr && low_const && high_const);
 	}
 	if (!skip_check) {
 		xb_emit_slice_bounds_check(p, se->open, lo, hi, len, se->low != nullptr);
@@ -3183,6 +3242,8 @@ gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 ////////////////////////////////////////////////////////////////
 // Compound literals
 ////////////////////////////////////////////////////////////////
+
+gb_internal void xb_add_values_to_array(xbProc *p, Array<xbValue> *out, xbValue v);
 
 gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 	ast_node(cl, CompoundLit, expr);
@@ -3278,23 +3339,30 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 				xb_store_value(p, a.mem, xb_emit_conv(p, v, a.type));
 				continue;
 			}
-			if (field_index >= st->fields.count) XB_UNSUPPORTED(p, "compound literal index");
-			off = type_offset_of(bt, field_index, &ft);
-			field_index++;
-			xbValue v = xb_build_expr(p, value_expr);
-			if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
-			xb_store_value(p, xb_mem_offset(m, off), xb_emit_conv(p, v, ft));
+			// a call returning several values fills that many fields
+			auto values = array_make<xbValue>(xb_allocator(), 0, 1);
+			xb_add_values_to_array(p, &values, xb_build_expr(p, value_expr));
+			for (xbValue v : values) {
+				if (field_index >= st->fields.count) XB_UNSUPPORTED(p, "compound literal index");
+				off = type_offset_of(bt, field_index, &ft);
+				field_index++;
+				xb_store_value(p, xb_mem_offset(m, off), xb_emit_conv(p, v, ft));
+			}
 		}
 		return xb_value_mem(type, m);
 	}
 	case Type_Array:
 	case Type_EnumeratedArray:
 	case Type_SimdVector:
-	case Type_Slice: {
+	case Type_Slice:
+	case Type_FixedCapacityDynamicArray: {
 		Type *et = nullptr;
 		i64 count = 0;
 		ExactValue min_value = exact_value_i64(0);
-		if (bt->kind == Type_Array) {
+		if (bt->kind == Type_FixedCapacityDynamicArray) {
+			et = bt->FixedCapacityDynamicArray.elem;
+			count = bt->FixedCapacityDynamicArray.capacity;
+		} else if (bt->kind == Type_Array) {
 			et = bt->Array.elem;
 			count = bt->Array.count;
 		} else if (bt->kind == Type_SimdVector) {
@@ -3336,15 +3404,19 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 					xb_store_value(p, xb_mem_offset(m, index*stride), v);
 				}
 			} else {
-				xbValue v = xb_build_expr(p, elem);
-				if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
-				v = xb_emit_conv(p, v, et);
-				xb_store_value(p, xb_mem_offset(m, elem_index*stride), v);
-				elem_index++;
+				auto values = array_make<xbValue>(xb_allocator(), 0, 1);
+				xb_add_values_to_array(p, &values, xb_build_expr(p, elem));
+				for (xbValue v : values) {
+					xb_store_value(p, xb_mem_offset(m, elem_index*stride), xb_emit_conv(p, v, et));
+					elem_index++;
+				}
 			}
 		}
 		if (bt->kind == Type_Slice) {
 			return xb_make_slice_value(p, type, xb_lea(p, m), xb_iconst(p, xbType_I64, count));
+		}
+		if (bt->kind == Type_FixedCapacityDynamicArray) {
+			xb_store(p, xbType_I64, xb_mem_offset(m, type_offset_of(bt, 1)), xb_iconst(p, xbType_I64, cl->max_count));
 		}
 		return xb_value_mem(type, m);
 	}
@@ -3521,9 +3593,9 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 // or_return, or_else, or_break, or_continue
 ////////////////////////////////////////////////////////////////
 
-gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named);
+gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named, TokenPos pos);
 gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &results, TokenPos pos);
-gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target);
+gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos);
 gb_internal xbBranchBlocks xb_lookup_branch_blocks(xbProc *p, Ast *ident);
 
 gb_internal void xb_emit_try_lhs_rhs(xbProc *p, Ast *arg, TypeAndValue const &tv, xbValue *lhs_, xbValue *rhs_) {
@@ -3586,7 +3658,7 @@ gb_internal xbValue xb_emit_or_return(xbProc *p, Ast *arg, TypeAndValue const &t
 			GB_ASSERT(tuple->variables.count == 1);
 			auto results = array_make<xbValue>(xb_allocator(), 0, 1);
 			array_add(&results, rhs);
-			xb_return_with_results(p, results, false);
+			xb_return_with_results(p, results, false, ast_token(arg).pos);
 			array_free(&results);
 		}
 	}
@@ -3666,7 +3738,7 @@ gb_internal xbValue xb_emit_or_branch(xbProc *p, Ast *expr, TypeAndValue const &
 	xbBlock *else_ = xb_new_block(p);
 	xb_branch(p, xb_emit_try_has_value(p, rhs), then_, else_);
 	xb_start_block(p, else_);
-	xb_emit_defer_stmts(p, false, block);
+	xb_emit_defer_stmts(p, false, block, ast_token(expr).pos);
 	xb_jump(p, block);
 	xb_start_block(p, then_);
 	return lhs;
@@ -3818,6 +3890,13 @@ gb_internal xbValue xb_build_expr_internal(xbProc *p, Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Implicit, expr);
 		return xb_addr_load(p, xb_build_addr(p, expr));
+	case_end;
+
+	case_ast_node(bd, BasicDirective, expr);
+		if (bd->name.string == "branch_location") {
+			return xb_source_code_location(p, p->entity->token.string, p->branch_location_pos);
+		}
+		XB_UNSUPPORTED(p, "basic directive");
 	case_end;
 
 	case_ast_node(u, Uninit, expr);

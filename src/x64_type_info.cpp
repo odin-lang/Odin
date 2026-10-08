@@ -524,7 +524,7 @@ gb_internal bool xb_generate_type_info(xbModule *m, char const **reason) {
 		xb_blob_int(&tb, 8, 8, cast(u64)g.count);
 		i32 tsym = xb_symbol(m, xb_entity_name(m, type_table));
 		xb_blob_finish(m, &tb, 8, tsym);
-		m->symbols[tsym].flags = xbSymbolFlag_Global | xbSymbolFlag_Weak;
+		m->symbols[tsym].flags = xbSymbolFlag_Global | xbSymbolFlag_Weak | xbSymbolFlag_Hidden;
 		ptr_set_add(&m->handled, type_table);
 	}
 	return true;

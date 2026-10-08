@@ -787,9 +787,33 @@ gb_internal xbValue xb_build_builtin_simd_proc(xbProc *p, Ast *expr, TypeAndValu
 	case BuiltinProc_simd_approx_recip:
 	case BuiltinProc_simd_approx_recip_sqrt: {
 		xbType st = xb_simd_st(p, elem);
-		// f32 goes through rcpps/rsqrtps, whose approximations only the hardware gives
-		if (st != xbType_F64) XB_UNSUPPORTED(p, "simd approx recip of f32");
 		xbMem a = xb_simd_mem(p, arg0);
+		if (st == xbType_F32) {
+			// rcpps/rsqrtps on four lanes at a time, whose approximations only the hardware gives
+			i64 count = xb_simd_count(vt);
+			if (count >= 16 && check_target_feature_is_enabled(str_lit("avx512vl"), nullptr)) {
+				XB_UNSUPPORTED(p, "simd approx recip with avx512");
+			}
+			i32 index = xb_vec_intrinsic_index(id == BuiltinProc_simd_approx_recip ? str_lit("llvm.x86.sse.rcp.ps") : str_lit("llvm.x86.sse.rsqrt.ps"));
+			Type *v4 = alloc_type_simd_vector(4, t_f32);
+			xbMem res = xb_add_local(p, rt, false);
+			for (i64 chunk = 0; chunk < count; chunk += 4) {
+				xbMem src = xb_mem_offset(a, cast(i32)(chunk*4));
+				if (count < 4) {
+					// the spare lanes repeat lane 0, as LLVM widens it
+					src = xb_add_local(p, v4, false);
+					for (i64 i = 0; i < 4; i++) {
+						xb_store_value(p, xb_mem_offset(src, cast(i32)(i*4)), xb_simd_lane(p, vt, a, i < count ? i : 0));
+					}
+				}
+				u32 ptr = xb_lea(p, src);
+				xbValue r = xb_emit_vec128(p, index, ptr, ptr, 0, 0, v4);
+				for (i64 i = 0; i < gb_min(count, cast(i64)4); i++) {
+					xb_store_value(p, xb_mem_offset(res, cast(i32)((chunk+i)*4)), xb_simd_lane(p, v4, r.mem, i));
+				}
+			}
+			return xb_value_mem(rt, res);
+		}
 		return xb_simd_build_reg(p, rt, [&](i64 i) {
 			u32 x = xb_simd_lane_reg(p, vt, a, i);
 			if (id == BuiltinProc_simd_approx_recip) {

@@ -267,7 +267,7 @@ gb_internal void xb_hasher_proc_body(xbProc *p, Type *type) {
 		return;
 	}
 	if (is_type_cstring(type) || is_type_string(type)) {
-		if (is_type_string16(type) || is_type_cstring16(type)) XB_UNSUPPORTED(p, "string16 hasher");
+		// LLVM hashes a string16 with the string hasher too
 		xbValue args[2] = {xb_value_reg(t_rawptr, xb_hasher_param(p, 0)), xb_value_reg(t_uintptr, xb_hasher_param(p, 1))};
 		xbValue r = xb_emit_runtime_call(p, is_type_cstring(type) ? "default_hasher_cstring" : "default_hasher_string", xb_args(args, 2));
 		xb_ret_uintptr(p, xb_value_to_reg(p, r));
@@ -277,6 +277,20 @@ gb_internal void xb_hasher_proc_body(xbProc *p, Type *type) {
 		xbValue v = xb_load_value(p, type, xb_mem(xbMem_Reg, xb_hasher_param(p, 0), 0));
 		xbValue args[2] = {xb_emit_conv(p, v, t_f64), xb_value_reg(t_uintptr, xb_hasher_param(p, 1))};
 		xbValue r = xb_emit_runtime_call(p, "default_hasher_f64", xb_args(args, 2));
+		xb_ret_uintptr(p, xb_value_to_reg(p, r));
+		return;
+	}
+	if (is_type_complex(type) || is_type_quaternion(type)) {
+		// every part as an f64, in memory order
+		Type *ft = base_complex_elem_type(type);
+		i64 n = is_type_complex(type) ? 2 : 4;
+		xbValue args[5] = {};
+		for (i64 i = 0; i < n; i++) {
+			xbValue part = xb_load_value(p, ft, xb_mem(xbMem_Reg, xb_hasher_param(p, 0), cast(i32)(i*type_size_of(ft))));
+			args[i] = xb_emit_conv(p, part, t_f64);
+		}
+		args[n] = xb_value_reg(t_uintptr, xb_hasher_param(p, 1));
+		xbValue r = xb_emit_runtime_call(p, n == 2 ? "default_hasher_complex128" : "default_hasher_quaternion256", xb_args(args, n+1));
 		xb_ret_uintptr(p, xb_value_to_reg(p, r));
 		return;
 	}

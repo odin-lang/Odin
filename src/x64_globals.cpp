@@ -31,10 +31,6 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 		return false;
 	}
 	bool tls = e->Variable.thread_local_model.len != 0;
-	if (tls && build_context.build_mode != BuildMode_Executable) {
-		*reason = "thread local global outside an executable";
-		return false;
-	}
 	ExactValue value = {};
 	if (decl->init_expr != nullptr && lb_global_variable_has_constant_init(e, decl)) {
 		value = type_and_value_of_expr(decl->init_expr).value;
@@ -77,7 +73,8 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 	s->size = size;
 	// weak like LLVM's, so each package's object may carry a copy
 	s->flags |= xbSymbolFlag_Global;
-	if (!e->Variable.is_export) s->flags |= xbSymbolFlag_Weak;
+	// hidden like LLVM's, so a shared object may reach it directly
+	if (!e->Variable.is_export) s->flags |= xbSymbolFlag_Weak | xbSymbolFlag_Hidden;
 	if (tls) s->flags |= xbSymbolFlag_TLS;
 
 	if (build_context.ODIN_DEBUG && !is_blank_ident(e->token.string)) {

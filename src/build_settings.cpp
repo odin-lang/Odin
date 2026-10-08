@@ -2144,8 +2144,13 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			gb_printf_err("-backend:x64 is only for unoptimized builds, use -o:none or -o:minimal\n");
 			gb_exit(1);
 		}
-		if (bc->build_mode != BuildMode_Executable && bc->build_mode != BuildMode_DynamicLibrary) {
-			gb_printf_err("-backend:x64 only supports -build-mode:exe, -build-mode:test and -build-mode:dll\n");
+		if (bc->build_mode == BuildMode_Assembly) {
+			gb_printf_err("-backend:x64 cannot write assembly, use -build-mode:obj and a disassembler instead\n");
+			gb_exit(1);
+		}
+		if (bc->build_mode != BuildMode_Executable && bc->build_mode != BuildMode_DynamicLibrary &&
+		    bc->build_mode != BuildMode_Object && bc->build_mode != BuildMode_StaticLibrary) {
+			gb_printf_err("-backend:x64 only supports -build-mode:exe, test, dll, obj and lib\n");
 			gb_exit(1);
 		}
 		if (bc->lto_kind != LTO_None) {

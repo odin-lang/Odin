@@ -146,6 +146,7 @@ struct xbProc {
 	i32         last_line;
 	u16         state_flags;
 	Ast *       curr_stmt;
+	TokenPos    branch_location_pos; // where the running defers were triggered, for #branch_location
 
 	Array<xbDebugVar> debug_vars;
 	struct xbFamily * family;
@@ -665,11 +666,13 @@ gb_internal i32 xb_entity_symbol(xbProc *p, Entity *e) {
 	xbSymbol *s = &p->m->symbols[sym];
 	if (e->kind == Entity_Procedure) {
 		s->flags |= xbSymbolFlag_Func;
+		if (e->Procedure.is_export) s->flags |= xbSymbolFlag_Export;
 		if (e->Procedure.is_foreign) {
 			s->flags |= xbSymbolFlag_Foreign;
 			xb_note_foreign_library(p->m, e->Procedure.foreign_library);
 		}
 	} else if (e->kind == Entity_Variable) {
+		if (e->Variable.is_export) s->flags |= xbSymbolFlag_Export;
 		if (e->Variable.is_foreign) {
 			s->flags |= xbSymbolFlag_Foreign;
 			xb_note_foreign_library(p->m, e->Variable.foreign_library);
@@ -1265,6 +1268,10 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 
 	// boolean -> boolean/integer
 	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
+		if (endian && is_type_integer(dst)) {
+			// to the platform integer, then into the byte order
+			return xb_emit_conv(p, xb_emit_conv(p, v, integer_endian_type_to_platform_type(dst)), t);
+		}
 		if (endian) XB_UNSUPPORTED(p, "endian bool conversion");
 		if (xb_is_int128(dst)) {
 			xbPair pr = {xb_int_resize(p, xb_to_bool_reg(p, v), xbType_I8, xbType_I64, false), xb_i64(p, 0)};
@@ -1365,7 +1372,7 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 		xbValue parts[4] = {xb_complex_part(p, v, 1), zero, zero, xb_complex_part(p, v, 0)};
 		return xb_complex_build(p, t, parts, 4);
 	}
-	if ((is_type_complex(src) || is_type_complex(dst) || is_type_quaternion(src) || is_type_quaternion(dst)) && !is_type_any(dst)) {
+	if ((is_type_complex(src) || is_type_complex(dst) || is_type_quaternion(src) || is_type_quaternion(dst)) && !is_type_any(dst) && !is_type_union(dst)) {
 		XB_UNSUPPORTED(p, "complex conversion");
 	}
 

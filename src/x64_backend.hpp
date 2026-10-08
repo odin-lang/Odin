@@ -150,9 +150,10 @@ enum xbOp : u8 {
 	xbOp_MulHiU,      // dst = high 64 bits of the unsigned product a * b
 	xbOp_Cpuid,       // [mem] = eax, ebx, ecx, edx of cpuid(eax = a, ecx = b)
 	xbOp_Xgetbv,      // [mem] = eax, edx of xgetbv(ecx = a)
-	xbOp_Vec128,      // [mem] = x86 vector instruction aux (xbVecOp) on [a], [b], [c]; a, b, c are pointers, imm = immediate
+	xbOp_Vec128,      // [mem] = x86 vector instruction xb_vec_intrinsics[aux] on [a], [b], [c]; a, b, c are pointers, imm = immediate
 	xbOp_Valgrind,    // dst = valgrind client request(default = a, args = [b])
 	xbOp_Alloca,      // dst = a bytes of fresh stack memory aligned to imm
+	xbOp_TlsAddr,     // dst = this thread's address of the thread local symbol imm, a call to __tls_get_addr
 
 	xbOp_COUNT,
 };
@@ -185,18 +186,6 @@ enum xbRmwOp : u8 {
 	xbRmw_Or,
 	xbRmw_Xor,
 	xbRmw_Nand,
-};
-
-// the 128-bit x86 instructions xbOp_Vec128 runs, for LLVM intrinsics with no portable form
-enum xbVecOp : u8 {
-	xbVec_Pshufb,
-	xbVec_Sha1Msg1,
-	xbVec_Sha1Msg2,
-	xbVec_Sha1Nexte,
-	xbVec_Sha1Rnds4,
-	xbVec_Sha256Msg1,
-	xbVec_Sha256Msg2,
-	xbVec_Sha256Rnds2, // the third operand is implicitly xmm0
 };
 
 struct xbInstr {
@@ -404,6 +393,7 @@ enum xbSymbolFlag : u8 {
 	xbSymbolFlag_Hidden  = 1<<3,
 	xbSymbolFlag_Foreign = 1<<4, // defined outside the executable, reach data through the GOT
 	xbSymbolFlag_TLS     = 1<<5,
+	xbSymbolFlag_Export  = 1<<6, // default visibility, so a shared object reaches it through the GOT
 };
 
 struct xbSymbol {
@@ -424,6 +414,7 @@ enum xbRelocKind : u8 {
 	xbReloc_Abs32,
 	xbReloc_TPOFF32,
 	xbReloc_GOTTPOFF,
+	xbReloc_TLSGD,
 };
 
 struct xbReloc {
@@ -490,6 +481,7 @@ struct xbModule {
 
 	// entities this backend compiles, so LLVM only declares them
 	PtrSet<Entity *>  handled;
+	PtrSet<Entity *>  defined_procs; // every procedure entity this backend has emitted
 	// procedure entities discovered while compiling (nested procedures, etc.)
 	Array<Entity *>   proc_queue;
 	PtrSet<Entity *>  proc_queued;
