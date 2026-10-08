@@ -279,6 +279,48 @@ gb_internal bool xb_can_keep(xbInstr const &in) {
 	return false;
 }
 
+// Whether the op only computes its result, so it can be skipped when nothing reads it.
+// Loads and divisions stay, they can fault.
+gb_internal bool xb_op_is_pure(xbOp op) {
+	switch (op) {
+	case xbOp_IConst:
+	case xbOp_FConst:
+	case xbOp_Lea:
+	case xbOp_Copy:
+	case xbOp_Add:
+	case xbOp_Sub:
+	case xbOp_Mul:
+	case xbOp_And:
+	case xbOp_Or:
+	case xbOp_Xor:
+	case xbOp_Shl:
+	case xbOp_LShr:
+	case xbOp_AShr:
+	case xbOp_FAdd:
+	case xbOp_FSub:
+	case xbOp_FMul:
+	case xbOp_FDiv:
+	case xbOp_Neg:
+	case xbOp_Not:
+	case xbOp_FNeg:
+	case xbOp_ICmp:
+	case xbOp_FCmp:
+	case xbOp_Zext:
+	case xbOp_Sext:
+	case xbOp_Trunc:
+	case xbOp_SIToF:
+	case xbOp_UIToF:
+	case xbOp_FToSI:
+	case xbOp_FToUI:
+	case xbOp_FExt:
+	case xbOp_FTrunc:
+	case xbOp_Bitcast:
+	case xbOp_Select:
+		return true;
+	}
+	return false;
+}
+
 gb_internal void xb_lower_layout(xbLower *L) {
 	xbProc *p = L->p;
 	i32 cur = 0;
@@ -1581,12 +1623,16 @@ gb_internal void xb_lower_proc(xbProc *p) {
 		}
 	}
 
+	// folded constants and unread pure values emit nothing
+	auto skipped = [&](xbInstr const &n) -> bool {
+		if (n.op == xbOp_IConst && xb_is_imm(&L, n.dst)) return true;
+		return n.dst != 0 && L.vinfo[n.dst].uses == 0 && xb_op_is_pure(n.op);
+	};
 	// the next instruction that emits code, nothing in between touches rax or the flags
 	auto next_code = [&](xbBlock *b, isize i) -> isize {
 		for (isize j = i+1; j < b->instrs.count; j++) {
 			xbInstr const &n = b->instrs[j];
-			if (n.op == xbOp_Loc || n.op == xbOp_Nop) continue;
-			if (n.op == xbOp_IConst && xb_is_imm(&L, n.dst)) continue;
+			if (n.op == xbOp_Loc || n.op == xbOp_Nop || skipped(n)) continue;
 			return j;
 		}
 		return -1;
@@ -1606,7 +1652,7 @@ gb_internal void xb_lower_proc(xbProc *p) {
 				xb_lower_instr(&L, in);
 				continue;
 			}
-			if (in.op == xbOp_IConst && xb_is_imm(&L, in.dst)) continue;
+			if (skipped(in)) continue;
 
 			L.keep = 0;
 			L.fuse_branch = false;
