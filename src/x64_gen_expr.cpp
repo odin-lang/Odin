@@ -2955,6 +2955,14 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 		if (is_type_simd_vector(type)) {
 			return xb_simd_not(p, x, type);
 		}
+		if (is_type_bit_set(type)) {
+			// flips the bits of the set's values, like LLVM
+			xbValue mask = xb_const_value(p, type, exact_bit_set_all_set_mask(type));
+			if (xb_bit_set_in_memory(type)) {
+				return xb_bit_set_mem_op(p, Token_Xor, x, mask, type);
+			}
+			return xb_emit_arith(p, Token_Xor, x, mask, type);
+		}
 		if (is_type_array_like(type)) {
 			Type *elem = base_array_type(type);
 			xbValue ones = xb_emit_conv(p, xb_value_reg(elem, xb_iconst(p, xb_scalar_type(elem) == xbType_None ? xbType_I64 : xb_scalar_type(elem), -1)), type);
@@ -2968,17 +2976,6 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 		}
 		xbType st = xb_scalar_type(type);
 		if (st == xbType_None || xb_type_is_float(st)) XB_UNSUPPORTED(p, "complement type");
-		if (is_type_bit_set(type)) {
-			// only the bits of the set
-			Type *bt = core_type(type);
-			i64 bits = bt->BitSet.upper - bt->BitSet.lower + 1;
-			u32 r = xb_unop(p, xbOp_Not, st, xb_value_to_reg(p, x));
-			if (bits < 8*xb_type_size(st)) {
-				u64 mask = (bits >= 64) ? ~cast(u64)0 : ((cast(u64)1 << bits) - 1);
-				r = xb_binop(p, xbOp_And, st, r, xb_iconst(p, st, cast(i64)mask));
-			}
-			return xb_value_reg(type, r);
-		}
 		return xb_value_reg(type, xb_unop(p, xbOp_Not, st, xb_value_to_reg(p, x)));
 	}
 	case Token_Not: {
@@ -3215,6 +3212,8 @@ gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 // Compound literals
 ////////////////////////////////////////////////////////////////
 
+gb_internal void xb_add_values_to_array(xbProc *p, Array<xbValue> *out, xbValue v);
+
 gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 	ast_node(cl, CompoundLit, expr);
 	Type *type = type_of_expr(expr);
@@ -3309,12 +3308,15 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 				xb_store_value(p, a.mem, xb_emit_conv(p, v, a.type));
 				continue;
 			}
-			if (field_index >= st->fields.count) XB_UNSUPPORTED(p, "compound literal index");
-			off = type_offset_of(bt, field_index, &ft);
-			field_index++;
-			xbValue v = xb_build_expr(p, value_expr);
-			if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
-			xb_store_value(p, xb_mem_offset(m, off), xb_emit_conv(p, v, ft));
+			// a call returning several values fills that many fields
+			auto values = array_make<xbValue>(xb_allocator(), 0, 1);
+			xb_add_values_to_array(p, &values, xb_build_expr(p, value_expr));
+			for (xbValue v : values) {
+				if (field_index >= st->fields.count) XB_UNSUPPORTED(p, "compound literal index");
+				off = type_offset_of(bt, field_index, &ft);
+				field_index++;
+				xb_store_value(p, xb_mem_offset(m, off), xb_emit_conv(p, v, ft));
+			}
 		}
 		return xb_value_mem(type, m);
 	}
@@ -3371,11 +3373,12 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 					xb_store_value(p, xb_mem_offset(m, index*stride), v);
 				}
 			} else {
-				xbValue v = xb_build_expr(p, elem);
-				if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
-				v = xb_emit_conv(p, v, et);
-				xb_store_value(p, xb_mem_offset(m, elem_index*stride), v);
-				elem_index++;
+				auto values = array_make<xbValue>(xb_allocator(), 0, 1);
+				xb_add_values_to_array(p, &values, xb_build_expr(p, elem));
+				for (xbValue v : values) {
+					xb_store_value(p, xb_mem_offset(m, elem_index*stride), xb_emit_conv(p, v, et));
+					elem_index++;
+				}
 			}
 		}
 		if (bt->kind == Type_Slice) {

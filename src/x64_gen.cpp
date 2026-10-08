@@ -1265,6 +1265,10 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 
 	// boolean -> boolean/integer
 	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
+		if (endian && is_type_integer(dst)) {
+			// to the platform integer, then into the byte order
+			return xb_emit_conv(p, xb_emit_conv(p, v, integer_endian_type_to_platform_type(dst)), t);
+		}
 		if (endian) XB_UNSUPPORTED(p, "endian bool conversion");
 		if (xb_is_int128(dst)) {
 			xbPair pr = {xb_int_resize(p, xb_to_bool_reg(p, v), xbType_I8, xbType_I64, false), xb_i64(p, 0)};
@@ -1365,7 +1369,7 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 		xbValue parts[4] = {xb_complex_part(p, v, 1), zero, zero, xb_complex_part(p, v, 0)};
 		return xb_complex_build(p, t, parts, 4);
 	}
-	if ((is_type_complex(src) || is_type_complex(dst) || is_type_quaternion(src) || is_type_quaternion(dst)) && !is_type_any(dst)) {
+	if ((is_type_complex(src) || is_type_complex(dst) || is_type_quaternion(src) || is_type_quaternion(dst)) && !is_type_any(dst) && !is_type_union(dst)) {
 		XB_UNSUPPORTED(p, "complex conversion");
 	}
 

@@ -187,3 +187,15 @@ bit_set_array_formatting :: proc(t: ^testing.T) {
 	testing.expect_value(t, sa, si)
 	testing.expect_value(t, sa, "{Bsa_E.A, Bsa_E.C, Bsa_E.H}")
 }
+
+@(private="file")
+Bsa_Sparse :: enum u8 { A, C = 2, D = 5 }
+
+// The complement only flips the bits of the enum's values, not every bit in its range
+@(test)
+bit_set_complement_of_sparse_enum :: proc(t: ^testing.T) {
+	s: bit_set[Bsa_Sparse] = {.C}
+	testing.expect_value(t, transmute(u8)~s, 0b100001)
+	a: bit_set[Bsa_Sparse; [2]u64] = {.D}
+	testing.expect_value(t, transmute([2]u64)~a, [2]u64{0b101, 0})
+}

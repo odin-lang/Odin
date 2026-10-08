@@ -13,7 +13,7 @@ struct xbConstBuf {
 gb_internal i32 xb_compile_data_proc_lit(xbModule *m, Ast *expr, char const **reason);
 gb_internal Entity *xb_proc_lit_entity(xbModule *m, Ast *expr);
 
-gb_internal i32 xb_const_global(xbModule *m, Type *type, ExactValue value, bool writable, char const **reason);
+gb_internal i32 xb_const_global(xbModule *m, Type *type, ExactValue value, bool writable, char const **reason, bool proc_lits=false);
 gb_internal i32 xb_const_place(xbConstBuf *b, i64 align);
 
 gb_internal void xb_cb_reloc(xbConstBuf *b, i64 off, i32 sym, i64 addend) {
@@ -326,7 +326,7 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 		isize count = gb_max(cast(isize)cl->max_count, cl->elems.count);
 		Type *t = alloc_type_array(elem, count);
 		char const *reason = nullptr;
-		i32 sym = xb_const_global(m, t, value, b->writable, &reason);
+		i32 sym = xb_const_global(m, t, value, b->writable, &reason, b->proc_lits);
 		if (sym < 0) return xb_cb_fail(b, reason);
 		xb_cb_reloc(b, off, sym, 0);
 		xb_cb_int(b, off+8, 8, cast(u64)count, false);
@@ -672,10 +672,11 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 }
 
 // An anonymous object holding the constant. Returns its symbol, or -1.
-gb_internal i32 xb_const_global(xbModule *m, Type *type, ExactValue value, bool writable, char const **reason) {
+gb_internal i32 xb_const_global(xbModule *m, Type *type, ExactValue value, bool writable, char const **reason, bool proc_lits) {
 	xbConstBuf b = {};
 	b.m = m;
 	b.writable = writable;
+	b.proc_lits = proc_lits;
 	i64 size = type_size_of(type);
 	i64 align = gb_max(type_align_of(type), cast(i64)1);
 	b.bytes = array_make<u8>(heap_allocator(), size, size);
