@@ -846,7 +846,10 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 	xb_add_debug_constants(m);
 	xb_dwarf_abbrevs(&d->abbrev);
 	// the compilation directory is the entry file's, like LLVM's, so debuggers show its files by their short names
-	String cwd = m->info->init_package->files[0]->directory;
+	String cwd = {};
+	if (m->info->init_package->files.count > 0) { // every file can be excluded by build tags
+		cwd = m->info->init_package->files[0]->directory;
+	}
 	if (Entity *entry_point = m->info->entry_point) {
 		if (Ast *ident = entry_point->identifier.load()) {
 			if (ident->file_id) cwd = ident->file()->directory;
