@@ -596,12 +596,13 @@ if lldb is not None:
 			cell_data_size = _lldb_fields(cell)["v"].GetByteSize()
 		return cell_layout(elem.GetByteSize(), cell.GetByteSize(), cell_data_size)
 
-	def _lldb_odin_type(target, name, id):
-		# the type a `typeid` names, None when it cannot be found
+	def _lldb_odin_type(target, basis, name, id):
+		# the type a `typeid` names, None when it cannot be found; basic types come from the type system of `basis`,
+		# an Odin type, as the target may answer from another, such as Swift's, whose types make no value
 		composite = composite_type(name)
 		if composite is not None and typeid_hash(name) == id:
 			elem_name, count = composite
-			elem = _lldb_odin_type(target, elem_name, typeid_hash(elem_name))
+			elem = _lldb_odin_type(target, basis, elem_name, typeid_hash(elem_name))
 			if elem is None:
 				return None
 			if count is None:
@@ -622,11 +623,11 @@ if lldb is not None:
 			size = target.GetAddressByteSize()
 
 		if kind == "rawptr":
-			return target.GetBasicType(lldb.eBasicTypeVoid).GetPointerType()
+			return basis.GetBasicType(lldb.eBasicTypeVoid).GetPointerType()
 		if kind == "cstring":
-			return target.GetBasicType(lldb.eBasicTypeChar).GetPointerType()
+			return basis.GetBasicType(lldb.eBasicTypeChar).GetPointerType()
 		if kind == "cstring16":
-			return target.GetBasicType(lldb.eBasicTypeChar16).GetPointerType()
+			return basis.GetBasicType(lldb.eBasicTypeChar16).GetPointerType()
 
 		basics = {
 			("int",   1):  lldb.eBasicTypeSignedChar,
@@ -648,7 +649,7 @@ if lldb is not None:
 		basic_type = basics.get((kind, size))
 		if basic_type is None:
 			return None
-		return target.GetBasicType(basic_type)
+		return basis.GetBasicType(basic_type)
 
 	def lldb_is_string(sbtype, internal_dict):
 		return _lldb_kind(sbtype) in ("string", "string16")
@@ -694,7 +695,7 @@ if lldb is not None:
 		name = id.GetValue() or ""
 		if data == 0 or id.GetValueAsUnsigned() == 0:
 			return "nil", None
-		t = _lldb_odin_type(valobj.GetTarget(), name, id.GetValueAsUnsigned())
+		t = _lldb_odin_type(valobj.GetTarget(), v.GetType(), name, id.GetValueAsUnsigned())
 		if t is None:
 			return name, None
 		if name not in ODIN_BASIC_TYPES and composite_type(name) is None:
