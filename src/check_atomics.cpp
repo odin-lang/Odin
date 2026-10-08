@@ -23,7 +23,9 @@
 // With -vet-atomic-access, a plain read or write of a location accessed atomically is an error, unless a call before it
 // to a procedure with `@(synchronizes=...)` acquires something which no call since releases, as within a lock, or for
 // a write, a call after it releases something which no call since acquires, as starting a thread does. Only calls in
-// branches which enclose it count, and deferred ones do not.
+// branches which enclose it count, and deferred ones do not. `@(synchronizes_shared=...)`, as on a shared lock, only
+// synchronizes reads. What a procedure without either synchronizes is inferred from what it calls: what it releases
+// before it acquires it, as unlocking does, and what it acquires but does not release by some return, as locking does.
 
 struct AtomicUses {
 	Ast *first;        // the first atomic operation of each, by position
@@ -110,19 +112,47 @@ struct AtomicAt {
 	Slice<AtomicArm> arms;
 };
 
+struct AtomicObject {
+	Entity *root; // NULL when not known, as then it is the same as nothing
+	String  path;
+};
+
+struct AtomicSync {
+	Ast *                 call;
+	Slice<AtomicArm>      arms;
+	AtomicObject          object;
+	OdinAtomicMemoryOrder order;
+	bool                  shared; // only reads
+	bool                  deferred;
+};
+
+struct AtomicExit {
+	isize            syncs;
+	Slice<AtomicArm> arms;
+};
+
+struct AtomicEffect {
+	i32                   param;  // the parameter `object.path` is within, or -1 for a global `object`
+	AtomicObject          object;
+	OdinAtomicMemoryOrder order;
+	bool                  shared;
+};
+
 struct AtomicScan {
-	Array<AtomicAt> reads;  // plain reads and writes of what is accessed atomically
-	Array<AtomicAt> writes;
-	Array<AtomicAt> syncs;  // calls to procedures with `@(synchronizes=...)`, other than deferred ones
+	Array<AtomicAt>   reads;  // plain reads and writes of what is accessed atomically
+	Array<AtomicAt>   writes;
+	Array<AtomicSync> syncs;
 
 	PtrMap<Ast *, AtomicPlace> *places; // NULL when not used
 	AtomicPlace                 place;
 	Array<AtomicArm>            arms;
 
 	PtrMap<Entity *, AtomicLocal> *locals; // NULL when not used
+
+	Array<AtomicExit>  *exits;     // NULL when not used
+	PtrSet<DeclInfo *> *inferring; // what may reach a call which synchronizes, NULL when not used
 };
 
-// the callers of each procedure, from what the escape analysis records, for fences through calls, when first needed
 struct AtomicCallers {
 	Checker *                              c;
 	bool                                   found;
@@ -130,11 +160,13 @@ struct AtomicCallers {
 };
 
 gb_global PtrMap<Entity *, AtomicUses> atomic_uses;
+gb_global PtrMap<DeclInfo *, Slice<AtomicEffect> > atomic_effects; // with -vet-atomic-access
 
 
 gb_internal void check_atomic_scan        (AtomicScan *s, Ast *node, bool addr);
 gb_internal void check_atomic_scan_arm    (AtomicScan *s, Ast *branch, i32 arm, Ast *node);
 gb_internal void check_atomic_scan_clauses(AtomicScan *s, Ast *node, Ast *body);
+gb_internal void check_atomic_infer       (PtrSet<DeclInfo *> *inferring, DeclInfo *decl);
 
 gb_internal Entity *check_atomic_field(Type *t, String const &name) {
 	t = base_type(type_deref(t));
@@ -263,33 +295,88 @@ gb_internal void check_atomic_address_taken(AtomicScan *s, Ast *expr) {
 	}
 }
 
+gb_internal Ast *check_atomic_call_argument(Ast *call, Entity *proc, isize index) {
+	ast_node(ce, CallExpr, call);
+	Type *pt = base_type(proc->type);
+	if (pt->kind != Type_Proc || pt->Proc.params == nullptr || index >= pt->Proc.params->Tuple.variables.count) {
+		return nullptr;
+	}
+	String name = pt->Proc.params->Tuple.variables[index]->token.string;
+	for (Ast *a : ce->args) {
+		if (a->kind == Ast_FieldValue && a->FieldValue.field->kind == Ast_Ident && a->FieldValue.field->Ident.token.string == name) {
+			return a->FieldValue.value;
+		}
+	}
+	if (index < ce->args.count && ce->args[index]->kind != Ast_FieldValue) {
+		return ce->args[index];
+	}
+	return nullptr;
+}
+
 gb_internal Ast *check_atomic_call_pointer(Ast *call) {
 	ast_node(ce, CallExpr, call);
-	Ast *arg = nullptr;
 	Entity *e = entity_of_node(ce->proc);
 	if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.futex != ProcedureFutex_None) {
-		Type *pt = base_type(e->type);
-		isize index = e->Procedure.futex_parameter;
-		if (pt->kind != Type_Proc || pt->Proc.params == nullptr || index >= pt->Proc.params->Tuple.variables.count) {
-			return nullptr;
-		}
-		String name = pt->Proc.params->Tuple.variables[index]->token.string;
-		for (Ast *a : ce->args) {
-			if (a->kind != Ast_FieldValue) {
-				continue;
-			}
-			Ast *field = a->FieldValue.field;
-			if (field->kind == Ast_Ident && field->Ident.token.string == name) {
-				arg = a->FieldValue.value;
-			}
-		}
-		if (arg == nullptr && index < ce->args.count && ce->args[index]->kind != Ast_FieldValue) {
-			arg = ce->args[index];
-		}
-	} else if (ce->args.count > 0) {
-		arg = ce->args[0];
+		return check_atomic_call_argument(call, e, e->Procedure.futex_parameter);
 	}
-	return arg;
+	if (ce->args.count > 0) {
+		return ce->args[0];
+	}
+	return nullptr;
+}
+
+gb_internal AtomicObject check_atomic_object(Ast *expr) {
+	expr = unparen_expr(expr);
+	switch (expr->kind) {
+	case_ast_node(ue, UnaryExpr, expr);
+		if (ue->op.kind == Token_And) {
+			return check_atomic_object(ue->expr);
+		}
+	case_end;
+
+	case_ast_node(de, DerefExpr, expr);
+		return check_atomic_object(de->expr);
+	case_end;
+
+	case_ast_node(i, Ident, expr);
+		Entity *e = entity_of_node(expr);
+		if (e == nullptr || e->kind != Entity_Variable) {
+			break;
+		}
+		if (e->using_parent != nullptr) {
+			return AtomicObject{e->using_parent, concatenate_strings(temporary_allocator(), str_lit("."), e->token.string)};
+		}
+		return AtomicObject{e, {}};
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		Entity *pkg = entity_of_node(se->expr);
+		if (pkg != nullptr && pkg->kind == Entity_ImportName) {
+			return check_atomic_object(se->selector);
+		}
+		AtomicObject o = check_atomic_object(se->expr);
+		if (o.root != nullptr && se->selector->kind == Ast_Ident) {
+			o.path = concatenate3_strings(temporary_allocator(), o.path, str_lit("."), se->selector->Ident.token.string);
+			return o;
+		}
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		AtomicObject o = check_atomic_object(ie->expr);
+		if (o.root != nullptr) {
+			gbString index = expr_to_string(ie->index);
+			o.path = concatenate3_strings(temporary_allocator(), o.path, str_lit("["), make_string_c(index));
+			o.path = concatenate_strings(temporary_allocator(), o.path, str_lit("]"));
+			gb_string_free(index);
+			return o;
+		}
+	case_end;
+	}
+	return {};
+}
+
+gb_internal bool check_atomic_same_object(AtomicObject const &a, AtomicObject const &b) {
+	return a.root != nullptr && a.root == b.root && a.path == b.path;
 }
 
 gb_internal Ast *check_atomic_call_address(Ast *call) {
@@ -406,10 +493,10 @@ gb_internal AtomicProcedure *check_atomic_procedure(PtrMap<DeclInfo *, AtomicPro
 
 	if (decl->proc_info != nullptr) {
 		AtomicScan s = {};
-		s.reads  = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-		s.writes = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-		s.syncs  = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-		s.arms   = array_make<AtomicArm>(temporary_allocator(), 0, 0);
+		s.reads  = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+		s.writes = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+		s.syncs  = array_make<AtomicSync>(temporary_allocator(), 0, 0);
+		s.arms   = array_make<AtomicArm> (temporary_allocator(), 0, 0);
 		s.places = &p.places;
 		check_atomic_scan(&s, decl->proc_info->body, false);
 	}
@@ -463,24 +550,33 @@ gb_internal bool check_atomic_fence_around(PtrMap<DeclInfo *, AtomicProcedure> *
 	return false;
 }
 
-gb_internal bool check_atomic_fence_called_by(PtrMap<DeclInfo *, AtomicProcedure> *procedures, AtomicCallers *callers, DeclInfo *decl, bool acquire) {
+gb_internal PtrMap<DeclInfo *, Array<DeclInfo *> > *check_atomic_callers(AtomicCallers *callers) {
 	if (!callers->found) {
 		callers->found = true;
-		for (PerThreadArraySlot<CheckedCall> &slot : callers->c->info.checked_calls_queue.slots) {
-			for (CheckedCall const &cc : slot.array) {
-				if (cc.caller == nullptr || cc.callee == nullptr || cc.callee->decl_info == nullptr) {
+		for (PerThreadArraySlot<ProcInfo *> &slot : callers->c->info.checked_bodies_queue.slots) {
+			for (ProcInfo *pi : slot.array) {
+				if (pi->decl == nullptr) {
 					continue;
 				}
-				Array<DeclInfo *> *found = map_get(&callers->map, cc.callee->decl_info);
-				if (found == nullptr) {
-					map_set(&callers->map, cc.callee->decl_info, array_make<DeclInfo *>(temporary_allocator(), 0, 4));
-					found = map_get(&callers->map, cc.callee->decl_info);
+				FOR_PTR_SET(e, pi->decl->deps) {
+					if (e->kind != Entity_Procedure || e->decl_info == nullptr) {
+						continue;
+					}
+					Array<DeclInfo *> *found = map_get(&callers->map, e->decl_info);
+					if (found == nullptr) {
+						map_set(&callers->map, e->decl_info, array_make<DeclInfo *>(temporary_allocator(), 0, 4));
+						found = map_get(&callers->map, e->decl_info);
+					}
+					array_add(found, pi->decl);
 				}
-				array_add(found, cc.caller);
 			}
 		}
 	}
+	return &callers->map;
+}
 
+gb_internal bool check_atomic_fence_called_by(PtrMap<DeclInfo *, AtomicProcedure> *procedures, AtomicCallers *callers, DeclInfo *decl, bool acquire) {
+	PtrMap<DeclInfo *, Array<DeclInfo *> > *map = check_atomic_callers(callers);
 	auto queue = array_make<DeclInfo *>(temporary_allocator(), 0, 16);
 	PtrSet<DeclInfo *> visited = {};
 	array_add(&queue, decl);
@@ -488,7 +584,7 @@ gb_internal bool check_atomic_fence_called_by(PtrMap<DeclInfo *, AtomicProcedure
 	bool fenced = false;
 	for (isize i = 0; i < queue.count && !fenced; i++) {
 		DeclInfo *callee = queue[i];
-		Array<DeclInfo *> *found = map_get(&callers->map, callee);
+		Array<DeclInfo *> *found = map_get(map, callee);
 		if (found == nullptr) {
 			continue;
 		}
@@ -713,8 +809,42 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 			if (proc->kind == Ast_Ident || proc->kind == Ast_SelectorExpr) {
 				e = entity_of_node(proc);
 			}
-			if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.synchronizes != OdinAtomicMemoryOrder_relaxed && !s->place.deferred) {
-				array_add(&s->syncs, AtomicAt{node, slice_from_array(array_clone(temporary_allocator(), s->arms))});
+			if (e != nullptr && e->kind == Entity_Procedure) {
+				AtomicSync sync = {};
+				sync.call     = node;
+				sync.deferred = s->place.deferred;
+				if (e->Procedure.synchronizes != OdinAtomicMemoryOrder_relaxed) {
+					sync.arms   = slice_from_array(array_clone(temporary_allocator(), s->arms));
+					sync.order  = cast(OdinAtomicMemoryOrder)e->Procedure.synchronizes;
+					sync.shared = e->Procedure.synchronizes_shared;
+					if (Ast *arg = check_atomic_call_argument(node, e, 0)) {
+						sync.object = check_atomic_object(arg);
+					}
+					array_add(&s->syncs, sync);
+				} else if (e->decl_info != nullptr) {
+					if (s->inferring != nullptr && ptr_set_exists(s->inferring, e->decl_info)) {
+						check_atomic_infer(s->inferring, e->decl_info);
+					}
+					if (Slice<AtomicEffect> *effects = map_get(&atomic_effects, e->decl_info)) {
+						for (AtomicEffect const &effect : *effects) {
+							sync.arms   = slice_from_array(array_clone(temporary_allocator(), s->arms));
+							sync.order  = effect.order;
+							sync.shared = effect.shared;
+							sync.object = effect.object;
+							if (effect.param >= 0) {
+								// within what is passed for it
+								sync.object = {};
+								if (Ast *arg = check_atomic_call_argument(node, e, effect.param)) {
+									AtomicObject o = check_atomic_object(arg);
+									if (o.root != nullptr) {
+										sync.object = AtomicObject{o.root, concatenate_strings(temporary_allocator(), o.path, effect.object.path)};
+									}
+								}
+							}
+							array_add(&s->syncs, sync);
+						}
+					}
+				}
 			}
 			check_atomic_scan(s, proc, false);
 		}
@@ -764,6 +894,9 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 
 	case_ast_node(re, OrReturnExpr, node);
 		check_atomic_scan(s, re->expr, false);
+		if (s->exits != nullptr) {
+			array_add(s->exits, AtomicExit{s->syncs.count, slice_from_array(array_clone(temporary_allocator(), s->arms))});
+		}
 	case_end;
 
 	case_ast_node(be, OrBranchExpr, node);
@@ -848,6 +981,9 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 	case_ast_node(rs, ReturnStmt, node);
 		for (Ast *result : rs->results) {
 			check_atomic_scan(s, result, false);
+		}
+		if (s->exits != nullptr) {
+			array_add(s->exits, AtomicExit{s->syncs.count, slice_from_array(array_clone(temporary_allocator(), s->arms))});
 		}
 	case_end;
 
@@ -956,48 +1092,28 @@ gb_internal bool check_atomic_encloses(Slice<AtomicArm> const &outer, Slice<Atom
 	return true;
 }
 
-gb_internal OdinAtomicMemoryOrder check_atomic_synchronizes(Ast *call) {
-	Entity *e = entity_of_node(call->CallExpr.proc);
-	return cast(OdinAtomicMemoryOrder)e->Procedure.synchronizes;
-}
-
-gb_internal bool check_atomic_same_object(Ast *a, Ast *b) {
-	if (a->CallExpr.args.count == 0 || b->CallExpr.args.count == 0) {
-		return false;
-	}
-	gbString x = expr_to_string(a->CallExpr.args[0]);
-	gbString y = expr_to_string(b->CallExpr.args[0]);
-	bool same = gb_strcmp(x, y) == 0;
-	gb_string_free(y);
-	gb_string_free(x);
-	return same;
-}
-
-gb_internal bool check_atomic_synchronized(Array<AtomicAt> const &syncs, AtomicAt const &access, bool write) {
+gb_internal bool check_atomic_synchronized(Array<AtomicSync> const &syncs, AtomicAt const &access, bool write) {
 	TokenPos pos = ast_token(access.node).pos;
-	for (AtomicAt const &a : syncs) {
-		if (!check_atomic_encloses(a.arms, access.arms)) {
+	for (AtomicSync const &a : syncs) {
+		if (a.deferred || (write && a.shared) || !check_atomic_encloses(a.arms, access.arms)) {
 			continue;
 		}
-		TokenPos at = ast_token(a.node).pos;
-		OdinAtomicMemoryOrder order = check_atomic_synchronizes(a.node);
+		TokenPos at = ast_token(a.call).pos;
 		bool undone = false;
-		if (token_pos_cmp(at, pos) < 0 && check_atomic_order_acquires(order)) {
+		if (token_pos_cmp(at, pos) < 0 && check_atomic_order_acquires(a.order)) {
 			// unlocked since
-			for (AtomicAt const &r : syncs) {
-				TokenPos rt = ast_token(r.node).pos;
-				undone |= check_atomic_encloses(r.arms, access.arms) &&
+			for (AtomicSync const &r : syncs) {
+				TokenPos rt = ast_token(r.call).pos;
+				undone |= !r.deferred && check_atomic_encloses(r.arms, access.arms) &&
 				          token_pos_cmp(at, rt) < 0 && token_pos_cmp(rt, pos) < 0 &&
-				          check_atomic_order_releases(check_atomic_synchronizes(r.node)) &&
-				          check_atomic_same_object(a.node, r.node);
+				          check_atomic_order_releases(r.order) && check_atomic_same_object(a.object, r.object);
 			}
-		} else if (write && token_pos_cmp(pos, at) < 0 && check_atomic_order_releases(order)) {
+		} else if (write && token_pos_cmp(pos, at) < 0 && check_atomic_order_releases(a.order)) {
 			// the unlock of a lock taken since
-			for (AtomicAt const &l : syncs) {
-				TokenPos lt = ast_token(l.node).pos;
-				undone |= token_pos_cmp(pos, lt) < 0 && token_pos_cmp(lt, at) < 0 &&
-				          check_atomic_order_acquires(check_atomic_synchronizes(l.node)) &&
-				          check_atomic_same_object(a.node, l.node);
+			for (AtomicSync const &l : syncs) {
+				TokenPos lt = ast_token(l.call).pos;
+				undone |= !l.deferred && token_pos_cmp(pos, lt) < 0 && token_pos_cmp(lt, at) < 0 &&
+				          check_atomic_order_acquires(l.order) && check_atomic_same_object(a.object, l.object);
 			}
 		} else {
 			continue;
@@ -1009,6 +1125,104 @@ gb_internal bool check_atomic_synchronized(Array<AtomicAt> const &syncs, AtomicA
 	return false;
 }
 
+gb_internal void check_atomic_infer(PtrSet<DeclInfo *> *inferring, DeclInfo *decl) {
+	Entity *pe = decl->entity;
+	if (map_get(&atomic_effects, decl) != nullptr || decl->proc_info == nullptr || decl->proc_info->body == nullptr ||
+	    (pe != nullptr && pe->kind == Entity_Procedure && pe->Procedure.synchronizes != OdinAtomicMemoryOrder_relaxed)) {
+		return;
+	}
+	// nothing, while within itself
+	map_set(&atomic_effects, decl, Slice<AtomicEffect>{});
+
+	ProcInfo *pi = decl->proc_info;
+	auto exits = array_make<AtomicExit>(temporary_allocator(), 0, 0);
+	AtomicScan s = {};
+	s.reads     = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+	s.writes    = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+	s.syncs     = array_make<AtomicSync>(temporary_allocator(), 0, 0);
+	s.arms      = array_make<AtomicArm> (temporary_allocator(), 0, 0);
+	s.exits     = &exits;
+	s.inferring = inferring;
+	check_atomic_scan(&s, pi->body, false);
+	Slice<Ast *> const &stmts = pi->body->BlockStmt.stmts;
+	if (stmts.count == 0 || stmts[stmts.count-1]->kind != Ast_ReturnStmt) {
+		array_add(&exits, AtomicExit{s.syncs.count, {}});
+	}
+
+	Type *pt = base_type(pi->type);
+	auto effects = array_make<AtomicEffect>(temporary_allocator(), 0, 0);
+	for_array(i, s.syncs) {
+		AtomicObject const &object = s.syncs[i].object;
+		bool seen = object.root == nullptr;
+		for (isize j = 0; j < i; j++) {
+			seen |= check_atomic_same_object(s.syncs[j].object, object);
+		}
+		if (seen) {
+			continue;
+		}
+
+		AtomicEffect effect = {-1, object, OdinAtomicMemoryOrder_relaxed, true};
+		bool releases = false;
+		bool acquired = false;
+		for (isize j = i; j < s.syncs.count; j++) {
+			AtomicSync const &r = s.syncs[j];
+			if (!check_atomic_same_object(r.object, object)) {
+				continue;
+			}
+			if (!acquired && check_atomic_order_releases(r.order)) {
+				releases = true;
+				effect.shared &= r.shared;
+			}
+			acquired |= !r.deferred && check_atomic_order_acquires(r.order);
+		}
+		bool acquires = false;
+		for (AtomicExit const &exit : exits) {
+			for (isize j = 0; j < exit.syncs; j++) {
+				AtomicSync const &a = s.syncs[j];
+				if (a.deferred || !check_atomic_order_acquires(a.order) || !check_atomic_same_object(a.object, object) || !check_atomic_encloses(a.arms, exit.arms)) {
+					continue;
+				}
+				bool released = false;
+				for (isize k = 0; k < exit.syncs; k++) {
+					AtomicSync const &r = s.syncs[k];
+					released |= (r.deferred || (k > j && check_atomic_encloses(r.arms, exit.arms))) &&
+					            check_atomic_order_releases(r.order) && check_atomic_same_object(r.object, object);
+				}
+				if (!released) {
+					acquires = true;
+					effect.shared &= a.shared;
+				}
+			}
+		}
+		if (acquires && releases) {
+			effect.order = OdinAtomicMemoryOrder_acq_rel;
+		} else if (acquires) {
+			effect.order = OdinAtomicMemoryOrder_acquire;
+		} else if (releases) {
+			effect.order = OdinAtomicMemoryOrder_release;
+		} else {
+			continue;
+		}
+
+		// what is within a parameter, or a global, as a local is nothing to what calls it
+		Entity *root = object.root;
+		if ((root->flags & EntityFlag_Param) != 0) {
+			for (isize k = 0; pt->kind == Type_Proc && pt->Proc.params != nullptr && k < pt->Proc.params->Tuple.variables.count; k++) {
+				if (pt->Proc.params->Tuple.variables[k] == root) {
+					effect.param = cast(i32)k;
+				}
+			}
+			if (effect.param < 0) {
+				continue;
+			}
+		} else if (!root->Variable.is_global && (root->flags & EntityFlag_Static) == 0) {
+			continue;
+		}
+		array_add(&effects, effect);
+	}
+	map_set(&atomic_effects, decl, slice_from_array(effects));
+}
+
 gb_internal void check_atomic_bodies(ProcInfo **procs, isize count) {
 	TEMPORARY_ALLOCATOR_GUARD();
 	for (isize i = 0; i < count; i++) {
@@ -1018,10 +1232,10 @@ gb_internal void check_atomic_bodies(ProcInfo **procs, isize count) {
 			continue;
 		}
 		AtomicScan s = {};
-		s.reads  = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-		s.writes = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-		s.syncs  = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-		s.arms   = array_make<AtomicArm>(temporary_allocator(), 0, 0);
+		s.reads  = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+		s.writes = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+		s.syncs  = array_make<AtomicSync>(temporary_allocator(), 0, 0);
+		s.arms   = array_make<AtomicArm> (temporary_allocator(), 0, 0);
 		check_atomic_scan(&s, body, false);
 		if (s.reads.count == 0 && s.writes.count == 0) {
 			continue;
@@ -1420,10 +1634,10 @@ gb_internal void check_atomics(Checker *c) {
 				continue;
 			}
 			AtomicScan s = {};
-			s.reads  = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-			s.writes = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-			s.syncs  = array_make<AtomicAt> (temporary_allocator(), 0, 0);
-			s.arms   = array_make<AtomicArm>(temporary_allocator(), 0, 0);
+			s.reads  = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+			s.writes = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
+			s.syncs  = array_make<AtomicSync>(temporary_allocator(), 0, 0);
+			s.arms   = array_make<AtomicArm> (temporary_allocator(), 0, 0);
 			s.locals = &locals;
 			check_atomic_scan(&s, decl->proc_info->body, false);
 		}
@@ -1631,7 +1845,6 @@ gb_internal void check_atomics(Checker *c) {
 		}
 	}
 
-	// only when a file has -vet-atomic-access
 	bool vetted = (build_context.vet_flags & VetFlag_AtomicAccess) != 0;
 	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
@@ -1639,6 +1852,38 @@ gb_internal void check_atomics(Checker *c) {
 	}
 	if (!vetted || atomic_uses.count == 0) {
 		return;
+	}
+
+	map_init(&atomic_effects, 0);
+	defer ({
+		map_destroy(&atomic_effects);
+		atomic_effects = {};
+	});
+	PtrSet<DeclInfo *> inferring = {};
+	defer (ptr_set_destroy(&inferring));
+	PtrMap<DeclInfo *, Array<DeclInfo *> > *callers_of = check_atomic_callers(&callers);
+	auto queue = array_make<DeclInfo *>(temporary_allocator(), 0, 16);
+	for (auto const &entry : *callers_of) {
+		Entity *e = entry.key->entity;
+		if (e == nullptr || e->kind != Entity_Procedure || e->Procedure.synchronizes == OdinAtomicMemoryOrder_relaxed) {
+			continue;
+		}
+		for (DeclInfo *caller : entry.value) {
+			if (!ptr_set_update(&inferring, caller)) {
+				array_add(&queue, caller);
+			}
+		}
+	}
+	for (isize i = 0; i < queue.count; i++) {
+		Array<DeclInfo *> *found = map_get(callers_of, queue[i]);
+		for (isize j = 0; found != nullptr && j < found->count; j++) {
+			if (!ptr_set_update(&inferring, (*found)[j])) {
+				array_add(&queue, (*found)[j]);
+			}
+		}
+	}
+	FOR_PTR_SET(decl, inferring) {
+		check_atomic_infer(&inferring, decl);
 	}
 
 	auto procs = array_make<ProcInfo *>(heap_allocator());

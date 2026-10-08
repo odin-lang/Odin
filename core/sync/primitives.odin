@@ -213,7 +213,7 @@ exclusive lock will be blocked from entering any critical sections associated
 with the same read-write mutex, until all shared locks associated with the
 specified read-write mutex are released.
 */
-@(synchronizes=.Acquire)
+@(synchronizes_shared=.Acquire)
 rw_mutex_shared_lock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_lock(rw)
 }
@@ -225,7 +225,7 @@ This procedure releases shared lock on the specified read-write mutex. When all
 shared locks are released, all critical sections associated with the same
 read-write mutex become open to other threads.
 */
-@(synchronizes=.Release)
+@(synchronizes_shared=.Release)
 rw_mutex_shared_unlock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_unlock(rw)
 }
@@ -241,7 +241,7 @@ If the shared lock has been acquired, it causes all threads attempting to
 acquire the exclusive lock to be blocked from entering any critical sections
 associated with the same read-write mutex, until all shared locks are released.
 */
-@(synchronizes=.Acquire)
+@(synchronizes_shared=.Acquire)
 rw_mutex_try_shared_lock :: proc "contextless" (rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_shared_lock(rw)
 }
@@ -294,7 +294,7 @@ section by running this procedure inside an `if` statement.
 		...
 	}
 */
-@(deferred_in=rw_mutex_shared_unlock, synchronizes=.Acquire)
+@(deferred_in=rw_mutex_shared_unlock, synchronizes_shared=.Acquire)
 rw_mutex_shared_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 	rw_mutex_shared_lock(m)
 	return true

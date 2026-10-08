@@ -161,7 +161,7 @@ atomic_rw_mutex_try_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) -> bool {
 }
 
 // atomic_rw_mutex_shared_lock locks rw for reading (with arbitrary number of readers)
-@(synchronizes=.Acquire)
+@(synchronizes_shared=.Acquire)
 atomic_rw_mutex_shared_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 	state := atomic_load(&rw.state)
 	for state & Atomic_RW_Mutex_State_Is_Writing == 0 {
@@ -184,7 +184,7 @@ atomic_rw_mutex_shared_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 }
 
 // atomic_rw_mutex_shared_unlock unlocks rw for reading (with arbitrary number of readers)
-@(synchronizes=.Release)
+@(synchronizes_shared=.Release)
 atomic_rw_mutex_shared_unlock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 	state := atomic_sub(&rw.state, Atomic_RW_Mutex_State_Reader)
 
@@ -197,7 +197,7 @@ atomic_rw_mutex_shared_unlock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 }
 
 // atomic_rw_mutex_try_shared_lock tries to lock rw for reading (with arbitrary number of readers)
-@(synchronizes=.Acquire)
+@(synchronizes_shared=.Acquire)
 atomic_rw_mutex_try_shared_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) -> bool {
 	state := atomic_load(&rw.state)
 	// NOTE: We need to check this in a for loop, because it is possible for
@@ -242,7 +242,7 @@ Example:
 		...
 	}
 */
-@(deferred_in=atomic_rw_mutex_shared_unlock, synchronizes=.Acquire)
+@(deferred_in=atomic_rw_mutex_shared_unlock, synchronizes_shared=.Acquire)
 atomic_rw_mutex_shared_guard :: proc "contextless" (m: ^Atomic_RW_Mutex) -> bool {
 	atomic_rw_mutex_shared_lock(m)
 	return true
