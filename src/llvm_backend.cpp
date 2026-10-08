@@ -587,6 +587,14 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_cstring", args);
 		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
+	} else if (is_type_cstring16(type) || is_type_string16(type)) {
+		// the length of these counts u16 units, not bytes
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		lbValue res = lb_emit_runtime_call(p, is_type_cstring16(type) ? "default_hasher_cstring16" : "default_hasher_string16", args);
+		lb_add_callsite_force_inline(p, res);
+		LLVMBuildRet(p->builder, res.value);
 	} else if (is_type_string(type)) {
 		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = data;

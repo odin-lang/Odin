@@ -1,6 +1,7 @@
 package test_internal
 
 import "core:log"
+import "base:intrinsics"
 import "base:runtime"
 import "core:math/rand"
 import "core:testing"
@@ -401,4 +402,35 @@ test_map_range_by_ref :: proc(t: ^testing.T) {
 	for k, v in m {
 		testing.expectf(t, v == 1, "Expected m[%v] to be 1, got %v", k, v)
 	}
+}
+
+// A `string16` length counts u16 units, so hashing it as a `string` covered only half its bytes,
+// and a `cstring16` was read as a `string16`.
+@test
+map_utf16_string_keys :: proc(t: ^testing.T) {
+	hasher := intrinsics.type_hasher_proc(string16)
+	a: string16 = "abcd"
+	b: string16 = "abXY"
+	testing.expect(t, hasher(&a, 0) != hasher(&b, 0))
+	testing.expect_value(t, hasher(&a, 0), runtime.default_hasher_fixed(raw_data(a), 0, len(a)*size_of(u16)))
+
+	m: map[string16]int
+	defer delete(m)
+	m[a] = 1
+	m[b] = 2
+	testing.expect_value(t, m[a], 1)
+	testing.expect_value(t, m[b], 2)
+
+	chasher := intrinsics.type_hasher_proc(cstring16)
+	c: cstring16 = "abcd"
+	testing.expect_value(t, chasher(&c, 0), hasher(&a, 0))
+
+	mc: map[cstring16]int
+	defer delete(mc)
+	d: cstring16 = "abXY"
+	mc[c] = 1
+	mc[d] = 2
+	testing.expect_value(t, len(mc), 2)
+	testing.expect_value(t, mc[c], 1)
+	testing.expect_value(t, mc[d], 2)
 }
