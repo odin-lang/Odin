@@ -265,8 +265,17 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 		}
 		return true;
 	}
-	if ((is_type_matrix(type) || is_type_simd_vector(type)) && value.kind != ExactValue_Compound) {
-		return xb_cb_fail(b, "matrix/simd constant");
+	if (is_type_simd_vector(type) && value.kind != ExactValue_Compound) {
+		// a single value spread over the lanes
+		Type *elem = type->SimdVector.elem;
+		i64 stride = type_size_of(elem);
+		for (i64 i = 0; i < type->SimdVector.count; i++) {
+			if (!xb_cb_write(b, elem, value, off + i*stride)) return false;
+		}
+		return true;
+	}
+	if (is_type_matrix(type) && value.kind != ExactValue_Compound) {
+		return xb_cb_fail(b, "matrix constant");
 	}
 
 	bool swap = is_type_different_to_arch_endianness(type);
@@ -395,6 +404,10 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 				return true;
 			}
 			return xb_cb_array_elems(b, value.value_compound, elem, type->Array.count, 0, stride, off);
+		}
+		if (is_type_simd_vector(type)) {
+			Type *elem = type->SimdVector.elem;
+			return xb_cb_array_elems(b, value.value_compound, elem, type->SimdVector.count, 0, type_size_of(elem), off);
 		}
 		if (is_type_enumerated_array(type)) {
 			Type *elem = type->EnumeratedArray.elem;

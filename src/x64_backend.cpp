@@ -12,6 +12,7 @@
 #include "x64_gen_expr.cpp"
 #include "x64_gen_stmt.cpp"
 #include "x64_gen_procs.cpp"
+#include "x64_simd.cpp"
 #include "x64_lower.cpp"
 #include "x64_type_info.cpp"
 #include "x64_globals.cpp"

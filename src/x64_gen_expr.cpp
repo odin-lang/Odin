@@ -391,7 +391,7 @@ gb_internal xbValue xb_const_value(xbProc *p, Type *type, ExactValue value) {
 				return xb_value_mem(type, local);
 			}
 		}
-		if (is_type_struct(bt) || is_type_array(bt) || is_type_enumerated_array(bt) || is_type_slice(bt) || is_type_bit_set(bt)) {
+		if (is_type_struct(bt) || is_type_array(bt) || is_type_enumerated_array(bt) || is_type_simd_vector(bt) || is_type_slice(bt) || is_type_bit_set(bt)) {
 			return xb_build_compound_lit(p, value.value_compound);
 		}
 		XB_UNSUPPORTED(p, reason ? reason : "compound constant");
@@ -1082,7 +1082,7 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 		}
 		if (se->swizzle_count > 0) {
 			Type *array_type = base_type(type_deref(tav.type));
-			if (array_type->kind != Type_Array) XB_UNSUPPORTED(p, "simd swizzle");
+			if (array_type->kind != Type_Array && array_type->kind != Type_SimdVector) XB_UNSUPPORTED(p, "swizzle type");
 			if (is_type_soa_pointer(tav.type)) XB_UNSUPPORTED(p, "soa swizzle");
 			xbMem base = {};
 			if (is_type_pointer(tav.type)) {
@@ -1096,7 +1096,7 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 			a.kind = xbAddr_Swizzle;
 			a.swizzle_count = se->swizzle_count;
 			a.swizzle_indices = se->swizzle_indices;
-			a.swizzle_elem = array_type->Array.elem;
+			a.swizzle_elem = base_array_type(array_type);
 			return a;
 		}
 		Selection sel = lookup_field(tav.type, selector, false);
@@ -1397,10 +1397,10 @@ gb_internal xbValue xb_emit_arith(xbProc *p, TokenKind op, xbValue x, xbValue y,
 		xbValue args[2] = {x, y};
 		return xb_emit_conv(p, xb_emit_runtime_call(p, name, xb_args(args, 2)), type);
 	}
-	if (is_type_array_like(bt)) {
+	if (is_type_array_like(bt) || is_type_simd_vector(bt)) {
 		return xb_emit_arith_array(p, op, x, y, type);
 	}
-	if (is_type_matrix(bt) || is_type_simd_vector(bt)) {
+	if (is_type_matrix(bt)) {
 		XB_UNSUPPORTED(p, "aggregate arithmetic");
 	}
 	if (xb_is_int128(type) && !is_type_different_to_arch_endianness(type)) {
@@ -1649,6 +1649,9 @@ gb_internal xbValue xb_emit_comp(xbProc *p, TokenKind op, xbValue left, xbValue 
 	a = core_type(left.type);
 	b = core_type(right.type);
 
+	if (is_type_simd_vector(a)) {
+		return xb_simd_comp(p, op, left, right);
+	}
 	if (is_type_array_like(a) && !is_type_simple_compare(a) && (op == Token_CmpEq || op == Token_NotEq)) {
 		Type *elem = base_array_type(a);
 		i64 count = get_array_type_count(a);
@@ -2049,6 +2052,9 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 		return xb_emit_conv(p, xb_build_expr(p, ue->expr), type);
 	case Token_Sub: {
 		xbValue x = xb_emit_conv(p, xb_build_expr(p, ue->expr), type);
+		if (is_type_simd_vector(type)) {
+			return xb_simd_neg(p, x, type);
+		}
 		if (is_type_array_like(type)) {
 			return xb_emit_arith_array(p, Token_Sub, xb_zero_value(p, type), x, type);
 		}
@@ -2079,6 +2085,9 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 	}
 	case Token_Xor: {
 		xbValue x = xb_emit_conv(p, xb_build_expr(p, ue->expr), type);
+		if (is_type_simd_vector(type)) {
+			return xb_simd_not(p, x, type);
+		}
 		if (is_type_array_like(type)) {
 			Type *elem = base_array_type(type);
 			xbValue ones = xb_emit_conv(p, xb_value_reg(elem, xb_iconst(p, xb_scalar_type(elem) == xbType_None ? xbType_I64 : xb_scalar_type(elem), -1)), type);
@@ -2107,6 +2116,9 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 	}
 	case Token_Not: {
 		xbValue x = xb_build_expr(p, ue->expr);
+		if (is_type_simd_vector(type)) {
+			return xb_simd_not(p, x, type);
+		}
 		u32 b = xb_to_bool_reg(p, x);
 		u32 r = xb_binop(p, xbOp_Xor, xbType_I8, b, xb_iconst(p, xbType_I8, 1));
 		return xb_emit_conv(p, xb_value_reg(t_bool, r), type);
@@ -2318,6 +2330,7 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 	}
 	case Type_Array:
 	case Type_EnumeratedArray:
+	case Type_SimdVector:
 	case Type_Slice: {
 		Type *et = nullptr;
 		i64 count = 0;
@@ -2325,6 +2338,9 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 		if (bt->kind == Type_Array) {
 			et = bt->Array.elem;
 			count = bt->Array.count;
+		} else if (bt->kind == Type_SimdVector) {
+			et = bt->SimdVector.elem;
+			count = bt->SimdVector.count;
 		} else if (bt->kind == Type_EnumeratedArray) {
 			et = bt->EnumeratedArray.elem;
 			count = bt->EnumeratedArray.count;

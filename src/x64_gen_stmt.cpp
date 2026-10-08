@@ -706,6 +706,12 @@ gb_internal xbValue xb_build_call_expr(xbProc *p, Ast *expr) {
 
 gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
+	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
+		return xb_build_builtin_simd_proc(p, expr, tv, id);
+	}
+	if (id == BuiltinProc_swizzle || id == BuiltinProc_fused_mul_add || (id == BuiltinProc_sqrt && is_type_simd_vector(tv.type))) {
+		return xb_build_builtin_vector_proc(p, expr, tv, id);
+	}
 	switch (id) {
 	case BuiltinProc_len:
 	case BuiltinProc_cap: {

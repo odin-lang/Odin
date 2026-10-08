@@ -768,6 +768,12 @@ gb_internal void    xb_emit_ret(xbProc *p, xbMem direct_result);
 gb_internal xbAbiFunc *xb_get_abi(xbProc *p, Type *proc_type);
 gb_internal void    xb_begin_proc(xbProc *p);
 gb_internal void    xb_end_proc(xbProc *p);
+gb_internal xbValue xb_simd_conv(xbProc *p, xbValue v, Type *t);
+gb_internal xbValue xb_simd_comp(xbProc *p, TokenKind op, xbValue left, xbValue right);
+gb_internal xbValue xb_simd_neg(xbProc *p, xbValue x, Type *type);
+gb_internal xbValue xb_simd_not(xbProc *p, xbValue x, Type *type);
+gb_internal xbValue xb_build_builtin_simd_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id);
+gb_internal xbValue xb_build_builtin_vector_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id);
 
 // int -> int of possibly different width
 gb_internal u32 xb_int_resize(xbProc *p, u32 v, xbType from, xbType to, bool from_signed) {
@@ -1361,8 +1367,8 @@ gb_internal xbValue xb_emit_conv(xbProc *p, xbValue v, Type *t) {
 		return xb_value_reg(t, xb_convop(p, sgn ? xbOp_SIToF : xbOp_UIToF, ds, it, r));
 	}
 
-	if (is_type_simd_vector(dst) || is_type_simd_vector(src)) {
-		XB_UNSUPPORTED(p, "simd conversion");
+	if (is_type_simd_vector(dst)) {
+		return xb_simd_conv(p, v, t);
 	}
 
 	// bit_field / bit_set <-> backing type
