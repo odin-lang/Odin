@@ -12,6 +12,8 @@ gb_internal xbValue xb_emit_arith_array(xbProc *p, TokenKind op, xbValue x, xbVa
 gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr);
 gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e);
 gb_internal void    xb_emit_bounds_check(xbProc *p, Token token, u32 index, u32 len);
+gb_internal u32     xb_build_index_int(xbProc *p, Ast *index_expr);
+gb_internal xbAddr  xb_soa_select(xbProc *p, xbAddr const &a, Selection const &sel);
 gb_internal xbValue xb_emit_union_wrap(xbProc *p, Type *union_type, Type *variant, xbValue v);
 gb_internal void    xb_set_debug_loc(xbProc *p, TokenPos pos);
 gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id);
@@ -500,23 +502,9 @@ gb_internal xbAddr xb_build_addr_from_entity(xbProc *p, Entity *e, Ast *expr) {
 		Selection sel = lookup_field(parent->type, string_interner_insert(e->token.string), false);
 		if (sel.entity == nullptr) XB_UNSUPPORTED(p, "using variable lookup");
 		xbAddr pa = xb_build_addr_from_entity(p, parent, nullptr);
+		if (pa.kind == xbAddr_SoaVariable) return xb_soa_select(p, pa, sel);
 		if (pa.kind != xbAddr_Default) XB_UNSUPPORTED(p, "using variable addr");
-		// walk the selection
-		Type *type = pa.type;
-		xbMem mem = pa.mem;
-		for (i32 index : sel.index) {
-			if (is_type_pointer(type)) {
-				type = type_deref(type);
-				mem = xb_mem(xbMem_Reg, xb_load(p, xbType_I64, mem), 0);
-			}
-			Type *ft = nullptr;
-			Type *bt = core_type(type);
-			if (bt->kind != Type_Struct || bt->Struct.soa_kind != StructSoa_None) XB_UNSUPPORTED(p, "using through non-struct");
-			i64 off = type_offset_of(bt, index, &ft);
-			mem = xb_mem_offset(mem, off);
-			type = ft;
-		}
-		return xb_addr(type, mem);
+		return xb_emit_deep_field(p, pa.type, pa.mem, sel);
 	}
 	if (e->kind == Entity_Variable) {
 		if (e->flags & EntityFlag_SoaPtrField) XB_UNSUPPORTED(p, "soa pointer field");
@@ -605,19 +593,28 @@ gb_internal void xb_soa_bounds_check(xbProc *p, xbAddr const &a) {
 	xb_emit_bounds_check(p, ast_token(a.soa_index_expr), a.soa_index, len);
 }
 
+// offset and type of component `i` of an #soa element: a struct field or an array element
+gb_internal i64 xb_soa_elem_component(xbProc *p, Type *elem, isize i, Type **ft) {
+	Type *bt = base_type(elem);
+	if (bt->kind == Type_Array) {
+		*ft = bt->Array.elem;
+		return i * type_size_of(bt->Array.elem);
+	}
+	if (bt->kind != Type_Struct || bt->Struct.is_raw_union) XB_UNSUPPORTED(p, "#soa of raw union");
+	return type_offset_of(bt, i, ft);
+}
+
 gb_internal xbValue xb_soa_load(xbProc *p, xbAddr const &a) {
 	Type *t = xb_soa_container_type(a);
 	Type *elem = t->Struct.soa_elem;
-	if (base_type(elem)->kind != Type_Struct) XB_UNSUPPORTED(p, "#soa of non-struct");
 	xb_soa_bounds_check(p, a);
 	xbMem res = xb_add_local(p, elem, true);
 	isize n = xb_soa_column_count(t);
-	Type *bt = base_type(elem);
 	for (isize i = 0; i < n; i++) {
 		Type *ft = nullptr;
 		xbMem src = xb_soa_elem_field(p, t, a.mem, a.soa_index, i, &ft);
 		Type *dt = nullptr;
-		i64 doff = type_offset_of(bt, i, &dt);
+		i64 doff = xb_soa_elem_component(p, elem, i, &dt);
 		xb_store_value(p, xb_mem_offset(res, doff), xb_load_value(p, ft, src));
 	}
 	return xb_value_mem(elem, res);
@@ -626,18 +623,158 @@ gb_internal xbValue xb_soa_load(xbProc *p, xbAddr const &a) {
 gb_internal void xb_soa_store(xbProc *p, xbAddr const &a, xbValue v) {
 	Type *t = xb_soa_container_type(a);
 	Type *elem = t->Struct.soa_elem;
-	if (base_type(elem)->kind != Type_Struct) XB_UNSUPPORTED(p, "#soa of non-struct");
 	v = xb_emit_conv(p, v, elem);
 	xbMem vm = xb_value_to_mem(p, v);
 	xb_soa_bounds_check(p, a);
 	isize n = xb_soa_column_count(t);
-	Type *bt = base_type(elem);
 	for (isize i = 0; i < n; i++) {
 		Type *ft = nullptr;
 		xbMem dst = xb_soa_elem_field(p, t, a.mem, a.soa_index, i, &ft);
 		Type *st = nullptr;
-		i64 soff = type_offset_of(bt, i, &st);
+		i64 soff = xb_soa_elem_component(p, elem, i, &st);
 		xb_store_value(p, dst, xb_load_value(p, st, xb_mem_offset(vm, soff)));
+	}
+}
+
+gb_internal xbAddr xb_soa_variable(Type *container, xbMem mem, u32 index, Ast *index_expr) {
+	xbAddr a = {};
+	a.kind = xbAddr_SoaVariable;
+	a.type = base_type(container)->Struct.soa_elem;
+	a.soa_container = container;
+	a.mem = mem;
+	a.soa_index = index;
+	a.soa_index_expr = index_expr;
+	return a;
+}
+
+// the element an #soa pointer {^container, index} points at; it was bounds checked when made
+gb_internal xbAddr xb_soa_variable_from_soa_ptr(xbProc *p, xbValue ptr) {
+	Type *pt = base_type(ptr.type);
+	GB_ASSERT(pt->kind == Type_SoaPointer);
+	xbMem m = xb_value_to_mem(p, ptr);
+	u32 container = xb_load(p, xbType_I64, m);
+	u32 index = xb_load(p, xbType_I64, xb_mem_offset(m, 8));
+	return xb_soa_variable(pt->SoaPointer.elem, xb_mem(xbMem_Reg, container, 0), index, nullptr);
+}
+
+gb_internal xbValue xb_make_soa_ptr(xbProc *p, Type *type, u32 container, u32 index) {
+	xbMem m = xb_add_local(p, type, false);
+	xb_store(p, xbType_I64, m, container);
+	xb_store(p, xbType_I64, xb_mem_offset(m, 8), index);
+	return xb_value_mem(type, m);
+}
+
+// component `comp` (a runtime index) of the array element of an #soa variable
+gb_internal xbMem xb_soa_component_dynamic(xbProc *p, xbAddr const &a, u32 comp) {
+	Type *t = xb_soa_container_type(a);
+	isize n = xb_soa_column_count(t);
+	Type *et = base_type(t->Struct.soa_elem);
+	GB_ASSERT(et->kind == Type_Array);
+	if (n == 0) {
+		// no components: the access is out of bounds by definition
+		return xb_mem(xbMem_Reg, xb_iconst(p, xbType_I64, 0), 0);
+	}
+	Type *ft = nullptr;
+	i64 off0 = type_offset_of(t, 0, &ft);
+	i64 col_stride = n > 1 ? type_offset_of(t, 1, &ft) - off0 : 0;
+	u32 col = xb_ptr_add_scaled(p, xb_lea(p, xb_mem_offset(a.mem, off0)), comp, col_stride);
+	i64 elem_size = type_size_of(et->Array.elem);
+	if (t->Struct.soa_kind == StructSoa_Fixed) {
+		return xb_mem(xbMem_Reg, xb_ptr_add_scaled(p, col, a.soa_index, elem_size), 0);
+	}
+	u32 data = xb_load(p, xbType_I64, xb_mem(xbMem_Reg, col, 0));
+	return xb_mem(xbMem_Reg, xb_ptr_add_scaled(p, data, a.soa_index, elem_size), 0);
+}
+
+// soa[i][j], or v[j] for an #soa looping variable or an #soa pointer
+gb_internal xbAddr xb_soa_elem_index(xbProc *p, xbAddr const &a, Ast *index_expr) {
+	Type *t = xb_soa_container_type(a);
+	Type *et = base_type(t->Struct.soa_elem);
+	GB_ASSERT(et->kind == Type_Array);
+	xb_soa_bounds_check(p, a);
+	TypeAndValue tv = type_and_value_of_expr(index_expr);
+	if (tv.mode == Addressing_Constant && tv.value.kind == ExactValue_Integer) {
+		Type *ft = nullptr;
+		xbMem m = xb_soa_elem_field(p, t, a.mem, a.soa_index, cast(isize)exact_value_to_i64(tv.value), &ft);
+		return xb_addr(ft, m);
+	}
+	u32 comp = xb_build_index_int(p, index_expr);
+	xb_emit_bounds_check(p, ast_token(index_expr), comp, xb_iconst(p, xbType_I64, et->Array.count));
+	return xb_addr(et->Array.elem, xb_soa_component_dynamic(p, a, comp));
+}
+
+// a field selection on an #soa element: the first index picks the column
+gb_internal xbAddr xb_soa_select(xbProc *p, xbAddr const &a, Selection const &sel) {
+	Type *t = xb_soa_container_type(a);
+	xb_soa_bounds_check(p, a);
+	Type *ft = nullptr;
+	xbMem m = xb_soa_elem_field(p, t, a.mem, a.soa_index, sel.index[0], &ft);
+	Selection sub = sel;
+	sub.index.data += 1;
+	sub.index.count -= 1;
+	if (sub.index.count == 0) return xb_addr(ft, m);
+	return xb_emit_deep_field(p, ft, m, sub);
+}
+
+gb_internal xbMem xb_soa_swizzle_gather(xbProc *p, xbAddr const &a) {
+	Type *t = xb_soa_container_type(a);
+	xb_soa_bounds_check(p, a);
+	xbMem res = xb_add_local(p, a.type, false);
+	i64 stride = type_size_of(a.swizzle_elem);
+	for_array(i, a.soa_swizzle) {
+		Type *ft = nullptr;
+		xbMem src = xb_soa_elem_field(p, t, a.mem, a.soa_index, a.soa_swizzle[i], &ft);
+		xb_store_value(p, xb_mem_offset(res, i*stride), xb_load_value(p, ft, src));
+	}
+	return res;
+}
+
+gb_internal void xb_soa_swizzle_store(xbProc *p, xbAddr const &a, xbValue v) {
+	Type *t = xb_soa_container_type(a);
+	v = xb_emit_conv(p, v, a.type);
+	xbMem src = xb_address_from_load_or_generate_local(p, v);
+	xb_soa_bounds_check(p, a);
+	i64 stride = type_size_of(a.swizzle_elem);
+	auto vals = array_make<xbValue>(xb_allocator(), a.soa_swizzle.count);
+	defer (array_free(&vals));
+	for_array(i, a.soa_swizzle) {
+		vals[i] = xb_load_value(p, a.swizzle_elem, xb_mem_offset(src, i*stride));
+	}
+	for_array(i, a.soa_swizzle) {
+		Type *ft = nullptr;
+		xbMem dst = xb_soa_elem_field(p, t, a.mem, a.soa_index, a.soa_swizzle[i], &ft);
+		xb_store_value(p, dst, vals[i]);
+	}
+}
+
+// x.yx += y: each distinct component, in first-seen order, takes the next element of y
+gb_internal void xb_soa_swizzle_op_assign(xbProc *p, TokenKind op, xbAddr const &a, xbValue rhs) {
+	Type *t = xb_soa_container_type(a);
+	rhs = xb_emit_conv(p, rhs, a.type);
+	xbMem y = xb_address_from_load_or_generate_local(p, rhs);
+	bool handled[4] = {};
+	i32 indices[4] = {};
+	i32 count = 0;
+	for (i32 index : a.soa_swizzle) {
+		GB_ASSERT(index < 4);
+		if (handled[index]) continue;
+		handled[index] = true;
+		indices[count++] = index;
+	}
+	xb_soa_bounds_check(p, a);
+	xbMem dst[4] = {};
+	xbValue ops[4] = {};
+	i64 stride = type_size_of(a.swizzle_elem);
+	for (i32 i = 0; i < count; i++) {
+		Type *ft = nullptr;
+		dst[i] = xb_soa_elem_field(p, t, a.mem, a.soa_index, indices[i], &ft);
+	}
+	for (i32 i = 0; i < count; i++) {
+		xbValue x = xb_load_value(p, a.swizzle_elem, dst[i]);
+		ops[i] = xb_emit_arith(p, op, x, xb_load_value(p, a.swizzle_elem, xb_mem_offset(y, i*stride)), a.swizzle_elem);
+	}
+	for (i32 i = 0; i < count; i++) {
+		xb_store_value(p, dst[i], ops[i]);
 	}
 }
 
@@ -683,6 +820,8 @@ gb_internal xbValue xb_addr_load(xbProc *p, xbAddr const &addr) {
 	}
 	case xbAddr_SoaVariable:
 		return xb_soa_load(p, addr);
+	case xbAddr_SwizzleSoa:
+		return xb_value_mem(addr.type, xb_soa_swizzle_gather(p, addr));
 	case xbAddr_Map:
 		return xb_map_load(p, addr);
 	}
@@ -708,6 +847,9 @@ gb_internal void xb_addr_store(xbProc *p, xbAddr const &addr, xbValue v) {
 	}
 	case xbAddr_SoaVariable:
 		xb_soa_store(p, addr, v);
+		return;
+	case xbAddr_SwizzleSoa:
+		xb_soa_swizzle_store(p, addr, v);
 		return;
 	case xbAddr_Map: {
 		u32 map_ptr = xb_load(p, xbType_I64, addr.mem);
@@ -762,6 +904,9 @@ gb_internal xbMem xb_addr_mem(xbProc *p, xbAddr const &addr) {
 	if (addr.kind == xbAddr_Swizzle) {
 		return xb_swizzle_gather(p, addr);
 	}
+	if (addr.kind == xbAddr_SwizzleSoa) {
+		return xb_soa_swizzle_gather(p, addr);
+	}
 	if (addr.kind == xbAddr_Context) {
 		xbMem ctx = xb_context_mem(p);
 		Type *type = t_context;
@@ -798,6 +943,13 @@ gb_internal xbAddr xb_emit_deep_field(xbProc *p, Type *type, xbMem mem, Selectio
 		Type *ft = nullptr;
 		i64 off = 0;
 		switch (bt->kind) {
+		case Type_SoaPointer: {
+			// the selected column of the element the #soa pointer points at
+			xbAddr a = xb_soa_variable_from_soa_ptr(p, xb_value_mem(type, mem));
+			mem = xb_soa_elem_field(p, xb_soa_container_type(a), a.mem, a.soa_index, index, &ft);
+			type = ft;
+			continue;
+		}
 		case Type_Struct:
 			if (bt->Struct.is_packed && mem.align == 0) {
 				mem.align = 1;
@@ -923,16 +1075,33 @@ gb_internal xbAddr xb_build_addr_index_expr(xbProc *p, Ast *expr) {
 		} else {
 			container = xb_build_addr_mem(p, ie->expr);
 		}
-		xbAddr a = {};
-		a.kind = xbAddr_SoaVariable;
-		a.type = t->Struct.soa_elem;
-		a.soa_container = t;
-		a.mem = container;
-		a.soa_index = xb_build_index_int(p, ie->index);
-		a.soa_index_expr = ie->index;
-		return a;
+		return xb_soa_variable(t, container, xb_build_index_int(p, ie->index), ie->index);
 	}
-	if (ie->expr->tav.mode == Addressing_SoaVariable) XB_UNSUPPORTED(p, "soa variable index");
+	if (ie->expr->tav.mode == Addressing_SoaVariable && is_type_multi_pointer(type_of_expr(ie->expr))) {
+		// soa.x[i]: a column of an #soa slice or dynamic array, bounds checked against its length
+		Ast *se_expr = unparen_expr(ie->expr);
+		if (se_expr->kind != Ast_SelectorExpr) XB_UNSUPPORTED(p, "soa column index");
+		ast_node(se, SelectorExpr, se_expr);
+		xbAddr ca = xb_build_addr(p, se->expr);
+		if (ca.kind != xbAddr_Default) XB_UNSUPPORTED(p, "soa column of special addr");
+		Type *ct = ca.type;
+		xbMem cm = ca.mem;
+		if (is_type_pointer(ct)) {
+			ct = type_deref(ct);
+			cm = xb_mem(xbMem_Reg, xb_load(p, xbType_I64, cm), 0);
+		}
+		Selection sel = lookup_field(ct, unparen_expr(se->selector)->Ident.interned, false);
+		if (!is_type_soa_struct(ct) || sel.index.count != 1) XB_UNSUPPORTED(p, "soa column selection");
+		Type *ft = nullptr;
+		i64 off = type_offset_of(base_type(ct), sel.index[0], &ft);
+		u32 data = xb_load(p, xbType_I64, xb_mem_offset(cm, off));
+		u32 index = xb_build_index_int(p, ie->index);
+		if (!build_context.no_bounds_check) {
+			xb_emit_bounds_check(p, ast_token(ie->index), index, xb_soa_len(p, ct, cm));
+		}
+		Type *elem = base_type(ft)->MultiPointer.elem;
+		return xb_addr(elem, xb_mem(xbMem_Reg, xb_ptr_add_scaled(p, data, index, type_size_of(elem)), 0));
+	}
 	if (is_type_map(t)) {
 		xbAddr map_addr = xb_build_addr(p, ie->expr);
 		xbMem map_mem = xb_addr_mem(p, map_addr);
@@ -967,7 +1136,17 @@ gb_internal xbAddr xb_build_addr_index_expr(xbProc *p, Ast *expr) {
 		if (deref) {
 			base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, ie->expr)), 0);
 		} else {
-			base = xb_build_addr_mem(p, ie->expr);
+			xbAddr array_addr = xb_build_addr(p, ie->expr);
+			// soa[i][j], or v[j] for an #soa looping variable
+			if (array_addr.kind == xbAddr_SoaVariable) {
+				return xb_soa_elem_index(p, array_addr, ie->index);
+			}
+			// p[j] for an #soa pointer p
+			if (is_type_soa_pointer(type_of_expr(ie->expr))) {
+				xbAddr a = xb_soa_variable_from_soa_ptr(p, xb_addr_load(p, array_addr));
+				return xb_soa_elem_index(p, a, ie->index);
+			}
+			base = xb_addr_mem(p, array_addr);
 		}
 		Type *elem = nullptr;
 		i64 count = 0;
@@ -1083,12 +1262,28 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 		if (se->swizzle_count > 0) {
 			Type *array_type = base_type(type_deref(tav.type));
 			if (array_type->kind != Type_Array) XB_UNSUPPORTED(p, "simd swizzle");
-			if (is_type_soa_pointer(tav.type)) XB_UNSUPPORTED(p, "soa swizzle");
 			xbMem base = {};
 			if (is_type_pointer(tav.type)) {
 				base = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, se->expr)), 0);
 			} else {
-				xbAddr a = xb_build_addr(p, se->expr);
+				xbAddr a = {};
+				if (is_type_soa_pointer(tav.type)) {
+					a = xb_soa_variable_from_soa_ptr(p, xb_build_expr(p, se->expr));
+				} else {
+					a = xb_build_addr(p, se->expr);
+				}
+				if (a.kind == xbAddr_SoaVariable) {
+					// soa[i].xy
+					auto indices = slice_make<i32>(permanent_allocator(), se->swizzle_count);
+					for (u8 i = 0; i < se->swizzle_count; i++) {
+						indices[i] = (se->swizzle_indices >> (i*2)) & 3;
+					}
+					a.kind = xbAddr_SwizzleSoa;
+					a.type = type_deref(expr->tav.type);
+					a.soa_swizzle = indices;
+					a.swizzle_elem = array_type->Array.elem;
+					return a;
+				}
 				if (a.kind != xbAddr_Default) XB_UNSUPPORTED(p, "swizzle of special addr");
 				base = a.mem;
 			}
@@ -1103,13 +1298,18 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 		GB_ASSERT(sel.entity != nullptr);
 		if (sel.pseudo_field) XB_UNSUPPORTED(p, "pseudo field");
 		if (sel.is_bit_field) XB_UNSUPPORTED(p, "bit field selector");
-		if (is_type_soa_pointer(tav.type)) XB_UNSUPPORTED(p, "soa pointer selector");
 		Type *deref_type = type_deref(tav.type);
 		if (tav.type->kind == Type_Pointer && deref_type->kind == Type_Named && deref_type->Named.type_name->TypeName.objc_ivar) {
 			XB_UNSUPPORTED(p, "objc ivar");
 		}
 
-		xbAddr addr = xb_build_addr(p, se->expr);
+		xbAddr addr = {};
+		if (is_type_soa_pointer(tav.type)) {
+			// p.x for an #soa pointer p is p^.x
+			addr = xb_soa_variable_from_soa_ptr(p, xb_build_expr(p, se->expr));
+		} else {
+			addr = xb_build_addr(p, se->expr);
+		}
 		if (addr.kind == xbAddr_Context) {
 			if (addr.ctx_sel.index.count > 0) {
 				sel = selection_combine(addr.ctx_sel, sel);
@@ -1118,15 +1318,7 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 			return addr;
 		}
 		if (addr.kind == xbAddr_SoaVariable) {
-			Type *t = xb_soa_container_type(addr);
-			xb_soa_bounds_check(p, addr);
-			Type *ft = nullptr;
-			xbMem m = xb_soa_elem_field(p, t, addr.mem, addr.soa_index, sel.index[0], &ft);
-			Selection sub = sel;
-			sub.index.data += 1;
-			sub.index.count -= 1;
-			if (sub.index.count == 0) return xb_addr(ft, m);
-			return xb_emit_deep_field(p, ft, m, sub);
+			return xb_soa_select(p, addr, sel);
 		}
 		if (addr.kind == xbAddr_Map) {
 			xbValue v = xb_addr_load(p, addr);
@@ -1143,8 +1335,10 @@ gb_internal xbAddr xb_build_addr(xbProc *p, Ast *expr) {
 
 	case_ast_node(de, DerefExpr, expr);
 		Type *t = type_of_expr(de->expr);
-		if (is_type_soa_pointer(t)) XB_UNSUPPORTED(p, "soa pointer deref");
-				xbValue ptr = xb_build_expr(p, de->expr);
+		if (is_type_soa_pointer(t)) {
+			return xb_soa_variable_from_soa_ptr(p, xb_build_expr(p, de->expr));
+		}
+		xbValue ptr = xb_build_expr(p, de->expr);
 		return xb_addr(type_deref(t), xb_mem_from_ptr(p, ptr));
 	case_end;
 
@@ -1570,10 +1764,18 @@ gb_internal xbValue xb_emit_comp_against_nil(xbProc *p, TokenKind op, xbValue x)
 	}
 	case Type_Slice:
 	case Type_DynamicArray:
-	case Type_Map: {
+	case Type_Map:
+	case Type_SoaPointer: {
 		xbMem m = xb_value_to_mem(p, x);
 		return xb_cmp_zero(p, op, xbType_I64, xb_load(p, xbType_I64, m));
 	}
+	case Type_Struct:
+		if (bt->Struct.soa_kind == StructSoa_Slice || bt->Struct.soa_kind == StructSoa_Dynamic) {
+			// the first field: the first column, or the length when there are none
+			xbMem m = xb_value_to_mem(p, x);
+			return xb_cmp_zero(p, op, xbType_I64, xb_load(p, xbType_I64, m));
+		}
+		break;
 	case Type_Union: {
 		if (type_size_of(t) == 0) {
 			return xb_const_bool(p, op == Token_CmpEq);
@@ -1675,6 +1877,15 @@ gb_internal xbValue xb_emit_comp(xbProc *p, TokenKind op, xbValue left, xbValue 
 		return xb_cmp_zero(p, op, xb_scalar_type(val.type), xb_value_to_reg(p, val));
 	}
 
+	if (is_type_soa_pointer(a)) {
+		if (op != Token_CmpEq && op != Token_NotEq) XB_UNSUPPORTED(p, "soa pointer ordering");
+		xbMem ma = xb_value_to_mem(p, left);
+		xbMem mb = xb_value_to_mem(p, right);
+		xbCond c = op == Token_CmpEq ? xbCond_EQ : xbCond_NE;
+		u32 r0 = xb_cmp(p, c, xbType_I64, xb_load(p, xbType_I64, ma), xb_load(p, xbType_I64, mb));
+		u32 r1 = xb_cmp(p, c, xbType_I64, xb_load(p, xbType_I64, xb_mem_offset(ma, 8)), xb_load(p, xbType_I64, xb_mem_offset(mb, 8)));
+		return xb_value_reg(t_llvm_bool, xb_binop(p, op == Token_CmpEq ? xbOp_And : xbOp_Or, xbType_I8, r0, r1));
+	}
 	if ((is_type_struct(a) || is_type_union(a)) && is_type_comparable(a)) {
 		i64 size = type_size_of(a);
 		if (size == 0) return xb_const_bool(p, op == Token_CmpEq);
@@ -2038,10 +2249,26 @@ gb_internal xbValue xb_build_unary_expr(xbProc *p, Ast *expr) {
 		if (ue_expr->kind == Ast_TypeAssertion) {
 			return xb_build_address_of_type_assertion(p, expr);
 		}
-		if (ue_expr->kind == Ast_IndexExpr && is_type_soa_struct(type_deref(type_of_expr(ue_expr->IndexExpr.expr)))) {
-			XB_UNSUPPORTED(p, "soa pointer");
+		if (is_type_soa_pointer(type)) {
+			Entity *e = entity_of_node(ue_expr);
+			if (e != nullptr && (e->flags & EntityFlag_SoaPtrField) != 0) {
+				// &v for an #soa looping variable, in range by construction
+				xbAddr a = xb_build_addr(p, ue_expr);
+				if (a.kind != xbAddr_SoaVariable) XB_UNSUPPORTED(p, "soa pointer of special addr");
+				return xb_make_soa_ptr(p, type, xb_lea(p, a.mem), a.soa_index);
+			}
+			if (ue_expr->kind != Ast_IndexExpr) XB_UNSUPPORTED(p, "soa pointer");
+			ast_node(ie, IndexExpr, ue_expr);
+			u32 container = 0;
+			if (is_type_pointer(type_of_expr(ie->expr))) {
+				container = xb_value_to_reg(p, xb_build_expr(p, ie->expr));
+			} else {
+				container = xb_lea(p, xb_build_addr_mem(p, ie->expr));
+			}
+			xbAddr a = xb_soa_variable(type_deref(type_of_expr(ie->expr)), xb_mem(xbMem_Reg, container, 0), xb_build_index_int(p, ie->index), ie->index);
+			xb_soa_bounds_check(p, a);
+			return xb_make_soa_ptr(p, type, container, a.soa_index);
 		}
-		if (is_type_soa_pointer(type)) XB_UNSUPPORTED(p, "soa pointer");
 		xbAddr a = xb_build_addr(p, ue->expr);
 		return xb_value_reg(type, xb_lea(p, xb_addr_mem(p, a)));
 	}
@@ -2178,12 +2405,58 @@ gb_internal void xb_emit_slice_bounds_check(xbProc *p, Token token, u32 low, u32
 	}
 }
 
+gb_internal xbValue xb_build_soa_slice_expr(xbProc *p, Ast *expr, Type *t, bool deref) {
+	ast_node(se, SliceExpr, expr);
+	Type *type = type_of_expr(expr);
+	xbMem container = {};
+	if (deref) {
+		container = xb_mem(xbMem_Reg, xb_value_to_reg(p, xb_build_expr(p, se->expr)), 0);
+	} else {
+		container = xb_build_addr_mem(p, se->expr);
+	}
+	// the columns are read before the indices are evaluated, the length after
+	xbMem base = container;
+	if (t->Struct.soa_kind != StructSoa_Fixed) {
+		base = xb_add_local(p, t, false);
+		xb_memcopy(p, base, container, type_size_of(t));
+	}
+	u32 lo = se->low ? xb_build_index_int(p, se->low) : xb_iconst(p, xbType_I64, 0);
+	u32 hi = se->high ? xb_build_index_int(p, se->high) : 0;
+	u32 len = xb_soa_len(p, t, container);
+	if (se->high == nullptr) hi = len;
+	bool no_indices = se->low == nullptr && se->high == nullptr;
+	if (!no_indices) {
+		xb_emit_slice_bounds_check(p, se->open, lo, hi, len, se->low != nullptr);
+	}
+	xbMem dst = xb_add_local(p, type, true);
+	if (t->Struct.soa_kind == StructSoa_Slice && no_indices) {
+		xb_memcopy(p, dst, base, type_size_of(t));
+		return xb_value_mem(type, dst);
+	}
+	isize n = xb_soa_column_count(t);
+	Type *rt = base_type(type);
+	for (isize i = 0; i < n; i++) {
+		Type *ft = nullptr;
+		xbMem src = xb_soa_elem_field(p, t, base, lo, i, &ft);
+		Type *dt = nullptr;
+		i64 doff = type_offset_of(rt, i, &dt);
+		xb_store(p, xbType_I64, xb_mem_offset(dst, doff), xb_lea(p, src));
+	}
+	Type *lt = nullptr;
+	i64 loff = type_offset_of(rt, n, &lt);
+	xb_store(p, xbType_I64, xb_mem_offset(dst, loff), xb_binop(p, xbOp_Sub, xbType_I64, hi, lo));
+	return xb_value_mem(type, dst);
+}
+
 gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);
 	Type *type = type_of_expr(expr);
 	Type *t = base_type(type_of_expr(se->expr));
 	bool deref = is_type_pointer(t);
 	if (deref) t = base_type(type_deref(t));
+	if (is_type_soa_struct(t)) {
+		return xb_build_soa_slice_expr(p, expr, t, deref);
+	}
 
 	u32 data = 0;
 	u32 len = 0;
@@ -2283,7 +2556,36 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 
 	switch (bt->kind) {
 	case Type_Struct: {
-		if (bt->Struct.soa_kind != StructSoa_None) XB_UNSUPPORTED(p, "soa compound literal");
+		if (bt->Struct.soa_kind != StructSoa_None) {
+			if (bt->Struct.soa_kind != StructSoa_Fixed) XB_UNSUPPORTED(p, "soa compound literal");
+			xbMem m = xb_add_local(p, type, true);
+			Type *et = bt->Struct.soa_elem;
+			auto store = [&](i64 index, xbValue v) {
+				xb_soa_store(p, xb_soa_variable(type, m, xb_iconst(p, xbType_I64, index), nullptr), v);
+			};
+			i64 elem_index = 0;
+			for (Ast *elem : cl->elems) {
+				if (elem->kind == Ast_FieldValue) {
+					ast_node(fv, FieldValue, elem);
+					xbValue v = xb_emit_conv(p, xb_build_expr(p, fv->value), et);
+					if (is_ast_range(fv->field)) {
+						ast_node(ie, BinaryExpr, fv->field);
+						i64 lo = exact_value_to_i64(ie->left->tav.value);
+						i64 hi = exact_value_to_i64(ie->right->tav.value);
+						if (ie->op.kind != Token_RangeHalf) hi += 1;
+						if (hi - lo > 256) XB_UNSUPPORTED(p, "large ranged compound literal");
+						for (i64 k = lo; k < hi; k++) store(k, v);
+					} else {
+						store(exact_value_to_i64(fv->field->tav.value), v);
+					}
+				} else {
+					xbValue v = xb_build_expr(p, elem);
+					if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
+					store(elem_index++, xb_emit_conv(p, v, et));
+				}
+			}
+			return xb_value_mem(type, m);
+		}
 		if (bt->Struct.is_raw_union && cl->elems.count > 0) {
 			// fallthrough: a raw union literal sets one field
 		}

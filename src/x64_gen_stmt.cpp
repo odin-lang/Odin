@@ -701,6 +701,124 @@ gb_internal xbValue xb_build_call_expr(xbProc *p, Ast *expr) {
 }
 
 ////////////////////////////////////////////////////////////////
+// #soa builtins
+////////////////////////////////////////////////////////////////
+
+gb_internal xbValue xb_build_array_swizzle(xbProc *p, AstCallExpr *ce, TypeAndValue const &tv) {
+	xbAddr a = xb_build_addr(p, ce->args[0]);
+	isize n = ce->args.count-1;
+	if (n == 0) return xb_addr_load(p, a);
+	auto indices = slice_make<i32>(permanent_allocator(), n);
+	for (isize i = 0; i < n; i++) {
+		indices[i] = cast(i32)exact_value_to_i64(type_and_value_of_expr(ce->args[i+1]).value);
+	}
+	Type *elem = base_type(tv.type)->Array.elem;
+	if (a.kind == xbAddr_SoaVariable) {
+		a.kind = xbAddr_SwizzleSoa;
+		a.type = tv.type;
+		a.soa_swizzle = indices;
+		a.swizzle_elem = elem;
+		return xb_value_mem(tv.type, xb_soa_swizzle_gather(p, a));
+	}
+	xbMem src = xb_addr_mem(p, a);
+	xbMem res = xb_add_local(p, tv.type, false);
+	i64 stride = type_size_of(elem);
+	for (isize i = 0; i < n; i++) {
+		xb_store_value(p, xb_mem_offset(res, i*stride), xb_load_value(p, elem, xb_mem_offset(src, indices[i]*stride)));
+	}
+	return xb_value_mem(tv.type, res);
+}
+
+gb_internal u32 xb_min_int(xbProc *p, u32 a, u32 b) {
+	return xb_select(p, xbType_I64, xb_cmp(p, xbCond_SLT, xbType_I64, a, b), a, b);
+}
+
+gb_internal xbValue xb_build_soa_zip(xbProc *p, AstCallExpr *ce, TypeAndValue const &tv) {
+	auto slices = array_make<xbMem>(xb_allocator(), ce->args.count);
+	defer (array_free(&slices));
+	for_array(i, ce->args) {
+		Ast *arg = ce->args[i];
+		if (arg->kind == Ast_FieldValue) arg = arg->FieldValue.value;
+		slices[i] = xb_value_to_mem(p, xb_build_expr(p, arg));
+	}
+	u32 len = xb_load(p, xbType_I64, xb_mem_offset(slices[0], 8));
+	for (isize i = 1; i < slices.count; i++) {
+		len = xb_min_int(p, len, xb_load(p, xbType_I64, xb_mem_offset(slices[i], 8)));
+	}
+	Type *t = base_type(tv.type);
+	xbMem res = xb_add_local(p, tv.type, true);
+	Type *ft = nullptr;
+	for_array(i, slices) {
+		xb_store(p, xbType_I64, xb_mem_offset(res, type_offset_of(t, i, &ft)), xb_load(p, xbType_I64, slices[i]));
+	}
+	xb_store(p, xbType_I64, xb_mem_offset(res, type_offset_of(t, slices.count, &ft)), len);
+	return xb_value_mem(tv.type, res);
+}
+
+gb_internal xbValue xb_build_soa_unzip(xbProc *p, AstCallExpr *ce, TypeAndValue const &tv) {
+	xbValue arg = xb_build_expr(p, ce->args[0]);
+	Type *t = base_type(arg.type);
+	GB_ASSERT(is_type_soa_struct(t) && t->Struct.soa_kind == StructSoa_Slice);
+	xbMem m = xb_value_to_mem(p, arg);
+	u32 len = xb_soa_len(p, t, m);
+	xbMem res = xb_add_local(p, tv.type, true);
+	isize n = is_type_tuple(tv.type) ? xb_soa_column_count(t) : 1;
+	for (isize i = 0; i < n; i++) {
+		Type *ft = nullptr;
+		i64 src = type_offset_of(t, i, &ft);
+		i64 dst = is_type_tuple(tv.type) ? type_offset_of(tv.type, i, &ft) : 0;
+		xb_store(p, xbType_I64, xb_mem_offset(res, dst), xb_load(p, xbType_I64, xb_mem_offset(m, src)));
+		xb_store(p, xbType_I64, xb_mem_offset(res, dst+8), len);
+	}
+	return xb_value_mem(tv.type, res);
+}
+
+gb_internal void xb_build_soa_copy_from_slice(xbProc *p, AstCallExpr *ce) {
+	xbValue ptr    = xb_build_expr(p, ce->args[0]);
+	xbValue offset = xb_build_expr(p, ce->args[1]);
+	xbValue args   = xb_build_expr(p, ce->args[2]);
+	Type *t = base_type(type_deref(ptr.type));
+	GB_ASSERT(is_type_soa_dynamic_array(t));
+	Type *elem = t->Struct.soa_elem;
+	isize n = xb_soa_column_count(t);
+	if (n == 0) return;
+	xbMem soa = xb_mem(xbMem_Reg, xb_value_to_reg(p, ptr), 0);
+	xbMem am = xb_value_to_mem(p, args);
+	u32 arg_ptr = xb_load(p, xbType_I64, am);
+	u32 arg_len = xb_load(p, xbType_I64, xb_mem_offset(am, 8));
+	u32 off = xb_value_to_reg(p, xb_emit_conv(p, offset, t_int));
+	u32 max_soa_len = xb_binop(p, xbOp_Sub, xbType_I64, xb_soa_len(p, t, soa), off);
+	u32 max_len = xb_min_int(p, arg_len, max_soa_len);
+	i64 elem_size = type_size_of(elem);
+	xbMem j_mem = xb_add_local(p, t_int, false);
+	for (isize f = 0; f < n; f++) {
+		Type *ct = nullptr;
+		i64 coff = type_offset_of(t, f, &ct);
+		Type *ft = nullptr;
+		i64 foff = xb_soa_elem_component(p, elem, f, &ft);
+		i64 fsize = type_size_of(ft);
+		u32 col = xb_load(p, xbType_I64, xb_mem_offset(soa, coff));
+		// for j in 0..<max_len: col[offset+j] = args[j].field
+		xbBlock *loop = xb_new_block(p);
+		xbBlock *body = xb_new_block(p);
+		xbBlock *done = xb_new_block(p);
+		xb_store(p, xbType_I64, j_mem, xb_iconst(p, xbType_I64, 0));
+		xb_jump(p, loop);
+		xb_start_block(p, loop);
+		u32 j = xb_load(p, xbType_I64, j_mem);
+		xb_branch(p, xb_cmp(p, xbCond_SLT, xbType_I64, j, max_len), body, done);
+		xb_start_block(p, body);
+		j = xb_load(p, xbType_I64, j_mem);
+		u32 dst = xb_ptr_add_scaled(p, col, xb_binop(p, xbOp_Add, xbType_I64, j, off), fsize);
+		u32 src = xb_ptr_add_const(p, xb_ptr_add_scaled(p, arg_ptr, j, elem_size), foff);
+		xb_memcopy(p, xb_mem(xbMem_Reg, dst, 0), xb_mem(xbMem_Reg, src, 0), fsize);
+		xb_store(p, xbType_I64, j_mem, xb_binop(p, xbOp_Add, xbType_I64, j, xb_iconst(p, xbType_I64, 1)));
+		xb_jump(p, loop);
+		xb_start_block(p, done);
+	}
+}
+
+////////////////////////////////////////////////////////////////
 // Builtins
 ////////////////////////////////////////////////////////////////
 
@@ -1378,6 +1496,18 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		xb_emit(p, xb_instr(xbOp_Trap));
 		xb_unreachable(p);
 		return {};
+	case BuiltinProc_swizzle:
+		if (is_type_array(tv.type)) {
+			return xb_build_array_swizzle(p, ce, tv);
+		}
+		break;
+	case BuiltinProc_soa_zip:
+		return xb_build_soa_zip(p, ce, tv);
+	case BuiltinProc_soa_unzip:
+		return xb_build_soa_unzip(p, ce, tv);
+	case BuiltinProc_soa_copy_from_slice:
+		xb_build_soa_copy_from_slice(p, ce);
+		return {};
 	}
 	{
 		gbString r = gb_string_make(permanent_allocator(), "builtin ");
@@ -1711,7 +1841,11 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 		XB_UNSUPPORTED(p, "logical op-assign");
 	}
 	xbAddr lhs = xb_build_addr(p, as->lhs[0]);
-	if (lhs.kind != xbAddr_Default && lhs.kind != xbAddr_Swizzle) XB_UNSUPPORTED(p, "op-assign to special addr");
+	if (lhs.kind == xbAddr_SwizzleSoa) {
+		xb_soa_swizzle_op_assign(p, op, lhs, xb_build_expr(p, as->rhs[0]));
+		return;
+	}
+	if (lhs.kind != xbAddr_Default && lhs.kind != xbAddr_Swizzle && lhs.kind != xbAddr_SoaVariable) XB_UNSUPPORTED(p, "op-assign to special addr");
 	xbValue old = xb_addr_load(p, lhs);
 	xbValue rhs = xb_build_expr(p, as->rhs[0]);
 	Type *type = lhs.type;
@@ -2112,11 +2246,27 @@ gb_internal void xb_build_range_indexed(xbProc *p, AstRangeStmt *rs) {
 	case Type_Array:
 	case Type_EnumeratedArray: {
 		xbAddr addr = xb_build_addr(p, expr);
-		if (addr.kind == xbAddr_SoaVariable) XB_UNSUPPORTED(p, "range over soa element");
+		if (addr.kind == xbAddr_Swizzle || addr.kind == xbAddr_SwizzleSoa) {
+			addr = xb_addr(addr.type, xb_addr_mem(p, addr));
+		}
+		if (addr.kind == xbAddr_Default && is_type_soa_pointer(addr.type)) {
+			addr = xb_soa_variable_from_soa_ptr(p, xb_load_value(p, addr.type, addr.mem));
+		}
+		if (addr.kind == xbAddr_SoaVariable) {
+			// for v in soa[i]: the components of the element live in different columns
+			xb_soa_bounds_check(p, addr);
+			addr.soa_index_expr = nullptr;
+			Type *elem = et->Array.elem;
+			i64 count = et->Array.count;
+			xb_build_range_indexed_loop(p, rs, elem,
+				[&]() { return xb_iconst(p, xbType_I64, count); },
+				[&](u32 idx) { return xb_lea(p, xb_soa_component_dynamic(p, addr, idx)); },
+				nullptr, nullptr);
+			return;
+		}
 		if (addr.kind != xbAddr_Default) XB_UNSUPPORTED(p, "range over special addr");
 		xbMem array = addr.mem;
 		if (is_type_pointer(addr.type)) {
-			if (is_type_soa_pointer(addr.type)) XB_UNSUPPORTED(p, "range over soa pointer");
 			array = xb_mem(xbMem_Reg, xb_load(p, xbType_I64, array), 0);
 		}
 		i32 base_local = xb_add_local_raw(p, 8, 8);

@@ -118,6 +118,65 @@ gb_internal bool xb_cb_array_elems(xbConstBuf *b, Ast *compound, Type *elem_type
 	return true;
 }
 
+// A fixed #soa constant: the elements are written as an array, then scattered into the columns.
+gb_internal bool xb_cb_soa(xbConstBuf *b, Type *type, ExactValue value, i64 off) {
+	Type *bt = base_type(type);
+	if (bt->Struct.soa_kind != StructSoa_Fixed) return xb_cb_fail(b, "soa constant");
+	Type *elem = bt->Struct.soa_elem;
+	Type *ebt = base_type(elem);
+	if (ebt->kind == Type_Struct && ebt->Struct.is_raw_union) return xb_cb_fail(b, "soa constant of raw union");
+	ast_node(cl, CompoundLit, value.value_compound);
+	if (cl->elems.count == 0 || !elem_type_can_be_constant(elem)) return true;
+	i64 count = bt->Struct.soa_count;
+	i64 esize = type_size_of(elem);
+	xbConstBuf tmp = {};
+	tmp.m = b->m;
+	tmp.writable = b->writable;
+	tmp.bytes = array_make<u8>(heap_allocator(), count*esize, count*esize);
+	gb_zero_size(tmp.bytes.data, count*esize);
+	tmp.relocs = array_make<xbReloc>(heap_allocator(), 0, 4);
+	defer (array_free(&tmp.bytes));
+	defer (array_free(&tmp.relocs));
+	if (!xb_cb_array_elems(&tmp, value.value_compound, elem, count, 0, esize, 0)) {
+		return xb_cb_fail(b, tmp.fail ? tmp.fail : "soa constant");
+	}
+	isize n = bt->Struct.fields.count;
+	auto component = [&](isize c, i64 *size) -> i64 {
+		Type *ft = nullptr;
+		i64 o = 0;
+		if (ebt->kind == Type_Array) {
+			ft = ebt->Array.elem;
+			o = c*type_size_of(ft);
+		} else {
+			o = type_offset_of(ebt, c, &ft);
+		}
+		*size = type_size_of(ft);
+		return o;
+	};
+	for (isize c = 0; c < n; c++) {
+		i64 fsize = 0;
+		i64 foff = component(c, &fsize);
+		i64 coff = type_offset_of(bt, c);
+		for (i64 i = 0; i < count; i++) {
+			xb_cb_bytes(b, off + coff + i*fsize, tmp.bytes.data + i*esize + foff, fsize);
+		}
+	}
+	for (xbReloc r : tmp.relocs) {
+		i64 i = r.offset / esize;
+		i64 rem = r.offset % esize;
+		for (isize c = 0; c < n; c++) {
+			i64 fsize = 0;
+			i64 foff = component(c, &fsize);
+			if (foff <= rem && rem < foff+fsize) {
+				r.offset = off + type_offset_of(bt, c) + i*fsize + (rem - foff);
+				array_add(&b->relocs, r);
+				break;
+			}
+		}
+	}
+	return true;
+}
+
 gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 off) {
 	xbModule *m = b->m;
 	type = default_type(type);
@@ -371,7 +430,7 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 		return true;
 	case ExactValue_Compound: {
 		if (is_type_bit_field(original_type)) return xb_cb_fail(b, "bit_field constant");
-		if (is_type_soa_struct(type)) return xb_cb_fail(b, "soa constant");
+		if (is_type_soa_struct(type)) return xb_cb_soa(b, type, value, off);
 		if (is_type_array(type)) {
 			Type *elem = type->Array.elem;
 			if (!elem_type_can_be_constant(elem)) return true;
