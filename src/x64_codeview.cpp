@@ -37,6 +37,7 @@ enum : u16 {
 	XCV_S_LTHREAD32   = 0x1112,
 	XCV_S_GTHREAD32   = 0x1113,
 	XCV_S_GPROC32     = 0x1110,
+	XCV_S_BLOCK32     = 0x1103,
 	XCV_S_COMPILE3    = 0x113c,
 
 	XCV_DEBUG_S_SYMBOLS    = 0xf1,
@@ -554,6 +555,71 @@ gb_internal u16 xb_cv_reg_of_dwarf(u8 dwarf_reg) {
 	return cast(u16)(336 + (dwarf_reg - 8));
 }
 
+// Where each lexical scope's code is, and which scopes get a block. Like LLVM, a scope
+// without variables of its own, or whose code is interleaved with a sibling's, gets no
+// block: its variables and blocks go to the parent.
+struct xbCvScopes {
+	Array<i32> lo, hi;     // the hull of the scope's code, cold code left out
+	Array<i32> eff;        // the scope whose block holds the scope's variables
+	Array<Array<i32>> kids; // the blocks directly inside a block
+};
+
+gb_internal void xb_cv_scopes_free(xbCvScopes *sc) {
+	for (auto &k : sc->kids) array_free(&k);
+	array_free(&sc->lo); array_free(&sc->hi); array_free(&sc->eff); array_free(&sc->kids);
+}
+
+gb_internal xbCvScopes xb_cv_scopes(xbProcDebug const &pd, u32 len) {
+	xbCvScopes sc = {};
+	isize n = gb_max(pd.scope_parent.count, cast(isize)1);
+	auto parent = [&](i32 s) -> i32 { return s < pd.scope_parent.count ? pd.scope_parent[s] : -1; };
+	sc.lo = array_make<i32>(heap_allocator(), n, n);
+	sc.hi = array_make<i32>(heap_allocator(), n, n);
+	sc.eff = array_make<i32>(heap_allocator(), n, n);
+	sc.kids = array_make<Array<i32>>(heap_allocator(), n, n);
+	for (isize s = 0; s < n; s++) {
+		sc.lo[s] = I32_MAX;
+		sc.hi[s] = 0;
+		sc.kids[s] = array_make<i32>(heap_allocator(), 0, 0);
+	}
+	auto const &marks = pd.scope_marks;
+	for_array(k, marks) {
+		i32 lo = marks[k].code_offset;
+		i32 hi = k+1 < marks.count ? marks[k+1].code_offset : cast(i32)len;
+		if (marks[k].cold || hi <= lo) continue;
+		for (i32 s = marks[k].scope; s >= 0; s = parent(s)) {
+			sc.lo[s] = gb_min(sc.lo[s], lo);
+			sc.hi[s] = gb_max(sc.hi[s], hi);
+		}
+	}
+	// whether t is s or inside it, a scope's id is above its parent's
+	auto inside = [&](i32 t, i32 s) -> bool {
+		while (t > s) t = parent(t);
+		return t == s;
+	};
+	auto own = array_make<i32>(heap_allocator(), n, n);
+	for (isize s = 0; s < n; s++) own[s] = 0;
+	for (xbDebugVar const &v : pd.vars) {
+		if (v.scope < n) own[v.scope] += 1;
+	}
+	// parents first, by the ids
+	for (isize s = 0; s < n; s++) {
+		bool ok = s == 0 || (own[s] > 0 && sc.lo[s] < sc.hi[s]);
+		for_array(k, marks) {
+			if (!ok || s == 0) break;
+			i32 lo = marks[k].code_offset;
+			i32 hi = k+1 < marks.count ? marks[k+1].code_offset : cast(i32)len;
+			if (marks[k].cold || hi <= lo || hi <= sc.lo[s] || lo >= sc.hi[s]) continue;
+			i32 t = marks[k].scope;
+			if (!inside(t, cast(i32)s) && !inside(cast(i32)s, t)) ok = false;
+		}
+		sc.eff[s] = ok ? cast(i32)s : sc.eff[parent(cast(i32)s)];
+		if (ok && s > 0) array_add(&sc.kids[sc.eff[parent(cast(i32)s)]], cast(i32)s);
+	}
+	array_free(&own);
+	return sc;
+}
+
 gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 	xbModule *m = w->m;
 	xbCv cv_ = {};
@@ -632,7 +698,8 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		xbb_u32(b, (2u << 14) | (2u << 16)); // locals and parameters off rbp
 		xb_cv_sym_end(b, at);
 
-		for (xbDebugVar const &v : pd.vars) {
+		auto emit_var = [&](xbDebugVar const &v) {
+			isize at = 0;
 			if (v.local < 0) {
 				xbSymbol const &s = m->symbols[v.sym];
 				bool tls = (s.flags & xbSymbolFlag_TLS) != 0;
@@ -641,7 +708,7 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 				xb_cv_addr(w, b, v.sym, 0);
 				xb_cv_name(b, v.name);
 				xb_cv_sym_end(b, at);
-				continue;
+				return;
 			}
 			if (v.in_reg) {
 				at = xb_cv_sym_begin(b, XCV_S_REGISTER);
@@ -649,7 +716,7 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 				xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
 				xb_cv_name(b, v.name);
 				xb_cv_sym_end(b, at);
-				continue;
+				return;
 			}
 			at = xb_cv_sym_begin(b, XCV_S_REGREL32);
 			xbb_u32(b, cast(u32)v.frame_offset_fixup);
@@ -657,7 +724,28 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 			xbb_u16(b, XCV_AMD64_RBP);
 			xb_cv_name(b, v.name);
 			xb_cv_sym_end(b, at);
-		}
+		};
+		xbCvScopes sc = xb_cv_scopes(pd, len);
+		// a lexical block per scope that has variables, nested like the scopes
+		auto emit_scope = [&](auto &self, i32 s) -> void {
+			for (xbDebugVar const &v : pd.vars) {
+				if (sc.eff[v.scope] == s) emit_var(v);
+			}
+			for (i32 c : sc.kids[s]) {
+				isize at = xb_cv_sym_begin(b, XCV_S_BLOCK32);
+				xbb_u32(b, 0); // parent, end: lld-link fills them in
+				xbb_u32(b, 0);
+				xbb_u32(b, cast(u32)(sc.hi[c] - sc.lo[c]));
+				xb_cv_addr(w, b, -1, pd.start + sc.lo[c]);
+				xb_cv_name(b, str_lit(""));
+				xb_cv_sym_end(b, at);
+				self(self, c);
+				at = xb_cv_sym_begin(b, XCV_S_END);
+				xb_cv_sym_end(b, at);
+			}
+		};
+		emit_scope(emit_scope, 0);
+		xb_cv_scopes_free(&sc);
 		at = xb_cv_sym_begin(b, XCV_S_END);
 		xb_cv_sym_end(b, at);
 		xb_cv_subsection_end(b, ss);

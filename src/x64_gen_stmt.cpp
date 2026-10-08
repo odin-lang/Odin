@@ -1922,8 +1922,17 @@ gb_internal xbValue xb_emit_union_wrap(xbProc *p, Type *union_type, Type *varian
 gb_internal void xb_build_stmt(xbProc *p, Ast *node);
 gb_internal void xb_emit_defer_stmts(xbProc *p, bool is_return, xbBlock *branch_target, TokenPos pos);
 
+gb_internal void xb_set_debug_scope(xbProc *p, i32 scope) {
+	p->debug_scope = scope;
+	xbInstr i = xb_instr(xbOp_Scope);
+	i.imm = scope;
+	xb_emit(p, i);
+}
+
 gb_internal void xb_open_scope(xbProc *p) {
 	p->scope_index += 1;
+	array_add(&p->debug_scope_parent, p->debug_scope);
+	xb_set_debug_scope(p, cast(i32)p->debug_scope_parent.count-1);
 }
 
 gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d);
@@ -1957,6 +1966,7 @@ gb_internal void xb_close_scope(xbProc *p, Ast *node) {
 		}
 	}
 	p->scope_index -= 1;
+	xb_set_debug_scope(p, p->debug_scope_parent[p->debug_scope]);
 }
 
 gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d) {
@@ -2046,6 +2056,7 @@ gb_internal void xb_add_debug_var(xbProc *p, Entity *e, xbMem mem, bool by_ref, 
 	v.by_ref = by_ref;
 	v.is_param = is_param;
 	v.line = e->token.pos.line;
+	v.scope = p->debug_scope;
 	array_add(&p->debug_vars, v);
 }
 
