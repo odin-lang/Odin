@@ -7,8 +7,8 @@
 // A call to a procedure with `@(futex=.Wait)` is a relaxed load of what it waits on, as the OS only compares it, and
 // one with `@(futex=.Wake)` accesses nothing; neither is taking its address elsewhere.
 // A relaxed read acquires when an acquire fence may be reached after it: later in its procedure, in the same loop, in
-// a `defer`, or in a procedure which calls its own, directly or not, before the fence. A relaxed write releases,
-// likewise, when a release fence may be reached before it.
+// a `defer`, in what its procedure calls after it, directly or not, or in a procedure which calls its own before the
+// fence. A relaxed write releases, likewise, when a release fence may be reached before it.
 // Also warned about: a weak compare-exchange whose second result is not used, as it may fail even when the value
 // matches; a futex woken before the procedure waking it writes it, as what waits on it may sleep again; and with an
 // unpaired ordering, an `atomic_signal_fence` where an `atomic_thread_fence` would pair, as it only orders against a
@@ -83,6 +83,9 @@ struct AtomicScan {
 };
 
 gb_global PtrMap<Entity *, AtomicUses> atomic_uses;
+
+
+gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr);
 
 
 // what an atomic operation on `&expr` is on, if anything
@@ -303,6 +306,28 @@ gb_internal void check_atomic_discard(AtomicScan *s, Ast *expr) {
 	}
 }
 
+gb_internal AtomicProcedure *check_atomic_procedure(PtrMap<DeclInfo *, AtomicProcedure> *procedures, DeclInfo *decl) {
+	if (AtomicProcedure *p = map_get(procedures, decl)) {
+		return p;
+	}
+	AtomicProcedure p = {};
+	p.acquires        = array_make<Ast *>(temporary_allocator(), 0, 0);
+	p.releases        = array_make<Ast *>(temporary_allocator(), 0, 0);
+	p.signal_acquires = array_make<Ast *>(temporary_allocator(), 0, 0);
+	p.signal_releases = array_make<Ast *>(temporary_allocator(), 0, 0);
+
+	if (decl->proc_info != nullptr) {
+		AtomicScan s = {};
+		s.reads = array_make<Ast *>(temporary_allocator(), 0, 0);
+		s.places = &p.places;
+		check_atomic_scan(&s, decl->proc_info->body, false);
+	}
+
+	map_set(procedures, decl, p);
+
+	return map_get(procedures, decl);
+}
+
 gb_internal void check_atomic_cover(PtrSet<DeclInfo *> *covered, DeclInfo *decl) {
 	if (ptr_set_update(covered, decl)) {
 		return;
@@ -317,6 +342,36 @@ gb_internal void check_atomic_cover(PtrSet<DeclInfo *> *covered, DeclInfo *decl)
 			}
 		}
 	}
+}
+
+gb_internal bool check_atomic_fence_called(PtrMap<DeclInfo *, AtomicProcedure> *procedures, Array<AtomicSite> const &sites, Entity *location, bool acquire) {
+	for (AtomicSite const &site : sites) {
+		if (site.location != location) {
+			continue;
+		}
+		AtomicProcedure *p = check_atomic_procedure(procedures, site.decl);
+		for (auto const &place : p->places) {
+			Entity *e = entity_of_node(place.key->CallExpr.proc);
+			if (e == nullptr || e->kind != Entity_Procedure || e->decl_info == nullptr) {
+				continue;
+			}
+			if ((acquire && !check_atomic_may_precede(p, site.call, place.key)) || (!acquire && !check_atomic_may_precede(p, place.key, site.call))) {
+				continue;
+			}
+			PtrSet<DeclInfo *> reached = {};
+			check_atomic_cover(&reached, e->decl_info);
+			bool fenced = false;
+			for (auto const &entry : *procedures) {
+				bool has_fence = (acquire && entry.value.acquires.count > 0) || (!acquire && entry.value.releases.count > 0);
+				fenced |= has_fence && ptr_set_exists(&reached, entry.key);
+			}
+			ptr_set_destroy(&reached);
+			if (fenced) {
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 gb_internal int check_atomic_report_cmp(void const *a, void const *b) {
@@ -684,15 +739,7 @@ gb_internal void check_atomics(Checker *c) {
 		if (a.decl == nullptr || !(fence || weak || a.futex == ProcedureFutex_Wake)) {
 			continue;
 		}
-		AtomicProcedure *p = map_get(&procedures, a.decl);
-		if (p == nullptr) {
-			map_set(&procedures, a.decl, AtomicProcedure{});
-			p = map_get(&procedures, a.decl);
-			p->acquires        = array_make<Ast *>(temporary_allocator(), 0, 0);
-			p->releases        = array_make<Ast *>(temporary_allocator(), 0, 0);
-			p->signal_acquires = array_make<Ast *>(temporary_allocator(), 0, 0);
-			p->signal_releases = array_make<Ast *>(temporary_allocator(), 0, 0);
-		}
+		AtomicProcedure *p = check_atomic_procedure(&procedures, a.decl);
 		if (!fence) {
 			continue;
 		}
@@ -716,16 +763,7 @@ gb_internal void check_atomics(Checker *c) {
 	defer (ptr_set_destroy(&covered_acquire));
 	defer (ptr_set_destroy(&covered_release));
 	for (auto &entry : procedures) {
-		DeclInfo *decl = entry.key;
 		AtomicProcedure *p = &entry.value;
-		if (decl->proc_info == nullptr) {
-			continue;
-		}
-		AtomicScan s = {};
-		s.reads = array_make<Ast *>(temporary_allocator(), 0, 0);
-		s.places = &p->places;
-		check_atomic_scan(&s, decl->proc_info->body, false);
-
 		for (auto const &place : p->places) {
 			Entity *e = entity_of_node(place.key->CallExpr.proc);
 			if (e == nullptr || e->kind != Entity_Procedure || e->decl_info == nullptr) {
@@ -740,8 +778,10 @@ gb_internal void check_atomics(Checker *c) {
 		}
 	}
 
-	auto write_sites = array_make<AtomicSite>(temporary_allocator(), 0, 0);
-	auto wake_sites  = array_make<AtomicSite>(temporary_allocator(), 0, 0);
+	auto write_sites    = array_make<AtomicSite>(temporary_allocator(), 0, 0);
+	auto wake_sites     = array_make<AtomicSite>(temporary_allocator(), 0, 0);
+	auto relaxed_reads  = array_make<AtomicSite>(temporary_allocator(), 0, 0); // which nothing acquires for, yet
+	auto relaxed_writes = array_make<AtomicSite>(temporary_allocator(), 0, 0);
 
 	PtrSet<Ast *> operated = {};
 	ptr_set_init(&operated, atomics.count);
@@ -890,6 +930,9 @@ gb_internal void check_atomics(Checker *c) {
 				acquires = ptr_set_exists(&covered_acquire, a.decl);
 			}
 			uses.acquires |= acquires;
+			if (!acquires && a.decl != nullptr) {
+				array_add(&relaxed_reads, AtomicSite{e, call, a.decl});
+			}
 			if (reported && check_atomic_order_acquires(order)) {
 				check_atomic_first(&uses.asks_acquire, call);
 			}
@@ -906,6 +949,9 @@ gb_internal void check_atomics(Checker *c) {
 				releases = ptr_set_exists(&covered_release, a.decl);
 			}
 			uses.releases |= releases;
+			if (!releases && a.decl != nullptr) {
+				array_add(&relaxed_writes, AtomicSite{e, call, a.decl});
+			}
 			if (reported && check_atomic_order_releases(order)) {
 				check_atomic_first(&uses.asks_release, call);
 			}
@@ -930,9 +976,10 @@ gb_internal void check_atomics(Checker *c) {
 				continue;
 			}
 			// asking for acquire ordering acquires, so at most one of these
-			if (uses.asks_release != nullptr && uses.load != nullptr && !uses.acquires) {
+			// a fence within what is called is only looked for here, as finding what each call may reach is not cheap
+			if (uses.asks_release != nullptr && uses.load != nullptr && !uses.acquires && !check_atomic_fence_called(&procedures, relaxed_reads, entry.key, true)) {
 				array_add(&reports, AtomicReport{AtomicReport_Release, uses.asks_release, uses.load});
-			} else if (uses.asks_acquire != nullptr && uses.store != nullptr && !uses.releases) {
+			} else if (uses.asks_acquire != nullptr && uses.store != nullptr && !uses.releases && !check_atomic_fence_called(&procedures, relaxed_writes, entry.key, false)) {
 				array_add(&reports, AtomicReport{AtomicReport_Acquire, uses.asks_acquire, uses.store});
 			}
 		}
