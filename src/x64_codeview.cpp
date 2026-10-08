@@ -753,41 +753,47 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		// lines, one block per run of the same file
 		ss = xb_cv_subsection_begin(b, XCV_DEBUG_S_LINES);
 		xb_cv_addr(w, b, -1, pd.start);
-		xbb_u16(b, 0); // no columns
+		xbb_u16(b, 1); // CV_LINES_HAVE_COLUMNS
 		xbb_u32(b, len);
-		struct Line { u32 offset; i32 line; };
+		struct Line { u32 offset; i32 line; i32 column; };
 		auto lines = array_make<Line>(heap_allocator(), 0, pd.line_entry_count + 1);
 		i32 file = gb_max(pd.file_id, 1);
 		auto flush = [&]() {
 			if (lines.count == 0) return;
 			xbb_u32(b, cast(u32)(8*(file-1))); // the file's entry in the checksums
 			xbb_u32(b, cast(u32)lines.count);
-			xbb_u32(b, cast(u32)(12 + 8*lines.count));
+			xbb_u32(b, cast(u32)(12 + 12*lines.count));
+			// not marked as statements, like LLVM
 			for (Line const &l : lines) {
 				xbb_u32(b, l.offset);
-				xbb_u32(b, (cast(u32)gb_max(l.line, 0) & 0xffffff) | 0x80000000u);
+				xbb_u32(b, cast(u32)gb_max(l.line, 0) & 0xffffff);
+			}
+			for (Line const &l : lines) {
+				xbb_u16(b, cast(u16)gb_clamp(l.column, 0, 0xffff));
+				xbb_u16(b, 0);
 			}
 			lines.count = 0;
 		};
-		auto add_line = [&](i32 f, u32 offset, i32 line) {
+		auto add_line = [&](i32 f, u32 offset, i32 line, i32 column) {
 			if (f != file) {
 				flush();
 				file = f;
 			}
 			if (lines.count > 0 && lines[lines.count-1].offset == offset) {
 				lines[lines.count-1].line = line;
+				lines[lines.count-1].column = column;
 				return;
 			}
-			Line l = {offset, line};
+			Line l = {offset, line, column};
 			array_add(&lines, l);
 		};
 		if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
 			// the prologue gets the declaration's line, debuggers look up the entry address
-			add_line(gb_max(pd.file_id, 1), 0, pd.line);
+			add_line(gb_max(pd.file_id, 1), 0, pd.line, 0);
 		}
 		for (i32 i = 0; i < pd.line_entry_count; i++) {
 			xbLineEntry const &e = m->lines[pd.line_entry_start + i];
-			add_line(e.file_id, cast(u32)e.code_offset, e.line);
+			add_line(e.file_id, cast(u32)e.code_offset, e.line, e.column);
 		}
 		flush();
 		array_free(&lines);
