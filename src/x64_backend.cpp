@@ -14,6 +14,7 @@
 #include "x64_gen_procs.cpp"
 #include "x64_simd.cpp"
 #include "x64_lower.cpp"
+#include "x64_win64.cpp"
 #include "x64_type_info.cpp"
 #include "x64_globals.cpp"
 #include "x64_elf.cpp"

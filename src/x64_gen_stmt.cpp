@@ -145,7 +145,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 				}
 				break;
 			case xbArg_Indirect: {
-				u32 ptr = xb_arg_address(p, v, abi->is_odin_cc);
+				u32 ptr = xb_arg_address(p, v, abi->is_odin_cc && !arg.copy);
 				xb_add_ptr_arg(p, &call_args, abi, arg, ptr);
 				break;
 			}
@@ -177,7 +177,9 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 
 	i32 stack_size = abi->stack_size;
 	i32 sse_count = -1;
-	if (abi->c_vararg) {
+	if (abi->c_vararg && xb_is_win64()) {
+		stack_size = xb_win64_varargs(p, abi, &call_args, args, arg_index);
+	} else if (abi->c_vararg) {
 		i32 gpr = abi->gpr_count;
 		i32 xmm = abi->xmm_count;
 		i32 stack = abi->stack_size;
@@ -1648,6 +1650,7 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		return {};
 	case BuiltinProc_syscall: {
 		if (ce->args.count > 7) XB_UNSUPPORTED(p, "syscall arg count");
+		if (xb_is_win64()) XB_UNSUPPORTED(p, "syscall on windows");
 		u8 const regs[7] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 		auto args = array_make<xbCallArg>(xb_allocator(), 0, ce->args.count);
 		for_array(i, ce->args) {

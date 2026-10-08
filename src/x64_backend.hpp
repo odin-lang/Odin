@@ -259,6 +259,7 @@ struct xbAbiArg {
 	i32        stack_offset;
 	i32        byval_size;
 	i32        byval_align;
+	bool       copy;      // Indirect: always pass a copy, the callee may write to it
 };
 
 struct xbAbiFunc {
@@ -404,6 +405,7 @@ enum xbSymbolFlag : u8 {
 	xbSymbolFlag_Hidden  = 1<<3,
 	xbSymbolFlag_Foreign = 1<<4, // defined outside the executable, reach data through the GOT
 	xbSymbolFlag_TLS     = 1<<5,
+	xbSymbolFlag_Export  = 1<<6, // dllexport on Windows
 };
 
 struct xbSymbol {
@@ -424,6 +426,7 @@ enum xbRelocKind : u8 {
 	xbReloc_Abs32,
 	xbReloc_TPOFF32,
 	xbReloc_GOTTPOFF,
+	xbReloc_SecRel32,   // COFF: offset from the start of the symbol's section
 };
 
 struct xbReloc {
@@ -459,6 +462,14 @@ struct xbProcDebug {
 	struct SavedReg { i32 dwarf_reg; i32 frame_offset; };
 	Array<SavedReg> saved_regs;
 	i32     saved_at; // code offset right after the spills
+	// Win64 prologue, for the unwind info: pushes, an optional `sub rsp, 8`, `mov rbp, rsp`, `sub rsp, N`
+	u8      win_push_reg[8];
+	u8      win_push_at[8];
+	i32     win_push_count;
+	u8      win_pad_at;     // 0: no pad
+	u8      win_setfp_at;
+	u8      win_alloc_at;   // 0: no allocation
+	i32     win_alloc_size;
 };
 
 struct xbStats {
@@ -512,6 +523,20 @@ struct xbModule {
 };
 
 gb_internal bool xb_is_enabled(void);
+
+// Windows x64 (x64_win64.cpp)
+struct xbLower;
+struct xbOpnd;
+struct xbValue;
+struct xbCallArg;
+gb_internal bool xb_is_win64(void);
+gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason);
+gb_internal i32 xb_win64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index);
+gb_internal void xb_win64_prologue(xbLower *L, xbProcDebug *dbg);
+gb_internal void xb_win64_epilogue(xbLower *L);
+gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch);
+gb_internal xbOpnd xb_win64_import_opnd(xbLower *L, xbMem const &m, u8 scratch);
+gb_internal bool xb_write_coff(xbModule *m, String path);
 
 // A bump allocator for everything that only lives while one procedure family is
 // compiled. Reset keeps the memory, so the pages stay mapped. Memory comes back zeroed.

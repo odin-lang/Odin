@@ -1182,6 +1182,9 @@ gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 	Type *pt = base_type(proc_type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	ProcCallingConvention cc = pt->Proc.calling_convention;
+	if (build_context.metrics.os == TargetOs_windows) {
+		return xb_abi_compute_win64(proc_type, reason);
+	}
 
 	switch (cc) {
 	case ProcCC_Odin:

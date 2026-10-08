@@ -326,6 +326,11 @@ gb_internal void xb_test_main_body(xbProc *p) {
 
 gb_internal void xb_build_test_main(xbModule *m) {
 	if (build_context.command_kind != Command_test) return;
+	if (xb_is_win64() && (build_context.no_crt || build_context.build_mode == BuildMode_DynamicLibrary)) {
+		// LLVM's has another name and signature there
+		xb_stat_fail(m, "test main without the crt");
+		return;
+	}
 	// the runtime may bring its own entry point
 	for (Entity *e : m->info->entities) {
 		if (e->kind != Entity_Procedure || e->pkg == nullptr || e->pkg->kind != Package_Runtime) continue;

@@ -39,6 +39,8 @@ struct xbLower {
 	Array<i8>   local_reg;   // local -> callee saved register holding it, or -1
 	i32         saved_count;
 	i32         save_offset[5];
+	i32         incoming_base; // rbp offset of the incoming stack arguments
+	bool        win_pad;       // Win64: the prologue pads with `sub rsp, 8`
 
 	u32  keep;        // the current instruction leaves this vreg in rax instead of its slot
 	u32  pend;        // the vreg the previous instruction left in a register
@@ -444,7 +446,7 @@ gb_internal void xb_lower_layout(xbLower *L) {
 		l.frame_offset = -cur;
 	}
 	cur = cast(i32)xb_lt_align_formula(cur, 8);
-	for (i32 i = 0; i < L->saved_count; i++) {
+	for (i32 i = 0; i < L->saved_count && !xb_is_win64(); i++) {
 		cur += 8;
 		L->save_offset[i] = -cur;
 	}
@@ -622,12 +624,19 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 		return xb_m(RBP, l.frame_offset + m.offset);
 	}
 	case xbMem_Incoming:
-		return xb_m(RBP, 16 + m.offset);
+		return xb_m(RBP, L->incoming_base + m.offset);
 	case xbMem_Reg:
 		xb_mov_r_rm(a, 8, scratch, xb_src(L, m.base));
 		return xb_m(scratch, m.offset);
 	case xbMem_Sym: {
 		xbSymbol *s = &L->p->m->symbols[m.base];
+		if ((s->flags & xbSymbolFlag_TLS) && xb_is_win64()) {
+			return xb_win64_tls_opnd(L, m, scratch);
+		}
+		if ((s->flags & xbSymbolFlag_Foreign) && s->section == xbSection_Undef && xb_is_win64()) {
+			if (s->flags & xbSymbolFlag_Func) return xb_m_sym(cast(i32)m.base, m.offset);
+			return xb_win64_import_opnd(L, m, scratch);
+		}
 		if (s->flags & xbSymbolFlag_TLS) {
 			// initial exec: the thread pointer plus the variable's offset from the GOT
 			// mov scratch, fs:[0]
@@ -1430,6 +1439,10 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	}
 	case xbOp_Ret:
 		xb_lower_call(L, p->calls[cast(isize)in.imm], true);
+		if (xb_is_win64()) {
+			xb_win64_epilogue(L);
+			break;
+		}
 		for (i32 i = 0; i < L->saved_count; i++) {
 			xb_mov_r_rm(a, 8, xb_promote_regs[i], xb_m(RBP, L->save_offset[i]));
 		}
@@ -1464,7 +1477,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_store_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_ReturnAddress:
-		xb_mov_r_rm(a, 8, RAX, xb_m(RBP, 8));
+		xb_mov_r_rm(a, 8, RAX, xb_m(RBP, L->incoming_base - 8));
 		xb_store_gpr(L, in.dst, RAX, 8);
 		break;
 	case xbOp_AtomicRmw: {
@@ -1714,14 +1727,19 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	dbg.type = p->type;
 
 	// prologue
-	xb_push(a, RBP);
-	xb_mov_rm_r(a, 8, xb_r(RBP), RSP);
-	if (L.frame_size > 0) {
-		xb_enc(a, XB_W, 0x81, 5, xb_r(RSP), 4); // sub rsp, imm32
-		xb_u32(a, cast(u32)L.frame_size);
-	}
+	L.incoming_base = 16;
 	dbg.saved_regs = array_make<xbProcDebug::SavedReg>(heap_allocator(), 0, L.saved_count);
-	for (i32 i = 0; i < L.saved_count; i++) {
+	if (xb_is_win64()) {
+		xb_win64_prologue(&L, &dbg);
+	} else {
+		xb_push(a, RBP);
+		xb_mov_rm_r(a, 8, xb_r(RBP), RSP);
+		if (L.frame_size > 0) {
+			xb_enc(a, XB_W, 0x81, 5, xb_r(RSP), 4); // sub rsp, imm32
+			xb_u32(a, cast(u32)L.frame_size);
+		}
+	}
+	for (i32 i = 0; i < L.saved_count && !xb_is_win64(); i++) {
 		u8 r = xb_promote_regs[i];
 		xb_mov_rm_r(a, 8, xb_m(RBP, L.save_offset[i]), r);
 		// dwarf numbers rbx 3, r12..r15 as themselves
@@ -1747,10 +1765,10 @@ gb_internal void xb_lower_proc(xbProc *p) {
 			break;
 		case xbLoc_Stack:
 			if (in.type == xbType_V128) {
-				xb_movups_x_m(a, 15, xb_m(RBP, 16 + in.stack_offset));
+				xb_movups_x_m(a, 15, xb_m(RBP, L.incoming_base + in.stack_offset));
 				xb_movups_m_x(a, dst, 15);
 			} else {
-				xb_mov_r_rm(a, 8, RAX, xb_m(RBP, 16 + in.stack_offset));
+				xb_mov_r_rm(a, 8, RAX, xb_m(RBP, L.incoming_base + in.stack_offset));
 				xb_store_bytes_gpr(&L, dst, RAX, in.size);
 			}
 			break;
