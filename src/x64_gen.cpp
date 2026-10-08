@@ -117,6 +117,7 @@ struct xbProc {
 	xbAbiFunc * abi;
 	DeclInfo *  decl;
 	bool        is_startup; // runs once; literals that outlive it get static storage
+	bool        naked;      // no prologue, epilogue or stack slots
 
 	Array<xbBlock *>  blocks;
 	Array<xbBlock *>  order;

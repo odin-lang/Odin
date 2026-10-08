@@ -3805,6 +3805,7 @@ gb_internal void xb_begin_proc(xbProc *p) {
 
 	p->sret_local = -1;
 	p->ret_temp_local = -1;
+	if (p->naked) return;
 	if (abi->has_sret) {
 		p->sret_local = xb_param_ptr_local(p, abi, abi->sret);
 	}

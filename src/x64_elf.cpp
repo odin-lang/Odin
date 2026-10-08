@@ -181,6 +181,7 @@ enum {
 	XDW_OP_fbreg = 0x91,
 	XDW_OP_reg0  = 0x50,
 	XDW_OP_reg6  = 0x56,
+	XDW_OP_call_frame_cfa = 0x9c,
 
 	XDW_LANG_C99 = 0x0c,
 };
@@ -1192,7 +1193,7 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 			xbb_u64(b, 0);
 			xbb_u32(b, cast(u32)(pd.end - pd.start));
 			xbb_uleb(b, 1);
-			xbb_u8(b, frame_reg);
+			xbb_u8(b, pd.naked ? XDW_OP_call_frame_cfa : frame_reg);
 			xbb_uleb(b, cast(u64)gb_max(pd.file_id, 1));
 			xbb_uleb(b, cast(u64)gb_max(pd.line, 0));
 			if (ret) xb_dwarf_type_ref(&dt, ret);
@@ -1265,6 +1266,12 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 			xbb_u32(b, 0); // pc begin
 			xbb_u32(b, cast(u32)(pd.end - pd.start));
 			xbb_uleb(b, 0); // augmentation data length
+			if (pd.naked) {
+				// no frame, the cie's rsp+8 holds throughout
+				xbb_align(b, 8);
+				xbb_patch_u32(b, fde_start, cast(u32)(b->count - fde_start - 4));
+				continue;
+			}
 			xbb_u8(b, 0x40 | 1);                    // advance 1 (push rbp)
 			xbb_u8(b, 0x0e); xbb_uleb(b, 16);       // def_cfa_offset 16
 			xbb_u8(b, 0x80 | 6); xbb_uleb(b, 2);    // rbp at cfa-16

@@ -997,6 +997,7 @@ gb_internal xbValue xb_build_asm_call(xbProc *p, Entity *e, AstCallExpr *ce) {
 	blk.outputs = slice_from_array(outputs);
 	u16 callee_saved = (1u << RBX) | (1u << R12) | (1u << R13) | (1u << R14) | (1u << R15);
 	blk.save_regs = gprs_used & callee_saved;
+	if (p->naked) blk.save_regs = 0;
 	blk.save_local = -1;
 	if (blk.save_regs != 0) {
 		blk.save_local = xb_add_local_raw(p, 8*gb_count_set_bits(blk.save_regs), 8);

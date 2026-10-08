@@ -1504,6 +1504,10 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	}
 	case xbOp_Ret:
 		xb_lower_call(L, p->calls[cast(isize)in.imm], true);
+		if (p->naked) {
+			xb_ret(a);
+			break;
+		}
 		if (xb_is_win64()) {
 			xb_win64_epilogue(L);
 			break;
@@ -1822,12 +1826,15 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	dbg.line = p->entity ? p->entity->token.pos.line : 0;
 	dbg.line_entry_start = cast(i32)m->lines.count;
 	dbg.type = p->type;
+	dbg.naked = p->naked;
 
 	// prologue
 	L.incoming_base = 16;
 	dbg.saved_regs = array_make<xbProcDebug::SavedReg>(heap_allocator(), 0, L.saved_count);
 	dbg.scope_marks = array_make<xbScopeMark>(heap_allocator(), 0, 16);
-	if (xb_is_win64()) {
+	if (p->naked) {
+		GB_ASSERT(L.saved_count == 0 && p->locals.count == 0 && p->params_in.count == 0);
+	} else if (xb_is_win64()) {
 		xb_win64_prologue(&L, &dbg);
 	} else {
 		xb_push(a, RBP);
