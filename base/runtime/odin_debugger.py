@@ -49,7 +49,9 @@ ODIN_BASIC_TYPES = {
 
 	"int": ("int", None), "uint": ("uint", None), "uintptr": ("uint", None),
 
-	"rawptr": ("rawptr", None), "cstring": ("cstring", None),
+	"rawptr": ("rawptr", None),
+
+	"cstring": ("cstring", None), "cstring16": ("cstring16", None),
 }
 
 
@@ -276,26 +278,31 @@ if gdb is not None:
 		return None
 
 	def _gdb_odin_type(name):
-		# the type a `typeid` names, None when it cannot be found
 		basic = ODIN_BASIC_TYPES.get(name)
 		if basic is None:
 			return _gdb_type(name, "struct " + name, "union " + name, "enum " + name)
+
 		kind, size = basic
 		if size is None:
 			size = gdb.lookup_type("void").pointer().sizeof
+
 		if kind == "rawptr":
 			return gdb.lookup_type("void").pointer()
 		if kind == "cstring":
 			return gdb.lookup_type("char").pointer()
+		if kind == "cstring16":
+			return _gdb_type("char16_t", "unsigned short").pointer()
 		if kind == "float":
 			return _gdb_type({2: "_Float16", 4: "float", 8: "double"}[size])
 		if kind == "bool":
 			return _gdb_type("_Bool", "bool")
 		if kind == "rune":
 			return _gdb_type("char32_t", "unsigned int")
+
 		ints = {1: "char", 2: "short", 4: "int", 8: "long long", 16: "__int128"}
 		if kind == "uint":
 			return _gdb_type("unsigned " + ints[size])
+
 		return _gdb_type("signed char" if size == 1 else ints[size])
 
 	def _gdb_is_short(t):
@@ -572,20 +579,34 @@ if lldb is not None:
 				if typeid_hash(t.GetName()) == id:
 					return t
 			return None
+
 		kind, size = basic
 		if size is None:
 			size = target.GetAddressByteSize()
+
 		if kind == "rawptr":
 			return target.GetBasicType(lldb.eBasicTypeVoid).GetPointerType()
 		if kind == "cstring":
 			return target.GetBasicType(lldb.eBasicTypeChar).GetPointerType()
+		if kind == "cstring16":
+			return target.GetBasicType(lldb.eBasicTypeChar16).GetPointerType()
+
 		basics = {
-			("int", 1): lldb.eBasicTypeSignedChar, ("int", 2): lldb.eBasicTypeShort, ("int", 4): lldb.eBasicTypeInt,
-			("int", 8): lldb.eBasicTypeLongLong, ("int", 16): lldb.eBasicTypeInt128,
-			("uint", 1): lldb.eBasicTypeUnsignedChar, ("uint", 2): lldb.eBasicTypeUnsignedShort, ("uint", 4): lldb.eBasicTypeUnsignedInt,
-			("uint", 8): lldb.eBasicTypeUnsignedLongLong, ("uint", 16): lldb.eBasicTypeUnsignedInt128,
-			("float", 2): lldb.eBasicTypeHalf, ("float", 4): lldb.eBasicTypeFloat, ("float", 8): lldb.eBasicTypeDouble,
-			("bool", 1): lldb.eBasicTypeBool, ("rune", 4): lldb.eBasicTypeChar32,
+			("int",   1):  lldb.eBasicTypeSignedChar,
+			("int",   2):  lldb.eBasicTypeShort,
+			("int",   4):  lldb.eBasicTypeInt,
+			("int",   8):  lldb.eBasicTypeLongLong,
+			("int",   16): lldb.eBasicTypeInt128,
+			("uint",  1):  lldb.eBasicTypeUnsignedChar,
+			("uint",  2):  lldb.eBasicTypeUnsignedShort,
+			("uint",  4):  lldb.eBasicTypeUnsignedInt,
+			("uint",  8):  lldb.eBasicTypeUnsignedLongLong,
+			("uint",  16): lldb.eBasicTypeUnsignedInt128,
+			("float", 2):  lldb.eBasicTypeHalf,
+			("float", 4):  lldb.eBasicTypeFloat,
+			("float", 8):  lldb.eBasicTypeDouble,
+			("bool",  1):  lldb.eBasicTypeBool,
+			("rune",  4):  lldb.eBasicTypeChar32,
 		}
 		basic_type = basics.get((kind, size))
 		if basic_type is None:
