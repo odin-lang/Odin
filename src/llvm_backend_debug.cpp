@@ -1021,8 +1021,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 		case Basic_rawptr:
 			{
-				LLVMMetadataRef void_type = lb_debug_type_basic_type(m, str_lit("void"), 8, LLVMDWARFTypeEncoding_Unsigned);
-				return LLVMDIBuilderCreatePointerType(m->debug_builder, void_type, ptr_bits, ptr_bits, LLVMDWARFTypeEncoding_Address, "rawptr", 6);
+				// NOTE: a pointer to no type is `void *`, as clang emits it, rather than a pointer to a byte shown as a C string
+				return LLVMDIBuilderCreatePointerType(m->debug_builder, nullptr, ptr_bits, ptr_bits, 0, "rawptr", 6);
 			}
 		case Basic_string:
 			{
