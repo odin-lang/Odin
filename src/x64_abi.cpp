@@ -878,7 +878,14 @@ namespace xbSysV {
 				if (lanes == 1 && elem_bytes == 8 && reg_class == RegClass_SSEDv) {
 					t = xbType_F64;
 				}
-				add_piece(t, cast(i32)vec_bytes, true, gb_clamp(vec_size, 1, build_context.max_simd_align));
+				if (vec_bytes > 16) {
+					// without AVX, LLVM splits a wider vector into consecutive xmm registers
+					for (i64 k = 0; k < vec_bytes; k += 16) {
+						add_piece(xbType_V128, 16, true, 16);
+					}
+				} else {
+					add_piece(t, cast(i32)vec_bytes, true, gb_clamp(vec_size, 1, build_context.max_simd_align));
+				}
 				sz -= vec_size;
 				i += vec_len;
 				continue;
@@ -1169,7 +1176,7 @@ gb_internal bool xb_abi_assign_ret(xbAbiFunc *f, xbAbiArg *arg, Array<xbAbiPiece
 			if (gpr >= 2) return false;
 			p.reg = gpr++ == 0 ? RAX : RDX;
 		} else {
-			if (xmm >= 2) return false;
+			if (xmm >= 4) return false;
 			p.reg = cast(u8)(xmm++);
 		}
 		array_add(&f->pieces, p);
@@ -1271,7 +1278,8 @@ gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 			ret_type = last;
 			xbLType *lt = xb_ltype(last);
 			auto r = xbSysV::amd64_type(lt, false, cc, false, nullptr, nullptr, nullptr, 0);
-			if (r.kind == xbArg_Indirect) {
+			if (r.kind == xbArg_Indirect || r.pieces.count > 4) {
+				// a vector too wide for xmm0-xmm3 is demoted by LLVM to a hidden sret pointer
 				ret_indirect = true;
 			} else if (r.kind == xbArg_Ignore) {
 				ret_void = true;
@@ -1288,7 +1296,7 @@ gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 				return_source = pt->Proc.results->Tuple.variables[0]->type;
 			}
 			auto r = xbSysV::amd64_type(lt, false, cc, false, nullptr, nullptr, return_source, 0);
-			if (r.kind == xbArg_Indirect) {
+			if (r.kind == xbArg_Indirect || r.pieces.count > 4) {
 				ret_indirect = true;
 			} else if (r.kind == xbArg_Ignore) {
 				ret_void = true;
@@ -1297,6 +1305,12 @@ gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 		}
 	}
 	f->ret_type = ret_type;
+	if (ret_type != nullptr && is_type_simd_vector(ret_type) && type_size_of(ret_type) > 16 &&
+	    check_target_feature_is_enabled(str_lit("avx"), nullptr)) {
+		// with AVX, LLVM returns a wide vector in ymm/zmm registers, which this backend does not use
+		*reason = "avx vector return";
+		return nullptr;
+	}
 
 	xbAbiAssigner s = {};
 	if (ret_indirect) {
