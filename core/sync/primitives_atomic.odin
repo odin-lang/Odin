@@ -362,6 +362,7 @@ Atomic_Sema :: struct {
 	count: Futex,
 }
 
+@(synchronizes=.Release)
 atomic_sema_post :: proc "contextless" (s: ^Atomic_Sema, count := 1) {
 	atomic_add_explicit(&s.count, Futex(count), .Release)
 	if count == 1 {

@@ -65,6 +65,7 @@ This procedure decrements the internal counter of the specified wait group and
 wakes up the waiting thread. Once the internal counter reaches zero, the waiting
 thread resumes execution.
 */
+@(synchronizes=.Release)
 wait_group_done :: proc "contextless" (wg: ^Wait_Group) {
 	wait_group_add(wg, -1)
 }
@@ -223,6 +224,7 @@ Signal an auto-reset event.
 This procedure signals an auto-reset event, waking up exactly one waiting
 thread.
 */
+@(synchronizes=.Release)
 auto_reset_event_signal :: proc "contextless" (e: ^Auto_Reset_Event) {
 	old_status := atomic_load_explicit(&e.status, .Relaxed)
 	for {
@@ -716,6 +718,7 @@ park_with_timeout :: proc "contextless" (p: ^Parker, duration: time.Duration) {
 /*
 Make the token available.
 */
+@(synchronizes=.Release)
 unpark :: proc "contextless" (p: ^Parker)  {
 	if atomic_exchange_explicit((^u32)(&p.state), PARKER_NOTIFIED, .Release) == PARKER_PARKED {
 		futex_signal(&p.state)
@@ -752,6 +755,7 @@ one_shot_event_wait :: proc "contextless" (e: ^One_Shot_Event) {
 /*
 Make event available.
 */
+@(synchronizes=.Release)
 one_shot_event_signal :: proc "contextless" (e: ^One_Shot_Event) {
 	atomic_store_explicit(&e.state, 1, .Release)
 	futex_broadcast(&e.state)

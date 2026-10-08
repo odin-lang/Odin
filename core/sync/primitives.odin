@@ -520,6 +520,7 @@ This procedure increments the internal counter of the semaphore. If any of the
 threads were waiting on the semaphore, up to `count` of threads will continue
 the execution and enter the critical section.
 */
+@(synchronizes=.Release)
 sema_post :: proc "contextless" (s: ^Sema, count := 1) {
 	_sema_post(s, count)
 }
