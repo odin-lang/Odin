@@ -6953,6 +6953,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)sz);
 				return false;
 			}
+			// the sign bit cannot hold a fraction bit
+			if (n == sz && !is_type_unsigned(x.type)) {
+				error(z.expr, "Scale parameter in '%.*s' must be less than the bit width of a signed integer, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)(sz-1));
+				return false;
+			}
 
 			if (sz >= 64) {
 				if (is_type_unsigned(x.type) || is_type_unsigned(y.type)) {
