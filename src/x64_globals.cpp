@@ -77,7 +77,62 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 	s->flags |= xbSymbolFlag_Global;
 	if (!e->Variable.is_export) s->flags |= xbSymbolFlag_Weak;
 	if (tls) s->flags |= xbSymbolFlag_TLS;
+
+	if (build_context.ODIN_DEBUG && !is_blank_ident(e->token.string)) {
+		xbGlobalDebug g = {};
+		g.name = e->token.string;
+		g.type = e->type;
+		g.sym = sym;
+		g.file_id = xb_file_id(m, e->token.pos.file_id);
+		g.line = e->token.pos.line;
+		array_add(&m->global_debug, g);
+	}
 	return true;
+}
+
+// Integer-like constants as DWARF variables, like lb_add_debug_info_for_global_constant_from_entity.
+gb_internal void xb_add_debug_constant(xbModule *m, Entity *e) {
+	if (e == nullptr || e->kind != Entity_Constant || is_blank_ident(e->token)) return;
+	ExactValue const &value = e->Constant.value;
+	if (value.kind != ExactValue_Integer && value.kind != ExactValue_Bool) return;
+	Type *t = e->type;
+	if (!is_type_integer(t) && !is_type_rune(t) && !is_type_boolean(t) && !is_type_enum(t) && !is_type_pointer(t)) return;
+	if ((value.kind == ExactValue_Bool) != is_type_boolean(t)) return;
+
+	xbGlobalDebug g = {};
+	g.sym = -1;
+	if (value.kind == ExactValue_Bool) {
+		g.value = value.value_bool;
+		g.type = default_type(t);
+	} else {
+		bool neg = big_int_is_neg(&value.value_integer);
+		g.value = neg ? exact_value_to_i64(value) : cast(i64)exact_value_to_u64(value);
+		g.type = is_type_rune(t) ? t_rune : is_type_untyped(t) ? (neg ? t_i64 : t_u64) : default_type(t);
+	}
+	g.name = e->token.string;
+	if (e->pkg && e->pkg->name.len > 0) {
+		gbString s = string_canonical_entity_name(permanent_allocator(), e);
+		g.name = make_string(cast(u8 const *)s, gb_string_length(s));
+	}
+	array_add(&m->global_debug, g);
+	// the main package's and the builtin constants also go by their plain name
+	if ((e->pkg && e->pkg->kind == Package_Init) || (e->scope && (e->scope->flags & ScopeFlag_Global))) {
+		g.name = e->token.string;
+		array_add(&m->global_debug, g);
+	}
+}
+
+// LLVM leaves them to this backend.
+gb_internal void xb_add_debug_constants(xbModule *m) {
+	if (!build_context.ODIN_DEBUG) return;
+	for (Entity *e : m->info->entities) {
+		if (e->kind != Entity_Constant) continue;
+		if ((e->scope->flags & ScopeFlag_File) == 0) continue;
+		xb_add_debug_constant(m, e);
+	}
+	for (auto const &entry : builtin_pkg->scope->elements) {
+		xb_add_debug_constant(m, entry.value);
+	}
 }
 
 gb_internal void xb_define_globals(xbModule *m) {

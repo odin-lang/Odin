@@ -347,6 +347,17 @@ struct xbDebugVar {
 	bool   by_ref;     // the local holds a pointer to the value
 	i32    line;
 	i32    file_id;
+	i32    sym;        // @(static): the symbol of its storage, used when local < 0
+};
+
+// A global variable or constant, for DWARF.
+struct xbGlobalDebug {
+	String       name;
+	Type *       type;
+	i32          sym;   // -1 for a constant, which has no file and line
+	i32          file_id;
+	i32          line;
+	i64          value; // for a constant
 };
 
 ////////////////////////////////////////////////////////////////
@@ -446,6 +457,7 @@ struct xbModule {
 
 	// debug info
 	Array<xbProcDebug> proc_debug;
+	Array<xbGlobalDebug> global_debug;
 	Array<xbLineEntry> lines;
 	Array<String>      files;
 	PtrMap<AstFile *, i32> file_ids;

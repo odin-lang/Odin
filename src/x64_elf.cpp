@@ -10,6 +10,7 @@ enum : u32 {
 	XB_R_X86_64_PLT32         = 4,
 	XB_R_X86_64_GOTPCREL      = 9,
 	XB_R_X86_64_32            = 10,
+	XB_R_X86_64_DTPOFF64      = 17,
 	XB_R_X86_64_GOTTPOFF      = 22,
 	XB_R_X86_64_TPOFF32       = 23,
 	XB_R_X86_64_GOTPCRELX     = 41,
@@ -68,6 +69,13 @@ struct xbExtraReloc {
 	i64 addend;
 };
 
+// a relocation in .debug_info against one of the module's symbols
+struct xbSymReloc {
+	i64 offset;
+	i32 sym;
+	u32 type;
+};
+
 enum xbOutSection {
 	xbOut_Null,
 	xbOut_Text,
@@ -108,6 +116,7 @@ enum {
 	XDW_TAG_structure_type   = 0x13,
 	XDW_TAG_typedef          = 0x16,
 	XDW_TAG_union_type       = 0x17,
+	XDW_TAG_subroutine_type  = 0x15,
 	XDW_TAG_subrange_type    = 0x21,
 	XDW_TAG_base_type        = 0x24,
 	XDW_TAG_enumerator       = 0x28,
@@ -120,6 +129,7 @@ enum {
 	XDW_AT_location        = 0x02,
 	XDW_AT_name            = 0x03,
 	XDW_AT_byte_size       = 0x0b,
+	XDW_AT_bit_size        = 0x0d,
 	XDW_AT_stmt_list       = 0x10,
 	XDW_AT_low_pc          = 0x11,
 	XDW_AT_high_pc         = 0x12,
@@ -136,6 +146,7 @@ enum {
 	XDW_AT_external        = 0x3f,
 	XDW_AT_frame_base      = 0x40,
 	XDW_AT_type            = 0x49,
+	XDW_AT_data_bit_offset = 0x6b,
 	XDW_AT_linkage_name    = 0x6e,
 
 	XDW_FORM_addr         = 0x01,
@@ -157,7 +168,10 @@ enum {
 	XDW_ATE_unsigned = 0x08,
 	XDW_ATE_unsigned_char = 0x08,
 
-	XDW_OP_deref = 0x06,
+	XDW_OP_addr    = 0x03,
+	XDW_OP_deref   = 0x06,
+	XDW_OP_const8u = 0x0e,
+	XDW_OP_GNU_push_tls_address = 0xe0,
 	XDW_OP_fbreg = 0x91,
 	XDW_OP_reg6  = 0x56,
 
@@ -182,6 +196,13 @@ enum xbAbbrev {
 	xbAbbrev_EnumType,
 	xbAbbrev_Enumerator,
 	xbAbbrev_UnionType,
+	xbAbbrev_GlobalVar,
+	xbAbbrev_Constant,
+	xbAbbrev_EmptyStructType,
+	xbAbbrev_BitMember,
+	xbAbbrev_SubroutineType,
+	xbAbbrev_SubprogramRet,
+	xbAbbrev_SubprogramRetNoChildren,
 };
 
 gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
@@ -225,6 +246,28 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 		XDW_AT_decl_file, XDW_FORM_udata,
 		XDW_AT_decl_line, XDW_FORM_udata,
 		XDW_AT_external, XDW_FORM_flag_present,
+	});
+	abbrev(xbAbbrev_SubprogramRet, XDW_TAG_subprogram, true, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_linkage_name, XDW_FORM_string,
+		XDW_AT_low_pc, XDW_FORM_addr,
+		XDW_AT_high_pc, XDW_FORM_data4,
+		XDW_AT_frame_base, XDW_FORM_exprloc,
+		XDW_AT_decl_file, XDW_FORM_udata,
+		XDW_AT_decl_line, XDW_FORM_udata,
+		XDW_AT_external, XDW_FORM_flag_present,
+		XDW_AT_type, XDW_FORM_ref4,
+	});
+	abbrev(xbAbbrev_SubprogramRetNoChildren, XDW_TAG_subprogram, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_linkage_name, XDW_FORM_string,
+		XDW_AT_low_pc, XDW_FORM_addr,
+		XDW_AT_high_pc, XDW_FORM_data4,
+		XDW_AT_frame_base, XDW_FORM_exprloc,
+		XDW_AT_decl_file, XDW_FORM_udata,
+		XDW_AT_decl_line, XDW_FORM_udata,
+		XDW_AT_external, XDW_FORM_flag_present,
+		XDW_AT_type, XDW_FORM_ref4,
 	});
 	abbrev(xbAbbrev_Param, XDW_TAG_formal_parameter, false, {
 		XDW_AT_name, XDW_FORM_string,
@@ -284,6 +327,31 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 		XDW_AT_name, XDW_FORM_string,
 		XDW_AT_byte_size, XDW_FORM_udata,
 	});
+	abbrev(xbAbbrev_EmptyStructType, XDW_TAG_structure_type, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_byte_size, XDW_FORM_udata,
+	});
+	abbrev(xbAbbrev_BitMember, XDW_TAG_member, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_type, XDW_FORM_ref4,
+		XDW_AT_bit_size, XDW_FORM_udata,
+		XDW_AT_data_bit_offset, XDW_FORM_udata,
+	});
+	abbrev(xbAbbrev_SubroutineType, XDW_TAG_subroutine_type, false, {});
+	abbrev(xbAbbrev_GlobalVar, XDW_TAG_variable, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_type, XDW_FORM_ref4,
+		XDW_AT_external, XDW_FORM_flag_present,
+		XDW_AT_decl_file, XDW_FORM_udata,
+		XDW_AT_decl_line, XDW_FORM_udata,
+		XDW_AT_location, XDW_FORM_exprloc,
+	});
+	abbrev(xbAbbrev_Constant, XDW_TAG_variable, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_type, XDW_FORM_ref4,
+		XDW_AT_external, XDW_FORM_flag_present,
+		XDW_AT_const_value, XDW_FORM_sdata,
+	});
 	xbb_u8(b, 0);
 }
 
@@ -297,6 +365,7 @@ struct xbDwarfTypes {
 	PtrSet<Type *> queued;
 	u32 void_ptr;
 	u32 byte_type;
+	isize cu_start;
 };
 
 gb_internal u32 xb_dwarf_type_ref(xbDwarfTypes *dt, Type *t) {
@@ -313,9 +382,14 @@ gb_internal u32 xb_dwarf_type_ref(xbDwarfTypes *dt, Type *t) {
 	return 0;
 }
 
-gb_internal String xb_dwarf_type_name(Type *t) {
-	gbString s = type_to_string(t, permanent_allocator());
-	return make_string_c(s);
+// a member of one bit, or of a bit_field's bits
+gb_internal void xb_dwarf_bit_member(xbDwarfTypes *dt, String name, Type *type, u64 bit_size, u64 bit_offset) {
+	Array<u8> *b = dt->info;
+	xbb_uleb(b, xbAbbrev_BitMember);
+	xbb_str(b, name);
+	xb_dwarf_type_ref(dt, type);
+	xbb_uleb(b, bit_size);
+	xbb_uleb(b, bit_offset);
 }
 
 gb_internal void xb_dwarf_write_struct_like(xbDwarfTypes *dt, Type *t, String name, std::initializer_list<std::pair<char const *, Type *>> fields) {
@@ -339,7 +413,9 @@ gb_internal void xb_dwarf_write_struct_like(xbDwarfTypes *dt, Type *t, String na
 gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 	Array<u8> *b = dt->info;
 	map_set(&dt->offsets, t, cast(u32)b->count);
-	String name = xb_dwarf_type_name(t);
+	TEMPORARY_ALLOCATOR_GUARD();
+	// the names LLVM gives them, with the package
+	String name = type_to_canonical_string(temporary_allocator(), t);
 	Type *bt = base_type(t);
 
 	if (t->kind == Type_Named && bt->kind != Type_Struct && bt->kind != Type_Union && bt->kind != Type_Enum) {
@@ -411,9 +487,14 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		xb_dwarf_type_ref(dt, bt->MultiPointer.elem);
 		return;
 	case Type_Proc:
-		xbb_uleb(b, xbAbbrev_VoidPointerType);
+		// named pointer to a subroutine, the two written right after the name
+		xbb_uleb(b, xbAbbrev_Typedef);
 		xbb_str(b, name);
+		xbb_u32(b, cast(u32)(b->count + 4 - dt->cu_start));
+		xbb_uleb(b, xbAbbrev_PointerType);
 		xbb_u8(b, 8);
+		xbb_u32(b, cast(u32)(b->count + 4 - dt->cu_start));
+		xbb_uleb(b, xbAbbrev_SubroutineType);
 		return;
 	case Type_Array:
 		xbb_uleb(b, xbAbbrev_ArrayType);
@@ -450,8 +531,19 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		xbb_u8(b, 0);
 		return;
 	}
+	case Type_Map:
+		init_map_internal_debug_types(bt);
+		bt = base_type(bt->Map.debug_metadata_type);
+		GB_ASSERT(bt->kind == Type_Struct);
+		/*fallthrough*/
 	case Type_Struct: {
 		if (bt->Struct.soa_kind != StructSoa_None) break;
+		if (bt->Struct.fields.count == 0) {
+			xbb_uleb(b, xbAbbrev_EmptyStructType);
+			xbb_str(b, name);
+			xbb_uleb(b, cast(u64)type_size_of(bt));
+			return;
+		}
 		xbb_uleb(b, bt->Struct.is_raw_union ? xbAbbrev_UnionType : xbAbbrev_StructType);
 		xbb_str(b, name);
 		xbb_uleb(b, cast(u64)type_size_of(bt));
@@ -477,11 +569,13 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 			xb_dwarf_type_ref(dt, union_tag_type(bt));
 			xbb_uleb(b, cast(u64)bt->Union.variant_block_size);
 		}
+		// numbered like LLVM's: from 1 when the union can be nil
+		isize first = (is_type_union_maybe_pointer(bt) || bt->Union.kind == UnionType_no_nil) ? 0 : 1;
 		for_array(i, bt->Union.variants) {
 			Type *v = bt->Union.variants[i];
 			if (type_size_of(v) == 0) continue;
 			char buf[32] = {};
-			gb_snprintf(buf, gb_size_of(buf), "v%td", i);
+			gb_snprintf(buf, gb_size_of(buf), "v%td", first+i);
 			xbb_uleb(b, xbAbbrev_Member);
 			xbb_str(b, copy_string(permanent_allocator(), make_string_c(buf)));
 			xb_dwarf_type_ref(dt, v);
@@ -490,12 +584,49 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		xbb_u8(b, 0);
 		return;
 	}
-	case Type_BitSet:
-	case Type_BitField: {
-		Type *ut = bt->kind == Type_BitSet ? bit_set_to_int(bt) : bt->BitField.backing_type;
-		xbb_uleb(b, xbAbbrev_Typedef);
+	case Type_BitSet: {
+		// a union of one bool bit per element, like LLVM's
+		Type *elem = base_type(bt->BitSet.elem);
+		i64 count = bt->BitSet.upper - bt->BitSet.lower + 1;
+		if ((elem->kind != Type_Enum && !is_type_integer(elem)) || count <= 0 || count > 128 ||
+		    is_type_different_to_arch_endianness(bit_set_to_int(bt))) {
+			xbb_uleb(b, xbAbbrev_Typedef);
+			xbb_str(b, name);
+			xb_dwarf_type_ref(dt, bit_set_to_int(bt));
+			return;
+		}
+		xbb_uleb(b, xbAbbrev_UnionType);
 		xbb_str(b, name);
-		xb_dwarf_type_ref(dt, ut);
+		xbb_uleb(b, cast(u64)type_size_of(bt));
+		if (elem->kind == Type_Enum) {
+			for (Entity *f : elem->Enum.fields) {
+				i64 bit = exact_value_to_i64(f->Constant.value) - bt->BitSet.lower;
+				if (bit < 0 || bit >= 8*type_size_of(bt)) continue;
+				xb_dwarf_bit_member(dt, f->token.string, t_bool, 1, cast(u64)bit);
+			}
+		} else {
+			for (i64 i = 0; i < count; i++) {
+				char buf[32] = {};
+				gb_snprintf(buf, gb_size_of(buf), "%lld", cast(long long)(bt->BitSet.lower + i));
+				xb_dwarf_bit_member(dt, make_string_c(buf), t_bool, 1, cast(u64)i);
+			}
+		}
+		xbb_u8(b, 0);
+		return;
+	}
+	case Type_BitField: {
+		if (bt->BitField.fields.count == 0) break;
+		xbb_uleb(b, xbAbbrev_StructType);
+		xbb_str(b, name);
+		xbb_uleb(b, cast(u64)type_size_of(bt));
+		u64 offset = 0;
+		for_array(i, bt->BitField.fields) {
+			Entity *f = bt->BitField.fields[i];
+			u8 bits = bt->BitField.bit_sizes[i];
+			xb_dwarf_bit_member(dt, f->token.string, f->type, bits, offset);
+			offset += bits;
+		}
+		xbb_u8(b, 0);
 		return;
 	}
 	}
@@ -551,6 +682,19 @@ gb_internal i32 xb_file_id(xbModule *m, i32 global_file_id) {
 	return id;
 }
 
+// DW_AT_location of a symbol's storage: its address, or its offset in the thread's TLS block
+gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbSymReloc> *relocs, i32 sym) {
+	bool tls = (m->symbols[sym].flags & xbSymbolFlag_TLS) != 0;
+	xbb_uleb(b, tls ? 10 : 9);
+	xbb_u8(b, tls ? XDW_OP_const8u : XDW_OP_addr);
+	xbSymReloc r = {b->count, sym, tls ? XB_R_X86_64_DTPOFF64 : XB_R_X86_64_64};
+	array_add(relocs, r);
+	xbb_u64(b, 0);
+	if (tls) xbb_u8(b, XDW_OP_GNU_push_tls_address);
+}
+
+gb_internal void xb_add_debug_constants(xbModule *m);
+
 gb_internal bool xb_write_object(xbModule *m, String path) {
 	Array<u8> sec[xbOut_COUNT] = {};
 	for (isize i = 0; i < xbOut_COUNT; i++) {
@@ -559,6 +703,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	auto extra_relocs = array_make<xbExtraReloc>(heap_allocator(), 0, 256);   // .eh_frame
 	auto info_relocs  = array_make<xbExtraReloc>(heap_allocator(), 0, 256);   // .debug_info
 	auto line_relocs  = array_make<xbExtraReloc>(heap_allocator(), 0, 256);   // .debug_line
+	auto info_sym_relocs = array_make<xbSymReloc>(heap_allocator(), 0, 256); // .debug_info
 
 	array_add_elems(&sec[xbOut_Text], m->sections[xbSection_Text].data, m->sections[xbSection_Text].count);
 	array_add_elems(&sec[xbOut_Rodata], m->sections[xbSection_Rodata].data, m->sections[xbSection_Rodata].count);
@@ -604,7 +749,15 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 
 	bool debug = build_context.ODIN_DEBUG;
 	if (debug) {
+		xb_add_debug_constants(m);
 		xb_dwarf_abbrevs(&sec[xbOut_DebugAbbrev]);
+		String cwd = {};
+		{
+			char buf[4096] = {};
+			if (getcwd(buf, gb_size_of(buf)-1) != nullptr) {
+				cwd = copy_string(permanent_allocator(), make_string_c(buf));
+			}
+		}
 
 		// .debug_line
 		{
@@ -623,13 +776,40 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 			xbb_u8(b, 13); // opcode base
 			u8 const std_lengths[12] = {0,1,1,1,1,0,0,0,1,0,0,1};
 			xbb_bytes(b, std_lengths, 12);
-			xbb_u8(b, 0); // no include directories
-			for (String f : m->files) {
-				xbb_str(b, f);
-				xbb_uleb(b, 0);
+			// directories and base names, so debuggers show short file names like LLVM's
+			auto last_slash = [](String f) -> isize {
+				for (isize j = f.len-1; j > 0; j--) if (f[j] == '/') return j;
+				return -1;
+			};
+			StringMap<u64> dirs = {};
+			string_map_init(&dirs);
+			auto file_dirs = array_make<u64>(heap_allocator(), m->files.count);
+			for_array(i, m->files) {
+				isize slash = last_slash(m->files[i]);
+				file_dirs[i] = 0;
+				if (slash < 0) continue;
+				String dir = substring(m->files[i], 0, slash);
+				if (dir == cwd) continue; // index 0 is the compilation directory
+				u64 *found = string_map_get(&dirs, dir);
+				if (found == nullptr) {
+					string_map_set(&dirs, dir, cast(u64)dirs.count + 1);
+					xbb_str(b, dir);
+					found = string_map_get(&dirs, dir);
+				}
+				file_dirs[i] = *found;
+			}
+			xbb_u8(b, 0);
+			for_array(i, m->files) {
+				String f = m->files[i];
+				isize slash = last_slash(f);
+				bool short_name = slash >= 0 && (file_dirs[i] != 0 || substring(f, 0, slash) == cwd);
+				xbb_str(b, short_name ? substring(f, slash+1, f.len) : f);
+				xbb_uleb(b, file_dirs[i]);
 				xbb_uleb(b, 0);
 				xbb_uleb(b, 0);
 			}
+			string_map_destroy(&dirs);
+			array_free(&file_dirs);
 			xbb_u8(b, 0);
 			xbb_patch_u32(b, header_len_at, cast(u32)(b->count - header_start));
 
@@ -644,6 +824,18 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 				i64 cur_addr = 0;
 				i64 cur_line = 1;
 				i32 cur_file = 1;
+				if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
+					// the prologue gets the declaration's line, debuggers look up the entry address
+					if (pd.file_id > 0 && pd.file_id != cur_file) {
+						xbb_u8(b, 4);
+						xbb_uleb(b, cast(u64)pd.file_id);
+						cur_file = pd.file_id;
+					}
+					xbb_u8(b, 3);
+					xbb_sleb(b, pd.line - cur_line);
+					cur_line = pd.line;
+					xbb_u8(b, 1);
+				}
 				for (i32 i = 0; i < pd.line_entry_count; i++) {
 					xbLineEntry const &e = m->lines[pd.line_entry_start + i];
 					if (e.file_id != cur_file) {
@@ -689,6 +881,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 			dt.queue = array_make<Type *>(heap_allocator(), 0, 256);
 
 			isize start = b->count;
+			dt.cu_start = start;
 			xbb_u32(b, 0); // unit length
 			xbb_u16(b, 4); // version
 			xbExtraReloc ra = {b->count, xbOut_DebugAbbrev, XB_R_X86_64_32, 0};
@@ -701,13 +894,6 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 			xbb_u16(b, XDW_LANG_C99);
 			String name = m->files.count > 0 ? m->files[0] : str_lit("odin");
 			xbb_str(b, name);
-			String cwd = {};
-			{
-				char buf[4096] = {};
-				if (getcwd(buf, gb_size_of(buf)-1) != nullptr) {
-					cwd = copy_string(permanent_allocator(), make_string_c(buf));
-				}
-			}
 			xbb_str(b, cwd);
 			xbExtraReloc rl = {b->count, xbOut_Text, XB_R_X86_64_64, 0};
 			array_add(&info_relocs, rl);
@@ -717,10 +903,34 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 			array_add(&info_relocs, rs);
 			xbb_u32(b, 0); // stmt list
 
+			for (xbGlobalDebug const &g : m->global_debug) {
+				xbb_uleb(b, g.sym >= 0 ? xbAbbrev_GlobalVar : xbAbbrev_Constant);
+				xbb_str(b, g.name);
+				xb_dwarf_type_ref(&dt, g.type);
+				if (g.sym >= 0) {
+					xbb_uleb(b, cast(u64)g.file_id);
+					xbb_uleb(b, cast(u64)gb_max(g.line, 0));
+					xb_dwarf_symbol_location(m, b, &info_sym_relocs, g.sym);
+				} else {
+					xbb_sleb(b, g.value);
+				}
+			}
+
 			for (xbProcDebug const &pd : m->proc_debug) {
 				bool has_children = pd.vars.count > 0;
-				xbb_uleb(b, has_children ? xbAbbrev_Subprogram : xbAbbrev_SubprogramNoChildren);
-				xbb_str(b, pd.name);
+				// the single result, so `finish` shows it
+				Type *ret = nullptr;
+				Type *pt = pd.type ? base_type(pd.type) : nullptr;
+				if (pt && pt->kind == Type_Proc && pt->Proc.result_count == 1) {
+					ret = pt->Proc.results->Tuple.variables[0]->type;
+				}
+				if (ret) {
+					xbb_uleb(b, has_children ? xbAbbrev_SubprogramRet : xbAbbrev_SubprogramRetNoChildren);
+				} else {
+					xbb_uleb(b, has_children ? xbAbbrev_Subprogram : xbAbbrev_SubprogramNoChildren);
+				}
+				// the full name, like LLVM's, so `break pkg::proc` finds it
+				xbb_str(b, pd.link_name);
 				xbb_str(b, pd.link_name);
 				xbExtraReloc r = {b->count, xbOut_Text, XB_R_X86_64_64, pd.start};
 				array_add(&info_relocs, r);
@@ -730,10 +940,17 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 				xbb_u8(b, XDW_OP_reg6);
 				xbb_uleb(b, cast(u64)gb_max(pd.file_id, 1));
 				xbb_uleb(b, cast(u64)gb_max(pd.line, 0));
+				if (ret) xb_dwarf_type_ref(&dt, ret);
 				if (has_children) {
 					for (xbDebugVar const &v : pd.vars) {
 						xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
 						xbb_str(b, v.name);
+						if (v.local < 0) {
+							xb_dwarf_symbol_location(m, b, &info_sym_relocs, v.sym);
+							xbb_uleb(b, cast(u64)gb_max(v.line, 0));
+							xb_dwarf_type_ref(&dt, v.type);
+							continue;
+						}
 						Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
 						// rbp is the frame base
 						xbb_u8(&expr, XDW_OP_fbreg);
@@ -877,6 +1094,18 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	add_extra(xbOut_EhFrame, extra_relocs);
 	add_extra(xbOut_DebugInfo, info_relocs);
 	add_extra(xbOut_DebugLine, line_relocs);
+	for (xbSymReloc const &r : info_sym_relocs) {
+		xbSymbol const &s = m->symbols[r.sym];
+		xbElfRela er = {};
+		er.r_offset = cast(u64)r.offset;
+		if (sym_index[r.sym] >= 0) {
+			er.r_info = (cast(u64)sym_index[r.sym] << 32) | r.type;
+		} else {
+			er.r_info = (cast(u64)section_sym[out_section_of(s.section)] << 32) | r.type;
+			er.r_addend = s.offset;
+		}
+		xbb_bytes(&sec[xbOut_RelaDebugInfo], &er, gb_size_of(er));
+	}
 
 	for (xbElfSym const &es : syms) {
 		xbb_bytes(&sec[xbOut_Symtab], &es, gb_size_of(es));
