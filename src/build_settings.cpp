@@ -2136,8 +2136,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	if (bc->backend == Backend_X64) {
-		if (bc->metrics.arch != TargetArch_amd64 || bc->metrics.os != TargetOs_linux) {
-			gb_printf_err("-backend:x64 is only supported for linux_amd64 for now\n");
+		if (bc->metrics.arch != TargetArch_amd64 || (bc->metrics.os != TargetOs_linux && bc->metrics.os != TargetOs_windows)) {
+			gb_printf_err("-backend:x64 is only supported for linux_amd64 and windows_amd64 for now\n");
 			gb_exit(1);
 		}
 		if (bc->optimization_level > 0) {
