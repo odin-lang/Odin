@@ -157,6 +157,7 @@ struct lbModule {
 
 	i64 estimated_cost;
 	i32 split_part;
+	bool is_debug_types_module;
 
 	// This is Set if this module defines type info entries
 	lbTypeInfoMembers *type_info_members;
@@ -246,6 +247,11 @@ struct lbGenerator : LinkerData {
 	Array<lbModule *>                  type_info_modules; // the will be the default module or several as the type info is a lot of data
 
 	lbModule *equal_module;
+
+	// NOTE: with separate modules, the record types' debug info is defined once in here,
+	// and every other module only forward declares them
+	lbModule *debug_types_module;
+	MPSCQueue<Type *> debug_homed_types;
 
 	isize used_module_count;
 

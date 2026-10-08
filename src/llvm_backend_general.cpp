@@ -83,6 +83,9 @@ gb_internal WORKER_TASK_PROC(lb_init_module_worker_proc) {
 	if (m->split_part > 0) {
 		module_name = gb_string_append_fmt(module_name, "$%d", m->split_part);
 	}
+	if (m->is_debug_types_module) {
+		module_name = gb_string_appendc(module_name, "$debug_types");
+	}
 
 	m->module_name = module_name;
 	m->ctx = LLVMContextCreate();
@@ -556,6 +559,17 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	}
 	for_array(i, gen->type_info_modules) {
 		gen->type_info_modules[i]->type_info_part = i;
+	}
+
+	mpsc_init(&gen->debug_homed_types, heap_allocator());
+	if (build_context.ODIN_DEBUG && USE_SEPARATE_MODULES) {
+		lbModule *m = permanent_alloc_item<lbModule>();
+		m->gen     = gen;
+		m->checker = c;
+		m->is_debug_types_module = true;
+		gen->debug_types_module = m;
+		map_set(&gen->modules, cast(void *)m, m);
+		lb_init_module(m, do_threading);
 	}
 
 	thread_pool_wait();

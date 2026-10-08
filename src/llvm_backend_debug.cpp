@@ -1164,6 +1164,48 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		break;
 	}
 
+	lbModule *home = m->gen->debug_types_module;
+	if (is_record && home != nullptr && m != home && record_bt->kind != Type_Tuple) {
+		// NOTE(bill): The record is defined once in the debug types module and only forward declared here.
+		// Enums are matched by name, as the C API cannot give an enumeration an identifier.
+		unsigned tag = DW_TAG_structure_type;
+		switch (record_bt->kind) {
+		case Type_Struct:
+			if (is_type_raw_union(record_bt)) {
+				tag = DW_TAG_union_type;
+			}
+			break;
+		case Type_Union:
+		case Type_BitSet:
+			tag = DW_TAG_union_type;
+			break;
+		case Type_Enum:
+			tag = DW_TAG_enumeration_type;
+			break;
+		}
+
+		String name = type_to_canonical_string(temporary_allocator(), type);
+		String identifier = name;
+		if (tag == DW_TAG_enumeration_type) {
+			identifier = {};
+		}
+
+		LLVMMetadataRef scope = nullptr;
+		if (type->kind == Type_Named && type->Named.type_name != nullptr) {
+			scope = lb_get_file_metadata(m, type->Named.type_name->file);
+		}
+
+		LLVMMetadataRef forward_decl = LLVMDIBuilderCreateForwardDecl(
+			m->debug_builder, tag,
+			cast(char const *)name.text, cast(size_t)name.len,
+			scope, scope, 0, 0, 0, 0,
+			cast(char const *)identifier.text, cast(size_t)identifier.len
+		);
+		lb_set_llvm_metadata(m, type, forward_decl);
+		mpsc_enqueue(&m->gen->debug_homed_types, type);
+		return forward_decl;
+	}
+
 	isize frame_index = m->debug_type_frames.count;
 	array_add(&m->debug_type_frames, lbDebugTypeFrame{type, is_record, frame_index});
 	defer ({
@@ -1595,4 +1637,100 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 		llvm_block
 	);
 #endif
+}
+
+struct lbDebugHomedType {
+	String name;
+	Type * type;
+};
+
+gb_internal GB_COMPARE_PROC(lb_debug_homed_type_cmp) {
+	lbDebugHomedType const *x = cast(lbDebugHomedType const *)a;
+	lbDebugHomedType const *y = cast(lbDebugHomedType const *)b;
+	return string_compare(x->name, y->name);
+}
+
+gb_internal void lb_debug_generate_types_module(lbGenerator *gen) {
+	lbModule *m = gen->debug_types_module;
+
+	StringSet seen = {};
+	string_set_init(&seen);
+	defer (string_set_destroy(&seen));
+
+	auto homed = array_make<lbDebugHomedType>(heap_allocator(), 0, 1024);
+	defer (array_free(&homed));
+	for (Type *type = nullptr; mpsc_dequeue(&gen->debug_homed_types, &type); /**/) {
+		String name = type_to_canonical_string(permanent_allocator(), type);
+		if (!string_set_update(&seen, name)) {
+			array_add(&homed, lbDebugHomedType{name, type});
+		}
+	}
+	array_sort(homed, lb_debug_homed_type_cmp);
+
+	String anchor_name = str_lit("__$debug_types");
+	LLVMMetadataRef file = lb_get_file_metadata(m, m->info->runtime_package->files[0]);
+
+	// TODO(bill): This is only a prototype. `ODIN_DEBUG_TYPES_ANCHOR=struct` picks the struct anchor
+	char const *anchor_kind = gb_get_env("ODIN_DEBUG_TYPES_ANCHOR", temporary_allocator());
+	if (anchor_kind != nullptr && gb_strcmp(anchor_kind, "struct") == 0) {
+		// a struct with every type as a member at offset 0, given to an unused global
+		auto members = array_make<LLVMMetadataRef>(heap_allocator(), 0, homed.count);
+		defer (array_free(&members));
+		u64 size_in_bits = 0;
+		for (lbDebugHomedType const &h : homed) {
+			u64 bits = 8*cast(u64)type_size_of(h.type);
+			size_in_bits = gb_max(size_in_bits, bits);
+			array_add(&members, LLVMDIBuilderCreateMemberType(m->debug_builder, file,
+				cast(char const *)h.name.text, h.name.len, file, 0,
+				bits, 8*cast(u32)type_align_of(h.type), 0, LLVMDIFlagZero, lb_debug_type(m, h.type)
+			));
+		}
+		LLVMMetadataRef anchor_type = LLVMDIBuilderCreateStructType(m->debug_builder, file,
+			cast(char const *)anchor_name.text, anchor_name.len, file, 0, size_in_bits, 8, LLVMDIFlagZero,
+			nullptr, members.data, cast(unsigned)members.count, 0, nullptr,
+			cast(char const *)anchor_name.text, anchor_name.len
+		);
+
+		LLVMTypeRef byte_type = LLVMInt8TypeInContext(m->ctx);
+		LLVMValueRef global = LLVMAddGlobal(m->mod, byte_type, cast(char const *)anchor_name.text);
+		LLVMSetInitializer(global, LLVMConstNull(byte_type));
+		LLVMSetLinkage(global, LLVMInternalLinkage);
+		lb_append_to_used(m, global);
+
+		LLVMMetadataRef global_expr = LLVMDIBuilderCreateGlobalVariableExpression(m->debug_builder, file,
+			cast(char const *)anchor_name.text, anchor_name.len, "", 0, file, 0, anchor_type, true,
+			LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0), nullptr, 8
+		);
+		LLVMGlobalSetMetadata(global, 0, global_expr);
+	} else {
+		// an unused procedure with a local of every type, all at one byte of stack
+		LLVMTypeRef proc_type = LLVMFunctionType(LLVMVoidTypeInContext(m->ctx), nullptr, 0, false);
+		LLVMValueRef proc = LLVMAddFunction(m->mod, cast(char const *)anchor_name.text, proc_type);
+		LLVMSetLinkage(proc, LLVMInternalLinkage);
+		lb_append_to_used(m, proc);
+
+		LLVMMetadataRef subroutine_type = LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, nullptr, 0, LLVMDIFlagZero);
+		LLVMMetadataRef subprogram = LLVMDIBuilderCreateFunction(m->debug_builder, file,
+			cast(char const *)anchor_name.text, anchor_name.len, cast(char const *)anchor_name.text, anchor_name.len,
+			file, 0, subroutine_type, true, true, 0, LLVMDIFlagArtificial, false
+		);
+		LLVMSetSubprogram(proc, subprogram);
+
+		LLVMBasicBlockRef block = LLVMAppendBasicBlockInContext(m->ctx, proc, "entry");
+		LLVMBuilderRef builder = LLVMCreateBuilderInContext(m->ctx);
+		defer (LLVMDisposeBuilder(builder));
+		LLVMPositionBuilderAtEnd(builder, block);
+		LLVMMetadataRef location = LLVMDIBuilderCreateDebugLocation(m->ctx, 0, 0, subprogram, nullptr);
+		LLVMSetCurrentDebugLocation2(builder, location);
+
+		LLVMValueRef slot = LLVMBuildAlloca(builder, LLVMInt8TypeInContext(m->ctx), "");
+		LLVMMetadataRef expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+		for (lbDebugHomedType const &h : homed) {
+			LLVMMetadataRef variable = LLVMDIBuilderCreateAutoVariable(m->debug_builder, subprogram,
+				cast(char const *)h.name.text, h.name.len, file, 0, lb_debug_type(m, h.type), true, LLVMDIFlagZero, 8
+			);
+			LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, slot, variable, expr, location, block);
+		}
+		LLVMBuildRetVoid(builder);
+	}
 }
