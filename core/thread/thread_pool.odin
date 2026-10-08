@@ -123,6 +123,7 @@ pool_init :: proc(
 	}
 }
 
+@(synchronizes=.Acquire)
 pool_destroy :: proc(pool: ^Pool) {
 	queue.destroy(&pool.tasks)
 	delete(pool.tasks_done)
@@ -136,6 +137,7 @@ pool_destroy :: proc(pool: ^Pool) {
 	delete(pool.threads, pool.allocator)
 }
 
+@(synchronizes=.Release)
 pool_start :: proc(pool: ^Pool) {
 	for t in pool.threads {
 		start(t)
@@ -368,6 +370,7 @@ pool_pop_done :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 }
 
 // Mostly for internal use.
+@(synchronizes=.Release)
 pool_do_work :: proc(pool: ^Pool, task: Task) {
 	{
 		context.allocator = task.allocator

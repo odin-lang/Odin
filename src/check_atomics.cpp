@@ -23,8 +23,8 @@
 // With -vet-atomic-access, a plain read or write of a location accessed atomically is an error, unless a call before it
 // to a procedure with `@(synchronizes=...)` acquires something which no call since releases, as within a lock, or for
 // a write, a call after it releases something which no call since acquires, as starting a thread does. Only calls in
-// branches which enclose it count, and deferred ones do not. `@(synchronizes_shared=...)`, as on a shared lock, only
-// synchronizes reads. What a procedure without either synchronizes is inferred from what it calls: what it releases
+// branches which enclose it count, and deferred ones do not, and a call on what is not known, e.g. a lock without
+// arguments, may release anything. `@(synchronizes_shared=...)`, as on a shared lock, only synchronizes reads. What a procedure without either synchronizes is inferred from what it calls: what it releases
 // before it acquires it, as unlocking does, and what it acquires but does not release by some return, as locking does.
 
 struct AtomicUses {
@@ -113,7 +113,7 @@ struct AtomicAt {
 };
 
 struct AtomicObject {
-	Entity *root; // NULL when not known, as then it is the same as nothing
+	Entity *root; // NULL when not known, e.g. without arguments
 	String  path;
 };
 
@@ -376,7 +376,10 @@ gb_internal AtomicObject check_atomic_object(Ast *expr) {
 }
 
 gb_internal bool check_atomic_same_object(AtomicObject const &a, AtomicObject const &b) {
-	if (a.root == nullptr || a.root != b.root) {
+	if (a.root == nullptr || b.root == nullptr) {
+		return a.root == b.root;
+	}
+	if (a.root != b.root) {
 		return false;
 	}
 	String outer = a.path;
@@ -388,6 +391,10 @@ gb_internal bool check_atomic_same_object(AtomicObject const &a, AtomicObject co
 		return false;
 	}
 	return inner.len == outer.len || inner[outer.len] == '.' || inner[outer.len] == '[';
+}
+
+gb_internal bool check_atomic_may_be_same_object(AtomicObject const &a, AtomicObject const &b) {
+	return a.root == nullptr || b.root == nullptr || check_atomic_same_object(a, b);
 }
 
 gb_internal Ast *check_atomic_call_address(Ast *call) {
@@ -1137,14 +1144,14 @@ gb_internal bool check_atomic_synchronized(Array<AtomicSync> const &syncs, Atomi
 				TokenPos rt = ast_token(r.call).pos;
 				undone |= !r.deferred && check_atomic_encloses(r.arms, access.arms) &&
 				          token_pos_cmp(at, rt) < 0 && token_pos_cmp(rt, pos) < 0 &&
-				          check_atomic_order_releases(r.order) && check_atomic_same_object(a.object, r.object);
+				          check_atomic_order_releases(r.order) && check_atomic_may_be_same_object(a.object, r.object);
 			}
 		} else if (write && token_pos_cmp(pos, at) < 0 && check_atomic_order_releases(a.order)) {
 			// the unlock of a lock taken since
 			for (AtomicSync const &l : syncs) {
 				TokenPos lt = ast_token(l.call).pos;
 				undone |= !l.deferred && token_pos_cmp(pos, lt) < 0 && token_pos_cmp(lt, at) < 0 &&
-				          check_atomic_order_acquires(l.order) && check_atomic_same_object(a.object, l.object);
+				          check_atomic_order_acquires(l.order) && check_atomic_may_be_same_object(a.object, l.object);
 			}
 		} else {
 			continue;
@@ -1184,7 +1191,7 @@ gb_internal void check_atomic_infer(PtrSet<DeclInfo *> *inferring, DeclInfo *dec
 	auto effects = array_make<AtomicEffect>(temporary_allocator(), 0, 0);
 	for_array(i, s.syncs) {
 		AtomicObject const &object = s.syncs[i].object;
-		bool seen = object.root == nullptr;
+		bool seen = false;
 		for (isize j = 0; j < i; j++) {
 			seen |= check_atomic_same_object(s.syncs[j].object, object);
 		}
@@ -1217,7 +1224,7 @@ gb_internal void check_atomic_infer(PtrSet<DeclInfo *> *inferring, DeclInfo *dec
 				for (isize k = 0; k < exit.syncs; k++) {
 					AtomicSync const &r = s.syncs[k];
 					released |= (r.deferred || (k > j && check_atomic_encloses(r.arms, exit.arms))) &&
-					            check_atomic_order_releases(r.order) && check_atomic_same_object(r.object, object);
+					            check_atomic_order_releases(r.order) && check_atomic_may_be_same_object(r.object, object);
 				}
 				if (!released) {
 					acquires = true;
@@ -1235,9 +1242,10 @@ gb_internal void check_atomic_infer(PtrSet<DeclInfo *> *inferring, DeclInfo *dec
 			continue;
 		}
 
-		// what is within a parameter, or a global, as a local is nothing to what calls it
 		Entity *root = object.root;
-		if ((root->flags & EntityFlag_Param) != 0) {
+		if (root == nullptr) {
+			// NOTE(bill): not known to what calls it either
+		} else if ((root->flags & EntityFlag_Param) != 0) {
 			for (isize k = 0; pt->kind == Type_Proc && pt->Proc.params != nullptr && k < pt->Proc.params->Tuple.variables.count; k++) {
 				if (pt->Proc.params->Tuple.variables[k] == root) {
 					effect.param = cast(i32)k;

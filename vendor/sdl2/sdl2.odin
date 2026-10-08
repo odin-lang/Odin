@@ -100,8 +100,11 @@ atomic_t :: struct { value: c.int }
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
+	@(synchronizes=.Acquire)
 	AtomicTryLock                :: proc(lock: ^SpinLock) -> bool ---
+	@(synchronizes=.Acquire)
 	AtomicLock                   :: proc(lock: ^SpinLock) ---
+	@(synchronizes=.Release)
 	AtomicUnlock                 :: proc(lock: ^SpinLock) ---
 	MemoryBarrierReleaseFunction :: proc() ---
 	MemoryBarrierAcquireFunction :: proc() ---
@@ -267,7 +270,9 @@ STANDARD_GRAVITY :: 9.80665
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
+	@(synchronizes=.Acquire)
 	LockSensors                    :: proc() ---
+	@(synchronizes=.Release)
 	UnlockSensors                  :: proc() ---
 	NumSensors                     :: proc() -> c.int ---
 	SensorGetDeviceName            :: proc(device_index: c.int) -> cstring ---

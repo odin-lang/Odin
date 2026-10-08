@@ -1029,6 +1029,7 @@ Example:
 		assert(!chan.close(c), "was already closed")
 	}
 */
+@(synchronizes=.Release)
 close :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c == nil {
 		return false
@@ -1052,7 +1053,7 @@ Returns if the channel is closed or not
 **Returns**:
 - `true` if the channel is closed, `false` otherwise
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c == nil {
 		return true
@@ -1206,7 +1207,7 @@ Output:
 	SELECT:         -1 None
 
 */
-@(require_results)
+@(require_results, synchronizes=.Acq_Rel)
 try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	Select_Op :: struct {
 		idx:     int, // local to the slice that was given
@@ -1271,7 +1272,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 	}
 }
 
-@(require_results, deprecated = "use try_select_raw")
+@(require_results, synchronizes=.Acq_Rel, deprecated="use try_select_raw")
 select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	return try_select_raw(recvs, sends, send_msgs, recv_out)
 }

@@ -138,6 +138,7 @@ start :: proc(thread: ^Thread) {
 /*
 Check if the thread has finished work.
 */
+@(synchronizes=.Acquire)
 is_done :: proc(thread: ^Thread) -> bool {
 	return _is_done(thread)
 }
