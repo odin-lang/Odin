@@ -154,7 +154,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 					}
 					break;
 				}
-				u32 ptr = xb_arg_address(p, v, abi->is_odin_cc && !arg.copy);
+				u32 ptr = xb_arg_address(p, v, is_calling_convention_odin(abi->cc) && !arg.copy);
 				xb_add_ptr_arg(p, &call_args, abi, arg, ptr);
 				break;
 			}
@@ -3815,7 +3815,7 @@ gb_internal void xb_begin_proc(xbProc *p) {
 					break;
 				}
 				i32 l = xb_param_ptr_local(p, abi, arg);
-				if (abi->is_odin_cc && sz <= 16) {
+				if (is_calling_convention_odin(abi->cc) && sz <= 16) {
 					// callee copy, like the LLVM backend
 					xbMem m = xb_add_local(p, e->type, false);
 					xb_memcopy(p, m, xb_mem(xbMem_Reg, xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)l)), 0), sz);
