@@ -404,6 +404,7 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 	i32 size = xb_type_size(in.type);
 	switch (in.op) {
 	case xbOp_Nop:
+	case xbOp_Scope:
 		break;
 	case xbOp_Loc: {
 		xbLineEntry e = {};
@@ -734,7 +735,11 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		a64_put(L, in.dst, A64_FP);
 		break;
 	case xbOp_ReturnAddress:
-		a64_ldr(a, 8, false, A64_T0, A64_FP, 8);
+		if (in.imm) {
+			a64_add_imm(a, A64_T0, A64_FP, 8);
+		} else {
+			a64_ldr(a, 8, false, A64_T0, A64_FP, 8);
+		}
 		a64_put(L, in.dst, A64_T0);
 		break;
 	case xbOp_TlsAddr: {
