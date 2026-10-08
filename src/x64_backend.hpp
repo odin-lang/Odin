@@ -155,6 +155,8 @@ enum xbOp : u8 {
 	xbOp_Valgrind,    // dst = valgrind client request(default = a, args = [b])
 	xbOp_Alloca,      // dst = a bytes of fresh stack memory aligned to imm
 	xbOp_TlsAddr,     // dst = this thread's address of the thread local symbol imm, a call to __tls_get_addr
+	xbOp_FToHalf,     // dst(i16) = f16 bits of a(aux float type), rounded by the cpu; arm64 only
+	xbOp_HalfToF,     // dst(f32) = the f16 bits a; arm64 only
 
 	xbOp_COUNT,
 };
@@ -266,6 +268,9 @@ struct xbAbiFunc {
 	Array<xbAbiArg>   split_ret_ptrs;
 	xbAbiArg   context;           // valid if is_odin_cc
 	Array<xbAbiPiece> pieces;
+	// arm64: a tuple returned in registers is laid out like LLVM's struct for it, which has no
+	// padding, so a packed union field moves; where each result goes, when that differs from Odin
+	Slice<i64> ret_tuple_offsets;
 	i32        stack_size;        // bytes of stack arguments
 	i32        gpr_count;         // registers used by the fixed params
 	i32        xmm_count;
@@ -428,6 +433,14 @@ enum xbRelocKind : u8 {
 	xbReloc_GOTTPOFF,
 	xbReloc_TLSGD,
 	xbReloc_SecRel32,   // COFF: offset from the start of the symbol's section
+	// arm64 Mach-O, the immediate fields are filled in by the linker
+	xbReloc_A64_Branch26,     // bl
+	xbReloc_A64_Page21,       // adrp of the symbol's page
+	xbReloc_A64_PageOff12,    // add of the low 12 bits
+	xbReloc_A64_GotPage21,    // adrp of the page of the symbol's GOT entry
+	xbReloc_A64_GotPageOff12, // ldr of the GOT entry
+	xbReloc_A64_TlvPage21,    // adrp of the page of the thread local's descriptor
+	xbReloc_A64_TlvPageOff12, // ldr of the descriptor's address
 };
 
 struct xbReloc {
@@ -546,6 +559,9 @@ gb_internal bool xb_write_coff(xbModule *m, String path);
 gb_internal bool xb_is_arm64(void);
 gb_internal bool xb_can_compile_procs(void);
 gb_internal xbAbiFunc *a64_abi_compute(Type *proc_type, char const **reason);
+gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index);
+gb_internal void a64_check_proc(xbProc *p);
+gb_internal void a64_lower_proc(xbProc *p);
 gb_internal bool a64_write_macho(xbModule *m, String path);
 
 // A bump allocator for everything that only lives while one procedure family is

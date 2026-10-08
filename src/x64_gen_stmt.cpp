@@ -188,6 +188,8 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 	i32 sse_count = -1;
 	if (abi->c_vararg && xb_is_win64() && abi->cc != ProcCC_SysV) {
 		stack_size = xb_win64_varargs(p, abi, &call_args, args, arg_index);
+	} else if (abi->c_vararg && xb_is_arm64()) {
+		stack_size = a64_varargs(p, abi, &call_args, args, arg_index);
 	} else if (abi->c_vararg) {
 		i32 gpr = abi->gpr_count;
 		i32 xmm = abi->xmm_count;
@@ -233,6 +235,10 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 		sse_count = xmm;
 	}
 
+	xbMem llvm_layout = {};
+	if (abi->ret_tuple_offsets.count > 0) {
+		llvm_layout = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 16, 8));
+	}
 	if (abi->ret.kind == xbArg_Direct) {
 		for (i32 i = 0; i < abi->ret.piece_count; i++) {
 			xbAbiPiece const &piece = abi->pieces[abi->ret.piece_index+i];
@@ -241,7 +247,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 			r.reg = piece.reg;
 			r.type = piece.type;
 			r.size = piece.size;
-			r.dst = xb_mem_offset(last_mem, piece.src_offset);
+			r.dst = xb_mem_offset(abi->ret_tuple_offsets.count > 0 ? llvm_layout : last_mem, piece.src_offset);
 			array_add(&call_rets, r);
 		}
 	}
@@ -261,6 +267,12 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 	xbInstr i = xb_instr(xbOp_Call);
 	i.imm = p->calls.count-1;
 	xb_emit(p, i);
+
+	for_array(i, abi->ret_tuple_offsets) {
+		Type *ft = nullptr;
+		i64 off = type_offset_of(rt, cast(i32)i, &ft);
+		xb_memcopy(p, xb_mem_offset(result_mem, off), xb_mem_offset(llvm_layout, abi->ret_tuple_offsets[i]), type_size_of(ft));
+	}
 
 	if (pt->Proc.diverging) {
 		xb_unreachable(p);
@@ -430,6 +442,7 @@ gb_internal xbValue xb_emit_vec128(xbProc *p, i32 index, u32 a, u32 b, u32 c, u8
 }
 
 gb_internal bool xb_build_x86_vec_intrinsic(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
+	if (xb_is_arm64()) return false;
 	i32 index = xb_vec_intrinsic_index(name);
 	if (index < 0) return false;
 	xbVecIntrinsic const &v = xb_vec_intrinsics[index];
@@ -1613,6 +1626,7 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		return {};
 	case BuiltinProc_x86_cpuid:
 	case BuiltinProc_x86_xgetbv: {
+		if (xb_is_arm64()) XB_UNSUPPORTED(p, "x86 builtin on arm64");
 		bool cpuid = id == BuiltinProc_x86_cpuid;
 		Type *rt = tv.type;
 		if (type_size_of(rt) != (cpuid ? 16 : 8)) XB_UNSUPPORTED(p, "cpuid result type");
@@ -1633,6 +1647,7 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		if (!build_context.ODIN_VALGRIND_SUPPORT) {
 			return xb_value_reg(t_uintptr, args[0]);
 		}
+		if (xb_is_arm64()) XB_UNSUPPORTED(p, "valgrind on arm64");
 		xbMem array = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 6*8, 8));
 		for (isize k = 0; k < 6; k++) {
 			xb_store(p, xbType_I64, xb_mem_offset(array, k*8), args[k+1]);
@@ -1710,6 +1725,7 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_syscall: {
 		if (ce->args.count > 7) XB_UNSUPPORTED(p, "syscall arg count");
 		if (xb_is_win64()) XB_UNSUPPORTED(p, "syscall on windows");
+		if (xb_is_arm64()) XB_UNSUPPORTED(p, "syscall on arm64");
 		u8 const regs[7] = {RAX, RDI, RSI, RDX, R10, R8, R9};
 		auto args = array_make<xbCallArg>(xb_allocator(), 0, ce->args.count);
 		for_array(i, ce->args) {
@@ -2260,7 +2276,8 @@ gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool
 gb_internal void xb_emit_ret(xbProc *p, xbMem direct_result) {
 	xbAbiFunc *abi = p->abi;
 	auto args = array_make<xbCallArg>(xb_allocator(), 0, 2);
-	if (abi->has_sret) {
+	if (abi->has_sret && !xb_is_arm64()) {
+		// x86-64 hands the sret pointer back in rax
 		xbCallArg a = {};
 		a.kind = xbCallArg_Gpr;
 		a.type = xbType_I64;
@@ -2376,6 +2393,7 @@ gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool
 			for (isize i = 0; i < return_count; i++) {
 				Type *ft = nullptr;
 				i64 off = type_offset_of(pt->results, i, &ft);
+				if (abi->ret_tuple_offsets.count > 0) off = abi->ret_tuple_offsets[i];
 				xb_store_value(p, xb_mem_offset(direct, off), results[i]);
 			}
 		}
@@ -3928,5 +3946,8 @@ gb_internal void xb_end_proc(xbProc *p) {
 			xbInstr i = xb_instr(xbOp_Unreachable);
 			array_add(&b->instrs, i);
 		}
+	}
+	if (xb_is_arm64()) {
+		a64_check_proc(p);
 	}
 }

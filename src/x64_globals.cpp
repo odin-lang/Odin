@@ -181,6 +181,14 @@ gb_internal bool xb_global_needs_init(Entity *e, DeclInfo *decl) {
 // A port of lb_init_global_var, for the globals in init order, then the @(init) procedures.
 gb_internal void xb_startup_body(xbProc *p) {
 	CheckerInfo *info = p->m->info;
+	if (build_context.metrics.os == TargetOs_darwin) {
+		// the Objective-C setup comes first, as in lb_create_startup_runtime
+		Type *pt = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
+		i32 sym = xb_symbol(p->m, str_lit("__$init_objc_names"));
+		p->m->symbols[sym].flags |= xbSymbolFlag_Func;
+		xbValue f = xb_value_reg(pt, xb_lea(p, xb_mem(xbMem_Sym, cast(u32)sym)));
+		xb_emit_call_internal(p, f, sym, {});
+	}
 	for (DeclInfo *d : info->variable_init_order) {
 		Entity *e = d->entity;
 		if ((e->scope->flags & ScopeFlag_File) == 0) continue;
@@ -218,13 +226,13 @@ gb_internal void xb_cleanup_body(xbProc *p) {
 	}
 }
 
-// One of the runtime's startup procedures, an Odin procedure without parameters.
-gb_internal bool xb_build_runtime_proc(xbModule *m, String name, void (*body)(xbProc *), char const **reason) {
+// One of the runtime's startup procedures, a procedure without parameters.
+gb_internal bool xb_build_runtime_proc(xbModule *m, String name, void (*body)(xbProc *), char const **reason, ProcCallingConvention cc=ProcCC_Odin) {
 	xbFamily family = {};
 	xb_family_init(&family, nullptr);
 	defer (xb_family_destroy(&family));
 
-	Type *pt = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+	Type *pt = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, cc);
 	xbProc *p = xb_new_proc(m, name, pt);
 	p->family = &family;
 	p->is_startup = true;
@@ -264,6 +272,21 @@ gb_internal void xb_build_startup(xbModule *m) {
 		return;
 	}
 	m->owns_startup = true;
+}
+
+gb_internal void xb_empty_body(xbProc *p) {}
+
+// When LLVM makes nothing at all, the startup's call to the Objective-C setup needs a target.
+// Class implementations are registered there, so a program with any is left to LLVM.
+gb_internal void xb_build_objc_names_stub(xbModule *m) {
+	if (m->info->objc_class_implementations.count.load(std::memory_order_relaxed) > 0) {
+		m->complete = false;
+		return;
+	}
+	char const *reason = nullptr;
+	if (!xb_build_runtime_proc(m, str_lit("__$init_objc_names"), xb_empty_body, &reason, ProcCC_CDecl)) {
+		m->complete = false;
+	}
 }
 
 ////////////////////////////////////////////////////////////////

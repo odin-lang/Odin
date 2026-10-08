@@ -1051,6 +1051,11 @@ gb_internal xbValue xb_byte_swap_any(xbProc *p, xbValue v, Type *t);
 gb_internal xbValue xb_f16_to_f32(xbProc *p, xbValue v) {
 	if (is_type_different_to_arch_endianness(v.type)) v = xb_byte_swap_any(p, v, t_f16);
 	v.type = t_f16;
+	if (xb_is_arm64()) {
+		// LLVM converts with fcvt on arm64, which rounds unlike the runtime's helpers
+		u32 bits = xb_load(p, xbType_I16, xb_value_to_mem(p, v));
+		return xb_value_reg(t_f32, xb_convop(p, xbOp_HalfToF, xbType_F32, xbType_I16, bits));
+	}
 	xbValue args[1] = {v};
 	xbValue r = xb_emit_runtime_call(p, "extendhfsf2", xb_args(args, 1));
 	return xb_value_reg(t_f32, xb_value_to_reg(p, r));
@@ -1061,6 +1066,13 @@ gb_internal xbValue xb_float_to_f16(xbProc *p, xbValue v, Type *t) {
 		return xb_byte_swap_any(p, xb_float_to_f16(p, v, t_f16), t);
 	}
 	xbType st = xb_scalar_type(v.type);
+	if (xb_is_arm64()) {
+		// an f16 lives in memory
+		u32 bits = xb_convop(p, xbOp_FToHalf, xbType_I16, st, xb_value_to_reg(p, v));
+		xbMem m = xb_add_local(p, t, false);
+		xb_store(p, xbType_I16, m, bits);
+		return xb_value_mem(t, m);
+	}
 	xbValue args[1] = {v};
 	xbValue r = xb_emit_runtime_call(p, st == xbType_F64 ? "truncdfhf2" : "truncsfhf2", xb_args(args, 1));
 	r = xb_value_copy_to_temp(p, r);

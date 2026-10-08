@@ -25,8 +25,18 @@ enum : u32 {
 	A64_S_THREAD_LOCAL_VARIABLES     = 0x13,
 	A64_S_ATTR_PURE_INSTRUCTIONS     = 0x80000000,
 	A64_S_ATTR_SOME_INSTRUCTIONS     = 0x00000400,
+	A64_S_ATTR_DEBUG                 = 0x02000000,
 
-	A64_ARM64_RELOC_UNSIGNED = 0,
+	A64_ARM64_RELOC_UNSIGNED            = 0,
+	A64_ARM64_RELOC_BRANCH26            = 2,
+	A64_ARM64_RELOC_PAGE21              = 3,
+	A64_ARM64_RELOC_PAGEOFF12           = 4,
+	A64_ARM64_RELOC_GOT_LOAD_PAGE21     = 5,
+	A64_ARM64_RELOC_GOT_LOAD_PAGEOFF12  = 6,
+	A64_ARM64_RELOC_TLVP_LOAD_PAGE21    = 8,
+	A64_ARM64_RELOC_TLVP_LOAD_PAGEOFF12 = 9,
+
+	A64_UNWIND_ARM64_MODE_FRAME = 0x04000000,
 };
 
 enum : u8 {
@@ -123,6 +133,15 @@ struct a64Reloc {
 	u32 r_info; // symbolnum:24, pcrel:1, length:2, extern:1, type:4
 };
 
+// A relocation before the symbol table is ordered: `sym` indexes the output symbols.
+struct a64PendingReloc {
+	i32 address;
+	i32 sym;
+	u32 type;
+	bool pcrel;
+	u32 length; // log2 of the size
+};
+
 enum a64OutSection {
 	a64Out_Text,
 	a64Out_Const,      // read only data without relocations
@@ -130,7 +149,8 @@ enum a64OutSection {
 	a64Out_Data,
 	a64Out_ThreadVars,
 	a64Out_ThreadData,
-	a64Out_Bss,
+	a64Out_CompactUnwind,
+	a64Out_Bss,        // the zerofill sections come last
 	a64Out_ThreadBss,
 	a64Out_COUNT,
 };
@@ -169,10 +189,10 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 	Array<u8> sec[a64Out_COUNT] = {};
 	i64 sec_size[a64Out_COUNT] = {};
 	i64 sec_align[a64Out_COUNT] = {};
-	auto sec_relocs = slice_make<Array<a64Reloc>>(heap_allocator(), a64Out_COUNT);
+	auto sec_relocs = slice_make<Array<a64PendingReloc>>(heap_allocator(), a64Out_COUNT);
 	for (isize i = 0; i < a64Out_COUNT; i++) {
 		sec[i] = array_make<u8>(heap_allocator(), 0, 0);
-		sec_relocs[i] = array_make<a64Reloc>(heap_allocator(), 0, 0);
+		sec_relocs[i] = array_make<a64PendingReloc>(heap_allocator(), 0, 0);
 		sec_align[i] = 1;
 	}
 
@@ -280,8 +300,8 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 			sym_out[i] = o;
 
 			// symbol numbers are patched in once the table is ordered
-			a64Reloc r0 = {cast(i32)at, cast(u32)tlv_bootstrap};
-			a64Reloc r1 = {cast(i32)(at + 16), cast(u32)init};
+			a64PendingReloc r0 = {cast(i32)at, tlv_bootstrap, A64_ARM64_RELOC_UNSIGNED, false, 3};
+			a64PendingReloc r1 = {cast(i32)(at + 16), init, A64_ARM64_RELOC_UNSIGNED, false, 3};
 			array_add(&sec_relocs[a64Out_ThreadVars], r0);
 			array_add(&sec_relocs[a64Out_ThreadVars], r1);
 			continue;
@@ -299,18 +319,45 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		i32 to = out_section_of(r.section);
 		GB_ASSERT(to >= 0);
 		GB_ASSERT_MSG(sym_out[r.sym] >= 0, "%.*s", LIT(m->symbols[r.sym].name));
+		a64PendingReloc ar = {cast(i32)r.offset, sym_out[r.sym], 0, false, 2};
 		switch (r.kind) {
-		case xbReloc_Abs64: {
+		case xbReloc_Abs64:
 			// the addend is stored in place
 			gb_memmove(sec[to].data + r.offset, &r.addend, 8);
-			a64Reloc ar = {cast(i32)r.offset, cast(u32)sym_out[r.sym]};
-			array_add(&sec_relocs[to], ar);
+			ar.type = A64_ARM64_RELOC_UNSIGNED;
+			ar.length = 3;
 			break;
-		}
+		// the code relocations carry no addend, the instruction fields stay zero
+		case xbReloc_A64_Branch26:     ar.type = A64_ARM64_RELOC_BRANCH26;            ar.pcrel = true; break;
+		case xbReloc_A64_Page21:       ar.type = A64_ARM64_RELOC_PAGE21;              ar.pcrel = true; break;
+		case xbReloc_A64_PageOff12:    ar.type = A64_ARM64_RELOC_PAGEOFF12;           break;
+		case xbReloc_A64_GotPage21:    ar.type = A64_ARM64_RELOC_GOT_LOAD_PAGE21;     ar.pcrel = true; break;
+		case xbReloc_A64_GotPageOff12: ar.type = A64_ARM64_RELOC_GOT_LOAD_PAGEOFF12;  break;
+		case xbReloc_A64_TlvPage21:    ar.type = A64_ARM64_RELOC_TLVP_LOAD_PAGE21;    ar.pcrel = true; break;
+		case xbReloc_A64_TlvPageOff12: ar.type = A64_ARM64_RELOC_TLVP_LOAD_PAGEOFF12; break;
 		default:
 			GB_PANIC("relocation kind %d is not supported on arm64", r.kind);
 		}
+		GB_ASSERT(r.addend == 0 || r.kind == xbReloc_Abs64);
+		array_add(&sec_relocs[to], ar);
 	}
+
+	// one compact unwind entry per procedure: every frame is the standard x29/x30 record
+	for (xbProcDebug const &pd : m->proc_debug) {
+		Array<u8> *cu = &sec[a64Out_CompactUnwind];
+		i64 at = cu->count;
+		array_resize(cu, at + 32);
+		gb_zero_size(cu->data + at, 32);
+		u32 length = cast(u32)(pd.end - pd.start);
+		u32 encoding = A64_UNWIND_ARM64_MODE_FRAME;
+		gb_memmove(cu->data + at + 8, &length, 4);
+		gb_memmove(cu->data + at + 12, &encoding, 4);
+		GB_ASSERT(sym_out[pd.sym] >= 0);
+		a64PendingReloc r = {cast(i32)at, sym_out[pd.sym], A64_ARM64_RELOC_UNSIGNED, false, 3};
+		array_add(&sec_relocs[a64Out_CompactUnwind], r);
+	}
+	sec_size[a64Out_CompactUnwind] = sec[a64Out_CompactUnwind].count;
+	sec_align[a64Out_CompactUnwind] = 8;
 
 	// the table is ordered: locals, defined externals, undefined externals
 	auto order = array_make<i32>(heap_allocator(), 0, out_syms.count);
@@ -354,6 +401,7 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		{"__data",        "__DATA", A64_S_REGULAR, false},
 		{"__thread_vars", "__DATA", A64_S_THREAD_LOCAL_VARIABLES, false},
 		{"__thread_data", "__DATA", A64_S_THREAD_LOCAL_REGULAR, false},
+		{"__compact_unwind", "__LD", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
 		{"__bss",         "__DATA", A64_S_ZEROFILL, true},
 		{"__thread_bss",  "__DATA", A64_S_THREAD_LOCAL_ZEROFILL, true},
 	};
@@ -396,9 +444,10 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 	for (isize i = 0; i < a64Out_COUNT; i++) {
 		if (!sect_number[i]) continue;
 		reloff[i] = out.count;
-		for (a64Reloc r : sec_relocs[i]) {
-			u32 symnum = out_syms[r.r_info].index;
-			r.r_info = symnum | (0u << 24) | (3u << 25) | (1u << 27) | (A64_ARM64_RELOC_UNSIGNED << 28);
+		for (a64PendingReloc const &pr : sec_relocs[i]) {
+			a64Reloc r = {};
+			r.r_address = pr.address;
+			r.r_info = out_syms[pr.sym].index | ((pr.pcrel ? 1u : 0u) << 24) | (pr.length << 25) | (1u << 27) | (pr.type << 28);
 			xbb_bytes(&out, &r, gb_size_of(r));
 		}
 	}

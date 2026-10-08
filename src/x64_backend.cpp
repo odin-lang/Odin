@@ -20,6 +20,8 @@
 #include "x64_elf.cpp"
 #include "x64_coff.cpp"
 #include "a64_abi.cpp"
+#include "a64_encode.cpp"
+#include "a64_lower.cpp"
 #include "a64_macho.cpp"
 
 gb_global xbModule *xb_module = nullptr;
@@ -398,6 +400,9 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	              m->owns_startup &&
 	              (m->owns_type_info || build_context.no_rtti) &&
 	              (build_context.command_kind != Command_test || m->owns_test_main || m->test_main_not_needed);
+	if (m->complete && build_context.metrics.os == TargetOs_darwin) {
+		xb_build_objc_names_stub(m);
+	}
 
 	if (m->stats.procs_compiled > 0 || m->stats.globals_defined > 0) {
 		m->object_path = xb_object_path(gen);

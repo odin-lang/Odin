@@ -1721,6 +1721,10 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 }
 
 gb_internal void xb_lower_proc(xbProc *p) {
+	if (xb_is_arm64()) {
+		a64_lower_proc(p);
+		return;
+	}
 	xbModule *m = p->m;
 	xbLower L = {};
 	L.p = p;

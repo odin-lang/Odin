@@ -1867,7 +1867,12 @@ gb_internal void lb_finalize_objc_names(lbGenerator *gen, lbProcedure *p) {
 		string_map_set(&global_class_map, g.name, lbObjCGlobalClass{g});
 	}
 
-	LLVMSetLinkage(p->value, LLVMInternalLinkage);
+	if (xb_owns_startup()) {
+		// the x64 backend's startup calls it from another object
+		LLVMSetVisibility(p->value, LLVMHiddenVisibility);
+	} else {
+		LLVMSetLinkage(p->value, LLVMInternalLinkage);
+	}
 	lb_begin_procedure_body(p);
 
 	// Register class globals, gathering classes that must be implemented
@@ -4011,7 +4016,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lbProcedure *startup_runtime_decl = nullptr;
 	lbProcedure *cleanup_runtime_decl = nullptr;
 	if (xb_owns_startup()) {
-		GB_ASSERT(gen->objc_names == nullptr);
+		// the x64 backend's startup calls gen->objc_names itself
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 		startup_runtime_decl = lb_create_dummy_procedure(default_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
 		cleanup_runtime_decl = lb_create_dummy_procedure(default_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);

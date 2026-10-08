@@ -1,0 +1,414 @@
+// arm64 machine code encoder for the forms the lowering uses. Every instruction is one
+// little endian 32 bit word.
+
+enum a64Reg : u8 {
+	X0 = 0, X1, X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13, X14, X15,
+	X16, X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28, X29, X30,
+	XZR = 31,
+	A64_SP = 31, // the same encoding as xzr, the instruction decides which
+	A64_FP = 29,
+	A64_LR = 30,
+};
+
+enum a64Cond : u8 {
+	A64_EQ = 0x0, A64_NE = 0x1, A64_HS = 0x2, A64_LO = 0x3,
+	A64_MI = 0x4, A64_PL = 0x5, A64_VS = 0x6, A64_VC = 0x7,
+	A64_HI = 0x8, A64_LS = 0x9, A64_GE = 0xA, A64_LT = 0xB,
+	A64_GT = 0xC, A64_LE = 0xD, A64_AL = 0xE,
+};
+
+gb_internal gb_inline void a64_emit(xbAsm *a, u32 w) {
+	xb_u32(a, w);
+}
+
+gb_internal gb_inline u32 a64_sf(i32 size) {
+	return size == 8 ? 1u<<31 : 0;
+}
+
+////////////////////////////////////////////////////////////////
+// Moves and immediates
+////////////////////////////////////////////////////////////////
+
+// mov xd, xm
+gb_internal void a64_mov(xbAsm *a, u8 rd, u8 rm) {
+	a64_emit(a, 0xAA0003E0 | (cast(u32)rm << 16) | rd);
+}
+
+// mov between sp and a register: add rd, rn, #0
+gb_internal void a64_mov_sp(xbAsm *a, u8 rd, u8 rn) {
+	a64_emit(a, 0x91000000 | (cast(u32)rn << 5) | rd);
+}
+
+gb_internal void a64_movz(xbAsm *a, u8 rd, u16 imm, u32 hw) {
+	a64_emit(a, 0xD2800000 | (hw << 21) | (cast(u32)imm << 5) | rd);
+}
+
+gb_internal void a64_movn(xbAsm *a, u8 rd, u16 imm, u32 hw) {
+	a64_emit(a, 0x92800000 | (hw << 21) | (cast(u32)imm << 5) | rd);
+}
+
+gb_internal void a64_movk(xbAsm *a, u8 rd, u16 imm, u32 hw) {
+	a64_emit(a, 0xF2800000 | (hw << 21) | (cast(u32)imm << 5) | rd);
+}
+
+// xd = v, with as few movz/movn/movk as the 16 bit chunks allow
+gb_internal void a64_mov_imm(xbAsm *a, u8 rd, u64 v) {
+	i32 zeros = 0, ones = 0;
+	for (u32 i = 0; i < 4; i++) {
+		u16 c = cast(u16)(v >> (16*i));
+		if (c == 0) zeros++;
+		if (c == 0xffff) ones++;
+	}
+	bool inverted = ones > zeros;
+	u16 fill = inverted ? 0xffff : 0;
+	bool first = true;
+	for (u32 i = 0; i < 4; i++) {
+		u16 c = cast(u16)(v >> (16*i));
+		if (c == fill) continue;
+		if (first) {
+			if (inverted) a64_movn(a, rd, cast(u16)~c, i);
+			else          a64_movz(a, rd, c, i);
+			first = false;
+		} else {
+			a64_movk(a, rd, c, i);
+		}
+	}
+	if (first) {
+		if (inverted) a64_movn(a, rd, 0, 0);
+		else          a64_movz(a, rd, 0, 0);
+	}
+}
+
+////////////////////////////////////////////////////////////////
+// Arithmetic
+////////////////////////////////////////////////////////////////
+
+enum a64AluOp : u32 {
+	A64_ADD  = 0x0B000000,
+	A64_SUB  = 0x4B000000,
+	A64_SUBS = 0x6B000000,
+	A64_AND  = 0x0A000000,
+	A64_ORR  = 0x2A000000,
+	A64_EOR  = 0x4A000000,
+	A64_ORN  = 0x2A200000,
+};
+
+enum a64Shift : u32 {
+	A64_LSL = 0,
+	A64_LSR = 1,
+	A64_ASR = 2,
+};
+
+// rd = rn op (rm shift amount), 64 bit; register 31 is xzr
+gb_internal void a64_alu(xbAsm *a, a64AluOp op, u8 rd, u8 rn, u8 rm, a64Shift shift=A64_LSL, u32 amount=0) {
+	a64_emit(a, (1u<<31) | op | (cast(u32)shift << 22) | (cast(u32)rm << 16) | (amount << 10) | (cast(u32)rn << 5) | rd);
+}
+
+// cmp xn, xm
+gb_internal void a64_cmp(xbAsm *a, u8 rn, u8 rm) {
+	a64_alu(a, A64_SUBS, XZR, rn, rm);
+}
+
+// cmp wn, #imm12
+gb_internal void a64_cmp_imm32(xbAsm *a, u8 rn, u32 imm) {
+	GB_ASSERT(imm < 4096);
+	a64_emit(a, 0x7100001F | (imm << 10) | (cast(u32)rn << 5));
+}
+
+// rd = rn + imm, where rn and rd may be sp. Large values go through x17.
+gb_internal void a64_add_imm(xbAsm *a, u8 rd, u8 rn, i64 imm) {
+	if (imm >= 0 && imm < 4096) {
+		a64_emit(a, 0x91000000 | (cast(u32)imm << 10) | (cast(u32)rn << 5) | rd);
+	} else if (imm < 0 && -imm < 4096) {
+		a64_emit(a, 0xD1000000 | (cast(u32)(-imm) << 10) | (cast(u32)rn << 5) | rd);
+	} else if (imm > 0 && imm < (1<<24) && (imm & 0xfff) == 0) {
+		a64_emit(a, 0x91400000 | (cast(u32)(imm >> 12) << 10) | (cast(u32)rn << 5) | rd);
+	} else if (imm < 0 && -imm < (1<<24) && (-imm & 0xfff) == 0) {
+		a64_emit(a, 0xD1400000 | (cast(u32)((-imm) >> 12) << 10) | (cast(u32)rn << 5) | rd);
+	} else {
+		GB_ASSERT(rd != X17 && rn != X17);
+		a64_mov_imm(a, X17, cast(u64)imm);
+		// add rd, rn, x17, uxtx: the extended register form takes sp
+		a64_emit(a, 0x8B206000 | (cast(u32)X17 << 16) | (cast(u32)rn << 5) | rd);
+	}
+}
+
+// xd = xn * xm
+gb_internal void a64_mul(xbAsm *a, u8 rd, u8 rn, u8 rm) {
+	a64_emit(a, 0x9B007C00 | (cast(u32)rm << 16) | (cast(u32)rn << 5) | rd);
+}
+
+// xd = xa - xn * xm
+gb_internal void a64_msub(xbAsm *a, u8 rd, u8 rn, u8 rm, u8 ra) {
+	a64_emit(a, 0x9B008000 | (cast(u32)rm << 16) | (cast(u32)ra << 10) | (cast(u32)rn << 5) | rd);
+}
+
+gb_internal void a64_umulh(xbAsm *a, u8 rd, u8 rn, u8 rm) {
+	a64_emit(a, 0x9BC07C00 | (cast(u32)rm << 16) | (cast(u32)rn << 5) | rd);
+}
+
+gb_internal void a64_smulh(xbAsm *a, u8 rd, u8 rn, u8 rm) {
+	a64_emit(a, 0x9B407C00 | (cast(u32)rm << 16) | (cast(u32)rn << 5) | rd);
+}
+
+gb_internal void a64_div(xbAsm *a, bool is_signed, u8 rd, u8 rn, u8 rm) {
+	a64_emit(a, (is_signed ? 0x9AC00C00 : 0x9AC00800) | (cast(u32)rm << 16) | (cast(u32)rn << 5) | rd);
+}
+
+// lslv, lsrv, asrv; a 32 bit shift masks the count by 31 like x86
+gb_internal void a64_shiftv(xbAsm *a, a64Shift kind, i32 size, u8 rd, u8 rn, u8 rm) {
+	u32 op = kind == A64_LSL ? 0x1AC02000 : kind == A64_LSR ? 0x1AC02400 : 0x1AC02800;
+	a64_emit(a, a64_sf(size) | op | (cast(u32)rm << 16) | (cast(u32)rn << 5) | rd);
+}
+
+// ubfm/sbfm, 64 bit
+gb_internal void a64_bfm(xbAsm *a, bool is_signed, u8 rd, u8 rn, u32 immr, u32 imms) {
+	a64_emit(a, (is_signed ? 0x93400000 : 0xD3400000) | (immr << 16) | (imms << 10) | (cast(u32)rn << 5) | rd);
+}
+
+gb_internal void a64_lsl_imm(xbAsm *a, u8 rd, u8 rn, u32 sh) {
+	a64_bfm(a, false, rd, rn, (64 - sh) & 63, 63 - sh);
+}
+
+gb_internal void a64_lsr_imm(xbAsm *a, u8 rd, u8 rn, u32 sh) {
+	a64_bfm(a, false, rd, rn, sh, 63);
+}
+
+// sign or zero extends the low `size` bytes of xn into xd
+gb_internal void a64_extend(xbAsm *a, bool is_signed, i32 size, u8 rd, u8 rn) {
+	if (size >= 8) {
+		if (rd != rn) a64_mov(a, rd, rn);
+		return;
+	}
+	a64_bfm(a, is_signed, rd, rn, 0, cast(u32)(8*size - 1));
+}
+
+// xd = cond ? 1 : 0
+gb_internal void a64_cset(xbAsm *a, u8 rd, a64Cond c) {
+	a64_emit(a, 0x9A9F07E0 | (cast(u32)(c ^ 1) << 12) | rd);
+}
+
+// xd = cond ? xn : xm
+gb_internal void a64_csel(xbAsm *a, u8 rd, u8 rn, u8 rm, a64Cond c) {
+	a64_emit(a, 0x9A800000 | (cast(u32)rm << 16) | (cast(u32)c << 12) | (cast(u32)rn << 5) | rd);
+}
+
+gb_internal void a64_clz(xbAsm *a, u8 rd, u8 rn) {
+	a64_emit(a, 0xDAC01000 | (cast(u32)rn << 5) | rd);
+}
+
+gb_internal void a64_rbit(xbAsm *a, u8 rd, u8 rn) {
+	a64_emit(a, 0xDAC00000 | (cast(u32)rn << 5) | rd);
+}
+
+// byte swap of the low `size` bytes, the rest are zero
+gb_internal void a64_rev(xbAsm *a, i32 size, u8 rd, u8 rn) {
+	switch (size) {
+	case 2: a64_emit(a, 0x5AC00400 | (cast(u32)rn << 5) | rd); break; // rev16 w
+	case 4: a64_emit(a, 0x5AC00800 | (cast(u32)rn << 5) | rd); break; // rev w
+	case 8: a64_emit(a, 0xDAC00C00 | (cast(u32)rn << 5) | rd); break; // rev x
+	default: GB_PANIC("a64: bad rev size");
+	}
+}
+
+////////////////////////////////////////////////////////////////
+// Loads and stores
+////////////////////////////////////////////////////////////////
+
+enum a64MemOp : u8 {
+	A64_STR,
+	A64_LDR,   // zero extends
+	A64_LDRS,  // sign extends to 64 bits
+};
+
+gb_internal u32 a64_size_log2(i32 size) {
+	switch (size) {
+	case 1:  return 0;
+	case 2:  return 1;
+	case 4:  return 2;
+	case 8:  return 3;
+	case 16: return 4;
+	}
+	GB_PANIC("a64: bad access size %d", size);
+	return 0;
+}
+
+// One load or store of `size` bytes at [rn + off]. Falls back to a register offset in x17.
+gb_internal void a64_ldst_raw(xbAsm *a, bool fp, a64MemOp op, i32 size, u8 rt, u8 rn, i64 off) {
+	u32 lg = a64_size_log2(size);
+	u32 sz = 0, opc = 0, v = 0;
+	if (fp) {
+		v = 1u << 26;
+		if (size == 16) {
+			sz = 0;
+			opc = op == A64_STR ? 2 : 3;
+		} else {
+			sz = lg;
+			opc = op == A64_STR ? 0 : 1;
+		}
+	} else {
+		sz = lg;
+		switch (op) {
+		case A64_STR:  opc = 0; break;
+		case A64_LDR:  opc = 1; break;
+		case A64_LDRS: opc = size == 8 ? 1 : 2; break;
+		}
+	}
+	u32 base = (sz << 30) | v | (opc << 22) | (cast(u32)rn << 5) | rt;
+	if (off >= 0 && (off % size) == 0 && (off / size) < 4096) {
+		a64_emit(a, 0x39000000 | base | (cast(u32)(off / size) << 10));
+	} else if (off >= -256 && off < 256) {
+		a64_emit(a, 0x38000000 | base | ((cast(u32)off & 0x1ff) << 12));
+	} else {
+		// rt names a v register for fp, which x17 cannot clash with
+		GB_ASSERT(rn != X17 && (fp || rt != X17));
+		a64_mov_imm(a, X17, cast(u64)off);
+		a64_emit(a, 0x38206800 | base | (cast(u32)X17 << 16));
+	}
+}
+
+gb_internal void a64_ldr(xbAsm *a, i32 size, bool is_signed, u8 rt, u8 rn, i64 off) {
+	a64_ldst_raw(a, false, is_signed ? A64_LDRS : A64_LDR, size, rt, rn, off);
+}
+
+gb_internal void a64_str(xbAsm *a, i32 size, u8 rt, u8 rn, i64 off) {
+	a64_ldst_raw(a, false, A64_STR, size, rt, rn, off);
+}
+
+gb_internal void a64_ldr_fp(xbAsm *a, i32 size, u8 vt, u8 rn, i64 off) {
+	a64_ldst_raw(a, true, A64_LDR, size, vt, rn, off);
+}
+
+gb_internal void a64_str_fp(xbAsm *a, i32 size, u8 vt, u8 rn, i64 off) {
+	a64_ldst_raw(a, true, A64_STR, size, vt, rn, off);
+}
+
+////////////////////////////////////////////////////////////////
+// Floating point
+////////////////////////////////////////////////////////////////
+
+// the ftype field: 0 single, 1 double, 3 half
+gb_internal u32 a64_ftype(i32 size) {
+	return size == 8 ? 1 : size == 4 ? 0 : 3;
+}
+
+enum a64FOp : u32 {
+	A64_FMUL = 0x1E200800,
+	A64_FDIV = 0x1E201800,
+	A64_FADD = 0x1E202800,
+	A64_FSUB = 0x1E203800,
+};
+
+gb_internal void a64_fop(xbAsm *a, a64FOp op, i32 size, u8 vd, u8 vn, u8 vm) {
+	a64_emit(a, op | (a64_ftype(size) << 22) | (cast(u32)vm << 16) | (cast(u32)vn << 5) | vd);
+}
+
+gb_internal void a64_fsqrt(xbAsm *a, i32 size, u8 vd, u8 vn) {
+	a64_emit(a, 0x1E21C000 | (a64_ftype(size) << 22) | (cast(u32)vn << 5) | vd);
+}
+
+gb_internal void a64_fneg(xbAsm *a, i32 size, u8 vd, u8 vn) {
+	a64_emit(a, 0x1E214000 | (a64_ftype(size) << 22) | (cast(u32)vn << 5) | vd);
+}
+
+gb_internal void a64_fcmp(xbAsm *a, i32 size, u8 vn, u8 vm) {
+	a64_emit(a, 0x1E202000 | (a64_ftype(size) << 22) | (cast(u32)vm << 16) | (cast(u32)vn << 5));
+}
+
+// float of `to` size from float of `from` size
+gb_internal void a64_fcvt(xbAsm *a, i32 to, i32 from, u8 vd, u8 vn) {
+	a64_emit(a, 0x1E224000 | (a64_ftype(from) << 22) | (a64_ftype(to) << 15) | (cast(u32)vn << 5) | vd);
+}
+
+// float from the 64 bit integer xn
+gb_internal void a64_cvtf(xbAsm *a, bool is_signed, i32 fsize, u8 vd, u8 xn) {
+	a64_emit(a, (is_signed ? 0x9E220000 : 0x9E230000) | (a64_ftype(fsize) << 22) | (cast(u32)xn << 5) | vd);
+}
+
+// 64 bit integer from a float, rounding toward zero
+gb_internal void a64_fcvtz(xbAsm *a, bool is_signed, i32 fsize, u8 xd, u8 vn) {
+	a64_emit(a, (is_signed ? 0x9E380000 : 0x9E390000) | (a64_ftype(fsize) << 22) | (cast(u32)vn << 5) | xd);
+}
+
+// fmov dd, xn
+gb_internal void a64_fmov_to_fp(xbAsm *a, u8 vd, u8 xn) {
+	a64_emit(a, 0x9E670000 | (cast(u32)xn << 5) | vd);
+}
+
+// fmov xd, dn
+gb_internal void a64_fmov_from_fp(xbAsm *a, u8 xd, u8 vn) {
+	a64_emit(a, 0x9E660000 | (cast(u32)vn << 5) | xd);
+}
+
+// cnt vd.8b, vn.8b
+gb_internal void a64_cnt8b(xbAsm *a, u8 vd, u8 vn) {
+	a64_emit(a, 0x0E205800 | (cast(u32)vn << 5) | vd);
+}
+
+// addv bd, vn.8b
+gb_internal void a64_addv8b(xbAsm *a, u8 vd, u8 vn) {
+	a64_emit(a, 0x0E31B800 | (cast(u32)vn << 5) | vd);
+}
+
+////////////////////////////////////////////////////////////////
+// Control flow and system
+////////////////////////////////////////////////////////////////
+
+// b, with the offset patched in later; returns where
+gb_internal i64 a64_b(xbAsm *a) {
+	i64 at = xb_pos(a);
+	a64_emit(a, 0x14000000);
+	return at;
+}
+
+gb_internal void a64_patch_b(xbAsm *a, i64 at, i64 target) {
+	i64 delta = (target - at) / 4;
+	GB_ASSERT(delta >= -(1ll<<25) && delta < (1ll<<25));
+	u32 w = 0x14000000 | (cast(u32)delta & 0x3ffffff);
+	xb_patch_u32(a, at, w);
+}
+
+// cbz/cbnz wt over the next instruction
+gb_internal void a64_cb_skip(xbAsm *a, bool nonzero, u8 rt) {
+	a64_emit(a, (nonzero ? 0x35000000 : 0x34000000) | (2u << 5) | rt);
+}
+
+// b.cond over the next instruction
+gb_internal void a64_bcond_skip(xbAsm *a, a64Cond c) {
+	a64_emit(a, 0x54000000 | (2u << 5) | c);
+}
+
+gb_internal void a64_bl_sym(xbAsm *a, i32 sym) {
+	xb_add_reloc(a->m, xbSection_Text, xbReloc_A64_Branch26, xb_pos(a), sym, 0);
+	a64_emit(a, 0x94000000);
+}
+
+gb_internal void a64_blr(xbAsm *a, u8 rn) {
+	a64_emit(a, 0xD63F0000 | (cast(u32)rn << 5));
+}
+
+gb_internal void a64_ret(xbAsm *a) {
+	a64_emit(a, 0xD65F03C0);
+}
+
+gb_internal void a64_brk(xbAsm *a, u16 imm) {
+	a64_emit(a, 0xD4200000 | (cast(u32)imm << 5));
+}
+
+// xd = the page of `sym`, the low 12 bits come from the following instruction
+gb_internal void a64_adrp(xbAsm *a, u8 rd, i32 sym, xbRelocKind kind) {
+	xb_add_reloc(a->m, xbSection_Text, kind, xb_pos(a), sym, 0);
+	a64_emit(a, 0x90000000 | rd);
+}
+
+// add xd, xn, sym@PAGEOFF
+gb_internal void a64_add_pageoff(xbAsm *a, u8 rd, u8 rn, i32 sym) {
+	xb_add_reloc(a->m, xbSection_Text, xbReloc_A64_PageOff12, xb_pos(a), sym, 0);
+	a64_emit(a, 0x91000000 | (cast(u32)rn << 5) | rd);
+}
+
+// ldr xd, [xn, sym@GOTPAGEOFF] or sym@TLVPPAGEOFF
+gb_internal void a64_ldr_pageoff(xbAsm *a, u8 rd, u8 rn, i32 sym, xbRelocKind kind) {
+	xb_add_reloc(a->m, xbSection_Text, kind, xb_pos(a), sym, 0);
+	a64_emit(a, 0xF9400000 | (cast(u32)rn << 5) | rd);
+}
