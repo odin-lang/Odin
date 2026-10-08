@@ -91,14 +91,14 @@ gb_internal xbValue xb_const_string(xbProc *p, String s, Type *t) {
 }
 
 // The entity of an anonymous procedure literal, made the same way as the LLVM backend
-gb_internal Entity *xb_proc_lit_entity(xbProc *p, Ast *expr) {
+gb_internal Entity *xb_proc_lit_entity(xbModule *m, Ast *expr) {
 	ast_node(pl, ProcLit, expr);
 	Entity *e = pl->decl->entity.load();
 	if (e == nullptr) {
 		Token token = {};
 		token.pos = ast_token(expr).pos;
 		token.kind = Token_Ident;
-		token.string = lb_local_proc_name(&p->m->gen->default_module, pl->decl);
+		token.string = lb_local_proc_name(&m->gen->default_module, pl->decl);
 		Entity *new_e = alloc_entity_procedure(nullptr, token, type_of_expr(expr), pl->tags);
 		new_e->file = expr->file();
 		new_e->scope = new_e->file->scope;
@@ -116,7 +116,7 @@ gb_internal Entity *xb_proc_lit_entity(xbProc *p, Ast *expr) {
 gb_internal xbValue xb_proc_lit_value(xbProc *p, Ast *expr, Type *type) {
 	ast_node(pl, ProcLit, expr);
 	if (pl->body == nullptr) XB_UNSUPPORTED(p, "procedure literal without body");
-	Entity *e = xb_proc_lit_entity(p, expr);
+	Entity *e = xb_proc_lit_entity(p->m, expr);
 	DeclInfo *enclosing = lb_enclosing_proc_decl(pl->decl);
 	if (enclosing != nullptr) {
 		bool inside = false;
@@ -524,7 +524,9 @@ gb_internal xbAddr xb_build_addr_from_entity(xbProc *p, Entity *e, Ast *expr) {
 			XB_UNSUPPORTED(p, "unknown local variable");
 		}
 		if (e->flags & EntityFlag_Static) {
-			XB_UNSUPPORTED(p, "static local variable");
+			i32 *sym = map_get(&p->family->statics, e);
+			if (sym == nullptr) XB_UNSUPPORTED(p, "static local variable");
+			return xb_addr(e->type, xb_mem(xbMem_Sym, cast(u32)*sym));
 		}
 		return xb_addr(e->type, xb_global_mem(p, e));
 	}

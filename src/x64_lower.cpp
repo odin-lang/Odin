@@ -94,6 +94,21 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 		f(in.dst, true);
 		f(in.c, true);
 		break;
+	case xbOp_Cpuid:
+	case xbOp_Xgetbv:
+		f(in.a, false);
+		f(in.b, false);
+		use_mem(in.mem);
+		break;
+	case xbOp_Valgrind:
+		f(in.a, false);
+		f(in.b, false);
+		f(in.dst, true);
+		break;
+	case xbOp_Alloca:
+		f(in.a, false);
+		f(in.dst, true);
+		break;
 	case xbOp_MulOvf:
 		f(in.a, false);
 		f(in.b, false);
@@ -127,6 +142,7 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 		// unary and binary ops
 		f(in.a, false);
 		if (in.op >= xbOp_Add && in.op <= xbOp_FDiv) f(in.b, false);
+		if (in.op == xbOp_MulHiU) f(in.b, false);
 		if (in.op == xbOp_ICmp || in.op == xbOp_FCmp) f(in.b, false);
 		f(in.dst, true);
 		break;
@@ -137,6 +153,14 @@ gb_internal void xb_lower_layout(xbLower *L) {
 	xbProc *p = L->p;
 	i32 cur = 0;
 	for (xbLocal &l : p->locals) {
+		if (l.over_align > 16) {
+			// the frame is only 16 byte aligned, the prologue picks an aligned spot in the raw area
+			cur = cast(i32)xb_lt_align_formula(cur + l.size + l.over_align - 16, 16);
+			l.raw_offset = -cur;
+			cur = cast(i32)xb_lt_align_formula(cur + 8, 8);
+			l.frame_offset = -cur;
+			continue;
+		}
 		cur = cast(i32)xb_lt_align_formula(cur + l.size, l.align);
 		l.frame_offset = -cur;
 	}
@@ -225,8 +249,14 @@ gb_internal xbOpnd xb_slot(xbLower *L, u32 v) {
 gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 	xbAsm *a = &L->a;
 	switch (m.kind) {
-	case xbMem_Local:
-		return xb_m(RBP, L->p->locals[m.base].frame_offset + m.offset);
+	case xbMem_Local: {
+		xbLocal const &l = L->p->locals[m.base];
+		if (l.over_align > 16) {
+			xb_mov_r_rm(a, 8, scratch, xb_m(RBP, l.frame_offset));
+			return xb_m(scratch, m.offset);
+		}
+		return xb_m(RBP, l.frame_offset + m.offset);
+	}
 	case xbMem_Incoming:
 		return xb_m(RBP, 16 + m.offset);
 	case xbMem_Reg:
@@ -985,6 +1015,54 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_mov_rm_r(a, 1, xb_slot(L, in.c), RDX);
 		break;
 	}
+	case xbOp_Cpuid:
+	case xbOp_Xgetbv: {
+		bool cpuid = in.op == xbOp_Cpuid;
+		xb_mov_r_rm(a, 4, cpuid ? RAX : RCX, xb_slot(L, in.a));
+		if (cpuid) {
+			xb_mov_r_rm(a, 4, RCX, xb_slot(L, in.b));
+			xb_mov_r_rm(a, 8, R10, xb_r(RBX)); // rbx is callee saved
+			xb_b(a, 0x0F); xb_b(a, 0xA2);
+		} else {
+			xb_b(a, 0x0F); xb_b(a, 0x01); xb_b(a, 0xD0);
+		}
+		xbOpnd m = xb_mem_opnd(L, in.mem, R11);
+		if (m.reg == XB_RIP) {
+			xb_lea(a, R11, m);
+			m = xb_m(R11, 0);
+		}
+		u8 const regs[4] = {RAX, cast(u8)(cpuid ? RBX : RDX), RCX, RDX};
+		for (i32 k = 0; k < (cpuid ? 4 : 2); k++) {
+			xbOpnd mk = m;
+			mk.disp += 4*k;
+			xb_mov_rm_r(a, 4, mk, regs[k]);
+		}
+		if (cpuid) {
+			xb_mov_r_rm(a, 8, RBX, xb_r(R10));
+		}
+		break;
+	}
+	case xbOp_Valgrind:
+		xb_mov_r_rm(a, 8, RDX, xb_slot(L, in.a));
+		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.b));
+		// the magic preamble rotates rdi by 128 bits in total, then xchg rbx, rbx
+		xb_shift_imm(a, 0, 8, xb_r(RDI), 3);
+		xb_shift_imm(a, 0, 8, xb_r(RDI), 13);
+		xb_shift_imm(a, 0, 8, xb_r(RDI), 61);
+		xb_shift_imm(a, 0, 8, xb_r(RDI), 51);
+		xb_enc(a, XB_W, 0x87, RBX, xb_r(RBX));
+		xb_store_gpr(L, in.dst, RDX, 8);
+		break;
+	case xbOp_Alloca: {
+		// the block goes above the outgoing argument area, which moves down with rsp
+		i32 args_area = cast(i32)xb_lt_align_formula(L->max_call_stack, 16);
+		xb_lea(a, RCX, xb_m(RSP, args_area));
+		xb_alu_r_rm(a, ALU_SUB, 8, RCX, xb_slot(L, in.a));
+		xb_alu_rm_imm(a, ALU_AND, 8, xb_r(RCX), -cast(i32)in.imm);
+		xb_lea(a, RSP, xb_m(RCX, -args_area));
+		xb_store_gpr(L, in.dst, RCX, 8);
+		break;
+	}
 	case xbOp_MulHiU:
 		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.a));
 		xb_grp3(a, 4, 8, xb_slot(L, in.b)); // mul: rdx:rax
@@ -1111,6 +1189,13 @@ gb_internal void xb_lower_proc(xbProc *p) {
 		xb_enc(a, XB_W, 0x81, 5, xb_r(RSP), 4); // sub rsp, imm32
 		xb_u32(a, cast(u32)L.frame_size);
 	}
+	for (xbLocal const &l : p->locals) {
+		if (l.over_align <= 16) continue;
+		// lea r11, [rbp + raw + align-1]; and r11, -align; mov [rbp + slot], r11
+		xb_lea(a, R11, xb_m(RBP, l.raw_offset + cast(i32)l.over_align - 1));
+		xb_alu_rm_imm(a, ALU_AND, 8, xb_r(R11), -cast(i32)l.over_align);
+		xb_mov_rm_r(a, 8, xb_m(RBP, l.frame_offset), R11);
+	}
 	for (xbParamIn const &in : p->params_in) {
 		xbOpnd dst = xb_mem_opnd(&L, in.dst, R11);
 		switch (in.loc) {
@@ -1161,7 +1246,13 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	dbg.vars = array_make<xbDebugVar>(heap_allocator(), 0, p->debug_vars.count);
 	for (xbDebugVar v : p->debug_vars) {
 		if (v.local >= 0) {
-			v.frame_offset_fixup += p->locals[v.local].frame_offset;
+			xbLocal const &l = p->locals[v.local];
+			if (l.over_align > 16) {
+				// the slot holds the variable's address
+				if (v.by_ref || v.frame_offset_fixup != 0) continue;
+				v.by_ref = true;
+			}
+			v.frame_offset_fixup += l.frame_offset;
 		}
 		array_add(&dbg.vars, v);
 	}

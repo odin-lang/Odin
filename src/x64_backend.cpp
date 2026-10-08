@@ -142,12 +142,14 @@ gb_internal void xb_family_init(xbFamily *family, DeclInfo *root_decl) {
 	ptr_set_init(&family->seen);
 	ptr_set_init(&family->roots);
 	ptr_set_init(&family->on_demand);
+	map_init(&family->statics);
 	if (root_decl) ptr_set_add(&family->roots, root_decl);
 }
 
 gb_internal void xb_family_destroy(xbFamily *family) {
 	ptr_set_destroy(&family->roots);
 	ptr_set_destroy(&family->on_demand);
+	map_destroy(&family->statics);
 	array_free(&family->queue);
 	ptr_set_destroy(&family->seen);
 	xb_family_cleanup(family);
@@ -219,6 +221,30 @@ gb_internal bool xb_compile_proc(xbModule *m, Entity *e, char const **reason) {
 	}
 	xb_family_lower(m, &family, e);
 	return true;
+}
+
+// A procedure literal in a global's initializer, compiled on its own. LLVM makes its own
+// copy if the global is left to it, so this one is weak.
+gb_internal i32 xb_compile_data_proc_lit(xbModule *m, Ast *expr, char const **reason) {
+	ast_node(pl, ProcLit, expr);
+	if (pl->body == nullptr || lb_enclosing_proc_decl(pl->decl) != nullptr) {
+		*reason = "procedure literal in constant data";
+		return -1;
+	}
+	Entity *e = xb_proc_lit_entity(m, expr);
+	i32 sym = xb_symbol(m, xb_entity_name(m, e));
+	if (m->symbols[sym].section != xbSection_Undef) return sym;
+
+	xbFamily family = {};
+	xb_family_init(&family, e->decl_info);
+	defer (xb_family_destroy(&family));
+	ptr_set_add(&family.on_demand, e);
+	xb_family_add(&family, e);
+	if (!xb_family_build(m, &family, nullptr, reason)) {
+		return -1;
+	}
+	xb_family_lower(m, &family, nullptr);
+	return sym;
 }
 
 gb_internal String xb_object_path(lbGenerator *gen) {

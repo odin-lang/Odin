@@ -403,6 +403,89 @@ gb_internal xbValue xb_handle_param_value(xbProc *p, Type *parameter_type, Param
 	return xb_zero_value(p, parameter_type);
 }
 
+// Calls to LLVM intrinsics declared as foreign procedures. At -O0 LLVM turns the libm
+// ones into plain calls to the C library, and so does this.
+gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallExpr *ce, Type *result_type) {
+	String name = e->Procedure.link_name;
+	Type *pt = base_type(e->type);
+	isize n = pt->Proc.param_count;
+	if (ce->args.count != n || pt->Proc.result_count != 1) XB_UNSUPPORTED(p, "llvm intrinsic");
+	for (Ast *arg : ce->args) {
+		if (arg->kind == Ast_FieldValue) XB_UNSUPPORTED(p, "llvm intrinsic");
+	}
+
+	isize dot = -1;
+	for (isize i = name.len-1; i >= 0; i--) {
+		if (name[i] == '.') { dot = i; break; }
+	}
+	String base = substring(name, 5, dot);
+	String suffix = substring(name, dot+1, name.len);
+	Type *ft = nullptr;
+	if (suffix == "f16") ft = t_f16;
+	if (suffix == "f32") ft = t_f32;
+	if (suffix == "f64") ft = t_f64;
+	if (ft == nullptr || !are_types_identical(core_type(pt->Proc.results->Tuple.variables[0]->type), ft)) {
+		XB_UNSUPPORTED(p, "llvm intrinsic");
+	}
+	for (Entity *pe : pt->Proc.params->Tuple.variables) {
+		if (!are_types_identical(core_type(pe->type), ft)) XB_UNSUPPORTED(p, "llvm intrinsic");
+	}
+
+	// f16 is computed in f32, like LLVM promotes it
+	Type *ct = ft == t_f16 ? t_f32 : ft;
+	xbType st = xb_scalar_type(ct);
+	u32 args[3] = {};
+	if (n > gb_count_of(args)) XB_UNSUPPORTED(p, "llvm intrinsic");
+	if (base == "fmuladd" && ft == t_f16) XB_UNSUPPORTED(p, "llvm intrinsic");
+	for (isize i = 0; i < n; i++) {
+		xbValue v = xb_build_expr(p, ce->args[i]);
+		v = xb_emit_conv(p, xb_emit_conv(p, v, ft), ct);
+		args[i] = xb_value_to_reg(p, v);
+	}
+
+	if (base == "fmuladd" && n == 3) {
+		// only fused when the target has fma
+		if (check_target_feature_is_enabled(str_lit("fma"), nullptr)) XB_UNSUPPORTED(p, "llvm intrinsic fmuladd with fma");
+		u32 m = xb_binop(p, xbOp_FMul, st, args[0], args[1]);
+		return xb_value_reg(result_type, xb_binop(p, xbOp_FAdd, st, m, args[2]));
+	}
+	if (base == "sqrt" && n == 1) {
+		return xb_emit_conv(p, xb_value_reg(ct, xb_unop(p, xbOp_Sqrt, st, args[0])), result_type);
+	}
+
+	struct LibmFn { char const *name; isize params; };
+	static LibmFn const libm[] = {
+		{"sin", 1}, {"cos", 1}, {"tan", 1}, {"asin", 1}, {"acos", 1}, {"atan", 1},
+		{"sinh", 1}, {"cosh", 1}, {"tanh", 1},
+		{"exp", 1}, {"exp2", 1}, {"exp10", 1}, {"log", 1}, {"log2", 1}, {"log10", 1},
+		{"floor", 1}, {"ceil", 1}, {"trunc", 1}, {"round", 1}, {"rint", 1}, {"nearbyint", 1},
+		{"pow", 2}, {"atan2", 2}, {"fma", 3},
+	};
+	char const *fn = nullptr;
+	for (LibmFn const &f : libm) {
+		if (base == make_string_c(f.name) && n == f.params) {
+			fn = f.name;
+			break;
+		}
+	}
+	if (fn == nullptr) XB_UNSUPPORTED(p, "llvm intrinsic");
+
+	char sym_name[32] = {};
+	gb_snprintf(sym_name, gb_size_of(sym_name), "%s%s", fn, ct == t_f32 ? "f" : "");
+	i32 sym = xb_symbol(p->m, make_string_c(sym_name));
+	p->m->symbols[sym].flags |= xbSymbolFlag_Func | xbSymbolFlag_Foreign;
+
+	Type *param_types[3] = {ct, ct, ct};
+	xbValue callee = {};
+	callee.type = alloc_type_proc_from_types(param_types, cast(unsigned)n, ct, false, ProcCC_CDecl);
+	xbValue values[3] = {};
+	for (isize i = 0; i < n; i++) {
+		values[i] = xb_value_reg(ct, args[i]);
+	}
+	xbValue res = xb_emit_call_internal(p, callee, sym, xb_args(values, n));
+	return xb_emit_conv(p, res, result_type);
+}
+
 gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 	TypeAndValue tv = type_and_value_of_expr(expr);
 	ast_node(ce, CallExpr, expr);
@@ -439,6 +522,11 @@ gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 		}
 		if (proc_entity->kind == Entity_AsmTemplate) {
 			XB_UNSUPPORTED(p, "asm template call");
+		}
+		if (proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_foreign &&
+		    base_type(proc_entity->type)->Proc.calling_convention == ProcCC_None &&
+		    string_starts_with(proc_entity->Procedure.link_name, str_lit("llvm."))) {
+			return xb_build_llvm_intrinsic_call(p, proc_entity, ce, tv.type);
 		}
 
 	}
@@ -1169,6 +1257,23 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		if (it != st) sw = xb_convop(p, xbOp_Bitcast, st, it, sw);
 		return xb_value_reg(t, sw);
 	}
+	case BuiltinProc_reverse_bits: {
+		Type *t = default_type(tv.type);
+		xbType st = xb_scalar_type(t);
+		if (st == xbType_None || !xb_type_is_int(st)) XB_UNSUPPORTED(p, "reverse_bits type");
+		u32 r = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t));
+		if (xb_type_size(st) > 1) r = xb_unop(p, xbOp_Bswap, st, r);
+		// then reverse the bits within each byte: swap nibbles, pairs, single bits
+		u64 const masks[3] = {0x0f0f0f0f0f0f0f0full, 0x3333333333333333ull, 0x5555555555555555ull};
+		for (i32 k = 0; k < 3; k++) {
+			u32 sh = xb_iconst(p, st, 4 >> k);
+			u32 m = xb_iconst(p, st, cast(i64)masks[k]);
+			u32 lo = xb_binop(p, xbOp_Shl, st, xb_binop(p, xbOp_And, st, r, m), sh);
+			u32 hi = xb_binop(p, xbOp_And, st, xb_binop(p, xbOp_LShr, st, r, sh), m);
+			r = xb_binop(p, xbOp_Or, st, lo, hi);
+		}
+		return xb_value_reg(t, r);
+	}
 	case BuiltinProc_overflow_add:
 	case BuiltinProc_overflow_sub:
 	case BuiltinProc_overflow_mul: {
@@ -1246,6 +1351,49 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_cpu_relax:
 		xb_emit(p, xb_instr(xbOp_CpuRelax));
 		return {};
+	case BuiltinProc_x86_cpuid:
+	case BuiltinProc_x86_xgetbv: {
+		bool cpuid = id == BuiltinProc_x86_cpuid;
+		Type *rt = tv.type;
+		if (type_size_of(rt) != (cpuid ? 16 : 8)) XB_UNSUPPORTED(p, "cpuid result type");
+		xbInstr i = xb_instr(cpuid ? xbOp_Cpuid : xbOp_Xgetbv);
+		i.a = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t_u32));
+		if (cpuid) {
+			i.b = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[1]), t_u32));
+		}
+		i.mem = xb_add_local(p, rt, false);
+		xb_emit(p, i);
+		return xb_value_mem(rt, i.mem);
+	}
+	case BuiltinProc_valgrind_client_request: {
+		u32 args[7] = {};
+		for (isize k = 0; k < 7; k++) {
+			args[k] = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[k]), t_uintptr));
+		}
+		if (!build_context.ODIN_VALGRIND_SUPPORT) {
+			return xb_value_reg(t_uintptr, args[0]);
+		}
+		xbMem array = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 6*8, 8));
+		for (isize k = 0; k < 6; k++) {
+			xb_store(p, xbType_I64, xb_mem_offset(array, k*8), args[k+1]);
+		}
+		xbInstr i = xb_instr(xbOp_Valgrind, xbType_I64);
+		i.a = args[0];
+		i.b = xb_lea(p, array);
+		i.dst = xb_new_vreg(p, xbType_I64);
+		xb_emit(p, i);
+		return xb_value_reg(t_uintptr, i.dst);
+	}
+	case BuiltinProc_alloca: {
+		u32 size = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t_int));
+		i64 align = exact_value_to_i64(type_and_value_of_expr(ce->args[1]).value);
+		xbInstr i = xb_instr(xbOp_Alloca, xbType_I64);
+		i.a = size;
+		i.imm = gb_max(align, cast(i64)16);
+		i.dst = xb_new_vreg(p, xbType_I64);
+		xb_emit(p, i);
+		return xb_value_reg(tv.type, i.dst);
+	}
 	case BuiltinProc_stack_pointer: {
 		xbInstr i = xb_instr(xbOp_StackPointer, xbType_I64);
 		i.dst = xb_new_vreg(p, xbType_I64);
@@ -2911,6 +3059,7 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		xbVar v = {};
 		v.mem = xb_mem(xbMem_Sym, cast(u32)sym);
 		map_set(&p->vars, e, v);
+		map_set(&p->family->statics, e, sym);
 	}
 }
 
