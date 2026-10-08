@@ -1029,6 +1029,14 @@ gb_internal xbMem xb_context_mem(xbProc *p) {
 		xb_emit_runtime_call_init_context(p, c);
 		xb_push_context(p, c, false);
 		p->context_stack[p->context_stack.count-1].scope_index = -1;
+		// a debugger shows it as `context`, like LLVM's
+		xbDebugVar dv = {};
+		dv.name = str_lit("context");
+		dv.type = t_context;
+		dv.local = cast(i32)c.base;
+		dv.line = p->entity ? p->entity->token.pos.line : 0;
+		dv.scope = p->debug_scope;
+		array_add(&p->debug_vars, dv);
 	}
 	xbContextEntry *e = &p->context_stack[p->context_stack.count-1];
 	e->uses += 1;
