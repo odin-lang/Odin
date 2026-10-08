@@ -255,6 +255,12 @@ $ODIN test ../test_issue_7010.odin $COMMON
 clang -c ../test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
 $ODIN test ../test_issue_sysv_abi.odin $COMMON
 
+# AVX-512 asked for through -target-features on the default microarch; needs a CPU that has it
+if grep -qw avx512f /proc/cpuinfo 2>/dev/null; then
+	clang -c ../test_issue_avx512_vector_abi.c -o test_issue_avx512_vector_abi_c.o -mavx512f
+	$ODIN test ../test_issue_avx512_vector_abi.odin $COMMON_CHECK -target-features:avx512f
+fi
+
 clang -c ../test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 $ODIN test ../test_issue_6809_6816.odin -o:speed $COMMON
 

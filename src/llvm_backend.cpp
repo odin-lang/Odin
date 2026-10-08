@@ -3649,6 +3649,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		llvm_features = gb_string_append_length(llvm_features, str.text, str.len);
 	}
+	if (lb_x86_features_need_evex512(build_context.target_features_string)) {
+		llvm_features = gb_string_appendc(llvm_features, first ? "+evex512" : ",+evex512");
+	}
 
 	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);	
 
