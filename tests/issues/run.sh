@@ -195,6 +195,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_proc_value.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_integer_literal_exponent.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else

@@ -2809,7 +2809,13 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 	Type *src = base_type(o->type);
 	Type *dst = base_type(type);
 
-	if (is_type_array(src) && is_type_slice(dst)) {
+	if (is_type_proc(src) && is_type_polymorphic(src)) {
+		if (is_type_proc(dst)) {
+			error_line("\tNote: the polymorphic procedure cannot be specialized to this procedure type\n");
+		} else {
+			error_line("\tNote: a polymorphic procedure has no value until it is specialized, e.g. by assigning it to a concrete procedure type\n");
+		}
+	} else if (is_type_array(src) && is_type_slice(dst)) {
 		Type *s = src->Array.elem;
 		Type *d = dst->Slice.elem;
 		if (are_types_identical(s, d)) {
@@ -3937,12 +3943,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 			}
 			return false;
 		}
-		return true;
+		// a polymorphic procedure has no value until it is specialized, which only assignment does
+		return !is_type_polymorphic(src);
 	}
 
 	// proc -> rawptr
 	if (is_type_proc(src) && is_type_rawptr(dst)) {
-		return true;
+		return !is_type_polymorphic(src);
 	}
 	// rawptr -> proc
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
@@ -4186,6 +4193,17 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		o->expr = node;
 		o->type = dst_t;
 		return true;
+	}
+
+	if (is_type_proc(src_bt) && is_type_polymorphic(src_bt)) {
+		gbString expr_str = expr_to_string(o->expr);
+		gbString type_str = type_to_string(src_t);
+		error(o->expr, "Cannot transmute the non-specialized polymorphic procedure '%s' of type '%s'", expr_str, type_str);
+		gb_string_free(type_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return false;
 	}
 
 
