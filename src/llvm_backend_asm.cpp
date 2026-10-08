@@ -706,12 +706,48 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 		}
 
 		auto const &cl = mem_op->classify;
+		u32 disp_flags = (flags & ~WriteOperandFlag_PrintPrefixes) | WriteOperandFlag_MemoryDisp;
+		bool wrote_disp = false;
 		if (cl.label != nullptr) {
-			u32 disp_flags = (flags & ~WriteOperandFlag_PrintPrefixes) | WriteOperandFlag_MemoryDisp;
 			this->write_operand(op_number, cl.label, disp_flags);
-		} else if (cl.has_disp_const &&
-		           (cl.disp_total != 0 || (cl.base == nullptr && cl.index == nullptr))) {
+			wrote_disp = true;
+		}
+		if (cl.has_disp_const &&
+		    (cl.disp_total != 0 || (cl.label == nullptr && cl.base == nullptr && cl.index == nullptr))) {
+			if (wrote_disp && cl.disp_total >= 0) {
+				write_cstr("+");
+			}
 			write_i64(cl.disp_total);
+			wrote_disp = true;
+		}
+		// A $ immediate displacement is not part of the classification.
+		for (Ast *term : mem_op->terms) {
+			if (term->kind != Ast_AsmMemoryTerm || term->AsmMemoryTerm.scale != nullptr ||
+			    term->AsmMemoryTerm.operand->kind != Ast_Ident) {
+				continue;
+			}
+			Entity *e = entity_of_node(term->AsmMemoryTerm.operand);
+			bool is_imm = false;
+			for (AsmTemplateEntityDecl const &d : *ops) {
+				if (d.entity == e && d.kind == AsmTemplateEntityDecl_Immediate) {
+					is_imm = true;
+				}
+			}
+			if (!is_imm) {
+				continue;
+			}
+			if (term->AsmMemoryTerm.op.kind == Token_Sub) {
+				write_cstr("-");
+			} else if (wrote_disp) {
+				write_cstr("+");
+			}
+			this->write_operand(op_number, term->AsmMemoryTerm.operand, disp_flags);
+			wrote_disp = true;
+		}
+		if (cl.label != nullptr && cl.base == nullptr && cl.index == nullptr) {
+			// A label is always relative to the instruction pointer.
+			write_cstr("(%rip)");
+			return;
 		}
 		if (cl.base == nullptr && cl.index == nullptr) {
 			GB_ASSERT(cl.scale == nullptr);
