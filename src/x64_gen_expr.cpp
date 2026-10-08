@@ -479,7 +479,7 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 
 gb_internal xbMem xb_global_mem(xbProc *p, Entity *e) {
 	GB_ASSERT(e->kind == Entity_Variable);
-	if (e->Variable.thread_local_model.len != 0 && build_context.build_mode != BuildMode_Executable) {
+	if (e->Variable.thread_local_model.len != 0 && build_context.build_mode != BuildMode_Executable && !xb_is_win64()) {
 		XB_UNSUPPORTED(p, "thread local variable outside an executable");
 	}
 	if (e->min_dep_count.load(std::memory_order_relaxed) == 0) {

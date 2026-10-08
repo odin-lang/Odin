@@ -3323,7 +3323,7 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		Ast *ident = vd->names[i];
 		Entity *e = entity_of_node(ident);
 		bool tls = e->Variable.thread_local_model.len != 0;
-		if (tls && build_context.build_mode != BuildMode_Executable) XB_UNSUPPORTED(p, "thread local static outside an executable");
+		if (tls && build_context.build_mode != BuildMode_Executable && !xb_is_win64()) XB_UNSUPPORTED(p, "thread local static outside an executable");
 		xbSection sec = tls ? xbSection_TData : xbSection_Data;
 		i64 size = gb_max(type_size_of(e->type), cast(i64)1);
 		i64 align = gb_max(gb_max(type_align_of(e->type), cast(i64)e->Variable.custom_align), cast(i64)1);

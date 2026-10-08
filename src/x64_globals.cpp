@@ -31,7 +31,7 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 		return false;
 	}
 	bool tls = e->Variable.thread_local_model.len != 0;
-	if (tls && build_context.build_mode != BuildMode_Executable) {
+	if (tls && build_context.build_mode != BuildMode_Executable && !xb_is_win64()) {
 		*reason = "thread local global outside an executable";
 		return false;
 	}
