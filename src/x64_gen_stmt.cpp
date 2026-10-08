@@ -499,7 +499,6 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 	xbType st = xb_scalar_type(ct);
 	u32 args[3] = {};
 	if (n > gb_count_of(args)) XB_UNSUPPORTED(p, "llvm intrinsic");
-	if (base == "fmuladd" && ft == t_f16) XB_UNSUPPORTED(p, "llvm intrinsic");
 	for (isize i = 0; i < n; i++) {
 		xbValue v = xb_build_expr(p, ce->args[i]);
 		v = xb_emit_conv(p, xb_emit_conv(p, v, ft), ct);
@@ -510,7 +509,11 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 		// only fused when the target has fma
 		if (check_target_feature_is_enabled(str_lit("fma"), nullptr)) XB_UNSUPPORTED(p, "llvm intrinsic fmuladd with fma");
 		u32 m = xb_binop(p, xbOp_FMul, st, args[0], args[1]);
-		return xb_value_reg(result_type, xb_binop(p, xbOp_FAdd, st, m, args[2]));
+		if (ft == t_f16) {
+			// LLVM rounds the product to f16 before the add
+			m = xb_value_to_reg(p, xb_f16_to_f32(p, xb_float_to_f16(p, xb_value_reg(ct, m), t_f16)));
+		}
+		return xb_emit_conv(p, xb_value_reg(ct, xb_binop(p, xbOp_FAdd, st, m, args[2])), result_type);
 	}
 	if (base == "sqrt" && n == 1) {
 		return xb_emit_conv(p, xb_value_reg(ct, xb_unop(p, xbOp_Sqrt, st, args[0])), result_type);
@@ -948,6 +951,28 @@ gb_internal void xb_build_soa_copy_from_slice(xbProc *p, AstCallExpr *ce) {
 // Builtins
 ////////////////////////////////////////////////////////////////
 
+// minnum/maxnum of two floats: `a` when it compares so or `b` is a NaN, else `b`.
+// An f16 is compared as f32 and keeps its own bits.
+gb_internal xbValue xb_float_pick(xbProc *p, Type *t, xbValue a, xbValue b, bool is_max) {
+	if (xb_is_f16(t)) {
+		u32 af = xb_value_to_reg(p, xb_f16_to_f32(p, a));
+		u32 bf = xb_value_to_reg(p, xb_f16_to_f32(p, b));
+		u32 pick_a = xb_cmp(p, is_max ? xbCond_FGT : xbCond_FLT, xbType_F32, af, bf);
+		u32 b_nan = xb_cmp(p, xbCond_FNE, xbType_F32, bf, bf);
+		u32 cond = xb_binop(p, xbOp_Or, xbType_I8, pick_a, b_nan);
+		u32 ab = xb_value_to_reg(p, xb_emit_transmute(p, a, t_u16));
+		u32 bb = xb_value_to_reg(p, xb_emit_transmute(p, b, t_u16));
+		return xb_emit_transmute(p, xb_value_reg(t_u16, xb_select(p, xbType_I16, cond, ab, bb)), t);
+	}
+	xbType st = xb_scalar_type(t);
+	u32 ar = xb_value_to_reg(p, a);
+	u32 br = xb_value_to_reg(p, b);
+	u32 pick_a = xb_cmp(p, is_max ? xbCond_FGT : xbCond_FLT, st, ar, br);
+	u32 r = xb_select(p, st, pick_a, ar, br);
+	u32 b_nan = xb_cmp(p, xbCond_FNE, st, br, br);
+	return xb_value_reg(t, xb_select(p, st, b_nan, ar, r));
+}
+
 gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
 	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
@@ -1065,19 +1090,16 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		// max then min, like lb_emit_clamp
 		Type *t = default_type(tv.type);
 		xbType st = xb_scalar_type(t);
-		if (st == xbType_None) XB_UNSUPPORTED(p, "clamp type");
+		if (st == xbType_None && !xb_is_f16(t)) XB_UNSUPPORTED(p, "clamp type");
 		xbValue x = xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t);
 		xbValue lo = xb_emit_conv(p, xb_build_expr(p, ce->args[1]), t);
 		xbValue hi = xb_emit_conv(p, xb_build_expr(p, ce->args[2]), t);
 		auto pick = [&](xbValue a, xbValue b, bool is_max) -> xbValue {
+			if (xb_is_f16(t) || xb_type_is_float(st)) {
+				return xb_float_pick(p, t, a, b, is_max);
+			}
 			u32 ar = xb_value_to_reg(p, a);
 			u32 br = xb_value_to_reg(p, b);
-			if (xb_type_is_float(st)) {
-				u32 pick_a = xb_cmp(p, is_max ? xbCond_FGT : xbCond_FLT, st, ar, br);
-				u32 r = xb_select(p, st, pick_a, ar, br);
-				u32 b_nan = xb_cmp(p, xbCond_FNE, st, br, br);
-				return xb_value_reg(t, xb_select(p, st, b_nan, ar, r));
-			}
 			bool sgn = xb_type_is_signed(t);
 			xbCond c = is_max ? (sgn ? xbCond_SGT : xbCond_UGT) : (sgn ? xbCond_SLT : xbCond_ULT);
 			return xb_value_reg(t, xb_select(p, st, xb_cmp(p, c, st, ar, br), ar, br));
@@ -1103,19 +1125,12 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_max: {
 		Type *t = default_type(tv.type);
 		xbType st = xb_scalar_type(t);
-		if (st == xbType_None || ce->args.count < 2) XB_UNSUPPORTED(p, "min/max");
+		if ((st == xbType_None && !xb_is_f16(t)) || ce->args.count < 2) XB_UNSUPPORTED(p, "min/max");
 		xbValue acc = xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t);
 		for (isize i = 1; i < ce->args.count; i++) {
 			xbValue b = xb_emit_conv(p, xb_build_expr(p, ce->args[i]), t);
-			if (xb_type_is_float(st)) {
-				// minnum/maxnum: a NaN operand gives the other operand
-				u32 ar = xb_value_to_reg(p, acc);
-				u32 br = xb_value_to_reg(p, b);
-				u32 pick_a = xb_cmp(p, id == BuiltinProc_min ? xbCond_FLT : xbCond_FGT, st, ar, br);
-				u32 r = xb_select(p, st, pick_a, ar, br);
-				u32 b_nan = xb_cmp(p, xbCond_FNE, st, br, br);
-				r = xb_select(p, st, b_nan, ar, r);
-				acc = xb_value_reg(t, r);
+			if (xb_is_f16(t) || xb_type_is_float(st)) {
+				acc = xb_float_pick(p, t, acc, b, id == BuiltinProc_max);
 				continue;
 			}
 			bool sgn = xb_type_is_signed(t);
@@ -1567,6 +1582,11 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	case BuiltinProc_sqrt: {
 		Type *t = default_type(tv.type);
 		xbType st = xb_scalar_type(t);
+		if (xb_is_f16(t)) {
+			// in f32, which rounds to the same f16
+			xbValue x = xb_f16_to_f32(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t));
+			return xb_float_to_f16(p, xb_value_reg(t_f32, xb_unop(p, xbOp_Sqrt, xbType_F32, xb_value_to_reg(p, x))), t);
+		}
 		if (!xb_type_is_float(st)) XB_UNSUPPORTED(p, "sqrt type");
 		u32 x = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t));
 		return xb_value_reg(t, xb_unop(p, xbOp_Sqrt, st, x));
@@ -2062,7 +2082,11 @@ gb_internal void xb_check_nested_decls(xbProc *p, Slice<Ast *> const &stmts) {
 				xb_family_add(p->family, e);
 			}
 		} else if (stmt->kind == Ast_ForeignBlockDecl) {
-			XB_UNSUPPORTED(p, "nested foreign block");
+			// foreign procedures only need their symbols; variables would need more
+			ast_node(fb, ForeignBlockDecl, stmt);
+			for (Ast *decl : fb->body->BlockStmt.stmts) {
+				if (decl->kind == Ast_ValueDecl && decl->ValueDecl.is_mutable) XB_UNSUPPORTED(p, "nested foreign variable");
+			}
 		}
 	}
 }
@@ -2666,6 +2690,8 @@ gb_internal void xb_build_range_string(xbProc *p, AstRangeStmt *rs) {
 		s = xb_load_value(p, type_deref(s.type), xb_mem_from_ptr(p, s));
 	}
 	if (is_type_untyped(s.type)) s = xb_emit_conv(p, s, default_type(s.type));
+	bool is16 = is_type_string16(s.type);
+	Type *str_type = is16 ? t_string16 : t_string;
 	xbMem str = xb_value_copy_to_temp(p, s).mem;
 	xbMem offset_mem = xb_add_local(p, t_int, false);
 
@@ -2692,17 +2718,17 @@ gb_internal void xb_build_range_string(xbProc *p, AstRangeStmt *rs) {
 	xbValue res = {};
 	u32 idx = 0;
 	if (!rs->reverse) {
-		xbValue rest = xb_make_slice_value(p, t_string, xb_binop(p, xbOp_Add, xbType_I64, base, off), xb_binop(p, xbOp_Sub, xbType_I64, len, off));
+		xbValue rest = xb_make_slice_value(p, str_type, xb_ptr_add_scaled(p, base, off, is16 ? 2 : 1), xb_binop(p, xbOp_Sub, xbType_I64, len, off));
 		xbValue args[1] = {rest};
-		res = xb_emit_runtime_call(p, "string_decode_rune", xb_args(args, 1));
+		res = xb_emit_runtime_call(p, is16 ? "string16_decode_rune" : "string_decode_rune", xb_args(args, 1));
 		Type *ft = nullptr;
 		u32 w = xb_load(p, xbType_I64, xb_mem_offset(res.mem, type_offset_of(res.type, 1, &ft)));
 		xb_store(p, xbType_I64, offset_mem, xb_binop(p, xbOp_Add, xbType_I64, off, w));
 		idx = off;
 	} else {
-		xbValue prefix = xb_make_slice_value(p, t_string, base, off);
+		xbValue prefix = xb_make_slice_value(p, str_type, base, off);
 		xbValue args[1] = {prefix};
-		res = xb_emit_runtime_call(p, "string_decode_last_rune", xb_args(args, 1));
+		res = xb_emit_runtime_call(p, is16 ? "string16_decode_last_rune" : "string_decode_last_rune", xb_args(args, 1));
 		Type *ft = nullptr;
 		u32 w = xb_load(p, xbType_I64, xb_mem_offset(res.mem, type_offset_of(res.type, 1, &ft)));
 		u32 next = xb_binop(p, xbOp_Sub, xbType_I64, off, w);
@@ -3056,7 +3082,7 @@ gb_internal void xb_build_range_stmt(xbProc *p, AstRangeStmt *rs) {
 				xb_build_range_soa(p, rs);
 			} else if (t->kind == Type_Tuple) {
 				xb_build_range_tuple(p, rs);
-			} else if (is_type_string(t) && !is_type_string16(t) && !is_type_cstring(t)) {
+			} else if (is_type_string(t) && !is_type_cstring(t) && !is_type_cstring16(t)) {
 				xb_build_range_string(p, rs);
 			} else if (t->kind == Type_Array || t->kind == Type_EnumeratedArray || t->kind == Type_Slice || t->kind == Type_DynamicArray ||
 			           t->kind == Type_FixedCapacityDynamicArray) {
@@ -3514,6 +3540,8 @@ gb_internal void xb_build_stmt(xbProc *p, Ast *node) {
 
 	switch (node->kind) {
 	case_ast_node(bs, EmptyStmt, node);
+	case_end;
+	case_ast_node(fb, ForeignBlockDecl, node);
 	case_end;
 	case_ast_node(us, UsingStmt, node);
 	case_end;

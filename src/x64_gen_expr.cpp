@@ -1107,6 +1107,14 @@ gb_internal xbAddr xb_emit_deep_field(xbProc *p, Type *type, xbMem mem, Selectio
 			} else if (is_type_complex(bt)) {
 				ft = base_complex_elem_type(bt);
 				off = index * type_size_of(ft);
+			} else if (is_type_quaternion(bt)) {
+				// @QuaternionLayout: x, y, z, w; `xyz` (index -1) is the first three as an array
+				ft = base_complex_elem_type(bt);
+				if (index < 0) {
+					ft = alloc_type_array(ft, 3);
+				} else {
+					off = index * type_size_of(ft);
+				}
 			} else {
 				XB_UNSUPPORTED(p, "basic field");
 			}

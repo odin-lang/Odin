@@ -134,3 +134,25 @@ string16_comparison :: proc(t: ^testing.T) {
 	testing.expect(t, opaque(X) == Cjk)
 	testing.expect(t, Empty == "")
 }
+
+@(test)
+string16_range_forward_and_reverse :: proc(t: ^testing.T) {
+	s := opaque(string16("aé😀b"))
+	runes: [8]rune
+	offsets: [8]int
+	n := 0
+	for r, i in s {
+		runes[n], offsets[n] = r, i
+		n += 1
+	}
+	testing.expect_value(t, n, 4)
+	testing.expect_value(t, runes[2], '😀')
+	testing.expect_value(t, offsets[3], 4) // the emoji is a surrogate pair
+	n = 0
+	#reverse for r, i in s {
+		runes[n], offsets[n] = r, i
+		n += 1
+	}
+	testing.expect_value(t, runes[0], 'b')
+	testing.expect_value(t, offsets[1], 2)
+}

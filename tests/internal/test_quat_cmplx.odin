@@ -416,3 +416,14 @@ constant_complex_f32_rounding :: proc(t: ^testing.T) {
 	q1 : f32 : jmag(quaternion128(0 + 0i + 0.1j + 0k))
 	c32(t, q1, "0.1")
 }
+
+@(test)
+quaternion_field_access :: proc(t: ^testing.T) {
+	q: quaternion128 = quaternion(real=1, imag=2, jmag=3, kmag=4)
+	testing.expect_value(t, q.x, 2)
+	testing.expect_value(t, q.w, 1)
+	testing.expect_value(t, q.xyz, [3]f32{2, 3, 4})
+	q.z = 9
+	q.xyz = {5, 6, q.z}
+	testing.expect_value(t, q, quaternion128(quaternion(real=1, imag=5, jmag=6, kmag=9)))
+}
