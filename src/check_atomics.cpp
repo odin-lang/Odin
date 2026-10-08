@@ -376,7 +376,18 @@ gb_internal AtomicObject check_atomic_object(Ast *expr) {
 }
 
 gb_internal bool check_atomic_same_object(AtomicObject const &a, AtomicObject const &b) {
-	return a.root != nullptr && a.root == b.root && a.path == b.path;
+	if (a.root == nullptr || a.root != b.root) {
+		return false;
+	}
+	String outer = a.path;
+	String inner = b.path;
+	if (outer.len > inner.len) {
+		gb_swap(String, outer, inner);
+	}
+	if (!string_starts_with(inner, outer)) {
+		return false;
+	}
+	return inner.len == outer.len || inner[outer.len] == '.' || inner[outer.len] == '[';
 }
 
 gb_internal Ast *check_atomic_call_address(Ast *call) {

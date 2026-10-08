@@ -181,6 +181,7 @@ foreign kernel32 {
 		lpThreadId: LPDWORD,
 	) -> HANDLE ---
 	SwitchToThread       :: proc() -> BOOL ---
+	@(synchronizes=.Release)
 	ResumeThread         :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority    :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority    :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
@@ -230,7 +231,9 @@ foreign kernel32 {
 	) -> BOOL ---
 	@(synchronizes=.Acquire)
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
+	@(synchronizes=.Acquire)
 	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
+	@(synchronizes=.Acq_Rel)
 	EnterSynchronizationBarrier :: proc(
 		lpBarrier: ^SYNCHRONIZATION_BARRIER,
 		dwFlags: SYNCHRONIZATION_BARRIER_FLAGS,
@@ -433,6 +436,7 @@ foreign kernel32 {
 		bWaitAll: BOOL,
 		dwMilliseconds: DWORD,
 	) -> DWORD ---
+	@(synchronizes=.Acquire)
 	WaitForMultipleObjectsEx :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,

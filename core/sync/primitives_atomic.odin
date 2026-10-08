@@ -325,7 +325,6 @@ Atomic_Cond :: struct {
 	state: Futex,
 }
 
-@(synchronizes=.Acquire)
 atomic_cond_wait :: proc "contextless" (c: ^Atomic_Cond, m: ^Atomic_Mutex) {
 	state := u32(atomic_load_explicit(&c.state, .Relaxed))
 	unlock(m)
@@ -334,7 +333,6 @@ atomic_cond_wait :: proc "contextless" (c: ^Atomic_Cond, m: ^Atomic_Mutex) {
 
 }
 
-@(synchronizes=.Acquire)
 atomic_cond_wait_with_timeout :: proc "contextless" (c: ^Atomic_Cond, m: ^Atomic_Mutex, duration: time.Duration) -> (ok: bool) {
 	state := u32(atomic_load_explicit(&c.state, .Relaxed))
 	unlock(m)

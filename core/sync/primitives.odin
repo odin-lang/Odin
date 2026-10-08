@@ -443,7 +443,6 @@ The mutex must be held by the calling thread, before calling the procedure.
 **Note**: This procedure can return on a spurious wake-up, even if the condition
 variable was not signalled by a thread.
 */
-@(synchronizes=.Acquire)
 cond_wait :: proc "contextless" (c: ^Cond, m: ^Mutex) {
 	_cond_wait(c, m)
 }
@@ -462,7 +461,6 @@ If the timeout was reached, this procedure returns `false`. Otherwise it returns
 
 Before this procedure is called the mutex must be held by the calling thread.
 */
-@(synchronizes=.Acquire)
 cond_wait_with_timeout :: proc "contextless" (c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
 	if duration <= 0 {
 		return false
