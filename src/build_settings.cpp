@@ -2142,25 +2142,28 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 			gb_printf_err("-backend:fast is only supported for linux_amd64, windows_amd64 and darwin_arm64 for now\n");
 			gb_exit(1);
 		}
+		// the fast backend is a debug backend: optimized, LTO and asm/IR builds go entirely through LLVM
+		char const *llvm_reason = nullptr;
 		if (bc->optimization_level > 0) {
-			gb_printf_err("-backend:fast is only for unoptimized builds, use -o:none or -o:minimal\n");
-			gb_exit(1);
+			llvm_reason = "optimized build";
+		} else if (bc->lto_kind != LTO_None) {
+			llvm_reason = "-lto";
+		} else if (bc->build_mode == BuildMode_Assembly || bc->build_mode == BuildMode_LLVM_IR) {
+			llvm_reason = "-build-mode:asm/llvm-ir";
 		}
-		if (bc->build_mode == BuildMode_Assembly) {
-			gb_printf_err("-backend:fast cannot write assembly, use -build-mode:obj and a disassembler instead\n");
-			gb_exit(1);
-		}
-		if (bc->build_mode != BuildMode_Executable && bc->build_mode != BuildMode_DynamicLibrary &&
+		if (llvm_reason != nullptr) {
+			if (gb_get_env("ODIN_XB_STATS", permanent_allocator()) != nullptr) {
+				gb_printf_err("fast backend: %s, using LLVM for the whole build\n", llvm_reason);
+			}
+			bc->backend = Backend_LLVM;
+		} else if (bc->build_mode != BuildMode_Executable && bc->build_mode != BuildMode_DynamicLibrary &&
 		    bc->build_mode != BuildMode_Object && bc->build_mode != BuildMode_StaticLibrary) {
 			gb_printf_err("-backend:fast only supports -build-mode:exe, test, dll, obj and lib\n");
 			gb_exit(1);
+		} else {
+			// objects from both backends are linked together, which needs external symbols
+			bc->use_separate_modules = true;
 		}
-		if (bc->lto_kind != LTO_None) {
-			gb_printf_err("-backend:fast cannot be used with -lto\n");
-			gb_exit(1);
-		}
-		// objects from both backends are linked together, which needs external symbols
-		bc->use_separate_modules = true;
 	}
 
 	if (bc->lto_kind == LTO_Thin || bc->lto_kind == LTO_Thin_Files) {
