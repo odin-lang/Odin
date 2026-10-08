@@ -277,36 +277,112 @@ int_atoi :: proc(res: ^Int, input: string, radix := i8(10), allocator := context
 	/*
 		Process each digit of the string.
 	*/
+
 	ch: rune
-	for len(input) > 0 {
-		/* if the radix <= 36 the conversion is case insensitive
-		 * this allows numbers like 1AB and 1ab to represent the same value
-		 * [e.g. in hex]
+
+	if platform_int_is_power_of_two(int(radix)) {
+
+		/*
+			For power-of-two bases, pack several digits into one native limb at once.
+			This reduces the number of bigint multiply/add steps by a factor of roughly
+			_DIGIT_BITS / log2(radix), while also preallocating the accumulator to avoid
+			excessive reallocations on large hex inputs.
 		*/
 
-		ch = rune(input[0])
-		if radix <= 36 && ch >= 'a' && ch <= 'z' {
-			ch -= 32 // 'a' - 'A'
+		bits_per_digit := 0
+		power_of_two := DIGIT(radix)
+		for power_of_two > 1 {
+			power_of_two >>= 1
+			bits_per_digit += 1
+		}
+		
+		/*
+			Ex.: Radix 16
+			-> 4 bits per digit
+			-> can fit 15 hex digits from the input into one 63-bit DIGIT
+		*/
+		digits_per_chunk := _DIGIT_BITS / bits_per_digit
+		assert(digits_per_chunk > 1, "Optimized path was expecting to fit multiple input digits into one DIGIT. Did the allowed radix range change (2..64)?")
+
+		/*
+			Preallocate everything at once.
+			The number of DIGIT elements is: ceildiv(len(input), chunk_digits)
+		*/
+		internal_grow(res, max(1, (len(input) + digits_per_chunk - 1) / digits_per_chunk)) or_return
+
+		chunk_value: DIGIT
+		chunk_count := 0  // Number of input digits we have already processed in the current chunk_value DIGIT
+		for len(input) > 0 {
+			ch = rune(input[0])
+			if radix <= 36 && ch >= 'a' && ch <= 'z' {
+				ch -= 32
+			}
+
+			pos := ch - '+'
+			if RADIX_TABLE_REVERSE_SIZE <= u32(pos) {
+				break
+			}
+			y := RADIX_TABLE_REVERSE[pos]
+			if y >= u8(radix) {
+				break
+			}
+
+			chunk_value = (chunk_value << uint(bits_per_digit)) | DIGIT(y)
+			chunk_count += 1
+			input = input[1:]
+
+			if chunk_count == digits_per_chunk || len(input) == 0 {
+				// Submit chunk.
+				if res.used == 0 {
+					internal_set(res, chunk_value) or_return
+				} else {
+					internal_shl(res, res, bits_per_digit * chunk_count) or_return
+					internal_add(res, res, chunk_value) or_return
+				}
+				chunk_value = 0
+				chunk_count = 0
+			}
 		}
 
-		pos := ch - '+'
-		if RADIX_TABLE_REVERSE_SIZE <= u32(pos) {
-			break
-		}
-		y := RADIX_TABLE_REVERSE[pos]
-		/* if the char was found in the map
-		 * and is less than the given radix add it
-		 * to the number, otherwise exit the loop.
-		 */
-		if y >= u8(radix) {
-			break
-		}
+	} else {
 
-		internal_mul(res, res, DIGIT(radix)) or_return
-		internal_add(res, res, DIGIT(y))     or_return
+		/*
+			Path for non-power-of-two bases.
+		*/
 
-		input = input[1:]
+		for len(input) > 0 {
+			/*
+				if the radix <= 36 the conversion is case insensitive
+				this allows numbers like 1AB and 1ab to represent the same value
+				[e.g. in hex]
+			*/
+
+			ch = rune(input[0])
+			if radix <= 36 && ch >= 'a' && ch <= 'z' {
+				ch -= 32 // 'a' - 'A'
+			}
+
+			pos := ch - '+'
+			if RADIX_TABLE_REVERSE_SIZE <= u32(pos) {
+				break
+			}
+			y := RADIX_TABLE_REVERSE[pos]
+			/*
+				if the char was found in the map
+				and is less than the given radix add it
+				to the number, otherwise exit the loop.
+			*/
+			if y >= u8(radix) {
+				break
+			}
+
+			internal_mul(res, res, DIGIT(radix)) or_return
+			internal_add(res, res, DIGIT(y))     or_return
+
+			input = input[1:]
+		}
 	}
+
 	/*
 		If an illegal character was found, fail.
 	*/
