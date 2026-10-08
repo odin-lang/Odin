@@ -197,7 +197,7 @@ Returns:
 - res: the io.Stream
 */
 @(require_results)
-to_stream :: proc(b: ^Builder) -> (res: io.Stream) {
+to_stream :: proc "contextless" (b: ^Builder) -> (res: io.Stream) {
 	return io.Stream{procedure=_builder_stream_proc, data=b}
 }
 /*
@@ -239,7 +239,7 @@ Clears the Builder byte buffer content (sets len to zero)
 Inputs:
 - b: A pointer to the Builder
 */
-builder_reset :: proc(b: ^Builder) {
+builder_reset :: proc "contextless" (b: ^Builder) {
 	clear(&b.buf)
 }
 /*
@@ -273,7 +273,7 @@ Output:
 
 */
 @(require_results)
-builder_from_bytes :: proc(backing: []byte) -> (res: Builder) {
+builder_from_bytes :: proc "contextless" (backing: []byte) -> (res: Builder) {
 	return Builder{
 		buf = transmute([dynamic]byte)runtime.Raw_Dynamic_Array{
 			data      = raw_data(backing),
@@ -299,7 +299,7 @@ Returns:
 - res: The contents of the Builder's buffer, as a string
 */
 @(require_results)
-to_string :: proc(b: Builder) -> (res: string) {
+to_string :: proc "contextless" (b: Builder) -> (res: string) {
 	return string(b.buf[:])
 }
 /*
@@ -351,7 +351,7 @@ Returns:
 - res: The length of the Builder's buffer
 */
 @(require_results)
-builder_len :: proc(b: Builder) -> (res: int) {
+builder_len :: proc "contextless" (b: Builder) -> (res: int) {
 	return len(b.buf)
 }
 /*
@@ -364,7 +364,7 @@ Returns:
 - res: The capacity of the Builder's buffer
 */
 @(require_results)
-builder_cap :: proc(b: Builder) -> (res: int) {
+builder_cap :: proc "contextless" (b: Builder) -> (res: int) {
 	return cap(b.buf)
 }
 /*
@@ -377,7 +377,7 @@ Returns:
 - res: The available space left in the Builder's buffer
 */
 @(require_results)
-builder_space :: proc(b: Builder) -> (res: int) {
+builder_space :: proc "contextless" (b: Builder) -> (res: int) {
 	return cap(b.buf) - len(b.buf)
 }
 /*
@@ -555,7 +555,7 @@ Inputs:
 Returns:
 - r: The last byte in the Builder or 0 if empty
 */
-pop_byte :: proc(b: ^Builder) -> (r: byte) {
+pop_byte :: proc "contextless" (b: ^Builder) -> (r: byte) {
 	if len(b.buf) == 0 {
 		return 0
 	}
@@ -575,7 +575,7 @@ Returns:
 - r: The popped rune
 - width: The rune width or 0 if the builder was empty
 */
-pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
+pop_rune :: proc "contextless" (b: ^Builder) -> (r: rune, width: int) {
 	if len(b.buf) == 0 {
 		return 0, 0
 	}

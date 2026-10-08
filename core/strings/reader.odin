@@ -20,7 +20,7 @@ Inputs:
 - r: A pointer to a Reader struct
 - s: The input string to be read
 */
-reader_init :: proc(r: ^Reader, s: string) {
+reader_init :: proc "contextless" (r: ^Reader, s: string) {
 	r.s = s
 	r.i = 0
 	r.prev_rune = -1
@@ -34,7 +34,7 @@ Inputs:
 Returns:
 - s: An io.Stream for the given Reader
 */
-reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
+reader_to_stream :: proc "contextless" (r: ^Reader) -> (s: io.Stream) {
 	s.data = r
 	s.procedure = _reader_proc
 	return
@@ -78,7 +78,7 @@ Inputs:
 Returns:
 - res: The remaining length of the Reader
 */
-reader_length :: proc(r: ^Reader) -> (res: int) {
+reader_length :: proc "contextless" (r: ^Reader) -> (res: int) {
 	if r.i >= i64(len(r.s)) {
 		return 0
 	}
@@ -93,7 +93,7 @@ Inputs:
 Returns:
 - res: The length of the string stored in the Reader
 */
-reader_size :: proc(r: ^Reader) -> (res: i64) {
+reader_size :: proc "contextless" (r: ^Reader) -> (res: i64) {
 	return i64(len(r.s))
 }
 /*
@@ -107,7 +107,7 @@ Returns:
 - n: The number of bytes read
 - err: An `io.Error` if an error occurs while reading, including `.EOF`, otherwise `nil` denotes success.
 */
-reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
+reader_read :: proc "contextless" (r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
 	}
@@ -128,7 +128,7 @@ Returns:
 - n: The number of bytes read
 - err: An `io.Error` if an error occurs while reading, including `.EOF`, otherwise `nil` denotes success.
 */
-reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
+reader_read_at :: proc "contextless" (r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
 	if off < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -151,7 +151,7 @@ Returns:
 - The byte read from the Reader
 - err: An `io.Error` if an error occurs while reading, including `.EOF`, otherwise `nil` denotes success.
 */
-reader_read_byte :: proc(r: ^Reader) -> (res: byte, err: io.Error) {
+reader_read_byte :: proc "contextless" (r: ^Reader) -> (res: byte, err: io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
@@ -169,7 +169,7 @@ Inputs:
 Returns:
 - err: An `io.Error` if `r.i <= 0` (`.Invalid_Unread`), otherwise `nil` denotes success.
 */
-reader_unread_byte :: proc(r: ^Reader) -> (err: io.Error) {
+reader_unread_byte :: proc "contextless" (r: ^Reader) -> (err: io.Error) {
 	if r.i <= 0 {
 		return .Invalid_Unread
 	}
@@ -188,7 +188,7 @@ Returns:
 - size: The size of the rune in bytes
 - err: An `io.Error` if an error occurs while reading
 */
-reader_read_rune :: proc(r: ^Reader) -> (rr: rune, size: int, err: io.Error) {
+reader_read_rune :: proc "contextless" (r: ^Reader) -> (rr: rune, size: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		r.prev_rune = -1
 		return 0, 0, .EOF
@@ -213,7 +213,7 @@ WARNING: May only be used once and after a valid `read_rune` call
 Returns:
 - err: An `io.Error` if an error occurs while unreading (`.Invalid_Unread`), else `nil` denotes success.
 */
-reader_unread_rune :: proc(r: ^Reader) -> (err: io.Error) {
+reader_unread_rune :: proc "contextless" (r: ^Reader) -> (err: io.Error) {
 	if r.i <= 0 {
 		return .Invalid_Unread
 	}
