@@ -587,6 +587,14 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_cstring", args);
 		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
+	} else if (is_type_cstring16(type) || is_type_string16(type)) {
+		// the length of these counts u16 units, not bytes
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		lbValue res = lb_emit_runtime_call(p, is_type_cstring16(type) ? "default_hasher_cstring16" : "default_hasher_string16", args);
+		lb_add_callsite_force_inline(p, res);
+		LLVMBuildRet(p->builder, res.value);
 	} else if (is_type_string(type)) {
 		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = data;
@@ -2421,7 +2429,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 	}
 	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-	LLVMSetAlignment(g.value, cast(u32)type_align_of(e->type));
+	LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
 
 	if (e->Variable.link_section.len > 0) {
 		LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
@@ -2433,6 +2441,20 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 	if (m->debug_builder) {
 		String global_name = e->token.string;
 		if (global_name.len != 0 && global_name != "_") {
+			gbString name = gb_string_make(heap_allocator(), "");
+			defer (gb_string_free(name));
+			if (e->Variable.is_foreign || e->Variable.is_export || (e->flags & EntityFlag_CustomLinkName)) {
+				size_t link_name_len = 0;
+				char const *link_name = LLVMGetValueName2(g.value, &link_name_len);
+				name = gb_string_append_length(name, link_name, link_name_len);
+			} else {
+				if (e->file != nullptr) {
+					name = lb_debug_append_name_prefix(name, e->file, e);
+				}
+				name = gb_string_append_length(name, global_name.text, global_name.len);
+			}
+			global_name = make_string(cast(u8 *)name, gb_string_length(name));
+
 			LLVMMetadataRef llvm_file = lb_get_file_metadata(m, e->file);
 			LLVMMetadataRef llvm_scope = llvm_file;
 
@@ -2858,6 +2880,13 @@ gb_internal WORKER_TASK_PROC(lb_llvm_module_pass_worker_proc) {
 	LLVMPassBuilderOptionsRef pb_options = LLVMCreatePassBuilderOptions();
 	defer (LLVMDisposePassBuilderOptions(pb_options));
 
+	if (build_context.ODIN_DEBUG && build_context.optimization_level >= OptimizationLevel_Minimal) {
+		// NOTE(bill): assignment tracking follows each variable's stores through the optimizations, so more of them keep
+		// a location; it must run first, and it sets the `debug-info-assignment-tracking` module flag itself.
+		// It is a function pass, wrapped so the pipeline is still parsed as one of module passes.
+		array_add(&passes, "function(declare-to-assign)");
+	}
+
 	#include "llvm_backend_passes.cpp"
 
 	// asan - Linux, Darwin, Windows
@@ -3041,13 +3070,23 @@ gb_internal void lb_generate_queued_procedures(lbGenerator *gen, bool do_threadi
 	}
 }
 
-gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (m->debug_builder != nullptr) {
-			LLVMDIBuilderFinalize(m->debug_builder);
+gb_internal WORKER_TASK_PROC(lb_debug_info_finalize_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	if (m->debug_builder != nullptr) {
+		LLVMDIBuilderFinalize(m->debug_builder);
+	}
+	return 0;
+}
+
+gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen, bool do_threading) {
+	for (lbModule *m : lb_modules_by_cost(gen)) {
+		if (do_threading) {
+			thread_pool_add_task(lb_debug_info_finalize_worker_proc, m);
+		} else {
+			lb_debug_info_finalize_worker_proc(m);
 		}
 	}
+	thread_pool_wait();
 }
 
 gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
@@ -3500,6 +3539,18 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
 
+#if LLVM_VERSION_MAJOR >= 22
+	if (build_context.ODIN_DEBUG) {
+		// NOTE(bill): the files are hashed for their debug info on the thread pool, while the stages below are mostly on one thread.
+		// Nothing waits for them: a file not hashed yet when its debug info is made is hashed then.
+		for (auto const &entry : info->packages) {
+			for (AstFile *f : entry.value->files) {
+				thread_pool_add_task(lb_debug_file_checksum_worker_proc, f);
+			}
+		}
+	}
+#endif
+
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64: 
 	case TargetArch_i386:
@@ -3655,7 +3706,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			gbString split_name = gb_string_make(temporary_allocator(), "");
 
 			LLVMBool is_optimized = build_context.optimization_level > 0;
-			AstFile *init_file = m->info->init_package->files[0];
+			AstFile *init_file = nullptr;
+			if (m->info->init_package->files.count > 0) {
+				init_file = m->info->init_package->files[0];
+			}
 
 			if (Entity *entry_point = m->info->entry_point) {
 				if (Ast *ident = entry_point->identifier.load()) {
@@ -3665,11 +3719,18 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
+			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
+			if (init_file_metadata == nullptr) {
+				// every file of the initial package was excluded by its build tags, as can be done for `odin test`
+				String path = m->info->init_package->fullpath;
+				init_file_metadata = LLVMDIBuilderCreateFile(m->debug_builder, cast(char const *)path.text, path.len, "", 0);
+			}
+
 			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;
 
 			m->debug_compile_unit = LLVMDIBuilderCreateCompileUnit(m->debug_builder, LLVMDWARFSourceLanguageC99,
-				lb_get_file_metadata(m, init_file),
+				init_file_metadata,
 				producer, gb_string_length(producer),
 				is_optimized, "", 0,
 				1, split_name, gb_string_length(split_name),
@@ -3840,6 +3901,40 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	if (build_context.ODIN_DEBUG) {
+		// NOTE(bill): gdb runs the pretty printers of `base/runtime/odin_debugger.py` from the `.debug_gdb_scripts` section of an ELF binary,
+		// once the user trusts its directory; lldb reads no such section.
+		// The section is written in assembly, as a global cannot be made a section that is never loaded into memory,
+		// which is what keeps the linker from dropping it, and lets it merge the copies of several objects.
+		if (build_context.metrics.os != TargetOs_windows && build_context.metrics.os != TargetOs_darwin && !is_arch_wasm()) {
+			String path = concatenate_strings(temporary_allocator(), odin_root_dir(), str_lit("base/runtime/odin_debugger.py"));
+			gbFileContents fc = gb_file_read_contents(heap_allocator(), false, alloc_cstring(temporary_allocator(), path));
+			if (fc.data != nullptr) {
+				// an entry of kind 4 is the script's name, a newline, then its text
+				gbString s = gb_string_make(heap_allocator(), ".pushsection \".debug_gdb_scripts\", \"MS\", %progbits, 1\n.byte 4\n.ascii \"odin_debugger.py\\n\"\n.ascii \"");
+				defer (gb_string_free(s));
+				for (isize i = 0; i < fc.size; i++) {
+					u8 c = (cast(u8 *)fc.data)[i];
+					switch (c) {
+					case '\r': break;
+					case '\n': s = gb_string_appendc(s, "\\n\"\n.ascii \""); break;
+					case '\t': s = gb_string_appendc(s, "\\t");  break;
+					case '\\': s = gb_string_appendc(s, "\\\\"); break;
+					case '"':  s = gb_string_appendc(s, "\\\""); break;
+					default:
+						if (c < 0x20 || c >= 0x7f) {
+							s = gb_string_append_fmt(s, "\\%03o", c);
+						} else {
+							s = gb_string_append_length(s, &c, 1);
+						}
+						break;
+					}
+				}
+				s = gb_string_appendc(s, "\"\n.byte 0\n.popsection\n");
+				gb_file_free_contents(&fc);
+				LLVMAppendModuleInlineAsm(default_module->mod, s, gb_string_length(s));
+			}
+		}
+
 		// Custom `.raddbg` section for its debugger
 		if (build_context.metrics.os == TargetOs_windows) {
 			lbModule *m = default_module;
@@ -3901,9 +3996,14 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lb_finalize_objc_names(gen, gen->objc_names);
 	}
 
+	if (gen->debug_types_modules.count != 0) {
+		TIME_SECTION("LLVM Debug Types Modules");
+		lb_debug_generate_types_modules(gen, do_threading);
+	}
+
 	if (build_context.ODIN_DEBUG) {
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
-		lb_debug_info_complete_types_and_finalize(gen);
+		lb_debug_info_complete_types_and_finalize(gen, do_threading);
 
 		// Custom `.raddbg` section for its debugger
 		if (build_context.metrics.os == TargetOs_windows) {
@@ -3913,8 +4013,17 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 			lb_add_raddbg_string(m, "type_view: {type: \"[]?\",        expr: \"array(data, len)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"string\",     expr: \"array(data, len)\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"string16\",   expr: \"array(data, len)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}");
 			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic;?]?\", expr: \"rows($, array(data, len), len)\"}");
+
+			// big endian integers, see `lb_debug_type_basic_type`
+			lb_add_raddbg_string(m, "type_view: {type: \"i16be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"u16be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"i32be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"u32be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"i64be\", expr: \"bswap $\"}");
+			lb_add_raddbg_string(m, "type_view: {type: \"u64be\", expr: \"bswap $\"}");
 
 			// column major matrices
 			lb_add_raddbg_string(m, "type_view: {type: \"matrix[1, ?]?\",  expr: \"columns($.data, $[0])\"}");
@@ -3974,6 +4083,20 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				s = gb_string_appendc(s, "\"}");
 
 				lb_add_raddbg_string(m, s);
+			}
+
+			{
+				// NOTE(bill): the generated views come from many threads, so they are sorted to keep the section the same each build,
+				// and they go last, as the first view matching a type is the one used, so that a user's own view wins
+				auto generated = array_make<String>(heap_allocator(), 0, gen->raddebug_generated_views.count.load());
+				defer (array_free(&generated));
+				for (String str = {}; mpsc_dequeue(&gen->raddebug_generated_views, &str); /**/) {
+					array_add(&generated, str);
+				}
+				array_sort(generated, string_cmp);
+				for (String const &str : generated) {
+					lb_add_raddbg_string(m, str);
+				}
 			}
 
 			TEMPORARY_ALLOCATOR_GUARD();

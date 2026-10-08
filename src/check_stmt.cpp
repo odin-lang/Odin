@@ -2109,6 +2109,11 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_addressed) {
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
+						if (analysis_in_use(AnalysisFlag_Atomic)) {
+							if (Entity *e = check_atomic_location(expr)) {
+								per_thread_array_add(&ctx->info->checked_addresses_queue, CheckedAddress{node, e});
+							}
+						}
 					} else {
 						char const *idx_name = is_map ? "key" : (is_bit_set || i == 0) ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
@@ -2287,6 +2292,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (ac.link_name.len > 0) {
 			e->Variable.link_name = ac.link_name;
 		}
+		e->Variable.custom_align = ac.align;
 
 		e->flags &= ~EntityFlag_Static;
 		if (ac.is_static) {
@@ -2633,10 +2639,8 @@ gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-// NOTE(bill): This is very basic escape analysis
-// This needs to be improved tremendously, and a lot of it done during the
-// middle-end (or LLVM side) to improve checks and error messages
-void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
+// returning stack memory made by the returned expression itself, where the escape analysis is disabled
+gb_internal void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 	auto const unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
 		gbString s = expr_to_string(o.expr);
 		if (extra_type) {
@@ -2769,6 +2773,9 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		}
 	}
 
+	if (ast_file_analysis(node->file(), AnalysisFlag_Escape)) {
+		return;
+	}
 	for (Operand &o : operands) {
 		if (o.expr == nullptr) {
 			continue;
@@ -2787,7 +2794,6 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 
 		check_unsafe_return(o, o.type, expr);
 	}
-
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {

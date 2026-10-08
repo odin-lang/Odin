@@ -123,6 +123,7 @@ struct AttributeContext {
 	String  link_section;
 	String  linkage;
 	isize   init_expr_list_count;
+	i64     align;
 	String  thread_local_model;
 	String  deprecated_message;
 	String  warning_message;
@@ -165,6 +166,9 @@ struct AttributeContext {
 	String enable_target_feature;  // will be enabled for the procedure only
 
 	u64 fast_math_flags;
+
+	u8     futex; // ProcedureFutex
+	String futex_parameter;
 
 	bool   raddbg_type_view;
 	String raddbg_type_view_string;
@@ -224,6 +228,11 @@ struct DeclInfo {
 
 	Entity *     para_poly_original;
 	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
+	struct ProcInfo *proc_info; // its body, once checked
+
+	i32               escape_index; // of its body, see `EscapeGraph`
+	std::atomic<bool> escapes_analysed;
+	Slice<struct EscapeFlow> escape_flows; // see `escape_call`
 
 	bool                          is_using;
 	bool                          foreign_require_results;
@@ -268,6 +277,24 @@ struct ProcInfo {
 	u64       tags;
 	bool      generated_from_polymorphic;
 	Ast *     poly_def_node;
+	ProcInfo *poly_parent; // the instantiation whose body this was instantiated or declared in, see `error_out_instantiations`
+};
+
+struct CheckedCall {
+	DeclInfo *caller;
+	Entity *  callee;
+};
+
+struct CheckedAtomic {
+	Ast *          call;
+	DeclInfo *     decl;
+	i32            id;    // BuiltinProcId, of an atomic or volatile intrinsic
+	u8             futex; // ProcedureFutex, or of a call to a procedure with `@(futex=...)`
+};
+
+struct CheckedAddress {
+	Ast *   node;     // `&x`, or what is sliced or iterated by reference
+	Entity *location; // see `check_atomic_location`
 };
 
 
@@ -831,6 +858,12 @@ struct CheckerInfo {
 	MPSCQueue<ProcInfo *> all_procedures_queue;
 	Array<ProcInfo *> all_procedures;
 
+	PerThreadArray<ProcInfo *>   checked_bodies_queue; // for `check_escapes`
+	PerThreadArray<CheckedCall>  checked_calls_queue;  // for `check_escapes`
+
+	PerThreadArray<CheckedAtomic>  checked_atomics_queue;   // for `check_atomics`
+	PerThreadArray<CheckedAddress> checked_addresses_queue; // for `check_atomics`, what has its address taken, by `&` or otherwise
+
 	BlockingMutex instrumentation_mutex;
 	Entity *instrumentation_enter_entity;
 	Entity *instrumentation_exit_entity;
@@ -878,6 +911,7 @@ struct CheckerContext {
 	u32        stmt_flags;
 	bool       in_enum_type;
 	bool       in_proc_group;
+	bool       in_proc_group_decl;
 	bool       in_procedure_of;
 	bool       allow_polymorphic_types;
 	bool       disallow_polymorphic_return_types; // NOTE(zen3ger): no poly type decl in return types
@@ -894,6 +928,7 @@ struct CheckerContext {
 
 	Ast *assignment_lhs_hint;
 	Ast *asm_template_hint;
+	Ast *call_proc_hint; // the callee of the call being checked
 };
 
 gb_internal u64 check_vet_flags(CheckerContext *c);
@@ -936,6 +971,7 @@ gb_internal isize        type_info_index        (CheckerInfo *info, TypeInfoPair
 
 // Will return nullptr if not found
 gb_internal Entity *entity_of_node(Ast *expr);
+gb_internal Entity *check_atomic_location(Ast *expr);
 
 
 // gb_internal Entity *scope_lookup_current(Scope *s, String const &name, u32 hash=0);
@@ -959,8 +995,15 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *c, Ast *decl);
 gb_internal void check_entity_decl(CheckerContext *c, Entity *e, DeclInfo *d, Type *named_type);
 gb_internal void global_group_check_edge(CheckerContext *ctx, Entity *e);
 
-// While a group of global entities is checked: its incomplete '#soa' types, completed by the same thread
-gb_thread_local Array<Type *> *global_group_soa_types;
+// Per-thread state of checking the global entities, see `check_global_group`
+struct GlobalGroupContext {
+	struct GlobalGroup *group;
+	Entity *            entity;
+	Array<Type *> *     soa_types;
+	u64                 child_ticks; // see `global_entity_timing_begin`
+};
+
+gb_global gb_thread_local GlobalGroupContext global_group_context;
 
 struct GlobalWhenTrialEntityScope {
 	struct GlobalWhenTrial *trial;

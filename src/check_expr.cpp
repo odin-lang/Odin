@@ -838,6 +838,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	entity->flags = 0;
 
 	entity->Procedure.optimization_mode = base_entity->Procedure.optimization_mode;
+	entity->Procedure.futex = base_entity->Procedure.futex;
+	entity->Procedure.futex_parameter = base_entity->Procedure.futex_parameter;
 	entity->Procedure.generated_from_polymorphic = true;
 
 	if (base_entity->flags & EntityFlag_Cold) {
@@ -860,6 +862,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->tags  = tags;
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
+	proc_info->poly_parent   = global_error_context.instantiations.proc;
 
 	// Before it can be found by another thread which could use it first
 	d->gen_proc_info.store(proc_info);
@@ -2740,23 +2743,7 @@ gb_internal char const *zero_value_suggestion(Operand *o, Type *type) {
 	if (!is_exact_value_zero(o->value)) {
 		return nullptr;
 	}
-
-	char const *suggestion = nullptr;
-	if (is_type_string(type)) {
-		suggestion = "\"\"";
-	} else if (is_type_boolean(type)) {
-		suggestion = "false";
-	} else if (is_type_bit_set(type)) {
-		// A bit_set accepts both `nil` and `{}`. `{}` is a bit more idiomatic
-		// because `{.Something}` becomes `{}` when no bits are set.
-		suggestion = "{}";
-	} else if (type_has_nil(type)) {
-		suggestion = "nil";
-	} else {
-		suggestion = "{}";
-	}
-
-	return suggestion;
+	return type_zero_value_string(type);
 }
 
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size) {
@@ -2822,7 +2809,13 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 	Type *src = base_type(o->type);
 	Type *dst = base_type(type);
 
-	if (is_type_array(src) && is_type_slice(dst)) {
+	if (is_type_proc(src) && is_type_polymorphic(src)) {
+		if (is_type_proc(dst)) {
+			error_line("\tNote: the polymorphic procedure cannot be specialized to this procedure type\n");
+		} else {
+			error_line("\tNote: a polymorphic procedure has no value until it is specialized, e.g. by assigning it to a concrete procedure type\n");
+		}
+	} else if (is_type_array(src) && is_type_slice(dst)) {
 		Type *s = src->Array.elem;
 		Type *d = dst->Slice.elem;
 		if (are_types_identical(s, d)) {
@@ -3080,6 +3073,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			}
 			o->mode = Addressing_Invalid;
 			return;
+		}
+		if (analysis_in_use(AnalysisFlag_Atomic)) {
+			if (Entity *e = check_atomic_location(o->expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
 		}
 
 		Type *soa_for_in_type = nullptr;
@@ -3945,12 +3943,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 			}
 			return false;
 		}
-		return true;
+		// a polymorphic procedure has no value until it is specialized, which only assignment does
+		return !is_type_polymorphic(src);
 	}
 
 	// proc -> rawptr
 	if (is_type_proc(src) && is_type_rawptr(dst)) {
-		return true;
+		return !is_type_polymorphic(src);
 	}
 	// rawptr -> proc
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
@@ -4194,6 +4193,17 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		o->expr = node;
 		o->type = dst_t;
 		return true;
+	}
+
+	if (is_type_proc(src_bt) && is_type_polymorphic(src_bt)) {
+		gbString expr_str = expr_to_string(o->expr);
+		gbString type_str = type_to_string(src_t);
+		error(o->expr, "Cannot transmute the non-specialized polymorphic procedure '%s' of type '%s'", expr_str, type_str);
+		gb_string_free(type_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return false;
 	}
 
 
@@ -6615,20 +6625,6 @@ gb_internal bool is_type_normal_pointer(Type *ptr, Type **elem) {
 	return false;
 }
 
-gb_internal bool is_type_valid_atomic_type(Type *elem) {
-	elem = core_type(elem);
-	if (is_type_internally_pointer_like(elem)) {
-		return true;
-	}
-	if (elem->kind == Type_BitSet) {
-		elem = bit_set_to_int(elem);
-	}
-	if (elem->kind != Type_Basic) {
-		return false;
-	}
-	return (elem->Basic.flags & (BasicFlag_Boolean|BasicFlag_OrderedNumeric)) != 0;
-}
-
 gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **out_scope = nullptr) {
 	switch (node->kind) {
 	case_ast_node(i, Ident, node);
@@ -7210,6 +7206,11 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 						ordered_operands[i].type = e->type;
 						if (e->Variable.param_value.kind == ParameterValue_Nil)
 							ordered_operands[i].type = t_untyped_nil;
+						if (e->Variable.param_value.kind == ParameterValue_Constant) {
+							// so a `#const` parameter accepts its own default
+							ordered_operands[i].mode  = Addressing_Constant;
+							ordered_operands[i].value = e->Variable.param_value.value;
+						}
 						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
 					}
 
@@ -9172,6 +9173,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		String generated_name = make_string_c(expr_to_string(call));
 
 		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
+		ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
+		global_error_context.instantiations.records = &instantiation;
 		if (bt->kind == Type_Struct) {
 			Ast *node = clone_ast(bt->Struct.node);
 			Type *struct_type = alloc_type_struct();
@@ -9199,6 +9202,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");
 		}
+		global_error_context.instantiations.records = instantiation.prev;
 
 		add_declaration_dependency(c, named_type->Named.type_name);
 		operand->mode = Addressing_Type;
@@ -9419,6 +9423,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	c->allow_in_progress_type_operand = false;
 	defer (c->allow_in_progress_type_operand = prev_allow_in_progress);
 
+	Ast *prev_call_proc_hint = c->call_proc_hint;
+	c->call_proc_hint = unparen_expr(proc != nullptr ? proc : operand->expr);
+	defer (c->call_proc_hint = prev_call_proc_hint);
+
 	if (proc != nullptr &&
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
@@ -9513,6 +9521,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
+		} else if (analysis_in_use(AnalysisFlag_Atomic)) {
+			bool is_atomic   = BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit;
+			bool is_volatile = id == BuiltinProc_volatile_store || id == BuiltinProc_volatile_load;
+			if (is_atomic || is_volatile) {
+				per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, id});
+			}
 		}
 		operand->expr = call;
 		return builtin_procs[id].kind;
@@ -9564,14 +9578,21 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	gb_zero_item(operand);
 	operand->expr = call;
 
-	if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0) {
-		// NOTE: which procedure of a group is called is only known once its arguments are checked
-		Entity *e = entity_of_node(call->CallExpr.proc);
-		if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.deferred_procedure.entity != nullptr) {
+	// NOTE: which procedure of a group is called is only known once its arguments are checked
+	Entity *callee = entity_of_node(call->CallExpr.proc);
+	if (callee != nullptr && callee->kind == Entity_Procedure) {
+		if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0 &&
+		    callee->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 			if (c->decl) {
 				c->decl->defer_used += 1;
 			}
+		}
+		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
+			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
+		}
+		if (callee->Procedure.futex != ProcedureFutex_None && call->CallExpr.args.count > 0 && analysis_in_use(AnalysisFlag_Atomic)) {
+			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, BuiltinProc_Invalid, callee->Procedure.futex});
 		}
 	}
 
@@ -12905,6 +12926,11 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
+		}
+		if (analysis_in_use(AnalysisFlag_Atomic) && !is_type_pointer(o->type)) {
+			if (Entity *e = check_atomic_location(node->SliceExpr.expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
 		}
 		o->type = alloc_type_slice(t->Array.elem);
 		break;

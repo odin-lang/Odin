@@ -129,6 +129,13 @@ struct lbTypeInfoMembers {
 	isize tags_index;
 };
 
+// A type whose debug info is being lowered, innermost last
+struct lbDebugTypeFrame {
+	Type *type;
+	bool  is_record;  // CodeView can refer back to it with a forward reference
+	isize lowest_cut; // the lowest frame cut back to while lowering this type
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -150,6 +157,8 @@ struct lbModule {
 
 	i64 estimated_cost;
 	i32 split_part;
+	bool is_debug_types_module;
+	MPSCQueue<Type *> debug_homed_types; // the record types this debug types module defines the debug info of
 
 	// This is Set if this module defines type info entries
 	lbTypeInfoMembers *type_info_members;
@@ -196,6 +205,7 @@ struct lbModule {
 
 	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
+	Array<lbDebugTypeFrame> debug_type_frames;
 
 
 	StringMap<lbAddr> objc_classes;
@@ -239,6 +249,10 @@ struct lbGenerator : LinkerData {
 
 	lbModule *equal_module;
 
+	// NOTE: with separate modules, each record type's debug info is defined once in one of these, picked by its canonical name,
+	// and every other module only forward declares it
+	Array<lbModule *> debug_types_modules;
+
 	isize used_module_count;
 
 	bool modules_in_parallel;
@@ -254,6 +268,7 @@ struct lbGenerator : LinkerData {
 	MPSCQueue<lbObjCGlobal>       objc_classes;
 	MPSCQueue<lbObjCGlobal>       objc_ivars;
 	MPSCQueue<String>             raddebug_section_strings;
+	MPSCQueue<String>             raddebug_generated_views;
 };
 
 
@@ -801,6 +816,7 @@ enum {
 	DW_TAG_array_type       = 1,
 	DW_TAG_enumeration_type = 4,
 	DW_TAG_structure_type   = 19,
+	DW_TAG_typedef          = 22,
 	DW_TAG_union_type       = 23,
 	DW_TAG_vector_type      = 259,
 	DW_TAG_subroutine_type  = 21,

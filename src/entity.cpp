@@ -140,6 +140,13 @@ enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_FavorSize,
 };
 
+// see `@(futex=...)`
+enum ProcedureFutex : u8 {
+	ProcedureFutex_None,
+	ProcedureFutex_Wait,
+	ProcedureFutex_Wake,
+};
+
 
 BlockingMutex global_type_name_objc_metadata_mutex;
 
@@ -273,6 +280,7 @@ struct Entity {
 			String     link_prefix;
 			String     link_suffix;
 			String     link_section;
+			i64        custom_align;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
@@ -307,6 +315,8 @@ struct Entity {
 			struct GenProcsData *gen_procs;
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
+			ProcedureFutex            futex;
+			i32                       futex_parameter; // the index of what `futex` waits on or wakes
 
 			u64     fast_math_flags;
 

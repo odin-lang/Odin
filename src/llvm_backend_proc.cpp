@@ -160,7 +160,17 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	{
 		TEMPORARY_ALLOCATOR_GUARD();
 		char *c_link_name = alloc_cstring(temporary_allocator(), p->name);
-		p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+		// the compiler may have declared this intrinsic itself (e.g. `llvm.memset`), and a second
+		// declaration would be renamed and so no longer be the intrinsic
+		LLVMValueRef existing = nullptr;
+		if (p->is_foreign && string_starts_with(p->name, str_lit("llvm."))) {
+			existing = LLVMGetNamedFunction(m->mod, c_link_name);
+		}
+		if (existing != nullptr && LLVMGlobalGetValueType(existing) == func_type) {
+			p->value = existing;
+		} else {
+			p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+		}
 	}
 
 	lb_ensure_abi_function_type(m, p);
@@ -354,7 +364,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		}
 	}
 
-	if (m->debug_builder) { // Debug Information
+	if (m->debug_builder && p->body != nullptr) { // Debug Information
 		Type *bt = base_type(p->type);
 
 		unsigned line = cast(unsigned)entity->token.pos.line;
@@ -380,33 +390,35 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 		// LLVMBool is_local_to_unit = !entity->Procedure.is_export;
 		LLVMBool is_local_to_unit = false;
-		LLVMBool is_definition = p->body != nullptr;
+		LLVMBool is_definition = true;
 		unsigned scope_line = line;
 		u32 flags = LLVMDIFlagStaticMember;
-		LLVMBool is_optimized = false;
+		LLVMBool is_optimized = build_context.optimization_level > OptimizationLevel_Minimal && entity->Procedure.optimization_mode != ProcedureOptimizationMode_None;
 		if (bt->Proc.diverging) {
 			flags |= LLVMDIFlagNoReturn;
 		}
-		if (p->body == nullptr) {
-			flags |= LLVMDIFlagPrototyped;
-			is_optimized = false;
+
+		// NOTE(bill): exported, foreign and custom link names are what a user knows the procedure by
+		String debug_name = p->name;
+		gbString name = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(name));
+		DeclInfo *decl = entity->decl_info;
+		if (!entity->Procedure.is_export && !entity->Procedure.is_foreign && (entity->flags & EntityFlag_CustomLinkName) == 0 &&
+		    decl != nullptr && decl->proc_lit != nullptr) {
+			name = lb_debug_append_proc_name(name, decl);
+			debug_name = make_string(cast(u8 *)name, gb_string_length(name));
 		}
 
-		if (p->body != nullptr) {
-			// String debug_name = entity->token.string.text;
-			String debug_name = p->name;
-
-			p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
-				cast(char const *)debug_name.text, debug_name.len,
-				cast(char const *)p->name.text, p->name.len,
-				file, line, type,
-				is_local_to_unit, is_definition,
-				scope_line, cast(LLVMDIFlags)flags, is_optimized
-			);
-			GB_ASSERT(p->debug_info != nullptr);
-			LLVMSetSubprogram(p->value, p->debug_info);
-			lb_set_llvm_metadata(m, p, p->debug_info);
-		}
+		p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
+			cast(char const *)debug_name.text, debug_name.len,
+			cast(char const *)p->name.text, p->name.len,
+			file, line, type,
+			is_local_to_unit, is_definition,
+			scope_line, cast(LLVMDIFlags)flags, is_optimized
+		);
+		GB_ASSERT(p->debug_info != nullptr);
+		LLVMSetSubprogram(p->value, p->debug_info);
+		lb_set_llvm_metadata(m, p, p->debug_info);
 	}
 
 	if (p->body && entity->pkg && ((entity->pkg->kind == Package_Normal) || (entity->pkg->kind == Package_Init))) {
@@ -722,6 +734,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue ptr = {};
 						ptr.value = LLVMGetParam(p->value, param_offset+llvm_param_index);
 						ptr.type = alloc_type_pointer(e->type);
+						LLVMValueRef incoming_ptr = ptr.value;
 
 						if (do_callee_copy) {
 							lbValue new_ptr = lb_add_local_generated(p, e->type, false).addr;
@@ -730,7 +743,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 						}
 
 						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block);
+						lb_add_debug_param_variable(p, incoming_ptr, e->type, e->token, param_index+1, p->decl_block);
 					}
 				}
 			}
@@ -3670,6 +3683,42 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			return res;
 		}
 
+	case BuiltinProc_return_address:
+	case BuiltinProc_frame_address:
+	case BuiltinProc_stack_pointer:
+	case BuiltinProc_address_of_return_address:
+		{
+			char const *name = nullptr;
+			switch (id) {
+			case BuiltinProc_return_address:            name = "llvm.returnaddress";          break;
+			case BuiltinProc_frame_address:             name = "llvm.frameaddress";           break;
+			case BuiltinProc_stack_pointer:             name = "llvm.stacksave";              break;
+			case BuiltinProc_address_of_return_address: name = "llvm.addressofreturnaddress"; break;
+			}
+
+			LLVMValueRef args[1] = {};
+			unsigned arg_count = 0;
+			if (id == BuiltinProc_return_address || id == BuiltinProc_frame_address) {
+				u64 level = 0;
+				if (ce->args.count > 0) {
+					level = cast(u64)exact_value_to_i64(ce->args[0]->tav.value);
+				}
+				args[arg_count++] = LLVMConstInt(lb_type(p->module, t_u32), level, false);
+			}
+
+			// whether these are overloaded on their pointer type differs between LLVM versions
+			LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
+			unsigned type_count = 0;
+			if (LLVMIntrinsicIsOverloaded(LLVMLookupIntrinsicID(name, gb_strlen(name)))) {
+				type_count = 1;
+			}
+
+			lbValue res = {};
+			res.value = lb_call_intrinsic(p, name, args, arg_count, types, type_count);
+			res.type = tv.type;
+			return res;
+		}
+
 	case BuiltinProc_count_trailing_zeros:
 		return lb_emit_count_trailing_zeros(p, lb_build_expr(p, ce->args[0]), tv.type);
 	case BuiltinProc_count_leading_zeros:
@@ -4070,6 +4119,14 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 		LLVMBool single_threaded = false;
 
+		// LLVM only compares integers and pointers, so a float is compared by its bits, as C does
+		LLVMTypeRef bits_type = nullptr;
+		if (is_type_float(elem)) {
+			bits_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*type_size_of(elem)));
+			old_value.value = LLVMBuildBitCast(p->builder, old_value.value, bits_type, "");
+			new_value.value = LLVMBuildBitCast(p->builder, new_value.value, bits_type, "");
+		}
+
 		LLVMValueRef value = LLVMBuildAtomicCmpXchg(
 			p->builder, address.value,
 			old_value.value, new_value.value,
@@ -4079,6 +4136,15 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		);
 		LLVMSetWeak(value, weak);
 		LLVMSetVolatile(value, true);
+
+		if (bits_type != nullptr) {
+			LLVMTypeRef fields[2] = {lb_type(p->module, elem), LLVMInt1TypeInContext(p->module->ctx)};
+			LLVMValueRef loaded = LLVMBuildBitCast(p->builder, LLVMBuildExtractValue(p->builder, value, 0, ""), fields[0], "");
+			LLVMValueRef ok     = LLVMBuildExtractValue(p->builder, value, 1, "");
+			value = LLVMGetUndef(LLVMStructTypeInContext(p->module->ctx, fields, 2, false));
+			value = LLVMBuildInsertValue(p->builder, value, loaded, 0, "");
+			value = LLVMBuildInsertValue(p->builder, value, ok, 1, "");
+		}
 
 		if (is_type_tuple(tv.type)) {
 			Type *fix_typed = alloc_type_tuple();

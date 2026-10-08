@@ -18,6 +18,36 @@ gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef va
 	}
 }
 
+#if LLVM_VERSION_MAJOR >= 22
+// NOTE(bill): with the source's checksum, a debugger can tell when the file it shows is not the one that was compiled.
+// MD5 is the only kind a DWARF 5 line table holds, and it holds none unless every file has one.
+gb_internal String lb_debug_file_checksum(AstFile *f) {
+	String *checksum = f->debug_checksum.load();
+	if (checksum == nullptr) {
+		u8 digest[16] = {};
+		md5(f->tokenizer.start, f->tokenizer.end - f->tokenizer.start, digest);
+
+		u8 *hex = gb_alloc_array(permanent_allocator(), u8, 32);
+		for (isize i = 0; i < 16; i++) {
+			hex[2*i+0] = "0123456789abcdef"[digest[i] >> 4];
+			hex[2*i+1] = "0123456789abcdef"[digest[i] & 15];
+		}
+
+		String *s = permanent_alloc_item<String>();
+		*s = make_string(hex, 32);
+		if (f->debug_checksum.compare_exchange_strong(checksum, s)) {
+			checksum = s;
+		}
+	}
+	return *checksum;
+}
+
+gb_internal WORKER_TASK_PROC(lb_debug_file_checksum_worker_proc) {
+	lb_debug_file_checksum(cast(AstFile *)data);
+	return 0;
+}
+#endif
+
 gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
 	if (f == nullptr || m->debug_builder == nullptr) {
 		return nullptr;
@@ -25,9 +55,18 @@ gb_internal LLVMMetadataRef lb_get_file_metadata(lbModule *m, AstFile *f) {
 	MUTEX_GUARD(&m->debug_values_mutex);
 	LLVMMetadataRef res = lb_get_llvm_metadata(m, f);
 	if (res == nullptr) {
+	#if LLVM_VERSION_MAJOR >= 22
+		String checksum = lb_debug_file_checksum(f);
+		res = LLVMDIBuilderCreateFileWithChecksum(m->debug_builder,
+			cast(char const *)f->filename.text, f->filename.len,
+			cast(char const *)f->directory.text, f->directory.len,
+			CSK_MD5, cast(char const *)checksum.text, checksum.len,
+			nullptr, 0);
+	#else
 		res = LLVMDIBuilderCreateFile(m->debug_builder,
 			cast(char const *)f->filename.text, f->filename.len,
 			cast(char const *)f->directory.text, f->directory.len);
+	#endif
 		lb_set_llvm_metadata(m, f, res);
 	}
 	return res;
@@ -49,6 +88,22 @@ gb_internal void lb_add_raddbg_string(lbModule *m, char const *a, char const *b)
 gb_internal void lb_add_raddbg_string(lbModule *m, char const *a, char const *b, char const *c) {
 	String str = concatenate3_strings(permanent_allocator(), make_string_c(a), make_string_c(b), make_string_c(c));
 	mpsc_enqueue(&m->gen->raddebug_section_strings, str);
+}
+
+gb_internal void lb_add_raddbg_generated_view(lbModule *m, String const &type_name, gbString expr) {
+	// NOTE(bill): a RAD Debugger type view of one type, for what a generic view cannot match
+
+	if (string_contains_char(type_name, '"') || string_contains_char(type_name, '\\')) {
+		// it cannot be quoted in the section
+		return;
+	}
+	gbString s = gb_string_make(heap_allocator(), "type_view: {type: \"");
+	defer (gb_string_free(s));
+	s = gb_string_append_length(s, type_name.text, type_name.len);
+	s = gb_string_appendc(s, "\", expr: \"");
+	s = gb_string_append_length(s, expr, gb_string_length(expr));
+	s = gb_string_appendc(s, "\"}");
+	mpsc_enqueue(&m->gen->raddebug_generated_views, copy_string(permanent_allocator(), make_string(cast(u8 *)s, gb_string_length(s))));
 }
 
 
@@ -92,9 +147,6 @@ gb_internal void lb_debug_file_line(lbModule *m, Type *type, Ast *node, LLVMMeta
 }
 
 gb_internal LLVMMetadataRef lb_debug_procedure_parameters(lbModule *m, Type *type) {
-	if (is_type_proc(type)) {
-		return lb_debug_type(m, t_rawptr);
-	}
 	if (type->kind == Type_Tuple && type->Tuple.variables.count == 1) {
 		return lb_debug_procedure_parameters(m, type->Tuple.variables[0]->type);
 	}
@@ -126,9 +178,6 @@ gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type)
 	bool return_is_tuple = false;
 	if (type->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
-		if (is_type_proc(single_ret)) {
-			single_ret = t_rawptr;
-		}
 		if (is_type_tuple(single_ret) && is_calling_convention_odin(type->Proc.calling_convention)) {
 			LLVMTypeRef actual = lb_type_internal_for_procedures_raw(m, type);
 			actual = LLVMGetReturnType(actual);
@@ -203,7 +252,29 @@ gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &nam
 	LLVMMetadataRef file = lb_get_file_metadata(m, pkg->files[0]);
 	LLVMMetadataRef scope = file;
 
-	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, cast(char const *)name.text, name.len);
+}
+
+// NOTE: only a named type can contain itself, so only it needs a placeholder for its members to refer to
+gb_internal LLVMMetadataRef lb_debug_placeholder(lbModule *m, Type *type, unsigned tag, String const &name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line, u64 size_in_bits, u32 align_in_bits) {
+	if (type->kind != Type_Named) {
+		return nullptr;
+	}
+	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
+		m->debug_builder, tag,
+		cast(char const *)name.text, cast(size_t)name.len,
+		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, cast(char const *)name.text, cast(size_t)name.len
+	);
+	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	return temp_forward_decl;
+}
+
+gb_internal LLVMMetadataRef lb_debug_replace_placeholder(lbModule *m, Type *type, LLVMMetadataRef temp_forward_decl, LLVMMetadataRef final_decl) {
+	if (temp_forward_decl != nullptr) {
+		LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
+	}
+	lb_set_llvm_metadata(m, type, final_decl);
+	return final_decl;
 }
 
 gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -219,13 +290,7 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, tag,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, tag, name, scope, file, line, size_in_bits, align_in_bits);
 
 	type_set_offsets(bt);
 
@@ -265,7 +330,7 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 			LLVMDIFlagZero,
 			elements, element_count,
 			0,
-			"", 0
+			cast(char const *)name.text, cast(size_t)name.len
 		);
 	} else {
 		 final_decl = LLVMDIBuilderCreateStructType(
@@ -278,13 +343,31 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 			elements, element_count,
 			0,
 			nullptr,
-			"", 0
+			cast(char const *)name.text, cast(size_t)name.len
 		);
 	}
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	if (build_context.metrics.os == TargetOs_windows && (bt->Struct.soa_kind == StructSoa_Slice || bt->Struct.soa_kind == StructSoa_Dynamic)) {
+		// NOTE(bill): the RAD Debugger then shows each field of a #soa slice or dynamic array as an array of its length
+		isize field_count = bt->Struct.fields.count - 1;
+		if (bt->Struct.soa_kind == StructSoa_Dynamic) {
+			field_count = bt->Struct.fields.count - 3;
+		}
+		gbString expr = gb_string_make(heap_allocator(), "rows($");
+		defer (gb_string_free(expr));
+		for_array(j, bt->Struct.fields) {
+			String fname = bt->Struct.fields[j]->token.string;
+			if (j >= field_count) {
+				expr = gb_string_append_fmt(expr, ", %.*s", LIT(fname));
+			} else if (!is_blank_ident(fname)) {
+				expr = gb_string_append_fmt(expr, ", array(%.*s, __$len)", LIT(fname));
+			}
+		}
+		expr = gb_string_appendc(expr, ")");
+		lb_add_raddbg_generated_view(m, name, expr);
+	}
+
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 gb_internal LLVMMetadataRef lb_debug_slice(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -296,13 +379,7 @@ gb_internal LLVMMetadataRef lb_debug_slice(lbModule *m, Type *type, String name,
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_structure_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_structure_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	unsigned element_count = 2;
 	LLVMMetadataRef elements[2];
@@ -339,12 +416,10 @@ gb_internal LLVMMetadataRef lb_debug_slice(lbModule *m, Type *type, String name,
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -357,13 +432,7 @@ gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, Stri
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_structure_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_structure_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	unsigned element_count = 4;
 	LLVMMetadataRef elements[4];
@@ -418,12 +487,10 @@ gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, Stri
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -435,13 +502,7 @@ gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, T
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_structure_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_structure_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	unsigned element_count = 2;
 	LLVMMetadataRef elements[2];
@@ -480,12 +541,10 @@ gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, T
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 
@@ -498,13 +557,7 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_union_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_union_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	isize index_offset = 1;
 	isize variant_offset = 1;
@@ -565,12 +618,27 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 		elements,
 		element_count,
 		0,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	if (build_context.metrics.os == TargetOs_windows && index_offset > 0) {
+		// NOTE(bill): the RAD Debugger then shows the variant the tag picks
+		gbString expr = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(expr));
+		for_array(j, bt->Union.variants) {
+			expr = gb_string_append_fmt(expr, "tag == %td ? v%td : ", variant_offset+j, variant_offset+j);
+		}
+		expr = gb_string_appendc(expr, "$");
+		lb_add_raddbg_generated_view(m, name, expr);
+	}
+
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
+}
+
+// NOTE(bill): DWARF debuggers show a flag enum as `A | C`, but the RAD Debugger only names a value that is exactly one enumerator.
+// CodeView keeps the union of one-bit members.
+gb_internal bool lb_debug_bit_set_is_flag_enum(Type *bt) {
+	return build_context.metrics.os != TargetOs_windows && base_type(bt->BitSet.elem)->kind == Type_Enum && type_size_of(bt) <= 8;
 }
 
 gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -581,6 +649,34 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
+
+	if (lb_debug_bit_set_is_flag_enum(bt)) {
+		Type *elem = base_type(bt->BitSet.elem);
+		auto enumerators = array_make<LLVMMetadataRef>(temporary_allocator(), 0, elem->Enum.fields.count);
+		u64 bits = 0;
+		for (Entity *f : elem->Enum.fields) {
+			i64 val = exact_value_to_i64(f->Constant.value);
+			if (val < bt->BitSet.lower || bt->BitSet.upper < val) {
+				continue;
+			}
+			u64 flag = 1ull << cast(u64)(val - bt->BitSet.lower);
+			if (bits & flag) {
+				// an alias of an earlier field, as debuggers only show disjoint values as flags
+				continue;
+			}
+			bits |= flag;
+			String field_name = f->token.string;
+			array_add(&enumerators, LLVMDIBuilderCreateEnumerator(m->debug_builder,
+				cast(char const *)field_name.text, cast(size_t)field_name.len, cast(i64)flag, true
+			));
+		}
+		LLVMMetadataRef final_decl = LLVMDIBuilderCreateEnumerationType(m->debug_builder, scope,
+			cast(char const *)name.text, cast(size_t)name.len, file, line, size_in_bits, align_in_bits,
+			enumerators.data, cast(unsigned)enumerators.count, lb_debug_type(m, bit_set_to_int(bt))
+		);
+		lb_set_llvm_metadata(m, type, final_decl);
+		return final_decl;
+	}
 
 	LLVMMetadataRef bit_set_field_type = lb_debug_type(m, t_bool);
 
@@ -648,7 +744,7 @@ gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name
 		elements,
 		element_count,
 		0,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 	lb_set_llvm_metadata(m, type, final_decl);
 	return final_decl;
@@ -689,7 +785,7 @@ gb_internal LLVMMetadataRef lb_debug_bitfield(lbModule *m, Type *type, String na
 		elements, element_count,
 		0,
 		nullptr,
-		"", 0
+		cast(char const *)name.text, cast(size_t)name.len
 	);
 	lb_set_llvm_metadata(m, type, final_decl);
 	return final_decl;
@@ -732,6 +828,15 @@ gb_internal LLVMMetadataRef lb_debug_enum(lbModule *m, Type *type, String name, 
 }
 
 gb_internal LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 size_in_bits, LLVMDWARFTypeEncoding encoding, LLVMDIFlags flags = LLVMDIFlagZero) {
+	if ((flags & LLVMDIFlagBigEndian) && build_context.metrics.os == TargetOs_windows) {
+		// NOTE: CodeView has no endianness and drops the names of basic types and typedefs, so a big endian type is
+		// an empty enum of its bits, which keeps its name for a view to swap the bytes
+		if (encoding == LLVMDWARFTypeEncoding_Float) {
+			encoding = LLVMDWARFTypeEncoding_Unsigned;
+		}
+		LLVMMetadataRef bits = LLVMDIBuilderCreateBasicType(m->debug_builder, cast(char const *)name.text, name.len, size_in_bits, encoding, LLVMDIFlagZero);
+		return LLVMDIBuilderCreateEnumerationType(m->debug_builder, nullptr, cast(char const *)name.text, name.len, nullptr, 0, size_in_bits, cast(u32)size_in_bits, nullptr, 0, bits);
+	}
 	LLVMMetadataRef basic_type = LLVMDIBuilderCreateBasicType(m->debug_builder, cast(char const *)name.text, name.len, size_in_bits, encoding, flags);
 #if 1
 	LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(m->debug_builder, basic_type, cast(char const *)name.text, name.len, nullptr, 0, nullptr, cast(u32)size_in_bits);
@@ -739,6 +844,52 @@ gb_internal LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &
 #else
 	return basic_type;
 #endif
+}
+
+struct lbDebugNamedType {
+	String name;
+	Type * type;
+};
+
+gb_internal GB_COMPARE_PROC(lb_debug_named_type_cmp) {
+	lbDebugNamedType const *x = cast(lbDebugNamedType const *)a;
+	lbDebugNamedType const *y = cast(lbDebugNamedType const *)b;
+	return string_compare(x->name, y->name);
+}
+
+// NOTE(bill): `typeid` is an enum of every type in the type table, named by its canonical name.
+// Meaning that a debugger shows which type a `typeid` is.
+gb_internal LLVMMetadataRef lb_debug_typeid_enum(lbModule *m) {
+	auto types = array_make<lbDebugNamedType>(heap_allocator(), 0, m->info->type_info_types_hash_map.count);
+	defer (array_free(&types));
+	for (TypeInfoPair const &tt : m->info->type_info_types_hash_map) {
+		if (tt.type != nullptr && tt.type != t_invalid) {
+			array_add(&types, lbDebugNamedType{type_to_canonical_string(temporary_allocator(), tt.type), tt.type});
+		}
+	}
+	array_sort(types, lb_debug_named_type_cmp);
+
+	auto enumerators = array_make<LLVMMetadataRef>(heap_allocator(), 0, types.count);
+	defer (array_free(&enumerators));
+	for (lbDebugNamedType const &t : types) {
+		array_add(&enumerators, LLVMDIBuilderCreateEnumerator(m->debug_builder,
+			cast(char const *)t.name.text, cast(size_t)t.name.len,
+			cast(i64)type_hash_canonical_type(t.type), true
+		));
+	}
+	String name = str_lit("typeid");
+	return LLVMDIBuilderCreateEnumerationType(m->debug_builder, nullptr,
+		cast(char const *)name.text, cast(size_t)name.len, nullptr, 0, 64, 64,
+		enumerators.data, cast(unsigned)enumerators.count, lb_debug_type(m, t_u64)
+	);
+}
+
+// NOTE: gdb reads a `wchar_t` as UTF-32 on Linux, but a 16-bit UTF character as UTF-16; CodeView knows `wchar_t` as UTF-16
+gb_internal LLVMMetadataRef lb_debug_char16_type(lbModule *m) {
+	if (build_context.metrics.os == TargetOs_windows) {
+		return lb_debug_type_basic_type(m, str_lit("wchar_t"), 16, LLVMDWARFTypeEncoding_Unsigned);
+	}
+	return lb_debug_type_basic_type(m, str_lit("char16_t"), 16, LLVMDWARFTypeEncoding_Utf);
 }
 
 gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
@@ -784,7 +935,10 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_uintptr: return lb_debug_type_basic_type(m, str_lit("uintptr"), ptr_bits, LLVMDWARFTypeEncoding_Unsigned);
 
 		case Basic_typeid:
-			return lb_debug_type_basic_type(m, str_lit("typeid"), 64, LLVMDWARFTypeEncoding_Unsigned);
+			if (build_context.no_rtti) {
+				return lb_debug_type_basic_type(m, str_lit("typeid"), 64, LLVMDWARFTypeEncoding_Unsigned);
+			}
+			return lb_debug_typeid_enum(m);
 
 		// Endian Specific Types
 		case Basic_i16le:  return lb_debug_type_basic_type(m, str_lit("i16le"),  16,  LLVMDWARFTypeEncoding_Signed,   LLVMDIFlagLittleEndian);
@@ -867,8 +1021,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 
 		case Basic_rawptr:
 			{
-				LLVMMetadataRef void_type = lb_debug_type_basic_type(m, str_lit("void"), 8, LLVMDWARFTypeEncoding_Unsigned);
-				return LLVMDIBuilderCreatePointerType(m->debug_builder, void_type, ptr_bits, ptr_bits, LLVMDWARFTypeEncoding_Address, "rawptr", 6);
+				// NOTE: a pointer to no type is `void *`, as clang emits it, rather than a pointer to a byte shown as a C string
+				return LLVMDIBuilderCreatePointerType(m->debug_builder, nullptr, ptr_bits, ptr_bits, 0, "rawptr", 6);
 			}
 		case Basic_string:
 			{
@@ -888,16 +1042,21 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_string16:
 			{
 				// NOTE(bill): size_of(^u16) <= size_of(int)
+				// The data is a pointer to a UTF-16 character, as `cstring16` is, so that debuggers show it as text
+				LLVMMetadataRef char_type = lb_debug_char16_type(m);
+				LLVMMetadataRef file = lb_get_file_metadata(m, m->info->runtime_package->files[0]);
 
 				LLVMMetadataRef elements[2] = {};
-				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_u16_ptr, 0);
+				elements[0] = LLVMDIBuilderCreateMemberType(m->debug_builder, file, "data", 4, file, 1, ptr_bits, ptr_bits, 0, LLVMDIFlagZero,
+					LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, nullptr, 0)
+				);
 				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, int_bits);
 				return lb_debug_basic_struct(m, str_lit("string16"), 2*int_bits, int_bits, elements, gb_count_of(elements));
 			}
 		case Basic_cstring16:
 			{
-				LLVMMetadataRef char_type = lb_debug_type_basic_type(m, str_lit("wchar_t"), 16, LLVMDWARFTypeEncoding_Unsigned);
-				return LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, "cstring16", 7);
+				LLVMMetadataRef char_type = lb_debug_char16_type(m);
+				return LLVMDIBuilderCreatePointerType(m->debug_builder, char_type, ptr_bits, ptr_bits, 0, "cstring16", 9);
 			}
 
 		case Basic_any:
@@ -1109,7 +1268,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			elements, 1,
 			0,
 			nullptr,
-			"", 0
+			name, gb_string_length(name)
 		);
 
 		return final_decl;
@@ -1143,14 +1302,146 @@ gb_internal LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope
 	}
 }
 
+// NOTE: gdb looks a declared enum up by name and stops at the first declaration it finds rather than the definition,
+// and it cannot look up a declared type whose name starts with `#`, so on DWARF these are defined in every module
+// which uses them, as clang does with enums
+gb_internal bool lb_debug_type_is_defined_everywhere(Type *bt) {
+	if (build_context.metrics.os == TargetOs_windows) {
+		return false;
+	}
+	switch (bt->kind) {
+	case Type_Enum:   return true;
+	case Type_BitSet: return lb_debug_bit_set_is_flag_enum(bt);
+	case Type_Struct: return bt->Struct.soa_kind != StructSoa_None;
+	case Type_Basic:  return bt->Basic.kind == Basic_typeid;
+	}
+	return false;
+}
+
 gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	GB_ASSERT(type != nullptr);
+
+	MUTEX_GUARD(&m->debug_values_mutex);
+
 	LLVMMetadataRef found = lb_get_llvm_metadata(m, type);
 	if (found != nullptr) {
+		// NOTE: CodeView can only refer back to a type through a forward reference to a record, so a loop made only of
+		// procedure, pointer and array types, as in `Bar :: proc(p: ^Bar)`, is cut to `rawptr` where it closes
+		if (type->kind == Type_Named && build_context.metrics.os == TargetOs_windows) {
+			for (isize i = m->debug_type_frames.count-1; i >= 0; i--) {
+				lbDebugTypeFrame const &frame = m->debug_type_frames[i];
+				if (frame.is_record) {
+					break;
+				}
+				if (frame.type == type) {
+					lbDebugTypeFrame *top = &m->debug_type_frames[m->debug_type_frames.count-1];
+					top->lowest_cut = gb_min(top->lowest_cut, i);
+					return lb_debug_type(m, t_rawptr);
+				}
+			}
+		}
 		return found;
 	}
 
-	MUTEX_GUARD(&m->debug_values_mutex);
+	bool is_record = false;
+	Type *record_bt = base_type(type);
+	switch (record_bt->kind) {
+	case Type_Struct:
+	case Type_Union:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_FixedCapacityDynamicArray:
+	case Type_Map:
+	case Type_BitSet:
+	case Type_BitField:
+	case Type_Enum:
+	case Type_Matrix:
+		is_record = true;
+		break;
+	case Type_Tuple:
+		is_record = record_bt->Tuple.variables.count != 1;
+		break;
+	case Type_Basic:
+		// NOTE(bill): the `typeid` debug-info enum is as mahussive as the type table
+		// This means we defined once like the record/any types or else its `id` differs between the module defining `typeid` and the rest
+		if (type->kind == Type_Basic) {
+			switch (type->Basic.kind) {
+			case Basic_typeid: is_record = !build_context.no_rtti; break;
+			case Basic_any:    is_record = true;                   break;
+			}
+		}
+		break;
+	}
+
+	Array<lbModule *> const &types_modules = m->gen->debug_types_modules;
+	String record_name = {};
+	lbModule *owner = nullptr;
+	if (is_record && types_modules.count != 0 && record_bt->kind != Type_Tuple && !lb_debug_type_is_defined_everywhere(record_bt)) {
+		record_name = type_to_canonical_string(temporary_allocator(), type);
+		owner = types_modules[string_hash(record_name) % types_modules.count];
+	}
+	if (owner != nullptr && owner != m) {
+		// NOTE(bill): The record is defined once in its debug types module and only forward declared here.
+		// Enums are matched by name, as the C API cannot give an enumeration an identifier.
+		unsigned tag = DW_TAG_structure_type;
+		switch (record_bt->kind) {
+		case Type_Struct:
+			if (is_type_raw_union(record_bt)) {
+				tag = DW_TAG_union_type;
+			}
+			break;
+		case Type_Union:
+			tag = DW_TAG_union_type;
+			break;
+		case Type_BitSet:
+			tag = DW_TAG_union_type;
+			if (lb_debug_bit_set_is_flag_enum(record_bt)) {
+				tag = DW_TAG_enumeration_type;
+			}
+			break;
+		case Type_Enum:
+			tag = DW_TAG_enumeration_type;
+			break;
+		case Type_Basic:
+			if (record_bt->Basic.kind == Basic_typeid) {
+				tag = DW_TAG_enumeration_type;
+			}
+			break;
+		}
+
+		String name = record_name;
+		String identifier = name;
+		if (tag == DW_TAG_enumeration_type) {
+			identifier = {};
+		}
+
+		LLVMMetadataRef scope = nullptr;
+		if (type->kind == Type_Named && type->Named.type_name != nullptr) {
+			scope = lb_get_file_metadata(m, type->Named.type_name->file);
+		}
+
+		LLVMMetadataRef forward_decl = LLVMDIBuilderCreateForwardDecl(
+			m->debug_builder, tag,
+			cast(char const *)name.text, cast(size_t)name.len,
+			scope, scope, 0, 0, 0, 0,
+			cast(char const *)identifier.text, cast(size_t)identifier.len
+		);
+		lb_set_llvm_metadata(m, type, forward_decl);
+		mpsc_enqueue(&owner->debug_homed_types, type);
+		return forward_decl;
+	}
+
+	isize frame_index = m->debug_type_frames.count;
+	array_add(&m->debug_type_frames, lbDebugTypeFrame{type, is_record, frame_index});
+	defer ({
+		lbDebugTypeFrame frame = array_pop(&m->debug_type_frames);
+		if (frame.lowest_cut < frame_index) {
+			// NOTE: holds a cut back to a type still being lowered, so it only stands for that loop and is not kept
+			map_remove(&m->debug_values, cast(void *)type);
+			lbDebugTypeFrame *parent = &m->debug_type_frames[m->debug_type_frames.count-1];
+			parent->lowest_cut = gb_min(parent->lowest_cut, frame.lowest_cut);
+		}
+	});
 
 	if (type->kind == Type_Named) {
 		LLVMMetadataRef file = nullptr;
@@ -1173,6 +1464,11 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		switch (bt->kind) {
 		default: {
 			u32 align_in_bits = 8*cast(u32)type_align_of(type);
+			// NOTE: only a type whose base is not basic can be reached again while lowering its base, as in `Bar :: proc(p: ^Bar)`
+			LLVMMetadataRef temp_forward_decl = nullptr;
+			if (bt->kind != Type_Basic) {
+				temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_typedef, name, scope, file, line, 8*cast(u64)type_size_of(type), align_in_bits);
+			}
 			LLVMMetadataRef debug_bt = lb_debug_type(m, bt);
 			LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(
 				m->debug_builder,
@@ -1180,8 +1476,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 				cast(char const *)name.text, cast(size_t)name.len,
 				file, line, scope, align_in_bits
 			);
-			lb_set_llvm_metadata(m, type, final_decl);
-			return final_decl;
+			return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 		}
 
 		case Type_Map: {
@@ -1403,6 +1698,45 @@ gb_internal void lb_add_debug_info_static_variable(lbProcedure *p, Entity *e, LL
 	LLVMGlobalSetMetadata(global, 0, global_variable_metadata);
 }
 
+// `pkg::`, or `pkg::[file.odin]::` for what only its own file can see
+gb_internal gbString lb_debug_append_name_prefix(gbString s, AstFile *file, Entity *e) {
+	AstPackage *pkg = file->pkg;
+	s = gb_string_append_length(s, pkg->name.text, pkg->name.len);
+	s = gb_string_appendc(s, "::");
+	if (e == nullptr || scope_lookup_current(pkg->scope, entity_interned_name(e)) != e) {
+		String file_name = filename_without_directory(file->fullpath);
+		s = gb_string_append_fmt(s, "[%.*s]::", LIT(file_name));
+	}
+	return s;
+}
+
+// NOTE(bill): the name a user types for a procedure: `pkg::name`, `pkg::outer::inner`, or `pkg::outer::proc@42` for a literal.
+// Every instance of a polymorphic procedure shares its name; if they ever need telling apart,
+// the template style `pkg::name<T>` is the option, once each debugger is checked with it.
+gb_internal gbString lb_debug_append_proc_name(gbString s, DeclInfo *decl) {
+	Entity *e = decl->entity.load();
+	bool is_literal = e == nullptr || e->Procedure.is_anonymous;
+	if (DeclInfo *enclosing = lb_enclosing_proc_decl(decl)) {
+		s = lb_debug_append_proc_name(s, enclosing);
+		s = gb_string_appendc(s, "::");
+	} else {
+		Entity *named = nullptr;
+		if (!is_literal) {
+			named = e;
+			if (decl->para_poly_original != nullptr) {
+				named = decl->para_poly_original;
+			}
+		}
+		s = lb_debug_append_name_prefix(s, decl->proc_lit->file(), named);
+	}
+	if (is_literal) {
+		s = gb_string_append_fmt(s, "proc@%d", ast_token(decl->proc_lit).pos.line);
+	} else {
+		s = gb_string_append_length(s, e->token.string.text, e->token.string.len);
+	}
+	return s;
+}
+
 gb_internal String lb_debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
 	String name = e->token.string;
 	if (e->pkg && e->pkg->name.len > 0) {
@@ -1567,4 +1901,122 @@ gb_internal void lb_add_debug_label(lbProcedure *p, Ast *label, lbBlock *target)
 		llvm_block
 	);
 #endif
+}
+
+struct lbDebugTypesPart {
+	lbModule *m;
+	isize     pending; // how many of the queued types this round defines
+	StringSet seen;
+	Array<lbDebugNamedType> homed;
+};
+
+gb_internal WORKER_TASK_PROC(lb_debug_define_homed_types_worker_proc) {
+	lbDebugTypesPart *part = cast(lbDebugTypesPart *)data;
+	lbModule *m = part->m;
+
+	// NOTE(bill): Defined in name order
+	// The output does not depend on the order the types were queued in.
+	isize first = part->homed.count;
+	for (isize i = 0; i < part->pending; i++) {
+		Type *type = nullptr;
+		bool ok = mpsc_dequeue(&m->debug_homed_types, &type);
+		GB_ASSERT(ok);
+		String name = type_to_canonical_string(permanent_allocator(), type);
+		if (!string_set_update(&part->seen, name)) {
+			array_add(&part->homed, lbDebugNamedType{name, type});
+		}
+	}
+	gb_sort_array(part->homed.data+first, part->homed.count-first, lb_debug_named_type_cmp);
+	for (isize i = first; i < part->homed.count; i++) {
+		lb_debug_type(m, part->homed[i].type);
+	}
+	return 0;
+}
+
+gb_internal WORKER_TASK_PROC(lb_debug_types_anchor_worker_proc) {
+	lbDebugTypesPart *part = cast(lbDebugTypesPart *)data;
+	lbModule *m = part->m;
+	if (part->homed.count == 0) {
+		return 0;
+	}
+	array_sort(part->homed, lb_debug_named_type_cmp);
+
+	char anchor_name[32] = {};
+	isize anchor_name_len = gb_snprintf(anchor_name, gb_size_of(anchor_name), "__$debug_types$%d", m->split_part) - 1;
+	LLVMMetadataRef file = lb_get_file_metadata(m, m->info->runtime_package->files[0]);
+	u32 ptr_bits = 8*cast(u32)build_context.ptr_size;
+
+	auto members = array_make<LLVMMetadataRef>(heap_allocator(), 0, part->homed.count);
+	defer (array_free(&members));
+	for (lbDebugNamedType const &h : part->homed) {
+		LLVMMetadataRef pointer = LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, h.type), ptr_bits, ptr_bits, 0, nullptr, 0);
+		array_add(&members, LLVMDIBuilderCreateMemberType(m->debug_builder, file,
+			cast(char const *)h.name.text, h.name.len, file, 0,
+			ptr_bits, ptr_bits, 0, LLVMDIFlagZero, pointer
+		));
+	}
+	LLVMMetadataRef anchor_type = LLVMDIBuilderCreateUnionType(m->debug_builder, file,
+		anchor_name, anchor_name_len, file, 0, ptr_bits, ptr_bits, LLVMDIFlagZero,
+		members.data, cast(unsigned)members.count, 0,
+		anchor_name, anchor_name_len
+	);
+
+	LLVMTypeRef ptr_type = LLVMPointerTypeInContext(m->ctx, 0);
+	LLVMValueRef global = LLVMAddGlobal(m->mod, ptr_type, anchor_name);
+	LLVMSetInitializer(global, LLVMConstNull(ptr_type));
+	LLVMSetLinkage(global, LLVMInternalLinkage);
+	lb_append_to_used(m, global);
+
+	LLVMMetadataRef global_expr = LLVMDIBuilderCreateGlobalVariableExpression(m->debug_builder, file,
+		anchor_name, anchor_name_len, "", 0, file, 0, anchor_type, true,
+		LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0), nullptr, ptr_bits
+	);
+	LLVMGlobalSetMetadata(global, 0, global_expr);
+	return 0;
+}
+
+gb_internal void lb_debug_generate_types_modules(lbGenerator *gen, bool do_threading) {
+	auto parts = array_make<lbDebugTypesPart>(heap_allocator(), gen->debug_types_modules.count);
+	defer (array_free(&parts));
+	for_array(i, parts) {
+		parts[i].m = gen->debug_types_modules[i];
+		string_set_init(&parts[i].seen);
+		array_init(&parts[i].homed, heap_allocator());
+	}
+
+	for (;;) {
+		bool any = false;
+		for (lbDebugTypesPart &part : parts) {
+			part.pending = part.m->debug_homed_types.count.load();
+			any |= part.pending != 0;
+		}
+		if (!any) {
+			break;
+		}
+		for (lbDebugTypesPart &part : parts) {
+			if (part.pending == 0) {
+				continue;
+			}
+			if (do_threading) {
+				thread_pool_add_task(lb_debug_define_homed_types_worker_proc, &part);
+			} else {
+				lb_debug_define_homed_types_worker_proc(&part);
+			}
+		}
+		thread_pool_wait();
+	}
+
+	for (lbDebugTypesPart &part : parts) {
+		if (do_threading) {
+			thread_pool_add_task(lb_debug_types_anchor_worker_proc, &part);
+		} else {
+			lb_debug_types_anchor_worker_proc(&part);
+		}
+	}
+	thread_pool_wait();
+
+	for (lbDebugTypesPart &part : parts) {
+		string_set_destroy(&part.seen);
+		array_free(&part.homed);
+	}
 }

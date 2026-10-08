@@ -4200,6 +4200,10 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 
 	if (is_type_cstring(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_cstring");
+	} else if (is_type_cstring16(key)) {
+		add_package_dependency(ctx, "runtime", "default_hasher_cstring16");
+	} else if (is_type_string16(key)) {
+		add_package_dependency(ctx, "runtime", "default_hasher_string16");
 	} else if (is_type_string(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_string");
 	} else if (!is_type_polymorphic(key)) {
@@ -4651,9 +4655,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	if (is_complete) {
 		add_type_info_type(ctx, soa_struct);
 		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
-	} else if (global_group_soa_types != nullptr) {
+	} else if (global_group_context.soa_types != nullptr) {
 		// NOTE: no task waits on the element type, which could hold every thread of the pool
-		array_add(global_group_soa_types, soa_struct);
+		array_add(global_group_context.soa_types, soa_struct);
 	} else {
 		SoaTypeWorkerData *wd = permanent_alloc_item<SoaTypeWorkerData>();
 		wd->ctx = *ctx;

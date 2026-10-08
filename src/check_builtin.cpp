@@ -2169,13 +2169,134 @@ gb_internal bool is_valid_type_for_load(Type *type) {
 	return false;
 }
 
+// the `&x` an atomic operation's pointer is, through any conversions of it, unless it is a pointer from elsewhere
+gb_internal Ast *check_atomic_address_of(Ast *ptr) {
+	ptr = unparen_expr(ptr);
+	for (;;) {
+		if (ptr->kind == Ast_CallExpr && ptr->CallExpr.proc->tav.mode == Addressing_Type && ptr->CallExpr.args.count == 1) {
+			ptr = unparen_expr(ptr->CallExpr.args[0]);
+		} else if (ptr->kind == Ast_TypeCast) {
+			ptr = unparen_expr(ptr->TypeCast.expr);
+		} else if (ptr->kind == Ast_AutoCast) {
+			ptr = unparen_expr(ptr->AutoCast.expr);
+		} else {
+			break;
+		}
+	}
+	if (ptr->kind != Ast_UnaryExpr || ptr->UnaryExpr.op.kind != Token_And) {
+		return nullptr;
+	}
+	return ptr;
+}
+
+gb_internal i64 check_atomic_address_alignment(Ast *x) {
+	x = unparen_expr(x);
+	switch (x->kind) {
+	case_ast_node(i, Ident, x);
+		Entity *e = entity_of_node(x);
+		if (e != nullptr && e->kind == Entity_Variable) {
+			return gb_max(type_align_of(e->type), e->Variable.custom_align);
+		}
+	case_end;
+
+	case_ast_node(se, SelectorExpr, x);
+		Entity *pkg = entity_of_node(se->expr);
+		if (pkg != nullptr && pkg->kind == Entity_ImportName) {
+			return check_atomic_address_alignment(se->selector);
+		}
+		if (se->swizzle_count > 0 || se->is_bit_field) {
+			break;
+		}
+		Type *t = type_deref(se->expr->tav.type);
+		Selection sel = lookup_field(t, se->selector->Ident.interned, false);
+		if (sel.entity == nullptr || sel.indirect) {
+			break;
+		}
+		i64 align = type_align_of(t);
+		if (!is_type_pointer(se->expr->tav.type)) {
+			align = check_atomic_address_alignment(se->expr);
+		}
+		i64 offset = type_offset_of_from_selection(t, sel);
+		if (offset != 0) {
+			align = gb_min(align, offset & -offset);
+		}
+		return align;
+	case_end;
+
+	case_ast_node(ie, IndexExpr, x);
+		Type *t = base_type(ie->expr->tav.type);
+		if (t == nullptr || t->kind != Type_Array) {
+			break;
+		}
+		i64 align = check_atomic_address_alignment(ie->expr);
+		i64 offset = type_size_of(t->Array.elem);
+		if (ie->index->tav.mode == Addressing_Constant) {
+			offset *= exact_value_to_i64(ie->index->tav.value);
+		}
+		if (offset != 0) {
+			align = gb_min(align, offset & -offset);
+		}
+		return align;
+	case_end;
+	}
+	return type_align_of(x->tav.type);
+}
+
 gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
 	if (!is_type_valid_atomic_type(elem)) {
 		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
 		return false;
 	}
-	return true;
+	if (!target_atomics_are_plain() && !is_type_lock_free(elem)) {
+		ERROR_BLOCK();
+		gbString str = type_to_string(elem);
+		error(operand->expr, "'%s' cannot be used as an atomic for '%.*s' on this target, as it is not lock-free", str, LIT(builtin_name));
+		gb_string_free(str);
+		if (build_context.metrics.arch == TargetArch_amd64 && type_size_of(elem) == 16) {
+			error_line("\tSuggestion: A 16 byte atomic needs 'cx16', e.g. with -microarch:x86-64-v2 or later\n");
+		}
+		return false;
+	}
 
+	Ast *ptr = check_atomic_address_of(operand->expr);
+	if (ptr == nullptr) {
+		return true;
+	}
+
+	// what is within a #packed struct may be at any address, where an atomic access faults on some targets
+	for (Ast *x = unparen_expr(ptr->UnaryExpr.expr); /**/; /**/) {
+		Ast *base = nullptr;
+		if (x->kind == Ast_SelectorExpr) {
+			base = x->SelectorExpr.expr;
+		} else if (x->kind == Ast_IndexExpr && is_type_array_like(x->IndexExpr.expr->tav.type)) {
+			base = x->IndexExpr.expr;
+		} else {
+			break;
+		}
+		Type *t = base_type(type_deref(base->tav.type));
+		if (t != nullptr && t->kind == Type_Struct && t->Struct.is_packed) {
+			gbString str = expr_to_string(ptr->UnaryExpr.expr);
+			error(operand->expr, "'%s' may be misaligned for '%.*s', as it is within a #packed struct", str, LIT(builtin_name));
+			gb_string_free(str);
+			return false;
+		}
+		if (is_type_pointer(base->tav.type)) {
+			break;
+		}
+		x = unparen_expr(base);
+	}
+
+	// e.g. a `u32` converted to a `^u64`, which an atomic access faults on, or splits, when misaligned
+	i64 align = check_atomic_address_alignment(ptr->UnaryExpr.expr);
+	if (align < type_size_of(elem)) {
+		gbString str = expr_to_string(ptr->UnaryExpr.expr);
+		gbString type_str = type_to_string(elem);
+		error(operand->expr, "'%s' may be misaligned for '%.*s' of '%s', as it is only known to be %lld byte aligned", str, LIT(builtin_name), type_str, cast(long long)align);
+		gb_string_free(type_str);
+		gb_string_free(str);
+		return false;
+	}
+	return true;
 }
 
 gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
@@ -5743,6 +5864,76 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_read_cycle_counter:
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
+		break;
+
+	case BuiltinProc_return_address:
+	case BuiltinProc_frame_address:
+		{
+			if (ce->args.count > 1) {
+				error(ce->args[1], "'%.*s' expects either 0 or 1 arguments, got %td", LIT(builtin_name), ce->args.count);
+				return false;
+			}
+			i64 level = 0;
+			if (ce->args.count > 0) {
+				Operand x = {};
+				check_expr(c, &x, ce->args[0]);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+				if (x.mode != Addressing_Constant || !is_type_integer(x.type)) {
+					error(x.expr, "'%.*s' expects a constant integer level", LIT(builtin_name));
+					return false;
+				}
+				// convert constant from BigInt to a type before `exact_value_to_i64`
+				convert_to_typed(c, &x, t_int);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+				level = exact_value_to_i64(x.value);
+				if (level < 0 || level > U32_MAX) {
+					error(x.expr, "'%.*s' expects a level in the range 0..=%u, got %lld", LIT(builtin_name), U32_MAX, cast(long long)level);
+					return false;
+				}
+			}
+			if (is_arch_wasm()) {
+				// wasm has no addressable return addresses, and LLVM has no frames above the current one
+				if (id == BuiltinProc_return_address) {
+					error(call, "'%.*s' is not allowed on wasm targets", LIT(builtin_name));
+					return false;
+				} else if (level > 0) {
+					error(call, "'%.*s' with a level above 0 is not allowed on wasm targets", LIT(builtin_name));
+					return false;
+				}
+			}
+			if (level > 0 &&
+			    build_context.metrics.arch == TargetArch_amd64 &&
+			    (build_context.metrics.os == TargetOs_windows || build_context.metrics.abi == TargetABI_Win64)) {
+				// frames can only be walked with the unwind tables, so LLVM ignores the level
+				error(call, "'%.*s' with a level above 0 is not allowed on Windows amd64 targets", LIT(builtin_name));
+				return false;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = t_rawptr;
+		}
+		break;
+
+	case BuiltinProc_stack_pointer:
+		operand->mode = Addressing_Value;
+		operand->type = t_rawptr;
+		break;
+
+	case BuiltinProc_address_of_return_address:
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+		case TargetArch_i386:
+		case TargetArch_arm64:
+			break;
+		default:
+			error(call, "'%.*s' is only allowed on amd64, i386, and arm64 targets", LIT(builtin_name));
+			return false;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = alloc_type_pointer(t_rawptr);
 		break;
 
 	case BuiltinProc_count_ones:

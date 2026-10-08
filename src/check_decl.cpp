@@ -1551,6 +1551,29 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	e->Procedure.fast_math_flags = ac.fast_math_flags;
 
+	e->Procedure.futex = cast(ProcedureFutex)ac.futex;
+	if (ac.futex == ProcedureFutex_None && ac.futex_parameter.len != 0) {
+		error(e->token, "@(futex_parameter) can only be used with @(futex)");
+	}
+	if (ac.futex != ProcedureFutex_None) {
+		Entity *param = nullptr;
+		if (pt->param_count > 0) {
+			for_array(i, pt->params->Tuple.variables) {
+				Entity *v = pt->params->Tuple.variables[i];
+				if (ac.futex_parameter.len == 0 || v->token.string == ac.futex_parameter) {
+					param = v;
+					e->Procedure.futex_parameter = cast(i32)i;
+					break;
+				}
+			}
+		}
+		if (param == nullptr && ac.futex_parameter.len != 0) {
+			error(e->token, "@(futex_parameter) names '%.*s', which is not a parameter of '%.*s'", LIT(ac.futex_parameter), LIT(e->token.string));
+		} else if (param == nullptr || !is_type_pointer(param->type) || !(is_type_integer(type_deref(param->type)) || is_type_polymorphic(type_deref(param->type)))) {
+			error(e->token, "A procedure with @(futex) must take a pointer to an integer as its first parameter, or the one @(futex_parameter) names, which is what it waits on or wakes");
+		}
+	}
+
 	e->deprecated_message = ac.deprecated_message;
 	e->warning_message = ac.warning_message;
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix, ac.link_suffix);
@@ -1757,6 +1780,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *e, Ast 
 
 	e->Variable.thread_local_model = ac.thread_local_model;
 	e->Variable.is_export = ac.is_export;
+	e->Variable.custom_align = ac.align;
 	e->flags &= ~EntityFlag_Static;
 	if (ac.is_static) {
 		error(e->token, "@(static) is not supported for global variables, nor required");
@@ -1903,11 +1927,14 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, D
 			arg = arg->BinaryExpr.left;
 		}
 
+		bool prev_in_proc_group_decl = ctx->in_proc_group_decl;
+		ctx->in_proc_group_decl = true;
 		if (arg->kind == Ast_Ident) {
 			e = check_ident(ctx, &o, arg, nullptr, nullptr, true);
 		} else if (arg->kind == Ast_SelectorExpr) {
 			e = check_selector(ctx, &o, arg, nullptr);
 		}
+		ctx->in_proc_group_decl = prev_in_proc_group_decl;
 		if (e == nullptr) {
 			error(arg, "Expected a valid entity name in procedure group, got %.*s", LIT(ast_strings[arg->kind]));
 			continue;
@@ -2223,10 +2250,13 @@ gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, 
 		}
 
 		CheckerContext c = *ctx;
+		ErrorInstantiations prev_instantiations = global_error_context.instantiations;
+		defer (global_error_context.instantiations = prev_instantiations);
 		if (d->scope->flags & ScopeFlag_File) {
 			// NOTE(bill): a global is checked in a context of its own file, never in that of whatever needed it first,
-			// which may be in another file or package, or a procedure body.
+			// which may be in another file or package, or a procedure body (nor is it part of its instantiation).
 			// Only the cycle detection carries over.
+			global_error_context.instantiations = {};
 			CheckerTypePath *type_path = c.type_path;
 			UntypedExprInfoMap *untyped = c.untyped;
 			gb_zero_size(&c.pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));

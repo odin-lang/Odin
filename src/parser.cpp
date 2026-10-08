@@ -91,6 +91,24 @@ gb_internal u64 ast_file_vet_flags(AstFile *f) {
 	return 0;
 }
 
+// the analyses a file with `#+analysis` has, so that each runs for them when the command line disables it otherwise
+gb_global std::atomic<u64> global_tagged_analysis_flags;
+
+gb_internal u64 ast_file_analysis_flags(AstFile *f) {
+	if (f != nullptr && f->analysis_flags_set) {
+		return f->analysis_flags;
+	}
+	return AnalysisFlag_All &~ build_context.no_analysis_flags;
+}
+
+gb_internal bool ast_file_analysis(AstFile *f, AnalysisFlags flag) {
+	return (ast_file_analysis_flags(f) & flag) != 0;
+}
+
+gb_internal bool analysis_in_use(AnalysisFlags flag) {
+	return (build_context.no_analysis_flags & flag) == 0 || (global_tagged_analysis_flags.load(std::memory_order_relaxed) & flag) != 0;
+}
+
 gb_internal bool ast_file_vet_style(AstFile *f) {
 	return (ast_file_vet_flags(f) & VetFlag_Style) != 0;
 }
@@ -7261,11 +7279,64 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags)
 			error_line("\ttabs\n");
 			error_line("\texplicit-allocators\n");
 			error_line("\twhen-shadowing\n");
+			error_line("\tnil-deref\n");
+			error_line("\tuninitialized\n");
+			error_line("\tatomic-access\n");
 			return vet_flags;
 		}
 	}
 
 	return vet_flags;
+}
+
+gb_internal u64 parse_analysis_tag(Token token_for_pos, String s, u64 base_analysis_flags) {
+	String const prefix = str_lit("analysis");
+	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return base_analysis_flags;
+	}
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	u64 analysis_flags = base_analysis_flags;
+
+	if (s.len == 0) {
+		analysis_flags |= AnalysisFlag_All;
+	}
+
+	while (s.len > 0) {
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s, /*allow_colon*/false));
+		if (p.len == 0) {
+			break;
+		}
+
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				syntax_error(token_for_pos, "Expected an analysis name after '!'");
+				return analysis_flags;
+			}
+		}
+
+		u64 flag = get_analysis_flag_from_name(p);
+		if (flag == AnalysisFlag_NONE) {
+			ERROR_BLOCK();
+			syntax_error(token_for_pos, "Invalid analysis name: %.*s", LIT(p));
+			error_line("\tExpected one of the following\n");
+			error_line("\tescape\n");
+			error_line("\tatomic\n");
+			return analysis_flags;
+		}
+		if (is_notted) {
+			analysis_flags &= ~flag;
+		} else {
+			analysis_flags |= flag;
+		}
+	}
+
+	return analysis_flags;
 }
 
 gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
@@ -7452,6 +7523,10 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (string_starts_with(lc, str_lit("vet"))) {
 		f->vet_flags = parse_vet_tag(tok, lc, ast_file_vet_flags(f));
 		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("analysis"))) {
+		f->analysis_flags = parse_analysis_tag(tok, lc, ast_file_analysis_flags(f));
+		f->analysis_flags_set = true;
+		global_tagged_analysis_flags.fetch_or(f->analysis_flags, std::memory_order_relaxed);
 	} else if (string_starts_with(lc, str_lit("test"))) {
 		if ((build_context.command_kind & Command_test) == 0) {
 			return false;

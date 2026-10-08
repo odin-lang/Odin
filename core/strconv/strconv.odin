@@ -93,7 +93,7 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -103,16 +103,24 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 		if v >= i64(base) {
 			break
 		}
-		value *= i64(base)
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i64) is accepted.
+			if value < (min(i64) + v)/i64(base) {
+				break
+			}
+			value = value*i64(base) - v
+		} else {
+			if value > (max(i64) - v)/i64(base) {
+				break
+			}
+			value = value*i64(base) + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -174,7 +182,7 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -184,16 +192,24 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i64) is accepted.
+			if value < (min(i64) + v)/base {
+				break
+			}
+			value = value*base - v
+		} else {
+			if value > (max(i64) - v)/base {
+				break
+			}
+			value = value*base + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -240,7 +256,7 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		s = s[1:]
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -250,13 +266,17 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		if v >= u64(base) {
 			break
 		}
-		value *= u64(base)
-		value += v
+		if value > (max(u64) - v)/u64(base) {
+			break
+		}
+		value = value*u64(base) + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -313,7 +333,7 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		}
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -323,13 +343,17 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if value > (max(u64) - v)/base {
+			break
+		}
+		value = value*base + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -376,6 +400,7 @@ parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool)
 	case:    v, ok = parse_i64_of_base(s, base, n)
 	}
 	value = int(v)
+	ok = ok && i64(value) == v
 	return
 }
 /*
@@ -421,6 +446,7 @@ parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: boo
 	case:    v, ok = parse_u64_of_base(s, base, n)
 	}
 	value = uint(v)
+	ok = ok && u64(value) == v
 	return
 }
 /*
@@ -469,7 +495,7 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -479,16 +505,24 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 		if v >= i128(base) {
 			break
 		}
-		value *= i128(base)
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i128) is accepted.
+			if value < (min(i128) + v)/i128(base) {
+				break
+			}
+			value = value*i128(base) - v
+		} else {
+			if value > (max(i128) - v)/i128(base) {
+				break
+			}
+			value = value*i128(base) + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -550,7 +584,7 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -560,16 +594,24 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i128) is accepted.
+			if value < (min(i128) + v)/base {
+				break
+			}
+			value = value*base - v
+		} else {
+			if value > (max(i128) - v)/base {
+				break
+			}
+			value = value*base + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -615,7 +657,7 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		s = s[1:]
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -625,13 +667,17 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		if v >= u128(base) {
 			break
 		}
-		value *= u128(base)
-		value += v
+		if value > (max(u128) - v)/u128(base) {
+			break
+		}
+		value = value*u128(base) + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -685,7 +731,7 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		}
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -695,13 +741,17 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if value > (max(u128) - v)/base {
+			break
+		}
+		value = value*base + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //

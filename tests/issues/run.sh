@@ -119,8 +119,8 @@ $ODIN test ../test_issue_7700.odin $COMMON
 $ODIN test ../test_issue_procedure_of_specialized.odin $COMMON
 $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
-$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
-$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native
 $ODIN test ../test_issue_omitted_field_union.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON -o:none
@@ -195,6 +195,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_proc_value.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_integer_literal_exponent.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -261,10 +268,12 @@ fi
 $ODIN test ../test_lifetime_markers.odin $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers.odin $COMMON -o:speed -lifetime-markers
 $ODIN test ../test_issue_7547.odin $COMMON
+$ODIN test ../test_issue_7547.odin $COMMON -debug
 $ODIN test ../test_issue_7490.odin $COMMON
 $ODIN test ../test_issue_7779.odin $COMMON
 $ODIN run ../test_issue_7798.odin $COMMON
 $ODIN test ../test_issue_7763.odin $COMMON
+$ODIN test ../test_issue_disabled_proc_value.odin $COMMON -disable-assert
 
 set +x
 

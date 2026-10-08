@@ -430,6 +430,8 @@ enum BuildFlagKind {
 	BuildFlag_NoCRT,
 	BuildFlag_NoRPath,
 	BuildFlag_NoEntryPoint,
+	BuildFlag_NoEscapeAnalysis,
+	BuildFlag_NoAtomicAnalysis,
 	BuildFlag_Linker,
 	BuildFlag_UseSeparateModules,
 	BuildFlag_UseSingleModule,
@@ -454,6 +456,9 @@ enum BuildFlagKind {
 	BuildFlag_VetCast,
 	BuildFlag_VetTabs,
 	BuildFlag_VetWhenShadowing,
+	BuildFlag_VetNilDeref,
+	BuildFlag_VetUninitialized,
+	BuildFlag_VetAtomicAccess,
 	BuildFlag_VetPackages,
 
 	BuildFlag_CustomAttribute,
@@ -701,6 +706,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoRPath,                 str_lit("no-rpath"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
+	add_flag(&build_flags, BuildFlag_NoEscapeAnalysis,        str_lit("no-escape-analysis"),        BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoAtomicAnalysis,        str_lit("no-atomic-analysis"),        BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_Linker,                  str_lit("linker"),                    BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSingleModule,         str_lit("use-single-module"),         BuildFlagParam_None,    Command__does_build);
@@ -725,6 +732,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetCast,                 str_lit("vet-cast"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetTabs,                 str_lit("vet-tabs"),                  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetWhenShadowing,        str_lit("vet-when-shadowing"),        BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetNilDeref,             str_lit("vet-nil-deref"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUninitialized,        str_lit("vet-uninitialized"),         BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetAtomicAccess,         str_lit("vet-atomic-access"),         BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetPackages,             str_lit("vet-packages"),              BuildFlagParam_String,  Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_CustomAttribute,         str_lit("custom-attribute"),          BuildFlagParam_String,  Command__does_check, true);
@@ -1422,6 +1432,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
+						case BuildFlag_NoEscapeAnalysis:
+							build_context.no_analysis_flags |= AnalysisFlag_Escape;
+							break;
+						case BuildFlag_NoAtomicAnalysis:
+							build_context.no_analysis_flags |= AnalysisFlag_Atomic;
+							break;
 						case BuildFlag_NoThreadLocal:
 							build_context.no_thread_local = true;
 							break;
@@ -1499,6 +1515,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VetCast:             build_context.vet_flags |= VetFlag_Cast;             break;
 						case BuildFlag_VetTabs:             build_context.vet_flags |= VetFlag_Tabs;             break;
 						case BuildFlag_VetWhenShadowing:    build_context.vet_flags |= VetFlag_WhenShadowing;    break;
+						case BuildFlag_VetNilDeref:         build_context.vet_flags |= VetFlag_NilDeref;         break;
+						case BuildFlag_VetUninitialized:    build_context.vet_flags |= VetFlag_Uninitialized;    break;
+						case BuildFlag_VetAtomicAccess:     build_context.vet_flags |= VetFlag_AtomicAccess;     break;
 						case BuildFlag_VetUnusedProcedures: build_context.vet_flags |= VetFlag_UnusedProcedures; break;
 
 						case BuildFlag_VetPackages:
@@ -1887,7 +1906,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (str_eq_ignore_case(value.value_string, str_lit("thin"))) {
 								build_context.lto_kind = LTO_Thin;
-								if (build_context.linker_choice == Linker_Invalid) {
+								if (build_context.linker_choice <= Linker_Default) {
 									build_context.linker_choice = Linker_lld;
 								}
 								if (!build_context.use_separate_modules) {
@@ -1899,7 +1918,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								}
 							} else if (str_eq_ignore_case(value.value_string, str_lit("thin-files"))) {
 								build_context.lto_kind = LTO_Thin_Files;
-								if (build_context.linker_choice == Linker_Invalid) {
+								if (build_context.linker_choice <= Linker_Default) {
 									build_context.linker_choice = Linker_lld;
 								}
 								if (!build_context.use_separate_modules) {
@@ -2068,6 +2087,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	if (set_flags[BuildFlag_VetUnusedProcedures] && !set_flags[BuildFlag_VetPackages]) {
 		gb_printf_err("-vet-unused-procedures must be used with -vet-packages\n");
+		bad_flags = true;
+	}
+
+	if (set_flags[BuildFlag_NoEscapeAnalysis] && (set_flags[BuildFlag_VetNilDeref] || set_flags[BuildFlag_VetUninitialized])) {
+		gb_printf_err("-vet-nil-deref and -vet-uninitialized cannot be used with -no-escape-analysis, as they are part of it\n");
+		bad_flags = true;
+	}
+
+	if (set_flags[BuildFlag_NoAtomicAnalysis] && set_flags[BuildFlag_VetAtomicAccess]) {
+		gb_printf_err("-vet-atomic-access cannot be used with -no-atomic-analysis, as it is part of it\n");
 		bad_flags = true;
 	}
 
@@ -3251,6 +3280,20 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (check) {
+		if (print_flag("-no-atomic-analysis")) {
+			print_usage_line(2, "Disables the analysis of atomic memory orderings, except in files with '#+analysis atomic'.");
+			print_usage_line(2, "It warns where what is written with release ordering is only loaded with relaxed ordering, or the reverse.");
+			print_usage_line(2, "Cannot be used with -vet-atomic-access.");
+		}
+
+		if (print_flag("-no-escape-analysis")) {
+			print_usage_line(2, "Disables the escape analysis of stack memory, except in files with '#+analysis escape'.");
+			print_usage_line(2, "Where it is disabled, by this or by '#+analysis !escape', only returning the address of a local or similar is an error.");
+			print_usage_line(2, "Cannot be used with -vet-nil-deref or -vet-uninitialized.");
+		}
+	}
+
 	if (run_or_build) {
 		if (print_flag("-no-rpath")) {
 			print_usage_line(2, "Disables automatic addition of an rpath linked to the executable directory.");
@@ -3507,16 +3550,25 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		if (print_flag("-vet")) {
 			print_usage_line(2, "Does extra checks on the code.");
 			print_usage_line(2, "Extra checks include:");
-				print_usage_line(3, "-vet-unused");
-				print_usage_line(3, "-vet-unused-variables");
-				print_usage_line(3, "-vet-unused-imports");
+				print_usage_line(3, "-vet-cast");
 				print_usage_line(3, "-vet-shadowing");
+				print_usage_line(3, "-vet-unused-imports");
+				print_usage_line(3, "-vet-unused-variables");
 				print_usage_line(3, "-vet-using-stmt");
 				print_usage_line(3, "-vet-when-shadowing");
 		}
 
+		if (print_flag("-vet-atomic-access")) {
+			print_usage_line(2, "Errs on a plain read of a variable or field which is accessed atomically elsewhere, except in procedures which take a lock.");
+		}
+
 		if (print_flag("-vet-cast")) {
 			print_usage_line(2, "Errs on casting a value to its own type or using `transmute` rather than `cast`.");
+		}
+
+		if (print_flag("-vet-nil-deref")) {
+			print_usage_line(2, "Errs on dereferencing a pointer, or calling a procedure value, which is nil on every path reaching it.");
+			print_usage_line(2, "A pointer made through an explicit conversion to 'rawptr' or 'uintptr', or a 'transmute', is never assumed to be nil.");
 		}
 
 		if (print_flag("-vet-packages:<comma-separated-strings>")) {
@@ -3562,6 +3614,11 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Checks for unused variable declarations.");
 		}
 
+
+		if (print_flag("-vet-uninitialized")) {
+			print_usage_line(2, "Errs on reading a variable declared with '---', or a part of it, before anything is stored in it on every path reaching it.");
+			print_usage_line(2, "Taking its address, e.g. to pass it to a procedure which fills it in, counts as storing into it.");
+		}
 
 		if (print_flag("-vet-using-param")) {
 			print_usage_line(2, "Checks for the use of 'using' on procedure parameters.");
@@ -4003,12 +4060,11 @@ int main(int arg_count, char const **arg_ptr) {
 
 	add_collection(str_lit("base"));
 	add_collection(str_lit("core"));
-	add_collection(str_lit("vendor"));
 
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
-	
+
 	init_build_context_error_pos_style();
 
 	isize double_dash_pos = -1;
@@ -4317,7 +4373,11 @@ int main(int arg_count, char const **arg_ptr) {
 		return bundle(init_filename);
 	}
 
-	// NOTE(bill): add 'shared' directory if it is not already set
+	// NOTE(bill): add 'vendor' and 'shared' collections if they are not already set
+	if (!find_library_collection_path(str_lit("vendor"), nullptr)) {
+		add_library_collection(str_lit("vendor"),
+			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor"), nullptr));
+	}
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
 			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared"), nullptr));
@@ -4328,7 +4388,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
-	
+
 #if !defined(GB_SYSTEM_WINDOWS)
 	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0) {
 		gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
@@ -4444,13 +4504,13 @@ int main(int arg_count, char const **arg_ptr) {
 
 				return 1;
 			}
-			
+
 			// Ensure the feature name always has +/- prefix. If there isn't, default to '+'
 			String feature_str = item;
 			if (*feature_str.text != '+' && *feature_str.text != '-') {
 				feature_str = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 			}
-			
+
 			// Ensure there is only a single entry for each feature in the target set.
 			// If the negative exists, override the existing value with the current one.
 			String neg_feature_str = clone_string(temporary_allocator(), feature_str);
@@ -4459,9 +4519,9 @@ int main(int arg_count, char const **arg_ptr) {
 				case '-': *neg_feature_str.text = '+'; break;
 				default: GB_ASSERT(false); break;
 			}
-			
+
 			string_set_remove(&build_context.target_features_set, neg_feature_str);
-			
+
 			string_set_add(&build_context.target_features_set, feature_str);
 		}
 	}
