@@ -174,6 +174,7 @@ enum {
 	XDW_OP_deref   = 0x06,
 	XDW_OP_const8u = 0x0e,
 	XDW_OP_GNU_push_tls_address = 0xe0,
+	XDW_OP_form_tls_address = 0x9b,
 	XDW_OP_fbreg = 0x91,
 	XDW_OP_reg0  = 0x50,
 	XDW_OP_reg6  = 0x56,
@@ -798,18 +799,289 @@ gb_internal i32 xb_file_id(xbModule *m, i32 global_file_id) {
 	return id;
 }
 
-// DW_AT_location of a symbol's storage: its address, or its offset in the thread's TLS block
-gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbSymReloc> *relocs, i32 sym) {
+gb_internal void xb_add_debug_constants(xbModule *m);
+
+// An address in .debug_info or .debug_line, relocated by the object writer.
+struct xbDwarfAddr {
+	isize offset; // in the debug section
+	i32   sym;    // a module symbol, or -1 for the text section
+	i64   addend; // the offset in the text section, when sym < 0
+};
+
+// The DWARF sections, which every object format shares but for their relocations.
+struct xbDwarf {
+	Array<u8> abbrev;
+	Array<u8> info;
+	Array<u8> line;
+	Array<xbDwarfAddr> info_addrs;
+	Array<xbDwarfAddr> line_addrs;
+	isize abbrev_offset_at; // in .debug_info, the offsets into .debug_abbrev and .debug_line
+	isize stmt_list_at;
+};
+
+// DW_AT_location of a symbol's storage: its address, or its offset in the thread's TLS block.
+// On macOS the symbol of a thread local is its TLV descriptor, which lldb resolves with form_tls_address.
+gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbDwarfAddr> *addrs, i32 sym) {
 	bool tls = (m->symbols[sym].flags & xbSymbolFlag_TLS) != 0;
 	xbb_uleb(b, tls ? 10 : 9);
 	xbb_u8(b, tls ? XDW_OP_const8u : XDW_OP_addr);
-	xbSymReloc r = {b->count, sym, tls ? XB_R_X86_64_DTPOFF64 : XB_R_X86_64_64};
-	array_add(relocs, r);
+	xbDwarfAddr r = {b->count, sym, 0};
+	array_add(addrs, r);
 	xbb_u64(b, 0);
-	if (tls) xbb_u8(b, XDW_OP_GNU_push_tls_address);
+	if (tls) xbb_u8(b, xb_is_arm64() ? XDW_OP_form_tls_address : XDW_OP_GNU_push_tls_address);
 }
 
-gb_internal void xb_add_debug_constants(xbModule *m);
+gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
+	d->abbrev = array_make<u8>(heap_allocator(), 0, 4096);
+	d->info = array_make<u8>(heap_allocator(), 0, 1<<16);
+	d->line = array_make<u8>(heap_allocator(), 0, 1<<16);
+	d->info_addrs = array_make<xbDwarfAddr>(heap_allocator(), 0, 256);
+	d->line_addrs = array_make<xbDwarfAddr>(heap_allocator(), 0, 256);
+	u8 const frame_reg = xb_is_arm64() ? XDW_OP_reg0 + 29 : XDW_OP_reg6; // x29 or rbp
+
+	xb_add_debug_constants(m);
+	xb_dwarf_abbrevs(&d->abbrev);
+	// the compilation directory is the entry file's, like LLVM's, so debuggers show its files by their short names
+	String cwd = m->info->init_package->files[0]->directory;
+	if (Entity *entry_point = m->info->entry_point) {
+		if (Ast *ident = entry_point->identifier.load()) {
+			if (ident->file_id) cwd = ident->file()->directory;
+		}
+	}
+	if (cwd.len == 0) {
+		char buf[4096] = {};
+		if (getcwd(buf, gb_size_of(buf)-1) != nullptr) {
+			cwd = copy_string(permanent_allocator(), make_string_c(buf));
+		}
+	}
+
+	// .debug_line
+	{
+		Array<u8> *b = &d->line;
+		isize start = b->count;
+		xbb_u32(b, 0); // unit length
+		xbb_u16(b, 4); // version
+		isize header_len_at = b->count;
+		xbb_u32(b, 0); // header length
+		isize header_start = b->count;
+		xbb_u8(b, 1);  // min instruction length
+		xbb_u8(b, 1);  // max ops per instruction
+		xbb_u8(b, 1);  // default is_stmt
+		xbb_u8(b, cast(u8)cast(i8)-5); // line base
+		xbb_u8(b, 14); // line range
+		xbb_u8(b, 13); // opcode base
+		u8 const std_lengths[12] = {0,1,1,1,1,0,0,0,1,0,0,1};
+		xbb_bytes(b, std_lengths, 12);
+		// directories and base names, so debuggers show short file names like LLVM's
+		auto last_slash = [](String f) -> isize {
+			for (isize j = f.len-1; j > 0; j--) if (f[j] == '/') return j;
+			return -1;
+		};
+		StringMap<u64> dirs = {};
+		string_map_init(&dirs);
+		auto file_dirs = array_make<u64>(heap_allocator(), m->files.count);
+		for_array(i, m->files) {
+			isize slash = last_slash(m->files[i]);
+			file_dirs[i] = 0;
+			if (slash < 0) continue;
+			String dir = substring(m->files[i], 0, slash);
+			if (dir == cwd) continue; // index 0 is the compilation directory
+			u64 *found = string_map_get(&dirs, dir);
+			if (found == nullptr) {
+				string_map_set(&dirs, dir, cast(u64)dirs.count + 1);
+				xbb_str(b, dir);
+				found = string_map_get(&dirs, dir);
+			}
+			file_dirs[i] = *found;
+		}
+		xbb_u8(b, 0);
+		for_array(i, m->files) {
+			String f = m->files[i];
+			isize slash = last_slash(f);
+			bool short_name = slash >= 0 && (file_dirs[i] != 0 || substring(f, 0, slash) == cwd);
+			xbb_str(b, short_name ? substring(f, slash+1, f.len) : f);
+			xbb_uleb(b, file_dirs[i]);
+			xbb_uleb(b, 0);
+			xbb_uleb(b, 0);
+		}
+		string_map_destroy(&dirs);
+		array_free(&file_dirs);
+		xbb_u8(b, 0);
+		xbb_patch_u32(b, header_len_at, cast(u32)(b->count - header_start));
+
+		for (xbProcDebug const &pd : m->proc_debug) {
+			// set address
+			xbb_u8(b, 0);
+			xbb_uleb(b, 9);
+			xbb_u8(b, 2);
+			xbDwarfAddr r = {b->count, -1, pd.start};
+			array_add(&d->line_addrs, r);
+			xbb_u64(b, 0);
+			i64 cur_addr = 0;
+			i64 cur_line = 1;
+			i32 cur_file = 1;
+			if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
+				// the prologue gets the declaration's line, debuggers look up the entry address
+				if (pd.file_id > 0 && pd.file_id != cur_file) {
+					xbb_u8(b, 4);
+					xbb_uleb(b, cast(u64)pd.file_id);
+					cur_file = pd.file_id;
+				}
+				xbb_u8(b, 3);
+				xbb_sleb(b, pd.line - cur_line);
+				cur_line = pd.line;
+				xbb_u8(b, 1);
+			}
+			for (i32 i = 0; i < pd.line_entry_count; i++) {
+				xbLineEntry const &e = m->lines[pd.line_entry_start + i];
+				if (e.file_id != cur_file) {
+					xbb_u8(b, 4); // set_file
+					xbb_uleb(b, cast(u64)e.file_id);
+					cur_file = e.file_id;
+				}
+				if (e.code_offset != cur_addr) {
+					xbb_u8(b, 2); // advance_pc
+					xbb_uleb(b, cast(u64)(e.code_offset - cur_addr));
+					cur_addr = e.code_offset;
+				}
+				if (e.line != cur_line) {
+					xbb_u8(b, 3); // advance_line
+					xbb_sleb(b, e.line - cur_line);
+					cur_line = e.line;
+				}
+				xbb_u8(b, 5); // set_column
+				xbb_uleb(b, cast(u64)gb_max(e.column, 0));
+				xbb_u8(b, 1); // copy
+			}
+			i64 end = pd.end - pd.start;
+			if (end != cur_addr) {
+				xbb_u8(b, 2);
+				xbb_uleb(b, cast(u64)(end - cur_addr));
+			}
+			// end sequence
+			xbb_u8(b, 0);
+			xbb_uleb(b, 1);
+			xbb_u8(b, 1);
+		}
+		xbb_patch_u32(b, start, cast(u32)(b->count - start - 4));
+	}
+
+	// .debug_info
+	{
+		Array<u8> *b = &d->info;
+		xbDwarfTypes dt = {};
+		dt.info = b;
+		map_init(&dt.offsets);
+		ptr_set_init(&dt.queued);
+		dt.pending = array_make<xbDwarfTypes::Pending>(heap_allocator(), 0, 256);
+		dt.queue = array_make<Type *>(heap_allocator(), 0, 256);
+
+		isize start = b->count;
+		dt.cu_start = start;
+		dt.checker = m->info;
+		xbb_u32(b, 0); // unit length
+		xbb_u16(b, 4); // version
+		d->abbrev_offset_at = b->count;
+		xbb_u32(b, 0); // abbrev offset
+		xbb_u8(b, 8);  // address size
+
+		xbb_uleb(b, xbAbbrev_CompileUnit);
+		xbb_cstr(b, xb_is_arm64() ? "odin (arm64 backend)" : "odin (x64 backend)");
+		xbb_u16(b, XDW_LANG_C99);
+		String name = m->files.count > 0 ? m->files[0] : str_lit("odin");
+		xbb_str(b, name);
+		xbb_str(b, cwd);
+		xbDwarfAddr rl = {b->count, -1, 0};
+		array_add(&d->info_addrs, rl);
+		xbb_u64(b, 0); // low pc
+		xbb_u64(b, cast(u64)m->sections[xbSection_Text].count); // high pc (length)
+		d->stmt_list_at = b->count;
+		xbb_u32(b, 0); // stmt list
+
+		for (xbGlobalDebug const &g : m->global_debug) {
+			xbb_uleb(b, g.sym >= 0 ? xbAbbrev_GlobalVar : xbAbbrev_Constant);
+			xbb_str(b, g.name);
+			xb_dwarf_type_ref(&dt, g.type);
+			if (g.sym >= 0) {
+				xbb_uleb(b, cast(u64)g.file_id);
+				xbb_uleb(b, cast(u64)gb_max(g.line, 0));
+				xb_dwarf_symbol_location(m, b, &d->info_addrs, g.sym);
+			} else {
+				xbb_sleb(b, g.value);
+			}
+		}
+
+		for (xbProcDebug const &pd : m->proc_debug) {
+			bool has_children = pd.vars.count > 0;
+			// the single result, so `finish` shows it
+			Type *ret = nullptr;
+			Type *pt = pd.type ? base_type(pd.type) : nullptr;
+			if (pt && pt->kind == Type_Proc && pt->Proc.result_count == 1) {
+				ret = pt->Proc.results->Tuple.variables[0]->type;
+			}
+			if (ret) {
+				xbb_uleb(b, has_children ? xbAbbrev_SubprogramRet : xbAbbrev_SubprogramRetNoChildren);
+			} else {
+				xbb_uleb(b, has_children ? xbAbbrev_Subprogram : xbAbbrev_SubprogramNoChildren);
+			}
+			// the full name, like LLVM's, so `break pkg::proc` finds it
+			xbb_str(b, pd.link_name);
+			xbb_str(b, pd.link_name);
+			xbDwarfAddr r = {b->count, -1, pd.start};
+			array_add(&d->info_addrs, r);
+			xbb_u64(b, 0);
+			xbb_u32(b, cast(u32)(pd.end - pd.start));
+			xbb_uleb(b, 1);
+			xbb_u8(b, frame_reg);
+			xbb_uleb(b, cast(u64)gb_max(pd.file_id, 1));
+			xbb_uleb(b, cast(u64)gb_max(pd.line, 0));
+			if (ret) xb_dwarf_type_ref(&dt, ret);
+			if (has_children) {
+				for (xbDebugVar const &v : pd.vars) {
+					xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
+					xbb_str(b, v.name);
+					if (v.local < 0) {
+						xb_dwarf_symbol_location(m, b, &d->info_addrs, v.sym);
+						xbb_uleb(b, cast(u64)gb_max(v.line, 0));
+						xb_dwarf_type_ref(&dt, v.type);
+						continue;
+					}
+					Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
+					if (v.in_reg) {
+						xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
+					} else {
+						// the frame pointer is the frame base
+						xbb_u8(&expr, XDW_OP_fbreg);
+						xbb_sleb(&expr, v.frame_offset_fixup);
+						if (v.by_ref) {
+							xbb_u8(&expr, XDW_OP_deref);
+						}
+					}
+					xbb_uleb(b, cast(u64)expr.count);
+					xbb_bytes(b, expr.data, expr.count);
+					array_free(&expr);
+					xbb_uleb(b, cast(u64)gb_max(v.line, 0));
+					xb_dwarf_type_ref(&dt, v.type);
+				}
+				xbb_u8(b, 0);
+			}
+		}
+
+		// types, written after their first use
+		for (isize i = 0; i < dt.queue.count; i++) {
+			xb_dwarf_write_type(&dt, dt.queue[i]);
+		}
+		for (auto const &pd : dt.pending) {
+			u32 *off = map_get(&dt.offsets, pd.type);
+			GB_ASSERT(off != nullptr);
+			xbb_patch_u32(b, pd.at, cast(u32)(*off - start));
+		}
+
+		xbb_u8(b, 0); // end of compile unit children
+		xbb_patch_u32(b, start, cast(u32)(b->count - start - 4));
+	}
+}
+
 
 gb_internal bool xb_write_object(xbModule *m, String path) {
 	Array<u8> sec[xbOut_COUNT] = {};
@@ -878,248 +1150,28 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 
 	bool debug = build_context.ODIN_DEBUG;
 	if (debug) {
-		xb_add_debug_constants(m);
-		xb_dwarf_abbrevs(&sec[xbOut_DebugAbbrev]);
-		// the compilation directory is the entry file's, like LLVM's, so debuggers show its files by their short names
-		String cwd = m->info->init_package->files[0]->directory;
-		if (Entity *entry_point = m->info->entry_point) {
-			if (Ast *ident = entry_point->identifier.load()) {
-				if (ident->file_id) cwd = ident->file()->directory;
-			}
-		}
-		if (cwd.len == 0) {
-			char buf[4096] = {};
-			if (getcwd(buf, gb_size_of(buf)-1) != nullptr) {
-				cwd = copy_string(permanent_allocator(), make_string_c(buf));
-			}
-		}
-
-		// .debug_line
-		{
-			Array<u8> *b = &sec[xbOut_DebugLine];
-			isize start = b->count;
-			xbb_u32(b, 0); // unit length
-			xbb_u16(b, 4); // version
-			isize header_len_at = b->count;
-			xbb_u32(b, 0); // header length
-			isize header_start = b->count;
-			xbb_u8(b, 1);  // min instruction length
-			xbb_u8(b, 1);  // max ops per instruction
-			xbb_u8(b, 1);  // default is_stmt
-			xbb_u8(b, cast(u8)cast(i8)-5); // line base
-			xbb_u8(b, 14); // line range
-			xbb_u8(b, 13); // opcode base
-			u8 const std_lengths[12] = {0,1,1,1,1,0,0,0,1,0,0,1};
-			xbb_bytes(b, std_lengths, 12);
-			// directories and base names, so debuggers show short file names like LLVM's
-			auto last_slash = [](String f) -> isize {
-				for (isize j = f.len-1; j > 0; j--) if (f[j] == '/') return j;
-				return -1;
-			};
-			StringMap<u64> dirs = {};
-			string_map_init(&dirs);
-			auto file_dirs = array_make<u64>(heap_allocator(), m->files.count);
-			for_array(i, m->files) {
-				isize slash = last_slash(m->files[i]);
-				file_dirs[i] = 0;
-				if (slash < 0) continue;
-				String dir = substring(m->files[i], 0, slash);
-				if (dir == cwd) continue; // index 0 is the compilation directory
-				u64 *found = string_map_get(&dirs, dir);
-				if (found == nullptr) {
-					string_map_set(&dirs, dir, cast(u64)dirs.count + 1);
-					xbb_str(b, dir);
-					found = string_map_get(&dirs, dir);
-				}
-				file_dirs[i] = *found;
-			}
-			xbb_u8(b, 0);
-			for_array(i, m->files) {
-				String f = m->files[i];
-				isize slash = last_slash(f);
-				bool short_name = slash >= 0 && (file_dirs[i] != 0 || substring(f, 0, slash) == cwd);
-				xbb_str(b, short_name ? substring(f, slash+1, f.len) : f);
-				xbb_uleb(b, file_dirs[i]);
-				xbb_uleb(b, 0);
-				xbb_uleb(b, 0);
-			}
-			string_map_destroy(&dirs);
-			array_free(&file_dirs);
-			xbb_u8(b, 0);
-			xbb_patch_u32(b, header_len_at, cast(u32)(b->count - header_start));
-
-			for (xbProcDebug const &pd : m->proc_debug) {
-				// set address
-				xbb_u8(b, 0);
-				xbb_uleb(b, 9);
-				xbb_u8(b, 2);
-				xbExtraReloc r = {b->count, xbOut_Text, XB_R_X86_64_64, pd.start};
-				array_add(&line_relocs, r);
-				xbb_u64(b, 0);
-				i64 cur_addr = 0;
-				i64 cur_line = 1;
-				i32 cur_file = 1;
-				if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
-					// the prologue gets the declaration's line, debuggers look up the entry address
-					if (pd.file_id > 0 && pd.file_id != cur_file) {
-						xbb_u8(b, 4);
-						xbb_uleb(b, cast(u64)pd.file_id);
-						cur_file = pd.file_id;
-					}
-					xbb_u8(b, 3);
-					xbb_sleb(b, pd.line - cur_line);
-					cur_line = pd.line;
-					xbb_u8(b, 1);
-				}
-				for (i32 i = 0; i < pd.line_entry_count; i++) {
-					xbLineEntry const &e = m->lines[pd.line_entry_start + i];
-					if (e.file_id != cur_file) {
-						xbb_u8(b, 4); // set_file
-						xbb_uleb(b, cast(u64)e.file_id);
-						cur_file = e.file_id;
-					}
-					if (e.code_offset != cur_addr) {
-						xbb_u8(b, 2); // advance_pc
-						xbb_uleb(b, cast(u64)(e.code_offset - cur_addr));
-						cur_addr = e.code_offset;
-					}
-					if (e.line != cur_line) {
-						xbb_u8(b, 3); // advance_line
-						xbb_sleb(b, e.line - cur_line);
-						cur_line = e.line;
-					}
-					xbb_u8(b, 5); // set_column
-					xbb_uleb(b, cast(u64)gb_max(e.column, 0));
-					xbb_u8(b, 1); // copy
-				}
-				i64 end = pd.end - pd.start;
-				if (end != cur_addr) {
-					xbb_u8(b, 2);
-					xbb_uleb(b, cast(u64)(end - cur_addr));
-				}
-				// end sequence
-				xbb_u8(b, 0);
-				xbb_uleb(b, 1);
-				xbb_u8(b, 1);
-			}
-			xbb_patch_u32(b, start, cast(u32)(b->count - start - 4));
-		}
-
-		// .debug_info
-		{
-			Array<u8> *b = &sec[xbOut_DebugInfo];
-			xbDwarfTypes dt = {};
-			dt.info = b;
-			map_init(&dt.offsets);
-			ptr_set_init(&dt.queued);
-			dt.pending = array_make<xbDwarfTypes::Pending>(heap_allocator(), 0, 256);
-			dt.queue = array_make<Type *>(heap_allocator(), 0, 256);
-
-			isize start = b->count;
-			dt.cu_start = start;
-			dt.checker = m->info;
-			xbb_u32(b, 0); // unit length
-			xbb_u16(b, 4); // version
-			xbExtraReloc ra = {b->count, xbOut_DebugAbbrev, XB_R_X86_64_32, 0};
-			array_add(&info_relocs, ra);
-			xbb_u32(b, 0); // abbrev offset
-			xbb_u8(b, 8);  // address size
-
-			xbb_uleb(b, xbAbbrev_CompileUnit);
-			xbb_cstr(b, "odin (x64 backend)");
-			xbb_u16(b, XDW_LANG_C99);
-			String name = m->files.count > 0 ? m->files[0] : str_lit("odin");
-			xbb_str(b, name);
-			xbb_str(b, cwd);
-			xbExtraReloc rl = {b->count, xbOut_Text, XB_R_X86_64_64, 0};
-			array_add(&info_relocs, rl);
-			xbb_u64(b, 0); // low pc
-			xbb_u64(b, cast(u64)m->sections[xbSection_Text].count); // high pc (length)
-			xbExtraReloc rs = {b->count, xbOut_DebugLine, XB_R_X86_64_32, 0};
-			array_add(&info_relocs, rs);
-			xbb_u32(b, 0); // stmt list
-
-			for (xbGlobalDebug const &g : m->global_debug) {
-				xbb_uleb(b, g.sym >= 0 ? xbAbbrev_GlobalVar : xbAbbrev_Constant);
-				xbb_str(b, g.name);
-				xb_dwarf_type_ref(&dt, g.type);
-				if (g.sym >= 0) {
-					xbb_uleb(b, cast(u64)g.file_id);
-					xbb_uleb(b, cast(u64)gb_max(g.line, 0));
-					xb_dwarf_symbol_location(m, b, &info_sym_relocs, g.sym);
-				} else {
-					xbb_sleb(b, g.value);
-				}
-			}
-
-			for (xbProcDebug const &pd : m->proc_debug) {
-				bool has_children = pd.vars.count > 0;
-				// the single result, so `finish` shows it
-				Type *ret = nullptr;
-				Type *pt = pd.type ? base_type(pd.type) : nullptr;
-				if (pt && pt->kind == Type_Proc && pt->Proc.result_count == 1) {
-					ret = pt->Proc.results->Tuple.variables[0]->type;
-				}
-				if (ret) {
-					xbb_uleb(b, has_children ? xbAbbrev_SubprogramRet : xbAbbrev_SubprogramRetNoChildren);
-				} else {
-					xbb_uleb(b, has_children ? xbAbbrev_Subprogram : xbAbbrev_SubprogramNoChildren);
-				}
-				// the full name, like LLVM's, so `break pkg::proc` finds it
-				xbb_str(b, pd.link_name);
-				xbb_str(b, pd.link_name);
-				xbExtraReloc r = {b->count, xbOut_Text, XB_R_X86_64_64, pd.start};
+		xbDwarf d = {};
+		xb_dwarf_build(m, &d);
+		sec[xbOut_DebugAbbrev] = d.abbrev;
+		sec[xbOut_DebugInfo] = d.info;
+		sec[xbOut_DebugLine] = d.line;
+		xbExtraReloc ra = {d.abbrev_offset_at, xbOut_DebugAbbrev, XB_R_X86_64_32, 0};
+		xbExtraReloc rs = {d.stmt_list_at, xbOut_DebugLine, XB_R_X86_64_32, 0};
+		array_add(&info_relocs, ra);
+		array_add(&info_relocs, rs);
+		for (xbDwarfAddr const &a : d.info_addrs) {
+			if (a.sym < 0) {
+				xbExtraReloc r = {a.offset, xbOut_Text, XB_R_X86_64_64, a.addend};
 				array_add(&info_relocs, r);
-				xbb_u64(b, 0);
-				xbb_u32(b, cast(u32)(pd.end - pd.start));
-				xbb_uleb(b, 1);
-				xbb_u8(b, XDW_OP_reg6);
-				xbb_uleb(b, cast(u64)gb_max(pd.file_id, 1));
-				xbb_uleb(b, cast(u64)gb_max(pd.line, 0));
-				if (ret) xb_dwarf_type_ref(&dt, ret);
-				if (has_children) {
-					for (xbDebugVar const &v : pd.vars) {
-						xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
-						xbb_str(b, v.name);
-						if (v.local < 0) {
-							xb_dwarf_symbol_location(m, b, &info_sym_relocs, v.sym);
-							xbb_uleb(b, cast(u64)gb_max(v.line, 0));
-							xb_dwarf_type_ref(&dt, v.type);
-							continue;
-						}
-						Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
-						if (v.in_reg) {
-							xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
-						} else {
-							// rbp is the frame base
-							xbb_u8(&expr, XDW_OP_fbreg);
-							xbb_sleb(&expr, v.frame_offset_fixup);
-							if (v.by_ref) {
-								xbb_u8(&expr, XDW_OP_deref);
-							}
-						}
-						xbb_uleb(b, cast(u64)expr.count);
-						xbb_bytes(b, expr.data, expr.count);
-						array_free(&expr);
-						xbb_uleb(b, cast(u64)gb_max(v.line, 0));
-						xb_dwarf_type_ref(&dt, v.type);
-					}
-					xbb_u8(b, 0);
-				}
+			} else {
+				bool tls = (m->symbols[a.sym].flags & xbSymbolFlag_TLS) != 0;
+				xbSymReloc r = {a.offset, a.sym, tls ? XB_R_X86_64_DTPOFF64 : XB_R_X86_64_64};
+				array_add(&info_sym_relocs, r);
 			}
-
-			// types, written after their first use
-			for (isize i = 0; i < dt.queue.count; i++) {
-				xb_dwarf_write_type(&dt, dt.queue[i]);
-			}
-			for (auto const &pd : dt.pending) {
-				u32 *off = map_get(&dt.offsets, pd.type);
-				GB_ASSERT(off != nullptr);
-				xbb_patch_u32(b, pd.at, cast(u32)(*off - start));
-			}
-
-			xbb_u8(b, 0); // end of compile unit children
-			xbb_patch_u32(b, start, cast(u32)(b->count - start - 4));
+		}
+		for (xbDwarfAddr const &a : d.line_addrs) {
+			xbExtraReloc r = {a.offset, xbOut_Text, XB_R_X86_64_64, a.addend};
+			array_add(&line_relocs, r);
 		}
 	}
 

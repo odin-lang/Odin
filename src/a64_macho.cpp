@@ -133,13 +133,15 @@ struct a64Reloc {
 	u32 r_info; // symbolnum:24, pcrel:1, length:2, extern:1, type:4
 };
 
-// A relocation before the symbol table is ordered: `sym` indexes the output symbols.
+// A relocation before the symbol table is ordered: `sym` indexes the output symbols,
+// or the output sections when `by_section`.
 struct a64PendingReloc {
 	i32 address;
 	i32 sym;
 	u32 type;
 	bool pcrel;
 	u32 length; // log2 of the size
+	bool by_section;
 };
 
 enum a64OutSection {
@@ -149,6 +151,9 @@ enum a64OutSection {
 	a64Out_Data,
 	a64Out_ThreadVars,
 	a64Out_ThreadData,
+	a64Out_DebugAbbrev,
+	a64Out_DebugInfo,
+	a64Out_DebugLine,
 	a64Out_CompactUnwind,
 	a64Out_Bss,        // the zerofill sections come last
 	a64Out_ThreadBss,
@@ -359,6 +364,34 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 	sec_size[a64Out_CompactUnwind] = sec[a64Out_CompactUnwind].count;
 	sec_align[a64Out_CompactUnwind] = 8;
 
+	// DWARF stays in the object: dsymutil and lldb read it there through the executable's debug map.
+	// Its addresses are object addresses with a relocation against their section, as clang writes them.
+	struct DwarfAddr { i32 sect; i64 offset; i32 target; i64 target_offset; i32 ext_sym; };
+	auto dwarf_addrs = array_make<DwarfAddr>(heap_allocator(), 0, 0);
+	if (build_context.ODIN_DEBUG) {
+		xbDwarf d = {};
+		xb_dwarf_build(m, &d);
+		sec[a64Out_DebugAbbrev] = d.abbrev;
+		sec[a64Out_DebugInfo] = d.info;
+		sec[a64Out_DebugLine] = d.line;
+		for (i32 i = a64Out_DebugAbbrev; i <= a64Out_DebugLine; i++) {
+			sec_size[i] = sec[i].count;
+		}
+		auto add = [&](i32 sect, xbDwarfAddr const &a) {
+			DwarfAddr da = {sect, cast(i64)a.offset, a64Out_Text, a.addend, -1};
+			if (a.sym >= 0) {
+				i32 o = sym_out[a.sym];
+				if (o < 0) return; // an unused undefined symbol, the address stays 0
+				da.target = out_syms[o].out_section;
+				da.target_offset = out_syms[o].offset;
+				if (da.target < 0) da.ext_sym = o;
+			}
+			array_add(&dwarf_addrs, da);
+		};
+		for (xbDwarfAddr const &a : d.info_addrs) add(a64Out_DebugInfo, a);
+		for (xbDwarfAddr const &a : d.line_addrs) add(a64Out_DebugLine, a);
+	}
+
 	// the table is ordered: locals, defined externals, undefined externals
 	auto order = array_make<i32>(heap_allocator(), 0, out_syms.count);
 	u32 nlocal = 0, nextdef = 0, nundef = 0;
@@ -401,6 +434,9 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		{"__data",        "__DATA", A64_S_REGULAR, false},
 		{"__thread_vars", "__DATA", A64_S_THREAD_LOCAL_VARIABLES, false},
 		{"__thread_data", "__DATA", A64_S_THREAD_LOCAL_REGULAR, false},
+		{"__debug_abbrev", "__DWARF", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
+		{"__debug_info",   "__DWARF", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
+		{"__debug_line",   "__DWARF", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
 		{"__compact_unwind", "__LD", A64_S_REGULAR | A64_S_ATTR_DEBUG, false},
 		{"__bss",         "__DATA", A64_S_ZEROFILL, true},
 		{"__thread_bss",  "__DATA", A64_S_THREAD_LOCAL_ZEROFILL, true},
@@ -430,6 +466,19 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 	// section addresses only line up with file offsets when the data starts that aligned
 	data_start = align_formula(data_start, max_align);
 
+	for (DwarfAddr const &da : dwarf_addrs) {
+		a64PendingReloc r = {cast(i32)da.offset, da.ext_sym, A64_ARM64_RELOC_UNSIGNED, false, 3, false};
+		u64 value = 0;
+		if (da.ext_sym < 0) {
+			GB_ASSERT(sect_number[da.target] != 0);
+			value = cast(u64)(sect_addr[da.target] + da.target_offset);
+			r.sym = da.target;
+			r.by_section = true;
+		}
+		gb_memmove(sec[da.sect].data + da.offset, &value, 8);
+		array_add(&sec_relocs[da.sect], r);
+	}
+
 	auto out = array_make<u8>(heap_allocator(), 0, data_start + file_end_addr + 4096);
 	array_resize(&out, data_start + file_end_addr);
 	gb_zero_size(out.data, out.count);
@@ -447,7 +496,11 @@ gb_internal bool a64_write_macho(xbModule *m, String path) {
 		for (a64PendingReloc const &pr : sec_relocs[i]) {
 			a64Reloc r = {};
 			r.r_address = pr.address;
-			r.r_info = out_syms[pr.sym].index | ((pr.pcrel ? 1u : 0u) << 24) | (pr.length << 25) | (1u << 27) | (pr.type << 28);
+			if (pr.by_section) {
+				r.r_info = cast(u32)sect_number[pr.sym] | ((pr.pcrel ? 1u : 0u) << 24) | (pr.length << 25) | (pr.type << 28);
+			} else {
+				r.r_info = out_syms[pr.sym].index | ((pr.pcrel ? 1u : 0u) << 24) | (pr.length << 25) | (1u << 27) | (pr.type << 28);
+			}
 			xbb_bytes(&out, &r, gb_size_of(r));
 		}
 	}
