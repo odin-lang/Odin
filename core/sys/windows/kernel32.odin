@@ -117,8 +117,11 @@ foreign kernel32 {
 
 	InitializeCriticalSection             :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 	InitializeCriticalSectionAndSpinCount :: proc(CriticalSection: ^CRITICAL_SECTION, dwSpinCount: DWORD) -> BOOL ---
+	@(synchronizes=.Acquire)
 	EnterCriticalSection                  :: proc(CriticalSection: ^CRITICAL_SECTION) ---
+	@(synchronizes=.Acquire)
 	TryEnterCriticalSection               :: proc(CriticalSection: ^CRITICAL_SECTION) -> BOOLEAN ---
+	@(synchronizes=.Release)
 	LeaveCriticalSection                  :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 	DeleteCriticalSection                 :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 
@@ -510,11 +513,17 @@ foreign kernel32 {
 	FindCloseChangeNotification :: proc(hChangeHandle: HANDLE) -> BOOL ---
 
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes=.Acquire)
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes=.Acquire)
 	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
+	@(synchronizes=.Release)
 	ReleaseSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes_shared=.Acquire)
 	AcquireSRWLockShared       :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes_shared=.Acquire)
 	TryAcquireSRWLockShared    :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
+	@(synchronizes_shared=.Release)
 	ReleaseSRWLockShared       :: proc(SRWLock: ^SRWLOCK) ---
 
 	InitializeConditionVariable :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---
