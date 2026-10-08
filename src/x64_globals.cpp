@@ -4,6 +4,7 @@ gb_internal void xb_family_init(xbFamily *family, DeclInfo *root_decl);
 gb_internal void xb_family_destroy(xbFamily *family);
 gb_internal bool xb_family_build(xbModule *m, xbFamily *family, Entity *root, char const **reason);
 gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root);
+gb_internal bool xb_compile_proc(xbModule *m, Entity *e, char const **reason);
 
 // Global variables: storage and constant data, for the same set of globals LLVM creates.
 // Globals with a non-constant initializer start zeroed, the startup code fills them in.
@@ -51,9 +52,20 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 		b.bytes = array_make<u8>(heap_allocator(), size, size);
 		gb_zero_size(b.bytes.data, size);
 		b.relocs = array_make<xbReloc>(heap_allocator(), 0, 4);
+		auto proc_lits = array_make<Entity *>(heap_allocator(), 0, 0);
+		defer (array_free(&proc_lits));
+		b.proc_lits = &proc_lits;
 		if (!xb_cb_write(&b, e->type, value, 0)) {
 			*reason = b.fail;
 			return false;
+		}
+		for (Entity *pe : proc_lits) {
+			i32 sym = xb_symbol(m, xb_entity_name(m, pe));
+			if (m->symbols[sym].section != xbSection_Undef) continue;
+			if (!xb_compile_proc(m, pe, reason)) return false;
+			// LLVM may make its own copy
+			m->symbols[sym].flags |= xbSymbolFlag_Weak;
+			ptr_set_add(&m->handled, pe);
 		}
 		sec = tls ? xbSection_TData : xbSection_Data;
 	}
@@ -103,6 +115,10 @@ gb_internal void xb_define_globals(xbModule *m) {
 			ptr_set_add(&m->handled, e);
 		} else {
 			xb_stat_fail(m, reason ? reason : "global");
+			if (m->verbose) {
+				String name = xb_entity_name(m, e);
+				gb_printf_err("xb: fallback global %.*s: %s\n", LIT(name), reason ? reason : "global");
+			}
 		}
 	}
 }

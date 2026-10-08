@@ -873,6 +873,24 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	}
 	case BuiltinProc_abs: {
 		Type *t = default_type(tv.type);
+		Type *at = core_type(type_of_expr(ce->args[0]));
+		if (is_type_complex(at) || is_type_quaternion(at)) {
+			i64 bits = 8*type_size_of(at);
+			char const *name = nullptr;
+			if (is_type_complex(at)) name = bits == 32 ? "abs_complex32" : bits == 64 ? "abs_complex64" : "abs_complex128";
+			else name = bits == 64 ? "abs_quaternion64" : bits == 128 ? "abs_quaternion128" : "abs_quaternion256";
+			xbValue args[1] = {xb_build_expr(p, ce->args[0])};
+			return xb_emit_conv(p, xb_emit_runtime_call(p, name, xb_args(args, 1)), t);
+		}
+		if (xb_is_f16(t)) {
+			// clear the sign bit
+			xbValue x = xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t);
+			u32 bits = xb_load(p, xbType_I16, xb_value_to_mem(p, x));
+			i64 mask = is_type_different_to_arch_endianness(t) ? 0xFF7F : 0x7FFF;
+			xbMem m = xb_add_local(p, t, false);
+			xb_store(p, xbType_I16, m, xb_binop(p, xbOp_And, xbType_I16, bits, xb_iconst(p, xbType_I16, mask)));
+			return xb_value_mem(t, m);
+		}
 		if (is_type_different_to_arch_endianness(t) && !xb_is_int128(t) && !xb_is_f16(t)) {
 			// in the platform order, then back
 			Type *pt = integer_endian_type_to_platform_type(t);
@@ -1150,6 +1168,66 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		}
 		return xb_value_reg(t, res);
 	}
+	case BuiltinProc_swizzle: {
+		if (is_type_simd_vector(tv.type)) XB_UNSUPPORTED(p, "builtin swizzle");
+		// the selected elements of the array, gathered
+		xbAddr a = xb_build_addr(p, ce->args[0]);
+		if (a.kind != xbAddr_Default) XB_UNSUPPORTED(p, "swizzle of special addr");
+		Type *elem = base_array_type(tv.type);
+		i64 stride = type_size_of(elem);
+		xbMem res = xb_add_local(p, tv.type, false);
+		for (isize i = 1; i < ce->args.count; i++) {
+			i64 index = exact_value_to_i64(ce->args[i]->tav.value);
+			xb_store_value(p, xb_mem_offset(res, (i-1)*stride), xb_load_value(p, elem, xb_mem_offset(a.mem, index*stride)));
+		}
+		return xb_value_mem(tv.type, res);
+	}
+	case BuiltinProc_transpose:
+		return xb_emit_matrix_transpose(p, xb_build_expr(p, ce->args[0]), tv.type);
+	case BuiltinProc_outer_product:
+		return xb_emit_outer_product(p, xb_build_expr(p, ce->args[0]), xb_build_expr(p, ce->args[1]), tv.type);
+	case BuiltinProc_hadamard_product: {
+		xbValue a = xb_build_expr(p, ce->args[0]);
+		xbValue b = xb_build_expr(p, ce->args[1]);
+		if (is_type_array(tv.type)) return xb_emit_arith(p, Token_Mul, a, b, tv.type);
+		return xb_emit_arith_matrix(p, Token_Mul, a, b, tv.type, true);
+	}
+	case BuiltinProc_matrix_flatten: {
+		xbValue m = xb_build_expr(p, ce->args[0]);
+		if (is_type_array(m.type)) {
+			m.type = tv.type;
+			return m;
+		}
+		xbValue r = xb_value_copy_to_temp(p, m);
+		r.type = tv.type;
+		return r;
+	}
+	case BuiltinProc_reverse_bits: {
+		// llvm.bitreverse: swap the bytes, then the bits within each byte
+		Type *t = default_type(tv.type);
+		xbValue x = xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t);
+		auto rev = [&](xbType st, u32 r) -> u32 {
+			if (xb_type_size(st) > 1) r = xb_unop(p, xbOp_Bswap, st, r);
+			static u64 const masks[3] = {0x5555555555555555ull, 0x3333333333333333ull, 0x0f0f0f0f0f0f0f0full};
+			for (i64 i = 0; i < 3; i++) {
+				u64 bits = xb_type_size(st) == 8 ? masks[i] : masks[i] & ((1ull << (8*xb_type_size(st))) - 1);
+				u32 m = xb_iconst(p, st, cast(i64)bits);
+				u32 sh = xb_iconst(p, st, 1ll << i);
+				u32 lo = xb_binop(p, xbOp_Shl, st, xb_binop(p, xbOp_And, st, r, m), sh);
+				u32 hi = xb_binop(p, xbOp_And, st, xb_binop(p, xbOp_LShr, st, r, sh), m);
+				r = xb_binop(p, xbOp_Or, st, lo, hi);
+			}
+			return r;
+		};
+		if (xb_is_int128(t)) {
+			xbPair a = xb_pair_of(p, x);
+			xbPair r = {rev(xbType_I64, a.hi), rev(xbType_I64, a.lo)};
+			return xb_pair_value(p, t, r);
+		}
+		xbType st = xb_scalar_type(t);
+		if (st == xbType_None || xb_type_is_float(st)) XB_UNSUPPORTED(p, "reverse_bits type");
+		return xb_value_reg(t, rev(st, xb_value_to_reg(p, x)));
+	}
 	case BuiltinProc_byte_swap: {
 		Type *t = default_type(tv.type);
 		if (xb_is_int128(t)) {
@@ -1358,6 +1436,31 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 				pos = e->token.pos;
 			}
 			return xb_source_code_location(p, procedure, pos);
+		}
+		if (name == "load_directory") {
+			// a constant array of {name, data} for the files
+			LoadDirectoryCache *cache = map_must_get(&p->m->info->load_directory_map, expr);
+			isize count = cache->files.count;
+			Type *array_type = alloc_type_array(t_load_directory_file, count);
+			i64 size = type_size_of(array_type);
+			xbConstBuf b = {};
+			b.m = p->m;
+			b.bytes = array_make<u8>(heap_allocator(), size, size);
+			gb_zero_size(b.bytes.data, size);
+			b.relocs = array_make<xbReloc>(heap_allocator(), 0, 2*count);
+			defer (array_free(&b.bytes));
+			defer (array_free(&b.relocs));
+			i64 stride = type_size_of(t_load_directory_file);
+			for_array(i, cache->files) {
+				LoadFileCache *file = cache->files[i];
+				Type *ft = nullptr;
+				i64 name_off = type_offset_of(t_load_directory_file, 0, &ft);
+				i64 data_off = type_offset_of(t_load_directory_file, 1, &ft);
+				xb_cb_write(&b, t_string, exact_value_string(filename_without_directory(file->path)), i*stride + name_off);
+				xb_cb_write(&b, t_u8_slice, exact_value_string(file->data), i*stride + data_off);
+			}
+			i32 sym = xb_const_place(&b, type_align_of(array_type));
+			return xb_make_slice_value(p, tv.type, xb_lea(p, xb_mem(xbMem_Sym, cast(u32)sym)), xb_iconst(p, xbType_I64, count));
 		}
 		XB_UNSUPPORTED(p, "directive");
 	}
@@ -1707,11 +1810,13 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 
 	// op-assign
 	TokenKind op = cast(TokenKind)(cast(i32)as->op.kind + (Token_Add - Token_AddEq));
-	if (as->op.kind == Token_CmpAndEq || as->op.kind == Token_CmpOrEq) {
-		XB_UNSUPPORTED(p, "logical op-assign");
+	if (op == Token_CmpAnd || op == Token_CmpOr) {
+		xbValue v = xb_emit_logical_binary(p, op, as->lhs[0], as->rhs[0], type_of_expr(as->lhs[0]));
+		xb_addr_store(p, xb_build_addr(p, as->lhs[0]), v);
+		return;
 	}
 	xbAddr lhs = xb_build_addr(p, as->lhs[0]);
-	if (lhs.kind != xbAddr_Default && lhs.kind != xbAddr_Swizzle) XB_UNSUPPORTED(p, "op-assign to special addr");
+	if (lhs.kind != xbAddr_Default && lhs.kind != xbAddr_Swizzle && lhs.kind != xbAddr_BitField) XB_UNSUPPORTED(p, "op-assign to special addr");
 	xbValue old = xb_addr_load(p, lhs);
 	xbValue rhs = xb_build_expr(p, as->rhs[0]);
 	Type *type = lhs.type;
@@ -1719,7 +1824,10 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 	xbValue res = {};
 	if (is_type_bit_set(bt)) {
 		xbType st = xb_scalar_type(type);
-		if (st == xbType_None) XB_UNSUPPORTED(p, "large bit_set op-assign");
+		if (st == xbType_None) {
+			xb_addr_store(p, lhs, xb_bit_set_mem_op(p, op, old, rhs, type));
+			return;
+		}
 		u32 a = xb_value_to_reg(p, old);
 		u32 b = xb_value_to_reg(p, xb_emit_conv(p, rhs, type));
 		switch (op) {
@@ -1729,6 +1837,11 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 		case Token_Xor: res = xb_value_reg(type, xb_binop(p, xbOp_Xor, st, a, b)); break;
 		default: XB_UNSUPPORTED(p, "bit_set op-assign");
 		}
+	} else if (op == Token_Mul && is_type_matrix(rhs.type) && is_type_array(type)) {
+		// array *= matrix
+		res = xb_emit_arith_matrix(p, op, old, rhs, old.type, false);
+	} else if (is_type_matrix(type)) {
+		res = xb_emit_arith(p, op, old, xb_emit_conv(p, rhs, type), type);
 	} else {
 		res = xb_emit_arith(p, op, old, rhs, type);
 	}

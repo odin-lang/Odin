@@ -7,9 +7,13 @@ struct xbConstBuf {
 	Array<xbReloc> relocs; // offsets are relative to the start of `bytes`
 	bool           writable;
 	char const *   fail;
+	Array<Entity *> *proc_lits; // procedure literals the data refers to, if allowed
 };
 
+gb_internal Entity *xb_proc_lit_entity(xbModule *m, Ast *expr);
+
 gb_internal i32 xb_const_global(xbModule *m, Type *type, ExactValue value, bool writable, char const **reason);
+gb_internal i32 xb_const_place(xbConstBuf *b, i64 align);
 
 gb_internal void xb_cb_reloc(xbConstBuf *b, i64 off, i32 sym, i64 addend) {
 	xbReloc r = {};
@@ -38,8 +42,9 @@ gb_internal void xb_cb_int(xbConstBuf *b, i64 off, i64 size, u64 v, bool swap) {
 }
 
 gb_internal void xb_cb_big_int(xbConstBuf *b, i64 off, i64 size, BigInt const *a, bool swap) {
-	// two's complement little endian bytes of any width
-	u8 tmp[16] = {};
+	// two's complement little endian bytes of any width (wide bit_sets hold more than 128 bits)
+	i64 nwords = gb_max((size + 7)/8, cast(i64)2);
+	u64 *words = gb_alloc_array(temporary_allocator(), u64, nwords);
 	BigInt v = {};
 	big_int_init(&v, a);
 	bool neg = big_int_is_neg(&v);
@@ -52,8 +57,7 @@ gb_internal void xb_cb_big_int(xbConstBuf *b, i64 off, i64 size, BigInt const *a
 	big_int_from_u64(&mask, ~cast(u64)0);
 	BigInt shift = {};
 	big_int_from_u64(&shift, 64);
-	u64 words[2] = {};
-	for (int w = 0; w < 2; w++) {
+	for (i64 w = 0; w < nwords; w++) {
 		BigInt lo = {};
 		big_int_and(&lo, &v, &mask);
 		words[w] = big_int_to_u64(&lo);
@@ -62,18 +66,22 @@ gb_internal void xb_cb_big_int(xbConstBuf *b, i64 off, i64 size, BigInt const *a
 		v = next;
 	}
 	if (neg) {
-		words[0] = ~words[0];
-		words[1] = ~words[1];
-		words[0] += 1;
-		if (words[0] == 0) words[1] += 1;
+		bool carry = true;
+		for (i64 w = 0; w < nwords; w++) {
+			words[w] = ~words[w];
+			if (carry) {
+				words[w] += 1;
+				carry = words[w] == 0;
+			}
+		}
 	}
-	gb_memmove(tmp, words, 16);
+	u8 *tmp = cast(u8 *)words;
 	if (swap) {
 		for (i64 i = 0; i < size/2; i++) {
 			u8 t = tmp[i]; tmp[i] = tmp[size-1-i]; tmp[size-1-i] = t;
 		}
 	}
-	xb_cb_bytes(b, off, tmp, gb_min(size, cast(i64)16));
+	xb_cb_bytes(b, off, tmp, size);
 }
 
 gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 off);
@@ -114,6 +122,38 @@ gb_internal bool xb_cb_array_elems(xbConstBuf *b, Ast *compound, Type *elem_type
 		if (index >= count) break;
 		if (!xb_cb_write(b, elem_type, tav.value, off + index*stride)) return false;
 		index++;
+	}
+	return true;
+}
+
+// lb_const_value_bit_field: each field's low bits at its bit offset, numbered little endian
+gb_internal bool xb_cb_bit_field(xbConstBuf *b, Type *type, ExactValue value, i64 off) {
+	Type *bt = base_type(type);
+	ast_node(cl, CompoundLit, value.value_compound);
+	for (Ast *elem : cl->elems) {
+		ast_node(fv, FieldValue, elem);
+		Selection sel = lookup_field(bt, fv->field->Ident.interned, false);
+		GB_ASSERT(sel.is_bit_field && sel.index.count == 1);
+		if (fv->value->tav.mode != Addressing_Constant) continue;
+		Type *ft = sel.entity->type;
+		if (is_type_different_to_arch_endianness(ft) || is_type_endian_big(ft)) return xb_cb_fail(b, "endian bit_field constant");
+		i64 bit_offset = bt->BitField.bit_offsets[sel.index[0]];
+		i64 bit_size   = bt->BitField.bit_sizes[sel.index[0]];
+		ExactValue v = fv->value->tav.value;
+		u64 bits = 0;
+		if (v.kind == ExactValue_Bool) {
+			bits = v.value_bool ? 1 : 0;
+		} else {
+			v = exact_value_to_integer(v);
+			if (v.kind != ExactValue_Integer) return xb_cb_fail(b, "bit_field constant value");
+			bits = big_int_is_neg(&v.value_integer) ? cast(u64)big_int_to_i64(&v.value_integer) : big_int_to_u64(&v.value_integer);
+		}
+		for (i64 i = 0; i < bit_size; i++) {
+			if ((bits >> i) & 1) {
+				i64 at = bit_offset + i;
+				b->bytes[off + (at >> 3)] |= cast(u8)(1 << (at & 7));
+			}
+		}
 	}
 	return true;
 }
@@ -174,7 +214,16 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 		for (;;) {
 			Ast *expr = unparen_expr(value.value_procedure);
 			if (expr->kind == Ast_ProcLit) {
-				return xb_cb_fail(b, "procedure literal in constant data");
+				// compiled along with the global that refers to it
+				if (b->proc_lits == nullptr) return xb_cb_fail(b, "procedure literal in constant data");
+				ast_node(pl, ProcLit, expr);
+				if (pl->body == nullptr || lb_enclosing_proc_decl(pl->decl) != nullptr) return xb_cb_fail(b, "procedure literal in constant data");
+				Entity *e = xb_proc_lit_entity(m, expr);
+				i32 sym = xb_symbol(m, xb_entity_name(m, e));
+				m->symbols[sym].flags |= xbSymbolFlag_Func;
+				xb_cb_reloc(b, off, sym, 0);
+				array_add(b->proc_lits, e);
+				return true;
 			}
 			Entity *e = entity_from_expr(expr);
 			if (e == nullptr) return xb_cb_fail(b, "procedure constant");
@@ -265,7 +314,16 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 		}
 		return true;
 	}
-	if ((is_type_matrix(type) || is_type_simd_vector(type)) && value.kind != ExactValue_Compound) {
+	if (is_type_matrix(type) && value.kind != ExactValue_Compound) {
+		// a scalar is the diagonal
+		Type *elem = type->Matrix.elem;
+		i64 es = type_size_of(elem);
+		for (i64 i = 0; i < gb_min(type->Matrix.row_count, type->Matrix.column_count); i++) {
+			if (!xb_cb_write(b, elem, value, off + matrix_indices_to_offset(type, i, i)*es)) return false;
+		}
+		return true;
+	}
+	if (is_type_simd_vector(type) && value.kind != ExactValue_Compound) {
 		return xb_cb_fail(b, "matrix/simd constant");
 	}
 
@@ -370,7 +428,7 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 		xb_cb_int(b, off, 8, cast(u64)value.value_pointer, false);
 		return true;
 	case ExactValue_Compound: {
-		if (is_type_bit_field(original_type)) return xb_cb_fail(b, "bit_field constant");
+		if (is_type_bit_field(original_type)) return xb_cb_bit_field(b, original_type, value, off);
 		if (is_type_soa_struct(type)) return xb_cb_fail(b, "soa constant");
 		if (is_type_array(type)) {
 			Type *elem = type->Array.elem;
@@ -395,6 +453,35 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 				return true;
 			}
 			return xb_cb_array_elems(b, value.value_compound, elem, type->Array.count, 0, stride, off);
+		}
+		if (is_type_matrix(type)) {
+			// elements in row major order
+			Type *elem = type->Matrix.elem;
+			if (!elem_type_can_be_constant(elem)) return true;
+			i64 es = type_size_of(elem);
+			ast_node(cl, CompoundLit, value.value_compound);
+			i64 index = 0;
+			for (Ast *e : cl->elems) {
+				if (e->kind == Ast_FieldValue) {
+					ast_node(fv, FieldValue, e);
+					i64 lo = 0, hi = 0;
+					if (is_ast_range(fv->field)) {
+						ast_node(ie, BinaryExpr, fv->field);
+						lo = exact_value_to_i64(ie->left->tav.value);
+						hi = exact_value_to_i64(ie->right->tav.value);
+						if (ie->op.kind != Token_RangeHalf) hi += 1;
+					} else {
+						lo = exact_value_to_i64(fv->field->tav.value);
+						hi = lo + 1;
+					}
+					for (i64 k = lo; k < hi; k++) {
+						if (!xb_cb_write(b, elem, fv->value->tav.value, off + matrix_row_major_index_to_offset(type, k)*es)) return false;
+					}
+				} else {
+					if (!xb_cb_write(b, elem, e->tav.value, off + matrix_row_major_index_to_offset(type, index++)*es)) return false;
+				}
+			}
+			return true;
 		}
 		if (is_type_enumerated_array(type)) {
 			Type *elem = type->EnumeratedArray.elem;
@@ -457,6 +544,19 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 			}
 			return true;
 		}
+		if (is_type_bit_set(type) && is_type_array(bit_set_to_int(type))) {
+			// bit k lives in byte k/8 of little endian elements
+			Type *et = base_array_type(bit_set_to_int(type));
+			if (type_size_of(et) > 1 && is_type_different_to_arch_endianness(et)) return xb_cb_fail(b, "bit_set of endian array");
+			ast_node(cl, CompoundLit, value.value_compound);
+			for (Ast *e : cl->elems) {
+				if (e->tav.mode != Addressing_Constant) continue;
+				i64 k = exact_value_to_i64(e->tav.value) - type->BitSet.lower;
+				if (k < 0 || k >= 8*size) continue;
+				b->bytes[off + (k >> 3)] |= cast(u8)(1 << (k & 7));
+			}
+			return true;
+		}
 		if (is_type_bit_set(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 			BigInt bits = {};
@@ -497,8 +597,16 @@ gb_internal i32 xb_const_global(xbModule *m, Type *type, ExactValue value, bool 
 		*reason = b.fail;
 		return -1;
 	}
+	return xb_const_place(&b, align);
+}
+
+// Puts the bytes of a constant buffer into an anonymous object. Returns its symbol.
+gb_internal i32 xb_const_place(xbConstBuf *bp, i64 align) {
+	xbConstBuf &b = *bp;
+	xbModule *m = b.m;
+	i64 size = b.bytes.count;
 	// anything with pointers is relocated at load time, so it goes into writable data
-	xbSection sec = (writable || b.relocs.count > 0) ? xbSection_Data : xbSection_Rodata;
+	xbSection sec = (b.writable || b.relocs.count > 0) ? xbSection_Data : xbSection_Rodata;
 	Array<u8> *data = &m->sections[sec];
 	while (data->count % align != 0) array_add(data, cast(u8)0);
 	i64 at = data->count;
