@@ -1842,13 +1842,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							String b = value.value_string;
 							if (b == "llvm") {
 								build_context.backend = Backend_LLVM;
-							} else if (b == "x64") {
+							} else if (b == "fast") {
 								build_context.backend = Backend_X64;
 							} else {
 								gb_printf_err("Invalid backend for -backend:<string>, got %.*s\n", LIT(b));
 								gb_printf_err("Valid backends:\n");
 								gb_printf_err("\tllvm\n");
-								gb_printf_err("\tx64 (unoptimized linux_amd64 builds; falls back to LLVM per procedure)\n");
+								gb_printf_err("\tfast (unoptimized builds for linux_amd64, windows_amd64 and darwin_arm64; falls back to LLVM per procedure)\n");
 								bad_flags = true;
 							}
 							break;

@@ -19,6 +19,8 @@
 #include "x64_globals.cpp"
 #include "x64_elf.cpp"
 #include "x64_coff.cpp"
+#include "a64_abi.cpp"
+#include "a64_macho.cpp"
 
 gb_global xbModule *xb_module = nullptr;
 gb_global f64 xb_time_build = 0;
@@ -54,9 +56,9 @@ gb_internal void xb_log_fallback(xbModule *m, char const *what, String name, Tok
 	m->fail_pos = {};
 	String file = pos.file_id > 0 ? get_file_path_string(pos.file_id) : str_lit("");
 	if (file.len > 0) {
-		gb_printf_err("%.*s(%d:%d) x64 backend: %s %.*s falls back to LLVM: %s\n", LIT(file), pos.line, pos.column, what, LIT(name), reason ? reason : "unknown");
+		gb_printf_err("%.*s(%d:%d) fast backend: %s %.*s falls back to LLVM: %s\n", LIT(file), pos.line, pos.column, what, LIT(name), reason ? reason : "unknown");
 	} else {
-		gb_printf_err("x64 backend: %s %.*s falls back to LLVM: %s\n", what, LIT(name), reason ? reason : "unknown");
+		gb_printf_err("fast backend: %s %.*s falls back to LLVM: %s\n", what, LIT(name), reason ? reason : "unknown");
 	}
 }
 
@@ -352,6 +354,10 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		}
 		if (!xb_proc_is_candidate(e)) continue;
 		m->stats.procs_total += 1;
+		if (!xb_can_compile_procs()) {
+			xb_stat_fail(m, "no code generation for this target yet");
+			continue;
+		}
 		if (m->limit >= 0 && m->stats.procs_compiled >= m->limit) {
 			xb_stat_fail(m, "limit");
 			continue;
@@ -379,9 +385,13 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		}
 	}
 
-	xb_build_startup(m);
+	if (xb_can_compile_procs()) {
+		xb_build_startup(m);
+	}
 	xb_build_type_info(m);
-	xb_build_test_main(m);
+	if (xb_can_compile_procs()) {
+		xb_build_test_main(m);
+	}
 
 	m->complete = m->stats.procs_compiled == m->stats.procs_total &&
 	              m->stats.globals_defined == m->stats.globals_total &&
@@ -392,15 +402,23 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	if (m->stats.procs_compiled > 0 || m->stats.globals_defined > 0) {
 		m->object_path = xb_object_path(gen);
 		f64 t0 = gb_time_now();
-		if (!(xb_is_win64() ? xb_write_coff(m, m->object_path) : xb_write_object(m, m->object_path))) {
+		bool ok = false;
+		if (xb_is_win64()) {
+			ok = xb_write_coff(m, m->object_path);
+		} else if (xb_is_arm64()) {
+			ok = a64_write_macho(m, m->object_path);
+		} else {
+			ok = xb_write_object(m, m->object_path);
+		}
+		if (!ok) {
 			gb_exit(1);
 		}
 		xb_time_write += gb_time_now() - t0;
 	}
 
 	if (gb_get_env("ODIN_XB_STATS", permanent_allocator()) != nullptr) {
-		gb_printf_err("x64 backend: compiled %td of %td procedures\n", m->stats.procs_compiled, m->stats.procs_total);
-		gb_printf_err("  globals %td of %td, startup %s, type info %s, test main %s%s\n", m->stats.globals_defined, m->stats.globals_total, m->owns_startup ? "x64" : "llvm", m->owns_type_info ? "x64" : "llvm", m->owns_test_main ? "x64" : "-", m->complete ? ", no LLVM" : "");
+		gb_printf_err("fast backend: compiled %td of %td procedures\n", m->stats.procs_compiled, m->stats.procs_total);
+		gb_printf_err("  globals %td of %td, startup %s, type info %s, test main %s%s\n", m->stats.globals_defined, m->stats.globals_total, m->owns_startup ? "fast" : "llvm", m->owns_type_info ? "fast" : "llvm", m->owns_test_main ? "fast" : "-", m->complete ? ", no LLVM" : "");
 		gb_printf_err("  build %.3f ms, lower %.3f ms, write %.3f ms\n", xb_time_build*1000, xb_time_lower*1000, xb_time_write*1000);
 		struct Reason { String name; isize count; };
 		auto reasons = array_make<Reason>(heap_allocator(), 0, m->stats.fail_reasons.count);

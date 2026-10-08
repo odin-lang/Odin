@@ -464,7 +464,7 @@ enum LTOKind : i32 {
 
 enum BackendKind : u8 {
 	Backend_LLVM,
-	Backend_X64, // the x64 debug backend, LLVM handles what it cannot
+	Backend_X64, // the fast debug backend (-backend:fast), LLVM handles what it cannot
 };
 
 enum LinkerChoice : i32 {
@@ -2136,25 +2136,27 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	if (bc->backend == Backend_X64) {
-		if (bc->metrics.arch != TargetArch_amd64 || (bc->metrics.os != TargetOs_linux && bc->metrics.os != TargetOs_windows)) {
-			gb_printf_err("-backend:x64 is only supported for linux_amd64 and windows_amd64 for now\n");
+		bool amd64 = bc->metrics.arch == TargetArch_amd64 && (bc->metrics.os == TargetOs_linux || bc->metrics.os == TargetOs_windows);
+		bool arm64 = bc->metrics.arch == TargetArch_arm64 && bc->metrics.os == TargetOs_darwin;
+		if (!amd64 && !arm64) {
+			gb_printf_err("-backend:fast is only supported for linux_amd64, windows_amd64 and darwin_arm64 for now\n");
 			gb_exit(1);
 		}
 		if (bc->optimization_level > 0) {
-			gb_printf_err("-backend:x64 is only for unoptimized builds, use -o:none or -o:minimal\n");
+			gb_printf_err("-backend:fast is only for unoptimized builds, use -o:none or -o:minimal\n");
 			gb_exit(1);
 		}
 		if (bc->build_mode == BuildMode_Assembly) {
-			gb_printf_err("-backend:x64 cannot write assembly, use -build-mode:obj and a disassembler instead\n");
+			gb_printf_err("-backend:fast cannot write assembly, use -build-mode:obj and a disassembler instead\n");
 			gb_exit(1);
 		}
 		if (bc->build_mode != BuildMode_Executable && bc->build_mode != BuildMode_DynamicLibrary &&
 		    bc->build_mode != BuildMode_Object && bc->build_mode != BuildMode_StaticLibrary) {
-			gb_printf_err("-backend:x64 only supports -build-mode:exe, test, dll, obj and lib\n");
+			gb_printf_err("-backend:fast only supports -build-mode:exe, test, dll, obj and lib\n");
 			gb_exit(1);
 		}
 		if (bc->lto_kind != LTO_None) {
-			gb_printf_err("-backend:x64 cannot be used with -lto\n");
+			gb_printf_err("-backend:fast cannot be used with -lto\n");
 			gb_exit(1);
 		}
 		// objects from both backends are linked together, which needs external symbols

@@ -327,7 +327,7 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 		case xbReloc_Abs32:    type = XB_IMAGE_REL_AMD64_ADDR32; break;
 		case xbReloc_SecRel32: type = XB_IMAGE_REL_AMD64_SECREL; break;
 		default:
-			GB_PANIC("x64 backend: relocation kind %d has no COFF form", r.kind);
+			GB_PANIC("fast backend: relocation kind %d has no COFF form", r.kind);
 		}
 		u32 offset = cast(u32)r.offset;
 		if (r.section == xbSection_TBss) offset += cast(u32)w.tbss_base;
@@ -469,7 +469,7 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 	gbFile f = {};
 	char const *cpath = alloc_cstring(temporary_allocator(), path);
 	if (gb_file_create(&f, cpath) != gbFileError_None) {
-		gb_printf_err("x64 backend: failed to create %s\n", cpath);
+		gb_printf_err("fast backend: failed to create %s\n", cpath);
 		return false;
 	}
 	gb_file_write(&f, out.data, out.count);

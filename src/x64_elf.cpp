@@ -1363,7 +1363,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	gbFile f = {};
 	char const *cpath = alloc_cstring(temporary_allocator(), path);
 	if (gb_file_create(&f, cpath) != gbFileError_None) {
-		gb_printf_err("x64 backend: failed to create %s\n", cpath);
+		gb_printf_err("fast backend: failed to create %s\n", cpath);
 		return false;
 	}
 	gb_file_write(&f, out.data, out.count);

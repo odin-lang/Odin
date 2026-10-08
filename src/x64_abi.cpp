@@ -1192,6 +1192,9 @@ gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 	if (build_context.metrics.os == TargetOs_windows && cc != ProcCC_SysV) {
 		return xb_abi_compute_win64(proc_type, reason);
 	}
+	if (xb_is_arm64()) {
+		return a64_abi_compute(proc_type, reason);
+	}
 
 	switch (cc) {
 	case ProcCC_Odin:

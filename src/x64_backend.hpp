@@ -1,6 +1,6 @@
-// A fast, non-optimizing x86-64 backend for debug builds (`-backend:x64`).
+// A fast, non-optimizing backend for debug builds (`-backend:fast`), for x86-64 and arm64.
 //
-// Pipeline: checked AST -> xb IR (per procedure) -> machine code -> ELF object.
+// Pipeline: checked AST -> xb IR (per procedure) -> machine code -> ELF, COFF or Mach-O object.
 //
 // Procedures the backend cannot compile yet are left to LLVM. Both backends use
 // the same symbol names and the same ABI, so their objects link together.
@@ -541,6 +541,12 @@ gb_internal void xb_win64_epilogue(xbLower *L);
 gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch);
 gb_internal xbOpnd xb_win64_import_opnd(xbLower *L, xbMem const &m, u8 scratch);
 gb_internal bool xb_write_coff(xbModule *m, String path);
+
+// macOS arm64 (a64_*.cpp)
+gb_internal bool xb_is_arm64(void);
+gb_internal bool xb_can_compile_procs(void);
+gb_internal xbAbiFunc *a64_abi_compute(Type *proc_type, char const **reason);
+gb_internal bool a64_write_macho(xbModule *m, String path);
 
 // A bump allocator for everything that only lives while one procedure family is
 // compiled. Reset keeps the memory, so the pages stay mapped. Memory comes back zeroed.
