@@ -1674,6 +1674,29 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		xb_emit(p, i);
 		return xb_value_reg(t_uintptr, c.result_vreg);
 	}
+	case BuiltinProc_constant_utf16_cstring: {
+		// encoded like the LLVM backend's, invalid runes become U+FFFD
+		String value = type_and_value_of_expr(ce->args[0]).value.value_string;
+		auto buf = array_make<u16>(xb_allocator(), 0, value.len + 1);
+		while (value.len > 0) {
+			Rune r = 0;
+			isize w = gb_utf8_decode(value.text, value.len, &r);
+			value.text += w;
+			value.len  -= w;
+			if ((0 <= r && r < 0xd800) || (0xe000 <= r && r < 0x10000)) {
+				array_add(&buf, cast(u16)r);
+			} else if (0x10000 <= r && r <= 0x10ffff) {
+				r -= 0x10000;
+				array_add(&buf, cast(u16)(0xd800 + ((r>>10)&0x3ff)));
+				array_add(&buf, cast(u16)(0xdc00 + (r&0x3ff)));
+			} else {
+				array_add(&buf, cast(u16)0xfffd);
+			}
+		}
+		array_add(&buf, cast(u16)0);
+		i32 sym = xb_rodata(p->m, buf.data, buf.count*2, 2);
+		return xb_value_reg(default_type(tv.type), xb_lea(p, xb_mem(xbMem_Sym, cast(u32)sym)));
+	}
 	case BuiltinProc_type_map_info: {
 		i32 sym = xb_map_info_sym(p, ce->args[0]->tav.type);
 		return xb_value_reg(t_map_info_ptr, xb_lea(p, xb_mem(xbMem_Sym, cast(u32)sym)));
