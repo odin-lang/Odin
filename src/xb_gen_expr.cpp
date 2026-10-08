@@ -1525,6 +1525,12 @@ gb_internal xbAddr xb_build_addr_internal(xbProc *p, Ast *expr) {
 		}
 		Selection sel = lookup_field(tav.type, selector, false);
 		GB_ASSERT(sel.entity != nullptr);
+		Type *deref_type = type_deref(tav.type);
+		if (tav.type->kind == Type_Pointer && deref_type->kind == Type_Named && deref_type->Named.type_name->TypeName.objc_ivar) {
+			// a field of the ivar of the object pointed at
+			xbValue ivar = xb_objc_ivar_ptr(p, xb_build_expr(p, se->expr));
+			return xb_emit_deep_field(p, type_deref(ivar.type), xb_mem_from_ptr(p, ivar), sel);
+		}
 		if (sel.pseudo_field) XB_UNSUPPORTED(p, "pseudo field");
 		if (sel.is_bit_field) {
 			// walk to the bit_field, the last index is its field
@@ -1539,11 +1545,6 @@ gb_internal xbAddr xb_build_addr_internal(xbProc *p, Ast *expr) {
 			}
 			return xb_addr_bit_field(bf.mem, bf.type, sel.index[sel.index.count-1]);
 		}
-		Type *deref_type = type_deref(tav.type);
-		if (tav.type->kind == Type_Pointer && deref_type->kind == Type_Named && deref_type->Named.type_name->TypeName.objc_ivar) {
-			XB_UNSUPPORTED(p, "objc ivar");
-		}
-
 		xbAddr addr = {};
 		if (is_type_soa_pointer(tav.type)) {
 			// p.x for an #soa pointer p is p^.x

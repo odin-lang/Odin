@@ -19,6 +19,7 @@
 #include "x64_win64.cpp"
 #include "xb_type_info.cpp"
 #include "xb_globals.cpp"
+#include "xb_objc.cpp"
 #include "xb_dwarf.cpp"
 #include "x64_elf.cpp"
 #include "x64_coff.cpp"
@@ -102,7 +103,6 @@ gb_internal void xb_stat_fail(xbModule *m, char const *reason) {
 gb_internal bool xb_proc_is_candidate(Entity *e) {
 	if (e->kind != Entity_Procedure) return false;
 	if (e->Procedure.is_foreign) return false;
-	if (e->Procedure.is_objc_impl_or_import) return false;
 	if (e->flags & EntityFlag_Disabled) return false;
 	DeclInfo *d = e->decl_info;
 	if (d == nullptr || d->proc_lit == nullptr) return false;
@@ -431,6 +431,10 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	map_init(&m->abi_cache);
 	string_map_init(&m->string_lits);
 	string_map_init(&m->stats.fail_reasons);
+	for (isize i = 0; i < xbObjc_COUNT; i++) {
+		m->objc_globals[i] = array_make<xbObjcGlobal>(heap_allocator(), 0, 16);
+		string_map_init(&m->objc_global_map[i]);
+	}
 
 	m->limit = -1;
 	if (char const *s = gb_get_env("ODIN_XB_LIMIT", permanent_allocator())) {
@@ -507,8 +511,16 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	              m->owns_startup &&
 	              (m->owns_type_info || build_context.no_rtti) &&
 	              (build_context.command_kind != Command_test || m->owns_test_main || m->test_main_not_needed);
-	if (m->complete && build_context.metrics.os == TargetOs_darwin) {
-		xb_build_objc_names_stub(m);
+	if (build_context.metrics.os == TargetOs_darwin && xb_can_compile_procs()) {
+		char const *reason = nullptr;
+		if (m->complete && !xb_build_objc_names(m, &reason)) {
+			m->complete = false;
+			xb_stat_fail(m, reason ? reason : "objc setup");
+			xb_log_fallback(m, "runtime procedure", str_lit("__$init_objc_names"), {}, reason);
+		}
+		if (!m->complete) {
+			xb_objc_hand_over(m);
+		}
 	}
 
 	if (m->stats.procs_compiled > 0 || m->stats.globals_defined > 0) {

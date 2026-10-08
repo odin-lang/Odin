@@ -494,12 +494,50 @@ gb_internal bool xb_build_x86_vec_intrinsic(xbProc *p, String name, AstCallExpr 
 	return true;
 }
 
+// The arm64 crypto intrinsics, on 16 byte operands in memory; a scalar operand or result
+// is the low lane.
+gb_internal bool xb_build_a64_vec_intrinsic(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
+	if (!xb_is_arm64()) return false;
+	isize args = 0;
+	i32 index = a64_vec_intrinsic_index(name, &args);
+	if (index < 0) return false;
+	if (ce->args.count != args) XB_UNSUPPORTED(p, "llvm intrinsic");
+	u32 ptrs[3] = {};
+	for (isize i = 0; i < args; i++) {
+		xbValue x = xb_build_expr(p, ce->args[i]);
+		i64 size = type_size_of(x.type);
+		if (size == 16) {
+			ptrs[i] = xb_lea(p, xb_address_from_load_or_generate_local(p, x));
+		} else if (size == 4 && xb_is_scalar(x.type)) {
+			xbMem m = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 16, 16));
+			xb_store_value(p, m, x);
+			ptrs[i] = xb_lea(p, m);
+		} else {
+			XB_UNSUPPORTED(p, "llvm intrinsic");
+		}
+	}
+	i64 result_size = type_size_of(result_type);
+	if (result_size != 16 && result_size != 4) XB_UNSUPPORTED(p, "llvm intrinsic");
+	xbInstr in = xb_instr(xbOp_Vec128);
+	in.aux = cast(u8)index;
+	in.a = ptrs[0];
+	in.b = args > 1 ? ptrs[1] : ptrs[0];
+	in.c = args > 2 ? ptrs[2] : 0;
+	in.mem = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 16, 16));
+	xb_emit(p, in);
+	*res = xb_load_value(p, result_type, in.mem);
+	return true;
+}
+
 gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallExpr *ce, Type *result_type) {
 	String name = e->Procedure.link_name;
 	Type *pt = base_type(e->type);
 	isize n = pt->Proc.param_count;
 	xbValue vec_res = {};
 	if (xb_build_x86_vec_intrinsic(p, name, ce, result_type, &vec_res)) {
+		return vec_res;
+	}
+	if (xb_build_a64_vec_intrinsic(p, name, ce, result_type, &vec_res)) {
 		return vec_res;
 	}
 	if (ce->args.count != n || pt->Proc.result_count != 1) XB_UNSUPPORTED(p, "llvm intrinsic");
@@ -626,9 +664,6 @@ gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 			xbValue v = {};
 			return v;
 		}
-		if (proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_objc_impl_or_import) {
-			XB_UNSUPPORTED(p, "objc call");
-		}
 		if (proc_entity->kind == Entity_AsmTemplate) {
 			return xb_build_asm_call(p, proc_entity, ce);
 		}
@@ -641,16 +676,20 @@ gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 	}
 	if (ce->tailing == ProcTailing_must_tail) XB_UNSUPPORTED(p, "must tail");
 
+	// an Objective-C method is sent as a message, its procedure is not called
+	bool is_objc_call = proc_entity != nullptr && proc_entity->kind == Entity_Procedure && proc_entity->Procedure.is_objc_impl_or_import;
 	xbValue value = {};
 	i32 direct_sym = -1;
-	if (proc_expr->tav.mode == Addressing_Constant) {
+	if (is_objc_call) {
+		value.type = proc_tv.type;
+	} else if (proc_expr->tav.mode == Addressing_Constant) {
 		ExactValue v = proc_expr->tav.value;
 		if (v.kind == ExactValue_Integer || v.kind == ExactValue_Pointer) {
 			u64 u = v.kind == ExactValue_Integer ? big_int_to_u64(&v.value_integer) : cast(u64)v.value_pointer;
 			value = xb_value_reg(proc_expr->tav.type, xb_iconst(p, xbType_I64, cast(i64)u));
 		}
 	}
-	if (value.kind == xbValue_Invalid) {
+	if (value.kind == xbValue_Invalid && !is_objc_call) {
 		if (proc_entity != nullptr && proc_entity->kind == Entity_Procedure) {
 			direct_sym = xb_direct_symbol_of(p, proc_expr, &value);
 		} else {
@@ -830,6 +869,10 @@ gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 			}
 		}
 		array_add(&call_args, args[i]);
+	}
+
+	if (is_objc_call) {
+		return xb_objc_auto_send(p, expr, slice_from_array(call_args));
 	}
 
 	xbValue res = {};
@@ -1021,6 +1064,128 @@ gb_internal xbValue xb_float_pick(xbProc *p, Type *t, xbValue a, xbValue b, bool
 	return xb_value_reg(t, xb_select(p, st, b_nan, ar, r));
 }
 
+gb_internal u32 xb_simd_saturate(xbProc *p, bool is_add, bool is_signed, xbType st, u32 a, u32 b);
+
+gb_internal xbValue xb_select_128(xbProc *p, Type *t, u32 cond, xbValue a, xbValue b) {
+	xbPair x = xb_pair_of(p, a);
+	xbPair y = xb_pair_of(p, b);
+	xbPair r = {xb_select(p, xbType_I64, cond, x.lo, y.lo), xb_select(p, xbType_I64, cond, x.hi, y.hi)};
+	return xb_pair_value(p, t, r);
+}
+
+// llvm.[su]{mul,div}.fix[.sat]: the product shifted right by the scale, or the dividend shifted
+// left and divided, exactly in 128 bits and rounded down like LLVM's expansion, then clamped
+// to the type for .sat. A zero divisor gives what integer division gives, of the unscaled x.
+gb_internal xbValue xb_build_fixed_point(xbProc *p, AstCallExpr *ce, Type *result_type, BuiltinProcId id) {
+	Type *t = integer_endian_type_to_platform_type(result_type);
+	xbType st = xb_scalar_type(t);
+	if (st == xbType_None || xb_is_int128(t)) XB_UNSUPPORTED(p, "fixed point type");
+	TypeAndValue scale_tv = type_and_value_of_expr(ce->args[2]);
+	if (scale_tv.mode != Addressing_Constant) XB_UNSUPPORTED(p, "fixed point scale");
+	bool is_signed = !is_type_unsigned(t);
+	bool is_mul = id == BuiltinProc_fixed_point_mul || id == BuiltinProc_fixed_point_mul_sat;
+	bool is_sat = id == BuiltinProc_fixed_point_mul_sat || id == BuiltinProc_fixed_point_div_sat;
+	Type *wt = is_signed ? t_i128 : t_u128;
+
+	xbValue x = xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t);
+	xbValue y = xb_emit_conv(p, xb_build_expr(p, ce->args[1]), t);
+	xbValue scale = xb_const_int(p, t_u64, exact_value_to_i64(scale_tv.value));
+	xbValue wx = xb_emit_conv(p, x, wt);
+	xbValue wy = xb_emit_conv(p, y, wt);
+	xbMem res = xb_add_local(p, t, false);
+	xbBlock *done = nullptr;
+	xbValue r = {};
+	if (is_mul) {
+		r = xb_emit_arith(p, Token_Shr, xb_emit_arith(p, Token_Mul, wx, wy, wt), scale, wt);
+	} else {
+		xbBlock *safe = xb_new_block(p);
+		xbBlock *zero = xb_new_block(p);
+		done = xb_new_block(p);
+		xb_branch(p, xb_cmp(p, xbCond_NE, st, xb_value_to_reg(p, y), xb_iconst(p, st, 0)), safe, zero);
+		xb_start_block(p, zero);
+		switch (xb_division_by_zero_behaviour(p)) {
+		case IntegerDivisionByZero_Trap:
+			xb_emit(p, xb_instr(xbOp_Trap));
+			xb_unreachable(p);
+			break;
+		case IntegerDivisionByZero_Zero:    xb_store(p, st, res, xb_iconst(p, st, 0)); break;
+		case IntegerDivisionByZero_Self:    xb_store_value(p, res, x); break;
+		case IntegerDivisionByZero_AllBits: xb_store(p, st, res, xb_iconst(p, st, -1)); break;
+		}
+		xb_jump(p, done);
+		xb_start_block(p, safe);
+		xbValue n = xb_emit_arith(p, Token_Shl, wx, scale, wt);
+		r = xb_emit_arith(p, Token_Quo, n, wy, wt);
+		if (is_signed) {
+			// down when a remainder is left and the signs differ
+			xbValue rem = xb_emit_arith(p, Token_Mod, n, wy, wt);
+			xbValue z = xb_emit_conv(p, xb_const_int(p, t_i64, 0), wt);
+			u32 inexact = xb_to_bool_reg(p, xb_emit_comp(p, Token_NotEq, rem, z));
+			u32 rem_neg = xb_to_bool_reg(p, xb_emit_comp(p, Token_Lt, rem, z));
+			u32 y_neg = xb_to_bool_reg(p, xb_emit_comp(p, Token_Lt, wy, z));
+			u32 down = xb_binop(p, xbOp_And, xbType_I8, inexact, xb_binop(p, xbOp_Xor, xbType_I8, rem_neg, y_neg));
+			xbValue one = xb_emit_conv(p, xb_const_int(p, t_i64, 1), wt);
+			r = xb_select_128(p, wt, down, xb_emit_arith(p, Token_Sub, r, one, wt), r);
+		}
+	}
+	if (is_sat) {
+		i64 bits = 8*type_size_of(t);
+		xbValue hi = {};
+		if (is_signed) {
+			i64 max = cast(i64)((cast(u64)1 << (bits-1)) - 1);
+			hi = xb_emit_conv(p, xb_const_int(p, t_i64, max), wt);
+			xbValue lo = xb_emit_conv(p, xb_const_int(p, t_i64, -max-1), wt);
+			r = xb_select_128(p, wt, xb_to_bool_reg(p, xb_emit_comp(p, Token_Lt, r, lo)), lo, r);
+		} else {
+			u64 max = bits == 64 ? ~cast(u64)0 : (cast(u64)1 << bits) - 1;
+			hi = xb_emit_conv(p, xb_const_int(p, t_u64, cast(i64)max), wt);
+		}
+		r = xb_select_128(p, wt, xb_to_bool_reg(p, xb_emit_comp(p, Token_Gt, r, hi)), hi, r);
+	}
+	xb_store_value(p, res, xb_emit_conv(p, r, t));
+	if (done != nullptr) {
+		xb_jump(p, done);
+		xb_start_block(p, done);
+	}
+	return xb_emit_conv(p, xb_load_value(p, t, res), result_type);
+}
+
+// c_va_list on arm64 macOS is a pointer to the next 8 byte stack slot; the variadic arguments
+// follow the fixed ones on the stack.
+gb_internal void xb_build_c_va_start(xbProc *p, AstCallExpr *ce) {
+	if (!xb_is_arm64()) XB_UNSUPPORTED(p, "c_va_start on x86-64");
+	if (p->inl != nullptr || !base_type(p->type)->Proc.c_vararg) XB_UNSUPPORTED(p, "c_va_start");
+	u32 list = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
+	u32 first = xb_lea(p, xb_mem(xbMem_Incoming, 0, cast(i32)align_formula(p->abi->stack_size, 8)));
+	xb_store(p, xbType_I64, xb_mem(xbMem_Reg, list, 0), first);
+}
+
+// LLVM's va_arg on arm64 macOS: integers and floats take 8 bytes, an f32 or f16 is passed as
+// an f64, a more aligned value starts aligned.
+gb_internal xbValue xb_build_c_va_arg(xbProc *p, AstCallExpr *ce, Type *type) {
+	if (!xb_is_arm64()) XB_UNSUPPORTED(p, "c_va_arg on x86-64");
+	xbType st = xb_scalar_type(type);
+	if (st == xbType_None || is_type_different_to_arch_endianness(type)) XB_UNSUPPORTED(p, "c_va_arg type");
+	u32 list = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
+	xbMem lm = xb_mem(xbMem_Reg, list, 0);
+	u32 ptr = xb_load(p, xbType_I64, lm);
+	i64 align = type_align_of(type);
+	if (align > 8) {
+		ptr = xb_binop(p, xbOp_And, xbType_I64, xb_ptr_add_const(p, ptr, align-1), xb_iconst(p, xbType_I64, -align));
+	}
+	i64 size = gb_max(cast(i64)xb_type_size(st), cast(i64)8);
+	xb_store(p, xbType_I64, lm, xb_ptr_add_const(p, ptr, size));
+	if (xb_type_is_float(st) && st != xbType_F64) {
+		xbValue d = xb_value_reg(t_f64, xb_load(p, xbType_F64, xb_mem(xbMem_Reg, ptr, 0)));
+		return xb_emit_conv(p, d, type);
+	}
+	if (xb_is_f16(type)) {
+		xbValue d = xb_value_reg(t_f64, xb_load(p, xbType_F64, xb_mem(xbMem_Reg, ptr, 0)));
+		return xb_emit_conv(p, d, type);
+	}
+	return xb_load_value(p, type, xb_mem(xbMem_Reg, ptr, 0));
+}
+
 gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
 	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
@@ -1030,6 +1195,15 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		return xb_build_builtin_vector_proc(p, expr, tv, id);
 	}
 	switch (id) {
+	case BuiltinProc_objc_send:
+	case BuiltinProc_objc_find_selector:
+	case BuiltinProc_objc_find_class:
+	case BuiltinProc_objc_register_selector:
+	case BuiltinProc_objc_register_class:
+	case BuiltinProc_objc_ivar_get:
+	case BuiltinProc_objc_block:
+	case BuiltinProc_objc_super:
+		return xb_build_objc_builtin(p, expr, id);
 	case BuiltinProc_len:
 	case BuiltinProc_cap: {
 		xbValue v = xb_build_expr(p, ce->args[0]);
@@ -1627,6 +1801,88 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		xb_store(p, xbType_I8, xb_mem_offset(m, type_offset_of(main_type, 1, &ft)), ovf);
 		return xb_value_mem(main_type, m);
 	}
+	case BuiltinProc_saturating_add:
+	case BuiltinProc_saturating_sub: {
+		Type *t = tv.type;
+		xbType st = xb_scalar_type(t);
+		if (st == xbType_None || is_type_different_to_arch_endianness(t)) XB_UNSUPPORTED(p, "saturating op type");
+		u32 x = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t));
+		u32 y = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[1]), t));
+		return xb_value_reg(t, xb_simd_saturate(p, id == BuiltinProc_saturating_add, !is_type_unsigned(t), st, x, y));
+	}
+	case BuiltinProc_fixed_point_mul:
+	case BuiltinProc_fixed_point_div:
+	case BuiltinProc_fixed_point_mul_sat:
+	case BuiltinProc_fixed_point_div_sat:
+		return xb_build_fixed_point(p, ce, tv.type, id);
+	case BuiltinProc_c_va_start:
+		xb_build_c_va_start(p, ce);
+		return {};
+	case BuiltinProc_c_va_end:
+		// nothing to release on any target
+		xb_build_expr(p, ce->args[0]);
+		return {};
+	case BuiltinProc_c_va_copy: {
+		u32 dst = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
+		u32 src = xb_value_to_reg(p, xb_build_expr(p, ce->args[1]));
+		xb_memcopy(p, xb_mem(xbMem_Reg, dst, 0), xb_mem(xbMem_Reg, src, 0), type_size_of(t_c_va_list));
+		return {};
+	}
+	case BuiltinProc_c_va_arg:
+		return xb_build_c_va_arg(p, ce, type_of_expr(ce->args[1]));
+	case BuiltinProc_expand_values: {
+		xbValue v = xb_build_expr(p, ce->args[0]);
+		Type *t = base_type(v.type);
+		xbMem src = xb_value_to_mem(p, v);
+		Type *rt = tv.type;
+		auto field = [&](isize i, Type **ft) -> i64 {
+			if (t->kind == Type_Struct) {
+				return type_offset_of(t, t->Struct.fields[i]->Variable.field_index, ft);
+			}
+			GB_ASSERT(is_type_array_like(t));
+			*ft = base_array_type(t);
+			return i * type_size_of(*ft);
+		};
+		if (!is_type_tuple(rt)) {
+			Type *ft = nullptr;
+			i64 off = field(0, &ft);
+			return xb_load_value(p, ft, xb_mem_offset(src, off));
+		}
+		xbMem dst = xb_add_local(p, rt, false);
+		for_array(i, rt->Tuple.variables) {
+			Type *ft = nullptr;
+			i64 off = field(i, &ft);
+			Type *et = nullptr;
+			i64 dst_off = type_offset_of(rt, i, &et);
+			xb_store_value(p, xb_mem_offset(dst, dst_off), xb_load_value(p, ft, xb_mem_offset(src, off)));
+		}
+		return xb_value_mem(rt, dst);
+	}
+	case BuiltinProc_compress_values: {
+		auto values = array_make<xbValue>(xb_allocator(), 0, ce->args.count);
+		for (Ast *arg : ce->args) {
+			xb_add_values_to_array(p, &values, xb_build_expr(p, arg));
+		}
+		if (values.count == 1) {
+			return xb_emit_conv(p, values[0], tv.type);
+		}
+		Type *dt = base_type(tv.type);
+		xbMem dst = xb_add_local(p, tv.type, true);
+		for_array(i, values) {
+			Type *ft = nullptr;
+			i64 off = 0;
+			if (is_type_struct(dt) || is_type_tuple(dt)) {
+				off = type_offset_of(dt, cast(i32)i, &ft);
+			} else if (is_type_array_like(dt)) {
+				ft = base_array_type(dt);
+				off = i * type_size_of(ft);
+			} else {
+				XB_UNSUPPORTED(p, "compress_values type");
+			}
+			xb_store_value(p, xb_mem_offset(dst, off), xb_emit_conv(p, values[i], ft));
+		}
+		return xb_value_mem(tv.type, dst);
+	}
 	case BuiltinProc_sqrt: {
 		Type *t = default_type(tv.type);
 		xbType st = xb_scalar_type(t);
@@ -1641,6 +1897,15 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 	}
 	case BuiltinProc_read_cycle_counter: {
 		xbInstr i = xb_instr(xbOp_ReadCycleCounter, xbType_I64);
+		i.dst = xb_new_vreg(p, xbType_I64);
+		xb_emit(p, i);
+		return xb_value_reg(tv.type, i.dst);
+	}
+	case BuiltinProc_read_cycle_counter_frequency: {
+		// LLVM's only has an arm64 form
+		if (!xb_is_arm64()) XB_UNSUPPORTED(p, "cycle counter frequency");
+		xbInstr i = xb_instr(xbOp_ReadCycleCounter, xbType_I64);
+		i.imm = 1;
 		i.dst = xb_new_vreg(p, xbType_I64);
 		xb_emit(p, i);
 		return xb_value_reg(tv.type, i.dst);

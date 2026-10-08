@@ -88,14 +88,14 @@ struct a64Addr {
 	i64 off;
 };
 
-// The x86 operations, which have no arm64 form; the procedure goes to LLVM.
+// The x86 operations, which have no arm64 form; the procedure goes to LLVM. On arm64,
+// xbOp_Vec128 is one of a64_vec_intrinsics.
 gb_internal void a64_check_proc(xbProc *p) {
 	for (xbBlock *b : p->order) {
 		for (xbInstr const &in : b->instrs) {
 			switch (in.op) {
 			case xbOp_Cpuid:
 			case xbOp_Xgetbv:
-			case xbOp_Vec128:
 			case xbOp_Valgrind:
 				XB_UNSUPPORTED(p, "arm64 operation");
 				break;
@@ -1680,8 +1680,21 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		break;
 	case xbOp_ReadCycleCounter: {
 		u8 d = a64_dst(L, in.dst, A64_T0);
-		a64_emit(a, 0xD53BE040 | d); // mrs xd, cntvct_el0
+		if (in.imm) {
+			a64_emit(a, 0xD53BE000 | d); // mrs xd, cntfrq_el0
+		} else {
+			a64_emit(a, 0xD53BE040 | d); // mrs xd, cntvct_el0
+		}
 		a64_put(L, in.dst, d);
+		break;
+	}
+	case xbOp_Vec128: {
+		a64_ldr_fp(a, 16, 16, a64_src(L, in.a, A64_TA, 8, xbExt_None), 0);
+		a64_ldr_fp(a, 16, 17, a64_src(L, in.b, A64_TA, 8, xbExt_None), 0);
+		if (in.c) a64_ldr_fp(a, 16, 18, a64_src(L, in.c, A64_TA, 8, xbExt_None), 0);
+		a64_vec_intrinsic(a, in.aux);
+		a64Addr m = a64_mem(L, in.mem);
+		a64_str_fp(a, 16, 16, m.base, m.off);
 		break;
 	}
 	case xbOp_StackPointer: {
