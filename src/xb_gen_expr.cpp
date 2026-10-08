@@ -6,6 +6,7 @@ gb_internal xbValue xb_addr_load(xbProc *p, xbAddr const &addr);
 gb_internal void    xb_addr_store(xbProc *p, xbAddr const &addr, xbValue v);
 gb_internal xbValue xb_build_call_expr(xbProc *p, Ast *expr);
 gb_internal xbValue xb_emit_call(xbProc *p, xbValue proc, Slice<xbValue> args, Ast *call_expr);
+gb_internal xbValue xb_emit_call_entity(xbProc *p, Entity *e, xbValue proc, Slice<xbValue> args, Ast *call_expr);
 gb_internal xbValue xb_emit_comp(xbProc *p, TokenKind op, xbValue x, xbValue y);
 gb_internal xbValue xb_emit_arith(xbProc *p, TokenKind op, xbValue x, xbValue y, Type *type);
 gb_internal xbValue xb_emit_arith_array(xbProc *p, TokenKind op, xbValue x, xbValue y, Type *type);
@@ -43,7 +44,7 @@ gb_internal xbValue xb_emit_runtime_call(xbProc *p, char const *name, Slice<xbVa
 		conv[j] = xb_emit_conv(p, args[j], param->type);
 		j++;
 	}
-	return xb_emit_call(p, proc, conv, nullptr);
+	return xb_emit_call_entity(p, e, proc, conv, nullptr);
 }
 
 gb_internal void xb_emit_runtime_call_init_context(xbProc *p, xbMem ctx) {
@@ -134,6 +135,7 @@ gb_internal Entity *xb_proc_lit_entity(xbModule *m, Ast *expr) {
 gb_internal xbValue xb_proc_lit_value(xbProc *p, Ast *expr, Type *type) {
 	ast_node(pl, ProcLit, expr);
 	if (pl->body == nullptr) XB_UNSUPPORTED(p, "procedure literal without body");
+	if (p->family == nullptr) XB_UNSUPPORTED(p, "procedure literal outside a family");
 	Entity *e = xb_proc_lit_entity(p->m, expr);
 	DeclInfo *enclosing = lb_enclosing_proc_decl(pl->decl);
 	if (enclosing != nullptr) {
@@ -457,7 +459,13 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 	DeclInfo *d = e->decl_info;
 	if (!e->Procedure.is_foreign && d != nullptr && d->proc_lit != nullptr) {
 		// nested procedures are generated together with their outermost procedure
-		if (lb_enclosing_proc_decl(d) != nullptr) {
+		if (p->family == nullptr) {
+			// a generated procedure, with a body inlined into it: whatever the body
+			// references is generated along with that body's own procedure
+			if (lb_enclosing_proc_decl(d) == nullptr && e->min_dep_count.load(std::memory_order_relaxed) == 0) {
+				XB_UNSUPPORTED(p, "unreferenced procedure outside a family");
+			}
+		} else if (lb_enclosing_proc_decl(d) != nullptr) {
 			bool inside = false;
 			for (DeclInfo *a = lb_enclosing_proc_decl(d); a != nullptr; a = lb_enclosing_proc_decl(a)) {
 				if (ptr_set_exists(&p->family->roots, a)) {
@@ -558,7 +566,7 @@ gb_internal xbAddr xb_build_addr_from_entity(xbProc *p, Entity *e, Ast *expr) {
 			XB_UNSUPPORTED(p, "unknown local variable");
 		}
 		if (e->flags & EntityFlag_Static) {
-			i32 *sym = map_get(&p->family->statics, e);
+			i32 *sym = p->family ? map_get(&p->family->statics, e) : nullptr;
 			if (sym == nullptr) XB_UNSUPPORTED(p, "static local variable");
 			if (e->Variable.thread_local_model.len != 0) {
 				return xb_addr(e->type, xb_tls_mem(p, *sym));

@@ -582,6 +582,19 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 	return xb_emit_conv(p, res, result_type);
 }
 
+gb_internal bool xb_should_inline(xbProc *p, Entity *e, ProcInlining call_inlining, ProcTailing tailing, Type *call_type);
+gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, Ast *call_expr, xbValue *res);
+
+// A call to the procedure `e`, whose value is `proc`, with converted arguments.
+gb_internal xbValue xb_emit_call_entity(xbProc *p, Entity *e, xbValue proc, Slice<xbValue> args, Ast *call_expr) {
+	xbValue res = {};
+	if (e != nullptr && xb_should_inline(p, e, ProcInlining_none, ProcTailing_none, proc.type) &&
+	    xb_try_inline_call(p, e, args, call_expr, &res)) {
+		return res;
+	}
+	return xb_emit_call(p, proc, args, call_expr);
+}
+
 gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 	TypeAndValue tv = type_and_value_of_expr(expr);
 	ast_node(ce, CallExpr, expr);
@@ -819,7 +832,11 @@ gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 		array_add(&call_args, args[i]);
 	}
 
-	xbValue res = xb_emit_call_internal(p, value, direct_sym, slice_from_array(call_args));
+	xbValue res = {};
+	if (direct_sym < 0 || !xb_should_inline(p, proc_entity, ce->inlining, ce->tailing, value.type) ||
+	    !xb_try_inline_call(p, proc_entity, slice_from_array(call_args), expr, &res)) {
+		res = xb_emit_call_internal(p, value, direct_sym, slice_from_array(call_args));
+	}
 
 	if (proc_entity != nullptr && proc_entity->kind == Entity_Procedure && entity_has_deferred_procedure(proc_entity)) {
 		DeferredProcedureKind kind = proc_entity->Procedure.deferred_procedure.kind;
@@ -864,6 +881,7 @@ gb_internal xbValue xb_build_call_expr_internal(xbProc *p, Ast *expr) {
 		d.scope_index = p->scope_index;
 		d.context_stack_count = p->context_stack.count;
 		d.proc = xb_proc_value_from_entity(p, deferred_entity);
+		d.proc_entity = deferred_entity;
 		d.args = result_as_args;
 		d.pos = ast_token(expr).pos;
 		array_add(&p->defers, d);
@@ -2016,7 +2034,7 @@ gb_internal void xb_build_defer_stmt(xbProc *p, xbDefer const &d) {
 			if (param->kind != Entity_Variable) continue;
 			if (j < d.args.count) array_add(&args, xb_emit_conv(p, d.args[j++], param->type));
 		}
-		xb_emit_call(p, d.proc, slice_from_array(args), nullptr);
+		xb_emit_call_entity(p, d.proc_entity, d.proc, slice_from_array(args), nullptr);
 		array_free(&args);
 	} else {
 		xb_build_stmt(p, d.stmt);
@@ -2140,6 +2158,8 @@ gb_internal void xb_check_nested_decls(xbProc *p, Slice<Ast *> const &stmts) {
 				Ast *value = unparen_expr(vd->values[i]);
 				if (value->kind != Ast_ProcLit) continue;
 				if (value->ProcLit.body == nullptr) continue;
+				// they belong to the family of the procedure they are declared in, which emits them
+				if (p->inl != nullptr) continue;
 				GenProcsData *gpd = e->Procedure.gen_procs;
 				if (gpd != nullptr) {
 					rw_mutex_shared_lock(&gpd->mutex);
@@ -2279,6 +2299,7 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 
 gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &results, TokenPos pos);
 gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool store_named, TokenPos pos);
+gb_internal void xb_inline_return(xbProc *p, Array<xbValue> &results, TokenPos pos);
 
 gb_internal void xb_emit_ret(xbProc *p, xbMem direct_result) {
 	xbAbiFunc *abi = p->abi;
@@ -2326,7 +2347,11 @@ gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_resu
 	if (return_count == 0) {
 		xb_emit_defer_stmts(p, true, nullptr, pos);
 		if (!xb_curr_terminated(p)) {
-			xb_emit_ret(p, {});
+			if (p->inl != nullptr) {
+				xb_jump(p, p->inl->exit);
+			} else {
+				xb_emit_ret(p, {});
+			}
 		}
 		return;
 	}
@@ -2375,6 +2400,11 @@ gb_internal void xb_return_with_results(xbProc *p, Array<xbValue> &results, bool
 				xb_store_value(p, found->mem, results[i]);
 			}
 		}
+	}
+
+	if (p->inl != nullptr) {
+		xb_inline_return(p, results, pos);
+		return;
 	}
 
 	// write the results out before running the defers
@@ -3481,6 +3511,18 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		xbSection sec = tls ? xbSection_TData : xbSection_Data;
 		i64 size = gb_max(type_size_of(e->type), cast(i64)1);
 		i64 align = gb_max(gb_max(type_align_of(e->type), cast(i64)e->Variable.custom_align), cast(i64)1);
+		if (p->inl != nullptr) {
+			// the inlined copies share one storage, which may differ from the procedure's own,
+			// so only one that is never written
+			if (!e->Variable.is_rodata) XB_UNSUPPORTED(p, "inlined static variable");
+			if (i32 *shared = map_get(&m->inline_statics, e)) {
+				xbVar v = {};
+				v.mem = xb_mem(xbMem_Sym, cast(u32)*shared);
+				map_set(&p->vars, e, v);
+				if (p->family) map_set(&p->family->statics, e, *shared);
+				continue;
+			}
+		}
 		i64 at = xb_section_reserve(m, sec, size, align);
 
 		if (vd->values.count > 0) {
@@ -3514,7 +3556,8 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 			v.mem = xb_mem(xbMem_Sym, cast(u32)sym);
 			map_set(&p->vars, e, v);
 		}
-		map_set(&p->family->statics, e, sym);
+		if (p->family) map_set(&p->family->statics, e, sym);
+		if (p->inl != nullptr) map_set(&m->inline_statics, e, sym);
 
 		if (!is_blank_ident(e->token.string)) {
 			xbDebugVar dv = {};
@@ -3977,4 +4020,281 @@ gb_internal void xb_end_proc(xbProc *p) {
 	if (xb_is_arm64()) {
 		a64_check_proc(p);
 	}
+}
+
+////////////////////////////////////////////////////////////////
+// #force_inline
+////////////////////////////////////////////////////////////////
+
+// Like LLVM, which inlines these even without optimization, the callee's body is built
+// straight into the caller. A body that cannot be inlined rolls the caller back to the
+// call, which is then made normally.
+
+gb_internal bool xb_proc_is_candidate(Entity *e);
+
+gb_internal bool xb_should_inline(xbProc *p, Entity *e, ProcInlining call_inlining, ProcTailing tailing, Type *call_type) {
+	if (e == nullptr || e->kind != Entity_Procedure) return false;
+	if (tailing != ProcTailing_none) return false;
+	if (!xb_proc_is_candidate(e)) return false;
+	ProcInlining inlining = call_inlining;
+	ProcInlining declared = e->decl_info->proc_lit->ProcLit.inlining;
+	if (declared != ProcInlining_none) inlining = declared;
+	if (inlining != ProcInlining_inline) return false;
+	if (ptr_set_exists(&p->m->inline_failed, e)) return false;
+
+	Type *pt = base_type(e->type);
+	if (pt->Proc.c_vararg || pt->Proc.calling_convention == ProcCC_Naked) return false;
+	// the body's parameters are the entities of the procedure's own type
+	if (!are_types_identical(base_type(call_type), pt)) return false;
+	if (e->Procedure.has_instrumentation && p->m->info->instrumentation_enter_entity != nullptr) return false;
+
+	// a recursive procedure is inlined once, then called
+	if (p->entity == e) return false;
+	isize depth = 0;
+	for (xbInline *in = p->inl; in != nullptr; in = in->prev) {
+		if (in->caller == e) return false;
+		depth += 1;
+	}
+	return depth < 16;
+}
+
+// Parameters are immutable, so a large argument in memory is used in place, as the Odin
+// convention passes it by pointer.
+gb_internal void xb_inline_bind_param(xbProc *p, Entity *e, xbValue v, ProcCallingConvention cc) {
+	i64 size = type_size_of(e->type);
+	if (v.kind == xbValue_Mem && is_calling_convention_odin(cc) && size > 16 &&
+	    (v.mem.align == 0 || v.mem.align >= type_align_of(e->type))) {
+		xbVar var = {v.mem, false};
+		map_set(&p->vars, e, var);
+		xb_add_debug_var(p, e, v.mem, false, false);
+		return;
+	}
+	xbMem m = xb_add_local(p, e->type, false);
+	if (v.kind == xbValue_Invalid) {
+		xb_memzero(p, m, size);
+	} else {
+		xb_store_value(p, m, v);
+	}
+	xbVar var = {m, false};
+	map_set(&p->vars, e, var);
+	xb_add_debug_var(p, e, m, false, false);
+}
+
+gb_internal void xb_inline_return(xbProc *p, Array<xbValue> &results, TokenPos pos) {
+	TypeProc *pt = &base_type(p->type)->Proc;
+	for_array(i, results) {
+		i64 off = 0;
+		if (results.count > 1) {
+			Type *ft = nullptr;
+			off = type_offset_of(pt->results, i, &ft);
+		}
+		xb_store_value(p, xb_mem_offset(p->inl->result, off), results[i]);
+	}
+	xb_emit_defer_stmts(p, true, nullptr, pos);
+	if (!xb_curr_terminated(p)) {
+		xb_jump(p, p->inl->exit);
+	}
+}
+
+gb_internal void xb_inline_body(xbProc *p, Entity *e, Slice<xbValue> args) {
+	TypeProc *pt = &base_type(e->type)->Proc;
+	Ast *body = e->decl_info->proc_lit->ProcLit.body;
+
+	for (BlockLabel const &bl : e->decl_info->labels) {
+		xbBranchBlocks bb = {bl.label, nullptr, nullptr};
+		array_add(&p->branch_blocks, bb);
+	}
+
+	// the body's variables get a lexical scope of their own
+	array_add(&p->debug_scope_parent, p->debug_scope);
+	xb_set_debug_scope(p, cast(i32)p->debug_scope_parent.count-1);
+	xb_set_debug_loc(p, e->token.pos);
+
+	if (pt->params != nullptr) {
+		isize k = 0;
+		for (Entity *pe : pt->params->Tuple.variables) {
+			if (pe->kind != Entity_Variable) continue;
+			GB_ASSERT(k < args.count);
+			xb_inline_bind_param(p, pe, args[k++], pt->calling_convention);
+		}
+		GB_ASSERT(k == args.count);
+	}
+	if (pt->has_named_results) {
+		for (Entity *re : pt->results->Tuple.variables) {
+			if (re->token.string == "") continue;
+			xbMem m = xb_add_local_entity(p, re, true);
+			if (re->Variable.param_value.kind != ParameterValue_Invalid) {
+				xbValue c = xb_handle_param_value(p, re->type, re->Variable.param_value, nullptr, nullptr);
+				xb_store_value(p, m, xb_emit_conv(p, c, re->type));
+			}
+		}
+	}
+
+	xb_build_stmt(p, body);
+
+	if (!xb_curr_terminated(p)) {
+		if (pt->result_count == 0) {
+			xb_emit_defer_stmts(p, true, nullptr, xb_defer_pos(body));
+			if (!xb_curr_terminated(p)) xb_jump(p, p->inl->exit);
+		} else {
+			xb_unreachable(p);
+		}
+	}
+}
+
+// Everything building the body may change, to roll back to.
+struct xbInlineSave {
+	xbBlock *curr;
+	isize    curr_instrs;
+	isize    blocks, order, vregs, locals, calls, asms;
+	isize    debug_vars, debug_scope_parent, branch_blocks, selector_cache, context_stack;
+	Array<xbDefer> defers;
+	xbTargetList *targets;
+	isize    scope_index;
+	i32      debug_scope;
+	i32      file_id, last_line, last_column;
+	u16      state_flags;
+	Ast *    curr_stmt;
+	TokenPos branch_location_pos;
+	Entity * entity;
+	Type *   type;
+	Ast *    body;
+	DeclInfo *decl;
+	jmp_buf *bail;
+	xbInline *inl;
+};
+
+gb_internal void xb_inline_restore(xbProc *p, xbInlineSave const &s, bool rollback) {
+	if (rollback) {
+		p->curr = s.curr;
+		p->curr->instrs.count = s.curr_instrs;
+		p->blocks.count = s.blocks;
+		p->order.count = s.order;
+		p->vregs.count = s.vregs;
+		p->locals.count = s.locals;
+		p->calls.count = s.calls;
+		p->asms.count = s.asms;
+		p->debug_vars.count = s.debug_vars;
+		p->debug_scope_parent.count = s.debug_scope_parent;
+		p->file_id = s.file_id;
+		p->last_line = s.last_line;
+		p->last_column = s.last_column;
+	}
+	p->branch_blocks.count = s.branch_blocks;
+	p->selector_cache.count = gb_min(p->selector_cache.count, s.selector_cache);
+	p->context_stack.count = s.context_stack;
+	p->defers = s.defers;
+	p->targets = s.targets;
+	p->scope_index = s.scope_index;
+	p->debug_scope = s.debug_scope;
+	p->state_flags = s.state_flags;
+	p->curr_stmt = s.curr_stmt;
+	p->branch_location_pos = s.branch_location_pos;
+	p->entity = s.entity;
+	p->type = s.type;
+	p->body = s.body;
+	p->decl = s.decl;
+	p->bail = s.bail;
+	p->inl = s.inl;
+}
+
+// Builds the body of `e` in place of a call to it with `args`, which are already converted
+// to the parameter types. Returns false, with nothing emitted, if it cannot.
+gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, Ast *call_expr, xbValue *res) {
+	TypeProc *pt = &base_type(e->type)->Proc;
+	isize param_count = 0;
+	if (pt->params != nullptr) {
+		for (Entity *pe : pt->params->Tuple.variables) {
+			if (pe->kind == Entity_Variable) param_count += 1;
+		}
+	}
+	if (param_count != args.count) return false;
+	if (pt->calling_convention == ProcCC_Odin && p->context_stack.count == 0) {
+		// made before the body, so every path through it sees the context
+		xb_context_mem(p);
+	}
+
+	xbInlineSave s = {};
+	s.curr = p->curr;
+	s.curr_instrs = p->curr->instrs.count;
+	s.blocks = p->blocks.count;
+	s.order = p->order.count;
+	s.vregs = p->vregs.count;
+	s.locals = p->locals.count;
+	s.calls = p->calls.count;
+	s.asms = p->asms.count;
+	s.debug_vars = p->debug_vars.count;
+	s.debug_scope_parent = p->debug_scope_parent.count;
+	s.branch_blocks = p->branch_blocks.count;
+	s.selector_cache = p->selector_cache.count;
+	s.context_stack = p->context_stack.count;
+	s.defers = p->defers;
+	s.targets = p->targets;
+	s.scope_index = p->scope_index;
+	s.debug_scope = p->debug_scope;
+	s.file_id = p->file_id;
+	s.last_line = p->last_line;
+	s.last_column = p->last_column;
+	s.state_flags = p->state_flags;
+	s.curr_stmt = p->curr_stmt;
+	s.branch_location_pos = p->branch_location_pos;
+	s.entity = p->entity;
+	s.type = p->type;
+	s.body = p->body;
+	s.decl = p->decl;
+	s.bail = p->bail;
+	s.inl = p->inl;
+	TokenPos saved_fail_pos = p->m->fail_pos;
+
+	xbInline inl = {};
+	inl.prev = p->inl;
+	inl.caller = p->entity;
+
+	jmp_buf bail;
+	p->bail = &bail;
+	if (setjmp(bail) != 0) {
+		if (p->m->verbose) {
+			gb_printf_err("xb:   not inlining %.*s: %s\n", LIT(e->token.string), p->fail_reason);
+		}
+		// a generated procedure has no family, which some bodies need; others may still inline it
+		if (p->family != nullptr) ptr_set_add(&p->m->inline_failed, e);
+		xb_inline_restore(p, s, true);
+		p->fail_reason = nullptr;
+		p->fail_node = nullptr;
+		p->m->fail_pos = saved_fail_pos;
+		return false;
+	}
+
+	Type *rt = reduce_tuple_to_single_type(pt->results);
+	if (rt != nullptr) inl.result = xb_add_local(p, rt, false);
+	inl.exit = xb_new_block(p);
+
+	p->inl = &inl;
+	p->entity = e;
+	p->type = e->type;
+	p->body = e->decl_info->proc_lit->ProcLit.body;
+	p->decl = e->decl_info;
+	p->defers = array_make<xbDefer>(xb_allocator(), 0, 4);
+	p->targets = nullptr;
+	p->state_flags = 0;
+	p->branch_location_pos = {};
+
+	xb_inline_body(p, e, args);
+
+	xb_inline_restore(p, s, false);
+	// the caller's code after the call has its own line row and scope
+	p->last_line = -1;
+	xb_start_block(p, inl.exit);
+	xb_set_debug_scope(p, s.debug_scope);
+	if (call_expr != nullptr) xb_set_debug_loc(p, ast_token(call_expr).pos);
+
+	if (pt->diverging) {
+		xb_unreachable(p);
+	}
+	p->m->stats.calls_inlined += 1;
+	*res = {};
+	if (rt != nullptr) {
+		*res = xb_load_value(p, rt, inl.result);
+	}
+	return true;
 }

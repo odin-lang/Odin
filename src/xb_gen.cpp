@@ -74,6 +74,7 @@ struct xbDefer {
 	// a deferred procedure call (`@(deferred_*)`)
 	bool  is_proc;
 	xbValue proc;
+	Entity *proc_entity;
 	Array<xbValue> args;
 	TokenPos pos;
 };
@@ -155,6 +156,15 @@ struct xbProc {
 	Array<i32>        debug_scope_parent;
 	i32               debug_scope;
 	struct xbFamily * family;
+	struct xbInline * inl; // the innermost #force_inline body being built, or nullptr
+};
+
+// A #force_inline procedure whose body is built into its caller.
+struct xbInline {
+	xbInline *prev;
+	Entity *  caller;  // the procedure the body is built into, itself maybe inlined
+	xbMem     result;  // the returns store the results here
+	xbBlock * exit;    // and jump here
 };
 
 // A procedure and every procedure declared inside it. They are compiled together,
@@ -847,10 +857,40 @@ gb_internal bool xb_is_int128(Type *t) {
 	return is_type_integer_128bit(core_type(t));
 }
 
+gb_internal bool xb_op_is_pure(xbOp op);
+
+// The vreg stored to the frame local `m` earlier in the current block, if nothing since may
+// have written it, or 0.
+gb_internal u32 xb_stored_value(xbProc *p, xbType t, xbMem m) {
+	if (p->curr == nullptr || m.kind != xbMem_Local) return 0;
+	for (isize i = p->curr->instrs.count-1; i >= 0; i--) {
+		xbInstr const &in = p->curr->instrs[i];
+		switch (in.op) {
+		case xbOp_Nop:
+		case xbOp_Loc:
+		case xbOp_Scope:
+		case xbOp_Load:
+			continue;
+		case xbOp_Store:
+			if (in.flags & xbInstrFlag_Volatile) return 0;
+			if (in.mem.kind == xbMem_Reg) return 0; // may point into the local
+			if (in.mem.kind != xbMem_Local || in.mem.base != m.base) continue;
+			if (in.mem.offset == m.offset && in.type == t) return in.a;
+			if (in.mem.offset + xb_type_size(in.type) <= m.offset || m.offset + xb_type_size(t) <= in.mem.offset) continue;
+			return 0;
+		}
+		if (!xb_op_is_pure(in.op)) return 0;
+	}
+	return 0;
+}
+
 gb_internal xbPair xb_pair_load(xbProc *p, xbMem m) {
 	xbPair r = {};
-	r.lo = xb_load(p, xbType_I64, m);
-	r.hi = xb_load(p, xbType_I64, xb_mem_offset(m, 8));
+	xbMem hi = xb_mem_offset(m, 8);
+	r.lo = xb_stored_value(p, xbType_I64, m);
+	r.hi = xb_stored_value(p, xbType_I64, hi);
+	if (r.lo == 0) r.lo = xb_load(p, xbType_I64, m);
+	if (r.hi == 0) r.hi = xb_load(p, xbType_I64, hi);
 	return r;
 }
 
@@ -867,8 +907,39 @@ gb_internal xbPair xb_pair_of(xbProc *p, xbValue v) {
 
 gb_internal u32 xb_i64(xbProc *p, i64 v) { return xb_iconst(p, xbType_I64, v); }
 
+gb_internal bool xb_vreg_const(xbProc *p, u32 v, i64 *out);
+
 // shifts of a pair by a count in a vreg, with Odin's semantics for large counts
 gb_internal xbPair xb_pair_shift(xbProc *p, xbPair x, u32 count, TokenKind op, bool is_signed) {
+	i64 c = 0;
+	if (xb_vreg_const(p, count, &c)) {
+		u64 n = cast(u64)c;
+		xbOp sh = op == Token_Shl ? xbOp_Shl : is_signed ? xbOp_AShr : xbOp_LShr;
+		u32 fill = (op != Token_Shl && is_signed) ? xb_binop(p, xbOp_AShr, xbType_I64, x.hi, xb_i64(p, 63)) : xb_i64(p, 0);
+		xbPair r = {};
+		if (n == 0) return x;
+		if (n >= 128) return xbPair{fill, fill};
+		if (n >= 64) {
+			if (op == Token_Shl) {
+				r.lo = fill;
+				r.hi = n == 64 ? x.lo : xb_binop(p, xbOp_Shl, xbType_I64, x.lo, xb_i64(p, n-64));
+			} else {
+				r.lo = n == 64 ? x.hi : xb_binop(p, sh, xbType_I64, x.hi, xb_i64(p, n-64));
+				r.hi = fill;
+			}
+			return r;
+		}
+		u32 by = xb_i64(p, n);
+		u32 back = xb_i64(p, 64-n);
+		if (op == Token_Shl) {
+			r.lo = xb_binop(p, xbOp_Shl, xbType_I64, x.lo, by);
+			r.hi = xb_binop(p, xbOp_Or, xbType_I64, xb_binop(p, xbOp_Shl, xbType_I64, x.hi, by), xb_binop(p, xbOp_LShr, xbType_I64, x.lo, back));
+		} else {
+			r.lo = xb_binop(p, xbOp_Or, xbType_I64, xb_binop(p, xbOp_LShr, xbType_I64, x.lo, by), xb_binop(p, xbOp_Shl, xbType_I64, x.hi, back));
+			r.hi = xb_binop(p, sh, xbType_I64, x.hi, by);
+		}
+		return r;
+	}
 	u32 zero = xb_i64(p, 0);
 	u32 c64 = xb_i64(p, 64);
 	u32 big = xb_cmp(p, xbCond_UGE, xbType_I64, count, xb_i64(p, 128));
@@ -935,10 +1006,15 @@ gb_internal xbValue xb_emit_arith_128(xbProc *p, TokenKind op, xbValue x, xbValu
 		break;
 	}
 	case Token_Mul: {
+		// a high half known to be zero adds nothing, as for widened 64 bit values
+		i64 c = 0;
+		bool a_hi_zero = xb_vreg_const(p, a.hi, &c) && c == 0;
+		bool b_hi_zero = xb_vreg_const(p, b.hi, &c) && c == 0;
 		r.lo = xb_binop(p, xbOp_Mul, xbType_I64, a.lo, b.lo);
 		u32 hi = xb_binop(p, xbOp_MulHiU, xbType_I64, a.lo, b.lo);
-		hi = xb_binop(p, xbOp_Add, xbType_I64, hi, xb_binop(p, xbOp_Mul, xbType_I64, a.lo, b.hi));
-		r.hi = xb_binop(p, xbOp_Add, xbType_I64, hi, xb_binop(p, xbOp_Mul, xbType_I64, a.hi, b.lo));
+		if (!b_hi_zero) hi = xb_binop(p, xbOp_Add, xbType_I64, hi, xb_binop(p, xbOp_Mul, xbType_I64, a.lo, b.hi));
+		if (!a_hi_zero) hi = xb_binop(p, xbOp_Add, xbType_I64, hi, xb_binop(p, xbOp_Mul, xbType_I64, a.hi, b.lo));
+		r.hi = hi;
 		break;
 	}
 	case Token_And: r.lo = xb_binop(p, xbOp_And, xbType_I64, a.lo, b.lo); r.hi = xb_binop(p, xbOp_And, xbType_I64, a.hi, b.hi); break;

@@ -539,6 +539,7 @@ struct xbProcDebug {
 struct xbStats {
 	isize procs_total;
 	isize procs_compiled;
+	isize calls_inlined;
 	isize globals_total;
 	isize globals_defined;
 	StringMap<isize> fail_reasons;
@@ -571,6 +572,8 @@ struct xbModule {
 	// procedure entities discovered while compiling (nested procedures, etc.)
 	Array<Entity *>   proc_queue;
 	PtrSet<Entity *>  proc_queued;
+	PtrSet<Entity *>  inline_failed; // #force_inline procedures whose body cannot be inlined
+	PtrMap<Entity *, i32> inline_statics; // the storage of read-only statics in inlined bodies
 
 	PtrMap<Type *, xbAbiFunc *> abi_cache;
 	StringMap<i32>    string_lits;

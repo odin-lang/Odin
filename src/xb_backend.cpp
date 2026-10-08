@@ -421,6 +421,8 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	ptr_set_init(&m->foreign_libs_set);
 	m->foreign_libs = array_make<Entity *>(heap_allocator(), 0, 16);
 	ptr_set_init(&m->proc_queued);
+	ptr_set_init(&m->inline_failed);
+	map_init(&m->inline_statics);
 	m->proc_queue = array_make<Entity *>(heap_allocator(), 0, 1024);
 	map_init(&m->abi_cache);
 	string_map_init(&m->string_lits);
@@ -523,7 +525,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	}
 
 	if (gb_get_env("ODIN_XB_STATS", permanent_allocator()) != nullptr) {
-		gb_printf_err("fast backend: compiled %td of %td procedures\n", m->stats.procs_compiled, m->stats.procs_total);
+		gb_printf_err("fast backend: compiled %td of %td procedures, inlined %td calls\n", m->stats.procs_compiled, m->stats.procs_total, m->stats.calls_inlined);
 		gb_printf_err("  globals %td of %td, startup %s, type info %s, test main %s%s\n", m->stats.globals_defined, m->stats.globals_total, m->owns_startup ? "fast" : "llvm", m->owns_type_info ? "fast" : "llvm", m->owns_test_main ? "fast" : "-", m->complete ? ", no LLVM" : "");
 		gb_printf_err("  build %.3f ms, lower %.3f ms, write %.3f ms\n", xb_time_build*1000, xb_time_lower*1000, xb_time_write*1000);
 		struct Reason { String name; isize count; };
