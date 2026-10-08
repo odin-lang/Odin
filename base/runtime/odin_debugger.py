@@ -481,7 +481,11 @@ if gdb is not None:
 				return "<%s>" % e
 			if name is None or (tag is None and int(self._val[name]) == 0):
 				return "nil"
-			return self._val[name]
+			value = self._val[name]
+			if value.type.strip_typedefs().code == gdb.TYPE_CODE_PTR:
+				# gdb prints nothing for a pointer value returned by `to_string`
+				return value.format_string()
+			return value
 
 	class _GdbAny(_GdbPrinter):
 		# The value it holds, after the name of its type; an unknown type shows the `any` itself
