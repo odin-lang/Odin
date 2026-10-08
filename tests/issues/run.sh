@@ -274,6 +274,7 @@ $ODIN test ../test_issue_7779.odin $COMMON
 $ODIN run ../test_issue_7798.odin $COMMON
 $ODIN test ../test_issue_7763.odin $COMMON
 $ODIN test ../test_issue_disabled_proc_value.odin $COMMON -disable-assert
+$ODIN test ../test_issue_loaded_pointer_alignment.odin $COMMON -o:speed
 
 set +x
 

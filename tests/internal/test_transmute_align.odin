@@ -33,3 +33,21 @@ transmute_array_like_to_simd_and_u128 :: proc(t: ^testing.T) {
 	local_e := [Named_Lane]u32{.A = 1, .B = 2, .C = 3, .D = 4}
 	testing.expect_value(t, transmute(u128)local_e, u128(4)<<96 | u128(3)<<64 | u128(2)<<32 | 1)
 }
+
+Helper :: struct #min_field_align(16) {
+	p: ^[4]f32,  // align 16 for the storage of the pointer
+}
+
+@(export)
+transmute_pointed_array :: #force_no_inline proc (s: ^Helper) -> #simd[4]f32 {
+	return transmute(#simd[4]f32)s.p^
+}
+
+@(test)
+transmute_through_aligned_pointer_storage :: proc(t: ^testing.T) {
+	arr := [8]f32{0, 1, 2, 3, 4, 5, 6, 7}
+	s := Helper{p = (^[4]f32)(&arr[1])}  // [4]f32 and arr[1] are both align 4
+
+	v := transmute_pointed_array(&s)
+	testing.expect_value(t, transmute([4]f32)v, [4]f32{1, 2, 3, 4})
+}
