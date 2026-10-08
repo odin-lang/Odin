@@ -3041,13 +3041,23 @@ gb_internal void lb_generate_queued_procedures(lbGenerator *gen, bool do_threadi
 	}
 }
 
-gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
-	for (auto const &entry : gen->modules) {
-		lbModule *m = entry.value;
-		if (m->debug_builder != nullptr) {
-			LLVMDIBuilderFinalize(m->debug_builder);
+gb_internal WORKER_TASK_PROC(lb_debug_info_finalize_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	if (m->debug_builder != nullptr) {
+		LLVMDIBuilderFinalize(m->debug_builder);
+	}
+	return 0;
+}
+
+gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen, bool do_threading) {
+	for (lbModule *m : lb_modules_by_cost(gen)) {
+		if (do_threading) {
+			thread_pool_add_task(lb_debug_info_finalize_worker_proc, m);
+		} else {
+			lb_debug_info_finalize_worker_proc(m);
 		}
 	}
+	thread_pool_wait();
 }
 
 gb_internal void lb_llvm_function_passes(lbGenerator *gen, bool do_threading) {
@@ -3903,7 +3913,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	if (build_context.ODIN_DEBUG) {
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
-		lb_debug_info_complete_types_and_finalize(gen);
+		lb_debug_info_complete_types_and_finalize(gen, do_threading);
 
 		// Custom `.raddbg` section for its debugger
 		if (build_context.metrics.os == TargetOs_windows) {

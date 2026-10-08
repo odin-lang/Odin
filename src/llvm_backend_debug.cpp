@@ -206,6 +206,28 @@ gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &nam
 	return LLVMDIBuilderCreateStructType(m->debug_builder, scope, cast(char const *)name.text, name.len, file, 1, size_in_bits, align_in_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
 }
 
+// NOTE: only a named type can contain itself, so only it needs a placeholder for its members to refer to
+gb_internal LLVMMetadataRef lb_debug_placeholder(lbModule *m, Type *type, unsigned tag, String const &name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line, u64 size_in_bits, u32 align_in_bits) {
+	if (type->kind != Type_Named) {
+		return nullptr;
+	}
+	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
+		m->debug_builder, tag,
+		cast(char const *)name.text, cast(size_t)name.len,
+		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
+	);
+	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	return temp_forward_decl;
+}
+
+gb_internal LLVMMetadataRef lb_debug_replace_placeholder(lbModule *m, Type *type, LLVMMetadataRef temp_forward_decl, LLVMMetadataRef final_decl) {
+	if (temp_forward_decl != nullptr) {
+		LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
+	}
+	lb_set_llvm_metadata(m, type, final_decl);
+	return final_decl;
+}
+
 gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
 	GB_ASSERT(bt->kind == Type_Struct);
 
@@ -219,13 +241,7 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, tag,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, tag, name, scope, file, line, size_in_bits, align_in_bits);
 
 	type_set_offsets(bt);
 
@@ -282,9 +298,7 @@ gb_internal LLVMMetadataRef lb_debug_struct(lbModule *m, Type *type, Type *bt, S
 		);
 	}
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 gb_internal LLVMMetadataRef lb_debug_slice(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -296,13 +310,7 @@ gb_internal LLVMMetadataRef lb_debug_slice(lbModule *m, Type *type, String name,
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_structure_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_structure_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	unsigned element_count = 2;
 	LLVMMetadataRef elements[2];
@@ -342,9 +350,7 @@ gb_internal LLVMMetadataRef lb_debug_slice(lbModule *m, Type *type, String name,
 		"", 0
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -357,13 +363,7 @@ gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, Stri
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_structure_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_structure_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	unsigned element_count = 4;
 	LLVMMetadataRef elements[4];
@@ -421,9 +421,7 @@ gb_internal LLVMMetadataRef lb_debug_dynamic_array(lbModule *m, Type *type, Stri
 		"", 0
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
@@ -435,13 +433,7 @@ gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, T
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_structure_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_structure_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	unsigned element_count = 2;
 	LLVMMetadataRef elements[2];
@@ -483,9 +475,7 @@ gb_internal LLVMMetadataRef lb_debug_fixed_capacity_dynamic_array(lbModule *m, T
 		"", 0
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 
@@ -498,13 +488,7 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 	u64 size_in_bits = 8*type_size_of(bt);
 	u32 align_in_bits = 8*cast(u32)type_align_of(bt);
 
-	LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-		m->debug_builder, DW_TAG_union_type,
-		cast(char const *)name.text, cast(size_t)name.len,
-		scope, file, line, 0, size_in_bits, align_in_bits, LLVMDIFlagZero, "", 0
-	);
-
-	lb_set_llvm_metadata(m, type, temp_forward_decl);
+	LLVMMetadataRef temp_forward_decl = lb_debug_placeholder(m, type, DW_TAG_union_type, name, scope, file, line, size_in_bits, align_in_bits);
 
 	isize index_offset = 1;
 	isize variant_offset = 1;
@@ -568,9 +552,7 @@ gb_internal LLVMMetadataRef lb_debug_union(lbModule *m, Type *type, String name,
 		"", 0
 	);
 
-	LLVMMetadataReplaceAllUsesWith(temp_forward_decl, final_decl);
-	lb_set_llvm_metadata(m, type, final_decl);
-	return final_decl;
+	return lb_debug_replace_placeholder(m, type, temp_forward_decl, final_decl);
 }
 
 gb_internal LLVMMetadataRef lb_debug_bitset(lbModule *m, Type *type, String name, LLVMMetadataRef scope, LLVMMetadataRef file, unsigned line) {
