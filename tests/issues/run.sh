@@ -268,6 +268,7 @@ fi
 $ODIN test ../test_lifetime_markers.odin $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers.odin $COMMON -o:speed -lifetime-markers
 $ODIN test ../test_issue_7547.odin $COMMON
+$ODIN test ../test_issue_7547.odin $COMMON -debug
 $ODIN test ../test_issue_7490.odin $COMMON
 $ODIN test ../test_issue_7779.odin $COMMON
 $ODIN run ../test_issue_7798.odin $COMMON

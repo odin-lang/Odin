@@ -3706,7 +3706,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			gbString split_name = gb_string_make(temporary_allocator(), "");
 
 			LLVMBool is_optimized = build_context.optimization_level > 0;
-			AstFile *init_file = m->info->init_package->files[0];
+			AstFile *init_file = nullptr;
+			if (m->info->init_package->files.count > 0) {
+				init_file = m->info->init_package->files[0];
+			}
 
 			if (Entity *entry_point = m->info->entry_point) {
 				if (Ast *ident = entry_point->identifier.load()) {
@@ -3716,11 +3719,18 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
+			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
+			if (init_file_metadata == nullptr) {
+				// every file of the initial package was excluded by its build tags, as can be done for `odin test`
+				String path = m->info->init_package->fullpath;
+				init_file_metadata = LLVMDIBuilderCreateFile(m->debug_builder, cast(char const *)path.text, path.len, "", 0);
+			}
+
 			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;
 
 			m->debug_compile_unit = LLVMDIBuilderCreateCompileUnit(m->debug_builder, LLVMDWARFSourceLanguageC99,
-				lb_get_file_metadata(m, init_file),
+				init_file_metadata,
 				producer, gb_string_length(producer),
 				is_optimized, "", 0,
 				1, split_name, gb_string_length(split_name),
