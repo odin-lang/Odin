@@ -15,6 +15,7 @@
 // signal handler on the same thread.
 // Atomics on a local whose address is only taken by them are warned about too, as nothing else can access it, so they
 // order nothing; `volatile_*` is probably what is meant, to keep the accesses, or it is a copy of what is shared.
+// A location accessed with `volatile_*` and atomically is warned about, as a volatile access is not atomic.
 // With -vet-atomic-access, a plain read of a location accessed atomically is an error, unless a lock is taken.
 
 struct AtomicUses {
@@ -61,6 +62,7 @@ enum AtomicReportKind {
 	AtomicReport_WeakIgnored, // a weak compare-exchange whose second result is not used
 	AtomicReport_WakeEarly,   // a futex woken before it is written
 	AtomicReport_Local,       // atomics on a local which nothing else can access
+	AtomicReport_Volatile,    // a volatile access of what is accessed atomically
 };
 
 struct AtomicReport {
@@ -716,8 +718,29 @@ gb_internal void check_atomics(Checker *c) {
 	map_init(&locals, 0);
 	defer (map_destroy(&locals));
 
+	PtrMap<Entity *, Ast *> volatiles = {};
+	map_init(&volatiles, 0);
+	defer (map_destroy(&volatiles));
+
 	for (CheckedAtomic const &a : atomics) {
 		if (a.id == BuiltinProc_atomic_thread_fence || a.id == BuiltinProc_atomic_signal_fence) {
+			continue;
+		}
+		if (a.id == BuiltinProc_volatile_load || a.id == BuiltinProc_volatile_store) {
+			// NOTE(bill): the access is not atomic nor taking its address elsewhere
+			Ast *ptr = check_atomic_address_of(a.call->CallExpr.args[0]);
+			if (ptr == nullptr) {
+				continue;
+			}
+			ptr_set_add(&operated, ptr);
+			if (Entity *e = check_atomic_location(ptr->UnaryExpr.expr)) {
+				Ast *site = nullptr;
+				if (Ast **found = map_get(&volatiles, e)) {
+					site = *found;
+				}
+				check_atomic_first(&site, a.call);
+				map_set(&volatiles, e, site);
+			}
 			continue;
 		}
 		Ast *call = a.call;
@@ -955,6 +978,13 @@ gb_internal void check_atomics(Checker *c) {
 			}
 		}
 
+		for (auto const &entry : volatiles) {
+			AtomicUses *uses = map_get(&atomic_uses, entry.key);
+			if (uses != nullptr && ast_file_analysis(entry.value->file(), AnalysisFlag_Atomic)) {
+				array_add(&reports, AtomicReport{AtomicReport_Volatile, entry.value, uses->first});
+			}
+		}
+
 		// NOTE(bill): In order and once for what is at the same place in each instantiation of a polymorphic procedure
 		array_sort(reports, check_atomic_report_cmp);
 		for_array(i, reports) {
@@ -1015,6 +1045,17 @@ gb_internal void check_atomics(Checker *c) {
 				warning(r.site, "'%s' is woken before it is written, so what waits on it may see it unchanged and sleep again", str);
 				error_line("\tSuggestion: Wake it after the write at %s\n", other);
 				break;
+			case AtomicReport_Volatile: {
+				gbString name = expr_to_string(r.site->CallExpr.proc);
+				warning(r.site, "'%s' is accessed with '%s', which is not atomic, but it is accessed atomically, e.g. at %s", str, name, other);
+				if (r.site->CallExpr.args.count == 1) {
+					error_line("\tSuggestion: Use 'atomic_load_explicit' instead, with .Relaxed ordering or stronger\n");
+				} else {
+					error_line("\tSuggestion: Use 'atomic_store_explicit' instead, with .Relaxed ordering or stronger\n");
+				}
+				gb_string_free(name);
+				break;
+			}
 			case AtomicReport_WeakIgnored:
 			case AtomicReport_Local:
 				break;

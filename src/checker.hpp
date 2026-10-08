@@ -287,7 +287,7 @@ struct CheckedCall {
 struct CheckedAtomic {
 	Ast *          call;
 	DeclInfo *     decl;
-	i32            id;    // BuiltinProcId, of an atomic intrinsic
+	i32            id;    // BuiltinProcId, of an atomic or volatile intrinsic
 	u8             futex; // ProcedureFutex, or of a call to a procedure with `@(futex=...)`
 };
 

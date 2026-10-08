@@ -9498,8 +9498,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
-		} else if (BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit && analysis_in_use(AnalysisFlag_Atomic)) {
-			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, id});
+		} else if (analysis_in_use(AnalysisFlag_Atomic)) {
+			bool is_atomic   = BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit;
+			bool is_volatile = id == BuiltinProc_volatile_store || id == BuiltinProc_volatile_load;
+			if (is_atomic || is_volatile) {
+				per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, id});
+			}
 		}
 		operand->expr = call;
 		return builtin_procs[id].kind;
