@@ -92,6 +92,7 @@ enum : u32 {
 	XB_LOCK   = 1<<5,
 	XB_0F     = 1<<6,
 	XB_0F38   = 1<<7,
+	XB_0F3A   = 1<<8,
 };
 
 // Encodes [prefixes] [REX] opcode modrm [sib] [disp]. `imm_size` is the number of
@@ -121,6 +122,7 @@ gb_internal void xb_enc(xbAsm *a, u32 flags, u8 opcode, u8 reg, xbOpnd rm, i32 i
 
 	if (flags & XB_0F)   xb_b(a, 0x0F);
 	if (flags & XB_0F38) { xb_b(a, 0x0F); xb_b(a, 0x38); }
+	if (flags & XB_0F3A) { xb_b(a, 0x0F); xb_b(a, 0x3A); }
 	xb_b(a, opcode);
 
 	u8 r = reg & 7;

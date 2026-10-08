@@ -405,10 +405,59 @@ gb_internal xbValue xb_handle_param_value(xbProc *p, Type *parameter_type, Param
 
 // Calls to LLVM intrinsics declared as foreign procedures. At -O0 LLVM turns the libm
 // ones into plain calls to the C library, and so does this.
+// x86 vector intrinsics with no portable form run as the instruction itself, as LLVM does
+gb_internal bool xb_build_x86_vec_intrinsic(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
+	struct VecIntrinsic { char const *name; xbVecOp op; isize vec_args; };
+	static VecIntrinsic const table[] = {
+		{"llvm.x86.ssse3.pshuf.b.128", xbVec_Pshufb,      2},
+		{"llvm.x86.sha1msg1",          xbVec_Sha1Msg1,    2},
+		{"llvm.x86.sha1msg2",          xbVec_Sha1Msg2,    2},
+		{"llvm.x86.sha1nexte",         xbVec_Sha1Nexte,   2},
+		{"llvm.x86.sha1rnds4",         xbVec_Sha1Rnds4,   2},
+		{"llvm.x86.sha256msg1",        xbVec_Sha256Msg1,  2},
+		{"llvm.x86.sha256msg2",        xbVec_Sha256Msg2,  2},
+		{"llvm.x86.sha256rnds2",       xbVec_Sha256Rnds2, 3},
+	};
+	VecIntrinsic const *v = nullptr;
+	for (VecIntrinsic const &t : table) {
+		if (name == make_string_c(t.name)) {
+			v = &t;
+			break;
+		}
+	}
+	if (v == nullptr) return false;
+	if (type_size_of(result_type) != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
+
+	u32 ptrs[3] = {};
+	for (isize i = 0; i < v->vec_args; i++) {
+		xbValue x = xb_build_expr(p, ce->args[i]);
+		if (type_size_of(x.type) != 16) XB_UNSUPPORTED(p, "llvm intrinsic");
+		ptrs[i] = xb_lea(p, xb_address_from_load_or_generate_local(p, x));
+	}
+	xbInstr in = xb_instr(xbOp_Vec128);
+	in.aux = cast(u8)v->op;
+	in.a = ptrs[0];
+	in.b = ptrs[1];
+	in.c = ptrs[2];
+	if (v->op == xbVec_Sha1Rnds4) {
+		TypeAndValue tv = type_and_value_of_expr(ce->args[2]);
+		if (tv.value.kind != ExactValue_Integer) XB_UNSUPPORTED(p, "llvm intrinsic");
+		in.imm = exact_value_to_i64(tv.value) & 3;
+	}
+	in.mem = xb_add_local(p, result_type, false);
+	xb_emit(p, in);
+	*res = xb_value_mem(result_type, in.mem);
+	return true;
+}
+
 gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallExpr *ce, Type *result_type) {
 	String name = e->Procedure.link_name;
 	Type *pt = base_type(e->type);
 	isize n = pt->Proc.param_count;
+	xbValue vec_res = {};
+	if (xb_build_x86_vec_intrinsic(p, name, ce, result_type, &vec_res)) {
+		return vec_res;
+	}
 	if (ce->args.count != n || pt->Proc.result_count != 1) XB_UNSUPPORTED(p, "llvm intrinsic");
 	for (Ast *arg : ce->args) {
 		if (arg->kind == Ast_FieldValue) XB_UNSUPPORTED(p, "llvm intrinsic");

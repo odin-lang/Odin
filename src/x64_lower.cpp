@@ -100,6 +100,12 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 		f(in.b, false);
 		use_mem(in.mem);
 		break;
+	case xbOp_Vec128:
+		f(in.a, false);
+		f(in.b, false);
+		if (in.c) f(in.c, false);
+		use_mem(in.mem);
+		break;
 	case xbOp_Valgrind:
 		f(in.a, false);
 		f(in.b, false);
@@ -1081,6 +1087,33 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		if (cpuid) {
 			xb_mov_r_rm(a, 8, RBX, xb_r(R10));
 		}
+		break;
+	}
+	case xbOp_Vec128: {
+		struct VecEnc { u32 flags; u8 opcode; };
+		static VecEnc const encs[] = {
+			{XB_P66|XB_0F38, 0x00}, // pshufb
+			{XB_0F38, 0xC9},        // sha1msg1
+			{XB_0F38, 0xCA},        // sha1msg2
+			{XB_0F38, 0xC8},        // sha1nexte
+			{XB_0F3A, 0xCC},        // sha1rnds4, imm8
+			{XB_0F38, 0xCC},        // sha256msg1
+			{XB_0F38, 0xCD},        // sha256msg2
+			{XB_0F38, 0xCB},        // sha256rnds2, k in xmm0
+		};
+		VecEnc e = encs[in.aux];
+		u8 const xmm1 = 1, xmm2 = 2;
+		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.a));
+		xb_movups_x_m(a, xmm1, xb_m(RAX, 0));
+		xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.b));
+		xb_movups_x_m(a, xmm2, xb_m(RAX, 0));
+		if (in.c) {
+			xb_mov_r_rm(a, 8, RAX, xb_slot(L, in.c));
+			xb_movups_x_m(a, 0, xb_m(RAX, 0));
+		}
+		xb_enc(a, e.flags, e.opcode, xmm1, xb_r(xmm2));
+		if (in.aux == xbVec_Sha1Rnds4) xb_b(a, cast(u8)in.imm);
+		xb_movups_m_x(a, xb_mem_opnd(L, in.mem, R11), xmm1);
 		break;
 	}
 	case xbOp_Valgrind:
