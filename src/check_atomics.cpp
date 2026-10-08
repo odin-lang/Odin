@@ -16,6 +16,9 @@
 // Atomics on a local whose address is only taken by them are warned about too, as nothing else can access it, so they
 // order nothing; `volatile_*` is probably what is meant, to keep the accesses, or it is a copy of what is shared.
 // A location accessed with `volatile_*` and atomically is warned about, as a volatile access is not atomic.
+// Atomics on a @(thread_local) whose address is not taken are warned about, as only its own thread can access it.
+// A store followed by a load of something else, with the reverse elsewhere, as in Dekker's algorithm, is warned about
+// unless .Seq_Cst orders each, as acquire and release ordering lets both loads read what was there before.
 // With -vet-atomic-access, a plain read of a location accessed atomically is an error, unless a lock is taken.
 
 struct AtomicUses {
@@ -64,12 +67,27 @@ enum AtomicReportKind : u8 {
 	AtomicReport_WakeEarly,   // a futex woken before it is written
 	AtomicReport_Local,       // atomics on a local which nothing else can access
 	AtomicReport_Volatile,    // a volatile access of what is accessed atomically
+	AtomicReport_ThreadLocal, // atomics on a @(thread_local) which only its own thread can access
+	AtomicReport_StoreLoad,   // a store followed by a load of something else, and the reverse elsewhere
 };
 
 struct AtomicReport {
 	AtomicReportKind kind;
 	Ast *            site;
-	Ast *            other; // what would pair with it, or the write after the wake
+	Ast *            other; // what would pair with it, the write after the wake, or the reverse store
+};
+
+struct AtomicAccess {
+	Entity *  location;
+	Ast *     call;
+	DeclInfo *decl;
+	bool      store;
+	bool      seq_cst;
+};
+
+struct AtomicStoreLoad {
+	AtomicAccess const *store;
+	AtomicAccess const *load;
 };
 
 struct AtomicScan {
@@ -111,9 +129,6 @@ gb_internal Entity *check_atomic_location(Ast *expr) {
 				return nullptr;
 			}
 			if (!e->Variable.is_global && (e->flags & EntityFlag_Static) == 0) {
-				return nullptr;
-			}
-			if (e->Variable.thread_local_model.len != 0) {
 				return nullptr;
 			}
 			return e;
@@ -372,6 +387,85 @@ gb_internal bool check_atomic_fence_called(PtrMap<DeclInfo *, AtomicProcedure> *
 		}
 	}
 	return false;
+}
+
+gb_internal bool check_atomic_has_seq_cst_fence(AtomicProcedure const &p) {
+	for (Ast *fence : p.acquires) {
+		if (check_atomic_order_of(fence->CallExpr.args[0]) == OdinAtomicMemoryOrder_seq_cst) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal bool check_atomic_seq_cst_ordered(PtrMap<DeclInfo *, AtomicProcedure> *procedures, AtomicStoreLoad const &sl) {
+	if (sl.store->seq_cst && sl.load->seq_cst) {
+		return true;
+	}
+	TokenPos from = ast_token(sl.store->call).pos;
+	TokenPos to   = ast_token(sl.load->call).pos;
+	AtomicProcedure *p = check_atomic_procedure(procedures, sl.store->decl);
+	for (auto const &place : p->places) {
+		Ast *call = place.key;
+		TokenPos pos = ast_token(call).pos;
+		if (token_pos_cmp(from, pos) >= 0 || token_pos_cmp(pos, to) >= 0) {
+			continue;
+		}
+		for (Ast *fence : p->acquires) {
+			if (fence == call && check_atomic_order_of(fence->CallExpr.args[0]) == OdinAtomicMemoryOrder_seq_cst) {
+				return true;
+			}
+		}
+		Entity *e = entity_of_node(call->CallExpr.proc);
+		if (e == nullptr || e->kind != Entity_Procedure || e->decl_info == nullptr) {
+			continue;
+		}
+		PtrSet<DeclInfo *> reached = {};
+		check_atomic_cover(&reached, e->decl_info);
+		bool fenced = false;
+		for (auto const &entry : *procedures) {
+			fenced |= check_atomic_has_seq_cst_fence(entry.value) && ptr_set_exists(&reached, entry.key);
+		}
+		ptr_set_destroy(&reached);
+		if (fenced) {
+			return true;
+		}
+	}
+	return false;
+}
+
+gb_internal int check_atomic_access_cmp(void const *a, void const *b) {
+	AtomicAccess const *x = cast(AtomicAccess const *)a;
+	AtomicAccess const *y = cast(AtomicAccess const *)b;
+	if (x->decl != y->decl) {
+		if (cast(uintptr)x->decl < cast(uintptr)y->decl) {
+			return -1;
+		}
+		return +1;
+	}
+	return token_pos_cmp(ast_token(x->call).pos, ast_token(y->call).pos);
+}
+
+gb_internal int check_atomic_store_load_cmp(void const *a, void const *b) {
+	AtomicStoreLoad const *x = cast(AtomicStoreLoad const *)a;
+	AtomicStoreLoad const *y = cast(AtomicStoreLoad const *)b;
+	uintptr xs = cast(uintptr)x->store->location;
+	uintptr ys = cast(uintptr)y->store->location;
+	if (xs != ys) {
+		if (xs < ys) {
+			return -1;
+		}
+		return +1;
+	}
+	uintptr xl = cast(uintptr)x->load->location;
+	uintptr yl = cast(uintptr)y->load->location;
+	if (xl != yl) {
+		if (xl < yl) {
+			return -1;
+		}
+		return +1;
+	}
+	return 0;
 }
 
 gb_internal int check_atomic_report_cmp(void const *a, void const *b) {
@@ -778,10 +872,11 @@ gb_internal void check_atomics(Checker *c) {
 		}
 	}
 
-	auto write_sites    = array_make<AtomicSite>(temporary_allocator(), 0, 0);
-	auto wake_sites     = array_make<AtomicSite>(temporary_allocator(), 0, 0);
-	auto relaxed_reads  = array_make<AtomicSite>(temporary_allocator(), 0, 0); // which nothing acquires for, yet
-	auto relaxed_writes = array_make<AtomicSite>(temporary_allocator(), 0, 0);
+	auto write_sites    = array_make<AtomicSite>  (temporary_allocator(), 0, 0);
+	auto wake_sites     = array_make<AtomicSite>  (temporary_allocator(), 0, 0);
+	auto relaxed_reads  = array_make<AtomicSite>  (temporary_allocator(), 0, 0); // which nothing acquires for, yet
+	auto relaxed_writes = array_make<AtomicSite>  (temporary_allocator(), 0, 0);
+	auto accesses       = array_make<AtomicAccess>(temporary_allocator(), 0, 0);
 
 	PtrSet<Ast *> operated = {};
 	ptr_set_init(&operated, atomics.count);
@@ -912,15 +1007,22 @@ gb_internal void check_atomics(Checker *c) {
 			// what is foreign or exported may be accessed by what is not checked
 			uses.escaped = e->Variable.is_foreign || e->Variable.is_export;
 		}
+
 		// seq_cst, by default or not, is not asked for as acquire or release ordering is, so it is never reported
 		bool reported = explicit_order && order != OdinAtomicMemoryOrder_seq_cst && ast_file_analysis(call->file(), AnalysisFlag_Atomic);
+		if (a.futex == ProcedureFutex_None && a.decl != nullptr && reads != writes) {
+			array_add(&accesses, AtomicAccess{e, call, a.decl, writes, order == OdinAtomicMemoryOrder_seq_cst});
+		}
+
 		check_atomic_first(&uses.first, call);
+
 		if (reads && !writes) {
 			check_atomic_first(&uses.load, call);
 		}
 		if (writes && !reads) {
 			check_atomic_first(&uses.store, call);
 		}
+
 		if (reads) {
 			bool acquires = check_atomic_order_acquires(order) || check_atomic_order_acquires(failure);
 			if (!acquires && p != nullptr) {
@@ -975,6 +1077,14 @@ gb_internal void check_atomics(Checker *c) {
 			if (uses.escaped) {
 				continue;
 			}
+
+			if (entry.key->Variable.thread_local_model.len != 0) {
+				if (ast_file_analysis(uses.first->file(), AnalysisFlag_Atomic)) {
+					array_add(&reports, AtomicReport{AtomicReport_ThreadLocal, uses.first, nullptr});
+				}
+				continue;
+			}
+
 			// asking for acquire ordering acquires, so at most one of these
 			// a fence within what is called is only looked for here, as finding what each call may reach is not cheap
 			if (uses.asks_release != nullptr && uses.load != nullptr && !uses.acquires && !check_atomic_fence_called(&procedures, relaxed_reads, entry.key, true)) {
@@ -1065,6 +1175,88 @@ gb_internal void check_atomics(Checker *c) {
 			}
 		}
 
+		// each store followed by a load of something else within a procedure, which a reverse pair, in another, makes
+		// a problem unless both are ordered by .Seq_Cst
+		array_sort(accesses, check_atomic_access_cmp);
+		auto store_loads = array_make<AtomicStoreLoad>(temporary_allocator(), 0, 0);
+		for_array(i, accesses) {
+			AtomicAccess const &store = accesses[i];
+			if (!store.store) {
+				continue;
+			}
+			for (isize j = i+1; j < accesses.count && accesses[j].decl == store.decl; j++) {
+				AtomicAccess const &load = accesses[j];
+				if (!load.store && load.location != store.location) {
+					array_add(&store_loads, AtomicStoreLoad{&store, &load});
+				}
+			}
+		}
+		array_sort(store_loads, check_atomic_store_load_cmp);
+		for (isize i = 0; i < store_loads.count; /**/) {
+			isize start = i;
+			while (i < store_loads.count && check_atomic_store_load_cmp(&store_loads[i], &store_loads[start]) == 0) {
+				i += 1;
+			}
+			AtomicStoreLoad const &x = store_loads[start];
+
+			if (cast(uintptr)x.store->location > cast(uintptr)x.load->location) {
+				continue;
+			}
+
+			AtomicAccess reverse_store = {};
+			AtomicAccess reverse_load  = {};
+			reverse_store.location = x.load->location;
+			reverse_load.location  = x.store->location;
+
+			AtomicStoreLoad reverse = {&reverse_store, &reverse_load};
+
+			isize lo = 0;
+			isize hi = store_loads.count;
+
+			while (lo < hi) {
+				isize mid = lo + (hi-lo)/2;
+				if (check_atomic_store_load_cmp(&store_loads[mid], &reverse) < 0) {
+					lo = mid+1;
+				} else {
+					hi = mid;
+				}
+			}
+			isize end = lo;
+			while (end < store_loads.count && check_atomic_store_load_cmp(&store_loads[end], &reverse) == 0) {
+				end += 1;
+			}
+			if (lo == end) {
+				continue;
+			}
+
+			// NOTE(bill): the first store which .Seq_Cst does not order on either side, and the first store of the other side
+			Ast *x_unordered = nullptr;
+			Ast *y_unordered = nullptr;
+			Ast *x_first = nullptr;
+			Ast *y_first = nullptr;
+			for (isize k = start; k < i; k++) {
+				check_atomic_first(&x_first, store_loads[k].store->call);
+				if (!check_atomic_seq_cst_ordered(&procedures, store_loads[k])) {
+					check_atomic_first(&x_unordered, store_loads[k].store->call);
+				}
+			}
+			for (isize k = lo; k < end; k++) {
+				check_atomic_first(&y_first, store_loads[k].store->call);
+				if (!check_atomic_seq_cst_ordered(&procedures, store_loads[k])) {
+					check_atomic_first(&y_unordered, store_loads[k].store->call);
+				}
+			}
+			Ast *site = x_unordered;
+			Ast *other = y_first;
+			if (site == nullptr || (y_unordered != nullptr && token_pos_cmp(ast_token(y_unordered).pos, ast_token(site).pos) < 0)) {
+				site = y_unordered;
+				other = x_first;
+			}
+			if (site != nullptr && ast_file_analysis(site->file(), AnalysisFlag_Atomic)) {
+				array_add(&reports, AtomicReport{AtomicReport_StoreLoad, site, other});
+			}
+		}
+
 		// NOTE(bill): In order and once for what is at the same place in each instantiation of a polymorphic procedure
 		array_sort(reports, check_atomic_report_cmp);
 		for_array(i, reports) {
@@ -1079,6 +1271,12 @@ gb_internal void check_atomics(Checker *c) {
 				warning(r.site, "'%s' may fail even when the value matches, so only its second result says whether it stored", name);
 				error_line("\tSuggestion: Use its second result, or the strong form when it is not retried\n");
 				gb_string_free(name);
+				continue;
+			}
+			if (r.kind == AtomicReport_ThreadLocal) {
+				Entity *e = check_atomic_location(check_atomic_call_address(r.site)->UnaryExpr.expr);
+				warning(r.site, "'%.*s' is @(thread_local) and its address is not taken, so only its own thread can access it, and the atomics on it order nothing", LIT(e->token.string));
+				error_line("\tSuggestion: If it is meant to be shared between threads, it cannot be @(thread_local)\n");
 				continue;
 			}
 			if (r.kind == AtomicReport_Local) {
@@ -1125,6 +1323,13 @@ gb_internal void check_atomics(Checker *c) {
 				warning(r.site, "'%s' is woken before it is written, so what waits on it may see it unchanged and sleep again", str);
 				error_line("\tSuggestion: Wake it after the write at %s\n", other);
 				break;
+			case AtomicReport_StoreLoad: {
+				gbString other_str = expr_to_string(check_atomic_call_address(r.other)->UnaryExpr.expr);
+				warning(check_atomic_call_address(r.site), "'%s' is stored and then '%s' loaded, while the reverse is done at %s, so both loads may read what was there before", str, other_str, other);
+				error_line("\tSuggestion: Use .Seq_Cst for these stores and loads, or 'atomic_thread_fence(.Seq_Cst)' between each store and the load after it\n");
+				gb_string_free(other_str);
+				break;
+			}
 			case AtomicReport_Volatile: {
 				gbString name = expr_to_string(r.site->CallExpr.proc);
 				warning(r.site, "'%s' is accessed with '%s', which is not atomic, but it is accessed atomically, e.g. at %s", str, name, other);
