@@ -14,8 +14,8 @@
 // - a struct field (one location shared by every value of that struct)
 //
 // The analysis will warn if one of the following things occur:
-// - A release store which only relaxed loads read, or an acquire load of what only relaxed stores write, as nothing
-//   pairs with it (read-modify-writes, e.g. counters, are fine, and thus is a location whose address escapes)
+// - A release write which only relaxed loads read, or an acquire read of what only relaxed stores write, as nothing
+//   pairs with it (a location only read-modify-written (e.g. a counter) is fine as is one whose address escapes)
 // - A weak compare-exchange whose `ok` is ignored, as it can fail even when the value matches
 // - A futex woken before it is written, as the waiter may go back to sleep
 // - An `atomic_signal_fence` where an `atomic_thread_fence` would pair, as it only orders within its own thread

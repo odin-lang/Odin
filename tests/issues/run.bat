@@ -104,6 +104,9 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin test ..\test_issue_7779.odin %COMMON% || exit /b
 ..\..\..\odin run ..\test_issue_7798.odin %COMMON% || exit /b
 ..\..\..\odin test ..\test_issue_disabled_proc_value.odin %COMMON% -disable-assert || exit /b
+..\..\..\odin check ..\test_issue_atomic_orderings.odin -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
+..\..\..\odin check ..\test_issue_atomic_errors.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
+..\..\..\odin check ..\test_issue_atomic_access.odin -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 
 @echo off
 
