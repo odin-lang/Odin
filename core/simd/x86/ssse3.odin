@@ -7,15 +7,15 @@ _ :: simd
 
 @(require_results, enable_target_feature="ssse3")
 _mm_abs_epi8 :: #force_inline proc "c" (a: __m128i) -> __m128i {
-	return transmute(__m128i)pabsb128(transmute(i8x16)a)
+	return transmute(__m128i)simd.abs(transmute(i8x16)a)
 }
 @(require_results, enable_target_feature="ssse3")
 _mm_abs_epi16 :: #force_inline proc "c" (a: __m128i) -> __m128i {
-	return transmute(__m128i)pabsw128(transmute(i16x8)a)
+	return transmute(__m128i)simd.abs(transmute(i16x8)a)
 }
 @(require_results, enable_target_feature="ssse3")
 _mm_abs_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
-	return transmute(__m128i)pabsd128(transmute(i32x4)a)
+	return transmute(__m128i)simd.abs(transmute(i32x4)a)
 }
 @(require_results, enable_target_feature="ssse3")
 _mm_shuffle_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
@@ -107,12 +107,6 @@ _mm_sign_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 
 @(private, default_calling_convention="none")
 foreign _ {
-	@(link_name = "llvm.x86.ssse3.pabs.b.128")
-	pabsb128     :: proc(a: i8x16) -> u8x16 ---
-	@(link_name = "llvm.x86.ssse3.pabs.w.128")
-	pabsw128     :: proc(a: i16x8) -> u16x8 ---
-	@(link_name = "llvm.x86.ssse3.pabs.d.128")
-	pabsd128     :: proc(a: i32x4) -> u32x4 ---
 	@(link_name = "llvm.x86.ssse3.pshuf.b.128")
 	pshufb128    :: proc(a, b: u8x16) -> u8x16 ---
 	@(link_name = "llvm.x86.ssse3.phadd.w.128")

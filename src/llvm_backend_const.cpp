@@ -2016,15 +2016,22 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				res.value = LLVMConstVector(values, cast(unsigned)total_elem_count);
 				return res;
 			} else {
+				isize elem_index = 0;
 				for (isize i = 0; i < elem_count; i++) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					values[i] = lb_const_value(m, elem_type, tav.value, cc).value;
+					if (is_type_tuple(tav.type)) {
+						elem_index += tav.type->Tuple.variables.count;
+					} else {
+						values[elem_index++] = lb_const_value(m, elem_type, tav.value, cc).value;
+					}
 				}
 				LLVMTypeRef et = lb_type(m, elem_type);
 
-				for (isize i = elem_count; i < total_elem_count; i++) {
-					values[i] = LLVMConstNull(et);
+				for (isize i = 0; i < total_elem_count; i++) {
+					if (values[i] == nullptr) {
+						values[i] = LLVMConstNull(et);
+					}
 				}
 				for (isize i = 0; i < total_elem_count; i++) {
 					values[i] = llvm_const_cast(m, values[i], et, /*failure_*/nullptr);
@@ -2384,15 +2391,19 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 				res.value = lb_build_constant_array_values(m, type, elem_type, cast(isize)total_count, values, cc);
 				return res;
 			} else {
-				GB_ASSERT_MSG(elem_count == max_count, "%td != %td", elem_count, max_count);
+				GB_ASSERT_MSG(elem_count <= max_count, "%td > %td", elem_count, max_count);
 
 				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, cast(isize)total_count);
+				i64 elem_index = 0;
 				for_array(i, cl->elems) {
 					TypeAndValue tav = cl->elems[i]->tav;
 					GB_ASSERT(tav.mode != Addressing_Invalid);
-					i64 offset = 0;
-					offset = matrix_row_major_index_to_offset(type, i);
-					values[offset] = lb_const_value(m, elem_type, tav.value, cc).value;
+					if (is_type_tuple(tav.type)) {
+						elem_index += tav.type->Tuple.variables.count;
+					} else {
+						i64 offset = matrix_row_major_index_to_offset(type, elem_index++);
+						values[offset] = lb_const_value(m, elem_type, tav.value, cc).value;
+					}
 				}
 				for (isize i = 0; i < total_count; i++) {
 					if (values[i] == nullptr) {

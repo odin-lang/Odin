@@ -5866,13 +5866,9 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_fixed_capacity_dynamic_array_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
-		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
-
-		if (!low_const || !high_const) {
-			if (!no_indices) {
-				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
-			}
+		// unlike a fixed array, the length is only known at runtime, so constant indices are checked too
+		if (!no_indices) {
+			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 		lbValue data_ptr = lb_addr_get_ptr(p, addr);
 		lbValue array_ptr = lb_emit_struct_ep(p, data_ptr, 0);
