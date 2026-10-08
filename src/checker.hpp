@@ -169,6 +169,7 @@ struct AttributeContext {
 
 	u8     futex; // ProcedureFutex
 	String futex_parameter;
+	u8     synchronizes; // OdinAtomicMemoryOrder, .Relaxed when it synchronizes nothing
 
 	bool   raddbg_type_view;
 	String raddbg_type_view_string;

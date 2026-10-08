@@ -223,6 +223,7 @@ foreign kernel32 {
 		WakeContext: PREASON_CONTEXT,
 		TolerableDelay: ULONG,
 	) -> BOOL ---
+	@(synchronizes=.Acquire)
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
 	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
 	EnterSynchronizationBarrier :: proc(
@@ -419,6 +420,7 @@ foreign kernel32 {
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	@(synchronizes=.Acquire)
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,

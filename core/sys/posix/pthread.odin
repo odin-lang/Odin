@@ -294,6 +294,7 @@ foreign lib {
 
 	[[ More; https://pubs.opengroup.org/onlinepubs/9699919799/functions/pthread_join.html ]]
 	*/
+	@(synchronizes=.Acquire)
 	pthread_join :: proc(thread: pthread_t, value_ptr: ^rawptr = nil) -> Errno ---
 
 	/*

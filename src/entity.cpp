@@ -317,6 +317,7 @@ struct Entity {
 			ProcedureOptimizationMode optimization_mode;
 			ProcedureFutex            futex;
 			i32                       futex_parameter; // the index of what `futex` waits on or wakes
+			u8                        synchronizes;    // OdinAtomicMemoryOrder, see `@(synchronizes=...)`
 
 			u64     fast_math_flags;
 

@@ -4649,6 +4649,23 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		case OdinFutexOperation_Wake: ac->futex = ProcedureFutex_Wake; break;
 		}
 		return true;
+	} else if (name == "synchronizes") {
+		ExactValue ev = check_decl_attribute_value(c, value, t_atomic_memory_order);
+		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
+			// already reported
+			return true;
+		}
+		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_atomic_memory_order)) {
+			error(elem, "Expected a constant of type 'intrinsics.Atomic_Memory_Order' for '%.*s', e.g. '.Acquire' or '.Release'", LIT(name));
+			return true;
+		}
+		i64 order = exact_value_to_i64(ev);
+		if (order == OdinAtomicMemoryOrder_relaxed) {
+			error(elem, "'%.*s' cannot be '.Relaxed', which synchronizes nothing", LIT(name));
+			return true;
+		}
+		ac->synchronizes = cast(u8)order;
+		return true;
 	} else if (name == "futex_parameter") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind != ExactValue_String || ev.value_string.len == 0) {

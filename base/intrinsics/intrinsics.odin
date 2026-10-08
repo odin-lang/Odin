@@ -103,6 +103,8 @@ syscall_bsd :: proc(id: uintptr, args: ..uintptr) -> (uintptr, bool) ---
 
 
 // Atomics
+// Also for `@(synchronizes=...)` on a procedure which acts as an atomic operation with that ordering, e.g. `.Acquire` for
+// taking a lock and `.Release` for releasing it, which -vet-atomic-access takes plain reads and writes after it to be under
 Atomic_Memory_Order :: enum {
 	Relaxed = 0, // Unordered
 	Consume = 1, // Monotonic
