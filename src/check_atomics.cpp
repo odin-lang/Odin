@@ -56,7 +56,8 @@ struct AtomicSite {
 	DeclInfo *decl;
 };
 
-enum AtomicReportKind {
+enum AtomicReportKind : u8 {
+	AtomicReport_Invalid,
 	AtomicReport_Release,     // written with release ordering, which nothing acquires
 	AtomicReport_Acquire,     // read with acquire ordering, which nothing releases
 	AtomicReport_WeakIgnored, // a weak compare-exchange whose second result is not used
@@ -1056,8 +1057,9 @@ gb_internal void check_atomics(Checker *c) {
 				gb_string_free(name);
 				break;
 			}
-			case AtomicReport_WeakIgnored:
-			case AtomicReport_Local:
+			default:
+				// what is reported above, or nothing
+				GB_PANIC("Unhandled AtomicReportKind");
 				break;
 			}
 			gb_string_free(str);
