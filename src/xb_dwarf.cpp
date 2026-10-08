@@ -117,8 +117,8 @@ enum {
 	XDW_ATE_boolean  = 0x02,
 	XDW_ATE_float    = 0x04,
 	XDW_ATE_signed   = 0x05,
-	XDW_ATE_unsigned = 0x08,
-	XDW_ATE_unsigned_char = 0x08,
+	XDW_ATE_unsigned = 0x07,
+	XDW_ATE_UTF      = 0x10,
 
 	XDW_OP_addr    = 0x03,
 	XDW_OP_deref   = 0x06,
@@ -482,7 +482,7 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		case Basic_bool: case Basic_b8: case Basic_b16: case Basic_b32: case Basic_b64: case Basic_llvm_bool:
 			enc = XDW_ATE_boolean; break;
 		case Basic_rune:
-			enc = XDW_ATE_signed; break;
+			enc = XDW_ATE_UTF; break;
 		case Basic_f16: case Basic_f32: case Basic_f64:
 		case Basic_f16le: case Basic_f32le: case Basic_f64le:
 		case Basic_f16be: case Basic_f32be: case Basic_f64be:
@@ -541,6 +541,10 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 				return;
 			}
 		}
+		// a typedef of the same name, like LLVM's, or a debugger shows the C type's name
+		xbb_uleb(b, xbAbbrev_Typedef);
+		xbb_str(b, name);
+		xbb_u32(b, cast(u32)(b->count + 4 - dt->cu_start));
 		xbb_uleb(b, xbAbbrev_BaseType);
 		xbb_str(b, name);
 		xbb_u8(b, enc);

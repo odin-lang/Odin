@@ -2605,6 +2605,15 @@ gb_internal xbMem xb_result_ptr_mem(xbProc *p, i32 local) {
 	return xb_mem(xbMem_Reg, xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)local)), 0);
 }
 
+// A machine nop in debug builds, for a line whose code may all fold away: a debugger stops
+// only on a line with code of its own.
+gb_internal void xb_debug_line_nop(xbProc *p) {
+	if (!build_context.ODIN_DEBUG || xb_curr_terminated(p)) return;
+	xbInstr nop = xb_instr(xbOp_Nop);
+	nop.imm = 1;
+	xb_emit(p, nop);
+}
+
 // leaves the #force_inline body being built
 gb_internal void xb_inline_exit(xbProc *p) {
 	if (xb_curr_terminated(p)) return;
@@ -2618,6 +2627,7 @@ gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_resu
 	TypeProc *pt = &base_type(p->type)->Proc;
 	isize return_count = pt->result_count;
 	if (return_count == 0) {
+		if (p->inl != nullptr) xb_debug_line_nop(p);
 		xb_emit_defer_stmts(p, true, nullptr, pos);
 		if (!xb_curr_terminated(p)) {
 			if (p->inl != nullptr) {
@@ -4355,6 +4365,7 @@ gb_internal void xb_inline_bind_param(xbProc *p, Entity *e, xbValue v, ProcCalli
 
 gb_internal void xb_inline_return(xbProc *p, Array<xbValue> &results, TokenPos pos) {
 	TypeProc *pt = &base_type(p->type)->Proc;
+	xb_debug_line_nop(p);
 	for_array(i, results) {
 		i64 off = 0;
 		if (results.count > 1) {
@@ -4570,12 +4581,8 @@ gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, A
 	p->state_flags = 0;
 	p->branch_location_pos = {};
 
-	if (build_context.ODIN_DEBUG) {
-		// the call's line needs code before the body's, or a debugger cannot stop there
-		xbInstr nop = xb_instr(xbOp_Nop);
-		nop.imm = 1;
-		xb_emit(p, nop);
-	}
+	// the call's line needs code before the body's
+	xb_debug_line_nop(p);
 	xb_inline_body(p, e, args);
 
 	xb_inline_restore(p, s, false);
