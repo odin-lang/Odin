@@ -434,3 +434,45 @@ map_utf16_string_keys :: proc(t: ^testing.T) {
 	testing.expect_value(t, mc[c], 1)
 	testing.expect_value(t, mc[d], 2)
 }
+
+@(test)
+map_op_assign :: proc(t: ^testing.T) {
+	m := make(map[int]int)
+	defer delete(m)
+	for i in 0..<20 {
+		m[i%7] += i
+	}
+	m[3] -= 2
+	m[4] *= 3
+	m[5] |= 64
+	m[99] += 5 // missing key starts from zero
+	testing.expect_value(t, m[0], 21)
+	testing.expect_value(t, m[3], 28)
+	testing.expect_value(t, m[4], 99)
+	testing.expect_value(t, m[5], 100)
+	testing.expect_value(t, m[99], 5)
+
+	// the right side runs before the old value is read
+	set_100 :: proc(m: ^map[int]int, k: int) -> int {
+		m[k] = 100
+		return 1
+	}
+	m[1] += set_100(&m, 1)
+	m[50] += set_100(&m, 50)
+	testing.expect_value(t, m[1], 101)
+	testing.expect_value(t, m[50], 101)
+
+	f := make(map[string]f64)
+	defer delete(f)
+	f["a"] += 1.5
+	f["a"] *= 3
+	testing.expect_value(t, f["a"], 4.5)
+
+	K :: struct { a: i32, b: u8 }
+	b := make(map[K]bit_set[0..<8])
+	defer delete(b)
+	b[{1, 2}] += {2}
+	b[{1, 2}] |= {5}
+	b[{1, 2}] -= {2}
+	testing.expect_value(t, b[{1, 2}], bit_set[0..<8]{5})
+}

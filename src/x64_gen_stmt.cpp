@@ -2106,9 +2106,10 @@ gb_internal void xb_build_assign_stmt(xbProc *p, AstAssignStmt *as) {
 		xb_soa_swizzle_op_assign(p, op, lhs, xb_build_expr(p, as->rhs[0]));
 		return;
 	}
-	if (lhs.kind != xbAddr_Default && lhs.kind != xbAddr_Swizzle && lhs.kind != xbAddr_SoaVariable && lhs.kind != xbAddr_BitField) XB_UNSUPPORTED(p, "op-assign to special addr");
-	xbValue old = xb_addr_load(p, lhs);
+	if (lhs.kind != xbAddr_Default && lhs.kind != xbAddr_Swizzle && lhs.kind != xbAddr_SoaVariable && lhs.kind != xbAddr_BitField && lhs.kind != xbAddr_Map) XB_UNSUPPORTED(p, "op-assign to special addr");
+	// the right side goes first, so a call in it that writes the target is seen (as in the LLVM backend)
 	xbValue rhs = xb_build_expr(p, as->rhs[0]);
+	xbValue old = xb_addr_load(p, lhs);
 	Type *type = lhs.type;
 	Type *bt = core_type(type);
 	xbValue res = {};
