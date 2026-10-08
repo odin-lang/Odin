@@ -111,6 +111,19 @@ def odin_kind(type_name, field_names, data_is_pointer, data_is_array, data_targe
 	return None
 
 
+def composite_type(name):
+	# the element of a pointer, multi-pointer or fixed array type named by a `typeid` and the array's count,
+	# which is None for a pointer; None for other types
+	if name.startswith("^"):
+		return name[1:], None
+	if name.startswith("[^]"):
+		return name[3:], None
+	m = re.fullmatch(r"\[([0-9]+)\](.+)", name)
+	if m:
+		return m.group(2), int(m.group(1))
+	return None
+
+
 def soa_fields(field_names):
 	return [n for n in field_names if n not in ("__$len", "__$cap", "allocator", "_")]
 
@@ -278,6 +291,16 @@ if gdb is not None:
 		return None
 
 	def _gdb_odin_type(name):
+		composite = composite_type(name)
+		if composite is not None:
+			elem_name, count = composite
+			elem = _gdb_odin_type(elem_name)
+			if elem is None:
+				return None
+			if count is None:
+				return elem.pointer()
+			return elem.array(count - 1)
+
 		basic = ODIN_BASIC_TYPES.get(name)
 		if basic is None:
 			return _gdb_type(name, "struct " + name, "union " + name, "enum " + name)
@@ -575,6 +598,16 @@ if lldb is not None:
 
 	def _lldb_odin_type(target, name, id):
 		# the type a `typeid` names, None when it cannot be found
+		composite = composite_type(name)
+		if composite is not None and typeid_hash(name) == id:
+			elem_name, count = composite
+			elem = _lldb_odin_type(target, elem_name, typeid_hash(elem_name))
+			if elem is None:
+				return None
+			if count is None:
+				return elem.GetPointerType()
+			return elem.GetArrayType(count)
+
 		basic = ODIN_BASIC_TYPES.get(name)
 		if basic is None:
 			types = target.FindTypes(name)
@@ -664,7 +697,7 @@ if lldb is not None:
 		t = _lldb_odin_type(valobj.GetTarget(), name, id.GetValueAsUnsigned())
 		if t is None:
 			return name, None
-		if name not in ODIN_BASIC_TYPES:
+		if name not in ODIN_BASIC_TYPES and composite_type(name) is None:
 			name = t.GetName()
 		value = valobj.CreateValueFromAddress("value", data, t)
 		value.SetPreferSyntheticValue(True)
