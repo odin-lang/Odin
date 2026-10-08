@@ -328,6 +328,7 @@ struct xbCall {
 struct xbBlock {
 	i32            index;
 	bool           placed;
+	bool           cold;  // placed after the rest of the procedure
 	isize          scope_index;
 	Array<xbInstr> instrs;
 	i32            code_offset;

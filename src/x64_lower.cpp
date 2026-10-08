@@ -1638,9 +1638,15 @@ gb_internal void xb_lower_proc(xbProc *p) {
 		return -1;
 	};
 
-	for (isize bi = 0; bi < p->order.count; bi++) {
-		xbBlock *b = p->order[bi];
-		i32 next_block = bi+1 < p->order.count ? p->order[bi+1]->index : -1;
+	// cold blocks go last, so the hot path falls through
+	auto order = array_make<xbBlock *>(heap_allocator(), 0, p->order.count);
+	defer (array_free(&order));
+	for (xbBlock *b : p->order) if (!b->cold) array_add(&order, b);
+	for (xbBlock *b : p->order) if (b->cold)  array_add(&order, b);
+
+	for (isize bi = 0; bi < order.count; bi++) {
+		xbBlock *b = order[bi];
+		i32 next_block = bi+1 < order.count ? order[bi+1]->index : -1;
 		b->code_offset = cast(i32)xb_pos(a);
 		for (isize i = 0; i < b->instrs.count; i++) {
 			xbInstr const &in = b->instrs[i];
