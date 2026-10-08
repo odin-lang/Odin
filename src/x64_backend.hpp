@@ -503,6 +503,7 @@ struct xbProcDebug {
 	Array<i32>        scope_parent; // per lexical scope, scope 0 is the procedure's
 	Array<xbScopeMark> scope_marks;
 	Type *  type;
+	bool    naked; // no frame, the cfa stays rsp+8
 	// callee saved registers spilled by the prologue, for the unwinder
 	struct SavedReg { i32 dwarf_reg; i32 frame_offset; };
 	Array<SavedReg> saved_regs;

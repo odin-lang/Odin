@@ -1201,9 +1201,9 @@ gb_internal xbAbiFunc *xb_abi_compute(Type *proc_type, char const **reason) {
 	case ProcCC_Contextless:
 	case ProcCC_CDecl:
 	case ProcCC_SysV:
+	case ProcCC_Naked:
 		break;
 	case ProcCC_None:
-	case ProcCC_Naked:
 	case ProcCC_InlineAsm:
 	default:
 		*reason = "calling convention";

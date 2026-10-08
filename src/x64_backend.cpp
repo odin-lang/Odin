@@ -137,6 +137,80 @@ gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	return p;
 }
 
+// A naked body has no frame, so it may only hold asm calls on constants, constant declarations,
+// traps and bare returns, like what the LLVM backend accepts. Returns why not, or nullptr.
+gb_internal char const *xb_naked_stmt_reason(Ast *node, bool has_results) {
+	if (node == nullptr) return nullptr;
+	switch (node->kind) {
+	case Ast_EmptyStmt:
+		return nullptr;
+	case Ast_BlockStmt:
+		for (Ast *s : node->BlockStmt.stmts) {
+			if (char const *r = xb_naked_stmt_reason(s, has_results)) return r;
+		}
+		return nullptr;
+	case Ast_WhenStmt: {
+		char const *r = xb_naked_stmt_reason(node->WhenStmt.body, has_results);
+		return r ? r : xb_naked_stmt_reason(node->WhenStmt.else_stmt, has_results);
+	}
+	case Ast_ValueDecl:
+		if (node->ValueDecl.is_mutable) return "naked procedure: variable";
+		return nullptr;
+	case Ast_ReturnStmt:
+		if (has_results) return "naked procedure: return with results";
+		return nullptr;
+	case Ast_ExprStmt: {
+		Ast *call = unparen_expr(node->ExprStmt.expr);
+		if (call->kind != Ast_CallExpr) break;
+		Entity *pe = entity_of_node(unparen_expr(call->CallExpr.proc));
+		if (pe == nullptr) break;
+		if (pe->kind == Entity_Builtin) {
+			switch (pe->Builtin.id) {
+			case BuiltinProc_trap:
+			case BuiltinProc_debug_trap:
+			case BuiltinProc_unreachable:
+				return nullptr;
+			}
+			break;
+		}
+		if (pe->kind != Entity_AsmTemplate) break;
+		for (Ast *arg : call->CallExpr.args) {
+			if (arg->kind == Ast_FieldValue) arg = arg->FieldValue.value;
+			if (type_and_value_of_expr(arg).mode != Addressing_Constant) return "naked procedure: asm operand";
+		}
+		return nullptr;
+	}
+	}
+	return xb_asm_reason("naked procedure:", ast_strings[node->kind]);
+}
+
+// What the naked body built into must need no frame either.
+gb_internal void xb_check_naked(xbProc *p) {
+	for (xbAsmBlock const &blk : p->asms) {
+		if (blk.inputs.count != 0 || blk.outputs.count != 0) XB_UNSUPPORTED(p, "naked procedure: asm operand");
+	}
+	if (p->locals.count != 0) XB_UNSUPPORTED(p, "naked procedure: stack slot");
+	for (xbBlock *b : p->order) {
+		for (xbInstr const &in : b->instrs) {
+			switch (in.op) {
+			case xbOp_Nop:
+			case xbOp_Loc:
+			case xbOp_Scope:
+			case xbOp_Jump:
+			case xbOp_Unreachable:
+			case xbOp_Trap:
+			case xbOp_DebugTrap:
+			case xbOp_Asm:
+				continue;
+			case xbOp_Ret:
+				if (p->calls[cast(isize)in.imm].args.count != 0) XB_UNSUPPORTED(p, "naked procedure: return with results");
+				continue;
+			}
+			XB_UNSUPPORTED(p, "naked procedure: stack slot");
+		}
+	}
+}
+
 gb_internal xbProc *xb_build_proc(xbModule *m, Entity *e, xbFamily *family, char const **reason) {
 	xbProc *p = xb_new_proc(m, xb_entity_name(m, e), e->type);
 	p->family = family;
@@ -152,7 +226,11 @@ gb_internal xbProc *xb_build_proc(xbModule *m, Entity *e, xbFamily *family, char
 	}
 
 	Type *pt = base_type(e->type);
-	if (pt->Proc.calling_convention == ProcCC_Naked) XB_UNSUPPORTED(p, "naked procedure");
+	if (pt->Proc.calling_convention == ProcCC_Naked) {
+		if (!xb_asm_target_ok()) XB_UNSUPPORTED(p, "naked procedure");
+		p->naked = true;
+		if (char const *r = xb_naked_stmt_reason(p->body, pt->Proc.result_count != 0)) XB_UNSUPPORTED(p, r);
+	}
 	if (e->Procedure.link_section.len != 0) XB_UNSUPPORTED(p, "link section");
 	if (e->Procedure.has_instrumentation && m->info->instrumentation_enter_entity != nullptr) XB_UNSUPPORTED(p, "instrumentation");
 	if (build_context.sanitizer_flags != 0) XB_UNSUPPORTED(p, "sanitizers");
@@ -164,6 +242,7 @@ gb_internal xbProc *xb_build_proc(xbModule *m, Entity *e, xbFamily *family, char
 	xb_begin_proc(p);
 	xb_build_stmt(p, p->body);
 	xb_end_proc(p);
+	if (p->naked) xb_check_naked(p);
 	return p;
 }
 
