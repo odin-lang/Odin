@@ -4718,16 +4718,26 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		{
 			lbValue ptr = lb_build_expr(p, ce->args[0]);
 			Type *type = type_of_expr(ce->args[1]);
-			LLVMTypeRef llvm_type = lb_type(p->module, type);
-			
+
+			// the caller applied the C default argument promotions, see lb_emit_c_vararg
+			Type *arg_type = type;
+			if (core_type(type)->kind == Type_BitSet) {
+				arg_type = bit_set_to_int(core_type(type));
+			}
+			Type *promoted = c_vararg_promote_type(arg_type);
+			LLVMTypeRef llvm_type = lb_type(p->module, promoted);
+
+			lbValue value = {};
+			value.type = promoted;
 			bool is_win64 = build_context.metrics.os == TargetOs_windows && build_context.metrics.arch == TargetArch_amd64;
 			if (is_win64 && LLVMGetTypeKind(llvm_type) == LLVMIntegerTypeKind && LLVMGetIntTypeWidth(llvm_type) < 64) {
 				LLVMValueRef slot = LLVMBuildVAArg(p->builder, ptr.value, lb_type(p->module, t_u64), "");
-				return {LLVMBuildTrunc(p->builder, slot, llvm_type, ""), type};
+				value.value = LLVMBuildTrunc(p->builder, slot, llvm_type, "");
+			} else {
+				value.value = LLVMBuildVAArg(p->builder, ptr.value, llvm_type, "");
 			}
-			LLVMValueRef value = LLVMBuildVAArg(p->builder, ptr.value, llvm_type, "");
-
-			return {value, type};
+			value = lb_emit_conv(p, value, arg_type);
+			return lb_emit_transmute(p, value, type);
 		} break;
 
 
