@@ -203,6 +203,8 @@ struct EscapeAnalysis {
 	i32                  group;       // of the procedures being analysed together, see `EscapeGraph`
 	Array<EscapeReport> *reports;     // kept rather than reported, while what flows through the group may still change
 	bool                 muted;       // the entry point of an executable, which only returns as the program ends
+	isize                stmt_visits;
+	bool                 too_large;   // give up on the procedure, see `escape_too_large`
 
 	bool                 nil_deref;    // -vet-nil-deref
 	bool                 uninit;       // -vet-uninitialized
@@ -667,7 +669,20 @@ gb_internal Type *escape_pointee_type(Type *t) {
 	return nullptr;
 }
 
+gb_internal bool escape_too_large(EscapeAnalysis *ea) {
+	enum : isize {
+		MAX_FACT_COUNT  = 1<<13,
+		MAX_STMT_VISITS = 1<<20,
+	};
+	ea->too_large |= ea->state.facts.count + ea->state.outers.count > MAX_FACT_COUNT ||
+	                 ea->stmt_visits > MAX_STMT_VISITS;
+	return ea->too_large;
+}
+
 gb_internal void escape_store_obj(EscapeAnalysis *ea, EscapeObject const &obj, EscapePath const &path, EscapeValue const &v, EscapeUpdateKind update) {
+	if (escape_too_large(ea)) {
+		return;
+	}
 	// a store to any element of an array leaves the others
 	bool replaces = update == EscapeUpdate_Replace;
 	for (EscapeStep const &step : path) {
@@ -2008,8 +2023,10 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 			continue;
 		}
 		EscapeValue v = {};
+		Type *v_type = nullptr;
 		if (flow.kind == EscapeFlow_Value && escape_path_deref_index(flow.param_path) == flow.param_path.count) {
 			v = escape_value_project(args[flow.param], flow.param_path);
+			v_type = escape_type_within(types[flow.param], flow.param_path);
 		} else {
 			Type *pointee = nullptr;
 			v = escape_arg_pointers(args[flow.param], types[flow.param], flow.param_path, &pointee);
@@ -2018,6 +2035,7 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 					continue;
 				}
 				v = escape_load_once(ea, v);
+				v_type = pointee;
 				if (pointee == nullptr) {
 					// NOTE(bill): the paths of what is loaded are of another type, which could otherwise nest without end in a loop
 					v = escape_as_pointer(v);
@@ -2028,12 +2046,18 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 			}
 		}
 
+		// NOTE(bill): likewise when it goes somewhere of another type, e.g. all of `p^` loaded into `p.name`
 		switch (flow.target) {
-		case EscapeFlowTarget_Result:
+		case EscapeFlowTarget_Result: {
+			Type *t = escape_type_within(pt->results->Tuple.variables[flow.target_index]->type, flow.target_path);
+			if (v_type != nullptr && t != nullptr && !are_types_identical(v_type, t)) {
+				v = escape_as_pointer(v);
+			}
 			for (EscapeValueFact const &f : v) {
 				escape_value_add(&results[flow.target_index], escape_path_concat(flow.target_path, f.path), f.origin);
 			}
 			break;
+		}
 
 		case EscapeFlowTarget_Pointee:
 		case EscapeFlowTarget_Loaded:
@@ -2043,6 +2067,8 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 				EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
 				if (flow.target != EscapeFlowTarget_Pointee) {
 					ptr = escape_as_pointer(escape_load_once(ea, ptr));
+				} else if (v_type != nullptr && pointee != nullptr && !are_types_identical(v_type, pointee)) {
+					v = escape_as_pointer(v);
 				}
 				if (flow.target == EscapeFlowTarget_Deep) {
 					ptr = escape_reachable(ea, ptr);
@@ -3099,6 +3125,10 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	if (node == nullptr || !ea->state.reachable) {
 		return;
 	}
+	ea->stmt_visits += 1;
+	if (escape_too_large(ea)) {
+		return;
+	}
 	switch (node->kind) {
 	case_ast_node(es, ExprStmt, node);
 		escape_nil_scan(ea, es->expr);
@@ -3513,10 +3543,10 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
 	global_error_context.instantiations = escape_instantiations_of(pi);
 	escape_stmt(&ea, body);
-	if (ea.state.reachable) {
+	if (ea.state.reachable && !ea.too_large) {
 		escape_exit(&ea, body, {}, {});
 	}
-	if (ea.nil_deref || ea.uninit) {
+	if ((ea.nil_deref || ea.uninit) && !ea.too_large) {
 		// a use is reported only when what it goes through is nil, or unset, every time it is reached, e.g. in a defer
 		// run at several exits
 		array_sort(ea.nil_uses, escape_nil_use_cmp);
