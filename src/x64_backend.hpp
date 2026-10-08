@@ -367,6 +367,8 @@ struct xbDebugVar {
 	i32    line;
 	i32    file_id;
 	i32    sym;        // @(static): the symbol of its storage, used when local < 0
+	bool   in_reg;     // the variable lives in dwarf_reg for the whole procedure
+	u8     dwarf_reg;
 };
 
 // A global variable or constant, for DWARF.
@@ -452,6 +454,10 @@ struct xbProcDebug {
 	i32     line_entry_count;
 	Array<xbDebugVar> vars;
 	Type *  type;
+	// callee saved registers spilled by the prologue, for the unwinder
+	struct SavedReg { i32 dwarf_reg; i32 frame_offset; };
+	Array<SavedReg> saved_regs;
+	i32     saved_at; // code offset right after the spills
 };
 
 struct xbStats {
