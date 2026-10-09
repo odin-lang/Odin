@@ -860,4 +860,5 @@ gb_internal bool xb_owns_startup(void);
 gb_internal bool xb_owns_type_info(void);
 gb_internal bool xb_owns_test_main(void);
 gb_internal bool xb_is_complete(void);
+gb_internal isize xb_procs_compiled(void);
 gb_internal bool xb_handles(Entity *e);

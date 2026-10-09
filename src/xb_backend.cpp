@@ -872,6 +872,10 @@ gb_internal bool xb_is_complete(void) {
 	return xb_module != nullptr && xb_module->complete;
 }
 
+gb_internal isize xb_procs_compiled(void) {
+	return xb_module != nullptr ? xb_module->stats.procs_compiled : 0;
+}
+
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #endif

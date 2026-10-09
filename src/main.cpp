@@ -4699,7 +4699,9 @@ int main(int arg_count, char const **arg_ptr) {
 		if (lb_generate_code(gen)) {
 			if (xb_is_complete()) {
 				// LLVM's modules stayed empty: the fast backend generated everything
-				global_timings.sections[code_gen_section].label = str_lit("Fast Backend Code Gen");
+				gbString label = gb_string_make(heap_allocator(), "Fast Backend Code Gen");
+				label = gb_string_append_fmt(label, " ( %4td procedures )", xb_procs_compiled());
+				global_timings.sections[code_gen_section].label = make_string((u8 *)label, gb_string_length(label));
 			}
 			switch (build_context.build_mode) {
 			case BuildMode_Executable:
