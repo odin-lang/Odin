@@ -291,7 +291,7 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 	}
 
 	is_newline :: proc(b: byte) -> bool {
-		return b == '\n' || b == '\r'
+		return b == '\n'
 	}
 
 	buf: []byte

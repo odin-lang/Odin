@@ -111,3 +111,21 @@ test_translate_to_bounds :: proc(t: ^testing.T) {
 	s.state.selection = {len(GRAPHEME_SAMPLE), len(GRAPHEME_SAMPLE)}
 	testing.expect_value(t, edit.translate_position(&s.state, .Right), len(GRAPHEME_SAMPLE))
 }
+
+@(test)
+test_translate_by_soft_line :: proc(t: ^testing.T) {
+	LINES :: "foo \r\nbar\nbaz\n"
+
+	s: State
+	state_init(&s, LINES, true)
+	defer state_destroy(&s)
+
+	expect_walk(t, &s, 0, .Soft_Line_End, {5})
+	expect_walk(t, &s, 5, .Soft_Line_End, {})
+	expect_walk(t, &s, 6, .Soft_Line_End, {9})
+	expect_walk(t, &s, len(LINES), .Soft_Line_End, {})
+
+	expect_walk(t, &s, len(LINES), .Soft_Line_Start, {})
+	expect_walk(t, &s, len(LINES) - 1, .Soft_Line_Start, {10})
+	expect_walk(t, &s, 7, .Soft_Line_Start, {6})
+}
