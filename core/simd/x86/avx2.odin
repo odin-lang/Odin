@@ -1215,24 +1215,721 @@ _mm256_hsubs_epi16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
 	return transmute(__m256i)simd.saturating_sub(c, d)
 }
 
+// Concatenate pairs of 16-byte blocks in `a` and `b` into a 32-byte temporary result,
+// shift the result right by `imm8` bytes, and store the low 16 bytes in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_alignr_epi8)
+@(require_results, enable_target_feature="avx2")
+_mm256_alignr_epi8 :: #force_inline proc "c" (a, b: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	when IMM8 >= 32 {
+		return __m256i(0)
+	} else when IMM8 > 16 {
+		shift :: u32(IMM8) % 16
+		c, d := __m256i(0), a
+		return transmute(__m256i)simd.shuffle(
+			transmute(simd.i8x32)d,
+			transmute(simd.i8x32)c,
+			(0  + shift) when (0  % 16) < 16 - shift else (0  + 16 + shift),
+			(1  + shift) when (1  % 16) < 16 - shift else (1  + 16 + shift),
+			(2  + shift) when (2  % 16) < 16 - shift else (2  + 16 + shift),
+			(3  + shift) when (3  % 16) < 16 - shift else (3  + 16 + shift),
+			(4  + shift) when (4  % 16) < 16 - shift else (4  + 16 + shift),
+			(5  + shift) when (5  % 16) < 16 - shift else (5  + 16 + shift),
+			(6  + shift) when (6  % 16) < 16 - shift else (6  + 16 + shift),
+			(7  + shift) when (7  % 16) < 16 - shift else (7  + 16 + shift),
+			(8  + shift) when (8  % 16) < 16 - shift else (8  + 16 + shift),
+			(9  + shift) when (9  % 16) < 16 - shift else (9  + 16 + shift),
+			(10 + shift) when (10 % 16) < 16 - shift else (10 + 16 + shift),
+			(11 + shift) when (11 % 16) < 16 - shift else (11 + 16 + shift),
+			(12 + shift) when (12 % 16) < 16 - shift else (12 + 16 + shift),
+			(13 + shift) when (13 % 16) < 16 - shift else (13 + 16 + shift),
+			(14 + shift) when (14 % 16) < 16 - shift else (14 + 16 + shift),
+			(15 + shift) when (15 % 16) < 16 - shift else (15 + 16 + shift),
+			(16 + shift) when (16 % 16) < 16 - shift else (16 + 16 + shift),
+			(17 + shift) when (17 % 16) < 16 - shift else (17 + 16 + shift),
+			(18 + shift) when (18 % 16) < 16 - shift else (18 + 16 + shift),
+			(19 + shift) when (19 % 16) < 16 - shift else (19 + 16 + shift),
+			(20 + shift) when (20 % 16) < 16 - shift else (20 + 16 + shift),
+			(21 + shift) when (21 % 16) < 16 - shift else (21 + 16 + shift),
+			(22 + shift) when (22 % 16) < 16 - shift else (22 + 16 + shift),
+			(23 + shift) when (23 % 16) < 16 - shift else (23 + 16 + shift),
+			(24 + shift) when (24 % 16) < 16 - shift else (24 + 16 + shift),
+			(25 + shift) when (25 % 16) < 16 - shift else (25 + 16 + shift),
+			(26 + shift) when (26 % 16) < 16 - shift else (26 + 16 + shift),
+			(27 + shift) when (27 % 16) < 16 - shift else (27 + 16 + shift),
+			(28 + shift) when (28 % 16) < 16 - shift else (28 + 16 + shift),
+			(29 + shift) when (29 % 16) < 16 - shift else (29 + 16 + shift),
+			(30 + shift) when (30 % 16) < 16 - shift else (30 + 16 + shift),
+			(31 + shift) when (31 % 16) < 16 - shift else (31 + 16 + shift),
+		)
+	} else when IMM8 == 16 {
+		return a
+	} else {
+		shift :: u32(IMM8)
+		c, d := a, b
+		return transmute(__m256i)simd.shuffle(
+			transmute(simd.i8x32)d,
+			transmute(simd.i8x32)c,
+			(0  + shift) when (0  % 16) < 16 - shift else (0  + 16 + shift),
+			(1  + shift) when (1  % 16) < 16 - shift else (1  + 16 + shift),
+			(2  + shift) when (2  % 16) < 16 - shift else (2  + 16 + shift),
+			(3  + shift) when (3  % 16) < 16 - shift else (3  + 16 + shift),
+			(4  + shift) when (4  % 16) < 16 - shift else (4  + 16 + shift),
+			(5  + shift) when (5  % 16) < 16 - shift else (5  + 16 + shift),
+			(6  + shift) when (6  % 16) < 16 - shift else (6  + 16 + shift),
+			(7  + shift) when (7  % 16) < 16 - shift else (7  + 16 + shift),
+			(8  + shift) when (8  % 16) < 16 - shift else (8  + 16 + shift),
+			(9  + shift) when (9  % 16) < 16 - shift else (9  + 16 + shift),
+			(10 + shift) when (10 % 16) < 16 - shift else (10 + 16 + shift),
+			(11 + shift) when (11 % 16) < 16 - shift else (11 + 16 + shift),
+			(12 + shift) when (12 % 16) < 16 - shift else (12 + 16 + shift),
+			(13 + shift) when (13 % 16) < 16 - shift else (13 + 16 + shift),
+			(14 + shift) when (14 % 16) < 16 - shift else (14 + 16 + shift),
+			(15 + shift) when (15 % 16) < 16 - shift else (15 + 16 + shift),
+			(16 + shift) when (16 % 16) < 16 - shift else (16 + 16 + shift),
+			(17 + shift) when (17 % 16) < 16 - shift else (17 + 16 + shift),
+			(18 + shift) when (18 % 16) < 16 - shift else (18 + 16 + shift),
+			(19 + shift) when (19 % 16) < 16 - shift else (19 + 16 + shift),
+			(20 + shift) when (20 % 16) < 16 - shift else (20 + 16 + shift),
+			(21 + shift) when (21 % 16) < 16 - shift else (21 + 16 + shift),
+			(22 + shift) when (22 % 16) < 16 - shift else (22 + 16 + shift),
+			(23 + shift) when (23 % 16) < 16 - shift else (23 + 16 + shift),
+			(24 + shift) when (24 % 16) < 16 - shift else (24 + 16 + shift),
+			(25 + shift) when (25 % 16) < 16 - shift else (25 + 16 + shift),
+			(26 + shift) when (26 % 16) < 16 - shift else (26 + 16 + shift),
+			(27 + shift) when (27 % 16) < 16 - shift else (27 + 16 + shift),
+			(28 + shift) when (28 % 16) < 16 - shift else (28 + 16 + shift),
+			(29 + shift) when (29 % 16) < 16 - shift else (29 + 16 + shift),
+			(30 + shift) when (30 % 16) < 16 - shift else (30 + 16 + shift),
+			(31 + shift) when (31 % 16) < 16 - shift else (31 + 16 + shift),
+		)
+	}
+}
+
+// Shift 128-bit lanes in `a` left by `imm8` bytes while shifting in zeros, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_bslli_epi128)
+@(require_results, enable_target_feature="avx2")
+_mm256_bslli_epi128 :: #force_inline proc "c" (a: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	shift :: u32(IMM8) & u32(max(u8))
+	return transmute(__m256i)simd.shuffle(
+		simd.i8x32(0),
+		transmute(simd.i8x32)a,
+		0 when shift > 15 || (0  % 16) < shift else (32 + 0  - shift),
+		0 when shift > 15 || (1  % 16) < shift else (32 + 1  - shift),
+		0 when shift > 15 || (2  % 16) < shift else (32 + 2  - shift),
+		0 when shift > 15 || (3  % 16) < shift else (32 + 3  - shift),
+		0 when shift > 15 || (4  % 16) < shift else (32 + 4  - shift),
+		0 when shift > 15 || (5  % 16) < shift else (32 + 5  - shift),
+		0 when shift > 15 || (6  % 16) < shift else (32 + 6  - shift),
+		0 when shift > 15 || (7  % 16) < shift else (32 + 7  - shift),
+		0 when shift > 15 || (8  % 16) < shift else (32 + 8  - shift),
+		0 when shift > 15 || (9  % 16) < shift else (32 + 9  - shift),
+		0 when shift > 15 || (10 % 16) < shift else (32 + 10 - shift),
+		0 when shift > 15 || (11 % 16) < shift else (32 + 11 - shift),
+		0 when shift > 15 || (12 % 16) < shift else (32 + 12 - shift),
+		0 when shift > 15 || (13 % 16) < shift else (32 + 13 - shift),
+		0 when shift > 15 || (14 % 16) < shift else (32 + 14 - shift),
+		0 when shift > 15 || (15 % 16) < shift else (32 + 15 - shift),
+		0 when shift > 15 || (16 % 16) < shift else (32 + 16 - shift),
+		0 when shift > 15 || (17 % 16) < shift else (32 + 17 - shift),
+		0 when shift > 15 || (18 % 16) < shift else (32 + 18 - shift),
+		0 when shift > 15 || (19 % 16) < shift else (32 + 19 - shift),
+		0 when shift > 15 || (20 % 16) < shift else (32 + 20 - shift),
+		0 when shift > 15 || (21 % 16) < shift else (32 + 21 - shift),
+		0 when shift > 15 || (22 % 16) < shift else (32 + 22 - shift),
+		0 when shift > 15 || (23 % 16) < shift else (32 + 23 - shift),
+		0 when shift > 15 || (24 % 16) < shift else (32 + 24 - shift),
+		0 when shift > 15 || (25 % 16) < shift else (32 + 25 - shift),
+		0 when shift > 15 || (26 % 16) < shift else (32 + 26 - shift),
+		0 when shift > 15 || (27 % 16) < shift else (32 + 27 - shift),
+		0 when shift > 15 || (28 % 16) < shift else (32 + 28 - shift),
+		0 when shift > 15 || (29 % 16) < shift else (32 + 29 - shift),
+		0 when shift > 15 || (30 % 16) < shift else (32 + 30 - shift),
+		0 when shift > 15 || (31 % 16) < shift else (32 + 31 - shift),
+	)
+}
+
+// Shift 128-bit lanes in `a` right by `imm8` bytes while shifting in zeros, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_bsrli_epi128)
+@(require_results, enable_target_feature="avx2")
+_mm256_bsrli_epi128 :: #force_inline proc "c" (a: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	shift :: u32(IMM8) & u32(max(u8))
+	return transmute(__m256i)simd.shuffle(
+		simd.i8x32(0),
+		transmute(simd.i8x32)a,
+		0 when shift > 15 || (15 - (0  % 16)) < shift else (32 + 0  + shift),
+		0 when shift > 15 || (15 - (1  % 16)) < shift else (32 + 1  + shift),
+		0 when shift > 15 || (15 - (2  % 16)) < shift else (32 + 2  + shift),
+		0 when shift > 15 || (15 - (3  % 16)) < shift else (32 + 3  + shift),
+		0 when shift > 15 || (15 - (4  % 16)) < shift else (32 + 4  + shift),
+		0 when shift > 15 || (15 - (5  % 16)) < shift else (32 + 5  + shift),
+		0 when shift > 15 || (15 - (6  % 16)) < shift else (32 + 6  + shift),
+		0 when shift > 15 || (15 - (7  % 16)) < shift else (32 + 7  + shift),
+		0 when shift > 15 || (15 - (8  % 16)) < shift else (32 + 8  + shift),
+		0 when shift > 15 || (15 - (9  % 16)) < shift else (32 + 9  + shift),
+		0 when shift > 15 || (15 - (10 % 16)) < shift else (32 + 10 + shift),
+		0 when shift > 15 || (15 - (11 % 16)) < shift else (32 + 11 + shift),
+		0 when shift > 15 || (15 - (12 % 16)) < shift else (32 + 12 + shift),
+		0 when shift > 15 || (15 - (13 % 16)) < shift else (32 + 13 + shift),
+		0 when shift > 15 || (15 - (14 % 16)) < shift else (32 + 14 + shift),
+		0 when shift > 15 || (15 - (15 % 16)) < shift else (32 + 15 + shift),
+		0 when shift > 15 || (15 - (16 % 16)) < shift else (32 + 16 + shift),
+		0 when shift > 15 || (15 - (17 % 16)) < shift else (32 + 17 + shift),
+		0 when shift > 15 || (15 - (18 % 16)) < shift else (32 + 18 + shift),
+		0 when shift > 15 || (15 - (19 % 16)) < shift else (32 + 19 + shift),
+		0 when shift > 15 || (15 - (20 % 16)) < shift else (32 + 20 + shift),
+		0 when shift > 15 || (15 - (21 % 16)) < shift else (32 + 21 + shift),
+		0 when shift > 15 || (15 - (22 % 16)) < shift else (32 + 22 + shift),
+		0 when shift > 15 || (15 - (23 % 16)) < shift else (32 + 23 + shift),
+		0 when shift > 15 || (15 - (24 % 16)) < shift else (32 + 24 + shift),
+		0 when shift > 15 || (15 - (25 % 16)) < shift else (32 + 25 + shift),
+		0 when shift > 15 || (15 - (26 % 16)) < shift else (32 + 26 + shift),
+		0 when shift > 15 || (15 - (27 % 16)) < shift else (32 + 27 + shift),
+		0 when shift > 15 || (15 - (28 % 16)) < shift else (32 + 28 + shift),
+		0 when shift > 15 || (15 - (29 % 16)) < shift else (32 + 29 + shift),
+		0 when shift > 15 || (15 - (30 % 16)) < shift else (32 + 30 + shift),
+		0 when shift > 15 || (15 - (31 % 16)) < shift else (32 + 31 + shift),
+	)
+}
+
+// Shift 128-bit lanes in `a` left by `imm8` bytes while shifting in zeros, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_slli_si256)
+@(require_results, enable_target_feature="avx2")
+_mm256_slli_si256 :: #force_inline proc "c" (a: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	shift :: u32(IMM8) & u32(max(u8))
+	return transmute(__m256i)simd.shuffle(
+		simd.i8x32(0),
+		transmute(simd.i8x32)a,
+		0 when shift > 15 || (0  % 16) < shift else (32 + 0  - shift),
+		0 when shift > 15 || (1  % 16) < shift else (32 + 1  - shift),
+		0 when shift > 15 || (2  % 16) < shift else (32 + 2  - shift),
+		0 when shift > 15 || (3  % 16) < shift else (32 + 3  - shift),
+		0 when shift > 15 || (4  % 16) < shift else (32 + 4  - shift),
+		0 when shift > 15 || (5  % 16) < shift else (32 + 5  - shift),
+		0 when shift > 15 || (6  % 16) < shift else (32 + 6  - shift),
+		0 when shift > 15 || (7  % 16) < shift else (32 + 7  - shift),
+		0 when shift > 15 || (8  % 16) < shift else (32 + 8  - shift),
+		0 when shift > 15 || (9  % 16) < shift else (32 + 9  - shift),
+		0 when shift > 15 || (10 % 16) < shift else (32 + 10 - shift),
+		0 when shift > 15 || (11 % 16) < shift else (32 + 11 - shift),
+		0 when shift > 15 || (12 % 16) < shift else (32 + 12 - shift),
+		0 when shift > 15 || (13 % 16) < shift else (32 + 13 - shift),
+		0 when shift > 15 || (14 % 16) < shift else (32 + 14 - shift),
+		0 when shift > 15 || (15 % 16) < shift else (32 + 15 - shift),
+		0 when shift > 15 || (16 % 16) < shift else (32 + 16 - shift),
+		0 when shift > 15 || (17 % 16) < shift else (32 + 17 - shift),
+		0 when shift > 15 || (18 % 16) < shift else (32 + 18 - shift),
+		0 when shift > 15 || (19 % 16) < shift else (32 + 19 - shift),
+		0 when shift > 15 || (20 % 16) < shift else (32 + 20 - shift),
+		0 when shift > 15 || (21 % 16) < shift else (32 + 21 - shift),
+		0 when shift > 15 || (22 % 16) < shift else (32 + 22 - shift),
+		0 when shift > 15 || (23 % 16) < shift else (32 + 23 - shift),
+		0 when shift > 15 || (24 % 16) < shift else (32 + 24 - shift),
+		0 when shift > 15 || (25 % 16) < shift else (32 + 25 - shift),
+		0 when shift > 15 || (26 % 16) < shift else (32 + 26 - shift),
+		0 when shift > 15 || (27 % 16) < shift else (32 + 27 - shift),
+		0 when shift > 15 || (28 % 16) < shift else (32 + 28 - shift),
+		0 when shift > 15 || (29 % 16) < shift else (32 + 29 - shift),
+		0 when shift > 15 || (30 % 16) < shift else (32 + 30 - shift),
+		0 when shift > 15 || (31 % 16) < shift else (32 + 31 - shift),
+	)
+}
+
+// Shift 128-bit lanes in `a` right by `imm8` bytes while shifting in zeros, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_srli_si256)
+@(require_results, enable_target_feature="avx2")
+_mm256_srli_si256 :: #force_inline proc "c" (a: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	shift :: u32(IMM8) & u32(max(u8))
+	return transmute(__m256i)simd.shuffle(
+		simd.i8x32(0),
+		transmute(simd.i8x32)a,
+		0 when shift > 15 || (15 - (0  % 16)) < shift else (32 + 0  + shift),
+		0 when shift > 15 || (15 - (1  % 16)) < shift else (32 + 1  + shift),
+		0 when shift > 15 || (15 - (2  % 16)) < shift else (32 + 2  + shift),
+		0 when shift > 15 || (15 - (3  % 16)) < shift else (32 + 3  + shift),
+		0 when shift > 15 || (15 - (4  % 16)) < shift else (32 + 4  + shift),
+		0 when shift > 15 || (15 - (5  % 16)) < shift else (32 + 5  + shift),
+		0 when shift > 15 || (15 - (6  % 16)) < shift else (32 + 6  + shift),
+		0 when shift > 15 || (15 - (7  % 16)) < shift else (32 + 7  + shift),
+		0 when shift > 15 || (15 - (8  % 16)) < shift else (32 + 8  + shift),
+		0 when shift > 15 || (15 - (9  % 16)) < shift else (32 + 9  + shift),
+		0 when shift > 15 || (15 - (10 % 16)) < shift else (32 + 10 + shift),
+		0 when shift > 15 || (15 - (11 % 16)) < shift else (32 + 11 + shift),
+		0 when shift > 15 || (15 - (12 % 16)) < shift else (32 + 12 + shift),
+		0 when shift > 15 || (15 - (13 % 16)) < shift else (32 + 13 + shift),
+		0 when shift > 15 || (15 - (14 % 16)) < shift else (32 + 14 + shift),
+		0 when shift > 15 || (15 - (15 % 16)) < shift else (32 + 15 + shift),
+		0 when shift > 15 || (15 - (16 % 16)) < shift else (32 + 16 + shift),
+		0 when shift > 15 || (15 - (17 % 16)) < shift else (32 + 17 + shift),
+		0 when shift > 15 || (15 - (18 % 16)) < shift else (32 + 18 + shift),
+		0 when shift > 15 || (15 - (19 % 16)) < shift else (32 + 19 + shift),
+		0 when shift > 15 || (15 - (20 % 16)) < shift else (32 + 20 + shift),
+		0 when shift > 15 || (15 - (21 % 16)) < shift else (32 + 21 + shift),
+		0 when shift > 15 || (15 - (22 % 16)) < shift else (32 + 22 + shift),
+		0 when shift > 15 || (15 - (23 % 16)) < shift else (32 + 23 + shift),
+		0 when shift > 15 || (15 - (24 % 16)) < shift else (32 + 24 + shift),
+		0 when shift > 15 || (15 - (25 % 16)) < shift else (32 + 25 + shift),
+		0 when shift > 15 || (15 - (26 % 16)) < shift else (32 + 26 + shift),
+		0 when shift > 15 || (15 - (27 % 16)) < shift else (32 + 27 + shift),
+		0 when shift > 15 || (15 - (28 % 16)) < shift else (32 + 28 + shift),
+		0 when shift > 15 || (15 - (29 % 16)) < shift else (32 + 29 + shift),
+		0 when shift > 15 || (15 - (30 % 16)) < shift else (32 + 30 + shift),
+		0 when shift > 15 || (15 - (31 % 16)) < shift else (32 + 31 + shift),
+	)
+}
+
+// Compare packed 8-bit integers in `a` and `b` for equality, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpeq_epi8)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpeq_epi8 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_eq(transmute(simd.i8x32)a, transmute(simd.i8x32)b)
+}
+
+// Compare packed 16-bit integers in `a` and `b` for equality, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpeq_epi16)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpeq_epi16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_eq(transmute(simd.i16x16)a, transmute(simd.i16x16)b)
+}
+
+// Compare packed 32-bit integers in `a` and `b` for equality, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpeq_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpeq_epi32 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_eq(transmute(simd.i32x8)a, transmute(simd.i32x8)b)
+}
+
+// Compare packed 64-bit integers in `a` and `b` for equality, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpeq_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpeq_epi64 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_eq(a, b)
+}
+
+// Compare packed signed 8-bit integers in `a` and `b` for greater-than, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpgt_epi8)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpgt_epi8 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_gt(transmute(simd.i8x32)a, transmute(simd.i8x32)b)
+}
+
+// Compare packed signed 16-bit integers in `a` and `b` for greater-than, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpgt_epi16)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpgt_epi16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_gt(transmute(simd.i16x16)a, transmute(simd.i16x16)b)
+}
+
+// Compare packed signed 32-bit integers in `a` and `b` for greater-than, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpgt_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpgt_epi32 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_gt(transmute(simd.i32x8)a, transmute(simd.i32x8)b)
+}
+
+// Compare packed signed 64-bit integers in `a` and `b` for greater-than, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cmpgt_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cmpgt_epi64 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)simd.lanes_gt(a, b)
+}
+
+// Extract an 8-bit integer from `a`, selected with `index`, and store the result in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_extract_epi8)
+@(require_results, enable_target_feature="avx2")
+_mm256_extract_epi8 :: #force_inline proc "c" (a: __m256i, $INDEX: i32) -> i32 where 0 <= INDEX, INDEX < 32 {
+	return cast(i32)simd.extract(transmute(simd.u8x32)a, uint(INDEX))
+}
+
+// Extract a 16-bit integer from `a`, selected with `index`, and store the result in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_extract_epi16)
+@(require_results, enable_target_feature="avx2")
+_mm256_extract_epi16 :: #force_inline proc "c" (a: __m256i, $INDEX: i32) -> i32 where 0 <= INDEX, INDEX < 16 {
+	return cast(i32)simd.extract(transmute(simd.u16x16)a, uint(INDEX))
+}
+
+// Extract 128 bits (composed of integer data) from `a`, selected with `imm8`, and store the result in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_extracti128_si256)
+@(require_results, enable_target_feature="avx2")
+_mm256_extracti128_si256 :: #force_inline proc "c" (a: __m256i, $IMM8: i32) -> __m128i where 0 <= IMM8, IMM8 < 2 {
+	return simd.shuffle(
+		a,
+		__m256i(0),
+		[2]int {0, 2}[u32(IMM8)],
+		[2]int {1, 3}[u32(IMM8)],
+	)
+}
+
+// Copy `a` to `dst`, then insert 128 bits (composed of integer data) from `b` into `dst` at the location specified by `imm8`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_inserti128_si256)
+@(require_results, enable_target_feature="avx,avx2")
+_mm256_inserti128_si256 :: #force_inline proc "c" (a: __m256i, b: __m128i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 2 {
+	return simd.shuffle(
+		a,
+		_mm256_castsi128_si256(b),
+		[2]int {4, 0}[u32(IMM8)],
+		[2]int {5, 1}[u32(IMM8)],
+		[2]int {2, 4}[u32(IMM8)],
+		[2]int {3, 5}[u32(IMM8)],
+	)
+}
+
+// Sign extend packed 8-bit integers in `a` to packed 16-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi8_epi16)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepi8_epi16 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	return transmute(__m256i)(cast(simd.i16x16)(transmute(simd.i8x16)a))
+}
+
+// Sign extend the lower eight signed 8-bit integers in `a` to packed 32-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi8_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepi8_epi32 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	b := simd.shuffle(
+		transmute(simd.i8x16)a,
+		transmute(simd.i8x16)a,
+		0, 1, 2, 3, 4, 5, 6, 7,
+	)
+	return transmute(__m256i)(cast(simd.i32x8)b)
+}
+
+// Sign extend the lower four signed 8-bit integers in `a` to packed 64-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi8_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepi8_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	b := simd.shuffle(
+		transmute(simd.i8x16)a,
+		transmute(simd.i8x16)a,
+		0, 1, 2, 3,
+	)
+	return transmute(__m256i)(cast(simd.i64x4)b)
+}
+
+// Zero extend packed unsigned 8-bit integers in `a` to packed 16-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepu8_epi16)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepu8_epi16 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	return transmute(__m256i)(cast(simd.u16x16)(transmute(simd.u8x16)a))
+}
+
+// Zero extend the lower eight unsigned 8-bit integers in `a` to packed 32-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepu8_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepu8_epi32 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	b := simd.shuffle(
+		transmute(simd.u8x16)a,
+		transmute(simd.u8x16)a,
+		0, 1, 2, 3, 4, 5, 6, 7,
+	)
+	return transmute(__m256i)(cast(simd.u32x8)b)
+}
+
+// Zero extend the lower four unsigned 8-bit integers in `a` to packed 64-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepu8_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepu8_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	b := simd.shuffle(
+		transmute(simd.u8x16)a,
+		transmute(simd.u8x16)a,
+		0, 1, 2, 3,
+	)
+	return transmute(__m256i)(cast(simd.u64x4)b)
+}
+
+// Sign extend packed 16-bit integers in `a` to packed 32-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi16_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepi16_epi32 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	return transmute(__m256i)(cast(simd.i32x8)(transmute(simd.i16x8)a))
+}
+
+// Sign extend the lower four signed 16-bit integers in `a` to packed 64-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi16_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepi16_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	b := simd.shuffle(
+		transmute(simd.i16x8)a,
+		transmute(simd.i16x8)a,
+		0, 1, 2, 3,
+	)
+	return transmute(__m256i)(cast(simd.i64x4)b)
+}
+
+// Zero extend packed unsigned 16-bit integers in `a` to packed 32-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepu16_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepu16_epi32 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	return transmute(__m256i)(cast(simd.u32x8)(transmute(simd.u16x8)a))
+}
+
+// Zero extend the lower four unsigned 16-bit integers in `a` to packed 64-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepu16_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepu16_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	b := simd.shuffle(
+		transmute(simd.u16x8)a,
+		transmute(simd.u16x8)a,
+		0, 1, 2, 3,
+	)
+	return transmute(__m256i)(cast(simd.u64x4)b)
+}
+
+// Sign extend packed 32-bit integers in `a` to packed 64-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi32_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepi32_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	return transmute(__m256i)(cast(simd.i64x4)(transmute(simd.i32x4)a))
+}
+
+// Zero extend packed unsigned 32-bit integers in `a` to packed 64-bit integers, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepu32_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_cvtepu32_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
+	return transmute(__m256i)(cast(simd.u64x4)(transmute(simd.u32x4)a))
+}
+
+// Multiply packed signed 16-bit integers in `a` and `b`, producing intermediate signed 32-bit integers.
+// Horizontally add adjacent pairs of intermediate 32-bit integers, and pack the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_madd_epi16)
+@(require_results, enable_target_feature="avx2")
+_mm256_madd_epi16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)llvm_pmaddwd(transmute(simd.i16x16)a, transmute(simd.i16x16)b)
+}
+
+// Vertically multiply each unsigned 8-bit integer from `a` with the corresponding signed 8-bit integer from `b`,
+// producing intermediate signed 16-bit integers. Horizontally add adjacent pairs of intermediate signed 16-bit integers,
+// and pack the saturated results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_maddubs_epi16)
+@(require_results, enable_target_feature="avx2")
+_mm256_maddubs_epi16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
+	return transmute(__m256i)llvm_pmaddubsw(transmute(simd.u8x32)a, transmute(simd.i8x32)b)
+}
+
+// Create mask from the most significant bit of each 8-bit element in `a`, and store the result in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_movemask_epi8)
+@(require_results, enable_target_feature="avx2")
+_mm256_movemask_epi8 :: #force_inline proc "c" (a: __m256i) -> i32 {
+	return transmute(i32)simd.extract_msbs(transmute(simd.i8x32)a)
+}
+
+// Compute the sum of absolute differences (SADs) of quadruplets of unsigned 8-bit integers in `a` compared to those in `b`,
+// and store the 16-bit results in `dst`. Eight SADs are performed for each 128-bit lane using one quadruplet from `b` and
+// eight quadruplets from `a`. One quadruplet is selected from `b` starting at on the offset specified in `imm8`.
+// Eight quadruplets are formed from sequential 8-bit integers selected from `a` starting at the offset specified in `imm8`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mpsadbw_epu8)
+@(require_results, enable_target_feature="avx2")
+_mm256_mpsadbw_epu8 :: #force_inline proc "c" (a, b: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	return transmute(__m256i)llvm_mpsadbw(
+		transmute(simd.u8x32)a,
+		transmute(simd.u8x32)b,
+		transmute(i8)(cast(u8)IMM8),
+	)
+}
+
+// Shuffle 128-bits (composed of integer data) selected by `imm8` from `a` and `b`, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_permute2x128_si256)
+@(require_results, enable_target_feature="avx2")
+_mm256_permute2x128_si256 :: #force_inline proc "c" (a, b: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	c := simd.shuffle(
+		a,
+		b,
+		2 * ((u32(IMM8) & 0xf) & 0b11) + 0,
+		2 * ((u32(IMM8) & 0xf) & 0b11) + 1,
+		2 * (((u32(IMM8) & 0xf0) >> 4) & 0b11) + 0,
+		2 * (((u32(IMM8) & 0xf0) >> 4) & 0b11) + 1,
+	)
+	return simd.shuffle(
+		c,
+		__m256i(0),
+		4 when ((u32(IMM8) & 0xf) & 0b1000) != 0 else 0,
+		4 when ((u32(IMM8) & 0xf) & 0b1000) != 0 else 1,
+		4 when (((u32(IMM8) & 0xf0) >> 4) & 0b1000) != 0 else 2,
+		4 when (((u32(IMM8) & 0xf0) >> 4) & 0b1000) != 0 else 3,
+	)
+}
+
+// Shuffle 64-bit integers in `a` across lanes using the control in `imm8`, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_permute4x64_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_permute4x64_epi64 :: #force_inline proc "c" (a: __m256i, $IMM8: i32) -> __m256i where 0 <= IMM8, IMM8 < 256 {
+	return simd.shuffle(
+		a,
+		__m256i(0),
+		(u32(IMM8) & 0b11),
+		(u32(IMM8) >> 2) & 0b11,
+		(u32(IMM8) >> 4) & 0b11,
+		(u32(IMM8) >> 6) & 0b11,
+	)
+}
+
+// Shuffle double-precision (64-bit) floating-point elements in `a` across lanes using the control in `imm8`, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_permute4x64_pd)
+@(require_results, enable_target_feature="avx2")
+_mm256_permute4x64_pd :: #force_inline proc "c" (a: __m256d, $IMM8: i32) -> __m256d where 0 <= IMM8, IMM8 < 256 {
+	return simd.shuffle(
+		a,
+		__m256d(0),
+		(u32(IMM8) & 0b11),
+		(u32(IMM8) >> 2) & 0b11,
+		(u32(IMM8) >> 4) & 0b11,
+		(u32(IMM8) >> 6) & 0b11,
+	)
+}
+
+// Shuffle 32-bit integers in `a` across lanes using the corresponding index in `idx`, and store the results in `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_permutevar8x32_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_permutevar8x32_epi32 :: #force_inline proc "c" (a: __m256i, idx: __m256i) -> __m256i {
+	return transmute(__m256i)llvm_permd(transmute(simd.u32x8)a, transmute(simd.u32x8)idx)
+}
+
+// Shuffle single-precision (32-bit) floating-point elements in `a` across lanes using the corresponding index in `idx`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_permutevar8x32_ps)
+@(require_results, enable_target_feature="avx2")
+_mm256_permutevar8x32_ps :: #force_inline proc "c" (a: __m256, idx: __m256i) -> __m256 {
+	return llvm_permps(a, transmute(simd.i32x8)idx)
+}
+
+// Load packed 32-bit integers from memory into `dst` using `mask`
+// (elements are zeroed out when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_maskload_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm_maskload_epi32 :: #force_inline proc "c" (mem_addr: ^i32, mask: __m128i) -> __m128i {
+	m := simd.shr(transmute(simd.i32x4)mask, simd.u32x4(31))
+	return transmute(__m128i)simd.masked_load(mem_addr, simd.i32x4(0), m)
+}
+
+// Load packed 32-bit integers from memory into `dst` using `mask`
+// (elements are zeroed out when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_maskload_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_maskload_epi32 :: #force_inline proc "c" (mem_addr: ^i32, mask: __m256i) -> __m256i {
+	m := simd.shr(transmute(simd.i32x8)mask, simd.u32x8(31))
+	return transmute(__m256i)simd.masked_load(mem_addr, simd.i32x8(0), m)
+}
+
+// Load packed 64-bit integers from memory into `dst` using `mask`
+// (elements are zeroed out when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_maskload_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm_maskload_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m128i) -> __m128i {
+	m := simd.shr(transmute(simd.i64x2)mask, simd.u64x2(63))
+	return transmute(__m128i)simd.masked_load(mem_addr, simd.i64x2(0), m)
+}
+
+// Load packed 64-bit integers from memory into `dst` using `mask`
+// (elements are zeroed out when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_maskload_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_maskload_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m256i) -> __m256i {
+	m := simd.shr(transmute(simd.i64x4)mask, simd.u64x4(63))
+	return transmute(__m256i)simd.masked_load(mem_addr, simd.i64x4(0), m)
+}
+
+// Store packed 32-bit integers from `a` into memory using `mask`
+// (elements are not stored when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_maskstore_epi32)
+@(enable_target_feature="avx2")
+_mm_maskstore_epi32 :: #force_inline proc "c" (mem_addr: ^i32, mask: __m128i, a: __m128i) {
+	m := simd.shr(transmute(simd.i32x4)mask, simd.u32x4(31))
+	simd.masked_store(mem_addr, transmute(simd.i32x4)a, m)
+}
+
+// Store packed 32-bit integers from `a` into memory using `mask`
+// (elements are not stored when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_maskstore_epi32)
+@(enable_target_feature="avx2")
+_mm256_maskstore_epi32 :: #force_inline proc "c" (mem_addr: ^i32, mask: __m256i, a: __m256i) {
+	m := simd.shr(transmute(simd.i32x8)mask, simd.u32x8(31))
+	simd.masked_store(mem_addr, transmute(simd.i32x8)a, m)
+}
+
+// Store packed 64-bit integers from `a` into memory using `mask`
+// (elements are not stored when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_maskstore_epi64)
+@(enable_target_feature="avx2")
+_mm_maskstore_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m128i, a: __m128i) {
+	m := simd.shr(transmute(simd.i64x2)mask, simd.u64x2(63))
+	simd.masked_store(mem_addr, transmute(simd.i64x2)a, m)
+}
+
+// Store packed 64-bit integers from `a` into memory using `mask`
+// (elements are not stored when the highest bit is not set in the corresponding element).
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_maskstore_epi64)
+@(enable_target_feature="avx2")
+_mm256_maskstore_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m256i, a: __m256i) {
+	m := simd.shr(transmute(simd.i64x4)mask, simd.u64x4(63))
+	simd.masked_store(mem_addr, transmute(simd.i64x4)a, m)
+}
+
 @(private, default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.x86.avx2.psign.b")    llvm_psignb   :: proc(a: simd.i8x32, b: simd.i8x32) -> simd.i8x32 ---
-	@(link_name="llvm.x86.avx2.psign.w")    llvm_psignw   :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psign.d")    llvm_psignd   :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.pmul.hr.sw") llvm_pmulhrsw :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.packsswb")   llvm_packsswb :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i8x32 ---
-	@(link_name="llvm.x86.avx2.packssdw")   llvm_packssdw :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.packuswb")   llvm_packuswb :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.u8x32 ---
-	@(link_name="llvm.x86.avx2.packusdw")   llvm_packusdw :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.u16x16 ---
-	@(link_name="llvm.x86.avx2.psad.bw")    llvm_psadbw   :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u64x4 ---
-	@(link_name="llvm.x86.avx2.pshuf.b")    llvm_pshufb   :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u8x32 ---
-	@(link_name="llvm.x86.avx2.psll.w")     llvm_psllw    :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psll.d")     llvm_pslld    :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.psll.q")     llvm_psllq    :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
-	@(link_name="llvm.x86.avx2.psrl.w")     llvm_psrlw    :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psrl.d")     llvm_psrld    :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.psrl.q")     llvm_psrlq    :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
-	@(link_name="llvm.x86.avx2.psra.w")     llvm_psraw    :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psra.d")     llvm_psrad    :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.psign.b")     llvm_psignb    :: proc(a: simd.i8x32, b: simd.i8x32) -> simd.i8x32 ---
+	@(link_name="llvm.x86.avx2.psign.w")     llvm_psignw    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psign.d")     llvm_psignd    :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.pmul.hr.sw")  llvm_pmulhrsw  :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.packsswb")    llvm_packsswb  :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i8x32 ---
+	@(link_name="llvm.x86.avx2.packssdw")    llvm_packssdw  :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.packuswb")    llvm_packuswb  :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.u8x32 ---
+	@(link_name="llvm.x86.avx2.packusdw")    llvm_packusdw  :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.u16x16 ---
+	@(link_name="llvm.x86.avx2.psad.bw")     llvm_psadbw    :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u64x4 ---
+	@(link_name="llvm.x86.avx2.pshuf.b")     llvm_pshufb    :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u8x32 ---
+	@(link_name="llvm.x86.avx2.psll.w")      llvm_psllw     :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psll.d")      llvm_pslld     :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.psll.q")      llvm_psllq     :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
+	@(link_name="llvm.x86.avx2.psrl.w")      llvm_psrlw     :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psrl.d")      llvm_psrld     :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.psrl.q")      llvm_psrlq     :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
+	@(link_name="llvm.x86.avx2.psra.w")      llvm_psraw     :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psra.d")      llvm_psrad     :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.pmadd.wd")    llvm_pmaddwd   :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.pmadd.ub.sw") llvm_pmaddubsw :: proc(a: simd.u8x32, b: simd.i8x32) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.mpsadbw")     llvm_mpsadbw   :: proc(a: simd.u8x32, b: simd.u8x32, imm8: i8) -> simd.u16x16 ---
+	@(link_name="llvm.x86.avx2.permd")       llvm_permd     :: proc(a: simd.u32x8, b: simd.u32x8) -> simd.u32x8 ---
+	@(link_name="llvm.x86.avx2.permps")      llvm_permps    :: proc(a: simd.f32x8, b: simd.i32x8) -> simd.f32x8 ---
 }
