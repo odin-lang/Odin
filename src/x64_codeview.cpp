@@ -29,7 +29,6 @@ enum : u16 {
 	XCV_S_END         = 0x0006,
 	XCV_S_FRAMEPROC   = 0x1012,
 	XCV_S_OBJNAME     = 0x1101,
-	XCV_S_REGISTER    = 0x1106,
 	XCV_S_CONSTANT    = 0x1107,
 	XCV_S_LDATA32     = 0x110c,
 	XCV_S_GDATA32     = 0x110d,
@@ -39,6 +38,8 @@ enum : u16 {
 	XCV_S_GPROC32     = 0x1110,
 	XCV_S_BLOCK32     = 0x1103,
 	XCV_S_COMPILE3    = 0x113c,
+	XCV_S_LOCAL       = 0x113e,
+	XCV_S_DEFRANGE_REGISTER = 0x1141,
 
 	XCV_DEBUG_S_SYMBOLS    = 0xf1,
 	XCV_DEBUG_S_LINES      = 0xf2,
@@ -47,6 +48,7 @@ enum : u16 {
 
 	XCV_PROP_FWDREF        = 0x80,
 	XCV_PROP_HASUNIQUENAME = 0x200,
+	XCV_LVARFLAG_ISPARAM   = 0x1,
 
 	XCV_AMD64_RBP = 334,
 };
@@ -764,11 +766,21 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 				return;
 			}
 			if (v.in_reg) {
-				at = xb_cv_sym_begin(b, XCV_S_REGISTER);
+				// S_LOCAL with def ranges rather than S_REGISTER, which the RAD Debugger ignores
+				at = xb_cv_sym_begin(b, XCV_S_LOCAL);
 				xbb_u32(b, type_of(v.type, false));
-				xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
+				xbb_u16(b, v.is_param ? XCV_LVARFLAG_ISPARAM : 0);
 				xb_cv_name(b, v.name);
 				xb_cv_sym_end(b, at);
+				// in the register throughout, in ranges of at most 0xffff bytes
+				for (u32 lo = 0; lo < len; lo += 0xffff) {
+					at = xb_cv_sym_begin(b, XCV_S_DEFRANGE_REGISTER);
+					xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
+					xbb_u16(b, 0); // not may-be-available
+					xb_cv_addr(w, b, -1, pd.start + lo);
+					xbb_u16(b, cast(u16)gb_min(len - lo, 0xffffu));
+					xb_cv_sym_end(b, at);
+				}
 				return;
 			}
 			at = xb_cv_sym_begin(b, XCV_S_REGREL32);
