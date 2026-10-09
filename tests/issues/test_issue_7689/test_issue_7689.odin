@@ -1,3 +1,8 @@
+// Tests debug source locations in if-else chains.
+//
+// NOTE: This is an interactive, manual test.
+//       Run it in the debugger and single-step through. Control flow
+//       should make sense for any value of `x`.
 package test_issue_7689
 
 import "core:fmt"

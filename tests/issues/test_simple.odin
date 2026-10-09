@@ -28,8 +28,10 @@ package tests_issues
 @(require) import "test_issue_6396"
 @(require) import "test_pr_6470"
 @(require) import "test_issue_6753"
+@(require) import "test_issue_6853"
 @(require) import "test_issue_6951_5214"
 @(require) import "test_issue_7008"
+@(require) import "test_issue_7089"
 @(require) import "test_issue_7316"
 @(require) import "test_issue_7336"
 @(require) import "test_issue_7356"
@@ -60,5 +62,6 @@ package tests_issues
 @(require) import "test_issue_poly_using_subtype"
 @(require) import "test_issue_global_proc_lits"
 @(require) import "test_issue_packed_field_by_value"
+@(require) import "test_issue_paren_poly_callee"
 @(require) import "test_issue_procedure_of_specialized"
 

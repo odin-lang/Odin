@@ -216,8 +216,6 @@ else
 	exit 1
 fi
 
-$ODIN test ../test_issue_7598 $COMMON
-
 if [[ $($ODIN build ../test_issue_7598_all_entities_checked $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
