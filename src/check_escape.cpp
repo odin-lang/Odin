@@ -39,7 +39,6 @@ enum EscapeFlowKind : u8 {
 	EscapeFlow_Invalid,
 	EscapeFlow_Value, // the pointers of the argument, or offsets of them
 	EscapeFlow_Load,  // the pointers loaded once through them
-	EscapeFlow_Deep,  // the pointers loaded more than once through them
 };
 
 enum EscapeFlowTargetKind : u8 {
@@ -2041,9 +2040,6 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 					v = escape_as_pointer(v);
 				}
 			}
-			if (flow.kind == EscapeFlow_Deep) {
-				v = escape_reachable(ea, v);
-			}
 		}
 
 		// NOTE(bill): likewise when it goes somewhere of another type, e.g. all of `p^` loaded into `p.name`
@@ -2576,12 +2572,10 @@ gb_internal bool escape_param_index(TypeProc *pt, Entity *e, isize *index) {
 	return false;
 }
 
-// a flow from the parameter whose memory the origin is
 gb_internal bool escape_flow_from(TypeProc *pt, EscapeOrigin const &o, EscapeFlow *flow) {
 	switch (o.kind) {
 	case EscapeOrigin_Param:     flow->kind = EscapeFlow_Value; break;
 	case EscapeOrigin_ParamLoad: flow->kind = EscapeFlow_Load;  break;
-	case EscapeOrigin_ParamDeep: flow->kind = EscapeFlow_Deep;  break;
 	default:
 		return false;
 	}
@@ -2701,11 +2695,13 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 				continue;
 			}
 		}
-		if (flow.target == EscapeFlowTarget_Pointee &&
-		    flow.target_index == flow.param &&
-		    escape_path_eq(flow.target_path, flow.param_path)) {
-			// storing it back into the memory it came from cannot make anything outlive it
-			continue;
+		if (flow.target != EscapeFlowTarget_Outer && flow.target_index == flow.param) {
+			if (flow.kind == EscapeFlow_Load) {
+				continue;
+			}
+			if (flow.target == EscapeFlowTarget_Pointee && escape_path_eq(flow.target_path, flow.param_path)) {
+				continue;
+			}
 		}
 		escape_add_flow(ea, flow);
 	}
