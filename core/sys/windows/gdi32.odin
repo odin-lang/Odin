@@ -25,6 +25,7 @@ foreign gdi32 {
 	StretchDIBits         :: proc(hdc: HDC, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight: INT, lpBits: LPVOID, lpbmi: ^BITMAPINFO, iUsage: UINT, rop: DWORD) -> INT ---
 	StretchBlt            :: proc(hdcDest: HDC, xDest, yDest, wDest, hDest: INT, hdcSrc: HDC, xSrc, ySrc, wSrc, hSrc: INT, rop: DWORD) -> BOOL ---
 
+	GetPixelFormat      :: proc(hdc: HDC) -> INT ---
 	SetPixelFormat      :: proc(hdc: HDC, format: INT, ppfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---
 	ChoosePixelFormat   :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
 	DescribePixelFormat :: proc(hdc: HDC, iPixelFormat: INT, nBytes: UINT, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
@@ -45,6 +46,9 @@ foreign gdi32 {
 	EnumFontFamiliesExW   :: proc(hdc: HDC, lpLogfont: LPLOGFONTW, lpProc: FONTENUMPROCW, lParam: LPARAM, dwFlags: DWORD) -> INT ---
 
 	TextOutW              :: proc(hdc: HDC, x, y: INT, lpString: LPCWSTR, c: INT) -> BOOL ---
+	ExtTextOutW           :: proc(hdc: HDC, x, y: INT, options: UINT, lprect: ^RECT, lpString: LPCWSTR, c: UINT, lpDx: ^INT) -> BOOL ---
+	SetTextAlign          :: proc(hdc: HDC, align: UINT) -> UINT ---
+	GetTextAlign          :: proc(hdc: HDC) -> UINT ---
 	GetTextExtentPoint32W :: proc(hdc: HDC, lpString: LPCWSTR, c: INT, psizl: LPSIZE) -> BOOL ---
 	GetTextMetricsW       :: proc(hdc: HDC, lptm: LPTEXTMETRICW) -> BOOL ---
 
@@ -68,6 +72,7 @@ foreign gdi32 {
 	RealizePalette :: proc(hdc: HDC) -> UINT ---
 
 	SetTextColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
+	GetTextColor :: proc(hdc: HDC) -> COLORREF ---
 	SetPixel     :: proc(hdc: HDC, x: INT, y: INT, color: COLORREF) -> COLORREF ---
 
 	GdiTransparentBlt :: proc(hdcDest: HDC, xoriginDest, yoriginDest, wDest, hDest: INT, hdcSrc: HDC, xoriginSrc, yoriginSrc, wSrc, hSrc: INT, crTransparent: UINT) -> BOOL ---
@@ -83,10 +88,20 @@ foreign gdi32 {
 	Polygon     :: proc(hdc: HDC, apt: [^]POINT, cpt: c_int) -> BOOL ---
 	PolyPolygon :: proc(hdc: HDC, apt: [^]POINT, asz: [^]c_int, csz: c_int) -> BOOL ---
 
-	// Line Drawing Functions
-	MoveToEx   :: proc(hdc: HDC, x: i32, y: i32, lppt: ^POINT) -> BOOL ---
-	LineTo     :: proc(hdc: HDC, x: i32, y: i32) -> BOOL ---
+	AngleArc :: proc(hdc: HDC, x, y: INT, r: DWORD, StartAngle, SweepAngle: FLOAT) -> BOOL ---
+	Arc :: proc(hdc: HDC, x1, y1, x2, y2, x3, y3, x4, y4: INT) -> BOOL ---
+	ArcTo :: proc(hdc: HDC, left, top, right, bottom, xr1, yr1, xr2, yr2: INT) -> BOOL ---
+	GetArcDirection :: proc(hdc: HDC) -> ArcDirection ---
+	LineDDA :: proc(xStart, yStart, xEnd, yEnd: INT, lpProc: LINEDDAPROC, data: LPARAM) -> BOOL ---
+	LineTo :: proc(hdc: HDC, x, y: INT) -> BOOL ---
+	MoveToEx :: proc(hdc: HDC, x: INT, y: INT, lppt: ^POINT) -> BOOL ---
+	PolyBezier :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
+	PolyBezierTo :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
+	PolyDraw :: proc(hdc: HDC, apt: [^]POINT, aj: ^BYTE, cpt: INT) -> BOOL ---
+	Polyline :: proc(hdc: HDC, apt: [^]POINT, cpt: INT) -> BOOL ---
 	PolylineTo :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
+	PolyPolyline :: proc(hdc: HDC, apt: [^]POINT, asz: ^DWORD, csz: DWORD) -> BOOL ---
+	SetArcDirection :: proc(hdc: HDC, dir: ArcDirection) -> INT ---
 }
 
 @(require_results)
@@ -156,24 +171,6 @@ BKMODE :: enum {
 	TRANSPARENT = 1,
 	OPAQUE      = 2,
 }
-
-ICONINFO :: struct {
-	fIcon:              BOOL,
-	xHotspot, yHotspot: DWORD,
-	hbmMask, hbmColor:  HBITMAP,
-}
-PICONINFO :: ^ICONINFO
-
-ICONINFOEXW :: struct {
-	cbSize:             DWORD,
-	fIcon:              BOOL,
-	xHotspot, yHotspot: DWORD,
-	hbmMask, hbmColor:  HBITMAP,
-	wResID:             WORD,
-	szModName:          [MAX_PATH]WCHAR,
-	szResName:          [MAX_PATH]WCHAR,
-}
-PICONINFOEXW :: ^ICONINFOEXW
 
 AC_SRC_OVER  :: 0x00
 AC_SRC_ALPHA :: 0x01
@@ -304,6 +301,32 @@ TA_BASELINE   :: 24
 TA_RTLREADING :: 256
 TA_MASK       :: (TA_BASELINE+TA_CENTER+TA_UPDATECP+TA_RTLREADING)
 
+VTA_BASELINE :: TA_BASELINE
+VTA_LEFT     :: TA_BOTTOM
+VTA_RIGHT    :: TA_TOP
+VTA_CENTER   :: TA_CENTER
+VTA_BOTTOM   :: TA_RIGHT
+VTA_TOP      :: TA_LEFT
+
+ETO_OPAQUE            :: 0x0002
+ETO_CLIPPED           :: 0x0004
+ETO_GLYPH_INDEX       :: 0x0010
+ETO_RTLREADING        :: 0x0080
+ETO_NUMERICSLOCAL     :: 0x0400
+ETO_NUMERICSLATIN     :: 0x0800
+ETO_IGNORELANGUAGE    :: 0x1000
+ETO_PDY               :: 0x2000
+ETO_REVERSE_INDEX_MAP :: 0x10000
+
+ASPECT_FILTERING :: 0x0001
+
+DCB_RESET      :: 0x0001
+DCB_ACCUMULATE :: 0x0002
+DCB_DIRTY      :: DCB_ACCUMULATE
+DCB_SET        :: (DCB_RESET | DCB_ACCUMULATE)
+DCB_ENABLE     :: 0x0004
+DCB_DISABLE    :: 0x0008
+
 MM_MAX_NUMAXES :: 16
 DESIGNVECTOR :: struct {
 	dvReserved: DWORD,
@@ -379,3 +402,22 @@ NEWTEXTMETRICW :: struct {
 }
 
 FONTENUMPROCW :: #type proc "system" (lpelf: ^ENUMLOGFONTW, lpntm: ^NEWTEXTMETRICW, FontType: DWORD, lParam: LPARAM) -> INT
+
+ArcDirection :: enum INT {
+	// Arcs and rectangles are drawn counterclockwise.
+	AD_COUNTERCLOCKWISE = 1,
+	// Arcs and rectangles are drawn clockwise.
+	AD_CLOCKWISE = 2,
+}
+
+LINEDDAPROC :: #type proc(x, y: INT, lpData: LPARAM)
+
+DISPLAY_DEVICEW :: struct {
+	cb:           DWORD,
+	DeviceName:   [32]WCHAR,
+	DeviceString: [128]WCHAR,
+	StateFlags:   DWORD,
+	DeviceID:     [128]WCHAR,
+	DeviceKey:    [128]WCHAR,
+}
+PDISPLAY_DEVICEW :: ^DISPLAY_DEVICEW

@@ -25,8 +25,8 @@ expect_value_64 :: proc(t: ^testing.T, #any_int act: u64, #any_int exp: u64, loc
 }
 
 @(private)
-expect_value_int :: proc(t: ^testing.T, act, exp: int, loc := #caller_location) {
-	expectf(t, act == exp, "0x%8X (should be: 0x%8X)", act, exp, loc = loc)
+expect_value_int :: proc(t: ^testing.T, #any_int act, exp: int, loc := #caller_location) {
+	expectf(t, act == exp, "%d (should be: %d)", act, exp, loc = loc)
 }
 
 @(private)
@@ -43,4 +43,17 @@ expect_value_str :: proc(t: ^testing.T, wact, wexp: win32.wstring, loc := #calle
 	exp, err = win32.wstring_to_utf8(wexp, 16)
 	expectf(t, err == .None, "0x%8X (should be: 0x%8X)", err, 0, loc = loc)
 	expectf(t, act == exp, "0x%8X (should be: 0x%8X)", act, exp, loc = loc)
+}
+
+@(private)
+expect_flags :: proc(t: ^testing.T, bs: $T, #any_int exp: uint, loc := #caller_location) where intrinsics.type_is_bit_set(T) {
+	when size_of(T) == 4 {
+		act: u32 = transmute(u32)transmute(T)bs
+		expectf(t, act == u32(exp), "0x%8X (should be: 0x%8X)", act, u32(exp), loc = loc)
+	} else when size_of(T) == 8 {
+		act: u64 = transmute(u64)transmute(T)bs
+		expectf(t, act == u64(exp), "0x%16X (should be: 0x%16X)", act, u64(exp), loc = loc)
+	} else {
+		#panic("Unhandled expect_flags bit_set size")
+	}
 }

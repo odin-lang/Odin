@@ -30,7 +30,7 @@ foreign user32 {
 	IsChild :: proc(hWndParent, hWnd: HWND) -> BOOL ---
 
 	RegisterClassW   :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
-	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
+	RegisterClassExW :: proc(lpWndClassEx: ^WNDCLASSEXW) -> ATOM ---
 	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
 	RegisterHotKey :: proc(hnwd: HWND, id: c_int, fsModifiers: UINT, vk: UINT) -> BOOL ---
@@ -110,6 +110,7 @@ foreign user32 {
 
 	LoadIconA      :: proc(hInstance: HINSTANCE, lpIconName: LPCSTR) -> HICON ---
 	LoadIconW      :: proc(hInstance: HINSTANCE, lpIconName: LPCWSTR) -> HICON ---
+	GetIconInfo    :: proc(hIcon: HICON, piconinfo: PICONINFO) -> BOOL ---
 	GetIconInfoExW :: proc(hIcon: HICON, piconinfo: PICONINFOEXW) -> BOOL ---
 	LoadCursorA    :: proc(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR ---
 	LoadCursorW    :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
@@ -154,6 +155,8 @@ foreign user32 {
 	AppendMenuW            :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
 	GetMenu                :: proc(hWnd: HWND) -> HMENU ---
 	SetMenu                :: proc(hWnd: HWND, hMenu: HMENU) -> BOOL ---
+	GetMenuInfo            :: proc(hMenu: HMENU, lpMenuInfo: LPMENUINFO) -> BOOL ---
+	SetMenuInfo            :: proc(hMenu: HMENU, lpMenuInfo: LPMENUINFO) -> BOOL ---
 	TrackPopupMenu         :: proc(hMenu: HMENU, uFlags: UINT, x, y: INT, nReserved: INT, hWnd: HWND, prcRect: ^RECT) -> INT ---
 	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
 
@@ -489,9 +492,9 @@ RAWHID :: struct {
 
 RAWMOUSE :: struct {
 	usFlags: USHORT,
-	using DUMMYUNIONNAME: struct #raw_union {
+	using _: struct #raw_union {
 		ulButtons: ULONG,
-		using DUMMYSTRUCTNAME: struct {
+		using _: struct {
 			usButtonFlags: USHORT,
 			usButtonData: USHORT,
 		},
@@ -659,6 +662,31 @@ CURSORINFO :: struct {
 }
 PCURSORINFO :: ^CURSORINFO
 
+CURSORSHAPE :: struct {
+	xHotSpot, yHotSpot: INT,
+	cx, cy: INT,
+	cbWidth: INT,
+	Planes: BYTE,
+	BitsPixel: BYTE,
+}
+
+ICONINFO :: struct {
+	fIcon: BOOL,
+	xHotspot, yHotspot: DWORD,
+	hbmMask, hbmColor: HBITMAP,
+}
+PICONINFO :: ^ICONINFO
+
+ICONINFOEXW :: struct {
+	cbSize:             DWORD,
+	fIcon:              BOOL,
+	xHotspot, yHotspot: DWORD,
+	hbmMask, hbmColor:  HBITMAP,
+	wResID:             WORD,
+	szModName:          [MAX_PATH]WCHAR,
+	szResName:          [MAX_PATH]WCHAR,
+}
+PICONINFOEXW :: ^ICONINFOEXW
 
 DRAWTEXTPARAMS :: struct {
 	cbSize:        UINT,
@@ -793,15 +821,17 @@ MENUITEMINFOW :: struct {
 	hbmpItem:      HBITMAP,      // used if MIIM_BITMAP
 }
 LPMENUITEMINFOW :: ^MENUITEMINFOW
-DISPLAY_DEVICEW :: struct {
-	cb:           DWORD,
-	DeviceName:   [32]WCHAR,
-	DeviceString: [128]WCHAR,
-	StateFlags:   DWORD,
-	DeviceID:     [128]WCHAR,
-	DeviceKey:    [128]WCHAR,
+
+MENUINFO :: struct {
+	cbSize:          DWORD,
+	fMask:           DWORD,
+	dwStyle:         DWORD,
+	cyMax:           UINT,
+	hbrBack:         HBRUSH,
+	dwContextHelpID: DWORD,
+	dwMenuData:      ULONG_PTR,
 }
-PDISPLAY_DEVICEW :: ^DISPLAY_DEVICEW
+LPMENUINFO :: ^MENUINFO
 
 // OUTOFCONTEXT is the zero value, use {}
 WinEventFlags :: distinct bit_set[WinEventFlag; DWORD]

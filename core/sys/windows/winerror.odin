@@ -187,10 +187,10 @@ FACILITY :: enum DWORD {
 	PIX                                      = 2748,
 }
 
-ERROR_SUCCESS : DWORD : 0
 NO_ERROR :: 0
-SEC_E_OK : HRESULT : 0x00000000
+SEC_E_OK : HRESULT : NO_ERROR
 
+ERROR_SUCCESS                : DWORD : 0
 ERROR_INVALID_FUNCTION       : DWORD : 1
 ERROR_FILE_NOT_FOUND         : DWORD : 2
 ERROR_PATH_NOT_FOUND         : DWORD : 3

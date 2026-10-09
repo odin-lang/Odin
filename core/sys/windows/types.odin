@@ -16,6 +16,7 @@ c_short     :: c.short
 c_ushort    :: c.ushort
 size_t      :: c.size_t
 wchar_t     :: c.wchar_t
+c_float     :: c.float
 
 DWORD           :: c_ulong
 DWORDLONG       :: c.ulonglong
@@ -86,6 +87,7 @@ LSTATUS         :: LONG
 PHKEY           :: ^HKEY
 PUSHORT         :: ^USHORT
 PCHAR           :: ^CHAR
+FLOAT           :: c_float
 
 UINT8  ::  u8
 UINT16 :: u16
@@ -1922,7 +1924,7 @@ WS_SYSMENU          : UINT : 0x0008_0000
 WS_TABSTOP          : UINT : 0x0001_0000
 WS_THICKFRAME       : UINT : 0x0004_0000
 WS_TILED            : UINT : 0x0000_0000
-WS_TILEDWINDOW      : UINT : WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE
+WS_TILEDWINDOW      : UINT : WS_OVERLAPPEDWINDOW
 WS_VISIBLE          : UINT : 0x1000_0000
 WS_VSCROLL          : UINT : 0x0020_0000
 
@@ -2605,6 +2607,21 @@ BITMAP :: struct {
 	bmBitsPixel:  WORD,
 	bmBits:       LPVOID,
 }
+
+BITMAPFILEHEADER :: struct #max_field_align(2) {
+	// The file type; must be 0x4d42 (the ASCII string "BM").
+	bfType: WORD,
+	// The size, in bytes, of the bitmap file.
+	bfSize: DWORD,
+	// Reserved; must be zero.
+	bfReserved1: WORD,
+	// Reserved; must be zero.
+	bfReserved2: WORD,
+	// The offset, in bytes, from the beginning of the BITMAPFILEHEADER structure to the bitmap bits.
+	bfOffBits: DWORD,
+}
+
+BITMAPFILEHEADER_TYPE : WORD : 0x4d42 // the ASCII string "BM"
 
 // pixel types
 PFD_TYPE_RGBA       :: 0

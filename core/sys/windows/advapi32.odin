@@ -225,6 +225,8 @@ foreign advapi32 {
 		GrantedAccess: LPDWORD,
 		AccessStatus: LPBOOL,
 	) -> BOOL ---
+
+	GetUserNameW :: proc(lpBuffer: LPWSTR, pcbBuffer: LPDWORD) -> BOOL ---
 }
 
 PTOKEN_INFORMATION_CLASS :: ^TOKEN_INFORMATION_CLASS
