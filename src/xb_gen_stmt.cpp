@@ -4356,7 +4356,9 @@ gb_internal void xb_begin_proc(xbProc *p) {
 					xb_memcopy(p, m, xb_mem(xbMem_Reg, xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)l)), 0), sz);
 					xbVar v = {m, false};
 					map_set(&p->vars, e, v);
-					if (named) xb_add_debug_var(p, e, m, false, true);
+					// Debuggers take a Win64 parameter over 8 bytes to be behind a pointer, so
+					// describe it through the incoming one, like LLVM; the copy is the same value
+					if (named) xb_add_debug_var(p, e, xb_mem(xbMem_Local, cast(u32)l), true, true);
 				} else {
 					xbVar v = {xb_mem(xbMem_Local, cast(u32)l), true};
 					map_set(&p->vars, e, v);
