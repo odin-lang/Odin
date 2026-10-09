@@ -481,6 +481,7 @@ enum xbRelocKind : u8 {
 	xbReloc_GOTTPOFF,
 	xbReloc_TLSGD,
 	xbReloc_SecRel32,   // COFF: offset from the start of the symbol's section
+	xbReloc_TLV,        // x86-64 Mach-O: the address of a thread local's descriptor
 	// arm64 Mach-O, the immediate fields are filled in by the linker
 	xbReloc_A64_Branch26,     // bl
 	xbReloc_A64_Page21,       // adrp of the symbol's page
@@ -494,6 +495,7 @@ enum xbRelocKind : u8 {
 struct xbReloc {
 	xbSection   section;
 	xbRelocKind kind;
+	u8          tail;   // rip relative: the immediate bytes after the field, which x86-64 Mach-O encodes
 	i64         offset;
 	i32         sym;
 	i64         addend;
@@ -644,6 +646,10 @@ gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch);
 gb_internal xbOpnd xb_win64_import_opnd(xbLower *L, xbMem const &m, u8 scratch);
 gb_internal bool xb_write_coff(xbModule *m, String path);
 
+// macOS (xb_macho.cpp)
+gb_internal bool xb_is_darwin(void);
+gb_internal bool xb_write_macho(xbModule *m, String path);
+
 // macOS arm64 (a64_*.cpp)
 gb_internal bool xb_is_arm64(void);
 gb_internal bool xb_can_compile_procs(void);
@@ -651,7 +657,6 @@ gb_internal xbAbiFunc *a64_abi_compute(Type *proc_type, char const **reason);
 gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index);
 gb_internal void a64_check_proc(xbProc *p);
 gb_internal void a64_lower_proc(xbProc *p);
-gb_internal bool a64_write_macho(xbModule *m, String path);
 gb_internal i32 a64_vec_intrinsic_index(String name, isize *args);
 
 // A bump allocator for everything that only lives while one procedure family is

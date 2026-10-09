@@ -26,7 +26,7 @@
 #include "a64_abi.cpp"
 #include "a64_encode.cpp"
 #include "a64_lower.cpp"
-#include "a64_macho.cpp"
+#include "xb_macho.cpp"
 
 gb_global xbModule *xb_module = nullptr;
 gb_global f64 xb_time_build = 0;
@@ -529,8 +529,8 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		bool ok = false;
 		if (xb_is_win64()) {
 			ok = xb_write_coff(m, m->object_path);
-		} else if (xb_is_arm64()) {
-			ok = a64_write_macho(m, m->object_path);
+		} else if (xb_is_darwin()) {
+			ok = xb_write_macho(m, m->object_path);
 		} else {
 			ok = xb_write_object(m, m->object_path);
 		}

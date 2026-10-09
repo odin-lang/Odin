@@ -109,6 +109,7 @@ gb_internal void xb_enc_modrm(xbAsm *a, u8 reg, xbOpnd rm, i32 imm_size, i32 dis
 		GB_ASSERT(rm.sym >= 0);
 		// rip points past the immediate when there is one
 		xb_add_reloc(a->m, xbSection_Text, rm.reloc, at, rm.sym, cast(i64)rm.disp - 4 - imm_size);
+		a->m->relocs[a->m->relocs.count-1].tail = cast(u8)imm_size;
 		return;
 	}
 	u8 base = rm.reg & 7;

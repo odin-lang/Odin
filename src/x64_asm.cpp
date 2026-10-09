@@ -32,7 +32,7 @@ struct xbAsmOpnd {
 };
 
 gb_internal bool xb_asm_target_ok(void) {
-	return build_context.metrics.arch == TargetArch_amd64 && build_context.metrics.os == TargetOs_linux;
+	return build_context.metrics.arch == TargetArch_amd64 && (build_context.metrics.os == TargetOs_linux || build_context.metrics.os == TargetOs_darwin);
 }
 
 gb_internal char const *xb_asm_reason(char const *what, String name) {

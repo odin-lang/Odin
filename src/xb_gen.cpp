@@ -1394,6 +1394,11 @@ gb_internal bool xb_is_f16(Type *t) {
 
 gb_internal xbValue xb_byte_swap_any(xbProc *p, xbValue v, Type *t);
 
+// Without LLVM's f16 support the runtime's helpers pass the bits as a u16, see __ODIN_LLVM_F16_SUPPORTED.
+gb_internal bool xb_f16_helpers_take_bits(void) {
+	return xb_is_darwin() && build_context.metrics.arch == TargetArch_amd64;
+}
+
 gb_internal xbValue xb_f16_to_f32(xbProc *p, xbValue v) {
 	if (is_type_different_to_arch_endianness(v.type)) v = xb_byte_swap_any(p, v, t_f16);
 	v.type = t_f16;
@@ -1403,6 +1408,9 @@ gb_internal xbValue xb_f16_to_f32(xbProc *p, xbValue v) {
 		return xb_value_reg(t_f32, xb_convop(p, xbOp_HalfToF, xbType_F32, xbType_I16, bits));
 	}
 	xbValue args[1] = {v};
+	if (xb_f16_helpers_take_bits()) {
+		args[0] = xb_value_reg(t_u16, xb_load(p, xbType_I16, xb_value_to_mem(p, v)));
+	}
 	xbValue r = xb_emit_runtime_call(p, "extendhfsf2", xb_args(args, 1));
 	return xb_value_reg(t_f32, xb_value_to_reg(p, r));
 }
@@ -1421,6 +1429,11 @@ gb_internal xbValue xb_float_to_f16(xbProc *p, xbValue v, Type *t) {
 	}
 	xbValue args[1] = {v};
 	xbValue r = xb_emit_runtime_call(p, st == xbType_F64 ? "truncdfhf2" : "truncsfhf2", xb_args(args, 1));
+	if (xb_f16_helpers_take_bits()) {
+		xbMem m = xb_add_local(p, t, false);
+		xb_store(p, xbType_I16, m, xb_value_to_reg(p, r));
+		return xb_value_mem(t, m);
+	}
 	r = xb_value_copy_to_temp(p, r);
 	r.type = t;
 	return r;

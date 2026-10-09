@@ -877,7 +877,7 @@ gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbDwa
 	xbDwarfAddr r = {b->count, sym, 0};
 	array_add(addrs, r);
 	xbb_u64(b, 0);
-	if (tls) xbb_u8(b, xb_is_arm64() ? XDW_OP_form_tls_address : XDW_OP_GNU_push_tls_address);
+	if (tls) xbb_u8(b, xb_is_darwin() ? XDW_OP_form_tls_address : XDW_OP_GNU_push_tls_address);
 }
 
 gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {

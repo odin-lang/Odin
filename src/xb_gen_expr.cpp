@@ -492,7 +492,7 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 // A thread local's storage. An executable reaches it from the thread pointer (initial exec),
 // anything else may be loaded with dlopen, so it asks __tls_get_addr (general dynamic) like LLVM.
 gb_internal xbMem xb_tls_mem(xbProc *p, i32 sym) {
-	if (xb_is_arm64()) {
+	if (xb_is_darwin()) {
 		// macOS calls the variable's TLV descriptor in every build mode
 		xbInstr in = xb_instr(xbOp_TlsAddr);
 		in.type = xbType_I64;

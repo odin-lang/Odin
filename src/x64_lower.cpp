@@ -349,6 +349,7 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch=R11) {
 			return xb_win64_import_opnd(L, m, scratch);
 		}
 		if (s->flags & xbSymbolFlag_TLS) {
+			GB_ASSERT_MSG(!xb_is_darwin(), "thread local %.*s is reached through xbOp_TlsAddr", LIT(s->name));
 			// initial exec: the thread pointer plus the variable's offset from the GOT
 			// mov scratch, fs:[0]
 			xb_b(a, 0x64);
@@ -1669,6 +1670,13 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_lower_asm(L, p->asms[cast(isize)in.imm]);
 		break;
 	case xbOp_TlsAddr: {
+		if (xb_is_darwin()) {
+			// mov rdi, [rip + sym@TLVP]; call [rdi], the descriptor's getter returns the address in rax
+			xb_enc(a, XB_W, 0x8B, RDI, xb_m_sym(cast(i32)in.imm, 0, xbReloc_TLV));
+			xb_call_rm(a, xb_m(RDI, 0));
+			x64_put(L, in.dst, RAX);
+			break;
+		}
 		// the exact general dynamic sequence, which the linker may rewrite into a cheaper model
 		xb_b(a, 0x66);
 		xb_enc(a, XB_W, 0x8D, RDI, xb_m_sym(cast(i32)in.imm, 0, xbReloc_TLSGD));

@@ -2136,10 +2136,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target, Subtarget subta
 	}
 
 	if (bc->backend == Backend_X64) {
-		bool amd64 = bc->metrics.arch == TargetArch_amd64 && (bc->metrics.os == TargetOs_linux || bc->metrics.os == TargetOs_windows);
+		bool amd64 = bc->metrics.arch == TargetArch_amd64 && (bc->metrics.os == TargetOs_linux || bc->metrics.os == TargetOs_windows || bc->metrics.os == TargetOs_darwin);
 		bool arm64 = bc->metrics.arch == TargetArch_arm64 && bc->metrics.os == TargetOs_darwin;
 		if (!amd64 && !arm64) {
-			gb_printf_err("-backend:fast is only supported for linux_amd64, windows_amd64 and darwin_arm64 for now\n");
+			gb_printf_err("-backend:fast is only supported for linux_amd64, windows_amd64, darwin_amd64 and darwin_arm64 for now\n");
 			gb_exit(1);
 		}
 		// the fast backend is a debug backend: optimized, LTO and asm/IR builds go entirely through LLVM
