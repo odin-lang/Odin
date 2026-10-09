@@ -539,7 +539,23 @@ struct xbRegPools {
 	i64  callee_weight;      // an interval lighter than this takes a callee saved register only when one is already saved
 };
 
+// What xb_alloc_regs finds about a vreg in its first pass over the instructions.
+struct xbVregFacts {
+	i64  weight;    // its spill cost: its references, each more for the loops around it
+	i32  block;     // the first block it appears in, or -1
+	i32  defs;      // the instructions writing it
+	i32  def_pos;   // the position of the first, or -1
+	i32  first_use; // the positions of the first and last read, or -1
+	i32  last_use;
+	i32  def_block; // the block of the latest write so far, or -1
+	i8   want;      // the argument register a call reads it from, XB_NOREG, or -2 for several
+	bool multi;     // it appears in more than one block
+	bool pinned;    // it must stay in its slot
+	bool cross;     // a read is in another block than the latest write before it
+};
+
 struct xbRegAlloc {
+	Array<xbVregFacts> facts;
 	Array<i32> uses;      // vreg -> number of reads
 	Array<i8>  reg;       // vreg -> the register holding it for its whole life, or XB_NOREG
 	Array<u8>  is_const;  // vreg -> defined once by an int IConst, materialized at its uses
@@ -568,6 +584,7 @@ gb_internal void xb_reg_alloc_free(xbRegAlloc *R) {
 	array_free(&R->remat);
 	array_free(&R->rmem);
 	array_free(&R->slot);
+	array_free(&R->facts);
 }
 
 // Gives registers to the vregs and promotable locals of p. The target tells:
@@ -600,40 +617,25 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		if (in.loc == xbLoc_Gpr || in.loc == xbLoc_Xmm) arrive[in.dst.base] = cast(i8)in.reg;
 	}
 
-	auto block = array_make<i32>(xb_allocator(), vreg_count);
-	auto defs = array_make<i32>(xb_allocator(), vreg_count);
-	auto def_pos = array_make<i32>(xb_allocator(), vreg_count);
-	auto first_use = array_make<i32>(xb_allocator(), vreg_count);
-	auto last_use = array_make<i32>(xb_allocator(), vreg_count);
-	auto multi = array_make<bool>(xb_allocator(), vreg_count);
-	auto def_block = array_make<i32>(xb_allocator(), vreg_count);
-	auto pinned = array_make<bool>(xb_allocator(), vreg_count);
+	// one struct per vreg: the passes over the instructions touch all of it at once
+	R->facts = array_make<xbVregFacts>(xb_allocator(), vreg_count);
+	auto &fx = R->facts;
 	auto clobbers = array_make<i32>(xb_allocator(), 0, 256); // prefix counts of target.clobbers
-	auto want = array_make<i8>(xb_allocator(), vreg_count);  // the argument register a call reads it from
-	defer (array_free(&block));
-	defer (array_free(&defs));
-	defer (array_free(&def_pos));
-	defer (array_free(&first_use));
-	defer (array_free(&last_use));
-	defer (array_free(&multi));
-	defer (array_free(&def_block));
-	defer (array_free(&pinned));
 	defer (array_free(&clobbers));
-	defer (array_free(&want));
-	for (isize i = 0; i < vreg_count; i++) {
-		block[i] = -1;
-		def_pos[i] = -1;
-		first_use[i] = -1;
-		last_use[i] = -1;
-		def_block[i] = -1;
-		want[i] = XB_NOREG;
+	for (xbVregFacts &x : fx) {
+		x.block = -1;
+		x.def_pos = -1;
+		x.first_use = -1;
+		x.last_use = -1;
+		x.def_block = -1;
+		x.want = XB_NOREG;
 	}
 	auto note_want = [&](u32 v, i32 r) {
 		if (v == 0) return;
-		want[v] = want[v] == XB_NOREG || want[v] == r ? cast(i8)r : cast(i8)-2;
+		fx[v].want = fx[v].want == XB_NOREG || fx[v].want == r ? cast(i8)r : cast(i8)-2;
 	};
 	auto pin = [&](u32 v) {
-		if (v != 0) pinned[v] = true;
+		if (v != 0) fx[v].pinned = true;
 	};
 
 	R->uses = array_make<i32>(xb_allocator(), vreg_count);
@@ -653,9 +655,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	// The spill cost of an item: its references, each 8 times more for each loop around it;
 	// a loop is a jump back to or before its block
 	auto bweight = array_make<i64>(xb_allocator(), p->blocks.count);
-	auto vweight = array_make<i64>(xb_allocator(), vreg_count);
 	defer (array_free(&bweight));
-	defer (array_free(&vweight));
 	{
 		isize bc = p->order.count;
 		auto pos = array_make<isize>(xb_allocator(), p->blocks.count);
@@ -688,15 +688,15 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		for (xbInstr const &in : b->instrs) {
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
 				if (v == 0) return;
-				vweight[v] += bweight[b->index];
-				if (block[v] < 0) {
-					block[v] = b->index;
-				} else if (block[v] != b->index) {
-					multi[v] = true;
+				fx[v].weight += bweight[b->index];
+				if (fx[v].block < 0) {
+					fx[v].block = b->index;
+				} else if (fx[v].block != b->index) {
+					fx[v].multi = true;
 				}
 				if (is_def) {
-					if (defs[v]++ == 0) def_pos[v] = linear;
-					def_block[v] = b->index;
+					if (fx[v].defs++ == 0) fx[v].def_pos = linear;
+					fx[v].def_block = b->index;
 					if (in.op == xbOp_IConst && xb_type_is_int(p->vregs[v])) {
 						R->is_const[v] = true;
 						R->cval[v] = in.imm;
@@ -710,8 +710,9 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 					}
 				} else {
 					R->uses[v]++;
-					if (first_use[v] < 0) first_use[v] = linear;
-					last_use[v] = linear;
+					if (fx[v].first_use < 0) fx[v].first_use = linear;
+					fx[v].last_use = linear;
+					if (fx[v].def_block != b->index) fx[v].cross = true;
 				}
 			});
 			if (in.op == xbOp_Call) {
@@ -725,12 +726,12 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		}
 	}
 	for (isize v = 1; v < vreg_count; v++) {
-		if (defs[v] != 1) {
+		if (fx[v].defs != 1) {
 			R->is_const[v] = false;
 			R->clean[v] = false;
 			R->remat[v] = false;
 		}
-		R->in_block[v] = defs[v] == 1 && !multi[v] && (first_use[v] < 0 || first_use[v] > def_pos[v]);
+		R->in_block[v] = fx[v].defs == 1 && !fx[v].multi && (fx[v].first_use < 0 || fx[v].first_use > fx[v].def_pos);
 	}
 
 	// The other int and float vregs get one interval in the block order that covers every point
@@ -756,7 +757,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	for (isize v = 1; v < vreg_count; v++) {
 		gid[v] = -1;
 		xbType t = p->vregs[v];
-		if (R->in_block[v] || defs[v] == 0 || R->is_const[v] || R->remat[v] || pinned[v] || (!xb_type_is_int(t) && !xb_type_is_float(t))) continue;
+		if (R->in_block[v] || fx[v].defs == 0 || R->is_const[v] || R->remat[v] || fx[v].pinned || (!xb_type_is_int(t) && !xb_type_is_float(t))) continue;
 		gid[v] = cast(i32)gvreg.count;
 		array_add(&gvreg, cast(u32)v);
 	}
@@ -976,27 +977,27 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 				if (in.op == xbOp_Load) {
 					i32 l = local_of(in.mem);
 					u32 v = in.dst;
-					if (l < 0 || v == 0 || !R->in_block[v] || pinned[v] || R->uses[v] == 0 || last_use[v] - pos > 256 ||
+					if (l < 0 || v == 0 || !R->in_block[v] || fx[v].pinned || R->uses[v] == 0 || fx[v].last_use - pos > 256 ||
 					    xb_type_is_float(p->vregs[v]) != local_fp[l]) continue;
 					bool ok = true;
-					for (isize j = i+1; ok && j <= i + (last_use[v] - pos); j++) ok = !writes(b->instrs[j], l);
+					for (isize j = i+1; ok && j <= i + (fx[v].last_use - pos); j++) ok = !writes(b->instrs[j], l);
 					if (!ok) continue;
 					R->via[v] = l;
-					alias_end[l] = gb_max(alias_end[l], last_use[v]);
-					ghi[lgid[l]] = gb_max(ghi[lgid[l]], last_use[v]);
+					alias_end[l] = gb_max(alias_end[l], fx[v].last_use);
+					ghi[lgid[l]] = gb_max(ghi[lgid[l]], fx[v].last_use);
 				} else if (in.op == xbOp_Store) {
 					i32 l = local_of(in.mem);
 					u32 v = in.a;
-					if (l < 0 || v == 0 || !R->in_block[v] || pinned[v] || R->uses[v] != 1 || R->is_const[v] || R->remat[v] || R->via[v] >= 0 ||
-					    !(local_fp[l] ? xb_type_is_float(p->vregs[v]) : xb_type_is_int(p->vregs[v])) || pos - def_pos[v] > 256 || alias_end[l] >= def_pos[v]) continue;
-					isize d = def_pos[v] - bstart[bi];
+					if (l < 0 || v == 0 || !R->in_block[v] || fx[v].pinned || R->uses[v] != 1 || R->is_const[v] || R->remat[v] || R->via[v] >= 0 ||
+					    !(local_fp[l] ? xb_type_is_float(p->vregs[v]) : xb_type_is_int(p->vregs[v])) || pos - fx[v].def_pos > 256 || alias_end[l] >= fx[v].def_pos) continue;
+					isize d = fx[v].def_pos - bstart[bi];
 					bool ok = true;
 					for (isize j = d; ok && j < i; j++) ok = !reads(b->instrs[j], l) && (j == d || !writes(b->instrs[j], l));
 					if (!ok) continue;
 					R->via[v] = l;
 					i32 id = lgid[l];
-					if (def_pos[v] < glo[id]) {
-						glo[id] = def_pos[v];
+					if (fx[v].def_pos < glo[id]) {
+						glo[id] = fx[v].def_pos;
 						glo_def[id] = true;
 					}
 				}
@@ -1051,7 +1052,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	auto shared = array_make<bool>(xb_allocator(), p->locals.count);
 	defer (array_free(&shared));
 	auto weight_of = [&](u32 v) -> i64 {
-		return (v & XB_LOCAL_ITEM) ? lweight[v & ~XB_LOCAL_ITEM] : vweight[v];
+		return (v & XB_LOCAL_ITEM) ? lweight[v & ~XB_LOCAL_ITEM] : fx[v].weight;
 	};
 	auto expire = array_make<i32>(xb_allocator(), clobbers.count + 1);
 	defer (array_free(&active));
@@ -1152,7 +1153,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 				take(gvreg[id], ghi[id], clobbers[ghi[id]+1] - clobbers[linear + (glo_def[id] ? 1 : 0)] > 0);
 			}
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
-				if (v == 0 || !is_def || !R->in_block[v] || R->is_const[v] || R->remat[v] || pinned[v] || R->reg[v] != XB_NOREG) return;
+				if (v == 0 || !is_def || !R->in_block[v] || R->is_const[v] || R->remat[v] || fx[v].pinned || R->reg[v] != XB_NOREG) return;
 				xbType t = p->vregs[v];
 				if (!xb_type_is_int(t) && !xb_type_is_float(t)) return;
 				if (R->via[v] >= 0 && R->local_reg[R->via[v]] >= 0) {
@@ -1160,9 +1161,9 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 					shared[R->via[v]] = true;
 					return;
 				}
-				i32 end = last_use[v] >= 0 ? last_use[v] : linear;
+				i32 end = fx[v].last_use >= 0 ? fx[v].last_use : linear;
 				// read only as an argument, before that call: right in the argument register
-				i8 w = want[v];
+				i8 w = fx[v].want;
 				if (w >= 0 && R->uses[v] == 1 && clobbers[end] - clobbers[linear+1] == 0 &&
 				    (w >= XB_FREG) == xb_type_is_float(t)) {
 					u32 *free = xb_type_is_float(t) ? &free_v : &free_x;
@@ -1192,32 +1193,9 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 // Frame slots for the vregs without a register, below `*cur` bytes under the frame pointer,
 // which grows by what they take.
 gb_internal void xb_alloc_slots(xbProc *p, xbRegAlloc *R, i32 *cur) {
-	isize vreg_count = p->vregs.count;
-	auto def_block = array_make<i32>(xb_allocator(), vreg_count);
-	auto last_use = array_make<i32>(xb_allocator(), vreg_count);
-	auto cross = array_make<bool>(xb_allocator(), vreg_count);
-	defer (array_free(&def_block));
-	defer (array_free(&last_use));
-	defer (array_free(&cross));
-	for (isize i = 0; i < vreg_count; i++) {
-		def_block[i] = -1;
-		last_use[i] = -1;
-	}
+	// the reads xb_alloc_regs found; nothing changed the IR since
+	auto const &fx = R->facts;
 	i32 linear = 0;
-	for (xbBlock *b : p->order) {
-		for (xbInstr const &in : b->instrs) {
-			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
-				if (v == 0) return;
-				if (is_def) {
-					def_block[v] = b->index;
-				} else {
-					last_use[v] = linear;
-					if (def_block[v] != b->index) cross[v] = true;
-				}
-			});
-			linear++;
-		}
-	}
 
 	auto free_slots = array_make<i32>(xb_allocator(), 0, 64);
 	defer (array_free(&free_slots));
@@ -1231,17 +1209,17 @@ gb_internal void xb_alloc_slots(xbProc *p, xbRegAlloc *R, i32 *cur) {
 				if (v == 0 || R->reg[v] != XB_NOREG || R->is_const[v] || R->remat[v]) return;
 				if (is_def) {
 					i32 s = 0;
-					if (!cross[v] && free_slots.count > 0) {
+					if (!fx[v].cross && free_slots.count > 0) {
 						s = array_pop(&free_slots);
 					} else {
 						*cur += 8;
 						s = -*cur;
 					}
 					R->slot[v] = s;
-					if (!cross[v] && last_use[v] < linear) {
+					if (!fx[v].cross && fx[v].last_use < linear) {
 						array_add(&to_free, v); // never used
 					}
-				} else if (!cross[v] && last_use[v] == linear) {
+				} else if (!fx[v].cross && fx[v].last_use == linear) {
 					array_add(&to_free, v);
 				}
 			});
