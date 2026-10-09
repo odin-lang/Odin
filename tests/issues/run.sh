@@ -13,7 +13,7 @@ set -x
 
 # CONTRIBUTORS:
 #   If your test can be run as a simple `odin test`, then please add it to
-#   `test_simple.odin` instead, to CI performance acceptable.
+#   `test_simple.odin` instead, to keep CI performance acceptable.
 #   Otherwise, add it here in the appropriate block, and make sure to
 #   update `run.bat` as well.
 
@@ -174,7 +174,9 @@ fi
 
 #########################################################################################################
 
+#
 # "odin build" tests:
+#
 
 $ODIN build ../test_issue_2113 $COMMON -debug
 
@@ -260,7 +262,9 @@ fi
 
 #########################################################################################################
 
+#
 # "odin run" tests:
+#
 
 $ODIN run ../test_issue_7482 $COMMON
 # 7562 is Windows only. TODO: Being in run.sh doesn't necessarily mean we're not on Windows.
@@ -272,7 +276,9 @@ $ODIN run ../test_issue_7798 $COMMON
 
 #########################################################################################################
 
+#
 # "odin test" tests with special needs, or others (e.g. "odin doc"):
+#
 
 if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_5640/test_issue_5640.c -o test_issue_5640_c.o

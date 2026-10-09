@@ -18,7 +18,6 @@ set ODIN=..\..\..\odin
 
 @rem Some tests require a C compiler.
 @rem   By default, it uses clang.  set ISSUES_TESTS_NO_CLANG=1  to use MSVC (cl.exe) instead.
-@rem   NOTE: Not all tests are compatible with MSVC.
 
 @rem #########################################################################################################
 
