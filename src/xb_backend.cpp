@@ -151,6 +151,15 @@ gb_internal bool xb_proc_is_candidate(Entity *e) {
 	return true;
 }
 
+struct xbCandidateCheck {
+	Entity *e;
+	bool    ok;
+};
+
+gb_internal void xb_candidate_checks(xbCandidateCheck *checks, isize count) {
+	for (isize i = 0; i < count; i++) checks[i].ok = xb_proc_is_candidate(checks[i].e);
+}
+
 // Builds the IR of one procedure. Nothing is emitted yet.
 gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	xbProc *p = xb_alloc_item<xbProc>();
@@ -325,7 +334,7 @@ gb_internal bool xb_family_build(xbModule *m, xbFamily *family, Entity *root, ch
 	for (isize i = 0; i < family->queue.count; i++) {
 		Entity *fe = family->queue[i];
 		String name = xb_entity_name(m, fe);
-		i32 *existing = string_map_get(&m->symbol_map, name);
+		i32 *existing = xb_symbol_find(m, name);
 		if (existing && m->symbols[*existing].section != xbSection_Undef) {
 			if (fe == root && !ptr_set_exists(&m->defined_procs, fe)) {
 				*reason = "duplicate symbol";
@@ -684,6 +693,12 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	}
 	array_sort(candidates, llvm_global_entity_cmp);
 
+	// xb_proc_is_candidate of each, on the thread pool: polymorphic types take long to check
+	auto checks = array_make<xbCandidateCheck>(heap_allocator(), candidates.count);
+	defer (array_free(&checks));
+	for (isize i = 0; i < candidates.count; i++) checks[i].e = candidates[i];
+	thread_pool_for_chunks(checks.data, checks.count, 64, xb_candidate_checks);
+
 	// the families are built a window at a time on the thread pool, and replayed in order here
 	bool parallel = xb_can_compile_procs() && m->limit < 0 && only == nullptr && skip == nullptr && !m->verbose &&
 	                gb_get_env("ODIN_XB_SERIAL", permanent_allocator()) == nullptr;
@@ -699,7 +714,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		if (e->Procedure.is_foreign) {
 			xb_note_foreign_library(m, e->Procedure.foreign_library);
 		}
-		if (!xb_proc_is_candidate(e)) continue;
+		if (!checks[ci].ok) continue;
 		m->stats.procs_total += 1;
 		if (!xb_can_compile_procs()) {
 			xb_stat_fail(m, "no code generation for this target yet");
@@ -728,12 +743,12 @@ gb_internal void xb_generate(lbGenerator *gen) {
 			if (next_job == jobs.count) {
 				xb_shadow_window_done(m, &jobs);
 				// a small first window, so the replay starts early
-				if (!building) xb_shadow_window_start(m, &next, candidates, ci, 32);
+				if (!building) xb_shadow_window_start(m, &next, checks, ci, 32);
 				xb_shadow_window_wait(&next);
 				Array<xbShadowJob> t = jobs; jobs = next; next = t;
 				next_job = 0;
 				// the window after this one is built while this one is replayed
-				xb_shadow_window_start(m, &next, candidates, jobs[jobs.count-1].candidate + 1, XB_SHADOW_WINDOW);
+				xb_shadow_window_start(m, &next, checks, jobs[jobs.count-1].candidate + 1, XB_SHADOW_WINDOW);
 				building = next.count > 0;
 			}
 			xbShadowJob *job = &jobs[next_job++];

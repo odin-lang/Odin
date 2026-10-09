@@ -908,9 +908,21 @@ gb_internal xbMem xb_mem_from_ptr(xbProc *p, xbValue ptr) {
 // Symbols
 ////////////////////////////////////////////////////////////////
 
+// The hash of a symbol name or string literal: murmur reads 8 bytes a step, fnv32a one, and
+// mangled names are long.
+gb_internal u32 xb_name_hash(String s) {
+	u32 hash = cast(u32)gb_murmur64(s.text, s.len) & 0x7fffffff;
+	return hash | (hash == 0);
+}
+
+gb_internal i32 *xb_symbol_find(xbModule *m, String name) {
+	return string_map_get(&m->symbol_map, xb_name_hash(name), name);
+}
+
 gb_internal i32 xb_symbol(xbModule *m, String name) {
 	i32 index = -1;
-	if (i32 *found = string_map_get(&m->symbol_map, name)) {
+	u32 hash = xb_name_hash(name);
+	if (i32 *found = string_map_get(&m->symbol_map, hash, name)) {
 		index = *found;
 	} else {
 		xbSymbol s = {};
@@ -919,7 +931,7 @@ gb_internal i32 xb_symbol(xbModule *m, String name) {
 		s.flags = xbSymbolFlag_Global;
 		index = cast(i32)m->symbols.count;
 		array_add(&m->symbols, s);
-		string_map_set(&m->symbol_map, s.name, index);
+		string_map_set(&m->symbol_map, hash, s.name, index);
 	}
 	if (xb_shadow_logs(m) && !xb_shadow_seen(m, xbShadowOp_Sym, cast(u64)index)) {
 		// every use: the real module may only get the symbol in a later one
@@ -1075,9 +1087,7 @@ gb_internal i32 xb_rodata(xbModule *m, void const *data, isize size, i64 align) 
 
 // A NUL terminated string literal in read-only data.
 gb_internal i32 xb_string_literal(xbModule *m, String str) {
-	// murmur reads 8 bytes a step, fnv32a one; test data has megabytes of string literals
-	u32 hash = cast(u32)gb_murmur64(str.text, str.len) & 0x7fffffff;
-	hash |= hash == 0;
+	u32 hash = xb_name_hash(str);
 	i32 sym = -1;
 	String key = {};
 	MapFindResult fr = string_map__find(&m->string_lits, hash, str);

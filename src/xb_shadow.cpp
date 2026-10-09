@@ -27,7 +27,6 @@ gb_internal void xb_module_init_tables(xbModule *m) {
 	m->lower_jobs = array_make<xbLowerJob>(heap_allocator(), 0, shadow ? 0 : XB_LOWER_BATCH);
 	m->lower_busy = array_make<xbLowerJob>(heap_allocator(), 0, shadow ? 0 : XB_LOWER_BATCH);
 	m->lower_sym_flags = array_make<u8>(heap_allocator(), 0, shadow ? 0 : 4096);
-	map_init(&m->abi_cache);
 	map_init(&m->equal_procs);
 	map_init(&m->hasher_procs);
 	map_init(&m->map_infos);
@@ -43,8 +42,7 @@ gb_internal void xb_module_init_tables(xbModule *m) {
 	map_init(&m->shadow_seen);
 }
 
-// Empties a replayed shadow for another family, keeping its memory. The ABI cache stays: it
-// only holds what the types give.
+// Empties a replayed shadow for another family, keeping its memory.
 gb_internal void xb_shadow_reset(xbModule *m) {
 	array_clear(&m->shadow_log);
 	array_clear(&m->shadow_open);
@@ -124,7 +122,6 @@ gb_internal void xb_shadow_destroy(xbModule *m) {
 	array_free(&m->lower_jobs);
 	array_free(&m->lower_busy);
 	array_free(&m->lower_sym_flags);
-	map_destroy(&m->abi_cache);
 	map_destroy(&m->equal_procs);
 	map_destroy(&m->hasher_procs);
 	map_destroy(&m->map_infos);
@@ -229,16 +226,16 @@ gb_global ThreadPoolChunks<xbShadowJob> xb_shadow_tasks;
 gb_global Array<xbModule *> xb_shadows_free;
 
 // Starts building the next window of families, from candidate `from` on, into `jobs`.
-gb_internal void xb_shadow_window_start(xbModule *m, Array<xbShadowJob> *jobs, Array<Entity *> const &candidates, isize from, isize size) {
+gb_internal void xb_shadow_window_start(xbModule *m, Array<xbShadowJob> *jobs, Array<xbCandidateCheck> const &candidates, isize from, isize size) {
 	if (xb_shadows_free.allocator.proc == nullptr) {
 		xb_shadows_free = array_make<xbModule *>(heap_allocator(), 0, 2*XB_SHADOW_WINDOW);
 	}
 	array_clear(jobs);
 	xbWindowArenas *arenas = xb_window_arenas_get(m);
 	for (isize j = from; j < candidates.count && jobs->count < size; j++) {
-		if (!xb_proc_is_candidate(candidates[j])) continue;
+		if (!candidates[j].ok) continue;
 		xbShadowJob job = {};
-		job.e = candidates[j];
+		job.e = candidates[j].e;
 		job.candidate = j;
 		job.arenas = arenas;
 		job.sh = xb_shadows_free.count > 0 ? array_pop(&xb_shadows_free) : nullptr;
@@ -310,7 +307,7 @@ gb_internal String xb_replay_name(xbReplay *r, String name) {
 gb_internal bool xb_replay_entity_defined(xbModule *m, Entity *e) {
 	String *name = map_get(&m->entity_names, e);
 	if (name == nullptr) return false;
-	i32 *sym = string_map_get(&m->symbol_map, *name);
+	i32 *sym = xb_symbol_find(m, *name);
 	return sym != nullptr && m->symbols[*sym].section != xbSection_Undef;
 }
 
@@ -376,7 +373,7 @@ gb_internal void xb_replay_skip(xbReplay *r, isize begin, isize end) {
 					if (real_name == nullptr) break;
 					name = *real_name;
 				}
-				if (i32 *v = string_map_get(&m->symbol_map, name)) r->syms[op.sym] = *v;
+				if (i32 *v = xb_symbol_find(m, name)) r->syms[op.sym] = *v;
 			}
 			break;
 		}

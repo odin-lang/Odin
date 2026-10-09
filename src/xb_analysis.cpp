@@ -213,7 +213,10 @@ gb_internal void xb_blocks_in_loops(xbProc *p, Array<bool> *in_loop) {
 	isize bc = p->order.count;
 	*in_loop = array_make<bool>(xb_allocator(), bc);
 	auto pos = array_make<isize>(xb_allocator(), p->blocks.count);
+	// the loops starting at each block minus those ending before it, summed up below
+	auto diff = array_make<i32>(xb_allocator(), bc + 1);
 	defer (array_free(&pos));
+	defer (array_free(&diff));
 	for (isize i = 0; i < bc; i++) pos[p->order[i]->index] = i;
 	for (isize i = 0; i < bc; i++) {
 		for (xbInstr const &in : p->order[i]->instrs) {
@@ -221,10 +224,16 @@ gb_internal void xb_blocks_in_loops(xbProc *p, Array<bool> *in_loop) {
 			if (in.op == xbOp_Jump) targets[0] = cast(i32)in.imm;
 			if (in.op == xbOp_Branch) { targets[0] = cast(i32)in.imm; targets[1] = cast(i32)in.c; }
 			for (i32 t : targets) {
-				if (t < 0 || !p->blocks[t]->placed) continue;
-				for (isize k = pos[t]; k <= i && pos[t] <= i; k++) (*in_loop)[k] = true;
+				if (t < 0 || !p->blocks[t]->placed || pos[t] > i) continue;
+				diff[pos[t]] += 1;
+				diff[i+1] -= 1;
 			}
 		}
+	}
+	i32 loops = 0;
+	for (isize i = 0; i < bc; i++) {
+		loops += diff[i];
+		(*in_loop)[i] = loops > 0;
 	}
 }
 
@@ -650,7 +659,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	{
 		isize bc = p->order.count;
 		auto pos = array_make<isize>(xb_allocator(), p->blocks.count);
-		auto depth = array_make<i32>(xb_allocator(), bc);
+		auto depth = array_make<i32>(xb_allocator(), bc + 1); // as differences first, see below
 		defer (array_free(&pos));
 		defer (array_free(&depth));
 		for (isize i = 0; i < bc; i++) pos[p->order[i]->index] = i;
@@ -661,10 +670,12 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 				if (in.op == xbOp_Branch) { targets[0] = cast(i32)in.imm; targets[1] = cast(i32)in.c; }
 				for (i32 t : targets) {
 					if (t < 0 || !p->blocks[t]->placed || pos[t] > i) continue;
-					for (isize k = pos[t]; k <= i; k++) depth[k]++;
+					depth[pos[t]] += 1;
+					depth[i+1] -= 1;
 				}
 			}
 		}
+		for (isize i = 1; i < bc; i++) depth[i] += depth[i-1];
 		for (isize i = 0; i < bc; i++) bweight[p->order[i]->index] = 1ll << (3*gb_min(depth[i], 6));
 	}
 

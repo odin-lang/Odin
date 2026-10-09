@@ -1,19 +1,25 @@
 // Frontend: calls, procedure bodies and statements
 
+// per thread: the ABI depends only on the type, and shadows on any thread reuse it
+struct xbAbiCached {
+	xbAbiFunc *  f;
+	char const * reason; // why there is none
+};
+gb_global gb_thread_local PtrMap<Type *, xbAbiCached> xb_abi_cache;
+
 gb_internal xbAbiFunc *xb_get_abi(xbProc *p, Type *proc_type) {
 	Type *pt = base_type(proc_type);
-	xbAbiFunc **found = map_get(&p->m->abi_cache, pt);
-	if (found) {
-		if (*found == nullptr) XB_UNSUPPORTED(p, "abi");
-		return *found;
+	xbAbiCached *found = map_get(&xb_abi_cache, pt);
+	if (found == nullptr) {
+		xbAbiCached c = {};
+		c.f = xb_abi_compute(pt, &c.reason);
+		map_set(&xb_abi_cache, pt, c);
+		found = map_get(&xb_abi_cache, pt);
 	}
-	char const *reason = nullptr;
-	xbAbiFunc *f = xb_abi_compute(pt, &reason);
-	map_set(&p->m->abi_cache, pt, f);
-	if (f == nullptr) {
-		XB_UNSUPPORTED(p, reason ? reason : "abi");
+	if (found->f == nullptr) {
+		XB_UNSUPPORTED(p, found->reason ? found->reason : "abi");
 	}
-	return f;
+	return found->f;
 }
 
 gb_internal void xb_set_debug_loc(xbProc *p, TokenPos pos) {

@@ -742,7 +742,6 @@ struct xbModule {
 	StringMap<Entity *> name_owners;
 	PtrMap<Entity *, i32> inline_statics; // the storage of read-only statics in inlined bodies
 
-	PtrMap<Type *, xbAbiFunc *> abi_cache;
 	StringMap<i32>    string_lits;
 
 	xbStats           stats;
@@ -816,7 +815,8 @@ gb_internal xbArena *xb_arena_get(void) {
 	return xb_arena_cur ? xb_arena_cur : &xb_arena_own;
 }
 
-gb_internal void *xb_arena_alloc(isize size, isize align) {
+// Memory that is not zeroed yet.
+gb_internal void *xb_arena_alloc_raw(isize size, isize align) {
 	xbArena *a = xb_arena_get();
 	if (a->chunks.allocator.proc == nullptr) {
 		a->chunks = array_make<xbArenaChunk>(heap_allocator(), 0, 16);
@@ -827,9 +827,7 @@ gb_internal void *xb_arena_alloc(isize size, isize align) {
 			isize start = (a->used + align - 1) & ~(align - 1);
 			if (start + size <= c->size) {
 				a->used = start + size;
-				u8 *p = c->base + start;
-				gb_zero_size(p, size);
-				return p;
+				return c->base + start;
 			}
 			a->curr += 1;
 			a->used = 0;
@@ -840,6 +838,30 @@ gb_internal void *xb_arena_alloc(isize size, isize align) {
 		c.base = cast(u8 *)gb_alloc(heap_allocator(), c.size);
 		array_add(&a->chunks, c);
 	}
+}
+
+gb_internal void *xb_arena_alloc(isize size, isize align) {
+	void *p = xb_arena_alloc_raw(size, align);
+	gb_zero_size(p, size);
+	return p;
+}
+
+// The new size of an allocation, zeroed past the old one. The last allocation grows in place.
+gb_internal void *xb_arena_resize(void *old_memory, isize old_size, isize size, isize align) {
+	xbArena *a = xb_arena_get();
+	if (old_memory != nullptr && a->curr < a->chunks.count) {
+		xbArenaChunk *c = &a->chunks[a->curr];
+		isize start = cast(u8 *)old_memory - c->base;
+		if (start >= 0 && start + old_size == a->used && start + size <= c->size) {
+			gb_zero_size(c->base + a->used, size - old_size);
+			a->used = start + size;
+			return old_memory;
+		}
+	}
+	u8 *p = cast(u8 *)xb_arena_alloc_raw(size, align);
+	if (old_memory != nullptr) gb_memmove(p, old_memory, old_size);
+	gb_zero_size(p + old_size, size - old_size);
+	return p;
 }
 
 gb_internal void xb_arena_reset(void) {
@@ -871,9 +893,7 @@ gb_internal GB_ALLOCATOR_PROC(xb_arena_allocator_proc) {
 	case gbAllocation_Resize: {
 		if (size == 0) return nullptr;
 		if (size <= old_size) return old_memory;
-		void *p = xb_arena_alloc(size, alignment);
-		if (old_memory) gb_memmove(p, old_memory, old_size);
-		return p;
+		return xb_arena_resize(old_memory, old_memory ? old_size : 0, size, alignment);
 	}
 	case gbAllocation_FreeAll:
 		return nullptr;

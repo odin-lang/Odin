@@ -30,6 +30,8 @@ struct xbLType {
 
 gb_global BlockingMutex xb_ltype_mutex;
 gb_global PtrMap<Type *, xbLType *> xb_ltype_cache;
+// in front of the shared cache, so families built in parallel do not wait on its lock
+gb_global gb_thread_local PtrMap<Type *, xbLType *> xb_ltype_local;
 
 gb_internal i64 xb_lt_align_formula(i64 off, i64 a) {
 	return (off + a - 1) / a * a;
@@ -391,16 +393,24 @@ gb_internal xbLType *xb_ltype_internal(Type *type) {
 
 gb_internal xbLType *xb_ltype(Type *type) {
 	type = default_type(type);
+	if (xbLType **local = map_get(&xb_ltype_local, type)) return *local;
+	xbLType *t = nullptr;
 	{
 		MUTEX_GUARD(&xb_ltype_mutex);
 		xbLType **found = map_get(&xb_ltype_cache, type);
-		if (found) return *found;
+		if (found) t = *found;
 	}
-	xbLType *t = xb_ltype_internal(type);
-	{
+	if (t == nullptr) {
+		t = xb_ltype_internal(type);
 		MUTEX_GUARD(&xb_ltype_mutex);
-		map_set(&xb_ltype_cache, type, t);
+		// another thread may have made it meanwhile: every thread uses the first one
+		if (xbLType **found = map_get(&xb_ltype_cache, type)) {
+			t = *found;
+		} else {
+			map_set(&xb_ltype_cache, type, t);
+		}
 	}
+	map_set(&xb_ltype_local, type, t);
 	return t;
 }
 
