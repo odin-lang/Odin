@@ -81,8 +81,8 @@ gb_internal void xb_for_each_vreg(xbProc *p, xbInstr const &in, F const &f) {
 		use_mem(in.mem);
 		break;
 	case xbOp_Vec128:
-		f(in.a, false);
-		f(in.b, false);
+		if (in.a) f(in.a, false);
+		if (in.b) f(in.b, false);
 		if (in.c) f(in.c, false);
 		use_mem(in.mem);
 		break;

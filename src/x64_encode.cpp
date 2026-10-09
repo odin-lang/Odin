@@ -395,6 +395,7 @@ gb_internal void xb_rep_stosb(xbAsm *a) { xb_b(a, 0xF3); xb_b(a, 0xAA); }
 gb_internal void xb_mfence(xbAsm *a) { xb_b(a, 0x0F); xb_b(a, 0xAE); xb_b(a, 0xF0); }
 gb_internal void xb_pause(xbAsm *a) { xb_b(a, 0xF3); xb_b(a, 0x90); }
 gb_internal void xb_rdtsc(xbAsm *a) { xb_b(a, 0x0F); xb_b(a, 0x31); }
+gb_internal void xb_rdtscp(xbAsm *a) { xb_b(a, 0x0F); xb_b(a, 0x01); xb_b(a, 0xF9); }
 gb_internal void xb_syscall(xbAsm *a) { xb_b(a, 0x0F); xb_b(a, 0x05); }
 gb_internal void xb_std(xbAsm *a) { xb_b(a, 0xFD); }
 gb_internal void xb_cld(xbAsm *a) { xb_b(a, 0xFC); }
@@ -487,6 +488,7 @@ enum xbVecForm : u8 {
 	xbVecForm_ShiftImm, // op /ext xmm1(a), imm8
 	xbVecForm_ToGpr,    // op eax, xmm1(a): the result is a scalar
 	xbVecForm_Flags,    // op xmm1(a), xmm2(b): the result is the condition in ext
+	xbVecForm_Rdtscp,   // rdtscp: the result is the (u64, u32) tuple of the counter and IA32_TSC_AUX
 };
 
 // ext of xbVecForm_Flags: an xbCC, possibly combined with the parity flag
@@ -559,6 +561,7 @@ gb_global xbVecIntrinsic const xb_vec_intrinsics[] = {
 	{"llvm.x86.sse2.cvtps2dq",      XB_P66|XB_0F, 0x5B, xbVecForm_Unary},
 	{"llvm.x86.sse2.cvttps2dq",     XB_PF3|XB_0F, 0x5B, xbVecForm_Unary},
 	{"llvm.x86.sse2.cvtpd2ps",      XB_P66|XB_0F, 0x5A, xbVecForm_Unary},
+	{"llvm.x86.sse2.cvtsd2ss",      XB_PF2|XB_0F, 0x5A, xbVecForm_Binary},
 	{"llvm.x86.sse2.cvtpd2dq",      XB_PF2|XB_0F, 0xE6, xbVecForm_Unary},
 	{"llvm.x86.sse2.cvttpd2dq",     XB_P66|XB_0F, 0xE6, xbVecForm_Unary},
 	{"llvm.x86.sse2.packsswb.128",  XB_P66|XB_0F, 0x63, xbVecForm_Binary},
@@ -644,6 +647,8 @@ gb_global xbVecIntrinsic const xb_vec_intrinsics[] = {
 	{"llvm.x86.sse41.ptestz",     XB_P66|XB_0F38, 0x17, xbVecForm_Flags, CC_E},
 	{"llvm.x86.sse41.ptestc",     XB_P66|XB_0F38, 0x17, xbVecForm_Flags, CC_B},
 	{"llvm.x86.sse41.ptestnzc",   XB_P66|XB_0F38, 0x17, xbVecForm_Flags, CC_A},
+
+	{"llvm.x86.rdtscp", 0, 0, xbVecForm_Rdtscp},
 };
 
 // xbOp_Vec128 keeps the index in its u8 aux

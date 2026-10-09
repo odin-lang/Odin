@@ -1677,6 +1677,14 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	}
 	case xbOp_Vec128: {
 		xbVecIntrinsic const &e = xb_vec_intrinsics[in.aux];
+		if (e.form == xbVecForm_Rdtscp) {
+			xb_rdtscp(a);
+			xb_shift_imm(a, 4, 8, xb_r(RDX), 32);
+			xb_alu_r_rm(a, ALU_OR, 8, RAX, xb_r(RDX));
+			xb_mov_rm_r(a, 8, xb_mem_opnd(L, in.mem, R11), RAX);
+			xb_mov_rm_r(a, 4, xb_mem_opnd(L, xb_mem_offset(in.mem, 8), R11), RCX);
+			break;
+		}
 		u8 const xmm1 = X64_F1, xmm2 = X64_F2;
 		x64_get(L, RAX, in.a, 8, xbExt_None);
 		xb_movups_x_m(a, xmm1, xb_m(RAX, 0));

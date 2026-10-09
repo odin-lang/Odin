@@ -466,8 +466,68 @@ gb_internal xbValue xb_emit_vec128(xbProc *p, i32 index, u32 a, u32 b, u32 c, u8
 	return xb_value_mem(result_type, in.mem);
 }
 
+// AVX's 256-bit round and dp work on each 128-bit half on its own, so they run as two SSE4.1 ops
+gb_internal bool xb_build_x86_vec256_halves(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
+	String half = {};
+	if      (name == "llvm.x86.avx.round.pd.256") half = str_lit("llvm.x86.sse41.round.pd");
+	else if (name == "llvm.x86.avx.round.ps.256") half = str_lit("llvm.x86.sse41.round.ps");
+	else if (name == "llvm.x86.avx.dp.ps.256")    half = str_lit("llvm.x86.sse41.dpps");
+	else return false;
+	i32 index = xb_vec_intrinsic_index(half);
+	GB_ASSERT(index >= 0);
+	isize vec_args = xb_vec_intrinsics[index].form == xbVecForm_Unary ? 1 : 2;
+	if (type_size_of(result_type) != 32 || ce->args.count != vec_args + 1) XB_UNSUPPORTED(p, "llvm intrinsic");
+	u32 ptrs[2] = {};
+	for (isize i = 0; i < vec_args; i++) {
+		xbValue x = xb_build_expr(p, ce->args[i]);
+		if (type_size_of(x.type) != 32) XB_UNSUPPORTED(p, "llvm intrinsic");
+		ptrs[i] = xb_lea(p, xb_address_from_load_or_generate_local(p, x));
+	}
+	if (vec_args == 1) ptrs[1] = ptrs[0];
+	TypeAndValue tv = type_and_value_of_expr(ce->args[vec_args]);
+	if (tv.value.kind != ExactValue_Integer) XB_UNSUPPORTED(p, "llvm intrinsic");
+	xbMem out = xb_add_local(p, result_type, false);
+	for (i64 h = 0; h < 2; h++) {
+		xbInstr in = xb_instr(xbOp_Vec128);
+		in.aux = cast(u8)index;
+		in.a = xb_ptr_add_scaled(p, ptrs[0], xb_iconst(p, xbType_I64, h), 16);
+		in.b = xb_ptr_add_scaled(p, ptrs[1], xb_iconst(p, xbType_I64, h), 16);
+		in.imm = cast(u8)exact_value_to_i64(tv.value);
+		in.mem = xb_mem_offset(out, 16*h);
+		xb_emit(p, in);
+	}
+	*res = xb_value_mem(result_type, out);
+	return true;
+}
+
+// llvm.x86.addcarry: (carry out, a + b + (c_in != 0))
+gb_internal bool xb_build_x86_addcarry(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
+	if (name != "llvm.x86.addcarry.32" && name != "llvm.x86.addcarry.64") return false;
+	if (ce->args.count != 3 || !is_type_tuple(result_type) || result_type->Tuple.variables.count != 2) XB_UNSUPPORTED(p, "llvm intrinsic");
+	Type *vt = result_type->Tuple.variables[1]->type;
+	xbType st = xb_scalar_type(vt);
+	if (st != xbType_I32 && st != xbType_I64) XB_UNSUPPORTED(p, "llvm intrinsic");
+	u32 cin = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[0]), t_u8));
+	u32 x = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[1]), vt));
+	u32 y = xb_value_to_reg(p, xb_emit_conv(p, xb_build_expr(p, ce->args[2]), vt));
+	u32 c = xb_int_resize(p, xb_cmp(p, xbCond_NE, xbType_I8, cin, xb_iconst(p, xbType_I8, 0)), xbType_I8, st, false);
+	u32 s1 = xb_binop(p, xbOp_Add, st, x, y);
+	u32 s2 = xb_binop(p, xbOp_Add, st, s1, c);
+	u32 c1 = xb_cmp(p, xbCond_ULT, st, s1, x);
+	u32 c2 = xb_cmp(p, xbCond_ULT, st, s2, s1);
+	u32 cout = xb_binop(p, xbOp_Or, xbType_I8, c1, c2);
+	xbMem m = xb_add_local(p, result_type, false);
+	Type *ft = nullptr;
+	xb_store(p, xbType_I8, xb_mem_offset(m, type_offset_of(result_type, 0, &ft)), cout);
+	xb_store(p, st, xb_mem_offset(m, type_offset_of(result_type, 1, &ft)), s2);
+	*res = xb_value_mem(result_type, m);
+	return true;
+}
+
 gb_internal bool xb_build_x86_vec_intrinsic(xbProc *p, String name, AstCallExpr *ce, Type *result_type, xbValue *res) {
 	if (xb_is_arm64()) return false;
+	if (xb_build_x86_vec256_halves(p, name, ce, result_type, res)) return true;
+	if (xb_build_x86_addcarry(p, name, ce, result_type, res)) return true;
 	i32 index = xb_vec_intrinsic_index(name);
 	if (index < 0) return false;
 	xbVecIntrinsic const &v = xb_vec_intrinsics[index];
@@ -479,6 +539,7 @@ gb_internal bool xb_build_x86_vec_intrinsic(xbProc *p, String name, AstCallExpr 
 	case xbVecForm_Binary:   vec_args = 2; break;
 	case xbVecForm_ToGpr:    vec_args = 1; break;
 	case xbVecForm_Flags:    vec_args = 2; break;
+	case xbVecForm_Rdtscp:   vec_args = 0; break;
 	}
 	bool scalar_result = v.form == xbVecForm_ToGpr || v.form == xbVecForm_Flags;
 	i64 result_size = type_size_of(result_type);
