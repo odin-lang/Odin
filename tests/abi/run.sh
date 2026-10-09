@@ -22,6 +22,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 # The C side's optimisation level. An ABI is a link-time contract, so the two
 # sides are built independently and either may be optimised: `ABI_CFLAGS=-O2`.
 : "${ABI_CFLAGS:=}"
+# Flags for both Odin commands, e.g. `ABI_ODIN_FLAGS=-microarch:native` where the CPU is
+# older than Odin's x86-64-v2 default; give the C side the same CPU with ABI_CFLAGS.
+: "${ABI_ODIN_FLAGS:=}"
 COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
 CC_TARGET=""; [ -n "$TRIPLE" ] && CC_TARGET="--target=$TRIPLE"
@@ -36,17 +39,17 @@ pushd "$here/build" > /dev/null
 
 set -x
 
-$ODIN run ../gen.odin -file -- .
+$ODIN run ../gen.odin -file $ABI_ODIN_FLAGS -- .
 
 # Ask the C compiler which tiers it has, by preprocessing the generated `build-cross/tiers.c`. 
 # The Odin side must use the same tiers or it references symbols C never emitted.
-have() { $CLANG $CC_TARGET -E tiers.c 2>/dev/null | grep -q "ABI_YES_$1" && echo true || echo false; }
+have() { $CLANG $CC_TARGET $ABI_CFLAGS -E tiers.c 2>/dev/null | grep -q "ABI_YES_$1" && echo true || echo false; }
 TIERS="-define:ABI_TIER_GNU=$(have GNU) -define:ABI_TIER_F16=$(have F16) -define:ABI_TIER_I128=$(have I128)"
 
 # `-w` because the corpus deliberately uses zero-length arrays and empty
 # structs; both are the extensions under test.
 $CLANG $CC_TARGET $ABI_CFLAGS -c abi_corpus.c -o abi_corpus_c.o -w
-$ODIN test abi_corpus.odin $COMMON $ODIN_TARGET $TIERS "$@"
+$ODIN test abi_corpus.odin $COMMON $ODIN_TARGET $ABI_ODIN_FLAGS $TIERS "$@"
 
 set +x
 
