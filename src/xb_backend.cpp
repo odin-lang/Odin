@@ -634,6 +634,13 @@ gb_internal void xb_generate(lbGenerator *gen) {
 
 	xb_lower_flush(m);
 
+	// for CI: anything left to LLVM is an error, the reasons are printed above
+	if (!m->complete && gb_get_env("ODIN_XB_NO_FALLBACK", permanent_allocator()) != nullptr) {
+		gb_printf_err("fast backend: ODIN_XB_NO_FALLBACK is set, but %td of %td procedures and %td of %td globals were compiled\n",
+		              m->stats.procs_compiled, m->stats.procs_total, m->stats.globals_defined, m->stats.globals_total);
+		gb_exit(1);
+	}
+
 	if (m->stats.procs_compiled > 0 || m->stats.globals_defined > 0) {
 		m->object_path = xb_object_path(gen);
 		f64 t0 = gb_time_now();

@@ -287,6 +287,21 @@ jobs:
           call run.bat
           set ABI_CFLAGS=-O2
           call run.bat -o:speed
+      - name: Fast backend tests
+        shell: cmd
+        env:
+          ODIN_XB_NO_FALLBACK: 1
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          odin run examples/demo -backend:fast || exit /b 1
+          odin run examples/demo -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do || exit /b 1
+          odin test tests/internal -all-packages -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
+          odin test tests/core/normal.odin -file -all-packages -backend:fast -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
+          odin test tests/core/normal.odin -file -all-packages -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
+          copy vendor\lua\5.4\windows\*.dll .
+          odin test tests/vendor -all-packages -backend:fast -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
+          cd tests/abi
+          call run.bat -backend:fast || exit /b 1
       - name: Check benchmarks
         shell: cmd
         run: |
