@@ -95,6 +95,7 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
 ..\..\..\odin test ..\test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 ..\..\..\odin test ..\test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
+..\..\..\odin test ..\test_issue_statics_across_modules -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 ..\..\..\odin test ..\test_issue_omitted_field_union.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON% -o:none || exit /b
