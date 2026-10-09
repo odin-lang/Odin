@@ -871,8 +871,13 @@ gb_internal void xb_dwarf_scopes(xbDwarfScopes *sc, xbProcDebug const &pd, i32 l
 
 // DW_AT_location of a symbol's storage: its address, or its offset in the thread's TLS block.
 // On macOS the symbol of a thread local is its TLV descriptor, which lldb resolves with form_tls_address.
+// Like LLVM, a thread local on arm64 Linux has an empty location: its linkers reject the relocation.
 gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbDwarfAddr> *addrs, i32 sym) {
 	bool tls = (m->symbols[sym].flags & xbSymbolFlag_TLS) != 0;
+	if (tls && xb_is_arm64() && !xb_is_darwin()) {
+		xbb_uleb(b, 0);
+		return;
+	}
 	xbb_uleb(b, tls ? 10 : 9);
 	xbb_u8(b, tls ? XDW_OP_const8u : XDW_OP_addr);
 	xbDwarfAddr r = {b->count, sym, 0};

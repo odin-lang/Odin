@@ -487,14 +487,20 @@ enum xbRelocKind : u8 {
 	xbReloc_TLSGD,
 	xbReloc_SecRel32,   // COFF: offset from the start of the symbol's section
 	xbReloc_TLV,        // x86-64 Mach-O: the address of a thread local's descriptor
-	// arm64 Mach-O, the immediate fields are filled in by the linker
+	// arm64, the immediate fields are filled in by the linker
 	xbReloc_A64_Branch26,     // bl
 	xbReloc_A64_Page21,       // adrp of the symbol's page
 	xbReloc_A64_PageOff12,    // add of the low 12 bits
 	xbReloc_A64_GotPage21,    // adrp of the page of the symbol's GOT entry
 	xbReloc_A64_GotPageOff12, // ldr of the GOT entry
-	xbReloc_A64_TlvPage21,    // adrp of the page of the thread local's descriptor
-	xbReloc_A64_TlvPageOff12, // ldr of the descriptor's address
+	xbReloc_A64_TlvPage21,    // Mach-O: adrp of the page of the thread local's descriptor
+	xbReloc_A64_TlvPageOff12, // Mach-O: ldr of the descriptor's address
+	xbReloc_A64_TlsIePage21,  // ELF: adrp of the page of the GOT entry with the thread local's offset
+	xbReloc_A64_TlsIeLo12,    // ELF: ldr of that GOT entry
+	xbReloc_A64_TlsDescPage21,// ELF: adrp of the page of the thread local's TLS descriptor
+	xbReloc_A64_TlsDescLd,    // ELF: ldr of the descriptor's resolver
+	xbReloc_A64_TlsDescAdd,   // ELF: add of the descriptor's low 12 bits
+	xbReloc_A64_TlsDescCall,  // ELF: the blr of the resolver
 };
 
 struct xbReloc {

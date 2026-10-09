@@ -1,4 +1,5 @@
-// ELF64 relocatable object writer, with .eh_frame. The DWARF sections come from xb_dwarf.cpp.
+// ELF64 relocatable object writer for x86-64 and arm64, with .eh_frame. The DWARF sections
+// come from xb_dwarf.cpp.
 
 #include <unistd.h>
 
@@ -14,7 +15,42 @@ enum : u32 {
 	XB_R_X86_64_TPOFF32       = 23,
 	XB_R_X86_64_GOTPCRELX     = 41,
 	XB_R_X86_64_REX_GOTPCRELX = 42,
+
+	XB_R_AARCH64_ABS64                       = 257,
+	XB_R_AARCH64_ABS32                       = 258,
+	XB_R_AARCH64_PREL32                      = 261,
+	XB_R_AARCH64_ADR_PREL_PG_HI21            = 275,
+	XB_R_AARCH64_ADD_ABS_LO12_NC             = 277,
+	XB_R_AARCH64_CALL26                      = 283,
+	XB_R_AARCH64_ADR_GOT_PAGE                = 311,
+	XB_R_AARCH64_LD64_GOT_LO12_NC            = 312,
+	XB_R_AARCH64_TLSIE_ADR_GOTTPREL_PAGE21   = 541,
+	XB_R_AARCH64_TLSIE_LD64_GOTTPREL_LO12_NC = 542,
+	XB_R_AARCH64_TLSDESC_ADR_PAGE21          = 562,
+	XB_R_AARCH64_TLSDESC_LD64_LO12           = 563,
+	XB_R_AARCH64_TLSDESC_ADD_LO12            = 564,
+	XB_R_AARCH64_TLSDESC_CALL                = 569,
 };
+
+// DW_CFA_offset of a register saved at cfa-8*n, for registers past the 6 bit short form too
+gb_internal void xb_cfa_offset(Array<u8> *b, u32 reg, u64 n) {
+	if (reg < 64) {
+		xbb_u8(b, cast(u8)(0x80 | reg));
+	} else {
+		xbb_u8(b, 0x05); // offset_extended
+		xbb_uleb(b, reg);
+	}
+	xbb_uleb(b, n);
+}
+
+// DW_CFA_advance_loc by `delta` code alignment units
+gb_internal void xb_cfa_advance(Array<u8> *b, u32 delta) {
+	if (delta < 64) {
+		xbb_u8(b, cast(u8)(0x40 | delta));
+	} else {
+		xbb_u8(b, 0x03); xbb_u8(b, cast(u8)delta); xbb_u8(b, cast(u8)(delta >> 8)); // advance_loc2
+	}
+}
 
 struct xbBuf {
 	Array<u8> data;
@@ -110,6 +146,11 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	array_add_elems(&sec[xbOut_Data], m->sections[xbSection_Data].data, m->sections[xbSection_Data].count);
 	array_add_elems(&sec[xbOut_TData], m->sections[xbSection_TData].data, m->sections[xbSection_TData].count);
 
+	bool arm64 = xb_is_arm64();
+	u32 const r_abs64 = arm64 ? XB_R_AARCH64_ABS64  : XB_R_X86_64_64;
+	u32 const r_abs32 = arm64 ? XB_R_AARCH64_ABS32  : XB_R_X86_64_32;
+	u32 const r_pc32  = arm64 ? XB_R_AARCH64_PREL32 : XB_R_X86_64_PC32;
+
 	// .eh_frame
 	{
 		Array<u8> *b = &sec[xbOut_EhFrame];
@@ -118,13 +159,17 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 		xbb_u32(b, 0); // CIE id
 		xbb_u8(b, 1);  // version
 		xbb_cstr(b, "zR");
-		xbb_uleb(b, 1);  // code alignment
-		xbb_sleb(b, -8); // data alignment
-		xbb_uleb(b, 16); // return address register
+		xbb_uleb(b, arm64 ? 4 : 1);   // code alignment
+		xbb_sleb(b, -8);              // data alignment
+		xbb_uleb(b, arm64 ? 30 : 16); // return address register
 		xbb_uleb(b, 1);  // augmentation data length
 		xbb_u8(b, 0x1b); // FDE pointers: pcrel sdata4
-		xbb_u8(b, 0x0c); xbb_uleb(b, 7); xbb_uleb(b, 8); // def_cfa rsp+8
-		xbb_u8(b, 0x80 | 16); xbb_uleb(b, 1);             // rip at cfa-8
+		if (arm64) {
+			xbb_u8(b, 0x0c); xbb_uleb(b, 31); xbb_uleb(b, 0); // def_cfa sp+0, the return address stays in x30
+		} else {
+			xbb_u8(b, 0x0c); xbb_uleb(b, 7); xbb_uleb(b, 8); // def_cfa rsp+8
+			xb_cfa_offset(b, 16, 1);                         // rip at cfa-8
+		}
 		xbb_align(b, 8);
 		xbb_patch_u32(b, cie_start, cast(u32)(b->count - cie_start - 4));
 
@@ -132,7 +177,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 			isize fde_start = b->count;
 			xbb_u32(b, 0);
 			xbb_u32(b, cast(u32)(b->count - cie_start)); // CIE pointer
-			xbExtraReloc r = {b->count, xbOut_Text, XB_R_X86_64_PC32, pd.start};
+			xbExtraReloc r = {b->count, xbOut_Text, r_pc32, pd.start};
 			array_add(&extra_relocs, r);
 			xbb_u32(b, 0); // pc begin
 			xbb_u32(b, cast(u32)(pd.end - pd.start));
@@ -143,22 +188,26 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 				xbb_patch_u32(b, fde_start, cast(u32)(b->count - fde_start - 4));
 				continue;
 			}
-			xbb_u8(b, 0x40 | 1);                    // advance 1 (push rbp)
-			xbb_u8(b, 0x0e); xbb_uleb(b, 16);       // def_cfa_offset 16
-			xbb_u8(b, 0x80 | 6); xbb_uleb(b, 2);    // rbp at cfa-16
-			xbb_u8(b, 0x40 | 3);                    // advance 3 (mov rbp, rsp)
-			xbb_u8(b, 0x0d); xbb_uleb(b, 6);        // def_cfa_register rbp
+			if (arm64) {
+				xb_cfa_advance(b, 1);                   // stp x29, x30, [sp, #-16]!
+				xbb_u8(b, 0x0e); xbb_uleb(b, 16);       // def_cfa_offset 16
+				xb_cfa_offset(b, 29, 2);                // x29 at cfa-16
+				xb_cfa_offset(b, 30, 1);                // x30 at cfa-8
+				xb_cfa_advance(b, 1);                   // mov x29, sp
+				xbb_u8(b, 0x0c); xbb_uleb(b, 29); xbb_uleb(b, 16); // def_cfa x29+16
+			} else {
+				xb_cfa_advance(b, 1);                   // push rbp
+				xbb_u8(b, 0x0e); xbb_uleb(b, 16);       // def_cfa_offset 16
+				xb_cfa_offset(b, 6, 2);                 // rbp at cfa-16
+				xb_cfa_advance(b, 3);                   // mov rbp, rsp
+				xbb_u8(b, 0x0d); xbb_uleb(b, 6);        // def_cfa_register rbp
+			}
 			if (pd.saved_regs.count > 0) {
-				u32 delta = cast(u32)(pd.saved_at - 4);
-				if (delta < 64) {
-					xbb_u8(b, cast(u8)(0x40 | delta)); // advance_loc
-				} else {
-					xbb_u8(b, 0x03); xbb_u8(b, cast(u8)delta); xbb_u8(b, cast(u8)(delta >> 8)); // advance_loc2
-				}
+				// after the saves, counted from the end of the frame setup
+				xb_cfa_advance(b, arm64 ? cast(u32)(pd.saved_at - 8) / 4 : cast(u32)(pd.saved_at - 4));
 				for (auto const &s : pd.saved_regs) {
-					// saved at rbp+off, the cfa is rbp+16
-					xbb_u8(b, cast(u8)(0x80 | s.dwarf_reg));
-					xbb_uleb(b, cast(u64)((16 - s.frame_offset) / 8));
+					// saved at fp+off, the cfa is fp+16
+					xb_cfa_offset(b, cast(u32)s.dwarf_reg, cast(u64)((16 - s.frame_offset) / 8));
 				}
 			}
 			xbb_align(b, 8);
@@ -174,28 +223,29 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 		sec[xbOut_DebugInfo] = d.info;
 		sec[xbOut_DebugLine] = d.line;
 		sec[xbOut_DebugRanges] = d.ranges;
-		xbExtraReloc ra = {d.abbrev_offset_at, xbOut_DebugAbbrev, XB_R_X86_64_32, 0};
-		xbExtraReloc rs = {d.stmt_list_at, xbOut_DebugLine, XB_R_X86_64_32, 0};
+		xbExtraReloc ra = {d.abbrev_offset_at, xbOut_DebugAbbrev, r_abs32, 0};
+		xbExtraReloc rs = {d.stmt_list_at, xbOut_DebugLine, r_abs32, 0};
 		array_add(&info_relocs, ra);
 		array_add(&info_relocs, rs);
 		for (isize at : d.ranges_refs) {
 			u32 off = 0;
 			gb_memmove(&off, d.info.data + at, 4);
-			xbExtraReloc r = {at, xbOut_DebugRanges, XB_R_X86_64_32, off};
+			xbExtraReloc r = {at, xbOut_DebugRanges, r_abs32, off};
 			array_add(&info_relocs, r);
 		}
 		for (xbDwarfAddr const &a : d.info_addrs) {
 			if (a.sym < 0) {
-				xbExtraReloc r = {a.offset, xbOut_Text, XB_R_X86_64_64, a.addend};
+				xbExtraReloc r = {a.offset, xbOut_Text, r_abs64, a.addend};
 				array_add(&info_relocs, r);
 			} else {
 				bool tls = (m->symbols[a.sym].flags & xbSymbolFlag_TLS) != 0;
-				xbSymReloc r = {a.offset, a.sym, tls ? XB_R_X86_64_DTPOFF64 : XB_R_X86_64_64};
+				GB_ASSERT(!tls || !arm64);
+				xbSymReloc r = {a.offset, a.sym, tls ? XB_R_X86_64_DTPOFF64 : r_abs64};
 				array_add(&info_sym_relocs, r);
 			}
 		}
 		for (xbDwarfAddr const &a : d.line_addrs) {
-			xbExtraReloc r = {a.offset, xbOut_Text, XB_R_X86_64_64, a.addend};
+			xbExtraReloc r = {a.offset, xbOut_Text, r_abs64, a.addend};
 			array_add(&line_relocs, r);
 		}
 	}
@@ -310,7 +360,20 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 		case xbReloc_TPOFF32:       type = XB_R_X86_64_TPOFF32; break;
 		case xbReloc_GOTTPOFF:      type = XB_R_X86_64_GOTTPOFF; break;
 		case xbReloc_TLSGD:         type = XB_R_X86_64_TLSGD; break;
+		case xbReloc_A64_Branch26:      type = XB_R_AARCH64_CALL26; break;
+		case xbReloc_A64_Page21:        type = XB_R_AARCH64_ADR_PREL_PG_HI21; break;
+		case xbReloc_A64_PageOff12:     type = XB_R_AARCH64_ADD_ABS_LO12_NC; break;
+		case xbReloc_A64_GotPage21:     type = XB_R_AARCH64_ADR_GOT_PAGE; break;
+		case xbReloc_A64_GotPageOff12:  type = XB_R_AARCH64_LD64_GOT_LO12_NC; break;
+		case xbReloc_A64_TlsIePage21:   type = XB_R_AARCH64_TLSIE_ADR_GOTTPREL_PAGE21; break;
+		case xbReloc_A64_TlsIeLo12:     type = XB_R_AARCH64_TLSIE_LD64_GOTTPREL_LO12_NC; break;
+		case xbReloc_A64_TlsDescPage21: type = XB_R_AARCH64_TLSDESC_ADR_PAGE21; break;
+		case xbReloc_A64_TlsDescLd:     type = XB_R_AARCH64_TLSDESC_LD64_LO12; break;
+		case xbReloc_A64_TlsDescAdd:    type = XB_R_AARCH64_TLSDESC_ADD_LO12; break;
+		case xbReloc_A64_TlsDescCall:   type = XB_R_AARCH64_TLSDESC_CALL; break;
 		}
+		if (arm64 && r.kind == xbReloc_Abs64) type = XB_R_AARCH64_ABS64;
+		GB_ASSERT_MSG(type != 0, "relocation kind %d has no ELF form", r.kind);
 		xbElfRela er = {};
 		er.r_offset = cast(u64)r.offset;
 		er.r_info = (cast(u64)elf_sym << 32) | type;
@@ -420,7 +483,7 @@ gb_internal bool xb_write_object(xbModule *m, String path) {
 	h[6] = 1; // version
 	h[7] = 0; // System V
 	u16 e_type = 1;      // relocatable
-	u16 e_machine = 62;  // x86-64
+	u16 e_machine = arm64 ? 183 : 62; // aarch64 or x86-64
 	u32 e_version = 1;
 	u64 zero = 0;
 	u16 e_ehsize = 64;

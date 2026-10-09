@@ -1848,7 +1848,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("Invalid backend for -backend:<string>, got %.*s\n", LIT(b));
 								gb_printf_err("Valid backends:\n");
 								gb_printf_err("\tllvm\n");
-								gb_printf_err("\tfast (unoptimized builds for linux_amd64, windows_amd64, darwin_amd64 and darwin_arm64; falls back to LLVM per procedure)\n");
+								gb_printf_err("\tfast (unoptimized builds for linux_amd64, linux_arm64, windows_amd64, darwin_amd64 and darwin_arm64; falls back to LLVM per procedure)\n");
 								bad_flags = true;
 							}
 							break;

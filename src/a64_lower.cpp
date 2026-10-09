@@ -89,14 +89,23 @@ gb_internal void a64_check_proc(xbProc *p) {
 	}
 }
 
+// Whether a thread local's address comes from a call: macOS calls the variable's TLV
+// descriptor, and on Linux anything but an executable may be loaded with dlopen, so it calls
+// the TLS descriptor's resolver (general dynamic) like LLVM. An executable adds the offset in
+// the variable's GOT entry to the thread pointer (initial exec).
+gb_internal bool a64_tls_calls(void) {
+	return xb_is_darwin() || build_context.build_mode != BuildMode_Executable;
+}
+
 // Whether the lowering of `in` calls something or writes x0-x8, which a vreg in those
 // registers or in v0-v7/v20-v31 cannot live through.
 gb_internal bool a64_clobbers(xbInstr const &in) {
 	switch (in.op) {
+	case xbOp_TlsAddr:
+		return a64_tls_calls();
 	case xbOp_Call:
 	case xbOp_Ret:
 	case xbOp_Syscall:
-	case xbOp_TlsAddr:
 	case xbOp_MemCopyDyn:
 	case xbOp_MemMoveDyn:
 	case xbOp_MemSetDyn:
@@ -1114,13 +1123,35 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_TlsAddr: {
-		// the variable's descriptor holds a function that returns its address in x0
 		i32 sym = cast(i32)in.imm;
-		a64_adrp(a, X0, sym, xbReloc_A64_TlvPage21);
-		a64_ldr_pageoff(a, X0, X0, sym, xbReloc_A64_TlvPageOff12);
-		a64_ldr(a, 8, false, A64_TA, X0, 0);
-		a64_blr(a, A64_TA);
-		a64_put(L, in.dst, X0);
+		u32 const mrs_tpidr_el0 = 0xD53BD040;
+		if (xb_is_darwin()) {
+			// the variable's descriptor holds a function that returns its address in x0
+			a64_adrp(a, X0, sym, xbReloc_A64_TlvPage21);
+			a64_ldr_pageoff(a, X0, X0, sym, xbReloc_A64_TlvPageOff12);
+			a64_ldr(a, 8, false, A64_TA, X0, 0);
+			a64_blr(a, A64_TA);
+			a64_put(L, in.dst, X0);
+		} else if (a64_tls_calls()) {
+			// the exact TLS descriptor sequence, which the linker may rewrite into a cheaper
+			// model; the resolver returns the offset from the thread pointer in x0
+			a64_adrp(a, X0, sym, xbReloc_A64_TlsDescPage21);
+			a64_ldr_pageoff(a, X1, X0, sym, xbReloc_A64_TlsDescLd);
+			xb_add_reloc(p->m, xbSection_Text, xbReloc_A64_TlsDescAdd, xb_pos(a), sym, 0);
+			a64_emit(a, 0x91000000 | (cast(u32)X0 << 5) | X0); // add x0, x0, #0
+			xb_add_reloc(p->m, xbSection_Text, xbReloc_A64_TlsDescCall, xb_pos(a), sym, 0);
+			a64_blr(a, X1);
+			a64_emit(a, mrs_tpidr_el0 | X1);
+			a64_alu(a, A64_ADD, X0, X1, X0);
+			a64_put(L, in.dst, X0);
+		} else {
+			u8 d = a64_dst(L, in.dst, A64_T0);
+			a64_adrp(a, d, sym, xbReloc_A64_TlsIePage21);
+			a64_ldr_pageoff(a, d, d, sym, xbReloc_A64_TlsIeLo12);
+			a64_emit(a, mrs_tpidr_el0 | A64_TA);
+			a64_alu(a, A64_ADD, d, A64_TA, d);
+			a64_put(L, in.dst, d);
+		}
 		break;
 	}
 	case xbOp_Alloca: {
@@ -1204,10 +1235,10 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		break;
 	}
 	case xbOp_Syscall: {
-		// Darwin: the number in x16, the arguments in x0-x5, the result in x0
+		// the number in x16 on Darwin, in x8 on Linux, the arguments in x0-x5, the result in x0
 		xbCall const &c = p->calls[cast(isize)in.imm];
 		a64_lower_call(L, c, true);
-		a64_emit(a, 0xD4001001); // svc #0x80
+		a64_emit(a, xb_is_darwin() ? 0xD4001001 : 0xD4000001); // svc #0x80 or svc #0
 		a64_put(L, c.result_vreg, X0);
 		break;
 	}

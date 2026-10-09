@@ -1166,7 +1166,7 @@ gb_internal xbValue xb_build_fixed_point(xbProc *p, AstCallExpr *ce, Type *resul
 // c_va_list on arm64 macOS is a pointer to the next 8 byte stack slot; the variadic arguments
 // follow the fixed ones on the stack.
 gb_internal void xb_build_c_va_start(xbProc *p, AstCallExpr *ce) {
-	if (!xb_is_arm64()) XB_UNSUPPORTED(p, "c_va_start on x86-64");
+	if (!xb_is_arm64() || !xb_is_darwin()) XB_UNSUPPORTED(p, "c_va_start outside arm64 macOS");
 	if (p->inl != nullptr || !base_type(p->type)->Proc.c_vararg) XB_UNSUPPORTED(p, "c_va_start");
 	u32 list = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
 	u32 first = xb_lea(p, xb_mem(xbMem_Incoming, 0, cast(i32)align_formula(p->abi->stack_size, 8)));
@@ -1176,7 +1176,7 @@ gb_internal void xb_build_c_va_start(xbProc *p, AstCallExpr *ce) {
 // LLVM's va_arg on arm64 macOS: integers and floats take 8 bytes, an f32 or f16 is passed as
 // an f64, a more aligned value starts aligned.
 gb_internal xbValue xb_build_c_va_arg(xbProc *p, AstCallExpr *ce, Type *type) {
-	if (!xb_is_arm64()) XB_UNSUPPORTED(p, "c_va_arg on x86-64");
+	if (!xb_is_arm64() || !xb_is_darwin()) XB_UNSUPPORTED(p, "c_va_arg outside arm64 macOS");
 	xbType st = xb_scalar_type(type);
 	if (st == xbType_None || is_type_different_to_arch_endianness(type)) XB_UNSUPPORTED(p, "c_va_arg type");
 	u32 list = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
@@ -2028,8 +2028,9 @@ gb_internal xbValue xb_build_builtin_proc(xbProc *p, Ast *expr, TypeAndValue con
 		if (ce->args.count > 7) XB_UNSUPPORTED(p, "syscall arg count");
 		if (xb_is_win64()) XB_UNSUPPORTED(p, "syscall on windows");
 		u8 const x86_regs[7] = {RAX, RDI, RSI, RDX, R10, R8, R9};
-		u8 const arm64_regs[7] = {16, 0, 1, 2, 3, 4, 5}; // Darwin
-		u8 const *regs = xb_is_arm64() ? arm64_regs : x86_regs;
+		u8 const darwin_arm64_regs[7] = {16, 0, 1, 2, 3, 4, 5};
+		u8 const linux_arm64_regs[7] = {8, 0, 1, 2, 3, 4, 5};
+		u8 const *regs = !xb_is_arm64() ? x86_regs : xb_is_darwin() ? darwin_arm64_regs : linux_arm64_regs;
 		auto args = array_make<xbCallArg>(xb_allocator(), 0, ce->args.count);
 		for_array(i, ce->args) {
 			xbValue v = xb_emit_conv(p, xb_build_expr(p, ce->args[i]), t_uintptr);

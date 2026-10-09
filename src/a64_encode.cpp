@@ -581,8 +581,33 @@ gb_internal void a64_brk(xbAsm *a, u16 imm) {
 }
 
 ////////////////////////////////////////////////////////////////
-// Atomics, all sequentially consistent; every Apple cpu has the LSE instructions
+// Atomics, all sequentially consistent. Every Apple cpu has the LSE instructions; without
+// them, as on a generic Linux cpu, read-modify-writes are exclusive load and store loops.
 ////////////////////////////////////////////////////////////////
+
+gb_internal bool a64_has_lse(void) {
+	return build_context.metrics.os == TargetOs_darwin || check_target_feature_is_enabled(str_lit("lse"), nullptr);
+}
+
+enum : u8 {
+	A64_LLSC_VALUE  = 17, // x17: the value a loop stores, or the value a compare and swap loads
+	A64_LLSC_STATUS = 15, // w15: whether the exclusive store failed
+};
+
+// ldaxr: load-acquire exclusive of `size` bytes at [xn], zero extended
+gb_internal void a64_ldaxr(xbAsm *a, i32 size, u8 rt, u8 rn) {
+	a64_emit(a, 0x085FFC00 | (a64_size_log2(size) << 30) | (cast(u32)rn << 5) | rt);
+}
+
+// stlxr: store-release exclusive of the low `size` bytes of xt at [xn], ws = 1 when it failed
+gb_internal void a64_stlxr(xbAsm *a, i32 size, u8 rs, u8 rt, u8 rn) {
+	a64_emit(a, 0x0800FC00 | (a64_size_log2(size) << 30) | (cast(u32)rs << 16) | (cast(u32)rn << 5) | rt);
+}
+
+// cbnz w`rt` by `delta` instructions
+gb_internal void a64_cbnz_w(xbAsm *a, u8 rt, i32 delta) {
+	a64_emit(a, 0x35000000 | ((cast(u32)delta & 0x7ffff) << 5) | rt);
+}
 
 // ldar: load-acquire of `size` bytes at [xn], zero extended
 gb_internal void a64_ldar(xbAsm *a, i32 size, u8 rt, u8 rn) {
@@ -602,14 +627,43 @@ enum a64LseOp : u32 {
 	A64_SWP   = 0x8000,
 };
 
-// xt = old [xn]; [xn] = old op xs, with acquire and release
+// xt = old [xn]; [xn] = old op xs, with acquire and release. Without LSE, xt and xs must
+// differ from x15 and x17.
 gb_internal void a64_lse(xbAsm *a, a64LseOp op, i32 size, u8 rs, u8 rt, u8 rn) {
-	a64_emit(a, 0x38E00000 | op | (a64_size_log2(size) << 30) | (cast(u32)rs << 16) | (cast(u32)rn << 5) | rt);
+	if (a64_has_lse()) {
+		a64_emit(a, 0x38E00000 | op | (a64_size_log2(size) << 30) | (cast(u32)rs << 16) | (cast(u32)rn << 5) | rt);
+		return;
+	}
+	GB_ASSERT(rt != rs && rt != rn);
+	u8 v = A64_LLSC_VALUE;
+	a64_ldaxr(a, size, rt, rn);
+	switch (op) {
+	case A64_LDADD: a64_alu(a, A64_ADD, v, rt, rs); break;
+	case A64_LDCLR: a64_alu(a, cast(a64AluOp)(A64_AND | (1u << 21)), v, rt, rs); break; // bic
+	case A64_LDEOR: a64_alu(a, A64_EOR, v, rt, rs); break;
+	case A64_LDSET: a64_alu(a, A64_ORR, v, rt, rs); break;
+	case A64_SWP:   v = rs; a64_emit(a, 0xD503201F); break; // nop, every loop has the same length
+	}
+	a64_stlxr(a, size, A64_LLSC_STATUS, v, rn);
+	a64_cbnz_w(a, A64_LLSC_STATUS, -3);
 }
 
-// casal: if [xn] == xs { [xn] = xt }; xs = old [xn]
+// casal: if [xn] == xs { [xn] = xt }; xs = old [xn]. Without LSE, xs must be zero extended
+// from `size` bytes, and xt and xs must differ from x15 and x17.
 gb_internal void a64_casal(xbAsm *a, i32 size, u8 rs, u8 rt, u8 rn) {
-	a64_emit(a, 0x08E0FC00 | (a64_size_log2(size) << 30) | (cast(u32)rs << 16) | (cast(u32)rn << 5) | rt);
+	if (a64_has_lse()) {
+		a64_emit(a, 0x08E0FC00 | (a64_size_log2(size) << 30) | (cast(u32)rs << 16) | (cast(u32)rn << 5) | rt);
+		return;
+	}
+	u8 old = A64_LLSC_VALUE;
+	a64_ldaxr(a, size, old, rn);
+	a64_cmp(a, old, rs);
+	a64_emit(a, 0x54000000 | (4u << 5) | 1);        // b.ne the clrex
+	a64_stlxr(a, size, A64_LLSC_STATUS, rt, rn);
+	a64_cbnz_w(a, A64_LLSC_STATUS, -4);
+	a64_emit(a, 0x14000002);                         // b over the clrex
+	a64_emit(a, 0xD503305F);                         // clrex
+	a64_alu(a, A64_ORR, rs, XZR, old);               // mov xs, the old value
 }
 
 gb_internal void a64_dmb_ish(xbAsm *a) {

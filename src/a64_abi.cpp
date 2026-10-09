@@ -1,20 +1,28 @@
-// The Apple arm64 calling convention, which must match LLVM's because procedures from
-// both backends call each other.
+// The arm64 calling conventions of Apple and of Linux (AAPCS64), which must match LLVM's
+// because procedures from both backends call each other.
 //
 // The LLVM backend classifies on its lowered types (lbAbiArm64 in llvm_abi.cpp), then
-// LLVM's CC_AArch64_DarwinPCS assigns the pieces. Both steps are mirrored here, on the
-// same `xbLType` the x64 classifier uses:
-//   - a scalar takes the next x or v register, then a stack slot of its own size
+// LLVM's CC_AArch64_DarwinPCS or CC_AArch64_AAPCS assigns the pieces. Both steps are
+// mirrored here, on the same `xbLType` the x64 classifier uses:
+//   - a scalar takes the next x or v register, then a stack slot of its own size on Apple,
+//     of at least 8 bytes on Linux
 //   - a homogeneous float aggregate of up to four members takes consecutive v registers,
 //     and a 9 to 16 byte aggregate two x registers, all or nothing: when they do not fit,
 //     every register of the class counts as used and the members go onto the stack
-//   - an i128 takes two consecutive x registers but never starts at x7, Apple drops
-//     the even register rule; on the stack it is 16 byte aligned
+//   - an i128 takes two consecutive x registers, starting at an even one on Linux; Apple
+//     drops that rule but never starts it at x7; on the stack it is 16 byte aligned
 //   - anything larger than 16 bytes is passed by pointer, and returned through x8
-//   - a C vararg always goes onto the stack, in an 8 byte slot
+//   - Apple makes the caller extend an integer narrower than 32 bits, Linux only a bool
+//   - a C vararg goes onto the stack in an 8 byte slot on Apple, and is assigned like a
+//     fixed argument on Linux
 
 gb_internal bool xb_is_arm64(void) {
 	return build_context.metrics.arch == TargetArch_arm64;
+}
+
+// Apple's arm64 calling convention, rather than AAPCS64
+gb_internal bool a64_is_apple(void) {
+	return build_context.metrics.os == TargetOs_darwin;
 }
 
 gb_internal bool xb_can_compile_procs(void) {
@@ -221,7 +229,7 @@ gb_internal void a64_register_pieces(a64Class *c, xbLType *t, Type *source_type)
 			if (t->size < 4) {
 				if (t->bits == 1) {
 					ext = xbExt_Zero;
-				} else if (source_type != nullptr && (is_type_integer_like(source_type) || is_type_enum(source_type))) {
+				} else if (a64_is_apple() && source_type != nullptr && (is_type_integer_like(source_type) || is_type_enum(source_type))) {
 					ext = (is_type_unsigned(source_type) || is_type_boolean(source_type)) ? xbExt_Zero : xbExt_Sign;
 				}
 			}
@@ -316,15 +324,18 @@ struct a64Assigner {
 	i32 nsaa;  // next stack offset
 };
 
+// The stack slot of a scalar of `size` bytes, which is also its alignment
 gb_internal i32 a64_slot_size(i32 size) {
+	if (!a64_is_apple()) return size <= 8 ? 8 : 16;
 	return size <= 1 ? 1 : size <= 2 ? 2 : size <= 4 ? 4 : size <= 8 ? 8 : 16;
 }
 
-gb_internal void a64_assign_stack(a64Assigner *s, xbAbiPiece *p, i32 align) {
+// `packed`: a member of a block after its first, which follows the previous member directly
+gb_internal void a64_assign_stack(a64Assigner *s, xbAbiPiece *p, i32 align, bool packed=false) {
 	p->loc = xbLoc_Stack;
 	s->nsaa = cast(i32)xb_lt_align_formula(s->nsaa, align);
 	p->stack_offset = s->nsaa;
-	s->nsaa += a64_slot_size(p->size);
+	s->nsaa += packed ? p->size : a64_slot_size(p->size);
 }
 
 gb_internal void a64_assign_pieces(xbAbiFunc *f, a64Assigner *s, a64Class const &c) {
@@ -334,6 +345,7 @@ gb_internal void a64_assign_pieces(xbAbiFunc *f, a64Assigner *s, a64Class const 
 	isize n = c.pieces.count;
 
 	if (c.i128_pair) {
+		if (!a64_is_apple()) s->ngrn += s->ngrn & 1;
 		if (s->ngrn + 2 <= 8) {
 			ps[0].reg = cast(u8)s->ngrn++;
 			ps[1].reg = cast(u8)s->ngrn++;
@@ -351,9 +363,10 @@ gb_internal void a64_assign_pieces(xbAbiFunc *f, a64Assigner *s, a64Class const 
 			for (isize i = 0; i < n; i++) ps[i].reg = cast(u8)(*next)++;
 		} else {
 			*next = 8;
+			// the members are packed after the first, which Linux aligns to at least 8
+			i32 align = a64_is_apple() ? cast(i32)c.block_align : gb_max(cast(i32)c.block_align, 8);
 			for (isize i = 0; i < n; i++) {
-				// the members are packed after the first
-				a64_assign_stack(s, &ps[i], i == 0 ? cast(i32)c.block_align : 1);
+				a64_assign_stack(s, &ps[i], i == 0 ? align : 1, true);
 			}
 		}
 		return;
@@ -545,9 +558,12 @@ gb_internal xbAbiFunc *a64_abi_compute(Type *proc_type, char const **reason) {
 }
 
 // The variadic arguments of a C call: on macOS each one takes an 8 byte stack slot after
-// the fixed arguments, never a register.
+// the fixed arguments, never a register. On Linux each takes the next x or v register like
+// a fixed argument, then an 8 byte stack slot.
 gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index) {
 	i32 stack = cast(i32)xb_lt_align_formula(abi->stack_size, 8);
+	i32 ngrn = a64_is_apple() ? 8 : abi->gpr_count;
+	i32 nsrn = a64_is_apple() ? 8 : abi->xmm_count;
 	for (; arg_index < args.count; arg_index++) {
 		xbValue v = args[arg_index];
 		xbType st = xb_scalar_type(v.type);
@@ -565,7 +581,14 @@ gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_ar
 			a.vreg = xb_convop(p, xbOp_FExt, xbType_F64, xbType_F32, a.vreg);
 			a.type = xbType_F64;
 		}
-		stack += 8;
+		i32 *next = xb_type_is_float(a.type) ? &nsrn : &ngrn;
+		if (*next < 8) {
+			a.kind = xb_type_is_float(a.type) ? xbCallArg_Xmm : xbCallArg_Gpr;
+			a.reg = cast(u8)(*next)++;
+			a.stack_offset = 0;
+		} else {
+			stack += 8;
+		}
 		array_add(call_args, a);
 	}
 	return stack;

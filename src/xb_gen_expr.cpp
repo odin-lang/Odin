@@ -489,11 +489,13 @@ gb_internal xbValue xb_proc_value_from_entity(xbProc *p, Entity *e) {
 	return xb_value_reg(e->type, xb_lea(p, m));
 }
 
-// A thread local's storage. An executable reaches it from the thread pointer (initial exec),
-// anything else may be loaded with dlopen, so it asks __tls_get_addr (general dynamic) like LLVM.
+// A thread local's storage. On x86-64 Linux an executable reaches it from the thread pointer
+// (initial exec), anything else may be loaded with dlopen, so it asks __tls_get_addr (general
+// dynamic) like LLVM.
 gb_internal xbMem xb_tls_mem(xbProc *p, i32 sym) {
-	if (xb_is_darwin()) {
-		// macOS calls the variable's TLV descriptor in every build mode
+	if (xb_is_darwin() || xb_is_arm64()) {
+		// macOS calls the variable's TLV descriptor in every build mode, arm64 Linux has no
+		// thread pointer relative addressing mode, see a64_tls_calls
 		xbInstr in = xb_instr(xbOp_TlsAddr);
 		in.type = xbType_I64;
 		in.imm = sym;
