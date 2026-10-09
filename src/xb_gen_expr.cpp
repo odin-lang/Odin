@@ -3233,9 +3233,8 @@ gb_internal xbValue xb_build_slice_expr(xbProc *p, Ast *expr) {
 		skip_check = true; // checked at compile time
 	}
 	if (t->kind == Type_FixedCapacityDynamicArray) {
-		// LLVM skips the check when both indices are constants, as it does for arrays
-		skip_check = (se->low == nullptr && se->high == nullptr) ||
-		             (se->low != nullptr && se->high != nullptr && low_const && high_const);
+		// the length is only known at runtime, so constant indices are checked too
+		skip_check = se->low == nullptr && se->high == nullptr;
 	}
 	if (!skip_check) {
 		xb_emit_slice_bounds_check(p, se->open, lo, hi, len, se->low != nullptr);
