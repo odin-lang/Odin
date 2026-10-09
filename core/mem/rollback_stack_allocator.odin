@@ -485,7 +485,7 @@ rollback_stack_allocator_proc :: proc(
 			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Resize_Non_Zeroed}
 		}
 		return nil, nil
-	case .Query_Info:
+	case .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 	return
