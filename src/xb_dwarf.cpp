@@ -901,6 +901,176 @@ gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbDwa
 	xbb_bytes(b, round.data, round.count);
 }
 
+struct xbDwarfProcs {
+	xbModule *m;
+	StringMap<u32> *abstract_dies; // inlined procedure -> its abstract entry's offset in the unit
+	u8 frame_reg;
+};
+
+// The entries of procedures [begin, end), with offsets from the start of `info` and `ranges`.
+// xb_dwarf_build appends them; the types they refer to are left to it.
+struct xbDwarfProcChunk {
+	xbDwarfProcs *procs;
+	isize begin, end;
+	Array<u8> info;
+	Array<u8> ranges;
+	Array<isize> ranges_refs; // in info, the offsets into ranges
+	Array<xbDwarfAddr> addrs;
+	Array<xbDwarfTypes::Pending> types;
+	xbDwarfScopes sc;
+	Array<u8> expr; // a variable's location expression
+};
+
+gb_internal void xb_dwarf_chunk_type_ref(xbDwarfProcChunk *c, Type *t) {
+	xbDwarfTypes::Pending pd = {c->info.count, default_type(t)};
+	array_add(&c->types, pd);
+	xbb_u32(&c->info, 0);
+}
+
+gb_internal void xb_dwarf_chunk_var(xbDwarfProcChunk *c, xbDebugVar const &v) {
+	Array<u8> *b = &c->info;
+	xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
+	xbb_str(b, v.name);
+	if (v.local < 0) {
+		xb_dwarf_symbol_location(c->procs->m, b, &c->addrs, v.sym);
+		xbb_uleb(b, cast(u64)gb_max(v.line, 0));
+		xb_dwarf_chunk_type_ref(c, v.type);
+		return;
+	}
+	Array<u8> *expr = &c->expr;
+	array_clear(expr);
+	if (v.in_reg && v.by_ref) {
+		xbb_u8(expr, cast(u8)(XDW_OP_breg0 + v.dwarf_reg));
+		xbb_sleb(expr, 0);
+	} else if (v.in_reg && v.dwarf_reg >= 32) {
+		xbb_u8(expr, XDW_OP_regx);
+		xbb_uleb(expr, v.dwarf_reg);
+	} else if (v.in_reg) {
+		xbb_u8(expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
+	} else {
+		// the frame pointer is the frame base
+		xbb_u8(expr, XDW_OP_fbreg);
+		xbb_sleb(expr, v.frame_offset_fixup);
+		if (v.by_ref) {
+			xbb_u8(expr, XDW_OP_deref);
+		}
+	}
+	xbb_uleb(b, cast(u64)expr->count);
+	xbb_bytes(b, expr->data, expr->count);
+	xbb_uleb(b, cast(u64)gb_max(v.line, 0));
+	xb_dwarf_chunk_type_ref(c, v.type);
+}
+
+// a block's variables, then its blocks, nested like the scopes
+gb_internal void xb_dwarf_chunk_block(xbDwarfProcChunk *c, xbProcDebug const &pd, i32 s) {
+	Array<u8> *b = &c->info;
+	xbDwarfScopes const &sc = c->sc;
+	for (i32 i = sc.var_head[s]; i >= 0; i = sc.var_next[i]) xb_dwarf_chunk_var(c, pd.vars[i]);
+	for (i32 k = sc.kid[s]; k >= 0; k = sc.sib[k]) {
+		xbDwarfScopes::Range const &r = sc.pool[sc.head[k]];
+		xbInlineSite const *site = sc.site[k] >= 0 ? &pd.inline_sites[sc.site[k]] : nullptr;
+		auto origin = [&]() {
+			u32 *at = string_map_get(c->procs->abstract_dies, site->name);
+			GB_ASSERT(at != nullptr);
+			xbb_u32(b, *at);
+		};
+		auto call_site = [&]() {
+			xbb_uleb(b, cast(u64)gb_max(site->call_file, 1));
+			xbb_uleb(b, cast(u64)gb_max(site->call_line, 0));
+			xbb_uleb(b, cast(u64)gb_max(site->call_column, 0));
+		};
+		if (r.next < 0) {
+			xbb_uleb(b, site ? xbAbbrev_InlinedSubroutine : xbAbbrev_LexicalBlock);
+			if (site) origin();
+			xbDwarfAddr a = {b->count, -1, pd.start + r.lo};
+			array_add(&c->addrs, a);
+			xbb_u64(b, 0);
+			xbb_u32(b, cast(u32)(r.hi - r.lo));
+			if (site) call_site();
+		} else {
+			xbb_uleb(b, site ? xbAbbrev_InlinedSubroutineRanges : xbAbbrev_LexicalBlockRanges);
+			if (site) origin();
+			array_add(&c->ranges_refs, b->count);
+			xbb_u32(b, cast(u32)c->ranges.count);
+			// offsets from the unit's low_pc, the start of the text section
+			for (i32 q = sc.head[k]; q >= 0; q = sc.pool[q].next) {
+				xbb_u64(&c->ranges, cast(u64)(pd.start + sc.pool[q].lo));
+				xbb_u64(&c->ranges, cast(u64)(pd.start + sc.pool[q].hi));
+			}
+			xbb_u64(&c->ranges, 0);
+			xbb_u64(&c->ranges, 0);
+			if (site) call_site();
+		}
+		xb_dwarf_chunk_block(c, pd, k);
+		xbb_u8(b, 0);
+	}
+}
+
+// Runs on the thread pool. It reads the module and writes only its chunks.
+gb_internal void xb_dwarf_proc_chunks(xbDwarfProcChunk *chunks, isize count) {
+	for (isize ci = 0; ci < count; ci++) {
+		xbDwarfProcChunk *c = &chunks[ci];
+		xbModule *m = c->procs->m;
+		Array<u8> *b = &c->info;
+		c->info = array_make<u8>(heap_allocator(), 0, 4096);
+		c->ranges = array_make<u8>(heap_allocator(), 0, 0);
+		c->ranges_refs = array_make<isize>(heap_allocator(), 0, 0);
+		c->addrs = array_make<xbDwarfAddr>(heap_allocator(), 0, 64);
+		c->types = array_make<xbDwarfTypes::Pending>(heap_allocator(), 0, 256);
+		c->expr = array_make<u8>(heap_allocator(), 0, 16);
+		xbDwarfScopes *sc = &c->sc;
+		sc->eff = array_make<i32>(heap_allocator(), 0, 0);
+		sc->kid = array_make<i32>(heap_allocator(), 0, 0);
+		sc->sib = array_make<i32>(heap_allocator(), 0, 0);
+		sc->head = array_make<i32>(heap_allocator(), 0, 0);
+		sc->tail = array_make<i32>(heap_allocator(), 0, 0);
+		sc->var_head = array_make<i32>(heap_allocator(), 0, 0);
+		sc->var_tail = array_make<i32>(heap_allocator(), 0, 0);
+		sc->var_next = array_make<i32>(heap_allocator(), 0, 0);
+		sc->site = array_make<i32>(heap_allocator(), 0, 0);
+		sc->pool = array_make<xbDwarfScopes::Range>(heap_allocator(), 0, 0);
+
+		for (isize i = c->begin; i < c->end; i++) {
+			xbProcDebug const &pd = m->proc_debug[i];
+			bool has_children = pd.vars.count > 0 || pd.inline_sites.count > 0;
+			// the single result, so `finish` shows it
+			Type *ret = nullptr;
+			Type *pt = pd.type ? base_type(pd.type) : nullptr;
+			if (pt && pt->kind == Type_Proc && pt->Proc.result_count == 1) {
+				ret = pt->Proc.results->Tuple.variables[0]->type;
+			}
+			if (ret) {
+				xbb_uleb(b, has_children ? xbAbbrev_SubprogramRet : xbAbbrev_SubprogramRetNoChildren);
+			} else {
+				xbb_uleb(b, has_children ? xbAbbrev_Subprogram : xbAbbrev_SubprogramNoChildren);
+			}
+			// the full name, like LLVM's, so `break pkg::proc` finds it
+			xbb_str(b, pd.link_name);
+			xbb_str(b, pd.link_name);
+			xbDwarfAddr r = {b->count, -1, pd.start};
+			array_add(&c->addrs, r);
+			xbb_u64(b, 0);
+			xbb_u32(b, cast(u32)(pd.end - pd.start));
+			xbb_uleb(b, 1);
+			xbb_u8(b, pd.naked ? XDW_OP_call_frame_cfa : c->procs->frame_reg);
+			xbb_uleb(b, cast(u64)gb_max(pd.file_id, 1));
+			xbb_uleb(b, cast(u64)gb_max(pd.line, 0));
+			if (ret) xb_dwarf_chunk_type_ref(c, ret);
+			if (has_children) {
+				xb_dwarf_scopes(sc, pd, cast(i32)(pd.end - pd.start));
+				xb_dwarf_chunk_block(c, pd, 0);
+				xbb_u8(b, 0);
+			}
+		}
+
+		array_free(&sc->eff); array_free(&sc->kid); array_free(&sc->sib);
+		array_free(&sc->head); array_free(&sc->tail); array_free(&sc->pool);
+		array_free(&sc->var_head); array_free(&sc->var_tail); array_free(&sc->var_next);
+		array_free(&sc->site);
+		array_free(&c->expr);
+	}
+}
+
 gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 	d->abbrev = array_make<u8>(heap_allocator(), 0, 4096);
 	d->info = array_make<u8>(heap_allocator(), 0, 1<<16);
@@ -1107,128 +1277,51 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 			}
 		}
 
-		auto emit_var = [&](xbDebugVar const &v) {
-			xbb_uleb(b, v.is_param ? xbAbbrev_Param : xbAbbrev_Var);
-			xbb_str(b, v.name);
-			if (v.local < 0) {
-				xb_dwarf_symbol_location(m, b, &d->info_addrs, v.sym);
-				xbb_uleb(b, cast(u64)gb_max(v.line, 0));
-				xb_dwarf_type_ref(&dt, v.type);
-				return;
-			}
-			Array<u8> expr = array_make<u8>(heap_allocator(), 0, 16);
-			if (v.in_reg && v.by_ref) {
-				xbb_u8(&expr, cast(u8)(XDW_OP_breg0 + v.dwarf_reg));
-				xbb_sleb(&expr, 0);
-			} else if (v.in_reg && v.dwarf_reg >= 32) {
-				xbb_u8(&expr, XDW_OP_regx);
-				xbb_uleb(&expr, v.dwarf_reg);
-			} else if (v.in_reg) {
-				xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
-			} else {
-				// the frame pointer is the frame base
-				xbb_u8(&expr, XDW_OP_fbreg);
-				xbb_sleb(&expr, v.frame_offset_fixup);
-				if (v.by_ref) {
-					xbb_u8(&expr, XDW_OP_deref);
-				}
-			}
-			xbb_uleb(b, cast(u64)expr.count);
-			xbb_bytes(b, expr.data, expr.count);
-			array_free(&expr);
-			xbb_uleb(b, cast(u64)gb_max(v.line, 0));
-			xb_dwarf_type_ref(&dt, v.type);
-		};
-		xbDwarfScopes sc = {};
-		sc.eff = array_make<i32>(heap_allocator(), 0, 0);
-		sc.kid = array_make<i32>(heap_allocator(), 0, 0);
-		sc.sib = array_make<i32>(heap_allocator(), 0, 0);
-		sc.head = array_make<i32>(heap_allocator(), 0, 0);
-		sc.tail = array_make<i32>(heap_allocator(), 0, 0);
-		sc.var_head = array_make<i32>(heap_allocator(), 0, 0);
-		sc.var_tail = array_make<i32>(heap_allocator(), 0, 0);
-		sc.var_next = array_make<i32>(heap_allocator(), 0, 0);
-		sc.site = array_make<i32>(heap_allocator(), 0, 0);
-		sc.pool = array_make<xbDwarfScopes::Range>(heap_allocator(), 0, 0);
-		// a block's variables, then its blocks, nested like the scopes
-		auto emit_block = [&](auto &self, xbProcDebug const &pd, i32 s) -> void {
-			for (i32 i = sc.var_head[s]; i >= 0; i = sc.var_next[i]) emit_var(pd.vars[i]);
-			for (i32 c = sc.kid[s]; c >= 0; c = sc.sib[c]) {
-				xbDwarfScopes::Range const &r = sc.pool[sc.head[c]];
-				xbInlineSite const *site = sc.site[c] >= 0 ? &pd.inline_sites[sc.site[c]] : nullptr;
-				auto origin = [&]() {
-					u32 *at = string_map_get(&abstract_dies, site->name);
-					GB_ASSERT(at != nullptr);
-					xbb_u32(b, *at);
-				};
-				auto call_site = [&]() {
-					xbb_uleb(b, cast(u64)gb_max(site->call_file, 1));
-					xbb_uleb(b, cast(u64)gb_max(site->call_line, 0));
-					xbb_uleb(b, cast(u64)gb_max(site->call_column, 0));
-				};
-				if (r.next < 0) {
-					xbb_uleb(b, site ? xbAbbrev_InlinedSubroutine : xbAbbrev_LexicalBlock);
-					if (site) origin();
-					xbDwarfAddr a = {b->count, -1, pd.start + r.lo};
-					array_add(&d->info_addrs, a);
-					xbb_u64(b, 0);
-					xbb_u32(b, cast(u32)(r.hi - r.lo));
-					if (site) call_site();
-				} else {
-					xbb_uleb(b, site ? xbAbbrev_InlinedSubroutineRanges : xbAbbrev_LexicalBlockRanges);
-					if (site) origin();
-					array_add(&d->ranges_refs, b->count);
-					xbb_u32(b, cast(u32)d->ranges.count);
-					// offsets from the unit's low_pc, the start of the text section
-					for (i32 k = sc.head[c]; k >= 0; k = sc.pool[k].next) {
-						xbb_u64(&d->ranges, cast(u64)(pd.start + sc.pool[k].lo));
-						xbb_u64(&d->ranges, cast(u64)(pd.start + sc.pool[k].hi));
-					}
-					xbb_u64(&d->ranges, 0);
-					xbb_u64(&d->ranges, 0);
-					if (site) call_site();
-				}
-				self(self, pd, c);
-				xbb_u8(b, 0);
-			}
-		};
-
-		for (xbProcDebug const &pd : m->proc_debug) {
-			bool has_children = pd.vars.count > 0 || pd.inline_sites.count > 0;
-			// the single result, so `finish` shows it
-			Type *ret = nullptr;
-			Type *pt = pd.type ? base_type(pd.type) : nullptr;
-			if (pt && pt->kind == Type_Proc && pt->Proc.result_count == 1) {
-				ret = pt->Proc.results->Tuple.variables[0]->type;
-			}
-			if (ret) {
-				xbb_uleb(b, has_children ? xbAbbrev_SubprogramRet : xbAbbrev_SubprogramRetNoChildren);
-			} else {
-				xbb_uleb(b, has_children ? xbAbbrev_Subprogram : xbAbbrev_SubprogramNoChildren);
-			}
-			// the full name, like LLVM's, so `break pkg::proc` finds it
-			xbb_str(b, pd.link_name);
-			xbb_str(b, pd.link_name);
-			xbDwarfAddr r = {b->count, -1, pd.start};
-			array_add(&d->info_addrs, r);
-			xbb_u64(b, 0);
-			xbb_u32(b, cast(u32)(pd.end - pd.start));
-			xbb_uleb(b, 1);
-			xbb_u8(b, pd.naked ? XDW_OP_call_frame_cfa : frame_reg);
-			xbb_uleb(b, cast(u64)gb_max(pd.file_id, 1));
-			xbb_uleb(b, cast(u64)gb_max(pd.line, 0));
-			if (ret) xb_dwarf_type_ref(&dt, ret);
-			if (has_children) {
-				xb_dwarf_scopes(&sc, pd, cast(i32)(pd.end - pd.start));
-				emit_block(emit_block, pd, 0);
-				xbb_u8(b, 0);
-			}
+		// the procedures' entries, built in parallel and appended in order
+		xbDwarfProcs procs = {};
+		procs.m = m;
+		procs.abstract_dies = &abstract_dies;
+		procs.frame_reg = frame_reg;
+		isize const per_chunk = 64;
+		isize nchunks = (m->proc_debug.count + per_chunk - 1) / per_chunk;
+		auto chunks = array_make<xbDwarfProcChunk>(heap_allocator(), nchunks);
+		for (isize i = 0; i < nchunks; i++) {
+			chunks[i] = {};
+			chunks[i].procs = &procs;
+			chunks[i].begin = i * per_chunk;
+			chunks[i].end = gb_min((i+1) * per_chunk, m->proc_debug.count);
 		}
-
-		array_free(&sc.eff); array_free(&sc.kid); array_free(&sc.sib);
-		array_free(&sc.head); array_free(&sc.tail); array_free(&sc.pool);
-		array_free(&sc.var_head); array_free(&sc.var_tail); array_free(&sc.var_next);
-		array_free(&sc.site);
+		thread_pool_for_chunks(chunks.data, chunks.count, 1, xb_dwarf_proc_chunks);
+		for (xbDwarfProcChunk &c : chunks) {
+			isize base = b->count;
+			u32 ranges_base = cast(u32)d->ranges.count;
+			xbb_bytes(b, c.info.data, c.info.count);
+			for (xbDwarfAddr a : c.addrs) {
+				a.offset += base;
+				array_add(&d->info_addrs, a);
+			}
+			for (isize at : c.ranges_refs) {
+				u32 v = 0;
+				gb_memmove(&v, b->data + base + at, 4);
+				xbb_patch_u32(b, base + at, v + ranges_base);
+				array_add(&d->ranges_refs, base + at);
+			}
+			xbb_bytes(&d->ranges, c.ranges.data, c.ranges.count);
+			for (xbDwarfTypes::Pending const &tp : c.types) {
+				xbDwarfTypes::Pending pd = {base + tp.at, tp.type};
+				array_add(&dt.pending, pd);
+				if (!ptr_set_exists(&dt.queued, tp.type)) {
+					ptr_set_add(&dt.queued, tp.type);
+					array_add(&dt.queue, tp.type);
+				}
+			}
+			array_free(&c.info);
+			array_free(&c.addrs);
+			array_free(&c.ranges_refs);
+			array_free(&c.ranges);
+			array_free(&c.types);
+		}
+		array_free(&chunks);
 		string_map_destroy(&abstract_dies);
 
 		// types, written after their first use
