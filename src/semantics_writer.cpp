@@ -8,7 +8,7 @@
 //     "exported": [{"file", "uses": [offset, entity, ...], "definitions": [offset, entity, ...], "inactive": [from, to, ...]}, ...],
 // }
 //
-// `file`, `type` and `entity` are indices into their tables, -1 when there is none, and offsets are in bytes
+// `file`, `type`, and `entity` are indices into their tables, -1 when there is none, and offsets are in bytes
 
 enum : i64 {
 	SEMANTICS_VERSION = 1,

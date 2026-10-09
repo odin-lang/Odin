@@ -7817,6 +7817,10 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	p->init_fullpath = init_fullpath;
 
+	StringSet extra_fullpaths = {};
+	string_set_init(&extra_fullpaths);
+	defer (string_set_destroy(&extra_fullpaths));
+
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
@@ -7849,10 +7853,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 					return ParseFile_WrongExtension;
 				}
 			}
-			AstPackage *pkg = try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
-			if (pkg) {
-				pkg->is_extra = true;
-			}
+			string_set_add(&extra_fullpaths, fullpath);
+			try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
 		}
 	}
 	
@@ -7864,6 +7866,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	}
 
 	for (AstPackage *pkg : p->packages) {
+		pkg->is_extra = string_set_exists(&extra_fullpaths, pkg->fullpath);
 		for (AstFile *file : pkg->files) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}
