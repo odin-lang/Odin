@@ -978,15 +978,17 @@ gb_internal i32 xb_rodata(xbModule *m, void const *data, isize size, i64 align) 
 
 // A NUL terminated string literal in read-only data.
 gb_internal i32 xb_string_literal(xbModule *m, String str) {
-	i32 *found = string_map_get(&m->string_lits, str);
+	// murmur reads 8 bytes a step, fnv32a one; test data has megabytes of string literals
+	u32 hash = cast(u32)gb_murmur64(str.text, str.len) & 0x7fffffff;
+	hash |= hash == 0;
+	i32 *found = string_map_get(&m->string_lits, hash, str);
 	if (found) {
 		return *found;
 	}
-	u8 *buf = gb_alloc_array(temporary_allocator(), u8, str.len+1);
-	gb_memmove(buf, str.text, str.len);
-	buf[str.len] = 0;
-	i32 sym = xb_rodata(m, buf, str.len+1, 1);
-	string_map_set(&m->string_lits, copy_string(permanent_allocator(), str), sym);
+	i32 sym = xb_rodata(m, str.text, str.len, 1);
+	array_add(&m->sections[xbSection_Rodata], cast(u8)0);
+	m->symbols[sym].size += 1;
+	string_map_set(&m->string_lits, hash, copy_string(permanent_allocator(), str), sym);
 	return sym;
 }
 
