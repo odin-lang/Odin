@@ -207,6 +207,19 @@ gb_internal void macho_set_name16(char *dst, char const *src) {
 	gb_memmove(dst, src, gb_min(n, cast(isize)16));
 }
 
+struct machoSortKey {
+	String name;
+	i32    index;
+};
+
+// equal names keep their order
+gb_internal GB_COMPARE_PROC(macho_sort_key_cmp) {
+	machoSortKey const *x = cast(machoSortKey const *)a;
+	machoSortKey const *y = cast(machoSortKey const *)b;
+	int c = string_compare(x->name, y->name);
+	return c != 0 ? c : i32_cmp(x->index, y->index);
+}
+
 gb_internal bool xb_write_macho(xbModule *m, String path) {
 	Array<u8> sec[machoOut_COUNT] = {};
 	i64 sec_size[machoOut_COUNT] = {};
@@ -472,15 +485,15 @@ gb_internal bool xb_write_macho(xbModule *m, String path) {
 		isize n = order.count - first;
 		if (pass > 0) {
 			// sorted by name, like the objects of other tools
-			for (isize a = first+1; a < order.count; a++) {
-				i32 v = order[a];
-				isize b = a;
-				while (b > first && string_compare(out_syms[order[b-1]].name, out_syms[v].name) > 0) {
-					order[b] = order[b-1];
-					b -= 1;
-				}
-				order[b] = v;
+			auto keys = array_make<machoSortKey>(heap_allocator(), n);
+			for (isize k = 0; k < n; k++) {
+				keys[k] = {out_syms[order[first+k]].name, order[first+k]};
 			}
+			array_sort(keys, macho_sort_key_cmp);
+			for (isize k = 0; k < n; k++) {
+				order[first+k] = keys[k].index;
+			}
+			array_free(&keys);
 		}
 		if (pass == 0) nlocal = cast(u32)n;
 		if (pass == 1) nextdef = cast(u32)n;
