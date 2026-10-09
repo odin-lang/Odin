@@ -67,6 +67,7 @@ gb_global Timings global_timings = {0};
 #include "parser.cpp"
 #include "checker.cpp"
 #include "docs.cpp"
+#include "semantics_writer.cpp"
 
 #include "cached.cpp"
 
@@ -443,6 +444,9 @@ enum BuildFlagKind {
 	BuildFlag_ExportDefineables,
 	BuildFlag_Overlay,
 	BuildFlag_Workspace,
+	BuildFlag_ExportSemantics,
+	BuildFlag_ExportSemanticsFile,
+	BuildFlag_ExportSemanticsFor,
 	BuildFlag_IgnoreUnusedDefineables,
 
 	BuildFlag_Vet,
@@ -721,6 +725,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Overlay,                 str_lit("overlay"),                   BuildFlagParam_String,  Command__does_check);
 	add_flag(&build_flags, BuildFlag_Workspace,               str_lit("workspace"),                 BuildFlagParam_None,    Command_check);
+	add_flag(&build_flags, BuildFlag_ExportSemantics,         str_lit("export-semantics"),          BuildFlagParam_String,  Command_check);
+	add_flag(&build_flags, BuildFlag_ExportSemanticsFile,     str_lit("export-semantics-file"),     BuildFlagParam_String,  Command_check);
+	add_flag(&build_flags, BuildFlag_ExportSemanticsFor,      str_lit("export-semantics-for"),      BuildFlagParam_String,  Command_check, true);
 	add_flag(&build_flags, BuildFlag_IgnoreUnusedDefineables, str_lit("ignore-unused-defineables"), BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
@@ -1134,6 +1141,40 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_Workspace: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.workspace = true;
+							break;
+						}
+						case BuildFlag_ExportSemantics: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							if (value.value_string == "json") {
+								build_context.export_semantics_format = SemanticsFormat_Json;
+							} else if (value.value_string == "cbor") {
+								build_context.export_semantics_format = SemanticsFormat_Cbor;
+							} else {
+								gb_printf_err("Invalid export format for -export-semantics:<string>, got %.*s\n", LIT(value.value_string));
+								gb_printf_err("Valid export formats:\n");
+								gb_printf_err("\tjson\n");
+								gb_printf_err("\tcbor\n");
+								bad_flags = true;
+							}
+							break;
+						}
+						case BuildFlag_ExportSemanticsFile: {
+							GB_ASSERT(value.kind == ExactValue_String);
+
+							String export_path = string_trim_whitespace(value.value_string);
+							if (is_build_flag_path_valid(export_path)) {
+								build_context.export_semantics_file = path_to_full_path(heap_allocator(), export_path);
+							} else {
+								gb_printf_err("Invalid -export-semantics-file path, got %.*s\n", LIT(export_path));
+								bad_flags = true;
+							}
+							break;
+						}
+						case BuildFlag_ExportSemanticsFor: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String path = string_trim_whitespace(value.value_string);
+							array_add(&build_context.export_semantics_for, path_to_full_path(heap_allocator(), path));
 							break;
 						}
 						case BuildFlag_IgnoreUnusedDefineables: {
@@ -3116,6 +3157,30 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Specifies the filename for `-export-dependencies`.");
 			print_usage_line(2, "Example: -export-dependencies-file:dependencies.d");
 		}
+	}
+
+	if (check_only) {
+		if (print_flag("-export-semantics:<format>")) {
+			print_usage_line(2, "Exports what each identifier refers to, its entity's kind, type, and definition, for editors and other tools.");
+			print_usage_line(2, "Also exports type layouts and the branches of 'when' statements not taken. Requires `-export-semantics-file`.");
+			print_usage_line(2, "It covers the packages named on the command line, or only the files given with `-export-semantics-for`.");
+			print_usage_line(2, "Available options:");
+				print_usage_line(3, "-export-semantics:json   Exports in JSON format");
+				print_usage_line(3, "-export-semantics:cbor   Exports in CBOR format");
+		}
+
+		if (print_flag("-export-semantics-file:<filename>")) {
+			print_usage_line(2, "Specifies the filename for `-export-semantics`.");
+			print_usage_line(2, "Example: -export-semantics-file:semantics.json");
+		}
+
+		if (print_flag("-export-semantics-for:<filename>")) {
+			print_usage_line(2, "Exports the semantics of only this file. Can be given several times.");
+			print_usage_line(2, "Example: -export-semantics-for:src/main.odin");
+		}
+	}
+
+	if (check) {
 
 		if (print_flag("-export-timings:<format>")) {
 			print_usage_line(2, "Exports timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`.");
@@ -4138,6 +4203,7 @@ int main(int arg_count, char const **arg_ptr) {
 	TIME_SECTION("init args");
 	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
+	build_context.export_semantics_for.allocator = heap_allocator();
 
 	init_build_context_error_pos_style();
 
@@ -4350,6 +4416,16 @@ int main(int arg_count, char const **arg_ptr) {
 	string_set_init(&build_context.vet_packages);
 
 	if (!parse_build_flags(args)) {
+		return 1;
+	}
+
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && build_context.export_semantics_file.len == 0) {
+		gb_printf_err("No semantics file specified with `-export-semantics-file`\n");
+		return 1;
+	}
+	if (build_context.export_semantics_format == SemanticsFormat_Invalid &&
+	    (build_context.export_semantics_file.len != 0 || build_context.export_semantics_for.count != 0)) {
+		gb_printf_err("`-export-semantics-file` and `-export-semantics-for` need `-export-semantics:<format>`\n");
 		return 1;
 	}
 
@@ -4683,6 +4759,12 @@ int main(int arg_count, char const **arg_ptr) {
 	if (!build_context.ignore_unused_defineables) {
 		check_defines(&build_context, checker);
 	}
+
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+		MAIN_TIME_SECTION("export semantics");
+		export_semantics(checker);
+	}
+
 	if (any_errors()) {
 		print_all_errors();
 		return 1;

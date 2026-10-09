@@ -505,6 +505,12 @@ enum OptimizationLevel : i32 {
 	OptimizationLevel_Aggressive =  3,
 };
 
+enum SemanticsFormat : u8 {
+	SemanticsFormat_Invalid,
+	SemanticsFormat_Json,
+	SemanticsFormat_Cbor,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -573,6 +579,11 @@ struct BuildContext {
 	String export_defineables_file;
 	String overlay_file;
 	bool   workspace;
+
+	SemanticsFormat export_semantics_format;
+	String          export_semantics_file;
+	Array<String>   export_semantics_for; // specific files
+
 	bool   ignore_unused_defineables;
 	bool   show_system_calls;
 	bool   keep_temp_files;

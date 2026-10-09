@@ -485,6 +485,11 @@ gb_internal void resolve_global_decl_source_internal(GlobalDeclSource *src, Inte
 			ws->is_cond_determined = true;
 			ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
 		}
+
+		if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+			per_thread_array_add(&ctx.info->semantic_when_queue, SemanticWhen{ws, ws->determined_cond});
+		}
+
 		if (ws->body == nullptr || ws->body->kind != Ast_BlockStmt) {
 			error(ws->cond, "Invalid body for 'when' statement");
 		} else if (ws->else_stmt != nullptr && ws->else_stmt->kind != Ast_BlockStmt && ws->else_stmt->kind != Ast_WhenStmt) {

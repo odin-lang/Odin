@@ -775,6 +775,17 @@ struct RaddbgTypeView {
 	String view;
 };
 
+struct SemanticIdent {
+	Ast *   ident;
+	Entity *entity;
+	bool    definition;
+};
+
+struct SemanticWhen {
+	AstWhenStmt *ws;
+	bool         taken;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -831,6 +842,11 @@ struct CheckerInfo {
 
 	PerThreadArray<Entity *> definition_queue;
 	PerThreadArray<Entity *> entity_queue;
+
+	// `-export-semantics` related stuff
+	PerThreadArray<SemanticIdent> semantic_ident_queue;
+	PerThreadArray<SemanticWhen>  semantic_when_queue;
+
 	bool                     entities_by_file; // until gathered, see `check_add_entities_from_files`
 	std::atomic<u64>         entities_without_file; // for their `order_in_src`
 	MPSCQueue<Entity *> required_global_variable_queue;
