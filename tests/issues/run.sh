@@ -263,8 +263,9 @@ fi
 # "odin run" tests:
 
 $ODIN run ../test_issue_7482 $COMMON
-$ODIN run ../test_issue_7562 $COMMON -no-crt -no-thread-local
-$ODIN run ../test_issue_7562 $COMMON -no-crt -no-thread-local -o:speed
+# 7562 is Windows only. TODO: Being in run.sh doesn't necessarily mean we're not on Windows.
+#$ODIN run ../test_issue_7562 $COMMON -no-crt -no-thread-local
+#$ODIN run ../test_issue_7562 $COMMON -no-crt -no-thread-local -o:speed
 $ODIN run ../test_issue_7564 $COMMON
 $ODIN run ../test_issue_7596 $COMMON
 $ODIN run ../test_issue_7798 $COMMON
