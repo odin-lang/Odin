@@ -200,10 +200,11 @@ struct EscapeAnalysis {
 	Array<EscapeFlow>    flows;
 	EscapeGraph *        graph;
 	i32                  group;       // of the procedures being analysed together, see `EscapeGraph`
-	Array<EscapeReport> *reports;     // kept rather than reported, while what flows through the group may still change
+	Array<EscapeReport> *reports;     // kept rather than reported until it is done, see `escape_analyse`
 	bool                 muted;       // the entry point of an executable, which only returns as the program ends
 	isize                stmt_visits;
-	bool                 too_large;   // give up on the procedure, see `escape_too_large`
+	bool                 too_large;   // see `escape_too_large` and `escape_analyse`
+	bool                 calls_unknown; // what the calls do, after growing too large with it
 
 	bool                 nil_deref;    // -vet-nil-deref
 	bool                 uninit;       // -vet-uninitialized
@@ -1926,7 +1927,7 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 				// otherwise a call the checker did not record, which should not happen
 				known = ea->graph->group_of[d->escape_index] == ea->group;
 			}
-			if (known) {
+			if (known && !ea->calls_unknown) {
 				flows = d->escape_flows;
 			}
 		}
@@ -2518,11 +2519,6 @@ gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, E
 	array_add(&ea->reported, node);
 
 	EscapeReport r = {kind, node, expr_str, o};
-	if (ea->reports == nullptr) {
-		escape_report_emit(r);
-		return;
-	}
-	// kept beyond this analysis and its temporary memory
 	r.expr_str    = copy_string(permanent_allocator(), expr_str);
 	r.origin.path = {};
 	array_add(ea->reports, r);
@@ -3487,8 +3483,7 @@ gb_internal ErrorInstantiations escape_instantiations_of(ProcInfo *pi) {
 	return {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 }
 
-// `reports` keeps what it reports rather than reporting it, when not null
-gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<EscapeReport> *reports) {
+gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<EscapeReport> *reports, bool calls_unknown=false) {
 	ProcInfo *pi = g->procs[v];
 	Type *type = pi->type;
 	Ast *body = pi->body;
@@ -3510,8 +3505,15 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.graph    = g;
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
+	ea.calls_unknown = calls_unknown;
 
-	// in a file without it, which only gives what flows through it to those calling it
+	Array<EscapeReport> own_reports = {};
+	if (ea.reports == nullptr) {
+		own_reports = array_make<EscapeReport>(temporary_allocator(), 0, 0);
+		ea.reports = &own_reports;
+	}
+	isize report_count = ea.reports->count;
+
 	bool enabled = ast_file_analysis(body->file(), AnalysisFlag_Escape);
 	ea.muted = !enabled;
 
@@ -3539,6 +3541,11 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
 	global_error_context.instantiations = escape_instantiations_of(pi);
 	escape_stmt(&ea, body);
+	if (ea.too_large && !calls_unknown) {
+		global_error_context.instantiations = prev_instantiations;
+		ea.reports->count = report_count;
+		return escape_analyse(g, v, reports, true);
+	}
 	if (ea.state.reachable && !ea.too_large) {
 		escape_exit(&ea, body, {}, {});
 	}
@@ -3556,15 +3563,16 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 			if (definite) {
 				gbString str = escape_expr_to_string(use.ptr);
 				EscapeReport r = {use.kind, use.ptr, make_string_c(str)};
-				if (reports == nullptr) {
-					escape_report_emit(r);
-				} else {
-					r.expr_str = copy_string(permanent_allocator(), r.expr_str);
-					array_add(reports, r);
-				}
+				r.expr_str = copy_string(permanent_allocator(), r.expr_str);
+				array_add(ea.reports, r);
 				gb_string_free(str);
 			}
 			i = j;
+		}
+	}
+	if (reports == nullptr) {
+		for (EscapeReport const &r : own_reports) {
+			escape_report_emit(r);
 		}
 	}
 	global_error_context.instantiations = prev_instantiations;
