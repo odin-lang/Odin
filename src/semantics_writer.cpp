@@ -14,7 +14,6 @@ enum : i64 {
 	SEMANTICS_VERSION = 1,
 };
 
-// fixed by the encoding, so the zero value is a real one
 enum CborMajor : u8 {
 	CborMajor_Unsigned = 0,
 	CborMajor_Negative = 1,
@@ -29,7 +28,7 @@ enum CborMajor : u8 {
 struct SemanticsWriter {
 	SemanticsFormat format;
 	Array<u8>       buf;
-	Array<i32>      items; // JSON: how many values each open container has
+	Array<i32>      items;
 	bool            after_key;
 };
 
@@ -71,80 +70,123 @@ gb_internal void sw_json_value(SemanticsWriter *w) {
 	}
 }
 
-// `count` is only needed by CBOR, whose containers give their length up front
 gb_internal void sw_open(SemanticsWriter *w, CborMajor cbor_major, char open, isize count) {
-	if (w->format == SemanticsFormat_Cbor) {
+	switch (w->format) {
+	case SemanticsFormat_Json:
+		sw_json_value(w);
+		sw_bytes(w, &open, 1);
+		array_add(&w->items, 0);
+		break;
+	case SemanticsFormat_Cbor:
 		sw_cbor_head(w, cbor_major, count);
-		return;
+		break;
+	default:
+		GB_PANIC("Unhandled SemanticsFormat %d", cast(int)w->format);
+		break;
 	}
-	sw_json_value(w);
-	sw_bytes(w, &open, 1);
-	array_add(&w->items, 0);
 }
 
 gb_internal void sw_close(SemanticsWriter *w, char close) {
-	if (w->format == SemanticsFormat_Json) {
+	switch (w->format) {
+	case SemanticsFormat_Json:
 		array_pop(&w->items);
 		sw_bytes(w, &close, 1);
+		break;
+	case SemanticsFormat_Cbor:
+		break;
+	default:
+		GB_PANIC("Unhandled SemanticsFormat %d", cast(int)w->format);
+		break;
 	}
 }
 
-gb_internal void sw_map(SemanticsWriter *w, isize count)   { sw_open(w, CborMajor_Map,   '{', count); }
-gb_internal void sw_map_end(SemanticsWriter *w)             { sw_close(w, '}'); }
-gb_internal void sw_array(SemanticsWriter *w, isize count) { sw_open(w, CborMajor_Array, '[', count); }
-gb_internal void sw_array_end(SemanticsWriter *w)           { sw_close(w, ']'); }
+gb_internal void sw_map(SemanticsWriter *w, isize count) {
+	sw_open(w, CborMajor_Map, '{', count);
+}
+
+gb_internal void sw_map_end(SemanticsWriter *w) {
+	sw_close(w, '}');
+}
+
+gb_internal void sw_array(SemanticsWriter *w, isize count) {
+	sw_open(w, CborMajor_Array, '[', count);
+}
+
+gb_internal void sw_array_end(SemanticsWriter *w) {
+	sw_close(w, ']');
+}
 
 gb_internal void sw_string(SemanticsWriter *w, String s) {
-	if (w->format == SemanticsFormat_Cbor) {
+	switch (w->format) {
+	case SemanticsFormat_Json:
+		sw_json_value(w);
+		sw_bytes(w, "\"", 1);
+		for (isize i = 0; i < s.len; i++) {
+			u8 c = s[i];
+			switch (c) {
+			case '"':  sw_bytes(w, "\\\"", 2); break;
+			case '\\': sw_bytes(w, "\\\\", 2); break;
+			case '\n': sw_bytes(w, "\\n",  2); break;
+			case '\r': sw_bytes(w, "\\r",  2); break;
+			case '\t': sw_bytes(w, "\\t",  2); break;
+			default:
+				if (c < 0x20) {
+					char escape[8] = {};
+					gb_snprintf(escape, gb_size_of(escape), "\\u%04x", c);
+					sw_bytes(w, escape, 6);
+				} else {
+					sw_bytes(w, &c, 1);
+				}
+				break;
+			}
+		}
+		sw_bytes(w, "\"", 1);
+		break;
+	case SemanticsFormat_Cbor:
 		sw_cbor_head(w, CborMajor_Text, s.len);
 		sw_bytes(w, s.text, s.len);
-		return;
+		break;
+	default:
+		GB_PANIC("Unhandled SemanticsFormat %d", cast(int)w->format);
+		break;
 	}
-	sw_json_value(w);
-	sw_bytes(w, "\"", 1);
-	for (isize i = 0; i < s.len; i++) {
-		u8 c = s[i];
-		switch (c) {
-		case '"':  sw_bytes(w, "\\\"", 2); break;
-		case '\\': sw_bytes(w, "\\\\", 2); break;
-		case '\n': sw_bytes(w, "\\n",  2); break;
-		case '\r': sw_bytes(w, "\\r",  2); break;
-		case '\t': sw_bytes(w, "\\t",  2); break;
-		default:
-			if (c < 0x20) {
-				char escape[8] = {};
-				gb_snprintf(escape, gb_size_of(escape), "\\u%04x", c);
-				sw_bytes(w, escape, 6);
-			} else {
-				sw_bytes(w, &c, 1);
-			}
-			break;
-		}
-	}
-	sw_bytes(w, "\"", 1);
 }
 
 gb_internal void sw_key(SemanticsWriter *w, char const *key) {
 	sw_string(w, make_string_c(key));
-	if (w->format == SemanticsFormat_Json) {
+	switch (w->format) {
+	case SemanticsFormat_Json:
 		sw_bytes(w, ":", 1);
 		w->after_key = true;
+		break;
+	case SemanticsFormat_Cbor:
+		break;
+	default:
+		GB_PANIC("Unhandled SemanticsFormat %d", cast(int)w->format);
+		break;
 	}
 }
 
 gb_internal void sw_int(SemanticsWriter *w, i64 value) {
-	if (w->format == SemanticsFormat_Cbor) {
+	switch (w->format) {
+	case SemanticsFormat_Json: {
+		sw_json_value(w);
+		char digits[32] = {};
+		gb_snprintf(digits, gb_size_of(digits), "%lld", cast(long long)value);
+		sw_bytes(w, digits, gb_strlen(digits));
+		break;
+	}
+	case SemanticsFormat_Cbor:
 		if (value >= 0) {
 			sw_cbor_head(w, CborMajor_Unsigned, cast(u64)value);
 		} else {
 			sw_cbor_head(w, CborMajor_Negative, cast(u64)(-1 - value));
 		}
-		return;
+		break;
+	default:
+		GB_PANIC("Unhandled SemanticsFormat %d", cast(int)w->format);
+		break;
 	}
-	sw_json_value(w);
-	char digits[32] = {};
-	gb_snprintf(digits, gb_size_of(digits), "%lld", cast(long long)value);
-	sw_bytes(w, digits, gb_strlen(digits));
 }
 
 
@@ -155,13 +197,13 @@ struct SemanticsIdent {
 	bool definition;
 };
 
-gb_internal int semantics_ident_cmp(void const *a, void const *b) {
+gb_internal GB_COMPARE_PROC(semantics_ident_cmp) {
 	SemanticsIdent const *x = cast(SemanticsIdent const *)a;
 	SemanticsIdent const *y = cast(SemanticsIdent const *)b;
-	if (x->file       != y->file)       return x->file       < y->file       ? -1 : +1;
-	if (x->offset     != y->offset)     return x->offset     < y->offset     ? -1 : +1;
-	if (x->definition != y->definition) return x->definition < y->definition ? -1 : +1;
-	if (x->entity     != y->entity)     return x->entity     < y->entity     ? -1 : +1;
+	if (x->file       != y->file)       { return x->file       < y->file       ? -1 : +1; }
+	if (x->offset     != y->offset)     { return x->offset     < y->offset     ? -1 : +1; }
+	if (x->definition != y->definition) { return x->definition < y->definition ? -1 : +1; }
+	if (x->entity     != y->entity)     { return x->entity     < y->entity     ? -1 : +1; }
 	return 0;
 }
 
@@ -171,19 +213,18 @@ struct SemanticsRange {
 	i32 to;
 };
 
-gb_internal int semantics_range_cmp(void const *a, void const *b) {
+gb_internal GB_COMPARE_PROC(semantics_range_cmp) {
 	SemanticsRange const *x = cast(SemanticsRange const *)a;
 	SemanticsRange const *y = cast(SemanticsRange const *)b;
-	if (x->file != y->file) return x->file < y->file ? -1 : +1;
-	if (x->from != y->from) return x->from < y->from ? -1 : +1;
+	if (x->file != y->file) { return x->file < y->file ? -1 : +1; }
+	if (x->from != y->from) { return x->from < y->from ? -1 : +1; }
 	return 0;
 }
 
-gb_internal int semantics_file_id_cmp(void const *a, void const *b) {
+gb_internal GB_COMPARE_PROC(semantics_file_id_cmp) {
 	return string_compare(get_file_path_string(*cast(i32 const *)a), get_file_path_string(*cast(i32 const *)b));
 }
 
-// an entity with what orders it the same way on every run, as the checker's threads meet them in no fixed order
 struct SemanticsEntity {
 	Entity *e;
 	i32     file_id;
@@ -191,7 +232,7 @@ struct SemanticsEntity {
 	String  type;
 };
 
-gb_internal int semantics_entity_cmp(void const *a, void const *b) {
+gb_internal GB_COMPARE_PROC(semantics_entity_cmp) {
 	SemanticsEntity const *x = cast(SemanticsEntity const *)a;
 	SemanticsEntity const *y = cast(SemanticsEntity const *)b;
 	int c = string_compare(x->path, y->path);
@@ -213,25 +254,29 @@ gb_internal int semantics_entity_cmp(void const *a, void const *b) {
 
 gb_internal char const *semantics_entity_kind(Entity *e) {
 	switch (e->kind) {
-	case Entity_Constant:    return "constant";
+	case Entity_Constant:
+		return "constant";
 	case Entity_Variable:
-		if (e->flags & EntityFlag_Field) return "field";
-		if (e->flags & EntityFlag_Param) return "parameter";
+		if (e->flags & EntityFlag_Field) {
+			return "field";
+		}
+		if (e->flags & EntityFlag_Param) {
+			return "parameter";
+		}
 		return "variable";
 	case Entity_TypeName:    return "type";
 	case Entity_Procedure:   return "procedure";
-	case Entity_ProcGroup:   return "procedure_group";
+	case Entity_ProcGroup:   return "group";
 	case Entity_Builtin:     return "builtin";
 	case Entity_ImportName:  return "import";
 	case Entity_LibraryName: return "library";
 	case Entity_Nil:         return "nil";
 	case Entity_Label:       return "label";
-	case Entity_AsmTemplate: return "asm_template";
+	case Entity_AsmTemplate: return "asm";
 	}
 	return "invalid";
 }
 
-// only a complete, non-polymorphic type has a layout
 gb_internal bool semantics_has_layout(Entity *e) {
 	if (e->kind != Entity_TypeName || e->type == nullptr || e->type == t_invalid) {
 		return false;
@@ -268,7 +313,6 @@ gb_internal void export_semantics(Checker *c) {
 	per_thread_array_gather(&info->semantic_ident_queue, &idents);
 	per_thread_array_gather(&info->semantic_when_queue,  &whens);
 
-	// the files of the packages named on the command line, or the ones `-export-semantics-for` names
 	auto exported = array_make<bool>(heap_allocator(), global_files.count);
 	defer (array_free(&exported));
 	for (AstPackage *pkg : c->parser->packages) {
@@ -288,38 +332,44 @@ gb_internal void export_semantics(Checker *c) {
 		}
 	}
 
-	// `files` holds file ids, ordered by path with the exported files first
 	auto file_index = array_make<i32>(heap_allocator(), global_files.count);
 	auto files      = array_make<i32>(heap_allocator());
 	defer (array_free(&file_index));
 	defer (array_free(&files));
+
 	for_array(i, file_index) {
 		file_index[i] = -1;
 		if (exported[i]) {
 			array_add(&files, cast(i32)i);
 		}
 	}
+
 	array_sort(files, semantics_file_id_cmp);
+
 	isize exported_count = files.count;
+
 	for_array(i, files) {
 		file_index[files[i]] = cast(i32)i;
 	}
 
-	// the entities used by the exported files
 	PtrMap<Entity *, i32> entity_index = {};
 	map_init(&entity_index, 1024);
 	defer (map_destroy(&entity_index));
+
 	auto entities = array_make<SemanticsEntity>(heap_allocator());
 	defer (array_free(&entities));
+
 	for (SemanticIdent const &si : idents) {
 		Token token = si.ident->Ident.token;
 		if ((token.flags & TokenFlag_Synthesized) != 0 || !semantics_file_exported(exported, token.pos.file_id)) {
 			continue;
 		}
+
 		Entity *e = si.entity;
 		if (e == nullptr || e->kind == Entity_Invalid || map_get(&entity_index, e) != nullptr) {
 			continue;
 		}
+
 		map_set(&entity_index, e, cast(i32)0);
 
 		SemanticsEntity se = {};
@@ -328,10 +378,12 @@ gb_internal void export_semantics(Checker *c) {
 			se.file_id = e->token.pos.file_id;
 			se.path    = get_file_path_string(se.file_id);
 		}
+
 		Type *type = e->type;
 		if (e->kind == Entity_TypeName && type != nullptr) {
 			type = base_type(type);
 		}
+
 		if (type != nullptr && type != t_invalid) {
 			se.type = make_string_c(type_to_string(type, permanent_allocator()));
 		}
@@ -339,16 +391,17 @@ gb_internal void export_semantics(Checker *c) {
 	}
 	array_sort(entities, semantics_entity_cmp);
 
-	// the other files and the types, in the entities' order
 	StringMap<i32> type_index = {};
 	string_map_init(&type_index);
 	defer (string_map_destroy(&type_index));
+
 	auto types = array_make<String>(heap_allocator());
 	defer (array_free(&types));
+
 	auto unique = array_make<SemanticsEntity>(heap_allocator());
 	defer (array_free(&unique));
+
 	for (SemanticsEntity const &se : entities) {
-		// entities no tool could tell apart, such as a generic's parameters checked more than once, are one
 		if (unique.count == 0 || semantics_entity_cmp(&se, &unique[unique.count-1]) != 0) {
 			array_add(&unique, se);
 			if (se.file_id > 0 && file_index[se.file_id] < 0) {
@@ -365,15 +418,18 @@ gb_internal void export_semantics(Checker *c) {
 
 	auto exported_idents = array_make<SemanticsIdent>(heap_allocator(), 0, idents.count);
 	defer (array_free(&exported_idents));
+
 	for (SemanticIdent const &si : idents) {
 		Token token = si.ident->Ident.token;
 		if ((token.flags & TokenFlag_Synthesized) != 0 || !semantics_file_exported(exported, token.pos.file_id)) {
 			continue;
 		}
+
 		i32 *entity = map_get(&entity_index, si.entity);
 		if (entity == nullptr) {
 			continue;
 		}
+
 		SemanticsIdent ident = {};
 		ident.file       = file_index[token.pos.file_id];
 		ident.offset     = token.pos.offset;
@@ -383,10 +439,10 @@ gb_internal void export_semantics(Checker *c) {
 	}
 	array_sort(exported_idents, semantics_ident_cmp);
 
-	// a branch is inactive when no check of its `when` took it, as a generic body's may differ per instantiation
 	PtrMap<AstWhenStmt *, u8> when_taken = {};
 	map_init(&when_taken, 64);
 	defer (map_destroy(&when_taken));
+
 	for (SemanticWhen const &sw : whens) {
 		u8 taken = 0;
 		if (u8 *found = map_get(&when_taken, sw.ws)) {
@@ -399,8 +455,10 @@ gb_internal void export_semantics(Checker *c) {
 		}
 		map_set(&when_taken, sw.ws, taken);
 	}
+
 	auto inactive = array_make<SemanticsRange>(heap_allocator());
 	defer (array_free(&inactive));
+
 	for (auto const &entry : when_taken) {
 		AstWhenStmt *ws = entry.key;
 		Ast *branches[2]      = {ws->body, ws->else_stmt};
@@ -445,6 +503,7 @@ gb_internal void export_semantics(Checker *c) {
 
 	sw_key(&w, "entities");
 	sw_array(&w, unique.count);
+
 	for (SemanticsEntity const &se : unique) {
 		Entity *e = se.e;
 		String value = {};
@@ -457,7 +516,6 @@ gb_internal void export_semantics(Checker *c) {
 		bool has_fields = false;
 		Type *bt = nullptr;
 		if (has_layout) {
-			// which also sets a struct's offsets
 			bt    = base_type(e->type);
 			size  = type_size_of(e->type);
 			align = type_align_of(e->type);
@@ -507,16 +565,16 @@ gb_internal void export_semantics(Checker *c) {
 	}
 	sw_array_end(&w);
 
-	// exported files are the first in `files`
 	sw_key(&w, "exported");
 	sw_array(&w, exported_count);
+
 	isize next_ident = 0;
 	isize next_range = 0;
 	for (i32 file = 0; file < exported_count; file++) {
-		isize first_ident = next_ident;
-		isize use_count = 0;
+		isize first_ident      = next_ident;
+		isize use_count        = 0;
 		isize definition_count = 0;
-		for (; next_ident < exported_idents.count && exported_idents[next_ident].file == file; next_ident++) {
+		for (/**/; next_ident < exported_idents.count && exported_idents[next_ident].file == file; next_ident++) {
 			SemanticsIdent const &x = exported_idents[next_ident];
 			if (next_ident > first_ident && semantics_ident_cmp(&x, &exported_idents[next_ident-1]) == 0) {
 				continue;
@@ -527,6 +585,7 @@ gb_internal void export_semantics(Checker *c) {
 				use_count += 1;
 			}
 		}
+
 		isize first_range = next_range;
 		while (next_range < inactive.count && inactive[next_range].file == file) {
 			next_range += 1;
@@ -554,6 +613,7 @@ gb_internal void export_semantics(Checker *c) {
 			}
 			sw_array_end(&w);
 		}
+
 		sw_key(&w, "inactive");
 		sw_array(&w, 2*(next_range - first_range));
 		for (isize i = first_range; i < next_range; i++) {
