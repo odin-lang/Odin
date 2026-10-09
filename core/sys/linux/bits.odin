@@ -2306,3 +2306,13 @@ Memfd_Create_Flag_Bits :: enum {
 	HUGETLB       = log2(0x4),
 }
 
+Fallocate_Mode_Bits :: enum {
+	KEEP_SIZE,
+	PUNCH_HOLE,
+	NO_HIDE_STALE,
+	COLLAPSE_RANGE,
+	ZERO_RANGE,
+	INSERT_RANGE,
+	UNSHARE_RANGE,
+	WRITE_ZEROES,
+}
