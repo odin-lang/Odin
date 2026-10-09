@@ -320,7 +320,7 @@ test :: proc() {
 	first  := clauses[0].derived.(^ast.Case_Clause)
 	second := clauses[1].derived.(^ast.Case_Clause)
 	testing.expect_value(t, len(first.list), 1)
-	testing.expect_value(t, first.list[0].derived.(^ast.Implicit_Selector_Expr).field.name, "")
+	testing.expect_value(t, first.list[0].derived.(^ast.Implicit_Selector_Expr).field.name, "_")
 	testing.expect_value(t, len(second.list), 2)
 }
 

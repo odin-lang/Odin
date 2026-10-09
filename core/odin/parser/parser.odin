@@ -3691,7 +3691,7 @@ parse_unary_expr :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		} else {
 			error(p, end_pos(op), "expected a selector")
 			field = ast.new(ast.Ident, op.pos, end_pos(op))
-			field.name = ""
+			field.name = "_"
 		}
 		ise := ast.new(ast.Implicit_Selector_Expr, op.pos, field)
 		ise.field = field
