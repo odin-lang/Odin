@@ -5,7 +5,6 @@ pushd build
 
 set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
 set ODIN=..\..\..\odin
-set CC=cl
 
 @echo on
 
@@ -16,6 +15,10 @@ set CC=cl
 @rem   `test_simple.odin` instead, to keep CI performance acceptable.
 @rem   Otherwise, add it here in the appropriate block, and make sure to
 @rem   update `run.sh` as well.
+
+@rem Some tests require a C compiler.
+@rem   By default, it uses clang.  set ISSUES_TESTS_NO_CLANG=1  to use MSVC (cl.exe) instead.
+@rem   NOTE: Not all tests are compatible with MSVC.
 
 @rem #########################################################################################################
 
@@ -85,19 +88,32 @@ set CC=cl
 @rem #########################################################################################################
 
 @rem "odin test" tests with special needs:
+if "%ISSUES_TESTS_NO_CLANG%" == "" (
+	clang -c "..\test_issue_5640\test_issue_5640.c" -o test_issue_5640_c.o || exit /b
+) else (
+	cl -c "..\test_issue_5640\test_issue_5640.c" /Fo:test_issue_5640_c.o || exit /b
+)
 
-%CC% -c "..\test_issue_5640\test_issue_5640.c" /Fo:test_issue_5640_c.o
 %ODIN% test "..\test_issue_5640" %COMMON% || exit /b
 
-%CC% -c "..\test_issue_6809_6816\test_issue_6809_6816.c" /Fo:test_issue_6809_6816_c.o -O3
+if "%ISSUES_TESTS_NO_CLANG%" == "" (
+	clang -c "..\test_issue_6809_6816\test_issue_6809_6816.c" -o test_issue_6809_6816_c.o -O3 || exit /b
+) else (
+	cl -c "..\test_issue_6809_6816\test_issue_6809_6816.c" /Fo:test_issue_6809_6816_c.o -O3 || exit /b
+)
+
 %ODIN% test "..\test_issue_6809_6816" %COMMON% || exit /b
 
 %ODIN% test "..\test_issue_6344" %COMMON% -o:speed || exit /b
 
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
-%CC% -c "..\test_issue_7010\test_issue_7010.c" /Fo:test_issue_7010_c.o
-%ODIN% test "..\test_issue_7010" %COMMON% || exit /b
+if "%ISSUES_TESTS_NO_CLANG%" == "" (
+	clang -c "..\test_issue_7010\test_issue_7010.c" -o test_issue_7010_c.o || exit /b
+	%ODIN% test "..\test_issue_7010" %COMMON% || exit /b
+) else (
+	@echo "!!! WARNING !!! test_issue_7010 is not compatible with MSVC."
+)
 
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
@@ -109,7 +125,12 @@ set CC=cl
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
 
-%CC% -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" /Fo:test_issue_sysv_abi_c.o || exit /b
+if "%ISSUES_TESTS_NO_CLANG%" == "" (
+	clang -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" -o test_issue_sysv_abi_c.o || exit /b
+) else (
+	cl -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" /Fo:test_issue_sysv_abi_c.o || exit /b
+)
+
 %ODIN% test "..\test_issue_sysv_abi" %COMMON% || exit /b
 
 @rem #########################################################################################################
