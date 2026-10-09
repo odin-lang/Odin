@@ -23,8 +23,13 @@ fma_matrix_product :: proc(t: ^testing.T) {
 	m := matrix[3, 3]f64{0.1, 0.2, 0.3, 1.1, 1.2, 1.3, 2.1, 2.2, 2.3}
 	p := m*m
 	// (0.1*0.1 + 0.2*1.1) + 0.3*2.1, rounded after every step or fused.
-	// Every arm64 CPU has a fused multiply-add, so arm64 always fuses.
-	when ODIN_ARCH == .arm64 || intrinsics.has_target_feature("fma") {
+	// Like lb_emit_mul_add, amd64 fuses only with fma, and i386 and wasm never fuse.
+	when ODIN_ARCH == .amd64 {
+		FUSED :: intrinsics.has_target_feature("fma")
+	} else {
+		FUSED :: ODIN_ARCH != .i386 && ODIN_ARCH != .wasm32 && ODIN_ARCH != .wasm64p32
+	}
+	when FUSED {
 		testing.expect_value(t, transmute(u64)p[0, 0], 0x3feb851eb851eb85)
 	} else {
 		testing.expect_value(t, transmute(u64)p[0, 0], 0x3feb851eb851eb86)
