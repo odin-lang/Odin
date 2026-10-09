@@ -590,6 +590,27 @@ if lldb is not None:
 		t = t.GetCanonicalType()
 		return {t.GetFieldAtIndex(i).GetName(): t.GetFieldAtIndex(i).GetType() for i in range(t.GetNumberOfFields())}
 
+	_lldb_module_types = {}
+
+	def _lldb_types_named(target, name):
+		# the types of every module called `name`, from an index of each module's types made once
+		# NOTE: `FindTypes` reads `main::Point` as `Point` in a namespace `main`, but on DWARF the name is
+		# the whole of `main::Point`, with no namespace, so it finds nothing
+		found = []
+		for i in range(target.GetNumModules()):
+			module = target.GetModuleAtIndex(i)
+			key = (str(module.GetFileSpec()), module.GetUUIDString())
+			index = _lldb_module_types.get(key)
+			if index is None:
+				index = {}
+				types = module.GetTypes()
+				for j in range(types.GetSize()):
+					t = types.GetTypeAtIndex(j)
+					index.setdefault(t.GetName(), []).append(t)
+				_lldb_module_types[key] = index
+			found += index.get(name, [])
+		return found
+
 	def _lldb_cell_layout(elem, cell):
 		cell_data_size = 0
 		if cell.GetByteSize() != elem.GetByteSize():
@@ -612,11 +633,14 @@ if lldb is not None:
 		basic = ODIN_BASIC_TYPES.get(name)
 		if basic is None:
 			types = target.FindTypes(name)
-			for i in range(types.GetSize()):
-				t = types.GetTypeAtIndex(i)
-				if typeid_hash(t.GetName()) == id:
+			found = [types.GetTypeAtIndex(i) for i in range(types.GetSize())]
+			if not found:
+				found = _lldb_types_named(target, name)
+			matches = [t for t in found if typeid_hash(t.GetName()) == id]
+			for t in matches:
+				if t.IsTypeComplete():
 					return t
-			return None
+			return matches[0] if matches else None
 
 		kind, size = basic
 		if size is None:
