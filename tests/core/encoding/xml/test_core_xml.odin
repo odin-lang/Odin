@@ -261,29 +261,6 @@ test_normalize_whitespace :: proc(t: ^testing.T) {
 	testing.expect_value(t, attr[0].val, "A & B")
 }
 
-doc_to_string_indent := [?]string {
-	"\t",
-	"\t\t",
-	"\t\t\t",
-	"\t\t\t\t",
-	"\t\t\t\t\t",
-	"\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t",        //   I am having fun  :)
-	"\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-	"\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t\t",
-}
-
 @(private)
 doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 	/*
@@ -326,7 +303,9 @@ doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 	print_element :: proc(writer: ^strings.Builder, doc: ^xml.Document, element_id: xml.Element_ID, indent := 0) {
 		tab :: #force_inline proc(writer: ^strings.Builder, indent: int) {
 			// PERF: Hot
-			strings.write_string(writer, doc_to_string_indent[indent])
+			for _ in 0 ..= indent {
+				#force_inline append(&writer.buf, '\t')
+			}
 		}
 
 		tab(writer, indent)
