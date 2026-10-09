@@ -193,14 +193,7 @@ gb_internal i64 xb_section_reserve(xbModule *m, xbSection sec, i64 size, i64 ali
 gb_internal xbMem xb_static_storage(xbProc *p, Type *type) {
 	i64 size = gb_max(type_size_of(type), cast(i64)1);
 	i64 at = xb_section_reserve(p->m, xbSection_Bss, size, gb_max(type_align_of(type), cast(i64)1));
-	char name[64] = {};
-	gb_snprintf(name, gb_size_of(name), ".Lxb.bss.%lld", cast(long long)at);
-	i32 sym = xb_symbol(p->m, make_string_c(name));
-	xbSymbol *s = &p->m->symbols[sym];
-	s->section = xbSection_Bss;
-	s->offset = at;
-	s->size = size;
-	s->flags = 0;
+	i32 sym = xb_offset_symbol(p->m, ".Lxb.bss.", xbSection_Bss, at, size, 0);
 	return xb_mem(xbMem_Sym, cast(u32)sym);
 }
 
@@ -514,7 +507,7 @@ gb_internal xbMem xb_tls_mem(xbProc *p, i32 sym) {
 		return xb_mem(xbMem_Sym, cast(u32)sym);
 	}
 	i32 get_addr = xb_symbol(p->m, str_lit("__tls_get_addr"));
-	p->m->symbols[get_addr].flags |= xbSymbolFlag_Func | xbSymbolFlag_Foreign;
+	xb_sym_add_flags(p->m, get_addr, xbSymbolFlag_Func | xbSymbolFlag_Foreign);
 	xbInstr in = xb_instr(xbOp_TlsAddr);
 	in.type = xbType_I64;
 	in.imm = sym;

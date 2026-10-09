@@ -166,6 +166,9 @@ struct xbProc {
 	i32               debug_scope;
 	struct xbFamily * family;
 	struct xbInline * inl; // the innermost #force_inline body being built, or nullptr
+	// #force_inline procedures whose body cannot be inlined here; per procedure, so what one
+	// procedure's build finds does not change another's
+	PtrSet<Entity *>  inline_failed;
 };
 
 // A #force_inline procedure whose body is built into its caller.
@@ -906,18 +909,92 @@ gb_internal xbMem xb_mem_from_ptr(xbProc *p, xbValue ptr) {
 ////////////////////////////////////////////////////////////////
 
 gb_internal i32 xb_symbol(xbModule *m, String name) {
-	i32 *found = string_map_get(&m->symbol_map, name);
-	if (found) {
-		return *found;
+	i32 index = -1;
+	if (i32 *found = string_map_get(&m->symbol_map, name)) {
+		index = *found;
+	} else {
+		xbSymbol s = {};
+		s.name = copy_string(permanent_allocator(), name);
+		s.section = xbSection_Undef;
+		s.flags = xbSymbolFlag_Global;
+		index = cast(i32)m->symbols.count;
+		array_add(&m->symbols, s);
+		string_map_set(&m->symbol_map, s.name, index);
 	}
-	xbSymbol s = {};
-	s.name = copy_string(permanent_allocator(), name);
-	s.section = xbSection_Undef;
-	s.flags = xbSymbolFlag_Global;
-	i32 index = cast(i32)m->symbols.count;
-	array_add(&m->symbols, s);
-	string_map_set(&m->symbol_map, s.name, index);
+	if (xb_shadow_logs(m) && !xb_shadow_seen(m, xbShadowOp_Sym, cast(u64)index)) {
+		// every use: the real module may only get the symbol in a later one
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_Sym);
+		op->str = m->symbols[index].name;
+		op->sym = index;
+	}
 	return index;
+}
+
+// The only writes to a symbol's fields while procedures are built, so they can be replayed.
+gb_internal void xb_sym_add_flags(xbModule *m, i32 sym, u8 flags) {
+	m->symbols[sym].flags |= flags;
+	if (xb_shadow_logs(m) && !xb_shadow_seen(m, xbShadowOp_SymAddFlags, cast(u64)sym | (cast(u64)flags << 32))) {
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_SymAddFlags);
+		op->sym = sym;
+		op->a = flags;
+	}
+}
+
+gb_internal void xb_sym_set_flags(xbModule *m, i32 sym, u8 flags) {
+	m->symbols[sym].flags = flags;
+	if (xb_shadow_logs(m)) {
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_SymSetFlags);
+		op->sym = sym;
+		op->a = flags;
+	}
+}
+
+gb_internal void xb_sym_set_realign(xbModule *m, i32 sym, i64 realign) {
+	m->symbols[sym].realign = realign;
+	if (xb_shadow_logs(m)) {
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_SymRealign);
+		op->sym = sym;
+		op->a = realign;
+	}
+}
+
+gb_internal i32 xb_symbol(xbModule *m, String name);
+
+// Places the symbol in a data section.
+gb_internal void xb_sym_define(xbModule *m, i32 sym, xbSection section, i64 offset, i64 size) {
+	xbSymbol *s = &m->symbols[sym];
+	s->section = section;
+	s->offset = offset;
+	s->size = size;
+	if (xb_shadow_logs(m)) {
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_SymDefine);
+		op->sym = sym;
+		op->sec = section;
+		op->a = offset;
+		op->b = size;
+	}
+}
+
+// A symbol for data at `offset` in `section`, named after the offset: `prefix` and the offset.
+gb_internal i32 xb_offset_symbol(xbModule *m, char const *prefix, xbSection section, i64 offset, i64 size, u8 flags) {
+	char name[96] = {};
+	gb_snprintf(name, gb_size_of(name), "%s%lld", prefix, cast(long long)offset);
+	m->shadow_quiet += 1;
+	i32 sym = xb_symbol(m, make_string_c(name));
+	xb_sym_define(m, sym, section, offset, size);
+	xb_sym_set_flags(m, sym, flags);
+	m->shadow_quiet -= 1;
+	if (xb_shadow_logs(m)) {
+		// named after the offset in the real module
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_OffsetSym);
+		op->str = copy_string(permanent_allocator(), make_string_c(prefix));
+		op->sec = section;
+		op->a = offset;
+		op->b = size;
+		op->c = flags;
+		op->sym = sym;
+	}
+	return sym;
 }
 
 gb_internal String xb_entity_name(xbModule *m, Entity *e);
@@ -929,51 +1006,71 @@ gb_internal void xb_note_foreign_library(xbModule *m, Entity *lib) {
 	if (!ptr_set_update(&m->foreign_libs_set, lib)) {
 		array_add(&m->foreign_libs, lib);
 	}
+	if (xb_shadow_logs(m) && !xb_shadow_seen(m, xbShadowOp_ForeignLib, cast(u64)cast(uintptr)lib)) {
+		xb_shadow_log(m, xbShadowOp_ForeignLib)->ptr = lib;
+	}
 }
 
 gb_internal i32 xb_entity_symbol(xbProc *p, Entity *e) {
 	String name = xb_entity_name(p->m, e);
 	i32 sym = xb_symbol(p->m, name);
-	xbSymbol *s = &p->m->symbols[sym];
+	u8 flags = 0;
 	if (e->kind == Entity_Procedure) {
-		s->flags |= xbSymbolFlag_Func;
-		if (e->Procedure.is_export) s->flags |= xbSymbolFlag_Export;
+		flags |= xbSymbolFlag_Func;
+		if (e->Procedure.is_export) flags |= xbSymbolFlag_Export;
 		if (e->Procedure.is_foreign) {
-			s->flags |= xbSymbolFlag_Foreign;
+			flags |= xbSymbolFlag_Foreign;
 			xb_note_foreign_library(p->m, e->Procedure.foreign_library);
 		}
 	} else if (e->kind == Entity_Variable) {
-		if (e->Variable.is_export) s->flags |= xbSymbolFlag_Export;
+		if (e->Variable.is_export) flags |= xbSymbolFlag_Export;
 		if (e->Variable.is_foreign) {
-			s->flags |= xbSymbolFlag_Foreign;
+			flags |= xbSymbolFlag_Foreign;
 			xb_note_foreign_library(p->m, e->Variable.foreign_library);
 		}
 		if (e->Variable.thread_local_model.len != 0) {
-			s->flags |= xbSymbolFlag_TLS;
-			s->realign = lb_tls_realign(e);
+			flags |= xbSymbolFlag_TLS;
+			xb_sym_set_realign(p->m, sym, lb_tls_realign(e));
 		}
 	}
+	xb_sym_add_flags(p->m, sym, flags);
 	return sym;
 }
 
-// Read-only data. Identical byte strings share storage.
-gb_internal i32 xb_rodata(xbModule *m, void const *data, isize size, i64 align) {
-	Array<u8> *sec = &m->sections[xbSection_Rodata];
+// Appends bytes to a section with contents, after zeros up to `align`. Returns their offset.
+// Unlike xb_section_reserve, it leaves the section's alignment alone.
+gb_internal i64 xb_section_append(xbModule *m, xbSection section, void const *data, isize size, i64 align) {
+	Array<u8> *sec = &m->sections[section];
 	while (sec->count % align != 0) {
 		array_add(sec, cast(u8)0);
 	}
 	i64 offset = sec->count;
-	array_add_elems(sec, cast(u8 const *)data, size);
+	if (data != nullptr) {
+		array_add_elems(sec, cast(u8 const *)data, size);
+	} else {
+		array_resize(sec, offset + size);
+		gb_zero_size(sec->data + offset, size);
+	}
+	if (xb_shadow_logs(m)) {
+		// the replay takes the bytes as the shadow leaves them, with later writes
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_Append);
+		op->sec = section;
+		op->a = offset;
+		op->b = size;
+		op->c = align;
+	}
+	return offset;
+}
 
-	char name[64] = {};
-	gb_snprintf(name, gb_size_of(name), ".Lxb.ro.%lld", cast(long long)offset);
-	i32 sym = xb_symbol(m, make_string_c(name));
-	xbSymbol *s = &m->symbols[sym];
-	s->section = xbSection_Rodata;
-	s->offset = offset;
-	s->size = size;
-	s->flags = 0; // local
-	return sym;
+// Overwrites bytes that are already in a section.
+gb_internal void xb_section_write(xbModule *m, xbSection section, i64 offset, void const *data, isize size) {
+	gb_memmove(m->sections[section].data + offset, data, size);
+}
+
+// Read-only data.
+gb_internal i32 xb_rodata(xbModule *m, void const *data, isize size, i64 align) {
+	i64 offset = xb_section_append(m, xbSection_Rodata, data, size, align);
+	return xb_offset_symbol(m, ".Lxb.ro.", xbSection_Rodata, offset, size, 0);
 }
 
 // A NUL terminated string literal in read-only data.
@@ -981,14 +1078,28 @@ gb_internal i32 xb_string_literal(xbModule *m, String str) {
 	// murmur reads 8 bytes a step, fnv32a one; test data has megabytes of string literals
 	u32 hash = cast(u32)gb_murmur64(str.text, str.len) & 0x7fffffff;
 	hash |= hash == 0;
-	i32 *found = string_map_get(&m->string_lits, hash, str);
-	if (found) {
-		return *found;
+	i32 sym = -1;
+	String key = {};
+	MapFindResult fr = string_map__find(&m->string_lits, hash, str);
+	if (fr.entry_index != MAP_SENTINEL) {
+		sym = m->string_lits.entries[fr.entry_index].value;
+		key = m->string_lits.entries[fr.entry_index].key;
+	} else {
+		m->shadow_quiet += 1;
+		sym = xb_rodata(m, str.text, str.len, 1);
+		u8 nul = 0;
+		xb_section_append(m, xbSection_Rodata, &nul, 1, 1);
+		xb_sym_define(m, sym, xbSection_Rodata, m->symbols[sym].offset, str.len+1);
+		m->shadow_quiet -= 1;
+		key = copy_string(permanent_allocator(), str);
+		string_map_set(&m->string_lits, hash, key, sym);
 	}
-	i32 sym = xb_rodata(m, str.text, str.len, 1);
-	array_add(&m->sections[xbSection_Rodata], cast(u8)0);
-	m->symbols[sym].size += 1;
-	string_map_set(&m->string_lits, hash, copy_string(permanent_allocator(), str), sym);
+	if (xb_shadow_logs(m) && !xb_shadow_seen(m, xbShadowOp_StringLit, cast(u64)sym)) {
+		// every use: the real module may only get the literal in a later one
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_StringLit);
+		op->str = key;
+		op->sym = sym;
+	}
 	return sym;
 }
 

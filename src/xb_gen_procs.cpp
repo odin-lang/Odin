@@ -4,7 +4,26 @@
 gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type);
 gb_internal void xb_lower_proc(xbProc *p);
 
-gb_global PtrMap<Type *, i32> xb_equal_procs; // -1 while being generated, -2 if it cannot be
+gb_internal PtrMap<Type *, i32> *xb_gen_cache(xbModule *m, xbGenCache kind) {
+	switch (kind) {
+	case xbGenCache_Equal:       return &m->equal_procs;
+	case xbGenCache_Hasher:      return &m->hasher_procs;
+	case xbGenCache_MapInfo:     return &m->map_infos;
+	case xbGenCache_MapCellInfo: return &m->map_cell_infos;
+	}
+	return nullptr;
+}
+
+gb_internal void xb_gen_cache_set(xbModule *m, xbGenCache kind, Type *type, i32 value) {
+	map_set(xb_gen_cache(m, kind), type, value);
+	if (xb_shadow_logs(m)) {
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_CacheSet);
+		op->aux = kind;
+		op->ptr = type;
+		op->a = value;
+	}
+}
+
 
 gb_internal xbMem xb_param_ptr_mem(xbProc *p, isize index) {
 	Type *pt = base_type(p->type);
@@ -124,24 +143,27 @@ gb_internal void xb_equal_proc_body(xbProc *p, Type *type) {
 gb_internal i32 xb_equal_proc_sym(xbProc *caller, Type *type) {
 	xbModule *m = caller->m;
 	type = base_type(type);
-	i32 *found = map_get(&xb_equal_procs, type);
+	i32 *found = map_get(&m->equal_procs, type);
 	if (found) {
 		if (*found == -2) XB_UNSUPPORTED(caller, "equal procedure");
 		if (*found >= 0) return *found;
 		// -1: recursive, the symbol already exists
 	}
+	isize depth = xb_shadow_depth(m);
+	if (found == nullptr) xb_shadow_begin(m, xbShadowSeg_Gen, type, 0, false, xbGenCache_Equal);
 	String name = lb_internal_gen_name_from_type("__$xb_equal", type);
 	i32 sym = xb_symbol(m, name);
 	if (found && *found == -1) return sym;
-	m->symbols[sym].flags = xbSymbolFlag_Func; // local
-	map_set(&xb_equal_procs, type, -1);
+	xb_sym_set_flags(m, sym, xbSymbolFlag_Func); // local
+	xb_gen_cache_set(m, xbGenCache_Equal, type, -1);
 
 	xbProc *p = xb_new_proc(m, name, t_equal_proc);
 	p->sym = sym;
 	jmp_buf bail;
 	p->bail = &bail;
 	if (setjmp(bail) != 0) {
-		map_set(&xb_equal_procs, type, -2);
+		xb_gen_cache_set(m, xbGenCache_Equal, type, -2);
+		xb_shadow_unwind(m, depth);
 		XB_UNSUPPORTED(caller, "equal procedure");
 	}
 	p->abi = xb_get_abi(p, t_equal_proc);
@@ -149,7 +171,8 @@ gb_internal i32 xb_equal_proc_sym(xbProc *caller, Type *type) {
 	xb_equal_proc_body(p, type);
 	xb_end_proc(p);
 	xb_lower_proc(p);
-	map_set(&xb_equal_procs, type, sym);
+	xb_gen_cache_set(m, xbGenCache_Equal, type, sym);
+	xb_shadow_end(m, sym);
 	return sym;
 }
 
@@ -171,9 +194,6 @@ gb_internal xbValue xb_emit_record_equal(xbProc *p, TokenKind op, xbValue left, 
 // Hashers and map info
 ////////////////////////////////////////////////////////////////
 
-gb_global PtrMap<Type *, i32> xb_hasher_procs; // -1 while being generated, -2 if it cannot be
-gb_global PtrMap<Type *, i32> xb_map_infos;
-gb_global PtrMap<Type *, i32> xb_map_cell_infos;
 
 gb_internal i32 xb_hasher_proc_sym(xbProc *caller, Type *type);
 
@@ -300,23 +320,26 @@ gb_internal void xb_hasher_proc_body(xbProc *p, Type *type) {
 gb_internal i32 xb_hasher_proc_sym(xbProc *caller, Type *type) {
 	xbModule *m = caller->m;
 	type = core_type(type);
-	i32 *found = map_get(&xb_hasher_procs, type);
+	i32 *found = map_get(&m->hasher_procs, type);
 	if (found) {
 		if (*found == -2) XB_UNSUPPORTED(caller, "hasher procedure");
 		if (*found >= 0) return *found;
 	}
+	isize depth = xb_shadow_depth(m);
+	if (found == nullptr) xb_shadow_begin(m, xbShadowSeg_Gen, type, 0, false, xbGenCache_Hasher);
 	String name = lb_internal_gen_name_from_type("__$xb_hasher", type);
 	i32 sym = xb_symbol(m, name);
 	if (found && *found == -1) return sym;
-	m->symbols[sym].flags = xbSymbolFlag_Func;
-	map_set(&xb_hasher_procs, type, -1);
+	xb_sym_set_flags(m, sym, xbSymbolFlag_Func);
+	xb_gen_cache_set(m, xbGenCache_Hasher, type, -1);
 
 	xbProc *p = xb_new_proc(m, name, t_hasher_proc);
 	p->sym = sym;
 	jmp_buf bail;
 	p->bail = &bail;
 	if (setjmp(bail) != 0) {
-		map_set(&xb_hasher_procs, type, -2);
+		xb_gen_cache_set(m, xbGenCache_Hasher, type, -2);
+		xb_shadow_unwind(m, depth);
 		XB_UNSUPPORTED(caller, "hasher procedure");
 	}
 	p->abi = xb_get_abi(p, t_hasher_proc);
@@ -324,19 +347,22 @@ gb_internal i32 xb_hasher_proc_sym(xbProc *caller, Type *type) {
 	xb_hasher_proc_body(p, type);
 	xb_end_proc(p);
 	xb_lower_proc(p);
-	map_set(&xb_hasher_procs, type, sym);
+	xb_gen_cache_set(m, xbGenCache_Hasher, type, sym);
+	xb_shadow_end(m, sym);
 	return sym;
 }
 
 // a constant Map_Cell_Info for the type
 gb_internal i32 xb_map_cell_info_sym(xbModule *m, Type *type) {
-	i32 *found = map_get(&xb_map_cell_infos, type);
+	i32 *found = map_get(&m->map_cell_infos, type);
 	if (found) return *found;
+	xb_shadow_begin(m, xbShadowSeg_Gen, type, 0, false, xbGenCache_MapCellInfo);
 	i64 size = 0, len = 0;
 	map_cell_size_and_len(type, &size, &len);
 	u64 values[4] = {cast(u64)type_size_of(type), cast(u64)type_align_of(type), cast(u64)size, cast(u64)len};
 	i32 sym = xb_rodata(m, values, gb_size_of(values), 8);
-	map_set(&xb_map_cell_infos, type, sym);
+	xb_gen_cache_set(m, xbGenCache_MapCellInfo, type, sym);
+	xb_shadow_end(m, sym);
 	return sym;
 }
 
@@ -344,30 +370,22 @@ gb_internal i32 xb_map_cell_info_sym(xbModule *m, Type *type) {
 gb_internal i32 xb_map_info_sym(xbProc *caller, Type *map_type) {
 	xbModule *m = caller->m;
 	map_type = base_type(map_type);
-	i32 *found = map_get(&xb_map_infos, map_type);
+	i32 *found = map_get(&m->map_infos, map_type);
 	if (found) return *found;
+	xb_shadow_begin(m, xbShadowSeg_Gen, map_type, 0, false, xbGenCache_MapInfo);
 	i32 ks = xb_map_cell_info_sym(m, map_type->Map.key);
 	i32 vs = xb_map_cell_info_sym(m, map_type->Map.value);
 	i32 hasher = xb_hasher_proc_sym(caller, map_type->Map.key);
 	i32 equal = xb_equal_proc_sym(caller, map_type->Map.key);
 
-	Array<u8> *data = &m->sections[xbSection_Data];
-	while (data->count % 8 != 0) array_add(data, cast(u8)0);
-	i64 at = data->count;
-	for (int i = 0; i < 32; i++) array_add(data, cast(u8)0);
+	i64 at = xb_section_append(m, xbSection_Data, nullptr, 32, 8);
 	i32 targets[4] = {ks, vs, hasher, equal};
 	for (int i = 0; i < 4; i++) {
 		xb_add_reloc(m, xbSection_Data, xbReloc_Abs64, at + 8*i, targets[i], 0);
 	}
-	char name[64] = {};
-	gb_snprintf(name, gb_size_of(name), ".Lxb.map_info.%lld", cast(long long)at);
-	i32 sym = xb_symbol(m, make_string_c(name));
-	xbSymbol *s = &m->symbols[sym];
-	s->section = xbSection_Data;
-	s->offset = at;
-	s->size = 32;
-	s->flags = 0;
-	map_set(&xb_map_infos, map_type, sym);
+	i32 sym = xb_offset_symbol(m, ".Lxb.map_info.", xbSection_Data, at, 32, 0);
+	xb_gen_cache_set(m, xbGenCache_MapInfo, map_type, sym);
+	xb_shadow_end(m, sym);
 	return sym;
 }
 

@@ -753,11 +753,20 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 
 gb_internal i32 xb_file_id(xbModule *m, i32 global_file_id) {
 	AstFile *f = global_files[global_file_id];
-	i32 *found = map_get(&m->file_ids, f);
-	if (found) return *found;
-	i32 id = cast(i32)m->files.count + 1;
-	array_add(&m->files, f->fullpath);
-	map_set(&m->file_ids, f, id);
+	i32 id = 0;
+	if (i32 *found = map_get(&m->file_ids, f)) {
+		id = *found;
+	} else {
+		id = cast(i32)m->files.count + 1;
+		array_add(&m->files, f->fullpath);
+		map_set(&m->file_ids, f, id);
+	}
+	if (xb_shadow_logs(m) && !xb_shadow_seen(m, xbShadowOp_FileId, cast(u64)global_file_id)) {
+		// every use: the real module numbers the files in the order of their first one
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_FileId);
+		op->a = global_file_id;
+		op->b = id;
+	}
 	return id;
 }
 

@@ -114,7 +114,7 @@ gb_internal u32 xb_simd_libc_call(xbProc *p, char const *name, Type *ft, u32 *ar
 	if (build_context.no_crt) XB_UNSUPPORTED(p, "libm call without crt");
 	GB_ASSERT(n <= 3);
 	// one procedure type per float type and arity, so the ABI is computed once
-	gb_local_persist Type *cache[2][4] = {};
+	gb_local_persist gb_thread_local Type *cache[2][4] = {};
 	Type **slot = &cache[are_types_identical(ft, t_f32) ? 0 : 1][n];
 	if (*slot == nullptr) {
 		Type *types[3] = {ft, ft, ft};
@@ -122,7 +122,7 @@ gb_internal u32 xb_simd_libc_call(xbProc *p, char const *name, Type *ft, u32 *ar
 	}
 	Type *pt = *slot;
 	i32 sym = xb_symbol(p->m, make_string_c(name));
-	p->m->symbols[sym].flags |= xbSymbolFlag_Func | xbSymbolFlag_Foreign;
+	xb_sym_add_flags(p->m, sym, xbSymbolFlag_Func | xbSymbolFlag_Foreign);
 	xbValue vals[3] = {};
 	for (isize i = 0; i < n; i++) vals[i] = xb_value_reg(ft, args[i]);
 	xbValue proc = xb_value_reg(pt, 0);

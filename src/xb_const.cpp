@@ -287,9 +287,9 @@ gb_internal bool xb_cb_write(xbConstBuf *b, Type *type, ExactValue value, i64 of
 				if (e->kind != Entity_Procedure) return xb_cb_fail(b, "procedure constant");
 				if (lb_enclosing_proc_decl(e->decl_info) != nullptr) return xb_cb_fail(b, "nested procedure in constant data");
 				i32 sym = xb_symbol(m, xb_entity_name(m, e));
-				m->symbols[sym].flags |= xbSymbolFlag_Func;
+				xb_sym_add_flags(m, sym, xbSymbolFlag_Func);
 				if (e->Procedure.is_foreign) {
-					m->symbols[sym].flags |= xbSymbolFlag_Foreign;
+					xb_sym_add_flags(m, sym, xbSymbolFlag_Foreign);
 					xb_note_foreign_library(m, e->Procedure.foreign_library);
 				}
 				xb_cb_reloc(b, off, sym, 0);
@@ -698,24 +698,15 @@ gb_internal i32 xb_const_place(xbConstBuf *bp, i64 align) {
 	i64 size = b.bytes.count;
 	// anything with pointers is relocated at load time, so it goes into writable data
 	xbSection sec = (b.writable || b.relocs.count > 0) ? xbSection_Data : xbSection_Rodata;
-	Array<u8> *data = &m->sections[sec];
-	while (data->count % align != 0) array_add(data, cast(u8)0);
-	i64 at = data->count;
-	array_add_elems(data, b.bytes.data, b.bytes.count);
+	i64 at = xb_section_append(m, sec, b.bytes.data, b.bytes.count, align);
 	for (xbReloc r : b.relocs) {
 		r.section = sec;
 		r.offset += at;
-		array_add(&m->relocs, r);
+		xb_module_reloc(m, r);
 	}
-	char name[64] = {};
-	gb_snprintf(name, gb_size_of(name), ".Lxb.const.%d.%lld", cast(int)sec, cast(long long)at);
-	i32 sym = xb_symbol(m, make_string_c(name));
-	xbSymbol *s = &m->symbols[sym];
-	s->section = sec;
-	s->offset = at;
-	s->size = size;
-	s->flags = 0;
-	return sym;
+	char prefix[32] = {};
+	gb_snprintf(prefix, gb_size_of(prefix), ".Lxb.const.%d.", cast(int)sec);
+	return xb_offset_symbol(m, prefix, sec, at, size, 0);
 }
 
 // Writes the constant into an existing object at `section`+`offset`.
@@ -733,11 +724,11 @@ gb_internal bool xb_const_write_at(xbModule *m, xbSection sec, i64 at, Type *typ
 		*reason = b.fail;
 		return false;
 	}
-	gb_memmove(m->sections[sec].data + at, b.bytes.data, size);
+	xb_section_write(m, sec, at, b.bytes.data, size);
 	for (xbReloc r : b.relocs) {
 		r.section = sec;
 		r.offset += at;
-		array_add(&m->relocs, r);
+		xb_module_reloc(m, r);
 	}
 	return true;
 }

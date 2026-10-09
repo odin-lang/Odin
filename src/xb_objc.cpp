@@ -43,7 +43,15 @@ gb_internal xbValue xb_objc_selector(xbProc *p, String name) {
 }
 
 // The ivar of the object `self` points at, from the offset the setup found.
+// A shadow cannot keep the Objective-C tables in order, so the family is built on the main thread.
+gb_internal void xb_objc_main_thread(xbProc *p) {
+	if (p->m->real == nullptr) return;
+	p->m->shadow_serial = true;
+	XB_UNSUPPORTED(p, "Objective-C off the main thread");
+}
+
 gb_internal xbValue xb_objc_ivar_ptr(xbProc *p, xbValue self) {
+	xb_objc_main_thread(p);
 	Type *self_type = type_deref(self.type);
 	GB_ASSERT(is_type_pointer(self.type) && self_type->kind == Type_Named);
 	Entity *tn = self_type->Named.type_name;
@@ -99,6 +107,7 @@ gb_internal xbValue xb_build_objc_send(xbProc *p, Ast *expr) {
 
 // A call of a method of an Objective-C class, sent as a message.
 gb_internal xbValue xb_objc_auto_send(xbProc *p, Ast *expr, Slice<xbValue> arg_values) {
+	xb_objc_main_thread(p);
 	ast_node(ce, CallExpr, expr);
 	ObjcMsgData data = map_must_get(&p->m->info->objc_msgSend_types, expr);
 	Entity *method = entity_of_node(ce->proc);
@@ -180,7 +189,7 @@ gb_internal i32 xb_objc_build_proc(xbModule *m, xbFamily *family, xbProc *caller
 	}
 	p->abi = xb_get_abi(p, pt);
 	p->sym = xb_symbol(m, name);
-	m->symbols[p->sym].flags = xbSymbolFlag_Func;
+	xb_sym_set_flags(m, p->sym, xbSymbolFlag_Func);
 	xb_begin_proc(p);
 	body(p);
 	xb_end_proc(p);
@@ -360,6 +369,7 @@ gb_internal xbValue xb_build_objc_block(xbProc *p, Ast *expr) {
 ////////////////////////////////////////////////////////////////
 
 gb_internal xbValue xb_build_objc_builtin(xbProc *p, Ast *expr, BuiltinProcId id) {
+	xb_objc_main_thread(p);
 	ast_node(ce, CallExpr, expr);
 	switch (id) {
 	case BuiltinProc_objc_send:

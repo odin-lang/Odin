@@ -74,6 +74,14 @@ gb_internal void xb_patch_u32(xbAsm *a, i64 at, u32 v) {
 	gb_memmove(a->code->data + at, &v, 4);
 }
 
+// A relocation in a data section.
+gb_internal void xb_module_reloc(xbModule *m, xbReloc const &r) {
+	array_add(&m->relocs, r);
+	if (xb_shadow_logs(m)) {
+		xb_shadow_log(m, xbShadowOp_Reloc)->reloc = r;
+	}
+}
+
 gb_internal void xb_add_reloc(xbModule *m, xbSection section, xbRelocKind kind, i64 offset, i32 sym, i64 addend) {
 	xbReloc r = {};
 	r.section = section;
@@ -81,7 +89,7 @@ gb_internal void xb_add_reloc(xbModule *m, xbSection section, xbRelocKind kind, 
 	r.offset = offset;
 	r.sym = sym;
 	r.addend = addend;
-	array_add(&m->relocs, r);
+	xb_module_reloc(m, r);
 }
 
 // A relocation in the code being assembled, at an offset in a->code.

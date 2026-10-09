@@ -592,8 +592,15 @@ struct xbLowerOut {
 	i64                 align;
 };
 
+// A shadow's symbols and file ids in the real module, which the lowering puts into the IR it built.
+struct xbRemap {
+	Slice<i32> syms;
+	Slice<i32> files;
+};
+
 struct xbLowerJob {
 	struct xbProc *p;
+	xbRemap *      remap; // the IR is a shadow's, or nullptr
 	xbLowerOut     out;
 };
 
@@ -601,6 +608,7 @@ struct xbStats {
 	isize procs_total;
 	isize procs_compiled;
 	isize calls_inlined;
+	isize shadow_serial; // families built on the main thread after all, see xb_shadow_compile
 	isize globals_total;
 	isize globals_defined;
 	StringMap<isize> fail_reasons;
@@ -621,9 +629,77 @@ struct xbObjcGlobal {
 	Type * class_type; // a class with @(objc_implement), or an ivar's class
 };
 
+// A shadow module builds a family of procedures off the main thread. Its tables start empty
+// and every change it makes to them is logged; xb_shadow_replay then makes the same changes to
+// the real module, in the order a serial build would have, so the object does not depend on
+// the threads. Symbols and file ids in the IR are the shadow's until the replay renumbers them.
+enum xbShadowOpKind : u8 {
+	xbShadowOp_EntityName,  // ptr: the entity named
+	xbShadowOp_Sym,         // str: name (a placeholder for an entity's), sym: the result
+	xbShadowOp_SymAddFlags, // sym, a: flags
+	xbShadowOp_SymSetFlags, // sym, a: flags
+	xbShadowOp_SymRealign,  // sym, a: the alignment
+	xbShadowOp_SymDefine,   // sym, sec, a: offset, b: size
+	xbShadowOp_OffsetSym,   // str: prefix, sec, a: offset, b: size, c: flags, sym: the result
+	xbShadowOp_Append,      // sec, a: offset, b: size, c: alignment
+	xbShadowOp_Reserve,     // sec, a: offset, b: size, c: alignment
+	xbShadowOp_Reloc,       // reloc
+	xbShadowOp_StringLit,   // str, sym: the result
+	xbShadowOp_FileId,      // a: global file id, b: the shadow's
+	xbShadowOp_ForeignLib,  // ptr: the library entity
+	xbShadowOp_Lower,       // ptr: the xbProc, queued for lowering
+	xbShadowOp_DefinedProc, // ptr: the entity
+	xbShadowOp_CacheSet,    // aux: xbGenCache, ptr: the type, a: symbol, or < 0
+	xbShadowOp_InlineStatic,// ptr: the entity, sym
+	xbShadowOp_CallInlined,
+	xbShadowOp_Begin,       // aux: xbShadowSeg, ptr: its key, sym, a: is the root, c: index of the End
+	xbShadowOp_End,         // sym: a generated object's symbol, a: 1 if a failure left the segment
+};
+
+// A segment holds the changes of something a serial build may not have done at that point,
+// because it was done before: the replay skips it then.
+enum xbShadowSeg : u8 {
+	xbShadowSeg_Proc,         // ptr: the entity, built for its family; a: it is the family's root
+	xbShadowSeg_FamilyLower,  // ptr: the entity, queued with its family
+	xbShadowSeg_Gen,          // aux2: xbGenCache, ptr: the type
+	xbShadowSeg_DataProcLit,  // ptr: the entity of a procedure literal in constant data
+	xbShadowSeg_InlineStatic, // ptr: the entity of a static variable in an inlined body
+};
+
+enum xbGenCache : u8 {
+	xbGenCache_Equal,
+	xbGenCache_Hasher,
+	xbGenCache_MapInfo,
+	xbGenCache_MapCellInfo,
+};
+
+struct xbShadowOp {
+	xbShadowOpKind kind;
+	u8        aux;
+	u8        aux2;
+	xbSection sec;
+	i32       sym;
+	union {
+		struct {
+			i64    a, b, c;
+			String str;
+			void * ptr;
+		};
+		xbReloc reloc;
+	};
+};
+
 struct xbModule {
 	CheckerInfo *     info;
 	struct lbGenerator *gen;
+
+	// set in a shadow module, see xbShadowOpKind
+	xbModule *        real;
+	Array<xbShadowOp> shadow_log;
+	Array<isize>      shadow_open;   // the Begin ops whose segment has not ended
+	i32               shadow_quiet;  // > 0 inside a change that is logged as a whole
+	bool              shadow_serial; // the family needs the main thread: it is built there instead
+	PtrMap<uintptr, u64> shadow_seen; // see xb_shadow_seen
 
 	Array<xbSymbol>   symbols;
 	StringMap<i32>    symbol_map;
@@ -644,22 +720,26 @@ struct xbModule {
 	i32               x64_move_helper;
 	i32               x64_set_helper;
 
+	// generated procedures and data, by type
+	PtrMap<Type *, i32> equal_procs;  // -1 while being generated, -2 if it cannot be
+	PtrMap<Type *, i32> hasher_procs; // -1 while being generated, -2 if it cannot be
+	PtrMap<Type *, i32> map_infos;
+	PtrMap<Type *, i32> map_cell_infos;
+
 	// procedures built and waiting to be lowered, in the order their code goes into .text
 	Array<xbLowerJob> lower_jobs;
 	// the batch the thread pool lowers while the next one is built
 	Array<xbLowerJob> lower_busy;
 	// the symbols' flags when the busy batch was handed over, see xb_lower_sym_flags
 	Array<u8>         lower_sym_flags;
+	i64               lower_queued; // jobs ever queued
+	i64               lower_done;   // jobs ever appended
 
 	// entities this backend compiles, so LLVM only declares them
 	PtrSet<Entity *>  handled;
 	PtrSet<Entity *>  defined_procs; // every procedure entity this backend has emitted
 	PtrMap<Entity *, String> entity_names;
 	StringMap<Entity *> name_owners;
-	// procedure entities discovered while compiling (nested procedures, etc.)
-	Array<Entity *>   proc_queue;
-	PtrSet<Entity *>  proc_queued;
-	PtrSet<Entity *>  inline_failed; // #force_inline procedures whose body cannot be inlined
 	PtrMap<Entity *, i32> inline_statics; // the storage of read-only statics in inlined bodies
 
 	PtrMap<Type *, xbAbiFunc *> abi_cache;
@@ -724,6 +804,7 @@ struct xbArena {
 	Array<xbArenaChunk> chunks;
 	isize curr;
 	isize used;
+	isize chunk_size; // 0: 4 MB
 };
 
 // one per thread: workers lower procedures while the main thread's arena holds their IR.
@@ -755,7 +836,7 @@ gb_internal void *xb_arena_alloc(isize size, isize align) {
 			continue;
 		}
 		xbArenaChunk c = {};
-		c.size = gb_max(size + align, cast(isize)(4<<20));
+		c.size = gb_max(size + align, a->chunk_size ? a->chunk_size : cast(isize)(4<<20));
 		c.base = cast(u8 *)gb_alloc(heap_allocator(), c.size);
 		array_add(&a->chunks, c);
 	}
@@ -805,6 +886,65 @@ gb_internal gbAllocator xb_allocator(void) {
 	a.proc = xb_arena_allocator_proc;
 	a.data = nullptr;
 	return a;
+}
+
+// Whether changes to m are logged: m is a shadow, outside a change logged as a whole.
+gb_internal bool xb_shadow_logs(xbModule *m) {
+	return m->real != nullptr && m->shadow_quiet == 0;
+}
+
+gb_internal xbShadowOp *xb_shadow_log(xbModule *m, xbShadowOpKind kind) {
+	xbShadowOp op = {};
+	op.kind = kind;
+	array_add(&m->shadow_log, op);
+	return &m->shadow_log[m->shadow_log.count-1];
+}
+
+// Whether the same change is logged already in a segment that is still open: the replay then
+// makes that one whenever it makes this one, so this one need not be logged.
+gb_internal bool xb_shadow_seen(xbModule *m, xbShadowOpKind kind, u64 value) {
+	uintptr key = (cast(uintptr)(kind + 1) << 56) ^ cast(uintptr)value;
+	isize depth = m->shadow_open.count;
+	u64 const mask = (cast(u64)1 << 40) - 1;
+	if (u64 *found = map_get(&m->shadow_seen, key)) {
+		isize d = cast(isize)(*found >> 40);
+		isize b = cast(isize)(*found & mask);
+		if (d <= depth && (d == 0 || m->shadow_open[d-1] == b)) return true;
+	}
+	u64 stamp = (cast(u64)depth << 40) | (depth > 0 ? cast(u64)m->shadow_open[depth-1] : 0);
+	map_set(&m->shadow_seen, key, stamp);
+	return false;
+}
+
+gb_internal void xb_shadow_begin(xbModule *m, xbShadowSeg seg, void *key, i32 sym=0, bool root=false, u8 aux2=0) {
+	if (!xb_shadow_logs(m)) return;
+	array_add(&m->shadow_open, m->shadow_log.count);
+	xbShadowOp *op = xb_shadow_log(m, xbShadowOp_Begin);
+	op->aux = seg;
+	op->aux2 = aux2;
+	op->ptr = key;
+	op->sym = sym;
+	op->a = root;
+}
+
+gb_internal void xb_shadow_end(xbModule *m, i32 sym=0, bool failed=false) {
+	if (!xb_shadow_logs(m)) return;
+	isize begin = array_pop(&m->shadow_open);
+	m->shadow_log[begin].c = m->shadow_log.count;
+	xbShadowOp *op = xb_shadow_log(m, xbShadowOp_End);
+	op->sym = sym;
+	op->a = failed;
+}
+
+gb_internal isize xb_shadow_depth(xbModule *m) {
+	return m->shadow_open.count;
+}
+
+// Where a failure lands: ends the segments it left.
+gb_internal void xb_shadow_unwind(xbModule *m, isize depth) {
+	while (m->shadow_open.count > depth) {
+		xb_shadow_end(m, 0, true);
+	}
 }
 
 // A symbol's flags for lowering, from when its batch was handed over: the main thread

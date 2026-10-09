@@ -81,7 +81,32 @@ gb_internal void xb_log_fallback(xbModule *m, char const *what, String name, Tok
 	}
 }
 
+// A shadow's name for an entity's symbol: only the real module decides the name, see below.
+gb_internal String xb_shadow_entity_name(xbModule *m, Entity *e) {
+	if (xb_shadow_logs(m) && !xb_shadow_seen(m, xbShadowOp_EntityName, cast(u64)cast(uintptr)e)) {
+		xb_shadow_log(m, xbShadowOp_EntityName)->ptr = e;
+	}
+	if (String *cached = map_get(&m->entity_names, e)) return *cached;
+	char buf[32] = {};
+	gb_snprintf(buf, gb_size_of(buf), "\x01%016llx", cast(unsigned long long)cast(uintptr)e);
+	String name = copy_string(permanent_allocator(), make_string_c(buf));
+	map_set(&m->entity_names, e, name);
+	return name;
+}
+
+// The entity whose shadow name this is, or nullptr.
+gb_internal Entity *xb_shadow_name_entity(String name) {
+	if (name.len != 17 || name[0] != 1) return nullptr;
+	u64 v = 0;
+	for (isize i = 1; i < name.len; i++) {
+		u8 c = name[i];
+		v = v*16 + (c <= '9' ? c - '0' : c - 'a' + 10);
+	}
+	return cast(Entity *)cast(uintptr)v;
+}
+
 gb_internal String xb_entity_name(xbModule *m, Entity *e) {
+	if (m->real != nullptr) return xb_shadow_entity_name(m, e);
 	String *cached = map_get(&m->entity_names, e);
 	if (cached) return *cached;
 	String name = lb_get_entity_name(&m->gen->default_module, e);
@@ -237,9 +262,11 @@ gb_internal xbProc *xb_build_proc(xbModule *m, Entity *e, xbFamily *family, char
 	p->decl = e->decl_info;
 	p->body = p->decl->proc_lit->ProcLit.body;
 
+	isize shadow_depth = xb_shadow_depth(m);
 	jmp_buf bail;
 	p->bail = &bail;
 	if (setjmp(bail) != 0) {
+		xb_shadow_unwind(m, shadow_depth);
 		*reason = p->fail_reason;
 		return nullptr;
 	}
@@ -308,8 +335,10 @@ gb_internal bool xb_family_build(xbModule *m, xbFamily *family, Entity *root, ch
 			continue;
 		}
 		f64 t0 = gb_time_now();
+		xb_shadow_begin(m, xbShadowSeg_Proc, fe, 0, fe == root);
 		xbProc *p = xb_build_proc(m, fe, family, reason);
-		xb_time_build += gb_time_now() - t0;
+		xb_shadow_end(m, 0, p == nullptr);
+		if (m->real == nullptr) xb_time_build += gb_time_now() - t0;
 		if (p == nullptr) {
 			if (fe != root && m->verbose) {
 				gb_printf_err("xb:   nested %.*s failed: %s\n", LIT(name), *reason);
@@ -321,29 +350,42 @@ gb_internal bool xb_family_build(xbModule *m, xbFamily *family, Entity *root, ch
 	return true;
 }
 
+gb_internal void xb_add_defined_proc(xbModule *m, Entity *e) {
+	ptr_set_add(&m->defined_procs, e);
+	if (xb_shadow_logs(m)) {
+		xb_shadow_log(m, xbShadowOp_DefinedProc)->ptr = e;
+	}
+}
+
 gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root) {
 	for (xbProc *p : family->procs) {
 		Entity *pe = p->entity;
 		xbSymbol *s = &m->symbols[p->sym];
 		if (pe != nullptr) {
 			if (s->section != xbSection_Undef) continue;
-			ptr_set_add(&m->defined_procs, pe);
-			s->flags = xbSymbolFlag_Global | xbSymbolFlag_Func;
+			// a serial build skipped it if another family built it before
+			xb_shadow_begin(m, xbShadowSeg_FamilyLower, pe);
+			xb_add_defined_proc(m, pe);
+			u8 flags = xbSymbolFlag_Global | xbSymbolFlag_Func;
 			if (!pe->Procedure.is_export) {
-				s->flags |= xbSymbolFlag_Hidden;
+				flags |= xbSymbolFlag_Hidden;
 			} else {
-				s->flags |= xbSymbolFlag_Export;
+				flags |= xbSymbolFlag_Export;
 			}
 			if (pe->flags & (EntityFlag_CustomLinkage_Weak|EntityFlag_CustomLinkage_LinkOnce)) {
-				s->flags |= xbSymbolFlag_Weak;
+				flags |= xbSymbolFlag_Weak;
 			}
 			if (pe != root) {
 				// LLVM may make its own copy, e.g. of an anonymous procedure for a default parameter
-				s->flags |= xbSymbolFlag_Weak;
+				flags |= xbSymbolFlag_Weak;
 			}
 			if (ptr_set_exists(&family->on_demand, pe)) {
-				s->flags |= xbSymbolFlag_Hidden;
+				flags |= xbSymbolFlag_Hidden;
 			}
+			xb_sym_set_flags(m, p->sym, flags);
+			xb_lower_proc(p);
+			xb_shadow_end(m);
+			continue;
 		}
 		xb_lower_proc(p);
 	}
@@ -353,12 +395,63 @@ gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root) {
 // and offset come with xb_lower_flush.
 gb_internal void xb_lower_proc(xbProc *p) {
 	xbModule *m = p->m;
-	xbSymbol *s = &m->symbols[p->sym];
-	s->section = xbSection_Text;
-	s->flags |= xbSymbolFlag_Func;
+	if (m->real != nullptr) {
+		m->shadow_quiet += 1;
+		xb_sym_define(m, p->sym, xbSection_Text, 0, 0);
+		xb_sym_add_flags(m, p->sym, xbSymbolFlag_Func);
+		m->shadow_quiet -= 1;
+		if (xb_shadow_logs(m)) {
+			xb_shadow_log(m, xbShadowOp_Lower)->ptr = p;
+		}
+		return;
+	}
+	xb_sym_define(m, p->sym, xbSection_Text, 0, 0);
+	xb_sym_add_flags(m, p->sym, xbSymbolFlag_Func);
 	xbLowerJob job = {};
 	job.p = p;
 	array_add(&m->lower_jobs, job);
+	m->lower_queued += 1;
+}
+
+gb_internal i32 xb_remap_sym(xbRemap const *rm, i64 sym) {
+	i32 s = rm->syms[sym];
+	GB_ASSERT_MSG(s >= 0, "fast backend: shadow symbol %lld has no real symbol", cast(long long)sym);
+	return s;
+}
+
+gb_internal i32 xb_remap_file(xbRemap const *rm, i32 id) {
+	return id > 0 ? rm->files[id] : id;
+}
+
+gb_internal void xb_remap_mem(xbRemap const *rm, xbMem *mem) {
+	if (mem->kind == xbMem_Sym) mem->base = cast(u32)xb_remap_sym(rm, mem->base);
+}
+
+// Renumbers the shadow's symbols and file ids in IR a shadow built. The replay did the rest of
+// the procedure, which needs the module.
+gb_internal void xb_remap_proc(xbProc *p, xbRemap const *rm) {
+	p->file_id = xb_remap_file(rm, p->file_id);
+	for (xbBlock *b : p->blocks) {
+		for (xbInstr &in : b->instrs) {
+			xb_remap_mem(rm, &in.mem);
+			if (in.op == xbOp_TlsAddr) in.imm = xb_remap_sym(rm, in.imm);
+			if (in.op == xbOp_Loc) in.a = cast(u32)xb_remap_file(rm, cast(i32)in.a);
+		}
+	}
+	for (xbCall &c : p->calls) {
+		if (c.target_sym >= 0) c.target_sym = xb_remap_sym(rm, c.target_sym);
+		for (xbCallArg &a : c.args) xb_remap_mem(rm, &a.mem);
+		for (xbCallRet &ret : c.rets) xb_remap_mem(rm, &ret.dst);
+	}
+	for (xbParamIn &pi : p->params_in) xb_remap_mem(rm, &pi.dst);
+	for (xbDebugVar &v : p->debug_vars) {
+		if (v.local < 0) v.sym = xb_remap_sym(rm, v.sym);
+		v.file_id = xb_remap_file(rm, v.file_id);
+	}
+	for (xbInlineSite &site : p->inline_sites) {
+		site.decl_file = xb_remap_file(rm, site.decl_file);
+		site.call_file = xb_remap_file(rm, site.call_file);
+	}
 }
 
 // Runs on a worker thread. It reads the module and the procedure's IR, and writes only `out`.
@@ -372,6 +465,7 @@ gb_internal void xb_lower_jobs(xbLowerJob *jobs, isize count) {
 		out->pending = array_make<xbPendingSym>(heap_allocator(), 0, 0);
 		// the main thread's arena holds the IR of the queued procedures when it runs a job
 		xbArenaMark mark = xb_arena_mark();
+		if (job->remap) xb_remap_proc(job->p, job->remap);
 		xb_cleanup_proc(job->p);
 		if (xb_is_arm64()) {
 			a64_lower_proc(job->p, out);
@@ -450,6 +544,7 @@ gb_internal void xb_lower_finish(xbModule *m) {
 	for (xbLowerJob &job : m->lower_busy) {
 		xb_append_lowered(m, &job.out);
 	}
+	m->lower_done += m->lower_busy.count;
 	array_clear(&m->lower_busy);
 	xb_time_lower += gb_time_now() - t0;
 }
@@ -513,10 +608,13 @@ gb_internal i32 xb_compile_data_proc_lit(xbModule *m, Ast *expr, char const **re
 	defer (xb_family_destroy(&family));
 	ptr_set_add(&family.on_demand, e);
 	xb_family_add(&family, e);
+	xb_shadow_begin(m, xbShadowSeg_DataProcLit, e, sym);
 	if (!xb_family_build(m, &family, nullptr, reason)) {
+		xb_shadow_end(m, 0, true);
 		return -1;
 	}
 	xb_family_lower(m, &family, nullptr);
+	xb_shadow_end(m);
 	return sym;
 }
 
@@ -545,44 +643,16 @@ gb_internal String xb_object_path(lbGenerator *gen) {
 	return make_string(cast(u8 *)path, gb_string_length(path));
 }
 
+#include "xb_shadow.cpp"
+
 gb_internal void xb_generate(lbGenerator *gen) {
 	f64 t_start = gb_time_now();
 	xbModule *m = permanent_alloc_item<xbModule>();
 	xb_module = m;
 	m->gen = gen;
 	m->info = gen->info;
-	m->symbols = array_make<xbSymbol>(heap_allocator(), 0, 4096);
-	string_map_init(&m->symbol_map);
-	for (isize i = 0; i < xbSection_COUNT; i++) {
-		m->sections[i] = array_make<u8>(heap_allocator(), 0, i == xbSection_Text ? 1<<20 : 1<<14);
-	}
-	m->relocs = array_make<xbReloc>(heap_allocator(), 0, 1<<14);
-	m->proc_debug = array_make<xbProcDebug>(heap_allocator(), 0, 1024);
-	m->global_debug = array_make<xbGlobalDebug>(heap_allocator(), 0, 256);
-	m->lines = array_make<xbLineEntry>(heap_allocator(), 0, 1<<14);
-	m->files = array_make<String>(heap_allocator(), 0, 64);
-	map_init(&m->file_ids);
-	ptr_set_init(&m->handled);
-	ptr_set_init(&m->defined_procs);
-	map_init(&m->entity_names);
-	string_map_init(&m->name_owners);
-	ptr_set_init(&m->foreign_libs_set);
-	m->foreign_libs = array_make<Entity *>(heap_allocator(), 0, 16);
-	ptr_set_init(&m->proc_queued);
-	ptr_set_init(&m->inline_failed);
-	map_init(&m->inline_statics);
-	m->proc_queue = array_make<Entity *>(heap_allocator(), 0, 1024);
-	m->lower_jobs = array_make<xbLowerJob>(heap_allocator(), 0, XB_LOWER_BATCH);
-	m->lower_busy = array_make<xbLowerJob>(heap_allocator(), 0, XB_LOWER_BATCH);
-	m->lower_sym_flags = array_make<u8>(heap_allocator(), 0, 4096);
+	xb_module_init_tables(m);
 	xb_arena_cur = &xb_main_arenas[0];
-	map_init(&m->abi_cache);
-	string_map_init(&m->string_lits);
-	string_map_init(&m->stats.fail_reasons);
-	for (isize i = 0; i < xbObjc_COUNT; i++) {
-		m->objc_globals[i] = array_make<xbObjcGlobal>(heap_allocator(), 0, 16);
-		string_map_init(&m->objc_global_map[i]);
-	}
 
 	m->limit = -1;
 	if (char const *s = gb_get_env("ODIN_XB_LIMIT", permanent_allocator())) {
@@ -613,7 +683,18 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	}
 	array_sort(candidates, llvm_global_entity_cmp);
 
-	for (Entity *e : candidates) {
+	// the families are built a window at a time on the thread pool, and replayed in order here
+	bool parallel = xb_can_compile_procs() && m->limit < 0 && only == nullptr && skip == nullptr && !m->verbose &&
+	                gb_get_env("ODIN_XB_SERIAL", permanent_allocator()) == nullptr;
+	auto jobs = array_make<xbShadowJob>(heap_allocator(), 0, XB_SHADOW_WINDOW); // being replayed
+	auto next = array_make<xbShadowJob>(heap_allocator(), 0, XB_SHADOW_WINDOW); // being built meanwhile
+	defer (array_free(&jobs));
+	defer (array_free(&next));
+	isize next_job = 0;
+	bool building = false;
+
+	for (isize ci = 0; ci < candidates.count; ci++) {
+		Entity *e = candidates[ci];
 		if (e->Procedure.is_foreign) {
 			xb_note_foreign_library(m, e->Procedure.foreign_library);
 		}
@@ -641,7 +722,26 @@ gb_internal void xb_generate(lbGenerator *gen) {
 			xb_lower_start(m);
 		}
 		char const *reason = nullptr;
-		if (xb_compile_proc(m, e, &reason)) {
+		bool ok = false;
+		if (parallel) {
+			if (next_job == jobs.count) {
+				xb_shadow_window_done(m, &jobs);
+				// a small first window, so the replay starts early
+				if (!building) xb_shadow_window_start(m, &next, candidates, ci, 32);
+				xb_shadow_window_wait(&next);
+				Array<xbShadowJob> t = jobs; jobs = next; next = t;
+				next_job = 0;
+				// the window after this one is built while this one is replayed
+				xb_shadow_window_start(m, &next, candidates, jobs[jobs.count-1].candidate + 1, XB_SHADOW_WINDOW);
+				building = next.count > 0;
+			}
+			xbShadowJob *job = &jobs[next_job++];
+			GB_ASSERT(job->e == e);
+			ok = xb_shadow_compile(m, job, &reason);
+		} else {
+			ok = xb_compile_proc(m, e, &reason);
+		}
+		if (ok) {
 			m->stats.procs_compiled += 1;
 			ptr_set_add(&m->handled, e);
 			if (m->verbose) {
@@ -653,6 +753,9 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		}
 	}
 
+	xb_shadow_window_done(m, &jobs);
+	GB_ASSERT(!building || next.count == 0 || next_job == 0);
+	if (building && next_job != 0) xb_shadow_window_wait(&next);
 	xb_time_procs = gb_time_now() - t_procs;
 
 	f64 t_extra = gb_time_now();
@@ -714,6 +817,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		gb_printf_err("fast backend: compiled %td of %td procedures, inlined %td calls\n", m->stats.procs_compiled, m->stats.procs_total, m->stats.calls_inlined);
 		gb_printf_err("  globals %td of %td, startup %s, type info %s, test main %s%s\n", m->stats.globals_defined, m->stats.globals_total, m->owns_startup ? "fast" : "llvm", m->owns_type_info ? "fast" : "llvm", m->owns_test_main ? "fast" : "-", m->complete ? ", no LLVM" : "");
 		gb_printf_err("  build %.3f ms, lower %.3f ms, write %.3f ms\n", xb_time_build*1000, xb_time_lower*1000, xb_time_write*1000);
+		gb_printf_err("  families built on the main thread after all: %td\n", m->stats.shadow_serial);
 		gb_printf_err("  globals %.3f ms, procedures %.3f ms, startup and type info %.3f ms, total %.3f ms\n", xb_time_globals*1000, xb_time_procs*1000, xb_time_extra*1000, xb_time_total*1000);
 		struct Reason { String name; isize count; };
 		auto reasons = array_make<Reason>(heap_allocator(), 0, m->stats.fail_reasons.count);

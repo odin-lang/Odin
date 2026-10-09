@@ -11,16 +11,24 @@ gb_internal bool xb_compile_proc(xbModule *m, Entity *e, char const **reason);
 
 gb_internal i64 xb_section_reserve(xbModule *m, xbSection sec, i64 size, i64 align) {
 	m->section_align[sec] = gb_max(m->section_align[sec], align);
+	i64 at = 0;
 	if (sec == xbSection_Bss || sec == xbSection_TBss) {
-		i64 at = align_formula(m->nobits_size[sec], align);
+		at = align_formula(m->nobits_size[sec], align);
 		m->nobits_size[sec] = at + size;
-		return at;
+	} else {
+		Array<u8> *data = &m->sections[sec];
+		while (data->count % align != 0) array_add(data, cast(u8)0);
+		at = data->count;
+		array_resize(data, at + size);
+		gb_zero_size(data->data + at, size);
 	}
-	Array<u8> *data = &m->sections[sec];
-	while (data->count % align != 0) array_add(data, cast(u8)0);
-	i64 at = data->count;
-	array_resize(data, at + size);
-	gb_zero_size(data->data + at, size);
+	if (xb_shadow_logs(m)) {
+		xbShadowOp *op = xb_shadow_log(m, xbShadowOp_Reserve);
+		op->sec = sec;
+		op->a = at;
+		op->b = size;
+		op->c = align;
+	}
 	return at;
 }
 

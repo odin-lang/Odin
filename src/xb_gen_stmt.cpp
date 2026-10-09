@@ -620,7 +620,7 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 	char sym_name[32] = {};
 	gb_snprintf(sym_name, gb_size_of(sym_name), "%s%s", fn, ct == t_f32 ? "f" : "");
 	i32 sym = xb_symbol(p->m, make_string_c(sym_name));
-	p->m->symbols[sym].flags |= xbSymbolFlag_Func | xbSymbolFlag_Foreign;
+	xb_sym_add_flags(p->m, sym, xbSymbolFlag_Func | xbSymbolFlag_Foreign);
 
 	Type *param_types[3] = {ct, ct, ct};
 	xbValue callee = {};
@@ -3871,6 +3871,8 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 				if (p->family) map_set(&p->family->statics, e, *shared);
 				continue;
 			}
+			// another family may have made the storage, see xb_shadow_replay
+			xb_shadow_begin(m, xbShadowSeg_InlineStatic, e);
 		}
 		i64 at = xb_section_reserve(m, sec, size, align);
 
@@ -3883,22 +3885,16 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 				if (backing < 0) XB_UNSUPPORTED(p, reason);
 				xb_add_reloc(m, sec, xbReloc_Abs64, at, backing, 0);
 				u64 id = type_hash_canonical_type(var_type);
-				gb_memmove(m->sections[sec].data + at + 8, &id, 8);
+				xb_section_write(m, sec, at + 8, &id, 8);
 			} else if (!xb_const_write_at(m, sec, at, e->type, ast_value->tav.value, &reason)) {
 				XB_UNSUPPORTED(p, reason);
 			}
 		}
 
-		char name[96] = {};
 		// thread locals get a real symbol, TLS relocations want one
-		gb_snprintf(name, gb_size_of(name), tls ? "__$xb_tls_static.%lld" : ".Lxb.static.%lld", cast(long long)at);
-		i32 sym = xb_symbol(m, make_string_c(name));
-		xbSymbol *s = &m->symbols[sym];
-		s->section = sec;
-		s->offset = at;
-		s->size = size;
-		s->flags = tls ? (xbSymbolFlag_Global | xbSymbolFlag_Hidden | xbSymbolFlag_TLS) : 0;
-		s->realign = lb_tls_realign(e);
+		i32 sym = tls ? xb_offset_symbol(m, "__$xb_tls_static.", sec, at, size, xbSymbolFlag_Global | xbSymbolFlag_Hidden | xbSymbolFlag_TLS)
+		              : xb_offset_symbol(m, ".Lxb.static.", sec, at, size, 0);
+		xb_sym_set_realign(m, sym, lb_tls_realign(e));
 
 		if (!tls) {
 			// a thread local's address is asked for at each use, see xb_tls_mem
@@ -3907,7 +3903,15 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 			map_set(&p->vars, e, v);
 		}
 		if (p->family) map_set(&p->family->statics, e, sym);
-		if (p->inl != nullptr) map_set(&m->inline_statics, e, sym);
+		if (p->inl != nullptr) {
+			map_set(&m->inline_statics, e, sym);
+			if (xb_shadow_logs(m)) {
+				xbShadowOp *op = xb_shadow_log(m, xbShadowOp_InlineStatic);
+				op->ptr = e;
+				op->sym = sym;
+			}
+			xb_shadow_end(m, sym);
+		}
 
 		if (!is_blank_ident(e->token.string)) {
 			xbDebugVar dv = {};
@@ -4392,7 +4396,7 @@ gb_internal bool xb_should_inline(xbProc *p, Entity *e, ProcInlining call_inlini
 	ProcInlining declared = e->decl_info->proc_lit->ProcLit.inlining;
 	if (declared != ProcInlining_none) inlining = declared;
 	if (inlining != ProcInlining_inline) return false;
-	if (ptr_set_exists(&p->m->inline_failed, e)) return false;
+	if (ptr_set_exists(&p->inline_failed, e)) return false;
 
 	Type *pt = base_type(e->type);
 	if (pt->Proc.c_vararg || pt->Proc.calling_convention == ProcCC_Naked) return false;
@@ -4602,6 +4606,7 @@ gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, A
 	s.bail = p->bail;
 	s.inl = p->inl;
 	TokenPos saved_fail_pos = p->m->fail_pos;
+	isize shadow_depth = xb_shadow_depth(p->m);
 
 	xbInline inl = {};
 	inl.prev = p->inl;
@@ -4614,7 +4619,8 @@ gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, A
 			gb_printf_err("xb:   not inlining %.*s: %s\n", LIT(e->token.string), p->fail_reason);
 		}
 		// a generated procedure has no family, which some bodies need; others may still inline it
-		if (p->family != nullptr) ptr_set_add(&p->m->inline_failed, e);
+		if (p->family != nullptr) ptr_set_add(&p->inline_failed, e);
+		xb_shadow_unwind(p->m, shadow_depth);
 		xb_inline_restore(p, s, true);
 		p->fail_reason = nullptr;
 		p->fail_node = nullptr;
@@ -4688,6 +4694,9 @@ gb_internal bool xb_try_inline_call(xbProc *p, Entity *e, Slice<xbValue> args, A
 		xb_unreachable(p);
 	}
 	p->m->stats.calls_inlined += 1;
+	if (xb_shadow_logs(p->m)) {
+		xb_shadow_log(p->m, xbShadowOp_CallInlined);
+	}
 	*res = {};
 	if (rt != nullptr) {
 		*res = xb_load_value(p, rt, inl.result);
