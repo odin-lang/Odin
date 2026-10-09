@@ -22,7 +22,7 @@ asm_encoding_integer :: proc(t: ^testing.T) {
 	xor8      :: asm(a: u8, b: u8) -> (r: u8) [a -> r] { xor r, b }
 	neg64     :: asm(a: i64) -> (r: i64) [a -> r] { neg r }
 	lea3      :: asm(a: u64, b: u64) -> (r: u64) { lea r, [a + b*4 + 100] }
-	cmov      :: asm(a: u64, b: u64) -> (r: u64) [t: u64] { mov r, a; cmp a, b; cmovb r, b }
+	cmov      :: asm(a: u64, b: u64) -> (r: u64) { mov r, a; cmp a, b; cmovb r, b }
 	bsr64     :: asm(a: u64) -> (r: u64) { bsr r, a }
 	popcnt64  :: asm(a: u64) -> (r: u64) { popcnt r, a }
 	tzcnt32   :: asm(a: u32) -> (r: u32) { tzcnt r, a }

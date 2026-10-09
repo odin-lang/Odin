@@ -95,6 +95,9 @@ gb_internal u16 asm_full_kill_mask(AsmInstructionFacts *f) {
 struct AsmCfg {
 	// Union of registers implicitly clobbered by matched forms (for redundant-#clobber hints).
 	u16 implicit_clobbered_regs;
+	// Union of registers read implicitly by matched forms (rep movsb reads rdi/rsi/rcx), so a
+	// pinned input consumed that way counts as used.
+	u16 implicit_read_regs;
 	u16 explicitly_produced_regs;
 	u16 stale_outputs;
 
@@ -946,6 +949,7 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 	}
 
 	u16 const REG_TOP = asm_ctx->CLOBBER_REGS_NAMED;
+	u16 const stack_bit = asm_ctx->clobber_bit_for_reg_name(str_lit("rsp")) | asm_ctx->clobber_bit_for_reg_name(str_lit("sp"));
 
 	u16 exit_live = 0;
 	u16 output_regs = 0;
@@ -1035,6 +1039,8 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 			// and that it does not itself read (self-use like `xor r,r` or `add r,x`) is a dead write.
 			u16 kill = asm_full_kill_mask(f);
 			u16 dead = kill & ~live_after & ~f->read_regs;
+			// The stack pointer is never dead: push/pop/call and [sp + n] read it, and the caller needs it back.
+			dead &= ~stack_bit;
 			for (u16 bit = 1; bit != 0; bit <<= 1) {
 				if ((dead & bit) == 0) {
 					continue;

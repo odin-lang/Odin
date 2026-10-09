@@ -1721,6 +1721,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		auto clobber = clobber_forms[valid_form_index];
 
 		facts->read_regs = cast(u16)clobber.implicit_rd & asm_ctx->CLOBBER_REGS_NAMED;
+		cfg->implicit_read_regs |= facts->read_regs;
 
 		// NOTE(bill): reads_mem/writes_mem are per-FORM capability bits.
 		// A form with an r/m slot (e.g. add r/m32, imm32) carries them even
@@ -3349,9 +3350,23 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			if (ptr_set_exists(&refs, ed.entity)) {
 				continue;
 			}
+			if (is_input) {
+				// An input read through one of its views (`a8: u8 = a`) is used.
+				bool via_view = false;
+				for (auto const &view : ate->decls) {
+					if (view.view_of >= 0 && ate->decls[view.view_of].entity == ed.entity &&
+					    view.entity != nullptr && ptr_set_exists(&refs, view.entity)) {
+						via_view = true;
+						break;
+					}
+				}
+				if (via_view) {
+					continue;
+				}
+			}
 			if (ed.pin.len != 0) {
 				u16 pin_bit = asm_ctx->clobber_bit_for_reg_name(ed.pin);
-				if (pin_bit != 0 && (touched_regs & pin_bit) != 0) {
+				if (pin_bit != 0 && ((touched_regs | cfg.implicit_read_regs) & pin_bit) != 0) {
 					continue;
 				}
 			}
