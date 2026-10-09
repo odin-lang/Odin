@@ -8,6 +8,7 @@
 #pragma warning(push)
 #pragma warning(disable: 4611) // bailing out longjmps past destructors on purpose, the arenas own everything
 #pragma warning(disable: 4702) // `return {};` after XB_UNSUPPORTED, which longjmps
+#pragma warning(disable: 4201) // xbShadowOp's nameless struct in its union
 #endif
 
 #include "xb_backend.hpp"
