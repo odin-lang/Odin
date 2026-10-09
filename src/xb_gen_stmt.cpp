@@ -655,6 +655,7 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 
 	if (base == "fmuladd" && n == 3) {
 		// fused on arm64 and on amd64 with fma, like LLVM
+		// LLVM rounds an f16 product before the add even on arm64, so f16 is never fused
 		if (xb_is_arm64() && ft != t_f16) {
 			return xb_emit_conv(p, xb_value_reg(ct, xb_fma(p, st, args[0], args[1], args[2])), result_type);
 		}

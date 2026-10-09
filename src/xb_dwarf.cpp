@@ -163,6 +163,7 @@ enum xbAbbrev {
 	xbAbbrev_SubprogramRet,
 	xbAbbrev_SubprogramRetNoChildren,
 	xbAbbrev_NamedPointerType,
+	xbAbbrev_NamedVoidPointerType,
 	xbAbbrev_Enumerator64,
 	xbAbbrev_LexicalBlock,
 	xbAbbrev_LexicalBlockRanges,
@@ -260,6 +261,10 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 		XDW_AT_name, XDW_FORM_string,
 		XDW_AT_byte_size, XDW_FORM_data1,
 		XDW_AT_type, XDW_FORM_ref4,
+	});
+	abbrev(xbAbbrev_NamedVoidPointerType, XDW_TAG_pointer_type, false, {
+		XDW_AT_name, XDW_FORM_string,
+		XDW_AT_byte_size, XDW_FORM_data1,
 	});
 	abbrev(xbAbbrev_StructType, XDW_TAG_structure_type, true, {
 		XDW_AT_name, XDW_FORM_string,
@@ -411,8 +416,8 @@ gb_internal void xb_dwarf_write_struct_like(xbDwarfTypes *dt, Type *t, String na
 	xbb_u8(b, 0);
 }
 
-// a pointer to a character type, `char` or `wchar_t` like LLVM's: the pointer, then the typedef and base type it points to
-gb_internal void xb_dwarf_char_pointer(xbDwarfTypes *dt, char const *name, char const *char_name, i64 char_size) {
+// a pointer to a character type, `char` or `char16_t` like LLVM's: the pointer, then the typedef and base type it points to
+gb_internal void xb_dwarf_char_pointer(xbDwarfTypes *dt, char const *name, char const *char_name, i64 char_size, u8 encoding=XDW_ATE_unsigned) {
 	Array<u8> *b = dt->info;
 	if (name != nullptr) {
 		xbb_uleb(b, xbAbbrev_NamedPointerType);
@@ -427,7 +432,7 @@ gb_internal void xb_dwarf_char_pointer(xbDwarfTypes *dt, char const *name, char 
 	xbb_u32(b, cast(u32)(b->count + 4 - dt->cu_start));
 	xbb_uleb(b, xbAbbrev_BaseType);
 	xbb_cstr(b, char_name);
-	xbb_u8(b, XDW_ATE_unsigned);
+	xbb_u8(b, encoding);
 	xbb_uleb(b, cast(u64)char_size);
 }
 
@@ -492,19 +497,22 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		case Basic_f16be: case Basic_f32be: case Basic_f64be:
 			enc = XDW_ATE_float; break;
 		case Basic_rawptr:
-			xb_dwarf_char_pointer(dt, "rawptr", "void", 1);
+			// a pointer to no type is `void *`, as clang and the LLVM backend describe it
+			xbb_uleb(b, xbAbbrev_NamedVoidPointerType);
+			xbb_cstr(b, "rawptr");
+			xbb_u8(b, 8);
 			return;
 		case Basic_cstring:
 			xb_dwarf_char_pointer(dt, "cstring", "char", 1);
 			return;
 		case Basic_cstring16:
-			xb_dwarf_char_pointer(dt, "cstring16", "wchar_t", 2);
+			xb_dwarf_char_pointer(dt, "cstring16", "char16_t", 2, XDW_ATE_UTF);
 			return;
 		case Basic_string:
 			xb_dwarf_write_struct_like(dt, bt, name, {{"data", t_u8_ptr}, {"len", t_int}});
 			return;
 		case Basic_string16: {
-			// the data is a `wchar_t` pointer, written after the struct
+			// the data is a UTF-16 character pointer, written after the struct, as in lb_debug_char16_type
 			xbb_uleb(b, xbAbbrev_StructType);
 			xbb_str(b, name);
 			xbb_uleb(b, 16);
@@ -519,7 +527,7 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 			xbb_uleb(b, 8);
 			xbb_u8(b, 0);
 			xbb_patch_u32(b, data_ref, cast(u32)(b->count - dt->cu_start));
-			xb_dwarf_char_pointer(dt, nullptr, "wchar_t", 2);
+			xb_dwarf_char_pointer(dt, nullptr, "char16_t", 2, XDW_ATE_UTF);
 			return;
 		}
 		case Basic_any:
@@ -679,8 +687,7 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 		// a union of one bool bit per element, like LLVM's
 		Type *elem = base_type(bt->BitSet.elem);
 		i64 count = bt->BitSet.upper - bt->BitSet.lower + 1;
-		if ((elem->kind != Type_Enum && !is_type_integer(elem)) || count <= 0 || count > 128 ||
-		    is_type_different_to_arch_endianness(bit_set_to_int(bt))) {
+		if ((elem->kind != Type_Enum && !is_type_integer(elem)) || count <= 0 || count > 128) {
 			xbb_uleb(b, xbAbbrev_Typedef);
 			xbb_str(b, name);
 			xb_dwarf_type_ref(dt, bit_set_to_int(bt));
@@ -722,6 +729,23 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 				xb_dwarf_bit_member(dt, make_string_c(buf), t_bool, 1, cast(u64)i);
 			}
 		}
+		xbb_u8(b, 0);
+		return;
+	}
+	case Type_Matrix: {
+		// a struct of one two-level array, like the LLVM backend's: the outer index is the
+		// column of a column-major matrix and the row of a row-major one
+		Type *elem = bt->Matrix.elem;
+		i64 rows = bt->Matrix.row_count, cols = bt->Matrix.column_count;
+		Type *inner = alloc_type_array(elem, bt->Matrix.is_row_major ? cols : rows);
+		Type *outer = alloc_type_array(inner, bt->Matrix.is_row_major ? rows : cols);
+		xbb_uleb(b, xbAbbrev_StructType);
+		xbb_str(b, name);
+		xbb_uleb(b, cast(u64)type_size_of(bt));
+		xbb_uleb(b, xbAbbrev_Member);
+		xbb_cstr(b, "data");
+		xb_dwarf_type_ref(dt, outer);
+		xbb_uleb(b, 0);
 		xbb_u8(b, 0);
 		return;
 	}
