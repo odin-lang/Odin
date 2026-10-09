@@ -773,6 +773,7 @@ struct xbCallArg;
 gb_internal bool xb_is_win64(void);
 gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason);
 gb_internal i32 xb_win64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index);
+gb_internal xbValue xb_c_vararg_value(xbProc *p, xbValue v);
 gb_internal void xb_win64_prologue(xbLower *L, xbProcDebug *dbg);
 gb_internal void xb_win64_epilogue(xbLower *L);
 gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch);

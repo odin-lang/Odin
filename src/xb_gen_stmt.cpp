@@ -219,7 +219,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 		i32 xmm = abi->xmm_count;
 		i32 stack = abi->stack_size;
 		for (; arg_index < args.count; arg_index++) {
-			xbValue v = args[arg_index];
+			xbValue v = xb_c_vararg_value(p, args[arg_index]);
 			xbType st = xb_scalar_type(v.type);
 			if (st == xbType_None) XB_UNSUPPORTED(p, "aggregate c vararg");
 			xbCallArg a = {};
@@ -1234,36 +1234,112 @@ gb_internal xbValue xb_build_fixed_point(xbProc *p, AstCallExpr *ce, Type *resul
 	return xb_emit_conv(p, xb_load_value(p, t, res), result_type);
 }
 
-// c_va_list on arm64 macOS is a pointer to the next 8 byte stack slot; the variadic arguments
-// follow the fixed ones on the stack.
-gb_internal void xb_build_c_va_start(xbProc *p, AstCallExpr *ce) {
-	if (!xb_is_arm64() || !xb_is_darwin()) XB_UNSUPPORTED(p, "c_va_start outside arm64 macOS");
-	if (p->inl != nullptr || !base_type(p->type)->Proc.c_vararg) XB_UNSUPPORTED(p, "c_va_start");
-	u32 list = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
-	u32 first = xb_lea(p, xb_mem(xbMem_Incoming, 0, cast(i32)align_formula(p->abi->stack_size, 8)));
-	xb_store(p, xbType_I64, xb_mem(xbMem_Reg, list, 0), first);
+// The C default argument promotions the targets' vararg placement does not do itself: an f16
+// travels as an f64. (f32 widens where the argument is placed, small integers extend there.)
+gb_internal xbValue xb_c_vararg_value(xbProc *p, xbValue v) {
+	if (xb_is_f16(v.type)) return xb_emit_conv(p, v, t_f64);
+	return v;
 }
 
-// LLVM's va_arg on arm64 macOS: integers and floats take 8 bytes, an f32 or f16 is passed as
-// an f64, a more aligned value starts aligned.
-gb_internal xbValue xb_build_c_va_arg(xbProc *p, AstCallExpr *ce, Type *type) {
-	if (!xb_is_arm64() || !xb_is_darwin()) XB_UNSUPPORTED(p, "c_va_arg outside arm64 macOS");
-	xbType st = xb_scalar_type(type);
-	if (st == xbType_None || is_type_different_to_arch_endianness(type)) XB_UNSUPPORTED(p, "c_va_arg type");
+// c_va_start fills the target's c_va_list. The variadic arguments that arrived in registers
+// are in a save area the prologue writes (see va_save_local and va_home), the rest follow
+// the fixed stack arguments.
+gb_internal void xb_build_c_va_start(xbProc *p, AstCallExpr *ce) {
+	if (p->inl != nullptr || !base_type(p->type)->Proc.c_vararg) XB_UNSUPPORTED(p, "c_va_start");
+	if (xb_is_win64() && p->abi->cc == ProcCC_SysV) XB_UNSUPPORTED(p, "c_va_start in a SysV procedure on Windows");
 	u32 list = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
 	xbMem lm = xb_mem(xbMem_Reg, list, 0);
-	u32 ptr = xb_load(p, xbType_I64, lm);
-	i64 align = type_align_of(type);
-	if (align > 8) {
-		ptr = xb_binop(p, xbOp_And, xbType_I64, xb_ptr_add_const(p, ptr, align-1), xb_iconst(p, xbType_I64, -align));
+	u32 overflow = xb_lea(p, xb_mem(xbMem_Incoming, 0, cast(i32)align_formula(p->abi->stack_size, 8)));
+	if (xb_is_win64()) {
+		// char*: every argument has an 8 byte slot, the first four are the home slots of rcx..r9
+		p->va_home = true;
+		xb_store(p, xbType_I64, lm, xb_lea(p, xb_mem(xbMem_Incoming, 0, 8*p->abi->gpr_count)));
+	} else if (xb_is_arm64() && xb_is_darwin()) {
+		// char*: every variadic argument is on the stack
+		xb_store(p, xbType_I64, lm, overflow);
+	} else if (xb_is_arm64()) {
+		// AAPCS64: {stack, gr_top, vr_top, gr_offs, vr_offs}; x0-x7 then q0-q7 in the save area,
+		// the offsets count up from minus the unused registers to zero
+		if (p->va_save_local < 0) p->va_save_local = xb_add_local_raw(p, 64+128, 16);
+		xbMem area = xb_mem(xbMem_Local, cast(u32)p->va_save_local);
+		xb_store(p, xbType_I64, lm, overflow);
+		xb_store(p, xbType_I64, xb_mem_offset(lm, 8), xb_lea(p, xb_mem_offset(area, 64)));
+		xb_store(p, xbType_I64, xb_mem_offset(lm, 16), xb_lea(p, xb_mem_offset(area, 64+128)));
+		xb_store(p, xbType_I32, xb_mem_offset(lm, 24), xb_iconst(p, xbType_I32, -8*(8 - p->abi->gpr_count)));
+		xb_store(p, xbType_I32, xb_mem_offset(lm, 28), xb_iconst(p, xbType_I32, -16*(8 - p->abi->xmm_count)));
+	} else {
+		// SysV: {gp_offset, fp_offset, overflow_arg_area, reg_save_area}; rdi..r9 then xmm0-7
+		// in the save area, the offsets count up to 48 and 176
+		if (p->va_save_local < 0) p->va_save_local = xb_add_local_raw(p, 176, 16);
+		xbMem area = xb_mem(xbMem_Local, cast(u32)p->va_save_local);
+		xb_store(p, xbType_I32, lm, xb_iconst(p, xbType_I32, 8*p->abi->gpr_count));
+		xb_store(p, xbType_I32, xb_mem_offset(lm, 4), xb_iconst(p, xbType_I32, 48 + 16*p->abi->xmm_count));
+		xb_store(p, xbType_I64, xb_mem_offset(lm, 8), overflow);
+		xb_store(p, xbType_I64, xb_mem_offset(lm, 16), xb_lea(p, area));
 	}
-	i64 size = gb_max(cast(i64)xb_type_size(st), cast(i64)8);
-	xb_store(p, xbType_I64, lm, xb_ptr_add_const(p, ptr, size));
-	if (xb_type_is_float(st) && st != xbType_F64) {
-		xbValue d = xb_value_reg(t_f64, xb_load(p, xbType_F64, xb_mem(xbMem_Reg, ptr, 0)));
-		return xb_emit_conv(p, d, type);
+}
+
+// Where the next variadic argument of a c_va_list is, and the list moved past it. `is_fp`
+// picks the float registers. Every slot is 8 bytes: the caller promoted the argument.
+gb_internal u32 xb_c_va_arg_addr(xbProc *p, xbMem lm, bool is_fp, i64 align) {
+	if (xb_is_win64() || (xb_is_arm64() && xb_is_darwin())) {
+		u32 ptr = xb_load(p, xbType_I64, lm);
+		if (align > 8 && !xb_is_win64()) {
+			ptr = xb_binop(p, xbOp_And, xbType_I64, xb_ptr_add_const(p, ptr, align-1), xb_iconst(p, xbType_I64, -align));
+		}
+		xb_store(p, xbType_I64, lm, xb_ptr_add_const(p, ptr, 8));
+		return ptr;
 	}
-	if (xb_is_f16(type)) {
+	xbMem res = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 8, 8));
+	xbBlock *in_reg   = xb_new_block(p);
+	xbBlock *on_stack = xb_new_block(p);
+	xbBlock *done     = xb_new_block(p);
+	if (xb_is_arm64()) {
+		// AAPCS64 section B.4, as lb_emit_aapcs64_va_arg walks it
+		xbMem offs_m = xb_mem_offset(lm, is_fp ? 28 : 24);
+		xbMem top_m  = xb_mem_offset(lm, is_fp ? 16 : 8);
+		xbBlock *maybe_reg = xb_new_block(p);
+		u32 zero = xb_iconst(p, xbType_I32, 0);
+		u32 offs = xb_load(p, xbType_I32, offs_m);
+		xb_branch(p, xb_cmp(p, xbCond_SGE, xbType_I32, offs, zero), on_stack, maybe_reg);
+		xb_start_block(p, maybe_reg);
+		u32 next = xb_binop(p, xbOp_Add, xbType_I32, offs, xb_iconst(p, xbType_I32, is_fp ? 16 : 8));
+		xb_store(p, xbType_I32, offs_m, next);
+		xb_branch(p, xb_cmp(p, xbCond_SLE, xbType_I32, next, zero), in_reg, on_stack);
+		xb_start_block(p, in_reg);
+		u32 top = xb_load(p, xbType_I64, top_m);
+		xb_store(p, xbType_I64, res, xb_binop(p, xbOp_Add, xbType_I64, top, xb_convop(p, xbOp_Sext, xbType_I64, xbType_I32, offs)));
+		xb_jump(p, done);
+	} else {
+		// SysV ABI figure 3.34
+		xbMem off_m = xb_mem_offset(lm, is_fp ? 4 : 0);
+		u32 off = xb_load(p, xbType_I32, off_m);
+		xb_branch(p, xb_cmp(p, xbCond_ULT, xbType_I32, off, xb_iconst(p, xbType_I32, is_fp ? 176 : 48)), in_reg, on_stack);
+		xb_start_block(p, in_reg);
+		u32 save = xb_load(p, xbType_I64, xb_mem_offset(lm, 16));
+		xb_store(p, xbType_I64, res, xb_binop(p, xbOp_Add, xbType_I64, save, xb_convop(p, xbOp_Zext, xbType_I64, xbType_I32, off)));
+		xb_store(p, xbType_I32, off_m, xb_binop(p, xbOp_Add, xbType_I32, off, xb_iconst(p, xbType_I32, is_fp ? 16 : 8)));
+		xb_jump(p, done);
+	}
+	xb_start_block(p, on_stack);
+	xbMem stack_m = xb_is_arm64() ? lm : xb_mem_offset(lm, 8);
+	u32 stack = xb_load(p, xbType_I64, stack_m);
+	xb_store(p, xbType_I64, res, stack);
+	xb_store(p, xbType_I64, stack_m, xb_ptr_add_const(p, stack, 8));
+	xb_jump(p, done);
+	xb_start_block(p, done);
+	return xb_load(p, xbType_I64, res);
+}
+
+// c_va_arg of a scalar: an f16 or f32 arrived as an f64, a small integer in the low bytes
+// of its slot.
+gb_internal xbValue xb_build_c_va_arg(xbProc *p, AstCallExpr *ce, Type *type) {
+	bool f16 = xb_is_f16(type);
+	xbType st = f16 ? xbType_F64 : xb_scalar_type(type);
+	if (st == xbType_None || is_type_different_to_arch_endianness(type)) XB_UNSUPPORTED(p, "c_va_arg type");
+	u32 list = xb_value_to_reg(p, xb_build_expr(p, ce->args[0]));
+	u32 ptr = xb_c_va_arg_addr(p, xb_mem(xbMem_Reg, list, 0), xb_type_is_float(st), type_align_of(type));
+	if (f16 || st == xbType_F32) {
 		xbValue d = xb_value_reg(t_f64, xb_load(p, xbType_F64, xb_mem(xbMem_Reg, ptr, 0)));
 		return xb_emit_conv(p, d, type);
 	}

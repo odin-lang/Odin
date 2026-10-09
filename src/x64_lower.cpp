@@ -1943,6 +1943,23 @@ gb_internal void x64_lower_proc(xbProc *p, xbLowerOut *out) {
 		}
 	}
 	dbg.saved_at = cast(i32)(xb_pos(a) - L.proc_start);
+	if (p->va_home) {
+		// c_va_start reads the register arguments from their home slots
+		u8 const regs[4] = {RCX, RDX, R8, R9};
+		for (i32 i = 0; i < 4; i++) {
+			xb_mov_rm_r(a, 8, xb_m(RBP, L.incoming_base + 8*i), regs[i]);
+		}
+	}
+	if (p->va_save_local >= 0) {
+		// c_va_start reads the register arguments from this save area: rdi..r9, then xmm0-7
+		i32 off = p->locals[p->va_save_local].frame_offset;
+		for (i32 i = 0; i < 6; i++) {
+			xb_mov_rm_r(a, 8, xb_m(RBP, off + 8*i), xb_sysv_int_regs[i]);
+		}
+		for (i32 i = 0; i < 8; i++) {
+			xb_movups_m_x(a, xb_m(RBP, off + 48 + 16*i), cast(u8)i);
+		}
+	}
 	for (xbLocal const &l : p->locals) {
 		if (l.over_align <= 16) continue;
 		// lea r11, [rbp + raw + align-1]; and r11, -align; mov [rbp + slot], r11

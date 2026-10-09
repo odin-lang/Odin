@@ -1396,6 +1396,17 @@ gb_internal bool a64_lower_proc_with(xbProc *p, xbLowerOut *out, bool far_branch
 		a64_pair(a, fp, false, hi, lo, A64_FP, off);
 	});
 	i32 saved_at = cast(i32)(xb_pos(a) - L.proc_start);
+	if (p->va_save_local >= 0) {
+		// c_va_start reads the register arguments from this save area: x0-x7, then q0-q7
+		for (i32 i = 0; i < 8; i++) {
+			a64Addr d = a64_mem(&L, xb_mem(xbMem_Local, cast(u32)p->va_save_local, 8*i));
+			a64_str(a, 8, cast(u8)i, d.base, d.off);
+		}
+		for (i32 i = 0; i < 8; i++) {
+			a64Addr d = a64_mem(&L, xb_mem(xbMem_Local, cast(u32)p->va_save_local, 64 + 16*i));
+			a64_str_fp(a, 16, cast(u8)i, d.base, d.off);
+		}
+	}
 	for (xbLocal const &l : p->locals) {
 		if (l.over_align <= 16) continue;
 		u32 shift = 0;

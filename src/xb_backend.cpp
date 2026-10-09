@@ -163,6 +163,7 @@ gb_internal void xb_candidate_checks(xbCandidateCheck *checks, isize count) {
 // Builds the IR of one procedure. Nothing is emitted yet.
 gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type) {
 	xbProc *p = xb_alloc_item<xbProc>();
+	p->va_save_local = -1;
 	p->m = m;
 	p->type = type;
 	p->name = name;
