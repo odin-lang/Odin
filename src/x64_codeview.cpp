@@ -508,13 +508,16 @@ gb_internal void xb_cv_define(xbCv *cv, Type *t) {
 		break;
 	}
 	case Type_BitSet: {
-		// a union of one bit bools named after the elements, like LLVM's
+		// a union of one bit bools named after the elements, like LLVM's. Each bit sits in its
+		// own byte, since a position past the bool's 8 bits is lost past bit 63 in WinDbg
+		bool big_endian = bt->BitSet.underlying != nullptr && is_type_endian_big(bt->BitSet.underlying);
 		auto add_bit = [&](String name, i64 bit) {
 			isize at = xb_cv_type_begin(cv, XCV_LF_BITFIELD);
 			xbb_u32(cv->t, XCV_T_BOOL08);
 			xbb_u8(cv->t, 1);
-			xbb_u8(cv->t, cast(u8)bit);
-			xbCvMember mem = {name, xb_cv_type_end(cv, at), 0};
+			xbb_u8(cv->t, cast(u8)(bit % 8));
+			i64 byte = big_endian ? size - 1 - bit/8 : bit/8;
+			xbCvMember mem = {name, xb_cv_type_end(cv, at), byte};
 			array_add(&members, mem);
 		};
 		Type *elem = base_type(bt->BitSet.elem);
