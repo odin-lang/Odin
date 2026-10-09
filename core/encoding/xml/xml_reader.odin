@@ -15,6 +15,8 @@ import    "core:encoding/entity"
 import    "base:intrinsics"
 import    "core:mem"
 import    "core:strings"
+import    "core:time"
+import    "core:log"
 
 likely :: intrinsics.expect
 
@@ -163,15 +165,79 @@ Error :: enum {
 	Conflicting_Options,
 }
 
+_Perf_Meas :: struct {
+	sw: map[_Perf]time.Stopwatch,
+}
+
+_Perf :: enum {
+	clone_input,
+	elements,
+	attributes,
+	attributes_set_context,
+	attributes_peek,
+	attributes_parse_attribute,
+	attributes_check_duplicates,
+	attributes_append,
+	attributes_skip_whitespace,
+	text_content,
+	cdata,
+	comments,
+	resize_result,
+	peek_total,
+	scan_total,
+	scan_string_total,
+	skip_whitespace_total,
+	advance_rune_total,
+	parse_attribute_set_context,
+	parse_attribute_tokenize_ident,
+	parse_attribute_tokenize_eq,
+	parse_attribute_tokenize_value,
+	parse_attribute_decode,
+	parse_attribute_append,
+}
+
+_meas_reset :: proc(m: ^_Perf_Meas) {
+	m.sw = make(map[_Perf]time.Stopwatch, context.temp_allocator)
+	for p in _Perf {
+		m.sw[p] = {}
+	}
+}
+
+_meas_begin :: #force_inline proc(m: ^_Perf_Meas, which: _Perf) {
+	time.stopwatch_start(&m.sw[which])
+}
+
+_meas_end :: #force_inline proc(m: ^_Perf_Meas, which: _Perf) {
+	time.stopwatch_stop(&m.sw[which])
+}
+
+_meas_log :: proc(m: _Perf_Meas) {
+	for p in _Perf {
+		sw := m.sw[p]
+		log.infof("% -35v:  %v", p, time.stopwatch_duration(sw))
+	}
+}
+
+@(thread_local) _parse_bytes_meas: _Perf_Meas
+
 parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
 	data := data
 	context.allocator = allocator
 
 	opts := validate_options(options) or_return
 
+	m := &_parse_bytes_meas
+	_meas_reset(m)
+	defer _meas_log(m^)
+
+	entity._meas_reset(&entity._decode_xml_meas)
+	defer entity._meas_log(entity._decode_xml_meas)
+
 	// If `.Input_May_Be_Modified` is not specified, we duplicate the input so that we can modify it in-place.
 	if .Input_May_Be_Modified not_in opts.flags {
+		_meas_begin(m, .clone_input)
 		data = bytes.clone(data)
+		_meas_end(m, .clone_input)
 	}
 
 	t := new(Tokenizer)
@@ -203,6 +269,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 			// NOTE(Jeroen): We're not using a switch because this if-else chain ordered by likelihood is 2.5% faster at -o:size and -o:speed.
 			if likely(open.kind, Token_Kind.Ident) == .Ident {
 				// e.g. <odin - Start of new element.
+				_meas_begin(m, .elements)
 				element = new_element(doc)
 				if element == 0 { // First Element
 					parent = element
@@ -212,8 +279,14 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 				doc.elements[element].parent = parent
 				doc.elements[element].ident  = open.text
+				_meas_end(m, .elements)
 
+				_meas_begin(m, .attributes)
+				// PERF: Hot !!
 				parse_attributes(doc, &doc.elements[element].attribs) or_return
+				_meas_end(m, .attributes)
+
+				_meas_begin(m, .elements)
 
 				// If a DOCTYPE is present _or_ the caller
 				// asked for a specific DOCTYPE and the DOCTYPE
@@ -245,8 +318,11 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					return
 				}
 
+				_meas_end(m, .elements)
+
 			} else if open.kind == .Slash {
 				// Close tag.
+				_meas_begin(m, .elements)
 				ident := expect(t, .Ident) or_return
 				_      = expect(t, .Gt)    or_return
 
@@ -256,6 +332,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				}
 				parent  = doc.elements[element].parent
 				element = parent
+				_meas_end(m, .elements)
 
 			} else if open.kind == .Exclaim {
 				// <!
@@ -290,6 +367,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					// Comment: <!-- -->.
 					// The grammar does not allow a comment to end in --->
 					expect(t, .Dash)
+					_meas_begin(m, .comments)
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
@@ -303,6 +381,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 							append(&doc.elements[element].value, el)
 						}
 					}
+					_meas_end(m, .comments)
 
 				case .Open_Bracket:
 					// This could be a CDATA tag part of a tag's body. Unread the `<![`
@@ -312,7 +391,9 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 					// Instead of calling `parse_body` here, we could also `continue loop`
 					// and fall through to the `case:` at the bottom of the outer loop.
 					// This makes the intent clearer.
+					_meas_begin(m, .cdata)
 					parse_body(doc, element, opts) or_return
+					_meas_end(m, .cdata)
 
 				case:
 					error(t, t.offset, "Unexpected Token after <!: %#v", next)
@@ -348,7 +429,9 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 
 		case:
 			// This should be a tag's body text.
+			_meas_begin(m, .text_content)
 			parse_body(doc, element, opts) or_return
+			_meas_end(m, .text_content)
 		}
 	}
 
@@ -360,7 +443,9 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 		return doc, .No_DocType
 	}
 
+	_meas_begin(m, .resize_result)
 	resize(&doc.elements, int(doc.element_count))
+	_meas_end(m, .resize_result)
 	return doc, .None
 }
 
@@ -408,7 +493,7 @@ validate_options :: proc(options: Options) -> (validated: Options, err: Error) {
 	return validated, .None
 }
 
-expect :: proc(t: ^Tokenizer, kind: Token_Kind, multiline_string := false) -> (tok: Token, err: Error) {
+expect :: #force_inline proc(t: ^Tokenizer, kind: Token_Kind, multiline_string := false) -> (tok: Token, err: Error) {
 	tok = scan(t, multiline_string=multiline_string)
 	if tok.kind == kind { return tok, .None }
 
@@ -416,18 +501,34 @@ expect :: proc(t: ^Tokenizer, kind: Token_Kind, multiline_string := false) -> (t
 	return tok, .Unexpected_Token
 }
 
-parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: Error) {
+_parse_attribute :: proc(doc: ^Document, builder: ^strings.Builder) -> (attr: Attribute, offset: int, err: Error) {
 	assert(doc != nil)
+	m := &_parse_bytes_meas
+	_meas_begin(m, .parse_attribute_set_context)
 	context.allocator = doc.allocator
+	_meas_end(m, .parse_attribute_set_context)
 	t := doc.tokenizer
 
+	_meas_begin(m, .parse_attribute_tokenize_ident)
 	key    := expect(t, .Ident)  or_return
-	_       = expect(t, .Eq)     or_return
-	value  := expect(t, .String, multiline_string=true) or_return
+	_meas_end(m, .parse_attribute_tokenize_ident)
 
-	normalized, normalize_err := entity.decode_xml(value.text, {.Normalize_Whitespace}, doc.allocator)
+	_meas_begin(m, .parse_attribute_tokenize_eq)
+	_       = expect(t, .Eq)     or_return
+	_meas_end(m, .parse_attribute_tokenize_eq)
+
+	_meas_begin(m, .parse_attribute_tokenize_value)
+	value  := expect(t, .String, multiline_string=true) or_return
+	_meas_end(m, .parse_attribute_tokenize_value)
+
+	_meas_begin(m, .parse_attribute_decode)
+	//builder := strings.builder_make_len_cap(0, len(value.text) + 10, doc.allocator)
+	normalized, normalize_err := entity.decode_xml_sb(builder, value.text, {.Normalize_Whitespace}, doc.allocator)
+	_meas_end(m, .parse_attribute_decode)
 	if normalize_err == .None {
-		append(&doc.strings_to_free, normalized)
+		//_meas_begin(m, .parse_attribute_append)
+		//append(&doc.strings_to_free, strings.to_string(builder))
+		//_meas_end(m, .parse_attribute_append)
 		value.text = normalized
 	}
 
@@ -445,20 +546,56 @@ check_duplicate_attributes :: proc(t: ^Tokenizer, attribs: Attributes, attr: Att
 			return .Duplicate_Attribute
 		}
 	}
-	return .None	
+	return .None
 }
 
 parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 	assert(doc != nil)
-	context.allocator = doc.allocator
+	m := &_parse_bytes_meas
+	_meas_begin(m, .attributes_set_context)
+	context.allocator = doc.allocator // PERF: mildly warmish
+	_meas_end(m, .attributes_set_context)
 	t := doc.tokenizer
 
-	for peek(t).kind == .Ident {
-		attr, offset := parse_attribute(doc)                  or_return
-		check_duplicate_attributes(t, attribs^, attr, offset) or_return
-		append(attribs, attr)
+	// PERF: Hot path. Consolidate attribute strings into one buffer.
+	// !!!!!!!!!!!!!!!!!
+	// TODO: Cannot leave it like this !! This will cause strings to become invalid in case it ever needs to grow the buffer !!
+	// !!!!!!!!!!!!!!!!!
+	builder := strings.builder_make_len_cap(0, 500, doc.allocator)
+	defer {
+		append(&doc.strings_to_free, strings.to_string(builder))
 	}
+
+	for {
+		_meas_begin(m, .attributes_peek)
+		k := peek(t).kind
+		_meas_end(m, .attributes_peek)
+		if k != .Ident {
+			break
+		}
+
+		_meas_begin(m, .attributes_parse_attribute)
+		attr, offset := _parse_attribute(doc, &builder)       or_return
+		_meas_end(m, .attributes_parse_attribute)
+
+		_meas_begin(m, .attributes_check_duplicates)
+		check_duplicate_attributes(t, attribs^, attr, offset) or_return
+		_meas_end(m, .attributes_check_duplicates)
+
+		_meas_begin(m, .attributes_append)
+		append(attribs, attr)
+		_meas_end(m, .attributes_append)
+	}
+
+	//log.infof("Builder contents: %v", strings.to_string(builder))
+	//for attr in attribs {
+	//	log.infof("Attr: %v", attr.val)
+	//}
+
+	_meas_begin(m, .attributes_skip_whitespace)
 	skip_whitespace(t)
+	_meas_end(m, .attributes_skip_whitespace)
+
 	return .None
 }
 

@@ -129,6 +129,8 @@ error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
 
 @(optimization_mode="favor_size")
 advance_rune :: proc(t: ^Tokenizer) {
+	//m := &_parse_bytes_meas
+	//_meas_begin(m, .advance_rune_total)
 	#no_bounds_check {
 		/*
 			Already bounds-checked here.
@@ -162,6 +164,7 @@ advance_rune :: proc(t: ^Tokenizer) {
 			t.ch = -1
 		}
 	}
+	//_meas_end(m, .advance_rune_total)
 }
 
 peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
@@ -172,24 +175,93 @@ peek_byte :: proc(t: ^Tokenizer, offset := 0) -> byte {
 }
 
 @(optimization_mode="favor_size")
+// PERF: warm
 skip_whitespace :: proc(t: ^Tokenizer) {
-	for {
-		switch t.ch {
-		case ' ', '\t', '\r', '\n':
-			advance_rune(t)
-		case:
-			return
+	//m := &_parse_bytes_meas
+	//_meas_begin(m, .skip_whitespace_total)
+	/*
+		Already bounds-checked here.
+	*/
+	/*#no_bounds_check*/ {
+		loop: for {
+			/*if t.ch == ' ' || t.ch == '\t' || t.ch == '\r' {
+				// PERF: Hot.
+				if t.read_offset < len(t.src) {
+					t.offset = t.read_offset
+					c := t.src[t.read_offset]
+					if c < utf8.RUNE_SELF {
+						t.read_offset += 1
+						t.ch = cast(rune)c
+					} else {
+						// PERF: Unlikely.
+						advance_rune(t)
+					}
+				} else {
+					// PERF: Unlikely.
+					advance_rune(t)
+				}
+			} else if t.ch == '\n' {
+				// PERF: Hot.
+				if t.read_offset < len(t.src) {
+					t.offset = t.read_offset
+					t.line_offset = t.offset
+					t.line_count += 1
+					c := t.src[t.read_offset]
+					if c < utf8.RUNE_SELF {
+						t.read_offset += 1
+						t.ch = cast(rune)c
+					} else {
+						// PERF: Unlikely.
+						advance_rune(t)
+					}
+				} else {
+					// PERF: Unlikely.
+					advance_rune(t)
+				}
+			} else {
+				break
+			}*/
+			
+			switch t.ch {
+			case ' ', '\t', '\r', '\n':
+				advance_rune(t)
+			case:
+				break loop
+			}
+			
 		}
 	}
+	//_meas_end(m, .skip_whitespace_total)
+}
+
+_is_letter_map := _is_letter_map_init()
+
+_is_letter_map_init :: proc "contextless" () -> [0x80]bool {
+	m: [0x80]bool
+	assert_contextless(utf8.RUNE_SELF == len(m))
+	m['_'] = true
+	for c in 'A' ..= 'Z' {
+		m[c] = true
+	}
+	for c in 'a' ..= 'z' {
+		m[c] = true
+	}
+	return m
 }
 
 @(optimization_mode="favor_size")
 is_letter :: proc(r: rune) -> bool {
+	// PERF: Warm
 	if r < utf8.RUNE_SELF {
+		//#no_bounds_check {
+		//	if _is_letter_map[r] {
+		//		return true
+		//	}
+		//}
 		switch r {
-		case '_':
-			return true
 		case 'A'..='Z', 'a'..='z':
+			return true
+		case '_':
 			return true
 		}
 	}
@@ -294,6 +366,10 @@ skip_cdata :: proc(t: ^Tokenizer) -> (err: Error) {
 
 @(optimization_mode="favor_size")
 scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close := false, multiline := true) -> (value: string, err: Error) {
+	//m := &_parse_bytes_meas
+	//_meas_begin(m, .scan_string_total)
+	//defer _meas_end(m, .scan_string_total)
+
 	err = .None
 
 	loop: for {
@@ -352,14 +428,18 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 	return lit, err
 }
 
-peek :: proc(t: ^Tokenizer) -> (token: Token) {
-	old  := t^
-	token = scan(t)
-	t^ = old
-	return token
+peek :: #force_inline proc(t: ^Tokenizer) -> (token: Token) {
+	m := &_parse_bytes_meas
+	_meas_begin(m, .peek_total)
+	tmp := t^
+	r := scan(&tmp)
+	_meas_end(m, .peek_total)
+	return r
 }
 
 scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
+	m := &_parse_bytes_meas
+	_meas_begin(m, .scan_total)
 	skip_whitespace(t)
 
 	offset := t.offset
@@ -367,10 +447,10 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	kind: Token_Kind
 	err:  Error
 	lit:  string
-	pos := offset_to_pos(t, offset)
+	pos := #force_inline offset_to_pos(t, offset)
 
 	switch ch := t.ch; true {
-	case is_letter(ch):
+	case #force_inline is_letter(ch):
 		lit = scan_identifier(t)
 		kind = .Ident
 
@@ -411,5 +491,6 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	if kind != .String && lit == "" {
 		lit = string(t.src[offset : t.offset])
 	}
+	_meas_end(m, .scan_total)
 	return Token{kind, lit, pos}
 }
