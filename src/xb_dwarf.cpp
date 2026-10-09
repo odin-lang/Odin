@@ -172,7 +172,7 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 	auto abbrev = [&](xbAbbrev code, u32 tag, bool children, std::initializer_list<u32> attrs) {
 		xbb_uleb(b, code);
 		xbb_uleb(b, tag);
-		xbb_u8(b, children ? XDW_CHILDREN_yes : XDW_CHILDREN_no);
+		xbb_u8(b, cast(u8)(children ? XDW_CHILDREN_yes : XDW_CHILDREN_no));
 		u32 const *it = attrs.begin();
 		for (isize i = 0; i < cast(isize)attrs.size(); i += 2) {
 			xbb_uleb(b, it[i]);
@@ -530,7 +530,7 @@ gb_internal void xb_dwarf_write_type(xbDwarfTypes *dt, Type *t) {
 			enc = XDW_ATE_unsigned; break;
 		default:
 			if (bt->Basic.flags & BasicFlag_Integer) {
-				enc = (bt->Basic.flags & BasicFlag_Unsigned) ? XDW_ATE_unsigned : XDW_ATE_signed;
+				enc = cast(u8)((bt->Basic.flags & BasicFlag_Unsigned) ? XDW_ATE_unsigned : XDW_ATE_signed);
 			} else {
 				// complex, quaternion, string16, ...: raw bytes
 				xbb_uleb(b, xbAbbrev_ArrayType);
@@ -879,11 +879,11 @@ gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbDwa
 		return;
 	}
 	xbb_uleb(b, tls ? 10 : 9);
-	xbb_u8(b, tls ? XDW_OP_const8u : XDW_OP_addr);
+	xbb_u8(b, cast(u8)(tls ? XDW_OP_const8u : XDW_OP_addr));
 	xbDwarfAddr r = {b->count, sym, 0};
 	array_add(addrs, r);
 	xbb_u64(b, 0);
-	if (tls) xbb_u8(b, xb_is_darwin() ? XDW_OP_form_tls_address : XDW_OP_GNU_push_tls_address);
+	if (tls) xbb_u8(b, cast(u8)(xb_is_darwin() ? XDW_OP_form_tls_address : XDW_OP_GNU_push_tls_address));
 }
 
 gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
@@ -909,10 +909,7 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 		}
 	}
 	if (cwd.len == 0) {
-		char buf[4096] = {};
-		if (getcwd(buf, gb_size_of(buf)-1) != nullptr) {
-			cwd = copy_string(permanent_allocator(), make_string_c(buf));
-		}
+		cwd = get_working_directory(permanent_allocator());
 	}
 
 	// .debug_line

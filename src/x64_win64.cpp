@@ -178,9 +178,9 @@ gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason
 		}
 		xbLType *lt = xb_ltype(single_ret);
 		bool is_aggregate = lt->kind == xbLT_Struct || lt->kind == xbLT_Array;
-		bool small = lt->size == 1 || lt->size == 2 || lt->size == 4 || lt->size == 8;
+		bool fits_reg = lt->size == 1 || lt->size == 2 || lt->size == 4 || lt->size == 8;
 		Type *ret_type = single_ret;
-		if (is_type_tuple(single_ret) && is_calling_convention_odin(cc) && is_aggregate && !small) {
+		if (is_type_tuple(single_ret) && is_calling_convention_odin(cc) && is_aggregate && !fits_reg) {
 			// all but the last result are returned through pointers appended to the params
 			f->split_returns = true;
 			auto const &vars = single_ret->Tuple.variables;

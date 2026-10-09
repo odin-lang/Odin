@@ -2648,7 +2648,6 @@ gb_internal void xb_inline_exit(xbProc *p) {
 }
 
 gb_internal void xb_build_return_stmt(xbProc *p, Slice<Ast *> const &return_results, TokenPos pos) {
-	xbAbiFunc *abi = p->abi;
 	TypeProc *pt = &base_type(p->type)->Proc;
 	isize return_count = pt->result_count;
 	if (return_count == 0) {

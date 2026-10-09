@@ -1,8 +1,6 @@
 // ELF64 relocatable object writer for x86-64 and arm64, with .eh_frame. The DWARF sections
 // come from xb_dwarf.cpp.
 
-#include <unistd.h>
-
 enum : u32 {
 	XB_R_X86_64_64            = 1,
 	XB_R_X86_64_PC32          = 2,

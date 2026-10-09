@@ -4,6 +4,12 @@
 // before it builds any bodies. Every procedure compiled here is only declared
 // on the LLVM side.
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable: 4611) // bailing out longjmps past destructors on purpose, the arenas own everything
+#pragma warning(disable: 4702) // `return {};` after XB_UNSUPPORTED, which longjmps
+#endif
+
 #include "xb_backend.hpp"
 #include "x64_encode.cpp"
 #include "x64_abi.cpp"
@@ -575,3 +581,7 @@ gb_internal void xb_add_object(lbGenerator *gen) {
 gb_internal bool xb_is_complete(void) {
 	return xb_module != nullptr && xb_module->complete;
 }
+
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif

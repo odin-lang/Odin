@@ -59,7 +59,7 @@ struct a64Lower {
 	Array<Fixup> fixups;
 	i64         proc_start;
 	i32         next_block;
-	bool        far;      // conditional branches skip over a `b`, the procedure is too long for theirs
+	bool        far_branches; // conditional branches skip over a `b`, the procedure is too long for theirs
 	bool        fuse;     // the current compare only sets the flags for the next instruction
 	u32         flags_vreg;
 	a64Cond     flags_cond;
@@ -608,7 +608,7 @@ gb_internal void a64_branch(a64Lower *L, a64Cond c, i32 test, i32 t, i32 f) {
 		if (test >= 0) a64_cb_skip(a, when, cast(u8)test);
 		else           a64_bcond_skip(a, when ? c : a64_invert(c));
 	};
-	if (L->far) {
+	if (L->far_branches) {
 		// cbz/cbnz and b.cond only skip one instruction, so no procedure is too long for them
 		if (t == L->next_block) {
 			skip_if(true);
@@ -1348,12 +1348,12 @@ gb_internal bool a64_can_fuse(a64Lower *L, xbInstr const &in, xbInstr const &n) 
 	return false;
 }
 
-// Lowers p, or returns false when a conditional branch cannot reach its target unless `far`.
-gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
+// Lowers p, or returns false when a conditional branch cannot reach its target unless `far_branches`.
+gb_internal bool a64_lower_proc_with(xbProc *p, bool far_branches) {
 	xbModule *m = p->m;
 	a64Lower L = {};
 	L.p = p;
-	L.far = far;
+	L.far_branches = far_branches;
 	L.a.m = m;
 	L.a.code = &m->sections[xbSection_Text];
 	L.fixups = array_make<a64Lower::Fixup>(heap_allocator(), 0, 64);

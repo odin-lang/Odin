@@ -88,7 +88,7 @@ gb_internal u32 xb_simd_round(xbProc *p, BuiltinProcId id, xbType st, u32 x) {
 	f64 limit = st == xbType_F32 ? 8388608.0 : 4503599627370496.0;
 	u32 lim = xb_fconst(p, st, limit);
 	u32 ax = xb_simd_fabs(p, st, x);
-	u32 small = xb_cmp(p, xbCond_FLT, st, ax, lim); // false for NaN and infinities
+	u32 in_range = xb_cmp(p, xbCond_FLT, st, ax, lim); // false for NaN and infinities
 	u32 r = 0;
 	if (id == BuiltinProc_simd_nearest) {
 		// adding 2^mantissa rounds to the nearest integer, ties to even
@@ -106,7 +106,7 @@ gb_internal u32 xb_simd_round(xbProc *p, BuiltinProcId id, xbType st, u32 x) {
 		}
 		r = t;
 	}
-	return xb_select(p, st, small, r, x);
+	return xb_select(p, st, in_range, r, x);
 }
 
 // calls a C library procedure `name(T, ..) -> T`, like LLVM does for llvm.fma without the fma feature

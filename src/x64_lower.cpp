@@ -1234,9 +1234,9 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		if (!L->is_const[y] && L->reg[y] == cast(i8)d) gb_swap(u32, x, y);
 		if (x64_imm(L, y, s, &imm)) {
 			// imul d, x, imm
-			bool small = imm >= -128 && imm <= 127;
-			xb_enc(a, xb_size_flags(s), small ? 0x6B : 0x69, d, x64_opnd(L, x, d, s), small ? 1 : 4);
-			if (small) xb_b(a, cast(u8)cast(i8)imm);
+			bool imm8 = imm >= -128 && imm <= 127;
+			xb_enc(a, xb_size_flags(s), imm8 ? 0x6B : 0x69, d, x64_opnd(L, x, d, s), imm8 ? 1 : 4);
+			if (imm8) xb_b(a, cast(u8)cast(i8)imm);
 			else       xb_u32(a, cast(u32)imm);
 		} else {
 			x64_get(L, d, x, s, xbExt_None);
