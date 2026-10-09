@@ -325,6 +325,8 @@ jobs:
           odin run examples/demo -backend:fast || exit /b 1
           odin run examples/demo -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do || exit /b 1
           odin test tests/internal -all-packages -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
+          odin test tests/core/testing -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
+          odin test tests/core/testing -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
           odin test tests/core/normal.odin -file -all-packages -backend:fast -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
           odin test tests/core/normal.odin -file -all-packages -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
           copy vendor\lua\5.4\windows\*.dll .

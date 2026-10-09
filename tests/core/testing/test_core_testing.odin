@@ -1,5 +1,6 @@
 package test_core_testing
 
+import "base:intrinsics"
 import "core:c/libc"
 import "core:math/rand"
 import "core:testing"
@@ -48,7 +49,13 @@ test_expected_assert_message :: proc(t: ^testing.T) {
 @test
 test_expected_signal :: proc(t: ^testing.T) {
 	testing.expect_signal(t, libc.SIGILL)
-	libc.raise(libc.SIGILL)
+	when ODIN_OS == .Windows {
+		// The CRT's raise aborts without an exception for the runner to catch;
+		// an illegal instruction is how SIGILL happens on Windows.
+		intrinsics.trap()
+	} else {
+		libc.raise(libc.SIGILL)
+	}
 }
 
 @test
