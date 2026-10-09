@@ -237,9 +237,13 @@ foreign lib {
 	GetQueuedAudioSize :: proc(dev: AudioDeviceID) -> u32                                        ---
 	ClearQueuedAudio   :: proc(dev: AudioDeviceID)                                               ---
 
+	@(synchronizes=.Acquire)
 	LockAudio         :: proc()                   ---
+	@(synchronizes=.Acquire)
 	LockAudioDevice   :: proc(dev: AudioDeviceID) ---
+	@(synchronizes=.Release)
 	UnlockAudio       :: proc()                   ---
+	@(synchronizes=.Release)
 	UnlockAudioDevice :: proc(dev: AudioDeviceID) --- /* Audio lock functions */
 
 	CloseAudio       :: proc() ---

@@ -2451,6 +2451,19 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	lb_close_scope(p, lbDeferExit_Default, done, ss->body);
 }
 
+gb_internal void lb_set_static_variable_linkage(lbModule *m, LLVMValueRef global, char const *name) {
+	LLVM_SET_INTERNAL_WEAK_LINKAGE(global);
+	if (!USE_SEPARATE_MODULES) {
+		return;
+	}
+	// A procedure literal can be emitted in several modules, and each copy defines its statics
+	LLVMSetVisibility(global, LLVMHiddenVisibility);
+	if (build_context.metrics.os != TargetOs_darwin) {
+		// Mach-O has no COMDATs, but merges weak definitions itself
+		LLVMSetComdat(global, LLVMGetOrInsertComdat(m->mod, name));
+	}
+}
+
 gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		lbValue value = {};
@@ -2495,9 +2508,8 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 			LLVMSetGlobalConstant(global, true);
 		}
 
-		if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
-			LLVM_SET_INTERNAL_WEAK_LINKAGE(global);
-		}
+		lb_apply_thread_local_model(global, e->Variable.thread_local_model);
+		lb_set_static_variable_linkage(p->module, global, c_name);
 
 		if (value.value != nullptr) {
 			if (is_type_any(e->type)) {
@@ -2512,10 +2524,9 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 				if (e->Variable.is_rodata) {
 					LLVMSetGlobalConstant(var_global_ref, true);
 				}
-				
-				if (!lb_apply_thread_local_model(var_global_ref, e->Variable.thread_local_model)) {
-					LLVM_SET_INTERNAL_WEAK_LINKAGE(var_global_ref);
-				}
+
+				lb_apply_thread_local_model(var_global_ref, e->Variable.thread_local_model);
+				lb_set_static_variable_linkage(p->module, var_global_ref, var_name);
 
 				auto vals = array_make<LLVMValueRef>(temporary_allocator(), 0, 3);
 				array_add(&vals, lb_emit_conv(p, var_global.addr, t_rawptr).value);
@@ -2539,9 +2550,8 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 					if (e->Variable.is_rodata) {
 						LLVMSetGlobalConstant(global, true);
 					}
-					if (!lb_apply_thread_local_model(global, e->Variable.thread_local_model)) {
-						LLVM_SET_INTERNAL_WEAK_LINKAGE(global);
-					}
+					lb_apply_thread_local_model(global, e->Variable.thread_local_model);
+					lb_set_static_variable_linkage(p->module, global, c_name);
 				}
 				LLVMSetInitializer(global, value.value);
 			}

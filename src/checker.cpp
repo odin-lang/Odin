@@ -4637,7 +4637,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	} else if (name == "futex") {
 		ExactValue ev = check_decl_attribute_value(c, value, t_futex_operation);
 		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
-			// already reported
 			return true;
 		}
 		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_futex_operation)) {
@@ -4648,6 +4647,27 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		case OdinFutexOperation_Wait: ac->futex = ProcedureFutex_Wait; break;
 		case OdinFutexOperation_Wake: ac->futex = ProcedureFutex_Wake; break;
 		}
+		return true;
+	} else if (name == "synchronizes" || name == "synchronizes_shared") {
+		ExactValue ev = check_decl_attribute_value(c, value, t_atomic_memory_order);
+		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
+			return true;
+		}
+		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_atomic_memory_order)) {
+			error(elem, "Expected a constant of type 'intrinsics.Atomic_Memory_Order' for '%.*s', e.g. '.Acquire' or '.Release'", LIT(name));
+			return true;
+		}
+		i64 order = exact_value_to_i64(ev);
+		if (order == OdinAtomicMemoryOrder_relaxed) {
+			error(elem, "'%.*s' cannot be '.Relaxed', which synchronizes nothing", LIT(name));
+			return true;
+		}
+		if (ac->synchronizes != OdinAtomicMemoryOrder_relaxed) {
+			error(elem, "'synchronizes' and 'synchronizes_shared' cannot both be used");
+			return true;
+		}
+		ac->synchronizes        = cast(u8)order;
+		ac->synchronizes_shared = name == "synchronizes_shared";
 		return true;
 	} else if (name == "futex_parameter") {
 		ExactValue ev = check_decl_attribute_value(c, value);

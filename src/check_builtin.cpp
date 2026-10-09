@@ -250,6 +250,9 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	map_set(&c->info->objc_msgSend_types, call, data);
 	mutex_unlock(&c->info->objc_objc_msgSend_mutex);
 
+	// the Objective-C setup looks up the receiver's class and the selector of every message
+	try_to_add_package_dependency(c, "runtime", "objc_lookUpClass");
+	try_to_add_package_dependency(c, "runtime", "sel_registerName");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
@@ -2242,7 +2245,7 @@ gb_internal i64 check_atomic_address_alignment(Ast *x) {
 	return type_align_of(x->tav.type);
 }
 
-gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
+gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem, bool writes) {
 	if (!is_type_valid_atomic_type(elem)) {
 		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
 		return false;
@@ -2295,6 +2298,42 @@ gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &built
 		gb_string_free(type_str);
 		gb_string_free(str);
 		return false;
+	}
+
+	// what is within @(rodata) faults when written, which a compare-exchange does even when it fails
+	if (writes) {
+		Ast *x = unparen_expr(ptr->UnaryExpr.expr);
+		for (;;) {
+			if (x->kind == Ast_SelectorExpr) {
+				Entity *pkg = entity_of_node(x->SelectorExpr.expr);
+				if (pkg != nullptr && pkg->kind == Entity_ImportName) {
+					x = x->SelectorExpr.selector;
+					break;
+				}
+				if (is_type_pointer(x->SelectorExpr.expr->tav.type)) {
+					break;
+				}
+				x = unparen_expr(x->SelectorExpr.expr);
+			} else if (x->kind == Ast_IndexExpr && is_type_array_like(x->IndexExpr.expr->tav.type)) {
+				x = unparen_expr(x->IndexExpr.expr);
+			} else {
+				break;
+			}
+		}
+		Entity *e = nullptr;
+		if (x->kind == Ast_Ident) {
+			e = entity_of_node(x);
+		}
+		if (e != nullptr && e->kind == Entity_Variable && e->Variable.is_rodata) {
+			gbString str = expr_to_string(ptr->UnaryExpr.expr);
+			if (x == unparen_expr(ptr->UnaryExpr.expr)) {
+				error(operand->expr, "'%s' is @(rodata), which faults when written, as '%.*s' does", str, LIT(builtin_name));
+			} else {
+				error(operand->expr, "'%s' is within @(rodata) '%.*s', which faults when written, as '%.*s' does", str, LIT(e->token.string), LIT(builtin_name));
+			}
+			gb_string_free(str);
+			return false;
+		}
 	}
 	return true;
 }
@@ -6589,7 +6628,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (id == BuiltinProc_atomic_store && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (id == BuiltinProc_atomic_store && !check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6608,7 +6647,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6643,7 +6682,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (id == BuiltinProc_atomic_load && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (id == BuiltinProc_atomic_load && !check_atomic_ptr_argument(operand, builtin_name, elem, false)) {
 				return false;
 			}
 
@@ -6659,7 +6698,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, false)) {
 				return false;
 			}
 
@@ -6693,7 +6732,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6731,7 +6770,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6769,7 +6808,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6799,7 +6838,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6948,6 +6987,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			i64 sz = 8*type_size_of(x.type);
 			if (n > sz) {
 				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)sz);
+				return false;
+			}
+			// the sign bit cannot hold a fraction bit
+			if (n == sz && !is_type_unsigned(x.type)) {
+				error(z.expr, "Scale parameter in '%.*s' must be less than the bit width of a signed integer, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)(sz-1));
 				return false;
 			}
 

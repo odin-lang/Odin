@@ -121,6 +121,7 @@ $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native
+$ODIN test ../test_issue_statics_across_modules -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_omitted_field_union.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON -o:none
@@ -208,6 +209,12 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
+if [[ $($ODIN check ../test_issue_fixed_point_scale.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 # `asm` templates are amd64-only, so this file is empty on every other architecture
 if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
@@ -255,6 +262,12 @@ $ODIN test ../test_issue_7010.odin $COMMON
 clang -c ../test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
 $ODIN test ../test_issue_sysv_abi.odin $COMMON
 
+# AVX-512 asked for through -target-features on the default microarch; needs a CPU that has it
+if grep -qw avx512f /proc/cpuinfo 2>/dev/null; then
+	clang -c ../test_issue_avx512_vector_abi.c -o test_issue_avx512_vector_abi_c.o -mavx512f
+	$ODIN test ../test_issue_avx512_vector_abi.odin $COMMON_CHECK -target-features:avx512f
+fi
+
 clang -c ../test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 $ODIN test ../test_issue_6809_6816.odin -o:speed $COMMON
 
@@ -274,6 +287,26 @@ $ODIN test ../test_issue_7779.odin $COMMON
 $ODIN run ../test_issue_7798.odin $COMMON
 $ODIN test ../test_issue_7763.odin $COMMON
 $ODIN test ../test_issue_disabled_proc_value.odin $COMMON -disable-assert
+$ODIN test ../test_issue_loaded_pointer_alignment.odin $COMMON -o:speed
+
+if [[ $($ODIN check ../test_issue_atomic_orderings.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 13 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN check ../test_issue_atomic_errors.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 11 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+if [[ $($ODIN check ../test_issue_atomic_access.odin -no-entry-point -vet-atomic-access $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 11 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 set +x
 

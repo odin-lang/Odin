@@ -274,9 +274,6 @@ gb_internal bool check_asm_immediate_value_fits(ExactValue ev, i32 bits, i32 *ne
 	return false;
 }
 
-// Returns true if the operand's Odin type is size/class-compatible with the form's slot.
-// On mismatch, fills *mismatch_ for a precise diagnostic. `slot` here is the
-// resolved OperandType at the correct (implicit-skipped) slot.
 template <typename AsmCtx>
 gb_internal bool asm_register_is_mask(AsmCtx *asm_ctx, String name) {
 	return false;
@@ -286,6 +283,9 @@ gb_internal bool asm_register_is_mask(Asm_amd64 *asm_ctx, String name) {
 	return r != Asm_amd64::REG_INVALID && asm_ctx->reg_class(asm_ctx->register_codes[r]) == Asm_amd64::REG_CLASS_K;
 }
 
+// Returns true if the operand's Odin type is size/class-compatible with the form's slot.
+// On mismatch, fills *mismatch_ for a precise diagnostic. `slot` here is the
+// resolved OperandType at the correct (implicit-skipped) slot.
 template <typename AsmCtx>
 gb_internal bool check_asm_operand_size_class(AsmCtx *asm_ctx, typename AsmCtx::OperandType slot, Operand const *operand,
                                               AsmMismatch *mismatch_, i32 *want_bits_, i32 *got_bits_) {

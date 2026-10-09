@@ -65,6 +65,7 @@ set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused
 ..\..\..\odin check ..\test_issue_foreign_import_attributes.odin -no-entry-point %COMMON% || exit /b
 ..\..\..\odin check ..\test_issue_foreign_redeclaration_mismatch.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 ..\..\..\odin check ..\test_issue_integer_literal_exponent.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+..\..\..\odin check ..\test_issue_fixed_point_scale.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 ..\..\..\odin doc ..\test_issue_asm_doc_category.odin -file 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
 ..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
 ..\..\..\odin test ..\test_issue_7421.odin %COMMON% || exit /b
@@ -95,6 +96,7 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
 ..\..\..\odin test ..\test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 ..\..\..\odin test ..\test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
+..\..\..\odin test ..\test_issue_statics_across_modules -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 ..\..\..\odin test ..\test_issue_omitted_field_union.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON%  || exit /b
 ..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON% -o:none || exit /b
@@ -105,6 +107,10 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin run ..\test_issue_7798.odin %COMMON% || exit /b
 ..\..\..\odin test ..\test_issue_7763.odin %COMMON% || exit /b
 ..\..\..\odin test ..\test_issue_disabled_proc_value.odin %COMMON% -disable-assert || exit /b
+..\..\..\odin check ..\test_issue_atomic_orderings.odin -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
+..\..\..\odin check ..\test_issue_atomic_errors.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
+..\..\..\odin check ..\test_issue_atomic_access.odin -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
+..\..\..\odin test ..\test_issue_loaded_pointer_alignment.odin %COMMON% -o:speed || exit /b
 
 @echo off
 

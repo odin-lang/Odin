@@ -2531,6 +2531,7 @@ time :: proc "contextless" (tloc: ^uint) -> (Errno) {
 /*
 	Wait on a futex until it's signaled.
 */
+@(futex=.Wait)
 futex_wait :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Type, flags: Futex_Flags, val: u32, timeout: ^Time_Spec = nil) -> (Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, val, timeout)
@@ -2541,6 +2542,7 @@ futex_wait :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Type, flags: Fut
 	Wake up other threads on a futex
 	n_wakeup specifies the number of processes to wakeup. Specify max(i32) to wake up all processes waiting
 */
+@(futex=.Wake)
 futex_wake :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Type, flags: Futex_Flags, n_wakeup: i32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, n_wakeup)
@@ -2589,6 +2591,7 @@ futex_wake_op :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Op_Type, flag
 /*
 	Same as wait, but mask specifies bits that must be equal for the mutex to wake up.
 */
+@(futex=.Wait)
 futex_wait_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Bitset_Type, flags: Futex_Flags, val: u32,
 	timeout: ^Time_Spec, mask: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
@@ -2599,6 +2602,7 @@ futex_wait_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wait_Bitset_Ty
 /*
 	Wake up on bitset.
 */
+@(futex=.Wake)
 futex_wake_bitset :: proc "contextless" (futex: ^Futex, op: Futex_Wake_Bitset_Type, flags: Futex_Flags, n_wakeup: u32, mask: u32) -> (int, Errno) {
 	futex_flags := cast(u32) op + transmute(u32) flags
 	ret := syscall(SYS_futex, futex, futex_flags, n_wakeup, 0, 0, mask)
