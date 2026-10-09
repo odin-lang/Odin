@@ -335,8 +335,12 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          odin build examples/all -build-mode:obj -backend:fast -thread-count:1 -out:xb_t1.obj || exit /b 1
-          odin build examples/all -build-mode:obj -backend:fast -thread-count:10 -out:xb_t10.obj || exit /b 1
+          rem all_vendor.odin imports the darwin vendor packages, whose objc calls only build on darwin
+          mkdir xb_all
+          copy examples\all\all_main.odin xb_all\
+          copy examples\all\all_vendor_windows.odin xb_all\
+          odin build xb_all -build-mode:obj -backend:fast -thread-count:1 -out:xb_t1.obj || exit /b 1
+          odin build xb_all -build-mode:obj -backend:fast -thread-count:10 -out:xb_t10.obj || exit /b 1
           fc /b xb_t1.obj xb_t10.obj || exit /b 1
       - name: Check benchmarks
         shell: cmd
