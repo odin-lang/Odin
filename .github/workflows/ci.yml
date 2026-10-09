@@ -165,6 +165,27 @@ jobs:
           ./odin build examples/all -build-mode:obj -backend:fast -thread-count:1 -out:xb_t1.o
           ./odin build examples/all -build-mode:obj -backend:fast -thread-count:10 -out:xb_t10.o
           cmp xb_t1.o xb_t10.o
+      - name: Fast backend tests
+        env:
+          ODIN_XB_NO_FALLBACK: 1
+        run: |
+          ./odin run examples/demo -backend:fast
+          ./odin run examples/demo -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do
+          ./odin test tests/internal -all-packages -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin test tests/core/normal.odin -file -all-packages -backend:fast -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          ./odin test tests/core/normal.odin -file -all-packages -backend:fast -debug -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+          cd tests/abi
+          ./run.sh "" "" -backend:fast
+      - name: Fast backend vendor tests
+        env:
+          ODIN_XB_NO_FALLBACK: 1
+        run: ./odin test tests/vendor -all-packages -backend:fast -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
+        if: matrix.os != 'macos-latest'
+      - name: Fast backend vendor tests (MacOS ARM)
+        env:
+          ODIN_XB_NO_FALLBACK: 1
+        run: ./odin test tests/vendor -all-packages -backend:fast -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -extra-linker-flags:"-L/opt/homebrew/opt/lua@5.4/lib"
+        if: matrix.os == 'macos-latest'
       - name: GitHub Issue tests
         run: |
           cd tests/issues
