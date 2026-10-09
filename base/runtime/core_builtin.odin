@@ -808,7 +808,7 @@ append_elem :: proc(#no_alias array: ^$T/[dynamic]$E, #no_broadcast arg: E, loc 
 		if arr.cap-arr.len > 0 {
 			// NOTE(bill, 2026-06-19): When this is in the hot path with -o:speed or -o:aggressive enabled,
 			// this code path cannot rely on type erasure and `mem_copy_non_overlapping`.
-			// So directly inlining the call and storing the argument like this helps the optimize a lot
+			// So directly inlining the call and storing the argument like this helps the optimizer a lot
 			assert(arr.data != nil, loc=loc)
 			([^]E)(arr.data)[arr.len] = arg
 			arr.len += 1
