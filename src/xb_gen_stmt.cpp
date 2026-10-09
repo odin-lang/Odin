@@ -102,6 +102,18 @@ gb_internal void xb_add_ptr_arg(xbProc *p, Array<xbCallArg> *out, xbAbiFunc *abi
 	array_add(out, a);
 }
 
+// The lanes of a short integer vector returned in d0, each in the low bytes of its widened lane,
+// see xbAbiFunc::ret_lane_size
+gb_internal void xb_narrow_ret_lanes(xbProc *p, xbAbiFunc *abi, xbMem dst, xbMem wide) {
+	if (abi->ret_lane_count == 0) return;
+	xbType lane_type = a64_int_piece_type(abi->ret_lane_size);
+	i32 wide_size = 8 / abi->ret_lane_count;
+	for (i32 i = 0; i < abi->ret_lane_count; i++) {
+		u32 lane = xb_load(p, lane_type, xb_mem_offset(wide, i*wide_size));
+		xb_store(p, lane_type, xb_mem_offset(dst, i*abi->ret_lane_size), lane);
+	}
+}
+
 // Calls `proc` with arguments already converted to the parameter types. For C varargs,
 // the extra arguments follow.
 gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sym, Slice<xbValue> args) {
@@ -242,7 +254,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 	}
 
 	xbMem llvm_layout = {};
-	if (abi->ret_tuple_offsets.count > 0) {
+	if (abi->ret_tuple_offsets.count > 0 || abi->ret_lane_count > 0) {
 		llvm_layout = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 16, 8));
 	}
 	if (abi->ret.kind == xbArg_Direct) {
@@ -253,7 +265,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 			r.reg = piece.reg;
 			r.type = piece.type;
 			r.size = piece.size;
-			r.dst = xb_mem_offset(abi->ret_tuple_offsets.count > 0 ? llvm_layout : last_mem, piece.src_offset);
+			r.dst = xb_mem_offset(abi->ret_tuple_offsets.count > 0 || abi->ret_lane_count > 0 ? llvm_layout : last_mem, piece.src_offset);
 			array_add(&call_rets, r);
 		}
 	}
@@ -279,6 +291,7 @@ gb_internal xbValue xb_emit_call_internal(xbProc *p, xbValue proc, i32 direct_sy
 		i64 off = type_offset_of(rt, cast(i32)i, &ft);
 		xb_memcopy(p, xb_mem_offset(result_mem, off), xb_mem_offset(llvm_layout, abi->ret_tuple_offsets[i]), type_size_of(ft));
 	}
+	xb_narrow_ret_lanes(p, abi, last_mem, llvm_layout);
 
 	if (pt->Proc.diverging) {
 		xb_unreachable(p);
@@ -2579,6 +2592,17 @@ gb_internal void xb_emit_ret(xbProc *p, xbMem direct_result) {
 		a.vreg = xb_load(p, xbType_I64, xb_mem(xbMem_Local, cast(u32)p->sret_local));
 		array_add(&args, a);
 	} else if (abi->ret.kind == xbArg_Direct) {
+		if (abi->ret_lane_count > 0) {
+			// each lane zero extended into its widened lane
+			xbMem wide = xb_mem(xbMem_Local, cast(u32)xb_add_local_raw(p, 8, 8));
+			i32 wide_size = 8 / abi->ret_lane_count;
+			for (i32 i = 0; i < abi->ret_lane_count; i++) {
+				u32 lane = xb_load(p, a64_int_piece_type(abi->ret_lane_size), xb_mem_offset(direct_result, i*abi->ret_lane_size));
+				u32 ext = xb_convop(p, xbOp_Zext, a64_int_piece_type(wide_size), a64_int_piece_type(abi->ret_lane_size), lane);
+				xb_store(p, a64_int_piece_type(wide_size), xb_mem_offset(wide, i*wide_size), ext);
+			}
+			direct_result = wide;
+		}
 		for (i32 i = 0; i < abi->ret.piece_count; i++) {
 			xbAbiPiece const &piece = abi->pieces[abi->ret.piece_index+i];
 			xbCallArg a = {};

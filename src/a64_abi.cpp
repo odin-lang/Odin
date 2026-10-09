@@ -182,6 +182,7 @@ struct a64Class {
 	bool block;        // the pieces need consecutive registers of one class
 	i64  block_align;  // stack alignment of the first piece when the block goes onto the stack
 	bool i128_pair;    // two consecutive x registers, x7 cannot hold the first half
+	i32  lane_size, lane_count; // a returned short integer vector, see xbAbiFunc::ret_lane_size
 };
 
 gb_internal xbType a64_int_piece_type(i64 size) {
@@ -295,6 +296,11 @@ gb_internal a64Class a64_classify_ret(xbLType *t, Type *return_source) {
 		a64_hfa_pieces(&c, base, count);
 	} else if (t->size > 16) {
 		c.kind = xbArg_Indirect;
+	} else if (t->kind == xbLT_Vector && t->size < 8 && t->elem->kind == xbLT_Int && t->count >= 2) {
+		// a short integer vector is returned as itself in d0, its lanes widened to fill it
+		a64_add_piece(&c, xbType_F64, 8, 0, xbLoc_Xmm);
+		c.lane_size = cast(i32)(t->size / t->count);
+		c.lane_count = cast(i32)t->count;
 	} else if (t->kind == xbLT_Vector) {
 		// a short vector is returned as itself, in v0
 		a64_add_piece(&c, t->size > 4 ? xbType_F64 : xbType_F32, cast(i32)t->size, 0, xbLoc_Xmm);
@@ -524,6 +530,8 @@ gb_internal xbAbiFunc *a64_abi_compute(Type *proc_type, char const **reason) {
 	f->stack_size = cast(i32)xb_lt_align_formula(s.nsaa, 8);
 
 	if (f->ret.kind == xbArg_Direct) {
+		f->ret_lane_size = ret.lane_size;
+		f->ret_lane_count = ret.lane_count;
 		f->ret.piece_index = cast(i32)f->pieces.count;
 		f->ret.piece_count = cast(i32)ret.pieces.count;
 		i32 gpr = 0;

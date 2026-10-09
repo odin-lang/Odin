@@ -273,6 +273,9 @@ struct xbAbiFunc {
 	// arm64: a tuple returned in registers is laid out like LLVM's struct for it, which has no
 	// padding, so a packed union field moves; where each result goes, when that differs from Odin
 	Slice<i64> ret_tuple_offsets;
+	// arm64: an integer vector narrower than 8 bytes is returned in d0 with each of its lanes
+	// widened to fill it, like LLVM's type legalization; the lane size and count, else 0
+	i32        ret_lane_size, ret_lane_count;
 	i32        stack_size;        // bytes of stack arguments
 	i32        gpr_count;         // registers used by the fixed params
 	i32        xmm_count;
@@ -664,6 +667,7 @@ gb_internal bool xb_can_compile_procs(void);
 gb_internal xbAbiFunc *a64_abi_compute(Type *proc_type, char const **reason);
 gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index);
 gb_internal void a64_check_proc(xbProc *p);
+gb_internal xbType a64_int_piece_type(i64 size);
 gb_internal void a64_lower_proc(xbProc *p);
 gb_internal i32 a64_vec_intrinsic_index(String name, isize *args);
 
