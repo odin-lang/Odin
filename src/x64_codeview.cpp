@@ -294,6 +294,8 @@ gb_internal bool xb_cv_is_record(Type *bt) {
 		return true;
 	case Type_BitField:
 		return bt->BitField.fields.count > 0;
+	case Type_BitSet:
+		return type_size_of(bt) > 0;
 	case Type_Basic:
 		return bt->Basic.kind == Basic_string || bt->Basic.kind == Basic_any || bt->Basic.kind == Basic_string16 ||
 		       is_type_complex(bt) || is_type_quaternion(bt);
@@ -315,6 +317,7 @@ gb_internal u32 xb_cv_type(xbCv *cv, Type *t) {
 		u16 kind = XCV_LF_STRUCTURE;
 		if (bt->kind == Type_Enum) kind = XCV_LF_ENUM;
 		if (bt->kind == Type_Struct && bt->Struct.is_raw_union) kind = XCV_LF_UNION;
+		if (bt->kind == Type_BitSet) kind = XCV_LF_UNION;
 		index = xb_cv_forward(cv, t, kind);
 		array_add(&cv->to_define_index, index);
 	} else {
@@ -502,8 +505,33 @@ gb_internal void xb_cv_define(xbCv *cv, Type *t) {
 		}
 		break;
 	}
+	case Type_BitSet: {
+		// a union of one bit bools named after the elements, like LLVM's
+		auto add_bit = [&](String name, i64 bit) {
+			isize at = xb_cv_type_begin(cv, XCV_LF_BITFIELD);
+			xbb_u32(cv->t, XCV_T_BOOL08);
+			xbb_u8(cv->t, 1);
+			xbb_u8(cv->t, cast(u8)bit);
+			xbCvMember mem = {name, xb_cv_type_end(cv, at), 0};
+			array_add(&members, mem);
+		};
+		Type *elem = base_type(bt->BitSet.elem);
+		if (elem->kind == Type_Enum) {
+			for (Entity *f : elem->Enum.fields) {
+				i64 bit = exact_value_to_i64(f->Constant.value) - bt->BitSet.lower;
+				if (0 <= bit && bit < 8*size) add_bit(f->token.string, bit);
+			}
+		} else {
+			for (i64 bit = 0; bit <= bt->BitSet.upper - bt->BitSet.lower && bit < 8*size; bit++) {
+				char buf[32] = {};
+				gb_snprintf(buf, gb_size_of(buf), "%lld", cast(long long)(bt->BitSet.lower + bit));
+				add_bit(copy_string(permanent_allocator(), make_string_c(buf)), bit);
+			}
+		}
+		break;
 	}
-	u16 kind = (bt->kind == Type_Struct && bt->Struct.is_raw_union) ? XCV_LF_UNION : XCV_LF_STRUCTURE;
+	}
+	u16 kind = ((bt->kind == Type_Struct && bt->Struct.is_raw_union) || bt->kind == Type_BitSet) ? XCV_LF_UNION : XCV_LF_STRUCTURE;
 	xb_cv_record_def(cv, t, kind, size, members);
 }
 
