@@ -22,8 +22,9 @@ here=$(cd "$(dirname "$0")" && pwd)
 # The C side's optimisation level. An ABI is a link-time contract, so the two
 # sides are built independently and either may be optimised: `ABI_CFLAGS=-O2`.
 : "${ABI_CFLAGS:=}"
-# Flags for both Odin commands, e.g. `ABI_ODIN_FLAGS=-microarch:native` where the CPU is
-# older than Odin's x86-64-v2 default; give the C side the same CPU with ABI_CFLAGS.
+# Flags for both Odin commands, e.g. `ABI_ODIN_FLAGS=-microarch:x86-64` where the CPU is
+# older than Odin's x86-64-v2 default. That is also clang's default, so both sides agree
+# on how vectors are passed; `-microarch:native` would not, if clang saw the CPU differently.
 : "${ABI_ODIN_FLAGS:=}"
 COMMON="-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables"
 
