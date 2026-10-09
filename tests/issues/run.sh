@@ -17,6 +17,10 @@ set -x
 #   Otherwise, add it here in the appropriate block, and make sure to
 #   update `run.bat` as well.
 
+# Some tests require a C compiler.
+#   By default, it uses clang.  export ISSUES_TESTS_NO_CLANG=1  to disable these tests.
+#   TODO: See if we can make the tests work with gcc instead?
+
 #########################################################################################################
 
 #
@@ -234,18 +238,22 @@ $ODIN run ../test_issue_7798 $COMMON
 
 #########################################################################################################
 
-# "odin test" tests with special needs:
+# "odin test" tests with special needs, or others (e.g. "odin doc"):
 
-clang -c ../test_issue_5640/test_issue_5640.c -o test_issue_5640_c.o
+if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+	clang -c ../test_issue_5640/test_issue_5640.c -o test_issue_5640_c.o
 
-if [[ "$(uname)" != "NetBSD" ]]; then
-	$ODIN test ../test_issue_5640 -o:none --sanitize:address $COMMON
-else
-	$ODIN test ../test_issue_5640 -o:none $COMMON
+	if [[ "$(uname)" != "NetBSD" ]]; then
+		$ODIN test ../test_issue_5640 -o:none --sanitize:address $COMMON
+	else
+		$ODIN test ../test_issue_5640 -o:none $COMMON
+	fi
 fi
 
-clang -c ../test_issue_6809_6816/test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
-$ODIN test ../test_issue_6809_6816 -o:speed $COMMON
+if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+	clang -c ../test_issue_6809_6816/test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
+	$ODIN test ../test_issue_6809_6816 -o:speed $COMMON
+fi
 
 $ODIN test ../test_issue_6344 $COMMON -o:speed
 
@@ -256,15 +264,16 @@ else
 	exit 1
 fi
 
-clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
-$ODIN test ../test_issue_7010 $COMMON
+if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+	clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
+	$ODIN test ../test_issue_7010 $COMMON
+fi
 
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug
 
 $ODIN test ../test_issue_fast_isel_lowering $COMMON -o:none
 
-TODO
 if [[ $($ODIN test ../test_issue_equal_proc_dependencies $COMMON -build-mode:obj 2>&1 | grep -ci "missing procedure") -eq 0 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
@@ -274,7 +283,7 @@ fi
 
 # `asm` templates are amd64-only, so this file is empty on every other architecture
 if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
-	if [[ $($ODIN doc ../test_issue_asm_doc_category -file 2>&1 | grep -c "asm templates") -eq 1 ]]; then
+	if [[ $($ODIN doc ../test_issue_asm_doc_category 2>&1 | grep -c "asm templates") -eq 1 ]]; then
 		echo "SUCCESSFUL 1/1"
 	else
 		echo "SUCCESSFUL 0/1"
@@ -285,8 +294,14 @@ fi
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers
 
-clang -c ../test_issue_sysv_abi/test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
-$ODIN test ../test_issue_sysv_abi $COMMON
+if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+	clang -c ../test_issue_sysv_abi/test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
+	$ODIN test ../test_issue_sysv_abi $COMMON
+fi
+
+if [[ -v ISSUES_TESTS_NO_CLANG ]]; then
+	echo "!!! WARNING !!! Tests that require clang have been skipped"
+fi
 
 #########################################################################################################
 

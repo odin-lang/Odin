@@ -87,7 +87,7 @@ set ODIN=..\..\..\odin
 
 @rem #########################################################################################################
 
-@rem "odin test" tests with special needs:
+@rem "odin test" tests with special needs, or others (e.g. "odin doc"):
 if "%ISSUES_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_5640\test_issue_5640.c" -o test_issue_5640_c.o || exit /b
 ) else (
@@ -121,6 +121,9 @@ if "%ISSUES_TESTS_NO_CLANG%" == "" (
 %ODIN% test "..\test_issue_fast_isel_lowering" %COMMON% -o:none || exit /b
 
 %ODIN% test "..\test_issue_equal_proc_dependencies" %COMMON% -build-mode:obj 2>&1 | find /i /c "missing procedure" | findstr /x "0" || exit /b
+
+@rem `asm` templates are amd64-only, assuming this is going to work on Windows (ARM?)
+%ODIN% doc "..\test_issue_asm_doc_category" 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
 
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
