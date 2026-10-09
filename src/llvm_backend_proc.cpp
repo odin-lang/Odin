@@ -12,6 +12,16 @@ gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLV
 	return LLVMBuildCall2(p->builder, call_type, ip, args, arg_count, "");
 }
 
+// llvm.va_start, llvm.va_end and llvm.va_copy are overloaded on the pointer type since LLVM 19
+gb_internal void lb_call_va_intrinsic(lbProcedure *p, char const *name, LLVMValueRef *args, unsigned arg_count) {
+#if LLVM_VERSION_MAJOR >= 19
+	LLVMTypeRef types[] = {LLVMTypeOf(args[0])};
+	lb_call_intrinsic(p, name, args, arg_count, types, gb_count_of(types));
+#else
+	lb_call_intrinsic(p, name, args, arg_count, nullptr, 0);
+#endif
+}
+
 gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
@@ -4685,9 +4695,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue ptr  = lb_build_expr(p, ce->args[0]);
 
 			LLVMValueRef va_start_args[] = {ptr.value};
-			LLVMTypeRef  va_start_types[] = {lb_type(p->module, ptr.type)};
-			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_start", va_start_args, gb_count_of(va_start_args), va_start_types, gb_count_of(va_start_types));
-			gb_unused(res);
+			lb_call_va_intrinsic(p, "llvm.va_start", va_start_args, gb_count_of(va_start_args));
 
 			return {};
 		} break;
@@ -4696,9 +4704,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue ptr = lb_build_expr(p, ce->args[0]);
 
 			LLVMValueRef va_end_args[] = {ptr.value};
-			LLVMTypeRef  va_end_types[] = {lb_type(p->module, ptr.type)};
-			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_end", va_end_args, gb_count_of(va_end_args), va_end_types, gb_count_of(va_end_types));
-			gb_unused(res);
+			lb_call_va_intrinsic(p, "llvm.va_end", va_end_args, gb_count_of(va_end_args));
 
 			return {};
 		} break;
@@ -4707,10 +4713,8 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			lbValue dst = lb_build_expr(p, ce->args[0]);
 			lbValue src = lb_build_expr(p, ce->args[1]);
 
-			LLVMValueRef va_end_args[] = {dst.value, src.value};
-			LLVMTypeRef  va_end_types[] = {lb_type(p->module, dst.type)};
-			LLVMValueRef res = lb_call_intrinsic(p, "llvm.va_copy", va_end_args, gb_count_of(va_end_args), va_end_types, gb_count_of(va_end_types));
-			gb_unused(res);
+			LLVMValueRef va_copy_args[] = {dst.value, src.value};
+			lb_call_va_intrinsic(p, "llvm.va_copy", va_copy_args, gb_count_of(va_copy_args));
 
 			return {};
 		} break;
