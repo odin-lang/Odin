@@ -137,6 +137,41 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_poly_proc_value $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_fixed_point_scale $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_atomic_orderings -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 13 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_atomic_errors -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 11 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_atomic_access -no-entry-point -vet-atomic-access $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 11 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 #########################################################################################################
 
 # "odin build" tests:
@@ -267,8 +302,10 @@ if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
 	$ODIN test ../test_issue_7010 $COMMON
 fi
 
-$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
-$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug
+$ODIN test ../test_issue_7547 $COMMON -debug
+
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
+$ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native
 
 $ODIN test ../test_issue_fast_isel_lowering $COMMON -o:none
 
@@ -278,7 +315,7 @@ else
 	echo "SUCCESSFUL 0/1"
 	exit 1
 fi
-if [[ $($ODIN check ../test_issue_fixed_point_scale.odin $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
+if [[ $($ODIN check ../test_issue_fixed_point_scale $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 4 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
 	echo "SUCCESSFUL 0/1"
@@ -302,6 +339,19 @@ if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
 	clang -c ../test_issue_sysv_abi/test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
 	$ODIN test ../test_issue_sysv_abi $COMMON
 fi
+
+# AVX-512 asked for through -target-features on the default microarch; needs a CPU that has it
+if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+	if grep -qw avx512f /proc/cpuinfo 2>/dev/null; then
+		clang -c ../test_issue_avx512_vector_abi/test_issue_avx512_vector_abi.c -o test_issue_avx512_vector_abi_c.o -mavx512f
+		$ODIN test ../test_issue_avx512_vector_abi $COMMON_CHECK -target-features:avx512f
+	fi
+fi
+
+$ODIN test ../test_issue_disabled_proc_value $COMMON -disable-assert
+$ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
+
+#########################################################################################################
 
 if [[ -v ISSUES_TESTS_NO_CLANG ]]; then
 	echo "!!! WARNING !!! Tests that require clang have been skipped"
