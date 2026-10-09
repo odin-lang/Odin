@@ -1317,16 +1317,15 @@ gb_internal void escape_nil_forget_results(EscapeAnalysis *ea) {
 	}
 }
 
-// what a condition being `truth` tells of what is nil
-gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
+gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth, bool narrow=false) {
 	cond = unparen_expr(cond);
-	if (!ea->nil_deref || cond == nullptr) {
+	if ((!ea->nil_deref && !narrow) || cond == nullptr) {
 		return;
 	}
 	switch (cond->kind) {
 	case_ast_node(ue, UnaryExpr, cond);
 		if (ue->op.kind == Token_Not) {
-			escape_nil_refine(ea, ue->expr, !truth);
+			escape_nil_refine(ea, ue->expr, !truth, narrow);
 		}
 	case_end;
 
@@ -1334,14 +1333,14 @@ gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
 		switch (be->op.kind) {
 		case Token_CmpAnd:
 			if (truth) {
-				escape_nil_refine(ea, be->left,  true);
-				escape_nil_refine(ea, be->right, true);
+				escape_nil_refine(ea, be->left,  true, narrow);
+				escape_nil_refine(ea, be->right, true, narrow);
 			}
 			break;
 		case Token_CmpOr:
 			if (!truth) {
-				escape_nil_refine(ea, be->left,  false);
-				escape_nil_refine(ea, be->right, false);
+				escape_nil_refine(ea, be->left,  false, narrow);
+				escape_nil_refine(ea, be->right, false, narrow);
 			}
 			break;
 		case Token_CmpEq:
@@ -1359,6 +1358,13 @@ gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
 				break;
 			}
 			bool is_nil = (be->op.kind == Token_CmpEq) == truth;
+			if (narrow && is_nil && exact) {
+				// as if it were set to nil
+				escape_store_obj(ea, {root}, path, {}, EscapeUpdate_Replace);
+			}
+			if (!ea->nil_deref) {
+				break;
+			}
 			if (!is_nil) {
 				escape_nil_kill(ea, root, path);
 			} else if (exact && escape_type_has_nilable(x->tav.type)) {
@@ -3312,12 +3318,12 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		escape_visit_exits(ea, is->cond);
 
 		EscapeState other = escape_state_clone(ea->state);
-		escape_nil_refine(ea, is->cond, true);
+		escape_nil_refine(ea, is->cond, true, true);
 		escape_stmt(ea, is->body);
 
 		EscapeState then = ea->state;
 		ea->state = other;
-		escape_nil_refine(ea, is->cond, false);
+		escape_nil_refine(ea, is->cond, false, true);
 		escape_stmt(ea, is->else_stmt);
 
 		escape_state_join(&ea->state, then);
