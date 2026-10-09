@@ -1798,16 +1798,11 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 		}
 
 		end_error_block();
-
-		if (prev.kind == Token_EOF) {
-			if (f->invalid_token_pos.line != 0) {
-				end_error_mute();
-			}
-			exit_with_errors();
-		}
 	}
 
-	advance_token(f);
+	if (prev.kind != Token_EOF) {
+		advance_token(f);
+	}
 	return prev;
 }
 
