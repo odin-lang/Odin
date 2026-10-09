@@ -88,13 +88,31 @@ sort_from_permutation_indices :: proc(data: $T/[]$E, indices: []int) {
 	}
 
 	for i in 0..<len(indices) {
-		index_to_swap := indices[i]
+		next_index := indices[i]
 
-		for index_to_swap < i {
-			index_to_swap = indices[index_to_swap]
+		if next_index < 0 {
+			indices[i] *= -1
+			continue
+		}
+		
+		if next_index <= i {
+			continue
 		}
 
-		ptr_swap_non_overlapping(&data[i], &data[index_to_swap], size_of(E))
+		cur_index := i
+		temp := data[cur_index]
+
+		for next_index != i {
+			indices[cur_index] *= -1
+
+			data[cur_index] = data[next_index]
+			
+			cur_index = next_index
+			next_index = indices[cur_index]
+		}
+		
+		data[cur_index] = temp
+		indices[i] *= -1
 	}
 }
 
