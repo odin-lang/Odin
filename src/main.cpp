@@ -3164,6 +3164,8 @@ gb_internal int print_show_help(String const arg0, String command, String option
 			print_usage_line(2, "Exports what each identifier refers to, its entity's kind, type, and definition, for editors and other tools.");
 			print_usage_line(2, "Also exports type layouts and the branches of 'when' statements not taken. Requires `-export-semantics-file`.");
 			print_usage_line(2, "It covers the packages named on the command line, or only the files given with `-export-semantics-for`.");
+			print_usage_line(2, "It is written once type checking finishes, even with type errors, but not when the errors reach `-max-error-count`.");
+			print_usage_line(2, "Tools should raise that, and remove the file before each run, as a previous one is otherwise left in place.");
 			print_usage_line(2, "Available options:");
 				print_usage_line(3, "-export-semantics:json   Exports in JSON format");
 				print_usage_line(3, "-export-semantics:cbor   Exports in CBOR format");
