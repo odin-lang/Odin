@@ -21,6 +21,9 @@ package encoding_unicode_entity
 		Jeroen van Rijn: Initial implementation.
 */
 
+@(private="file")
+INSTRUMENTATION :: false
+
 import "base:runtime"
 import "core:unicode/utf8"
 import "core:unicode"
@@ -94,7 +97,7 @@ _Perf :: enum {
 	line_ends,
 }
 
-_meas_reset :: proc(m: ^_Perf_Meas) {
+_meas_reset :: #force_inline proc(m: ^_Perf_Meas) {
 	m.sw = make(map[_Perf]time.Stopwatch, context.temp_allocator)
 	for p in _Perf {
 		m.sw[p] = {}
@@ -109,7 +112,7 @@ _meas_end :: #force_inline proc(m: ^_Perf_Meas, which: _Perf) {
 	time.stopwatch_stop(&m.sw[which])
 }
 
-_meas_log :: proc(m: _Perf_Meas) {
+_meas_log :: #force_inline proc(m: _Perf_Meas) {
 	for p in _Perf {
 		sw := m.sw[p]
 		log.infof("% -35v:  %v", p, time.stopwatch_duration(sw))
@@ -130,10 +133,10 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 
 decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_Decode_Options{}, allocator := context.allocator) -> (decoded: string, err: Error) {
 	// PERF: Hot
-	m := &_decode_xml_meas
-	_meas_begin(m, .set_context)
+	//m := &_decode_xml_meas
+	//_meas_begin(m, .set_context)
 	context.allocator = allocator
-	_meas_end(m, .set_context)
+	//_meas_end(m, .set_context)
 
 	l := len(input)
 	if l == 0 { return "", .None }
@@ -156,9 +159,9 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 	prev: rune = ' '
 
 	loop: for {
-		_meas_begin(m, .advance)
+		//_meas_begin(m, .advance)
 		advance(&t) or_return
-		_meas_end(m, .advance)
+		//_meas_end(m, .advance)
 
 		if t.r < 0 { break loop }
 
@@ -175,23 +178,23 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 				Keep in mind that we could already *be* inside a CDATA tag.
 				If so, write `<` as a literal and continue.
 			*/
-			_meas_begin(m, .cdata)
+			//_meas_begin(m, .cdata)
 			if in_data {
 				write_rune(builder, '<')
 				continue
 			}
 			in_data = _handle_xml_special(&t, builder, options) or_return
-			_meas_end(m, .cdata)
+			//_meas_end(m, .cdata)
 
 		case ']':
 			// If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
 			if in_data {
-				_meas_begin(m, .cdata)
+				//_meas_begin(m, .cdata)
 				if strings.has_prefix(t.src[t.offset:], CDATA_END) {
 					in_data = false
 					t.read_offset += len(CDATA_END) - 1
 				}
-				_meas_end(m, .cdata)
+				//_meas_end(m, .cdata)
 				continue
 			} else {
 				write_rune(builder, ']')
@@ -200,15 +203,15 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 		case:
 			if in_data && .Decode_CDATA not_in options {
 				// Unboxed, but undecoded.
-				_meas_begin(m, .cdata)
+				//_meas_begin(m, .cdata)
 				write_rune(builder, t.r)
-				_meas_end(m, .cdata)
+				//_meas_end(m, .cdata)
 				continue
 			}
 
 			if t.r == '&' {
-				_meas_begin(m, .decode_amp)
-				defer _meas_end(m, .decode_amp)
+				//_meas_begin(m, .decode_amp)
+				//defer _meas_end(m, .decode_amp)
 				entity, entity_err := _extract_xml_entity(&t)
 				if entity_err == nil {
 					if .No_Entity_Decode not_in options {
@@ -234,7 +237,7 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 			} else {
 				// Handle AV Normalization: https://www.w3.org/TR/2006/REC-xml11-20060816/#AVNormalize
 				if .Normalize_Whitespace in options {
-					_meas_begin(m, .av_normalization)
+					//_meas_begin(m, .av_normalization)
 					switch t.r {
 					case ' ', '\r', '\n', '\t':
 						if prev != ' ' {
@@ -245,10 +248,10 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 						write_rune(builder, t.r)
 						prev = t.r
 					}
-					_meas_end(m, .av_normalization)
+					//_meas_end(m, .av_normalization)
 				} else {
 					// https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-line-ends
-					_meas_begin(m, .line_ends)
+					//_meas_begin(m, .line_ends)
 					switch t.r {
 					case '\n', 0x85, 0x2028:
 						write_rune(builder, '\n')
@@ -260,7 +263,7 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 						write_rune(builder, t.r)
 					}
 					prev = t.r
-					_meas_end(m, .line_ends)
+					//_meas_end(m, .line_ends)
 				}
 			}
 		}

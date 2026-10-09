@@ -203,12 +203,19 @@ _meas_reset :: proc(m: ^_Perf_Meas) {
 	}
 }
 
+@(private="file")
+INSTRUMENTATION :: false
+
 _meas_begin :: #force_inline proc(m: ^_Perf_Meas, which: _Perf) {
-	time.stopwatch_start(&m.sw[which])
+	when INSTRUMENTATION {
+		time.stopwatch_start(&m.sw[which])
+	}
 }
 
 _meas_end :: #force_inline proc(m: ^_Perf_Meas, which: _Perf) {
-	time.stopwatch_stop(&m.sw[which])
+	when INSTRUMENTATION {
+		time.stopwatch_stop(&m.sw[which])
+	}
 }
 
 _meas_log :: proc(m: _Perf_Meas) {
