@@ -155,7 +155,7 @@ create :: proc(name: string) -> (^File, Error) {
 /*
 	`open` is a generalized open call, which defaults to opening for reading.
 	If the file does not exist, and the `{.Create}` flag is passed, it is created with the permissions `perm`,
-	and please note that the containing directory must exist otherwise and an error will be returned.
+	and please note that the containing directory must already exist, otherwise an error will be returned.
 	If successful, a `^File` is return which can be used for I/O.
 	And error is returned if any is encountered.
 */
