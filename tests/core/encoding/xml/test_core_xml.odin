@@ -198,32 +198,32 @@ run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 
 	sw: time.Stopwatch
 
-	log.infof("Starting xml.load_from_file...")
+	log.debugf("Starting xml.load_from_file...")
 	time.stopwatch_reset(&sw)
 	time.stopwatch_start(&sw)
 	doc, err := xml.load_from_file(path, test.options, Silent)
-	log.infof("Finished xml.load_from_file: %v", time.stopwatch_duration(sw))
+	log.debugf("Finished xml.load_from_file: %v", time.stopwatch_duration(sw))
 	defer {
-		log.infof("Starting xml.destroy...")
+		log.debugf("Starting xml.destroy...")
 		time.stopwatch_reset(&sw)
 		time.stopwatch_start(&sw)
 		xml.destroy(doc)
-		log.infof("Finished xml.destroy: %v", time.stopwatch_duration(sw))
+		log.debugf("Finished xml.destroy: %v", time.stopwatch_duration(sw))
 	}
 
-	log.infof("Starting doc_to_string...")
+	log.debugf("Starting doc_to_string...")
 	time.stopwatch_reset(&sw)
 	time.stopwatch_start(&sw)
 	tree_string := doc_to_string(doc, capacity = 20_000_000)
-	log.infof("Finished doc_to_string: %v", time.stopwatch_duration(sw))
+	log.debugf("Finished doc_to_string: %v", time.stopwatch_duration(sw))
 	defer delete(tree_string)
 
-	log.infof("Starting hash.crc32...")
+	log.debugf("Starting hash.crc32...")
 	time.stopwatch_reset(&sw)
 	time.stopwatch_start(&sw)
 	tree_bytes  := transmute([]u8)tree_string
 	crc32 := hash.crc32(tree_bytes)
-	log.infof("Finished hash.crc32: %v", time.stopwatch_duration(sw))
+	log.debugf("Finished hash.crc32: %v", time.stopwatch_duration(sw))
 
 	failed := err != test.err
 	testing.expectf(t, err == test.err, "%v: Expected return value %v, got %v", test.filename, test.err, err, loc=loc)
@@ -358,7 +358,7 @@ doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 
 	result = strings.to_string(buf)
 	if len(result) < capacity - 1000 {
-		log.infof("Document converted to debug string - result length: %v", len(result))
+		log.debugf("Document converted to debug string - result length: %v", len(result))
 	} else {
 		log.warnf("Document converted to debug string - result length: %v - initial string builder capacity: %v - please increase capacity for better test performance.", len(result), capacity)
 	}
