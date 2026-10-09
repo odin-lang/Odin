@@ -1193,6 +1193,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		Token token  = {};
 		token.pos    = ast_token(ss->body).pos;
 		token.string = str_lit("true");
+		token.flags  = TokenFlag_Synthesized;
 
 		x.expr = alloc_ast_node(nullptr, Ast_Ident);
 		x.expr->Ident.token = token;

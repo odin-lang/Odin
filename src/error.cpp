@@ -264,6 +264,7 @@ gb_internal bool terse_errors(void);
 gb_internal bool json_errors(void);
 gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
+TokenPos token_pos_end(Token const &token);
 
 // Let the compiler check these against their arguments. 
 #if defined(__GNUC__) || defined(__clang__)
@@ -605,8 +606,9 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 				squiggle_length += graphemes[i].width;
 			}
 		}
-	} else {
-		// The error is at one spot; no range known.
+	}
+	if (squiggle_length == 0) {
+		// The error is at one spot; no range known, or it is empty.
 		squiggle_length = 1;
 	}
 
@@ -974,14 +976,14 @@ gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const
 gb_internal void warning(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	warning_va(token.pos, {}, fmt, va);
+	warning_va(token.pos, token_pos_end(token), fmt, va);
 	va_end(va);
 }
 
 gb_internal void error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	error_va(token.pos, {}, fmt, va);
+	error_va(token.pos, token_pos_end(token), fmt, va);
 	va_end(va);
 }
 
@@ -1005,7 +1007,7 @@ gb_internal void error_line(char const *fmt, ...) {
 gb_internal void syntax_error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	syntax_error_va(token.pos, {}, fmt, va);
+	syntax_error_va(token.pos, token_pos_end(token), fmt, va);
 	va_end(va);
 }
 

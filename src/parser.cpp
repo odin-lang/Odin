@@ -5858,6 +5858,7 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		break;
 	default:
 		import_name.pos = f->curr_token.pos;
+		import_name.flags |= TokenFlag_Synthesized;
 		break;
 	}
 
@@ -5906,6 +5907,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 			break;
 		default:
 			lib_name.pos = token.pos;
+			lib_name.flags |= TokenFlag_Synthesized;
 			break;
 		}
 		if (is_blank_ident(lib_name)) {

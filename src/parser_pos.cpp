@@ -141,6 +141,9 @@ gb_internal Token ast_token(Ast *node) {
 
 TokenPos token_pos_end(Token const &token) {
 	TokenPos pos = token.pos;
+	if (token.flags & TokenFlag_Synthesized) {
+		return pos;
+	}
 	pos.offset += cast(i32)token.string.len;
 	for (isize i = 0; i < token.string.len; i++) {
 		// TODO(bill): This assumes ASCII

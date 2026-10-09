@@ -639,6 +639,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		ident.kind   = Token_Ident;
 		ident.string = str_lit("Objc_Block");
 		ident.pos    = ast_token(call).pos;
+		ident.flags  = TokenFlag_Synthesized;
 
 		Token l_paren = {};
 		l_paren.kind   = Token_OpenParen;

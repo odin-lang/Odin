@@ -248,8 +248,9 @@ TokenPos token_pos_add_column(TokenPos pos) {
 }
 
 enum TokenFlag : u8 {
-	TokenFlag_Remove  = 1<<1,
-	TokenFlag_Replace = 1<<2,
+	TokenFlag_Remove      = 1<<1,
+	TokenFlag_Replace     = 1<<2,
+	TokenFlag_Synthesized = 1<<3, // NOTE(bill): `string` is not the source text at `pos`
 };
 
 struct Token {
