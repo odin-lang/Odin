@@ -472,6 +472,7 @@ struct xbSymbol {
 	u8        flags;
 	i64       offset;
 	i64       size;
+	i64       realign;  // a thread local whose accesses round its address up to this, see lb_tls_realign
 	i32       elf_index;
 };
 

@@ -37,6 +37,10 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 	}
 	i64 size = type_size_of(e->type);
 	i64 align = gb_max(gb_max(type_align_of(e->type), cast(i64)e->Variable.custom_align), cast(i64)1);
+	if (i64 realign = lb_tls_realign(e)) {
+		size += realign - 16;
+		align = 16;
+	}
 
 	xbSection sec = tls ? xbSection_TBss : xbSection_Bss;
 	xbConstBuf b = {};
@@ -77,6 +81,7 @@ gb_internal bool xb_define_global(xbModule *m, Entity *e, DeclInfo *decl, char c
 	if (!e->Variable.is_export) s->flags |= xbSymbolFlag_Weak | xbSymbolFlag_Hidden;
 	else s->flags |= xbSymbolFlag_Export;
 	if (tls) s->flags |= xbSymbolFlag_TLS;
+	s->realign = lb_tls_realign(e);
 
 	if (build_context.ODIN_DEBUG && !is_blank_ident(e->token.string)) {
 		xbGlobalDebug g = {};

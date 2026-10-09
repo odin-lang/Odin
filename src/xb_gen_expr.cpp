@@ -501,7 +501,13 @@ gb_internal xbMem xb_tls_mem(xbProc *p, i32 sym) {
 		in.imm = sym;
 		in.dst = xb_new_vreg(p, xbType_I64);
 		xb_emit(p, in);
-		return xb_mem(xbMem_Reg, in.dst, 0);
+		u32 addr = in.dst;
+		if (i64 align = p->m->symbols[sym].realign) {
+			// the variable starts at the next multiple of its alignment, see lb_tls_realign
+			u32 pad = xb_binop(p, xbOp_And, xbType_I64, xb_unop(p, xbOp_Neg, xbType_I64, addr), xb_iconst(p, xbType_I64, align-1));
+			addr = xb_binop(p, xbOp_Add, xbType_I64, addr, pad);
+		}
+		return xb_mem(xbMem_Reg, addr, 0);
 	}
 	if (build_context.build_mode == BuildMode_Executable || xb_is_win64()) {
 		// Windows goes through _tls_index in every build mode, see xb_win64_tls_opnd

@@ -2392,7 +2392,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		// the x64 backend defines it, this is only a declaration
 		LLVMSetLinkage(g.value, LLVMExternalLinkage);
 		lb_apply_thread_local_model(g.value, e->Variable.thread_local_model);
-		LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
+		LLVMSetAlignment(g.value, lb_variable_storage_align(e));
 		var->is_initialized = decl->init_expr != nullptr && lb_global_variable_has_constant_init(e, decl);
 		g.value = LLVMConstPointerCast(g.value, lb_type(m, alloc_type_pointer(e->type)));
 		var->var = g;

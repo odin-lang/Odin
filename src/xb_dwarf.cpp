@@ -130,6 +130,9 @@ enum {
 	XDW_OP_reg6  = 0x56,
 	XDW_OP_breg0 = 0x70,
 	XDW_OP_regx  = 0x90,
+	XDW_OP_constu = 0x10,
+	XDW_OP_and    = 0x1a,
+	XDW_OP_plus_uconst = 0x23,
 	XDW_OP_call_frame_cfa = 0x9c,
 
 	XDW_LANG_C99 = 0x0c,
@@ -878,12 +881,24 @@ gb_internal void xb_dwarf_symbol_location(xbModule *m, Array<u8> *b, Array<xbDwa
 		xbb_uleb(b, 0);
 		return;
 	}
-	xbb_uleb(b, tls ? 10 : 9);
+	i64 realign = m->symbols[sym].realign;
+	Array<u8> round = array_make<u8>(heap_allocator(), 0, 16);
+	defer (array_free(&round));
+	if (realign != 0) {
+		// up to the next multiple of the alignment, see lb_tls_realign
+		xbb_u8(&round, cast(u8)XDW_OP_plus_uconst);
+		xbb_uleb(&round, cast(u64)(realign-1));
+		xbb_u8(&round, cast(u8)XDW_OP_constu);
+		xbb_uleb(&round, ~cast(u64)(realign-1));
+		xbb_u8(&round, cast(u8)XDW_OP_and);
+	}
+	xbb_uleb(b, (tls ? 10 : 9) + cast(u64)round.count);
 	xbb_u8(b, cast(u8)(tls ? XDW_OP_const8u : XDW_OP_addr));
 	xbDwarfAddr r = {b->count, sym, 0};
 	array_add(addrs, r);
 	xbb_u64(b, 0);
 	if (tls) xbb_u8(b, cast(u8)(xb_is_darwin() ? XDW_OP_form_tls_address : XDW_OP_GNU_push_tls_address));
+	xbb_bytes(b, round.data, round.count);
 }
 
 gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {

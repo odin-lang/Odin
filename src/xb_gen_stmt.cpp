@@ -3855,6 +3855,11 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		xbSection sec = tls ? xbSection_TData : xbSection_Data;
 		i64 size = gb_max(type_size_of(e->type), cast(i64)1);
 		i64 align = gb_max(gb_max(type_align_of(e->type), cast(i64)e->Variable.custom_align), cast(i64)1);
+		if (i64 realign = lb_tls_realign(e)) {
+			if (vd->values.count > 0) XB_UNSUPPORTED(p, "initialized over-aligned thread local");
+			size += realign - 16;
+			align = 16;
+		}
 		if (p->inl != nullptr) {
 			// the inlined copies share one storage, which may differ from the procedure's own,
 			// so only one that is never written
@@ -3893,6 +3898,7 @@ gb_internal void xb_build_static_variables(xbProc *p, AstValueDecl *vd) {
 		s->offset = at;
 		s->size = size;
 		s->flags = tls ? (xbSymbolFlag_Global | xbSymbolFlag_Hidden | xbSymbolFlag_TLS) : 0;
+		s->realign = lb_tls_realign(e);
 
 		if (!tls) {
 			// a thread local's address is asked for at each use, see xb_tls_mem

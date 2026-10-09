@@ -950,6 +950,7 @@ gb_internal i32 xb_entity_symbol(xbProc *p, Entity *e) {
 		}
 		if (e->Variable.thread_local_model.len != 0) {
 			s->flags |= xbSymbolFlag_TLS;
+			s->realign = lb_tls_realign(e);
 		}
 	}
 	return sym;
