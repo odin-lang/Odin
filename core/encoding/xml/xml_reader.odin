@@ -79,7 +79,11 @@ Document :: struct {
 
 	// Input. Either the original buffer, or a copy if `.Input_May_Be_Modified` isn't specified.
 	input:           []u8            `fmt:"-"`,
-	strings_to_free: [dynamic]string `fmt:"-"`,
+
+	// An arena for small strings, especially for attribute key-value pairs.
+	// This is a hot path optimization for large XML files.
+	extra_strings_arena: mem.Dynamic_Arena `fmt:"-"`,
+	extra_strings_allocator: mem.Allocator `fmt:"-"`,
 }
 
 Element :: struct {
@@ -192,6 +196,7 @@ _Perf :: enum {
 	parse_attribute_tokenize_ident,
 	parse_attribute_tokenize_eq,
 	parse_attribute_tokenize_value,
+	parse_attribute_alloc_sb,
 	parse_attribute_decode,
 	parse_attribute_append,
 }
@@ -254,6 +259,12 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 	doc.allocator = allocator
 	doc.tokenizer = t
 	doc.input     = data
+
+	// Initialize arena allocator for small strings.
+	// Estimate the block size based on input size, but don't splurge on memory for very small XML documents.
+	dynamic_arena_block_size := max(256, len(data) / 4)
+	mem.dynamic_arena_init(&doc.extra_strings_arena, allocator, allocator, dynamic_arena_block_size)
+	doc.extra_strings_allocator = mem.dynamic_arena_allocator(&doc.extra_strings_arena)
 
 	doc.elements = make([dynamic]Element, 1024, 1024, allocator)
 
@@ -468,20 +479,35 @@ destroy :: proc(doc: ^Document, allocator := context.allocator) {
 	context.allocator = allocator
 	if doc == nil { return }
 
+	total_attribs := 0
+	total_values := 0
+
+	log.infof("xml.destroy: Total elements: %v", len(doc.elements))
 	for el in doc.elements {
+		total_attribs += len(el.attribs)
+		total_values += len(el.value)
 		delete(el.attribs)
 		delete(el.value)
 	}
 	delete(doc.elements)
 
+	log.infof("xml.destroy: Total attributes: %v", total_attribs)
+	log.infof("xml.destroy: Total values: %v", total_values)
+
 	delete(doc.prologue)
 	delete(doc.comments)
 	delete(doc.input)
 
-	for s in doc.strings_to_free {
-		delete(s)
-	}
-	delete(doc.strings_to_free)
+	//log.infof("xml.destroy: total extra strings: %v", len(doc.strings_to_free))
+	//for s in doc.strings_to_free {
+	//	delete(s)
+	//}
+	//delete(doc.strings_to_free)
+
+	log.infof("xml.destroy: extra string arena usage: %v", len(doc.extra_strings_arena.used_blocks) * doc.extra_strings_arena.block_size - doc.extra_strings_arena.bytes_left)
+	doc.extra_strings_allocator = {}
+	mem.dynamic_arena_destroy(&doc.extra_strings_arena)
+	doc.extra_strings_arena = {}
 
 	free(doc.tokenizer)
 	free(doc)
@@ -508,7 +534,7 @@ expect :: #force_inline proc(t: ^Tokenizer, kind: Token_Kind, multiline_string :
 	return tok, .Unexpected_Token
 }
 
-_parse_attribute :: proc(doc: ^Document, builder: ^strings.Builder) -> (attr: Attribute, offset: int, err: Error) {
+_parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: Error) {
 	assert(doc != nil)
 	m := &_parse_bytes_meas
 	_meas_begin(m, .parse_attribute_set_context)
@@ -528,9 +554,12 @@ _parse_attribute :: proc(doc: ^Document, builder: ^strings.Builder) -> (attr: At
 	value  := expect(t, .String, multiline_string=true) or_return
 	_meas_end(m, .parse_attribute_tokenize_value)
 
+	_meas_begin(m, .parse_attribute_alloc_sb)
+	builder := strings.builder_make_len_cap(0, len(value.text) + 10, doc.extra_strings_allocator)
+	_meas_end(m, .parse_attribute_alloc_sb)
+
 	_meas_begin(m, .parse_attribute_decode)
-	//builder := strings.builder_make_len_cap(0, len(value.text) + 10, doc.allocator)
-	normalized, normalize_err := entity.decode_xml_sb(builder, value.text, {.Normalize_Whitespace}, doc.allocator)
+	normalized, normalize_err := entity.decode_xml_sb(&builder, value.text, {.Normalize_Whitespace}, doc.allocator)
 	_meas_end(m, .parse_attribute_decode)
 	if normalize_err == .None {
 		//_meas_begin(m, .parse_attribute_append)
@@ -568,10 +597,10 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 	// !!!!!!!!!!!!!!!!!
 	// TODO: Cannot leave it like this !! This will cause strings to become invalid in case it ever needs to grow the buffer !!
 	// !!!!!!!!!!!!!!!!!
-	builder := strings.builder_make_len_cap(0, 500, doc.allocator)
-	defer {
-		append(&doc.strings_to_free, strings.to_string(builder))
-	}
+	//builder := strings.builder_make_len_cap(0, 500, doc.allocator)
+	//defer {
+	//	append(&doc.strings_to_free, strings.to_string(builder))
+	//}
 
 	for {
 		_meas_begin(m, .attributes_peek)
@@ -582,7 +611,7 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 		}
 
 		_meas_begin(m, .attributes_parse_attribute)
-		attr, offset := _parse_attribute(doc, &builder)       or_return
+		attr, offset := _parse_attribute(doc)       or_return
 		_meas_end(m, .attributes_parse_attribute)
 
 		_meas_begin(m, .attributes_check_duplicates)
@@ -728,10 +757,10 @@ parse_body :: proc(doc: ^Document, element: Element_ID, opts: Options) -> (err: 
 		}
 	}
 
-	decoded, decode_err := entity.decode_xml(body_text, decode_opts)
+	builder := strings.builder_make_len_cap(0, len(body_text) + 10, doc.extra_strings_allocator)
+	decoded, decode_err := entity.decode_xml_sb(&builder, body_text, decode_opts)
 	if decode_err == .None {
 		append(&doc.elements[element].value, decoded)
-		append(&doc.strings_to_free, decoded)
 	} else {
 		append(&doc.elements[element].value, body_text)
 	}
@@ -756,5 +785,7 @@ new_element :: proc(doc: ^Document) -> (id: Element_ID) {
 
 	cur := doc.element_count
 	doc.element_count += 1
+	e := doc.elements[cur]
+	e.attribs = make_dynamic_array(Attributes, doc.extra_strings_allocator)
 	return cur
 }
