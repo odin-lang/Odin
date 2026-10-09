@@ -51,3 +51,37 @@ c_vararg_promoted_arguments :: proc(t: ^testing.T) {
 	testing.expect_value(t, v.bs, C_Vararg_Flags{1, 7})
 	testing.expect_value(t, v.i, i64(1) << 40)
 }
+
+C_Vararg_Many :: struct {
+	ints:   [10]i64,
+	floats: [10]f64,
+	p:      rawptr,
+}
+
+// More arguments than any target passes in registers, so the rest come from the stack.
+c_vararg_read_many :: proc "c" (out: ^C_Vararg_Many, #c_vararg args: ..any) {
+	list: c.va_list
+	intrinsics.c_va_start(&list, args)
+	defer intrinsics.c_va_end(&list)
+	for i in 0..<10 {
+		out.ints[i]   = intrinsics.c_va_arg(&list, i64)
+		out.floats[i] = intrinsics.c_va_arg(&list, f64)
+	}
+	out.p = intrinsics.c_va_arg(&list, rawptr)
+}
+
+@(test)
+c_vararg_stack_arguments :: proc(t: ^testing.T) {
+	v: C_Vararg_Many
+	marker: int
+	c_vararg_read_many(&v,
+		i64(1), 1.5, i64(2), 2.5, i64(3), 3.5, i64(4), 4.5, i64(5), 5.5,
+		i64(6), 6.5, i64(7), 7.5, i64(8), 8.5, i64(9), 9.5, i64(10), 10.5,
+		&marker,
+	)
+	for i in 0..<10 {
+		testing.expect_value(t, v.ints[i], i64(i+1))
+		testing.expect_value(t, v.floats[i], f64(i+1) + 0.5)
+	}
+	testing.expect_value(t, v.p, rawptr(&marker))
+}
