@@ -2386,7 +2386,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 
 	lbValue g = {};
 	g.type = alloc_type_pointer(e->type);
-	g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+	g.value = LLVMAddGlobal(m->mod, lb_variable_storage_type(m, e), alloc_cstring(permanent_allocator(), name));
 
 	if (xb_handles(e)) {
 		// the x64 backend defines it, this is only a declaration
@@ -2444,7 +2444,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVMSetExternallyInitialized(g.value, true);
 		lb_add_foreign_library_path(m, e->Variable.foreign_library);
 	} else if (LLVMGetInitializer(g.value) == nullptr) {
-		LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
+		LLVMSetInitializer(g.value, LLVMConstNull(LLVMGlobalGetValueType(g.value)));
 	}
 	if (is_export) {
 		LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
@@ -2453,7 +2453,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
 	}
 	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-	LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
+	LLVMSetAlignment(g.value, lb_variable_storage_align(e));
 
 	if (e->Variable.link_section.len > 0) {
 		LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
@@ -2484,7 +2484,7 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 
 			LLVMBool local_to_unit = LLVMGetLinkage(g.value) == LLVMInternalLinkage;
 
-			LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+			LLVMMetadataRef llvm_expr = lb_debug_variable_expression(m, e);
 			LLVMMetadataRef llvm_decl = nullptr;
 
 			u32 align_in_bits = cast(u32)(8*type_align_of(e->type));
