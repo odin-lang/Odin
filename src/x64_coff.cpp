@@ -69,6 +69,12 @@ gb_internal void xb_coff_add_reloc(xbCoffWriter *w, xbCoffSec in, u32 offset, xb
 
 #include "x64_codeview.cpp"
 
+// the parts of the write time, for ODIN_XB_STATS
+gb_global f64 xb_time_coff_unwind = 0;
+gb_global f64 xb_time_coff_debug = 0;
+gb_global f64 xb_time_coff_symbols = 0;
+gb_global f64 xb_time_coff_file = 0;
+
 // The RAD Debugger's section, like LLVM writes it: a byte it sets when attached, the entry
 // point, then the type views, each a NUL terminated string. Only for a build the fast backend
 // covers entirely, otherwise LLVM's module brings its own.
@@ -228,13 +234,18 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 	w.align[xbCoff_DebugS] = 4;
 	w.align[xbCoff_DebugT] = 4;
 
+	f64 t0 = gb_time_now();
 	xb_coff_unwind(&w);
+	f64 t1 = gb_time_now();
 	if (build_context.ODIN_DEBUG) {
 		xb_codeview_emit(&w);
 		if (m->complete) {
 			xb_coff_raddbg(&w);
 		}
 	}
+	f64 t2 = gb_time_now();
+	xb_time_coff_unwind += t1 - t0;
+	xb_time_coff_debug += t2 - t1;
 
 	// exports
 	for (xbSymbol const &s : m->symbols) {
@@ -401,6 +412,9 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 		}
 	}
 
+	f64 t3 = gb_time_now();
+	xb_time_coff_symbols += t3 - t2;
+
 	// string table
 	auto strtab = array_make<u8>(heap_allocator(), 0, 4096);
 	xbb_u32(&strtab, 0);
@@ -521,5 +535,6 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 	}
 	gb_file_write(&f, out.data, out.count);
 	gb_file_close(&f);
+	xb_time_coff_file += gb_time_now() - t3;
 	return true;
 }

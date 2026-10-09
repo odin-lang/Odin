@@ -833,6 +833,10 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		gb_printf_err("fast backend: compiled %td of %td procedures, inlined %td calls\n", m->stats.procs_compiled, m->stats.procs_total, m->stats.calls_inlined);
 		gb_printf_err("  globals %td of %td, startup %s, type info %s, test main %s%s\n", m->stats.globals_defined, m->stats.globals_total, m->owns_startup ? "fast" : "llvm", m->owns_type_info ? "fast" : "llvm", m->owns_test_main ? "fast" : "-", m->complete ? ", no LLVM" : "");
 		gb_printf_err("  build %.3f ms, lower %.3f ms, write %.3f ms\n", xb_time_build*1000, xb_time_lower*1000, xb_time_write*1000);
+		if (xb_is_win64()) {
+			gb_printf_err("  write: unwind %.3f ms, debug info %.3f ms, symbols and relocations %.3f ms, layout and file %.3f ms\n",
+			              xb_time_coff_unwind*1000, xb_time_coff_debug*1000, xb_time_coff_symbols*1000, xb_time_coff_file*1000);
+		}
 		gb_printf_err("  families built on the main thread after all: %td\n", m->stats.shadow_serial);
 		gb_printf_err("  globals %.3f ms, procedures %.3f ms, startup and type info %.3f ms, total %.3f ms\n", xb_time_globals*1000, xb_time_procs*1000, xb_time_extra*1000, xb_time_total*1000);
 		struct Reason { String name; isize count; };

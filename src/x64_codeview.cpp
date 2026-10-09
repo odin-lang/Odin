@@ -608,7 +608,7 @@ gb_internal void xb_cv_subsection_end(Array<u8> *b, isize at) {
 }
 
 // secrel32 + section16 of a code offset or a symbol
-gb_internal void xb_cv_addr(xbCoffWriter *w, Array<u8> *b, i32 sym, i64 text_offset) {
+gb_internal void xb_cv_addr(xbCoffWriter *w, Array<xbCoffReloc> *relocs, Array<u8> *b, i32 sym, i64 text_offset) {
 	xbModule *m = w->m;
 	xbCoffSec sec = xbCoff_Text;
 	i64 off = text_offset;
@@ -624,10 +624,10 @@ gb_internal void xb_cv_addr(xbCoffWriter *w, Array<u8> *b, i32 sym, i64 text_off
 		}
 	}
 	xbCoffReloc r1 = {cast(u32)b->count, rsym, sec, XB_IMAGE_REL_AMD64_SECREL};
-	array_add(&w->relocs[xbCoff_DebugS], r1);
+	array_add(relocs, r1);
 	xbb_u32(b, cast(u32)off);
 	xbCoffReloc r2 = {cast(u32)b->count, rsym, sec, XB_IMAGE_REL_AMD64_SECTION};
-	array_add(&w->relocs[xbCoff_DebugS], r2);
+	array_add(relocs, r2);
 	xbb_u16(b, 0);
 }
 
@@ -704,8 +704,215 @@ gb_internal xbCvScopes xb_cv_scopes(xbProcDebug const &pd, u32 len) {
 	return sc;
 }
 
-gb_internal void xb_codeview_emit(xbCoffWriter *w) {
+// A type's index, or with by_ref a reference to it, written on first use. Serial.
+gb_internal u32 xb_cv_type_of(xbCv *cv, Type *t, bool by_ref) {
+	u32 index = xb_cv_type(cv, t);
+	if (!by_ref) return index;
+	u32 *found = map_get(&cv->refs, t);
+	if (found) return *found;
+	u32 ref = xb_cv_pointer(cv, index, true);
+	map_set(&cv->refs, t, ref);
+	return ref;
+}
+
+// The index xb_cv_type_of gave a type before: only reads, so procedures can be written in parallel
+gb_internal u32 xb_cv_type_lookup(xbCv *cv, Type *t, bool by_ref) {
+	u32 *found = by_ref ? map_get(&cv->refs, t) : map_get(&cv->types, default_type(t));
+	GB_ASSERT_MSG(found != nullptr, "fast backend: CodeView type %s was not written before", type_to_string(t));
+	return *found;
+}
+
+// The types a procedure's symbols refer to, written in the order of the procedures
+gb_internal void xb_cv_proc_types(xbCv *cv, xbProcDebug const &pd) {
+	if (pd.type) {
+		Type *pt = base_type(pd.type);
+		if (pt && pt->kind == Type_Proc) xb_cv_type_of(cv, pd.type, false);
+	}
+	for (xbDebugVar const &v : pd.vars) {
+		xb_cv_type_of(cv, v.type, v.local >= 0 && !v.in_reg && v.by_ref);
+	}
+}
+
+// A procedure's symbols and line table, with its relocations in relocs
+gb_internal void xb_cv_emit_proc(xbCoffWriter *w, xbCv *cv, xbProcDebug const &pd, Array<u8> *b, Array<xbCoffReloc> *relocs) {
 	xbModule *m = w->m;
+	isize ss = xb_cv_subsection_begin(b, XCV_DEBUG_S_SYMBOLS);
+	u32 proc_type = 0;
+	if (pd.type) {
+		Type *pt = base_type(pd.type);
+		if (pt && pt->kind == Type_Proc) {
+			// the pointer's referent is the LF_PROCEDURE, written just before it
+			proc_type = xb_cv_type_lookup(cv, pd.type, false) - 1;
+		}
+	}
+	u32 len = cast(u32)(pd.end - pd.start);
+	isize at = xb_cv_sym_begin(b, XCV_S_GPROC32);
+	xbb_u32(b, 0); // parent, end, next: lld-link fills them in
+	xbb_u32(b, 0);
+	xbb_u32(b, 0);
+	xbb_u32(b, len);
+	u32 body = pd.win_alloc_at ? pd.win_alloc_at : pd.win_setfp_at;
+	xbb_u32(b, body);
+	xbb_u32(b, len);
+	xbb_u32(b, proc_type);
+	xb_cv_addr(w, relocs, b, -1, pd.start);
+	xbb_u8(b, 0);
+	xb_cv_name(b, pd.link_name);
+	xb_cv_sym_end(b, at);
+
+	at = xb_cv_sym_begin(b, XCV_S_FRAMEPROC);
+	xbb_u32(b, cast(u32)pd.win_alloc_size);
+	xbb_u32(b, 0);
+	xbb_u32(b, 0);
+	xbb_u32(b, cast(u32)(8*pd.win_push_count + 16*pd.win_xmm_count));
+	xbb_u32(b, 0);
+	xbb_u16(b, 0);
+	xbb_u32(b, (2u << 14) | (2u << 16)); // locals and parameters off rbp
+	xb_cv_sym_end(b, at);
+
+	auto emit_var = [&](xbDebugVar const &v) {
+		isize at = 0;
+		if (v.local < 0) {
+			xbSymbol const &s = m->symbols[v.sym];
+			bool tls = (s.flags & xbSymbolFlag_TLS) != 0;
+			at = xb_cv_sym_begin(b, tls ? XCV_S_LTHREAD32 : XCV_S_LDATA32);
+			xbb_u32(b, xb_cv_type_lookup(cv, v.type, false));
+			xb_cv_addr(w, relocs, b, v.sym, 0);
+			xb_cv_name(b, v.name);
+			xb_cv_sym_end(b, at);
+			return;
+		}
+		if (v.in_reg && v.by_ref) {
+			// the register holds the variable's address: it is at [reg+0]
+			at = xb_cv_sym_begin(b, XCV_S_REGREL32);
+			xbb_u32(b, 0);
+			xbb_u32(b, xb_cv_type_lookup(cv, v.type, false));
+			xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
+			xb_cv_name(b, v.name);
+			xb_cv_sym_end(b, at);
+			return;
+		}
+		if (v.in_reg) {
+			// S_LOCAL with def ranges rather than S_REGISTER, which the RAD Debugger ignores
+			at = xb_cv_sym_begin(b, XCV_S_LOCAL);
+			xbb_u32(b, xb_cv_type_lookup(cv, v.type, false));
+			xbb_u16(b, v.is_param ? XCV_LVARFLAG_ISPARAM : 0);
+			xb_cv_name(b, v.name);
+			xb_cv_sym_end(b, at);
+			// in the register throughout, in ranges of at most 0xffff bytes
+			for (u32 lo = 0; lo < len; lo += 0xffff) {
+				at = xb_cv_sym_begin(b, XCV_S_DEFRANGE_REGISTER);
+				xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
+				xbb_u16(b, 0); // not may-be-available
+				xb_cv_addr(w, relocs, b, -1, pd.start + lo);
+				xbb_u16(b, cast(u16)gb_min(len - lo, 0xffffu));
+				xb_cv_sym_end(b, at);
+			}
+			return;
+		}
+		at = xb_cv_sym_begin(b, XCV_S_REGREL32);
+		xbb_u32(b, cast(u32)v.frame_offset_fixup);
+		xbb_u32(b, xb_cv_type_lookup(cv, v.type, v.by_ref));
+		xbb_u16(b, XCV_AMD64_RBP);
+		xb_cv_name(b, v.name);
+		xb_cv_sym_end(b, at);
+	};
+	xbCvScopes sc = xb_cv_scopes(pd, len);
+	// a lexical block per scope that has variables, nested like the scopes
+	auto emit_scope = [&](auto &self, i32 s) -> void {
+		for (xbDebugVar const &v : pd.vars) {
+			if (sc.eff[v.scope] == s) emit_var(v);
+		}
+		for (i32 c : sc.kids[s]) {
+			isize at = xb_cv_sym_begin(b, XCV_S_BLOCK32);
+			xbb_u32(b, 0); // parent, end: lld-link fills them in
+			xbb_u32(b, 0);
+			xbb_u32(b, cast(u32)(sc.hi[c] - sc.lo[c]));
+			xb_cv_addr(w, relocs, b, -1, pd.start + sc.lo[c]);
+			xb_cv_name(b, str_lit(""));
+			xb_cv_sym_end(b, at);
+			self(self, c);
+			at = xb_cv_sym_begin(b, XCV_S_END);
+			xb_cv_sym_end(b, at);
+		}
+	};
+	emit_scope(emit_scope, 0);
+	xb_cv_scopes_free(&sc);
+	at = xb_cv_sym_begin(b, XCV_S_END);
+	xb_cv_sym_end(b, at);
+	xb_cv_subsection_end(b, ss);
+
+	// lines, one block per run of the same file
+	ss = xb_cv_subsection_begin(b, XCV_DEBUG_S_LINES);
+	xb_cv_addr(w, relocs, b, -1, pd.start);
+	xbb_u16(b, 1); // CV_LINES_HAVE_COLUMNS
+	xbb_u32(b, len);
+	struct Line { u32 offset; i32 line; i32 column; };
+	auto lines = array_make<Line>(heap_allocator(), 0, pd.line_entry_count + 1);
+	i32 file = gb_max(pd.file_id, 1);
+	auto flush = [&]() {
+		if (lines.count == 0) return;
+		xbb_u32(b, cast(u32)(8*(file-1))); // the file's entry in the checksums
+		xbb_u32(b, cast(u32)lines.count);
+		xbb_u32(b, cast(u32)(12 + 12*lines.count));
+		// not marked as statements, like LLVM
+		for (Line const &l : lines) {
+			xbb_u32(b, l.offset);
+			xbb_u32(b, cast(u32)gb_max(l.line, 0) & 0xffffff);
+		}
+		for (Line const &l : lines) {
+			xbb_u16(b, cast(u16)gb_clamp(l.column, 0, 0xffff));
+			xbb_u16(b, 0);
+		}
+		lines.count = 0;
+	};
+	auto add_line = [&](i32 f, u32 offset, i32 line, i32 column) {
+		if (f != file) {
+			flush();
+			file = f;
+		}
+		if (lines.count > 0 && lines[lines.count-1].offset == offset) {
+			lines[lines.count-1].line = line;
+			lines[lines.count-1].column = column;
+			return;
+		}
+		Line l = {offset, line, column};
+		array_add(&lines, l);
+	};
+	if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
+		// the prologue gets the declaration's line, debuggers look up the entry address
+		add_line(gb_max(pd.file_id, 1), 0, pd.line, 0);
+		if (pd.prologue_end > 0) add_line(gb_max(pd.file_id, 1), cast(u32)pd.prologue_end, pd.line, 0);
+	}
+	for (i32 i = 0; i < pd.line_entry_count; i++) {
+		xbLineEntry const &e = m->lines[pd.line_entry_start + i];
+		add_line(e.file_id, cast(u32)e.code_offset, e.line, e.column);
+	}
+	flush();
+	array_free(&lines);
+	xb_cv_subsection_end(b, ss);
+}
+
+struct xbCvProcChunk {
+	xbCoffWriter *w;
+	xbCv *cv;
+	isize begin, end;
+	Array<u8> bytes;
+	Array<xbCoffReloc> relocs; // offsets in bytes
+};
+
+gb_internal void xb_cv_proc_chunks(xbCvProcChunk *chunks, isize count) {
+	for (isize ci = 0; ci < count; ci++) {
+		xbCvProcChunk *c = &chunks[ci];
+		c->bytes = array_make<u8>(heap_allocator(), 0, 16*1024);
+		c->relocs = array_make<xbCoffReloc>(heap_allocator(), 0, 256);
+		for (isize i = c->begin; i < c->end; i++) {
+			xb_cv_emit_proc(c->w, c->cv, c->w->m->proc_debug[i], &c->bytes, &c->relocs);
+		}
+	}
+}
+
+gb_internal void xb_codeview_emit(xbCoffWriter *w) {	xbModule *m = w->m;
 	xbCv cv_ = {};
 	xbCv *cv = &cv_;
 	cv->w = w;
@@ -717,15 +924,6 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 	cv->to_define_index = array_make<u32>(heap_allocator(), 0, 256);
 	xbb_u32(cv->t, 4); // CV_SIGNATURE_C13
 
-	auto type_of = [&](Type *t, bool by_ref) -> u32 {
-		u32 index = xb_cv_type(cv, t);
-		if (!by_ref) return index;
-		u32 *found = map_get(&cv->refs, t);
-		if (found) return *found;
-		u32 ref = xb_cv_pointer(cv, index, true);
-		map_set(&cv->refs, t, ref);
-		return ref;
-	};
 
 	xb_add_debug_constants(m);
 
@@ -747,162 +945,33 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		xb_cv_subsection_end(b, ss);
 	}
 
-	for (xbProcDebug const &pd : m->proc_debug) {
-		isize ss = xb_cv_subsection_begin(b, XCV_DEBUG_S_SYMBOLS);
-		u32 proc_type = 0;
-		if (pd.type) {
-			Type *pt = base_type(pd.type);
-			if (pt && pt->kind == Type_Proc) {
-				// the pointer's referent is the LF_PROCEDURE, written just before it
-				proc_type = xb_cv_type(cv, pd.type) - 1;
-			}
+	// the types first, in the order of the procedures, then each procedure's symbols in
+	// parallel; every chunk's bytes are a whole number of 4 byte aligned subsections
+	for (xbProcDebug const &pd : m->proc_debug) xb_cv_proc_types(cv, pd);
+	{
+		isize const per_chunk = 64;
+		isize nchunks = (m->proc_debug.count + per_chunk - 1) / per_chunk;
+		auto chunks = array_make<xbCvProcChunk>(heap_allocator(), nchunks);
+		for (isize i = 0; i < nchunks; i++) {
+			chunks[i] = {};
+			chunks[i].w = w;
+			chunks[i].cv = cv;
+			chunks[i].begin = i * per_chunk;
+			chunks[i].end = gb_min((i+1) * per_chunk, m->proc_debug.count);
 		}
-		u32 len = cast(u32)(pd.end - pd.start);
-		isize at = xb_cv_sym_begin(b, XCV_S_GPROC32);
-		xbb_u32(b, 0); // parent, end, next: lld-link fills them in
-		xbb_u32(b, 0);
-		xbb_u32(b, 0);
-		xbb_u32(b, len);
-		u32 body = pd.win_alloc_at ? pd.win_alloc_at : pd.win_setfp_at;
-		xbb_u32(b, body);
-		xbb_u32(b, len);
-		xbb_u32(b, proc_type);
-		xb_cv_addr(w, b, -1, pd.start);
-		xbb_u8(b, 0);
-		xb_cv_name(b, pd.link_name);
-		xb_cv_sym_end(b, at);
-
-		at = xb_cv_sym_begin(b, XCV_S_FRAMEPROC);
-		xbb_u32(b, cast(u32)pd.win_alloc_size);
-		xbb_u32(b, 0);
-		xbb_u32(b, 0);
-		xbb_u32(b, cast(u32)(8*pd.win_push_count + 16*pd.win_xmm_count));
-		xbb_u32(b, 0);
-		xbb_u16(b, 0);
-		xbb_u32(b, (2u << 14) | (2u << 16)); // locals and parameters off rbp
-		xb_cv_sym_end(b, at);
-
-		auto emit_var = [&](xbDebugVar const &v) {
-			isize at = 0;
-			if (v.local < 0) {
-				xbSymbol const &s = m->symbols[v.sym];
-				bool tls = (s.flags & xbSymbolFlag_TLS) != 0;
-				at = xb_cv_sym_begin(b, tls ? XCV_S_LTHREAD32 : XCV_S_LDATA32);
-				xbb_u32(b, type_of(v.type, false));
-				xb_cv_addr(w, b, v.sym, 0);
-				xb_cv_name(b, v.name);
-				xb_cv_sym_end(b, at);
-				return;
+		thread_pool_for_chunks(chunks.data, chunks.count, 1, xb_cv_proc_chunks);
+		for (xbCvProcChunk &c : chunks) {
+			GB_ASSERT(b->count % 4 == 0);
+			u32 base = cast(u32)b->count;
+			xbb_bytes(b, c.bytes.data, c.bytes.count);
+			for (xbCoffReloc r : c.relocs) {
+				r.offset += base;
+				array_add(&w->relocs[xbCoff_DebugS], r);
 			}
-			if (v.in_reg && v.by_ref) {
-				// the register holds the variable's address: it is at [reg+0]
-				at = xb_cv_sym_begin(b, XCV_S_REGREL32);
-				xbb_u32(b, 0);
-				xbb_u32(b, type_of(v.type, false));
-				xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
-				xb_cv_name(b, v.name);
-				xb_cv_sym_end(b, at);
-				return;
-			}
-			if (v.in_reg) {
-				// S_LOCAL with def ranges rather than S_REGISTER, which the RAD Debugger ignores
-				at = xb_cv_sym_begin(b, XCV_S_LOCAL);
-				xbb_u32(b, type_of(v.type, false));
-				xbb_u16(b, v.is_param ? XCV_LVARFLAG_ISPARAM : 0);
-				xb_cv_name(b, v.name);
-				xb_cv_sym_end(b, at);
-				// in the register throughout, in ranges of at most 0xffff bytes
-				for (u32 lo = 0; lo < len; lo += 0xffff) {
-					at = xb_cv_sym_begin(b, XCV_S_DEFRANGE_REGISTER);
-					xbb_u16(b, xb_cv_reg_of_dwarf(v.dwarf_reg));
-					xbb_u16(b, 0); // not may-be-available
-					xb_cv_addr(w, b, -1, pd.start + lo);
-					xbb_u16(b, cast(u16)gb_min(len - lo, 0xffffu));
-					xb_cv_sym_end(b, at);
-				}
-				return;
-			}
-			at = xb_cv_sym_begin(b, XCV_S_REGREL32);
-			xbb_u32(b, cast(u32)v.frame_offset_fixup);
-			xbb_u32(b, type_of(v.type, v.by_ref));
-			xbb_u16(b, XCV_AMD64_RBP);
-			xb_cv_name(b, v.name);
-			xb_cv_sym_end(b, at);
-		};
-		xbCvScopes sc = xb_cv_scopes(pd, len);
-		// a lexical block per scope that has variables, nested like the scopes
-		auto emit_scope = [&](auto &self, i32 s) -> void {
-			for (xbDebugVar const &v : pd.vars) {
-				if (sc.eff[v.scope] == s) emit_var(v);
-			}
-			for (i32 c : sc.kids[s]) {
-				isize at = xb_cv_sym_begin(b, XCV_S_BLOCK32);
-				xbb_u32(b, 0); // parent, end: lld-link fills them in
-				xbb_u32(b, 0);
-				xbb_u32(b, cast(u32)(sc.hi[c] - sc.lo[c]));
-				xb_cv_addr(w, b, -1, pd.start + sc.lo[c]);
-				xb_cv_name(b, str_lit(""));
-				xb_cv_sym_end(b, at);
-				self(self, c);
-				at = xb_cv_sym_begin(b, XCV_S_END);
-				xb_cv_sym_end(b, at);
-			}
-		};
-		emit_scope(emit_scope, 0);
-		xb_cv_scopes_free(&sc);
-		at = xb_cv_sym_begin(b, XCV_S_END);
-		xb_cv_sym_end(b, at);
-		xb_cv_subsection_end(b, ss);
-
-		// lines, one block per run of the same file
-		ss = xb_cv_subsection_begin(b, XCV_DEBUG_S_LINES);
-		xb_cv_addr(w, b, -1, pd.start);
-		xbb_u16(b, 1); // CV_LINES_HAVE_COLUMNS
-		xbb_u32(b, len);
-		struct Line { u32 offset; i32 line; i32 column; };
-		auto lines = array_make<Line>(heap_allocator(), 0, pd.line_entry_count + 1);
-		i32 file = gb_max(pd.file_id, 1);
-		auto flush = [&]() {
-			if (lines.count == 0) return;
-			xbb_u32(b, cast(u32)(8*(file-1))); // the file's entry in the checksums
-			xbb_u32(b, cast(u32)lines.count);
-			xbb_u32(b, cast(u32)(12 + 12*lines.count));
-			// not marked as statements, like LLVM
-			for (Line const &l : lines) {
-				xbb_u32(b, l.offset);
-				xbb_u32(b, cast(u32)gb_max(l.line, 0) & 0xffffff);
-			}
-			for (Line const &l : lines) {
-				xbb_u16(b, cast(u16)gb_clamp(l.column, 0, 0xffff));
-				xbb_u16(b, 0);
-			}
-			lines.count = 0;
-		};
-		auto add_line = [&](i32 f, u32 offset, i32 line, i32 column) {
-			if (f != file) {
-				flush();
-				file = f;
-			}
-			if (lines.count > 0 && lines[lines.count-1].offset == offset) {
-				lines[lines.count-1].line = line;
-				lines[lines.count-1].column = column;
-				return;
-			}
-			Line l = {offset, line, column};
-			array_add(&lines, l);
-		};
-		if (pd.line > 0 && (pd.line_entry_count == 0 || m->lines[pd.line_entry_start].code_offset != 0)) {
-			// the prologue gets the declaration's line, debuggers look up the entry address
-			add_line(gb_max(pd.file_id, 1), 0, pd.line, 0);
-			if (pd.prologue_end > 0) add_line(gb_max(pd.file_id, 1), cast(u32)pd.prologue_end, pd.line, 0);
+			array_free(&c.bytes);
+			array_free(&c.relocs);
 		}
-		for (i32 i = 0; i < pd.line_entry_count; i++) {
-			xbLineEntry const &e = m->lines[pd.line_entry_start + i];
-			add_line(e.file_id, cast(u32)e.code_offset, e.line, e.column);
-		}
-		flush();
-		array_free(&lines);
-		xb_cv_subsection_end(b, ss);
+		array_free(&chunks);
 	}
 
 	// globals and constants
@@ -911,7 +980,7 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 		for (xbGlobalDebug const &g : m->global_debug) {
 			if (g.sym < 0) {
 				isize at = xb_cv_sym_begin(b, XCV_S_CONSTANT);
-				xbb_u32(b, type_of(g.type, false));
+				xbb_u32(b, xb_cv_type_of(cv, g.type, false));
 				xb_cv_numeric(b, g.value);
 				xb_cv_name(b, g.name);
 				xb_cv_sym_end(b, at);
@@ -919,8 +988,8 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 			}
 			bool tls = (m->symbols[g.sym].flags & xbSymbolFlag_TLS) != 0;
 			isize at = xb_cv_sym_begin(b, tls ? XCV_S_GTHREAD32 : XCV_S_GDATA32);
-			xbb_u32(b, type_of(g.type, false));
-			xb_cv_addr(w, b, g.sym, 0);
+			xbb_u32(b, xb_cv_type_of(cv, g.type, false));
+			xb_cv_addr(w, &w->relocs[xbCoff_DebugS], b, g.sym, 0);
 			xb_cv_name(b, g.name);
 			xb_cv_sym_end(b, at);
 		}
