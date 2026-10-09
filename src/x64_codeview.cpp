@@ -858,7 +858,13 @@ gb_internal void xb_codeview_emit(xbCoffWriter *w) {
 			xbb_u8(b, 0); // checksum size
 			xbb_u8(b, 0); // no checksum
 			xbb_u16(b, 0);
-			xb_cv_name(&strings, f);
+			// debuggers match `file:line` against native paths, like LLVM writes them
+			String native = copy_string(heap_allocator(), f);
+			for (isize i = 0; i < native.len; i++) {
+				if (native[i] == '/') native.text[i] = '\\';
+			}
+			xb_cv_name(&strings, native);
+			gb_free(heap_allocator(), native.text);
 		}
 		xb_cv_subsection_end(b, ss);
 		ss = xb_cv_subsection_begin(b, XCV_DEBUG_S_STRINGTABLE);
