@@ -2260,6 +2260,16 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (entity == nullptr) {
 		return;
 	}
+	if ((entity->flags & EntityFlag_Disabled) && identifier != nullptr && c->decl != nullptr) {
+		// calls to a disabled procedure are dropped, but its value may still be taken
+		Ast *node = unparen_expr(identifier);
+		Ast *callee = c->call_proc_hint;
+		bool is_callee = node == callee ||
+		                 (callee != nullptr && callee->kind == Ast_SelectorExpr && node == unparen_expr(callee->SelectorExpr.selector));
+		if (!is_callee) {
+			add_dependency(c->info, c->decl, entity);
+		}
+	}
 	add_declaration_dependency(c, entity);
 	entity->flags |= EntityFlag_Used;
 	if (entity->kind == Entity_Procedure && entity->Procedure.generated_from_polymorphic) {
@@ -4627,7 +4637,6 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	} else if (name == "futex") {
 		ExactValue ev = check_decl_attribute_value(c, value, t_futex_operation);
 		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
-			// already reported
 			return true;
 		}
 		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_futex_operation)) {
@@ -4638,6 +4647,27 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		case OdinFutexOperation_Wait: ac->futex = ProcedureFutex_Wait; break;
 		case OdinFutexOperation_Wake: ac->futex = ProcedureFutex_Wake; break;
 		}
+		return true;
+	} else if (name == "synchronizes" || name == "synchronizes_shared") {
+		ExactValue ev = check_decl_attribute_value(c, value, t_atomic_memory_order);
+		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
+			return true;
+		}
+		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_atomic_memory_order)) {
+			error(elem, "Expected a constant of type 'intrinsics.Atomic_Memory_Order' for '%.*s', e.g. '.Acquire' or '.Release'", LIT(name));
+			return true;
+		}
+		i64 order = exact_value_to_i64(ev);
+		if (order == OdinAtomicMemoryOrder_relaxed) {
+			error(elem, "'%.*s' cannot be '.Relaxed', which synchronizes nothing", LIT(name));
+			return true;
+		}
+		if (ac->synchronizes != OdinAtomicMemoryOrder_relaxed) {
+			error(elem, "'synchronizes' and 'synchronizes_shared' cannot both be used");
+			return true;
+		}
+		ac->synchronizes        = cast(u8)order;
+		ac->synchronizes_shared = name == "synchronizes_shared";
 		return true;
 	} else if (name == "futex_parameter") {
 		ExactValue ev = check_decl_attribute_value(c, value);

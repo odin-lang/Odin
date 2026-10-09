@@ -169,6 +169,8 @@ struct AttributeContext {
 
 	u8     futex; // ProcedureFutex
 	String futex_parameter;
+	u8     synchronizes;        // OdinAtomicMemoryOrder, .Relaxed when it synchronizes nothing
+	bool   synchronizes_shared; // only reads, as a shared lock does
 
 	bool   raddbg_type_view;
 	String raddbg_type_view_string;
@@ -928,6 +930,7 @@ struct CheckerContext {
 
 	Ast *assignment_lhs_hint;
 	Ast *asm_template_hint;
+	Ast *call_proc_hint; // the callee of the call being checked
 };
 
 gb_internal u64 check_vet_flags(CheckerContext *c);

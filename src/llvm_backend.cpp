@@ -587,6 +587,14 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_cstring", args);
 		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
+	} else if (is_type_cstring16(type) || is_type_string16(type)) {
+		// the length of these counts u16 units, not bytes
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
+		args[0] = data;
+		args[1] = seed;
+		lbValue res = lb_emit_runtime_call(p, is_type_cstring16(type) ? "default_hasher_cstring16" : "default_hasher_string16", args);
+		lb_add_callsite_force_inline(p, res);
+		LLVMBuildRet(p->builder, res.value);
 	} else if (is_type_string(type)) {
 		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = data;
@@ -3641,6 +3649,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 		llvm_features = gb_string_append_length(llvm_features, str.text, str.len);
 	}
+	if (lb_x86_features_need_evex512(build_context.target_features_string)) {
+		llvm_features = gb_string_appendc(llvm_features, first ? "+evex512" : ",+evex512");
+	}
 
 	debugf("CPU: %.*s, Features: %s\n", LIT(llvm_cpu), llvm_features);	
 
@@ -3698,7 +3709,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			gbString split_name = gb_string_make(temporary_allocator(), "");
 
 			LLVMBool is_optimized = build_context.optimization_level > 0;
-			AstFile *init_file = m->info->init_package->files[0];
+			AstFile *init_file = nullptr;
+			if (m->info->init_package->files.count > 0) {
+				init_file = m->info->init_package->files[0];
+			}
 
 			if (Entity *entry_point = m->info->entry_point) {
 				if (Ast *ident = entry_point->identifier.load()) {
@@ -3708,11 +3722,18 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
+			LLVMMetadataRef init_file_metadata = lb_get_file_metadata(m, init_file);
+			if (init_file_metadata == nullptr) {
+				// every file of the initial package was excluded by its build tags, as can be done for `odin test`
+				String path = m->info->init_package->fullpath;
+				init_file_metadata = LLVMDIBuilderCreateFile(m->debug_builder, cast(char const *)path.text, path.len, "", 0);
+			}
+
 			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;
 
 			m->debug_compile_unit = LLVMDIBuilderCreateCompileUnit(m->debug_builder, LLVMDWARFSourceLanguageC99,
-				lb_get_file_metadata(m, init_file),
+				init_file_metadata,
 				producer, gb_string_length(producer),
 				is_optimized, "", 0,
 				1, split_name, gb_string_length(split_name),

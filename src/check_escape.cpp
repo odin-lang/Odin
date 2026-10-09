@@ -39,7 +39,6 @@ enum EscapeFlowKind : u8 {
 	EscapeFlow_Invalid,
 	EscapeFlow_Value, // the pointers of the argument, or offsets of them
 	EscapeFlow_Load,  // the pointers loaded once through them
-	EscapeFlow_Deep,  // the pointers loaded more than once through them
 };
 
 enum EscapeFlowTargetKind : u8 {
@@ -156,8 +155,6 @@ struct EscapeNilUse {
 	bool             definite;
 };
 
-// The procedures are analysed in the strongly connected components of what they may call, callees first,
-// and those calling each other until what flows through them settles, so what is found never depends on the threads
 struct EscapeGraph {
 	Array<ProcInfo *>         procs;          // a procedure's index is kept on its decl, see `DeclInfo::escape_index`
 	Array<i32>                offsets;        // procedure -> the procedures it may call, as `targets[offsets[v]..<offsets[v+1]]`
@@ -179,14 +176,7 @@ struct EscapeMemberTask {
 	bool                stale;   // as the flows of one it calls changed
 	Slice<EscapeFlow>   flows;
 	Array<EscapeReport> reports; // of its latest analysis
-	Array<i32>          callees; // the members of the group it calls, by their index
-	Array<i32>          callers;
-};
-
-// of a walk through the members of a group calling each other
-struct EscapeOrderFrame {
-	i32   k;
-	isize next;
+	Array<i32>          callers; // the members of the group calling it, by their index
 };
 
 struct EscapeAnalysis {
@@ -201,8 +191,11 @@ struct EscapeAnalysis {
 	Array<EscapeFlow>    flows;
 	EscapeGraph *        graph;
 	i32                  group;       // of the procedures being analysed together, see `EscapeGraph`
-	Array<EscapeReport> *reports;     // kept rather than reported, while what flows through the group may still change
+	Array<EscapeReport> *reports;     // kept rather than reported until it is done, see `escape_analyse`
 	bool                 muted;       // the entry point of an executable, which only returns as the program ends
+	isize                stmt_visits;
+	bool                 too_large;   // see `escape_too_large` and `escape_analyse`
+	bool                 calls_unknown; // what the calls do, after growing too large with it
 
 	bool                 nil_deref;    // -vet-nil-deref
 	bool                 uninit;       // -vet-uninitialized
@@ -667,7 +660,20 @@ gb_internal Type *escape_pointee_type(Type *t) {
 	return nullptr;
 }
 
+gb_internal bool escape_too_large(EscapeAnalysis *ea) {
+	enum : isize {
+		MAX_FACT_COUNT  = 1<<13,
+		MAX_STMT_VISITS = 1<<20,
+	};
+	ea->too_large |= ea->state.facts.count + ea->state.outers.count > MAX_FACT_COUNT ||
+	                 ea->stmt_visits > MAX_STMT_VISITS;
+	return ea->too_large;
+}
+
 gb_internal void escape_store_obj(EscapeAnalysis *ea, EscapeObject const &obj, EscapePath const &path, EscapeValue const &v, EscapeUpdateKind update) {
+	if (escape_too_large(ea)) {
+		return;
+	}
 	// a store to any element of an array leaves the others
 	bool replaces = update == EscapeUpdate_Replace;
 	for (EscapeStep const &step : path) {
@@ -1302,16 +1308,15 @@ gb_internal void escape_nil_forget_results(EscapeAnalysis *ea) {
 	}
 }
 
-// what a condition being `truth` tells of what is nil
-gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
+gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth, bool narrow=false) {
 	cond = unparen_expr(cond);
-	if (!ea->nil_deref || cond == nullptr) {
+	if ((!ea->nil_deref && !narrow) || cond == nullptr) {
 		return;
 	}
 	switch (cond->kind) {
 	case_ast_node(ue, UnaryExpr, cond);
 		if (ue->op.kind == Token_Not) {
-			escape_nil_refine(ea, ue->expr, !truth);
+			escape_nil_refine(ea, ue->expr, !truth, narrow);
 		}
 	case_end;
 
@@ -1319,14 +1324,14 @@ gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
 		switch (be->op.kind) {
 		case Token_CmpAnd:
 			if (truth) {
-				escape_nil_refine(ea, be->left,  true);
-				escape_nil_refine(ea, be->right, true);
+				escape_nil_refine(ea, be->left,  true, narrow);
+				escape_nil_refine(ea, be->right, true, narrow);
 			}
 			break;
 		case Token_CmpOr:
 			if (!truth) {
-				escape_nil_refine(ea, be->left,  false);
-				escape_nil_refine(ea, be->right, false);
+				escape_nil_refine(ea, be->left,  false, narrow);
+				escape_nil_refine(ea, be->right, false, narrow);
 			}
 			break;
 		case Token_CmpEq:
@@ -1344,6 +1349,13 @@ gb_internal void escape_nil_refine(EscapeAnalysis *ea, Ast *cond, bool truth) {
 				break;
 			}
 			bool is_nil = (be->op.kind == Token_CmpEq) == truth;
+			if (narrow && is_nil && exact) {
+				// as if it were set to nil
+				escape_store_obj(ea, {root}, path, {}, EscapeUpdate_Replace);
+			}
+			if (!ea->nil_deref) {
+				break;
+			}
 			if (!is_nil) {
 				escape_nil_kill(ea, root, path);
 			} else if (exact && escape_type_has_nilable(x->tav.type)) {
@@ -1912,7 +1924,7 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 				// otherwise a call the checker did not record, which should not happen
 				known = ea->graph->group_of[d->escape_index] == ea->group;
 			}
-			if (known) {
+			if (known && !ea->calls_unknown) {
 				flows = d->escape_flows;
 			}
 		}
@@ -2008,8 +2020,10 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 			continue;
 		}
 		EscapeValue v = {};
+		Type *v_type = nullptr;
 		if (flow.kind == EscapeFlow_Value && escape_path_deref_index(flow.param_path) == flow.param_path.count) {
 			v = escape_value_project(args[flow.param], flow.param_path);
+			v_type = escape_type_within(types[flow.param], flow.param_path);
 		} else {
 			Type *pointee = nullptr;
 			v = escape_arg_pointers(args[flow.param], types[flow.param], flow.param_path, &pointee);
@@ -2018,22 +2032,26 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 					continue;
 				}
 				v = escape_load_once(ea, v);
+				v_type = pointee;
 				if (pointee == nullptr) {
 					// NOTE(bill): the paths of what is loaded are of another type, which could otherwise nest without end in a loop
 					v = escape_as_pointer(v);
 				}
 			}
-			if (flow.kind == EscapeFlow_Deep) {
-				v = escape_reachable(ea, v);
-			}
 		}
 
+		// NOTE(bill): likewise when it goes somewhere of another type, e.g. all of `p^` loaded into `p.name`
 		switch (flow.target) {
-		case EscapeFlowTarget_Result:
+		case EscapeFlowTarget_Result: {
+			Type *t = escape_type_within(pt->results->Tuple.variables[flow.target_index]->type, flow.target_path);
+			if (v_type != nullptr && t != nullptr && !are_types_identical(v_type, t)) {
+				v = escape_as_pointer(v);
+			}
 			for (EscapeValueFact const &f : v) {
 				escape_value_add(&results[flow.target_index], escape_path_concat(flow.target_path, f.path), f.origin);
 			}
 			break;
+		}
 
 		case EscapeFlowTarget_Pointee:
 		case EscapeFlowTarget_Loaded:
@@ -2043,6 +2061,8 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 				EscapeValue ptr = escape_arg_pointers(args[flow.target_index], types[flow.target_index], flow.target_path, &pointee);
 				if (flow.target != EscapeFlowTarget_Pointee) {
 					ptr = escape_as_pointer(escape_load_once(ea, ptr));
+				} else if (v_type != nullptr && pointee != nullptr && !are_types_identical(v_type, pointee)) {
+					v = escape_as_pointer(v);
 				}
 				if (flow.target == EscapeFlowTarget_Deep) {
 					ptr = escape_reachable(ea, ptr);
@@ -2496,11 +2516,6 @@ gb_internal void escape_report(EscapeAnalysis *ea, Ast *node, String expr_str, E
 	array_add(&ea->reported, node);
 
 	EscapeReport r = {kind, node, expr_str, o};
-	if (ea->reports == nullptr) {
-		escape_report_emit(r);
-		return;
-	}
-	// kept beyond this analysis and its temporary memory
 	r.expr_str    = copy_string(permanent_allocator(), expr_str);
 	r.origin.path = {};
 	array_add(ea->reports, r);
@@ -2550,12 +2565,10 @@ gb_internal bool escape_param_index(TypeProc *pt, Entity *e, isize *index) {
 	return false;
 }
 
-// a flow from the parameter whose memory the origin is
 gb_internal bool escape_flow_from(TypeProc *pt, EscapeOrigin const &o, EscapeFlow *flow) {
 	switch (o.kind) {
 	case EscapeOrigin_Param:     flow->kind = EscapeFlow_Value; break;
 	case EscapeOrigin_ParamLoad: flow->kind = EscapeFlow_Load;  break;
-	case EscapeOrigin_ParamDeep: flow->kind = EscapeFlow_Deep;  break;
 	default:
 		return false;
 	}
@@ -2675,11 +2688,13 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 				continue;
 			}
 		}
-		if (flow.target == EscapeFlowTarget_Pointee &&
-		    flow.target_index == flow.param &&
-		    escape_path_eq(flow.target_path, flow.param_path)) {
-			// storing it back into the memory it came from cannot make anything outlive it
-			continue;
+		if (flow.target != EscapeFlowTarget_Outer && flow.target_index == flow.param) {
+			if (flow.kind == EscapeFlow_Load) {
+				continue;
+			}
+			if (flow.target == EscapeFlowTarget_Pointee && escape_path_eq(flow.target_path, flow.param_path)) {
+				continue;
+			}
 		}
 		escape_add_flow(ea, flow);
 	}
@@ -3099,6 +3114,10 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	if (node == nullptr || !ea->state.reachable) {
 		return;
 	}
+	ea->stmt_visits += 1;
+	if (escape_too_large(ea)) {
+		return;
+	}
 	switch (node->kind) {
 	case_ast_node(es, ExprStmt, node);
 		escape_nil_scan(ea, es->expr);
@@ -3290,12 +3309,12 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		escape_visit_exits(ea, is->cond);
 
 		EscapeState other = escape_state_clone(ea->state);
-		escape_nil_refine(ea, is->cond, true);
+		escape_nil_refine(ea, is->cond, true, true);
 		escape_stmt(ea, is->body);
 
 		EscapeState then = ea->state;
 		ea->state = other;
-		escape_nil_refine(ea, is->cond, false);
+		escape_nil_refine(ea, is->cond, false, true);
 		escape_stmt(ea, is->else_stmt);
 
 		escape_state_join(&ea->state, then);
@@ -3461,8 +3480,7 @@ gb_internal ErrorInstantiations escape_instantiations_of(ProcInfo *pi) {
 	return {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 }
 
-// `reports` keeps what it reports rather than reporting it, when not null
-gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<EscapeReport> *reports) {
+gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<EscapeReport> *reports, bool calls_unknown=false) {
 	ProcInfo *pi = g->procs[v];
 	Type *type = pi->type;
 	Ast *body = pi->body;
@@ -3484,8 +3502,15 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.graph    = g;
 	ea.group    = g->group_of[v];
 	ea.reports  = reports;
+	ea.calls_unknown = calls_unknown;
 
-	// in a file without it, which only gives what flows through it to those calling it
+	Array<EscapeReport> own_reports = {};
+	if (ea.reports == nullptr) {
+		own_reports = array_make<EscapeReport>(temporary_allocator(), 0, 0);
+		ea.reports = &own_reports;
+	}
+	isize report_count = ea.reports->count;
+
 	bool enabled = ast_file_analysis(body->file(), AnalysisFlag_Escape);
 	ea.muted = !enabled;
 
@@ -3513,10 +3538,15 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
 	global_error_context.instantiations = escape_instantiations_of(pi);
 	escape_stmt(&ea, body);
-	if (ea.state.reachable) {
+	if (ea.too_large && !calls_unknown) {
+		global_error_context.instantiations = prev_instantiations;
+		ea.reports->count = report_count;
+		return escape_analyse(g, v, reports, true);
+	}
+	if (ea.state.reachable && !ea.too_large) {
 		escape_exit(&ea, body, {}, {});
 	}
-	if (ea.nil_deref || ea.uninit) {
+	if ((ea.nil_deref || ea.uninit) && !ea.too_large) {
 		// a use is reported only when what it goes through is nil, or unset, every time it is reached, e.g. in a defer
 		// run at several exits
 		array_sort(ea.nil_uses, escape_nil_use_cmp);
@@ -3530,15 +3560,16 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 			if (definite) {
 				gbString str = escape_expr_to_string(use.ptr);
 				EscapeReport r = {use.kind, use.ptr, make_string_c(str)};
-				if (reports == nullptr) {
-					escape_report_emit(r);
-				} else {
-					r.expr_str = copy_string(permanent_allocator(), r.expr_str);
-					array_add(reports, r);
-				}
+				r.expr_str = copy_string(permanent_allocator(), r.expr_str);
+				array_add(ea.reports, r);
 				gb_string_free(str);
 			}
 			i = j;
+		}
+	}
+	if (reports == nullptr) {
+		for (EscapeReport const &r : own_reports) {
+			escape_report_emit(r);
 		}
 	}
 	global_error_context.instantiations = prev_instantiations;
@@ -3599,7 +3630,7 @@ gb_internal void escape_update_member(EscapeGraph *g, Slice<EscapeMemberTask> ta
 }
 
 gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
-	enum : isize { MAX_ITERATION_COUNT = 16 };
+	enum : isize { ROUND_COUNT = 3 };
 
 	i32 start = g->group_offsets[gi];
 	i32 end   = g->group_offsets[gi+1];
@@ -3627,78 +3658,33 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 		t.stale = true;
 		// filled in by analyses on other threads, which free their own temporary memory
 		array_init(&t.reports, heap_allocator(), 0, 0);
-		array_init(&t.callees, temporary_allocator(), 0, 0);
 		array_init(&t.callers, temporary_allocator(), 0, 0);
 	}
 	for_array(k, tasks) {
 		for (i32 i = g->offsets[tasks[k].v]; i < g->offsets[tasks[k].v+1]; i++) {
 			for_array(j, tasks) {
 				if (tasks[j].v == g->targets[i]) {
-					array_add(&tasks[k].callees, cast(i32)j);
 					array_add(&tasks[j].callers, cast(i32)k);
 				}
 			}
 		}
 	}
 
-	// callees before their callers, unless they call each other
-	auto order = array_make<i32>(temporary_allocator(), 0, tasks.count);
-	{
-		auto frames  = array_make<EscapeOrderFrame>(temporary_allocator(), 0, tasks.count);
-		auto visited = array_make<bool>(temporary_allocator(), tasks.count);
-		for_array(root, tasks) {
-			if (visited[root]) {
-				continue;
-			}
-			visited[root] = true;
-			array_add(&frames, EscapeOrderFrame{cast(i32)root, 0});
-			while (frames.count > 0) {
-				EscapeOrderFrame &top = frames[frames.count-1];
-				Array<i32> const &callees = tasks[top.k].callees;
-				if (top.next < callees.count) {
-					i32 callee = callees[top.next++];
-					if (!visited[callee]) {
-						visited[callee] = true;
-						array_add(&frames, EscapeOrderFrame{callee, 0});
-					}
-					continue;
-				}
-				array_add(&order, top.k);
-				array_pop(&frames);
-			}
+	for (isize round = 0; round < ROUND_COUNT; round++) {
+		escape_analyse_members(g, tasks);
+		for (EscapeMemberTask &t : tasks) {
+			t.stale = false;
 		}
-	}
-
-	// what each may return or store depends on the others, so they start from nothing until that settles:
-	// all at once at first, then one at a time with what the others have so far, only those calling one whose
-	// flows changed, so the latest analysis of each was with what settled
-	escape_analyse_members(g, tasks);
-	for (EscapeMemberTask &t : tasks) {
-		t.stale = false;
-	}
-	for_array(k, tasks) {
-		escape_update_member(g, tasks, k);
-	}
-
-	bool settled = false;
-	for (isize budget = MAX_ITERATION_COUNT*tasks.count; !settled && budget > 0; /**/) {
-		settled = true;
-		for (i32 k : order) {
-			if (!tasks[k].stale) {
-				continue;
-			}
-			settled = false;
-			budget -= 1;
-			tasks[k].stale = false;
-			escape_member_worker(&tasks[k]);
+		for_array(k, tasks) {
 			escape_update_member(g, tasks, k);
 		}
-	}
-	if (!settled) {
-		for (EscapeMemberTask &t : tasks) {
-			t.stale = true;
+		bool settled = true;
+		for (EscapeMemberTask const &t : tasks) {
+			settled &= !t.stale;
 		}
-		escape_analyse_members(g, tasks);
+		if (settled) {
+			break;
+		}
 	}
 
 	for (EscapeMemberTask &t : tasks) {

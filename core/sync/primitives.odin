@@ -54,6 +54,7 @@ until the the lock is released.
 **Note**: If the mutex is already locked by the current thread, a call to this
 procedure will block indefinately. Do not use this in recursive procedures.
 */
+@(synchronizes=.Acquire)
 mutex_lock :: proc "contextless" (m: ^Mutex) {
 	_mutex_lock(m)
 }
@@ -69,6 +70,7 @@ this allows one other thread waiting on the mutex to enter any critical sections
 associated with the mutex. If there are no threads waiting on the mutex, the
 critical sections will remain open.
 */
+@(synchronizes=.Release)
 mutex_unlock :: proc "contextless" (m: ^Mutex) {
 	_mutex_unlock(m)
 }
@@ -84,6 +86,7 @@ If the lock is acquired, all threads that attempt to acquire a lock will be
 blocked from entering any critical sections associated with the same mutex,
 until the lock is released.
 */
+@(synchronizes=.Acquire)
 mutex_try_lock :: proc "contextless" (m: ^Mutex) -> bool {
 	return _mutex_try_lock(m)
 }
@@ -109,6 +112,7 @@ section by putting the function inside the `if` statement.
 	}
 */
 @(deferred_in=mutex_unlock)
+@(synchronizes=.Acquire)
 mutex_guard :: proc "contextless" (m: ^Mutex) -> bool {
 	mutex_lock(m)
 	return true
@@ -162,6 +166,7 @@ After a lock has been acquired, any thread attempting to acquire any lock
 will be blocked from entering any critical sections associated with the same
 read-write mutex, until the exclusive lock is released.
 */
+@(synchronizes=.Acquire)
 rw_mutex_lock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_lock(rw)
 }
@@ -175,6 +180,7 @@ read-write mutex.
 When the exclusive lock is released, all critical sections, associated with the
 same read-write mutex, become open to other threads.
 */
+@(synchronizes=.Release)
 rw_mutex_unlock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_unlock(rw)
 }
@@ -190,6 +196,7 @@ If the lock has been acquired, all threads attempting to acquire any lock
 will be blocked from entering any critical sections associated with the same
 read-write mutex, until the exclusive locked is released.
 */
+@(synchronizes=.Acquire)
 rw_mutex_try_lock :: proc "contextless" (rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_lock(rw)
 }
@@ -206,6 +213,7 @@ exclusive lock will be blocked from entering any critical sections associated
 with the same read-write mutex, until all shared locks associated with the
 specified read-write mutex are released.
 */
+@(synchronizes_shared=.Acquire)
 rw_mutex_shared_lock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_lock(rw)
 }
@@ -217,6 +225,7 @@ This procedure releases shared lock on the specified read-write mutex. When all
 shared locks are released, all critical sections associated with the same
 read-write mutex become open to other threads.
 */
+@(synchronizes_shared=.Release)
 rw_mutex_shared_unlock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_unlock(rw)
 }
@@ -232,6 +241,7 @@ If the shared lock has been acquired, it causes all threads attempting to
 acquire the exclusive lock to be blocked from entering any critical sections
 associated with the same read-write mutex, until all shared locks are released.
 */
+@(synchronizes_shared=.Acquire)
 rw_mutex_try_shared_lock :: proc "contextless" (rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_shared_lock(rw)
 }
@@ -257,7 +267,7 @@ section by running this procedure inside an `if` statement.
 		...
 	}
 */
-@(deferred_in=rw_mutex_unlock)
+@(deferred_in=rw_mutex_unlock, synchronizes=.Acquire)
 rw_mutex_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 	rw_mutex_lock(m)
 	return true
@@ -284,7 +294,7 @@ section by running this procedure inside an `if` statement.
 		...
 	}
 */
-@(deferred_in=rw_mutex_shared_unlock)
+@(deferred_in=rw_mutex_shared_unlock, synchronizes_shared=.Acquire)
 rw_mutex_shared_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 	rw_mutex_shared_lock(m)
 	return true
@@ -328,6 +338,7 @@ When the lock is acquired, all other threads attempting to acquire a lock will
 be blocked from entering any critical sections associated with the same mutex,
 until the lock is released.
 */
+@(synchronizes=.Acquire)
 recursive_mutex_lock :: proc "contextless" (m: ^Recursive_Mutex) {
 	_recursive_mutex_lock(m)
 }
@@ -339,6 +350,7 @@ This procedure releases a lock on the specified recursive mutex. It also causes
 the critical sections associated with the same mutex, to become open for other
 threads for entering.
 */
+@(synchronizes=.Release)
 recursive_mutex_unlock :: proc "contextless" (m: ^Recursive_Mutex) {
 	_recursive_mutex_unlock(m)
 }
@@ -354,6 +366,7 @@ If the lock is acquired, all other threads attempting to obtain a lock will be
 blocked from entering any critical sections associated with the same mutex,
 until the lock is released.
 */
+@(synchronizes=.Acquire)
 recursive_mutex_try_lock :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 	return _recursive_mutex_try_lock(m)
 }
@@ -379,7 +392,7 @@ section by calling this procedure inside an `if` statement.
 		...
 	}
 */
-@(deferred_in=recursive_mutex_unlock)
+@(deferred_in=recursive_mutex_unlock, synchronizes=.Acquire)
 recursive_mutex_guard :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 	recursive_mutex_lock(m)
 	return true
@@ -505,6 +518,7 @@ This procedure increments the internal counter of the semaphore. If any of the
 threads were waiting on the semaphore, up to `count` of threads will continue
 the execution and enter the critical section.
 */
+@(synchronizes=.Release)
 sema_post :: proc "contextless" (s: ^Sema, count := 1) {
 	_sema_post(s, count)
 }
@@ -516,6 +530,7 @@ This procedure blocks the execution of the current thread, until the semaphore
 counter is non-zero, and atomically decrements it by one, once the wait has
 ended.
 */
+@(synchronizes=.Acquire)
 sema_wait :: proc "contextless" (s: ^Sema) {
 	_sema_wait(s)
 }
@@ -528,6 +543,7 @@ counter is non-zero, and if so atomically decrements it by one, once the wait
 has ended. If the specified timeout is reached, the function returns `false`,
 otherwise it returns `true`.
 */
+@(synchronizes=.Acquire)
 sema_wait_with_timeout :: proc "contextless" (s: ^Sema, duration: time.Duration) -> bool {
 	return _sema_wait_with_timeout(s, duration)
 }

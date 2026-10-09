@@ -1552,6 +1552,8 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	e->Procedure.fast_math_flags = ac.fast_math_flags;
 
 	e->Procedure.futex = cast(ProcedureFutex)ac.futex;
+	e->Procedure.synchronizes        = ac.synchronizes;
+	e->Procedure.synchronizes_shared = ac.synchronizes_shared;
 	if (ac.futex == ProcedureFutex_None && ac.futex_parameter.len != 0) {
 		error(e->token, "@(futex_parameter) can only be used with @(futex)");
 	}

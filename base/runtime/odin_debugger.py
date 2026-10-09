@@ -111,6 +111,19 @@ def odin_kind(type_name, field_names, data_is_pointer, data_is_array, data_targe
 	return None
 
 
+def composite_type(name):
+	# the element of a pointer, multi-pointer or fixed array type named by a `typeid` and the array's count,
+	# which is None for a pointer; None for other types
+	if name.startswith("^"):
+		return name[1:], None
+	if name.startswith("[^]"):
+		return name[3:], None
+	m = re.fullmatch(r"\[([0-9]+)\](.+)", name)
+	if m:
+		return m.group(2), int(m.group(1))
+	return None
+
+
 def soa_fields(field_names):
 	return [n for n in field_names if n not in ("__$len", "__$cap", "allocator", "_")]
 
@@ -278,6 +291,16 @@ if gdb is not None:
 		return None
 
 	def _gdb_odin_type(name):
+		composite = composite_type(name)
+		if composite is not None:
+			elem_name, count = composite
+			elem = _gdb_odin_type(elem_name)
+			if elem is None:
+				return None
+			if count is None:
+				return elem.pointer()
+			return elem.array(count - 1)
+
 		basic = ODIN_BASIC_TYPES.get(name)
 		if basic is None:
 			return _gdb_type(name, "struct " + name, "union " + name, "enum " + name)
@@ -481,7 +504,11 @@ if gdb is not None:
 				return "<%s>" % e
 			if name is None or (tag is None and int(self._val[name]) == 0):
 				return "nil"
-			return self._val[name]
+			value = self._val[name]
+			if value.type.strip_typedefs().code == gdb.TYPE_CODE_PTR:
+				# gdb prints nothing for a pointer value returned by `to_string`
+				return value.format_string()
+			return value
 
 	class _GdbAny(_GdbPrinter):
 		# The value it holds, after the name of its type; an unknown type shows the `any` itself
@@ -563,33 +590,68 @@ if lldb is not None:
 		t = t.GetCanonicalType()
 		return {t.GetFieldAtIndex(i).GetName(): t.GetFieldAtIndex(i).GetType() for i in range(t.GetNumberOfFields())}
 
+	_lldb_module_types = {}
+
+	def _lldb_types_named(target, name):
+		# the types of every module called `name`, from an index of each module's types made once
+		# NOTE: `FindTypes` reads `main::Point` as `Point` in a namespace `main`, but on DWARF the name is
+		# the whole of `main::Point`, with no namespace, so it finds nothing
+		found = []
+		for i in range(target.GetNumModules()):
+			module = target.GetModuleAtIndex(i)
+			key = (str(module.GetFileSpec()), module.GetUUIDString())
+			index = _lldb_module_types.get(key)
+			if index is None:
+				index = {}
+				types = module.GetTypes()
+				for j in range(types.GetSize()):
+					t = types.GetTypeAtIndex(j)
+					index.setdefault(t.GetName(), []).append(t)
+				_lldb_module_types[key] = index
+			found += index.get(name, [])
+		return found
+
 	def _lldb_cell_layout(elem, cell):
 		cell_data_size = 0
 		if cell.GetByteSize() != elem.GetByteSize():
 			cell_data_size = _lldb_fields(cell)["v"].GetByteSize()
 		return cell_layout(elem.GetByteSize(), cell.GetByteSize(), cell_data_size)
 
-	def _lldb_odin_type(target, name, id):
-		# the type a `typeid` names, None when it cannot be found
+	def _lldb_odin_type(target, basis, name, id):
+		# the type a `typeid` names, None when it cannot be found; basic types come from the type system of `basis`,
+		# an Odin type, as the target may answer from another, such as Swift's, whose types make no value
+		composite = composite_type(name)
+		if composite is not None and typeid_hash(name) == id:
+			elem_name, count = composite
+			elem = _lldb_odin_type(target, basis, elem_name, typeid_hash(elem_name))
+			if elem is None:
+				return None
+			if count is None:
+				return elem.GetPointerType()
+			return elem.GetArrayType(count)
+
 		basic = ODIN_BASIC_TYPES.get(name)
 		if basic is None:
 			types = target.FindTypes(name)
-			for i in range(types.GetSize()):
-				t = types.GetTypeAtIndex(i)
-				if typeid_hash(t.GetName()) == id:
+			found = [types.GetTypeAtIndex(i) for i in range(types.GetSize())]
+			if not found:
+				found = _lldb_types_named(target, name)
+			matches = [t for t in found if typeid_hash(t.GetName()) == id]
+			for t in matches:
+				if t.IsTypeComplete():
 					return t
-			return None
+			return matches[0] if matches else None
 
 		kind, size = basic
 		if size is None:
 			size = target.GetAddressByteSize()
 
 		if kind == "rawptr":
-			return target.GetBasicType(lldb.eBasicTypeVoid).GetPointerType()
+			return basis.GetBasicType(lldb.eBasicTypeVoid).GetPointerType()
 		if kind == "cstring":
-			return target.GetBasicType(lldb.eBasicTypeChar).GetPointerType()
+			return basis.GetBasicType(lldb.eBasicTypeChar).GetPointerType()
 		if kind == "cstring16":
-			return target.GetBasicType(lldb.eBasicTypeChar16).GetPointerType()
+			return basis.GetBasicType(lldb.eBasicTypeChar16).GetPointerType()
 
 		basics = {
 			("int",   1):  lldb.eBasicTypeSignedChar,
@@ -611,7 +673,7 @@ if lldb is not None:
 		basic_type = basics.get((kind, size))
 		if basic_type is None:
 			return None
-		return target.GetBasicType(basic_type)
+		return basis.GetBasicType(basic_type)
 
 	def lldb_is_string(sbtype, internal_dict):
 		return _lldb_kind(sbtype) in ("string", "string16")
@@ -657,10 +719,10 @@ if lldb is not None:
 		name = id.GetValue() or ""
 		if data == 0 or id.GetValueAsUnsigned() == 0:
 			return "nil", None
-		t = _lldb_odin_type(valobj.GetTarget(), name, id.GetValueAsUnsigned())
+		t = _lldb_odin_type(valobj.GetTarget(), v.GetType(), name, id.GetValueAsUnsigned())
 		if t is None:
 			return name, None
-		if name not in ODIN_BASIC_TYPES:
+		if name not in ODIN_BASIC_TYPES and composite_type(name) is None:
 			name = t.GetName()
 		value = valobj.CreateValueFromAddress("value", data, t)
 		value.SetPreferSyntheticValue(True)

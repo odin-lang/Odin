@@ -32,7 +32,9 @@ foreign lib {
 	@(require_results) GetBooleanProperty  :: proc(props: PropertiesID, name: cstring, default_value: bool) -> bool ---
 
 	CopyProperties                :: proc(src, dst: PropertiesID) -> bool ---
+	@(synchronizes=.Acquire)
 	LockProperties                :: proc(props: PropertiesID)    -> bool ---
+	@(synchronizes=.Release)
 	UnlockProperties              :: proc(props: PropertiesID) ---
 	SetPointerPropertyWithCleanup :: proc(props: PropertiesID, name: cstring, value: rawptr, cleanup: CleanupPropertyCallback, userdata: rawptr) -> bool ---
 	SetPointerProperty            :: proc(props: PropertiesID, name: cstring, value: rawptr)  -> bool ---

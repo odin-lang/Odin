@@ -342,10 +342,10 @@ translate_position :: proc(s: ^State, t: Translation) -> int {
 			pos -= 1
 		}
 	case .Word_Right:
-		for pos < len(buf) && !is_space(buf[pos]) {
+		for pos < len(buf) && is_space(buf[pos]) {
 			pos += 1
 		}
-		for pos < len(buf) && is_space(buf[pos]) {
+		for pos < len(buf) && !is_space(buf[pos]) {
 			pos += 1
 		}
 	case .Word_Start:
