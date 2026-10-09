@@ -987,6 +987,15 @@ gb_internal bool check_asm_cfg_liveness(AsmCtx *asm_ctx, AsmCfg *cfg, Entity *en
 			if (check_asm_cfg_block_leaves(cfg, cast(i32)bi)) {
 				lo |= exit_live;
 			}
+			{
+				// `ret` or a jump out of the template hands every register on, e.g. %rax to a
+				// naked procedure's caller
+				AsmInstructionFacts *lf = cfg->insts[b.last]->facts;
+				if (lf != nullptr && lf->is_terminal && lf->is_control &&
+				    (lf->branch_target == nullptr || asm_cfg_label_block_index(lf->branch_target) < 0)) {
+					lo |= REG_TOP;
+				}
+			}
 
 			u16 live = lo;
 			for (i32 ii = b.last; ii >= b.first; ii--) {
