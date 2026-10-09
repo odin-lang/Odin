@@ -12,6 +12,7 @@ enum xbCoffSec {
 	xbCoff_Drectve,
 	xbCoff_DebugS,
 	xbCoff_DebugT,
+	xbCoff_Raddbg,
 	xbCoff_COUNT,
 };
 
@@ -39,6 +40,7 @@ struct xbCoffWriter {
 	i64 bss_size;
 	i64 tbss_base;   // .tbss follows .tdata in .tls$
 	i64 align[xbCoff_COUNT];
+	Array<String> raddbg_views; // generated while describing the types, see xb_coff_raddbg
 };
 
 gb_internal xbCoffSec xb_coff_section_of(xbSection s) {
@@ -66,6 +68,30 @@ gb_internal void xb_coff_add_reloc(xbCoffWriter *w, xbCoffSec in, u32 offset, xb
 }
 
 #include "x64_codeview.cpp"
+
+// The RAD Debugger's section, like LLVM writes it: a byte it sets when attached, the entry
+// point, then the type views, each a NUL terminated string. Only for a build the fast backend
+// covers entirely, otherwise LLVM's module brings its own.
+gb_internal void xb_coff_raddbg(xbCoffWriter *w) {
+	xbModule *m = w->m;
+	Array<u8> *b = &w->sec[xbCoff_Raddbg];
+	xbb_u8(b, 0); // raddbg_is_attached_byte_marker
+	auto add = [&](String str) {
+		xbb_bytes(b, str.text, str.len);
+		xbb_u8(b, 0);
+	};
+	if (Entity *entry = m->gen->info->entry_point) {
+		String name = xb_entity_name(m, entry);
+		add(concatenate3_strings(permanent_allocator(), str_lit("entry_point: \""), name, str_lit("\"")));
+	}
+	auto views = array_make<String>(heap_allocator(), 0, 64);
+	defer (array_free(&views));
+	raddbg_builtin_views(m->gen->info, &views);
+	for (String const &view : views) add(view);
+	// the first view matching a type wins, so the generated ones go last, sorted to keep the object the same each build
+	array_sort(w->raddbg_views, string_cmp);
+	for (String const &view : w->raddbg_views) add(view);
+}
 
 ////////////////////////////////////////////////////////////////
 // Unwind info
@@ -178,6 +204,7 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 		w.relocs[i] = array_make<xbCoffReloc>(heap_allocator(), 0, 0);
 		w.align[i] = 1;
 	}
+	w.raddbg_views = array_make<String>(heap_allocator(), 0, 0);
 	auto copy_section = [&](xbCoffSec to, xbSection from) {
 		array_add_elems(&w.sec[to], m->sections[from].data, m->sections[from].count);
 		w.align[to] = gb_max(w.align[to], gb_max(m->section_align[from], cast(i64)16));
@@ -204,6 +231,9 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 	xb_coff_unwind(&w);
 	if (build_context.ODIN_DEBUG) {
 		xb_codeview_emit(&w);
+		if (m->complete) {
+			xb_coff_raddbg(&w);
+		}
 	}
 
 	// exports
@@ -220,7 +250,7 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 	}
 
 	// which sections exist, numbered from 1
-	char const *names[xbCoff_COUNT] = {".text", ".rdata", ".data", ".bss", ".tls$", ".pdata", ".xdata", ".drectve", ".debug$S", ".debug$T"};
+	char const *names[xbCoff_COUNT] = {".text", ".rdata", ".data", ".bss", ".tls$", ".pdata", ".xdata", ".drectve", ".debug$S", ".debug$T", ".raddbg"};
 	i16 number[xbCoff_COUNT] = {};
 	i16 section_count = 0;
 	for (isize i = 0; i < xbCoff_COUNT; i++) {
@@ -292,6 +322,13 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 		} else {
 			sym_index[i] = add_sym(cs);
 		}
+	}
+	if (number[xbCoff_Raddbg] != 0) {
+		xbCoffSym marker = {};
+		marker.name = str_lit("raddbg_is_attached_byte_marker");
+		marker.section = number[xbCoff_Raddbg];
+		marker.storage_class = 2; // external
+		add_sym(marker);
 	}
 
 	// relocations, with the addend written into the section's bytes
@@ -404,6 +441,7 @@ gb_internal bool xb_write_coff(xbModule *m, String path) {
 		case xbCoff_Drectve: flags = LNK_INFO | LNK_REMOVE; break;
 		case xbCoff_DebugS:  flags = CNT_INIT | MEM_READ | DISCARDABLE; break;
 		case xbCoff_DebugT:  flags = CNT_INIT | MEM_READ | DISCARDABLE; break;
+		case xbCoff_Raddbg:  flags = CNT_INIT | MEM_READ | MEM_WRITE; break;
 		}
 		flags |= xb_coff_align_flag(w.align[i]);
 		if (i == xbCoff_Bss) {

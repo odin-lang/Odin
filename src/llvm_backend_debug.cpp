@@ -90,6 +90,84 @@ gb_internal void lb_add_raddbg_string(lbModule *m, char const *a, char const *b,
 	mpsc_enqueue(&m->gen->raddebug_section_strings, str);
 }
 
+// The RAD Debugger views every Windows debug build gets, whichever backend wrote it:
+// the built in types, then the user's @(raddbg_type_view)s
+gb_internal void raddbg_builtin_views(CheckerInfo *info, Array<String> *out) {
+	array_add(out, str_lit("type_view: {type: \"[]?\",        expr: \"array(data, len)\"}"));
+	array_add(out, str_lit("type_view: {type: \"string\",     expr: \"array(data, len)\"}"));
+	array_add(out, str_lit("type_view: {type: \"string16\",   expr: \"array(data, len)\"}"));
+	array_add(out, str_lit("type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}"));
+	array_add(out, str_lit("type_view: {type: \"[dynamic;?]?\", expr: \"rows($, array(data, len), len)\"}"));
+
+	// big endian integers, see `lb_debug_type_basic_type`
+	array_add(out, str_lit("type_view: {type: \"i16be\", expr: \"bswap $\"}"));
+	array_add(out, str_lit("type_view: {type: \"u16be\", expr: \"bswap $\"}"));
+	array_add(out, str_lit("type_view: {type: \"i32be\", expr: \"bswap $\"}"));
+	array_add(out, str_lit("type_view: {type: \"u32be\", expr: \"bswap $\"}"));
+	array_add(out, str_lit("type_view: {type: \"i64be\", expr: \"bswap $\"}"));
+	array_add(out, str_lit("type_view: {type: \"u64be\", expr: \"bswap $\"}"));
+
+	// column major matrices
+	array_add(out, str_lit("type_view: {type: \"matrix[1, ?]?\",  expr: \"columns($.data, $[0])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[2, ?]?\",  expr: \"columns($.data, $[0], $[1])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[3, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[4, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[5, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[6, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[7, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[8, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[9, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[10, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[11, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[12, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[13, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[14, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[15, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}"));
+	array_add(out, str_lit("type_view: {type: \"matrix[16, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}"));
+
+	// row major matrices
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 1]?\",  expr: \"columns($.data, $[0])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 2]?\",  expr: \"columns($.data, $[0], $[1])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 3]?\",  expr: \"columns($.data, $[0], $[1], $[2])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 4]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 5]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 6]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 7]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 8]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 9]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 10]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 11]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 12]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 13]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 14]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 15]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}"));
+	array_add(out, str_lit("type_view: {type: \"#row_major matrix[?, 16]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}"));
+
+
+	for (RaddbgTypeView const &type_view : info->raddbg_type_views) {
+		if (type_view.type == nullptr) {
+			continue;
+		}
+
+		if (type_view.view.len == 0) {
+			continue;
+		}
+
+		String t_str = type_to_canonical_string(permanent_allocator(), type_view.type);
+
+		gbString s = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(s));
+
+		s = gb_string_appendc(s, "type_view: {type: \"");
+		s = gb_string_append_length(s, t_str.text, t_str.len);
+		s = gb_string_appendc(s, "\", expr: \"");
+		s = gb_string_append_length(s, type_view.view.text, type_view.view.len);
+		s = gb_string_appendc(s, "\"}");
+
+		array_add(out, copy_string(permanent_allocator(), make_string(cast(u8 *)s, gb_string_length(s))));
+	}
+}
+
 gb_internal void lb_add_raddbg_generated_view(lbModule *m, String const &type_name, gbString expr) {
 	// NOTE(bill): a RAD Debugger type view of one type, for what a generic view cannot match
 

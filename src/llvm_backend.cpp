@@ -4080,78 +4080,13 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMModuleRef mod = m->mod;
 			LLVMContextRef ctx = m->ctx;
 
-			lb_add_raddbg_string(m, "type_view: {type: \"[]?\",        expr: \"array(data, len)\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"string\",     expr: \"array(data, len)\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"string16\",   expr: \"array(data, len)\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic]?\", expr: \"rows($, array(data, len), len, cap, allocator)\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"[dynamic;?]?\", expr: \"rows($, array(data, len), len)\"}");
-
-			// big endian integers, see `lb_debug_type_basic_type`
-			lb_add_raddbg_string(m, "type_view: {type: \"i16be\", expr: \"bswap $\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"u16be\", expr: \"bswap $\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"i32be\", expr: \"bswap $\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"u32be\", expr: \"bswap $\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"i64be\", expr: \"bswap $\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"u64be\", expr: \"bswap $\"}");
-
-			// column major matrices
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[1, ?]?\",  expr: \"columns($.data, $[0])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[2, ?]?\",  expr: \"columns($.data, $[0], $[1])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[3, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[4, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[5, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[6, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[7, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[8, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[9, ?]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[10, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[11, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[12, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[13, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[14, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[15, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"matrix[16, ?]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
-
-			// row major matrices
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 1]?\",  expr: \"columns($.data, $[0])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 2]?\",  expr: \"columns($.data, $[0], $[1])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 3]?\",  expr: \"columns($.data, $[0], $[1], $[2])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 4]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 5]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 6]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 7]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 8]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 9]?\",  expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 10]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 11]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 12]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 13]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 14]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 15]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14])\"}");
-			lb_add_raddbg_string(m, "type_view: {type: \"#row_major matrix[?, 16]?\", expr: \"columns($.data, $[0], $[1], $[2], $[3], $[4], $[5], $[6], $[7], $[8], $[9], $[10], $[11], $[12], $[13], $[14], $[15])\"}");
-
-
-			TEMPORARY_ALLOCATOR_GUARD();
-			for (RaddbgTypeView const &type_view : gen->info->raddbg_type_views) {
-				if (type_view.type == nullptr) {
-					continue;
+			{
+				auto views = array_make<String>(heap_allocator(), 0, 64);
+				defer (array_free(&views));
+				raddbg_builtin_views(gen->info, &views);
+				for (String const &view : views) {
+					lb_add_raddbg_string(m, view);
 				}
-
-				if (type_view.view.len == 0) {
-					continue;
-				}
-
-				String t_str = type_to_canonical_string(temporary_allocator(), type_view.type);
-
-				gbString s = gb_string_make(temporary_allocator(), "");
-
-				s = gb_string_appendc(s, "type_view: {type: \"");
-				s = gb_string_append_length(s, t_str.text, t_str.len);
-				s = gb_string_appendc(s, "\", expr: \"");
-				s = gb_string_append_length(s, type_view.view.text, type_view.view.len);
-				s = gb_string_appendc(s, "\"}");
-
-				lb_add_raddbg_string(m, s);
 			}
 
 			{

@@ -287,7 +287,6 @@ gb_internal u32 xb_cv_basic(Type *bt) {
 gb_internal bool xb_cv_is_record(Type *bt) {
 	switch (bt->kind) {
 	case Type_Struct:
-		return bt->Struct.soa_kind == StructSoa_None;
 	case Type_Union:
 	case Type_Enum:
 	case Type_Slice:
@@ -391,6 +390,17 @@ gb_internal u32 xb_cv_type(xbCv *cv, Type *t) {
 	return index;
 }
 
+// A RAD Debugger view of one type, like LLVM's lb_add_raddbg_generated_view.
+gb_internal void xb_cv_raddbg_view(xbCv *cv, Type *t, gbString expr) {
+	String name = xb_cv_type_name(t);
+	if (string_contains_char(name, '"') || string_contains_char(name, '\\')) {
+		return; // it cannot be quoted in the section
+	}
+	String view = concatenate4_strings(permanent_allocator(), str_lit("type_view: {type: \""), name, str_lit("\", expr: \""),
+	                                   make_string(cast(u8 *)expr, gb_string_length(expr)));
+	array_add(&cv->w->raddbg_views, concatenate_strings(permanent_allocator(), view, str_lit("\"}")));
+}
+
 // The full definition of a forward referenced type.
 gb_internal void xb_cv_define(xbCv *cv, Type *t) {
 	Type *bt = base_type(t);
@@ -475,6 +485,22 @@ gb_internal void xb_cv_define(xbCv *cv, Type *t) {
 			Entity *f = bt->Struct.fields[i];
 			add(f->token.string, f->type, bt->Struct.is_raw_union ? 0 : bt->Struct.offsets[i]);
 		}
+		if (bt->Struct.soa_kind == StructSoa_Slice || bt->Struct.soa_kind == StructSoa_Dynamic) {
+			// each field of a #soa slice or dynamic array shows as an array of its length
+			isize field_count = bt->Struct.fields.count - (bt->Struct.soa_kind == StructSoa_Dynamic ? 3 : 1);
+			gbString expr = gb_string_make(heap_allocator(), "rows($");
+			for_array(j, bt->Struct.fields) {
+				String fname = bt->Struct.fields[j]->token.string;
+				if (j >= field_count) {
+					expr = gb_string_append_fmt(expr, ", %.*s", LIT(fname));
+				} else if (!is_blank_ident(fname)) {
+					expr = gb_string_append_fmt(expr, ", array(%.*s, __$len)", LIT(fname));
+				}
+			}
+			expr = gb_string_appendc(expr, ")");
+			xb_cv_raddbg_view(cv, t, expr);
+			gb_string_free(expr);
+		}
 		break;
 	case Type_Union: {
 		// {variants..., tag}, numbered like LLVM's: from 1 when the union can be nil
@@ -482,13 +508,21 @@ gb_internal void xb_cv_define(xbCv *cv, Type *t) {
 			add(str_lit("tag"), union_tag_type(bt), bt->Union.variant_block_size);
 		}
 		isize first = (is_type_union_maybe_pointer(bt) || bt->Union.kind == UnionType_no_nil) ? 0 : 1;
+		gbString expr = gb_string_make(heap_allocator(), "");
 		for_array(i, bt->Union.variants) {
 			Type *v = bt->Union.variants[i];
 			if (type_size_of(v) == 0) continue;
 			char buf[32] = {};
 			gb_snprintf(buf, gb_size_of(buf), "v%td", first+i);
 			add(copy_string(permanent_allocator(), make_string_c(buf)), v, 0);
+			expr = gb_string_append_fmt(expr, "tag == %td ? v%td : ", first+i, first+i);
 		}
+		if (members.count > 0 && members[0].name == "tag") {
+			// the RAD Debugger then shows the variant the tag picks
+			expr = gb_string_appendc(expr, "$");
+			xb_cv_raddbg_view(cv, t, expr);
+		}
+		gb_string_free(expr);
 		break;
 	}
 	case Type_BitField: {
