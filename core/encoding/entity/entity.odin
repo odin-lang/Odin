@@ -21,15 +21,10 @@ package encoding_unicode_entity
 		Jeroen van Rijn: Initial implementation.
 */
 
-@(private="file")
-INSTRUMENTATION :: false
-
 import "base:runtime"
 import "core:unicode/utf8"
 import "core:unicode"
 import "core:strings"
-import "core:time"
-import "core:log"
 
 MAX_RUNE_CODEPOINT :: int(unicode.MAX_RUNE)
 
@@ -83,44 +78,6 @@ XML_Decode_Option :: enum u8 {
 }
 XML_Decode_Options :: bit_set[XML_Decode_Option; u8]
 
-_Perf_Meas :: struct {
-	sw: map[_Perf]time.Stopwatch,
-}
-
-_Perf :: enum {
-	set_context,
-	init_builder,
-	advance,
-	cdata,
-	decode_amp,
-	av_normalization,
-	line_ends,
-}
-
-_meas_reset :: #force_inline proc(m: ^_Perf_Meas) {
-	m.sw = make(map[_Perf]time.Stopwatch, context.temp_allocator)
-	for p in _Perf {
-		m.sw[p] = {}
-	}
-}
-
-_meas_begin :: #force_inline proc(m: ^_Perf_Meas, which: _Perf) {
-	time.stopwatch_start(&m.sw[which])
-}
-
-_meas_end :: #force_inline proc(m: ^_Perf_Meas, which: _Perf) {
-	time.stopwatch_stop(&m.sw[which])
-}
-
-_meas_log :: #force_inline proc(m: _Perf_Meas) {
-	for p in _Perf {
-		sw := m.sw[p]
-		log.infof("% -35v:  %v", p, time.stopwatch_duration(sw))
-	}
-}
-
-@(thread_local) _decode_xml_meas: _Perf_Meas
-
 // Decode a string that may include SGML/XML/HTML entities.
 // The caller has to free the result.
 decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := context.allocator) -> (decoded: string, err: Error) {
@@ -131,25 +88,13 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 	return
 }
 
+// Decode a string that may include SGML/XML/HTML entities into an existing `builder`.
+// The returned `decoded` string is a reference into the builder's buffer, and therefore does not need to be freed individually.
 decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_Decode_Options{}, allocator := context.allocator) -> (decoded: string, err: Error) {
-	// PERF: Hot
-	//m := &_decode_xml_meas
-	//_meas_begin(m, .set_context)
 	context.allocator = allocator
-	//_meas_end(m, .set_context)
 
 	l := len(input)
 	if l == 0 { return "", .None }
-
-	// PERF: This is a hot path, using an arena allocator here is beneficial.
-	//builder, builder_err := strings.builder_make_len_cap(0, 250, context.temp_allocator)
-	//if builder_err != nil {
-		// Fallback to the provided allocator if no temp allocator is available.
-	//_meas_begin(m, .init_builder)
-	//	builder := strings.builder_make_len_cap(0, 100)
-	//_meas_end(m, .init_builder)
-	//}
-	//defer strings.builder_destroy(&builder)
 
 	string_start_in_builder := len(builder.buf)
 
@@ -158,10 +103,9 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 
 	prev: rune = ' '
 
+	// PERF: Hot
 	loop: for {
-		//_meas_begin(m, .advance)
 		advance(&t) or_return
-		//_meas_end(m, .advance)
 
 		if t.r < 0 { break loop }
 
@@ -178,23 +122,19 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 				Keep in mind that we could already *be* inside a CDATA tag.
 				If so, write `<` as a literal and continue.
 			*/
-			//_meas_begin(m, .cdata)
 			if in_data {
 				write_rune(builder, '<')
 				continue
 			}
 			in_data = _handle_xml_special(&t, builder, options) or_return
-			//_meas_end(m, .cdata)
 
 		case ']':
 			// If we're unboxing _and_ decoding CDATA, we'll have to check for the end tag.
 			if in_data {
-				//_meas_begin(m, .cdata)
 				if strings.has_prefix(t.src[t.offset:], CDATA_END) {
 					in_data = false
 					t.read_offset += len(CDATA_END) - 1
 				}
-				//_meas_end(m, .cdata)
 				continue
 			} else {
 				write_rune(builder, ']')
@@ -203,15 +143,11 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 		case:
 			if in_data && .Decode_CDATA not_in options {
 				// Unboxed, but undecoded.
-				//_meas_begin(m, .cdata)
 				write_rune(builder, t.r)
-				//_meas_end(m, .cdata)
 				continue
 			}
 
 			if t.r == '&' {
-				//_meas_begin(m, .decode_amp)
-				//defer _meas_end(m, .decode_amp)
 				entity, entity_err := _extract_xml_entity(&t)
 				if entity_err == nil {
 					if .No_Entity_Decode not_in options {
@@ -237,7 +173,6 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 			} else {
 				// Handle AV Normalization: https://www.w3.org/TR/2006/REC-xml11-20060816/#AVNormalize
 				if .Normalize_Whitespace in options {
-					//_meas_begin(m, .av_normalization)
 					switch t.r {
 					case ' ', '\r', '\n', '\t':
 						if prev != ' ' {
@@ -248,10 +183,8 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 						write_rune(builder, t.r)
 						prev = t.r
 					}
-					//_meas_end(m, .av_normalization)
 				} else {
 					// https://www.w3.org/TR/2006/REC-xml11-20060816/#sec-line-ends
-					//_meas_begin(m, .line_ends)
 					switch t.r {
 					case '\n', 0x85, 0x2028:
 						write_rune(builder, '\n')
@@ -263,12 +196,10 @@ decode_xml_sb :: proc(builder: ^strings.Builder, input: string, options := XML_D
 						write_rune(builder, t.r)
 					}
 					prev = t.r
-					//_meas_end(m, .line_ends)
 				}
 			}
 		}
 	}
-	//return strings.clone(strings.to_string(builder), allocator), err
 	return transmute(string)builder.buf[string_start_in_builder:], err
 }
 

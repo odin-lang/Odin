@@ -429,17 +429,12 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 }
 
 peek :: #force_inline proc(t: ^Tokenizer) -> (token: Token) {
-	m := &_parse_bytes_meas
-	_meas_begin(m, .peek_total)
 	tmp := t^
 	r := scan(&tmp)
-	_meas_end(m, .peek_total)
 	return r
 }
 
 scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
-	m := &_parse_bytes_meas
-	_meas_begin(m, .scan_total)
 	skip_whitespace(t)
 
 	offset := t.offset
@@ -491,6 +486,6 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	if kind != .String && lit == "" {
 		lit = string(t.src[offset : t.offset])
 	}
-	_meas_end(m, .scan_total)
+
 	return Token{kind, lit, pos}
 }

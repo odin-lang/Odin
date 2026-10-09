@@ -216,12 +216,12 @@ run_test :: proc(t: ^testing.T, test: TEST, loc := #caller_location) {
 	time.stopwatch_start(&sw)
 	tree_string := doc_to_string(doc, capacity = 20_000_000)
 	log.infof("Finished doc_to_string: %v", time.stopwatch_duration(sw))
-	tree_bytes  := transmute([]u8)tree_string
-	defer delete(tree_bytes)
+	defer delete(tree_string)
 
 	log.infof("Starting hash.crc32...")
 	time.stopwatch_reset(&sw)
 	time.stopwatch_start(&sw)
+	tree_bytes  := transmute([]u8)tree_string
 	crc32 := hash.crc32(tree_bytes)
 	log.infof("Finished hash.crc32: %v", time.stopwatch_duration(sw))
 
@@ -327,9 +327,6 @@ doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 		tab :: #force_inline proc(writer: ^strings.Builder, indent: int) {
 			// PERF: Hot
 			strings.write_string(writer, doc_to_string_indent[indent])
-			//for _ in 0..=indent {
-			//	fmt.wprintf(writer, "\t")
-			//}
 		}
 
 		tab(writer, indent)
@@ -373,14 +370,9 @@ doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 		}
 	}
 
-	// TODO: strings.write_rune is way slower than strings.write_string
-	// TODO: fmt.sbprintf is slower than fmt.wprintf
-
 	buf: strings.Builder
 	if capacity > 0 {
 		strings.builder_init_len_cap(&buf, 0, capacity)
-	} else {
-		assert(false)
 	}
 
 	print(&buf, doc)
@@ -389,7 +381,7 @@ doc_to_string :: proc(doc: ^xml.Document, capacity: int) -> (result: string) {
 	if len(result) < capacity - 1000 {
 		log.infof("Document converted to debug string - result length: %v", len(result))
 	} else {
-		log.warnf("Document converted to debug string - result length: %v - initial string builder capacity: %v - please increase capacity for better performance.", len(result), capacity)
+		log.warnf("Document converted to debug string - result length: %v - initial string builder capacity: %v - please increase capacity for better test performance.", len(result), capacity)
 	}
 	return
 }
