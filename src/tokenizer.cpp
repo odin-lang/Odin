@@ -439,8 +439,13 @@ gb_global TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT
 };
 
 gb_internal TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
+	String load_path = fullpath;
+	OverlayEntry *overlay = overlay_find(fullpath);
+	if (overlay != nullptr && overlay->replacement.len != 0) {
+		load_path = overlay->replacement;
+	}
 	LoadedFileError file_err = load_file_32(
-		alloc_cstring(temporary_allocator(), fullpath), 
+		alloc_cstring(temporary_allocator(), load_path),
 		&t->loaded_file,
 		copy_file_contents
 	);

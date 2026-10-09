@@ -6580,6 +6580,10 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		fi.fullpath = path;
 		fi.size = get_file_size(path);
 		fi.is_dir = false;
+		OverlayEntry *overlay = overlay_find(path);
+		if (overlay != nullptr && overlay->replacement.len != 0) {
+			fi.size = get_file_size(overlay->replacement);
+		}
 
 		array_reserve(&pkg->files, 1);
 		pkg->is_single_file = true;
@@ -6593,6 +6597,13 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	Array<FileInfo> list = {};
 	ReadDirectoryError rd_err = read_directory(path, &list);
 	defer (array_free(&list));
+	if (rd_err == ReadDirectory_None || rd_err == ReadDirectory_Empty) {
+		overlay_directory(path, &list);
+		rd_err = ReadDirectory_None;
+		if (list.count == 0) {
+			rd_err = ReadDirectory_Empty;
+		}
+	}
 
 	if (list.count == 1) {
 		GB_ASSERT(path != list[0].fullpath);

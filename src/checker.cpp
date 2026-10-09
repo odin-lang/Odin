@@ -7782,6 +7782,11 @@ gb_internal bool check_unique_package_names(Checker *c) {
 
 		ok = false;
 
+		if (build_context.workspace) {
+			// packages checked together may be of different programs, so a name may be used by each
+			continue;
+		}
+
 		begin_error_block();
 		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));
 		error_line("\tA package name must be unique\n"

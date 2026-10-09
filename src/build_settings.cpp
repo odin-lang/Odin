@@ -571,6 +571,8 @@ struct BuildContext {
 	bool   show_more_timings;
 	bool   show_defineables;
 	String export_defineables_file;
+	String overlay_file;
+	bool   workspace;
 	bool   ignore_unused_defineables;
 	bool   show_system_calls;
 	bool   keep_temp_files;

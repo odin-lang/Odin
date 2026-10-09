@@ -441,6 +441,8 @@ enum BuildFlagKind {
 
 	BuildFlag_ShowDefineables,
 	BuildFlag_ExportDefineables,
+	BuildFlag_Overlay,
+	BuildFlag_Workspace,
 	BuildFlag_IgnoreUnusedDefineables,
 
 	BuildFlag_Vet,
@@ -717,6 +719,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_ShowDefineables,         str_lit("show-defineables"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExportDefineables,       str_lit("export-defineables"),        BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_Overlay,                 str_lit("overlay"),                   BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_Workspace,               str_lit("workspace"),                 BuildFlagParam_None,    Command_check);
 	add_flag(&build_flags, BuildFlag_IgnoreUnusedDefineables, str_lit("ignore-unused-defineables"), BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
@@ -1120,6 +1124,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 
+							break;
+						}
+						case BuildFlag_Overlay: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.overlay_file = string_trim_whitespace(value.value_string);
+							break;
+						}
+						case BuildFlag_Workspace: {
+							GB_ASSERT(value.kind == ExactValue_Invalid);
+							build_context.workspace = true;
 							break;
 						}
 						case BuildFlag_IgnoreUnusedDefineables: {
@@ -2871,6 +2885,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "odin check .                     Type checks package in current directory.");
 		print_usage_line(3, "odin check <dir>                 Type checks package in <dir>.");
+		print_usage_line(3, "odin check <dir> <dir2> ... -workspace   Type checks the packages in <dir>, <dir2>, and so on, together.");
 		print_usage_line(3, "odin check filename.odin -file   Type checks single-file package, must contain entry point.");
 	} else if (command == "test") {
 		print_usage_header_once();
@@ -3342,6 +3357,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		}
 	}
 
+	if (check) {
+		if (print_flag("-overlay:<filename>")) {
+			print_usage_line(2, "Reads some files from elsewhere instead, as for an editor's unsaved files.");
+			print_usage_line(2, "The file holds JSON in the form Go's -overlay takes: {\"Replace\": {\"<path>\": \"<replacement path>\", ...}}");
+			print_usage_line(2, "An empty replacement path treats the file as deleted.");
+			print_usage_line(2, "Example: -overlay:overlay.json");
+		}
+	}
+
 	if (doc) {
 		if (print_flag("-out:<filepath>")) {
 			print_usage_line(2, "Sets the base name of the resulting .odin-doc file.");
@@ -3439,6 +3463,12 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (check_only) {
+		if (print_flag("-workspace")) {
+			print_usage_line(2, "Type checks several packages together, given before the flags, as editors and other tools need.");
+			print_usage_line(2, "The packages may be of different programs, so names and link names may repeat across them.");
+			print_usage_line(2, "They all share one target and set of defines.");
+			print_usage_line(2, "Example: odin check game tools -workspace");
+		}
 		if (print_flag("-show-unused")) {
 			print_usage_line(2, "Shows unused package declarations within the current project.");
 		}
@@ -4018,6 +4048,50 @@ gb_internal void init_terminal(void) {
 	}
 }
 
+gb_internal bool load_overlays(String overlay_file) {
+	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, alloc_cstring(temporary_allocator(), overlay_file));
+	if (fc.data == nullptr) {
+		error(TokenPos{}, "Unable to read the overlay file '%.*s'", LIT(overlay_file));
+		return false;
+	}
+
+	JsonValue *root = nullptr;
+	JsonError json_err = {};
+	if (!json_parse(permanent_allocator(), make_string(cast(u8 *)fc.data, fc.size), &root, &json_err)) {
+		error(TokenPos{}, "%.*s(%d:%d) %s", LIT(overlay_file), json_err.line, json_err.column, json_err.message);
+		return false;
+	}
+
+	JsonValue *replace = nullptr;
+	if (root->kind == Json_Object) {
+		for_array(i, root->object) {
+			if (root->object[i].key == "Replace") {
+				replace = root->object[i].value;
+			}
+		}
+	}
+	if (replace == nullptr || replace->kind != Json_Object) {
+		error(TokenPos{}, "%.*s: expected an object with a \"Replace\" object", LIT(overlay_file));
+		return false;
+	}
+
+	array_init(&global_overlays, heap_allocator(), 0, replace->object.count);
+	for_array(i, replace->object) {
+		JsonObjectEntry const &entry = replace->object[i];
+		if (entry.value->kind != Json_String) {
+			error(TokenPos{}, "%.*s: expected the replacement for '%.*s' to be a string", LIT(overlay_file), LIT(entry.key));
+			return false;
+		}
+		OverlayEntry e = {};
+		e.path = path_to_full_path(permanent_allocator(), entry.key);
+		if (entry.value->string.len != 0) {
+			e.replacement = path_to_full_path(permanent_allocator(), entry.value->string);
+		}
+		array_add(&global_overlays, e);
+	}
+	return true;
+}
+
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -4178,19 +4252,6 @@ int main(int arg_count, char const **arg_ptr) {
 
 		build_context.command_kind = Command_doc;
 		init_filename = args[2];
-		for (isize i = 3; i < args.count; i++) {
-			auto arg = args[i];
-			if (string_starts_with(arg, str_lit("-"))) {
-				break;
-			}
-			array_add(&build_context.extra_packages, arg);
-		}
-		isize extra_count = build_context.extra_packages.count;
-		if (extra_count > 0) {
-			gb_memmove(args.data + 3, args.data + 3 + extra_count, extra_count * gb_size_of(*args.data));
-			args.count -= extra_count;
-		}
-
 
 		build_context.no_output_files = true;
 		build_context.generate_docs = true;
@@ -4267,6 +4328,20 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
+	if (build_context.command_kind == Command_doc || build_context.command_kind == Command_check) {
+		for (isize i = 3; i < args.count; i++) {
+			if (string_starts_with(args[i], str_lit("-"))) {
+				break;
+			}
+			array_add(&build_context.extra_packages, args[i]);
+		}
+		isize extra_count = build_context.extra_packages.count;
+		if (extra_count > 0) {
+			gb_memmove(args.data + 3, args.data + 3 + extra_count, (args.count - 3 - extra_count) * gb_size_of(*args.data));
+			args.count -= extra_count;
+		}
+	}
+
 	init_filename = copy_string(permanent_allocator(), init_filename);
 
 	build_context.command = command;
@@ -4275,6 +4350,16 @@ int main(int arg_count, char const **arg_ptr) {
 	string_set_init(&build_context.vet_packages);
 
 	if (!parse_build_flags(args)) {
+		return 1;
+	}
+
+	if (build_context.command_kind == Command_check && build_context.extra_packages.count > 0 && !build_context.workspace) {
+		gb_printf_err("`%.*s check` takes one package; use -workspace to check several together\n", LIT(args[0]));
+		return 1;
+	}
+
+	if (build_context.overlay_file.len != 0 && !load_overlays(build_context.overlay_file)) {
+		print_all_errors();
 		return 1;
 	}
 
@@ -4359,7 +4444,8 @@ int main(int arg_count, char const **arg_ptr) {
 					gb_printf_err("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 					return 1;
 				}
-				if (!gb_file_exists(cast(const char*)init_filename.text)) {
+				if (!gb_file_exists(cast(const char*)init_filename.text) &&
+				    overlay_find(path_to_full_path(temporary_allocator(), init_filename)) == nullptr) {
 					gb_printf_err("The file '%.*s' was not found.\n", LIT(init_filename));
 					return 1;
 				}
