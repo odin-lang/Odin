@@ -12,7 +12,7 @@ V16u32 :: #simd[16]u32
 V8f64  :: #simd[8]f64
 V32u32 :: #simd[32]u32
 
-foreign import lib "build/test_issue_avx512_vector_abi_c.o"
+foreign import lib "../build/test_issue_avx512_vector_abi_c.o"
 
 @(default_calling_convention="c")
 foreign lib {
