@@ -3308,9 +3308,9 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 						store(exact_value_to_i64(fv->field->tav.value), v);
 					}
 				} else {
-					xbValue v = xb_build_expr(p, elem);
-					if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
-					store(elem_index++, xb_emit_conv(p, v, et));
+					auto values = array_make<xbValue>(xb_allocator(), 0, 1);
+					xb_add_values_to_array(p, &values, xb_build_expr(p, elem));
+					for (xbValue v : values) store(elem_index++, xb_emit_conv(p, v, et));
 				}
 			}
 			return xb_value_mem(type, m);
@@ -3454,9 +3454,12 @@ gb_internal xbValue xb_build_compound_lit(xbProc *p, Ast *expr) {
 					xb_store_value(p, xb_mem_offset(m, matrix_row_major_index_to_offset(bt, k)*es), v);
 				}
 			} else {
-				xbValue v = xb_build_expr(p, elem);
-				if (is_type_tuple(v.type)) XB_UNSUPPORTED(p, "tuple in compound literal");
-				xb_store_value(p, xb_mem_offset(m, matrix_row_major_index_to_offset(bt, elem_index++)*es), xb_emit_conv(p, v, et));
+				// a call returning several values fills that many elements
+				auto values = array_make<xbValue>(xb_allocator(), 0, 1);
+				xb_add_values_to_array(p, &values, xb_build_expr(p, elem));
+				for (xbValue v : values) {
+					xb_store_value(p, xb_mem_offset(m, matrix_row_major_index_to_offset(bt, elem_index++)*es), xb_emit_conv(p, v, et));
+				}
 			}
 		}
 		return xb_value_mem(type, m);
