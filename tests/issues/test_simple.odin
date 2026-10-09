@@ -44,6 +44,7 @@ package tests_issues
 @(require) import "test_issue_7700"
 @(require) import "test_issue_7708"
 @(require) import "test_issue_7779"
+@(require) import "test_issue_fast_isel_lowering"
 @(require) import "test_issue_omitted_field_union"
 @(require) import "test_issue_equal_proc_dependencies"
 @(require) import "test_issue_global_address_of_literal"

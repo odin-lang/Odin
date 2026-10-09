@@ -9,11 +9,25 @@ set CC=cl
 
 @echo on
 
+@rem #########################################################################################################
+
+@rem CONTRIBUTORS:
+@rem   If your test can be run as a simple `odin test`, then please add it to
+@rem   `test_simple.odin` instead, to keep CI performance acceptable.
+@rem   Otherwise, add it here in the appropriate block, and make sure to
+@rem   update `run.sh` as well.
+
+@rem #########################################################################################################
+
 @rem Build prerequisites for the simple tests:
 @rem   (nothing to do here)
 
+@rem #########################################################################################################
+
 @rem "odin test" - All simple tests that can be tested without special arguments or error handling:
 %ODIN% test "..\test_simple.odin" -file -all-packages %COMMON% || exit /b
+
+@rem #########################################################################################################
 
 @rem "odin check" tests:
 %ODIN% check "..\test_issue_5105_5569" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
@@ -36,6 +50,8 @@ set CC=cl
 %ODIN% check "..\test_issue_foreign_redeclaration_mismatch" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_integer_literal_exponent" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
+@rem #########################################################################################################
+
 @rem "odin build" tests:
 %ODIN% build "..\test_issue_2113" %COMMON% -debug || exit /b
 %ODIN% build "..\test_issue_2395" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
@@ -56,6 +72,8 @@ set CC=cl
 %ODIN% build "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" || exit /b
 %ODIN% build "..\test_issue_7598_all_entities_checked" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 
+@rem #########################################################################################################
+
 @rem "odin run" tests:
 %ODIN% run "..\test_issue_7482" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local || exit /b
@@ -63,6 +81,8 @@ set CC=cl
 %ODIN% run "..\test_issue_7564" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7596" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7798" %COMMON% || exit /b
+
+@rem #########################################################################################################
 
 @rem "odin test" tests with special needs:
 
@@ -82,7 +102,6 @@ set CC=cl
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
 
-%ODIN% test "..\test_issue_fast_isel_lowering" || exit /b
 %ODIN% test "..\test_issue_fast_isel_lowering" %COMMON% -o:none || exit /b
 
 %ODIN% test "..\test_issue_equal_proc_dependencies" %COMMON% -build-mode:obj 2>&1 | find /i /c "missing procedure" | findstr /x "0" || exit /b
@@ -92,6 +111,8 @@ set CC=cl
 
 %CC% -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" /Fo:test_issue_sysv_abi_c.o || exit /b
 %ODIN% test "..\test_issue_sysv_abi" %COMMON% || exit /b
+
+@rem #########################################################################################################
 
 @echo off
 
