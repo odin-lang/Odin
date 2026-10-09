@@ -257,6 +257,9 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			}
 			feature_str = gb_string_append_length(feature_str, str.text, str.len);
 		}
+		if (lb_x86_features_need_evex512(pt->Proc.enable_target_feature)) {
+			feature_str = gb_string_appendc(feature_str, ",+evex512");
+		}
 
 		lb_add_attribute_to_proc_with_string(m, p->value, make_string_c("target-features"), make_string_c(feature_str));
 	}

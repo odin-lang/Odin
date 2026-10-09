@@ -3520,3 +3520,32 @@ gb_internal void lb_do_build_diagnostics(lbGenerator *gen) {
 	gb_printf("------------------------------------------------------------------------------------------\n");
 	gb_printf("------------------------------------------------------------------------------------------\n\n");
 }
+
+// LLVM only adds `evex512` by itself for the generic x86 CPUs, so with e.g. the default `x86-64-v2`
+// an explicit `+avx512f` gives no zmm registers and 512-bit vectors are returned as ymm pairs, unlike C.
+// Like clang, ask for it whenever an AVX-512 feature is enabled and `evex512` isn't named explicitly.
+gb_internal bool lb_x86_features_need_evex512(String features) {
+#if LLVM_VERSION_MAJOR >= 18
+	if (!is_arch_x86()) {
+		return false;
+	}
+	bool has_avx512 = false;
+	String_Iterator it = {features, 0};
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
+		bool disabled = string_starts_with(str, '-');
+		if (string_starts_with(str, '+') || disabled) {
+			str = substring(str, 1, str.len);
+		}
+		if (str == "evex512") {
+			return false;
+		}
+		if (!disabled && string_starts_with(str, str_lit("avx512"))) {
+			has_avx512 = true;
+		}
+	}
+	return has_avx512;
+#else
+	return false;
+#endif
+}
