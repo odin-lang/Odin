@@ -4695,7 +4695,12 @@ int main(int arg_count, char const **arg_ptr) {
 			label_code_gen = gb_string_append_fmt(label_code_gen, " ( %4td modules )", gen->modules.count);
 		}
 		MAIN_TIME_SECTION_WITH_LEN(label_code_gen, gb_string_length(label_code_gen));
+		isize code_gen_section = global_timings.sections.count-1;
 		if (lb_generate_code(gen)) {
+			if (xb_is_complete()) {
+				// LLVM's modules stayed empty: the fast backend generated everything
+				global_timings.sections[code_gen_section].label = str_lit("Fast Backend Code Gen");
+			}
 			switch (build_context.build_mode) {
 			case BuildMode_Executable:
 			case BuildMode_StaticLibrary:
