@@ -125,7 +125,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 // 	- sep: An optional separator string (default is a single space).
 // 	- allocator: (default: context.allocator)
 //
-// 	Returns: A formatted string. 
+// 	Returns: A formatted string.
 //
 @(require_results)
 aprint :: proc(args: ..any, sep := " ", allocator := context.allocator) -> string {
@@ -523,7 +523,7 @@ sbprintfln :: proc(buf: ^strings.Builder, format: string, args: ..any) -> string
 //
 // Returns: The number of bytes written
 //
-wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
+wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
 	fi: Info
 	fi.writer = w
 
@@ -564,7 +564,7 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 //
 // Returns: The number of bytes written
 //
-wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
+wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> (bytes_written: int) {
 	fi: Info
 	fi.writer = w
 
@@ -591,7 +591,7 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ", flush := true) -> int {
 //
 // Returns: The number of bytes written
 //
-wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> int {
+wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline := false) -> (bytes_written: int) {
 	MAX_CHECKED_ARGS :: 64
 	assert(len(args) <= MAX_CHECKED_ARGS, "number of args > 64 is unsupported")
 
@@ -859,7 +859,7 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any, flush := true, newline :
 //
 // Returns: The number of bytes written.
 //
-wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> int {
+wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> (bytes_written: int) {
 	return wprintf(w, format, ..args, flush=flush, newline=true)
 }
 // Writes a ^runtime.Type_Info value to an io.Writer
@@ -870,12 +870,12 @@ wprintfln :: proc(w: io.Writer, format: string, args: ..any, flush := true) -> i
 //
 // Returns: The number of bytes written and an io.Error if encountered
 //
-wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (int, io.Error) {
-	n, err := reflect.write_type(w, info)
+wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (bytes_written: int, err: io.Error) {
+	bytes_written, err = reflect.write_type(w, info)
 	if flush {
 		io.flush(w)
 	}
-	return n, err
+	return bytes_written, err
 }
 // Writes a typeid value to an io.Writer
 //
@@ -885,12 +885,12 @@ wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info, flush := true) -> (i
 //
 // Returns: The number of bytes written and an io.Error if encountered
 //
-wprint_typeid :: proc(w: io.Writer, id: typeid, flush := true) -> (int, io.Error) {
-	n, err := reflect.write_type(w, type_info_of(id))
+wprint_typeid :: proc(w: io.Writer, id: typeid, flush := true) -> (bytes_written: int, err: io.Error) {
+	bytes_written, err = reflect.write_type(w, type_info_of(id))
 	if flush {
 		io.flush(w)
 	}
-	return n, err
+	return bytes_written, err
 }
 // Parses an integer from a given string starting at a specified offset
 //
@@ -1037,7 +1037,9 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 	}
 
 	pad_byte: byte = ' '
-	if !fi.space {
+	if !fi.space && !fi.minus {
+		// a left-justified field pads to the right of the digits, where a '0' would read
+		// as part of the number rather than as filler
 		pad_byte = '0'
 	}
 
@@ -1100,7 +1102,13 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	if fi.prec_set {
 		prec = fi.prec
 		if prec == 0 && u == 0 {
-			fmt_write_padding(fi, fi.width)
+			if fi.minus {
+				io.write_byte(fi.writer, '0', &fi.n)
+				fmt_write_padding(fi, fi.width - 1)
+			} else {
+				fmt_write_padding(fi, fi.width - 1)
+				io.write_byte(fi.writer, '0', &fi.n)
+			}
 			return
 		}
 	} else if fi.zero && fi.width_set {
@@ -1453,8 +1461,17 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		_fmt_float_as(fi, v, bit_size, verb, 'E', 6)
 
 	case 'h', 'H':
-		prev_fi := fi^
-		defer fi^ = prev_fi
+		prev_hash := fi.hash
+		defer fi.hash = prev_hash
+		prev_zero := fi.zero
+		defer fi.zero = prev_zero
+		prev_plus := fi.plus
+		defer fi.plus = prev_plus
+		prev_width := fi.width
+		defer fi.width = prev_width
+		prev_width_set := fi.width_set
+		defer fi.width_set = prev_width_set
+
 		fi.hash = false
 		fi.zero = true
 		fi.plus = false
@@ -1807,6 +1824,14 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 		fmt_bit_set(fi, val, info.name, verb)
 
 	case runtime.Type_Info_Bit_Set:
+		if info.underlying != nil {
+			#partial switch _ in runtime.type_info_base(info.underlying).variant {
+			case runtime.Type_Info_Array:
+				fmt_bit_set_array(fi, v, type_info, name, verb)
+				return
+			}
+		}
+
 		bits: u128
 		bit_size := u128(8*type_info.size)
 
@@ -1903,6 +1928,58 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "", verb: rune = 'v') {
 			io.write_i64(fi.writer, i, 10, &fi.n)
 			commas += 1
 		}
+	}
+}
+
+// Formats an array-of-integers backed bit_set (e.g. `bit_set[E; [4]u64]`).
+// The bits are stored as a little-endian sequence in memory (bit `b` is bit `b%8` of byte `b/8`),
+// so they can be scanned directly regardless of how many array elements back the set.
+fmt_bit_set_array :: proc(fi: ^Info, v: any, type_info: ^runtime.Type_Info, name: string, verb: rune) {
+	info := type_info.variant.(runtime.Type_Info_Bit_Set)
+	bit_size := int(8*type_info.size)
+
+	et := runtime.type_info_base(info.elem)
+	e, is_enum := et.variant.(runtime.Type_Info_Enum)
+
+	if verb != 'w' {
+		if name != "" {
+			io.write_string(fi.writer, name, &fi.n)
+		} else {
+			reflect.write_type(fi.writer, type_info, &fi.n)
+		}
+	}
+	io.write_byte(fi.writer, '{', &fi.n)
+	defer io.write_byte(fi.writer, '}', &fi.n)
+
+	bytes := ([^]u8)(v.data)
+	commas := 0
+	loop: for bit_index in 0..<bit_size {
+		if (bytes[bit_index/8] >> uint(bit_index & 7)) & 1 == 0 {
+			continue
+		}
+		i := i64(bit_index) + info.lower
+		if commas > 0 {
+			io.write_string(fi.writer, ", ", &fi.n)
+		}
+		if is_enum {
+			enum_name: string
+			if ti_named, is_named := info.elem.variant.(runtime.Type_Info_Named); is_named {
+				enum_name = ti_named.name
+			}
+			for ev, evi in e.values {
+				if u64(ev) == u64(i) {
+					if verb == 'w' {
+						io.write_string(fi.writer, enum_name, &fi.n)
+						io.write_byte(fi.writer, '.', &fi.n)
+					}
+					io.write_string(fi.writer, e.names[evi], &fi.n)
+					commas += 1
+					continue loop
+				}
+			}
+		}
+		io.write_i64(fi.writer, i, 10, &fi.n)
+		commas += 1
 	}
 }
 
@@ -3403,6 +3480,8 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 		io.write_string(fi.writer, "<nil>")
 		return
 	}
+	prev_arg := fi.arg
+	defer fi.arg = prev_arg
 	fi.arg = arg
 
 	if verb == 'T' {

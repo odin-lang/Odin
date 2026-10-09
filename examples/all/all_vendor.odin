@@ -12,6 +12,7 @@ package all
 @(require) import "vendor:miniaudio"
 @(require) import "vendor:portmidi"
 @(require) import "vendor:raylib"
+@(require) import "vendor:raylib/rlgl"
 @(require) import "vendor:zlib"
 
 @(require) import "vendor:sdl2"
@@ -41,6 +42,7 @@ package all
 @(require) import "vendor:directx/dxc"
 @(require) import "vendor:directx/d3d11"
 @(require) import "vendor:directx/d3d12"
+@(require) import "vendor:directx/d3d_compiler"
 @(require) import "vendor:directx/dxgi"
 @(require) import "vendor:commonmark"
 

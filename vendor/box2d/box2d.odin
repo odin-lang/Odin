@@ -68,6 +68,8 @@ foreign lib {
 	// Override the default assert callback
 	//	@param assertFcn a non-null assert callback
 	SetAssertFcn :: proc(assertfcn: AssertFcn) ---
+	// Get the current version of Box2D.
+	GetVersion   :: proc() -> Version ---
 
 	// Get the absolute number of system ticks. The value is platform specific.
 	GetTicks                :: proc() -> u64 ---

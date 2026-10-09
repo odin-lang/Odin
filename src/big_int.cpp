@@ -100,20 +100,15 @@ gb_internal void big_int_rem_eq(BigInt *dst, BigInt const *x);
 gb_internal bool big_int_is_neg(BigInt const *x);
 gb_internal void big_int_neg(BigInt *dst, BigInt const *x);
 
+// NOTE: libtommath allows the output to alias an input, so `dst` is not copied first
 gb_internal void big_int_add_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_add(dst, &res, x);
+	big_int_add(dst, dst, x);
 }
 gb_internal void big_int_sub_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_sub(dst, &res, x);
+	big_int_sub(dst, dst, x);
 }
 gb_internal void big_int_shl_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_shl(dst, &res, x);
+	big_int_shl(dst, dst, x);
 }
 gb_internal void big_int_shr_eq(BigInt *dst, BigInt const *x) {
 	BigInt res = {};
@@ -121,9 +116,7 @@ gb_internal void big_int_shr_eq(BigInt *dst, BigInt const *x) {
 	big_int_shr(dst, &res, x);
 }
 gb_internal void big_int_mul_eq(BigInt *dst, BigInt const *x) {
-	BigInt res = {};
-	big_int_init(&res, dst);
-	big_int_mul(dst, &res, x);
+	big_int_mul(dst, dst, x);
 }
 gb_internal void big_int_quo_eq(BigInt *dst, BigInt const *x) {
 	BigInt res = {};
@@ -214,10 +207,8 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 
 	mp_zero(dst);
 
-	BigInt digit = {};
-	defer (big_int_dealloc(&digit));
-
 	isize i = 0;
+	isize digit_count = 0;
 	for (; i < len; i++) {
 		Rune r = cast(Rune)text[i];
 
@@ -241,11 +232,17 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 				*success = false;
 			}
 			break;
+		} else {
+			digit_count += 1;
 		}
 
-		big_int_from_u64(&digit, v);
-		big_int_mul_eq(dst, &b);
-		big_int_add_eq(dst, &digit);
+		mp_mul_d(dst, cast(mp_digit)base, dst);
+		mp_add_d(dst, cast(mp_digit)v, dst);
+	}
+	if (digit_count == 0) {
+		// a base prefix with only digit separators after it, `0x_`, has no digits at all
+		*success = false;
+		return;
 	}
 	if (i < len && (text[i] == 'e' || text[i] == 'E')) {
 		i += 1;
@@ -281,7 +278,7 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 				v = u64_digit_value(r);
 			} else {
 				*success = false;
-				break;
+				return;
 			}
 			exp *= 10;
 			exp += v;
@@ -292,11 +289,8 @@ gb_internal void big_int_from_string(BigInt *dst, String const &s, bool *success
 			return;
 		}
 
-		// NOTE(Jeroen): A valid integer can never have an exponent larger than 308 (per `max(f64)`).
-		//               As an integer, not even larger than `max(u128)` which has a base 10 exponent of 38.
-		//               But we also use this path to parse float literals like those in `core:math.pow10_f64`,
-		//               so we have to stick with 1e308.
-		if (exp > 308) {
+		// NOTE(bill): Just limit the maximum exponent to bigger than the actual maximum to allow for keeping overflows
+		if (exp > 512) {
 			*success = false;
 			return;
 		}
@@ -489,7 +483,8 @@ gb_internal void big_int_and(BigInt *dst, BigInt const *x, BigInt const *y) {
 
 gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) {
 	if (mp_iszero(x)) {
-		big_int_init(dst, y);
+		// 0 &~ y == 0 & ~y == 0
+		big_int_from_i64(dst, 0);
 		return;
 	}
 	if (mp_iszero(y)) {
@@ -505,13 +500,13 @@ gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) 
 			mp_decr(&x1);
 			mp_decr(&y1);
 
-			BigInt ny1 = {};
-			mp_complement(&y1, &ny1);
-			mp_and(&x1, &ny1, dst);
+			BigInt nx1 = {};
+			mp_complement(&x1, &nx1);
+			mp_and(&y1, &nx1, dst);
 
 			big_int_dealloc(&x1);
 			big_int_dealloc(&y1);
-			big_int_dealloc(&ny1);
+			big_int_dealloc(&nx1);
 			return;
 		}
 
@@ -532,6 +527,7 @@ gb_internal void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y) 
 		BigInt z1 = {};
 		big_int_or(&z1, &x1, &y1);
 		mp_add_d(&z1, 1, dst);
+		big_int_neg(dst, dst);
 
 		big_int_dealloc(&x1);
 		big_int_dealloc(&y1);
@@ -639,6 +635,27 @@ gb_internal String big_int_to_string(gbAllocator allocator, BigInt const *x, u64
 		u8 *buf = gb_alloc_array(allocator, u8, 1);
 		buf[0] = '0';
 		return make_string(buf, 1);
+	}
+
+	if (mp_count_bits(x) <= 64) {
+		u64 magnitude = mp_get_mag_u64(x);
+		char digits[64];
+		isize digit_count = 0;
+		do {
+			digits[digit_count++] = digit_to_char(cast(u8)(magnitude % base));
+			magnitude /= base;
+		} while (magnitude != 0);
+
+		isize len = digit_count + (x->sign != MP_ZPOS ? 1 : 0);
+		u8 *text = gb_alloc_array(allocator, u8, len);
+		isize i = 0;
+		if (x->sign != MP_ZPOS) {
+			text[i++] = '-';
+		}
+		while (digit_count > 0) {
+			text[i++] = digits[--digit_count];
+		}
+		return make_string(text, len);
 	}
 
 	Array<char> buf = {};

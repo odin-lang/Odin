@@ -28,6 +28,7 @@ _os_version :: proc (allocator: runtime.Allocator, loc := #caller_location) -> (
 	} else {
 		res.platform = .MacOS
 		switch version.majorVersion {
+		case 27: ws(&b, "macOS Golden Gate")
 		case 26: ws(&b, "macOS Tahoe")
 		case 15: ws(&b, "macOS Sequoia")
 		case 14: ws(&b, "macOS Sonoma")

@@ -14,6 +14,7 @@ File_Info :: struct {
 	name:              string,        // base name of the file
 
 	inode:             u128,          // might be zero if cannot be determined
+	device:            u64,           // might be zero if cannot be determined
 	size:              i64 `fmt:"M"`, // length in bytes for regular files; system-dependent for other file types
 	mode:              Permissions,   // file permission flags
 	type:              File_Type,

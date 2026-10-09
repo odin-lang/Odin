@@ -65,6 +65,21 @@ template <typename T> struct TypeIs64BitInteger { enum {value = false}; };
 template <> struct TypeIs64BitInteger<u64> { enum {value = true}; };
 template <> struct TypeIs64BitInteger<i64> { enum {value = true}; };
 
+#if defined(GB_SYSTEM_WINDOWS)
+uint32_t old_console_codepage = 0;
+void set_utf8_codepage() {
+	old_console_codepage = GetConsoleOutputCP();
+	SetConsoleOutputCP(65001);
+}
+
+void restore_old_codepage() {
+	// Nothing we can do if this fails, so we're not asserting or anything.
+	SetConsoleOutputCP(old_console_codepage);
+}
+#else
+void set_utf8_codepage() {}
+void restore_old_codepage() {}
+#endif
 
 
 #include "unicode.cpp"
@@ -167,6 +182,89 @@ gb_internal u64 fnv64a(void const *data, isize len, u64 seed=0xcbf29ce484222325u
 		h = (h ^ *bytes++) * 0x100000001b3ull;
 	}
 	return h;
+}
+
+gb_internal void md5_block(u32 h[4], u8 const *block) {
+	gb_local_persist u32 const K[64] = {
+		0xd76aa478, 0xe8c7b756, 0x242070db, 0xc1bdceee, 0xf57c0faf, 0x4787c62a, 0xa8304613, 0xfd469501,
+		0x698098d8, 0x8b44f7af, 0xffff5bb1, 0x895cd7be, 0x6b901122, 0xfd987193, 0xa679438e, 0x49b40821,
+		0xf61e2562, 0xc040b340, 0x265e5a51, 0xe9b6c7aa, 0xd62f105d, 0x02441453, 0xd8a1e681, 0xe7d3fbc8,
+		0x21e1cde6, 0xc33707d6, 0xf4d50d87, 0x455a14ed, 0xa9e3e905, 0xfcefa3f8, 0x676f02d9, 0x8d2a4c8a,
+		0xfffa3942, 0x8771f681, 0x6d9d6122, 0xfde5380c, 0xa4beea44, 0x4bdecfa9, 0xf6bb4b60, 0xbebfbc70,
+		0x289b7ec6, 0xeaa127fa, 0xd4ef3085, 0x04881d05, 0xd9d4d039, 0xe6db99e5, 0x1fa27cf8, 0xc4ac5665,
+		0xf4292244, 0x432aff97, 0xab9423a7, 0xfc93a039, 0x655b59c3, 0x8f0ccc92, 0xffeff47d, 0x85845dd1,
+		0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1, 0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391,
+	};
+	gb_local_persist u32 const R[64] = {
+		7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+		5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20, 5,  9, 14, 20,
+		4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+		6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
+	};
+
+	u32 w[16];
+	for (isize i = 0; i < 16; i++) {
+		w[i] = block[4*i] | (block[4*i+1] << 8) | (block[4*i+2] << 16) | (cast(u32)block[4*i+3] << 24);
+	}
+
+	u32 a = h[0];
+	u32 b = h[1];
+	u32 c = h[2];
+	u32 d = h[3];
+
+	for (isize i = 0; i < 64; i++) {
+		u32 f = 0;
+		isize g = 0;
+		switch (i / 16) {
+		case 0: f = (b & c) | (~b & d); g = i;              break;
+		case 1: f = (d & b) | (~d & c); g = (5*i + 1) % 16; break;
+		case 2: f = b ^ c ^ d;          g = (3*i + 5) % 16; break;
+		case 3: f = c ^ (b | ~d);       g = (7*i) % 16;     break;
+		}
+		u32 x = a + f + K[i] + w[g];
+		a = d;
+		d = c;
+		c = b;
+		b += (x << R[i]) | (x >> (32 - R[i]));
+	}
+	h[0] += a;
+	h[1] += b;
+	h[2] += c;
+	h[3] += d;
+}
+
+// RFC 1321
+gb_internal void md5(void const *data, isize len, u8 digest[16]) {
+	u8 const *bytes = cast(u8 const *)data;
+	u32 h[4] = {0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476};
+	isize i = 0;
+	for (; i+64 <= len; i += 64) {
+		md5_block(h, bytes+i);
+	}
+
+	// the rest, a one bit, zeros to 56 bytes of a block, then the length in bits
+	isize rest = len - i;
+	u8 tail[128] = {};
+	gb_memmove(tail, bytes+i, rest);
+	tail[rest] = 0x80;
+
+	isize tail_len = 64;
+	if (rest >= 56) {
+		tail_len = 128;
+	}
+
+	u64 bit_len = 8*cast(u64)len;
+	for (isize j = 0; j < 8; j++) {
+		tail[tail_len-8+j] = cast(u8)(bit_len >> (8*j));
+	}
+
+	for (isize j = 0; j < tail_len; j += 64) {
+		md5_block(h, tail+j);
+	}
+
+	for (isize j = 0; j < 16; j++) {
+		digest[j] = cast(u8)(h[j/4] >> (8*(j%4)));
+	}
 }
 
 gb_internal u64 u64_digit_value(Rune r) {
@@ -367,6 +465,7 @@ gb_global bool global_module_path_set = false;
 #include "string16_map.cpp"
 #include "string_set.cpp"
 #include "priority_queue.cpp"
+#include "sort.cpp"
 #include "thread_pool.cpp"
 #include "string_interner.cpp"
 
@@ -725,6 +824,75 @@ gb_internal wchar_t **command_line_to_wargv(wchar_t *cmd_line, int *_argc, isize
 	return argv;
 }
 
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+
+gb_internal char **command_line_to_spawn_argv(const char *cmd_line, int *_argc) {
+	u32 i, j;
+
+	u32 len = cast(u32)strlen(cmd_line);
+	i = len*gb_size_of(void *) + gb_size_of(void *);
+
+	char **argv = cast(char **)gb_alloc(gb_heap_allocator(), i + (len+1));
+	char *_argv = (cast(char *)argv)+i;
+
+	u32 argc = 0;
+	argv[argc] = _argv;
+	bool in_quote = false;
+	bool in_text = false;
+	bool in_space = true;
+	i = 0;
+	j = 0;
+
+	for (;;) {
+		char a = cmd_line[i];
+		if (a == 0) {
+			break;
+		}
+		if (in_quote) {
+			if (a == '\"') {
+				in_quote = false;
+			} else {
+				_argv[j++] = a;
+			}
+		} else {
+			switch (a) {
+			case '\"':
+				in_quote = true;
+				in_text = true;
+				if (in_space) {
+					// check_double_dash();
+					argv[argc++] = _argv + j;
+				}
+				in_space = false;
+				break;
+			case ' ':
+			case '\t':
+			case '\n':
+			case '\r':
+				if (in_text) _argv[j++] = '\0';
+				in_text = false;
+				in_space = true;
+				break;
+			default:
+				in_text = true;
+				if (in_space) {
+					// check_double_dash();
+					argv[argc++] = _argv + j;
+				}
+				_argv[j++] = a;
+				in_space = false;
+				break;
+			}
+		}
+		i++;
+	}
+	_argv[j] = '\0';
+	argv[argc] = nullptr;
+
+	if (_argc) *_argc = argc;
+	return argv;
+}
+
 #endif
 
 #include "path.cpp"
@@ -749,9 +917,9 @@ enum LoadedFileError {
 
 gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_file, bool copy_file_contents) {
 	LoadedFileError err = LoadedFile_None;
-	
-	if (!copy_file_contents) {
-	#if defined(GB_SYSTEM_WINDOWS)
+
+#if defined(GB_SYSTEM_WINDOWS)
+	{
 		TEMPORARY_ALLOCATOR_GUARD();
 
 		isize w_len = 0;
@@ -765,7 +933,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		HANDLE file_mapping = nullptr;
 		void *file_data = nullptr;
 		
-		handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
+		handle = CreateFileW(w_str, GENERIC_READ, FILE_SHARE_READ|FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 		if (handle == INVALID_HANDLE_VALUE) {
 			handle = nullptr;
 			goto window_handle_file_error;
@@ -787,6 +955,20 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 			memory_mapped_file->handle = nullptr;
 			memory_mapped_file->data   = nullptr;
 			memory_mapped_file->size   = 0;
+			return err;
+		}
+
+		if (copy_file_contents) {
+			u8 *data = cast(u8 *)gb_alloc(permanent_allocator(), (file_size+1+15)&~15);
+			DWORD bytes_read = 0;
+			if (!ReadFile(handle, data, cast(DWORD)file_size, &bytes_read, nullptr)) {
+				goto window_handle_file_error;
+			}
+			CloseHandle(handle);
+			data[bytes_read] = 0;
+			memory_mapped_file->handle = nullptr;
+			memory_mapped_file->data   = data;
+			memory_mapped_file->size   = cast(i32)bytes_read;
 			return err;
 		}
 
@@ -817,9 +999,10 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 			}
 			return err;
 		}
-	#endif
 	}
-	
+#else
+	gb_unused(copy_file_contents);
+
 	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, fullpath);
 
 	if (fc.size > I32_MAX) {
@@ -845,6 +1028,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 		}
 	}
 	return err;
+#endif
 }
 
 

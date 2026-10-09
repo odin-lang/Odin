@@ -430,7 +430,7 @@ gen_one_builder :: proc(sb: ^strings.Builder, opname, verb: string, has_rt, has_
 
 	fmt.sbprintf(sb, "\n%s :: proc(%s)%s {{\n", verb, join(hl[:]), has_r ? " -> Id" : "")
 	if has_r { strings.write_string(sb, "\tr := alloc_id(b)\n") }
-	fmt.sbprintf(sb, "\tappend(&b.ops, inst_%s(%s))\n", opname, join(call[:]))
+	fmt.sbprintf(sb, "\tappend_elem(&b.ops, inst_%s(%s))\n", opname, join(call[:]))
 	if has_r { strings.write_string(sb, "\treturn r\n") }
 	strings.write_string(sb, "}\n")
 }

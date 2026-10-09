@@ -2899,7 +2899,7 @@ abs_diff :: #force_inline proc "contextless" (a, b: $T/#simd[$LANES]$E) -> T whe
 }
 
 pairwise_add :: intrinsics.simd_pairwise_add
-pairwise_sub :: intrinsics.simd_pairwise_add
+pairwise_sub :: intrinsics.simd_pairwise_sub
 
 interleave   :: intrinsics.simd_interleave
 deinterleave :: intrinsics.simd_deinterleave

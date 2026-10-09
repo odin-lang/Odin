@@ -10,7 +10,7 @@ _stderr_write :: proc "contextless" (data: []byte) -> (int, _OS_Errno) {
 	foreign odin_env {
 		write :: proc "contextless" (fd: u32, p: []byte) ---
 	}
-	write(1, data)
+	write(2, data)
 	return len(data), 0
 }
 

@@ -335,7 +335,7 @@ generate_emit_proc :: proc(sb: ^strings.Builder, entry: Proc_Entry, mnemonic_str
 		strings.write_string(sb, ", ")
 		strings.write_string(sb, params)
 	}
-	strings.write_string(sb, ") { append(instructions, ")
+	strings.write_string(sb, ") { append_elem(instructions, ")
 	strings.write_string(sb, entry.proc_name)
 	strings.write_string(sb, "(")
 	strings.write_string(sb, kind_args(entry.kind))

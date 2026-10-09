@@ -3,7 +3,6 @@ package debug_trace
 
 import "base:runtime"
 
-import "core:fmt"
 import "core:mem"
 import "core:sync"
 
@@ -290,47 +289,87 @@ tracking_allocator_print_results :: proc(t: ^Tracking_Allocator, temp_allocator 
 	ALLOCATOR_MAX_BACKTRACES :: 16
 
 	for _, leak in t.allocation_map {
-		fmt.eprintfln("%v leaked %m", leak.location, leak.size)
+		runtime.print_caller_location(leak.location)
+		runtime.print_string(" leaked ")
+		_print_memory(leak.size)
+		runtime.print_byte('\n')
 
 		defer i += 1
 		if i > ALLOCATOR_MAX_BACKTRACES {
 			continue
 		}
 
-		fmt.eprintln("[back trace]")
+		runtime.print_string("[back trace]\n")
 
 		trace, err := resolve(leak.backtrace, temp_allocator, temp_allocator)
 		if err != nil {
-			fmt.eprintfln("\tbacktrace error: %v", err)
+			runtime.print_string("\tbacktrace error: ")
+			runtime.print_string(resolve_err_string(err))
+			runtime.print_string("\n")
 			continue
 		}
 		defer locations_destroy(trace, temp_allocator)
 
 		print(trace)
-		fmt.eprintln()
+		runtime.print_string("\n")
 	}
 
 	for bad_free, _ in t.bad_free_array {
-		fmt.eprintfln(
-			"%v allocation %p was freed badly",
-			bad_free.location,
-			bad_free.memory,
-		)
+		runtime.print_caller_location(bad_free.location)
+		runtime.print_string(" allocation ")
+		runtime.print_u64(u64(uintptr(bad_free.memory)))
+		runtime.print_string(" was freed badly\n")
 
 		defer i += 1
 		if i > ALLOCATOR_MAX_BACKTRACES {
 			continue
 		}
 
-		fmt.eprintln("[back trace]")
+		runtime.print_string("[back trace]\n")
 
 		trace, err := resolve(bad_free.backtrace, temp_allocator, temp_allocator)
 		if err != nil {
-			fmt.eprintfln("\tbacktrace error: %v", err)
+			runtime.print_string("\tbacktrace error: ")
+			runtime.print_string(resolve_err_string(err))
+			runtime.print_string("\n")
 			continue
 		}
 		defer locations_destroy(trace, temp_allocator)
 
 		print(trace)
 	}
+}
+
+@(rodata)
+_MEMORY_UNITS := [?]string{"b", "kib", "mib", "gib", "tib", "pib", "eib"}
+
+_print_memory :: proc(size: int) {
+	assert(size >= 0)
+
+	u := u64(size)
+	unit_idx := 0
+	div: u64 = 1
+	for u / div >= mem.Kilobyte && unit_idx < len(_MEMORY_UNITS) - 1 {
+		div *= mem.Kilobyte
+		unit_idx += 1
+	}
+
+	whole := u / div
+	rem   := u % div
+	frac  := (rem * 10 + div / 2) / div
+	if frac == 10 {
+		frac = 0
+		whole += 1
+		if whole == mem.Kilobyte && unit_idx < len(_MEMORY_UNITS) - 1 {
+			whole = 1
+			unit_idx += 1
+		}
+	}
+
+	runtime.print_u64(whole)
+	if frac != 0 {
+		runtime.print_byte('.')
+		runtime.print_byte(byte('0' + frac))
+	}
+	runtime.print_string(_MEMORY_UNITS[unit_idx])
 }

@@ -444,6 +444,19 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 			      expr_str,
 			      LIT(context_name));
 			rhs->mode = Addressing_Invalid;
+			return nullptr;
+		}
+		case Addressing_Builtin: {
+			// a builtin is not a value
+			gbString expr_str = expr_to_string(rhs->expr);
+			defer (gb_string_free(expr_str));
+
+			error(rhs->expr,
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+			rhs->mode = Addressing_Invalid;
+			return nullptr;
 		}
 		case Addressing_Invalid:
 			return nullptr;
@@ -833,10 +846,10 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 	}
 
 	case Entity_Variable: {
-		bool is_ptr = is_type_pointer(e->type);
+		bool is_ptr = is_type_pointer(e->type) || is_type_soa_pointer(e->type);
 		Type *t = base_type(type_deref(e->type));
 		if (t->kind == Type_Struct) {
-			wait_signal_until_available(&t->Struct.fields_wait_signal);
+			wait_for_record_signal(&t->Struct.fields_wait_signal, &t->Struct.checking_thread);
 
 			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
@@ -941,14 +954,17 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 			error(x.expr, "Expected a constant integer for #unroll, got '%s'", s);
 			gb_string_free(s);
 		} else {
-			ExactValue value = exact_value_to_integer(x.value);
-			i64 v = exact_value_to_i64(value);
-			if (v < 1) {
-				error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
-			} else {
-				unroll_count = v;
-				if (v > 1024) {
-					error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+			convert_to_typed(ctx, &x, t_int);
+			if (x.mode != Addressing_Invalid) {
+				ExactValue value = exact_value_to_integer(x.value);
+				i64 v = exact_value_to_i64(value);
+				if (v < 1) {
+					error(x.expr, "Expected a constant integer >= 1 for #unroll, got %lld", cast(long long)v);
+				} else {
+					unroll_count = v;
+					if (v > 1024) {
+						error(x.expr, "Too large of a value for #unroll, got %lld, expected <= 1024", cast(long long)v);
+					}
 				}
 			}
 
@@ -1134,9 +1150,9 @@ gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		if (ctx->inline_for_depth >= MAX_INLINE_FOR_DEPTH && prev_inline_for_depth < MAX_INLINE_FOR_DEPTH) {
 			ERROR_BLOCK();
 			if (prev_inline_for_depth > 0) {
-				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "Nested '#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			} else {
-				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", v, MAX_INLINE_FOR_DEPTH);
+				error(node, "'#unroll for' loop cannot be inlined as it exceeds the maximum '#unroll for' depth (%lld levels >= %lld maximum levels)", cast(long long)v, MAX_INLINE_FOR_DEPTH);
 			}
 			error_line("\tUse a normal 'for' loop instead by removing the 'inline' prefix\n");
 			ctx->inline_for_depth = MAX_INLINE_FOR_DEPTH;
@@ -1151,6 +1167,8 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
+	// Tagless switch cases are independent predicates, not case values.
+	bool check_duplicate_cases = ss->tag != nullptr;
 
 	mod_flags |= Stmt_BreakAllowed | Stmt_FallthroughAllowed;
 	check_open_scope(ctx, node);
@@ -1169,7 +1187,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	} else {
 		x.mode  = Addressing_Constant;
-		x.type  = t_bool;
+		x.type  = t_untyped_bool;
 		x.value = exact_value_bool(true);
 
 		Token token  = {};
@@ -1276,7 +1294,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				Operand b1 = rhs;
 				check_comparison(ctx, expr, &a1, &b1, Token_LtEq);
 
-				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				if (check_duplicate_cases) {
+					add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
+				}
 
 				if (is_type_string16(x.type)) {
 					// NOTE(bill): Force dependency for strings here
@@ -1295,6 +1315,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				} else {
 					check_expr_with_type_hint(ctx, &y, expr, x.type);
 				}
+				if (expr->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
+					error(expr, "Procedure calls that have an associated deferred procedure are not allowed within case clauses");
+				}
 
 				if (x.mode == Addressing_Invalid ||
 				    y.mode == Addressing_Invalid) {
@@ -1309,7 +1332,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					}
 					t = default_type(t);
 					add_type_info_type(ctx, t);
-					add_type_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_type_to_seen_map(ctx, &seen, y);
+					}
 				} else {
 					convert_to_typed(ctx, &y, x.type);
 					if (y.mode == Addressing_Invalid) {
@@ -1326,7 +1351,9 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 						continue;
 					}
 					update_untyped_expr_type(ctx, z.expr, x.type, !is_type_untyped(x.type));
-					add_to_seen_map(ctx, &seen, y);
+					if (check_duplicate_cases) {
+						add_to_seen_map(ctx, &seen, y);
+					}
 				}
 			}
 		}
@@ -1371,7 +1398,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1512,6 +1539,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		bool saw_nil = false;
 		// TODO(bill): Make robust
 		Type *bt = base_type(type_deref(x.type));
+		if (bt->kind == Type_Union) {
+			wait_for_record_signal(&bt->Union.variants_wait_signal, &bt->Union.checking_thread);
+		}
 
 		Type *case_type = nullptr;
 		for (Ast *type_expr : cc->list) {
@@ -1647,7 +1677,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 	}
 
-	if (build_context.strict_style) {
+	if (is_strict_style(node->thread_safe_file())) {
 		Token stok = ss->token;
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -2079,6 +2109,11 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_addressed) {
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
+						if (analysis_in_use(AnalysisFlag_Atomic)) {
+							if (Entity *e = check_atomic_location(expr)) {
+								per_thread_array_add(&ctx->info->checked_addresses_queue, CheckedAddress{node, e});
+							}
+						}
 					} else {
 						char const *idx_name = is_map ? "key" : (is_bit_set || i == 0) ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
@@ -2257,6 +2292,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (ac.link_name.len > 0) {
 			e->Variable.link_name = ac.link_name;
 		}
+		e->Variable.custom_align = ac.align;
 
 		e->flags &= ~EntityFlag_Static;
 		if (ac.is_static) {
@@ -2325,23 +2361,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			}
 			init_entity_foreign_library(ctx, e);
 
-			auto *fp = &ctx->checker->info.foreigns;
-			StringHashKey key = string_hash_string(name);
-			Entity **found = string_map_get(fp, key);
-			if (found) {
-				Entity *f = *found;
-				TokenPos pos = f->token.pos;
-				Type *this_type = base_type(e->type);
-				Type *other_type = base_type(f->type);
-				if (!signature_parameter_similar_enough(this_type, other_type)) {
-					error(e->token,
-					      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-					      "\tat %s",
-					      LIT(name), token_pos_to_string(pos));
-				}
-			} else {
-				string_map_set(fp, key, e);
-			}
+			add_link_name_use(ctx->info, name, e, ctx->decl, LinkNameUse_Variable);
 		} else if (e->flags & EntityFlag_Static) {
 			if (vd->values.count > 0) {
 				if (entity_count != vd->values.count) {
@@ -2498,7 +2518,7 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 			{
 				gbString lhs = expr_to_string(be->left);
 				gbString rhs = expr_to_string(be->right);
-				error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
+				error_line("\tSuggestion: Did you mean to do an assignment?\n");
 				error_line("\t            '%s = %s;'\n", lhs, rhs);
 				gb_string_free(rhs);
 				gb_string_free(lhs);
@@ -2619,10 +2639,8 @@ gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-// NOTE(bill): This is very basic escape analysis
-// This needs to be improved tremendously, and a lot of it done during the
-// middle-end (or LLVM side) to improve checks and error messages
-void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
+// returning stack memory made by the returned expression itself, where the escape analysis is disabled
+gb_internal void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 	auto const unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
 		gbString s = expr_to_string(o.expr);
 		if (extra_type) {
@@ -2755,6 +2773,9 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		}
 	}
 
+	if (ast_file_analysis(node->file(), AnalysisFlag_Escape)) {
+		return;
+	}
 	for (Operand &o : operands) {
 		if (o.expr == nullptr) {
 			continue;
@@ -2773,7 +2794,6 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 
 		check_unsafe_return(o, o.type, expr);
 	}
-
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {

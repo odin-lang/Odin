@@ -1724,6 +1724,8 @@ NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
 NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
 NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
 
+// Pointer to a double-null-terminated string.
+// Special care must be taken when converting to this type.
 PCZZWSTR :: cstring16
 
 SHFILEOPSTRUCTW :: struct {
@@ -2247,7 +2249,7 @@ SEE_MASK_WAITFORINPUTIDLE  :: 0x02000000
 SEE_MASK_FLAG_LOG_USAGE    :: 0x04000000
 
 // When SEE_MASK_FLAG_HINST_IS_SITE is specified SHELLEXECUTEINFO.hInstApp is used as an
-// _In_ parameter and specifies a IUnknown* to be used as a site pointer. The site pointer
+// `_In_` parameter and specifies a `IUnknown*` to be used as a site pointer. The site pointer
 // is used to provide services to shell execute, the handler binding process and the verb handlers
 // once they are invoked.
 SEE_MASK_FLAG_HINST_IS_SITE :: 0x08000000
@@ -2963,10 +2965,10 @@ FILE_END_OF_FILE_INFO :: struct {
 }
 
 FILE_NOTIFY_INFORMATION :: struct {
-	next_entry_offset: DWORD,
-	action:            DWORD,
-	file_name_length:  DWORD,
-	file_name:         [1]WCHAR,
+	NextEntryOffset: DWORD,
+	Action:          DWORD,
+	FileNameLength:  DWORD,
+	FileName:        [1]WCHAR,
 }
 
 REPARSE_DATA_BUFFER :: struct {
@@ -4302,7 +4304,7 @@ SHCONTF_ENABLE_ASYNC          :: 0x8000
 SHCONTF_INCLUDESUPERHIDDEN    :: 0x10000
 
 SHACF_DEFAULT               :: 0x00000000  // Currently (SHACF_FILESYSTEM | SHACF_URLALL)
-SHACF_FILESYSTEM            :: 0x00000001  // This includes the File System as well as the rest of the shell (Desktop\My Computer\Control Panel\)
+SHACF_FILESYSTEM            :: 0x00000001  // This includes the File System as well as the rest of the shell (`Desktop\My Computer\Control Panel\`)
 SHACF_URLALL                :: (SHACF_URLHISTORY | SHACF_URLMRU)
 SHACF_URLHISTORY            :: 0x00000002  // URLs in the User's History
 SHACF_URLMRU                :: 0x00000004  // URLs in the User's Recently Used list.
@@ -5479,10 +5481,9 @@ CRYPT_DIGEST_BLOB   :: distinct CRYPTOAPI_BLOB
 CRYPT_DER_BLOB      :: distinct CRYPTOAPI_BLOB
 CRYPT_ATTR_BLOB     :: distinct CRYPTOAPI_BLOB
 
-//+-------------------------------------------------------------------------
 //  In a CRYPT_BIT_BLOB the last byte may contain 0-7 unused bits. Therefore, the
 //  overall bit length is cbData * 8 - cUnusedBits.
-//--------------------------------------------------------------------------
+//
 // certenrolls_begin -- CERT_CONTEXT
 CRYPT_BIT_BLOB :: struct {
 	cbData:      DWORD,
@@ -5490,12 +5491,10 @@ CRYPT_BIT_BLOB :: struct {
 	cUnusedBits: DWORD,
 }
 
-//+-------------------------------------------------------------------------
 //  Type used for any algorithm
 //
 //  Where the Parameters CRYPT_OBJID_BLOB is in its encoded representation. For most
 //  algorithm types, the Parameters CRYPT_OBJID_BLOB is NULL (Parameters.cbData = 0).
-//--------------------------------------------------------------------------
 CRYPT_ALGORITHM_IDENTIFIER :: struct {
 	pszObjId:   LPSTR,
 	Parameters: CRYPT_OBJID_BLOB,

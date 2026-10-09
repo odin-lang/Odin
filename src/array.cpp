@@ -94,6 +94,19 @@ gb_internal Slice<T> slice_make(gbAllocator const &allocator, isize count) {
 	return s;
 }
 
+
+template <typename T>
+gb_internal Slice<T> slice_make_aligned(gbAllocator const &allocator, isize count, isize alignment) {
+	GB_ASSERT(count >= 0);
+	Slice<T> s = {};
+	s.data  = cast(T *)gb_alloc_align(allocator, count*gb_size_of(T), alignment);
+	if (count > 0) {
+		GB_ASSERT(s.data != nullptr);
+	}
+	s.count = count;
+	return s;
+}
+
 template <typename T>
 gb_internal void slice_init(Slice<T> *s, gbAllocator const &allocator, isize count) {
 	GB_ASSERT(count >= 0);
@@ -186,6 +199,20 @@ gb_internal gb_inline Slice<T> slice(Array<T> const &array, isize lo, isize hi) 
 	}
 	return out;
 }
+
+template <typename T>
+gb_internal gb_inline Slice<T> slice_lower_and_count(Slice<T> const &array, isize lo, isize count) {
+	GB_ASSERT(0 <= lo);
+	GB_ASSERT(0 <= count);
+	GB_ASSERT((array.count-lo) <= count);
+	Slice<T> out = {};
+	if (count > 0) {
+		out.data = array.data+lo;
+		out.count = count;
+	}
+	return out;
+}
+
 
 
 template <typename T>

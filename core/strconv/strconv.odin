@@ -93,7 +93,7 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -103,16 +103,24 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 		if v >= i64(base) {
 			break
 		}
-		value *= i64(base)
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i64) is accepted.
+			if value < (min(i64) + v)/i64(base) {
+				break
+			}
+			value = value*i64(base) - v
+		} else {
+			if value > (max(i64) - v)/i64(base) {
+				break
+			}
+			value = value*i64(base) + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -174,7 +182,7 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -184,16 +192,24 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i64) is accepted.
+			if value < (min(i64) + v)/base {
+				break
+			}
+			value = value*base - v
+		} else {
+			if value > (max(i64) - v)/base {
+				break
+			}
+			value = value*base + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -240,7 +256,7 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		s = s[1:]
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -250,13 +266,17 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 		if v >= u64(base) {
 			break
 		}
-		value *= u64(base)
-		value += v
+		if value > (max(u64) - v)/u64(base) {
+			break
+		}
+		value = value*u64(base) + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -313,7 +333,7 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		}
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -323,13 +343,17 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if value > (max(u64) - v)/base {
+			break
+		}
+		value = value*base + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -376,6 +400,7 @@ parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool)
 	case:    v, ok = parse_i64_of_base(s, base, n)
 	}
 	value = int(v)
+	ok = ok && i64(value) == v
 	return
 }
 /*
@@ -421,6 +446,7 @@ parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: boo
 	case:    v, ok = parse_u64_of_base(s, base, n)
 	}
 	value = uint(v)
+	ok = ok && u64(value) == v
 	return
 }
 /*
@@ -469,7 +495,7 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -479,16 +505,24 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 		if v >= i128(base) {
 			break
 		}
-		value *= i128(base)
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i128) is accepted.
+			if value < (min(i128) + v)/i128(base) {
+				break
+			}
+			value = value*i128(base) - v
+		} else {
+			if value > (max(i128) - v)/i128(base) {
+				break
+			}
+			value = value*i128(base) + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -550,7 +584,7 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 	}
 
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -560,16 +594,24 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if neg {
+			// Accumulate negatively so that min(i128) is accepted.
+			if value < (min(i128) + v)/base {
+				break
+			}
+			value = value*base - v
+		} else {
+			if value > (max(i128) - v)/base {
+				break
+			}
+			value = value*base + v
+		}
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
-
-	if neg {
-		value = -value
-	}
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -615,7 +657,7 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		s = s[1:]
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -625,13 +667,17 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 		if v >= u128(base) {
 			break
 		}
-		value *= u128(base)
-		value += v
+		if value > (max(u128) - v)/u128(base) {
+			break
+		}
+		value = value*u128(base) + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 /*
@@ -685,7 +731,7 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		}
 	}
 
-	i := 0
+	i, digits := 0, 0
 	for r in s {
 		if r == '_' {
 			i += 1
@@ -695,13 +741,17 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 		if v >= base {
 			break
 		}
-		value *= base
-		value += v
+		if value > (max(u128) - v)/base {
+			break
+		}
+		value = value*base + v
 		i += 1
+		digits += 1
 	}
 	s = s[i:]
 
-	ok = len(s) == 0
+	// Underscores are only separators; at least one digit is required.
+	ok = len(s) == 0 && digits > 0
 	return
 }
 //
@@ -746,9 +796,13 @@ Output:
 - ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
 parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
-	v: f64 = ---
-	v, ok = parse_f64(s, n)
-	return f32(v), ok
+	nr: int
+	value, nr, ok = parse_f32_prefix(s)
+	if ok && len(s) != nr {
+		ok = false
+	}
+	if n != nil { n^ = nr }
+	return
 }
 /*
 Parses a 64-bit floating point number from a string
@@ -817,10 +871,7 @@ Output:
 - ok: A boolean indicating whether the parsing was successful.
 */
 parse_f32_prefix :: proc(str: string) -> (value: f32, nr: int, ok: bool) {
-	f: f64
-	f, nr, ok = parse_f64_prefix(str)
-	value = f32(f)
-	return
+	return parse_float_prefix_generic(f32, str)
 }
 /*
 Parses a 64-bit floating point number from a string and returns the parsed number, the length of the parsed substring, and a boolean indicating whether the parsing was successful
@@ -855,6 +906,11 @@ Output:
 - ok: `false` if a base 10 float could not be found
 */
 parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
+	return parse_float_prefix_generic(f64, str)
+}
+
+// Parses directly to `T`, so the result is correctly rounded for both `f32` and `f64`.
+parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: int, ok: bool) where T == f32 || T == f64 {
 	common_prefix_len_ignore_case :: proc "contextless" (s, prefix: string) -> int {
 		n := len(prefix)
 		if n > len(s) {
@@ -909,279 +965,163 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		}
 		return
 	}
-	parse_components :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, neg, trunc, hex: bool, i: int, ok: bool) {
-		if len(s) == 0 {
-			return
-		}
-		switch s[i] {
-		case '+': i += 1
-		case '-': i += 1; neg = true
-		}
 
-		base := u64(10)
-		MAX_MANT_DIGITS := 19
-		exp_char := byte('e')
-		// support stupid 0x1.ABp100 hex floats even if Odin doesn't
-		if i+2 < len(s) && s[i] == '0' && lower(s[i+1]) == 'x' {
-			base = 16
-			MAX_MANT_DIGITS = 16
-			i += 2
-			exp_char = 'p'
-			hex = true
-		}
-
-		underscores := false
-		saw_dot, saw_digits := false, false
-		nd := 0
-		nd_mant := 0
-		decimal_point := 0
-		trailing_zeroes_nd := -1
-		loop: for ; i < len(s); i += 1 {
-			switch c := s[i]; true {
-			case c == '_':
-				underscores = true
-				continue loop
-			case c == '.':
-				if saw_dot {
-					break loop
-				}
-				saw_dot = true
-				decimal_point = nd
-				continue loop
-
-			case '0' <= c && c <= '9':
-				saw_digits = true
-				if c == '0' {
-					if nd == 0 {
-						decimal_point -= 1
-						continue loop
-					}
-					if trailing_zeroes_nd == -1 {
-						trailing_zeroes_nd = nd
-					}
-				} else {
-					trailing_zeroes_nd = -1
-				}
-				nd += 1
-				if nd_mant < MAX_MANT_DIGITS {
-					mantissa *= base
-					mantissa += u64(c - '0')
-					nd_mant += 1
-				} else if c != '0' {
-					trunc = true
-				}
-				continue loop
-			case base == 16 && 'a' <= lower(c) && lower(c) <= 'f':
-				saw_digits = true
-				nd += 1
-				if nd_mant < MAX_MANT_DIGITS {
-					mantissa *= 16
-					mantissa += u64(lower(c) - 'a' + 10)
-					nd_mant += 1
-				} else {
-					trunc = true
-				}
-				continue loop
-			}
-			break loop
-		}
-
-		if !saw_digits {
-			return
-		}
-		if !saw_dot {
-			decimal_point = nd
-		}
-		if trailing_zeroes_nd > 0 {
-			trailing_zeroes_nd = nd_mant - trailing_zeroes_nd
-		}
-		for /**/; trailing_zeroes_nd > 0; trailing_zeroes_nd -= 1 {
-			mantissa /= base
-			nd_mant -= 1
-			nd -= 1
-		}
-		if base == 16 {
-			decimal_point *= 4
-			nd_mant *= 4
-		}
-
-		if i < len(s) && lower(s[i]) == exp_char {
-			i += 1
-			if i >= len(s) { return }
-			exp_sign := 1
-			switch s[i] {
-			case '+': i += 1
-			case '-': i += 1; exp_sign = -1
-			}
-			if i >= len(s) || s[i] < '0' || s[i] > '9' {
-				return
-			}
-			e := 0
-			for ; i < len(s) && ('0' <= s[i] && s[i] <= '9' || s[i] == '_'); i += 1 {
-				if s[i] == '_' {
-					underscores = true
-					continue
-				}
-				if e < 1e5 {
-					e = e*10 + int(s[i]) - '0'
-				}
-			}
-			decimal_point += e * exp_sign
-		} else if base == 16 {
-			return
-		}
-
-		if mantissa != 0 {
-			exp = decimal_point - nd_mant
-		}
-		ok = true
-		return
-	}
-
-	parse_hex :: proc "contextless" (s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
-		info := &_f64_info
-
-		mantissa, exp := mantissa, exp
-
-		MAX_EXP := 1<<info.expbits + info.bias - 2
-		MIN_EXP := info.bias + 1
-		exp += int(info.mantbits)
-
-		for mantissa != 0 && mantissa >> (info.mantbits+2) == 0 {
-			mantissa <<= 1
-			exp -= 1
-		}
-		if trunc {
-			mantissa |= 1
-		}
-
-		for mantissa != 0 && mantissa >> (info.mantbits+2) == 0 {
-			mantissa = mantissa>>1 | mantissa&1
-			exp += 1
-		}
-
-		// denormalize
-		if mantissa > 1 && exp < MIN_EXP-2 {
-			mantissa = mantissa>>1 | mantissa&1
-			exp += 1
-		}
-
-		round := mantissa & 3
-		mantissa >>= 2
-		round |= mantissa & 1 // round to even
-		exp += 2
-		if round == 3 {
-			mantissa += 1
-			if mantissa == 1 << (1 + info.mantbits) {
-				mantissa >>= 1
-				exp += 1
-			}
-		}
-		if mantissa>>info.mantbits == 0 {
-			// zero or denormal
-			exp = info.bias
-		}
-
-		ok := true
-		if exp > MAX_EXP {
-			// infinity or invalid
-			mantissa = 1<<info.mantbits
-			exp = MAX_EXP + 1
-			ok = false
-		}
-
-		bits := mantissa & (1<<info.mantbits - 1)
-		bits |= u64((exp-info.bias) & (1<<info.expbits - 1)) << info.mantbits
-		if neg {
-			bits |= 1 << info.mantbits << info.expbits
-		}
-		return transmute(f64)bits, ok
-	}
-
-	if len(str) > 2 && str[0] == '0' && str[1] == 'h' {
-		nr = 2
-
+	// 0h string to float case
+	@(cold)
+	parse_0h :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
 		as_int: u64
 		digits: int
-		for r in str[2:] {
-			if r == '_' {
-				nr += 1
-				continue
-			}
-			v := u64(_digit_value(r))
-			if v >= 16 {
+		i := 2
+		// Read 8 hex digits at a time, then 4 digits at a time (like "0h3c00" or groups
+		// between `_` separators), then single digits and `_` separators.
+		for i+8 <= len(str) {
+			v := read8_to_u64(str, i)
+			if !is_eight_hex_digits(v) {
 				break
 			}
-			as_int *= 16
-			as_int += v
-			digits += 1
+			as_int = as_int<<32 | parse_eight_hex_digits(v)
+			digits += 8
+			i += 8
 		}
-		nr += digits
+		for i < len(str) {
+			if i+4 <= len(str) {
+				// Four digits: pad them with "0000" and use the 8-digit code.
+				v := u64(read4_to_u32(str, i)) | 0x3030_3030 << 32
+				if is_eight_hex_digits(v) {
+					as_int = as_int<<16 | parse_eight_hex_digits(v) >> 16
+					digits += 4
+					i += 4
+					continue
+				}
+			}
+			if str[i] != '_' {
+				v := hex_digit_table[str[i]]
+				if v >= 16 {
+					break
+				}
+				as_int = as_int<<4 | u64(v)
+				digits += 1
+			}
+			i += 1
+		}
+		nr = i
 		ok = len(str) == nr
 
 		switch digits {
 		case 4:
-			value = cast(f64)transmute(f16)cast(u16)as_int
+			value = cast(F)transmute(f16)cast(u16)as_int
 		case 8:
-			value = cast(f64)transmute(f32)cast(u32)as_int
+			value = cast(F)transmute(f32)cast(u32)as_int
 		case 16:
-			value = transmute(f64)as_int
+			value = cast(F)transmute(f64)as_int
 		case:
 			ok = false
 		}
 		return
 	}
 
-	if value, nr, ok = check_special(str); ok {
-		return
+	@(cold)
+	parse_special :: proc "contextless" ($F: typeid, str: string) -> (value: F, nr: int, ok: bool) {
+		f: f64
+		f, nr, ok = check_special(str)
+		return F(f), nr, ok
+	}
+
+	@(cold)
+	parse_slow :: proc($F: typeid, str: string, info: ^Float_Info) -> (value: F, ok: bool) {
+		when F == f64 { Bits :: u64 } else { Bits :: u32 }
+		d: decimal.Decimal
+		decimal.set(&d, str)
+		b, overflow := decimal_to_float_bits(&d, info)
+		return transmute(F)Bits(b), !overflow
+	}
+
+	if len(str) > 2 && str[0] == '0' && str[1] == 'h' {
+		return parse_0h(T, str)
+	}
+
+	when T == f64 {
+		Bits :: u64
+		info := &_f64_info
+	} else {
+		Bits :: u32
+		info := &_f32_info
 	}
 
 	mantissa: u64
 	exp:      int
-	neg, trunc, hex: bool
-	mantissa, exp, neg, trunc, hex, nr = parse_components(str) or_return
-
-	if hex {
-		value, ok = parse_hex(str, mantissa, exp, neg, trunc)
-		return
+	neg, trunc: bool
+	mantissa, exp, neg, trunc, nr, ok = parse_number_string(str)
+	if !ok {
+		// Not a decimal number: try a hexadecimal float, then "inf" and "nan".
+		mantissa, exp, neg, trunc, nr, ok = scan_hex_float(str)
+		if !ok {
+			return parse_special(T, str)
+		}
+		b, in_range := hex_float_bits(mantissa, exp, neg, trunc, info)
+		return transmute(T)Bits(b), nr, in_range
 	}
 
-	trunc_block: if !trunc {
+	// Clinger's fast path algorithm
+	clinger_fast_path: if !trunc && !(ODIN_ARCH == .i386 && ODIN_OS != .Windows) {
 		@(static, rodata) pow10 := [?]f64{
 			1e0,  1e1,  1e2,  1e3,  1e4,  1e5,  1e6,  1e7,  1e8,  1e9,
 			1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
 			1e20, 1e21, 1e22,
 		}
 
-		if mantissa>>_f64_info.mantbits != 0 {
-			break trunc_block
+		// Every integer up to 2^53 is an exact f64 value.
+		if mantissa > 1<<53 {
+			break clinger_fast_path
 		}
 		f := f64(mantissa)
-		f_abs := f
+		switch {
+		case exp == 0:
+		case exp > 0 && exp <= 15+22:
+			e := exp
+			if e > 22 {
+				f *= pow10[e-22]
+				e = 22
+				if f > 1e15 {
+					break clinger_fast_path
+				}
+			}
+			f *= pow10[e]
+		case -22 <= exp && exp < 0:
+			f /= pow10[-exp]
+		case:
+			break clinger_fast_path
+		}
+		when T == f32 {
+			// Every f32 midpoint is an f64 value, so rounding to f64 cannot
+			// move the result past a midpoint. The conversion to f32 is then
+			// correct, unless the f64 result is exactly a midpoint.
+			if transmute(u64)f & (1<<29 - 1) == 1<<28 {
+				break clinger_fast_path
+			}
+		}
 		if neg {
 			f = -f
 		}
-		switch {
-		case exp == 0:
-			return f, nr, true
-		case exp > 0 && exp <= 15+22:
-			if exp > 22 {
-				f *= pow10[exp-22]
-				exp = 22
+		return T(f), nr, true
+	}
+
+	// Eisel-Lemire's fast float algorithm
+	when FAST_FLOAT {
+		fast_float: {
+			b := fast_float_compute_float(T, exp, mantissa)
+			if trunc && b != fast_float_compute_float(T, exp, mantissa+1) {
+				break fast_float
 			}
-			if f_abs > 1e15 || f_abs < 1e-15 {
-				break trunc_block
+			ok = b >> info.mantbits != 1<<info.expbits - 1 // infinity means overflow
+			if neg {
+				b |= 1 << info.mantbits << info.expbits
 			}
-			return f * pow10[exp], nr, true
-		case -22 <= exp && exp < 0:
-			return f / pow10[-exp], nr, true
+			return transmute(T)Bits(b), nr, ok
 		}
 	}
-	d: decimal.Decimal
-	decimal.set(&d, str[:nr])
-	b, overflow := decimal_to_float_bits(&d, &_f64_info)
-	value = transmute(f64)b
-	ok = !overflow
+
+	value, ok = parse_slow(T, str[:nr], info)
 	return
 }
 /*
@@ -1595,7 +1535,7 @@ Writes a quoted string representation of the input string to a given byte slice 
 - buf: The byte slice to which the quoted string will be written
 - str: The input string to be quoted
 
-!! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected
+!! ISSUE !! NOT EXPECTED -- `"\"hello\""` was expected
 
 Example:
 

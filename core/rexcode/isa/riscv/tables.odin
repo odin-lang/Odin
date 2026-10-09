@@ -30,35 +30,43 @@ Decode_Entry :: struct #packed {
 	bits:     u32,                 // 4
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
-	flags:    Encoding_Flags,      // 1
+	flags:    Encoding_Flags,      // 2
 }
-#assert(size_of(Decode_Entry) == 20)
+#assert(size_of(Decode_Entry) == 21)
 
 Decode_Index :: struct #packed {
 	start: u16,
 	count: u16,
 }
 #assert(size_of(Decode_Index) == 4)
-
 // -----------------------------------------------------------------------------
 // Loaded tables (rodata, embedded from tables/*.bin at compile time)
 // -----------------------------------------------------------------------------
 
-@(rodata) ENCODE_FORMS        := #load("tables/riscv.encode_forms.bin", []Encoding)
-@(rodata) ENCODE_RUNS         := #load("tables/riscv.encode_runs.bin",  []Encode_Run)
-@(rodata) DECODE_ENTRIES      := #load("tables/riscv.entries.bin",      []Decode_Entry)
-@(rodata) DECODE_INDEX_OPCODE := #load("tables/riscv.idx_opcode.bin",   []Decode_Index)
-@(rodata) DECODE_INDEX_OP_FP  := #load("tables/riscv.idx_op_fp.bin",    []Decode_Index)
-@(rodata) DECODE_INDEX_RVC    := #load("tables/riscv.idx_rvc.bin",      []Decode_Index)
+@(rodata) ENCODE_FORMS        := #load("tables/riscv.encode_forms.bin",  []Encoding)
+@(rodata) ENCODE_RUNS         := #load("tables/riscv.encode_runs.bin",   []Encode_Run)
+@(rodata) DECODE_ENTRIES      := #load("tables/riscv.entries.bin",       []Decode_Entry)
+@(rodata) DECODE_INDEX_OPCODE := #load("tables/riscv.idx_opcode.bin",    []Decode_Index)
+@(rodata) DECODE_INDEX_OP_FP  := #load("tables/riscv.idx_op_fp.bin",     []Decode_Index)
+@(rodata) DECODE_INDEX_RVC    := #load("tables/riscv.idx_rvc.bin",       []Decode_Index)
+@(rodata) CLOBBER_FORMS       := #load("tables/riscv.clobber_forms.bin", []Clobber)
 
 // -----------------------------------------------------------------------------
 // Accessors
 // -----------------------------------------------------------------------------
 
-// Per-mnemonic encode forms: the run of ENCODE_FORMS belonging to `m`.
+// Per-mnemonic encode forms: the run of ENCODE_FORMS belonging to ` + "`m`" + `.
 // Replaces the old ENCODING_TABLE[m] slice; the returned view is into rodata.
 @(private, require_results)
 encoding_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Encoding {
 	r := ENCODE_RUNS[u16(m)]
 	return ENCODE_FORMS[r.start:][:r.count]
+}
+
+// Per-mnemonic clobber forms: the run of CLOBBER_FORMS belonging to ` + "`m`" + `.
+// Replaces the old ENCODING_TABLE[m] slice; the returned view is into rodata.
+@(private, require_results)
+clobber_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Clobber {
+	r := ENCODE_RUNS[u16(m)]
+	return CLOBBER_FORMS[r.start:][:r.count]
 }

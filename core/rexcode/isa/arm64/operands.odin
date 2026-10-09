@@ -28,6 +28,17 @@ Operand_Kind :: enum u8 {
 	SHIFTED_REG,      // X reg + shift type + shift amount
 	EXTENDED_REG,     // X/W reg + extend + amount
 	COND,             // 4-bit condition code (EQ/NE/.../AL/NV)
+	ZA_SLICE,         // `za0h.b[w12, 0]` -- a row or column of an SME tile
+}
+
+// One slice of an SME accumulator tile: which tile, taken along the rows (h)
+// or the columns (v), addressed by one of W12..W15 plus a fixed offset.
+ZA_Slice :: bit_field u32 {
+	tile:     u8   | 4,
+	vertical: bool | 1,
+	ws:       u8   | 2,   // 0..3, meaning W12..W15
+	offset:   u8   | 4,
+	elem:     u8   | 5,   // the ZSHAPE_* code the tile is viewed at
 }
 
 Shift_Type :: enum u8 {
@@ -57,51 +68,67 @@ Address_Mode :: enum u8 {
 	LITERAL,          // PC-rel target (LDR literal)
 }
 
-// 16-byte memory operand: base + optional index + signed disp + addressing
-// metadata. Index is `NONE` for non-register-offset modes.
-Memory :: struct #packed {
-	base:    Register,     // 2
-	index:   Register,     // 2  (NONE for OFFSET/PRE/POST/LITERAL)
-	disp:    i32,          // 4  (signed; pre/post can be -256..255 unscaled,
-	                       //     OFFSET supports 0..32760 scaled via imm12*size)
-	extend:  Extend,       // 1  (for EXT_REG_OFFSET; UXTX otherwise)
-	shift:   u8,           // 1  (0..4 for register-offset / extended; or
-	                       //     shift amount for shifted-register operands
-	                       //     when reused there)
-	mode:    Address_Mode, // 1
-	_:       u8,           // 1
+// Memory operand packed into one word: base + optional index + signed disp +
+// addressing metadata. Index is `NONE` for non-register-offset modes.
+//
+// A bit_field rather than a struct because this sits in every Operand, so its
+// width is multiplied by four in every Instruction. Field syntax is unchanged
+// (`m.base`, `m.disp`) and composite literals still work, so this is invisible
+// to callers.
+//
+// Widths: registers get 16 bits. `Register` itself is a u32, but every class
+// legal in an address lives entirely in its low 16 bits -- only a system
+// register (class REG_SYS) carries field bits above them, and one is never a
+// valid base or index -- so the truncation is lossless and the NONE sentinel
+// (0xFFFF) round-trips. That leaves 23 bits for `disp` (+/-4.19M) against a
+// worst case of 65,520 -- LDR Q, [Xn, #imm12*16] -- the largest displacement
+// any A64 addressing mode can encode, so there is ~64x headroom.
+Memory :: bit_field u64 {
+	base:    Register     | 16,
+	index:   Register     | 16,  // NONE for OFFSET/PRE/POST/LITERAL
+	disp:    i32          | 23,
+	extend:  Extend       | 3,   // for EXT_REG_OFFSET; UXTX otherwise
+	shift:   u8           | 3,   // 0..4 for register-offset / extended
+	mode:    Address_Mode | 3,
+	// Full: 16 + 16 + 23 + 3 + 3 + 3 = 64.
 }
-#assert(size_of(Memory) == 12)
+#assert(size_of(Memory) == 8)
 
 Shifted_Reg :: struct #packed {
-	reg:    Register,    // 2
+	reg:    Register,    // 4
 	type:   Shift_Type,  // 1
 	amount: u8,          // 1  (0..63 for 64-bit; 0..31 for 32-bit)
 }
-#assert(size_of(Shifted_Reg) == 4)
+#assert(size_of(Shifted_Reg) == 6)
 
 Extended_Reg :: struct #packed {
-	reg:    Register,    // 2
+	reg:    Register,    // 4
 	extend: Extend,      // 1
 	amount: u8,          // 1  (0..4)
 }
-#assert(size_of(Extended_Reg) == 4)
+#assert(size_of(Extended_Reg) == 6)
 
-// 16-byte tagged operand. The union holds whichever payload matches `kind`.
+// 11-byte tagged operand. The union holds whichever payload matches `kind`.
 Operand :: struct #packed {
 	using _: struct #raw_union #packed {
-		reg:       Register,        // 2
-		mem:       Memory,          // 12
+		reg:       Register,        // 4
+		mem:       Memory,          // 8
 		immediate: i64,             // 8
 		relative:  i64,             // 8
-		shifted:   Shifted_Reg,     // 8
-		extended:  Extended_Reg,    // 8
+		shifted:   Shifted_Reg,     // 6
+		extended:  Extended_Reg,    // 6
 		cond:      u8,              // 1
-	}, // 12 total because of alignment
+		za:        ZA_Slice,        // 4
+	}, // 8 total -- the largest member wins
 	kind: Operand_Kind,                 // 1
 	size: u8,                           // 1 -- carried width info; meaning varies
+	// How many consecutive registers the syntax writes as a list, starting at
+	// `reg`: `{v0.16b, v1.16b}` is 2. Zero means the operand is a plain
+	// register. The count belongs to the instruction form rather than to the
+	// caller -- LD2 always names two -- so it comes from the encoding.
+	list_count: u8,                     // 1
 }
-#assert(size_of(Operand) == 14)
+#assert(size_of(Operand) == 11)
 
 // -----------------------------------------------------------------------------
 // Constructors -- generic
@@ -144,6 +171,52 @@ op_cond :: #force_inline proc "contextless" (c: Cond) -> Operand {
 	return Operand{cond = u8(c), kind = .COND, size = 1}
 }
 
+// A vector lane index. It is a plain immediate in the encoding, but it prints
+// glued to the register it indexes (`v2.s[3]`) rather than as a separate
+// operand, so it is marked to tell it apart from an immediate that really is
+// one -- EXT's byte index, for instance, is written `#3`.
+LANE_INDEX :: u8(0xFF)
+
+// SVE writes its element-count pattern by name (`vl8`, `mul3`, `all`) and its
+// multiplier as `mul #N`, so both need telling apart from a plain immediate.
+SVE_PATTERN_IMM :: u8(0xFE)
+SVE_MUL_IMM     :: u8(0xFD)
+
+// ZERO's operand is an 8-bit mask, one bit per .d tile, written as the list of
+// the largest tiles that exactly cover it: a .s tile is two .d tiles four
+// apart, a .h tile is four two apart, and the single .b tile is all eight.
+ZA_TILE_MASK :: u8(0xFC)
+
+// The 32 SVE element-count patterns; the gaps are reserved and print as a
+// bare number.
+@(rodata)
+SVE_PATTERN_NAMES := [32]string{
+	"pow2", "vl1", "vl2", "vl3", "vl4", "vl5", "vl6", "vl7",
+	"vl8", "vl16", "vl32", "vl64", "vl128", "vl256", "", "",
+	"", "", "", "", "", "", "", "",
+	"", "", "", "", "", "mul4", "mul3", "all",
+}
+
+@(require_results)
+op_lane_index :: #force_inline proc "contextless" (index: i64) -> Operand {
+	return Operand{immediate = index, kind = .IMMEDIATE, size = LANE_INDEX}
+}
+
+// A system register operand -- op_reg with the intent in the name, kept so
+// MRS/MSR call sites read as what they are.
+@(require_results)
+op_sysreg :: #force_inline proc "contextless" (sr: Register) -> Operand {
+	return op_reg(sr)
+}
+
+@(require_results)
+op_za_slice :: #force_inline proc "contextless" (tile, ws, offset, elem: u8, vertical := false) -> Operand {
+	return Operand{
+		za   = ZA_Slice{tile = tile, vertical = vertical, ws = ws, offset = offset, elem = elem},
+		kind = .ZA_SLICE, size = elem,
+	}
+}
+
 // -----------------------------------------------------------------------------
 // SVE Z-register builders -- encode the element arrangement in op.size
 // (B=1, H=2, S=4, D=8). Matcher uses op.size to disambiguate the right
@@ -167,8 +240,96 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 	return Operand{reg = Register(REG_Z | u16(n & 0x1F)), kind = .REGISTER, size = 8}
 }
 
+// SVE packs an element size and a shift amount into one field, `tszh:tszl:imm3`,
+// as `V = 2*esize - shift`. Because the shift is in [1, esize], V lands in
+// [esize, 2*esize), so the four element sizes occupy disjoint ranges and the
+// position of the highest set bit names the size:
+//
+//   .b  V in [ 8,  15]     .s  V in [32,  63]
+//   .h  V in [16,  31]     .d  V in [64, 127]
+//
+// Encoder and decoder both need this, and it is written once here so the two
+// cannot drift apart.
+
+// The element width, in bits, that a packed tsz value names.
+@(require_results)
+sve_tsz_esize :: #force_inline proc "contextless" (v: u32) -> u32 {
+	switch {
+	case v >= 64: return 64
+	case v >= 32: return 32
+	case v >= 16: return 16
+	}
+	return 8
+}
+
+// The shift amount a packed tsz value names.
+@(require_results)
+sve_tsz_shift :: #force_inline proc "contextless" (v: u32) -> u32 {
+	return 2 * sve_tsz_esize(v) - v
+}
+
+// The packed tsz value for an element width and shift.
+@(require_results)
+sve_tsz_pack :: #force_inline proc "contextless" (esize, shift: u32) -> u32 {
+	return (2 * esize - shift) & 0x7F
+}
+
+// The SVE element-width code (the `size` an operand carries) for a width in
+// bits: .b = 1, .h = 2, .s = 4, .d = 8.
+@(require_results)
+sve_esize_code :: #force_inline proc "contextless" (esize: u32) -> u8 {
+	return u8(esize / 8)
+}
+
+// A predicate register's governing qualifier, carried in Operand.size and read
+// only when the register's class is REG_P. SVE writes it as a suffix -- `p0/z`
+// zeroes the inactive lanes, `p0/m` leaves them alone -- and an assembler will
+// not take the instruction without it where the form calls for one.
+PQUAL_ZERO  :: u8(1)
+PQUAL_MERGE :: u8(2)
+PQUAL_NONE  :: u8(4)
+
+// A predicate that is an instruction's DESTINATION is written with an element
+// size instead -- `cmpge p0.b, p1/z, ...` -- so those codes have to live apart
+// from the qualifiers above, and apart from the neutral 4 a plain op_reg gives.
+PSHAPE_B :: u8(20)
+PSHAPE_H :: u8(21)
+PSHAPE_S :: u8(22)
+PSHAPE_D :: u8(23)
+
+// Arrangement codes carried in Operand.size. Element views are odd and
+// arrangements are multiples of 8, so the two can never be confused; 4 is the
+// neutral "no vector shape" value every scalar class uses.
+VSHAPE_NONE :: u8(4)
+VSHAPE_8B   :: u8(8)
+VSHAPE_16B  :: u8(16)
+VSHAPE_4H   :: u8(24)
+VSHAPE_8H   :: u8(32)
+VSHAPE_2S   :: u8(40)
+VSHAPE_4S   :: u8(48)
+VSHAPE_1D   :: u8(56)
+VSHAPE_2D   :: u8(64)
+VSHAPE_1Q   :: u8(72)
+VSHAPE_ELEM_B :: u8(1)
+VSHAPE_ELEM_H :: u8(3)
+VSHAPE_ELEM_S :: u8(5)
+VSHAPE_ELEM_D :: u8(7)
+
+// SVE element-width codes carried in Operand.size for a Z register.
+ZSHAPE_B :: u8(1)
+ZSHAPE_H :: u8(2)
+ZSHAPE_S :: u8(4)
+ZSHAPE_D :: u8(8)
+ZSHAPE_Q :: u8(16)
+
 // -----------------------------------------------------------------------------
-// NEON V-register arrangement builders -- op.size encodes lanes*elem-bytes:
+// NEON V-register arrangement builders. These take the register the caller
+// actually has, not its number: rebuilding one from `reg_hw` would relabel an
+// X register as a V register, and the matcher -- which checks reg_class --
+// would never get to reject it. Passing a non-V register here now simply
+// matches no form, and encode reports it.
+//
+// op.size encodes lanes*elem-bytes:
 //   .8B  = 8     .16B = 16
 //   .4H  = 24    .8H  = 32
 //   .2S  = 40    .4S  = 48
@@ -178,56 +339,73 @@ op_z_d :: #force_inline proc "contextless" (n: u8) -> Operand {
 // -----------------------------------------------------------------------------
 
 @(require_results)
-op_v_8b  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 8}
+op_v_8b  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 8}
 }
 @(require_results)
-op_v_16b :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 16}
+op_v_16b :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 16}
 }
 @(require_results)
-op_v_4h  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 24}
+op_v_4h  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 24}
 }
 @(require_results)
-op_v_8h  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 32}
+op_v_8h  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 32}
 }
 @(require_results)
-op_v_2s  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 40}
+op_v_2s  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 40}
 }
 @(require_results)
-op_v_4s  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 48}
+op_v_4s  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 48}
 }
 @(require_results)
-op_v_1d  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 56}
+op_v_1d  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 56}
 }
 @(require_results)
-op_v_2d  :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 64}
+op_v_2d  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 64}
+}
+// .1q breaks the lanes*elem-bytes rule the others follow (1*16 would collide
+// with 16B), so it gets the next free multiple of 8.
+@(require_results)
+op_v_1q  :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 72}
+}
+// A run of `count` consecutive registers written as a list, `{v0.16b, v1.16b}`.
+// `shape` is one of the VSHAPE_* codes.
+@(require_results)
+op_v_list :: #force_inline proc "contextless" (first: Register, shape, count: u8) -> Operand {
+	return Operand{reg = first, kind = .REGISTER, size = shape, list_count = count}
 }
 
 // Element-indexed V views (V0.B[i]/.H[i]/.S[i]/.D[i]). The element size rides
-// in op.size (1/2/4/8) so the matcher can disambiguate DUP/INS forms; the lane
-// index is a separate immediate operand.
+// in op.size so the matcher can disambiguate DUP/INS forms; the lane index is
+// a separate immediate operand.
+//
+// The codes are ODD (1/3/5/7) on purpose: arrangement operands above use
+// multiples of 8, so a size can never mean both. They used to be 1/2/4/8,
+// which made an element-D view indistinguishable from an 8B arrangement --
+// the printer cannot tell `.d` from `.8b` if both are size 8.
 @(require_results)
-op_v_elem_b :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 1}
+op_v_elem_b :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 1}
 }
 @(require_results)
-op_v_elem_h :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 2}
+op_v_elem_h :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 3}
 }
 @(require_results)
-op_v_elem_s :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 4}
+op_v_elem_s :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 5}
 }
 @(require_results)
-op_v_elem_d :: #force_inline proc "contextless" (n: u8) -> Operand {
-	return Operand{reg = Register(REG_V | u16(n & 0x1F)), kind = .REGISTER, size = 8}
+op_v_elem_d :: #force_inline proc "contextless" (r: Register) -> Operand {
+	return Operand{reg = r, kind = .REGISTER, size = 7}
 }
 
 // -----------------------------------------------------------------------------

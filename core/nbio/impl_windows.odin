@@ -19,6 +19,38 @@ import win "core:sys/windows"
 @(private="package")
 _FULLY_SUPPORTED :: true
 
+// Poll is driven by AFD, the socket driver underneath winsock.
+// `WSAEventSelect` is edge triggered (`FD_WRITE` is only recorded again after a
+// send fails with WOULDBLOCK) and neither `select` nor `WSAPoll` reports send
+// buffer space, so neither can give the level triggered readiness `poll` promises.
+// AFD also completes on the IOCP, which makes a poll an ordinary overlapped operation.
+IOCTL_AFD_POLL :: 0x00012024
+SIO_BASE_HANDLE :: win.DWORD(0x48000022)
+
+AFD_POLL_RECEIVE           :: 0x0001
+AFD_POLL_RECEIVE_EXPEDITED :: 0x0002
+AFD_POLL_SEND              :: 0x0004
+AFD_POLL_DISCONNECT        :: 0x0008
+AFD_POLL_ABORT             :: 0x0010
+AFD_POLL_LOCAL_CLOSE       :: 0x0020
+AFD_POLL_ACCEPT            :: 0x0080
+AFD_POLL_CONNECT_FAIL      :: 0x0100
+
+AFD_Poll_Handle_Info :: struct {
+	handle: win.HANDLE,
+	events: win.ULONG,
+	status: win.NTSTATUS,
+}
+
+AFD_Poll_Info :: struct {
+	timeout:           i64,
+	number_of_handles: win.ULONG,
+	exclusive:         win.ULONG,
+	handles:           [1]AFD_Poll_Handle_Info,
+}
+
+afd_device_name := [?]u16{'\\','D','e','v','i','c','e','\\','A','f','d','\\','E','n','d','p','o','i','n','t'}
+
 @(private="package")
 _Event_Loop :: struct {
 	timeouts:      avl.Tree(^Operation),
@@ -88,7 +120,7 @@ _Timeout :: struct {
 
 @(private="package")
 _Poll :: struct {
-	wait_handle: win.HANDLE,
+	info: AFD_Poll_Info,
 }
 
 @(private="package")
@@ -165,15 +197,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 
 	if pool.num_outstanding(&l.operation_pool) == 0 { return nil }
 
-	actual_timeout := win.INFINITE
-	if queue.len(l.completed) > 0 || mpsc_count(&l.completed_oob) > 0 {
-		actual_timeout = 0
-	} else if timeout >= 0 {
-		actual_timeout = win.DWORD(timeout / time.Millisecond)
-	}
-	if nt, ok := next_timeout.?; ok {
-		actual_timeout = min(actual_timeout, win.DWORD(nt / time.Millisecond))
-	}
+	actual_timeout := compute_timeout(l, timeout, next_timeout)
 
 	if actual_timeout > 0 {
 		sync.atomic_store_explicit(&l.state, .Sleeping, .Release)
@@ -181,7 +205,6 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 		// There could be a race condition where we go sleeping at the same time as things get queued
 		// and a wakeup isn't done because the state is not .Sleeping yet.
 		// So after sleeping we first check our queues.
-
 		for {
 			op := (^Operation)(mpsc_dequeue(&l.queue))
 			if op == nil { break }
@@ -193,6 +216,10 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 			if op == nil { break }
 			handle_completed(op)
 		}
+
+		// The drains can add timeouts, and `timeout_exec` only puts those in
+		// `l.timeouts` without posting anything
+		actual_timeout = compute_timeout(l, timeout, check_timeouts(l))
 	}
 
 	for {
@@ -228,7 +255,7 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 				handle_completed(op)
 			} else {
 				op_l := op.l
-				for !mpsc_enqueue(&op.l.completed_oob, op) {
+				for !mpsc_enqueue(&op_l.completed_oob, op) {
 					warn("oob queue filled up, QUEUE_SIZE may need increasing")
 					_wake_up(op_l)
 					win.SwitchToThread()
@@ -246,7 +273,34 @@ __tick :: proc(l: ^Event_Loop, timeout: time.Duration) -> (err: General_Error) {
 		actual_timeout = 0
 	}
 
+	// A wake, or another loop routing a completion to us, can leave work queued.
+	// Handle it here instead of waiting for the caller to tick again.
+	for {
+		op := (^Operation)(mpsc_dequeue(&l.queue))
+		if op == nil { break }
+		_exec(op)
+	}
+
+	for {
+		op := (^Operation)(mpsc_dequeue(&l.completed_oob))
+		if op == nil { break }
+		handle_completed(op)
+	}
+
 	return nil
+
+	compute_timeout :: proc(l: ^Event_Loop, timeout: time.Duration, next_timeout: Maybe(time.Duration)) -> win.DWORD {
+		actual: win.DWORD = win.INFINITE
+		if queue.len(l.completed) > 0 || mpsc_count(&l.completed_oob) > 0 {
+			actual = 0
+		} else if timeout >= 0 {
+			actual = win.DWORD(timeout / time.Millisecond)
+		}
+		if nt, ok := next_timeout.?; ok {
+			actual = min(actual, win.DWORD(nt / time.Millisecond))
+		}
+		return actual
+	}
 
 	check_timeouts :: proc(l: ^Event_Loop) -> (expires: Maybe(time.Duration)) {
 		curr := l.now
@@ -677,19 +731,6 @@ _remove :: proc(target: ^Operation) {
 	target._impl.timeout = (^Operation)(REMOVED)
 
 	switch target.type {
-	case .Poll:
-		win.UnregisterWaitEx(target.poll._impl.wait_handle, nil)
-		target.poll._impl.wait_handle = nil
-
-		ok := win.PostQueuedCompletionStatus(
-			g.iocp,
-			0,
-			0,
-			&target._impl.over,
-		)
-		ensure(ok == true, "unexpected PostQueuedCompletionStatus error")
-		return
-
 	case .Timeout:
 		if avl.remove_value(&target.l.timeouts, target) {
 			debug("removed timeout directly")
@@ -704,6 +745,17 @@ _remove :: proc(target: ^Operation) {
 	case .Close, .Open, .Stat:
 		// Synchronous ops, picked up in handler.
 		return
+
+	case .Poll:
+		// The poll may have completed already, with its completion queued but not yet
+		// handled, `NOT_FOUND` is expected rather than exceptional.
+		if !win.CancelIoEx(g.afd, &target._impl.over) {
+			#partial switch win.System_Error(win.GetLastError()) {
+			case .NOT_FOUND:
+				// nop
+			case: assert(false, "unexpected CancelIoEx error")
+			}
+		}
 
 	case .Accept, .Dial, .Read, .Recv, .Send, .Write, .Send_File:
 		if is_pending(target._impl.over) {
@@ -802,6 +854,7 @@ g: struct{
 	mu:   sync.Mutex,
 	refs: int,
 	iocp: win.HANDLE,
+	afd:  win.HANDLE,
 	err:  General_Error,
 }
 
@@ -817,6 +870,36 @@ g_ref :: proc() -> General_Error {
 		if g.iocp == nil {
 			g.err = General_Error(win.GetLastError())
 		}
+
+		if g.err != nil { return g.err }
+
+		// A handle on the socket driver, used to poll sockets for readiness.
+		iosb: win.IO_STATUS_BLOCK
+		status := win.NtCreateFile(
+			&g.afd,
+			win.SYNCHRONIZE,
+			&{
+				Length = size_of(win.OBJECT_ATTRIBUTES),
+				ObjectName = &{
+					Length        = u16(len(afd_device_name)*2),
+					MaximumLength = u16(len(afd_device_name)*2),
+					Buffer        = raw_data(afd_device_name[:]),
+				},
+			},
+			&iosb,
+			nil,
+			0,
+			win.FILE_SHARE_READ|win.FILE_SHARE_WRITE,
+			win.FILE_OPEN,
+			0,
+			nil,
+			0,
+		)
+		if syserr := win.System_Error(win.RtlNtStatusToDosError(status)); syserr != .SUCCESS {
+			g.err = General_Error(syserr)
+		} else if win.CreateIoCompletionPort(g.afd, g.iocp, 0, 0) != g.iocp {
+			g.err = General_Error(win.GetLastError())
+		}
 	}
 
 	sync.atomic_add(&g.refs, 1)
@@ -828,6 +911,7 @@ g_unref :: proc() {
 	sync.guard(&g.mu)
 
 	if sync.atomic_sub(&g.refs, 1) == 1 {
+		if g.afd != nil { win.CloseHandle(g.afd) }
 		win.CloseHandle(g.iocp)
 		g.err = nil
 	}
@@ -850,7 +934,7 @@ operation_handle :: proc(op: ^Operation) -> win.HANDLE {
 	case .Recv:            return win.HANDLE(uintptr(net.any_socket_to_socket(op.recv.socket)))
 	case .Send:            return win.HANDLE(uintptr(net.any_socket_to_socket(op.send.socket)))
 	case .Send_File:       return win.HANDLE(uintptr(net.any_socket_to_socket(op.sendfile.socket)))
-	case .Poll:            return win.HANDLE(uintptr(net.any_socket_to_socket(op.poll.socket)))
+	case .Poll:            return g.afd
 	case .Stat:            return win.HANDLE(uintptr(op.stat.handle))
 
 	case .Timeout, .Open, ._Splice, ._Link_Timeout, ._Remove, .None:
@@ -925,6 +1009,9 @@ accept_exec :: proc(op: ^Operation) -> Op_Result {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			op.accept.err = net._accept_error()
+		} else {
+			link_timeout(op, op.accept.expires)
+			return .Pending
 		}
 	}
 
@@ -1026,6 +1113,9 @@ dial_exec :: proc(op: ^Operation) -> (result: Op_Result) {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			op.dial.err = net._dial_error()
+		} else {
+			link_timeout(op, op.dial.expires)
+			return .Pending
 		}
 	}
 
@@ -1085,6 +1175,13 @@ read_exec :: proc(op: ^Operation) -> Op_Result {
 				return .Pending
 			}
 			op.read.err = FS_Error(err)
+		} else {
+			// The read completed synchronously with a failure status. `FILE_SKIP_COMPLETION_PORT_ON_SUCCESS`
+			// only suppresses the completion packet on success, so one is still queued for
+			// this. Returning `.Done` here would complete the operation a second time, on an
+			// Operation that has already been recycled into the pool.
+			link_timeout(op, op.read.expires)
+			return .Pending
 		}
 	}
 
@@ -1159,6 +1256,9 @@ write_exec :: proc(op: ^Operation) -> Op_Result {
 				return .Pending
 			}
 			op.write.err = FS_Error(err)
+		} else {
+			link_timeout(op, op.write.expires)
+			return .Pending
 		}
 	}
 
@@ -1252,6 +1352,9 @@ recv_exec :: proc(op: ^Operation) -> Op_Result {
 			case TCP_Socket: op.recv.err = net._tcp_recv_error()
 			case UDP_Socket: op.recv.err = net._udp_recv_error()
 			}
+		} else {
+			link_timeout(op, op.recv.expires)
+			return .Pending
 		}
 	}
 
@@ -1370,6 +1473,9 @@ send_exec :: proc(op: ^Operation) -> Op_Result {
 			case TCP_Socket: op.send.err = net._tcp_send_error()
 			case UDP_Socket: op.send.err = net._udp_send_error()
 			}
+		} else {
+			link_timeout(op, op.send.expires)
+			return .Pending
 		}
 	}
 
@@ -1459,6 +1565,9 @@ sendfile_exec :: proc(op: ^Operation) -> Op_Result {
 			return .Pending
 		} else if op._impl.over.Internal == nil {
 			op.sendfile.err = net._tcp_send_error()
+		} else {
+			link_timeout(op, op.sendfile.expires)
+			return .Pending
 		}
 	}
 
@@ -1505,84 +1614,91 @@ sendfile_callback :: proc(op: ^Operation) -> Op_Result {
 @(require_results)
 poll_exec :: proc(op: ^Operation) -> Op_Result {
 	assert(op.type == .Poll)
+	op._impl.over = {} // Operations are recycled, clear stale state from a previous use.
 
-	events: i32 = win.FD_CLOSE
+	events: win.ULONG = AFD_POLL_ABORT|AFD_POLL_DISCONNECT|AFD_POLL_LOCAL_CLOSE|AFD_POLL_CONNECT_FAIL
 	switch op.poll.event {
-	case .Send:    events |= win.FD_WRITE|win.FD_CONNECT
-	case .Receive: events |= win.FD_READ|win.FD_ACCEPT
+	case .Receive: events |= AFD_POLL_RECEIVE|AFD_POLL_RECEIVE_EXPEDITED|AFD_POLL_ACCEPT
+	case .Send:    events |= AFD_POLL_SEND
 	case:
 		op.poll.result = .Invalid_Argument
 		return .Done
 	}
 
-	op._impl.over.hEvent = win.WSACreateEvent()
-	if win.WSAEventSelect(
+	// AFD needs the socket underneath any layered service providers.
+	base: win.SOCKET
+	bytes: win.DWORD
+	if win.WSAIoctl(
 		win.SOCKET(net.any_socket_to_socket(op.poll.socket)),
-		op._impl.over.hEvent,
-		events,
+		SIO_BASE_HANDLE,
+		nil, 0,
+		&base, size_of(base),
+		&bytes, nil, nil,
 	) != 0 {
-		#partial switch win.System_Error(win.GetLastError()) {
+		#partial switch win.System_Error(win.WSAGetLastError()) {
 		case .WSAEINVAL, .WSAENOTSOCK: op.poll.result = .Invalid_Argument
 		case:                          op.poll.result = .Error
 		}
 		return .Done
 	}
 
-	timeout := win.INFINITE
+	// A negative timeout is relative, in 100ns units.
+	timeout := max(i64)
 	if op.poll.expires != {} {
 		diff := max(0, time.diff(op.l.now, op.poll.expires))
-		timeout = win.DWORD(diff / time.Millisecond)
+		timeout = -i64(diff / 100)
 	}
 
-	ok := win.RegisterWaitForSingleObject(
-		&op.poll._impl.wait_handle,
-		op._impl.over.hEvent,
-		wait_callback,
-		op,
-		timeout,
-		win.WT_EXECUTEINWAITTHREAD|win.WT_EXECUTEONLYONCE,
+	op.poll._impl.info = {
+		timeout           = timeout,
+		number_of_handles = 1,
+		handles           = {{handle = win.HANDLE(uintptr(base)), events = events}},
+	}
+
+	// The OVERLAPPED doubles as the IO_STATUS_BLOCK, their first two fields line up.
+	status := win.NtDeviceIoControlFile(
+		g.afd,
+		nil,
+		nil,
+		&op._impl.over,
+		win.PIO_STATUS_BLOCK(rawptr(&op._impl.over)),
+		IOCTL_AFD_POLL,
+		&op.poll._impl.info,
+		size_of(AFD_Poll_Info),
+		&op.poll._impl.info,
+		size_of(AFD_Poll_Info),
 	)
-	ensure(ok == true, "unexpected RegisterWaitForSingleObject error")
 
-	return .Pending
-
-	wait_callback :: proc "system" (lpParameter: win.PVOID, TimerOrWaitFired: win.BOOLEAN) {
-		op := (^Operation)(lpParameter)
-		assert_contextless(op.type == .Poll)
-
-		if TimerOrWaitFired {
-			op.poll.result = .Timeout
-		}
-
-		ok := win.PostQueuedCompletionStatus(
-			g.iocp,
-			0,
-			0,
-			&op._impl.over,
-		)
-		ensure_contextless(ok == true, "unexpected PostQueuedCompletionStatus error")
+	// The AFD handle is not set to skip completion on success, so a completion is
+	// queued even when this finishes synchronously.
+	#partial switch win.System_Error(win.RtlNtStatusToDosError(status)) {
+	case .SUCCESS, .IO_PENDING:
+		return .Pending
+	case:
+		op.poll.result = .Error
+		return .Done
 	}
 }
 
 poll_callback :: proc(op: ^Operation) {
 	assert(op.type == .Poll)
 
-	if op._impl.over.hEvent != nil {
-		win.WSACloseEvent(op._impl.over.hEvent)
-	}
-
-	if op.poll._impl.wait_handle != nil {
-		win.UnregisterWaitEx(op.poll._impl.wait_handle, nil)
-	}
-
 	if op.poll.result != nil {
 		return
 	}
 
-	_, err := get_result(op._impl.over)
-	#partial switch err {
-	case .SUCCESS:
-	case:
+	// AFD reports a timeout by coming back with no handles.
+	if op.poll._impl.info.number_of_handles == 0 {
+		op.poll.result = .Timeout
+		return
+	}
+
+	if _, err := get_result(op._impl.over); err != .SUCCESS {
+		op.poll.result = .Error
+		return
+	}
+
+	if op.poll._impl.info.handles[0].events & (AFD_POLL_ABORT|AFD_POLL_CONNECT_FAIL) != 0 {
 		op.poll.result = .Error
 	}
 }

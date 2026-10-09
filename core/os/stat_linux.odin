@@ -32,6 +32,7 @@ _fstat_internal :: proc(fd: linux.Fd, allocator: runtime.Allocator) -> (fi: File
 		fullpath          = _get_full_path(fd, allocator) or_return,
 		name              = "",
 		inode             = u128(u64(s.ino)),
+		device            = u64(linux.makedev(s.dev_major, s.dev_minor)),
 		size              = i64(s.size),
 		mode              = mode,
 		type              = type,

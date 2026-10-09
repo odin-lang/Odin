@@ -44,6 +44,10 @@ poly64x2_t :: #simd[2]poly64_t
 
 int8x8x2_t  :: [2]int8x8_t
 int8x16x2_t :: [2]int8x16_t
+int16x4x2_t :: [2]int16x4_t
+int16x8x2_t :: [2]int16x8_t
+int32x2x2_t :: [2]int32x2_t
+int32x4x2_t :: [2]int32x4_t
 int8x8x3_t  :: [3]int8x8_t
 int8x16x3_t :: [3]int8x16_t
 int8x8x4_t  :: [4]int8x8_t
@@ -51,6 +55,10 @@ int8x16x4_t :: [4]int8x16_t
 
 uint8x8x2_t  :: [2]uint8x8_t
 uint8x16x2_t :: [2]uint8x16_t
+uint16x4x2_t :: [2]uint16x4_t
+uint16x8x2_t :: [2]uint16x8_t
+uint32x2x2_t :: [2]uint32x2_t
+uint32x4x2_t :: [2]uint32x4_t
 uint8x8x3_t  :: [3]uint8x8_t
 uint8x16x3_t :: [3]uint8x16_t
 uint8x8x4_t  :: [4]uint8x8_t
@@ -58,6 +66,8 @@ uint8x16x4_t :: [4]uint8x16_t
 
 poly8x8x2_t  :: [2]poly8x8_t
 poly8x16x2_t :: [2]poly8x16_t
+poly16x4x2_t :: [2]poly16x4_t
+poly16x8x2_t :: [2]poly16x8_t
 poly8x8x3_t  :: [3]poly8x8_t
 poly8x16x3_t :: [3]poly8x16_t
 poly8x8x4_t  :: [4]poly8x8_t

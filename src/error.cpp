@@ -23,9 +23,95 @@ struct ErrorCollector {
 	Array<ErrorValue> error_values;
 	ErrorValue        curr_error_value;
 	std::atomic<bool> curr_error_value_set;
+
+	// see `release_held_errors`
+	std::atomic<i64>  held_count;
+	std::atomic<i64>  held_warning_count;
+	Array<ErrorValue> held_error_values;
 };
 
 gb_global ErrorCollector global_error_collector;
+
+// Optional annotations for the next errored source line, `show_error_on_line` snapshots and clears them.
+//
+//   primary label, inline:                    primary label, vertical:      secondary span (always vertical):
+//     append(&x, true)                          append(x, {1,2,3})             append(&x, true)
+//                ^~~^ expected '…', found '…'          ^                              ^^  ^~~^ expected '…', found '…'
+//                                                      |                              |
+//                                                      expected '^…', pass '&x'       '[dynamic][3]int', elements are '[3]int'
+struct ErrorCaret {
+	char     label[512];     // primary label text
+	bool     label_vertical; // render primary label as | + text below, not inline
+	bool     sec_present;    // a secondary span (to the left) is set
+	TokenPos sec_pos;
+	TokenPos sec_end;
+	char     sec_label[512];
+};
+
+struct ErrorRecordInstantiation {
+	ErrorRecordInstantiation *prev;
+	struct Ast *              site;
+	struct Type *             named_type;
+};
+
+// The polymorphic instantiations the code being checked is within, see `error_out_instantiations`
+struct ErrorInstantiations {
+	struct ProcInfo *         proc;    // whose body is being checked
+	ErrorRecordInstantiation *records; // being instantiated within it
+};
+
+// Per-thread, so nothing leaks between concurrently-checked files
+struct ErrorContext {
+	bool hold; // see `release_held_errors`
+
+	// Scoped error muting. While muted, error/warning emission is suppressed but still *counted*, so a
+	// caller can trial-check something (e.g. one branch of a procedure group) and learn whether it would
+	// have failed without printing anything. Muting nests.
+	i32 mute_depth;
+	i64 mute_count;
+
+	ErrorInstantiations instantiations;
+	ErrorCaret          caret;
+};
+
+gb_global gb_thread_local ErrorContext global_error_context;
+
+gb_internal void error_out_instantiations(void); // defined in checker.cpp
+
+gb_internal void begin_error_mute(void) {
+	global_error_context.mute_depth += 1;
+}
+gb_internal void end_error_mute(void) {
+	GB_ASSERT(global_error_context.mute_depth > 0);
+	global_error_context.mute_depth -= 1;
+}
+gb_internal i64 error_mute_count(void) {
+	return global_error_context.mute_count;
+}
+gb_internal bool is_error_muted(void) {
+	return global_error_context.mute_depth > 0;
+}
+
+gb_internal void set_caret_label(char const *text) {
+	ErrorCaret *caret = &global_error_context.caret;
+	caret->label_vertical = false;
+	if (text == nullptr) {
+		caret->label[0] = 0;
+	} else {
+		gb_snprintf(caret->label, gb_size_of(caret->label), "%s", text);
+	}
+}
+gb_internal void set_caret_label_vertical(char const *text) {
+	set_caret_label(text);
+	global_error_context.caret.label_vertical = true;
+}
+gb_internal void set_caret_secondary(TokenPos pos, TokenPos end, char const *text) {
+	ErrorCaret *caret = &global_error_context.caret;
+	caret->sec_present = text != nullptr;
+	caret->sec_pos = pos;
+	caret->sec_end = end;
+	gb_snprintf(caret->sec_label, gb_size_of(caret->sec_label), "%s", text ? text : "");
+}
 
 
 gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = ErrorValue_Error) {
@@ -40,7 +126,11 @@ gb_internal void push_error_value(TokenPos const &pos, ErrorValueKind kind = Err
 gb_internal void pop_error_value(void) {
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.curr_error_value_set.load()) {
-		array_add(&global_error_collector.error_values, global_error_collector.curr_error_value);
+		ErrorInstantiations const &insts = global_error_context.instantiations;
+		if ((insts.proc != nullptr || insts.records != nullptr) && global_error_collector.curr_error_value.kind == ErrorValue_Error) {
+			error_out_instantiations();
+		}
+		array_add(global_error_context.hold ? &global_error_collector.held_error_values : &global_error_collector.error_values, global_error_collector.curr_error_value);
 
 		global_error_collector.curr_error_value = {};
 		global_error_collector.curr_error_value_set.store(false);
@@ -72,6 +162,7 @@ gb_internal bool any_warnings(void) {
 
 gb_internal void init_global_error_collector(void) {
 	array_init(&global_error_collector.error_values, heap_allocator());
+	array_init(&global_error_collector.held_error_values, heap_allocator());
 	array_init(&global_file_path_strings, heap_allocator(), 1, 4096);
 	array_init(&global_files,             heap_allocator(), 1, 4096);
 }
@@ -174,14 +265,21 @@ gb_internal bool json_errors(void);
 gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
-gb_internal void warning(Token const &token, char const *fmt, ...);
-gb_internal void error(Token const &token, char const *fmt, ...);
-gb_internal void error(TokenPos pos, char const *fmt, ...);
-gb_internal void error_line(char const *fmt, ...);
-gb_internal void syntax_error(Token const &token, char const *fmt, ...);
-gb_internal void syntax_error(TokenPos pos, char const *fmt, ...);
-gb_internal void syntax_warning(Token const &token, char const *fmt, ...);
-gb_internal void compiler_error(char const *fmt, ...);
+// Let the compiler check these against their arguments. 
+#if defined(__GNUC__) || defined(__clang__)
+	#define ODIN_FMT_LIKE(fmt_idx, va_idx) __attribute__((format(printf, fmt_idx, va_idx)))
+#else
+	#define ODIN_FMT_LIKE(fmt_idx, va_idx)
+#endif
+
+gb_internal void warning(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error(TokenPos pos, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void error_line(char const *fmt, ...) ODIN_FMT_LIKE(1, 2);
+gb_internal void syntax_error(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void syntax_error(TokenPos pos, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void syntax_warning(Token const &token, char const *fmt, ...) ODIN_FMT_LIKE(2, 3);
+gb_internal void compiler_error(char const *fmt, ...) ODIN_FMT_LIKE(1, 2);
 gb_internal void print_all_errors(void);
 
 
@@ -189,23 +287,48 @@ gb_internal void print_all_errors(void);
 typedef ERROR_OUT_PROC(ErrorOutProc);
 
 gb_internal ERROR_OUT_PROC(default_error_out_va) {
+	if (global_error_context.mute_depth > 0) {
+		// NOTE(bill): the error this would continue was muted, so there is no current error value
+		return;
+	}
 	char buf[4096] = {};
-	isize len = gb_snprintf_va(buf, gb_size_of(buf), fmt, va);
+	char *text = buf;
+	isize cap = gb_size_of(buf);
+	isize len = 0;
+	for (;;) {
+		va_list args;
+		va_copy(args, va);
+		len = gb_snprintf_va(text, cap, fmt, args);
+		va_end(args);
+		if (len >= 0) {
+			break;
+		}
+		// it did not fit, and `gb_snprintf_va` does not say how much space it needs
+		if (text != buf) {
+			gb_free(heap_allocator(), text);
+		}
+		cap *= 2;
+		text = gb_alloc_array(heap_allocator(), char, cap);
+	}
 	isize n = len-1;
 
 	if (n > 0) {
 		ErrorValue *ev = get_error_value();
 		if (terse_errors()) {
 			for (isize i = 0; i < n && !ev->seen_newline; i++) {
-				u8 c = cast(u8)buf[i];
+				u8 c = cast(u8)text[i];
 				if (c == '\n') {
 					ev->seen_newline = true;
 				}
 				array_add(&ev->msg, c);
 			}
 		} else {
-			array_add_elems(&ev->msg, (u8 *)buf, n);
+			array_add_elems(&ev->msg, (u8 *)text, n);
 		}
+	}
+
+	if (text != buf) {
+		gb_free(heap_allocator(), text);
 	}
 }
 
@@ -281,6 +404,12 @@ gb_internal void terminal_reset_colours(void) {
 
 gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	get_error_value()->end = end;
+
+	// Consume the caret annotations now, so they are cleared even on an early return and can never leak
+	// onto a later error's line.
+	ErrorCaret caret = global_error_context.caret;
+	global_error_context.caret = {};
+
 	if (!show_error_line()) {
 		return -1;
 	}
@@ -432,8 +561,10 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		window_close_bytes = line_length_bytes;
 	}
 
-	for (i32 i = error_start_index_graphemes; i > 0; i -= 1) {
-		if (graphemes[i].byte_index == window_open_bytes) {
+	// counts the graphemes before the error. It must not read the one at it: an error at the
+	// end of a line indexes one past the last grapheme
+	for (i32 i = error_start_index_graphemes-1; i >= 0; i -= 1) {
+		if (graphemes[i].byte_index < window_open_bytes) {
 			break;
 		}
 		squiggle_padding += graphemes[i].width;
@@ -483,13 +614,57 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		error_out(" ...");
 	}
 
-	error_out("\n\t");
-
-	for (i32 i = squiggle_padding; i > 0; i -= 1) {
-		error_out(" ");
+	// Secondary span (drawn to the left of the primary on the same line): compute its padding/width the
+	// same way as the primary's, and only draw it if it sits fully to the left within the window.
+	i32 sec_pad = 0;
+	i32 sec_len = 0;
+	bool draw_sec = caret.sec_present && caret.sec_pos.line == pos.line && caret.sec_end.line == pos.line;
+	if (draw_sec) {
+		i32 sec_start_byte = error_start_index_bytes + (caret.sec_pos.column - pos.column);
+		i32 sec_end_byte   = error_start_index_bytes + (caret.sec_end.column - pos.column);
+		if (window_open_bytes > 0) {
+			sec_pad += 4;
+		}
+		for (i32 i = 0; i < line_length_graphemes; i += 1) {
+			if (graphemes[i].byte_index < window_open_bytes)  continue;
+			if (graphemes[i].byte_index >= sec_start_byte)    break;
+			sec_pad += graphemes[i].width;
+		}
+		for (i32 i = 0; i < line_length_graphemes; i += 1) {
+			if (graphemes[i].byte_index < sec_start_byte) continue;
+			if (graphemes[i].byte_index >= sec_end_byte)  break;
+			sec_len += graphemes[i].width;
+		}
+		if (sec_len < 1) {
+			sec_len = 1;
+		}
+		if (sec_start_byte >= error_start_index_bytes || sec_pad + sec_len > squiggle_padding) {
+			draw_sec = false; // overlaps or is not to the left; skip rather than misalign
+		}
 	}
 
+	error_out("\n\t");
+
+	i32 printed = 0;
 	terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
+	if (draw_sec) {
+		for (i32 i = sec_pad - printed; i > 0; i -= 1) {
+			error_out(" ");
+		}
+		printed = sec_pad;
+		error_out("^");
+		for (i32 k = sec_len - 2; k > 0; k -= 1) {
+			error_out("~");
+		}
+		if (sec_len >= 2) {
+			error_out("^");
+		}
+		printed += sec_len;
+	}
+
+	for (i32 i = squiggle_padding - printed; i > 0; i -= 1) {
+		error_out(" ");
+	}
 
 	if (squiggle_length > 0) {
 		error_out("^");
@@ -506,11 +681,45 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 		}
 	}
 
+	if (caret.label[0] != 0 && !caret.label_vertical) {
+		terminal_set_colours(TerminalStyle_Normal, TerminalColour_Grey);
+		error_out(" %s", caret.label);
+	}
+
 	// NOTE(Feoramund): Specifically print a newline, then reset colours,
 	// instead of the other way around. Otherwise the printing mechanism
 	// will collapse the newline for reasons currently beyond my ken.
 	error_out("\n");
 	terminal_reset_colours();
+
+	// A vertical label hangs under its span: `|` then the text, aligned to the span's column. The
+	// secondary span takes priority (its label explains the primary); otherwise a vertical primary label.
+	i32 vpad = -1;
+	char const *vtext = nullptr;
+	if (draw_sec && caret.sec_label[0] != 0) {
+		vpad = sec_pad;
+		vtext = caret.sec_label;
+	} else if (caret.label_vertical && caret.label[0] != 0) {
+		vpad = squiggle_padding;
+		vtext = caret.label;
+	}
+	if (vpad >= 0 && vtext != nullptr && vtext[0] != 0) {
+		error_out("\t");
+		for (i32 i = vpad; i > 0; i -= 1) {
+			error_out(" ");
+		}
+		terminal_set_colours(TerminalStyle_Bold, TerminalColour_Green);
+		error_out("|\n");
+		terminal_reset_colours();
+
+		error_out("\t");
+		for (i32 i = vpad; i > 0; i -= 1) {
+			error_out(" ");
+		}
+		terminal_set_colours(TerminalStyle_Normal, TerminalColour_Grey);
+		error_out("%s\n", vtext);
+		terminal_reset_colours();
+	}
 
 	return squiggle_padding;
 }
@@ -533,7 +742,11 @@ gb_internal void error_out_coloured(char const *str, TerminalStyle style, Termin
 
 
 gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
-	global_error_collector.count.fetch_add(1);
+	if (global_error_context.mute_depth > 0) {
+		global_error_context.mute_count += 1;
+		return;
+	}
+	(global_error_context.hold ? global_error_collector.held_count : global_error_collector.count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
@@ -570,8 +783,12 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 	if (global_ignore_warnings()) {
 		return;
 	}
+	if (global_error_context.mute_depth > 0) {
+		global_error_context.mute_count += 1;
+		return;
+	}
 
-	global_error_collector.warning_count.fetch_add(1);
+	(global_error_context.hold ? global_error_collector.held_warning_count : global_error_collector.warning_count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);
@@ -599,11 +816,18 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 
 
 gb_internal void error_line_va(char const *fmt, va_list va) {
+	if (global_error_context.mute_depth > 0) {
+		return;
+	}
 	error_out_va(fmt, va);
 }
 
 gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
-	global_error_collector.count.fetch_add(1);
+	if (global_error_context.mute_depth > 0) {
+		global_error_context.mute_count += 1;
+		return;
+	}
+	(global_error_context.hold ? global_error_collector.held_count : global_error_collector.count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count.load() > MAX_ERROR_COLLECTOR_COUNT()) {
 		print_all_errors();
@@ -635,6 +859,10 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 
 
 gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	if (global_error_context.mute_depth > 0) {
+		global_error_context.mute_count += 1;
+		return;
+	}
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
@@ -642,7 +870,7 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 		gb_exit(1);
 	}
 
-	push_error_value(pos, ErrorValue_Warning);
+	push_error_value(pos, ErrorValue_Error);
 
 	if (pos.line == 0) {
 		error_out_empty();
@@ -667,6 +895,10 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 }
 
 gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	if (global_error_context.mute_depth > 0) {
+		global_error_context.mute_count += 1;
+		return;
+	}
 	global_error_collector.count.fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
@@ -674,7 +906,7 @@ gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end,
 		gb_exit(1);
 	}
 
-	push_error_value(pos, ErrorValue_Warning);
+	push_error_value(pos, ErrorValue_Error);
 
 	if (pos.line == 0) {
 		error_out_empty();
@@ -816,6 +1048,27 @@ gb_internal void compiler_error(char const *fmt, ...) {
 }
 
 
+// Reports the held errors and warnings as if they had not been held, once parsing reports no errors, as otherwise they are
+// never reported
+gb_internal void release_held_errors(void) {
+	isize kept_error_count = 0;
+	for (ErrorValue const &ev : global_error_collector.held_error_values) {
+		// NOTE: as many as are printed when exiting at the error after the maximum
+		if (ev.kind == ErrorValue_Error && kept_error_count++ >= MAX_ERROR_COLLECTOR_COUNT()) {
+			continue;
+		}
+		array_add(&global_error_collector.error_values, ev);
+	}
+	array_clear(&global_error_collector.held_error_values);
+
+	global_error_collector.count.fetch_add(global_error_collector.held_count.exchange(0));
+	global_error_collector.warning_count.fetch_add(global_error_collector.held_warning_count.exchange(0));
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
+		print_all_errors();
+		gb_exit(1);
+	}
+}
+
 gb_internal void exit_with_errors(void) {
 	if (any_errors() || any_warnings()) {
 		print_all_errors();
@@ -823,13 +1076,6 @@ gb_internal void exit_with_errors(void) {
 	gb_exit(1);
 }
 
-
-
-gb_internal int error_value_cmp(void const *a, void const *b) {
-	ErrorValue *x = cast(ErrorValue *)a;
-	ErrorValue *y = cast(ErrorValue *)b;
-	return token_pos_cmp(x->pos, y->pos);
-}
 
 gb_global String error_article_table[][2] = {
 	{str_lit("a "),  str_lit("bit_set literal")},
@@ -896,7 +1142,10 @@ gb_internal void print_all_errors(void) {
 
 	GB_ASSERT(any_errors() || any_warnings());
 
-	array_sort(global_error_collector.error_values, error_value_cmp);
+	// stable, so that of the errors at the same position, the first reported is kept, see the merging below
+	natural_merge_sort(global_error_collector.error_values.data, global_error_collector.error_values.count, [](ErrorValue const &x, ErrorValue const &y) -> int {
+		return token_pos_cmp(x.pos, y.pos);
+	});
 
 
 	{ // NOTE(bill): merge neighbouring errors

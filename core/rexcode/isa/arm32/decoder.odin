@@ -152,15 +152,29 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		// back to the index within ENCODING_TABLE[mnemonic]. Stored as
 		// (form_idx + 1) so a zero hint means "not set".
 		inst.form_id = DECODE_FORM_IDX[entry_idx] + 1
+		// Carry the `.i32` suffix out with the instruction, so a decoded
+		// instruction re-encodes to the same form without needing form_id.
+		inst.dt = e.dt
 
 		// Cond: A32 entries with bits[31:28] variable in mask take cond from word
-		if mode == .A32 && (e.mask >> 28) == 0 {
+		if e.flags.cond_in_21 {
+			// Four conditions only, and not in their usual order.
+			inst.cond = VSEL_CONDITIONS[(word >> 20) & 3]
+		} else if mode == .A32 && (e.mask >> 28) == 0 {
 			inst.cond = u8((word >> 28) & 0xF)
 		} else {
 			inst.cond = 14    // AL / unconditional
 		}
 		if e.flags.sets_flags {
-			inst.flags.sets_flags = true
+			inst.sets_flags = true
+		}
+		// LDM/STM carry the writeback in bit 21; nothing else in the operand
+		// model records it, and without it the two forms print identically.
+		for k in 0 ..< len(e.enc) {
+			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .RN_A32_WB || e.enc[k] == .IMPL_SP {
+				inst.writeback = (word >> 21) & 1 != 0
+				break
+			}
 		}
 
 		for _, k in e.enc {
@@ -251,13 +265,18 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 			st  := Shift_Type(u8(st_bits) + u8(Shift_Type.LSL_REG))
 			rs  := u8((word >> 8) & 0xF)
 			return Operand{reg = reg, kind = .REGISTER, size = 4,
-						   shift_type = st, shift_amt = rs, cond = 14}
+						   shift_type = st, shift_amt = rs}
 		case .GPR_SHIFTED:
 			// Imm-shift: amount in bits 11..7, type in 6..5, bit 4 = 0.
 			st  := Shift_Type((word >> 5) & 0x3)
 			amt := u8((word >> 7) & 0x1F)
 			if st == .ROR && amt == 0 { return op_reg_shifted(reg, .RRX, 0) }
 			if st == .LSL && amt == 0 { return op_reg(reg) }
+			// A shift of zero is not a shift, so the field spends that
+			// spare value on 32 instead -- the one amount five bits cannot
+			// otherwise reach. LSL has no use for it and ROR spends it on
+			// RRX, so only these two.
+			if (st == .LSR || st == .ASR) && amt == 0 { return op_reg_shifted(reg, st, 32) }
 			return op_reg_shifted(reg, st, amt)
 		}
 		return op_reg(reg)
@@ -300,6 +319,11 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	// ---- A32 immediates ----
 	case .A32_IMM12:    return op_imm(i64(word & 0xFFF))
 	case .A32_IMM_SHIFT: return op_imm(i64((word >> 7) & 0x1F))
+	case .A32_IMM_SHIFT_32:
+		// The LSR and ASR mnemonics reach 32 the same way a shifted operand
+		// does: a field of zero, since a shift of zero would be a MOV.
+		amt := (word >> 7) & 0x1F
+		return op_imm(i64(amt == 0 ? 32 : amt))
 	case .A32_SHIFT_TYPE: return op_imm(i64((word >> 5) & 0x3))
 	case .A32_IMM24:
 		// Ambiguous: A32_IMM24 is used both for branch displacements (B/BL,
@@ -376,13 +400,29 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFFF)
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm(base, disp))
+		mm := mem_imm(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
+	case .MEM_IMM8_SCALED4, .MEM_IMM8_SCALED4_PRE, .MEM_IMM8_SCALED4_POST:
+		// The VFP and coprocessor loads count the offset in words, so the
+		// eight bits reach +/-1020 rather than +/-255.
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		u_bit := (word >> 23) & 1
+		disp := i32(word & 0xFF) * 4
+		if u_bit == 0 { disp = -disp }
+		mm := mem_imm(base, disp)
+		if enc == .MEM_IMM8_SCALED4_PRE  { mm.mode = .PRE_INDEX  }
+		if enc == .MEM_IMM8_SCALED4_POST { mm.mode = .POST_INDEX }
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_IMM8_OFFSET:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
 		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm(base, disp))
+		mm := mem_imm(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_REG_OFFSET:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		idx  := Register(REG_GPR | u16(word & 0xF))
@@ -400,11 +440,13 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .CPS_IFLAGS:   return op_imm(i64(word & 0x1FF))
 	case .PSR_FIELD_MASK: return op_imm(i64(decode_psr_field(word)))
 	case .SYSM_FIELD:   return op_imm(i64(word & 0xFF))
-	case .COPROC_NUM_FIELD:  return op_imm(i64((word >> 8) & 0xF))
+	case .COPROC_NUM_FIELD:  return op_reg(Register(REG_COPROC_NUM | u16((word >> 8) & 0xF)))
 	case .COPROC_OPC1_FIELD: return op_imm(i64((word >> 20) & 0xF))
 	case .COPROC_OPC2_FIELD: return op_imm(i64((word >> 5) & 0x7))
 	case .COPROC_CRN_FIELD:  return op_reg(Register(REG_COPROC | u16((word >> 16) & 0xF)))
 	case .COPROC_CRM_FIELD:  return op_reg(Register(REG_COPROC | u16(word & 0xF)))
+	case .COPROC_CRD_FIELD:  return op_reg(Register(REG_COPROC | u16((word >> 12) & 0xF)))
+	case .COPROC_OPC1_MCR:   return op_imm(i64((word >> 21) & 0x7))
 	case .COPROC_OPC_MCRR:   return op_imm(i64((word >> 4) & 0xF))
 	case .NEON_CMODE:        return op_imm(i64((word >> 8) & 0xF))
 	case .NEON_OP_BIT:       return op_imm(i64((word >> 5) & 1))
@@ -414,15 +456,86 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		a := extract_neon_modimm_abcdefgh(word)
 		cmode := (word >> 8) & 0xF
 		op := (word >> 5) & 1
-		return op_imm(i64(decode_neon_modimm(a, cmode, op)))
+		v := decode_neon_modimm(a, cmode, op)
+		// Only cmode 1111 expands to a float; the rest are bit patterns.
+		if cmode == 0b1111 { return op_float_imm(v) }
+		return op_hex_imm(v)
+	case .DBG_OPTION:    return op_imm(i64(word & 0xF))
+	case .MRS_SPEC_REG:  return op_reg(Register(REG_SREG | u16(((word >> 22) & 1) * 2)))
+	case .VFP_SPEC_REG:  return op_reg(Register(REG_FPSC | u16((word >> 16) & 0xF)))
+	case .SETEND_ENDIAN: return op_reg(Register(REG_ENDIAN | u16((word >> 9) & 1)))
+	case .IMPL_SP:       return op_reg(SP)
+	case .MODE_IMM5:     return op_imm(i64(word & 0x1F))
+	case .RN_A32_WB:     return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
+	case .VM_S_PLUS1:
+		// The second of a consecutive pair; only the first is encoded.
+		return op_reg(Register(REG_SPR | u16(((word & 0xF) << 1 | ((word >> 5) & 1)) + 1)))
+	case .NEON_LANE_VN_32:
+		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
+		return op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> 21) & 1))
 	case .VFP_IMM8:
 		a := ((word >> 16) & 0xF) << 4 | (word & 0xF)
-		return op_imm(i64(decode_vfp_imm8_f32(a)))
-	case .VFP_S_LIST, .VFP_D_LIST:
-		// Register count is encoded in bits 7..0 (count, not bitmask). Wrap
-		// as a REG_LIST so the encoder's shape_match for SPR_LIST/DPR_LIST
-		// accepts it; the encoder packs the same 8-bit count back out.
-		return op_reg_list(u16(word & 0xFF))
+		// Held as the 32-bit pattern whatever the form's width: it is the
+		// same value either way, and it is what re-encoding needs back.
+		return op_float_imm(decode_vfp_imm8_f32(a))
+	case .NEON_D_LIST_1:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, false)
+	case .NEON_D_LIST_2:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 2, 1, false)
+	case .NEON_D_LIST_3:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 3, 1, false)
+	case .NEON_D_LIST_4:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 4, 1, false)
+	case .NEON_D_LIST_2X:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 2, 2, false)
+	case .NEON_D_LIST_3X:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 3, 2, false)
+	case .NEON_D_LIST_4X:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 4, 2, false)
+	case .NEON_D_LIST_ALL:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), 1, 1, true)
+	case .NEON_D_LIST_ALL_2, .NEON_D_LIST_ALL_3, .NEON_D_LIST_ALL_4:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		count := u8(2 + (int(enc) - int(Operand_Encoding.NEON_D_LIST_ALL_2)))
+		return op_reg_run(Register(REG_DPR | u16(n)), count,
+		                  ((word >> 5) & 1) != 0 ? 2 : 1, true)
+	case .NEON_LANE_D_8, .NEON_LANE_D_16, .NEON_LANE_D_32, .NEON_LANE_D_8_2, .NEON_LANE_D_16_2, .NEON_LANE_D_32_2, .NEON_LANE_D_8_3, .NEON_LANE_D_16_3, .NEON_LANE_D_32_3, .NEON_LANE_D_8_4, .NEON_LANE_D_16_4, .NEON_LANE_D_32_4:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		shift, mask, count := neon_lane_shape(enc)
+		op := op_dpr_lane(Register(REG_DPR | u16(n)), u8((word >> shift) & mask))
+		op.list = {count = count, stride = 1}
+		return op
+	case .NEON_VDUP_LANE_8, .NEON_VDUP_LANE_16, .NEON_VDUP_LANE_32:
+		imm4 := (word >> 16) & 0xF
+		shift: u32 = enc == .NEON_VDUP_LANE_8 ? 1 : enc == .NEON_VDUP_LANE_16 ? 2 : 3
+		return op_dpr_lane(Register(REG_DPR | u16(((word >> 5) & 1) << 4 | (word & 0xF))),
+		                   u8(imm4 >> shift))
+	case .NEON_VM_SCALAR_16:
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0x7)),
+		                   u8(((word >> 5) & 1) << 1 | ((word >> 3) & 1)))
+	case .NEON_VM_SCALAR_32:
+		return op_dpr_lane(Register(REG_DPR | u16(word & 0xF)), u8((word >> 5) & 1))
+	case .NEON_VN_TABLE_1, .NEON_VN_TABLE_2, .NEON_VN_TABLE_3, .NEON_VN_TABLE_4:
+		n := ((word >> 7) & 1) << 4 | ((word >> 16) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), table_run_length(enc))
+	case .VFP_S_LIST:
+		// {S<Vd>, ...} -- imm8 counts the registers, and the run starts at Vd.
+		// Both halves matter: keeping only the count printed the wrong bank
+		// and the wrong registers.
+		n := ((word >> 12) & 0xF) << 1 | ((word >> 22) & 1)
+		return op_reg_run(Register(REG_SPR | u16(n)), max(u8(word & 0xFF), 1))
+	case .VFP_D_LIST:
+		// {D<Vd>, ...} -- imm8 counts half-words here, two per D register.
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg_run(Register(REG_DPR | u16(n)), max(u8((word & 0xFF) / 2), 1))
 
 	// ---- Branch fields (decoded into RELATIVE) ----
 	case .BRANCH_24:
@@ -479,8 +592,30 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_imm(i64((word >> 18) & 0xF))
 
 	// ---- Saturate / bit field ----
-	case .SAT_IMM5, .SAT_IMM5_T32, .BFI_MSB:
+	case .NEON_SHLL_8:  return op_imm(8)
+	case .NEON_SHLL_16: return op_imm(16)
+	case .NEON_SHLL_32: return op_imm(32)
+	case .NEON_ROT_2:   return op_imm(((word >> 24) & 1) != 0 ? 270 : 90)
+	case .NEON_ROT_4:   return op_imm(i64(((word >> 20) & 3) * 90))
+	case .NEON_ROT_4_HI: return op_imm(i64(((word >> 23) & 3) * 90))
+	case .VFP_FBITS:
+		// The fixed-point width is 16 or 32 by the sx bit, and the fraction
+		// is that less imm4:i -- so the widest fraction encodes as zero.
+		width: u32 = ((word >> 7) & 1) != 0 ? 32 : 16
+		return op_imm(i64(width - (((word & 0xF) << 1) | ((word >> 5) & 1))))
+	case .SAT_IMM5, .SAT_IMM5_T32:
+		// SSAT and SSAT16 saturate to a signed width of one to 32, and the
+		// field holds one less than that. USAT and USAT16 saturate to an
+		// unsigned width of zero to 31, which the field holds as it stands.
+		return op_imm(i64(((word >> 16) & 0x1F) + 1))
+	case .SAT_IMM5_U, .SAT_IMM5_U_T32:
 		return op_imm(i64((word >> 16) & 0x1F))
+	case .BFX_WIDTH:
+		// One less than the width.
+		return op_imm(i64(((word >> 16) & 0x1F) + 1))
+	case .BFI_MSB:
+		// The top bit's position; the syntax wants the width.
+		return op_imm(i64(((word >> 16) & 0x1F) - ((word >> 7) & 0x1F) + 1))
 	case .BFI_LSB, .BFI_LSB_T32:
 		return op_imm(i64((word >> 7) & 0x1F))
 	case .NEON_SHIFT_IMM6:
@@ -522,18 +657,42 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	// PRE_INDEX and POST_INDEX wrap MEM_IMM12_OFFSET: same field layout but the
 	// addressing mode flag is set differently. We reconstruct the full Memory
 	// operand here (base, disp, sign, mode).
+	case .RT2_A32_PAIR:
+		return op_reg(Register(REG_GPR | u16(((word >> 12) + 1) & 0xF)))
+	case .MEM_IMM8_PRE_INDEX:
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
+		if (word >> 23) & 1 == 0 { disp = -disp }
+		mm := mem_imm_pre(base, disp)
+
+		if (word >> 23) & 1 == 0 { mm.sign = -1 }
+
+		return op_mem(mm)
+	case .MEM_IMM8_POST_INDEX:
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		disp := i32(((word >> 8) & 0xF) << 4 | (word & 0xF))
+		if (word >> 23) & 1 == 0 { disp = -disp }
+		mm := mem_imm_post(base, disp)
+
+		if (word >> 23) & 1 == 0 { mm.sign = -1 }
+
+		return op_mem(mm)
 	case .MEM_PRE_INDEX:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFFF)
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm_pre(base, disp))
+		mm := mem_imm_pre(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_POST_INDEX:
 		base := Register(REG_GPR | u16((word >> 16) & 0xF))
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFFF)
 		if u_bit == 0 { disp = -disp }
-		return op_mem(mem_imm_post(base, disp))
+		mm := mem_imm_post(base, disp)
+		if u_bit == 0 { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_LITERAL:
 		// PC-relative literal load: U bit + 12-bit signed disp
 		u_bit := (word >> 23) & 1
@@ -558,6 +717,22 @@ decode_max_instruction_count :: #force_inline proc "contextless" (data: []u8) ->
 	return len(data) / 2
 }
 
+// How many D registers a VTBL/VTBX table spans.
+@(private="file", require_results)
+table_run_length :: #force_inline proc "contextless" (e: Operand_Encoding) -> u8 {
+	#partial switch e {
+	case .NEON_VN_TABLE_1: return 1
+	case .NEON_VN_TABLE_2: return 2
+	case .NEON_VN_TABLE_3: return 3
+	case .NEON_VN_TABLE_4: return 4
+	}
+	return 1
+}
+
+// The conditions VSEL can name, in the order bits 21:20 give them.
+@(private="file")
+VSEL_CONDITIONS := [4]u8{0, 6, 10, 12}   // EQ, VS, GE, GT
+
 // Typical-case estimate of the instruction count for `data`.
 @(require_results)
 decode_estimate_instruction_count :: #force_inline proc "contextless" (data: []u8) -> int {
@@ -571,4 +746,25 @@ decode_reserve :: proc(instructions: ^[dynamic]Instruction, inst_info: ^[dynamic
 	if instructions != nil { reserve(instructions, len(instructions) + n) }
 	if inst_info    != nil { reserve(inst_info,    len(inst_info)    + n) }
 	if label_defs   != nil { reserve(label_defs,   len(label_defs)   + n) }
+}
+
+// The lane field's position and the list length for a NEON single-lane
+// load/store. The lane sits just above the alignment bits, and how far above
+// follows the element size: bits 7:5 for .8, 7:6 for .16, bit 7 for .32.
+@(private="file", require_results)
+neon_lane_shape :: #force_inline proc "contextless" (e: Operand_Encoding) -> (shift, mask: u32, count: u8) {
+	#partial switch e {
+	case .NEON_LANE_D_8:    return 5, 0x7, 1
+	case .NEON_LANE_D_16:   return 6, 0x3, 1
+	case .NEON_LANE_D_32:   return 7, 0x1, 1
+	case .NEON_LANE_D_8_2:  return 5, 0x7, 2
+	case .NEON_LANE_D_16_2: return 6, 0x3, 2
+	case .NEON_LANE_D_32_2: return 7, 0x1, 2
+	case .NEON_LANE_D_8_3:  return 5, 0x7, 3
+	case .NEON_LANE_D_16_3: return 6, 0x3, 3
+	case .NEON_LANE_D_32_3: return 7, 0x1, 3
+	case .NEON_LANE_D_8_4:  return 5, 0x7, 4
+	case .NEON_LANE_D_16_4: return 6, 0x3, 4
+	case:                   return 7, 0x1, 4
+	}
 }

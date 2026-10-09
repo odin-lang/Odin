@@ -68,19 +68,19 @@ _mm_madd_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_max_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)pmaxsw(transmute(i16x8)a, transmute(i16x8)b)
+	return transmute(__m128i)simd.max(transmute(i16x8)a, transmute(i16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_max_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)pmaxub(transmute(u8x16)a, transmute(u8x16)b)
+	return transmute(__m128i)simd.max(transmute(u8x16)a, transmute(u8x16)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_min_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)pminsw(transmute(i16x8)a, transmute(i16x8)b)
+	return transmute(__m128i)simd.min(transmute(i16x8)a, transmute(i16x8)b)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_min_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	return transmute(__m128i)pminub(transmute(u8x16)a, transmute(u8x16)b)
+	return transmute(__m128i)simd.min(transmute(u8x16)a, transmute(u8x16)b)
 }
 
 
@@ -98,7 +98,10 @@ _mm_mullo_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_mul_epu32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
-	return transmute(__m128i)pmuludq(transmute(u32x4)a, transmute(u32x4)b)
+	c := transmute(u64x2)a
+	d := transmute(u64x2)b
+	m := u64x2(max(u32))
+	return transmute(__m128i)simd.mul(simd.bit_and(c, m), simd.bit_and(d, m))
 }
 @(require_results, enable_target_feature="sse2")
 _mm_sad_epu8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
@@ -351,7 +354,7 @@ _mm_cvtsi32_sd :: #force_inline proc "c" (a: __m128d, b: i32) -> __m128d {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_cvtepi32_ps :: #force_inline proc "c" (a: __m128i) -> __m128 {
-	return cvtdq2ps(transmute(i32x4)a)
+	return cast(__m128)transmute(i32x4)a
 }
 @(require_results, enable_target_feature="sse2")
 _mm_cvtps_epi32 :: #force_inline proc "c" (a: __m128) -> __m128i {
@@ -482,10 +485,15 @@ _mm_packus_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 _mm_extract_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> i32 {
 	return i32(simd.extract(transmute(u16x8)a, IMM8))
 }
+
+// Copy `a` to `dst`, and insert the 16-bit integer `i` into `dst` at the location specified by `imm8`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_insert_epi16)
 @(require_results, enable_target_feature="sse2")
-_mm_insert_epi16 :: #force_inline proc "c" (a: __m128i, i: i32, $IMM8: u32) -> __m128i {
-	return i32(simd.replace(transmute(u16x8)a, IMM8, i16(i)))
+_mm_insert_epi16 :: #force_inline proc "c" (a: __m128i, i: i32, $IMM8: i32) -> __m128i where 0 <= IMM8, IMM8 < 8 {
+	return transmute(__m128i)simd.replace(transmute(simd.i16x8)a, uint(IMM8), i16(i))
 }
+
 @(require_results, enable_target_feature="sse2")
 _mm_movemask_epi8 :: #force_inline proc "c" (a: __m128i) -> i32 {
 	return pmovmskb(transmute(i8x16)a)
@@ -620,7 +628,7 @@ _mm_mul_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_sqrt_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
-	return simd.replace(a, 0, _mm_cvtsd_f64(sqrtsd(b)))
+	return simd.replace(a, 0, intrinsics.sqrt(_mm_cvtsd_f64(b)))
 }
 @(require_results, enable_target_feature="sse2")
 _mm_sqrt_pd :: #force_inline proc "c" (a: __m128d) -> __m128d {
@@ -809,7 +817,7 @@ _mm_cvtpd_ps :: #force_inline proc "c" (a: __m128d) -> __m128 {
 }
 @(require_results, enable_target_feature="sse2")
 _mm_cvtps_pd :: #force_inline proc "c" (a: __m128) -> __m128d {
-	return cvtps2pd(a)
+	return cast(__m128d)simd.shuffle(a, a, 0, 1)
 }
 @(require_results, enable_target_feature="sse2")
 _mm_cvtpd_epi32 :: #force_inline proc "c" (a: __m128d) -> __m128i {
@@ -820,7 +828,7 @@ _mm_cvtsd_si32 :: #force_inline proc "c" (a: __m128d) -> i32 {
 	return cvtsd2si(a)
 }
 @(require_results, enable_target_feature="sse2")
-_mm_cvtsd_ss :: #force_inline proc "c" (a, b: __m128d) -> __m128 {
+_mm_cvtsd_ss :: #force_inline proc "c" (a: __m128, b: __m128d) -> __m128 {
 	return cvtsd2ss(a, b)
 }
 @(require_results, enable_target_feature="sse2")
@@ -828,8 +836,8 @@ _mm_cvtsd_f64 :: #force_inline proc "c" (a: __m128d) -> f64 {
 	return simd.extract(a, 0)
 }
 @(require_results, enable_target_feature="sse2")
-_mm_cvtss_sd :: #force_inline proc "c" (a, b: __m128) -> __m128d {
-	return cvtss2sd(a, b)
+_mm_cvtss_sd :: #force_inline proc "c" (a: __m128d, b: __m128) -> __m128d {
+	return simd.replace(a, 0, f64(simd.extract(b, 0)))
 }
 @(require_results, enable_target_feature="sse2")
 _mm_cvttpd_epi32 :: #force_inline proc "c" (a: __m128d) -> __m128i {
@@ -901,7 +909,7 @@ _mm_store_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
 }
 @(enable_target_feature="sse2")
 _mm_storeu_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
-	storeupd(mem_addr, a)
+	intrinsics.unaligned_store((^__m128d)(mem_addr), a)
 }
 @(enable_target_feature="sse2")
 _mm_store1_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
@@ -1063,20 +1071,10 @@ foreign _ {
 	pavgw      :: proc(a, b: u16x8) -> u16x8 ---
 	@(link_name="llvm.x86.sse2.pmadd.wd")
 	pmaddwd    :: proc(a, b: i16x8) -> i32x4 ---
-	@(link_name="llvm.x86.sse2.pmaxs.w")
-	pmaxsw     :: proc(a, b: i16x8) -> i16x8 ---
-	@(link_name="llvm.x86.sse2.pmaxu.b")
-	pmaxub     :: proc(a, b: u8x16) -> u8x16 ---
-	@(link_name="llvm.x86.sse2.pmins.w")
-	pminsw     :: proc(a, b: i16x8) -> i16x8 ---
-	@(link_name="llvm.x86.sse2.pminu.b")
-	pminub     :: proc(a, b: u8x16) -> u8x16 ---
 	@(link_name="llvm.x86.sse2.pmulh.w")
 	pmulhw     :: proc(a, b: i16x8) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.pmulhu.w")
 	pmulhuw    :: proc(a, b: u16x8) -> u16x8 ---
-	@(link_name="llvm.x86.sse2.pmulu.dq")
-	pmuludq    :: proc(a, b: u32x4) -> u64x2 ---
 	@(link_name="llvm.x86.sse2.psad.bw")
 	psadbw     :: proc(a, b: u8x16) -> u64x2 ---
 	@(link_name="llvm.x86.sse2.pslli.w")
@@ -1111,8 +1109,6 @@ foreign _ {
 	psrliq     :: proc(a: i64x2, #const imm8: u32) -> i64x2 ---
 	@(link_name="llvm.x86.sse2.psrl.q")
 	psrlq      :: proc(a: i64x2, count: i64x2) -> i64x2 ---
-	@(link_name="llvm.x86.sse2.cvtdq2ps")
-	cvtdq2ps   :: proc(a: i32x4) -> __m128 ---
 	@(link_name="llvm.x86.sse2.cvtps2dq")
 	cvtps2dq   :: proc(a: __m128) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.maskmov.dqu")
@@ -1133,10 +1129,6 @@ foreign _ {
 	minsd      :: proc(a, b: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.min.pd")
 	minpd      :: proc(a, b: __m128d) -> __m128d ---
-	@(link_name="llvm.x86.sse2.sqrt.sd")
-	sqrtsd     :: proc(a: __m128d) -> __m128d ---
-	@(link_name="llvm.x86.sse2.sqrt.pd")
-	sqrtpd     :: proc(a: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cmp.sd")
 	cmpsd      :: proc(a, b: __m128d, imm8: i8) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cmp.pd")
@@ -1169,24 +1161,18 @@ foreign _ {
 	movmskpd   :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvtpd2ps")
 	cvtpd2ps   :: proc(a: __m128d) -> __m128 ---
-	@(link_name="llvm.x86.sse2.cvtps2pd")
-	cvtps2pd   :: proc(a: __m128) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cvtpd2dq")
 	cvtpd2dq   :: proc(a: __m128d) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.cvtsd2si")
 	cvtsd2si   :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvtsd2ss")
-	cvtsd2ss   :: proc(a, b: __m128d) -> __m128 ---
-	@(link_name="llvm.x86.sse2.cvtss2sd")
-	cvtss2sd   :: proc(a, b: __m128) -> __m128d ---
+	cvtsd2ss   :: proc(a: __m128, b: __m128d) -> __m128 ---
 	@(link_name="llvm.x86.sse2.cvttpd2dq")
 	cvttpd2dq  :: proc(a: __m128d) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.cvttsd2si")
 	cvttsd2si  :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvttps2dq")
 	cvttps2dq  :: proc(a: __m128) -> i32x4 ---
-	@(link_name="llvm.x86.sse2.storeu.pd")
-	storeupd   :: proc(mem_addr: rawptr, a: __m128d) ---
 
 	// amd64 only
 	@(link_name="llvm.x86.sse2.cvtsd2si64")

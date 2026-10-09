@@ -451,6 +451,7 @@ Example:
 		assert(! chan.send(c, 2))
 	}
 */
+@(synchronizes=.Release)
 send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where C.D <= .Both {
 	data := data
 	ok = send_raw(c, &data)
@@ -483,7 +484,7 @@ Example:
 		assert(!chan.try_send(c, 2), "the buffer is already full")
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Release)
 try_send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where C.D <= .Both {
 	data := data
 	ok = try_send_raw(c, &data)
@@ -528,8 +529,8 @@ Example:
 		assert(!ok, "the channel is closed")
 	}
 */
-@(require_results)
-recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D >= .Both {
+@(require_results, synchronizes=.Acquire)
+recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where C.D >= .Both {
 	ok = recv_raw(c, &data)
 	return
 }
@@ -558,8 +559,8 @@ Example:
 		assert(!ok, "there is not value to read")
 	}
 */
-@(require_results)
-try_recv :: proc "contextless" (c: $C/Chan($T)) -> (data: T, ok: bool) where C.D >= .Both {
+@(require_results, synchronizes=.Acquire)
+try_recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where C.D >= .Both {
 	ok = try_recv_raw(c, &data)
 	return
 }
@@ -602,7 +603,7 @@ Example:
 		assert(! chan.send_raw(c, &value))
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Release)
 send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 	if c == nil {
 		return
@@ -692,7 +693,7 @@ Example:
 		assert(! chan.recv_raw(c, &value))
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 	if c == nil {
 		return
@@ -772,7 +773,7 @@ Example:
 		assert(!chan.try_send_raw(c, &value), "the buffer is already full")
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Release)
 try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 	if c == nil {
 		return false
@@ -835,7 +836,7 @@ Example:
 		assert(!chan.try_recv_raw(c, &value))
 	}
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	if c == nil {
 		return false
@@ -1028,6 +1029,7 @@ Example:
 		assert(!chan.close(c), "was already closed")
 	}
 */
+@(synchronizes=.Release)
 close :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c == nil {
 		return false
@@ -1051,7 +1053,7 @@ Returns if the channel is closed or not
 **Returns**:
 - `true` if the channel is closed, `false` otherwise
 */
-@(require_results)
+@(require_results, synchronizes=.Acquire)
 is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c == nil {
 		return true
@@ -1205,7 +1207,7 @@ Output:
 	SELECT:         -1 None
 
 */
-@(require_results)
+@(require_results, synchronizes=.Acq_Rel)
 try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	Select_Op :: struct {
 		idx:     int, // local to the slice that was given
@@ -1270,7 +1272,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 	}
 }
 
-@(require_results, deprecated = "use try_select_raw")
+@(require_results, synchronizes=.Acq_Rel, deprecated="use try_select_raw")
 select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []rawptr, recv_out: rawptr) -> (select_idx: int, status: Select_Status) #no_bounds_check {
 	return try_select_raw(recvs, sends, send_msgs, recv_out)
 }

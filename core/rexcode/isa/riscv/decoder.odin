@@ -165,7 +165,9 @@ decode_one_inline :: #force_inline proc "contextless" (
 	return matched_idx
 }
 
-@(private="file")
+// Shared with the encoder: an rv32_only / rv64_only form is only selectable
+// when the target XLEN matches.
+@(private)
 xlen_accepts :: #force_inline proc "contextless" (xlen: XLEN, f: Encoding_Flags) -> bool {
 	if f.rv32_only && xlen != .RV32 { return false }
 	if f.rv64_only && xlen != .RV64 { return false }

@@ -142,9 +142,9 @@ x86.label_set(&lm, "done", &instructions)
 result := x86.encode(instructions[:], lm.labels[:], code[:], &relocs, &errors)
 
 // Printer wants id→name; Label_Map stores name→id, so invert once.
-id_to_name := make(map[u32]string, len(lm.names), context.temp_allocator)
-for name, id in lm.names { id_to_name[id] = name }
-x86.print(decoded_insts[:], decoded_info[:], lm.labels[:], label_names = &id_to_name)
+names := make(x86.Label_Names, len(lm.names), context.temp_allocator)   // BYTE OFFSET -> name
+for name, id in lm.names { names[x86.Label_Offset(u32(lm.labels[id]))] = name }
+x86.print(decoded_insts[:], decoded_info[:], lm.labels[:], label_names = &names)
 ```
 
 ## Driver script (`build.lua`)

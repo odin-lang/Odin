@@ -117,8 +117,11 @@ foreign kernel32 {
 
 	InitializeCriticalSection             :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 	InitializeCriticalSectionAndSpinCount :: proc(CriticalSection: ^CRITICAL_SECTION, dwSpinCount: DWORD) -> BOOL ---
+	@(synchronizes=.Acquire)
 	EnterCriticalSection                  :: proc(CriticalSection: ^CRITICAL_SECTION) ---
+	@(synchronizes=.Acquire)
 	TryEnterCriticalSection               :: proc(CriticalSection: ^CRITICAL_SECTION) -> BOOLEAN ---
+	@(synchronizes=.Release)
 	LeaveCriticalSection                  :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 	DeleteCriticalSection                 :: proc(CriticalSection: ^CRITICAL_SECTION) ---
 
@@ -159,6 +162,7 @@ foreign kernel32 {
 		lpBytesReturned: LPDWORD,
 		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL ---
+	@(synchronizes=.Release)
 	CreateThread :: proc(
 		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
 		dwStackSize: SIZE_T,
@@ -177,6 +181,7 @@ foreign kernel32 {
 		lpThreadId: LPDWORD,
 	) -> HANDLE ---
 	SwitchToThread       :: proc() -> BOOL ---
+	@(synchronizes=.Release)
 	ResumeThread         :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority    :: proc(thread: HANDLE) -> c_int ---
 	SetThreadPriority    :: proc(thread: HANDLE, priority: c_int) -> BOOL ---
@@ -201,6 +206,7 @@ foreign kernel32 {
 	) -> DWORD_PTR ---
 
 	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCWSTR) -> HANDLE ---
+	@(synchronizes=.Release)
 	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---
 
 	CreateWaitableTimerW :: proc(
@@ -223,8 +229,11 @@ foreign kernel32 {
 		WakeContext: PREASON_CONTEXT,
 		TolerableDelay: ULONG,
 	) -> BOOL ---
+	@(synchronizes=.Acquire)
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
+	@(synchronizes=.Acquire)
 	WaitForSingleObjectEx :: proc(hHandle: HANDLE, dwMilliseconds: DWORD, bAlterable: BOOL) -> DWORD ---
+	@(synchronizes=.Acq_Rel)
 	EnterSynchronizationBarrier :: proc(
 		lpBarrier: ^SYNCHRONIZATION_BARRIER,
 		dwFlags: SYNCHRONIZATION_BARRIER_FLAGS,
@@ -418,13 +427,16 @@ foreign kernel32 {
 		dwDesiredAccess: DWORD,
 	) -> HANDLE ---
 	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	@(synchronizes=.Release)
 	SetEvent :: proc(hEvent: HANDLE) -> BOOL ---
+	@(synchronizes=.Acquire)
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
 		bWaitAll: BOOL,
 		dwMilliseconds: DWORD,
 	) -> DWORD ---
+	@(synchronizes=.Acquire)
 	WaitForMultipleObjectsEx :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
@@ -505,11 +517,17 @@ foreign kernel32 {
 	FindCloseChangeNotification :: proc(hChangeHandle: HANDLE) -> BOOL ---
 
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes=.Acquire)
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes=.Acquire)
 	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
+	@(synchronizes=.Release)
 	ReleaseSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes_shared=.Acquire)
 	AcquireSRWLockShared       :: proc(SRWLock: ^SRWLOCK) ---
+	@(synchronizes_shared=.Acquire)
 	TryAcquireSRWLockShared    :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
+	@(synchronizes_shared=.Release)
 	ReleaseSRWLockShared       :: proc(SRWLock: ^SRWLOCK) ---
 
 	InitializeConditionVariable :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---

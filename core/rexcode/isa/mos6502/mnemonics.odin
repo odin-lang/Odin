@@ -12,9 +12,10 @@ package rexcode_mos6502
 //   - 65C02 additions (Rockwell/WDC), incl. RMB/SMB/BBR/BBS bit ops
 //   - HuC6280 (PC Engine) additions: block xfer, swap regs, MMR ops
 //
-// The undocumented NMOS SAX (store A&X) collides in mnemonic with the
-// HuC6280 SAX (swap A,X). To keep both, the NMOS undocumented form is
-// named `SAX_NMOS` (sometimes written as AAX or SAX-undoc elsewhere).
+// The undocumented NMOS SAX (store A&X) and the HuC6280 SAX (swap A,X)
+// share the assembler mnemonic `sax`. They are one Mnemonic with two sets
+// of forms: the NMOS one takes a memory operand and the HuC6280 one takes
+// none, so the operand shape alone picks the right encoding.
 
 Mnemonic :: enum u16 {
 	INVALID = 0,
@@ -62,7 +63,6 @@ Mnemonic :: enum u16 {
 	// -------------------------------------------------------------------------
 
 	LAX,        // LDA + LDX (load A and X from memory)
-	SAX_NMOS,   // store A AND X to memory (also called AAX / AXS-undoc)
 	DCP,        // DEC + CMP (memory)
 	ISC,        // INC + SBC (also ISB)
 	RLA,        // ROL + AND
@@ -109,7 +109,7 @@ Mnemonic :: enum u16 {
 	// -------------------------------------------------------------------------
 
 	SXY,              // swap X, Y
-	SAX,              // swap A, X   (NB: distinct from undocumented NMOS SAX_NMOS)
+	SAX,              // swap A,X (HuC6280) / store A AND X (NMOS undocumented)
 	SAY,              // swap A, Y
 	CLA, CLX, CLY,    // clear A / X / Y
 	CSH, CSL,         // CPU speed high / low (7.16 MHz vs 1.79 MHz)

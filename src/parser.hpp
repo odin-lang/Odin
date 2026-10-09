@@ -101,12 +101,12 @@ enum AstFileFlag : u32 {
 enum AstDelayQueueKind {
 	AstDelayQueue_Import,
 	AstDelayQueue_Expr,
-	AstDelayQueue_ForeignBlock,
 	AstDelayQueue_COUNT,
 };
 
 struct AstFile {
 	i32          id;
+	i32          index_in_pkg; // once the package's files are sorted by name, see `check_create_file_scopes`
 	u32          flags;
 	AstPackage * pkg;
 	Scope *      scope;
@@ -116,20 +116,27 @@ struct AstFile {
 	String       fullpath;
 	String       filename;
 	String       directory;
+	std::atomic<String *> debug_checksum; // the backend's MD5 of the source as hex, made when debug info first needs it
 
 	Tokenizer    tokenizer;
-	Array<Token> tokens;
+	Array<Token> lookahead; // read by peeking, before the parser reaches them
+	isize        lookahead_index;
+	isize        token_count;
 	isize        curr_token_index;
-	isize        prev_token_index;
+	Token        first_token;
 	Token        curr_token;
 	Token        prev_token; // previous non-comment
+	TokenPos     invalid_token_pos;
+	Array<Token> token_edits; // for `-strip-semicolon`
 	Token        package_token;
 	String       package_name;
 
 	u64          vet_flags;
 	u64          feature_flags;
+	u64          analysis_flags;
 	bool         vet_flags_set;
 	bool         feature_flags_set;
+	bool         analysis_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -144,15 +151,13 @@ struct AstFile {
 
 	isize total_file_decl_count;
 	isize delayed_decl_count;
+
 	Slice<Ast *> decls;
 	Array<Ast *> imports; // 'import'
 	isize        directive_count;
 
 	Ast *          curr_proc;
 	isize          error_count;
-	ParseFileError last_error;
-	f64            time_to_tokenize; // seconds
-	f64            time_to_parse;    // seconds
 
 	CommentGroup *lead_comment;     // Comment (block) before the decl
 	CommentGroup *line_comment;     // Comment after the semicolon
@@ -170,6 +175,22 @@ struct AstFile {
 
 	struct LLVMOpaqueMetadata *llvm_metadata;
 	struct LLVMOpaqueMetadata *llvm_metadata_scope;
+
+	//// Profiling /////
+
+	f64            time_to_load;        // seconds
+	f64            time_to_parse;       // seconds, tokenizing included, setting up the decls excluded
+	f64            time_to_setup_decls; // seconds, mostly finding and adding the imported packages
+	u64            cpu_time_to_load;
+	u64            cpu_time_to_parse;
+	u64            cpu_time_to_setup_decls;
+
+	//// Semantic Checking /////
+
+	Array<struct Entity *> collected_entities;
+	bool                   collected_entities_out_of_order;
+
+	Array<struct Entity *> type_alias_candidates; // see `correct_type_aliases_in_package`
 };
 
 enum AstForeignFileKind {
@@ -201,6 +222,8 @@ struct AstPackage {
 	bool                  is_single_file;
 	isize                 order;
 
+	std::atomic<isize>    files_to_parse; // and one more until they are all added, see `parser_package_file_done`
+
 	BlockingMutex         files_mutex;
 	BlockingMutex         foreign_files_mutex;
 	BlockingMutex         type_and_value_mutex;
@@ -215,11 +238,6 @@ struct AstPackage {
 	bool      is_extra;
 };
 
-
-struct ParseFileErrorNode {
-	ParseFileErrorNode *next, *prev;
-	ParseFileError      err;
-};
 
 struct Parser {
 	String                 init_fullpath;
@@ -236,15 +254,7 @@ struct Parser {
 
 	std::atomic<isize>     total_seen_load_directive_count;
 
-	// TODO(bill): What should this mutex be per?
-	//  * Parser
-	//  * Package
-	//  * File
-	BlockingMutex          file_decl_mutex;
-
-	BlockingMutex          file_error_mutex;
-	ParseFileErrorNode *   file_error_head;
-	ParseFileErrorNode *   file_error_tail;
+	WorkerTaskProc *       package_parsed_proc; // if set, a task for each package once its files are parsed
 };
 
 struct ParserWorkerData {
@@ -391,20 +401,6 @@ enum StmtAllowFlag {
 	StmtAllowFlag_Label   = 1<<1,
 };
 
-enum InlineAsmDialectKind : u8 {
-	InlineAsmDialect_Default, // ATT is default
-	InlineAsmDialect_ATT,
-	InlineAsmDialect_Intel,
-
-	InlineAsmDialect_COUNT,
-};
-
-gb_global char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
-	"",
-	"att",
-	"intel",
-};
-
 enum UnionTypeKind : u8 {
 	UnionType_Normal     = 0,
 	UnionType_no_nil     = 2,
@@ -423,6 +419,24 @@ gb_global char const *union_type_kind_strings[UnionType_COUNT] = {
 struct AstSplitArgs {
 	Slice<Ast *> positional;
 	Slice<Ast *> named;
+};
+
+enum AsmMemoryOperandKind : u8 {
+	AsmMemoryOperand_Default,
+	AsmMemoryOperand_Pre,
+	AsmMemoryOperand_Post,
+	AsmMemoryOperand_COUNT
+};
+
+struct AsmMemClassify {
+	Ast * base;
+	Ast * index;
+	Ast * scale;
+	Token scale_op;
+	Ast * label; // IP-relative disp, if any
+	i64   disp_total;
+	bool  has_disp_const;
+	bool  ok;
 };
 
 #define AST_KINDS \
@@ -451,6 +465,12 @@ struct AstSplitArgs {
 		Token        close; \
 		Slice<Ast *> args;  \
 	}) \
+	AST_KIND(AsmGroup, "asm group", struct { \
+		Token        token; \
+		Token        open;  \
+		Token        close; \
+		Slice<Ast *> args;  \
+	}) \
 	AST_KIND(ProcLit, "procedure literal", struct { \
 		Ast *type; \
 		Ast *body; \
@@ -467,6 +487,71 @@ struct AstSplitArgs {
 		Token open, close; \
 		i64 max_count; \
 		Ast *tag; \
+	}) \
+	AST_KIND(AsmTemplate, "asm template", struct { \
+		Token        token;            \
+		Ast *        signature;        \
+		Slice<Ast *> specs;            \
+		Slice<Ast *> clobbers;         \
+		Slice<Ast *> instructions;     \
+		Token        end;              \
+		Entity *     anonymous_entity; \
+	}) \
+	AST_KIND(AsmRegister, "asm register", struct { \
+		Token token; \
+		Token name;  \
+		Token flag;  \
+	}) \
+	AST_KIND(AsmSpec, "asm specification", struct { \
+		Ast *        name;       \
+		Ast *        tied_name;  \
+		Ast *        type;       \
+		Ast *        value;      \
+		Array<Ast *> directives; \
+	}) \
+	AST_KIND(AsmClobber, "asm clobber", struct { \
+		Token token; \
+		Token name;  \
+		Ast * value; \
+	}) \
+	AST_KIND(AsmLabelDecl, "asm label declaration", struct { \
+		Token token; \
+		Ast * name;  \
+	}) \
+	AST_KIND(AsmInstruction, "asm instruction", struct { \
+		Ast *        name;     \
+		Slice<Ast *> operands; \
+		u16 mnemonic;          \
+		u8  suffix_flags;      \
+		i32 valid_form_index;  \
+		struct AsmInstructionFacts *facts; \
+	}) \
+	AST_KIND(AsmMemoryTerm, "asm memory term", struct { \
+		Token op;       \
+		Ast * operand;  \
+		Token scale_op; \
+		Ast * scale;    \
+	}) \
+	AST_KIND(AsmMemoryOperand, "asm memory operand", struct { \
+		AsmMemoryOperandKind kind;       \
+		Token          open;             \
+		Ast *          segment_override; \
+		Slice<Ast *>   terms;            \
+		AsmMemClassify classify;         \
+		Ast *          type;             \
+		Token          close;            \
+	}) \
+	AST_KIND(AsmRegisterGroup, "asm register group", struct { \
+		Token        open;        \
+		Array<Ast *> registers;   \
+		Token        range_token; \
+		Token        close;       \
+		Ast *        type;        \
+	}) \
+	AST_KIND(AsmDirective, "asm directive", struct { \
+		Token        token;    \
+		Token        name;     \
+		Slice<Ast *> operands; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
@@ -529,17 +614,6 @@ AST_KIND(_ExprBegin,  "",  bool) \
 	}) \
 	AST_KIND(TypeCast,      "type cast",           struct { Token token; Ast *type, *expr; }) \
 	AST_KIND(AutoCast,      "auto_cast",           struct { Token token; Ast *expr; }) \
-	AST_KIND(InlineAsmExpr, "inline asm expression", struct { \
-		Token token; \
-		Token open, close; \
-		Slice<Ast *> param_types; \
-		Ast *return_type; \
-		Ast *asm_string; \
-		Ast *constraints_string; \
-		bool has_side_effects; \
-		bool is_align_stack; \
-		InlineAsmDialectKind dialect; \
-	}) \
 	AST_KIND(MatrixIndexExpr, "matrix index expression",       struct { Ast *expr, *row_index, *column_index; Token open, close; }) \
 AST_KIND(_ExprEnd,       "", bool) \
 AST_KIND(_StmtBegin,     "", bool) \

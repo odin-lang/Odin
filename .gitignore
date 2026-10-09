@@ -277,6 +277,8 @@ odin
 *.bin
 demo.bin
 libLLVM*.so*
+*.a
+*.o
 
 # core:rexcode commits its generated encode/decode tables: each arch's tablegen
 # emits human-readable Odin, serialized to tables/*.bin, which the library
@@ -307,6 +309,9 @@ build.sh
 *.raddbg
 *.rdi
 tests/issues/build/*
+tests/abi/build/*
+tests/abi/build-cross/*
+tests/debug_info/build/*
 misc/featuregen/featuregen
 
 # Clangd stuff
@@ -319,5 +324,3 @@ build/
 cmake-build*/
 CMakeLists.txt
 sandbox/
-
-vendor/box3d/lib/box3d_wasm.o

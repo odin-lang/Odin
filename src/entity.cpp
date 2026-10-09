@@ -15,7 +15,8 @@ struct DeclInfo;
 	ENTITY_KIND(ImportName) \
 	ENTITY_KIND(LibraryName) \
 	ENTITY_KIND(Nil) \
-	ENTITY_KIND(Label)
+	ENTITY_KIND(Label) \
+	ENTITY_KIND(AsmTemplate)
 
 enum EntityKind {
 #define ENTITY_KIND(k) GB_JOIN2(Entity_, k),
@@ -75,7 +76,8 @@ enum EntityFlag : u64 {
 	EntityFlag_Init          = 1ull<<31,
 	EntityFlag_Subtype       = 1ull<<32,
 	EntityFlag_Fini          = 1ull<<33,
-	
+	EntityFlag_PolyConstArg  = 1ull<<34, // passed to a `$` parameter, so a local procedure may be called outside its parent
+
 	EntityFlag_CustomLinkName = 1ull<<40,
 	EntityFlag_CustomLinkage_Internal = 1ull<<41,
 	EntityFlag_CustomLinkage_Strong   = 1ull<<42,
@@ -138,8 +140,19 @@ enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_FavorSize,
 };
 
+// see `@(futex=...)`
+enum ProcedureFutex : u8 {
+	ProcedureFutex_None,
+	ProcedureFutex_Wait,
+	ProcedureFutex_Wake,
+};
+
 
 BlockingMutex global_type_name_objc_metadata_mutex;
+
+struct TypeNameObjCMetadata;
+
+gb_internal TypeNameObjCMetadata *entity_objc_metadata(struct Entity *e);
 
 struct TypeNameObjCMetadataEntry {
 	InternedString interned;
@@ -159,12 +172,54 @@ gb_internal TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
 	return md;
 }
 
+enum AsmTemplateEntityDeclKind : u8 {
+	AsmTemplateEntityDecl_Invalid,
+	AsmTemplateEntityDecl_Register,
+	AsmTemplateEntityDecl_Memory,
+	AsmTemplateEntityDecl_Immediate,
+
+	AsmTemplateEntityDecl_COUNT
+};
+
+enum AsmTemplateEntityDeclParamGroup : u8 {
+	AsmTemplateEntityDeclParamGroup_Unknown,
+	AsmTemplateEntityDeclParamGroup_Input,
+	AsmTemplateEntityDeclParamGroup_Output,
+	AsmTemplateEntityDeclParamGroup_Scratch,
+
+	AsmTemplateEntityDeclParamGroup_COUNT
+};
+
+struct AsmTemplateEntityDecl {
+	Entity *                        entity;
+	Entity *                        tied_entity;
+	AsmTemplateEntityDeclKind       kind;
+	AsmTemplateEntityDeclParamGroup param_group;
+	AsmRegClass                     reg_class;
+
+	String                          pin;
+	String                          pin_flag; // e.g. %flags.zf
+
+	i32 total_index;
+
+	i32 param_index;  // index into the Proc signature's params (inputs), else -1
+	i32 result_index; // index into results (outputs), else -1
+	i32 tie; // InOut: index into operands[] of the tied output; else -1
+
+	i32 view_of; // total_index of the source operand this is a width-view of, else -1
+	i32 view_bits; // the view width in bits, otherwise 0
+
+	bool no_init;
+};
+
 // An Entity is a named "thing" in the language
 struct Entity {
 	EntityKind  kind;
+	i32         global_graph_node; // 1 + the index of its node in the global groups' graph, 0 if it is none
 	u64         id;
 	std::atomic<u64>         flags;
 	std::atomic<EntityState> state;
+	Futex                    checking_thread; // 1 + the index of the thread in `check_entity_decl` for it, else 0
 	std::atomic<i32>         min_dep_count;
 	Token       token;
 	Scope *     scope;
@@ -225,6 +280,7 @@ struct Entity {
 			String     link_prefix;
 			String     link_suffix;
 			String     link_section;
+			i64        custom_align;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
@@ -259,6 +315,10 @@ struct Entity {
 			struct GenProcsData *gen_procs;
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
+			ProcedureFutex            futex;
+			i32                       futex_parameter; // the index of what `futex` waits on or wakes
+			u8                        synchronizes;        // OdinAtomicMemoryOrder, see `@(synchronizes=...)`
+			bool                      synchronizes_shared; // see `@(synchronizes_shared=...)`
 
 			u64     fast_math_flags;
 
@@ -277,6 +337,7 @@ struct Entity {
 			bool    is_objc_class_method       : 1;
 		} Procedure;
 		struct {
+			bool is_asm_group;
 			Array<Entity *> entities;
 		} ProcGroup;
 		struct {
@@ -300,9 +361,32 @@ struct Entity {
 			String name;
 			Ast *node;
 			Ast *parent;
+
+			i32 asm_block_index;
 		} Label;
+		struct {
+			Ast *node;
+			bool is_volatile;
+			bool is_align_stack;
+			bool is_pure;
+
+			bool has_observable_side_effect;
+
+			Scope *param_scope;
+			Scope *label_scope;
+			Array<AsmTemplateEntityDecl> decls;
+
+			StringSet clobber_registers_set;
+			StringSet preserve_registers_set;
+			bool      clobber_flags;
+			bool      clobber_memory;
+		} AsmTemplate;
 	};
 };
+
+
+gb_internal AsmRegClass check_asm_reg_class_from_type(Type *type);
+gb_internal bool is_type_internally_pointer_like(Type *t);
 
 gb_internal InternedString entity_interned_name(Entity *entity) {
 	auto name = entity->interned_name.load();
@@ -313,6 +397,26 @@ gb_internal InternedString entity_interned_name(Entity *entity) {
 	}
 	return name;
 }
+
+
+gb_internal AsmTemplateEntityDecl asm_template_entity_decl_default(Entity *entity) {
+	AsmTemplateEntityDecl ed = {};
+	ed.kind = AsmTemplateEntityDecl_Register;
+	if (is_type_internally_pointer_like(entity->type)) {
+		ed.kind = AsmTemplateEntityDecl_Memory;
+	}
+	ed.reg_class = check_asm_reg_class_from_type(entity->type);
+	ed.entity = entity;
+	ed.total_index  = -1;
+	ed.param_index  = -1;
+	ed.result_index = -1;
+	ed.tie          = -1;
+	ed.view_of      = -1;
+	ed.view_bits    =  0;
+
+	return ed;
+}
+
 
 gb_internal bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
 	switch (kind) {
@@ -358,6 +462,18 @@ gb_internal bool entity_has_deferred_procedure(Entity *e) {
 
 gb_global std::atomic<u64> global_entity_id;
 
+gb_global thread_local u64 entity_id_next;
+gb_global thread_local u64 entity_id_end;
+
+gb_internal u64 next_entity_id(void) {
+	if (entity_id_next == entity_id_end) {
+		enum {ENTITY_ID_BLOCK = 1024};
+		entity_id_next = global_entity_id.fetch_add(ENTITY_ID_BLOCK, std::memory_order_relaxed);
+		entity_id_end  = entity_id_next + ENTITY_ID_BLOCK;
+	}
+	return 1 + entity_id_next++;
+}
+
 // NOTE(bill): This exists to allow for bulk allocations of entities all at once to improve performance for type generation
 #define INTERNAL_ENTITY_INIT(e_, kind_, scope_, token_, type_) do {                  \
 	(e_)->kind   = (kind_);                                                      \
@@ -365,7 +481,7 @@ gb_global std::atomic<u64> global_entity_id;
 	(e_)->scope  = (scope_);                                                     \
 	(e_)->token  = (token_);                                                     \
 	(e_)->type   = (type_);                                                      \
-	(e_)->id     = 1 + global_entity_id.fetch_add(1);                            \
+	(e_)->id     = next_entity_id();                                             \
 	if ((token_).pos.file_id) {                                                  \
 		e_->file = thread_unsafe_get_ast_file_from_id((token_).pos.file_id); \
 	}                                                                            \
@@ -478,8 +594,12 @@ gb_internal Entity *alloc_entity_library_name(Scope *scope, Token token, Type *t
 }
 
 
-
-
+gb_internal Entity *alloc_entity_asm_template(Scope *scope, Token token, Type *type, Ast *node) {
+	GB_ASSERT(node->kind == Ast_AsmTemplate);
+	Entity *entity = alloc_entity(Entity_AsmTemplate, scope, token, type);
+	entity->AsmTemplate.node = node;
+	return entity;
+}
 
 gb_internal Entity *alloc_entity_nil(String name, Type *type) {
 	Entity *entity = alloc_entity(Entity_Nil, nullptr, make_token_ident(name), type);
@@ -490,6 +610,7 @@ gb_internal Entity *alloc_entity_label(Scope *scope, Token token, Type *type, As
 	Entity *entity = alloc_entity(Entity_Label, scope, token, type);
 	entity->Label.node = node;
 	entity->Label.parent = parent;
+	entity->Label.asm_block_index = -1;
 	entity->state = EntityState_Resolved;
 	return entity;
 }

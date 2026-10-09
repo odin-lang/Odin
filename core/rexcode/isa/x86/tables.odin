@@ -94,6 +94,7 @@ Decode_Index :: struct {
 @(rodata) EVEX_INDEX_0F         := #load("tables/x86.evex_idx_0f.bin",    []Decode_Index)
 @(rodata) EVEX_INDEX_0F38       := #load("tables/x86.evex_idx_0f38.bin",  []Decode_Index)
 @(rodata) EVEX_INDEX_0F3A       := #load("tables/x86.evex_idx_0f3a.bin",  []Decode_Index)
+@(rodata) CLOBBER_FORMS         := #load("tables/x86.clobber_forms.bin",  []Clobber)
 
 // -----------------------------------------------------------------------------
 // Accessors
@@ -105,6 +106,14 @@ Decode_Index :: struct {
 encoding_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Encoding {
 	r := ENCODE_RUNS[u16(m)]
 	return ENCODE_FORMS[r.start:][:r.count]
+}
+
+// Per-mnemonic encode forms: the run of ENCODE_FORMS belonging to `m`.
+// Replaces the old ENCODING_TABLE[m] slice; the returned view is into rodata.
+@(private, require_results)
+clobber_forms :: #force_inline proc "contextless" (m: Mnemonic) -> []Clobber {
+	r := ENCODE_RUNS[u16(m)]
+	return CLOBBER_FORMS[r.start:][:r.count]
 }
 
 // Flat [prefix][opcode] lookup into a logical [4][256] index table.

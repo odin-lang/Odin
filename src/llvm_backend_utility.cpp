@@ -59,14 +59,29 @@ gb_internal lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 }
 
 
+gb_internal unsigned lb_metadata_kind(lbModule *m, String const &name) {
+	for (isize i = 0; i < m->metadata_kind_count; i++) {
+		if (m->metadata_kinds[i].name == name) {
+			return m->metadata_kinds[i].kind;
+		}
+	}
+	unsigned kind = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	if (m->metadata_kind_count < gb_count_of(m->metadata_kinds)) {
+		m->metadata_kinds[m->metadata_kind_count].name = name;
+		m->metadata_kinds[m->metadata_kind_count].kind = kind;
+		m->metadata_kind_count += 1;
+	}
+	return kind;
+}
+
 gb_internal void lb_set_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name, u64 value) {
-	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	unsigned md_id = lb_metadata_kind(m, name);
 	LLVMMetadataRef md = LLVMValueAsMetadata(LLVMConstInt(lb_type(m, t_u64), value, false));
 	LLVMValueRef node = LLVMMetadataAsValue(m->ctx, LLVMMDNodeInContext2(m->ctx, &md, 1));
 	LLVMSetMetadata(v_ref, md_id, node);
 }
 gb_internal u64 lb_get_metadata_custom_u64(lbModule *m, LLVMValueRef v_ref, String name) {
-	unsigned md_id = LLVMGetMDKindIDInContext(m->ctx, cast(char const *)name.text, cast(unsigned)name.len);
+	unsigned md_id = lb_metadata_kind(m, name);
 	LLVMValueRef v_md = LLVMGetMetadata(v_ref, md_id);
 	if (v_md == nullptr) {
 		return 0;
@@ -97,6 +112,27 @@ gb_internal LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef p
 		}
 	}
 
+
+	if (is_inlinable && !is_volatile && lb_uses_fast_isel()) {
+		LLVMValueRef dst = LLVMBuildPointerCast(p->builder, ptr, lb_type(p->module, t_rawptr), "");
+		LLVMValueRef last = nullptr;
+		for (i64 offset = 0; offset < const_len; /**/) {
+			i64 chunk = 8;
+			while (chunk > const_len - offset) {
+				chunk >>= 1;
+			}
+			LLVMTypeRef chunk_type = LLVMIntTypeInContext(p->module->ctx, cast(unsigned)(8*chunk));
+			LLVMValueRef chunk_ptr = dst;
+			if (offset != 0) {
+				LLVMValueRef index = LLVMConstInt(lb_type(p->module, t_int), offset, false);
+				chunk_ptr = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), dst, &index, 1, "");
+			}
+			last = LLVMBuildStore(p->builder, LLVMConstNull(chunk_type), chunk_ptr);
+			LLVMSetAlignment(last, 1);
+			offset += chunk;
+		}
+		return last;
+	}
 
 	char const *name = "llvm.memset";
 	if (is_inlinable) {
@@ -408,7 +444,9 @@ gb_internal void lb_emit_try_lhs_rhs(lbProcedure *p, Ast *arg, TypeAndValue cons
 	lbValue value = lb_build_expr(p, arg);
 	if (is_type_tuple(value.type)) {
 		i32 n = cast(i32)(value.type->Tuple.variables.count-1);
-		if (value.type->Tuple.variables.count == 2) {
+		if (value.type->Tuple.variables.count == 1) {
+			// No lhs
+		} else if (value.type->Tuple.variables.count == 2) {
 			lhs = lb_emit_tuple_ev(p, value, 0);
 		} else {
 			lbAddr lhs_addr = lb_add_local_generated(p, tv.type, false);
@@ -449,6 +487,11 @@ gb_internal bool lb_is_type_trivial(Type *type) {
 	    	return true;
 	}
 	return false;
+}
+
+gb_internal bool lb_is_type_large_aggregate(lbModule *m, Type *type) {
+	LLVMTypeKind kind = LLVMGetTypeKind(lb_type(m, type));
+	return (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) && type_size_of(type) > 64;
 }
 
 gb_internal bool lb_is_expr_trivial(Ast *e) {
@@ -513,8 +556,30 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 		lb_emit_unreachable(p); // add just in case
 
 		lb_start_block(p, then);
-		return lb_emit_conv(p, lhs, type);
+		if (lhs.value != nullptr && type != nullptr) {
+			return lb_emit_conv(p, lhs, type);
+		}
+		return {};
 	} else {
+		if (lb_is_type_large_aggregate(p->module, type)) {
+			lbAddr res = lb_add_local_generated(p, type, false);
+
+			lbBlock *then  = lb_create_block(p, "or_else.then");
+			lbBlock *done  = lb_create_block(p, "or_else.done");
+			lbBlock *else_ = lb_create_block(p, "or_else.else");
+
+			lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+			lb_start_block(p, then);
+			lb_addr_store(p, res, lb_emit_conv(p, lhs, type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, else_);
+			lb_addr_store(p, res, lb_emit_conv(p, lb_build_expr(p, else_expr), type));
+			lb_emit_jump(p, done);
+
+			lb_start_block(p, done);
+			return lb_addr_load(p, res);
+		}
 		if (lb_is_type_trivial(type) && lb_is_expr_trivial(else_expr)) {
 			lbValue has_value = lb_emit_try_has_value(p, rhs);
 			lbValue then_val = lb_emit_conv(p, lhs, type);
@@ -532,18 +597,22 @@ gb_internal lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, Ty
 		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
 		lb_start_block(p, then);
 
-		incoming_values[0] = lb_emit_conv(p, lhs, type).value;
+		LLVMTypeRef llvm_type = lb_type(p->module, type);
+
+		// A union constant is built as an anonymous packed struct, which a phi cannot accept
+		// alongside the named type it results in, even though the two are laid out identically
+		incoming_values[0] = OdinLLVMBuildTransmute(p, lb_emit_conv(p, lhs, type).value, llvm_type);
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, else_);
 
-		incoming_values[1] = lb_emit_conv(p, lb_build_expr(p, else_expr), type).value;
+		incoming_values[1] = OdinLLVMBuildTransmute(p, lb_emit_conv(p, lb_build_expr(p, else_expr), type).value, llvm_type);
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, done);
 
 		lbValue res = {};
-		res.value = LLVMBuildPhi(p->builder, lb_type(p->module, type), "");
+		res.value = LLVMBuildPhi(p->builder, llvm_type, "");
 		res.type = type;
 
 		GB_ASSERT(p->curr_block->preds.count >= 2);
@@ -985,7 +1054,7 @@ gb_internal lbAddr lb_find_or_generate_context_ptr(lbProcedure *p) {
 }
 
 gb_internal lbValue lb_address_from_load_or_generate_local(lbProcedure *p, lbValue value) {
-	if (LLVMIsALoadInst(value.value)) {
+	if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
 		lbValue res = {};
 		res.value = LLVMGetOperand(value.value, 0);
 		res.type = alloc_type_pointer(value.type);
@@ -1548,27 +1617,25 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 		type = core_type(type);
 
 		if (type->kind == Type_SoaPointer) {
+			// #soa pointer is {^container, index}; index into the selected
+			// column, then keep walking remaining selection indices (e.g. `using`)
 			lbValue addr = lb_emit_struct_ep(p, e, 0);
-			lbValue index = lb_emit_struct_ep(p, e, 1);
+			lbValue soa_index = lb_emit_struct_ep(p, e, 1);
 			addr = lb_emit_load(p, addr);
-			index = lb_emit_load(p, index);
+			soa_index = lb_emit_load(p, soa_index);
 
-			i32 first_index = sel.index[0];
-			Selection sub_sel = sel;
-			sub_sel.index.data += 1;
-			sub_sel.index.count -= 1;
-
-			lbValue arr = lb_emit_struct_ep(p, addr, first_index);
+			lbValue arr = lb_emit_struct_ep(p, addr, index);
 
 			Type *t = base_type(type_deref(addr.type));
 			GB_ASSERT(is_type_soa_struct(t));
 
 			if (t->Struct.soa_kind == StructSoa_Fixed) {
-				e = lb_emit_array_ep(p, arr, index);
+				e = lb_emit_array_ep(p, arr, soa_index);
 			} else {
-				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
+				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), soa_index);
 			}
 			e.type = alloc_type_multi_pointer_to_pointer(e.type);
+			type = type_deref(e.type);
 
 		} else if (is_type_quaternion(type)) {
 			e = lb_emit_struct_ep(p, e, index);
@@ -2960,7 +3027,7 @@ gb_internal lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
 
 	auto args = array_make<lbValue>(permanent_allocator(), 3);
 	args[0] = lb_const_nil(m, t_objc_Class);
-	args[1] = lb_const_nil(m, t_objc_Class);
+	args[1] = lb_const_value(m, t_cstring, exact_value_string(name));
 	args[2] = lb_const_int(m, t_uint, 0);
 	lbValue ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
 	lb_addr_store(p, dst, ptr);
@@ -3452,4 +3519,33 @@ gb_internal void lb_do_build_diagnostics(lbGenerator *gen) {
 	lb_do_module_diagnostics(gen);
 	gb_printf("------------------------------------------------------------------------------------------\n");
 	gb_printf("------------------------------------------------------------------------------------------\n\n");
+}
+
+// LLVM only adds `evex512` by itself for the generic x86 CPUs, so with e.g. the default `x86-64-v2`
+// an explicit `+avx512f` gives no zmm registers and 512-bit vectors are returned as ymm pairs, unlike C.
+// Like clang, ask for it whenever an AVX-512 feature is enabled and `evex512` isn't named explicitly.
+gb_internal bool lb_x86_features_need_evex512(String features) {
+#if LLVM_VERSION_MAJOR >= 18
+	if (!is_arch_x86()) {
+		return false;
+	}
+	bool has_avx512 = false;
+	String_Iterator it = {features, 0};
+	String str = {};
+	while (string_split_iterator_next(&it, ',', &str)) {
+		bool disabled = string_starts_with(str, '-');
+		if (string_starts_with(str, '+') || disabled) {
+			str = substring(str, 1, str.len);
+		}
+		if (str == "evex512") {
+			return false;
+		}
+		if (!disabled && string_starts_with(str, str_lit("avx512"))) {
+			has_avx512 = true;
+		}
+	}
+	return has_avx512;
+#else
+	return false;
+#endif
 }

@@ -62,6 +62,7 @@ package all
 @(require) import "core:crypto/tuplehash"
 @(require) import "core:crypto/x25519"
 @(require) import "core:crypto/x448"
+@(require) import "core:crypto/x509"
 
 @(require) import "core:debug/pe"
 @(require) import "core:debug/trace"
@@ -124,7 +125,6 @@ package all
 @(require) import "core:prof/spall"
 
 @(require) import "core:os"
-@(require) import "core:os/old"
 
 @(require) import "core:path/slashpath"
 @(require) import "core:path/filepath"

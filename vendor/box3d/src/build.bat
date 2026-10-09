@@ -17,5 +17,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
+cl -nologo -MT -TC -O2 -LD -std:c17 -Dbox3d_EXPORTS -I"include" src\*.c -link -out:..\lib\box3d.dll -implib:..\lib\box3ddll.lib
+if errorlevel 1 (
+    popd
+    exit /b 1
+)
+
 del "*.obj"
 popd

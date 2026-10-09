@@ -117,19 +117,26 @@ encode :: proc(
 				#partial switch op.kind {
 				case .REGISTER:
 					// R8-R15, XMM8-31, YMM8-31, ZMM8-31 require REX/VEX/EVEX extension.
-					if reg_needs_rex(op.reg) { invalid = true; break }
+					if reg_needs_rex(op.reg) {
+						invalid = true
+						break
+					}
 					// SPL/BPL/SIL/DIL (REG_GPR8 hw 4-7) don't exist in i386;
 					// those encodings decode as AH/CH/DH/BH there. Users
 					// wanting high-byte regs should use REG_GPR8H (AH..BH).
 					if reg_class(op.reg) == REG_GPR8 {
 						hw := reg_hw(op.reg)
-						if hw >= 4 && hw <= 7 { invalid = true; break }
+						if hw >= 4 && hw <= 7 {
+							invalid = true
+							break
+						}
 					}
 				case .MEMORY:
 					m := op.mem
 					if (mem_has_base(m)  && m.base_ext)  ||
 					   (mem_has_index(m) && m.index_ext) {
-						invalid = true; break
+						invalid = true
+						break
 					}
 				}
 			}
@@ -152,6 +159,27 @@ encode :: proc(
 		if mode == ._64 && inst.enc_hint != ENC_HINT_NONE && int(inst.enc_hint) <= len(ENCODE_FORMS) {
 			form_index = int(inst.enc_hint) - 1
 			matched_enc = &ENCODE_FORMS[form_index]
+			/* THE HINT MUST NAME A FORM OF THIS MNEMONIC. The bounds check above is not enough: the
+			   index is GLOBAL and baked into `mnemonic_builders.odin` at generation time, so any
+			   later edit to the encoding table that inserts or removes a form shifts every index
+			   after it and leaves the builders naming someone else's instruction. Nothing here
+			   noticed — the encoder took the form, emitted its bytes, and returned success.
+
+			   It has happened twice. `6e17e7a2d` left 2130 of 3671 builders pointing at the wrong
+			   form; `36af73834` regenerated both halves and cleared it; `baae2636b` (adding `in`
+			   and `out`) re-broke 37; `9ae9a9bf9` shifted an early mnemonic and broke 3393 of 3802,
+			   including CALL — whose r/m64 builder then encoded `0F 8A` (JPE) instead of `FF /2`,
+			   turning every indirect call into a conditional jump. The symptom was a segfault in a
+			   JIT'd program, arbitrarily far from the cause.
+
+			   Debug-only, so the release fast path is byte-for-byte what it was: this is a
+			   REGENERATION-TIME mistake, and it only has to be caught once by anyone running tests. */
+			when ODIN_DEBUG {
+				run := ENCODE_RUNS[inst.mnemonic]
+				if form_index < int(run.start) || form_index >= int(run.start) + int(run.count) {
+					panic("rexcode/x86: a baked enc_hint names a form outside its own mnemonic's run — mnemonic_builders.odin is stale relative to tables/x86.encode_*.bin. Regenerate it: odin run core/rexcode/isa/x86/tools/gen_mnemonic_builders.odin -file")
+				}
+			}
 		} else {
 			// Resolve the form on the matcher path (memoizing cache + scan) in a
 			// separate, non-inlined proc so this hot loop stays lean for the hint
@@ -222,17 +250,26 @@ encode :: proc(
 			// only the explicit slots (skipping implicit). For non-implicit forms
 			// the two are identical (operand_count == total), so nothing changes.
 			total_form_ops := 0
-			for op in enc.ops { if op == .NONE { break }; total_form_ops += 1 }
+			for op in enc.ops {
+				if op == .NONE {
+					break
+				}
+				total_form_ops += 1
+			}
 			fully_explicit := int(inst.operand_count) == total_form_ops
 
 			user_idx := 0
 			for op, i in enc.ops {
-				if op == .NONE { break }
+				if op == .NONE {
+					break
+				}
 				uop: ^Operand
 				if fully_explicit {
 					uop = &inst.ops[i]
 				} else if !is_implicit_op_inline(op) {
-					if user_idx < int(inst.operand_count) { uop = &inst.ops[user_idx] }
+					if user_idx < int(inst.operand_count) {
+						uop = &inst.ops[user_idx]
+					}
 					user_idx += 1
 				}
 				if uop != nil {
@@ -297,8 +334,26 @@ encode :: proc(
 				pos += 1
 			}
 
-			// Address size override (67h)
-			if inst.flags.addr32 {
+			// Address size override (67h), when the CALLER asked for one. A form
+			// that requires a particular address size emits it below instead --
+			// this branch is inside the "any instruction flag is set" gate, and
+			// such a form needs the prefix whether or not the caller set a flag.
+			if inst.flags.addr32 && enc.flags.addr_size == .DEFAULT {
+				out[pos] = 0x67
+				pos += 1
+			}
+		}
+
+		// A form whose ADDRESS size is fixed (JRCXZ/JECXZ/JCXZ -- one opcode, the
+		// mnemonic saying which counter register) carries the prefix when its size
+		// is not the mode's default. Outside the flags gate above because it is a
+		// property of the ENCODING, not of the caller's request; `addr_size` is
+		// .DEFAULT for all but three forms, so the test is one compare against a
+		// field already loaded.
+		if enc.flags.addr_size != .DEFAULT {
+			// Reachability was settled by the matcher's gate, which refuses a form
+			// whose address size this mode cannot express.
+			if needs_67, _ := addr_size_prefix(enc.flags.addr_size, mode); needs_67 {
 				out[pos] = 0x67
 				pos += 1
 			}
@@ -309,8 +364,14 @@ encode :: proc(
 		#partial switch enc.flags.vex_type{
 		case .VEX:
 			// VEX prefix encoding
-			r: u8 = 1; x: u8 = 1; b: u8 = 1
-			vvvv: u8 = 0xF; l: u8 = 0; pp: u8 = 0; mmmmm: u8 = 1; w: u8 = 0
+			r:     u8 = 1
+			x:     u8 = 1
+			b:     u8 = 1
+			vvvv:  u8 = 0xF
+			l:     u8 = 0
+			pp:    u8 = 0
+			mmmmm: u8 = 1
+			w:     u8 = 0
 
 			#partial switch enc.flags.esc {
 			case ._0F:   mmmmm = 1
@@ -336,7 +397,9 @@ encode :: proc(
 			// contributions, gate by kind, clear the inverted bit via AND-mask).
 			for enc_type, i in enc.enc {
 				user_op := user_ops[i]
-				if user_op == nil { continue }
+				if user_op == nil {
+					continue
+				}
 
 				is_reg := user_op.kind == .REGISTER
 				is_mem := user_op.kind == .MEMORY
@@ -371,9 +434,19 @@ encode :: proc(
 
 		case .EVEX:
 			// EVEX prefix encoding (4 bytes)
-			r: u8 = 1; x: u8 = 1; b: u8 = 1; rr: u8 = 1
-			mm: u8 = 1; w: u8 = 0; vvvv: u8 = 0xF; pp: u8 = 0
-			z: u8 = 0; ll: u8 = 0; bb: u8 = 0; vvv: u8 = 1; aaa: u8 = 0
+			r:    u8 = 1
+			x:    u8 = 1
+			b:    u8 = 1
+			rr:   u8 = 1
+			mm:   u8 = 1
+			w:    u8 = 0
+			vvvv: u8 = 0xF
+			pp:   u8 = 0
+			z:    u8 = 0
+			ll:   u8 = 0
+			bb:   u8 = 0
+			vvv:  u8 = 1
+			aaa:  u8 = 0
 
 			#partial switch enc.flags.esc {
 			case ._0F:   mm = 1
@@ -398,7 +471,9 @@ encode :: proc(
 
 			for i in 0..<4 {
 				user_op := user_ops[i]
-				if user_op == nil { continue }
+				if user_op == nil {
+					continue
+				}
 
 				is_reg := user_op.kind == .REGISTER
 				is_mem := user_op.kind == .MEMORY
@@ -511,10 +586,12 @@ encode :: proc(
 				out[pos] = 0x0F
 				pos += 1
 			case ._0F38:
-				out[pos] = 0x0F; out[pos+1] = 0x38
+				out[pos+0] = 0x0F
+				out[pos+1] = 0x38
 				pos += 2
 			case ._0F3A:
-				out[pos] = 0x0F; out[pos+1] = 0x3A
+				out[pos+0] = 0x0F
+				out[pos+1] = 0x3A
 				pos += 2
 			}
 		}
@@ -653,7 +730,10 @@ encode :: proc(
 			// bytes are written past the real size.
 			if disp_is_label {
 				append(&pending_relocations, Relocation{byte_count + pos, disp_label_id, 0, .REL32, 4, u16(instruction_index)})
-				out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
+				out[pos+0] = 0
+				out[pos+1] = 0
+				out[pos+2] = 0
+				out[pos+3] = 0
 				pos += 4
 			} else {
 				for _ in 0..<displacement_size {
@@ -679,8 +759,10 @@ encode :: proc(
 		}
 
 		// --- Immediate(s), in operand-slot order (ENTER = C8 has two: IMM16 then IMM8). ---
-		for slot in 0 ..< 4 {
-			if user_ops[slot] == nil { continue }
+		for slot in 0..<4 {
+			if user_ops[slot] == nil {
+				continue
+			}
 			user_op := user_ops[slot]
 			#partial switch enc.enc[slot] {
 			case .IB:
@@ -697,19 +779,26 @@ encode :: proc(
 			case .IW:
 				if user_op.kind == .IMMEDIATE {
 					v := u16(user_op.immediate)
-					out[pos] = u8(v); out[pos+1] = u8(v >> 8)
+					out[pos+0] = u8(v)
+					out[pos+1] = u8(v >> 8)
 					pos += 2
 				}
 			case .ID:
 				#partial switch user_op.kind {
 				case .IMMEDIATE:
 					v := u32(user_op.immediate)
-					out[pos] = u8(v); out[pos+1] = u8(v >> 8); out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
+					out[pos+0] = u8(v)
+					out[pos+1] = u8(v >> 8)
+					out[pos+2] = u8(v >> 16)
+					out[pos+3] = u8(v >> 24)
 					pos += 4
 				case .RELATIVE:
 					label_id := u32(user_op.relative)
 					append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .REL32, 4, u16(instruction_index)})
-					out[pos] = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
+					out[pos+0] = 0
+					out[pos+1] = 0
+					out[pos+2] = 0
+					out[pos+3] = 0
 					pos += 4
 				}
 			case .IQ:
@@ -718,13 +807,25 @@ encode :: proc(
 						// movabs reg, <label>: placeholder imm64 + ABS64 relocation.
 						label_id := u32(user_op.immediate)
 						append(&pending_relocations, Relocation{byte_count + pos, label_id, 0, .ABS64, 8, u16(instruction_index)})
-						out[pos]   = 0; out[pos+1] = 0; out[pos+2] = 0; out[pos+3] = 0
-						out[pos+4] = 0; out[pos+5] = 0; out[pos+6] = 0; out[pos+7] = 0
+						out[pos+0] = 0
+						out[pos+1] = 0
+						out[pos+2] = 0
+						out[pos+3] = 0
+						out[pos+4] = 0
+						out[pos+5] = 0
+						out[pos+6] = 0
+						out[pos+7] = 0
 						pos += 8
 					} else {
 						v := u64(user_op.immediate)
-						out[pos]   = u8(v);       out[pos+1] = u8(v >> 8);  out[pos+2] = u8(v >> 16); out[pos+3] = u8(v >> 24)
-						out[pos+4] = u8(v >> 32); out[pos+5] = u8(v >> 40); out[pos+6] = u8(v >> 48); out[pos+7] = u8(v >> 56)
+						out[pos+0] = u8(v)
+						out[pos+1] = u8(v >> 8)
+						out[pos+2] = u8(v >> 16)
+						out[pos+3] = u8(v >> 24)
+						out[pos+4] = u8(v >> 32)
+						out[pos+5] = u8(v >> 40)
+						out[pos+6] = u8(v >> 48)
+						out[pos+7] = u8(v >> 56)
 						pos += 8
 					}
 				}
@@ -805,7 +906,18 @@ bmask :: #force_inline proc "contextless" (b: bool) -> u8 {
 encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encoding, mode: Mode) -> bool {
 	// Mode gate: skip i386-only encodings (short-form INC/DEC at 0x40-0x4F)
 	// when not in Mode._32.
-	if enc.flags.mode_32_only && mode != ._32 { return false }
+	if enc.flags.mode_32_only && mode != ._32 {
+		return false
+	}
+
+	// Address-size gate: a form fixed to an address size this mode cannot reach
+	// is not encodable here at all -- JCXZ (16-bit) in long mode, where 67h
+	// selects 32-bit; JRCXZ (64-bit) outside it. Every other form is .DEFAULT.
+	if enc.flags.addr_size != .DEFAULT {
+		if _, reachable := addr_size_prefix(enc.flags.addr_size, mode); !reachable {
+			return false
+		}
+	}
 
 	// PUSH/POP FS/GS: the segment operand is fixed by the opcode (0F A0/A1 -> FS,
 	// 0F A8/A9 -> GS), so a form only matches when the user's segment agrees --
@@ -820,8 +932,10 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	explicit_count := enc.flags.explicit_count
 
 	if !enc.flags.has_implicit {
-		if inst.operand_count != explicit_count { return false }
-		for i in 0 ..< explicit_count {
+		if inst.operand_count != explicit_count {
+			return false
+		}
+		for i in 0..<explicit_count {
 			eff := mode_rewrite_op_type(enc.ops[i], mode, enc.flags.default_64)
 			operand_matches_inline(&inst.ops[i], eff) or_return
 		}
@@ -831,7 +945,9 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// Total operand slots (implicit + explicit) in this form.
 	total_ops: u8 = 0
 	for op_type in enc.ops {
-		if op_type == .NONE { break }
+		if op_type == .NONE {
+			break
+		}
 		total_ops += 1
 	}
 
@@ -845,9 +961,13 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 	// path maps slots positionally for this same operand_count == total_ops case.)
 	if inst.operand_count == total_ops {
 		for op_type, i in enc.ops {
-			if op_type == .NONE { break }
+			if op_type == .NONE {
+				break
+			}
 			if is_implicit_op_inline(op_type) {
-				if !implicit_operand_matches(&inst.ops[i], op_type) { return false }
+				if !implicit_operand_matches(&inst.ops[i], op_type) {
+					return false
+				}
 			} else {
 				eff := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
 				operand_matches_inline(&inst.ops[i], eff) or_return
@@ -858,13 +978,21 @@ encoding_matches_inline :: proc "contextless" (inst: ^Instruction, enc: ^Encodin
 
 	// Implicit operand(s) omitted by the caller (hand-built `add imm`, `shl rm`):
 	// operand count must match the explicit-only count; match those in order.
-	if inst.operand_count != explicit_count { return false }
+	if inst.operand_count != explicit_count {
+		return false
+	}
 	user_idx: u8 = 0
 	for op_type in enc.ops {
-		if op_type == .NONE { break }
-		if is_implicit_op_inline(op_type) { continue }
+		if op_type == .NONE {
+			break
+		}
+		if is_implicit_op_inline(op_type) {
+			continue
+		}
 
-		if user_idx >= inst.operand_count { return false }
+		if user_idx >= inst.operand_count {
+			return false
+		}
 		effective_op_type := mode_rewrite_op_type(op_type, mode, enc.flags.default_64)
 		operand_matches_inline(&inst.ops[user_idx], effective_op_type) or_return
 		user_idx += 1
@@ -918,8 +1046,10 @@ operand_matches_inline :: #force_inline proc "contextless" (op: ^Operand, op_typ
 	case .IMMEDIATE: return imm_matches_inline(op, op_type)
 	case .RELATIVE:
 		// Respect user's size preference: size=1 -> REL8, size=4 -> REL32
-		if op.size == 1 { return op_type == .REL8  }
-		if op.size == 4 { return op_type == .REL32 }
+		switch op.size {
+		case 1: return op_type == .REL8
+		case 4: return op_type == .REL32
+		}
 		// Default: accept either
 		return op_type == .REL8 || op_type == .REL32
 	}
