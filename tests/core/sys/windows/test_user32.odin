@@ -11,3 +11,9 @@ verify_rawinput_code :: proc(t: ^testing.T) {
 	testing.expect_value(t, win32.GET_RAWINPUT_CODE_WPARAM(0x100), win32.RAWINPUT_CODE.RIM_INPUT)
 	testing.expect_value(t, win32.GET_RAWINPUT_CODE_WPARAM(0x101), win32.RAWINPUT_CODE.RIM_INPUTSINK)
 }
+
+@(test)
+verify_winuser_manual :: proc(t: ^testing.T) {
+	expect_size(t, win32.DLGTEMPLATE, 18)
+	expect_size(t, win32.DLGITEMTEMPLATE, 18)
+}

@@ -574,6 +574,9 @@ foreign kernel32 {
 	LookupIconIdFromDirectoryEx :: proc(presbits: PBYTE, fIcon: BOOL, cxDesired: INT, cyDesired: INT, Flags: UINT) -> INT ---
 	CreateIconFromResourceEx    :: proc(presbits: PBYTE, dwResSize: DWORD, fIcon: BOOL, dwVer: DWORD, cxDesired: INT, cyDesired: INT, Flags: UINT) -> HICON ---
 
+	GetThreadUILanguage         :: proc() -> LANGID ---
+	SetThreadUILanguage         :: proc(LangId: LANGID) -> LANGID ---
+
 	GetFullPathNameW  :: proc(filename: LPCWSTR, buffer_length: DWORD, buffer: LPCWSTR, file_part: ^LPCWSTR) -> DWORD ---
 	GetLongPathNameW  :: proc(short, long: LPCWSTR, len: DWORD) -> DWORD ---
 	GetShortPathNameW :: proc(long, short: LPCWSTR, len: DWORD) -> DWORD ---

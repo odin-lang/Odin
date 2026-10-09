@@ -24,7 +24,14 @@ foreign gdi32 {
 	CreateDIBSection      :: proc(hdc: HDC, pbmi: ^BITMAPINFO, usage: UINT, ppvBits: ^PVOID, hSection: HANDLE, offset: DWORD) -> HBITMAP ---
 	StretchDIBits         :: proc(hdc: HDC, xDest, yDest, DestWidth, DestHeight, xSrc, ySrc, SrcWidth, SrcHeight: INT, lpBits: LPVOID, lpbmi: ^BITMAPINFO, iUsage: UINT, rop: DWORD) -> INT ---
 	StretchBlt            :: proc(hdcDest: HDC, xDest, yDest, wDest, hDest: INT, hdcSrc: HDC, xSrc, ySrc, wSrc, hSrc: INT, rop: DWORD) -> BOOL ---
+	GetStretchBltMode     :: proc(hdc: HDC) -> c_int ---
+	SetStretchBltMode     :: proc(hdc: HDC, mode: c_int) -> c_int ---
 
+	GetPixel            :: proc(hdc: HDC, x, y: c_int) -> COLORREF ---
+	SetPixel            :: proc(hdc: HDC, x, y: c_int, color: COLORREF) -> COLORREF ---
+	SetPixelV           :: proc(hdc: HDC, x, y: c_int, color: COLORREF) -> BOOL ---
+
+	GetPixelFormat      :: proc(hdc: HDC) -> c_int ---
 	SetPixelFormat      :: proc(hdc: HDC, format: INT, ppfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---
 	ChoosePixelFormat   :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
 	DescribePixelFormat :: proc(hdc: HDC, iPixelFormat: INT, nBytes: UINT, ppfd: ^PIXELFORMATDESCRIPTOR) -> INT ---
@@ -67,8 +74,8 @@ foreign gdi32 {
 	SelectPalette  :: proc(hdc: HDC, hPal: HPALETTE, bForceBkgd: BOOL) -> HPALETTE ---
 	RealizePalette :: proc(hdc: HDC) -> UINT ---
 
+	GetTextColor :: proc(hdc: HDC) -> COLORREF ---
 	SetTextColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
-	SetPixel     :: proc(hdc: HDC, x: INT, y: INT, color: COLORREF) -> COLORREF ---
 
 	GdiTransparentBlt :: proc(hdcDest: HDC, xoriginDest, yoriginDest, wDest, hDest: INT, hdcSrc: HDC, xoriginSrc, yoriginSrc, wSrc, hSrc: INT, crTransparent: UINT) -> BOOL ---
 	GdiGradientFill   :: proc(hdc: HDC, pVertex: PTRIVERTEX, nVertex: ULONG, pMesh: PVOID, nCount: ULONG, ulMode: ULONG) -> BOOL ---
@@ -87,6 +94,23 @@ foreign gdi32 {
 	MoveToEx   :: proc(hdc: HDC, x: i32, y: i32, lppt: ^POINT) -> BOOL ---
 	LineTo     :: proc(hdc: HDC, x: i32, y: i32) -> BOOL ---
 	PolylineTo :: proc(hdc: HDC, apt: [^]POINT, cpt: DWORD) -> BOOL ---
+
+	// Color Space Functions
+	SetICMMode           :: proc(hdc: HDC, mode: c_int) -> c_int ---
+	CheckColorsInGamut   :: proc(hdc: HDC, lpRGBTriple: ^RGBTRIPLE, dlpBuffer: LPVOID, nCount: DWORD) -> BOOL ---
+	GetColorSpace        :: proc(hdc: HDC) -> HCOLORSPACE ---
+	SetColorSpace        :: proc(hdc: HDC, hcs: HCOLORSPACE) -> HCOLORSPACE ---
+	GetLogColorSpaceW    :: proc(hColorSpace: HCOLORSPACE, lpBuffer: ^LOGCOLORSPACEW, nSize: WORD) -> BOOL ---
+	CreateColorSpaceW    :: proc(lplcs: ^LOGCOLORSPACEW) -> HCOLORSPACE ---
+	DeleteColorSpace     :: proc(hcs: HCOLORSPACE) -> BOOL ---
+	GetICMProfileW       :: proc(hdc: HDC, pBufSize: LPDWORD, pszFilename: LPWSTR) -> BOOL ---
+	SetICMProfileW       :: proc(hdc: HDC, lpFileName: LPWSTR) -> BOOL ---
+	GetDeviceGammaRamp   :: proc(hdc: HDC, lpRamp: LPVOID) -> BOOL --- // Writes `(3 * 256 * 2)` bytes to `lpRamp`.
+	SetDeviceGammaRamp   :: proc(hdc: HDC, lpRamp: LPVOID) -> BOOL --- // Reads `(3 * 256 * 2)` bytes from `lpRamp`.
+	ColorMatchToTarget   :: proc(hdc: HDC, hdcTarget: HDC, action: DWORD) -> BOOL ---
+	EnumICMProfilesW     :: proc(hdc: HDC, p: ICMENUMPROCW, param: LPARAM) -> c_int ---
+	UpdateICMRegKeyW     :: proc(reserved: DWORD, lpszCMID: LPWSTR, lpszFileName: LPWSTR, command: UINT) -> BOOL ---
+	ColorCorrectPalette  :: proc(hdc: HDC, hPal: HPALETTE, deFirst: DWORD, num: DWORD) -> BOOL ---
 }
 
 @(require_results)
@@ -104,7 +128,60 @@ PALETTEINDEX :: #force_inline proc "contextless" (#any_int i: int) -> COLORREF {
 	return COLORREF(DWORD(0x01000000) | DWORD(WORD(i)))
 }
 
-FXPT2DOT30 :: distinct i32 // fixed.Fixed(i32, 30)
+// Device Parameters for `GetDeviceCaps()`
+
+DRIVERVERSION    :: 0     // Device driver version
+TECHNOLOGY       :: 2     // Device classification
+HORZSIZE         :: 4     // Horizontal size in millimeters
+VERTSIZE         :: 6     // Vertical size in millimeters
+HORZRES          :: 8     // Horizontal width in pixels
+VERTRES          :: 10    // Vertical height in pixels
+BITSPIXEL        :: 12    // Number of bits per pixel
+PLANES           :: 14    // Number of planes
+NUMBRUSHES       :: 16    // Number of brushes the device has
+NUMPENS          :: 18    // Number of pens the device has
+NUMMARKERS       :: 20    // Number of markers the device has
+NUMFONTS         :: 22    // Number of fonts the device has
+NUMCOLORS        :: 24    // Number of colors the device supports
+PDEVICESIZE      :: 26    // Size required for device descriptor
+CURVECAPS        :: 28    // Curve capabilities
+LINECAPS         :: 30    // Line capabilities
+POLYGONALCAPS    :: 32    // Polygonal capabilities
+TEXTCAPS         :: 34    // Text capabilities
+CLIPCAPS         :: 36    // Clipping capabilities
+RASTERCAPS       :: 38    // Bitblt capabilities
+ASPECTX          :: 40    // Length of the X leg
+ASPECTY          :: 42    // Length of the Y leg
+ASPECTXY         :: 44    // Length of the hypotenuse
+
+LOGPIXELSX       :: 88    // Logical pixels/inch in X
+LOGPIXELSY       :: 90    // Logical pixels/inch in Y
+
+SIZEPALETTE      :: 104   // Number of entries in physical palette
+NUMRESERVED      :: 106   // Number of reserved entries in palette
+COLORRES         :: 108   // Actual color resolution
+
+// Printing related DeviceCaps. These replace the appropriate Escapes
+
+PHYSICALWIDTH    :: 110   // Physical Width in device units
+PHYSICALHEIGHT   :: 111   // Physical Height in device units
+PHYSICALOFFSETX  :: 112   // Physical Printable Area x margin
+PHYSICALOFFSETY  :: 113   // Physical Printable Area y margin
+SCALINGFACTORX   :: 114   // Scaling factor x
+SCALINGFACTORY   :: 115   // Scaling factor y
+
+// Display driver specific
+
+VREFRESH         :: 116   // Current vertical refresh rate of the display device (for displays only) in Hz
+DESKTOPVERTRES   :: 117   // Horizontal width of entire desktop in pixels
+DESKTOPHORZRES   :: 118   // Vertical height of entire desktop in pixels
+BLTALIGNMENT     :: 119   // Preferred blt alignment
+
+SHADEBLENDCAPS   :: 120   // Shading and blending caps
+COLORMGMTCAPS    :: 121   // Color Management caps
+
+FXPT16DOT16 :: distinct i32 // fixed.Fixed(i32, 16)
+FXPT2DOT30  :: distinct i32 // fixed.Fixed(i32, 30)
 
 CIEXYZ :: struct {
 	ciexyzX, ciexyzY, ciexyzZ: FXPT2DOT30,
@@ -112,6 +189,50 @@ CIEXYZ :: struct {
 
 CIEXYZTRIPLE :: struct {
 	ciexyzRed, ciexyzGreen, ciexyzBlue: CIEXYZ,
+}
+
+BITMAPCOREHEADER :: struct {
+	bcSize:      DWORD, // used to get to color table
+	bcWidth:     WORD,
+	bcHeight:    WORD,
+	bcPlanes:    WORD,
+	bcBitCount:  WORD,
+}
+
+BITMAPCOREINFO :: struct($num_color_table_entries: int) {
+	bmciHeader:  BITMAPCOREHEADER,
+	bmciColors:  [num_color_table_entries]RGBTRIPLE,
+}
+
+BITMAPFILEHEADER :: struct {
+	bfType:       WORD,
+	bfSize:       DWORD,
+	bfReserved1:  WORD,
+	bfReserved2:  WORD,
+	bfOffBits:    DWORD,
+}
+
+BITMAPV4HEADER :: struct {
+	bV4Size:           DWORD,
+	bV4Width:          LONG,
+	bV4Height:         LONG,
+	bV4Planes:         WORD,
+	bV4BitCount:       WORD,
+	bV4V4Compression:  DWORD,
+	bV4SizeImage:      DWORD,
+	bV4XPelsPerMeter:  LONG,
+	bV4YPelsPerMeter:  LONG,
+	bV4ClrUsed:        DWORD,
+	bV4ClrImportant:   DWORD,
+	bV4RedMask:        DWORD,
+	bV4GreenMask:      DWORD,
+	bV4BlueMask:       DWORD,
+	bV4AlphaMask:      DWORD,
+	bV4CSType:         DWORD,
+	bV4Endpoints:      CIEXYZTRIPLE,
+	bV4GammaRed:       DWORD,
+	bV4GammaGreen:     DWORD,
+	bV4GammaBlue:      DWORD,
 }
 
 // https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-bitmapv5header
@@ -140,6 +261,83 @@ BITMAPV5HEADER :: struct {
 	bV5ProfileData:   DWORD,
 	bV5ProfileSize:   DWORD,
 	bV5Reserved:      DWORD,
+}
+
+// Values for `bV5CSType`
+
+PROFILE_LINKED                   :: 0x4C494E4B // 'LINK'
+PROFILE_EMBEDDED                 :: 0x4D424544 // 'MBED'
+
+ICM_OFF                          :: 1
+ICM_ON                           :: 2
+ICM_QUERY                        :: 3
+ICM_DONE_OUTSIDEDC               :: 4
+
+ICMENUMPROCW :: #type proc "system" (name: LPWSTR, lparam: LPARAM) -> c_int
+
+// Image Color Matching color definitions
+
+CS_ENABLE                        :: 0x00000001
+CS_DISABLE                       :: 0x00000002
+CS_DELETE_TRANSFORM              :: 0x00000003
+
+// Logcolorspace signature
+
+LCS_SIGNATURE                    :: 0x50534F43 // 'PSOC'
+
+// Logcolorspace lcsType values
+
+LCS_sRGB                         :: 0x73524742 // 'sRGB'
+LCS_WINDOWS_COLOR_SPACE          :: 0x57696E20 // 'Win ' - Windows default color space
+
+LCSCSTYPE :: #type LONG
+
+LCS_CALIBRATED_RGB               :: 0x00000000
+
+LCSGAMUTMATCH :: #type LONG
+
+LCS_GM_BUSINESS                  :: 0x00000001
+LCS_GM_GRAPHICS                  :: 0x00000002
+LCS_GM_IMAGES                    :: 0x00000004
+LCS_GM_ABS_COLORIMETRIC          :: 0x00000008
+
+// ICM Defines for results from `CheckColorInGamut()`
+
+CM_OUT_OF_GAMUT                  :: 255
+CM_IN_GAMUT                      :: 0
+
+// `UpdateICMRegKey` Constants
+
+ICM_ADDPROFILE                   :: 1
+ICM_DELETEPROFILE                :: 2
+ICM_QUERYPROFILE                 :: 3
+ICM_SETDEFAULTPROFILE            :: 4
+ICM_REGISTERICMATCHER            :: 5
+ICM_UNREGISTERICMATCHER          :: 6
+ICM_QUERYMATCH                   :: 7
+
+// Macros to retrieve CMYK values from a `COLORREF`
+
+GetKValue :: #force_inline proc "contextless" (cmyk: COLORREF) -> BYTE { return cast(BYTE)(cmyk      ) }
+GetYValue :: #force_inline proc "contextless" (cmyk: COLORREF) -> BYTE { return cast(BYTE)(cmyk >>  8) }
+GetMValue :: #force_inline proc "contextless" (cmyk: COLORREF) -> BYTE { return cast(BYTE)(cmyk >> 16) }
+GetCValue :: #force_inline proc "contextless" (cmyk: COLORREF) -> BYTE { return cast(BYTE)(cmyk >> 24) }
+
+CMYK :: #force_inline proc "contextless" (c, m, y, k: BYTE) -> COLORREF {
+	return cast(DWORD)k | cast(DWORD)y << 8 | cast(DWORD)m << 16 | cast(DWORD)c << 24
+}
+
+LOGCOLORSPACEW :: struct {
+	lcsSignature:   DWORD,
+	lcsVersion:     DWORD,
+	lcsSize:        DWORD,
+	lcsCSType:      LCSCSTYPE,
+	lcsIntent:      LCSGAMUTMATCH,
+	lcsEndpoints:   CIEXYZTRIPLE,
+	lcsGammaRed:    DWORD,
+	lcsGammaGreen:  DWORD,
+	lcsGammaBlue:   DWORD,
+	lcsFilename:    [MAX_PATH]WCHAR,
 }
 
 PALETTEENTRY :: struct {
@@ -279,6 +477,12 @@ RGN_COPY :: 5
 // WHITEONBLACK :: 2
 // COLORONCOLOR :: 3
 // HALFTONE     :: 4
+
+/* New StretchBlt() Modes */
+STRETCH_ANDSCANS     :: BLACKONWHITE
+STRETCH_DELETESCANS  :: COLORONCOLOR
+STRETCH_HALFTONE     :: HALFTONE
+STRETCH_ORSCANS      :: WHITEONBLACK
 
 /* PolyFill() Modes */
 ALTERNATE :: 1
