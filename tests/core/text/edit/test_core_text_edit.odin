@@ -114,6 +114,7 @@ test_translate_to_bounds :: proc(t: ^testing.T) {
 
 @(test)
 test_translate_by_soft_line :: proc(t: ^testing.T) {
+	// We deliberately ignore "\r"
 	LINES :: "foo \r\nbar\nbaz\n"
 
 	s: State
@@ -128,4 +129,5 @@ test_translate_by_soft_line :: proc(t: ^testing.T) {
 	expect_walk(t, &s, len(LINES), .Soft_Line_Start, {})
 	expect_walk(t, &s, len(LINES) - 1, .Soft_Line_Start, {10})
 	expect_walk(t, &s, 7, .Soft_Line_Start, {6})
+	expect_walk(t, &s, 5, .Soft_Line_Start, {0})
 }
