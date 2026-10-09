@@ -3658,6 +3658,44 @@ gb_internal void lb_add_attribute_to_proc_with_string(lbModule *m, LLVMValueRef 
 }
 
 
+// macOS allocates a thread's thread locals with malloc, which aligns them to 16 bytes only. A
+// thread local that needs more gets that much more storage, and every access rounds its address
+// up. Returns that alignment, or 0 when e's storage is e itself.
+gb_internal i64 lb_tls_realign(Entity *e) {
+	if (build_context.metrics.os != TargetOs_darwin) return 0;
+	if (e == nullptr || e->kind != Entity_Variable || e->Variable.thread_local_model == "") return 0;
+	i64 align = gb_max(type_align_of(e->type), e->Variable.custom_align);
+	return align > 16 ? align : 0;
+}
+
+// The alignment of the storage of the variable e: only what macOS gives a realigned thread local,
+// so that LLVM cannot fold away the rounding, see lb_tls_realign
+gb_internal u32 lb_variable_storage_align(Entity *e) {
+	if (lb_tls_realign(e) != 0) return 16;
+	return cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align);
+}
+
+// The LLVM type of the storage of the variable e, see lb_tls_realign
+gb_internal LLVMTypeRef lb_variable_storage_type(lbModule *m, Entity *e) {
+	i64 align = lb_tls_realign(e);
+	if (align == 0) return lb_type(m, e->type);
+	return LLVMArrayType(LLVMInt8TypeInContext(m->ctx), cast(unsigned)(type_size_of(e->type) + align - 16));
+}
+
+// The address of the variable e from the address of its storage, see lb_tls_realign
+gb_internal lbValue lb_variable_from_storage(lbProcedure *p, Entity *e, lbValue storage) {
+	i64 align = lb_tls_realign(e);
+	if (align == 0 || p == nullptr || storage.value == nullptr) return storage;
+	LLVMTypeRef intptr = lb_type(p->module, t_uintptr);
+	LLVMValueRef addr = LLVMBuildPtrToInt(p->builder, storage.value, intptr, "");
+	// the bytes up to the next multiple of align: -addr & (align-1)
+	LLVMValueRef pad = LLVMBuildAnd(p->builder, LLVMBuildNeg(p->builder, addr, ""), LLVMConstInt(intptr, cast(u64)(align-1), false), "");
+	lbValue v = {};
+	v.value = LLVMBuildGEP2(p->builder, LLVMInt8TypeInContext(p->module->ctx), storage.value, &pad, 1, "");
+	v.type = alloc_type_pointer(e->type);
+	return v;
+}
+
 gb_internal bool lb_apply_thread_local_model(LLVMValueRef value, String model) {
 	if (model != "") {
 		LLVMSetThreadLocal(value, true);
@@ -4140,7 +4178,7 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 		if (is_type_proc(v.type)) {
 			return v;
 		}
-		return lb_emit_load(p, v);
+		return lb_emit_load(p, lb_variable_from_storage(p, e, v));
 	} else if (e != nullptr && e->kind == Entity_Variable) {
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	}
@@ -4156,13 +4194,13 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
 
 			lbValue g = {};
-			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+			g.value = LLVMAddGlobal(m->mod, lb_variable_storage_type(m, e), alloc_cstring(permanent_allocator(), name));
 			g.type = alloc_type_pointer(e->type);
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 
 			lb_add_entity(m, e, g);
 			lb_add_member(m, name, g);
-			return lb_emit_load(p, g);
+			return lb_emit_load(p, lb_variable_from_storage(p, e, g));
 		}
 	}
 
@@ -4435,7 +4473,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			String name = lb_get_entity_name(other_module, e);
 
 			lbValue g = {};
-			g.value = LLVMAddGlobal(m->mod, lb_type(m, e->type), alloc_cstring(permanent_allocator(), name));
+			g.value = LLVMAddGlobal(m->mod, lb_variable_storage_type(m, e), alloc_cstring(permanent_allocator(), name));
 			g.type = alloc_type_pointer(e->type);
 			lb_add_entity(m, e, g);
 			lb_add_member(m, name, g);

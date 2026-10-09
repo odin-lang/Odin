@@ -2499,9 +2499,10 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 
 		char *c_name = alloc_cstring(permanent_allocator(), mangled_name);
 
-		LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_type(p->module, e->type), c_name);
-		LLVMSetAlignment(global, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
-		LLVMSetInitializer(global, LLVMConstNull(lb_type(p->module, e->type)));
+		LLVMValueRef global = LLVMAddGlobal(p->module->mod, lb_variable_storage_type(p->module, e), c_name);
+		LLVMSetAlignment(global, lb_variable_storage_align(e));
+		LLVMSetInitializer(global, LLVMConstNull(LLVMGlobalGetValueType(global)));
+		GB_ASSERT(value.value == nullptr || lb_tls_realign(e) == 0);
 
 		if (e->Variable.is_rodata) {
 			LLVMSetGlobalConstant(global, true);
@@ -2545,7 +2546,7 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 				if (actual_type != expected_type) {
 					LLVMDeleteGlobal(global);
 					global = LLVMAddGlobal(p->module->mod, actual_type, c_name);
-					LLVMSetAlignment(global, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
+					LLVMSetAlignment(global, lb_variable_storage_align(e));
 					if (e->Variable.is_rodata) {
 						LLVMSetGlobalConstant(global, true);
 					}

@@ -5023,7 +5023,7 @@ gb_internal lbValue lb_get_using_variable(lbProcedure *p, Entity *e) {
 		// the element has no single address, so make a soa pointer for lb_emit_deep_field_gep
 		v = lb_address_from_load_or_generate_local(p, lb_soa_variable_make_pointer(p, parent_addr));
 	} else if (pv != nullptr) {
-		v = *pv;
+		v = lb_variable_from_storage(p, parent, *pv);
 	} else {
 		GB_ASSERT_MSG(e->using_expr != nullptr, "%.*s", LIT(e->token.string));
 		v = lb_build_addr_ptr(p, e->using_expr);
@@ -5073,7 +5073,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 
 
 	if (v.value == nullptr) {
-		return lb_addr(lb_find_value_from_entity(p->module, e));
+		return lb_addr(lb_variable_from_storage(p, e, lb_find_value_from_entity(p->module, e)));
 
 		// error(expr, "%.*s Unknown value: %.*s, entity: %p %.*s",
 		//       LIT(p->name),
@@ -5081,7 +5081,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 		// GB_PANIC("Unknown value");
 	}
 
-	return lb_addr(v);
+	return lb_addr(lb_variable_from_storage(p, e, v));
 }
 
 gb_internal lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, TypeAndValue const &tv) {

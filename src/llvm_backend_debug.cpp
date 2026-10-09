@@ -1680,6 +1680,17 @@ gb_internal void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx
 	lb_add_debug_local_variable(p, ptr, t_context, token);
 }
 
+// The location of the variable e from the address of its storage, see lb_tls_realign
+gb_internal LLVMMetadataRef lb_debug_variable_expression(lbModule *m, Entity *e) {
+	i64 align = lb_tls_realign(e);
+	if (align == 0) {
+		return LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+	}
+	u64 const DW_OP_constu = 0x10, DW_OP_and = 0x1a, DW_OP_plus_uconst = 0x23;
+	u64 ops[] = {DW_OP_plus_uconst, cast(u64)(align-1), DW_OP_constu, ~cast(u64)(align-1), DW_OP_and};
+	return LLVMDIBuilderCreateExpression(m->debug_builder, ops, gb_count_of(ops));
+}
+
 gb_internal void lb_add_debug_info_static_variable(lbProcedure *p, Entity *e, LLVMValueRef global) {
 	if (p->debug_info == nullptr) {
 		return;
@@ -1691,7 +1702,7 @@ gb_internal void lb_add_debug_info_static_variable(lbProcedure *p, Entity *e, LL
 		lb_get_file_metadata(p->module, e->file), cast(unsigned)e->token.pos.line,
 		lb_debug_type(p->module, e->type),
 		true, // local to unit
-		LLVMDIBuilderCreateExpression(p->module->debug_builder, nullptr, 0),
+		lb_debug_variable_expression(p->module, e),
 		nullptr,
 		cast(u32)(8*type_align_of(e->type))
 	);
