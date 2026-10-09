@@ -160,6 +160,11 @@ jobs:
 
       - name: Internals tests
         run: ./odin test tests/internal -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true -sanitize:address
+      - name: Fast backend output is the same at 1 and 10 threads
+        run: |
+          ./odin build examples/all -build-mode:obj -backend:fast -thread-count:1 -out:xb_t1.o
+          ./odin build examples/all -build-mode:obj -backend:fast -thread-count:10 -out:xb_t10.o
+          cmp xb_t1.o xb_t10.o
       - name: GitHub Issue tests
         run: |
           cd tests/issues
@@ -302,6 +307,13 @@ jobs:
           odin test tests/vendor -all-packages -backend:fast -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b 1
           cd tests/abi
           call run.bat -backend:fast || exit /b 1
+      - name: Fast backend output is the same at 1 and 10 threads
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          odin build examples/all -build-mode:obj -backend:fast -thread-count:1 -out:xb_t1.obj || exit /b 1
+          odin build examples/all -build-mode:obj -backend:fast -thread-count:10 -out:xb_t10.obj || exit /b 1
+          fc /b xb_t1.obj xb_t10.obj || exit /b 1
       - name: Check benchmarks
         shell: cmd
         run: |
