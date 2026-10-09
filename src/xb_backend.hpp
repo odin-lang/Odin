@@ -720,11 +720,12 @@ struct xbModule {
 	i32               x64_move_helper;
 	i32               x64_set_helper;
 
-	// generated procedures and data, by type
-	PtrMap<Type *, i32> equal_procs;  // -1 while being generated, -2 if it cannot be
-	PtrMap<Type *, i32> hasher_procs; // -1 while being generated, -2 if it cannot be
-	PtrMap<Type *, i32> map_infos;
-	PtrMap<Type *, i32> map_cell_infos;
+	// generated procedures and data, by type hash like LLVM's: identical types can be different
+	// Type pointers, and which one a family sees first must not change what gets generated
+	PtrMap<u64/*type hash*/, i32> equal_procs;  // -1 while being generated, -2 if it cannot be
+	PtrMap<u64/*type hash*/, i32> hasher_procs; // -1 while being generated, -2 if it cannot be
+	PtrMap<u64/*type hash*/, i32> map_infos;
+	PtrMap<u64/*type hash*/, i32> map_cell_infos;
 
 	// procedures built and waiting to be lowered, in the order their code goes into .text
 	Array<xbLowerJob> lower_jobs;

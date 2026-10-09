@@ -4,7 +4,7 @@
 gb_internal xbProc *xb_new_proc(xbModule *m, String name, Type *type);
 gb_internal void xb_lower_proc(xbProc *p);
 
-gb_internal PtrMap<Type *, i32> *xb_gen_cache(xbModule *m, xbGenCache kind) {
+gb_internal PtrMap<u64, i32> *xb_gen_cache(xbModule *m, xbGenCache kind) {
 	switch (kind) {
 	case xbGenCache_Equal:       return &m->equal_procs;
 	case xbGenCache_Hasher:      return &m->hasher_procs;

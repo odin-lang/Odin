@@ -82,8 +82,10 @@ struct xbCv {
 	xbCoffWriter *w;
 	Array<u8> *t;
 	u32 next_index;
-	PtrMap<Type *, u32> types;
-	PtrMap<Type *, u32> refs;    // reference-to-type, for variables reached through a pointer
+	// keyed by type hash, not Type *: identical types built on different threads are
+	// different pointers, and one record each would depend on the thread schedule
+	PtrMap<u64/*type hash*/, u32> types;
+	PtrMap<u64/*type hash*/, u32> refs;    // reference-to-type, for variables reached through a pointer
 	Array<Type *> to_define;      // forward referenced, definition still to write
 	Array<u32> to_define_index;
 };

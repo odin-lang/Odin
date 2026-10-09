@@ -362,17 +362,28 @@ gb_internal void xb_dwarf_abbrevs(Array<u8> *b) {
 
 struct xbDwarfTypes {
 	Array<u8> *info;
-	PtrMap<Type *, u32> offsets;  // type -> DIE offset in .debug_info
+	// keyed by type hash, not Type *: identical types built on different threads are
+	// different pointers, and one DIE each would depend on the thread schedule
+	PtrMap<u64/*type hash*/, u32> offsets;  // type -> DIE offset in .debug_info
 	// types whose DIE is referenced before it is written
 	struct Pending { isize at; Type *type; };
 	Array<Pending> pending;
 	Array<Type *> queue;
-	PtrSet<Type *> queued;
+	PtrMap<u64/*type hash*/, bool> queued;
 	u32 void_ptr;
 	u32 byte_type;
 	isize cu_start;
 	CheckerInfo *checker;
 };
+
+// queues a type's DIE to be written, once per distinct type
+gb_internal void xb_dwarf_queue_type(xbDwarfTypes *dt, Type *t) {
+	u64 hash = type_hash_canonical_type(t);
+	if (map_get(&dt->queued, hash) == nullptr) {
+		map_set(&dt->queued, hash, true);
+		array_add(&dt->queue, t);
+	}
+}
 
 gb_internal u32 xb_dwarf_type_ref(xbDwarfTypes *dt, Type *t) {
 	// writes a ref4 placeholder, patched once the type is written
@@ -381,10 +392,7 @@ gb_internal u32 xb_dwarf_type_ref(xbDwarfTypes *dt, Type *t) {
 	xbb_u32(dt->info, 0);
 	xbDwarfTypes::Pending pd = {at, t};
 	array_add(&dt->pending, pd);
-	if (!ptr_set_exists(&dt->queued, t)) {
-		ptr_set_add(&dt->queued, t);
-		array_add(&dt->queue, t);
-	}
+	xb_dwarf_queue_type(dt, t);
 	return 0;
 }
 
@@ -1256,7 +1264,7 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 		xbDwarfTypes dt = {};
 		dt.info = b;
 		map_init(&dt.offsets);
-		ptr_set_init(&dt.queued);
+		map_init(&dt.queued);
 		dt.pending = array_make<xbDwarfTypes::Pending>(heap_allocator(), 0, 256);
 		dt.queue = array_make<Type *>(heap_allocator(), 0, 256);
 
@@ -1343,10 +1351,7 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 			for (xbDwarfTypes::Pending const &tp : c.types) {
 				xbDwarfTypes::Pending pd = {base + tp.at, tp.type};
 				array_add(&dt.pending, pd);
-				if (!ptr_set_exists(&dt.queued, tp.type)) {
-					ptr_set_add(&dt.queued, tp.type);
-					array_add(&dt.queue, tp.type);
-				}
+				xb_dwarf_queue_type(&dt, tp.type);
 			}
 			array_free(&c.info);
 			array_free(&c.addrs);
