@@ -1103,7 +1103,9 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	case xbOp_AtomicLoad: {
 		bool fp = xb_type_is_float(in.type);
 		if (in.mem.kind == xbMem_Local && L->local_reg[in.mem.base] >= 0) {
-			x64_put(L, in.dst, cast(u8)L->local_reg[in.mem.base]);
+			i8 lr = L->local_reg[in.mem.base];
+			if (lr >= XB_FREG) x64_putf(L, in.dst, cast(u8)(lr - XB_FREG), size);
+			else               x64_put(L, in.dst, cast(u8)lr);
 			break;
 		}
 		xbLower::Stored const &st = L->stored;
@@ -1132,8 +1134,10 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 	}
 	case xbOp_Store: {
 		if (in.mem.kind == xbMem_Local && L->local_reg[in.mem.base] >= 0) {
+			i8 lr = L->local_reg[in.mem.base];
 			// zero extended, as a load from memory would give it back
-			x64_get(L, cast(u8)L->local_reg[in.mem.base], in.a, size, xbExt_Zero);
+			if (lr >= XB_FREG) x64_getf(L, cast(u8)(lr - XB_FREG), in.a, size);
+			else               x64_get(L, cast(u8)lr, in.a, size, xbExt_Zero);
 			break;
 		}
 		xbLower::Stored st = {true, xb_type_is_float(in.type), 0, size, in.mem, true};
@@ -1974,12 +1978,21 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	// the promoted ones stay in the register they arrive in or move to a callee saved one
 	for (xbParamIn const &in : p->params_in) {
 		if (in.dst.kind != xbMem_Local || L.local_reg[in.dst.base] < 0) continue;
-		u8 lr = cast(u8)L.local_reg[in.dst.base];
-		if (in.loc == xbLoc_Gpr) {
-			x64_extend(a, xbExt_Zero, in.size, lr, in.reg);
+		i8 lr = L.local_reg[in.dst.base];
+		xbOpnd src = xb_m(RBP, L.incoming_base + in.stack_offset);
+		if (lr >= XB_FREG) {
+			u8 x = cast(u8)(lr - XB_FREG);
+			if (in.loc == xbLoc_Xmm) {
+				x64_movaps(a, x, in.reg);
+			} else {
+				GB_ASSERT(in.loc == xbLoc_Stack);
+				xb_movs_x_rm(a, in.size, x, src);
+			}
+		} else if (in.loc == xbLoc_Gpr) {
+			x64_extend(a, xbExt_Zero, in.size, cast(u8)lr, in.reg);
 		} else {
 			GB_ASSERT(in.loc == xbLoc_Stack);
-			xb_load_ext(a, in.size, false, lr, xb_m(RBP, L.incoming_base + in.stack_offset));
+			xb_load_ext(a, in.size, false, cast(u8)lr, src);
 		}
 	}
 	// like LLVM's prologue_end, on the declaration's line: a breakpoint on the procedure stops here, its parameters in place
@@ -2076,7 +2089,8 @@ gb_internal void xb_lower_proc(xbProc *p) {
 			v.frame_offset_fixup += l.frame_offset;
 			if (L.local_reg[v.local] >= 0) {
 				v.in_reg = true;
-				v.dwarf_reg = x64_dwarf_reg(cast(u8)L.local_reg[v.local]);
+				i8 lr = L.local_reg[v.local];
+				v.dwarf_reg = lr >= XB_FREG ? cast(u8)(17 + lr - XB_FREG) : x64_dwarf_reg(cast(u8)lr); // xmm0 is 17
 			}
 		}
 		array_add(&dbg.vars, v);

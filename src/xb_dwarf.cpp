@@ -129,6 +129,7 @@ enum {
 	XDW_OP_reg0  = 0x50,
 	XDW_OP_reg6  = 0x56,
 	XDW_OP_breg0 = 0x70,
+	XDW_OP_regx  = 0x90,
 	XDW_OP_call_frame_cfa = 0x9c,
 
 	XDW_LANG_C99 = 0x0c,
@@ -1102,6 +1103,9 @@ gb_internal void xb_dwarf_build(xbModule *m, xbDwarf *d) {
 			if (v.in_reg && v.by_ref) {
 				xbb_u8(&expr, cast(u8)(XDW_OP_breg0 + v.dwarf_reg));
 				xbb_sleb(&expr, 0);
+			} else if (v.in_reg && v.dwarf_reg >= 32) {
+				xbb_u8(&expr, XDW_OP_regx);
+				xbb_uleb(&expr, v.dwarf_reg);
 			} else if (v.in_reg) {
 				xbb_u8(&expr, cast(u8)(XDW_OP_reg0 + v.dwarf_reg));
 			} else {

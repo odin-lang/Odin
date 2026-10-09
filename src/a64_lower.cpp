@@ -699,7 +699,9 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 	}
 	case xbOp_Load: {
 		if (in.mem.kind == xbMem_Local && L->local_reg[in.mem.base] >= 0) {
-			a64_put(L, in.dst, cast(u8)L->local_reg[in.mem.base]);
+			i8 lr = L->local_reg[in.mem.base];
+			if (lr >= XB_FREG) a64_putf(L, in.dst, cast(u8)(lr - XB_FREG), size);
+			else               a64_put(L, in.dst, cast(u8)lr);
 			break;
 		}
 		a64Lower::Stored const &st = L->stored;
@@ -728,10 +730,14 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 	}
 	case xbOp_Store: {
 		if (in.mem.kind == xbMem_Local && L->local_reg[in.mem.base] >= 0) {
+			i8 lr = L->local_reg[in.mem.base];
+			if (lr >= XB_FREG) {
+				a64_getf(L, cast(u8)(lr - XB_FREG), in.a, size);
+				break;
+			}
 			// zero extended, as a load from memory would give it back
-			u8 lr = cast(u8)L->local_reg[in.mem.base];
-			u8 r = a64_src(L, in.a, lr, size, xbExt_Zero);
-			if (r != lr) a64_mov(a, lr, r);
+			u8 r = a64_src(L, in.a, cast(u8)lr, size, xbExt_Zero);
+			if (r != cast(u8)lr) a64_mov(a, cast(u8)lr, r);
 			break;
 		}
 		// the value first, the address may need x16 and x17
@@ -1394,12 +1400,20 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 	// the promoted ones stay in the register they arrive in or move to a callee saved one
 	for (xbParamIn const &in : p->params_in) {
 		if (in.dst.kind != xbMem_Local || L.local_reg[in.dst.base] < 0) continue;
-		u8 lr = cast(u8)L.local_reg[in.dst.base];
-		if (in.loc == xbLoc_Gpr) {
-			a64_extend(a, false, in.size, lr, in.reg);
+		i8 lr = L.local_reg[in.dst.base];
+		if (lr >= XB_FREG) {
+			u8 vr = cast(u8)(lr - XB_FREG);
+			if (in.loc == xbLoc_Xmm) {
+				if (vr != in.reg) a64_fmov_reg(a, vr, in.reg);
+			} else {
+				GB_ASSERT(in.loc == xbLoc_Stack);
+				a64_ldr_fp(a, in.size, vr, A64_FP, 16 + in.stack_offset);
+			}
+		} else if (in.loc == xbLoc_Gpr) {
+			a64_extend(a, false, in.size, cast(u8)lr, in.reg);
 		} else {
 			GB_ASSERT(in.loc == xbLoc_Stack);
-			a64_ldr(a, in.size, false, lr, A64_FP, 16 + in.stack_offset);
+			a64_ldr(a, in.size, false, cast(u8)lr, A64_FP, 16 + in.stack_offset);
 		}
 	}
 	// like LLVM's prologue_end, on the declaration's line: a breakpoint on the procedure stops here, its parameters in place
@@ -1524,7 +1538,8 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far) {
 			v.frame_offset_fixup += l.frame_offset;
 			if (L.local_reg[v.local] >= 0) {
 				v.in_reg = true;
-				v.dwarf_reg = L.local_reg[v.local];
+				i8 lr = L.local_reg[v.local];
+				v.dwarf_reg = lr >= XB_FREG ? cast(u8)(64 + lr - XB_FREG) : cast(u8)lr; // v0 is 64
 			}
 		}
 		array_add(&dbg.vars, v);

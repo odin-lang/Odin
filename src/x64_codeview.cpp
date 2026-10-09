@@ -563,9 +563,10 @@ gb_internal void xb_cv_addr(xbCoffWriter *w, Array<u8> *b, i32 sym, i64 text_off
 }
 
 gb_internal u16 xb_cv_reg_of_dwarf(u8 dwarf_reg) {
-	// DWARF numbers rax, rdx, rcx, rbx, rsi, rdi, rbp, rsp, then r8..r15
+	// DWARF numbers rax, rdx, rcx, rbx, rsi, rdi, rbp, rsp, then r8..r15, then xmm0..xmm15
 	static u16 const low[8] = {328, 331, 330, 329, 332, 333, 334, 335};
 	if (dwarf_reg < 8) return low[dwarf_reg];
+	if (dwarf_reg >= 17) return cast(u16)(dwarf_reg < 25 ? 154 + (dwarf_reg - 17) : 252 + (dwarf_reg - 25));
 	return cast(u16)(336 + (dwarf_reg - 8));
 }
 

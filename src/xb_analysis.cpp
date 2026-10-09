@@ -188,7 +188,8 @@ gb_internal bool xb_op_is_pure(xbOp op) {
 }
 
 // The scalar locals that can live in a register, heaviest first. A local qualifies when
-// every access is a plain whole-value int load or store, so nothing can see its memory.
+// every access is a plain whole-value load or store, all int or all float, so nothing can see
+// its memory. `is_float` tells which locals hold a float.
 // Each access weighs `loop_weight` inside a loop and `other_weight` elsewhere, and a
 // local needs more than `min_weight`.
 struct xbRankedLocal { i32 weight; i32 index; };
@@ -227,22 +228,29 @@ gb_internal void xb_blocks_in_loops(xbProc *p, Array<bool> *in_loop) {
 	}
 }
 
-// `weights`, when given, gets every local's weight.
-gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other_weight, i32 min_weight, Array<i32> *ranked, bool call_mem=false, bool by_ref_reg=false, Array<i32> *weights=nullptr) {
+gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other_weight, i32 min_weight, Array<i32> *ranked, Array<bool> *is_float, bool call_mem=false, bool by_ref_reg=false) {
 	*ranked = array_make<i32>(heap_allocator(), 0, 8);
 	isize n = p->locals.count;
+	*is_float = array_make<bool>(heap_allocator(), n);
 	if (n == 0) return;
 
 	auto ok = array_make<bool>(heap_allocator(), n);
 	auto weight = array_make<i32>(heap_allocator(), n);
+	auto kind = array_make<u8>(heap_allocator(), n); // 1: read and written as an int, 2: as a float
 	defer (array_free(&ok));
 	defer (array_free(&weight));
+	defer (array_free(&kind));
 	for (isize i = 0; i < n; i++) {
 		xbLocal const &l = p->locals[i];
 		ok[i] = l.over_align <= 16 && (l.size == 1 || l.size == 2 || l.size == 4 || l.size == 8);
 	}
 	auto bad = [&](xbMem const &m) {
 		if (m.kind == xbMem_Local) ok[m.base] = false;
+	};
+	auto access = [&](i32 l, bool fp) {
+		u8 k = fp ? 2 : 1;
+		if (kind[l] != 0 && kind[l] != k) ok[l] = false;
+		kind[l] = k;
 	};
 
 	isize bc = p->order.count;
@@ -257,9 +265,11 @@ gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other
 			case xbOp_Store: {
 				if (in.mem.kind != xbMem_Local) break;
 				xbLocal const &l = p->locals[in.mem.base];
-				bool plain = in.mem.offset == 0 && xb_type_is_int(in.type) && xb_type_size(in.type) == l.size &&
+				bool fp = xb_type_is_float(in.type);
+				bool plain = in.mem.offset == 0 && (xb_type_is_int(in.type) || (fp && l.size >= 4)) && xb_type_size(in.type) == l.size &&
 				             !(in.flags & xbInstrFlag_Volatile);
 				if (!plain) ok[in.mem.base] = false;
+				access(in.mem.base, fp);
 				weight[in.mem.base] += in_loop[bi] ? loop_weight : other_weight;
 				break;
 			}
@@ -282,6 +292,7 @@ gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other
 				for (xbCallArg const &arg : c.args) {
 					if (arg.kind == xbCallArg_Gpr || arg.kind == xbCallArg_Xmm || arg.kind == xbCallArg_Stack) continue;
 					if (call_mem && arg.kind == xbCallArg_GprMem && xb_call_mem_is_local(p, arg.mem, arg.size)) {
+						access(arg.mem.base, false);
 						weight[arg.mem.base] += in_loop[bi] ? loop_weight : other_weight;
 						continue;
 					}
@@ -289,6 +300,7 @@ gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other
 				}
 				for (xbCallRet const &r : c.rets) {
 					if (call_mem && in.op == xbOp_Call && c.rets.count == 1 && r.loc == xbLoc_Gpr && xb_call_mem_is_local(p, r.dst, r.size)) {
+						access(r.dst.base, false);
 						weight[r.dst.base] += in_loop[bi] ? loop_weight : other_weight;
 						continue;
 					}
@@ -301,22 +313,20 @@ gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other
 	}
 	for (xbParamIn const &in : p->params_in) {
 		if (in.dst.kind != xbMem_Local) continue;
-		bool plain = (in.loc == xbLoc_Gpr || (in.loc == xbLoc_Stack && in.type != xbType_V128)) &&
-		             in.dst.offset == 0 && in.size == p->locals[in.dst.base].size;
+		bool fp = in.loc == xbLoc_Xmm || (in.loc == xbLoc_Stack && xb_type_is_float(in.type));
+		bool plain = (in.loc == xbLoc_Gpr || in.loc == xbLoc_Xmm || (in.loc == xbLoc_Stack && in.type != xbType_V128)) &&
+		             in.dst.offset == 0 && in.size == p->locals[in.dst.base].size && (!fp || in.size >= 4);
 		if (!plain) ok[in.dst.base] = false;
+		access(in.dst.base, fp);
 	}
 	for (xbDebugVar const &v : p->debug_vars) {
 		if (v.local >= 0 && v.by_ref && !(by_ref_reg && v.frame_offset_fixup == 0)) ok[v.local] = false;
 	}
 
-	if (weights) {
-		*weights = array_make<i32>(heap_allocator(), n);
-		for (isize i = 0; i < n; i++) (*weights)[i] = weight[i];
-	}
-
 	auto order = array_make<xbRankedLocal>(heap_allocator(), 0, n);
 	defer (array_free(&order));
 	for (isize i = 0; i < n; i++) {
+		(*is_float)[i] = kind[i] == 2;
 		if (!ok[i] || weight[i] <= min_weight) continue;
 		xbRankedLocal r = {weight[i], cast(i32)i};
 		array_add(&order, r);
@@ -517,8 +527,7 @@ enum : u32 { XB_LOCAL_ITEM = 0x80000000u };
 struct xbRegPools {
 	u32  caller_x, callee_x; // general registers
 	u32  caller_v, callee_v; // float registers
-	bool evict;              // a short interval may take a long one's register
-	i32  callee_weight;      // an interval lighter than this takes a callee saved register only when one is already saved
+	i64  callee_weight;      // an interval lighter than this takes a callee saved register only when one is already saved
 };
 
 struct xbRegAlloc {
@@ -530,6 +539,8 @@ struct xbRegAlloc {
 	Array<u8>  clean;     // vreg -> its register holds 0 or 1
 	Array<i8>  local_reg; // local -> the register holding it, or XB_NOREG
 	Array<i32> via;       // vreg -> the local whose register it shares, or -1
+	Array<u8>  remat;     // vreg -> defined once as a frame address, computed at each use from rmem
+	Array<xbMem> rmem;
 	Array<i32> slot;      // vreg -> frame offset of its 8 byte slot, when it has no register
 	u32        used_x, used_v; // every register handed out
 	i32        max_call_stack;
@@ -545,6 +556,8 @@ gb_internal void xb_reg_alloc_free(xbRegAlloc *R) {
 	array_free(&R->clean);
 	array_free(&R->local_reg);
 	array_free(&R->via);
+	array_free(&R->remat);
+	array_free(&R->rmem);
 	array_free(&R->slot);
 }
 
@@ -561,25 +574,21 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	R->local_reg = array_make<i8>(heap_allocator(), p->locals.count);
 	for (isize i = 0; i < p->locals.count; i++) R->local_reg[i] = XB_NOREG;
 	Array<i32> ranked = {};
-	Array<i32> local_weight = {};
-	xb_rank_promotable_locals(p, 16, 1, 0, &ranked, true, true, &local_weight);
+	Array<bool> local_fp = {};
+	xb_rank_promotable_locals(p, 16, 1, 0, &ranked, &local_fp, true, true);
 	defer (array_free(&ranked));
-	defer (array_free(&local_weight));
-	// a vreg's weight: its reads and writes, 16 each in a loop
-	Array<bool> in_loop = {};
-	xb_blocks_in_loops(p, &in_loop);
-	defer (array_free(&in_loop));
-	auto vweight = array_make<i32>(heap_allocator(), pools.callee_weight > 0 || pools.evict ? vreg_count : 0);
-	defer (array_free(&vweight));
+	defer (array_free(&local_fp));
 	auto arrive = array_make<i8>(heap_allocator(), p->locals.count); // a parameter's register
 	defer (array_free(&arrive));
 	for (isize i = 0; i < p->locals.count; i++) arrive[i] = XB_NOREG;
 	auto is_param = array_make<bool>(heap_allocator(), p->locals.count);
 	defer (array_free(&is_param));
+	u32 arrive_v = 0; // the float registers parameters arrive in
 	for (xbParamIn const &in : p->params_in) {
+		if (in.loc == xbLoc_Xmm) arrive_v |= 1u << in.reg;
 		if (in.dst.kind != xbMem_Local) continue;
 		is_param[in.dst.base] = true;
-		if (in.loc == xbLoc_Gpr) arrive[in.dst.base] = cast(i8)in.reg;
+		if (in.loc == xbLoc_Gpr || in.loc == xbLoc_Xmm) arrive[in.dst.base] = cast(i8)in.reg;
 	}
 
 	auto block = array_make<i32>(heap_allocator(), vreg_count);
@@ -625,9 +634,38 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	R->in_block = array_make<u8>(heap_allocator(), vreg_count);
 	R->clean = array_make<u8>(heap_allocator(), vreg_count);
 	R->via = array_make<i32>(heap_allocator(), vreg_count);
+	R->remat = array_make<u8>(heap_allocator(), vreg_count);
+	R->rmem = array_make<xbMem>(heap_allocator(), vreg_count);
 	for (isize i = 0; i < vreg_count; i++) {
 		R->reg[i] = XB_NOREG;
 		R->via[i] = -1;
+	}
+
+	// The spill cost of an item: its references, each 8 times more for each loop around it;
+	// a loop is a jump back to or before its block
+	auto bweight = array_make<i64>(heap_allocator(), p->blocks.count);
+	auto vweight = array_make<i64>(heap_allocator(), vreg_count);
+	defer (array_free(&bweight));
+	defer (array_free(&vweight));
+	{
+		isize bc = p->order.count;
+		auto pos = array_make<isize>(heap_allocator(), p->blocks.count);
+		auto depth = array_make<i32>(heap_allocator(), bc);
+		defer (array_free(&pos));
+		defer (array_free(&depth));
+		for (isize i = 0; i < bc; i++) pos[p->order[i]->index] = i;
+		for (isize i = 0; i < bc; i++) {
+			for (xbInstr const &in : p->order[i]->instrs) {
+				i32 targets[2] = {-1, -1};
+				if (in.op == xbOp_Jump) targets[0] = cast(i32)in.imm;
+				if (in.op == xbOp_Branch) { targets[0] = cast(i32)in.imm; targets[1] = cast(i32)in.c; }
+				for (i32 t : targets) {
+					if (t < 0 || !p->blocks[t]->placed || pos[t] > i) continue;
+					for (isize k = pos[t]; k <= i; k++) depth[k]++;
+				}
+			}
+		}
+		for (isize i = 0; i < bc; i++) bweight[p->order[i]->index] = 1ll << (3*gb_min(depth[i], 6));
 	}
 
 	i32 linear = 0;
@@ -639,7 +677,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		for (xbInstr const &in : b->instrs) {
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
 				if (v == 0) return;
-				if (vweight.count > 0) vweight[v] += in_loop[bi] ? 16 : 1;
+				vweight[v] += bweight[b->index];
 				if (block[v] < 0) {
 					block[v] = b->index;
 				} else if (block[v] != b->index) {
@@ -651,6 +689,10 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 					if (in.op == xbOp_IConst && xb_type_is_int(p->vregs[v])) {
 						R->is_const[v] = true;
 						R->cval[v] = in.imm;
+					}
+					if (in.op == xbOp_Lea && ((in.mem.kind == xbMem_Local && p->locals[in.mem.base].over_align <= 16) || in.mem.kind == xbMem_Incoming)) {
+						R->remat[v] = true;
+						R->rmem[v] = in.mem;
 					}
 					if ((in.op == xbOp_ICmp || in.op == xbOp_FCmp) || (in.op == xbOp_Load && in.type == xbType_I8)) {
 						R->clean[v] = true;
@@ -675,6 +717,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		if (defs[v] != 1) {
 			R->is_const[v] = false;
 			R->clean[v] = false;
+			R->remat[v] = false;
 		}
 		R->in_block[v] = defs[v] == 1 && !multi[v] && (first_use[v] < 0 || first_use[v] > def_pos[v]);
 	}
@@ -688,7 +731,9 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	auto gvreg = array_make<u32>(heap_allocator(), 0, 64);
 	defer (array_free(&gvreg));
 	auto lgid = array_make<i32>(heap_allocator(), p->locals.count);
+	auto lweight = array_make<i64>(heap_allocator(), p->locals.count);
 	defer (array_free(&lgid));
+	defer (array_free(&lweight));
 	for (isize i = 0; i < p->locals.count; i++) lgid[i] = -1;
 	for (int pass = 0; pass < 2; pass++) {
 		for (i32 l : ranked) {
@@ -700,7 +745,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	for (isize v = 1; v < vreg_count; v++) {
 		gid[v] = -1;
 		xbType t = p->vregs[v];
-		if (R->in_block[v] || defs[v] == 0 || R->is_const[v] || pinned[v] || (!xb_type_is_int(t) && !xb_type_is_float(t))) continue;
+		if (R->in_block[v] || defs[v] == 0 || R->is_const[v] || R->remat[v] || pinned[v] || (!xb_type_is_int(t) && !xb_type_is_float(t))) continue;
 		gid[v] = cast(i32)gvreg.count;
 		array_add(&gvreg, cast(u32)v);
 	}
@@ -767,6 +812,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 					smax[scope] = gb_max(smax[scope], linear);
 				}
 				auto note = [&](i32 id, bool is_def) {
+					if (gvreg[id] & XB_LOCAL_ITEM) lweight[gvreg[id] & ~XB_LOCAL_ITEM] += bweight[b->index];
 					if (ev_block[id] != bi) {
 						ev_block[id] = cast(i32)bi;
 						ev_state[id] = 0;
@@ -919,7 +965,8 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 				if (in.op == xbOp_Load) {
 					i32 l = local_of(in.mem);
 					u32 v = in.dst;
-					if (l < 0 || v == 0 || !R->in_block[v] || pinned[v] || R->uses[v] == 0 || last_use[v] - pos > 256) continue;
+					if (l < 0 || v == 0 || !R->in_block[v] || pinned[v] || R->uses[v] == 0 || last_use[v] - pos > 256 ||
+					    xb_type_is_float(p->vregs[v]) != local_fp[l]) continue;
 					bool ok = true;
 					for (isize j = i+1; ok && j <= i + (last_use[v] - pos); j++) ok = !writes(b->instrs[j], l);
 					if (!ok) continue;
@@ -929,8 +976,8 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 				} else if (in.op == xbOp_Store) {
 					i32 l = local_of(in.mem);
 					u32 v = in.a;
-					if (l < 0 || v == 0 || !R->in_block[v] || pinned[v] || R->uses[v] != 1 || R->is_const[v] || R->via[v] >= 0 ||
-					    !xb_type_is_int(p->vregs[v]) || pos - def_pos[v] > 256 || alias_end[l] >= def_pos[v]) continue;
+					if (l < 0 || v == 0 || !R->in_block[v] || pinned[v] || R->uses[v] != 1 || R->is_const[v] || R->remat[v] || R->via[v] >= 0 ||
+					    !(local_fp[l] ? xb_type_is_float(p->vregs[v]) : xb_type_is_int(p->vregs[v])) || pos - def_pos[v] > 256 || alias_end[l] >= def_pos[v]) continue;
 					isize d = def_pos[v] - bstart[bi];
 					bool ok = true;
 					for (isize j = d; ok && j < i; j++) ok = !reads(b->instrs[j], l) && (j == d || !writes(b->instrs[j], l));
@@ -976,107 +1023,77 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		}
 	}
 
-	// registers for the vregs, first come first served. With pools.evict, an interval that finds
-	// none free takes the one of the interval that ends last, when that ends after it; the
-	// loser lives in its slot all its life.
-	u32 free_x = 0, free_v = 0;
+	// registers for the vregs, first come first served. When none is free, an interval takes the
+	// register of an active one that costs less in memory for each position it covers; the loser
+	// lives in its slot all its life.
+	u32 free_x = pools.caller_x | pools.callee_x;
+	u32 free_v = pools.caller_v | pools.callee_v;
+	R->used_x = 0;
+	R->used_v = 0;
 	// the vregs and locals holding a register, listed under the position after their last
-	struct Active { u32 v; i32 next; i32 end; bool lost; };
+	struct Active { u32 v; i32 next; bool dead; i32 len; };
 	auto active = array_make<Active>(heap_allocator(), 0, 64);
+	// the active entry holding each general register, and each float register at XB_FREG + n
+	i32 owner[64];
+	for (i32 &o : owner) o = -1;
+	// a local whose register a vreg shares keeps it
+	auto shared = array_make<bool>(heap_allocator(), p->locals.count);
+	defer (array_free(&shared));
+	auto weight_of = [&](u32 v) -> i64 {
+		return (v & XB_LOCAL_ITEM) ? lweight[v & ~XB_LOCAL_ITEM] : vweight[v];
+	};
 	auto expire = array_make<i32>(heap_allocator(), clobbers.count + 1);
 	defer (array_free(&active));
 	defer (array_free(&expire));
-	i32 owner_x[32], owner_v[32]; // the active entry holding each register
-	// the vregs sharing a local's register, so they lose it with the local
-	auto via_head = array_make<u32>(heap_allocator(), pools.evict ? p->locals.count : 0);
-	auto via_next = array_make<u32>(heap_allocator(), pools.evict ? vreg_count : 0);
-	defer (array_free(&via_head));
-	defer (array_free(&via_next));
-	// locals that lost their register in a round go without one in the next, so the vregs
-	// copied from and to them get registers of their own
-	auto excluded = array_make<bool>(heap_allocator(), pools.evict ? p->locals.count : 0);
-	defer (array_free(&excluded));
-	bool lost_local = false;
-	auto hold = [&](u32 v, i32 end, i8 r) {
-		bool fp = r >= XB_FREG;
-		u32 bit = 1u << (fp ? r - XB_FREG : r);
-		if (fp) {
-			free_v &= ~bit;
-			R->used_v |= bit;
-			owner_v[r - XB_FREG] = cast(i32)active.count;
-		} else {
-			free_x &= ~bit;
-			R->used_x |= bit;
-			owner_x[r] = cast(i32)active.count;
-		}
-		if (v & XB_LOCAL_ITEM) R->local_reg[v & ~XB_LOCAL_ITEM] = r;
-		else                   R->reg[v] = r;
-		Active act = {v, expire[end+1], end, false};
-		expire[end+1] = cast(i32)active.count;
-		array_add(&active, act);
-	};
-	auto item_weight = [&](u32 v) -> i32 {
-		if (v & XB_LOCAL_ITEM) {
-			i32 l = cast(i32)(v & ~XB_LOCAL_ITEM);
-			return local_weight[l] + (is_param[l] ? 1 : 0);
-		}
-		return vweight[v];
-	};
+	for (i32 &e : expire) e = -1;
 	// gives v a register for [now, end] if one is free, a callee saved one when `calls`
 	auto take = [&](u32 v, i32 end, bool calls) {
 		bool is_local = (v & XB_LOCAL_ITEM) != 0;
 		i32 l = cast(i32)(v & ~XB_LOCAL_ITEM);
-		if (is_local && pools.evict && excluded[l]) return;
-		bool fp = !is_local && xb_type_is_float(p->vregs[v]);
+		bool fp = is_local ? local_fp[l] : xb_type_is_float(p->vregs[v]);
 		u32 *free = fp ? &free_v : &free_x;
 		u32 pool = fp ? (calls ? pools.callee_v : pools.caller_v | pools.callee_v)
 		              : (calls ? pools.callee_x : pools.caller_x | pools.callee_x);
 		if (is_local && is_param[l]) {
 			// the prologue moves a parameter into a register no other parameter arrives in
-			pool = pools.callee_x;
+			pool = fp ? pool & ~arrive_v : pools.callee_x;
 			i8 w = arrive[l];
 			if (w >= 0 && !calls && (*free & (1u << w))) pool = 1u << w;
 		}
-		u32 avail = *free & pool;
-		if (calls && pools.callee_weight > 0) {
-			// saving a callee saved register costs about what a few slot accesses do
-			if (item_weight(v) < pools.callee_weight) {
-				avail &= fp ? R->used_v : R->used_x;
-				if (avail == 0) return;
-			}
+		if (calls && weight_of(v) + (is_local && is_param[l] ? 1 : 0) < pools.callee_weight) {
+			// saving a callee saved register costs about what a few slot accesses do; a
+			// parameter's slot also costs the prologue's store
+			pool &= fp ? R->used_v : R->used_x;
 		}
+		u32 avail = *free & pool;
 		if (avail == 0) {
-			if (!pools.evict) return;
-			// the lightest interval that ends later, when it is lighter than v
-			i32 *owner = fp ? owner_v : owner_x;
-			i32 victim = -1;
-			u32 vr = 0;
-			i32 vw = item_weight(v);
+			// the register of the active item that costs least in memory for each position it
+			// covers, when that is less than v's
+			i64 w = weight_of(v);
+			i64 wl = end - linear + 1;
+			i32 best = -1;
 			for (u32 r = 0; r < 32; r++) {
 				if (!(pool & (1u << r))) continue;
-				i32 k = owner[r];
-				i32 kw = item_weight(active[k].v);
-				if (active[k].end > end && kw < vw && (victim < 0 || kw < item_weight(active[victim].v) ||
-				    (kw == item_weight(active[victim].v) && active[k].end > active[victim].end))) {
-					victim = k;
-					vr = r;
-				}
+				i32 k = owner[(fp ? XB_FREG : 0) + r];
+				if (k < 0) continue;
+				u32 y = active[k].v;
+				if ((y & XB_LOCAL_ITEM) && shared[y & ~XB_LOCAL_ITEM]) continue;
+				i64 wy = weight_of(y);
+				i64 ly = active[k].len;
+				if (wy*wl < w*ly) { w = wy; wl = ly; best = k; }
 			}
-			if (victim < 0) return;
-			Active *lost = &active[victim];
-			lost->lost = true;
-			if (lost->v & XB_LOCAL_ITEM) {
-				i32 ll = cast(i32)(lost->v & ~XB_LOCAL_ITEM);
-				R->local_reg[ll] = XB_NOREG;
-				excluded[ll] = true;
-				lost_local = true;
-				for (u32 w = via_head[ll]; w != 0; w = via_next[w]) R->reg[w] = XB_NOREG;
-			} else {
-				R->reg[lost->v] = XB_NOREG;
+			if (best >= 0) {
+				u32 y = active[best].v;
+				i8 r = (y & XB_LOCAL_ITEM) ? R->local_reg[y & ~XB_LOCAL_ITEM] : R->reg[y];
+				if (y & XB_LOCAL_ITEM) R->local_reg[y & ~XB_LOCAL_ITEM] = XB_NOREG;
+				else                   R->reg[y] = XB_NOREG;
+				active[best].dead = true;
+				owner[r] = -1;
+				*free |= 1u << (r >= XB_FREG ? r - XB_FREG : r);
+				avail = *free & pool;
 			}
-			*free |= 1u << vr;
-			avail = 1u << vr;
 		}
+		if (avail == 0) return;
 		// the caller saved ones first, they cost no save; from the top, where calls
 		// want the fewest arguments
 		u32 caller = avail & (fp ? pools.caller_v : pools.caller_x);
@@ -1087,65 +1104,74 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		} else {
 			while ((avail & (1u << r)) == 0) r++;
 		}
-		hold(v, end, cast(i8)(fp ? XB_FREG + r : r));
+		*free &= ~(1u << r);
+		if (fp && is_local) {
+			R->used_v |= 1u << r;
+			R->local_reg[l] = cast(i8)(XB_FREG + r);
+		} else if (fp) {
+			R->used_v |= 1u << r;
+			R->reg[v] = cast(i8)(XB_FREG + r);
+		} else if (is_local) {
+			R->used_x |= 1u << r;
+			R->local_reg[l] = cast(i8)r;
+		} else {
+			R->used_x |= 1u << r;
+			R->reg[v] = cast(i8)r;
+		}
+		owner[(fp ? XB_FREG : 0) + r] = cast(i32)active.count;
+		Active act = {v, expire[end+1], false, end - linear + 1};
+		expire[end+1] = cast(i32)active.count;
+		array_add(&active, act);
 	};
-	for (i32 round = 0; ; round++) {
-		free_x = pools.caller_x | pools.callee_x;
-		free_v = pools.caller_v | pools.callee_v;
-		R->used_x = 0;
-		R->used_v = 0;
-		active.count = 0;
-		for (i32 &e : expire) e = -1;
-		for (i8 &r : R->reg) r = XB_NOREG;
-		for (i8 &r : R->local_reg) r = XB_NOREG;
-		for (u32 &h : via_head) h = 0;
-		lost_local = false;
-		isize gs = 0;
-		linear = 0;
-		for (xbBlock *b : p->order) {
-			for (xbInstr const &in : b->instrs) {
-				for (i32 k = expire[linear]; k >= 0; k = active[k].next) {
-					if (active[k].lost) continue;
-					u32 v = active[k].v;
-					i8 r = (v & XB_LOCAL_ITEM) ? R->local_reg[v & ~XB_LOCAL_ITEM] : R->reg[v];
-					if (r >= XB_FREG) free_v |= 1u << (r - XB_FREG);
-					else              free_x |= 1u << r;
+	isize gs = 0;
+	linear = 0;
+	for (xbBlock *b : p->order) {
+		for (xbInstr const &in : b->instrs) {
+			for (i32 k = expire[linear]; k >= 0; k = active[k].next) {
+				if (active[k].dead) continue;
+				u32 v = active[k].v;
+				i8 r = (v & XB_LOCAL_ITEM) ? R->local_reg[v & ~XB_LOCAL_ITEM] : R->reg[v];
+				owner[r] = -1;
+				if (r >= XB_FREG) free_v |= 1u << (r - XB_FREG);
+				else              free_x |= 1u << r;
+			}
+			while (gs < gstart.count && glo[gstart[gs]] == linear) {
+				i32 id = gstart[gs++];
+				// a call that defines v writes it afterwards
+				take(gvreg[id], ghi[id], clobbers[ghi[id]+1] - clobbers[linear + (glo_def[id] ? 1 : 0)] > 0);
+			}
+			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
+				if (v == 0 || !is_def || !R->in_block[v] || R->is_const[v] || R->remat[v] || pinned[v] || R->reg[v] != XB_NOREG) return;
+				xbType t = p->vregs[v];
+				if (!xb_type_is_int(t) && !xb_type_is_float(t)) return;
+				if (R->via[v] >= 0 && R->local_reg[R->via[v]] >= 0) {
+					R->reg[v] = R->local_reg[R->via[v]];
+					shared[R->via[v]] = true;
+					return;
 				}
-				while (gs < gstart.count && glo[gstart[gs]] == linear) {
-					i32 id = gstart[gs++];
-					// a call that defines v writes it afterwards
-					take(gvreg[id], ghi[id], clobbers[ghi[id]+1] - clobbers[linear + (glo_def[id] ? 1 : 0)] > 0);
-				}
-				xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
-					if (v == 0 || !is_def || !R->in_block[v] || R->is_const[v] || pinned[v] || R->reg[v] != XB_NOREG) return;
-					xbType t = p->vregs[v];
-					if (!xb_type_is_int(t) && !xb_type_is_float(t)) return;
-					if (R->via[v] >= 0 && R->local_reg[R->via[v]] >= 0) {
-						R->reg[v] = R->local_reg[R->via[v]];
-						if (pools.evict) {
-							via_next[v] = via_head[R->via[v]];
-							via_head[R->via[v]] = v;
-						}
+				i32 end = last_use[v] >= 0 ? last_use[v] : linear;
+				// read only as an argument, before that call: right in the argument register
+				i8 w = want[v];
+				if (w >= 0 && R->uses[v] == 1 && clobbers[end] - clobbers[linear+1] == 0 &&
+				    (w >= XB_FREG) == xb_type_is_float(t)) {
+					u32 *free = xb_type_is_float(t) ? &free_v : &free_x;
+					u32 bit = 1u << (w >= XB_FREG ? w - XB_FREG : w);
+					if (*free & bit) {
+						*free &= ~bit;
+						R->reg[v] = w;
+						if (w >= XB_FREG) R->used_v |= bit;
+						else              R->used_x |= bit;
+						owner[w] = cast(i32)active.count;
+						Active act = {v, expire[end+1], false, 0};
+						expire[end+1] = cast(i32)active.count;
+						array_add(&active, act);
 						return;
 					}
-					i32 end = last_use[v] >= 0 ? last_use[v] : linear;
-					// read only as an argument, before that call: right in the argument register
-					i8 w = want[v];
-					if (w >= 0 && R->uses[v] == 1 && clobbers[end] - clobbers[linear+1] == 0 &&
-					    (w >= XB_FREG) == xb_type_is_float(t)) {
-						u32 *free = xb_type_is_float(t) ? &free_v : &free_x;
-						u32 bit = 1u << (w >= XB_FREG ? w - XB_FREG : w);
-						if (*free & bit) {
-							hold(v, end, w);
-							return;
-						}
-					}
-					take(v, end, clobbers[end+1] - clobbers[linear+1] > 0);
-				});
-				linear++;
-			}
+				}
+				take(v, end, clobbers[end+1] - clobbers[linear+1] > 0);
+			});
+			linear++;
 		}
-		if (!lost_local || round == 2) break;
 	}
 
 	// the other vregs used only in the block that defines them share slots, given by xb_alloc_slots
@@ -1191,7 +1217,7 @@ gb_internal void xb_alloc_slots(xbProc *p, xbRegAlloc *R, i32 *cur) {
 		for (xbInstr const &in : b->instrs) {
 			to_free.count = 0;
 			xb_for_each_vreg(p, in, [&](u32 v, bool is_def) {
-				if (v == 0 || R->reg[v] != XB_NOREG || R->is_const[v]) return;
+				if (v == 0 || R->reg[v] != XB_NOREG || R->is_const[v] || R->remat[v]) return;
 				if (is_def) {
 					i32 s = 0;
 					if (!cross[v] && free_slots.count > 0) {
