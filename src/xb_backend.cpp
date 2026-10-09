@@ -39,6 +39,9 @@ gb_global f64 xb_time_build = 0;
 gb_global f64 xb_time_lower = 0;
 gb_global f64 xb_time_write = 0;
 
+// procedures lowered together; more keeps the threads busier, fewer keeps less IR in memory
+enum : isize { XB_LOWER_BATCH = 1024 };
+
 gb_internal void lb_add_foreign_library_path(lbModule *m, Entity *e);
 
 gb_internal bool xb_is_enabled(void) {
@@ -263,7 +266,6 @@ gb_internal void xb_family_cleanup(xbFamily *family) {
 		map_destroy(&fp->vars);
 	}
 	array_free(&family->procs);
-	xb_arena_reset();
 }
 
 gb_internal void xb_family_init(xbFamily *family, DeclInfo *root_decl) {
@@ -339,10 +341,107 @@ gb_internal void xb_family_lower(xbModule *m, xbFamily *family, Entity *root) {
 				s->flags |= xbSymbolFlag_Hidden;
 			}
 		}
-		f64 t0 = gb_time_now();
 		xb_lower_proc(p);
+	}
+}
+
+// Queues p for lowering. It counts as defined from here on, so it is built only once; its code
+// and offset come with xb_lower_flush.
+gb_internal void xb_lower_proc(xbProc *p) {
+	xbModule *m = p->m;
+	xbSymbol *s = &m->symbols[p->sym];
+	s->section = xbSection_Text;
+	s->flags |= xbSymbolFlag_Func;
+	xbLowerJob job = {};
+	job.p = p;
+	array_add(&m->lower_jobs, job);
+}
+
+// Runs on a worker thread. It reads the module and the procedure's IR, and writes only `out`.
+gb_internal void xb_lower_jobs(xbLowerJob *jobs, isize count) {
+	for (isize i = 0; i < count; i++) {
+		xbLowerJob *job = &jobs[i];
+		xbLowerOut *out = &job->out;
+		out->text = array_make<u8>(heap_allocator(), 0, 1024);
+		out->relocs = array_make<xbReloc>(heap_allocator(), 0, 32);
+		out->lines = array_make<xbLineEntry>(heap_allocator(), 0, 32);
+		out->pending = array_make<xbPendingSym>(heap_allocator(), 0, 0);
+		// the main thread's arena holds the IR of the queued procedures when it runs a job
+		xbArenaMark mark = xb_arena_mark();
+		xb_cleanup_proc(job->p);
+		if (xb_is_arm64()) {
+			a64_lower_proc(job->p, out);
+		} else {
+			x64_lower_proc(job->p, out);
+		}
+		xb_arena_release(mark);
+	}
+}
+
+// Appends one lowered procedure to .text, after the symbols it asked for.
+gb_internal void xb_append_lowered(xbModule *m, xbLowerOut *out) {
+	auto syms = slice_make<i32>(heap_allocator(), out->pending.count);
+	// the helpers go right before the first procedure that calls them, memmove's first
+	for (i8 helper = 1; helper <= 2; helper++) {
+		for (isize i = 0; i < out->pending.count; i++) {
+			if (out->pending[i].helper == helper) syms[i] = x64_helper(m, helper == 2);
+		}
+	}
+	for (isize i = 0; i < out->pending.count; i++) {
+		xbPendingSym const &ps = out->pending[i];
+		if (ps.helper == 0) {
+			syms[i] = xb_symbol(m, ps.name);
+			m->symbols[syms[i]].flags |= ps.flags;
+		}
+	}
+
+	Array<u8> *text = &m->sections[xbSection_Text];
+	if (xb_is_arm64()) {
+		u32 brk = 0xD4200020; // brk #1
+		while (text->count % out->align != 0) array_add_elems(text, cast(u8 *)&brk, 4);
+	} else {
+		m->section_align[xbSection_Text] = gb_max(m->section_align[xbSection_Text], out->align);
+		while (text->count % out->align != 0) array_add(text, cast(u8)0xCC);
+	}
+	i64 base = text->count;
+	array_add_elems(text, out->text.data, out->text.count);
+	for (xbReloc r : out->relocs) {
+		r.offset += base;
+		if (r.sym >= XB_PENDING_SYM) r.sym = syms[r.sym - XB_PENDING_SYM];
+		array_add(&m->relocs, r);
+	}
+	xbProcDebug dbg = out->dbg;
+	dbg.start += base;
+	dbg.end += base;
+	dbg.line_entry_start += cast(i32)m->lines.count;
+	array_add_elems(&m->lines, out->lines.data, out->lines.count);
+	xbSymbol *s = &m->symbols[dbg.sym];
+	s->section = xbSection_Text;
+	s->offset = dbg.start;
+	s->size = dbg.end - dbg.start;
+	s->flags |= xbSymbolFlag_Func;
+	array_add(&m->proc_debug, dbg);
+
+	slice_free(&syms, heap_allocator());
+	array_free(&out->text);
+	array_free(&out->relocs);
+	array_free(&out->lines);
+	array_free(&out->pending);
+}
+
+// Lowers the queued procedures on the thread pool and appends them in queue order, so the
+// object is the same for any thread count. Frees the IR.
+gb_internal void xb_lower_flush(xbModule *m) {
+	if (m->lower_jobs.count > 0) {
+		f64 t0 = gb_time_now();
+		thread_pool_for_chunks(m->lower_jobs.data, m->lower_jobs.count, 8, xb_lower_jobs);
+		for (xbLowerJob &job : m->lower_jobs) {
+			xb_append_lowered(m, &job.out);
+		}
+		array_clear(&m->lower_jobs);
 		xb_time_lower += gb_time_now() - t0;
 	}
+	xb_arena_reset();
 }
 
 // Compiles a procedure with everything nested in it, or nothing at all.
@@ -434,6 +533,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	ptr_set_init(&m->inline_failed);
 	map_init(&m->inline_statics);
 	m->proc_queue = array_make<Entity *>(heap_allocator(), 0, 1024);
+	m->lower_jobs = array_make<xbLowerJob>(heap_allocator(), 0, XB_LOWER_BATCH);
 	map_init(&m->abi_cache);
 	string_map_init(&m->string_lits);
 	string_map_init(&m->stats.fail_reasons);
@@ -491,6 +591,9 @@ gb_internal void xb_generate(lbGenerator *gen) {
 			continue;
 		}
 
+		if (m->lower_jobs.count >= XB_LOWER_BATCH) {
+			xb_lower_flush(m);
+		}
 		char const *reason = nullptr;
 		if (xb_compile_proc(m, e, &reason)) {
 			m->stats.procs_compiled += 1;
@@ -528,6 +631,8 @@ gb_internal void xb_generate(lbGenerator *gen) {
 			xb_objc_hand_over(m);
 		}
 	}
+
+	xb_lower_flush(m);
 
 	if (m->stats.procs_compiled > 0 || m->stats.globals_defined > 0) {
 		m->object_path = xb_object_path(gen);

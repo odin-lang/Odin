@@ -449,7 +449,7 @@ gb_internal void xb_win64_epilogue(xbLower *L) {
 // A thread local: the module's TLS block from the TEB, plus the variable's offset in .tls.
 gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 	xbAsm *a = &L->a;
-	i32 index = xb_symbol(L->p->m, str_lit("_tls_index"));
+	i32 index = xb_lower_symbol(L->p->m, L->out, str_lit("_tls_index"), 0);
 	// mov scratch32, [rip + _tls_index]
 	xb_enc(a, 0, 0x8B, scratch, xb_m_sym(index, 0));
 	xb_shift_imm(a, 4, 8, xb_r(scratch), 3);
@@ -467,7 +467,7 @@ gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 	xb_b(a, 0x8D);
 	xb_b(a, cast(u8)(0x80 | (r << 3) | r));
 	if (r == 4) xb_b(a, 0x24); // sib for r12
-	xb_add_reloc(L->p->m, xbSection_Text, xbReloc_SecRel32, xb_pos(a), cast(i32)m.base, 0);
+	xb_asm_reloc(a, xbReloc_SecRel32, xb_pos(a), cast(i32)m.base, 0);
 	xb_u32(a, 0);
 	return xb_m(scratch, m.offset);
 }
@@ -476,7 +476,7 @@ gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 gb_internal xbOpnd xb_win64_import_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 	xbModule *mod = L->p->m;
 	String name = concatenate_strings(permanent_allocator(), str_lit("__imp_"), mod->symbols[m.base].name);
-	i32 imp = xb_symbol(mod, name);
+	i32 imp = xb_lower_symbol(mod, L->out, name, 0);
 	xb_enc(&L->a, XB_W, 0x8B, scratch, xb_m_sym(imp, 0));
 	return xb_m(scratch, m.offset);
 }

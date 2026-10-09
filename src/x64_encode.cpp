@@ -51,6 +51,7 @@ gb_internal gb_inline xbOpnd xb_m_sym(i32 sym, i32 addend, xbRelocKind reloc=xbR
 struct xbAsm {
 	xbModule *m;
 	Array<u8> *code;
+	Array<xbReloc> *relocs;
 };
 
 gb_internal gb_inline i64 xb_pos(xbAsm *a) {
@@ -83,6 +84,17 @@ gb_internal void xb_add_reloc(xbModule *m, xbSection section, xbRelocKind kind, 
 	array_add(&m->relocs, r);
 }
 
+// A relocation in the code being assembled, at an offset in a->code.
+gb_internal void xb_asm_reloc(xbAsm *a, xbRelocKind kind, i64 offset, i32 sym, i64 addend) {
+	xbReloc r = {};
+	r.section = xbSection_Text;
+	r.kind = kind;
+	r.offset = offset;
+	r.sym = sym;
+	r.addend = addend;
+	array_add(a->relocs, r);
+}
+
 enum : u32 {
 	XB_W      = 1<<0, // REX.W
 	XB_BYTE   = 1<<1, // 8-bit operation on a gpr (needs REX for sil/dil/spl/bpl)
@@ -108,8 +120,8 @@ gb_internal void xb_enc_modrm(xbAsm *a, u8 reg, xbOpnd rm, i32 imm_size, i32 dis
 		xb_u32(a, 0);
 		GB_ASSERT(rm.sym >= 0);
 		// rip points past the immediate when there is one
-		xb_add_reloc(a->m, xbSection_Text, rm.reloc, at, rm.sym, cast(i64)rm.disp - 4 - imm_size);
-		a->m->relocs[a->m->relocs.count-1].tail = cast(u8)imm_size;
+		xb_asm_reloc(a, rm.reloc, at, rm.sym, cast(i64)rm.disp - 4 - imm_size);
+		(*a->relocs)[a->relocs->count-1].tail = cast(u8)imm_size;
 		return;
 	}
 	u8 base = rm.reg & 7;
@@ -349,7 +361,7 @@ gb_internal void xb_call_sym(xbAsm *a, i32 sym) {
 	xb_b(a, 0xE8);
 	i64 at = xb_pos(a);
 	xb_u32(a, 0);
-	xb_add_reloc(a->m, xbSection_Text, xbReloc_PLT32, at, sym, -4);
+	xb_asm_reloc(a, xbReloc_PLT32, at, sym, -4);
 }
 
 gb_internal void xb_call_rm(xbAsm *a, xbOpnd rm) {

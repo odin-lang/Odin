@@ -569,6 +569,32 @@ struct xbProcDebug {
 	i32     win_alloc_size;
 };
 
+// A symbol that lowering needs and that may not exist yet. Lowering runs on worker threads and
+// must not add symbols, so it refers to these as XB_PENDING_SYM + index until its code is appended.
+struct xbPendingSym {
+	String name;
+	u32    flags;
+	i8     helper; // x86-64: 1 the memmove helper, 2 the memset helper, which the append emits
+};
+
+enum : i32 { XB_PENDING_SYM = 1<<30 };
+
+// What lowering one procedure produces, with code offsets from the procedure's start.
+// The driver appends it to the module in a fixed order, so the object does not depend on threads.
+struct xbLowerOut {
+	Array<u8>           text;
+	Array<xbReloc>      relocs;
+	Array<xbLineEntry>  lines;
+	Array<xbPendingSym> pending;
+	xbProcDebug         dbg;
+	i64                 align;
+};
+
+struct xbLowerJob {
+	struct xbProc *p;
+	xbLowerOut     out;
+};
+
 struct xbStats {
 	isize procs_total;
 	isize procs_compiled;
@@ -615,6 +641,9 @@ struct xbModule {
 	// x86-64: the module's memmove and memset for sizes known at run time, symbol + 1, 0 until emitted
 	i32               x64_move_helper;
 	i32               x64_set_helper;
+
+	// procedures built and waiting to be lowered, in the order their code goes into .text
+	Array<xbLowerJob> lower_jobs;
 
 	// entities this backend compiles, so LLVM only declares them
 	PtrSet<Entity *>  handled;
@@ -675,7 +704,7 @@ gb_internal xbAbiFunc *a64_abi_compute(Type *proc_type, char const **reason);
 gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index);
 gb_internal void a64_check_proc(xbProc *p);
 gb_internal xbType a64_int_piece_type(i64 size);
-gb_internal void a64_lower_proc(xbProc *p);
+gb_internal void a64_lower_proc(xbProc *p, xbLowerOut *out);
 gb_internal i32 a64_vec_intrinsic_index(String name, isize *args);
 
 // A bump allocator for everything that only lives while one procedure family is
@@ -691,7 +720,8 @@ struct xbArena {
 	isize used;
 };
 
-gb_global xbArena xb_arena;
+// one per thread: workers lower procedures while the main thread's arena holds their IR
+gb_global gb_thread_local xbArena xb_arena;
 
 gb_internal void *xb_arena_alloc(isize size, isize align) {
 	xbArena *a = &xb_arena;
@@ -722,6 +752,21 @@ gb_internal void *xb_arena_alloc(isize size, isize align) {
 gb_internal void xb_arena_reset(void) {
 	xb_arena.curr = 0;
 	xb_arena.used = 0;
+}
+
+struct xbArenaMark {
+	isize curr;
+	isize used;
+};
+
+gb_internal xbArenaMark xb_arena_mark(void) {
+	return {xb_arena.curr, xb_arena.used};
+}
+
+// Frees everything allocated since the mark.
+gb_internal void xb_arena_release(xbArenaMark mark) {
+	xb_arena.curr = mark.curr;
+	xb_arena.used = mark.used;
 }
 
 gb_internal GB_ALLOCATOR_PROC(xb_arena_allocator_proc) {

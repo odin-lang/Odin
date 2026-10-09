@@ -30,6 +30,7 @@ enum : i64 { X64_INLINE_COPY = 64 };
 
 struct xbLower {
 	xbProc *    p;
+	xbLowerOut *out;
 	xbAsm       a;
 	Array<i32>  slot;     // vreg -> rbp offset (negative), when it has no register
 	Array<i32>  uses;     // vreg -> number of reads
@@ -611,6 +612,7 @@ gb_internal i32 x64_helper(xbModule *m, bool set) {
 	xbAsm as = {};
 	as.m = m;
 	as.code = &m->sections[xbSection_Text];
+	as.relocs = &m->relocs;
 	xbAsm *a = &as;
 	while (a->code->count % 16 != 0) xb_b(a, 0xCC);
 	i64 start = xb_pos(a);
@@ -771,28 +773,25 @@ gb_internal i32 x64_helper(xbModule *m, bool set) {
 	return sym;
 }
 
-// Whether p copies or sets memory through the helpers.
-gb_internal void x64_need_helpers(xbProc *p, bool *move, bool *set) {
-	for (xbBlock *b : p->order) {
-		for (xbInstr const &in : b->instrs) {
-			switch (in.op) {
-			case xbOp_MemCopyDyn:
-			case xbOp_MemMoveDyn:
-				*move = true;
-				break;
-			case xbOp_MemCopy:
-			case xbOp_MemMove:
-				if (in.imm > X64_INLINE_COPY) *move = true;
-				break;
-			case xbOp_MemSetDyn:
-				*set = true;
-				break;
-			case xbOp_MemZero:
-				if (in.imm > 64) *set = true;
-				break;
-			}
-		}
+// The symbol of `name`, or a pending one when it does not exist yet or lacks `flags`.
+// Lowering runs on worker threads, which only read the module.
+gb_internal i32 xb_lower_symbol(xbModule *m, xbLowerOut *out, String name, u32 flags, i8 helper=0) {
+	i32 *found = string_map_get(&m->symbol_map, name);
+	if (found && (m->symbols[*found].flags & flags) == flags) return *found;
+	for (isize i = 0; i < out->pending.count; i++) {
+		if (out->pending[i].name == name) return XB_PENDING_SYM + cast(i32)i;
 	}
+	xbPendingSym ps = {name, flags, helper};
+	array_add(&out->pending, ps);
+	return XB_PENDING_SYM + cast(i32)(out->pending.count-1);
+}
+
+// The helper is emitted when the procedure's code is appended, right before it.
+gb_internal i32 x64_lower_helper(xbLower *L, bool set) {
+	xbModule *m = L->p->m;
+	i32 at = set ? m->x64_set_helper : m->x64_move_helper;
+	if (at != 0) return at - 1;
+	return xb_lower_symbol(m, L->out, set ? str_lit("__xb_memset") : str_lit("__xb_memmove"), 0, set ? 2 : 1);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -1070,7 +1069,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		e.file_id = cast(i32)in.a;
 		e.line = cast(i32)in.imm;
 		e.column = cast(i32)in.b;
-		array_add(&p->m->lines, e);
+		array_add(&L->out->lines, e);
 		break;
 	}
 	case xbOp_IConst:
@@ -1502,7 +1501,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 			x64_get(L, RDX, in.b, 8, xbExt_None);
 			x64_get(L, RAX, in.a, 8, xbExt_None);
 			xb_mov_r_imm(a, RCX, cast(u64)n);
-			xb_call_sym(a, x64_helper(p->m, false));
+			xb_call_sym(a, x64_lower_helper(L, false));
 		}
 		break;
 	}
@@ -1524,7 +1523,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 			xb_lea(a, RDX, xb_mem_opnd(L, in.mem, R11));
 			xb_alu_r_rm(a, ALU_XOR, 4, RAX, xb_r(RAX));
 			xb_mov_r_imm(a, RCX, cast(u64)n);
-			xb_call_sym(a, x64_helper(p->m, true));
+			xb_call_sym(a, x64_lower_helper(L, true));
 		}
 		break;
 	}
@@ -1533,13 +1532,13 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		x64_get(L, RCX, in.c, 8, xbExt_None);
 		x64_get(L, RDX, in.b, 8, xbExt_None);
 		x64_get(L, RAX, in.a, 8, xbExt_None);
-		xb_call_sym(a, x64_helper(p->m, false));
+		xb_call_sym(a, x64_lower_helper(L, false));
 		break;
 	case xbOp_MemSetDyn:
 		x64_get(L, RCX, in.c, 8, xbExt_None);
 		x64_get(L, RDX, in.a, 8, xbExt_None);
 		x64_get(L, RAX, in.b, 1, xbExt_None);
-		xb_call_sym(a, x64_helper(p->m, true));
+		xb_call_sym(a, x64_lower_helper(L, true));
 		break;
 	case xbOp_Call:
 		xb_lower_call(L, p->calls[cast(isize)in.imm], false);
@@ -1723,7 +1722,7 @@ gb_internal void xb_lower_instr(xbLower *L, xbInstr const &in) {
 		xb_b(a, 0x66);
 		xb_b(a, 0x66);
 		xb_b(a, 0x48);
-		xb_call_sym(a, xb_symbol(L->p->m, str_lit("__tls_get_addr")));
+		xb_call_sym(a, xb_lower_symbol(L->p->m, L->out, str_lit("__tls_get_addr"), 0));
 		x64_put(L, in.dst, RAX);
 		break;
 	}
@@ -1867,17 +1866,14 @@ gb_internal bool x64_can_fuse(xbLower *L, xbInstr const &in, xbInstr const &n) {
 	return false;
 }
 
-gb_internal void xb_lower_proc(xbProc *p) {
-	xb_cleanup_proc(p);
-	if (xb_is_arm64()) {
-		a64_lower_proc(p);
-		return;
-	}
+gb_internal void x64_lower_proc(xbProc *p, xbLowerOut *out) {
 	xbModule *m = p->m;
 	xbLower L = {};
 	L.p = p;
+	L.out = out;
 	L.a.m = m;
-	L.a.code = &m->sections[xbSection_Text];
+	L.a.code = &out->text;
+	L.a.relocs = &out->relocs;
 	L.fixups = array_make<xbLower::Fixup>(heap_allocator(), 0, 64);
 	defer (array_free(&L.fixups));
 	defer (array_free(&L.slot));
@@ -1892,26 +1888,11 @@ gb_internal void xb_lower_proc(xbProc *p) {
 
 	xb_lower_layout(&L);
 
-	// the helpers go before the procedure that first needs them
-	bool need_move = false, need_set = false;
-	x64_need_helpers(p, &need_move, &need_set);
-	if (need_move) x64_helper(m, false);
-	if (need_set)  x64_helper(m, true);
-
 	xbAsm *a = &L.a;
 	// 16 byte aligned procedure starts, more when an asm template aligns its code
-	i64 proc_align = 16;
-	for (xbAsmBlock const &blk : p->asms) proc_align = gb_max(proc_align, cast(i64)blk.align);
-	m->section_align[xbSection_Text] = gb_max(m->section_align[xbSection_Text], proc_align);
-	while (a->code->count % proc_align != 0) {
-		xb_b(a, 0xCC);
-	}
+	out->align = 16;
+	for (xbAsmBlock const &blk : p->asms) out->align = gb_max(out->align, cast(i64)blk.align);
 	L.proc_start = xb_pos(a);
-
-	xbSymbol *sym = &m->symbols[p->sym];
-	sym->section = xbSection_Text;
-	sym->offset = L.proc_start;
-	sym->flags |= xbSymbolFlag_Func;
 
 	xbProcDebug dbg = {};
 	dbg.name = p->entity ? p->entity->token.string : p->name;
@@ -1920,7 +1901,7 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	dbg.start = L.proc_start;
 	dbg.file_id = p->file_id;
 	dbg.line = p->entity ? p->entity->token.pos.line : 0;
-	dbg.line_entry_start = cast(i32)m->lines.count;
+	dbg.line_entry_start = cast(i32)out->lines.count;
 	dbg.type = p->type;
 	dbg.naked = p->naked;
 
@@ -2069,8 +2050,7 @@ gb_internal void xb_lower_proc(xbProc *p) {
 	}
 
 	dbg.end = xb_pos(a);
-	dbg.line_entry_count = cast(i32)(m->lines.count - dbg.line_entry_start);
-	sym->size = dbg.end - dbg.start;
+	dbg.line_entry_count = cast(i32)(out->lines.count - dbg.line_entry_start);
 
 	// debug variables, now that frame offsets are known
 	dbg.vars = array_make<xbDebugVar>(heap_allocator(), 0, p->debug_vars.count);
@@ -2095,5 +2075,5 @@ gb_internal void xb_lower_proc(xbProc *p) {
 		}
 		array_add(&dbg.vars, v);
 	}
-	array_add(&m->proc_debug, dbg);
+	out->dbg = dbg;
 }

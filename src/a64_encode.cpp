@@ -564,7 +564,7 @@ gb_internal void a64_bcond_to(xbAsm *a, a64Cond c, i64 target) {
 }
 
 gb_internal void a64_bl_sym(xbAsm *a, i32 sym) {
-	xb_add_reloc(a->m, xbSection_Text, xbReloc_A64_Branch26, xb_pos(a), sym, 0);
+	xb_asm_reloc(a, xbReloc_A64_Branch26, xb_pos(a), sym, 0);
 	a64_emit(a, 0x94000000);
 }
 
@@ -672,18 +672,18 @@ gb_internal void a64_dmb_ish(xbAsm *a) {
 
 // xd = the page of `sym`, the low 12 bits come from the following instruction
 gb_internal void a64_adrp(xbAsm *a, u8 rd, i32 sym, xbRelocKind kind) {
-	xb_add_reloc(a->m, xbSection_Text, kind, xb_pos(a), sym, 0);
+	xb_asm_reloc(a, kind, xb_pos(a), sym, 0);
 	a64_emit(a, 0x90000000 | rd);
 }
 
 // add xd, xn, sym@PAGEOFF
 gb_internal void a64_add_pageoff(xbAsm *a, u8 rd, u8 rn, i32 sym) {
-	xb_add_reloc(a->m, xbSection_Text, xbReloc_A64_PageOff12, xb_pos(a), sym, 0);
+	xb_asm_reloc(a, xbReloc_A64_PageOff12, xb_pos(a), sym, 0);
 	a64_emit(a, 0x91000000 | (cast(u32)rn << 5) | rd);
 }
 
 // ldr xd, [xn, sym@GOTPAGEOFF] or sym@TLVPPAGEOFF
 gb_internal void a64_ldr_pageoff(xbAsm *a, u8 rd, u8 rn, i32 sym, xbRelocKind kind) {
-	xb_add_reloc(a->m, xbSection_Text, kind, xb_pos(a), sym, 0);
+	xb_asm_reloc(a, kind, xb_pos(a), sym, 0);
 	a64_emit(a, 0xF9400000 | (cast(u32)rn << 5) | rd);
 }

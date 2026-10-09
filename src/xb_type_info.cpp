@@ -530,6 +530,8 @@ gb_internal bool xb_generate_type_info(xbModule *m, char const **reason) {
 	return true;
 }
 
+gb_internal void xb_lower_flush(xbModule *m);
+
 gb_internal void xb_build_type_info(xbModule *m) {
 	if (build_context.no_rtti) return;
 	char const *reason = nullptr;
@@ -539,5 +541,5 @@ gb_internal void xb_build_type_info(xbModule *m) {
 		xb_stat_fail(m, reason ? reason : "type info");
 		xb_log_fallback(m, "global", str_lit("type info table"), {}, reason);
 	}
-	xb_arena_reset();
+	xb_lower_flush(m);
 }

@@ -39,6 +39,7 @@ enum : i64 {
 
 struct a64Lower {
 	xbProc *    p;
+	xbLowerOut *out;
 	xbAsm       a;
 	Array<i32>  slot;     // vreg -> x29 offset (negative)
 	Array<i32>  uses;     // vreg -> number of reads
@@ -475,12 +476,6 @@ gb_internal bool a64_cond_is_signed(xbCond c) {
 	return c == xbCond_SLT || c == xbCond_SLE || c == xbCond_SGT || c == xbCond_SGE;
 }
 
-gb_internal i32 a64_libc_sym(xbModule *m, char const *name) {
-	i32 sym = xb_symbol(m, make_string_c(name));
-	m->symbols[sym].flags |= xbSymbolFlag_Func | xbSymbolFlag_Foreign;
-	return sym;
-}
-
 ////////////////////////////////////////////////////////////////
 // Calls
 ////////////////////////////////////////////////////////////////
@@ -576,7 +571,7 @@ gb_internal void a64_lower_call(a64Lower *L, xbCall const &c, bool is_ret) {
 
 // memmove(x0, x1, x2) or memset(x0, w1, x2), from the C library like LLVM's lowering
 gb_internal void a64_call_libc(a64Lower *L, char const *name) {
-	a64_bl_sym(&L->a, a64_libc_sym(L->p->m, name));
+	a64_bl_sym(&L->a, xb_lower_symbol(L->p->m, L->out, make_string_c(name), xbSymbolFlag_Func | xbSymbolFlag_Foreign));
 }
 
 gb_internal void a64_epilogue(a64Lower *L) {
@@ -687,7 +682,7 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		e.file_id = cast(i32)in.a;
 		e.line = cast(i32)in.imm;
 		e.column = cast(i32)in.b;
-		array_add(&p->m->lines, e);
+		array_add(&L->out->lines, e);
 		break;
 	}
 	case xbOp_IConst:
@@ -1137,9 +1132,9 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 			// model; the resolver returns the offset from the thread pointer in x0
 			a64_adrp(a, X0, sym, xbReloc_A64_TlsDescPage21);
 			a64_ldr_pageoff(a, X1, X0, sym, xbReloc_A64_TlsDescLd);
-			xb_add_reloc(p->m, xbSection_Text, xbReloc_A64_TlsDescAdd, xb_pos(a), sym, 0);
+			xb_asm_reloc(a, xbReloc_A64_TlsDescAdd, xb_pos(a), sym, 0);
 			a64_emit(a, 0x91000000 | (cast(u32)X0 << 5) | X0); // add x0, x0, #0
-			xb_add_reloc(p->m, xbSection_Text, xbReloc_A64_TlsDescCall, xb_pos(a), sym, 0);
+			xb_asm_reloc(a, xbReloc_A64_TlsDescCall, xb_pos(a), sym, 0);
 			a64_blr(a, X1);
 			a64_emit(a, mrs_tpidr_el0 | X1);
 			a64_alu(a, A64_ADD, X0, X1, X0);
@@ -1349,13 +1344,15 @@ gb_internal bool a64_can_fuse(a64Lower *L, xbInstr const &in, xbInstr const &n) 
 }
 
 // Lowers p, or returns false when a conditional branch cannot reach its target unless `far_branches`.
-gb_internal bool a64_lower_proc_with(xbProc *p, bool far_branches) {
+gb_internal bool a64_lower_proc_with(xbProc *p, xbLowerOut *out, bool far_branches) {
 	xbModule *m = p->m;
 	a64Lower L = {};
 	L.p = p;
+	L.out = out;
 	L.far_branches = far_branches;
 	L.a.m = m;
-	L.a.code = &m->sections[xbSection_Text];
+	L.a.code = &out->text;
+	L.a.relocs = &out->relocs;
 	L.fixups = array_make<a64Lower::Fixup>(heap_allocator(), 0, 64);
 	defer (array_free(&L.fixups));
 	defer (array_free(&L.slot));
@@ -1374,17 +1371,10 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far_branches) {
 
 	xbAsm *a = &L.a;
 	// 16 byte aligned procedure starts, like LLVM's
-	while (a->code->count % 16 != 0) {
-		a64_emit(a, 0xD4200020); // brk #1
-	}
+	out->align = 16;
 	L.proc_start = xb_pos(a);
 
-	xbSymbol *sym = &m->symbols[p->sym];
-	sym->section = xbSection_Text;
-	sym->offset = L.proc_start;
-	sym->flags |= xbSymbolFlag_Func;
-
-	i32 line_entry_start = cast(i32)m->lines.count;
+	i32 line_entry_start = cast(i32)out->lines.count;
 
 	// prologue
 	a64_emit(a, 0xA9BF7BFD); // stp x29, x30, [sp, #-16]!
@@ -1536,12 +1526,11 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far_branches) {
 	dbg.file_id = p->file_id;
 	dbg.line = p->entity ? p->entity->token.pos.line : 0;
 	dbg.line_entry_start = line_entry_start;
-	dbg.line_entry_count = cast(i32)(m->lines.count - line_entry_start);
+	dbg.line_entry_count = cast(i32)(out->lines.count - line_entry_start);
 	dbg.type = p->type;
 	dbg.saved_at = saved_at;
 	dbg.prologue_end = prologue_end;
 	dbg.scope_marks = scope_marks;
-	sym->size = dbg.end - dbg.start;
 
 	// dwarf numbers x19-x28 as themselves and d8-d15 as 72-79
 	dbg.saved_regs = array_make<xbProcDebug::SavedReg>(heap_allocator(), 0, 0);
@@ -1575,22 +1564,19 @@ gb_internal bool a64_lower_proc_with(xbProc *p, bool far_branches) {
 		}
 		array_add(&dbg.vars, v);
 	}
-	array_add(&m->proc_debug, dbg);
+	out->dbg = dbg;
 	return true;
 }
 
-gb_internal void a64_lower_proc(xbProc *p) {
-	xbModule *m = p->m;
-	isize text = m->sections[xbSection_Text].count;
-	isize relocs = m->relocs.count;
-	isize lines = m->lines.count;
-	if (a64_lower_proc_with(p, false)) {
+gb_internal void a64_lower_proc(xbProc *p, xbLowerOut *out) {
+	if (a64_lower_proc_with(p, out, false)) {
 		return;
 	}
 	// a conditional branch is out of range: start over with ones that reach anywhere
-	m->sections[xbSection_Text].count = text;
-	m->relocs.count = relocs;
-	m->lines.count = lines;
-	bool ok = a64_lower_proc_with(p, true);
+	out->text.count = 0;
+	out->relocs.count = 0;
+	out->lines.count = 0;
+	out->pending.count = 0;
+	bool ok = a64_lower_proc_with(p, out, true);
 	GB_ASSERT(ok);
 }
