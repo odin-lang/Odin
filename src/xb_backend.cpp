@@ -38,6 +38,10 @@ gb_global xbModule *xb_module = nullptr;
 gb_global f64 xb_time_build = 0;
 gb_global f64 xb_time_lower = 0;
 gb_global f64 xb_time_write = 0;
+gb_global f64 xb_time_globals = 0;
+gb_global f64 xb_time_procs = 0;
+gb_global f64 xb_time_extra = 0;
+gb_global f64 xb_time_total = 0;
 
 // procedures lowered together; more keeps the threads busier, fewer keeps less IR in memory
 enum : isize { XB_LOWER_BATCH = 1024 };
@@ -429,19 +433,50 @@ gb_internal void xb_append_lowered(xbModule *m, xbLowerOut *out) {
 	array_free(&out->pending);
 }
 
-// Lowers the queued procedures on the thread pool and appends them in queue order, so the
-// object is the same for any thread count. Frees the IR.
-gb_internal void xb_lower_flush(xbModule *m) {
-	if (m->lower_jobs.count > 0) {
-		f64 t0 = gb_time_now();
-		thread_pool_for_chunks(m->lower_jobs.data, m->lower_jobs.count, 8, xb_lower_jobs);
-		for (xbLowerJob &job : m->lower_jobs) {
-			xb_append_lowered(m, &job.out);
-		}
-		array_clear(&m->lower_jobs);
-		xb_time_lower += gb_time_now() - t0;
+gb_global ThreadPoolChunks<xbLowerJob> xb_lower_tasks;
+// the main thread's arenas: one holds the IR of the busy batch, the other the batch being built
+gb_global xbArena xb_main_arenas[2];
+gb_global isize   xb_main_arena;
+
+// Waits for the busy batch and appends its code in queue order, so the object is the same
+// for any thread count.
+gb_internal void xb_lower_finish(xbModule *m) {
+	if (m->lower_busy.count == 0) return;
+	f64 t0 = gb_time_now();
+	thread_pool_wait_chunks(&xb_lower_tasks);
+	for (xbLowerJob &job : m->lower_busy) {
+		xb_append_lowered(m, &job.out);
 	}
+	array_clear(&m->lower_busy);
+	xb_time_lower += gb_time_now() - t0;
+}
+
+// Hands the queued procedures to the thread pool, which lowers them while the main thread
+// builds the next batch in its other arena.
+gb_internal void xb_lower_start(xbModule *m) {
+	xb_lower_finish(m);
+	if (m->lower_jobs.count == 0) return;
+	f64 t0 = gb_time_now();
+	array_resize(&m->lower_sym_flags, m->symbols.count);
+	for (isize i = 0; i < m->symbols.count; i++) {
+		xbSymbol const &s = m->symbols[i];
+		m->lower_sym_flags[i] = s.flags | (s.section == xbSection_Undef ? xbSymbolFlag_Undef : 0);
+	}
+	Array<xbLowerJob> jobs = m->lower_busy;
+	m->lower_busy = m->lower_jobs;
+	m->lower_jobs = jobs;
+	thread_pool_start_chunks(&xb_lower_tasks, m->lower_busy.data, m->lower_busy.count, 8, xb_lower_jobs);
+	// the arena of the batch before, appended above
+	xb_main_arena ^= 1;
+	xb_arena_cur = &xb_main_arenas[xb_main_arena];
 	xb_arena_reset();
+	xb_time_lower += gb_time_now() - t0;
+}
+
+// Lowers and appends every queued procedure.
+gb_internal void xb_lower_flush(xbModule *m) {
+	xb_lower_start(m);
+	xb_lower_finish(m);
 }
 
 // Compiles a procedure with everything nested in it, or nothing at all.
@@ -508,6 +543,7 @@ gb_internal String xb_object_path(lbGenerator *gen) {
 }
 
 gb_internal void xb_generate(lbGenerator *gen) {
+	f64 t_start = gb_time_now();
 	xbModule *m = permanent_alloc_item<xbModule>();
 	xb_module = m;
 	m->gen = gen;
@@ -534,6 +570,9 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	map_init(&m->inline_statics);
 	m->proc_queue = array_make<Entity *>(heap_allocator(), 0, 1024);
 	m->lower_jobs = array_make<xbLowerJob>(heap_allocator(), 0, XB_LOWER_BATCH);
+	m->lower_busy = array_make<xbLowerJob>(heap_allocator(), 0, XB_LOWER_BATCH);
+	m->lower_sym_flags = array_make<u8>(heap_allocator(), 0, 4096);
+	xb_arena_cur = &xb_main_arenas[0];
 	map_init(&m->abi_cache);
 	string_map_init(&m->string_lits);
 	string_map_init(&m->stats.fail_reasons);
@@ -550,7 +589,11 @@ gb_internal void xb_generate(lbGenerator *gen) {
 	char const *skip = gb_get_env("ODIN_XB_SKIP", permanent_allocator());
 	m->verbose = gb_get_env("ODIN_XB_VERBOSE", permanent_allocator()) != nullptr;
 
+	f64 t_globals = gb_time_now();
 	xb_define_globals(m);
+	xb_time_globals = gb_time_now() - t_globals;
+
+	f64 t_procs = gb_time_now();
 
 	// every procedure LLVM would generate, in a stable order
 	// (the same filter as lb_create_global_procedures_and_types)
@@ -592,7 +635,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		}
 
 		if (m->lower_jobs.count >= XB_LOWER_BATCH) {
-			xb_lower_flush(m);
+			xb_lower_start(m);
 		}
 		char const *reason = nullptr;
 		if (xb_compile_proc(m, e, &reason)) {
@@ -607,6 +650,9 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		}
 	}
 
+	xb_time_procs = gb_time_now() - t_procs;
+
+	f64 t_extra = gb_time_now();
 	if (xb_can_compile_procs()) {
 		xb_build_startup(m);
 	}
@@ -632,6 +678,7 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		}
 	}
 
+	xb_time_extra = gb_time_now() - t_extra;
 	xb_lower_flush(m);
 
 	// for CI: anything left to LLVM is an error, the reasons are printed above
@@ -658,10 +705,13 @@ gb_internal void xb_generate(lbGenerator *gen) {
 		xb_time_write += gb_time_now() - t0;
 	}
 
+	xb_time_total = gb_time_now() - t_start;
+
 	if (gb_get_env("ODIN_XB_STATS", permanent_allocator()) != nullptr) {
 		gb_printf_err("fast backend: compiled %td of %td procedures, inlined %td calls\n", m->stats.procs_compiled, m->stats.procs_total, m->stats.calls_inlined);
 		gb_printf_err("  globals %td of %td, startup %s, type info %s, test main %s%s\n", m->stats.globals_defined, m->stats.globals_total, m->owns_startup ? "fast" : "llvm", m->owns_type_info ? "fast" : "llvm", m->owns_test_main ? "fast" : "-", m->complete ? ", no LLVM" : "");
 		gb_printf_err("  build %.3f ms, lower %.3f ms, write %.3f ms\n", xb_time_build*1000, xb_time_lower*1000, xb_time_write*1000);
+		gb_printf_err("  globals %.3f ms, procedures %.3f ms, startup and type info %.3f ms, total %.3f ms\n", xb_time_globals*1000, xb_time_procs*1000, xb_time_extra*1000, xb_time_total*1000);
 		struct Reason { String name; isize count; };
 		auto reasons = array_make<Reason>(heap_allocator(), 0, m->stats.fail_reasons.count);
 		for (auto const &entry : m->stats.fail_reasons) {

@@ -384,9 +384,9 @@ gb_internal a64Addr a64_mem(a64Lower *L, xbMem const &m, u8 scratch) {
 		return r;
 	case xbMem_Sym: {
 		i32 sym = cast(i32)m.base;
-		xbSymbol *s = &L->p->m->symbols[sym];
-		GB_ASSERT_MSG((s->flags & xbSymbolFlag_TLS) == 0, "a64: thread local %.*s is reached through xbOp_TlsAddr", LIT(s->name));
-		if ((s->flags & xbSymbolFlag_Foreign) && s->section == xbSection_Undef) {
+		u8 flags = xb_lower_sym_flags(L->p->m, sym);
+		GB_ASSERT_MSG((flags & xbSymbolFlag_TLS) == 0, "a64: thread local symbol %d is reached through xbOp_TlsAddr", sym);
+		if ((flags & xbSymbolFlag_Foreign) && (flags & xbSymbolFlag_Undef)) {
 			// it may live in a dylib
 			a64_adrp(a, scratch, sym, xbReloc_A64_GotPage21);
 			a64_ldr_pageoff(a, scratch, scratch, sym, xbReloc_A64_GotPageOff12);
@@ -1353,7 +1353,7 @@ gb_internal bool a64_lower_proc_with(xbProc *p, xbLowerOut *out, bool far_branch
 	L.a.m = m;
 	L.a.code = &out->text;
 	L.a.relocs = &out->relocs;
-	L.fixups = array_make<a64Lower::Fixup>(heap_allocator(), 0, 64);
+	L.fixups = array_make<a64Lower::Fixup>(xb_allocator(), 0, 64);
 	defer (array_free(&L.fixups));
 	defer (array_free(&L.slot));
 	defer (array_free(&L.uses));
@@ -1460,7 +1460,7 @@ gb_internal bool a64_lower_proc_with(xbProc *p, xbLowerOut *out, bool far_branch
 	};
 
 	// cold blocks go last, so the hot path falls through
-	auto order = array_make<xbBlock *>(heap_allocator(), 0, p->order.count);
+	auto order = array_make<xbBlock *>(xb_allocator(), 0, p->order.count);
 	defer (array_free(&order));
 	for (xbBlock *b : p->order) if (!b->cold) array_add(&order, b);
 	for (xbBlock *b : p->order) if (b->cold)  array_add(&order, b);

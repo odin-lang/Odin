@@ -211,8 +211,8 @@ gb_internal bool xb_call_mem_is_local(xbProc *p, xbMem const &m, i32 size) {
 // Per block in p->order, whether it is in a loop: a later block jumps back to or before it.
 gb_internal void xb_blocks_in_loops(xbProc *p, Array<bool> *in_loop) {
 	isize bc = p->order.count;
-	*in_loop = array_make<bool>(heap_allocator(), bc);
-	auto pos = array_make<isize>(heap_allocator(), p->blocks.count);
+	*in_loop = array_make<bool>(xb_allocator(), bc);
+	auto pos = array_make<isize>(xb_allocator(), p->blocks.count);
 	defer (array_free(&pos));
 	for (isize i = 0; i < bc; i++) pos[p->order[i]->index] = i;
 	for (isize i = 0; i < bc; i++) {
@@ -229,14 +229,14 @@ gb_internal void xb_blocks_in_loops(xbProc *p, Array<bool> *in_loop) {
 }
 
 gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other_weight, i32 min_weight, Array<i32> *ranked, Array<bool> *is_float, bool call_mem=false, bool by_ref_reg=false) {
-	*ranked = array_make<i32>(heap_allocator(), 0, 8);
+	*ranked = array_make<i32>(xb_allocator(), 0, 8);
 	isize n = p->locals.count;
-	*is_float = array_make<bool>(heap_allocator(), n);
+	*is_float = array_make<bool>(xb_allocator(), n);
 	if (n == 0) return;
 
-	auto ok = array_make<bool>(heap_allocator(), n);
-	auto weight = array_make<i32>(heap_allocator(), n);
-	auto kind = array_make<u8>(heap_allocator(), n); // 1: read and written as an int, 2: as a float
+	auto ok = array_make<bool>(xb_allocator(), n);
+	auto weight = array_make<i32>(xb_allocator(), n);
+	auto kind = array_make<u8>(xb_allocator(), n); // 1: read and written as an int, 2: as a float
 	defer (array_free(&ok));
 	defer (array_free(&weight));
 	defer (array_free(&kind));
@@ -323,7 +323,7 @@ gb_internal void xb_rank_promotable_locals(xbProc *p, i32 loop_weight, i32 other
 		if (v.local >= 0 && v.by_ref && !(by_ref_reg && v.frame_offset_fixup == 0)) ok[v.local] = false;
 	}
 
-	auto order = array_make<xbRankedLocal>(heap_allocator(), 0, n);
+	auto order = array_make<xbRankedLocal>(xb_allocator(), 0, n);
 	defer (array_free(&order));
 	for (isize i = 0; i < n; i++) {
 		(*is_float)[i] = kind[i] == 2;
@@ -344,13 +344,13 @@ gb_internal void xb_cleanup_proc(xbProc *p) {
 	isize ln = p->locals.count;
 	isize bc = p->order.count;
 	struct At { i32 block; i32 instr; };
-	auto uses = array_make<i32>(heap_allocator(), vn);
-	auto def_at = array_make<At>(heap_allocator(), vn);
-	auto keep = array_make<bool>(heap_allocator(), ln);  // a debug variable's local
-	auto reads = array_make<i32>(heap_allocator(), ln);  // the instructions that may read the local
-	auto stores = array_make<At>(heap_allocator(), 0, 64); // stores to locals that may be dead
-	auto has_store = array_make<bool>(heap_allocator(), bc);
-	auto work = array_make<u32>(heap_allocator(), 0, 64);
+	auto uses = array_make<i32>(xb_allocator(), vn);
+	auto def_at = array_make<At>(xb_allocator(), vn);
+	auto keep = array_make<bool>(xb_allocator(), ln);  // a debug variable's local
+	auto reads = array_make<i32>(xb_allocator(), ln);  // the instructions that may read the local
+	auto stores = array_make<At>(xb_allocator(), 0, 64); // stores to locals that may be dead
+	auto has_store = array_make<bool>(xb_allocator(), bc);
+	auto work = array_make<u32>(xb_allocator(), 0, 64);
 	defer (array_free(&uses));
 	defer (array_free(&def_at));
 	defer (array_free(&keep));
@@ -448,7 +448,7 @@ gb_internal void xb_cleanup_proc(xbProc *p) {
 	// Stores that a later one in the block overwrites first. Going back, `covered` holds the
 	// bytes the stores after this point write, below offset 64, of the locals nothing read since.
 	struct Cover { i32 local; u64 bytes; };
-	auto covered = array_make<Cover>(heap_allocator(), 0, 16);
+	auto covered = array_make<Cover>(xb_allocator(), 0, 16);
 	defer (array_free(&covered));
 	for (isize bi = 0; bi < bc; bi++) {
 		if (!has_store[bi]) continue;
@@ -571,17 +571,17 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 
 	// Promotable scalar locals get live intervals like the vregs, a parameter's starting in the
 	// register it arrives in
-	R->local_reg = array_make<i8>(heap_allocator(), p->locals.count);
+	R->local_reg = array_make<i8>(xb_allocator(), p->locals.count);
 	for (isize i = 0; i < p->locals.count; i++) R->local_reg[i] = XB_NOREG;
 	Array<i32> ranked = {};
 	Array<bool> local_fp = {};
 	xb_rank_promotable_locals(p, 16, 1, 0, &ranked, &local_fp, true, true);
 	defer (array_free(&ranked));
 	defer (array_free(&local_fp));
-	auto arrive = array_make<i8>(heap_allocator(), p->locals.count); // a parameter's register
+	auto arrive = array_make<i8>(xb_allocator(), p->locals.count); // a parameter's register
 	defer (array_free(&arrive));
 	for (isize i = 0; i < p->locals.count; i++) arrive[i] = XB_NOREG;
-	auto is_param = array_make<bool>(heap_allocator(), p->locals.count);
+	auto is_param = array_make<bool>(xb_allocator(), p->locals.count);
 	defer (array_free(&is_param));
 	u32 arrive_v = 0; // the float registers parameters arrive in
 	for (xbParamIn const &in : p->params_in) {
@@ -591,16 +591,16 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		if (in.loc == xbLoc_Gpr || in.loc == xbLoc_Xmm) arrive[in.dst.base] = cast(i8)in.reg;
 	}
 
-	auto block = array_make<i32>(heap_allocator(), vreg_count);
-	auto defs = array_make<i32>(heap_allocator(), vreg_count);
-	auto def_pos = array_make<i32>(heap_allocator(), vreg_count);
-	auto first_use = array_make<i32>(heap_allocator(), vreg_count);
-	auto last_use = array_make<i32>(heap_allocator(), vreg_count);
-	auto multi = array_make<bool>(heap_allocator(), vreg_count);
-	auto def_block = array_make<i32>(heap_allocator(), vreg_count);
-	auto pinned = array_make<bool>(heap_allocator(), vreg_count);
-	auto clobbers = array_make<i32>(heap_allocator(), 0, 256); // prefix counts of target.clobbers
-	auto want = array_make<i8>(heap_allocator(), vreg_count);  // the argument register a call reads it from
+	auto block = array_make<i32>(xb_allocator(), vreg_count);
+	auto defs = array_make<i32>(xb_allocator(), vreg_count);
+	auto def_pos = array_make<i32>(xb_allocator(), vreg_count);
+	auto first_use = array_make<i32>(xb_allocator(), vreg_count);
+	auto last_use = array_make<i32>(xb_allocator(), vreg_count);
+	auto multi = array_make<bool>(xb_allocator(), vreg_count);
+	auto def_block = array_make<i32>(xb_allocator(), vreg_count);
+	auto pinned = array_make<bool>(xb_allocator(), vreg_count);
+	auto clobbers = array_make<i32>(xb_allocator(), 0, 256); // prefix counts of target.clobbers
+	auto want = array_make<i8>(xb_allocator(), vreg_count);  // the argument register a call reads it from
 	defer (array_free(&block));
 	defer (array_free(&defs));
 	defer (array_free(&def_pos));
@@ -627,15 +627,15 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		if (v != 0) pinned[v] = true;
 	};
 
-	R->uses = array_make<i32>(heap_allocator(), vreg_count);
-	R->reg = array_make<i8>(heap_allocator(), vreg_count);
-	R->is_const = array_make<u8>(heap_allocator(), vreg_count);
-	R->cval = array_make<i64>(heap_allocator(), vreg_count);
-	R->in_block = array_make<u8>(heap_allocator(), vreg_count);
-	R->clean = array_make<u8>(heap_allocator(), vreg_count);
-	R->via = array_make<i32>(heap_allocator(), vreg_count);
-	R->remat = array_make<u8>(heap_allocator(), vreg_count);
-	R->rmem = array_make<xbMem>(heap_allocator(), vreg_count);
+	R->uses = array_make<i32>(xb_allocator(), vreg_count);
+	R->reg = array_make<i8>(xb_allocator(), vreg_count);
+	R->is_const = array_make<u8>(xb_allocator(), vreg_count);
+	R->cval = array_make<i64>(xb_allocator(), vreg_count);
+	R->in_block = array_make<u8>(xb_allocator(), vreg_count);
+	R->clean = array_make<u8>(xb_allocator(), vreg_count);
+	R->via = array_make<i32>(xb_allocator(), vreg_count);
+	R->remat = array_make<u8>(xb_allocator(), vreg_count);
+	R->rmem = array_make<xbMem>(xb_allocator(), vreg_count);
 	for (isize i = 0; i < vreg_count; i++) {
 		R->reg[i] = XB_NOREG;
 		R->via[i] = -1;
@@ -643,14 +643,14 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 
 	// The spill cost of an item: its references, each 8 times more for each loop around it;
 	// a loop is a jump back to or before its block
-	auto bweight = array_make<i64>(heap_allocator(), p->blocks.count);
-	auto vweight = array_make<i64>(heap_allocator(), vreg_count);
+	auto bweight = array_make<i64>(xb_allocator(), p->blocks.count);
+	auto vweight = array_make<i64>(xb_allocator(), vreg_count);
 	defer (array_free(&bweight));
 	defer (array_free(&vweight));
 	{
 		isize bc = p->order.count;
-		auto pos = array_make<isize>(heap_allocator(), p->blocks.count);
-		auto depth = array_make<i32>(heap_allocator(), bc);
+		auto pos = array_make<isize>(xb_allocator(), p->blocks.count);
+		auto depth = array_make<i32>(xb_allocator(), bc);
 		defer (array_free(&pos));
 		defer (array_free(&depth));
 		for (isize i = 0; i < bc; i++) pos[p->order[i]->index] = i;
@@ -725,13 +725,13 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	// The other int and float vregs get one interval in the block order that covers every point
 	// where a liveness analysis finds them live.
 	isize bc = p->order.count;
-	auto gid = array_make<i32>(heap_allocator(), vreg_count);
+	auto gid = array_make<i32>(xb_allocator(), vreg_count);
 	defer (array_free(&gid));
 	// an item is a vreg, or a local with XB_LOCAL_ITEM set
-	auto gvreg = array_make<u32>(heap_allocator(), 0, 64);
+	auto gvreg = array_make<u32>(xb_allocator(), 0, 64);
 	defer (array_free(&gvreg));
-	auto lgid = array_make<i32>(heap_allocator(), p->locals.count);
-	auto lweight = array_make<i64>(heap_allocator(), p->locals.count);
+	auto lgid = array_make<i32>(xb_allocator(), p->locals.count);
+	auto lweight = array_make<i64>(xb_allocator(), p->locals.count);
 	defer (array_free(&lgid));
 	defer (array_free(&lweight));
 	for (isize i = 0; i < p->locals.count; i++) lgid[i] = -1;
@@ -750,28 +750,28 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		array_add(&gvreg, cast(u32)v);
 	}
 	isize gn = gvreg.count;
-	auto glo = array_make<i32>(heap_allocator(), gn);
-	auto ghi = array_make<i32>(heap_allocator(), gn);
-	auto glo_def = array_make<bool>(heap_allocator(), gn); // the interval starts where an instruction writes it
-	auto gstart = array_make<i32>(heap_allocator(), 0, gn); // global ids by the start of their interval
+	auto glo = array_make<i32>(xb_allocator(), gn);
+	auto ghi = array_make<i32>(xb_allocator(), gn);
+	auto glo_def = array_make<bool>(xb_allocator(), gn); // the interval starts where an instruction writes it
+	auto gstart = array_make<i32>(xb_allocator(), 0, gn); // global ids by the start of their interval
 	defer (array_free(&glo));
 	defer (array_free(&ghi));
 	defer (array_free(&glo_def));
 	defer (array_free(&gstart));
 	if (gn > 0 && bc > 0) {
-		auto bstart   = array_make<i32>(heap_allocator(), bc);
-		auto bend     = array_make<i32>(heap_allocator(), bc);
-		auto succ     = array_make<i32>(heap_allocator(), 2*bc);
-		auto opos     = array_make<i32>(heap_allocator(), p->blocks.count);
+		auto bstart   = array_make<i32>(xb_allocator(), bc);
+		auto bend     = array_make<i32>(xb_allocator(), bc);
+		auto succ     = array_make<i32>(xb_allocator(), 2*bc);
+		auto opos     = array_make<i32>(xb_allocator(), p->blocks.count);
 		defer (array_free(&bstart));
 		defer (array_free(&bend));
 		defer (array_free(&succ));
 		defer (array_free(&opos));
 		// per block, whether an item is read there before it is written (gen) or is written (kill)
 		struct Event { i32 id; i32 block; bool kill; };
-		auto events = array_make<Event>(heap_allocator(), 0, 4*gn);
-		auto ev_block = array_make<i32>(heap_allocator(), gn); // the block of the item's last event
-		auto ev_state = array_make<u8>(heap_allocator(), gn);  // 1: gen noted, 2: killed
+		auto events = array_make<Event>(xb_allocator(), 0, 4*gn);
+		auto ev_block = array_make<i32>(xb_allocator(), gn); // the block of the item's last event
+		auto ev_state = array_make<u8>(xb_allocator(), gn);  // 1: gen noted, 2: killed
 		defer (array_free(&events));
 		defer (array_free(&ev_block));
 		defer (array_free(&ev_state));
@@ -790,8 +790,8 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 
 		// the positions each debug scope covers
 		isize sn = p->debug_scope_parent.count;
-		auto smin = array_make<i32>(heap_allocator(), sn);
-		auto smax = array_make<i32>(heap_allocator(), sn);
+		auto smin = array_make<i32>(xb_allocator(), sn);
+		auto smax = array_make<i32>(xb_allocator(), sn);
 		defer (array_free(&smin));
 		defer (array_free(&smax));
 		for (isize i = 0; i < sn; i++) {
@@ -871,35 +871,35 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 
 		// Each item is live into the blocks that read it first, and from there back through the
 		// predecessors until the blocks that write it.
-		auto pred_start = array_make<i32>(heap_allocator(), bc+1);
-		auto preds      = array_make<i32>(heap_allocator(), 2*bc);
+		auto pred_start = array_make<i32>(xb_allocator(), bc+1);
+		auto preds      = array_make<i32>(xb_allocator(), 2*bc);
 		defer (array_free(&pred_start));
 		defer (array_free(&preds));
 		for (isize s = 0; s < 2*bc; s++) if (succ[s] >= 0) pred_start[succ[s]+1]++;
 		for (isize i = 0; i < bc; i++) pred_start[i+1] += pred_start[i];
 		{
-			auto fill = array_make<i32>(heap_allocator(), bc);
+			auto fill = array_make<i32>(xb_allocator(), bc);
 			defer (array_free(&fill));
 			for (isize s = 0; s < 2*bc; s++) {
 				if (succ[s] >= 0) preds[pred_start[succ[s]] + fill[succ[s]]++] = cast(i32)(s/2);
 			}
 		}
-		auto ev_start = array_make<i32>(heap_allocator(), gn+1);
-		auto by_id    = array_make<i32>(heap_allocator(), events.count);
+		auto ev_start = array_make<i32>(xb_allocator(), gn+1);
+		auto by_id    = array_make<i32>(xb_allocator(), events.count);
 		defer (array_free(&ev_start));
 		defer (array_free(&by_id));
 		for (Event const &e : events) ev_start[e.id+1]++;
 		for (isize i = 0; i < gn; i++) ev_start[i+1] += ev_start[i];
 		{
-			auto fill = array_make<i32>(heap_allocator(), gn);
+			auto fill = array_make<i32>(xb_allocator(), gn);
 			defer (array_free(&fill));
 			for (isize i = 0; i < events.count; i++) by_id[ev_start[events[i].id] + fill[events[i].id]++] = cast(i32)i;
 		}
 		// marks hold id+1 for the item being walked
-		auto kill_mark = array_make<i32>(heap_allocator(), bc);
-		auto in_mark   = array_make<i32>(heap_allocator(), bc);
-		auto out_mark  = array_make<i32>(heap_allocator(), bc);
-		auto stack     = array_make<i32>(heap_allocator(), 0, 64);
+		auto kill_mark = array_make<i32>(xb_allocator(), bc);
+		auto in_mark   = array_make<i32>(xb_allocator(), bc);
+		auto out_mark  = array_make<i32>(xb_allocator(), bc);
+		auto stack     = array_make<i32>(xb_allocator(), 0, 64);
 		defer (array_free(&kill_mark));
 		defer (array_free(&in_mark));
 		defer (array_free(&out_mark));
@@ -935,7 +935,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		// Copies between a promoted local and a vreg in one block. A load's vreg reads the local's
 		// register while nothing writes the local. A vreg whose only use is a store to the local is
 		// computed right in its register, when nothing reads or writes the local in between.
-		auto alias_end = array_make<i32>(heap_allocator(), p->locals.count); // last read through an alias
+		auto alias_end = array_make<i32>(xb_allocator(), p->locals.count); // last read through an alias
 		defer (array_free(&alias_end));
 		for (isize i = 0; i < p->locals.count; i++) alias_end[i] = -1;
 		auto local_of = [&](xbMem const &m) -> i32 {
@@ -1011,7 +1011,7 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 		}
 
 		// ordered by start, a counting sort
-		auto first = array_make<i32>(heap_allocator(), linear+1);
+		auto first = array_make<i32>(xb_allocator(), linear+1);
 		defer (array_free(&first));
 		for (isize i = 0; i < gn; i++) {
 			if (ghi[i] >= 0) first[glo[i]+1]++;
@@ -1032,17 +1032,17 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	R->used_v = 0;
 	// the vregs and locals holding a register, listed under the position after their last
 	struct Active { u32 v; i32 next; bool dead; i32 len; };
-	auto active = array_make<Active>(heap_allocator(), 0, 64);
+	auto active = array_make<Active>(xb_allocator(), 0, 64);
 	// the active entry holding each general register, and each float register at XB_FREG + n
 	i32 owner[64];
 	for (i32 &o : owner) o = -1;
 	// a local whose register a vreg shares keeps it
-	auto shared = array_make<bool>(heap_allocator(), p->locals.count);
+	auto shared = array_make<bool>(xb_allocator(), p->locals.count);
 	defer (array_free(&shared));
 	auto weight_of = [&](u32 v) -> i64 {
 		return (v & XB_LOCAL_ITEM) ? lweight[v & ~XB_LOCAL_ITEM] : vweight[v];
 	};
-	auto expire = array_make<i32>(heap_allocator(), clobbers.count + 1);
+	auto expire = array_make<i32>(xb_allocator(), clobbers.count + 1);
 	defer (array_free(&active));
 	defer (array_free(&expire));
 	for (i32 &e : expire) e = -1;
@@ -1175,16 +1175,16 @@ gb_internal void xb_alloc_regs(xbProc *p, xbRegAlloc *R, xbRegPools const &pools
 	}
 
 	// the other vregs used only in the block that defines them share slots, given by xb_alloc_slots
-	R->slot = array_make<i32>(heap_allocator(), vreg_count);
+	R->slot = array_make<i32>(xb_allocator(), vreg_count);
 }
 
 // Frame slots for the vregs without a register, below `*cur` bytes under the frame pointer,
 // which grows by what they take.
 gb_internal void xb_alloc_slots(xbProc *p, xbRegAlloc *R, i32 *cur) {
 	isize vreg_count = p->vregs.count;
-	auto def_block = array_make<i32>(heap_allocator(), vreg_count);
-	auto last_use = array_make<i32>(heap_allocator(), vreg_count);
-	auto cross = array_make<bool>(heap_allocator(), vreg_count);
+	auto def_block = array_make<i32>(xb_allocator(), vreg_count);
+	auto last_use = array_make<i32>(xb_allocator(), vreg_count);
+	auto cross = array_make<bool>(xb_allocator(), vreg_count);
 	defer (array_free(&def_block));
 	defer (array_free(&last_use));
 	defer (array_free(&cross));
@@ -1208,9 +1208,9 @@ gb_internal void xb_alloc_slots(xbProc *p, xbRegAlloc *R, i32 *cur) {
 		}
 	}
 
-	auto free_slots = array_make<i32>(heap_allocator(), 0, 64);
+	auto free_slots = array_make<i32>(xb_allocator(), 0, 64);
 	defer (array_free(&free_slots));
-	auto to_free = array_make<u32>(heap_allocator(), 0, 8);
+	auto to_free = array_make<u32>(xb_allocator(), 0, 8);
 	defer (array_free(&to_free));
 	linear = 0;
 	for (xbBlock *b : p->order) {

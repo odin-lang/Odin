@@ -367,16 +367,16 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 		}
 		return xb_m(x64_src(L, m.base, scratch, 8, xbExt_None), cast(i32)m.offset);
 	case xbMem_Sym: {
-		xbSymbol *s = &L->p->m->symbols[m.base];
-		if ((s->flags & xbSymbolFlag_TLS) && xb_is_win64()) {
+		u8 flags = xb_lower_sym_flags(L->p->m, m.base);
+		if ((flags & xbSymbolFlag_TLS) && xb_is_win64()) {
 			return xb_win64_tls_opnd(L, m, scratch);
 		}
-		if ((s->flags & xbSymbolFlag_Foreign) && s->section == xbSection_Undef && xb_is_win64()) {
-			if (s->flags & xbSymbolFlag_Func) return xb_m_sym(cast(i32)m.base, cast(i32)m.offset);
+		if ((flags & xbSymbolFlag_Foreign) && (flags & xbSymbolFlag_Undef) && xb_is_win64()) {
+			if (flags & xbSymbolFlag_Func) return xb_m_sym(cast(i32)m.base, cast(i32)m.offset);
 			return xb_win64_import_opnd(L, m, scratch);
 		}
-		if (s->flags & xbSymbolFlag_TLS) {
-			GB_ASSERT_MSG(!xb_is_darwin(), "thread local %.*s is reached through xbOp_TlsAddr", LIT(s->name));
+		if (flags & xbSymbolFlag_TLS) {
+			GB_ASSERT_MSG(!xb_is_darwin(), "thread local symbol %d is reached through xbOp_TlsAddr", cast(i32)m.base);
 			// initial exec: the thread pointer plus the variable's offset from the GOT
 			// mov scratch, fs:[0]
 			xb_b(a, 0x64);
@@ -389,9 +389,9 @@ gb_internal xbOpnd xb_mem_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 			xb_enc(a, XB_W, 0x03, scratch, xb_m_sym(cast(i32)m.base, 0, xbReloc_GOTTPOFF));
 			return xb_m(scratch, cast(i32)m.offset);
 		}
-		bool preemptible = (s->flags & xbSymbolFlag_Export) &&
+		bool preemptible = (flags & xbSymbolFlag_Export) &&
 		                   (build_context.build_mode == BuildMode_DynamicLibrary || build_context.reloc_mode == RelocMode_PIC);
-		if (((s->flags & xbSymbolFlag_Foreign) && s->section == xbSection_Undef) || preemptible) {
+		if (((flags & xbSymbolFlag_Foreign) && (flags & xbSymbolFlag_Undef)) || preemptible) {
 			// mov scratch, [rip + sym@GOTPCREL]
 			xb_enc(a, XB_W, 0x8B, scratch, xb_m_sym(cast(i32)m.base, 0, xbReloc_REX_GOTPCRELX));
 			return xb_m(scratch, cast(i32)m.offset);
@@ -773,11 +773,9 @@ gb_internal i32 x64_helper(xbModule *m, bool set) {
 	return sym;
 }
 
-// The symbol of `name`, or a pending one when it does not exist yet or lacks `flags`.
-// Lowering runs on worker threads, which only read the module.
+// A pending symbol for `name`, which the main thread looks up or adds when it appends the
+// code: it changes the symbol table while workers lower.
 gb_internal i32 xb_lower_symbol(xbModule *m, xbLowerOut *out, String name, u32 flags, i8 helper=0) {
-	i32 *found = string_map_get(&m->symbol_map, name);
-	if (found && (m->symbols[*found].flags & flags) == flags) return *found;
 	for (isize i = 0; i < out->pending.count; i++) {
 		if (out->pending[i].name == name) return XB_PENDING_SYM + cast(i32)i;
 	}
@@ -789,8 +787,6 @@ gb_internal i32 xb_lower_symbol(xbModule *m, xbLowerOut *out, String name, u32 f
 // The helper is emitted when the procedure's code is appended, right before it.
 gb_internal i32 x64_lower_helper(xbLower *L, bool set) {
 	xbModule *m = L->p->m;
-	i32 at = set ? m->x64_set_helper : m->x64_move_helper;
-	if (at != 0) return at - 1;
 	return xb_lower_symbol(m, L->out, set ? str_lit("__xb_memset") : str_lit("__xb_memmove"), 0, set ? 2 : 1);
 }
 
@@ -950,7 +946,7 @@ gb_internal void xb_lower_asm(xbLower *L, xbAsmBlock const &blk) {
 			xb_enc(a, 0, 0x8A, io.reg, x64_slot(L, io.vreg));
 		}
 	}
-	auto code = array_make<u8>(heap_allocator(), 0, blk.pool.count + 16);
+	auto code = array_make<u8>(xb_allocator(), 0, blk.pool.count + 16);
 	bool fits = xb_asm_layout(blk.items, blk.pool, blk.label_count, xb_pos(a), &code);
 	GB_ASSERT(fits);
 	xb_bytes(a, code.data, code.count);
@@ -1874,7 +1870,7 @@ gb_internal void x64_lower_proc(xbProc *p, xbLowerOut *out) {
 	L.a.m = m;
 	L.a.code = &out->text;
 	L.a.relocs = &out->relocs;
-	L.fixups = array_make<xbLower::Fixup>(heap_allocator(), 0, 64);
+	L.fixups = array_make<xbLower::Fixup>(xb_allocator(), 0, 64);
 	defer (array_free(&L.fixups));
 	defer (array_free(&L.slot));
 	defer (array_free(&L.uses));
@@ -1998,7 +1994,7 @@ gb_internal void x64_lower_proc(xbProc *p, xbLowerOut *out) {
 	};
 
 	// cold blocks go last, so the hot path falls through
-	auto order = array_make<xbBlock *>(heap_allocator(), 0, p->order.count);
+	auto order = array_make<xbBlock *>(xb_allocator(), 0, p->order.count);
 	defer (array_free(&order));
 	for (xbBlock *b : p->order) if (!b->cold) array_add(&order, b);
 	for (xbBlock *b : p->order) if (b->cold)  array_add(&order, b);

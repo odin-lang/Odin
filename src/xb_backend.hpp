@@ -464,6 +464,7 @@ enum xbSymbolFlag : u8 {
 	xbSymbolFlag_Foreign = 1<<4, // defined outside the executable, reach data through the GOT
 	xbSymbolFlag_TLS     = 1<<5,
 	xbSymbolFlag_Export  = 1<<6, // default visibility, reached through the GOT by a shared object; dllexport on Windows
+	xbSymbolFlag_Undef   = 1<<7, // only in lower_sym_flags: the symbol has no section yet
 };
 
 struct xbSymbol {
@@ -644,6 +645,10 @@ struct xbModule {
 
 	// procedures built and waiting to be lowered, in the order their code goes into .text
 	Array<xbLowerJob> lower_jobs;
+	// the batch the thread pool lowers while the next one is built
+	Array<xbLowerJob> lower_busy;
+	// the symbols' flags when the busy batch was handed over, see xb_lower_sym_flags
+	Array<u8>         lower_sym_flags;
 
 	// entities this backend compiles, so LLVM only declares them
 	PtrSet<Entity *>  handled;
@@ -720,11 +725,17 @@ struct xbArena {
 	isize used;
 };
 
-// one per thread: workers lower procedures while the main thread's arena holds their IR
-gb_global gb_thread_local xbArena xb_arena;
+// one per thread: workers lower procedures while the main thread's arena holds their IR.
+// The main thread switches between two, one holds the IR of the batch being lowered.
+gb_global gb_thread_local xbArena xb_arena_own;
+gb_global gb_thread_local xbArena *xb_arena_cur;
+
+gb_internal xbArena *xb_arena_get(void) {
+	return xb_arena_cur ? xb_arena_cur : &xb_arena_own;
+}
 
 gb_internal void *xb_arena_alloc(isize size, isize align) {
-	xbArena *a = &xb_arena;
+	xbArena *a = xb_arena_get();
 	if (a->chunks.allocator.proc == nullptr) {
 		a->chunks = array_make<xbArenaChunk>(heap_allocator(), 0, 16);
 	}
@@ -750,8 +761,8 @@ gb_internal void *xb_arena_alloc(isize size, isize align) {
 }
 
 gb_internal void xb_arena_reset(void) {
-	xb_arena.curr = 0;
-	xb_arena.used = 0;
+	xb_arena_get()->curr = 0;
+	xb_arena_get()->used = 0;
 }
 
 struct xbArenaMark {
@@ -760,13 +771,13 @@ struct xbArenaMark {
 };
 
 gb_internal xbArenaMark xb_arena_mark(void) {
-	return {xb_arena.curr, xb_arena.used};
+	return {xb_arena_get()->curr, xb_arena_get()->used};
 }
 
 // Frees everything allocated since the mark.
 gb_internal void xb_arena_release(xbArenaMark mark) {
-	xb_arena.curr = mark.curr;
-	xb_arena.used = mark.used;
+	xb_arena_get()->curr = mark.curr;
+	xb_arena_get()->used = mark.used;
 }
 
 gb_internal GB_ALLOCATOR_PROC(xb_arena_allocator_proc) {
@@ -793,6 +804,13 @@ gb_internal gbAllocator xb_allocator(void) {
 	a.proc = xb_arena_allocator_proc;
 	a.data = nullptr;
 	return a;
+}
+
+// A symbol's flags for lowering, from when its batch was handed over: the main thread
+// adds symbols and flags while the batch is lowered.
+gb_internal u8 xb_lower_sym_flags(xbModule *m, i64 sym) {
+	GB_ASSERT(0 <= sym && sym < m->lower_sym_flags.count);
+	return m->lower_sym_flags[sym];
 }
 
 template <typename T>
