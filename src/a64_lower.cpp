@@ -29,6 +29,7 @@ enum : u8 {
 
 	A64_F0 = 16,
 	A64_F1 = 17,
+	A64_F2 = 18,
 };
 
 // Copies and zeroing up to these sizes are inline, larger ones call the C library.
@@ -861,6 +862,15 @@ gb_internal void a64_lower_instr(a64Lower *L, xbInstr const &in) {
 		u8 rb = a64_srcf(L, in.b, A64_F1, size);
 		u8 d = a64_dstf(L, in.dst, A64_F0);
 		a64_fop(a, op, size, d, ra, rb);
+		a64_putf(L, in.dst, d, size);
+		break;
+	}
+	case xbOp_Fma: {
+		u8 ra = a64_srcf(L, in.a, A64_F0, size);
+		u8 rb = a64_srcf(L, in.b, A64_F1, size);
+		u8 rc = a64_srcf(L, in.c, A64_F2, size);
+		u8 d = a64_dstf(L, in.dst, A64_F0);
+		a64_fmadd(a, size, d, ra, rb, rc);
 		a64_putf(L, in.dst, d, size);
 		break;
 	}

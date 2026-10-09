@@ -396,6 +396,11 @@ gb_internal void a64_fop(xbAsm *a, a64FOp op, i32 size, u8 vd, u8 vn, u8 vm) {
 	a64_emit(a, op | (a64_ftype(size) << 22) | (cast(u32)vm << 16) | (cast(u32)vn << 5) | vd);
 }
 
+// fmadd: vd = va + vn*vm, rounded once
+gb_internal void a64_fmadd(xbAsm *a, i32 size, u8 vd, u8 vn, u8 vm, u8 va) {
+	a64_emit(a, 0x1F000000 | (a64_ftype(size) << 22) | (cast(u32)vm << 16) | (cast(u32)va << 10) | (cast(u32)vn << 5) | vd);
+}
+
 gb_internal void a64_fsqrt(xbAsm *a, i32 size, u8 vd, u8 vn) {
 	a64_emit(a, 0x1E21C000 | (a64_ftype(size) << 22) | (cast(u32)vn << 5) | vd);
 }

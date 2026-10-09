@@ -593,7 +593,10 @@ gb_internal xbValue xb_build_llvm_intrinsic_call(xbProc *p, Entity *e, AstCallEx
 	}
 
 	if (base == "fmuladd" && n == 3) {
-		// only fused when the target has fma
+		// fused on arm64 and on amd64 with fma, like LLVM
+		if (xb_is_arm64() && ft != t_f16) {
+			return xb_emit_conv(p, xb_value_reg(ct, xb_fma(p, st, args[0], args[1], args[2])), result_type);
+		}
 		if (check_target_feature_is_enabled(str_lit("fma"), nullptr)) XB_UNSUPPORTED(p, "llvm intrinsic fmuladd with fma");
 		u32 m = xb_binop(p, xbOp_FMul, st, args[0], args[1]);
 		if (ft == t_f16) {

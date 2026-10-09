@@ -1836,10 +1836,10 @@ gb_internal bool xb_matrix_simdable(Type *t, bool ignore_layout) {
 
 gb_internal u32 xb_simd_fma(xbProc *p, Type *ft, u32 a, u32 b, u32 c);
 
-// lb_emit_mul_add: a*b + c, fused when the target has fma
+// lb_emit_mul_add: a*b + c, fused on arm64 and on amd64 with fma
 gb_internal xbValue xb_mul_add(xbProc *p, xbValue a, xbValue b, xbValue c, Type *t) {
 	if (is_type_float(t) && !is_type_different_to_arch_endianness(t) && type_size_of(t) != 2 &&
-	    check_target_feature_is_enabled(str_lit("fma"), nullptr)) {
+	    (xb_is_arm64() || check_target_feature_is_enabled(str_lit("fma"), nullptr))) {
 		return xb_value_reg(t, xb_simd_fma(p, t, xb_value_to_reg(p, a), xb_value_to_reg(p, b), xb_value_to_reg(p, c)));
 	}
 	return xb_emit_arith(p, Token_Add, xb_emit_arith(p, Token_Mul, a, b, t), c, t);

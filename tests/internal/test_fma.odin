@@ -22,8 +22,9 @@ fma_rounds_once :: proc(t: ^testing.T) {
 fma_matrix_product :: proc(t: ^testing.T) {
 	m := matrix[3, 3]f64{0.1, 0.2, 0.3, 1.1, 1.2, 1.3, 2.1, 2.2, 2.3}
 	p := m*m
-	// (0.1*0.1 + 0.2*1.1) + 0.3*2.1, rounded after every step or fused
-	when intrinsics.has_target_feature("fma") {
+	// (0.1*0.1 + 0.2*1.1) + 0.3*2.1, rounded after every step or fused.
+	// Every arm64 CPU has a fused multiply-add, so arm64 always fuses.
+	when ODIN_ARCH == .arm64 || intrinsics.has_target_feature("fma") {
 		testing.expect_value(t, transmute(u64)p[0, 0], 0x3feb851eb851eb85)
 	} else {
 		testing.expect_value(t, transmute(u64)p[0, 0], 0x3feb851eb851eb86)
