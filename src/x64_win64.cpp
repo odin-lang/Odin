@@ -474,9 +474,8 @@ gb_internal xbOpnd xb_win64_tls_opnd(xbLower *L, xbMem const &m, u8 scratch) {
 
 // Foreign data lives in a DLL: its address is in the import table, at __imp_<name>.
 gb_internal xbOpnd xb_win64_import_opnd(xbLower *L, xbMem const &m, u8 scratch) {
-	xbModule *mod = L->p->m;
-	String name = concatenate_strings(permanent_allocator(), str_lit("__imp_"), mod->symbols[m.base].name);
-	i32 imp = xb_lower_symbol(mod, L->out, name, 0);
+	// the main thread adds symbols while this runs, so the append names it
+	i32 imp = xb_lower_import_symbol(L->out, cast(i32)m.base);
 	xb_enc(&L->a, XB_W, 0x8B, scratch, xb_m_sym(imp, 0));
 	return xb_m(scratch, m.offset);
 }

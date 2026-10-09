@@ -784,6 +784,17 @@ gb_internal i32 xb_lower_symbol(xbModule *m, xbLowerOut *out, String name, u32 f
 	return XB_PENDING_SYM + cast(i32)(out->pending.count-1);
 }
 
+// The __imp_ symbol of `sym`, pending.
+gb_internal i32 xb_lower_import_symbol(xbLowerOut *out, i32 sym) {
+	for (isize i = 0; i < out->pending.count; i++) {
+		if (out->pending[i].import_of == sym + 1) return XB_PENDING_SYM + cast(i32)i;
+	}
+	xbPendingSym ps = {};
+	ps.import_of = sym + 1;
+	array_add(&out->pending, ps);
+	return XB_PENDING_SYM + cast(i32)(out->pending.count-1);
+}
+
 // The helper is emitted when the procedure's code is appended, right before it.
 gb_internal i32 x64_lower_helper(xbLower *L, bool set) {
 	xbModule *m = L->p->m;

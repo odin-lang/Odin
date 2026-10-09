@@ -576,6 +576,7 @@ struct xbPendingSym {
 	String name;
 	u32    flags;
 	i8     helper; // x86-64: 1 the memmove helper, 2 the memset helper, which the append emits
+	i32    import_of; // Windows: symbol + 1 whose __imp_ symbol this is, named by the append
 };
 
 enum : i32 { XB_PENDING_SYM = 1<<30 };

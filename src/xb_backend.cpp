@@ -393,7 +393,10 @@ gb_internal void xb_append_lowered(xbModule *m, xbLowerOut *out) {
 	}
 	for (isize i = 0; i < out->pending.count; i++) {
 		xbPendingSym const &ps = out->pending[i];
-		if (ps.helper == 0) {
+		if (ps.import_of != 0) {
+			String name = concatenate_strings(permanent_allocator(), str_lit("__imp_"), m->symbols[ps.import_of - 1].name);
+			syms[i] = xb_symbol(m, name);
+		} else if (ps.helper == 0) {
 			syms[i] = xb_symbol(m, ps.name);
 			m->symbols[syms[i]].flags |= ps.flags;
 		}
