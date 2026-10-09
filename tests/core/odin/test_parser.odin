@@ -7,6 +7,7 @@ import "core:log"
 import "core:odin/ast"
 import "core:odin/parser"
 import "core:odin/tokenizer"
+import "core:os"
 import "core:testing"
 
 @test
@@ -157,30 +158,38 @@ Bar :: struct {x, y: int /* c4 */} // after`,
 }
 
 @test
-test_parse_parser :: proc(t: ^testing.T) {
-	context.allocator = context.temp_allocator
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+test_parse_base_core_vendor :: proc(t: ^testing.T) {
+	for root in ([]string{ODIN_ROOT + "base", ODIN_ROOT + "core", ODIN_ROOT + "vendor"}) {
+		w := os.walker_create(root)
+		defer os.walker_destroy(&w)
 
-	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "core/odin/parser")
-	
-	testing.expect(t, ok, "parser.parse_package_from_path failed")
+		for info in os.walker_walk(&w) {
+			if info.type != .Directory {
+				continue
+			}
+			if root == ODIN_ROOT + "base" && (info.name == "builtin" || info.name == "intrinsics") {
+				// documentation in pseudo-syntax, e.g. `proc(values: ...)`
+				continue
+			}
 
-	for key, value in pkg.files {
-		testing.expectf(t, value.syntax_error_count == 0, "%v should contain zero errors", key)
-	}
-}
+			context.allocator = context.temp_allocator
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
-@test
-test_parse_stb_image :: proc(t: ^testing.T) {
-	context.allocator = context.temp_allocator
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+			pkg, ok := parser.collect_package(info.fullpath)
+			if !testing.expectf(t, ok, "%v could not be read", info.fullpath) {
+				continue
+			}
 
-	pkg, ok := parser.parse_package_from_path(ODIN_ROOT + "vendor/stb/image")
-	
-	testing.expect(t, ok, "parser.parse_package_from_path failed")
+			// one file at a time, as a directory can hold other packages in `#+build ignore` files
+			p := parser.default_parser()
+			for path, file in pkg.files {
+				parser.parse_file(&p, file)
+				testing.expectf(t, file.syntax_error_count == 0, "%v should contain zero errors", path)
+			}
+		}
 
-	for key, value in pkg.files {
-		testing.expectf(t, value.syntax_error_count == 0, "%v should contain zero errors", key)
+		path, err := os.walker_error(&w)
+		testing.expectf(t, err == nil, "failed walking %v: %v", path, err)
 	}
 }
 

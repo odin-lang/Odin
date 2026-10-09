@@ -189,13 +189,8 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	}
 	
 	pkg_name := expect_token_after(p, .Ident, "package")
-	if pkg_name.kind == .Ident {
-		switch name := pkg_name.text; {
-		case is_blank_ident(name):
-			error(p, pkg_name.pos, "invalid package name '_'")
-		case is_package_name_reserved(name), file.pkg != nil && file.pkg.kind != .Runtime && name == "runtime":
-			error(p, pkg_name.pos, "use of reserved package name '%s'", name)
-		}
+	if pkg_name.kind == .Ident && is_blank_ident(pkg_name.text) {
+		error(p, pkg_name.pos, "invalid package name '_'")
 	}
 	p.file.pkg_name = pkg_name.text
 
