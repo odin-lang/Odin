@@ -126,6 +126,8 @@ struct xbProc {
 	DeclInfo *  decl;
 	bool        is_startup; // runs once; literals that outlive it get static storage
 	bool        naked;      // no prologue, epilogue or stack slots
+	bool        va_home;       // Win64: c_va_start is used, the prologue homes rcx, rdx, r8 and r9
+	i32         va_save_local; // SysV and AAPCS64: the local the prologue saves the argument registers into for c_va_start, or -1
 
 	Array<xbBlock *>  blocks;
 	Array<xbBlock *>  order;

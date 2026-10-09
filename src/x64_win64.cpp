@@ -310,7 +310,7 @@ gb_internal xbAbiFunc *xb_abi_compute_win64(Type *proc_type, char const **reason
 gb_internal i32 xb_win64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_args, Slice<xbValue> args, isize arg_index) {
 	i32 slot = abi->gpr_count;
 	for (; arg_index < args.count; arg_index++) {
-		xbValue v = args[arg_index];
+		xbValue v = xb_c_vararg_value(p, args[arg_index]);
 		xbType st = xb_scalar_type(v.type);
 		if (st == xbType_None) XB_UNSUPPORTED(p, "aggregate c vararg");
 		xbCallArg a = {};

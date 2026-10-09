@@ -565,7 +565,7 @@ gb_internal i32 a64_varargs(xbProc *p, xbAbiFunc *abi, Array<xbCallArg> *call_ar
 	i32 ngrn = a64_is_apple() ? 8 : abi->gpr_count;
 	i32 nsrn = a64_is_apple() ? 8 : abi->xmm_count;
 	for (; arg_index < args.count; arg_index++) {
-		xbValue v = args[arg_index];
+		xbValue v = xb_c_vararg_value(p, args[arg_index]);
 		xbType st = xb_scalar_type(v.type);
 		if (st == xbType_None) XB_UNSUPPORTED(p, "aggregate c vararg");
 		xbCallArg a = {};
