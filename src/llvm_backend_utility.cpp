@@ -3027,7 +3027,7 @@ gb_internal lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
 
 	auto args = array_make<lbValue>(permanent_allocator(), 3);
 	args[0] = lb_const_nil(m, t_objc_Class);
-	args[1] = lb_const_nil(m, t_objc_Class);
+	args[1] = lb_const_value(m, t_cstring, exact_value_string(name));
 	args[2] = lb_const_int(m, t_uint, 0);
 	lbValue ptr = lb_emit_runtime_call(p, "objc_allocateClassPair", args);
 	lb_addr_store(p, dst, ptr);

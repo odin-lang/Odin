@@ -250,6 +250,9 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	map_set(&c->info->objc_msgSend_types, call, data);
 	mutex_unlock(&c->info->objc_objc_msgSend_mutex);
 
+	// the Objective-C setup looks up the receiver's class and the selector of every message
+	try_to_add_package_dependency(c, "runtime", "objc_lookUpClass");
+	try_to_add_package_dependency(c, "runtime", "sel_registerName");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
@@ -6984,6 +6987,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			i64 sz = 8*type_size_of(x.type);
 			if (n > sz) {
 				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)sz);
+				return false;
+			}
+			// the sign bit cannot hold a fraction bit
+			if (n == sz && !is_type_unsigned(x.type)) {
+				error(z.expr, "Scale parameter in '%.*s' must be less than the bit width of a signed integer, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)(sz-1));
 				return false;
 			}
 
