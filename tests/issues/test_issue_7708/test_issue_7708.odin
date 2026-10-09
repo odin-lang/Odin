@@ -1,6 +1,6 @@
 // Tests issue #7708 https://github.com/odin-lang/Odin/issues/7708
 // A record's concrete constant parameters must match, e.g. `M(1, 1, $T)` does not take a `M(3, 3, f64)`
-package test_issues
+package test_issue_7708
 
 import "core:testing"
 

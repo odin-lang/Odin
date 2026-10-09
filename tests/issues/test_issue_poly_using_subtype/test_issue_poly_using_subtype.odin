@@ -1,5 +1,5 @@
 // A pointer to a `using` subtype satisfies a `$T/^Base` constraint, with `T` as the argument's type
-package test_issues
+package test_issue_poly_using_subtype
 
 import "core:testing"
 

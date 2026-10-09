@@ -1,5 +1,5 @@
 // A value within a packed struct, passed to a procedure by reference, is passed by an address as aligned as its type
-package test_issues
+package test_issue_packed_field_by_value
 
 import "core:testing"
 

@@ -1,7 +1,7 @@
 // Tests issue #7596 and #7511: a procedure literal converted to a union variant inside a
 // compound literal crashed the backend with `value_type != nullptr`.
 // https://github.com/odin-lang/Odin/issues/7596
-package test_issues
+package test_issue_7596
 
 P :: proc() -> int
 U :: union {P, int}

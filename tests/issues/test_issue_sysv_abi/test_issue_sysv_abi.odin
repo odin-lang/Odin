@@ -6,7 +6,7 @@
 // union of floats never reached a floating-point register at all.
 //
 // Being an ABI guarantee, must be cross-checked against a c compiler
-package test_issues
+package test_issue_sysv_abi
 
 import "core:testing"
 
@@ -17,7 +17,7 @@ Nested           :: struct { a: struct{ x: f32 }, b: f64 }
 Union_Float      :: struct #raw_union { x: f32, y: f32 }
 Union_In_Struct  :: struct { u: Union_Float, b: f64 }
 
-foreign import lib "build/test_issue_sysv_abi_c.o"
+foreign import lib "../build/test_issue_sysv_abi_c.o"
 
 @(default_calling_convention="c")
 foreign lib {

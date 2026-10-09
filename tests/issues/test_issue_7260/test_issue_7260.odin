@@ -1,5 +1,5 @@
 // Tests issue #7260 https://github.com/odin-lang/Odin/issues/7260
-package test_issues
+package test_issue_7260
 
 A :: [2]int
 

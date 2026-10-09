@@ -1,6 +1,6 @@
 // Tests issue #829 https://github.com/odin-lang/Odin/issues/829
 #+feature dynamic-literals
-package test_issues
+package test_issue_829
 
 import "core:testing"
 

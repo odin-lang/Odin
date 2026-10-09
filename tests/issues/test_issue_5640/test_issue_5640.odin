@@ -1,6 +1,6 @@
 // Tests issue: https://github.com/odin-lang/Odin/issues/5640
 
-package test_issues
+package test_issue_5640
 
 import "core:testing"
 
@@ -19,7 +19,7 @@ myfunc :: #force_no_inline proc( f: Foo ) -> bool {
 	return f.x[0] == 45 && f.x[14] == 67
 }
 
-foreign import test_lib "build/test_issue_5640_c.o"
+foreign import test_lib "../build/test_issue_5640_c.o"
 
 foreign test_lib {
 	test_stack_next :: proc(

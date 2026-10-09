@@ -1,6 +1,6 @@
 // Tests issue #7316 https://github.com/odin-lang/Odin/issues/7316
 // A polymorphic procedure in a constant compound literal is its instance, not nil
-package test_issues
+package test_issue_7316
 
 import "core:testing"
 

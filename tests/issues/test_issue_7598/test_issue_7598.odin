@@ -13,7 +13,7 @@
 // Both sides of the count are exact, which is what made one declaration more or less compile:
 // one entity fewer and the alias insert does not reach the load factor, one entity more and the
 // map has already grown while collecting declarations, before the loop starts.
-package test_issues
+package test_issue_7598
 
 import "core:testing"
 

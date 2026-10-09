@@ -1,6 +1,6 @@
 // The field comparison that guards this had been reading a type's name as its field list, so
 // signatures this different were accepted whenever the two names differed in length
-package test_issues
+package test_issue_foreign_redeclaration_mismatch
 
 foreign import lib "this_library_does_not_exist"
 

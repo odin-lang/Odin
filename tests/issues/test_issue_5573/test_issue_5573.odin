@@ -1,5 +1,5 @@
 // Tests issue #5573 https://github.com/odin-lang/Odin/issues/5573
-package test_issues
+package test_issue_5573
 
 poly :: proc(x: $T) -> string {
 	return "poly"

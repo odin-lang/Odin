@@ -1,11 +1,11 @@
 // Tests issue: https://github.com/odin-lang/Odin/issues/6809
 // & https://github.com/odin-lang/Odin/issues/6816
 
-package test_issues
+package test_issue_6809_6816
 
 import "core:testing"
 
-foreign import test_lib "build/test_issue_6809_6816_c.o"
+foreign import test_lib "../build/test_issue_6809_6816_c.o"
 
 foreign test_lib {
     test_i8   :: proc "c" (val: i8) -> bool ---

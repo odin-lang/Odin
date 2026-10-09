@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_7779
 
 import "base:runtime"
 import "core:testing"

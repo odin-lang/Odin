@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_7798
 
 
 @(export, link_name = "A_link_name")

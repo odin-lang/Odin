@@ -1,4 +1,4 @@
-package bug_repro
+package test_issue_7689
 
 import "core:fmt"
 import "core:os"

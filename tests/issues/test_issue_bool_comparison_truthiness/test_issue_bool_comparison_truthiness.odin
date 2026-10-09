@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_bool_comparison_truthiness
 
 import "core:testing"
 

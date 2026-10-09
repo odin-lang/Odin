@@ -1,6 +1,6 @@
 // `intrinsics.procedure_of` of a polymorphic call: procedures without results, any calling convention,
 // and the specialized procedure is a concrete value usable through `type_of`
-package test_issues
+package test_issue_procedure_of_specialized
 
 import "base:intrinsics"
 import "core:fmt"

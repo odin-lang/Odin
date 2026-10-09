@@ -2,7 +2,7 @@
 // The compiler used to terminate with a SIGBUS/SIGSEGV when compiling a
 // recursive `#soa` slice/dynamic array contained within its own element type.
 
-package test_issues
+package test_issue_7356
 
 import "core:testing"
 

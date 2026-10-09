@@ -1,5 +1,5 @@
 // Tests issue #7073-part 1 https://github.com/odin-lang/Odin/issues/7073
-package test_issues
+package test_issue_7073_1
 
 main :: proc() {
 	arr := [2]int{10, 20}

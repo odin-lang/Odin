@@ -1,5 +1,5 @@
 // Cycles of global 'when's where no choice of branches is consistent, so each is an error
-package test_issues
+package test_issue_global_when_cycle
 
 // taken, `int` becomes 4 bytes and the first condition is false; not taken, the second is true
 when size_of(int) == 8 { A :: 1 }

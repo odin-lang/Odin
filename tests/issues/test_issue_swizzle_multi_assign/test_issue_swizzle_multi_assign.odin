@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_swizzle_multi_assign
 
 import "core:testing"
 

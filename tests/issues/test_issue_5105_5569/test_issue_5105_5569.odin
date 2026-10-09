@@ -1,6 +1,6 @@
 // Tests issues #5105 https://github.com/odin-lang/Odin/issues/5105
 // and #5569 https://github.com/odin-lang/Odin/issues/5569
-package test_issues
+package test_issue_5105_5569
 
 import "core:sync"
 

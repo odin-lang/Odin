@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_7188
 
 main :: proc() {
 	val: f32 = 42.0

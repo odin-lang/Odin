@@ -1,6 +1,6 @@
 // Tests issue #7700 https://github.com/odin-lang/Odin/issues/7700
 // A field of a constant `#soa` array is the array of that field of each element
-package test_issues
+package test_issue_7700
 
 import "base:intrinsics"
 import "core:fmt"
@@ -31,8 +31,8 @@ types_proc   :: proc($t: [3]typeid) -> [3]typeid { return t }
 test_issue_7700 :: proc(t: ^testing.T) {
 	testing.expect_value(t, fmt.tprint(typeid_of(Strings(STUFF.name))), `Strings($strings={"i", "f", "p"})`)
 	testing.expect_value(t, fmt.tprint(typeid_of(Types(STUFF.type))), `Types($types={i64, f64, rawptr})`)
-	testing.expect_value(t, intrinsics.type_canonical_name(Strings(STUFF.name)), `test_issues::Strings(strings:$${"i","f","p"})`)
-	testing.expect_value(t, intrinsics.type_canonical_name(Types(STUFF.type)), `test_issues::Types(types:$${i64,f64,rawptr})`)
+	testing.expect_value(t, intrinsics.type_canonical_name(Strings(STUFF.name)), `test_issue_7700::Strings(strings:$${"i","f","p"})`)
+	testing.expect_value(t, intrinsics.type_canonical_name(Types(STUFF.type)), `test_issue_7700::Types(types:$${i64,f64,rawptr})`)
 
 	testing.expect_value(t, STUFF.name, [3]string{"i", "f", "p"})
 	testing.expect_value(t, STUFF.type, [3]typeid{i64, f64, rawptr})

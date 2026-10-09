@@ -1,5 +1,5 @@
 // What unoptimized x86 code is lowered to before LLVM's fast instruction selector sees it
-package test_issues
+package test_issue_fast_isel_lowering
 
 import "core:testing"
 

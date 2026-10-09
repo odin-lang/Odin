@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_6853
 
 import "core:testing"
 

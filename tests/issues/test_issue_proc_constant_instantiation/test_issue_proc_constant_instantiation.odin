@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_proc_constant_instantiation
 
 import "core:testing"
 

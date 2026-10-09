@@ -1,7 +1,7 @@
 // Tests issue #7421: constant conditions in a tagless switch are conditions,
 // not values to compare against one another for duplicate cases.
 // https://github.com/odin-lang/Odin/issues/7421
-package test_issues
+package test_issue_7421
 
 import "core:testing"
 

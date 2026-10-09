@@ -1,7 +1,7 @@
 // Tests issue #7429: local distinct types in procedure literal values must have
 // unique canonical names.
 // https://github.com/odin-lang/Odin/issues/7429
-package test_issues
+package test_issue_7429
 
 main :: proc() {
 	_ = proc() {

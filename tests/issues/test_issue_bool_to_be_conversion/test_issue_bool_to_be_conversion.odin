@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_bool_to_be_conversion
 
 import "core:testing"
 

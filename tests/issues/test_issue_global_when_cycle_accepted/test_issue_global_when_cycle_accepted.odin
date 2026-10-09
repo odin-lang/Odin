@@ -1,5 +1,5 @@
 // Cycles of global 'when's with exactly one consistent choice of branches
-package test_issues
+package test_issue_global_when_cycle_accepted
 
 import "core:testing"
 

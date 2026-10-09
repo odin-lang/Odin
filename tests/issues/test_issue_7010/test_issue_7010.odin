@@ -1,6 +1,6 @@
 // Tests issue: https://github.com/odin-lang/Odin/issues/7010
 
-package test_issues
+package test_issue_7010
 
 Matrix4x4 :: struct {
 	columns: [4]#simd[4]f32,
@@ -50,7 +50,7 @@ odin_add_matrix4x2 :: proc (a: Matrix4x2, b: Matrix4x2) -> Matrix4x2 {
 	return copy_mat
 }
 
-foreign import ctest "build/test_issue_7010_c.o"
+foreign import ctest "../build/test_issue_7010_c.o"
 foreign ctest {
 	c_add_vec4f32 :: proc "c" (a: #simd[4]f32, b: #simd[4]f32) -> #simd[4]f32 ---
 	c_add_vec2u32 :: proc "c" (a: #simd[2]u32, b: #simd[2]u32) -> #simd[2]u32 ---

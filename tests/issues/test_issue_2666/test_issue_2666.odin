@@ -1,6 +1,6 @@
 // Tests issue https://github.com/odin-lang/Odin/issues/2666
 // @(disabled=<boolean>) does not work with polymorphic procs
-package test_issues
+package test_issue_2666
 
 import "core:testing"
 

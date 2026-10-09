@@ -1,6 +1,6 @@
 // Tests issue #7547 https://github.com/odin-lang/Odin/issues/7547 (win32 implementation of `os.remove_all`)
 #+build windows
-package test_issues
+package test_issue_7547
 
 import runtime "base:runtime"
 import testing "core:testing"

@@ -1,5 +1,5 @@
 // Global 'when's are resolved when a lookup needs a name they may declare, whatever the source order
-package test_issues
+package test_issue_global_when_order
 
 import "core:testing"
 

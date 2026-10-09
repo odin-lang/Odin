@@ -1,4 +1,4 @@
-package main
+package test_issue_3435
 
 import "base:runtime"
 import "core:mem"

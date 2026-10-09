@@ -1,5 +1,5 @@
 // Tests issue #6401 https://github.com/odin-lang/Odin/issues/6401
-package test_issues
+package test_issue_6401
 
 Wrapper :: struct(T: typeid) {
 	value: T,

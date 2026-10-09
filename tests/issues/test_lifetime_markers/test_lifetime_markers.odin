@@ -1,4 +1,4 @@
-package test_issues
+package test_lifetime_markers
 
 import "core:testing"
 

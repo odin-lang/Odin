@@ -1,6 +1,6 @@
 // A global initialized with the address of a compound literal used to crash the backend
 // if the literal's value was not a constant.
-package test_issues
+package test_issue_global_address_of_literal
 
 import "core:testing"
 

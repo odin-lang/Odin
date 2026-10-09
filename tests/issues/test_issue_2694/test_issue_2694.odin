@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_2694
 
 import "core:fmt"
 import "core:encoding/json"

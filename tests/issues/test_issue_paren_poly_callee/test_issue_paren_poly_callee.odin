@@ -1,5 +1,5 @@
 // Calling a polymorphic procedure through a parenthesized callee, e.g. `(foo)(x)`
-package test_issues
+package test_issue_paren_poly_callee
 
 import "core:testing"
 

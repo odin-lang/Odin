@@ -1,5 +1,5 @@
 // Tests PR #6470 https://github.com/odin-lang/Odin/pull/6470
-package test_issues
+package test_pr_6470
 
 TEST_EXPECT_FAILURE :: #config(TEST_EXPECT_FAILURE, false)
 

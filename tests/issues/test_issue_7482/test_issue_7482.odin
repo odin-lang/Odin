@@ -1,7 +1,7 @@
 // Tests issue #7482 and #7474: a polymorphic procedure from another package used as a
 // procedure value crashed the backend with `addr.addr.value != nullptr`.
 // https://github.com/odin-lang/Odin/issues/7482
-package test_issues
+package test_issue_7482
 
 import "core:sort"
 

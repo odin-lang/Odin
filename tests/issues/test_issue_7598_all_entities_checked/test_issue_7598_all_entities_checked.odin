@@ -12,7 +12,7 @@
 // has already grown by the time the loop starts and it reports its own 2 errors even without the
 // fix; `boundary_errors_12` holds exactly 12 entities and its map grows *inside* the loop, so
 // without the fix it swallows one of its 2.
-package test_issues
+package test_issue_7598_all_entities_checked
 
 boundary_errors_13 :: proc() -> int {
 	n :: 11

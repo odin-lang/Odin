@@ -1,5 +1,5 @@
 // Tests issue #4584 https://github.com/odin-lang/Odin/issues/4584
-package test_issues
+package test_issue_4584
 
 import "core:testing"
 import "core:log"

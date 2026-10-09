@@ -1,5 +1,5 @@
 // Tests issue #6240 https://github.com/odin-lang/Odin/issues/6240
-package test_issues
+package test_issue_6240
 
 // should error - N=10 does not match bit_set range 0..<5
 foo :: proc($N: int, b: $B/bit_set[0 ..< N]) {}

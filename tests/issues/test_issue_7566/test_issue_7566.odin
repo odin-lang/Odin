@@ -1,6 +1,6 @@
 // Tests issue #7566 https://github.com/odin-lang/Odin/issues/7566
 // Polymorphic instances whose constant parameters are spelt the same but have different values
-package test_issues
+package test_issue_7566
 
 import "core:testing"
 

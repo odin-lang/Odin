@@ -1,5 +1,5 @@
 // Tests another variation of, this should compile #5097 https://github.com/odin-lang/Odin/issues/5097
-package test_issues
+package test_issue_5097_2
 
 Face      :: ^FaceRec
 GlyphSlot :: ^GlyphSlotRec

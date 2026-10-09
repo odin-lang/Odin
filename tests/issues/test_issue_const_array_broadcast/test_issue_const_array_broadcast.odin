@@ -1,4 +1,4 @@
-package test_issues
+package test_issue_const_array_broadcast
 
 import "core:testing"
 

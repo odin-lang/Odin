@@ -1,6 +1,6 @@
 // Tests that a bare `..` in a type position call is rejected rather than left as a
 // null argument for the checker to walk off of.
-package test_issues
+package test_issue_ellipsis_type_call
 
 Foo :: struct($T: typeid) {
 	x: T,

@@ -1,5 +1,5 @@
 // Tests issue #2637 https://github.com/odin-lang/Odin/issues/2637
-package test_issues
+package test_issue_2637
 
 import "core:testing"
 

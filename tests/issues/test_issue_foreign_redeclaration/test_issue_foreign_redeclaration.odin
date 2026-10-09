@@ -1,6 +1,6 @@
 // Two declarations of the same foreign symbol whose parameters reach a named struct through a
 // slice or a field read the wrong member of the type union and segfaulted the compiler
-package test_issues
+package test_issue_foreign_redeclaration
 
 foreign import lib "this_library_does_not_exist"
 

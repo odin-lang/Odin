@@ -1,5 +1,5 @@
 // A `distinct` copy of a record satisfies a `$T/Record` constraint, as it shares its base record.
-package test_issues
+package test_issue_distinct_constraint
 
 import "core:testing"
 

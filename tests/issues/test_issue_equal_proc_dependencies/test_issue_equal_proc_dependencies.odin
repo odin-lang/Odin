@@ -1,6 +1,6 @@
 // The backend gives each comparable struct and union in the type table, and the key of each map, an equality
 // procedure, so the runtime procedures it compares fields with must be dependencies however the type was reached
-package test_issues
+package test_issue_equal_proc_dependencies
 
 import "base:runtime"
 import "core:fmt"

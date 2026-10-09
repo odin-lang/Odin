@@ -1,5 +1,5 @@
 // test issue for #6753 https://github.com/odin-lang/odin/issues/6753
-package test_issues
+package test_issue_6753
 import "core:testing"
 import "core:fmt"
 

@@ -1,7 +1,7 @@
 // Tests issue #6419 https://github.com/odin-lang/Odin/issues/6419
 // A polymorphic procedure with default procedure literal parameters
 // should not cause the compiler to hang.
-package test_issues
+package test_issue_6419
 
 import "core:testing"
 

@@ -1,6 +1,6 @@
 // Global declarations whose result used to depend on which declaration was checked first.
 // Each case puts the declaration that used to break first in source order.
-package test_issues
+package test_issue_decl_order
 
 import "core:testing"
 

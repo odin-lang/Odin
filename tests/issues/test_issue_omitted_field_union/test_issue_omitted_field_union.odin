@@ -1,6 +1,6 @@
 // A field omitted from a constant compound literal is the zero value of its type,
 // so converting it to a union holds that variant rather than nil
-package test_issues
+package test_issue_omitted_field_union
 
 import "core:testing"
 

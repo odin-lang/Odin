@@ -1,6 +1,6 @@
 // Tests issue https://github.com/odin-lang/Odin/issues/2615
 // Cannot iterate over string literals
-package test_issues
+package test_issue_2615
 
 import "core:testing"
 

@@ -3,7 +3,7 @@
 // `src/docs.cpp`, so its slot was zero-filled: ordering `0` and a null name. `odin doc` and
 // `odin check -show-unused` printed an `asm` template under an empty category header, and passed
 // the null name to a `%s`.
-package test_issues
+package test_issue_asm_doc_category
 
 DOC_CONST :: 1
 

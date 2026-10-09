@@ -3,105 +3,87 @@
 if not exist "build\" mkdir build
 pushd build
 
-set COMMON=-define:ODIN_TEST_FANCY=false -file -vet -strict-style -ignore-unused-defineables
+set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables
+set ODIN=..\..\..\odin
+set CC=cl
 
 @echo on
 
-..\..\..\odin test ..\test_issue_829.odin  %COMMON%   || exit /b
-..\..\..\odin test ..\test_issue_1592.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_1730.odin %COMMON% || exit /b
-..\..\..\odin test ..\test_issue_2056.odin %COMMON%  || exit /b
-..\..\..\odin build ..\test_issue_2113.odin %COMMON% -debug || exit /b
-..\..\..\odin test ..\test_issue_2466.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_2615.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_2637.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_2666.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_2694.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_3435.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_4210.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_4364.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_4584.odin %COMMON%  || exit /b
-..\..\..\odin build ..\test_issue_2395.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
-..\..\..\odin build ..\test_issue_5043.odin %COMMON% || exit /b
-..\..\..\odin build ..\test_issue_5097.odin %COMMON% || exit /b
-..\..\..\odin build ..\test_issue_5097-2.odin %COMMON% || exit /b
-..\..\..\odin check ..\test_issue_5105_5569.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
-..\..\..\odin build ..\test_issue_5265.odin %COMMON% || exit /b
-..\..\..\odin test ..\test_issue_5318.odin %COMMON%  || exit /b
-..\..\..\odin build ..\test_issue_5573.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
-..\..\..\odin test ..\test_issue_5699.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_6068.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_6165.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_6302.odin %COMMON%  || exit /b
-..\..\..\odin build ..\test_issue_6240.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
-..\..\..\odin build ..\test_issue_6401.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
-..\..\..\odin test ..\test_issue_6419.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_pr_6470.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_pr_6470.odin -define:TEST_EXPECT_FAILURE=true %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
-..\..\..\odin check ..\test_issue_6484.odin -no-entry-point %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_6753.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_6874.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
-..\..\..\odin test ..\test_issue_6951_5214.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_6979.odin -no-entry-point %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_7008.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_global_address_of_literal.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_7012.odin -no-entry-point %COMMON% || exit /b
-..\..\..\odin check ..\test_issue_7260.odin -no-entry-point %COMMON% || exit /b
-..\..\..\odin test ..\test_issue_bool_to_be_conversion.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_bool_comparison_truthiness.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_const_array_broadcast.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_decl_order.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_distinct_constraint.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_ambiguous_union_literal.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
-..\..\..\odin test ..\test_issue_proc_constant_instantiation.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_global_when_order.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_global_when_cycle.odin -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
-..\..\..\odin test ..\test_issue_global_when_cycle_accepted.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_global_when_cycle_ambiguous.odin -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
-..\..\..\odin check ..\test_issue_global_when_shadowing.odin -no-entry-point %COMMON% 2>&1 | find /c "within a global" | findstr /x "2" || exit /b
-..\..\..\odin check ..\test_issue_7336.odin -no-entry-point %COMMON% || exit /b
-..\..\..\odin check ..\test_issue_ellipsis_type_call.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
-..\..\..\odin check ..\test_issue_foreign_redeclaration.odin -no-entry-point %COMMON% || exit /b
-..\..\..\odin check ..\test_issue_foreign_import_attributes.odin -no-entry-point %COMMON% || exit /b
-..\..\..\odin check ..\test_issue_foreign_redeclaration_mismatch.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
-..\..\..\odin check ..\test_issue_integer_literal_exponent.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
-..\..\..\odin doc ..\test_issue_asm_doc_category.odin -file 2>&1 | find /c "asm templates" | findstr /x "1" || exit /b
-..\..\..\odin build ..\test_issue_7037.odin %COMMON% -o:none  || exit /b
-..\..\..\odin test ..\test_issue_7421.odin %COMMON% || exit /b
-..\..\..\odin check ..\test_issue_7421_tagged_duplicate.odin %COMMON% 2>&1 | find /c "Error: Duplicate case" | findstr /x "1" || exit /b
-..\..\..\odin test ..\test_issue_7430.odin %COMMON%  || exit /b
-..\..\..\odin build ..\test_issue_7188.odin %COMMON%  || exit /b
-clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
-..\..\..\odin test ..\test_issue_sysv_abi.odin %COMMON%  || exit /b
-..\..\..\odin build ..\test_issue_7073-1.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
-..\..\..\odin test ..\test_issue_swizzle_multi_assign.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_lifetime_markers.odin %COMMON% -o:size -lifetime-markers  || exit /b
-..\..\..\odin test ..\test_lifetime_markers.odin %COMMON% -o:speed -lifetime-markers  || exit /b
-..\..\..\odin test ..\test_issue_7547.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_7477_7506.odin %COMMON%  || exit /b
-..\..\..\odin run ..\test_issue_7482.odin %COMMON% || exit /b
-..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local || exit /b
-..\..\..\odin run ..\test_issue_7562.odin %COMMON% -no-crt -no-thread-local -o:speed || exit /b
-..\..\..\odin test ..\test_issue_7316.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_7566.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_poly_using_subtype.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_global_proc_lits.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_packed_field_by_value.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_7708.odin %COMMON%  || exit /b
-..\..\..\odin check ..\test_issue_7708_mismatch.odin %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
-..\..\..\odin test ..\test_issue_7700.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_procedure_of_specialized.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_7587.odin %COMMON%  || exit /b
-..\..\..\odin run ..\test_issue_7596.odin %COMMON% || exit /b
-..\..\..\odin test ..\test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
-..\..\..\odin test ..\test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
-..\..\..\odin test ..\test_issue_omitted_field_union.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_fast_isel_lowering.odin %COMMON% -o:none || exit /b
-..\..\..\odin test ..\test_issue_equal_proc_dependencies.odin %COMMON%  || exit /b
-..\..\..\odin test ..\test_issue_equal_proc_dependencies.odin %COMMON% -build-mode:obj 2>&1 | find /i /c "missing procedure" | findstr /x "0" || exit /b
-..\..\..\odin test ..\test_issue_7779.odin %COMMON% || exit /b
-..\..\..\odin run ..\test_issue_7798.odin %COMMON% || exit /b
+@rem Build prerequisites for the simple tests:
+@rem   (nothing to do here)
+
+@rem "odin test" - All simple tests that can be tested without special arguments or error handling:
+%ODIN% test "..\test_simple.odin" -file -all-packages %COMMON% || exit /b
+
+@rem "odin check" tests:
+%ODIN% check "..\test_issue_5105_5569" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_6484" -no-entry-point %COMMON%  || exit /b
+%ODIN% check "..\test_issue_6874" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_6979" -no-entry-point %COMMON%  || exit /b
+%ODIN% check "..\test_issue_7012" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_7260" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_ambiguous_union_literal" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_global_when_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_global_when_cycle_ambiguous" -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_global_when_shadowing" -no-entry-point %COMMON% 2>&1 | find /c "within a global" | findstr /x "2" || exit /b
+%ODIN% check "..\test_issue_7336" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_ellipsis_type_call" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "10" || exit /b
+%ODIN% check "..\test_issue_foreign_redeclaration" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_foreign_import_attributes" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_foreign_redeclaration_mismatch" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_integer_literal_exponent" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_7421_tagged_duplicate" %COMMON% 2>&1 | find /c "Error: Duplicate case" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_7708_mismatch" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+
+@rem "odin build" tests:
+%ODIN% build "..\test_issue_2113" %COMMON% -debug || exit /b
+%ODIN% build "..\test_issue_2395" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% build "..\test_issue_5043" %COMMON% || exit /b
+%ODIN% build "..\test_issue_5097" %COMMON% || exit /b
+%ODIN% build "..\test_issue_5097-2" %COMMON% || exit /b
+%ODIN% build "..\test_issue_5265" %COMMON% || exit /b
+%ODIN% build "..\test_issue_5573" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% build "..\test_issue_6240" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% build "..\test_issue_6401" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% build "..\test_issue_7037" %COMMON% -o:none  || exit /b
+%ODIN% build "..\test_issue_7073-1" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
+%ODIN% build "..\test_issue_7188" %COMMON%  || exit /b
+
+@rem "odin run" tests:
+%ODIN% run "..\test_issue_7482" %COMMON% || exit /b
+%ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local || exit /b
+%ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local -o:speed || exit /b
+%ODIN% run "..\test_issue_7596" %COMMON% || exit /b
+%ODIN% run "..\test_issue_7798" %COMMON% || exit /b
+
+@rem "odin test" tests with special needs:
+
+%CC% -c "..\test_issue_5640\test_issue_5640.c" /Fo:test_issue_5640_c.o
+%ODIN% test "..\test_issue_5640" %COMMON% || exit /b
+
+%CC% -c "..\test_issue_6809_6816\test_issue_6809_6816.c" /Fo:test_issue_6809_6816_c.o -O3
+%ODIN% test "..\test_issue_6809_6816" %COMMON% || exit /b
+
+%ODIN% test "..\test_issue_6344" %COMMON% -o:speed || exit /b
+
+%ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+
+%CC% -c "..\test_issue_7010\test_issue_7010.c" /Fo:test_issue_7010_c.o
+%ODIN% test "..\test_issue_7010" %COMMON% || exit /b
+
+%ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
+%ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
+
+%ODIN% test "..\test_issue_fast_isel_lowering" || exit /b
+%ODIN% test "..\test_issue_fast_isel_lowering" %COMMON% -o:none || exit /b
+
+%ODIN% test "..\test_issue_equal_proc_dependencies" %COMMON% -build-mode:obj 2>&1 | find /i /c "missing procedure" | findstr /x "0" || exit /b
+
+%ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
+%ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
+
+%CC% -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" /Fo:test_issue_sysv_abi_c.o || exit /b
+%ODIN% test "..\test_issue_sysv_abi" %COMMON% || exit /b
 
 @echo off
 

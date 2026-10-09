@@ -1,5 +1,5 @@
 // Tests issue #5097 https://github.com/odin-lang/Odin/issues/5097
-package test_issues
+package test_issue_5097
 
 Node_Ptr :: ^Node // the typedef...
 

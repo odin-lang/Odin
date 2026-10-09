@@ -1,6 +1,6 @@
 // Tests issue #7708 https://github.com/odin-lang/Odin/issues/7708
 // A record argument whose constant parameters differ from the parameter's must be rejected
-package test_issues
+package test_issue_7708_mismatch
 
 M :: struct($R, $C: int, $T: typeid) { data: [C][R]T }
 

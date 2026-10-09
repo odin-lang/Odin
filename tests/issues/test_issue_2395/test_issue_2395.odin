@@ -3,7 +3,7 @@
 // Ensures that we no longer raise the faulty error for #no_nil unions when
 // then are 2 variants with the polymorphic type. Also ensure that we raise
 // exactly 2 errors from the invalid unions
-package test_issues
+package test_issue_2395
 
 ValidUnion :: union($T: typeid) #no_nil {
     T,

@@ -1,6 +1,6 @@
 // Tests issues #7477 https://github.com/odin-lang/Odin/issues/7477
 // and #7506 https://github.com/odin-lang/Odin/issues/7506
-package test_issues
+package test_issue_7477_7506
 
 import "core:testing"
 

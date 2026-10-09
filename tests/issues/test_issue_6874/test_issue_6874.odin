@@ -1,6 +1,6 @@
 // Test for issue #6874 https://github.com/odin-lang/Odin/issues/6874
 
-package test_issues
+package test_issue_6874
 
 import "core:fmt"
 

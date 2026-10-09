@@ -1,5 +1,5 @@
 // Tests issue #4210 https://github.com/odin-lang/Odin/issues/4210
-package test_issues
+package test_issue_4210
 
 import "core:testing"
 import "base:intrinsics"
