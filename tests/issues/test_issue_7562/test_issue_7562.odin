@@ -1,4 +1,5 @@
 // Regression for #7562: Windows AMD64 no-CRT builds must provide __chkstk.
+#+build windows
 package test_issue_7562
 
 import win32 "core:sys/windows"

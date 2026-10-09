@@ -22,6 +22,9 @@ set CC=cl
 %ODIN% check "..\test_issue_6979" -no-entry-point %COMMON%  || exit /b
 %ODIN% check "..\test_issue_7012" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_7260" -no-entry-point %COMMON% || exit /b
+%ODIN% check "..\test_issue_7421_tagged_duplicate" %COMMON% 2>&1 | find /c "Error: Duplicate case" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_7429" %COMMON% || exit /b
+%ODIN% check "..\test_issue_7708_mismatch" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% check "..\test_issue_ambiguous_union_literal" %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_global_when_cycle" -no-entry-point %COMMON% 2>&1 | find /c "Contradictory global" | findstr /x "4" || exit /b
 %ODIN% check "..\test_issue_global_when_cycle_ambiguous" -no-entry-point %COMMON% 2>&1 | find /c "Ambiguous global" | findstr /x "1" || exit /b
@@ -32,8 +35,6 @@ set CC=cl
 %ODIN% check "..\test_issue_foreign_import_attributes" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_foreign_redeclaration_mismatch" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_integer_literal_exponent" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
-%ODIN% check "..\test_issue_7421_tagged_duplicate" %COMMON% 2>&1 | find /c "Error: Duplicate case" | findstr /x "1" || exit /b
-%ODIN% check "..\test_issue_7708_mismatch" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 
 @rem "odin build" tests:
 %ODIN% build "..\test_issue_2113" %COMMON% -debug || exit /b
@@ -45,14 +46,21 @@ set CC=cl
 %ODIN% build "..\test_issue_5573" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 %ODIN% build "..\test_issue_6240" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
 %ODIN% build "..\test_issue_6401" %COMMON% 2>&1 | find /c "Error:" | findstr /x "3" || exit /b
+%ODIN% build "..\test_issue_6594" %COMMON% 2>&1 | find /c "Error:" || exit /b
+%ODIN% build "..\test_issue_6621" %COMMON% 2>&1 | find /c "Error:" || exit /b
 %ODIN% build "..\test_issue_7037" %COMMON% -o:none  || exit /b
 %ODIN% build "..\test_issue_7073-1" %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
-%ODIN% build "..\test_issue_7188" %COMMON%  || exit /b
+%ODIN% build "..\test_issue_7108" %COMMON% 2>&1 | find /c "Error" | findstr /x "2" || exit /b
+%ODIN% build "..\test_issue_7167" %COMMON% || exit /b
+%ODIN% build "..\test_issue_7188" %COMMON% || exit /b
+%ODIN% build "..\test_issue_7304" %COMMON% 2>&1 | find /c "9223372036854775808 is not representable by int" || exit /b
+%ODIN% build "..\test_issue_7598_all_entities_checked" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
 
 @rem "odin run" tests:
 %ODIN% run "..\test_issue_7482" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local || exit /b
 %ODIN% run "..\test_issue_7562" %COMMON% -no-crt -no-thread-local -o:speed || exit /b
+%ODIN% run "..\test_issue_7564" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7596" %COMMON% || exit /b
 %ODIN% run "..\test_issue_7798" %COMMON% || exit /b
 
