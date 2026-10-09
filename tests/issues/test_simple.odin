@@ -45,6 +45,7 @@ package tests_issues
 @(require) import "test_issue_7598"
 @(require) import "test_issue_7700"
 @(require) import "test_issue_7708"
+@(require) import "test_issue_7763"
 @(require) import "test_issue_7779"
 @(require) import "test_issue_fast_isel_lowering"
 @(require) import "test_issue_omitted_field_union"
@@ -64,4 +65,5 @@ package tests_issues
 @(require) import "test_issue_packed_field_by_value"
 @(require) import "test_issue_paren_poly_callee"
 @(require) import "test_issue_procedure_of_specialized"
+@(require) import "test_issue_statics_across_modules"
 

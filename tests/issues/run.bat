@@ -53,6 +53,11 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_foreign_import_attributes" -no-entry-point %COMMON% || exit /b
 %ODIN% check "..\test_issue_foreign_redeclaration_mismatch" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_integer_literal_exponent" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_fixed_point_scale" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_poly_proc_value" %COMMON% 2>&1 | find /c "Error:" | findstr /x "4" || exit /b
+%ODIN% check "..\test_issue_atomic_orderings" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
+%ODIN% check "..\test_issue_atomic_errors" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
+%ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 
 @rem #########################################################################################################
 
