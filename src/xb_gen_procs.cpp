@@ -286,10 +286,13 @@ gb_internal void xb_hasher_proc_body(xbProc *p, Type *type) {
 		xb_ret_uintptr(p, xb_load(p, xbType_I64, seed_mem));
 		return;
 	}
-	if (is_type_cstring(type) || is_type_string(type)) {
-		// LLVM hashes a string16 with the string hasher too
+	if (is_type_cstring(type) || is_type_cstring16(type) || is_type_string(type)) {
+		// a string16's length counts u16 units, so it has its own hashers
+		char const *name = is_type_cstring16(type) ? "default_hasher_cstring16" :
+		                   is_type_string16(type)  ? "default_hasher_string16"  :
+		                   is_type_cstring(type)   ? "default_hasher_cstring"   : "default_hasher_string";
 		xbValue args[2] = {xb_value_reg(t_rawptr, xb_hasher_param(p, 0)), xb_value_reg(t_uintptr, xb_hasher_param(p, 1))};
-		xbValue r = xb_emit_runtime_call(p, is_type_cstring(type) ? "default_hasher_cstring" : "default_hasher_string", xb_args(args, 2));
+		xbValue r = xb_emit_runtime_call(p, name, xb_args(args, 2));
 		xb_ret_uintptr(p, xb_value_to_reg(p, r));
 		return;
 	}
