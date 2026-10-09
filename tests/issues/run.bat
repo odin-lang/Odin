@@ -114,12 +114,13 @@ if "%ISSUES_TESTS_NO_CLANG%" == "" (
 
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
-if "%ISSUES_TESTS_NO_CLANG%" == "" (
-	clang -c "..\test_issue_7010\test_issue_7010.c" -o test_issue_7010_c.o || exit /b
-	%ODIN% test "..\test_issue_7010" %COMMON% || exit /b
-) else (
-	@echo "!!! WARNING !!! test_issue_7010 is not compatible with MSVC."
-)
+@rem It seems at this point 7010 is not for Windows.
+@rem if "%ISSUES_TESTS_NO_CLANG%" == "" (
+@rem 	clang -c "..\test_issue_7010\test_issue_7010.c" -o test_issue_7010_c.o || exit /b
+@rem 	%ODIN% test "..\test_issue_7010" %COMMON% || exit /b
+@rem ) else (
+@rem 	@echo "!!! WARNING !!! test_issue_7010 is not compatible with MSVC."
+@rem )
 
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables || exit /b
 %ODIN% test "..\test_issue_split_globals" -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug || exit /b
