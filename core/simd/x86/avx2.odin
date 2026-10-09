@@ -1616,12 +1616,11 @@ _mm256_cvtepi8_epi32 :: #force_inline proc "c" (a: __m128i) -> __m256i {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi8_epi64)
 @(require_results, enable_target_feature="avx2")
 _mm256_cvtepi8_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
-	b := simd.shuffle(
+	return cast(simd.i64x4)simd.shuffle(
 		transmute(simd.i8x16)a,
 		transmute(simd.i8x16)a,
 		0, 1, 2, 3,
 	)
-	return transmute(__m256i)(cast(simd.i64x4)b)
 }
 
 // Zero extend packed unsigned 8-bit integers in `a` to packed 16-bit integers, and store the results in `dst`.
@@ -1671,12 +1670,11 @@ _mm256_cvtepi16_epi32 :: #force_inline proc "c" (a: __m128i) -> __m256i {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi16_epi64)
 @(require_results, enable_target_feature="avx2")
 _mm256_cvtepi16_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
-	b := simd.shuffle(
+	return cast(simd.i64x4)simd.shuffle(
 		transmute(simd.i16x8)a,
 		transmute(simd.i16x8)a,
 		0, 1, 2, 3,
 	)
-	return transmute(__m256i)(cast(simd.i64x4)b)
 }
 
 // Zero extend packed unsigned 16-bit integers in `a` to packed 32-bit integers, and store the results in `dst`.
@@ -1705,7 +1703,7 @@ _mm256_cvtepu16_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_cvtepi32_epi64)
 @(require_results, enable_target_feature="avx2")
 _mm256_cvtepi32_epi64 :: #force_inline proc "c" (a: __m128i) -> __m256i {
-	return transmute(__m256i)(cast(simd.i64x4)(transmute(simd.i32x4)a))
+	return cast(simd.i64x4)(transmute(simd.i32x4)a)
 }
 
 // Zero extend packed unsigned 32-bit integers in `a` to packed 64-bit integers, and store the results in `dst`.
@@ -1853,8 +1851,8 @@ _mm256_maskload_epi32 :: #force_inline proc "c" (mem_addr: ^i32, mask: __m256i) 
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_maskload_epi64)
 @(require_results, enable_target_feature="avx2")
 _mm_maskload_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m128i) -> __m128i {
-	m := simd.shr(transmute(simd.i64x2)mask, simd.u64x2(63))
-	return transmute(__m128i)simd.masked_load(mem_addr, simd.i64x2(0), m)
+	m := simd.shr(mask, simd.u64x2(63))
+	return simd.masked_load(mem_addr, __m128i(0), m)
 }
 
 // Load packed 64-bit integers from memory into `dst` using `mask`
@@ -1863,8 +1861,8 @@ _mm_maskload_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m128i) -> 
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_maskload_epi64)
 @(require_results, enable_target_feature="avx2")
 _mm256_maskload_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m256i) -> __m256i {
-	m := simd.shr(transmute(simd.i64x4)mask, simd.u64x4(63))
-	return transmute(__m256i)simd.masked_load(mem_addr, simd.i64x4(0), m)
+	m := simd.shr(mask, simd.u64x4(63))
+	return simd.masked_load(mem_addr, __m256i(0), m)
 }
 
 // Store packed 32-bit integers from `a` into memory using `mask`
@@ -1893,8 +1891,8 @@ _mm256_maskstore_epi32 :: #force_inline proc "c" (mem_addr: ^i32, mask: __m256i,
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_maskstore_epi64)
 @(enable_target_feature="avx2")
 _mm_maskstore_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m128i, a: __m128i) {
-	m := simd.shr(transmute(simd.i64x2)mask, simd.u64x2(63))
-	simd.masked_store(mem_addr, transmute(simd.i64x2)a, m)
+	m := simd.shr(mask, simd.u64x2(63))
+	simd.masked_store(mem_addr, a, m)
 }
 
 // Store packed 64-bit integers from `a` into memory using `mask`
@@ -1903,8 +1901,8 @@ _mm_maskstore_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m128i, a:
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_maskstore_epi64)
 @(enable_target_feature="avx2")
 _mm256_maskstore_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m256i, a: __m256i) {
-	m := simd.shr(transmute(simd.i64x4)mask, simd.u64x4(63))
-	simd.masked_store(mem_addr, transmute(simd.i64x4)a, m)
+	m := simd.shr(mask, simd.u64x4(63))
+	simd.masked_store(mem_addr, a, m)
 }
 
 @(private, default_calling_convention="none")
