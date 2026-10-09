@@ -95,6 +95,60 @@ bit_field_signed_fields_sign_extend :: proc(t: ^testing.T) {
 	testing.expect_value(t, w.s, 2047)
 }
 
+// and to the full width of its type, even one wider than the backing, without taking any bits of its
+// neighbours: `lo` and `hi` are set around `s`, so a read that keeps them gets the wrong value
+@(test)
+bit_field_signed_field_wider_than_backing :: proc(t: ^testing.T) {
+	S :: bit_field u16 { lo: u8 | 5, s: i32 | 3, hi: u8 | 8 }
+
+	expected := [8]i32{0, 1, 2, 3, -4, -3, -2, -1}
+	for v in u16(0) ..< 8 {
+		x := transmute(S)(0xAA00 | v << 5 | 0b10101) // hi = 0xAA, s = v, lo = 0b10101
+		testing.expect_value(t, x.s, expected[v])
+	}
+}
+
+// an array backing is laid out the same way, with fields running across its elements
+@(test)
+bit_field_array_backing :: proc(t: ^testing.T) {
+	A :: bit_field [3]u8 { lo: u8 | 4, mid: u16 | 12, hi: i8 | 8 }
+
+	a := transmute(A)[3]u8{0x5A, 0xBC, 0xF0}
+	testing.expect_value(t, a.lo, 0xA)
+	testing.expect_value(t, a.mid, 0xBC5)
+	testing.expect_value(t, a.hi, -16)
+
+	a.mid = 0x123
+	testing.expect_value(t, transmute([3]u8)a, [3]u8{0x3A, 0x12, 0xF0})
+}
+
+// the same in a backing of more than 8 bytes, with a field that starts in the first 8 and ends after them
+@(test)
+bit_field_array_backing_across_elements :: proc(t: ^testing.T) {
+	A :: bit_field [11]u8 { lo: u64 | 60, mid: u32 | 24, hi: i8 | 4 }
+
+	a := transmute(A)[11]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0xFE, 0x21, 0x43, 0xA5}
+	testing.expect_value(t, a.lo, 0x0EDCBA9876543210)
+	testing.expect_value(t, a.mid, 0x54321F)
+	testing.expect_value(t, a.hi, -6)
+
+	a.mid = 0x123456
+	testing.expect_value(t, transmute([11]u8)a, [11]u8{0x10, 0x32, 0x54, 0x76, 0x98, 0xBA, 0xDC, 0x6E, 0x45, 0x23, 0xA1})
+}
+
+// the elements of an array backing may be wider than its fields
+@(test)
+bit_field_array_backing_wide_elements :: proc(t: ^testing.T) {
+	A :: bit_field [2]u128 { lo: u64 | 64, pad: u64 | 60, mid: u16 | 12, hi: u64 | 64 }
+
+	a := transmute(A)[2]u128{max(u128), max(u128)}
+	a.mid = 0xABC
+	a.hi  = 0x0123456789ABCDEF
+	testing.expect_value(t, transmute([2]u128)a, [2]u128{0xCFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFF0123456789ABCDEFAB})
+	testing.expect_value(t, a.mid, 0xABC)
+	testing.expect_value(t, a.hi, 0x0123456789ABCDEF)
+}
+
 // A 1-bit boolean field is well formed at every backing value: the mask leaves only bit 0, so the
 // read is 0 or 1 whichever way it is tested. Wider boolean fields are legal -- any non-zero value
 // is true -- and are not covered here
