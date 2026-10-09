@@ -26,11 +26,12 @@ get_env_buf :: proc(buf: []u8, key: string) -> string {
 get_env :: proc{get_env_alloc, get_env_buf}
 
 // `lookup_env` gets the value of the environment variable named by the key
-// If the variable is found in the environment the value (which can be empty) is returned and the boolean is true
-// Otherwise the returned value will be empty and the boolean will be false
+// If the variable is found in the environment the value (which can be empty) is returned and `err` is nil.
+// If the variable is not found, the returned value will be empty, and the `err` is `General_Error.Env_Var_Not_Found`.
+// If an error ocurrs, return returned value will be empty, and the error is returned in `err`.
 // NOTE: the value will be allocated with the supplied allocator
 @(require_results)
-lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+lookup_env_alloc :: proc(key: string, allocator: runtime.Allocator) -> (value: string, err: Error) {
 	return _lookup_env_alloc(key, allocator)
 }
 
