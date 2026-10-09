@@ -645,11 +645,13 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		l_paren.kind   = Token_OpenParen;
 		l_paren.string = str_lit("(");
 		l_paren.pos    = ident.pos;
+		l_paren.flags  = TokenFlag_Synthesized;
 
 		Token r_paren = {};
 		r_paren.kind   = Token_CloseParen;
-		l_paren.string = str_lit(")");
+		r_paren.string = str_lit(")");
 		r_paren.pos    = ident.pos;
+		r_paren.flags  = TokenFlag_Synthesized;
 
 		// Remove the capture args from the resulting Objc_Block type signature
 		Ast* handler_proc_type_copy = clone_ast(handler_type_proc.node);
@@ -4364,6 +4366,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Token token = {};
 			token.kind = Token_Ident;
 			token.pos = ast_token(call).pos;
+			token.flags = TokenFlag_Synthesized;
 
 			isize index = 0;
 			for_array(i, ce->args) {

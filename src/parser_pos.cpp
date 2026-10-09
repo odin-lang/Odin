@@ -145,10 +145,10 @@ TokenPos token_pos_end(Token const &token) {
 		return pos;
 	}
 	pos.offset += cast(i32)token.string.len;
-	for (isize i = 0; i < token.string.len; i++) {
-		// TODO(bill): This assumes ASCII
-		char c = token.string[i];
-		if (c == '\n') {
+	for (isize i = 0; i < token.string.len; /**/) {
+		Rune r = 0;
+		i += utf8_decode(token.string.text+i, token.string.len-i, &r);
+		if (r == '\n') {
 			pos.line += 1;
 			pos.column = 1;
 		} else {

@@ -261,14 +261,14 @@ struct Token {
 };
 
 Token empty_token = {Token_Invalid};
-Token blank_token = {Token_Ident, 0, {cast(u8 *)"_", 1}};
+Token blank_token = {Token_Ident, TokenFlag_Synthesized, {cast(u8 *)"_", 1}};
 
 gb_internal Token make_token_ident(String s) {
-	Token t = {Token_Ident, 0, s};
+	Token t = {Token_Ident, TokenFlag_Synthesized, s};
 	return t;
 }
 gb_internal Token make_token_ident(char const *s) {
-	Token t = {Token_Ident, 0, make_string_c(s)};
+	Token t = {Token_Ident, TokenFlag_Synthesized, make_string_c(s)};
 	return t;
 }
 

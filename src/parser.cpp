@@ -913,25 +913,6 @@ gb_internal Ast *ast_uninit(AstFile *f, Token token) {
 }
 
 gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
-	auto token_pos_at_offset = [](Token const &token, isize offset) -> TokenPos {
-		TokenPos pos = token.pos;
-		if (offset <= 0) {
-			return pos;
-		}
-		String s = token.string;
-		isize n = gb_min(offset, s.len);
-		for (isize i = 0; i < n; i++) {
-			if (s.text[i] == '\n') {
-				pos.line += 1;
-				pos.column = 1;
-			} else {
-				pos.column += 1;
-			}
-			pos.offset += 1;
-		}
-		return pos;
-	};
-
 	String s = token.string;
 	string_interner_insert(s);
 	switch (token.kind) {
@@ -947,7 +928,9 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 			TripleStringErrorKind terr = TripleStringError_None;
 			isize terr_off = -1;
 			if (!unquote_string_triple(ast_allocator(f), &s, string_contains_char(s, '\r'), &terr, &terr_off)) {
-				TokenPos pos = token_pos_at_offset(token, terr_off);
+				Token prefix = token;
+				prefix.string = substring(token.string, 0, gb_clamp(terr_off, 0, token.string.len));
+				TokenPos pos = token_pos_end(prefix);
 				switch (terr) {
 				case TripleStringError_ContentOnOpeningLine:
 					syntax_error(pos, "A multi-line string literal must begin on the line after the opening delimiter");
@@ -2006,9 +1989,7 @@ gb_internal Token expect_closing(AstFile *f, TokenKind kind, String const &conte
 	    f->curr_token.kind == Token_Semicolon &&
 	    (f->curr_token.string == "\n" || f->curr_token.kind == Token_EOF)) {
 	    	if (f->allow_newline) {
-			Token tok = f->prev_token;
-			tok.pos.column += cast(i32)tok.string.len;
-			syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
+			syntax_error(token_pos_end(f->prev_token), "Missing ',' before newline in %.*s", LIT(context));
 		}
 		advance_token(f);
 	}
@@ -2077,8 +2058,7 @@ gb_internal void expect_semicolon(AstFile *f) {
 
 	if (f->curr_token.pos.line == f->prev_token.pos.line) {
 		String p = token_to_string(f->curr_token);
-		prev_token.pos = token_pos_end(prev_token);
-		syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
+		syntax_error(token_pos_end(prev_token), "Expected ';', got %.*s", LIT(p));
 		fix_advance_to_next_stmt(f);
 	}
 }
@@ -6272,7 +6252,8 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 				Token ident = f->curr_token;
 				if (allow_token(f, Token_Ident) &&
 				    name.pos.line == f->curr_token.pos.line) {
-					if (f->curr_token.kind == Token_OpenParen && f->curr_token.pos.column == ident.pos.column+ident.string.len) {
+					if (f->curr_token.kind == Token_OpenParen &&
+					    f->curr_token.pos.offset == ident.pos.offset+ident.string.len) {
 						call_like = true;
 						(void)parse_call_expr(f, nullptr);
 					}
