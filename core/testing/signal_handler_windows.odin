@@ -152,10 +152,16 @@ This is a dire bug and should be reported to the Odin developers.
 		intrinsics.atomic_store(&stop_test_passed, passed)
 		intrinsics.atomic_store(&stop_test_alert, 1)
 
+		// Idle until the runner terminates this thread, holding the gate it unlocks
+		// in `_should_stop_test`, like the POSIX handler. Passing the exception on
+		// would end the whole process unless something delays that long enough for
+		// the runner to get there first, like Windows Error Reporting on a desktop;
+		// on CI runners it does not. A debugger has already seen the exception.
+		for {
+			win32.Sleep(1)
+		}
 	}
 
-	// Pass on the exeption to the next handler. As we don't wont to recover from it.
-	// This also allows debuggers handle it properly.
 	return win32.EXCEPTION_CONTINUE_SEARCH
 }
 
