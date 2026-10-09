@@ -805,12 +805,14 @@ Sock_Addr_In6 :: struct #packed {
 	sin6_scope_id: u32,
 }
 
+UNIX_PATH_MAX :: 108
+
 /*
 	Struct representing Unix Domain Socket address
 */
 Sock_Addr_Un :: struct #packed {
 	sun_family: Address_Family,
-	sun_path:   [108]u8,
+	sun_path:   [UNIX_PATH_MAX]u8,
 }
 
 /*

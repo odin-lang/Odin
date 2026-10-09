@@ -57,6 +57,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	switch family {
 	case .IP4:  c_family = .INET
 	case .IP6:  c_family = .INET6
+	case .UNIX: c_family = .UNIX
 	case:
 		unreachable()
 	}
@@ -64,6 +65,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	switch protocol {
 	case .TCP:  c_type = .STREAM; c_protocol = .TCP
 	case .UDP:  c_type = .DGRAM;  c_protocol = .UDP
+	case .UNIX: c_type = .STREAM; c_protocol = .UNSPEC
 	case:
 		unreachable()
 	}
@@ -75,8 +77,9 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 	}
 
 	switch protocol {
-	case .TCP:  return TCP_Socket(sock), nil
-	case .UDP:  return UDP_Socket(sock), nil
+	case .TCP:  return TCP_Socket(sock),  nil
+	case .UDP:  return UDP_Socket(sock),  nil
+	case .UNIX: return Unix_Socket(sock), nil
 	case:
 		unreachable()
 	}
@@ -107,6 +110,29 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := DEFAULT_TCP_OPTIO
 }
 
 @(private)
+_dial_unix :: proc(path: string, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	assert(len(path) < posix.UNIX_PATH_MAX, "net.dial_unix_from_path(): path too long", loc = loc)
+
+	sock := _create_socket(.UNIX, .UNIX) or_return
+	socket = sock.(Unix_Socket)
+
+	sockaddr := posix.sockaddr_un {
+		sun_family = .UNIX,
+	}
+	n := copy(sockaddr.sun_path[:], path)
+	sockaddr.sun_path[n] = 0
+
+	res := posix.connect(posix.FD(socket), cast(^posix.sockaddr)&sockaddr, size_of(sockaddr))
+	if res != nil {
+		err = _dial_error()
+		return
+	}
+
+	return
+}
+
+
+@(private)
 _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
@@ -117,8 +143,10 @@ _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Bind_Error) {
 	return
 }
 
+DEFAULT_LISTEN_BACKLOG :: posix.SOMAXCONN
+
 @(private)
-_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
+_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := DEFAULT_LISTEN_BACKLOG) -> (skt: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
 	family := family_from_endpoint(interface_endpoint)
@@ -136,6 +164,27 @@ _listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_
 
 	if posix.listen(posix.FD(skt), i32(backlog)) != .OK {
 		err = _listen_error()
+	}
+
+	return
+}
+
+@(private)
+_listen_unix :: proc(path: string, backlog := DEFAULT_LISTEN_BACKLOG, loc := #caller_location) -> (socket: Unix_Socket, err: Network_Error) {
+	assert(len(path) < posix.UNIX_PATH_MAX, "net.listen_unix(): path too long", loc = loc)
+
+	sock := _create_socket(.UNIX, .UNIX) or_return
+	socket = sock.(Unix_Socket)
+
+	sockaddr := posix.sockaddr_un {
+		sun_family = .UNIX,
+	}
+	n := copy(sockaddr.sun_path[:], path)
+	sockaddr.sun_path[n] = 0
+
+	if res := posix.bind(posix.FD(socket), (^posix.sockaddr)(&sockaddr), size_of(sockaddr)); res != .OK {
+		err = _listen_error()
+		return
 	}
 
 	return
@@ -183,6 +232,15 @@ _accept_tcp :: proc(sock: TCP_Socket, options := DEFAULT_TCP_OPTIONS) -> (client
 }
 
 @(private)
+_accept_unix :: proc(listening_socket: Unix_Socket) -> (client: Unix_Socket, err: Accept_Error) {
+	client_sock := posix.accept(posix.FD(listening_socket), nil, nil)
+	if client_sock == -1 {
+		return {}, _accept_error()
+	}
+	return Unix_Socket(client_sock), nil
+}
+
+@(private)
 _close :: proc(skt: Any_Socket) {
 	s := any_socket_to_socket(skt)
 	posix.close(posix.FD(s))
@@ -223,6 +281,18 @@ _recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endp
 }
 
 @(private)
+_recv_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_read: int, err: Unix_Recv_Error) {
+	if len(buf) <= 0 {
+		return 0, nil
+	}
+	num_read := posix.recv(posix.FD(socket), raw_data(buf), len(buf), {})
+	if num_read < 0 {
+		return 0, _unix_recv_error()
+	}
+	return int(num_read), nil
+}
+
+@(private)
 _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: TCP_Send_Error) {
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
@@ -236,6 +306,21 @@ _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: TCP
 		bytes_written += int(res)
 	}
 	return
+}
+
+@(private)
+_send_unix :: proc(socket: Unix_Socket, buf: []byte) -> (bytes_written: int, err: Unix_Send_Error) {
+	total_written := 0
+	for total_written < len(buf) {
+		limit := min(int(max(i32)), len(buf) - total_written)
+		remaining := buf[total_written:][:limit]
+		res := posix.send(posix.FD(socket), raw_data(remaining), len(remaining), {.NOSIGNAL})
+		if res < 0 {
+			return total_written, _unix_send_error()
+		}
+		total_written += int(res)
+	}
+	return total_written, nil
 }
 
 @(private)
