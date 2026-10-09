@@ -121,6 +121,7 @@ $ODIN test ../test_issue_7587.odin $COMMON
 $ODIN run ../test_issue_7596.odin $COMMON
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native
+$ODIN test ../test_issue_statics_across_modules -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_omitted_field_union.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON
 $ODIN test ../test_issue_fast_isel_lowering.odin $COMMON -o:none
