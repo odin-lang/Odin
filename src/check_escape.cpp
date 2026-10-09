@@ -155,8 +155,6 @@ struct EscapeNilUse {
 	bool             definite;
 };
 
-// The procedures are analysed in the strongly connected components of what they may call, callees first,
-// and those calling each other until what flows through them settles, so what is found never depends on the threads
 struct EscapeGraph {
 	Array<ProcInfo *>         procs;          // a procedure's index is kept on its decl, see `DeclInfo::escape_index`
 	Array<i32>                offsets;        // procedure -> the procedures it may call, as `targets[offsets[v]..<offsets[v+1]]`
@@ -178,14 +176,7 @@ struct EscapeMemberTask {
 	bool                stale;   // as the flows of one it calls changed
 	Slice<EscapeFlow>   flows;
 	Array<EscapeReport> reports; // of its latest analysis
-	Array<i32>          callees; // the members of the group it calls, by their index
-	Array<i32>          callers;
-};
-
-// of a walk through the members of a group calling each other
-struct EscapeOrderFrame {
-	i32   k;
-	isize next;
+	Array<i32>          callers; // the members of the group calling it, by their index
 };
 
 struct EscapeAnalysis {
@@ -3639,7 +3630,7 @@ gb_internal void escape_update_member(EscapeGraph *g, Slice<EscapeMemberTask> ta
 }
 
 gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
-	enum : isize { MAX_ITERATION_COUNT = 16 };
+	enum : isize { ROUND_COUNT = 3 };
 
 	i32 start = g->group_offsets[gi];
 	i32 end   = g->group_offsets[gi+1];
@@ -3667,78 +3658,33 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 		t.stale = true;
 		// filled in by analyses on other threads, which free their own temporary memory
 		array_init(&t.reports, heap_allocator(), 0, 0);
-		array_init(&t.callees, temporary_allocator(), 0, 0);
 		array_init(&t.callers, temporary_allocator(), 0, 0);
 	}
 	for_array(k, tasks) {
 		for (i32 i = g->offsets[tasks[k].v]; i < g->offsets[tasks[k].v+1]; i++) {
 			for_array(j, tasks) {
 				if (tasks[j].v == g->targets[i]) {
-					array_add(&tasks[k].callees, cast(i32)j);
 					array_add(&tasks[j].callers, cast(i32)k);
 				}
 			}
 		}
 	}
 
-	// callees before their callers, unless they call each other
-	auto order = array_make<i32>(temporary_allocator(), 0, tasks.count);
-	{
-		auto frames  = array_make<EscapeOrderFrame>(temporary_allocator(), 0, tasks.count);
-		auto visited = array_make<bool>(temporary_allocator(), tasks.count);
-		for_array(root, tasks) {
-			if (visited[root]) {
-				continue;
-			}
-			visited[root] = true;
-			array_add(&frames, EscapeOrderFrame{cast(i32)root, 0});
-			while (frames.count > 0) {
-				EscapeOrderFrame &top = frames[frames.count-1];
-				Array<i32> const &callees = tasks[top.k].callees;
-				if (top.next < callees.count) {
-					i32 callee = callees[top.next++];
-					if (!visited[callee]) {
-						visited[callee] = true;
-						array_add(&frames, EscapeOrderFrame{callee, 0});
-					}
-					continue;
-				}
-				array_add(&order, top.k);
-				array_pop(&frames);
-			}
+	for (isize round = 0; round < ROUND_COUNT; round++) {
+		escape_analyse_members(g, tasks);
+		for (EscapeMemberTask &t : tasks) {
+			t.stale = false;
 		}
-	}
-
-	// what each may return or store depends on the others, so they start from nothing until that settles:
-	// all at once at first, then one at a time with what the others have so far, only those calling one whose
-	// flows changed, so the latest analysis of each was with what settled
-	escape_analyse_members(g, tasks);
-	for (EscapeMemberTask &t : tasks) {
-		t.stale = false;
-	}
-	for_array(k, tasks) {
-		escape_update_member(g, tasks, k);
-	}
-
-	bool settled = false;
-	for (isize budget = MAX_ITERATION_COUNT*tasks.count; !settled && budget > 0; /**/) {
-		settled = true;
-		for (i32 k : order) {
-			if (!tasks[k].stale) {
-				continue;
-			}
-			settled = false;
-			budget -= 1;
-			tasks[k].stale = false;
-			escape_member_worker(&tasks[k]);
+		for_array(k, tasks) {
 			escape_update_member(g, tasks, k);
 		}
-	}
-	if (!settled) {
-		for (EscapeMemberTask &t : tasks) {
-			t.stale = true;
+		bool settled = true;
+		for (EscapeMemberTask const &t : tasks) {
+			settled &= !t.stale;
 		}
-		escape_analyse_members(g, tasks);
+		if (settled) {
+			break;
+		}
 	}
 
 	for (EscapeMemberTask &t : tasks) {
