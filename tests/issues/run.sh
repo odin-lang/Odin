@@ -274,7 +274,7 @@ $ODIN run ../test_issue_7798 $COMMON
 
 # "odin test" tests with special needs, or others (e.g. "odin doc"):
 
-if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_5640/test_issue_5640.c -o test_issue_5640_c.o
 
 	if [[ "$(uname)" != "NetBSD" ]]; then
@@ -284,7 +284,7 @@ if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
 	fi
 fi
 
-if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_6809_6816/test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 	$ODIN test ../test_issue_6809_6816 -o:speed $COMMON
 fi
@@ -298,7 +298,7 @@ else
 	exit 1
 fi
 
-if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
 	$ODIN test ../test_issue_7010 $COMMON
 fi
@@ -336,13 +336,13 @@ fi
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers
 
-if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_sysv_abi/test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
 	$ODIN test ../test_issue_sysv_abi $COMMON
 fi
 
 # AVX-512 asked for through -target-features on the default microarch; needs a CPU that has it
-if [[ ! -v ISSUES_TESTS_NO_CLANG ]]; then
+if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	if grep -qw avx512f /proc/cpuinfo 2>/dev/null; then
 		clang -c ../test_issue_avx512_vector_abi/test_issue_avx512_vector_abi.c -o test_issue_avx512_vector_abi_c.o -mavx512f
 		$ODIN test ../test_issue_avx512_vector_abi $COMMON_CHECK -target-features:avx512f
@@ -354,7 +354,7 @@ $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
 
 #########################################################################################################
 
-if [[ -v ISSUES_TESTS_NO_CLANG ]]; then
+if [[ ! -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	echo "!!! WARNING !!! Tests that require clang have been skipped"
 fi
 
