@@ -318,8 +318,9 @@ write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_wri
 	return
 }
 
-
-// writer append a quoted rune into the byte buffer, return the written size
+// Write a quoted (`'`) rune into `w`.
+//
+// Returns the total number of bytes written.
 write_quoted_rune :: proc(w: Writer, r: rune) -> (n: int) {
 	_write_byte :: #force_inline proc(w: Writer, c: byte) -> int {
 		err := write_byte(w, c)
