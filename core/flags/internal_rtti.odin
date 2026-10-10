@@ -567,6 +567,14 @@ get_field_name :: proc(field: reflect.Struct_Field) -> string {
 	return name
 }
 
+get_field_short :: proc(field: reflect.Struct_Field) -> (string, bool) {
+	if args_tag, ok := reflect.struct_tag_lookup(field.tag, TAG_ARGS); ok {
+		return get_struct_subtag(args_tag, SUBTAG_SHORT)
+	}
+
+	return "", false
+}
+
 get_field_pos :: proc(field: reflect.Struct_Field) -> (int, bool) {
 	if args_tag, ok := reflect.struct_tag_lookup(field.tag, TAG_ARGS); ok {
 		if pos_subtag, pos_ok := get_struct_subtag(args_tag, SUBTAG_POS); pos_ok {
@@ -591,6 +599,18 @@ get_field_by_name :: proc(model: ^$T, name: string) -> (result: reflect.Struct_F
 		.Missing_Flag,
 		fmt.tprintf("Unable to find any flag named `%s`.", name),
 	}
+	return
+}
+
+// Get a struct field by its `short` subtag.
+get_field_by_short :: proc(model: ^$T, name: string) -> (result: reflect.Struct_Field, index: int, ok: bool) {
+	for field, i in reflect.struct_fields_zipped(T) {
+		short := get_field_short(field) or_continue
+		if short == name {
+			return field, i, true
+		}
+	}
+
 	return
 }
 
