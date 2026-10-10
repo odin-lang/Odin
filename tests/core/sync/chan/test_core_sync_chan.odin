@@ -700,4 +700,55 @@ test_send_close_read :: proc(t: ^testing.T) {
 	thread.destroy(closer)
 }
 
+// Ensures every message sent on an unbuffered channel by concurrent senders
+// is received exactly once by concurrent receivers.
+@test
+test_unbuffered_many_senders_and_receivers :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	THREADS :: 4
+	PER     :: 1000
+
+	ch, alloc_err := chan.create(chan.Chan(int), context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	counts: [THREADS*PER]i32
+
+	Context :: struct {
+		id:     int,
+		ch:     chan.Chan(int),
+		counts: ^[THREADS*PER]i32,
+	}
+
+	senders, receivers: [THREADS]^thread.Thread
+	for i in 0..<THREADS {
+		ctx := Context{id = i, ch = ch, counts = &counts}
+		senders[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+			for j in 0..<PER {
+				assert(chan.send(ctx.ch, ctx.id*PER + j))
+			}
+		})
+		receivers[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+			for v in chan.recv(ctx.ch) {
+				sync.atomic_add(&ctx.counts[v], 1)
+			}
+		})
+	}
+
+	thread.join_multiple(..senders[:])
+	testing.expect(t, chan.close(ch))
+	thread.join_multiple(..receivers[:])
+	for tr in senders   { thread.destroy(tr) }
+	for tr in receivers { thread.destroy(tr) }
+
+	wrong := 0
+	for n in counts {
+		if n != 1 {
+			wrong += 1
+		}
+	}
+	testing.expect_value(t, wrong, 0)
+}
+
 
