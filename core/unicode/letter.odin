@@ -2,15 +2,50 @@ package unicode
 
 import "base:runtime"
 
-MAX_RUNE         :: '\U0010ffff' // Maximum valid unicode code point
-REPLACEMENT_CHAR :: '\ufffd'     // Represented an invalid code point
-MAX_ASCII        :: '\u007f'     // Maximum ASCII value
-MAX_LATIN1       :: '\u00ff'     // Maximum Latin-1 value
+/*
+The maximum valid Unicode code point, `U+10FFFF`.
+*/
+MAX_RUNE :: '\U0010ffff'
 
-ZERO_WIDTH_SPACE      :: '\u200B'
+/*
+`U+FFFD`, the replacement character, which stands in for a code point that is
+invalid or unrecognised.
+*/
+REPLACEMENT_CHAR :: '\ufffd'
+
+/*
+The highest code point in the ASCII range, `U+007F` (DEL).
+*/
+MAX_ASCII :: '\u007f'
+
+/*
+The highest code point in the Latin-1 range, `U+00FF`.
+*/
+MAX_LATIN1 :: '\u00ff'
+
+/*
+`U+200B`, the zero width space. It is not the same as `U+0020`: it has no
+width, and `[[is_space]]` does not consider it whitespace.
+*/
+ZERO_WIDTH_SPACE :: '\u200B'
+
+/*
+`U+200C`, the zero width non-joiner. It suppresses the ligature or joining
+form that would otherwise form between the characters on either side of it.
+*/
 ZERO_WIDTH_NON_JOINER :: '\u200C'
-ZERO_WIDTH_JOINER     :: '\u200D'
-WORD_JOINER           :: '\u2060'
+
+/*
+`U+200D`, the zero width joiner. It requests the ligature or joining form
+between the characters on either side of it.
+*/
+ZERO_WIDTH_JOINER :: '\u200D'
+
+/*
+`U+2060`, the word joiner. Marks a position at which a line break is not
+permitted.
+*/
+WORD_JOINER :: '\u2060'
 
 @(require_results)
 binary_search :: proc(c: $T, table: []T, length, stride: int, loc := #caller_location) -> int #no_bounds_check {
@@ -33,6 +68,39 @@ binary_search :: proc(c: $T, table: []T, length, stride: int, loc := #caller_loc
 	return -1
 }
 
+/*
+Converts the rune `r` to lower case, using the Unicode simple lower case mapping.
+
+The mapping is one rune to one rune: a character which expands to several runes
+under full case folding, such as `U+0130` (I with dot above), is not expanded and
+is returned unchanged.
+
+Inputs:
+- r: The rune to convert.
+
+Returns:
+The lower case equivalent of `r`, or `r` itself when no lower case mapping exists.
+
+Example:
+
+	import "core:fmt"
+	import "core:unicode"
+
+	to_lower_example :: proc() {
+		fmt.println(unicode.to_lower('A'))     // 'a'
+		fmt.println(unicode.to_lower('Z'))     // 'z'
+		fmt.println(unicode.to_lower('\u00C9')) // e with acute
+		fmt.println(unicode.to_lower('1'))     // '1'
+	}
+
+Output:
+
+	a
+	z
+	é
+	1
+
+*/
 @(require_results)
 to_lower :: proc(r: rune) -> rune #no_bounds_check {
 	c := i32(r)
@@ -46,6 +114,38 @@ to_lower :: proc(r: rune) -> rune #no_bounds_check {
 	}
 	return rune(c)
 }
+/*
+Converts the rune `r` to upper case, using the Unicode simple upper case mapping.
+
+As with [[to_lower]], the mapping is one rune to one rune, so runes which expand
+to several runes are returned unchanged.
+
+Inputs:
+- r: The rune to convert.
+
+Returns:
+The upper case equivalent of `r`, or `r` itself when no upper case mapping exists.
+
+Example:
+
+	import "core:fmt"
+	import "core:unicode"
+
+	to_upper_example :: proc() {
+		fmt.println(unicode.to_upper('a'))     // 'A'
+		fmt.println(unicode.to_upper('z'))     // 'Z'
+		fmt.println(unicode.to_upper('\u00E9')) // E with acute
+		fmt.println(unicode.to_upper('1'))     // '1'
+	}
+
+Output:
+
+	A
+	Z
+	É
+	1
+
+*/
 @(require_results)
 to_upper :: proc(r: rune) -> rune #no_bounds_check {
 	c := i32(r)
@@ -70,6 +170,35 @@ to_title :: proc(r: rune) -> rune #no_bounds_check {
 }
 
 
+/*
+Returns whether the rune `r` is a lower case letter.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is in the Unicode general category Ll, `false` otherwise.
+
+Example:
+
+	import "core:fmt"
+	import "core:unicode"
+
+	is_lower_example :: proc() {
+		fmt.println(unicode.is_lower('a'))       // true
+		fmt.println(unicode.is_lower('A'))       // false
+		fmt.println(unicode.is_lower('\u00E0')) // true, a with grave
+		fmt.println(unicode.is_lower('1'))       // false
+	}
+
+Output:
+
+	true
+	false
+	true
+	false
+
+*/
 @(require_results)
 is_lower :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
@@ -78,6 +207,35 @@ is_lower :: proc(r: rune) -> bool #no_bounds_check {
 	return in_range(r, ll_ranges) || in_range(r, other_lowercase_ranges)
 }
 
+/*
+Returns whether the rune `r` is an upper case letter.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is in the Unicode general category Lu, `false` otherwise.
+
+Example:
+
+	import "core:fmt"
+	import "core:unicode"
+
+	is_upper_example :: proc() {
+		fmt.println(unicode.is_upper('A'))       // true
+		fmt.println(unicode.is_upper('a'))       // false
+		fmt.println(unicode.is_upper('\u00C9')) // true, E with acute
+		fmt.println(unicode.is_upper('1'))       // false
+	}
+
+Output:
+
+	true
+	false
+	true
+	false
+
+*/
 @(require_results)
 is_upper :: proc(r: rune) -> bool #no_bounds_check {
 	if r <= MAX_ASCII {
