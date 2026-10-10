@@ -1302,6 +1302,10 @@ gb_internal void check_link_name_uses(Checker *c) {
 			first = u;
 			continue;
 		}
+		if (build_context.workspace) {
+			// packages checked together may be of different programs, so a link name may be used by each
+			continue;
+		}
 
 		Entity *e = u->entity;
 		Entity *f = first->entity;

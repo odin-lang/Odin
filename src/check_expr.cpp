@@ -5918,6 +5918,7 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 			Token token = {Token_Integer};
 			token.string = copy_string(permanent_allocator(), make_string_c(gb_bprintf("%td", i)));
 			token.pos    = ast_token(nodes[i]).pos;
+			token.flags  = TokenFlag_Synthesized;
 
 			Ast *index = alloc_ast_node(f, Ast_BasicLit);
 			index->BasicLit.token = token;

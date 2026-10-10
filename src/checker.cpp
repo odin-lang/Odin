@@ -1717,6 +1717,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->entity_queue,     global_thread_pool.threads.count);
 	i->entities_by_file = true;
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->semantic_ident_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->semantic_when_queue,  global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_atomics_queue,   global_thread_pool.threads.count);
@@ -1755,6 +1757,8 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	per_thread_array_destroy(&i->entity_queue);
 	per_thread_array_destroy(&i->definition_queue);
+	per_thread_array_destroy(&i->semantic_ident_queue);
+	per_thread_array_destroy(&i->semantic_when_queue);
 	per_thread_array_destroy(&i->checked_bodies_queue);
 	per_thread_array_destroy(&i->checked_calls_queue);
 	per_thread_array_destroy(&i->checked_atomics_queue);
@@ -2133,6 +2137,13 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	}
 }
 
+gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
+	Token const &token = identifier->Ident.token;
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && (token.flags & TokenFlag_Synthesized) == 0) {
+		per_thread_array_add(&i->semantic_ident_queue, SemanticIdent{entity, token.pos.file_id, token.pos.offset, definition});
+	}
+}
+
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
 	if (identifier->kind != Ast_Ident) {
@@ -2146,6 +2157,7 @@ gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
 	per_thread_array_add(&i->definition_queue, entity);
+	add_semantic_ident(i, identifier, entity, true);
 }
 
 gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
@@ -2259,6 +2271,9 @@ gb_internal bool add_entity(CheckerContext *c, Scope *scope, Ast *identifier, En
 gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 	if (entity == nullptr) {
 		return;
+	}
+	if (identifier != nullptr && identifier->kind == Ast_Ident) {
+		add_semantic_ident(c->info, identifier, entity, false);
 	}
 	if ((entity->flags & EntityFlag_Disabled) && identifier != nullptr && c->decl != nullptr) {
 		// calls to a disabled procedure are dropped, but its value may still be taken
@@ -5176,6 +5191,9 @@ gb_internal void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhe
 
 		ws->is_cond_determined = true;
 		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+		if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+			per_thread_array_add(&c->info->semantic_when_queue, SemanticWhen{ws, ws->determined_cond});
+		}
 	}
 
 	if (ws->body == nullptr || ws->body->kind != Ast_BlockStmt) {
@@ -7781,6 +7799,11 @@ gb_internal bool check_unique_package_names(Checker *c) {
 		}
 
 		ok = false;
+
+		if (build_context.workspace) {
+			// packages checked together may be of different programs, so a name may be used by each
+			continue;
+		}
 
 		begin_error_block();
 		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));

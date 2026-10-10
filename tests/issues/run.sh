@@ -304,6 +304,12 @@ else
 	exit 1
 fi
 
+$ODIN check ../test_pr_7848/pkg_b ../test_pr_7848/pkg_a -no-entry-point -workspace -overlay:../test_pr_7848/overlay.json $COMMON_CHECK -export-semantics:json -export-semantics-file:pr_7848.json
+$ODIN check ../test_pr_7848/pkg_b ../test_pr_7848/pkg_a -no-entry-point -workspace -overlay:../test_pr_7848/overlay.json $COMMON_CHECK -export-semantics:cbor -export-semantics-file:pr_7848.cbor
+$ODIN check ../test_pr_7848/pkg_b ../test_pr_7848/pkg_a -no-entry-point -workspace -overlay:../test_pr_7848/overlay.json $COMMON_CHECK -export-semantics:cbor -export-semantics-file:pr_7848_again.cbor
+cmp pr_7848.cbor pr_7848_again.cbor
+$ODIN test ../test_pr_7848 $COMMON
+
 if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
 	$ODIN test ../test_issue_7010 $COMMON
