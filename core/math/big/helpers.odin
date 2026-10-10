@@ -13,7 +13,9 @@ import "base:runtime"
 */
 
 /*
-	Deallocates the backing memory of one or more `Int`s.
+	Zeros the full backing storage of one or more `Int`s and deallocates it
+	using each dynamic array's own allocator. Resets each `Int` to its zero
+	value, so repeated destruction is safe and the `Int` can be reused.
 */
 int_destroy :: proc(integers: ..^Int) {
 	integers := integers
