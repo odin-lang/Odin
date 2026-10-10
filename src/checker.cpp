@@ -2137,6 +2137,13 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	}
 }
 
+gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
+	Token const &token = identifier->Ident.token;
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && (token.flags & TokenFlag_Synthesized) == 0) {
+		per_thread_array_add(&i->semantic_ident_queue, SemanticIdent{entity, token.pos.file_id, token.pos.offset, definition});
+	}
+}
+
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
 	if (identifier->kind != Ast_Ident) {
@@ -2150,9 +2157,7 @@ gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
 	per_thread_array_add(&i->definition_queue, entity);
-	if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
-		per_thread_array_add(&i->semantic_ident_queue, SemanticIdent{identifier, entity, true});
-	}
+	add_semantic_ident(i, identifier, entity, true);
 }
 
 gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
@@ -2267,8 +2272,8 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (entity == nullptr) {
 		return;
 	}
-	if (identifier != nullptr && identifier->kind == Ast_Ident && build_context.export_semantics_format != SemanticsFormat_Invalid) {
-		per_thread_array_add(&c->info->semantic_ident_queue, SemanticIdent{identifier, entity, false});
+	if (identifier != nullptr && identifier->kind == Ast_Ident) {
+		add_semantic_ident(c->info, identifier, entity, false);
 	}
 	if ((entity->flags & EntityFlag_Disabled) && identifier != nullptr && c->decl != nullptr) {
 		// calls to a disabled procedure are dropped, but its value may still be taken

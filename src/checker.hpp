@@ -776,8 +776,9 @@ struct RaddbgTypeView {
 };
 
 struct SemanticIdent {
-	Ast *   ident;
 	Entity *entity;
+	i32     file_id;
+	i32     offset;
 	bool    definition;
 };
 

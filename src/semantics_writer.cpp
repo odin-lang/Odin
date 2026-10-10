@@ -118,30 +118,35 @@ gb_internal void sw_array_end(SemanticsWriter *w) {
 
 gb_internal void sw_string(SemanticsWriter *w, String s) {
 	switch (w->format) {
-	case SemanticsFormat_Json:
+	case SemanticsFormat_Json: {
 		sw_json_value(w);
 		sw_bytes(w, "\"", 1);
+		isize run = 0;
 		for (isize i = 0; i < s.len; i++) {
 			u8 c = s[i];
+			if (c >= 0x20 && c != '"' && c != '\\') {
+				continue;
+			}
+			sw_bytes(w, s.text+run, i-run);
+			run = i+1;
 			switch (c) {
 			case '"':  sw_bytes(w, "\\\"", 2); break;
 			case '\\': sw_bytes(w, "\\\\", 2); break;
 			case '\n': sw_bytes(w, "\\n",  2); break;
 			case '\r': sw_bytes(w, "\\r",  2); break;
 			case '\t': sw_bytes(w, "\\t",  2); break;
-			default:
-				if (c < 0x20) {
-					char escape[8] = {};
-					gb_snprintf(escape, gb_size_of(escape), "\\u%04x", c);
-					sw_bytes(w, escape, 6);
-				} else {
-					sw_bytes(w, &c, 1);
-				}
+			default: {
+				char escape[8] = {};
+				gb_snprintf(escape, gb_size_of(escape), "\\u%04x", c);
+				sw_bytes(w, escape, 6);
 				break;
 			}
+			}
 		}
+		sw_bytes(w, s.text+run, s.len-run);
 		sw_bytes(w, "\"", 1);
 		break;
+	}
 	case SemanticsFormat_Cbor:
 		sw_cbor_head(w, CborMajor_Text, s.len);
 		sw_bytes(w, s.text, s.len);
@@ -172,7 +177,7 @@ gb_internal void sw_int(SemanticsWriter *w, i64 value) {
 	case SemanticsFormat_Json: {
 		sw_json_value(w);
 		char digits[32] = {};
-		gb_snprintf(digits, gb_size_of(digits), "%lld", cast(long long)value);
+		gb_i64_to_str(value, digits, 10);
 		sw_bytes(w, digits, gb_strlen(digits));
 		break;
 	}
@@ -193,19 +198,14 @@ gb_internal void sw_int(SemanticsWriter *w, i64 value) {
 struct SemanticsIdent {
 	i32  file;
 	i32  offset;
-	i32  entity;
+	i32  entity; // index into the entities before they are sorted
 	bool definition;
 };
 
-gb_internal GB_COMPARE_PROC(semantics_ident_cmp) {
-	SemanticsIdent const *x = cast(SemanticsIdent const *)a;
-	SemanticsIdent const *y = cast(SemanticsIdent const *)b;
-	if (x->file       != y->file)       { return x->file       < y->file       ? -1 : +1; }
-	if (x->offset     != y->offset)     { return x->offset     < y->offset     ? -1 : +1; }
-	if (x->definition != y->definition) { return x->definition < y->definition ? -1 : +1; }
-	if (x->entity     != y->entity)     { return x->entity     < y->entity     ? -1 : +1; }
-	return 0;
-}
+enum : u64 {
+	SEMANTICS_KEY_DEFINITION = 1ull<<31,
+	SEMANTICS_KEY_ENTITY     = SEMANTICS_KEY_DEFINITION-1,
+};
 
 struct SemanticsRange {
 	i32 file;
@@ -226,26 +226,29 @@ gb_internal GB_COMPARE_PROC(semantics_file_id_cmp) {
 }
 
 struct SemanticsEntity {
-	Entity *e;
-	i32     file_id;
-	String  path;
-	String  type;
+	Entity *   e;
+	EntityKind kind;
+	i32        file_id;
+	i32        file_rank; // the file's position when sorted by path, -1 when there is none
+	i32        offset;
+	i32        index;     // its position before sorting
+	i32        type_index;
+	String     type;
 };
 
 gb_internal GB_COMPARE_PROC(semantics_entity_cmp) {
 	SemanticsEntity const *x = cast(SemanticsEntity const *)a;
 	SemanticsEntity const *y = cast(SemanticsEntity const *)b;
-	int c = string_compare(x->path, y->path);
-	if (c != 0) {
-		return c;
+	if (x->file_rank != y->file_rank) {
+		return x->file_rank < y->file_rank ? -1 : +1;
 	}
-	if (x->e->token.pos.offset != y->e->token.pos.offset) {
-		return x->e->token.pos.offset < y->e->token.pos.offset ? -1 : +1;
+	if (x->offset != y->offset) {
+		return x->offset < y->offset ? -1 : +1;
 	}
-	if (x->e->kind != y->e->kind) {
-		return x->e->kind < y->e->kind ? -1 : +1;
+	if (x->kind != y->kind) {
+		return x->kind < y->kind ? -1 : +1;
 	}
-	c = string_compare(x->e->token.string, y->e->token.string);
+	int c = string_compare(x->e->token.string, y->e->token.string);
 	if (c != 0) {
 		return c;
 	}
@@ -255,26 +258,26 @@ gb_internal GB_COMPARE_PROC(semantics_entity_cmp) {
 gb_internal char const *semantics_entity_kind(Entity *e) {
 	switch (e->kind) {
 	case Entity_Constant:
-		return "constant";
+		return "Constant";
 	case Entity_Variable:
 		if (e->flags & EntityFlag_Field) {
-			return "field";
+			return "Field";
 		}
 		if (e->flags & EntityFlag_Param) {
-			return "parameter";
+			return "Parameter";
 		}
-		return "variable";
-	case Entity_TypeName:    return "type";
-	case Entity_Procedure:   return "procedure";
-	case Entity_ProcGroup:   return "group";
-	case Entity_Builtin:     return "builtin";
-	case Entity_ImportName:  return "import";
-	case Entity_LibraryName: return "library";
-	case Entity_Nil:         return "nil";
-	case Entity_Label:       return "label";
-	case Entity_AsmTemplate: return "asm";
+		return "Variable";
+	case Entity_TypeName:    return "Type";
+	case Entity_Procedure:   return "Procedure";
+	case Entity_ProcGroup:   return "Group";
+	case Entity_Builtin:     return "Builtin";
+	case Entity_ImportName:  return "Import";
+	case Entity_LibraryName: return "Library";
+	case Entity_Nil:         return "Nil";
+	case Entity_Label:       return "Label";
+	case Entity_AsmTemplate: return "Asm";
 	}
-	return "invalid";
+	return "Invalid";
 }
 
 gb_internal bool semantics_has_layout(Entity *e) {
@@ -297,6 +300,19 @@ gb_internal bool semantics_has_layout(Entity *e) {
 		return true;
 	}
 	return false;
+}
+
+gb_internal void semantics_type_strings(SemanticsEntity *items, isize count) {
+	for (isize i = 0; i < count; i++) {
+		Entity *e = items[i].e;
+		Type *type = e->type;
+		if (e->kind == Entity_TypeName && type != nullptr) {
+			type = base_type(type);
+		}
+		if (type != nullptr && type != t_invalid) {
+			items[i].type = make_string_c(type_to_string(type, permanent_allocator()));
+		}
+	}
 }
 
 gb_internal bool semantics_file_exported(Array<bool> const &exported, i32 file_id) {
@@ -356,38 +372,65 @@ gb_internal void export_semantics(Checker *c) {
 	map_init(&entity_index, 1024);
 	defer (map_destroy(&entity_index));
 
-	auto entities = array_make<SemanticsEntity>(heap_allocator());
+	auto entities        = array_make<SemanticsEntity>(heap_allocator());
+	auto exported_idents = array_make<SemanticsIdent>(heap_allocator(), 0, idents.count);
 	defer (array_free(&entities));
+	defer (array_free(&exported_idents));
 
 	for (SemanticIdent const &si : idents) {
-		Token token = si.ident->Ident.token;
-		if ((token.flags & TokenFlag_Synthesized) != 0 || !semantics_file_exported(exported, token.pos.file_id)) {
-			continue;
-		}
-
 		Entity *e = si.entity;
-		if (e == nullptr || e->kind == Entity_Invalid || map_get(&entity_index, e) != nullptr) {
+		if (!semantics_file_exported(exported, si.file_id) || e == nullptr || e->kind == Entity_Invalid) {
 			continue;
 		}
 
-		map_set(&entity_index, e, cast(i32)0);
+		i32 index = cast(i32)entities.count;
+		if (i32 *found = map_get(&entity_index, e)) {
+			index = *found;
+		} else {
+			map_set(&entity_index, e, index);
 
-		SemanticsEntity se = {};
-		se.e = e;
-		if ((e->token.flags & TokenFlag_Synthesized) == 0 && e->token.pos.file_id > 0 && e->token.pos.file_id < file_index.count) {
-			se.file_id = e->token.pos.file_id;
-			se.path    = get_file_path_string(se.file_id);
+			SemanticsEntity se = {};
+			se.e         = e;
+			se.kind      = e->kind;
+			se.file_rank = -1;
+			se.offset    = e->token.pos.offset;
+			se.index     = index;
+			if ((e->token.flags & TokenFlag_Synthesized) == 0 && e->token.pos.file_id > 0 && e->token.pos.file_id < file_index.count) {
+				se.file_id = e->token.pos.file_id;
+			}
+			array_add(&entities, se);
 		}
 
-		Type *type = e->type;
-		if (e->kind == Entity_TypeName && type != nullptr) {
-			type = base_type(type);
-		}
+		SemanticsIdent ident = {};
+		ident.file       = file_index[si.file_id];
+		ident.offset     = si.offset;
+		ident.entity     = index;
+		ident.definition = si.definition;
+		array_add(&exported_idents, ident);
+	}
 
-		if (type != nullptr && type != t_invalid) {
-			se.type = make_string_c(type_to_string(type, permanent_allocator()));
+	thread_pool_for_chunks(entities.data, entities.count, 256, semantics_type_strings);
+
+	{ // rank the entities' files by path
+		auto file_rank = array_make<i32>(heap_allocator(), global_files.count);
+		auto ranked    = array_make<i32>(heap_allocator());
+		defer (array_free(&file_rank));
+		defer (array_free(&ranked));
+		for (SemanticsEntity const &se : entities) {
+			if (se.file_id > 0 && file_rank[se.file_id] == 0) {
+				file_rank[se.file_id] = 1;
+				array_add(&ranked, se.file_id);
+			}
 		}
-		array_add(&entities, se);
+		array_sort(ranked, semantics_file_id_cmp);
+		for_array(i, ranked) {
+			file_rank[ranked[i]] = cast(i32)i;
+		}
+		for (SemanticsEntity &se : entities) {
+			if (se.file_id > 0) {
+				se.file_rank = file_rank[se.file_id];
+			}
+		}
 	}
 	array_sort(entities, semantics_entity_cmp);
 
@@ -395,49 +438,66 @@ gb_internal void export_semantics(Checker *c) {
 	string_map_init(&type_index);
 	defer (string_map_destroy(&type_index));
 
-	auto types = array_make<String>(heap_allocator());
-	defer (array_free(&types));
-
+	auto types  = array_make<String>         (heap_allocator());
 	auto unique = array_make<SemanticsEntity>(heap_allocator());
+	auto remap  = array_make<i32>            (heap_allocator(), entities.count);
+	defer (array_free(&types));
 	defer (array_free(&unique));
+	defer (array_free(&remap));
 
 	for (SemanticsEntity const &se : entities) {
 		if (unique.count == 0 || semantics_entity_cmp(&se, &unique[unique.count-1]) != 0) {
-			array_add(&unique, se);
+			SemanticsEntity u = se;
+			u.type_index = -1;
 			if (se.file_id > 0 && file_index[se.file_id] < 0) {
 				file_index[se.file_id] = cast(i32)files.count;
 				array_add(&files, se.file_id);
 			}
-			if (se.type.len > 0 && string_map_get(&type_index, se.type) == nullptr) {
-				string_map_set(&type_index, se.type, cast(i32)types.count);
-				array_add(&types, se.type);
+			if (se.type.len > 0) {
+				if (i32 *found = string_map_get(&type_index, se.type)) {
+					u.type_index = *found;
+				} else {
+					u.type_index = cast(i32)types.count;
+					string_map_set(&type_index, se.type, u.type_index);
+					array_add(&types, se.type);
+				}
 			}
+			array_add(&unique, u);
 		}
-		map_set(&entity_index, se.e, cast(i32)unique.count-1);
+		remap[se.index] = cast(i32)unique.count-1;
 	}
 
-	auto exported_idents = array_make<SemanticsIdent>(heap_allocator(), 0, idents.count);
-	defer (array_free(&exported_idents));
+	auto file_starts = array_make<isize>(heap_allocator(), exported_count+1);
+	auto keys        = array_make<u64> (heap_allocator(), exported_idents.count);
+	auto temp        = array_make<u64> (heap_allocator(), exported_idents.count);
+	defer (array_free(&file_starts));
+	defer (array_free(&keys));
+	defer (array_free(&temp));
 
-	for (SemanticIdent const &si : idents) {
-		Token token = si.ident->Ident.token;
-		if ((token.flags & TokenFlag_Synthesized) != 0 || !semantics_file_exported(exported, token.pos.file_id)) {
-			continue;
-		}
-
-		i32 *entity = map_get(&entity_index, si.entity);
-		if (entity == nullptr) {
-			continue;
-		}
-
-		SemanticsIdent ident = {};
-		ident.file       = file_index[token.pos.file_id];
-		ident.offset     = token.pos.offset;
-		ident.entity     = *entity;
-		ident.definition = si.definition;
-		array_add(&exported_idents, ident);
+	for (SemanticsIdent const &x : exported_idents) {
+		file_starts[x.file+1] += 1;
 	}
-	array_sort(exported_idents, semantics_ident_cmp);
+	for (isize i = 0; i < exported_count; i++) {
+		file_starts[i+1] += file_starts[i];
+	}
+	{
+		auto next = array_make<isize>(heap_allocator(), exported_count);
+		defer (array_free(&next));
+		for (isize i = 0; i < exported_count; i++) {
+			next[i] = file_starts[i];
+		}
+		for (SemanticsIdent const &x : exported_idents) {
+			u64 key = (cast(u64)x.offset << 32) | cast(u64)remap[x.entity];
+			if (x.definition) {
+				key |= SEMANTICS_KEY_DEFINITION;
+			}
+			keys[next[x.file]++] = key;
+		}
+	}
+	for (isize i = 0; i < exported_count; i++) {
+		isize start = file_starts[i];
+		gb_radix_sort(u64)(keys.data + start, temp.data + start, file_starts[i+1] - start);
+	}
 
 	PtrMap<AstWhenStmt *, u8> when_taken = {};
 	map_init(&when_taken, 64);
@@ -527,10 +587,6 @@ gb_internal void export_semantics(Checker *c) {
 			file   = file_index[se.file_id];
 			offset = e->token.pos.offset;
 		}
-		i32 type = -1;
-		if (se.type.len > 0) {
-			type = *string_map_get(&type_index, se.type);
-		}
 		String pkg = {};
 		if (e->pkg != nullptr) {
 			pkg = e->pkg->name;
@@ -542,7 +598,7 @@ gb_internal void export_semantics(Checker *c) {
 		sw_key(&w, "pkg");    sw_string(&w, pkg);
 		sw_key(&w, "file");   sw_int(&w, file);
 		sw_key(&w, "offset"); sw_int(&w, offset);
-		sw_key(&w, "type");   sw_int(&w, type);
+		sw_key(&w, "type");   sw_int(&w, se.type_index);
 		if (value.len > 0) {
 			sw_key(&w, "value"); sw_string(&w, value);
 		}
@@ -568,18 +624,17 @@ gb_internal void export_semantics(Checker *c) {
 	sw_key(&w, "exported");
 	sw_array(&w, exported_count);
 
-	isize next_ident = 0;
 	isize next_range = 0;
 	for (i32 file = 0; file < exported_count; file++) {
-		isize first_ident      = next_ident;
+		isize first_ident      = file_starts[file];
+		isize end_ident        = file_starts[file+1];
 		isize use_count        = 0;
 		isize definition_count = 0;
-		for (/**/; next_ident < exported_idents.count && exported_idents[next_ident].file == file; next_ident++) {
-			SemanticsIdent const &x = exported_idents[next_ident];
-			if (next_ident > first_ident && semantics_ident_cmp(&x, &exported_idents[next_ident-1]) == 0) {
+		for (isize i = first_ident; i < end_ident; i++) {
+			if (i > first_ident && keys[i] == keys[i-1]) {
 				continue;
 			}
-			if (x.definition) {
+			if ((keys[i] & SEMANTICS_KEY_DEFINITION) != 0) {
 				definition_count += 1;
 			} else {
 				use_count += 1;
@@ -603,13 +658,13 @@ gb_internal void export_semantics(Checker *c) {
 				sw_key(&w, "uses");
 				sw_array(&w, 2*use_count);
 			}
-			for (isize i = first_ident; i < next_ident; i++) {
-				SemanticsIdent const &x = exported_idents[i];
-				if (x.definition != definitions || (i > first_ident && semantics_ident_cmp(&x, &exported_idents[i-1]) == 0)) {
+			for (isize i = first_ident; i < end_ident; i++) {
+				bool definition = (keys[i] & SEMANTICS_KEY_DEFINITION) != 0;
+				if (definition != definitions || (i > first_ident && keys[i] == keys[i-1])) {
 					continue;
 				}
-				sw_int(&w, x.offset);
-				sw_int(&w, x.entity);
+				sw_int(&w, cast(i64)(keys[i] >> 32));
+				sw_int(&w, cast(i64)(keys[i] & SEMANTICS_KEY_ENTITY));
 			}
 			sw_array_end(&w);
 		}
