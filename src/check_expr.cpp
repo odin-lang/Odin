@@ -1425,7 +1425,8 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		if (is_type_union(elem_type) && !is_type_untyped_nil(operand->type)) {
 			target_type = elem_type;
 		}
-		if (type == nullptr || is_type_any(elem_type)) {
+		if (type == nullptr || is_type_any(type) ||
+		    (is_type_any(elem_type) && !is_type_untyped_nil(operand->type) && !is_type_untyped_uninit(operand->type))) {
 			if (type == nullptr && is_type_untyped_uninit(operand->type)) {
 				String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
 
