@@ -2871,6 +2871,94 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 	return t_invalid;
 }
 
+gb_internal Array<Operand> poly_operands_with_definite_types(CheckerContext *c, TypeProc *pt, Array<Operand> const &operands) {
+	Array<Operand> result = {};
+	if (pt->params == nullptr) {
+		return result;
+	}
+	Slice<Entity *> const &params = pt->params->Tuple.variables;
+	isize n = gb_min(params.count, operands.count);
+
+	auto is_untyped_declaring_generic = [&](isize i) -> bool {
+		Entity *p = params[i];
+		Operand const &o = operands[i];
+		if (p->kind != Entity_Variable || p->type->kind != Type_Generic) {
+			return false;
+		}
+		if (!o.deferred_untyped_arg && !(is_operand_value(o) && is_type_untyped(o.type))) {
+			return false;
+		}
+
+		// NOTE(bill): `$T` is written after the names of the parameters it declares
+		Entity *te = poly_generic_entity(p->type);
+		if (te == nullptr || te->token.pos <= p->token.pos) {
+			return false;
+		}
+		for (isize k = 0; k < i; k++) {
+			if (params[k]->type == p->type) {
+				return false;
+			}
+		}
+		return true;
+	};
+
+	bool any_untyped = false;
+	for (isize i = 0; i < n; i++) {
+		if (is_untyped_declaring_generic(i)) {
+			any_untyped = true;
+			break;
+		}
+	}
+	if (!any_untyped) {
+		return result;
+	}
+
+	PolySubst subst = {};
+	subst.items.allocator = temporary_allocator();
+	for (isize i = 0; i < n; i++) {
+		Entity *p = params[i];
+		Operand const &o = operands[i];
+		bool definite = false;
+		if (p->kind == Entity_TypeName) {
+			definite = o.mode == Addressing_Type;
+		} else if (p->kind == Entity_Variable) {
+			definite = !o.deferred_untyped_arg && is_operand_value(o) && is_type_typed(o.type);
+		}
+		if (!definite || !is_type_polymorphic(p->type) || is_type_polymorphic(o.type)) {
+			continue;
+		}
+		PolySubst one = {};
+		one.items.allocator = temporary_allocator();
+		if (subst_unify(c, p->type, o.type, &one) == Subst_Matched) {
+			for (PolyBinding const &b : one.items) {
+				poly_subst_add(&subst, b.key, b);
+			}
+		}
+	}
+
+	for (isize i = 0; i < n; i++) {
+		if (!is_untyped_declaring_generic(i)) {
+			continue;
+		}
+		PolyBinding *b = poly_subst_find(&subst, poly_generic_entity(params[i]->type));
+		if (b == nullptr || b->kind != PolyBind_Type) {
+			continue;
+		}
+		if (!operands[i].deferred_untyped_arg && are_types_identical(b->type, default_type(operands[i].type))) {
+			continue;
+		}
+		if (result.data == nullptr) {
+			result = array_make<Operand>(temporary_allocator(), operands.count);
+			array_copy(&result, operands, 0);
+		}
+		Operand bound = {Addressing_Value};
+		bound.type = b->type;
+		bound.expr = operands[i].expr;
+		result[i] = bound;
+	}
+	return result;
+}
+
 gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 	if (expr == nullptr) {
 		return false;

@@ -55,3 +55,52 @@ test_type_inference_in_min_max_clamp :: proc(t: ^testing.T) {
 	x: E = min(.B, .C)
 	testing.expect_value(t, x, E.B)
 }
+
+@test
+test_type_inference_of_implicit_selectors_against_arrays :: proc(t: ^testing.T) {
+	E :: enum {A, B, C}
+
+	a: [3]E = .B
+	testing.expect_value(t, a, [3]E{.B, .B, .B})
+	testing.expect(t, a == .B)
+
+	b: [2][2]E = .C
+	testing.expect_value(t, b[1][0], E.C)
+
+	second :: proc(x: [2]E) -> E { return x[1] }
+	testing.expect_value(t, second(.A), E.A)
+}
+
+@test
+test_type_inference_of_polymorphic_types_from_later_arguments :: proc(t: ^testing.T) {
+	E :: enum {A, B, C}
+	second :: proc(a: $T, b: T) -> T { return b }
+
+	e := E.C
+	testing.expect_value(t, second(.A, e),          E.C)
+	testing.expect_value(t, second(b = e, a = .A), E.C)
+
+	x: f32 = 0.5
+	y := second(1, x)
+	#assert(type_of(y) == f32)
+	testing.expect_value(t, y, 0.5)
+
+	v := [2]f32{1, 2}
+	testing.expect_value(t, second({3, 4}, v), v)
+
+	p := new(int)
+	defer free(p)
+	testing.expect_value(t, second(nil, p), p)
+
+	#assert(type_of(second(1, 2.0)) == int)
+
+	member_any    :: proc(a: int, b: any) -> int { return 1 }
+	member_poly   :: proc(a: $T, b: T) -> int { return 2 }
+	member_string :: proc(s: string) -> int { return 3 }
+	group_any    :: proc{member_any, member_poly}
+	group_string :: proc{member_string, member_poly}
+
+	f: f64 = 2.5
+	testing.expect_value(t, group_any(1, f),    1)
+	testing.expect_value(t, group_string(1, f), 2)
+}

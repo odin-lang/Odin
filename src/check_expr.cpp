@@ -47,16 +47,19 @@ struct CallArgumentData {
 	Entity *gen_entity;
 	i64     score;
 	Type *  result_type;
+	bool    bound_by_later_arg;
 };
 
 struct PolyProcData {
 	Entity *  gen_entity;
 	ProcInfo *proc_info;
+	bool      bound_by_later_arg;
 };
 
 struct ValidIndexAndScore {
 	isize index;
 	i64   score;
+	bool  bound_by_later_arg;
 };
 
 gb_internal int valid_index_and_score_cmp(void const *a, void const *b) {
@@ -126,6 +129,7 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr);
 
 gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands);
+gb_internal Array<Operand> poly_operands_with_definite_types(CheckerContext *c, TypeProc *pt, Array<Operand> const &operands);
 
 gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finish);
 
@@ -658,6 +662,13 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	Array<Operand> operands = {};
 	if (param_operands) {
 		operands = *param_operands;
+		Array<Operand> bound = poly_operands_with_definite_types(old_c, &src->Proc, operands);
+		if (bound.data != nullptr) {
+			operands = bound;
+			if (poly_proc_data) {
+				poly_proc_data->bound_by_later_arg = true;
+			}
+		}
 	} else {
 		operands = array_make<Operand>(a, 0, dst->Proc.param_count);
 		for (isize i = 0; i < dst->Proc.param_count; i++) {
@@ -7047,6 +7058,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 	Type *final_proc_type = proc_type;
 	Entity *gen_entity = nullptr;
+	bool bound_by_later_arg = false;
 
 	if (vari_expand && !variadic) {
 		if (show_error) {
@@ -7378,6 +7390,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			PolyProcData poly_proc_data = {};
 			if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
 				gen_entity = poly_proc_data.gen_entity;
+				bound_by_later_arg = poly_proc_data.bound_by_later_arg;
 				Type *gept = base_type(proc_entity_full_type(gen_entity));
 				GB_ASSERT(is_type_proc(gept));
 				final_proc_type = proc_entity_full_type(gen_entity);
@@ -7504,6 +7517,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
+		data->bound_by_later_arg = bound_by_later_arg;
 
 
 		Ast *proc_lit = nullptr;
@@ -8076,6 +8090,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 			ValidIndexAndScore item = {};
 			item.score = data.score;
+			item.bound_by_later_arg = data.bound_by_later_arg;
 
 			if (data.gen_entity != nullptr) {
 				array_add(&proc_entities, data.gen_entity);
@@ -8121,6 +8136,16 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 	}
 	c->in_proc_group = false;
+
+	isize direct_count = 0;
+	for (ValidIndexAndScore const &v : valids) {
+		if (!v.bound_by_later_arg) {
+			valids[direct_count++] = v;
+		}
+	}
+	if (direct_count > 0) {
+		valids.count = direct_count;
+	}
 
 	if (max_matched_features > 0) {
 		for_array(i, valids) {
