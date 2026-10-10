@@ -4,8 +4,8 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
-COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native"
-COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables"
+COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native"
+COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings"
 
 set -x
 
@@ -273,6 +273,21 @@ $ODIN run ../test_issue_7482 $COMMON
 $ODIN run ../test_issue_7564 $COMMON
 $ODIN run ../test_issue_7596 $COMMON
 $ODIN run ../test_issue_7798 $COMMON
+
+#########################################################################################################
+
+#
+# Test clang - improve error message for users that don't have it.
+#
+
+if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
+	if ! clang --version; then
+		set +x
+		echo "ERROR: clang not working. This is required for some tests."
+		echo "You can disable tests that require clang:  export ISSUES_TESTS_NO_CLANG=1"
+		exit 1
+	fi
+fi
 
 #########################################################################################################
 
