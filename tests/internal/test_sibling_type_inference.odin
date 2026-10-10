@@ -104,3 +104,17 @@ test_type_inference_of_polymorphic_types_from_later_arguments :: proc(t: ^testin
 	testing.expect_value(t, group_any(1, f),    1)
 	testing.expect_value(t, group_string(1, f), 2)
 }
+
+@test
+test_type_inference_of_polymorphic_records_from_literal_fields :: proc(t: ^testing.T) {
+	Pair :: struct($T: typeid) {a, b: T}
+	KV   :: struct($K, $V: typeid) {k: K, v: V}
+	second :: proc(p: Pair($T)) -> T { return p.b }
+	value  :: proc(kv: KV($K, $V)) -> V { return kv.v }
+
+	x := second({1, 2})
+	#assert(type_of(x) == int)
+	testing.expect_value(t, x, 2)
+	testing.expect_value(t, second({b = 2.5}), 2.5)
+	testing.expect_value(t, value({"a", 3}), 3)
+}

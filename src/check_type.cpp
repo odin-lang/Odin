@@ -2665,7 +2665,28 @@ gb_internal bool ast_is_context_free_constant(Ast *e) {
 	return false;
 }
 
-gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Type *poly_type, Ast *expr) {
+gb_internal Type *context_free_constant_type(CheckerContext *ctx, Ast *e) {
+	if (!ast_is_context_free_constant(e)) {
+		return nullptr;
+	}
+	Operand o = {};
+	Ast *trial = clone_ast(e);
+	i64 muted_before = error_mute_count();
+	begin_error_mute();
+	check_expr(ctx, &o, trial);
+	end_error_mute();
+	if (o.mode == Addressing_Invalid || o.type == nullptr || o.type == t_invalid ||
+	    error_mute_count() != muted_before) {
+		return nullptr;
+	}
+	Type *t = default_type(o.type);
+	if (t == nullptr || t == t_invalid || is_type_polymorphic(t)) {
+		return nullptr;
+	}
+	return t;
+}
+
+gb_internal Type *poly_array_source_from_compound_lit(CheckerContext *ctx, Type *poly_type, Ast *expr) {
 	if (expr == nullptr) {
 		return nullptr;
 	}
@@ -2713,21 +2734,8 @@ gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Typ
 	if (elem_is_poly) {
 		// Determine the element type from the (homogeneous, context-free) elements.
 		for (Ast *e : elems) {
-			if (!ast_is_context_free_constant(e)) {
-				return nullptr;
-			}
-			Operand o = {};
-			Ast *trial = clone_ast(e);
-			i64 muted_before = error_mute_count();
-			begin_error_mute();
-			check_expr(ctx, &o, trial);
-			end_error_mute();
-			if (o.mode == Addressing_Invalid || o.type == nullptr || o.type == t_invalid ||
-			    error_mute_count() != muted_before) {
-				return nullptr;
-			}
-			Type *et = is_type_untyped(o.type) ? default_type(o.type) : o.type;
-			if (et == nullptr || et == t_invalid || is_type_polymorphic(et)) {
+			Type *et = context_free_constant_type(ctx, e);
+			if (et == nullptr) {
 				return nullptr;
 			}
 			if (elem_type == nullptr) {
@@ -2759,19 +2767,105 @@ gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Typ
 	case Type_Slice:        source = alloc_type_slice(elem_type);         break;
 	case Type_DynamicArray: source = alloc_type_dynamic_array(elem_type); break;
 	}
-	if (source == nullptr) {
+	return source;
+}
+
+gb_internal Type *poly_record_source_from_compound_lit(CheckerContext *ctx, Type *poly_type, Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr || expr->kind != Ast_CompoundLit || expr->CompoundLit.type != nullptr) {
 		return nullptr;
+	}
+	Type *bt = base_type(poly_type);
+	if (bt->kind != Type_Struct || bt->Struct.polymorphic_parent == nullptr) {
+		return nullptr;
+	}
+	Type *original_type = bt->Struct.polymorphic_parent;
+	Type *ob = base_type(original_type);
+	TypeTuple *params = get_record_polymorphic_params(bt);
+	if (params == nullptr || ob->kind != Type_Struct || ob->Struct.node == nullptr) {
+		return nullptr;
+	}
+	Slice<Ast *> const &elems = expr->CompoundLit.elems;
+	if (elems.count == 0) {
+		return nullptr;
+	}
+	ast_node(st, StructType, ob->Struct.node);
+
+	Type **bound = temporary_alloc_array<Type *>(params->variables.count);
+	isize position = 0;
+	for (Ast *field : st->fields) {
+		if (field->kind != Ast_Field) {
+			continue;
+		}
+		ast_node(f, Field, field);
+		Ast *field_type = unparen_expr(f->type);
+		for (Ast *name : f->names) {
+			Ast *value = nullptr;
+			for (isize i = 0; i < elems.count; i++) {
+				Ast *elem = elems[i];
+				if (elem->kind == Ast_FieldValue) {
+					Ast *key = elem->FieldValue.field;
+					if (key->kind == Ast_Ident &&
+					    name->kind == Ast_Ident &&
+					    key->Ident.token.string == name->Ident.token.string) {
+						value = elem->FieldValue.value;
+					}
+				} else if (i == position) {
+					value = elem;
+				}
+			}
+			position += 1;
+
+			if (value == nullptr || field_type == nullptr || field_type->kind != Ast_Ident) {
+				continue;
+			}
+			isize param_index = -1;
+			for_array(j, params->variables) {
+				Entity *p = params->variables[j];
+				if (p->kind == Entity_TypeName && p->token.string == field_type->Ident.token.string) {
+					param_index = j;
+				}
+			}
+			if (param_index < 0) {
+				continue;
+			}
+			Type *t = context_free_constant_type(ctx, value);
+			if (t == nullptr) {
+				return nullptr;
+			}
+			if (bound[param_index] == nullptr) {
+				bound[param_index] = t;
+			} else if (!are_types_identical(bound[param_index], t)) {
+				return nullptr;
+			}
+		}
 	}
 
-	PolySubst subst = {};
-	subst.items.allocator = heap_allocator();
-	defer (array_free(&subst.items));
-	if (subst_unify(ctx, poly_type, source, &subst) != Subst_Matched) {
-		return nullptr;
+	auto operands = array_make<Operand>(permanent_allocator(), params->variables.count);
+	for_array(j, params->variables) {
+		Entity *p = params->variables[j];
+		Operand o = {};
+		o.expr = expr;
+		if (p->kind == Entity_TypeName) {
+			o.mode = Addressing_Type;
+			o.type = p->type;
+			if (is_type_polymorphic(p->type)) {
+				if (p->type->kind != Type_Generic || bound[j] == nullptr) {
+					return nullptr;
+				}
+				o.type = bound[j];
+			}
+		} else if (p->kind == Entity_Constant && !is_type_polymorphic(p->type)) {
+			o.mode = Addressing_Constant;
+			o.type = p->type;
+			o.value = p->Constant.value;
+		} else {
+			return nullptr;
+		}
+		operands[j] = o;
 	}
-	Type *applied = subst_apply(ctx, poly_type, source, &subst);
-	subst_bind_entities(&subst);
-	return applied;
+
+	return instantiate_polymorphic_record(ctx, original_type, operands, expr);
 }
 
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
@@ -2779,8 +2873,19 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
 		if (operand.deferred_untyped_arg && modify_type) {
-			if (Type *determined = determine_poly_elem_from_compound_lit(ctx, poly_type, operand.expr)) {
-				return determined;
+			Type *source = poly_array_source_from_compound_lit(ctx, poly_type, operand.expr);
+			if (source == nullptr) {
+				source = poly_record_source_from_compound_lit(ctx, poly_type, operand.expr);
+			}
+			if (source != nullptr) {
+				PolySubst subst = {};
+				subst.items.allocator = heap_allocator();
+				defer (array_free(&subst.items));
+				if (subst_unify(ctx, poly_type, source, &subst) == Subst_Matched) {
+					Type *applied = subst_apply(ctx, poly_type, source, &subst);
+					subst_bind_entities(&subst);
+					return applied;
+				}
 			}
 		}
 		if (operand.deferred_untyped_arg && !modify_type) {

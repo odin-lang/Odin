@@ -8910,6 +8910,81 @@ gb_internal isize lookup_polymorphic_record_parameter(Type *t, String parameter_
 }
 
 
+gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *original_type, Array<Operand> ordered_operands, Ast *call) {
+	isize param_count = get_record_polymorphic_params(original_type)->variables.count;
+
+	GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
+	mutex_lock(&found_gen_types->mutex);
+
+	// NOTE(bill, 2026-1010):
+	// check_struct_type/check_union_type release this mutex early (after publishing, before checking members)
+	// to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit path keeps it until scope end.
+	bool gen_types_locked = true;
+	defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
+
+	Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
+	if (found_entity) {
+		add_declaration_dependency(c, found_entity);
+		return found_entity->type;
+	}
+
+	CheckerContext ctx = *c;
+
+	// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
+	ctx.scope = polymorphic_record_parent_scope(original_type);
+
+	// NOTE(bill): the instance's members are only checked by its first use because their dependencies are the instance's own and each use depends on the instance instead
+	ctx.decl = make_decl_info(ctx.scope, nullptr);
+
+	if (original_type->Named.type_name && original_type->Named.type_name->file) {
+		ctx.file = original_type->Named.type_name->file;
+		ctx.pkg = ctx.file->pkg;
+	}
+	GB_ASSERT(ctx.scope != nullptr);
+
+	Type *bt = base_type(original_type);
+	String generated_name = make_string_c(expr_to_string(call));
+
+	Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
+	ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
+	global_error_context.instantiations.records = &instantiation;
+	if (bt->kind == Type_Struct) {
+		Ast *node = clone_ast(bt->Struct.node);
+
+		Type *struct_type = alloc_type_struct();
+		struct_type->Struct.node = node;
+		struct_type->Struct.polymorphic_parent = original_type;
+		set_base_type(named_type, struct_type);
+
+		check_open_scope(&ctx, node);
+		check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+
+		// check_struct_type released found_gen_types->mutex after publishing the instantiation.
+		gen_types_locked = false;
+		check_close_scope(&ctx);
+	} else if (bt->kind == Type_Union) {
+		Ast *node = clone_ast(bt->Union.node);
+
+		Type *union_type = alloc_type_union();
+		union_type->Union.node = node;
+		union_type->Union.polymorphic_parent = original_type;
+		set_base_type(named_type, union_type);
+
+		check_open_scope(&ctx, node);
+		check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+
+		// check_union_type released found_gen_types->mutex after publishing the instantiation.
+		gen_types_locked = false;
+		check_close_scope(&ctx);
+	} else {
+		GB_PANIC("Unsupported parametric polymorphic record type");
+	}
+	global_error_context.instantiations.records = instantiation.prev;
+
+	add_declaration_dependency(c, named_type->Named.type_name);
+	return named_type;
+}
+
 gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *operand, Ast *call) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
@@ -9196,75 +9271,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		return err;
 	}
 
-	{
-		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
-		mutex_lock(&found_gen_types->mutex);
-		// check_struct_type/check_union_type release this mutex early (after publishing, before
-		// checking members) to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit
-		// path keeps it until scope end.
-		bool gen_types_locked = true;
-		defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
-
-		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
-		if (found_entity) {
-			add_declaration_dependency(c, found_entity);
-			operand->mode = Addressing_Type;
-			operand->type = found_entity->type;
-			return err;
-		}
-
-		CheckerContext ctx = *c;
-		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
-		ctx.scope = polymorphic_record_parent_scope(original_type);
-		// NOTE(bill): the instance's members are only checked by its first use, so their dependencies are
-		// the instance's own, and each use depends on the instance instead
-		ctx.decl = make_decl_info(ctx.scope, nullptr);
-
-		if (original_type->Named.type_name && original_type->Named.type_name->file) {
-			ctx.file = original_type->Named.type_name->file;
-			ctx.pkg = ctx.file->pkg;
-		}
-		GB_ASSERT(ctx.scope != nullptr);
-
-		Type *bt = base_type(original_type);
-		String generated_name = make_string_c(expr_to_string(call));
-
-		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
-		ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
-		global_error_context.instantiations.records = &instantiation;
-		if (bt->kind == Type_Struct) {
-			Ast *node = clone_ast(bt->Struct.node);
-			Type *struct_type = alloc_type_struct();
-			struct_type->Struct.node = node;
-			struct_type->Struct.polymorphic_parent = original_type;
-			set_base_type(named_type, struct_type);
-
-			check_open_scope(&ctx, node);
-			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
-			// check_struct_type released found_gen_types->mutex after publishing the instantiation.
-			gen_types_locked = false;
-			check_close_scope(&ctx);
-		} else if (bt->kind == Type_Union) {
-			Ast *node = clone_ast(bt->Union.node);
-			Type *union_type = alloc_type_union();
-			union_type->Union.node = node;
-			union_type->Union.polymorphic_parent = original_type;
-			set_base_type(named_type, union_type);
-
-			check_open_scope(&ctx, node);
-			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
-			// check_union_type released found_gen_types->mutex after publishing the instantiation.
-			gen_types_locked = false;
-			check_close_scope(&ctx);
-		} else {
-			GB_PANIC("Unsupported parametric polymorphic record type");
-		}
-		global_error_context.instantiations.records = instantiation.prev;
-
-		add_declaration_dependency(c, named_type->Named.type_name);
-		operand->mode = Addressing_Type;
-		operand->type = named_type;
-	}
+	operand->mode = Addressing_Type;
+	operand->type = instantiate_polymorphic_record(c, original_type, ordered_operands, call);
 	return err;
 }
 
