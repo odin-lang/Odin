@@ -791,7 +791,7 @@ Blocks the current thread on the queue until another thread pops it with `wait_q
 **Returns**
 - The `ok` passed to `waiter_wake`
 */
-wait_queue_wait :: proc "contextless" (q: ^Wait_Queue, m: ^Mutex, data: rawptr) -> bool {
+wait_queue_wait :: #force_inline proc "contextless" (q: ^Wait_Queue, m: ^Mutex, data: rawptr) -> bool {
 	w := Waiter{data = data}
 	wp := (^Waiter)(rawptr(&w))
 	if q.tail != nil {

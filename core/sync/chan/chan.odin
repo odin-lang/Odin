@@ -296,7 +296,10 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 
 	msg_offset := runtime.align_forward_int(size_of(uint), msg_alignment)
 	stride     := runtime.align_forward_int(msg_offset + msg_size, max(align_of(uint), msg_alignment))
-	align      := max(RING_PAD, msg_alignment)
+	if stride > CACHE_LINE/2 {
+		stride = runtime.align_forward_int(stride, CACHE_LINE)
+	}
+	align := max(RING_PAD, msg_alignment)
 
 	ring_offset  := runtime.align_forward_int(size_of(Raw_Chan), RING_PAD)
 	slots_offset := runtime.align_forward_int(ring_offset + size_of(Raw_Ring), align)
@@ -641,7 +644,7 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 		}
 		if r := sync.wait_queue_pop(&c.r_waiters); r != nil {
 			sync.unlock(&c.mutex)
-			intrinsics.mem_copy(r.data, msg_in, size)
+			intrinsics.mem_copy_non_overlapping(r.data, msg_in, size)
 			sync.waiter_wake(r, true)
 			return true
 		}
@@ -736,7 +739,7 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 		if s := sync.wait_queue_pop(&c.w_waiters); s != nil {
 			sync.unlock(&c.mutex)
 
-			intrinsics.mem_copy(msg_out, s.data, size)
+			intrinsics.mem_copy_non_overlapping(msg_out, s.data, size)
 			sync.waiter_wake(s, true)
 			return true
 		}
@@ -786,6 +789,9 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 		wake_one(c, &c.r_waiting, &c.r_waiters)
 		ok = true
 	} else { // unbuffered
+		if sync.wait_queue_is_empty(&c.r_waiters) {
+			return false
+		}
 		size := int(c.msg_size)
 
 		sync.lock(&c.mutex)
@@ -799,7 +805,7 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 			return false
 		}
 
-		intrinsics.mem_copy(r.data, msg_in, size)
+		intrinsics.mem_copy_non_overlapping(r.data, msg_in, size)
 		sync.waiter_wake(r, true)
 		ok = true
 	}
@@ -844,6 +850,9 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 		wake_one(c, &c.w_waiting, &c.w_waiters)
 		return true
 	} else { // unbuffered
+		if sync.wait_queue_is_empty(&c.w_waiters) {
+			return false
+		}
 		size := int(c.msg_size)
 
 		sync.lock(&c.mutex)
@@ -857,7 +866,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 			return false
 		}
 
-		intrinsics.mem_copy(msg_out, s.data, size)
+		intrinsics.mem_copy_non_overlapping(msg_out, s.data, size)
 		sync.waiter_wake(s, true)
 		return true
 	}
@@ -1302,7 +1311,10 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 }
 
 @(private)
-RING_PAD :: 128
+CACHE_LINE :: 64 // TODO(bill): actually use the correct cache line size for whatever platform we are targeting
+
+@(private)
+RING_PAD :: 2*CACHE_LINE
 
 @(private)
 Raw_Ring :: struct {
@@ -1337,6 +1349,7 @@ ring_next :: proc "contextless" (r: ^Raw_Ring, pos: uint) -> uint {
 @(private, require_results)
 ring_send :: proc "contextless" (r: ^Raw_Ring, msg_in: rawptr, size: int) -> Ring_Status {
 	tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
+	backoff := 1
 	for {
 		if (tail & r.mark) != 0 {
 			return .Closed
@@ -1348,11 +1361,15 @@ ring_send :: proc "contextless" (r: ^Raw_Ring, msg_in: rawptr, size: int) -> Rin
 		case stamp == tail:
 			next := ring_next(r, tail)
 			if t, ok := sync.atomic_compare_exchange_weak_explicit(&r.tail, tail, next, .Seq_Cst, .Relaxed); ok {
-				intrinsics.mem_copy(slot[r.msg_offset:], msg_in, size)
+				intrinsics.mem_copy_non_overlapping(slot[r.msg_offset:], msg_in, size)
 				sync.atomic_store_explicit((^uint)(slot), tail + 1, .Release)
 				return .Ok
 			} else {
 				tail = t
+				for _ in 0..<backoff {
+					sync.cpu_relax()
+				}
+				backoff = min(backoff*2, 64)
 			}
 		case (stamp + r.one_lap) == (tail + 1):
 			sync.atomic_thread_fence(.Seq_Cst)
@@ -1372,6 +1389,7 @@ ring_send :: proc "contextless" (r: ^Raw_Ring, msg_in: rawptr, size: int) -> Rin
 @(private, require_results)
 ring_recv :: proc "contextless" (r: ^Raw_Ring, msg_out: rawptr, size: int) -> Ring_Status {
 	head := sync.atomic_load_explicit(&r.head, .Relaxed)
+	backoff := 1
 	for {
 		index := head & (r.mark - 1)
 		slot  := r.slots[index*r.stride:]
@@ -1380,11 +1398,15 @@ ring_recv :: proc "contextless" (r: ^Raw_Ring, msg_out: rawptr, size: int) -> Ri
 		case stamp == (head + 1):
 			next := ring_next(r, head)
 			if h, ok := sync.atomic_compare_exchange_weak_explicit(&r.head, head, next, .Seq_Cst, .Relaxed); ok {
-				intrinsics.mem_copy(msg_out, slot[r.msg_offset:], size)
+				intrinsics.mem_copy_non_overlapping(msg_out, slot[r.msg_offset:], size)
 				sync.atomic_store_explicit((^uint)(slot), head + r.one_lap, .Release)
 				return .Ok
 			} else {
 				head = h
+				for _ in 0..<backoff {
+					sync.cpu_relax()
+				}
+				backoff = min(backoff*2, 64)
 			}
 		case stamp == head:
 			sync.atomic_thread_fence(.Seq_Cst)
