@@ -10155,7 +10155,12 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 	o->type = th;
 
 	bool ok = attempt_implicit_selector_expr(c, o, ise, th);
-	if (!ok) {
+	if (ok) {
+		Type *bt = base_type(o->type);
+		if (bt->kind == Type_Enum) {
+			add_entity_use(c, ise->selector, scope_lookup_current(bt->Enum.scope, ise->selector->Ident.interned));
+		}
+	} else {
 		String name = ise->selector->Ident.token.string;
 
 		if (is_type_enum(th)) {
