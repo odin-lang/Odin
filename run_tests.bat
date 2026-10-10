@@ -1,5 +1,35 @@
 @rem This file runs most of the tests that the CI would run.
-@rem It omits time-intensive optimized core library tests and Wycheproof tests.
+@rem When the "slim" argument is provided, it omits time-intensive optimized core library tests and Wycheproof tests.
+
+setlocal EnableDelayedExpansion
+
+@echo off
+
+set SLIM=
+
+for %%A in (%*) do (
+	if "%%A"=="slim" (
+		set SLIM=1
+	) else if "%%A"=="no-clang" (
+		set ODIN_TESTS_NO_CLANG=1
+	) else (
+		echo Unrecognized argument: %%A
+		exit /b
+	)
+)
+
+rem Check if clang is present
+if not defined ODIN_TESTS_NO_CLANG (
+	clang --version
+	if !ERRORLEVEL! neq 0 (
+		echo ERROR: clang is not present. Some tests require this.
+		echo Note: You can try using msvc instead by specifying the "no-clang" argument, or setting ODIN_TESTS_NO_CLANG=1
+		echo       However, some ABI tests will be skipped.
+		exit /b
+	)
+)
+
+@echo on
 
 @rem Check examples/all
 @pushd .
@@ -38,11 +68,56 @@ cd tests\issues
 call run.bat || exit /b
 @popd
 
-@rem Run ABI tests
-@pushd .
-cd tests\abi
-set ABI_CFLAGS=
-call run.bat || exit /b
-set ABI_CFLAGS=-O2
-call run.bat -o:speed || exit /b
-@popd
+@rem The ABI tests can be disabled here because they require clang at the moment.
+@rem   TODO: Maybe try to make them work with msvc as well?
+if not defined ODIN_TESTS_NO_CLANG (
+
+	@rem Run ABI tests
+	@pushd .
+	cd tests\abi
+	set ABI_CFLAGS=
+	call run.bat || exit /b
+	set ABI_CFLAGS=-O2
+	call run.bat -o:speed || exit /b
+	@popd
+
+)
+
+@rem More extensive tests (non-slim):
+
+if not defined SLIM (
+
+	@echo Running extended tests...
+
+	@rem Optimized Core library tests
+	@pushd tests\core
+	..\..\odin test speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b
+	@popd
+
+	@rem Wycheproof tests
+	@pushd tests\core
+	..\..\odin test crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
+	@popd
+
+	@rem Noise Protocol Framework tests
+	@pushd tests\core
+	..\..\odin test crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
+	@popd
+
+	@rem X.509 limbo tests
+	@pushd tests\core
+	..\..\odin test crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
+	@popd
+
+	@echo SUCCESS:  Extended tests have been executed successfully.
+	@echo           Note: You can call  "run_tests slim"  to omit some of the slower tests.
+
+) else (
+
+	@echo SUCCESS:  Slim tests have been executed successfully.
+
+)
+
+if defined ODIN_TESTS_NO_CLANG (
+	@echo WARNING:  ODIN_TESTS_NO_CLANG specified - ABI tests have been skipped.
+)

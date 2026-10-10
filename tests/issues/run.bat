@@ -95,12 +95,12 @@ set ODIN=..\..\..\odin
 
 @rem Test clang - improve error message for users that don't have it.
 
-@if "%ISSUES_TESTS_NO_CLANG%" == "" (
+@if "%ODIN_TESTS_NO_CLANG%" == "" (
 	@echo Testing for clang...
 	clang --version
 	if !ERRORLEVEL! neq 0 (
 		@echo ERROR: clang not working. This is required for some tests.
-		@echo You can try msvc instead:  set ISSUES_TESTS_NO_CLANG=1
+		@echo You can try msvc instead:  set ODIN_TESTS_NO_CLANG=1
 		exit /b
 	)
 ) else (
@@ -108,7 +108,7 @@ set ODIN=..\..\..\odin
 	cl
 	if !ERRORLEVEL! neq 0 (
 		@echo ERROR: msvc not working. This is required for some tests.
-		@echo You can try clang instead:  set ISSUES_TESTS_NO_CLANG=
+		@echo You can try clang instead:  set ODIN_TESTS_NO_CLANG=
 		exit /b
 	)
 )
@@ -116,7 +116,7 @@ set ODIN=..\..\..\odin
 @rem #########################################################################################################
 
 @rem "odin test" tests with special needs, or others (e.g. "odin doc"):
-@if "%ISSUES_TESTS_NO_CLANG%" == "" (
+@if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_5640\test_issue_5640.c" -o test_issue_5640_c.o || exit /b
 ) else (
 	cl -c "..\test_issue_5640\test_issue_5640.c" /Fo:test_issue_5640_c.o || exit /b
@@ -124,7 +124,7 @@ set ODIN=..\..\..\odin
 
 %ODIN% test "..\test_issue_5640" %COMMON% || exit /b
 
-@if "%ISSUES_TESTS_NO_CLANG%" == "" (
+@if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_6809_6816\test_issue_6809_6816.c" -o test_issue_6809_6816_c.o -O3 || exit /b
 ) else (
 	cl -c "..\test_issue_6809_6816\test_issue_6809_6816.c" /Fo:test_issue_6809_6816_c.o -O3 || exit /b
@@ -137,7 +137,7 @@ set ODIN=..\..\..\odin
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
 @rem It seems at this point 7010 is not for Windows.
-@rem @if "%ISSUES_TESTS_NO_CLANG%" == "" (
+@rem @if "%ODIN_TESTS_NO_CLANG%" == "" (
 @rem 	clang -c "..\test_issue_7010\test_issue_7010.c" -o test_issue_7010_c.o || exit /b
 @rem 	%ODIN% test "..\test_issue_7010" %COMMON% || exit /b
 @rem ) else (
@@ -157,7 +157,7 @@ set ODIN=..\..\..\odin
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:size -lifetime-markers || exit /b
 %ODIN% test "..\test_lifetime_markers" %COMMON% -o:speed -lifetime-markers || exit /b
 
-@if "%ISSUES_TESTS_NO_CLANG%" == "" (
+@if "%ODIN_TESTS_NO_CLANG%" == "" (
 	clang -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" -o test_issue_sysv_abi_c.o || exit /b
 ) else (
 	cl -c "..\test_issue_sysv_abi\test_issue_sysv_abi.c" /Fo:test_issue_sysv_abi_c.o || exit /b
