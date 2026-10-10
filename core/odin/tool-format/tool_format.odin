@@ -24,10 +24,12 @@ marshal_overlay :: proc(overlay: Overlay, allocator := context.allocator) -> (da
 }
 
 
-Semantics_Version :: 1
+SEMANTICS_VERSION :: 1
 
 // `file`, `type` and `entity` fields are indices into `files`, `types` and `entities`, -1 when there is none.
 // Offsets are in bytes.
+// The copies of a declaration made by each instantiation of a generic are one entity, keeping only what they agree on,
+// otherwise the generic's own type, if any, and no value or layout.
 Semantics :: struct {
 	version:  int,
 	files:    []string, // the exported files come first, in the same order as `exported`
@@ -87,7 +89,7 @@ Ident :: struct {
 }
 
 // The pairs of `uses` or `definitions` for the identifier starting at `offset`.
-// A call to a procedure group or a generic procedure also records the procedure it picks or instantiates.
+// A call to a procedure group also records the procedure it picks.
 find_idents :: proc(pairs: []i32, offset: int) -> []Ident {
 	idents := slice.reinterpret([]Ident, pairs)
 	i, _ := slice.binary_search_by(idents, offset, proc(x: Ident, offset: int) -> slice.Ordering {
@@ -119,7 +121,7 @@ unmarshal_semantics :: proc(data: []byte, semantics: ^Semantics, allocator := co
 	} else {
 		json.unmarshal(data, semantics, allocator=allocator) or_return
 	}
-	if semantics.version != Semantics_Version {
+	if semantics.version != SEMANTICS_VERSION {
 		return .Unsupported_Version
 	}
 	return nil
