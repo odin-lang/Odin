@@ -2206,6 +2206,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, nullptr);
 				entity->identifier = name;
+				add_semantic_ident(ctx->info, name, entity, true);
 
 				Ast *fl = ctx->foreign_context.curr_library;
 				if (fl != nullptr) {
