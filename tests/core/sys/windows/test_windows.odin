@@ -16,22 +16,22 @@ expect_size :: proc(t: ^testing.T, $act: typeid, exp: int, loc := #caller_locati
 
 @(private)
 expect_value :: proc(t: ^testing.T, #any_int act: u32, #any_int exp: u32, loc := #caller_location) {
-	expectf(t, act == exp, "0x%8X (should be: 0x%8X)", act, exp, loc = loc)
+	expectf(t, act == exp, "0x%08X (should be: 0x%08X)", act, exp, loc = loc)
 }
 
 @(private)
 expect_value_64 :: proc(t: ^testing.T, #any_int act: u64, #any_int exp: u64, loc := #caller_location) {
-	expectf(t, act == exp, "0x%8X (should be: 0x%8X)", act, exp, loc = loc)
+	expectf(t, act == exp, "0x%08X (should be: 0x%08X)", act, exp, loc = loc)
 }
 
 @(private)
 expect_value_int :: proc(t: ^testing.T, act, exp: int, loc := #caller_location) {
-	expectf(t, act == exp, "0x%8X (should be: 0x%8X)", act, exp, loc = loc)
+	expectf(t, act == exp, "0x%08X (should be: 0x%08X)", act, exp, loc = loc)
 }
 
 @(private)
 expect_value_uintptr :: proc(t: ^testing.T, act: uintptr, exp: int, loc := #caller_location) {
-	expectf(t, act == uintptr(exp), "0x%8X (should be: 0x%8X)", act, uintptr(exp), loc = loc)
+	expectf(t, act == uintptr(exp), "0x%08X (should be: 0x%08X)", act, uintptr(exp), loc = loc)
 }
 
 @(private)
@@ -39,8 +39,8 @@ expect_value_str :: proc(t: ^testing.T, wact, wexp: win32.wstring, loc := #calle
 	act, exp: string
 	err: runtime.Allocator_Error
 	act, err = win32.wstring_to_utf8(wact, 16)
-	expectf(t, err == .None, "0x%8X (should be: 0x%8X)", err, 0, loc = loc)
+	expectf(t, err == .None, "0x%08X (should be: 0x%08X)", err, 0, loc = loc)
 	exp, err = win32.wstring_to_utf8(wexp, 16)
-	expectf(t, err == .None, "0x%8X (should be: 0x%8X)", err, 0, loc = loc)
-	expectf(t, act == exp, "0x%8X (should be: 0x%8X)", act, exp, loc = loc)
+	expectf(t, err == .None, "0x%08X (should be: 0x%08X)", err, 0, loc = loc)
+	expectf(t, act == exp, "0x%08X (should be: 0x%08X)", act, exp, loc = loc)
 }

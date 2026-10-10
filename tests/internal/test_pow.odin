@@ -18,7 +18,7 @@ pow_test :: proc(t: ^testing.T) {
 				// pow2_f64 returns the same float on all platforms because it isn't this stupid
 				_v1 = 0h00000000_00000000
 			}
-			testing.expectf(t,  _v1 == _v2, "Expected math.pow2_f64(%d) == math.pow(2, %d) (= %16x), got %16x", exp, exp, _v1, _v2)
+			testing.expectf(t,  _v1 == _v2, "Expected math.pow2_f64(%d) == math.pow(2, %d) (= %016x), got %016x", exp, exp, _v1, _v2)
 		}
 		{
 			v1 := math.pow(2, f32(exp))

@@ -347,7 +347,7 @@ date_component_roundtrip_test :: proc(t: ^testing.T, moment: dt.DateTime) {
 	testing.expectf(
 		t,
 		ok,
-		"Expected %4d-%2d-%2d %2d:%2d:%2d, got %4d-%2d-%2d %2d:%2d:%2d",
+		"Expected %04d-%02d-%02d %02d:%02d:%02d, got %04d-%02d-%02d %02d:%02d:%02d",
 		moment.year, moment.month, moment.day, moment.hour, moment.minute, moment.second, YYYY, MM, DD, hh, mm, ss,
 	)
 }
