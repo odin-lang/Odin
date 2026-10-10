@@ -283,7 +283,11 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           cd tests/issues
           call run.bat
-          cd ../abi
+      - name: Run ABI tests
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          cd tests/abi
           call run.bat
           set ABI_CFLAGS=-O2
           call run.bat -o:speed

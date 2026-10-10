@@ -14,6 +14,9 @@ map_insert_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]i64, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -64,6 +67,9 @@ map_update_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]i64, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -128,6 +134,9 @@ map_delete_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]i64
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]i64, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -256,6 +265,9 @@ set_insert_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]struct{}
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]struct{}, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
@@ -304,6 +316,9 @@ set_delete_random_key_value :: proc(t: ^testing.T) {
 	for entries in ENTRY_COUNTS {
 		log.infof("Testing %v entries", entries)
 		m: map[i64]struct{}
+		if entries >= 100_000 {
+			m = make_map_cap(map[i64]struct{}, entries * 2)
+		}
 		defer delete(m)
 
 		unique_keys := 0
