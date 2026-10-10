@@ -3885,6 +3885,10 @@ general_end:;
 		max_align = gb_max(max_align, 16);
 
 		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
+		if (dst_size > src_size) {
+			// NOTE(bill): the bytes past `src` are padding and must read as zero
+			LLVMBuildStore(p->builder, LLVMConstNull(dst_type), ptr);
+		}
 
 		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
 		LLVMBuildStore(p->builder, val, nptr);

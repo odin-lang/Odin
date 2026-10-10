@@ -308,10 +308,9 @@ build.sh
 # RAD debugger project file
 *.raddbg
 *.rdi
-tests/issues/build/*
-tests/abi/build/*
-tests/abi/build-cross/*
-tests/debug_info/build/*
+
+# NOTE: The /tests/** directories have their own .gitignore files
+
 misc/featuregen/featuregen
 
 # Clangd stuff
