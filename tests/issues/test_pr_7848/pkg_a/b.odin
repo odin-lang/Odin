@@ -22,11 +22,24 @@ add_f32 :: proc(a, b: f32) -> f32 {
 
 add :: proc{add_int, add_f32}
 
+Axis :: enum {X, Y}
+Side :: enum {X, Left}
+
+axis :: proc(a: Axis, i: int) -> int {
+	return int(a) + i
+}
+
+side :: proc(s: Side, f: f32) -> int {
+	return int(s) + int(f)
+}
+
+pick :: proc{axis, side}
+
 use_all :: proc() -> int {
 	p := Point{1, 2, 3}
 	a := twice(int(p.z))
 	b := twice(p.x)
-	c := add(a, FIVE) + int(b)
+	c := add(a, FIVE) + int(b) + pick(.X, 1)
 	when FIVE == 6 {
 		c += 100
 	} else {
