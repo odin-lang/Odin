@@ -1422,7 +1422,7 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		Type *elem_type = core_broadcastable_elem_type(type);
-		if (is_type_union(elem_type)) {
+		if (is_type_union(elem_type) && !is_type_untyped_nil(operand->type)) {
 			target_type = elem_type;
 		}
 		if (type == nullptr || is_type_any(elem_type)) {
@@ -5313,7 +5313,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			elem = core_broadcastable_elem_type(elem);
 			operand->mode = Addressing_Value;
 			convert_to_typed(c, operand, elem, /*no_final_update*/true);
-			if (is_type_union(elem)) {
+			if (is_type_union(elem) && !is_type_untyped_nil(operand->type)) {
 				target_type = operand->type;
 			}
 		} else {
