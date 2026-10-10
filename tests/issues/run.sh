@@ -4,8 +4,8 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
-COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native"
-COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables"
+COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native"
+COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings"
 
 set -x
 
@@ -18,7 +18,7 @@ set -x
 #   update `run.bat` as well.
 
 # Some tests require a C compiler.
-#   By default, it uses clang.  export ISSUES_TESTS_NO_CLANG=1  to disable these tests.
+#   By default, it uses clang.  export ODIN_TESTS_NO_CLANG=1  to disable these tests.
 #   TODO: See if we can make the tests work with gcc instead?
 
 #########################################################################################################
@@ -277,10 +277,25 @@ $ODIN run ../test_issue_7798 $COMMON
 #########################################################################################################
 
 #
+# Test clang - improve error message for users that don't have it.
+#
+
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
+	if ! clang --version; then
+		set +x
+		echo "ERROR: clang not working. This is required for some tests."
+		echo "You can disable tests that require clang:  export ODIN_TESTS_NO_CLANG=1"
+		exit 1
+	fi
+fi
+
+#########################################################################################################
+
+#
 # "odin test" tests with special needs, or others (e.g. "odin doc"):
 #
 
-if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_5640/test_issue_5640.c -o test_issue_5640_c.o
 
 	if [[ "$(uname)" != "NetBSD" ]]; then
@@ -290,7 +305,7 @@ if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
 	fi
 fi
 
-if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_6809_6816/test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 	$ODIN test ../test_issue_6809_6816 -o:speed $COMMON
 fi
@@ -310,7 +325,7 @@ $ODIN check ../test_pr_7848/pkg_b ../test_pr_7848/pkg_a -no-entry-point -workspa
 cmp pr_7848.cbor pr_7848_again.cbor
 $ODIN test ../test_pr_7848 $COMMON
 
-if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
 	$ODIN test ../test_issue_7010 $COMMON
 fi
@@ -348,13 +363,13 @@ fi
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
 $ODIN test ../test_lifetime_markers $COMMON -o:speed -lifetime-markers
 
-if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_sysv_abi/test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o
 	$ODIN test ../test_issue_sysv_abi $COMMON
 fi
 
 # AVX-512 asked for through -target-features on the default microarch; needs a CPU that has it
-if [[ -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	if grep -qw avx512f /proc/cpuinfo 2>/dev/null; then
 		clang -c ../test_issue_avx512_vector_abi/test_issue_avx512_vector_abi.c -o test_issue_avx512_vector_abi_c.o -mavx512f
 		$ODIN test ../test_issue_avx512_vector_abi $COMMON_CHECK -target-features:avx512f
@@ -366,7 +381,7 @@ $ODIN test ../test_issue_loaded_pointer_alignment $COMMON -o:speed
 
 #########################################################################################################
 
-if [[ ! -z ${ISSUES_TESTS_NO_CLANG+x} ]]; then
+if [[ ! -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	echo "!!! WARNING !!! Tests that require clang have been skipped"
 fi
 

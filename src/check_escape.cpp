@@ -3396,6 +3396,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, RangeStmt, node);
+		escape_stmt(ea, rs->init);
 		Ast *val0 = nullptr;
 		Ast *val1 = nullptr;
 		if (rs->vals.count > 0) {
@@ -3416,9 +3417,11 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			escape_nil_scan(ea, rs->expr);
 		}
 		escape_loop(ea, node, nullptr, nullptr, rs->body, val0, val1, rs->expr);
+		escape_forget(ea, rs->init);
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);
+		escape_stmt(ea, rs->init);
 		bool by_ref = false;
 		Ast *vals[2] = {rs->val0, rs->val1};
 		for (Ast *val : vals) {
@@ -3431,6 +3434,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 			escape_nil_scan(ea, rs->expr);
 		}
 		escape_loop(ea, node, nullptr, nullptr, rs->body, rs->val0, rs->val1, rs->expr);
+		escape_forget(ea, rs->init);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
