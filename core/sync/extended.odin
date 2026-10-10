@@ -761,3 +761,95 @@ one_shot_event_signal :: proc "contextless" (e: ^One_Shot_Event) {
 	atomic_store_explicit(&e.state, 1, .Release)
 	futex_broadcast(&e.state)
 }
+
+/*
+A FIFO queue of blocked threads, each woken individually by the thread that pops it, which can exchange data with it through `Waiter.data`.
+
+The queue is guarded by a `Mutex` the caller provides: `wait_queue_wait` and `wait_queue_pop` must be called while holding it.
+*/
+Wait_Queue :: struct {
+	head: ^Waiter,
+	tail: ^Waiter,
+}
+
+Waiter :: struct {
+	next:  ^Waiter,
+	data:  rawptr,
+	state: Futex,
+}
+
+@(private="file") WAITER_WAITING  :: 0
+@(private="file") WAITER_PARKED   :: 1
+@(private="file") WAITER_WOKEN    :: 2
+@(private="file") WAITER_WOKEN_OK :: 3
+
+/*
+Blocks the current thread on the queue until another thread pops it with `wait_queue_pop` and wakes it with `waiter_wake`.
+
+`m` must be held, and is unlocked before blocking; it is not locked again on return. `data` is given to the waking thread as `Waiter.data`.
+
+**Returns**
+- The `ok` passed to `waiter_wake`
+*/
+wait_queue_wait :: proc "contextless" (q: ^Wait_Queue, m: ^Mutex, data: rawptr) -> bool {
+	w := Waiter{data = data}
+	wp := (^Waiter)(rawptr(&w))
+	if q.tail != nil {
+		q.tail.next = wp
+	} else {
+		atomic_store_explicit(&q.head, wp, .Relaxed)
+	}
+	q.tail = wp
+	mutex_unlock(m)
+
+	state := atomic_load_explicit(&w.state, .Acquire)
+	for spin := 0; state == WAITER_WAITING && spin < 32; spin += 1 {
+		cpu_relax()
+		state = atomic_load_explicit(&w.state, .Acquire)
+	}
+
+	if state == WAITER_WAITING {
+		state, _ = atomic_compare_exchange_strong_explicit(&w.state, WAITER_WAITING, WAITER_PARKED, .Acquire, .Acquire)
+		for state < WAITER_WOKEN {
+			futex_wait(&w.state, WAITER_PARKED)
+			state = atomic_load_explicit(&w.state, .Acquire)
+		}
+	}
+	return state == WAITER_WOKEN_OK
+}
+
+/*
+Removes the longest waiting thread from the queue, or returns `nil` if it is empty.
+The returned waiter must be woken with `waiter_wake`.
+*/
+@(require_results)
+wait_queue_pop :: proc "contextless" (q: ^Wait_Queue) -> (w: ^Waiter) {
+	w = atomic_load_explicit(&q.head, .Relaxed)
+	if w != nil {
+		atomic_store_explicit(&q.head, w.next, .Relaxed)
+		if w.next == nil {
+			q.tail = nil
+		}
+	}
+	return
+}
+
+/*
+Returns whether no thread is waiting on the queue. Without the mutex held, this could only be only a hint.
+*/
+@(require_results)
+wait_queue_is_empty :: proc "contextless" (q: ^Wait_Queue) -> bool {
+	return atomic_load_explicit(&q.head, .Relaxed) == nil
+}
+
+/*
+Wakes a waiter returned by `wait_queue_pop` making its `wait_queue_wait` return `ok`.
+The mutex need not be held and `w` must not be used afterwards.
+*/
+@(synchronizes=.Release)
+waiter_wake :: proc "contextless" (w: ^Waiter, ok: bool) {
+	state: Futex = WAITER_WOKEN_OK if ok else WAITER_WOKEN
+	if atomic_exchange_explicit(&w.state, state, .Release) == WAITER_PARKED {
+		futex_signal(&w.state)
+	}
+}
