@@ -343,6 +343,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		Token token = ast_token(node);
 		token.kind = Token_String;
 		token.string = named_type->Named.name;
+		token.flags |= TokenFlag_Synthesized;
 
 		Ast *node = ast_ident(nullptr, token);
 
@@ -716,6 +717,7 @@ gb_internal void set_polymorphic_record_instantiation_name(Type *named_type, Typ
 	named_type->Named.name = new_name;
 	if (named_type->Named.type_name) {
 		named_type->Named.type_name->token.string = new_name;
+		named_type->Named.type_name->token.flags |= TokenFlag_Synthesized;
 	}
 }
 

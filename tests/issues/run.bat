@@ -136,6 +136,12 @@ set ODIN=..\..\..\odin
 
 %ODIN% test "..\test_pr_6470" %COMMON% -define:TEST_EXPECT_FAILURE=true 2>&1 | find /c "Error:" | findstr /x "1" || exit /b
 
+%ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:json -export-semantics-file:pr_7848.json || exit /b
+%ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:cbor -export-semantics-file:pr_7848.cbor || exit /b
+%ODIN% check "..\test_pr_7848\pkg_b" "..\test_pr_7848\pkg_a" -no-entry-point -workspace -overlay:..\test_pr_7848\overlay.json %COMMON% -export-semantics:cbor -export-semantics-file:pr_7848_again.cbor || exit /b
+fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
+%ODIN% test "..\test_pr_7848" %COMMON% || exit /b
+
 @rem It seems at this point 7010 is not for Windows.
 @rem @if "%ODIN_TESTS_NO_CLANG%" == "" (
 @rem 	clang -c "..\test_issue_7010\test_issue_7010.c" -o test_issue_7010_c.o || exit /b

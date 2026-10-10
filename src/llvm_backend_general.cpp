@@ -1395,7 +1395,7 @@ gb_internal bool lb_can_try_to_inline_array_arith(Type *t) {
 	return type_size_of(t) <= build_context.max_simd_align;
 }
 
-gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vector_type_) {
+gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vector_type_, i64 *alignment_) {
 	Type *array_type = base_type(type_deref(ptr.type));
 	GB_ASSERT(is_type_array_like(array_type));
 	i64 count = get_array_type_count(array_type);
@@ -1404,25 +1404,21 @@ gb_internal bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vecto
 	// TODO(bill): Determine what is the correct limit for doing vector arithmetic
 	if (lb_can_try_to_inline_array_arith(array_type) &&
 	    is_type_valid_vector_elem(elem_type)) {
-		// Try to treat it like a vector if possible
-		bool possible = false;
 		LLVMTypeRef vector_type = LLVMVectorType(lb_type(m, elem_type), cast(unsigned)count);
 		unsigned vector_alignment = cast(unsigned)lb_alignof(vector_type);
+		GB_ASSERT(type_align_of(array_type) <= vector_alignment);
+		i64 alignment = type_align_of(array_type);
 
+		// allocas and globals get the vector natural alignment;
+		// anything else only gets the alignment of the pointed type
 		LLVMValueRef addr_ptr = ptr.value;
-		if (LLVMIsAAllocaInst(addr_ptr) || LLVMIsAGlobalValue(addr_ptr)) {
-			possible = lb_try_update_alignment(addr_ptr, vector_alignment);
-		} else if (LLVMIsALoadInst(addr_ptr)) {
-			unsigned alignment = LLVMGetAlignment(addr_ptr);
-			possible = alignment >= vector_alignment;
+		if (lb_try_update_alignment(addr_ptr, vector_alignment)) {
+			alignment = vector_alignment;
 		}
 
-		// NOTE: Due to alignment requirements, if the pointer is not correctly aligned
-		// then it cannot be treated as a vector
-		if (possible) {
-			if (vector_type_) *vector_type_ =vector_type;
-			return true;
-		}
+		if (vector_type_) *vector_type_ = vector_type;
+		if (alignment_)   *alignment_   = alignment;
+		return true;
 	}
 	return false;
 }
@@ -1535,18 +1531,12 @@ gb_internal LLVMValueRef OdinLLVMBuildLoad(lbProcedure *p, LLVMTypeRef type, LLV
 	return result;
 }
 
+// caps an OdinLLVMBuildLoad to the specified alignment
 gb_internal LLVMValueRef OdinLLVMBuildLoadAligned(lbProcedure *p, LLVMTypeRef type, LLVMValueRef value, i64 alignment) {
-	LLVMValueRef result = LLVMBuildLoad2(p->builder, type, value, "");
-
-	LLVMSetAlignment(result, cast(unsigned)alignment);
-
-	if (LLVMIsAInstruction(value)) {
-		u64 is_packed = lb_get_metadata_custom_u64(p->module, value, ODIN_METADATA_IS_PACKED);
-		if (is_packed != 0) {
-			LLVMSetAlignment(result, 1);
-		}
+	LLVMValueRef result = OdinLLVMBuildLoad(p, type, value);
+	if (cast(i64)LLVMGetAlignment(result) > alignment) {
+		LLVMSetAlignment(result, cast(unsigned)alignment);
 	}
-
 	return result;
 }
 
@@ -2340,9 +2330,10 @@ gb_internal lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		GB_ASSERT(is_type_pointer(ptr.type));
 
 		LLVMTypeRef vector_type = nullptr;
-		if (lb_try_vector_cast(p->module, addr.addr, &vector_type)) {
+		i64 vector_load_alignment = 0;
+		if (lb_try_vector_cast(p->module, addr.addr, &vector_type, &vector_load_alignment)) {
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, addr.addr.value, LLVMPointerType(vector_type, 0), "");
-			LLVMValueRef v = OdinLLVMBuildLoad(p, vector_type, vp);
+			LLVMValueRef v = OdinLLVMBuildLoadAligned(p, vector_type, vp, vector_load_alignment);
 			LLVMValueRef scalars[4] = {};
 			for (u8 i = 0; i < addr.swizzle.count; i++) {
 				scalars[i] = LLVMConstInt(lb_type(p->module, t_u32), addr.swizzle.indices[i], false);

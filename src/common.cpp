@@ -895,6 +895,7 @@ gb_internal char **command_line_to_spawn_argv(const char *cmd_line, int *_argc) 
 
 #endif
 
+#include "json.cpp"
 #include "path.cpp"
 
 struct LoadedFile {

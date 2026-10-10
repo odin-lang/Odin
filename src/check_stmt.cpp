@@ -710,8 +710,13 @@ gb_internal void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags
 		error(ws->cond, "Invalid body for 'when' statement");
 		return;
 	}
-	if (operand.value.kind == ExactValue_Bool &&
-	    operand.value.value_bool) {
+
+	bool taken = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+		per_thread_array_add(&ctx->info->semantic_when_queue, SemanticWhen{ws, taken});
+	}
+
+	if (taken) {
 		check_stmt_list(ctx, ws->body->BlockStmt.stmts, flags);
 	} else if (ws->else_stmt) {
 		switch (ws->else_stmt->kind) {
@@ -1193,6 +1198,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		Token token  = {};
 		token.pos    = ast_token(ss->body).pos;
 		token.string = str_lit("true");
+		token.flags  = TokenFlag_Synthesized;
 
 		x.expr = alloc_ast_node(nullptr, Ast_Ident);
 		x.expr->Ident.token = token;

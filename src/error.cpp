@@ -264,6 +264,7 @@ gb_internal bool terse_errors(void);
 gb_internal bool json_errors(void);
 gb_internal bool has_ansi_terminal_colours(void);
 gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
+TokenPos token_pos_end(Token const &token);
 
 // Let the compiler check these against their arguments. 
 #if defined(__GNUC__) || defined(__clang__)
@@ -578,6 +579,11 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	i32 squiggle_length = 0;
 	bool trailing_squiggle = false;
 
+	i32 error_start_index_runes = line_length_runes;
+	if (error_start_index_graphemes < line_length_graphemes) {
+		error_start_index_runes = graphemes[error_start_index_graphemes].rune_index;
+	}
+
 	if (end.file_id == pos.file_id) {
 		// The error has an endpoint.
 
@@ -593,10 +599,10 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 
 		} else if (end.line == pos.line && end.column > pos.column) {
 			// Error terminates before line end.
-			i32 adjusted_end_index = graphemes[error_start_index_graphemes].byte_index + end.column - pos.column;
+			i32 error_end_index_runes = error_start_index_runes + end.column - pos.column;
 
 			for (i32 i = error_start_index_graphemes; i < line_length_graphemes; i += 1) {
-				if (graphemes[i].byte_index >= adjusted_end_index) {
+				if (graphemes[i].rune_index >= error_end_index_runes) {
 					break;
 				} else if (graphemes[i].byte_index >= window_close_bytes) {
 					trailing_squiggle = true;
@@ -605,8 +611,9 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 				squiggle_length += graphemes[i].width;
 			}
 		}
-	} else {
-		// The error is at one spot; no range known.
+	}
+	if (squiggle_length == 0) {
+		// The error is at one spot; no range known, or it is empty.
 		squiggle_length = 1;
 	}
 
@@ -620,25 +627,33 @@ gb_internal isize show_error_on_line(TokenPos const &pos, TokenPos end) {
 	i32 sec_len = 0;
 	bool draw_sec = caret.sec_present && caret.sec_pos.line == pos.line && caret.sec_end.line == pos.line;
 	if (draw_sec) {
-		i32 sec_start_byte = error_start_index_bytes + (caret.sec_pos.column - pos.column);
-		i32 sec_end_byte   = error_start_index_bytes + (caret.sec_end.column - pos.column);
+		i32 sec_start_rune = error_start_index_runes + (caret.sec_pos.column - pos.column);
+		i32 sec_end_rune   = error_start_index_runes + (caret.sec_end.column - pos.column);
 		if (window_open_bytes > 0) {
 			sec_pad += 4;
 		}
 		for (i32 i = 0; i < line_length_graphemes; i += 1) {
-			if (graphemes[i].byte_index < window_open_bytes)  continue;
-			if (graphemes[i].byte_index >= sec_start_byte)    break;
+			if (graphemes[i].byte_index < window_open_bytes) {
+				continue;
+			}
+			if (graphemes[i].rune_index >= sec_start_rune) {
+				break;
+			}
 			sec_pad += graphemes[i].width;
 		}
 		for (i32 i = 0; i < line_length_graphemes; i += 1) {
-			if (graphemes[i].byte_index < sec_start_byte) continue;
-			if (graphemes[i].byte_index >= sec_end_byte)  break;
+			if (graphemes[i].rune_index < sec_start_rune) {
+				continue;
+			}
+			if (graphemes[i].rune_index >= sec_end_rune) {
+				break;
+			}
 			sec_len += graphemes[i].width;
 		}
 		if (sec_len < 1) {
 			sec_len = 1;
 		}
-		if (sec_start_byte >= error_start_index_bytes || sec_pad + sec_len > squiggle_padding) {
+		if (sec_start_rune >= error_start_index_runes || sec_pad + sec_len > squiggle_padding) {
 			draw_sec = false; // overlaps or is not to the left; skip rather than misalign
 		}
 	}
@@ -974,14 +989,14 @@ gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const
 gb_internal void warning(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	warning_va(token.pos, {}, fmt, va);
+	warning_va(token.pos, token_pos_end(token), fmt, va);
 	va_end(va);
 }
 
 gb_internal void error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	error_va(token.pos, {}, fmt, va);
+	error_va(token.pos, token_pos_end(token), fmt, va);
 	va_end(va);
 }
 
@@ -1005,7 +1020,7 @@ gb_internal void error_line(char const *fmt, ...) {
 gb_internal void syntax_error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	syntax_error_va(token.pos, {}, fmt, va);
+	syntax_error_va(token.pos, token_pos_end(token), fmt, va);
 	va_end(va);
 }
 
