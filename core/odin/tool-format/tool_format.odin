@@ -89,7 +89,8 @@ Ident :: struct {
 }
 
 // The pairs of `uses` or `definitions` for the identifier starting at `offset`.
-// A call to a procedure group also records the procedure it picks.
+// There can be more than one: each instantiation of a generic can refer to something different,
+// and a use of a generic type also records the type it instantiates.
 find_idents :: proc(pairs: []i32, offset: int) -> []Ident {
 	idents := slice.reinterpret([]Ident, pairs)
 	i, _ := slice.binary_search_by(idents, offset, proc(x: Ident, offset: int) -> slice.Ordering {

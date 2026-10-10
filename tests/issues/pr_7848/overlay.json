@@ -1,0 +1,7 @@
+{
+	"Replace": {
+		"../pr_7848/pkg_a/a.odin":       "../pr_7848/overlay/a.odin",
+		"../pr_7848/pkg_a/deleted.odin": "",
+		"../pr_7848/pkg_a/added.odin":   "../pr_7848/overlay/added.odin"
+	}
+}

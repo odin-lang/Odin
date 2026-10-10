@@ -288,6 +288,11 @@ $ODIN run ../test_issue_7798.odin $COMMON
 $ODIN test ../test_issue_7763.odin $COMMON
 $ODIN test ../test_issue_disabled_proc_value.odin $COMMON -disable-assert
 $ODIN test ../test_issue_loaded_pointer_alignment.odin $COMMON -o:speed
+$ODIN check ../pr_7848/pkg_b ../pr_7848/pkg_a -no-entry-point -workspace -vet -strict-style -overlay:../pr_7848/overlay.json -export-semantics:json -export-semantics-file:pr_7848.json
+$ODIN check ../pr_7848/pkg_b ../pr_7848/pkg_a -no-entry-point -workspace -vet -strict-style -overlay:../pr_7848/overlay.json -export-semantics:cbor -export-semantics-file:pr_7848.cbor
+$ODIN check ../pr_7848/pkg_b ../pr_7848/pkg_a -no-entry-point -workspace -vet -strict-style -overlay:../pr_7848/overlay.json -export-semantics:cbor -export-semantics-file:pr_7848_again.cbor
+cmp pr_7848.cbor pr_7848_again.cbor
+$ODIN test ../test_pr_7848.odin $COMMON
 
 if [[ $($ODIN check ../test_issue_atomic_orderings.odin -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 13 ]]; then
 	echo "SUCCESSFUL 1/1"

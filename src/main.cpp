@@ -4151,6 +4151,14 @@ gb_internal bool load_overlays(String overlay_file) {
 		}
 		OverlayEntry e = {};
 		e.path = path_to_full_path(permanent_allocator(), entry.key);
+		if (!gb_file_exists(alloc_cstring(temporary_allocator(), entry.key))) {
+			String dir = directory_from_path(entry.key);
+			if (dir.len == 0) {
+				dir = str_lit(".");
+			}
+			dir = path_to_full_path(temporary_allocator(), dir);
+			e.path = concatenate3_strings(permanent_allocator(), dir, str_lit("/"), filename_without_directory(entry.key));
+		}
 		if (entry.value->string.len != 0) {
 			e.replacement = path_to_full_path(permanent_allocator(), entry.value->string);
 		}

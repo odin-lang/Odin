@@ -111,6 +111,11 @@ clang -c ..\test_issue_sysv_abi.c -o test_issue_sysv_abi_c.o || exit /b
 ..\..\..\odin check ..\test_issue_atomic_errors.odin -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 ..\..\..\odin check ..\test_issue_atomic_access.odin -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 ..\..\..\odin test ..\test_issue_loaded_pointer_alignment.odin %COMMON% -o:speed || exit /b
+..\..\..\odin check ..\pr_7848\pkg_b ..\pr_7848\pkg_a -no-entry-point -workspace -vet -strict-style -overlay:..\pr_7848\overlay.json -export-semantics:json -export-semantics-file:pr_7848.json || exit /b
+..\..\..\odin check ..\pr_7848\pkg_b ..\pr_7848\pkg_a -no-entry-point -workspace -vet -strict-style -overlay:..\pr_7848\overlay.json -export-semantics:cbor -export-semantics-file:pr_7848.cbor || exit /b
+..\..\..\odin check ..\pr_7848\pkg_b ..\pr_7848\pkg_a -no-entry-point -workspace -vet -strict-style -overlay:..\pr_7848\overlay.json -export-semantics:cbor -export-semantics-file:pr_7848_again.cbor || exit /b
+fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
+..\..\..\odin test ..\test_pr_7848.odin %COMMON% || exit /b
 
 @echo off
 
