@@ -77,6 +77,7 @@ Raw_Chan :: struct {
 	allocation_size: int,
 	msg_size:        u16,
 	closed:          b16, // guarded by `mutex`
+	msg_offset:      u32, // buffered; here to fill the padding
 	mutex:           sync.Mutex,
 	r_waiters:       sync.Wait_Queue, // guarded by `mutex`
 	w_waiters:       sync.Wait_Queue, // guarded by `mutex`
@@ -85,6 +86,11 @@ Raw_Chan :: struct {
 	ring:      ^Raw_Ring,
 	r_waiting: int, // receivers in or entering `r_waiters`
 	w_waiting: int, // senders in or entering `w_waiters`
+
+	slots:     [^]u8,
+	cap:       uint,
+	stride:    uint,
+	mark:      uint,
 }
 
 /*
@@ -313,21 +319,18 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 	c.allocator       = allocator
 	c.allocation_size = size
 	c.msg_size        = u16(msg_size)
-
-	r := (^Raw_Ring)(ptr[ring_offset:])
-	r.slots      = ptr[slots_offset:]
-	r.cap        = uint(cap)
-	r.stride     = uint(stride)
-	r.msg_offset = uint(msg_offset)
-	r.mark       = 1
-	for r.mark <= r.cap {
-		r.mark <<= 1
+	c.msg_offset      = u32(msg_offset)
+	c.ring            = (^Raw_Ring)(ptr[ring_offset:])
+	c.slots           = ptr[slots_offset:]
+	c.cap             = uint(cap)
+	c.stride          = uint(stride)
+	c.mark            = 1
+	for c.mark <= c.cap {
+		c.mark <<= 1
 	}
-	r.one_lap = r.mark << 1
-	for i in 0..<r.cap {
-		(^uint)(r.slots[i*r.stride:])^ = i
+	for i in 0..<c.cap {
+		(^uint)(c.slots[i*c.stride:])^ = i
 	}
-	c.ring = r
 	return
 }
 
@@ -772,7 +775,7 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 		return false
 	}
 	if c.ring != nil { // buffered
-		if ring_send(c.ring, msg_in, int(c.msg_size)) != .Ok {
+		if ring_send(c, msg_in, int(c.msg_size)) != .Ok {
 			return false
 		}
 		wake_one(c, &c.r_waiting, &c.r_waiters)
@@ -833,7 +836,7 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 		return false
 	}
 	if c.ring != nil { // buffered
-		if ring_recv(c.ring, msg_out, int(c.msg_size)) != .Ok {
+		if ring_recv(c, msg_out, int(c.msg_size)) != .Ok {
 			return false
 		}
 		wake_one(c, &c.w_waiting, &c.w_waiters)
@@ -992,17 +995,17 @@ len :: proc "contextless" (c: ^Raw_Chan) -> int {
 		if sync.atomic_load_explicit(&r.tail, .Seq_Cst) != tail {
 			continue
 		}
-		hix := head & (r.mark - 1)
-		tix := tail & (r.mark - 1)
+		hix := head & (c.mark - 1)
+		tix := tail & (c.mark - 1)
 		switch {
 		case hix < tix:
 			return int(tix - hix)
 		case hix > tix:
-			return int(r.cap - hix + tix)
-		case (tail &~ r.mark) == head:
+			return int(c.cap - hix + tix)
+		case (tail &~ c.mark) == head:
 			return 0
 		case:
-			return int(r.cap)
+			return int(c.cap)
 		}
 	}
 }
@@ -1037,8 +1040,8 @@ Output:
 */
 @(require_results)
 cap :: proc "contextless" (c: ^Raw_Chan) -> int {
-	if c != nil && c.ring != nil {
-		return int(c.ring.cap)
+	if c != nil {
+		return int(c.cap)
 	}
 	return 0
 }
@@ -1079,8 +1082,8 @@ close :: proc "contextless" (c: ^Raw_Chan) -> bool {
 		return false
 	}
 	if r := c.ring; r != nil {
-		tail := sync.atomic_or_explicit(&r.tail, r.mark, .Seq_Cst)
-		if (tail & r.mark) != 0 {
+		tail := sync.atomic_or_explicit(&r.tail, c.mark, .Seq_Cst)
+		if (tail & c.mark) != 0 {
 			return false
 		}
 	}
@@ -1154,7 +1157,7 @@ can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if r := c.ring; r != nil {
 		head := sync.atomic_load_explicit(&r.head, .Relaxed)
 		tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
-		return (tail &~ r.mark) != head
+		return (tail &~ c.mark) != head
 	}
 	return !sync.wait_queue_is_empty(&c.w_waiters)
 }
@@ -1190,7 +1193,7 @@ can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if r := c.ring; r != nil {
 		tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
 		head := sync.atomic_load_explicit(&r.head, .Relaxed)
-		return (head + r.one_lap) != (tail &~ r.mark)
+		return (head + (c.mark << 1)) != (tail &~ c.mark)
 	}
 	return !sync.wait_queue_is_empty(&c.r_waiters)
 }
@@ -1347,18 +1350,14 @@ CACHE_LINE :: 64 // TODO(bill): actually use the correct cache line size for wha
 @(private)
 RING_PAD :: 2*CACHE_LINE
 
+#assert(size_of(Raw_Chan) <= RING_PAD)
+
 @(private)
 Raw_Ring :: struct {
-	tail:       uint,
-	_:          [RING_PAD - size_of(uint)]u8,
-	head:       uint,
-	_:          [RING_PAD - size_of(uint)]u8,
-	slots:      [^]u8,
-	cap:        uint,
-	stride:     uint,
-	msg_offset: uint,
-	mark:       uint,
-	one_lap:    uint,
+	tail: uint,
+	_:    [RING_PAD - size_of(uint)]u8,
+	head: uint,
+	_:    [RING_PAD - size_of(uint)]u8,
 }
 
 @(private)
@@ -1369,30 +1368,33 @@ Ring_Status :: enum u8 {
 }
 
 @(private, require_results)
-ring_next :: proc "contextless" (r: ^Raw_Ring, pos: uint) -> uint {
-	index := pos & (r.mark - 1)
-	if (index + 1) == r.cap {
-		return (pos &~ (r.one_lap - 1)) + r.one_lap
+ring_next :: proc "contextless" (c: ^Raw_Chan, pos: uint) -> uint {
+	index := pos & (c.mark - 1)
+	if (index + 1) == c.cap {
+		one_lap := c.mark << 1
+		return (pos &~ (one_lap - 1)) + one_lap
 	}
 	return pos + 1
 }
 
 @(private, require_results)
-ring_send :: proc "contextless" (r: ^Raw_Ring, msg_in: rawptr, size: int) -> Ring_Status {
+ring_send :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_in: rawptr, size: int) -> Ring_Status {
+	r := c.ring
+	one_lap := c.mark << 1
 	tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
 	backoff := 1
 	for {
-		if (tail & r.mark) != 0 {
+		if (tail & c.mark) != 0 {
 			return .Closed
 		}
-		index := tail & (r.mark - 1)
-		slot  := r.slots[index*r.stride:]
+		index := tail & (c.mark - 1)
+		slot  := c.slots[index*c.stride:]
 		stamp := sync.atomic_load_explicit((^uint)(slot), .Acquire)
 		switch {
 		case stamp == tail:
-			next := ring_next(r, tail)
+			next := ring_next(c, tail)
 			if t, ok := sync.atomic_compare_exchange_weak_explicit(&r.tail, tail, next, .Seq_Cst, .Relaxed); ok {
-				intrinsics.mem_copy_non_overlapping(slot[r.msg_offset:], msg_in, size)
+				intrinsics.mem_copy_non_overlapping(slot[c.msg_offset:], msg_in, size)
 				sync.atomic_store_explicit((^uint)(slot), tail + 1, .Release)
 				return .Ok
 			} else {
@@ -1402,10 +1404,10 @@ ring_send :: proc "contextless" (r: ^Raw_Ring, msg_in: rawptr, size: int) -> Rin
 				}
 				backoff = min(backoff*2, 64)
 			}
-		case (stamp + r.one_lap) == (tail + 1):
+		case (stamp + one_lap) == (tail + 1):
 			sync.atomic_thread_fence(.Seq_Cst)
 			head := sync.atomic_load_explicit(&r.head, .Relaxed)
-			if (head + r.one_lap) == tail {
+			if (head + one_lap) == tail {
 				return .Blocked
 			}
 			sync.cpu_relax()
@@ -1418,19 +1420,21 @@ ring_send :: proc "contextless" (r: ^Raw_Ring, msg_in: rawptr, size: int) -> Rin
 }
 
 @(private, require_results)
-ring_recv :: proc "contextless" (r: ^Raw_Ring, msg_out: rawptr, size: int) -> Ring_Status {
+ring_recv :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_out: rawptr, size: int) -> Ring_Status {
+	r := c.ring
+	one_lap := c.mark << 1
 	head := sync.atomic_load_explicit(&r.head, .Relaxed)
 	backoff := 1
 	for {
-		index := head & (r.mark - 1)
-		slot  := r.slots[index*r.stride:]
+		index := head & (c.mark - 1)
+		slot  := c.slots[index*c.stride:]
 		stamp := sync.atomic_load_explicit((^uint)(slot), .Acquire)
 		switch {
 		case stamp == (head + 1):
-			next := ring_next(r, head)
+			next := ring_next(c, head)
 			if h, ok := sync.atomic_compare_exchange_weak_explicit(&r.head, head, next, .Seq_Cst, .Relaxed); ok {
-				intrinsics.mem_copy_non_overlapping(msg_out, slot[r.msg_offset:], size)
-				sync.atomic_store_explicit((^uint)(slot), head + r.one_lap, .Release)
+				intrinsics.mem_copy_non_overlapping(msg_out, slot[c.msg_offset:], size)
+				sync.atomic_store_explicit((^uint)(slot), head + one_lap, .Release)
 				return .Ok
 			} else {
 				head = h
@@ -1442,8 +1446,8 @@ ring_recv :: proc "contextless" (r: ^Raw_Ring, msg_out: rawptr, size: int) -> Ri
 		case stamp == head:
 			sync.atomic_thread_fence(.Seq_Cst)
 			tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
-			if (tail &~ r.mark) == head {
-				if (tail & r.mark) != 0 {
+			if (tail &~ c.mark) == head {
+				if (tail & c.mark) != 0 {
 					return .Closed
 				}
 				return .Blocked
@@ -1471,7 +1475,7 @@ send_blocking :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_in: rawptr,
 	size := int(c.msg_size)
 	if r := c.ring; r != nil { // buffered
 		for spin := 0; ; spin += 1 {
-			switch ring_send(r, msg_in, size) {
+			switch ring_send(c, msg_in, size) {
 			case .Ok:
 				wake_one(c, &c.r_waiting, &c.r_waiters)
 				return .Ok
@@ -1501,7 +1505,7 @@ send_blocking :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_in: rawptr,
 			head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
 
 			switch {
-			case (head + r.one_lap) != tail:
+			case (head + (c.mark << 1)) != tail:
 				sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
 				sync.unlock(&c.mutex)
 			case !timed:
@@ -1559,7 +1563,7 @@ recv_blocking :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_out: rawptr
 	size := int(c.msg_size)
 	if r := c.ring; r != nil { // buffered
 		for spin := 0; ; spin += 1 {
-			switch ring_recv(r, msg_out, size) {
+			switch ring_recv(c, msg_out, size) {
 			case .Ok:
 				wake_one(c, &c.w_waiting, &c.w_waiters)
 				return .Ok
