@@ -5,6 +5,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:sync"
 import "core:math/rand"
+import "core:time"
 
 when ODIN_TEST {
 /*
@@ -563,6 +564,92 @@ try_recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where
 	return
 }
 
+/*
+The result of a send or receive with a timeout.
+*/
+Timeout_Status :: enum {
+	Ok,        // the message was sent or received
+	Timed_Out, // the timeout passed first
+	Closed,    // the channel was closed; when receiving, also empty
+}
+
+/*
+Sends the specified message, blocking the current thread until it is sent, the channel is closed, or `duration` has passed.
+
+**Inputs**
+- `c`: The channel
+- `data`: The message to send
+- `duration`: The longest time to wait
+
+**Returns**
+- `.Ok` if the message was sent, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed
+
+Example:
+
+	import "core:sync/chan"
+	import "core:time"
+
+	send_with_timeout_example :: proc() {
+		c, err := chan.create(chan.Chan(int), 1, context.allocator)
+		assert(err == .None)
+		defer chan.destroy(c)
+
+		assert(chan.send_with_timeout(c, 1, time.Millisecond) == .Ok)
+
+		// the buffer is full and will give up after a millisecond
+		assert(chan.send_with_timeout(c, 2, time.Millisecond) == .Timed_Out)
+
+		chan.close(c)
+		assert(chan.send_with_timeout(c, 3, time.Millisecond) == .Closed)
+	}
+*/
+@(require_results, synchronizes=.Release)
+send_with_timeout :: proc "contextless" (c: $C/Chan($T, $D), data: T, duration: time.Duration) -> Timeout_Status where C.D <= .Both {
+	data := data
+	return send_raw_with_timeout(c, &data, duration)
+}
+
+/*
+Reads a message from the channel, blocking the current thread until one is available, the channel is closed and empty, or `duration` has passed.
+
+**Inputs**
+- `c`: The channel
+- `duration`: The longest time to wait
+
+**Returns**
+- The message
+- `.Ok` if a message was received, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed and empty
+
+Example:
+
+	import "core:sync/chan"
+	import "core:time"
+
+	recv_with_timeout_example :: proc() {
+		c, err := chan.create(chan.Chan(int), 1, context.allocator)
+		assert(err == .None)
+		defer chan.destroy(c)
+
+		// the channel is empty and will give up after a millisecond
+		_, status := chan.recv_with_timeout(c, time.Millisecond)
+		assert(status == .Timed_Out)
+
+		assert(chan.send(c, 2))
+		value: int
+		value, status = chan.recv_with_timeout(c, time.Millisecond)
+		assert(status == .Ok && value == 2)
+
+		chan.close(c)
+		_, status = chan.recv_with_timeout(c, time.Millisecond)
+		assert(status == .Closed)
+	}
+*/
+@(require_results, synchronizes=.Acquire)
+recv_with_timeout :: proc "contextless" (c: $C/Chan($T, $D), duration: time.Duration) -> (data: T, status: Timeout_Status) where C.D >= .Both {
+	status = recv_raw_with_timeout(c, &data, duration)
+	return
+}
+
 
 /*
 Sends the specified message, blocking the current thread if:
@@ -603,54 +690,7 @@ Example:
 */
 @(require_results, synchronizes=.Release)
 send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
-	if c == nil {
-		return
-	}
-	if r := c.ring; r != nil { // buffered
-		size := int(c.msg_size)
-		for spin := 0; ; spin += 1 {
-			switch ring_send(r, msg_in, size) {
-			case .Ok:
-				wake_one(c, &c.r_waiting, &c.r_waiters)
-				return true
-			case .Closed:
-				return false
-			case .Blocked:
-			}
-			if spin < 7 {
-				for _ in 0..<(1<<uint(spin)) {
-					sync.cpu_relax()
-				}
-				continue
-			}
-
-			sync.lock(&c.mutex)
-			sync.atomic_add_explicit(&c.w_waiting, 1, .Seq_Cst)
-			tail := sync.atomic_load_explicit(&r.tail, .Seq_Cst)
-			head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
-			if (head + r.one_lap) == tail {
-				sync.wait_queue_wait(&c.w_waiters, &c.mutex, nil)
-			} else {
-				sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
-				sync.unlock(&c.mutex)
-			}
-		}
-	} else { // unbuffered
-		size := int(c.msg_size)
-		sync.lock(&c.mutex)
-		if c.closed {
-			sync.unlock(&c.mutex)
-			return false
-		}
-		if r := sync.wait_queue_pop(&c.r_waiters); r != nil {
-			sync.unlock(&c.mutex)
-			intrinsics.mem_copy_non_overlapping(r.data, msg_in, size)
-			sync.waiter_wake(r, true)
-			return true
-		}
-		ok = sync.wait_queue_wait(&c.w_waiters, &c.mutex, msg_in)
-	}
-	return
+	return send_blocking(c, msg_in, false, 0) == .Ok
 }
 
 /*
@@ -695,58 +735,7 @@ Example:
 */
 @(require_results, synchronizes=.Acquire)
 recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
-	if c == nil {
-		return
-	}
-	if r := c.ring; r != nil { // buffered
-		size := int(c.msg_size)
-		for spin := 0; ; spin += 1 {
-			switch ring_recv(r, msg_out, size) {
-			case .Ok:
-				wake_one(c, &c.w_waiting, &c.w_waiters)
-				return true
-			case .Closed:
-				return false
-			case .Blocked:
-			}
-			if spin < 7 {
-				for _ in 0..<(1<<uint(spin)) {
-					sync.cpu_relax()
-				}
-				continue
-			}
-
-			sync.lock(&c.mutex)
-			sync.atomic_add_explicit(&c.r_waiting, 1, .Seq_Cst)
-			tail := sync.atomic_load_explicit(&r.tail, .Seq_Cst)
-			head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
-			if head == tail {
-				sync.wait_queue_wait(&c.r_waiters, &c.mutex, nil)
-			} else {
-				sync.atomic_sub_explicit(&c.r_waiting, 1, .Relaxed)
-				sync.unlock(&c.mutex)
-			}
-		}
-	} else { // unbuffered
-		size := int(c.msg_size)
-
-		sync.lock(&c.mutex)
-		if c.closed {
-			sync.unlock(&c.mutex)
-			return false
-		}
-
-		if s := sync.wait_queue_pop(&c.w_waiters); s != nil {
-			sync.unlock(&c.mutex)
-
-			intrinsics.mem_copy_non_overlapping(msg_out, s.data, size)
-			sync.waiter_wake(s, true)
-			return true
-		}
-
-		ok = sync.wait_queue_wait(&c.r_waiters, &c.mutex, msg_out)
-	}
-	return
+	return recv_blocking(c, msg_out, false, 0) == .Ok
 }
 
 
@@ -870,6 +859,44 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 		sync.waiter_wake(s, true)
 		return true
 	}
+}
+
+/*
+Sends the specified message, blocking the current thread until it is sent, the channel is closed, or `duration` has passed.
+
+Note: The message referenced by `msg_in` must match the size
+and alignment used when the `Raw_Chan` was created.
+
+**Inputs**
+- `c`: The channel
+- `msg_in`: Pointer to the data to send
+- `duration`: The longest time to wait
+
+**Returns**
+- `.Ok` if the message was sent, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed
+*/
+@(require_results, synchronizes=.Release)
+send_raw_with_timeout :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr, duration: time.Duration) -> Timeout_Status {
+	return send_blocking(c, msg_in, true, duration)
+}
+
+/*
+Reads a message from the channel, blocking the current thread until one is available, the channel is closed and empty, or `duration` has passed.
+
+Note: The location pointed to by `msg_out` must match the size
+and alignment used when the `Raw_Chan` was created.
+
+**Inputs**
+- `c`: The channel
+- `msg_out`: Pointer to where the message should be stored
+- `duration`: The longest time to wait
+
+**Returns**
+- `.Ok` if a message was received, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed and empty
+*/
+@(require_results, synchronizes=.Acquire)
+recv_raw_with_timeout :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr, duration: time.Duration) -> Timeout_Status {
+	return recv_blocking(c, msg_out, true, duration)
 }
 
 
@@ -1062,14 +1089,18 @@ close :: proc "contextless" (c: ^Raw_Chan) -> bool {
 		return false
 	}
 	sync.atomic_store_explicit(&c.closed, true, .Relaxed)
-	sync.atomic_store_explicit(&c.r_waiting, 0, .Relaxed)
-	sync.atomic_store_explicit(&c.w_waiting, 0, .Relaxed)
 
 	for w := sync.wait_queue_pop(&c.r_waiters); w != nil; w = sync.wait_queue_pop(&c.r_waiters) {
+		if c.ring != nil {
+			sync.atomic_sub_explicit(&c.r_waiting, 1, .Relaxed)
+		}
 		sync.waiter_wake(w, false)
 	}
 
 	for w := sync.wait_queue_pop(&c.w_waiters); w != nil; w = sync.wait_queue_pop(&c.w_waiters) {
+		if c.ring != nil {
+			sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
+		}
 		sync.waiter_wake(w, false)
 	}
 	return true
@@ -1422,6 +1453,182 @@ ring_recv :: proc "contextless" (r: ^Raw_Ring, msg_out: rawptr, size: int) -> Ri
 		case:
 			sync.cpu_relax()
 			head = sync.atomic_load_explicit(&r.head, .Relaxed)
+		}
+	}
+}
+
+@(private, require_results)
+send_blocking :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_in: rawptr, timed: bool, duration: time.Duration) -> Timeout_Status {
+	if c == nil {
+		return .Closed
+	}
+
+	start: time.Tick
+	if timed {
+		start = time.tick_now()
+	}
+
+	size := int(c.msg_size)
+	if r := c.ring; r != nil { // buffered
+		for spin := 0; ; spin += 1 {
+			switch ring_send(r, msg_in, size) {
+			case .Ok:
+				wake_one(c, &c.r_waiting, &c.r_waiters)
+				return .Ok
+			case .Closed:
+				return .Closed
+			case .Blocked:
+			}
+
+			remaining: time.Duration
+			if timed {
+				remaining = duration - time.tick_since(start)
+				if remaining <= 0 {
+					return .Timed_Out
+				}
+			}
+
+			if spin < 7 {
+				for _ in 0..<(1<<uint(spin)) {
+					sync.cpu_relax()
+				}
+				continue
+			}
+
+			sync.lock(&c.mutex)
+			sync.atomic_add_explicit(&c.w_waiting, 1, .Seq_Cst)
+			tail := sync.atomic_load_explicit(&r.tail, .Seq_Cst)
+			head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
+
+			switch {
+			case (head + r.one_lap) != tail:
+				sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
+				sync.unlock(&c.mutex)
+			case !timed:
+				sync.wait_queue_wait(&c.w_waiters, &c.mutex, nil)
+			case:
+				if woken, _ := sync.wait_queue_wait_with_timeout(&c.w_waiters, &c.mutex, nil, remaining); !woken {
+					sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
+				}
+			}
+		}
+	} else { // unbuffered
+		sync.lock(&c.mutex)
+		if c.closed {
+			sync.unlock(&c.mutex)
+			return .Closed
+		}
+
+		if r := sync.wait_queue_pop(&c.r_waiters); r != nil {
+			sync.unlock(&c.mutex)
+			intrinsics.mem_copy_non_overlapping(r.data, msg_in, size)
+			sync.waiter_wake(r, true)
+			return .Ok
+		}
+
+		if !timed {
+			if sync.wait_queue_wait(&c.w_waiters, &c.mutex, msg_in) {
+				return .Ok
+			}
+			return .Closed
+		}
+
+		woken, ok := sync.wait_queue_wait_with_timeout(&c.w_waiters, &c.mutex, msg_in, duration - time.tick_since(start))
+		switch {
+		case !woken:
+			return .Timed_Out
+		case ok:
+			return .Ok
+		case:
+			return .Closed
+		}
+	}
+}
+
+@(private, require_results)
+recv_blocking :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_out: rawptr, timed: bool, duration: time.Duration) -> Timeout_Status {
+	if c == nil {
+		return .Closed
+	}
+
+	start: time.Tick
+	if timed {
+		start = time.tick_now()
+	}
+
+	size := int(c.msg_size)
+	if r := c.ring; r != nil { // buffered
+		for spin := 0; ; spin += 1 {
+			switch ring_recv(r, msg_out, size) {
+			case .Ok:
+				wake_one(c, &c.w_waiting, &c.w_waiters)
+				return .Ok
+			case .Closed:
+				return .Closed
+			case .Blocked:
+			}
+
+			remaining: time.Duration
+			if timed {
+				remaining = duration - time.tick_since(start)
+				if remaining <= 0 {
+					return .Timed_Out
+				}
+			}
+
+			if spin < 7 {
+				for _ in 0..<(1<<uint(spin)) {
+					sync.cpu_relax()
+				}
+				continue
+			}
+
+			sync.lock(&c.mutex)
+			sync.atomic_add_explicit(&c.r_waiting, 1, .Seq_Cst)
+			tail := sync.atomic_load_explicit(&r.tail, .Seq_Cst)
+			head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
+
+			switch {
+			case head != tail:
+				sync.atomic_sub_explicit(&c.r_waiting, 1, .Relaxed)
+				sync.unlock(&c.mutex)
+			case !timed:
+				sync.wait_queue_wait(&c.r_waiters, &c.mutex, nil)
+			case:
+				if woken, _ := sync.wait_queue_wait_with_timeout(&c.r_waiters, &c.mutex, nil, remaining); !woken {
+					sync.atomic_sub_explicit(&c.r_waiting, 1, .Relaxed)
+				}
+			}
+		}
+	} else { // unbuffered
+		sync.lock(&c.mutex)
+		if c.closed {
+			sync.unlock(&c.mutex)
+			return .Closed
+		}
+
+		if s := sync.wait_queue_pop(&c.w_waiters); s != nil {
+			sync.unlock(&c.mutex)
+			intrinsics.mem_copy_non_overlapping(msg_out, s.data, size)
+			sync.waiter_wake(s, true)
+			return .Ok
+		}
+
+		if !timed {
+			if sync.wait_queue_wait(&c.r_waiters, &c.mutex, msg_out) {
+				return .Ok
+			}
+			return .Closed
+		}
+
+		woken, ok := sync.wait_queue_wait_with_timeout(&c.r_waiters, &c.mutex, msg_out, duration - time.tick_since(start))
+		switch {
+		case !woken:
+			return .Timed_Out
+		case ok:
+			return .Ok
+		case:
+			return .Closed
 		}
 	}
 }
