@@ -944,7 +944,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 			if (p->context_stack.count > 0) {
 				name = "type_assertion_check2_with_context";
 			}
-			lb_emit_runtime_call(p, name, args);
+			lb_emit_runtime_call_unless(p, ok, name, args);
 		}
 
 		return lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 0));
@@ -1022,7 +1022,7 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 			if (p->context_stack.count > 0) {
 				name = "type_assertion_check2_with_context";
 			}
-			lb_emit_runtime_call(p, name, args);
+			lb_emit_runtime_call_unless(p, ok, name, args);
 		}
 
 		return lb_addr(lb_emit_struct_ep(p, v.addr, 0));
