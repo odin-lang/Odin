@@ -24,8 +24,8 @@ The highest code point in the Latin-1 range, `U+00FF`.
 MAX_LATIN1 :: '\u00ff'
 
 /*
-`U+200B`, the zero width space. It is not the same as `U+0020`: it has no
-width, and `[[is_space]]` does not consider it whitespace.
+`U+200B`, the zero width space. It has no width, but it is still counted as
+whitespace by [[is_space]].
 */
 ZERO_WIDTH_SPACE :: '\u200B'
 
@@ -244,6 +244,18 @@ is_upper :: proc(r: rune) -> bool #no_bounds_check {
 	return in_range(r, lu_ranges) || in_range(r, other_uppercase_ranges)
 }
 
+/*
+Returns whether the rune `r` is a letter.
+
+This is an alias for [[is_letter]] and behaves identically to it.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is in the Unicode general category Ll, Lm, Lo, Lt or Lu, and
+`false` otherwise.
+*/
 is_alpha :: is_letter
 
 /*
@@ -319,7 +331,30 @@ is_digit :: proc(r: rune) -> bool {
 }
 
 
+/*
+Returns whether the rune `r` is whitespace.
+
+This is an alias for [[is_space]] and behaves identically to it.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is whitespace, and `false` otherwise.
+*/
 is_white_space :: is_space
+/*
+Returns whether the rune `r` is whitespace.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a space, tab, or other separator defined by Unicode, and
+`false` otherwise. Note that the zero width space [[ZERO_WIDTH_SPACE]] and
+[[WORD_JOINER]] are handled differently: the former counts as whitespace,
+while the latter does not.
+*/
 @(require_results)
 is_space :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
@@ -337,6 +372,18 @@ is_space :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
+/*
+Returns whether the rune `r` is a combining character.
+
+These are characters that combine with the preceding character to form a
+single grapheme, such as the accents used to build letters like `é` from `e`.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a combining character, `false` otherwise.
+*/
 @(require_results)
 is_combining :: proc(r: rune) -> bool {
 	c := i32(r)
@@ -350,6 +397,18 @@ is_combining :: proc(r: rune) -> bool {
 
 
 
+/*
+Returns whether the rune `r` is a graphic character, meaning it has a visible
+shape.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a letter, number, punctuation mark, symbol, or a character
+that takes up space, and `false` otherwise. Control characters are not
+graphic, but the space character `U+0020` is.
+*/
 @(require_results)
 is_graphic :: proc(r: rune) -> bool {
 	if u32(r) <= MAX_LATIN1 {
@@ -367,6 +426,15 @@ is_graphic :: proc(r: rune) -> bool {
 	return false
 }
 
+/*
+Returns whether the rune `r` is printable.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is printable, `false` otherwise.
+*/
 @(require_results)
 is_print :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
@@ -375,6 +443,16 @@ is_print :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
+/*
+Returns whether the rune `r` is a control character, meaning it is not a
+printable character.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a control character, `false` otherwise.
+*/
 @(require_results)
 is_control :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
@@ -404,6 +482,16 @@ is_number :: proc(r: rune) -> bool #no_bounds_check {
 	return in_range(r, nd_ranges) || in_range(r, nl_ranges) || in_range(r, no_ranges)
 }
 
+/*
+Returns whether the rune `r` is punctuation.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is in a Unicode punctuation category (Pc, Pd, Ps, Pe, Pi, Pf
+or Po), and `false` otherwise.
+*/
 @(require_results)
 is_punct :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
@@ -421,6 +509,17 @@ is_punct :: proc(r: rune) -> bool #no_bounds_check {
 	return in_range(r, ps_ranges)
 }
 
+/*
+Returns whether the rune `r` is a symbol, as distinct from a letter, number or
+punctuation mark.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is in a Unicode symbol category (Sm, Sc, Sk or So), and `false`
+otherwise.
+*/
 @(require_results)
 is_symbol :: proc(r: rune) -> bool #no_bounds_check {
 	if u32(r) <= MAX_LATIN1 {
@@ -440,19 +539,53 @@ is_symbol :: proc(r: rune) -> bool #no_bounds_check {
 // The procedures below are accurate as of Unicode 15.1.0.
 //
 
-// Emoji_Modifier
+/*
+Unicode property: `Emoji_Modifier`.
+
+Returns whether the rune `r` is an emoji modifier, used to recolour the
+preceding emoji skin tone.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is an emoji modifier, `false` otherwise.
+*/
 @(require_results)
 is_emoji_modifier :: proc(r: rune) -> bool {
 	return 0x1F3FB <= r && r <= 0x1F3FF
 }
 
-// Regional_Indicator
+/*
+Unicode property: `Regional_Indicator`.
+
+Returns whether the rune `r` is a regional indicator symbol, the letters used
+to build flag emoji.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a regional indicator symbol, `false` otherwise.
+*/
 @(require_results)
 is_regional_indicator :: proc(r: rune) -> bool {
 	return 0x1F1E6 <= r && r <= 0x1F1FF
 }
 
-// General_Category=Enclosing_Mark
+/*
+Unicode property: `General_Category=Enclosing_Mark`.
+
+Returns whether the rune `r` is an enclosing mark, which combines with the
+preceding characters to enclose them in a single glyph, as with the parentheses
+in some scripts.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is an enclosing mark, `false` otherwise.
+*/
 @(require_results)
 is_enclosing_mark :: proc(r: rune) -> bool {
 	switch r {
@@ -468,7 +601,18 @@ is_enclosing_mark :: proc(r: rune) -> bool {
 	return false
 }
 
-// Prepended_Concatenation_Mark
+/*
+Unicode property: `Prepended_Concatenation_Mark`.
+
+Returns whether the rune `r` is a prepended concatenation mark, which joins to
+the following characters to form a single glyph.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a prepended concatenation mark, `false` otherwise.
+*/
 @(require_results)
 is_prepended_concatenation_mark :: proc(r: rune) -> bool {
 	switch r {
@@ -485,7 +629,18 @@ is_prepended_concatenation_mark :: proc(r: rune) -> bool {
 	}
 }
 
-// General_Category=Spacing_Mark
+/*
+Unicode property: `General_Category=Spacing_Mark`.
+
+Returns whether the rune `r` is a spacing mark, a character that combines with
+the preceding character but still occupies space of its own.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a spacing mark, `false` otherwise.
+*/
 @(require_results)
 is_spacing_mark :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -496,7 +651,19 @@ is_spacing_mark :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
-// General_Category=Nonspacing_Mark
+/*
+Unicode property: `General_Category=Nonspacing_Mark`.
+
+Returns whether the rune `r` is a nonspacing mark, a character that combines
+with the preceding character without occupying space of its own, such as most
+combining accents.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a nonspacing mark, `false` otherwise.
+*/
 @(require_results)
 is_nonspacing_mark :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -507,7 +674,18 @@ is_nonspacing_mark :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
-// Extended_Pictographic
+/*
+Unicode property: `Extended_Pictographic`.
+
+Returns whether the rune `r` is an extended pictographic character, meaning it
+should be treated as an emoji or ideograph when rendering text.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is an extended pictographic character, `false` otherwise.
+*/
 @(require_results)
 is_emoji_extended_pictographic :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -518,7 +696,18 @@ is_emoji_extended_pictographic :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
-// Grapheme_Extend
+/*
+Unicode property: `Grapheme_Extend`.
+
+Returns whether the rune `r` extends the preceding character in a grapheme
+cluster, meaning it combines with it rather than starting a new character.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` extends a grapheme cluster, `false` otherwise.
+*/
 @(require_results)
 is_grapheme_extend :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -530,25 +719,69 @@ is_grapheme_extend :: proc(r: rune) -> bool #no_bounds_check {
 }
 
 
-// Hangul_Syllable_Type=Leading_Jamo
+/*
+Unicode property: `Hangul_Syllable_Type=Leading_Jamo`.
+
+Returns whether the rune `r` is a leading Hangul jamo, the first consonant of a
+Hangul syllable.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a leading Hangul jamo, `false` otherwise.
+*/
 @(require_results)
 is_hangul_syllable_leading :: proc(r: rune) -> bool {
 	return 0x1100 <= r && r <= 0x115F || 0xA960 <= r && r <= 0xA97C
 }
 
-// Hangul_Syllable_Type=Vowel_Jamo
+/*
+Unicode property: `Hangul_Syllable_Type=Vowel_Jamo`.
+
+Returns whether the rune `r` is a vowel Hangul jamo, the second component of a
+Hangul syllable.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a vowel Hangul jamo, `false` otherwise.
+*/
 @(require_results)
 is_hangul_syllable_vowel :: proc(r: rune) -> bool {
 	return 0x1160 <= r && r <= 0x11A7 || 0xD7B0 <= r && r <= 0xD7C6
 }
 
-// Hangul_Syllable_Type=Trailing_Jamo
+/*
+Unicode property: `Hangul_Syllable_Type=Trailing_Jamo`.
+
+Returns whether the rune `r` is a trailing Hangul jamo, the last component of a
+Hangul syllable.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a trailing Hangul jamo, `false` otherwise.
+*/
 @(require_results)
 is_hangul_syllable_trailing :: proc(r: rune) -> bool {
 	return 0x11A8 <= r && r <= 0x11FF || 0xD7CB <= r && r <= 0xD7FB
 }
 
-// Hangul_Syllable_Type=LV_Syllable
+/*
+Unicode property: `Hangul_Syllable_Type=LV_Syllable`.
+
+Returns whether the rune `r` is a Hangul syllable of type LV, which behaves as
+both a leading and a trailing jamo.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is an LV Hangul syllable, `false` otherwise.
+*/
 @(require_results)
 is_hangul_syllable_lv :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -559,7 +792,18 @@ is_hangul_syllable_lv :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
-// Hangul_Syllable_Type=LVT_Syllable
+/*
+Unicode property: `Hangul_Syllable_Type=LVT_Syllable`.
+
+Returns whether the rune `r` is a Hangul syllable of type LVT, which behaves as
+both a leading and a trailing jamo and carries a trailing consonant.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is an LVT Hangul syllable, `false` otherwise.
+*/
 @(require_results)
 is_hangul_syllable_lvt :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -571,7 +815,18 @@ is_hangul_syllable_lvt :: proc(r: rune) -> bool #no_bounds_check {
 }
 
 
-// Indic_Syllabic_Category=Consonant_Preceding_Repha
+/*
+Unicode property: `Indic_Syllabic_Category=Consonant_Preceding_Repha`.
+
+Returns whether the rune `r` is an Indic consonant that takes a repha before it,
+used when rendering Indic scripts.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a consonant preceding repha, `false` otherwise.
+*/
 @(require_results)
 is_indic_consonant_preceding_repha :: proc(r: rune) -> bool {
 	switch r {
@@ -585,7 +840,18 @@ is_indic_consonant_preceding_repha :: proc(r: rune) -> bool {
 	}
 }
 
-// Indic_Syllabic_Category=Consonant_Prefixed
+/*
+Unicode property: `Indic_Syllabic_Category=Consonant_Prefixed`.
+
+Returns whether the rune `r` is an Indic consonant that takes a prefix before
+it, used when rendering Indic scripts.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a prefixed consonant, `false` otherwise.
+*/
 @(require_results)
 is_indic_consonant_prefixed :: proc(r: rune) -> bool {
 	switch r {
@@ -599,7 +865,18 @@ is_indic_consonant_prefixed :: proc(r: rune) -> bool {
 	}
 }
 
-// Indic_Conjunct_Break=Linker
+/*
+Unicode property: `Indic_Conjunct_Break=Linker`.
+
+Returns whether the rune `r` is an Indic conjunct break linker, the character
+that joins two consonants into a single conjunct glyph.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a conjunct break linker, `false` otherwise.
+*/
 @(require_results)
 is_indic_conjunct_break_linker :: proc(r: rune) -> bool {
 	switch r {
@@ -615,7 +892,18 @@ is_indic_conjunct_break_linker :: proc(r: rune) -> bool {
 	}
 }
 
-// Indic_Conjunct_Break=Consonant
+/*
+Unicode property: `Indic_Conjunct_Break=Consonant`.
+
+Returns whether the rune `r` is an Indic conjunct break consonant, one side of
+a conjunct formed around a linker.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a conjunct break consonant, `false` otherwise.
+*/
 @(require_results)
 is_indic_conjunct_break_consonant :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -626,7 +914,18 @@ is_indic_conjunct_break_consonant :: proc(r: rune) -> bool #no_bounds_check {
 	return false
 }
 
-// Indic_Conjunct_Break=Extend
+/*
+Unicode property: `Indic_Conjunct_Break=Extend`.
+
+Returns whether the rune `r` is an Indic conjunct break extender, a character
+that may appear within a conjunct without breaking it.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`true` when `r` is a conjunct break extender, `false` otherwise.
+*/
 @(require_results)
 is_indic_conjunct_break_extend :: proc(r: rune) -> bool #no_bounds_check {
 	c := i32(r)
@@ -672,12 +971,17 @@ is_gcb_extend_class :: proc(r: rune) -> bool {
 	return is_grapheme_extend(r) || is_emoji_modifier(r)
 }
 
-// Return values:
-//
-// - 2 if East_Asian_Width=F or W, or
-// - 0 if non-printable / zero-width, or
-// - 1 in all other cases.
-//
+/*
+Returns the normalized East Asian width of the rune `r`, as used when laying
+out text in a terminal or other fixed-width display.
+
+Inputs:
+- r: The rune to check.
+
+Returns:
+`2` if the rune is East Asian Wide or Fullwidth, `0` if it is non-printable or
+zero-width, and `1` in all other cases.
+*/
 @(require_results)
 normalized_east_asian_width :: proc(r: rune) -> int #no_bounds_check {
 	// This is a different interpretation of the BOM which occurs in the middle of text.

@@ -1,18 +1,42 @@
 package unicode
 
-// simple_fold iterates over the Unicode code points equivalent under the Unicode defined simple case folding.
-// simple_fold returns the smallest rune > r if one exists, or the smallest rune >= 0.
-// If no valid Unicode code point exists, r is returned.
-//
-// Example:
-// 	simple_fold('A')      == 'a'
-// 	simple_fold('a')      == 'A'
-// 	simple_fold('Z')      == 'z'
-// 	simple_fold('z')      == 'Z'
-// 	simple_fold('7')      == '7'
-// 	simple_fold('k')      == '\u212a' (Kelvin symbol, K)
-// 	simple_fold('\u212a') == 'k'
-// 	simple_fold(-3)       == -3
+/*
+Returns the next rune equivalent to `r` under Unicode simple case folding.
+
+Iterating with this procedure walks over every rune in a case folding orbit,
+which is how case insensitive comparisons are performed without relying on the
+platform. A rune with no equivalent folds to itself.
+
+Inputs:
+- r: The rune to fold.
+
+Returns:
+The smallest rune greater than `r` which is equivalent to it under case folding.
+If no such rune exists, the smallest rune greater than or equal to zero is
+returned, or `r` itself when `r` is not a valid Unicode code point.
+
+Example:
+
+	import "core:fmt"
+	import "core:unicode"
+
+	simple_fold_example :: proc() {
+		fmt.println(unicode.simple_fold('A'))
+		fmt.println(unicode.simple_fold('a'))
+		fmt.println(unicode.simple_fold('7'))
+		fmt.println(unicode.simple_fold('k'))
+		fmt.println(unicode.simple_fold('\u212a'))
+	}
+
+Output:
+
+	a
+	A
+	7
+	K
+	K
+
+*/
 @(require_results)
 simple_fold :: proc(r: rune) -> rune #no_bounds_check {
 	Fold_Pair :: struct {
