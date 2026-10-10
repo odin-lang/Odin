@@ -7,6 +7,11 @@ Iterating with this procedure walks over every rune in a case folding orbit,
 which is how case insensitive comparisons are performed without relying on the
 platform. A rune with no equivalent folds to itself.
 
+Note that `simple_fold` always moves to the *next* rune in the orbit rather
+than canonicalising to a single representative, so folding `k` yields the
+Kelvin sign `U+212A` and folding `U+212A` yields ASCII `K`. Both print as
+`K`, which is why the example below walks the orbit instead.
+
 Inputs:
 - r: The rune to fold.
 
@@ -24,8 +29,10 @@ Example:
 		fmt.println(unicode.simple_fold('A'))
 		fmt.println(unicode.simple_fold('a'))
 		fmt.println(unicode.simple_fold('7'))
-		fmt.println(unicode.simple_fold('k'))
-		fmt.println(unicode.simple_fold('\u212a'))
+
+		// Walk the whole orbit of 'k', printing the code point of each.
+		fmt.println(fmt.tprintf("%U", unicode.simple_fold('k')))
+		fmt.println(fmt.tprintf("%U", unicode.simple_fold('\u212a')))
 	}
 
 Output:
@@ -33,8 +40,8 @@ Output:
 	a
 	A
 	7
-	K
-	K
+	U+212A
+	U+4B
 
 */
 @(require_results)

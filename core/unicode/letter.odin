@@ -71,9 +71,9 @@ binary_search :: proc(c: $T, table: []T, length, stride: int, loc := #caller_loc
 /*
 Converts the rune `r` to lower case, using the Unicode simple lower case mapping.
 
-The mapping is one rune to one rune: a character which expands to several runes
-under full case folding, such as `U+0130` (I with dot above), is not expanded and
-is returned unchanged.
+The mapping is one rune to one rune: a character whose full case folding expands
+to several runes is never expanded here. `U+0130` (I with dot above), for
+example, maps to `U+0069` (i) rather than to a two rune sequence.
 
 Inputs:
 - r: The rune to convert.
@@ -117,8 +117,8 @@ to_lower :: proc(r: rune) -> rune #no_bounds_check {
 /*
 Converts the rune `r` to upper case, using the Unicode simple upper case mapping.
 
-As with [[to_lower]], the mapping is one rune to one rune, so runes which expand
-to several runes are returned unchanged.
+As with [[to_lower]], the mapping is one rune to one rune, so a character whose
+full case folding expands to several runes is never expanded here.
 
 Inputs:
 - r: The rune to convert.
@@ -427,13 +427,36 @@ is_graphic :: proc(r: rune) -> bool {
 }
 
 /*
-Returns whether the rune `r` is printable.
+Returns whether the rune `r` is a printable ASCII or Latin-1 character.
+
+This currently only covers `U+0000` to `U+00FF`: every rune above Latin-1 is
+reported as not printable, including characters such as CJK ideographs which
+are plainly printable. Use [[is_graphic]] for a check that covers the whole
+Unicode range.
 
 Inputs:
 - r: The rune to check.
 
 Returns:
-`true` when `r` is printable, `false` otherwise.
+`true` when `r` is printable and at most `U+00FF`, `false` otherwise.
+
+Example:
+
+	import "core:fmt"
+	import "core:unicode"
+
+	is_print_example :: proc() {
+		fmt.println(unicode.is_print('a'))     // true
+		fmt.println(unicode.is_print('\u00E9')) // true
+		fmt.println(unicode.is_print('\u4E00')) // false, above Latin-1
+	}
+
+Output:
+
+	true
+	true
+	false
+
 */
 @(require_results)
 is_print :: proc(r: rune) -> bool #no_bounds_check {
