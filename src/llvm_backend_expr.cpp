@@ -130,9 +130,10 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		i32 count = cast(i32)get_array_type_count(tl);
 
 		LLVMTypeRef vector_type = nullptr;
-		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type)) {
+		i64 vector_load_alignment = 0;
+		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type, &vector_load_alignment)) {
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, val.value, LLVMPointerType(vector_type, 0), "");
-			LLVMValueRef v = OdinLLVMBuildLoad(p, vector_type, vp);
+			LLVMValueRef v = OdinLLVMBuildLoadAligned(p, vector_type, vp, vector_load_alignment);
 
 			LLVMValueRef opv = nullptr;
 			switch (op) {
@@ -438,8 +439,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 
 	LLVMTypeRef vector_type0 = nullptr;
 	LLVMTypeRef vector_type1 = nullptr;
-	if (lb_try_vector_cast(p->module, lhs_ptr, &vector_type0) &&
-	    lb_try_vector_cast(p->module, rhs_ptr, &vector_type1)) {
+	i64 lhs_alignment = 0;
+	i64 rhs_alignment = 0;
+	if (lb_try_vector_cast(p->module, lhs_ptr, &vector_type0, &lhs_alignment) &&
+	    lb_try_vector_cast(p->module, rhs_ptr, &vector_type1, &rhs_alignment)) {
 		GB_ASSERT(vector_type0 == vector_type1);
 		LLVMTypeRef vector_type = vector_type0;
 
@@ -460,8 +463,8 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 
 		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
 		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
-		LLVMValueRef x = OdinLLVMBuildLoad(p, vector_type, lhs_vp);
-		LLVMValueRef y = OdinLLVMBuildLoad(p, vector_type, rhs_vp);
+		LLVMValueRef x = OdinLLVMBuildLoadAligned(p, vector_type, lhs_vp, lhs_alignment);
+		LLVMValueRef y = OdinLLVMBuildLoadAligned(p, vector_type, rhs_vp, rhs_alignment);
 		LLVMValueRef z = nullptr;
 
 		if (is_type_float(integral_type)) {
