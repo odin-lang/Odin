@@ -77,18 +77,17 @@ Raw_Chan :: struct {
 	msg_size:        u16,
 	closed:          b16, // guarded by `mutex`
 	mutex:           sync.Mutex,
-	r_cond:          sync.Cond,
-	w_cond:          sync.Cond,
-	r_waiting:       int,  // guarded by `mutex`
-	w_waiting:       int,  // guarded by `mutex`
-
-	did_read: bool, // lets a sender know if the value was read
 
 	// Buffered
-	queue: ^Raw_Queue,
+	queue:     ^Raw_Queue,
+	r_cond:    sync.Cond,
+	w_cond:    sync.Cond,
+	r_waiting: int, // guarded by `mutex`
+	w_waiting: int, // guarded by `mutex`
 
 	// Unbuffered
-	unbuffered_data: rawptr,
+	r_waiters: sync.Wait_Queue, // guarded by `mutex`
+	w_waiters: sync.Wait_Queue, // guarded by `mutex`
 }
 
 /*
@@ -256,19 +255,13 @@ Example:
 @(require_results)
 create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: runtime.Allocator, loc := #caller_location) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
 	assert(msg_size <= int(max(u16)))
-	align := max(align_of(Raw_Chan), msg_alignment)
 
-	size := runtime.align_forward_int(size_of(Raw_Chan), align)
-	offset := size
-	size += msg_size
-	size = runtime.align_forward_int(size, align)
+	data := runtime.mem_alloc(size_of(Raw_Chan), align_of(Raw_Chan), allocator, loc) or_return
 
-	data := runtime.mem_alloc(size, align, allocator, loc) or_return
 	c = (^Raw_Chan)(raw_data(data))
-	c.allocator = allocator
-	c.allocation_size = size
-	c.unbuffered_data = raw_data(data[offset:])
-	c.msg_size = u16(msg_size)
+	c.allocator       = allocator
+	c.allocation_size = size_of(Raw_Chan)
+	c.msg_size        = u16(msg_size)
 	return
 }
 
@@ -459,17 +452,14 @@ send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where C.D
 }
 
 /*
-Tries sending the specified message which is:
-- blocking: given the channel is unbuffered
-- non-blocking: given the channel is buffered
+Tries sending the specified message without blocking. On an unbuffered channel, this only succeeds when a receiver is already waiting.
 
 **Inputs**
 - `c`: The channel
 - `data`: The message to send
 
 **Returns**
-- `true` if the message was sent, `false` when the channel was
-already closed or the channel's buffer was full
+- `true` if the message was sent; `false` when the channel was already closed, the channel's buffer was full, or no receiver was waiting on an unbuffered channel
 
 Example:
 
@@ -624,31 +614,20 @@ send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
 		}
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
-
+	} else { // unbuffered
+		size := int(c.msg_size)
+		sync.lock(&c.mutex)
 		if c.closed {
+			sync.unlock(&c.mutex)
 			return false
 		}
-
-		c.did_read = false
-		defer c.did_read = false
-
-		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
-
-		c.w_waiting += 1
-
-		if c.r_waiting > 0 {
-			sync.signal(&c.r_cond)
+		if r := sync.wait_queue_pop(&c.r_waiters); r != nil {
+			sync.unlock(&c.mutex)
+			intrinsics.mem_copy(r.data, msg_in, size)
+			sync.waiter_wake(r, true)
+			return true
 		}
-
-		sync.wait(&c.w_cond, &c.mutex)
-
-		if c.closed && !c.did_read {
-			return false
-		}
-
-		ok = true
+		ok = sync.wait_queue_wait(&c.w_waiters, &c.mutex, msg_in)
 	}
 	return
 }
@@ -719,34 +698,31 @@ recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
 			sync.signal(&c.w_cond)
 		}
 		ok = true
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
+	} else { // unbuffered
+		size := int(c.msg_size)
 
-		for !c.closed && c.w_waiting == 0 {
-			c.r_waiting += 1
-			sync.wait(&c.r_cond, &c.mutex)
-			c.r_waiting -= 1
-		}
-
+		sync.lock(&c.mutex)
 		if c.closed {
-			return
+			sync.unlock(&c.mutex)
+			return false
 		}
 
-		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
-		c.w_waiting -= 1
+		if s := sync.wait_queue_pop(&c.w_waiters); s != nil {
+			sync.unlock(&c.mutex)
 
-		c.did_read = true
-		sync.signal(&c.w_cond)
-		ok = true
+			intrinsics.mem_copy(msg_out, s.data, size)
+			sync.waiter_wake(s, true)
+			return true
+		}
+
+		ok = sync.wait_queue_wait(&c.r_waiters, &c.mutex, msg_out)
 	}
 	return
 }
 
 
 /*
-Tries sending the specified message which is:
-- blocking: given the channel is unbuffered
-- non-blocking: given the channel is buffered
+Tries sending the specified message without blocking. On an unbuffered channel, this only succeeds when a receiver is already waiting.
 
 Note: The message referenced by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
@@ -756,8 +732,7 @@ and alignment used when the `Raw_Chan` was created.
 - `msg_out`: pointer to the data to send
 
 **Returns**
-- `true` if the message was sent, `false` when the channel was
-already closed or the channel's buffer was full
+- `true` if the message was sent; `false` when the channel was already closed, the channel's buffer was full, or no receiver was waiting on an unbuffered channel
 
 Example:
 
@@ -792,19 +767,22 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 		if c.r_waiting > 0 {
 			sync.signal(&c.r_cond)
 		}
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
+	} else { // unbuffered
+		size := int(c.msg_size)
 
-		if c.closed || c.r_waiting - c.w_waiting <= 0 {
+		sync.lock(&c.mutex)
+		r: ^sync.Waiter
+		if !c.closed {
+			r = sync.wait_queue_pop(&c.r_waiters)
+		}
+		sync.unlock(&c.mutex)
+
+		if r == nil {
 			return false
 		}
 
-		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
-		c.w_waiting += 1
-		if c.r_waiting > 0 {
-			sync.signal(&c.r_cond)
-		}
-		sync.wait(&c.w_cond, &c.mutex)
+		intrinsics.mem_copy(r.data, msg_in, size)
+		sync.waiter_wake(r, true)
 		ok = true
 	}
 	return
@@ -856,20 +834,24 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 			sync.signal(&c.w_cond)
 		}
 		return true
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
+	} else { // unbuffered
+		size := int(c.msg_size)
 
-		if c.closed || c.w_waiting - c.r_waiting <= 0 {
+		sync.lock(&c.mutex)
+		s: ^sync.Waiter
+		if !c.closed {
+			s = sync.wait_queue_pop(&c.w_waiters)
+		}
+		sync.unlock(&c.mutex)
+
+		if s == nil {
 			return false
 		}
 
-		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
-		c.w_waiting -= 1
-
-		sync.signal(&c.w_cond)
+		intrinsics.mem_copy(msg_out, s.data, size)
+		sync.waiter_wake(s, true)
 		return true
 	}
-	return false
 }
 
 
@@ -919,7 +901,7 @@ Example:
 */
 @(require_results)
 is_unbuffered :: proc "contextless" (c: ^Raw_Chan) -> bool {
-	return c != nil && c.unbuffered_data != nil
+	return c != nil && c.queue == nil
 }
 
 /*
@@ -1038,9 +1020,18 @@ close :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c.closed {
 		return false
 	}
-	c.closed = true
+	sync.atomic_store_explicit(&c.closed, true, .Relaxed)
+
 	sync.broadcast(&c.r_cond)
 	sync.broadcast(&c.w_cond)
+
+	for w := sync.wait_queue_pop(&c.r_waiters); w != nil; w = sync.wait_queue_pop(&c.r_waiters) {
+		sync.waiter_wake(w, false)
+	}
+
+	for w := sync.wait_queue_pop(&c.w_waiters); w != nil; w = sync.wait_queue_pop(&c.w_waiters) {
+		sync.waiter_wake(w, false)
+	}
 	return true
 }
 
@@ -1089,11 +1080,10 @@ Example:
 */
 @(require_results)
 can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
-	sync.guard(&c.mutex)
 	if is_buffered(c) {
-		return c.queue.len > 0
+		return sync.atomic_load_explicit(&c.queue.len, .Relaxed) > 0
 	}
-	return c.w_waiting - c.r_waiting > 0
+	return !sync.wait_queue_is_empty(&c.w_waiters)
 }
 
 
@@ -1124,11 +1114,10 @@ Example:
 */
 @(require_results)
 can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
-	sync.guard(&c.mutex)
 	if is_buffered(c) {
-		return c.queue.len < c.queue.cap
+		return sync.atomic_load_explicit(&c.queue.len, .Relaxed) < c.queue.cap
 	}
-	return c.r_waiting - c.w_waiting > 0
+	return !sync.wait_queue_is_empty(&c.r_waiters)
 }
 
 /*
@@ -1221,7 +1210,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 		count := 0
 
 		for c, i in recvs {
-			if !c.closed && can_recv(c) {
+			if !sync.atomic_load_explicit(&c.closed, .Relaxed) && can_recv(c) {
 				candidates[count] = {
 					is_recv = true,
 					idx     = i,
@@ -1234,7 +1223,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 			if i > builtin.len(send_msgs)-1 || send_msgs[i] == nil {
 				continue
 			}
-			if !c.closed && can_send(c)  {
+			if !sync.atomic_load_explicit(&c.closed, .Relaxed) && can_send(c) {
 				candidates[count] = {
 					is_recv = false,
 					idx     = i,
@@ -1318,10 +1307,10 @@ Example:
 @(private)
 raw_queue_init :: proc "contextless" (q: ^Raw_Queue, data: rawptr, cap: int, size: int) {
 	q.data = ([^]byte)(data)
-	q.len  = 0
 	q.cap  = cap
 	q.next = 0
 	q.size = size
+	sync.atomic_store_explicit(&q.len, 0, .Relaxed)
 }
 
 /*
@@ -1352,17 +1341,19 @@ Example:
 */
 @(private, require_results)
 raw_queue_push :: proc "contextless" (q: ^Raw_Queue, data: rawptr) -> bool {
-	if q.len == q.cap {
+	n := sync.atomic_load_explicit(&q.len, .Relaxed)
+	if n == q.cap {
 		return false
 	}
-	pos := q.next + q.len
+
+	pos := q.next + n
 	if pos >= q.cap {
 		pos -= q.cap
 	}
 
 	val_ptr := q.data[pos*q.size:]
 	intrinsics.mem_copy(val_ptr, data, q.size)
-	q.len += 1
+	sync.atomic_store_explicit(&q.len, n + 1, .Relaxed)
 	return true
 }
 
@@ -1399,10 +1390,10 @@ Example:
 */
 @(private, require_results)
 raw_queue_pop :: proc "contextless" (q: ^Raw_Queue) -> (data: rawptr) {
-	if q.len > 0 {
+	if n := sync.atomic_load_explicit(&q.len, .Relaxed); n > 0 {
 		data = q.data[q.next*q.size:]
 		q.next += 1
-		q.len -= 1
+		sync.atomic_store_explicit(&q.len, n - 1, .Relaxed)
 		if q.next >= q.cap {
 			q.next -= q.cap
 		}
