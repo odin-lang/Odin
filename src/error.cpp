@@ -64,9 +64,6 @@ struct ErrorInstantiations {
 struct ErrorContext {
 	bool hold; // see `release_held_errors`
 
-	// Scoped error muting. While muted, error/warning emission is suppressed but still *counted*, so a
-	// caller can trial-check something (e.g. one branch of a procedure group) and learn whether it would
-	// have failed without printing anything. Muting nests.
 	i32 mute_depth;
 	i64 mute_count;
 
@@ -791,6 +788,9 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 }
 
 gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	if (global_error_context.mute_depth > 0) {
+		return;
+	}
 	if (global_warnings_as_errors()) {
 		error_va(pos, end, fmt, va);
 		return;
@@ -798,12 +798,13 @@ gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, 
 	if (global_ignore_warnings()) {
 		return;
 	}
-	if (global_error_context.mute_depth > 0) {
-		global_error_context.mute_count += 1;
-		return;
+
+	if (global_error_context.hold) {
+		global_error_collector.held_warning_count.fetch_add(1);
+	} else {
+		global_error_collector.warning_count.fetch_add(1);
 	}
 
-	(global_error_context.hold ? global_error_collector.held_warning_count : global_error_collector.warning_count).fetch_add(1);
 	mutex_lock(&global_error_collector.mutex);
 
 	push_error_value(pos, ErrorValue_Warning);

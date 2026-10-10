@@ -4341,6 +4341,13 @@ gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
 		return node->CompoundLit.type == nullptr;
 	case Ast_ImplicitSelectorExpr:
 		return true;
+	case Ast_UnaryExpr: {
+		Ast *expr = unparen_expr(node->UnaryExpr.expr);
+		return node->UnaryExpr.op.kind == Token_And &&
+		       expr != nullptr &&
+		       expr->kind == Ast_CompoundLit &&
+		       expr->CompoundLit.type == nullptr;
+	}
 	case Ast_TernaryIfExpr:
 		return arg_is_deferrable_untyped_expr(node->TernaryIfExpr.x) &&
 		       arg_is_deferrable_untyped_expr(node->TernaryIfExpr.y);
@@ -7385,6 +7392,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			Operand *o = &ordered_operands[i];
 			if (o->deferred_untyped_arg) {
 				materialize_deferred_untyped_arg(c, o, pt->params->Tuple.variables[i]->type, show_error);
+				if (o->mode == Addressing_Invalid) {
+					err = CallArgumentError_WrongTypes;
+				}
 			}
 			if (o->mode == Addressing_Invalid) {
 				continue;
@@ -7441,6 +7451,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				deferred_local = *o;
 				materialize_deferred_untyped_arg(c, &deferred_local, vari_expand ? slice : elem, show_error);
 				o = &deferred_local;
+				if (o->mode == Addressing_Invalid) {
+					err = CallArgumentError_WrongTypes;
+				}
 			}
 			if (vari_expand) {
 				t = slice;
