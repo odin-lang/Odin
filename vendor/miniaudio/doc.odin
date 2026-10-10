@@ -274,7 +274,7 @@ to the user via the UI.
 When creating your own context you will want to pass it to `ma_device_init()` when initializing the
 device. Passing in NULL, like we do in the first example, will result in miniaudio creating the
 context for you, which you don't want to do since you've already created a context. Note that
-internally the context is only tracked by it's pointer which means you must not change the location
+internally the context is only tracked by its pointer which means you must not change the location
 of the `ma_context` object. If this is an issue, consider using `malloc()` to allocate memory for
 the context.
 
@@ -944,7 +944,7 @@ Instead, initialize multiple data sources for each instance.
 4.1. Custom Data Sources
 ------------------------
 You can implement a custom data source by implementing the functions in `ma_data_source_vtable`.
-Your custom object must have `ma_data_source_base` as it's first member:
+Your custom object must have `ma_data_source_base` as its first member:
 
     ```c
     struct my_data_source
@@ -1168,7 +1168,7 @@ position, direction and velocity are all specified in absolute terms:
     ma_engine_listener_set_position(&engine, listenerIndex, worldPosX, worldPosY, worldPosZ);
     ```
 
-The direction of the listener represents it's forward vector. The listener's up vector can also be
+The direction of the listener represents its forward vector. The listener's up vector can also be
 specified and defaults to +1 on the Y axis.
 
     ```c
@@ -1280,7 +1280,7 @@ will start outputting audio before the sound has been fully decoded when the `MA
 is specified.
 
 If you need to wait for an asynchronously loaded sound to be fully loaded, you can use a fence. A
-fence in miniaudio is a simple synchronization mechanism which simply blocks until it's internal
+fence in miniaudio is a simple synchronization mechanism which simply blocks until its internal
 counter hit's zero. You can specify a fence like so:
 
     ```c
@@ -1544,7 +1544,7 @@ specify whether or not you want the sound to be fully loaded into memory (and op
 pre-decoded) or streamed. When loading into memory, you can also specify whether or not you want
 the data to be loaded asynchronously.
 
-The example below is how you can initialize a resource manager using it's default configuration:
+The example below is how you can initialize a resource manager using its default configuration:
 
     ```c
     ma_resource_manager_config config;
@@ -1861,7 +1861,7 @@ object. Both of these objects are data sources which means they can be used with
 
 Another major feature of the resource manager is the ability to asynchronously decode audio files.
 This relieves the audio thread of time-consuming decoding which can negatively affect scalability
-due to the audio thread needing to complete it's work extremely quickly to avoid glitching.
+due to the audio thread needing to complete its work extremely quickly to avoid glitching.
 Asynchronous decoding is achieved through a job system. There is a central multi-producer,
 multi-consumer, fixed-capacity job queue. When some asynchronous work needs to be done, a job is
 posted to the queue which is then read by a job thread. The number of job threads can be
@@ -2058,7 +2058,7 @@ a diagram that illustrates a hypothetical node graph setup:
 
 In the above graph, it starts with two data sources whose outputs are attached to the input of a
 splitter node. It's at this point that the two data sources are mixed. After mixing, the splitter
-performs it's processing routine and produces two outputs which is simply a duplication of the
+performs its processing routine and produces two outputs which is simply a duplication of the
 input stream. One output is attached to a low pass filter, whereas the other output is attached to
 a echo/delay. The outputs of the low pass filter and the echo are attached to the endpoint, and
 since they're both connected to the same input bus, they'll be mixed.
@@ -2350,7 +2350,7 @@ actually be invoked by the node graph until it's connected. When you stop a node
 read from any of its input connections. You can use this property to stop a group of sounds
 atomically.
 
-You can configure the initial state of a node in it's config:
+You can configure the initial state of a node in its config:
 
     ```c
     nodeConfig.initialState = ma_node_state_stopped;
@@ -2433,7 +2433,7 @@ implementation, but are crafted in a way such that such locking is not required 
 data from the graph. Locking in these areas are achieved by means of spinlocks.
 
 The main complication with keeping `ma_node_graph_read_pcm_frames()` lock-free stems from the fact
-that a node can be uninitialized, and it's memory potentially freed, while in the middle of being
+that a node can be uninitialized, and its memory potentially freed, while in the middle of being
 processed on the audio thread. There are times when the audio thread will be referencing a node,
 which means the uninitialization process of a node needs to make sure it delays returning until the
 audio thread is finished so that control is not handed back to the caller thereby giving them a
@@ -2443,7 +2443,7 @@ When the audio thread is processing a node, it does so by reading from each of t
 the node. In order for a node to process data for one of its output buses, it needs to read from
 each of its input buses, and so on an so forth. It follows that once all output buses of a node
 are detached, the node as a whole will be disconnected and no further processing will occur unless
-it's output buses are reattached, which won't be happening when the node is being uninitialized.
+its output buses are reattached, which won't be happening when the node is being uninitialized.
 By having `ma_node_detach_output_bus()` wait until the audio thread is finished with it, we can
 simplify a few things, at the expense of making `ma_node_detach_output_bus()` a bit slower. By
 doing this, the implementation of `ma_node_uninit()` becomes trivial - just detach all output
@@ -3550,7 +3550,7 @@ operates on PCM frames. They are otherwise identical as `ma_pcm_rb` is just a wr
 
 Unlike most other APIs in miniaudio, ring buffers support both interleaved and deinterleaved
 streams. The caller can also allocate their own backing memory for the ring buffer to use
-internally for added flexibility. Otherwise the ring buffer will manage it's internal memory for
+internally for added flexibility. Otherwise the ring buffer will manage its internal memory for
 you.
 
 The examples below use the PCM frame variant of the ring buffer since that's most likely the one

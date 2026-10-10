@@ -88,7 +88,7 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - socket:  A bound and listening socket *associated with the event loop*
-- p:       User data, the callback will receive this as it's second argument
+- p:       User data, the callback will receive this as its second argument
 - cb:      The callback to be called when the operation finishes, `Operation.accept` will contain results
 - timeout: Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
 - l:       Event loop to associate the operation with, defaults to the current thread's loop
@@ -116,8 +116,8 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - socket:  A bound and listening socket *associated with the event loop*
-- p:       User data, the callback will receive this as it's second argument
-- p2:      User data, the callback will receive this as it's third argument
+- p:       User data, the callback will receive this as its second argument
+- p2:      User data, the callback will receive this as its third argument
 - cb:      The callback to be called when the operation finishes, `Operation.accept` will contain results
 - timeout: Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
 - l:       Event loop to associate the operation with, defaults to the current thread's loop
@@ -145,9 +145,9 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - socket:  A bound and listening socket *associated with the event loop*
-- p:       User data, the callback will receive this as it's second argument
-- p2:      User data, the callback will receive this as it's third argument
-- p3:      User data, the callback will receive this as it's fourth argument
+- p:       User data, the callback will receive this as its second argument
+- p2:      User data, the callback will receive this as its third argument
+- p3:      User data, the callback will receive this as its fourth argument
 - cb:      The callback to be called when the operation finishes, `Operation.accept` will contain results
 - timeout: Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
 - l:       Event loop to associate the operation with, defaults to the current thread's loop
@@ -246,7 +246,7 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - subject: The subject (socket or file) to close
-- p:       User data, the callback will receive this as it's second argument
+- p:       User data, the callback will receive this as its second argument
 - cb:      The optional callback to be called when the operation finishes, `Operation.close` will contain results 
 - l:       Event loop to associate the operation with, defaults to the current thread's loop
 
@@ -271,8 +271,8 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - subject: The subject (socket or file) to close
-- p:       User data, the callback will receive this as it's second argument
-- p2:      User data, the callback will receive this as it's third argument
+- p:       User data, the callback will receive this as its second argument
+- p2:      User data, the callback will receive this as its third argument
 - cb:      The optional callback to be called when the operation finishes, `Operation.close` will contain results 
 - l:       Event loop to associate the operation with, defaults to the current thread's loop
 
@@ -297,9 +297,9 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - subject: The subject (socket or file) to close
-- p:       User data, the callback will receive this as it's second argument
-- p2:      User data, the callback will receive this as it's third argument
-- p3:      User data, the callback will receive this as it's fourth argument
+- p:       User data, the callback will receive this as its second argument
+- p2:      User data, the callback will receive this as its third argument
+- p3:      User data, the callback will receive this as its fourth argument
 - cb:      The optional callback to be called when the operation finishes, `Operation.close` will contain results 
 - l:       Event loop to associate the operation with, defaults to the current thread's loop
 
@@ -392,7 +392,7 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - endpoint: The endpoint to connect to
-- p:        User data, the callback will receive this as it's second argument
+- p:        User data, the callback will receive this as its second argument
 - cb:       The callback to be called when the operation finishes, `Operation.dial` will contain results
 - timeout:  Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
 - l:        Event loop to associate the operation with, defaults to the current thread's loop
@@ -421,8 +421,8 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - endpoint: The endpoint to connect to
-- p:        User data, the callback will receive this as it's second argument
-- p2:       User data, the callback will receive this as it's third argument
+- p:        User data, the callback will receive this as its second argument
+- p2:       User data, the callback will receive this as its third argument
 - cb:       The callback to be called when the operation finishes, `Operation.dial` will contain results
 - timeout:  Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
 - l:        Event loop to associate the operation with, defaults to the current thread's loop
@@ -451,9 +451,9 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 
 Inputs:
 - endpoint: The endpoint to connect to
-- p:        User data, the callback will receive this as it's second argument
-- p2:       User data, the callback will receive this as it's third argument
-- p3:       User data, the callback will receive this as it's fourth argument
+- p:        User data, the callback will receive this as its second argument
+- p2:       User data, the callback will receive this as its third argument
+- p3:       User data, the callback will receive this as its fourth argument
 - cb:       The callback to be called when the operation finishes, `Operation.dial` will contain results
 - timeout:  Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
 - l:        Event loop to associate the operation with, defaults to the current thread's loop
@@ -601,7 +601,7 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:  The socket to receive from
 - bufs:    Buffers to fill with received data
-- p:       User data, the callback will receive this as it's second argument
+- p:       User data, the callback will receive this as its second argument
 - cb:      The callback to be called when the operation finishes, `Operation.recv` will contain results
 - all:     If true, waits until all buffers are full before completing (TCP only, ignored for UDP)
 - timeout: Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
@@ -638,8 +638,8 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:  The socket to receive from
 - bufs:    Buffers to fill with received data
-- p:       User data, the callback will receive this as it's second argument
-- p2:      User data, the callback will receive this as it's third argument
+- p:       User data, the callback will receive this as its second argument
+- p2:      User data, the callback will receive this as its third argument
 - cb:      The callback to be called when the operation finishes, `Operation.recv` will contain results
 - all:     If true, waits until all buffers are full before completing (TCP only, ignored for UDP)
 - timeout: Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
@@ -676,9 +676,9 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:  The socket to receive from
 - bufs:    Buffers to fill with received data
-- p:       User data, the callback will receive this as it's second argument
-- p2:      User data, the callback will receive this as it's third argument
-- p3:      User data, the callback will receive this as it's fourth argument
+- p:       User data, the callback will receive this as its second argument
+- p2:      User data, the callback will receive this as its third argument
+- p3:      User data, the callback will receive this as its fourth argument
 - cb:      The callback to be called when the operation finishes, `Operation.recv` will contain results
 - all:     If true, waits until all buffers are full before completing (TCP only, ignored for UDP)
 - timeout: Optional timeout for the operation, the callback will get a `.Timeout` error after that duration
@@ -821,7 +821,7 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:   The socket to send to
 - bufs:     Buffers containing the data to send
-- p:        User data, the callback will receive this as it's second argument
+- p:        User data, the callback will receive this as its second argument
 - cb:       The callback to be called when the operation finishes, `Operation.send` will contain results
 - endpoint: The destination endpoint (UDP only, ignored for TCP)
 - all:      If true, the operation ensures all data is sent before completing
@@ -858,8 +858,8 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:   The socket to send to
 - bufs:     Buffers containing the data to send
-- p:        User data, the callback will receive this as it's second argument
-- p2:       User data, the callback will receive this as it's third argument
+- p:        User data, the callback will receive this as its second argument
+- p2:       User data, the callback will receive this as its third argument
 - cb:       The callback to be called when the operation finishes, `Operation.send` will contain results
 - endpoint: The destination endpoint (UDP only, ignored for TCP)
 - all:      If true, the operation ensures all data is sent before completing
@@ -896,9 +896,9 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:   The socket to send to
 - bufs:     Buffers containing the data to send
-- p:        User data, the callback will receive this as it's second argument
-- p2:       User data, the callback will receive this as it's third argument
-- p3:       User data, the callback will receive this as it's fourth argument
+- p:        User data, the callback will receive this as its second argument
+- p2:       User data, the callback will receive this as its third argument
+- p3:       User data, the callback will receive this as its fourth argument
 - cb:       The callback to be called when the operation finishes, `Operation.send` will contain results
 - endpoint: The destination endpoint (UDP only, ignored for TCP)
 - all:      If true, the operation ensures all data is sent before completing
@@ -1892,7 +1892,7 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:           The destination TCP socket
 - file:             The source file handle
-- p:                User data, the callback will receive this as it's second argument
+- p:                User data, the callback will receive this as its second argument
 - cb:               The callback to be called when data is sent (if `progress_updates` is true) or the operation completes
 - offset:           Byte offset to start reading from the file
 - nbytes:           Total bytes to send (use SEND_ENTIRE_FILE for the whole file)
@@ -1932,8 +1932,8 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:           The destination TCP socket
 - file:             The source file handle
-- p:                User data, the callback will receive this as it's second argument
-- p2:               User data, the callback will receive this as it's third argument
+- p:                User data, the callback will receive this as its second argument
+- p2:               User data, the callback will receive this as its third argument
 - cb:               The callback to be called when data is sent (if `progress_updates` is true) or the operation completes
 - offset:           Byte offset to start reading from the file
 - nbytes:           Total bytes to send (use SEND_ENTIRE_FILE for the whole file)
@@ -1973,9 +1973,9 @@ This procedure uses polymorphism for type safe user data up to a certain size.
 Inputs:
 - socket:           The destination TCP socket
 - file:             The source file handle
-- p:                User data, the callback will receive this as it's second argument
-- p2:               User data, the callback will receive this as it's third argument
-- p3:               User data, the callback will receive this as it's fourth argument
+- p:                User data, the callback will receive this as its second argument
+- p2:               User data, the callback will receive this as its third argument
+- p3:               User data, the callback will receive this as its fourth argument
 - cb:               The callback to be called when data is sent (if `progress_updates` is true) or the operation completes
 - offset:           Byte offset to start reading from the file
 - nbytes:           Total bytes to send (use SEND_ENTIRE_FILE for the whole file)

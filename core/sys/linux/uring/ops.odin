@@ -325,7 +325,7 @@ timeout :: proc(ring: ^Ring, user_data: u64, ts: ^linux.Time_Spec, count: u32, f
 /*
 Rmove an existing timeout operation.
 
-The timeout is identified by it's `user_data`.
+The timeout is identified by its `user_data`.
 
 The completion event result will be `0` if the timeout was found and cancelled successfully,
 `-EBUSY` if the timeout was found but expiration was already in progress, or
@@ -376,7 +376,7 @@ where T == linux.Sock_Addr_In || T == linux.Sock_Addr_In6 || T == linux.Sock_Add
 /*
 Attempt to cancel an already issued request.
 
-The request is identified by it's user data.
+The request is identified by its user data.
 
 The cancelation request will complete with one of the following results codes.
 
