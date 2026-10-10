@@ -1998,7 +1998,12 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 			}
 			// Keep struct aliases named so recursive fields retain their alias edge.
 			if (bt != nullptr && bt->kind != Type_Struct) {
-				o->type = bt;
+				if (bt->kind == Type_Union) {
+					o->type = base_named_type(o->type);
+				}
+				else {
+					o->type = bt;
+				}
 			}
 		}
 		break;
