@@ -6064,6 +6064,418 @@ vcltq_u32 :: #force_inline proc "c" (a, b: uint32x4_t) -> uint32x4_t {
 	return simd.lanes_lt(a, b)
 }
 
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_u8)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_u8 :: #force_inline proc "c" (v: uint8x16_t, $LANE: int32_t) -> uint8_t where 0 <= LANE, LANE < 16 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_u16)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_u16 :: #force_inline proc "c" (v: uint16x8_t, $LANE: int32_t) -> uint16_t where 0 <= LANE, LANE < 8 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_u32)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_u32 :: #force_inline proc "c" (v: uint32x4_t, $LANE: int32_t) -> uint32_t where 0 <= LANE, LANE < 4 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 3, 2, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_u64)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_u64 :: #force_inline proc "c" (v: uint64x2_t, $LANE: int32_t) -> uint64_t where 0 <= LANE, LANE < 2 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_s8)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_s8 :: #force_inline proc "c" (v: int8x16_t, $LANE: int32_t) -> int8_t where 0 <= LANE, LANE < 16 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_s16)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_s16 :: #force_inline proc "c" (v: int16x8_t, $LANE: int32_t) -> int16_t where 0 <= LANE, LANE < 8 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_s32)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_s32 :: #force_inline proc "c" (v: int32x4_t, $LANE: int32_t) -> int32_t where 0 <= LANE, LANE < 4 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 3, 2, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Move vector element to general-purpose register
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vgetq_lane_s64)
+@(require_results, enable_target_feature = "neon")
+vgetq_lane_s64 :: #force_inline proc "c" (v: int64x2_t, $LANE: int32_t) -> int64_t where 0 <= LANE, LANE < 2 {
+	when ODIN_ENDIAN == .Little {
+		return simd.extract(v, LANE)
+	} else {
+		v := simd.shuffle(v, v, 1, 0)
+		return simd.extract(v, LANE)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_u8)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_u8 :: #force_inline proc "c" (a: uint8_t, v: uint8x16_t, $LANE: int32_t) -> uint8x16_t where 0 <= LANE, LANE < 16 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_u16)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_u16 :: #force_inline proc "c" (a: uint16_t, v: uint16x8_t, $LANE: int32_t) -> uint16x8_t where 0 <= LANE, LANE < 8 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd_shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_u32)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_u32 :: #force_inline proc "c" (a: uint32_t, v: uint32x4_t, $LANE: int32_t) -> uint32x4_t where 0 <= LANE, LANE < 4 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd_shuffle(c, c, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_u64)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_u64 :: #force_inline proc "c" (a: uint64_t, v: uint64x2_t, $LANE: int32_t) -> uint64x2_t where 0 <= LANE, LANE < 2 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_s8)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_s8 :: #force_inline proc "c" (a: int8_t, v: int8x16_t, $LANE: int32_t) -> int8x16_t where 0 <= LANE, LANE < 16 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_s16)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_s16 :: #force_inline proc "c" (a: int16_t, v: int16x8_t, $LANE: int32_t) -> int16x8_t where 0 <= LANE, LANE < 8 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd_shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_s32)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_s32 :: #force_inline proc "c" (a: int32_t, v: int32x4_t, $LANE: int32_t) -> int32x4_t where 0 <= LANE, LANE < 4 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd_shuffle(c, c, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vsetq_lane_s64)
+@(require_results, enable_target_feature = "neon")
+vsetq_lane_s64 :: #force_inline proc "c" (a: int64_t, v: int64x2_t, $LANE: int32_t) -> int64x2_t where 0 <= LANE, LANE < 2 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_u8)
+@(require_results, enable_target_feature = "neon")
+vset_lane_u8 :: #force_inline proc "c" (a: uint8_t, v: uint8x8_t, $LANE: int32_t) -> uint8x8_t where 0 <= LANE, LANE < 8 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_u16)
+@(require_results, enable_target_feature = "neon")
+vset_lane_u16 :: #force_inline proc "c" (a: uint16_t, v: uint16x4_t, $LANE: int32_t) -> uint16x4_t where 0 <= LANE, LANE < 4 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_u32)
+@(require_results, enable_target_feature = "neon")
+vset_lane_u32 :: #force_inline proc "c" (a: uint32_t, v: uint32x2_t, $LANE: int32_t) -> uint32x2_t where 0 <= LANE, LANE < 2 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_u64)
+@(require_results, enable_target_feature = "neon")
+vset_lane_u64 :: #force_inline proc "c" (a: uint64_t, v: uint64x1_t, $LANE: int32_t) -> uint64x1_t where LANE == 0 {
+	return simd.replace(v, LANE, a)
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_s8)
+@(require_results, enable_target_feature = "neon")
+vset_lane_s8 :: #force_inline proc "c" (a: int8_t, v: int8x8_t, $LANE: int32_t) -> int8x8_t where 0 <= LANE, LANE < 8 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 7, 6, 5, 4, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 7, 6, 5, 4, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_s16)
+@(require_results, enable_target_feature = "neon")
+vset_lane_s16 :: #force_inline proc "c" (a: int16_t, v: int16x4_t, $LANE: int32_t) -> int16x4_t where 0 <= LANE, LANE < 4 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 3, 2, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 3, 2, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_s32)
+@(require_results, enable_target_feature = "neon")
+vset_lane_s32 :: #force_inline proc "c" (a: int32_t, v: int32x2_t, $LANE: int32_t) -> int32x2_t where 0 <= LANE, LANE < 2 {
+	when ODIN_ENDIAN == .Little {
+		return simd.replace(v, LANE, a)
+	} else {
+		v := simd.shuffle(v, v, 1, 0)
+		c := simd.replace(v, LANE, a)
+		return simd.shuffle(c, c, 1, 0)
+	}
+}
+
+// Insert vector element from another vector element
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vset_lane_s64)
+@(require_results, enable_target_feature = "neon")
+vset_lane_s64 :: #force_inline proc "c" (a: int64_t, v: int64x1_t, $LANE: int32_t) -> int64x1_t where LANE == 0 {
+	return simd.replace(v, LANE, a)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_s8)
+@(require_results, enable_target_feature = "neon")
+vceq_s8 :: #force_inline proc "c" (a, b: int8x8_t) -> uint8x8_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_s16)
+@(require_results, enable_target_feature = "neon")
+vceq_s16 :: #force_inline proc "c" (a, b: int16x4_t) -> uint16x4_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_s32)
+@(require_results, enable_target_feature = "neon")
+vceq_s32 :: #force_inline proc "c" (a, b: int32x2_t) -> uint32x2_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_u8)
+@(require_results, enable_target_feature = "neon")
+vceq_u8 :: #force_inline proc "c" (a, b: uint8x8_t) -> uint8x8_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_u16)
+@(require_results, enable_target_feature = "neon")
+vceq_u16 :: #force_inline proc "c" (a, b: uint16x4_t) -> uint16x4_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_u32)
+@(require_results, enable_target_feature = "neon")
+vceq_u32 :: #force_inline proc "c" (a, b: uint32x2_t) -> uint32x2_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_s8)
+@(require_results, enable_target_feature = "neon")
+vceqq_s8 :: #force_inline proc "c" (a, b: int8x16_t) -> uint8x16_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_s16)
+@(require_results, enable_target_feature = "neon")
+vceqq_s16 :: #force_inline proc "c" (a, b: int16x8_t) -> uint16x8_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_s32)
+@(require_results, enable_target_feature = "neon")
+vceqq_s32 :: #force_inline proc "c" (a, b: int32x4_t) -> uint32x4_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_u8)
+@(require_results, enable_target_feature = "neon")
+vceqq_u8 :: #force_inline proc "c" (a, b: uint8x16_t) -> uint8x16_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_u16)
+@(require_results, enable_target_feature = "neon")
+vceqq_u16 :: #force_inline proc "c" (a, b: uint16x8_t) -> uint16x8_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_u32)
+@(require_results, enable_target_feature = "neon")
+vceqq_u32 :: #force_inline proc "c" (a, b: uint32x4_t) -> uint32x4_t {
+	return simd.lanes_eq(a, b)
+}
+
 when ODIN_ARCH == .arm64 {
 	// Table Lookup.
 	//
@@ -9118,6 +9530,318 @@ when ODIN_ARCH == .arm64 {
 	@(require_results, enable_target_feature = "neon")
 	vcltzd_s64 :: #force_inline proc "c" (a: int64_t) -> uint64_t {
 		return transmute(uint64_t)simd.lanes_lt(transmute(int64x1_t)a, int64x1_t(0))
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_s64)
+	@(require_results, enable_target_feature = "neon")
+	vceq_s64 :: #force_inline proc "c" (a, b: int64x1_t) -> uint64x1_t {
+		return simd.lanes_eq(a, b)
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_u64)
+	@(require_results, enable_target_feature = "neon")
+	vceq_u64 :: #force_inline proc "c" (a, b: uint64x1_t) -> uint64x1_t {
+		return simd.lanes_eq(a, b)
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_s64)
+	@(require_results, enable_target_feature = "neon")
+	vceqq_s64 :: #force_inline proc "c" (a, b: int64x2_t) -> uint64x2_t {
+		return simd.lanes_eq(a, b)
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_u64)
+	@(require_results, enable_target_feature = "neon")
+	vceqq_u64 :: #force_inline proc "c" (a, b: uint64x2_t) -> uint64x2_t {
+		return simd.lanes_eq(a, b)
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqd_s64)
+	@(require_results, enable_target_feature = "neon")
+	vceqd_s64 :: #force_inline proc "c" (a, b: int64_t) -> uint64_t {
+		return transmute(uint64_t)simd.lanes_eq(transmute(int64x1_t)a, transmute(int64x1_t)b)
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqd_u64)
+	@(require_results, enable_target_feature = "neon")
+	vceqd_u64 :: #force_inline proc "c" (a, b: uint64_t) -> uint64_t {
+		return transmute(uint64_t)simd.lanes_eq(transmute(uint64x1_t)a, transmute(uint64x1_t)b)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_s8)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_s8 :: #force_inline proc "c" (a, b: int8x16_t, $LANE1, $LANE2: int32_t) -> int8x16_t where 0 <= LANE1, LANE1 < 16, 0 <= LANE2, LANE2 < 16 {
+		return vsetq_lane_s8(vgetq_lane_s8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_s16)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_s16 :: #force_inline proc "c" (a, b: int16x8_t, $LANE1, $LANE2: int32_t) -> int16x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 8 {
+		return vsetq_lane_s16(vgetq_lane_s16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_s32)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_s32 :: #force_inline proc "c" (a, b: int32x4_t, $LANE1, $LANE2: int32_t) -> int32x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 4 {
+		return vsetq_lane_s32(vgetq_lane_s32(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_s64 :: #force_inline proc "c" (a, b: int64x2_t, $LANE1, $LANE2: int32_t) -> int64x2_t where 0 <= LANE1, LANE1 < 2, 0 <= LANE2, LANE2 < 2 {
+		return vsetq_lane_s64(vgetq_lane_s64(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_u8)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_u8 :: #force_inline proc "c" (a, b: uint8x16_t, $LANE1, $LANE2: int32_t) -> uint8x16_t where 0 <= LANE1, LANE1 < 16, 0 <= LANE2, LANE2 < 16 {
+		return vsetq_lane_u8(vgetq_lane_u8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_u16)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_u16 :: #force_inline proc "c" (a, b: uint16x8_t, $LANE1, $LANE2: int32_t) -> uint16x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 8 {
+		return vsetq_lane_u16(vgetq_lane_u16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_u32)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_u32 :: #force_inline proc "c" (a, b: uint32x4_t, $LANE1, $LANE2: int32_t) -> uint32x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 4 {
+		return vsetq_lane_u32(vgetq_lane_u32(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_u64)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_u64 :: #force_inline proc "c" (a, b: uint64x2_t, $LANE1, $LANE2: int32_t) -> uint64x2_t where 0 <= LANE1, LANE1 < 2, 0 <= LANE2, LANE2 < 2 {
+		return vsetq_lane_u64(vgetq_lane_u64(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_s8)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_s8 :: #force_inline proc "c" (a: int8x16_t, b: int8x8_t, $LANE1, $LANE2: int32_t) -> int8x16_t where 0 <= LANE1, LANE1 < 16, 0 <= LANE2, LANE2 < 8 {
+		c := vcombine_s8(b, b)
+		return vsetq_lane_s8(vgetq_lane_s8(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_s16)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_s16 :: #force_inline proc "c" (a: int16x8_t, b: int16x4_t, $LANE1, $LANE2: int32_t) -> int16x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 4 {
+		c := vcombine_s16(b, b)
+		return vsetq_lane_s16(vgetq_lane_s16(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_s32)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_s32 :: #force_inline proc "c" (a: int32x4_t, b: int32x2_t, $LANE1, $LANE2: int32_t) -> int32x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 2 {
+		c := vcombine_s32(b, b)
+		return vsetq_lane_s32(vgetq_lane_s32(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_s64 :: #force_inline proc "c" (a: int64x2_t, b: int64x1_t, $LANE1, $LANE2: int32_t) -> int64x2_t where 0 <= LANE1, LANE1 < 2, LANE2 == 0 {
+		c := vcombine_s64(b, b)
+		return vsetq_lane_s64(vgetq_lane_s64(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_u8)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_u8 :: #force_inline proc "c" (a: uint8x16_t, b: uint8x8_t, $LANE1, $LANE2: int32_t) -> uint8x16_t where 0 <= LANE1, LANE1 < 16, 0 <= LANE2, LANE2 < 8 {
+		c := vcombine_u8(b, b)
+		return vsetq_lane_u8(vgetq_lane_u8(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_u16)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_u16 :: #force_inline proc "c" (a: uint16x8_t, b: uint16x4_t, $LANE1, $LANE2: int32_t) -> uint16x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 4 {
+		c := vcombine_u16(b, b)
+		return vsetq_lane_u16(vgetq_lane_u16(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_u32)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_u32 :: #force_inline proc "c" (a: uint32x4_t, b: uint32x2_t, $LANE1, $LANE2: int32_t) -> uint32x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 2 {
+		c := vcombine_u32(b, b)
+		return vsetq_lane_u32(vgetq_lane_u32(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_u64)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_u64 :: #force_inline proc "c" (a: uint64x2_t, b: uint64x1_t, $LANE1, $LANE2: int32_t) -> uint64x2_t where 0 <= LANE1, LANE1 < 2, LANE2 == 0 {
+		c := vcombine_u64(b, b)
+		return vsetq_lane_u64(vgetq_lane_u64(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_s8)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_s8 :: #force_inline proc "c" (a: int8x8_t, b: int8x16_t, $LANE1, $LANE2: int32_t) -> int8x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 16 {
+		return vset_lane_s8(vgetq_lane_s8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_s16)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_s16 :: #force_inline proc "c" (a: int16x4_t, b: int16x8_t, $LANE1, $LANE2: int32_t) -> int16x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 8 {
+		return vset_lane_s16(vgetq_lane_s16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_s32)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_s32 :: #force_inline proc "c" (a: int32x2_t, b: int32x4_t, $LANE1, $LANE2: int32_t) -> int32x2_t where 0 <= LANE1, LANE1 < 2, 0 <= LANE2, LANE2 < 4 {
+		return vset_lane_s32(vgetq_lane_s32(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_s64 :: #force_inline proc "c" (a: int64x1_t, b: int64x2_t, $LANE1, $LANE2: int32_t) -> int64x1_t where LANE1 == 0, 0 <= LANE2, LANE2 < 2 {
+		return transmute(int64x1_t)vgetq_lane_s64(b, LANE2)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_u8)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_u8 :: #force_inline proc "c" (a: uint8x8_t, b: uint8x16_t, $LANE1, $LANE2: int32_t) -> uint8x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 16 {
+		return vset_lane_u8(vgetq_lane_u8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_u16)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_u16 :: #force_inline proc "c" (a: uint16x4_t, b: uint16x8_t, $LANE1, $LANE2: int32_t) -> uint16x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 8 {
+		return vset_lane_u16(vgetq_lane_u16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_u32)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_u32 :: #force_inline proc "c" (a: uint32x2_t, b: uint32x4_t, $LANE1, $LANE2: int32_t) -> uint32x2_t where 0 <= LANE1, LANE1 < 2, 0 <= LANE2, LANE2 < 4 {
+		return vset_lane_u32(vgetq_lane_u32(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_u64)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_u64 :: #force_inline proc "c" (a: uint64x1_t, b: uint64x2_t, $LANE1, $LANE2: int32_t) -> uint64x1_t where LANE1 == 0, 0 <= LANE2, LANE2 < 2 {
+		return transmute(uint64x1_t)vgetq_lane_u64(b, LANE2)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_s8)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_s8 :: #force_inline proc "c" (a, b: int8x8_t, $LANE1, $LANE2: int32_t) -> int8x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 8 {
+		return vset_lane_s8(vget_lane_s8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_s16)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_s16 :: #force_inline proc "c" (a, b: int16x4_t, $LANE1, $LANE2: int32_t) -> int16x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 4 {
+		return vset_lane_s16(vget_lane_s16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_s32)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_s32 :: #force_inline proc "c" (a, b: int32x2_t, $LANE1, $LANE2: int32_t) -> int32x2_t where 0 <= LANE1, LANE1 < 2, 0 <= LANE2, LANE2 < 2 {
+		return vset_lane_s32(vget_lane_s32(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_s64)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_s64 :: #force_inline proc "c" (a, b: int64x1_t, $LANE1, $LANE2: int32_t) -> int64x1_t where LANE1 == 0, LANE2 == 0 {
+		return b
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_u8)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_u8 :: #force_inline proc "c" (a, b: uint8x8_t, $LANE1, $LANE2: int32_t) -> uint8x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 8 {
+		return vset_lane_u8(vget_lane_u8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_u16)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_u16 :: #force_inline proc "c" (a, b: uint16x4_t, $LANE1, $LANE2: int32_t) -> uint16x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 4 {
+		return vset_lane_u16(vget_lane_u16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_u32)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_u32 :: #force_inline proc "c" (a, b: uint32x2_t, $LANE1, $LANE2: int32_t) -> uint32x2_t where 0 <= LANE1, LANE1 < 2, 0 <= LANE2, LANE2 < 2 {
+		return vset_lane_u32(vget_lane_u32(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_u64)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_u64 :: #force_inline proc "c" (a, b: uint64x1_t, $LANE1, $LANE2: int32_t) -> uint64x1_t where LANE1 == 0, LANE2 == 0 {
+		return b
 	}
 }
 

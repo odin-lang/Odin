@@ -1463,6 +1463,22 @@ vtrnq_p16 :: #force_inline proc "c" (a, b: poly16x8_t) -> poly16x8x2_t {
 	}
 }
 
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_p8)
+@(require_results, enable_target_feature = "neon")
+vceq_p8 :: #force_inline proc "c" (a, b: poly8x8_t) -> uint8x8_t {
+	return simd.lanes_eq(a, b)
+}
+
+// Compare bitwise equal.
+//
+// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_p8)
+@(require_results, enable_target_feature = "neon")
+vceqq_p8 :: #force_inline proc "c" (a, b: poly8x16_t) -> uint8x16_t {
+	return simd.lanes_eq(a, b)
+}
+
 when ODIN_ARCH == .arm64 {
 	// Polynomial multiply long
 	//
@@ -2398,6 +2414,121 @@ when ODIN_ARCH == .arm64 {
 			c := simd.shuffle(a, b, 1, 3)
 			return simd.shuffle(c, c, 1, 0)
 		}
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceq_p64)
+	@(require_results, enable_target_feature = "neon")
+	vceq_p64 :: #force_inline proc "c" (a, b: poly64x1_t) -> uint64x1_t {
+		return simd.lanes_eq(a, b)
+	}
+
+	// Compare bitwise equal.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vceqq_p64)
+	@(require_results, enable_target_feature = "neon")
+	vceqq_p64 :: #force_inline proc "c" (a, b: poly64x2_t) -> uint64x2_t {
+		return simd.lanes_eq(a, b)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_p8)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_p8 :: #force_inline proc "c" (a, b: poly8x16_t, $LANE1, $LANE2: int32_t) -> poly8x16_t where 0 <= LANE1, LANE1 < 16, 0 <= LANE2, LANE2 < 16 {
+		return vsetq_lane_p8(vgetq_lane_p8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_p16)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_p16 :: #force_inline proc "c" (a, b: poly16x8_t, $LANE1, $LANE2: int32_t) -> poly16x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 8 {
+		return vsetq_lane_p16(vgetq_lane_p16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_laneq_p64)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_laneq_p64 :: #force_inline proc "c" (a, b: poly64x2_t, $LANE1, $LANE2: int32_t) -> poly64x2_t where 0 <= LANE1, LANE1 < 2, 0 <= LANE2, LANE2 < 2 {
+		return vsetq_lane_p64(vgetq_lane_p64(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_p8)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_p8 :: #force_inline proc "c" (a: poly8x16_t, b: poly8x8_t, $LANE1, $LANE2: int32_t) -> poly8x16_t where 0 <= LANE1, LANE1 < 16, 0 <= LANE2, LANE2 < 8 {
+		c := vcombine_p8(b, b)
+		return vsetq_lane_p8(vgetq_lane_p8(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_p16)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_p16 :: #force_inline proc "c" (a: poly16x8_t, b: poly16x4_t, $LANE1, $LANE2: int32_t) -> poly16x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 4 {
+		c := vcombine_p16(b, b)
+		return vsetq_lane_p16(vgetq_lane_p16(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopyq_lane_p64)
+	@(require_results, enable_target_feature = "neon")
+	vcopyq_lane_p64 :: #force_inline proc "c" (a: poly64x2_t, b: poly64x1_t, $LANE1, $LANE2: int32_t) -> poly64x2_t where 0 <= LANE1, LANE1 < 2, LANE2 == 0 {
+		c := vcombine_p64(b, b)
+		return vsetq_lane_p64(vgetq_lane_p64(c, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_p8)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_p8 :: #force_inline proc "c" (a: poly8x8_t, b: poly8x16_t, $LANE1, $LANE2: int32_t) -> poly8x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 16 {
+		return vset_lane_p8(vgetq_lane_p8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_p16)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_p16 :: #force_inline proc "c" (a: poly16x4_t, b: poly16x8_t, $LANE1, $LANE2: int32_t) -> poly16x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 8 {
+		return vset_lane_p16(vgetq_lane_p16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_laneq_p64)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_laneq_p64 :: #force_inline proc "c" (a: poly64x1_t, b: poly64x2_t, $LANE1, $LANE2: int32_t) -> poly64x1_t where LANE1 == 0, 0 <= LANE2, LANE2 < 2 {
+		return transmute(poly64x1_t)vgetq_lane_p64(b, LANE2)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_p8)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_p8 :: #force_inline proc "c" (a, b: poly8x8_t, $LANE1, $LANE2: int32_t) -> poly8x8_t where 0 <= LANE1, LANE1 < 8, 0 <= LANE2, LANE2 < 8 {
+		return vset_lane_p8(vget_lane_p8(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_p16)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_p16 :: #force_inline proc "c" (a, b: poly16x4_t, $LANE1, $LANE2: int32_t) -> poly16x4_t where 0 <= LANE1, LANE1 < 4, 0 <= LANE2, LANE2 < 4 {
+		return vset_lane_p16(vget_lane_p16(b, LANE2), a, LANE1)
+	}
+
+	// Insert vector element from another vector element.
+	//
+	// [Arm's documentation](https://developer.arm.com/architectures/instruction-sets/intrinsics/vcopy_lane_p64)
+	@(require_results, enable_target_feature = "neon")
+	vcopy_lane_p64 :: #force_inline proc "c" (a, b: poly64x1_t, $LANE1, $LANE2: int32_t) -> poly64x1_t where LANE1 == 0, LANE2 == 0 {
+		return b
 	}
 }
 
