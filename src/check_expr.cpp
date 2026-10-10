@@ -10191,14 +10191,13 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 	o->expr = node;
 	o->mode = Addressing_Invalid;
 
-	Type *th = type_hint;
-
-	if (th == nullptr) {
+	if (type_hint == nullptr) {
 		gbString str = expr_to_string(node);
 		error(node, "Cannot determine type for implicit selector expression '%s'", str);
 		gb_string_free(str);
 		return Expr_Expr;
 	}
+	Type *th = core_broadcastable_elem_type(type_hint);
 	o->type = th;
 
 	bool ok = attempt_implicit_selector_expr(c, o, ise, th);
@@ -10216,17 +10215,17 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 			error(node, "Undeclared name '%.*s' for type '%s'", LIT(name), typ);
 
 			check_did_you_mean_type(name, bt->Enum.fields);
-		} else if (is_type_bit_set(th) && is_type_enum(th->BitSet.elem)) {
+		} else if (is_type_bit_set(type_hint) && is_type_enum(type_hint->BitSet.elem)) {
 			ERROR_BLOCK();
 
-			gbString typ = type_to_string(th);
+			gbString typ = type_to_string(type_hint);
 			gbString str = expr_to_string(node);
 			error(node, "Cannot convert enum value to '%s'", typ);
 			error_line("\tSuggestion: Did you mean '{ %s }'?\n", str);
 			gb_string_free(typ);
 			gb_string_free(str);
 		} else {
-			gbString typ = type_to_string(th);
+			gbString typ = type_to_string(type_hint);
 			gbString str = expr_to_string(node);
 			error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
 			gb_string_free(str);
