@@ -1123,6 +1123,10 @@ is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c == nil {
 		return true
 	}
+	if r := c.ring; r != nil {
+		tail := sync.atomic_load_explicit(&r.tail, .Acquire)
+		return (tail & c.mark) != 0
+	}
 	sync.guard(&c.mutex)
 	return bool(c.closed)
 }
