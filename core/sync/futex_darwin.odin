@@ -57,8 +57,18 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 	when darwin.ULOCK_WAIT_2_AVAILABLE {
 		timeout_ns := u64(duration)
 		s := __ulock_wait2(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns, 0)
+		shortened := false
 	} else {
-		timeout_us := u32(duration / time.Microsecond)
+		// NOTE(bill): A timeout of 0 means none
+		// We can wait at least 1µs
+		// Past the `u32` limit we need wait in pieces.
+		timeout_us := u32(0)
+		shortened := false
+		if duration > 0 {
+			us := max(duration / time.Microsecond, 1)
+			shortened = us > time.Duration(max(u32))
+			timeout_us = u32(min(us, time.Duration(max(u32))))
+		}
 		s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_us)
 	}
 
@@ -70,7 +80,7 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 	case EINTR, EFAULT:
 		return true
 	case ETIMEDOUT:
-		return false
+		return shortened
 	case:
 		panic_contextless("futex_wait failure")
 	}
@@ -87,9 +97,9 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 				return
 			}
 			switch darwin.errno() {
-			case -EINTR, -EFAULT:
+			case -EINTR:
 				continue loop
-			case -ENOENT:
+			case -ENOENT, -EFAULT:
 				return
 			case:
 				panic_contextless("darwin.os_sync_wake_by_address_any failure")
@@ -103,9 +113,9 @@ _futex_signal :: proc "contextless" (f: ^Futex) {
 			return
 		}
 		switch s {
-		case EINTR, EFAULT: 
+		case EINTR:
 			continue loop
-		case ENOENT:
+		case ENOENT, EFAULT:
 			return
 		case:
 			panic_contextless("futex_wake_single failure")
@@ -123,9 +133,9 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 				return
 			}
 			switch darwin.errno() {
-			case -EINTR, -EFAULT:
+			case -EINTR:
 				continue loop
-			case -ENOENT:
+			case -ENOENT, -EFAULT:
 				return
 			case:
 				panic_contextless("darwin.os_sync_wake_by_address_all failure")
@@ -139,9 +149,9 @@ _futex_broadcast :: proc "contextless" (f: ^Futex) {
 			return
 		}
 		switch s {
-		case EINTR, EFAULT: 
+		case EINTR:
 			continue loop
-		case ENOENT:
+		case ENOENT, EFAULT:
 			return
 		case:
 			panic_contextless("futex_wake_all failure")

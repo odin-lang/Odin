@@ -700,4 +700,458 @@ test_send_close_read :: proc(t: ^testing.T) {
 	thread.destroy(closer)
 }
 
+// Ensures every message sent on an unbuffered channel by concurrent senders
+// is received exactly once by concurrent receivers.
+@test
+test_unbuffered_many_senders_and_receivers :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	THREADS :: 4
+	PER     :: 1000
+
+	ch, alloc_err := chan.create(chan.Chan(int), context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	counts: [THREADS*PER]i32
+
+	Context :: struct {
+		id:     int,
+		ch:     chan.Chan(int),
+		counts: ^[THREADS*PER]i32,
+	}
+
+	senders, receivers: [THREADS]^thread.Thread
+	for i in 0..<THREADS {
+		ctx := Context{id = i, ch = ch, counts = &counts}
+		senders[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+			for j in 0..<PER {
+				assert(chan.send(ctx.ch, ctx.id*PER + j))
+			}
+		})
+		receivers[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+			for v in chan.recv(ctx.ch) {
+				sync.atomic_add(&ctx.counts[v], 1)
+			}
+		})
+	}
+
+	thread.join_multiple(..senders[:])
+	testing.expect(t, chan.close(ch))
+	thread.join_multiple(..receivers[:])
+	for tr in senders   { thread.destroy(tr) }
+	for tr in receivers { thread.destroy(tr) }
+
+	wrong := 0
+	for n in counts {
+		if n != 1 {
+			wrong += 1
+		}
+	}
+	testing.expect_value(t, wrong, 0)
+}
+
+// Ensures every message sent on a buffered channel by concurrent senders is
+// received exactly once by concurrent receivers, whether or not they block.
+@test
+test_buffered_many_senders_and_receivers :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	THREADS :: 4
+	PER     :: 1000
+
+	Context :: struct {
+		id:     int,
+		ch:     chan.Chan(int),
+		counts: ^[THREADS*PER]i32,
+	}
+
+	for capacity in ([?]int{1, 4, 64}) {
+		ch, alloc_err := chan.create(chan.Chan(int), capacity, context.allocator)
+		assert(alloc_err == nil, "allocation failed")
+		defer chan.destroy(ch)
+
+		counts: [THREADS*PER]i32
+
+		senders, receivers: [THREADS]^thread.Thread
+		for i in 0..<THREADS {
+			ctx := Context{id = i, ch = ch, counts = &counts}
+			senders[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+				for j in 0..<PER {
+					assert(chan.send(ctx.ch, ctx.id*PER + j))
+				}
+			})
+			receivers[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+				for v in chan.recv(ctx.ch) {
+					sync.atomic_add(&ctx.counts[v], 1)
+				}
+			})
+		}
+
+		thread.join_multiple(..senders[:])
+		testing.expect(t, chan.close(ch))
+		thread.join_multiple(..receivers[:])
+		for tr in senders   { thread.destroy(tr) }
+		for tr in receivers { thread.destroy(tr) }
+
+		wrong := 0
+		for n in counts {
+			if n != 1 {
+				wrong += 1
+			}
+		}
+		testing.expectf(t, wrong == 0, "capacity %v: %v values not received exactly once", capacity, wrong)
+	}
+}
+
+// Ensures that closing a buffered channel while senders and receivers are busy
+// on it loses and duplicates nothing: exactly the sends which reported success
+// are received, each once.
+@test
+test_buffered_close_while_busy :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	THREADS :: 4
+	PER     :: 1000
+
+	Context :: struct {
+		id:       int,
+		ch:       chan.Chan(int),
+		sent:     ^[THREADS*PER]i32,
+		counts:   ^[THREADS*PER]i32,
+		received: ^int,
+	}
+
+	for capacity in ([?]int{1, 4, 64}) {
+		ch, alloc_err := chan.create(chan.Chan(int), capacity, context.allocator)
+		assert(alloc_err == nil, "allocation failed")
+		defer chan.destroy(ch)
+
+		sent, counts: [THREADS*PER]i32
+		received: int
+
+		senders, receivers: [THREADS]^thread.Thread
+		for i in 0..<THREADS {
+			ctx := Context{id = i, ch = ch, sent = &sent, counts = &counts, received = &received}
+			senders[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+				for j in 0..<PER {
+					v := ctx.id*PER + j
+					if !chan.send(ctx.ch, v) {
+						break
+					}
+					ctx.sent[v] = 1
+				}
+			})
+			receivers[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+				for v in chan.recv(ctx.ch) {
+					sync.atomic_add(&ctx.counts[v], 1)
+					sync.atomic_add(ctx.received, 1)
+				}
+			})
+		}
+
+		for sync.atomic_load(&received) < THREADS*PER/2 {
+			thread.yield()
+		}
+		testing.expect(t, chan.close(ch))
+		thread.join_multiple(..senders[:])
+		thread.join_multiple(..receivers[:])
+		for tr in senders   { thread.destroy(tr) }
+		for tr in receivers { thread.destroy(tr) }
+
+		wrong := 0
+		for n, v in counts {
+			if n != sent[v] {
+				wrong += 1
+			}
+		}
+		testing.expectf(t, wrong == 0, "capacity %v: %v values received a different number of times than sent", capacity, wrong)
+	}
+}
+
+// Ensures that closing a full buffered channel wakes the senders blocked on it,
+// which report false, and that the buffered message can still be received.
+@test
+test_buffered_close_wakes_blocked_senders :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	ch, alloc_err := chan.create(chan.Chan(int), 1, context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	testing.expect(t, chan.send(ch, 1))
+
+	senders: [4]^thread.Thread
+	for &tr in senders {
+		tr = thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(int)) {
+			assert(!chan.send(ch, 2))
+		})
+	}
+	for sync.atomic_load(&ch.impl.w_waiting) < len(senders) {
+		thread.yield()
+	}
+
+	testing.expect(t, chan.close(ch))
+	thread.join_multiple(..senders[:])
+	for tr in senders { thread.destroy(tr) }
+
+	v, ok := chan.recv(ch)
+	testing.expect(t, ok)
+	testing.expect_value(t, v, 1)
+	_, ok = chan.recv(ch)
+	testing.expect(t, !ok)
+}
+
+// Ensures that closing an empty buffered channel wakes the receivers blocked on
+// it, which report false.
+@test
+test_buffered_close_wakes_blocked_receivers :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	ch, alloc_err := chan.create(chan.Chan(int), 4, context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	receivers: [4]^thread.Thread
+	for &tr in receivers {
+		tr = thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(int)) {
+			_, ok := chan.recv(ch)
+			assert(!ok)
+		})
+	}
+	for sync.atomic_load(&ch.impl.r_waiting) < len(receivers) {
+		thread.yield()
+	}
+
+	testing.expect(t, chan.close(ch))
+	thread.join_multiple(..receivers[:])
+	for tr in receivers { thread.destroy(tr) }
+}
+
+// Ensures a lone sender and receiver on a capacity 1 channel never miss each
+// other's wake-ups. The delays make each side often run out of spinning and
+// block just as the other side acts.
+@test
+test_buffered_ping_pong :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	N :: 5000
+
+	delay :: proc(i: int) {
+		for _ in 0..<(i*7919) % 1000 {
+			sync.cpu_relax()
+		}
+	}
+
+	ch, alloc_err := chan.create(chan.Chan(int), 1, context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	sender := thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(int)) {
+		for i in 0..<N {
+			delay(i)
+			assert(chan.send(ch, i))
+		}
+	})
+
+	wrong := 0
+	for i in 0..<N {
+		delay(i*31 + 7)
+		v, ok := chan.recv(ch)
+		if !ok || v != i {
+			wrong += 1
+		}
+	}
+	thread.join(sender)
+	thread.destroy(sender)
+	testing.expect_value(t, wrong, 0)
+}
+
+// Ensures messages larger than half a cache line, whose slots are padded,
+// arrive intact as the ring wraps around.
+@test
+test_buffered_large_messages :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	N :: 10_000
+
+	Msg :: struct {
+		id:  int,
+		pad: [4]int,
+	}
+
+	ch, alloc_err := chan.create(chan.Chan(Msg), 3, context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(ch)
+
+	sender := thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(Msg)) {
+		for i in 0..<N {
+			m := Msg{id = i}
+			for &p, j in m.pad {
+				p = i*10 + j
+			}
+			assert(chan.send(ch, m))
+		}
+	})
+
+	wrong := 0
+	for i in 0..<N {
+		m, ok := chan.recv(ch)
+		if !ok || m.id != i || m.pad != {i*10, i*10 + 1, i*10 + 2, i*10 + 3} {
+			wrong += 1
+		}
+	}
+	thread.join(sender)
+	thread.destroy(sender)
+	testing.expect_value(t, wrong, 0)
+}
+
+// Ensures sends and receives with a timeout give up, no earlier than the
+// timeout, when nothing can be sent or received.
+@test
+test_timeout_expires :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	TIMEOUT :: 5 * time.Millisecond
+
+	buffered, alloc_err := chan.create(chan.Chan(int), 1, context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(buffered)
+
+	unbuffered: chan.Chan(int)
+	unbuffered, alloc_err = chan.create(chan.Chan(int), context.allocator)
+	assert(alloc_err == nil, "allocation failed")
+	defer chan.destroy(unbuffered)
+
+	start := time.tick_now()
+	_, status := chan.recv_with_timeout(buffered, TIMEOUT)
+	testing.expect_value(t, status, chan.Timeout_Status.Timed_Out)
+	testing.expect(t, time.tick_since(start) >= TIMEOUT)
+
+	testing.expect(t, chan.send(buffered, 1))
+	start = time.tick_now()
+	testing.expect_value(t, chan.send_with_timeout(buffered, 2, TIMEOUT), chan.Timeout_Status.Timed_Out)
+	testing.expect(t, time.tick_since(start) >= TIMEOUT)
+
+	start = time.tick_now()
+	_, status = chan.recv_with_timeout(unbuffered, TIMEOUT)
+	testing.expect_value(t, status, chan.Timeout_Status.Timed_Out)
+	testing.expect(t, time.tick_since(start) >= TIMEOUT)
+
+	start = time.tick_now()
+	testing.expect_value(t, chan.send_with_timeout(unbuffered, 3, TIMEOUT), chan.Timeout_Status.Timed_Out)
+	testing.expect(t, time.tick_since(start) >= TIMEOUT)
+
+	// Nothing was left behind by the timed out waits.
+	testing.expect(t, !chan.can_send(unbuffered))
+	testing.expect(t, !chan.can_recv(unbuffered))
+	testing.expect_value(t, sync.atomic_load(&buffered.impl.r_waiting), 0)
+	testing.expect_value(t, sync.atomic_load(&buffered.impl.w_waiting), 0)
+	v, ok := chan.recv(buffered)
+	testing.expect(t, ok)
+	testing.expect_value(t, v, 1)
+}
+
+// Ensures a send or receive with a timeout succeeds when the other side
+// arrives in time, and reports a close that happens while it waits.
+@test
+test_timeout_woken :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, FAIL_TIME)
+
+	for capacity in ([?]int{0, 1}) {
+		ch, alloc_err := chan.create(chan.Chan(int), capacity, context.allocator)
+		assert(alloc_err == nil, "allocation failed")
+		defer chan.destroy(ch)
+
+		sender := thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(int)) {
+			time.sleep(time.Millisecond)
+			assert(chan.send(ch, 42))
+		})
+		v, status := chan.recv_with_timeout(ch, FAIL_TIME)
+		testing.expect_value(t, status, chan.Timeout_Status.Ok)
+		testing.expect_value(t, v, 42)
+		thread.join(sender)
+		thread.destroy(sender)
+
+		closer := thread.create_and_start_with_poly_data(ch, proc(ch: chan.Chan(int)) {
+			time.sleep(time.Millisecond)
+			assert(chan.close(ch))
+		})
+		start := time.tick_now()
+		_, status = chan.recv_with_timeout(ch, FAIL_TIME)
+		testing.expect_value(t, status, chan.Timeout_Status.Closed)
+		testing.expect(t, time.tick_since(start) < FAIL_TIME/2)
+		testing.expect_value(t, chan.send_with_timeout(ch, 1, FAIL_TIME), chan.Timeout_Status.Closed)
+		thread.join(closer)
+		thread.destroy(closer)
+	}
+}
+
+// Ensures timeouts racing with the other side lose and duplicate nothing:
+// a send which timed out was not received, and every send which succeeded
+// was received exactly once.
+@test
+test_timeout_races :: proc(t: ^testing.T) {
+	testing.set_fail_timeout(t, 5 * FAIL_TIME)
+
+	THREADS :: 4
+	PER     :: 2000
+
+	Context :: struct {
+		id:     int,
+		ch:     chan.Chan(int),
+		counts: ^[THREADS*PER]i32,
+	}
+
+	for capacity in ([?]int{0, 1, 4}) {
+		ch, alloc_err := chan.create(chan.Chan(int), capacity, context.allocator)
+		assert(alloc_err == nil, "allocation failed")
+		defer chan.destroy(ch)
+
+		counts: [THREADS*PER]i32
+
+		senders, receivers: [THREADS]^thread.Thread
+		for i in 0..<THREADS {
+			ctx := Context{id = i, ch = ch, counts = &counts}
+			senders[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+				for j in 0..<PER {
+					v := ctx.id*PER + j
+					for k := j; ; k += 1 {
+						timeout := time.Duration((k*7919) % 20) * time.Microsecond
+						if chan.send_with_timeout(ctx.ch, v, timeout) == .Ok {
+							break
+						}
+					}
+				}
+			})
+			receivers[i] = thread.create_and_start_with_poly_data(ctx, proc(ctx: Context) {
+				for k := ctx.id; ; k += 1 {
+					timeout := time.Duration((k*104729) % 20) * time.Microsecond
+					v, status := chan.recv_with_timeout(ctx.ch, timeout)
+					switch status {
+					case .Ok:
+						sync.atomic_add(&ctx.counts[v], 1)
+					case .Timed_Out:
+					case .Closed:
+						return
+					}
+				}
+			})
+		}
+
+		thread.join_multiple(..senders[:])
+		testing.expect(t, chan.close(ch))
+		thread.join_multiple(..receivers[:])
+		for tr in senders   { thread.destroy(tr) }
+		for tr in receivers { thread.destroy(tr) }
+
+		wrong := 0
+		for n in counts {
+			if n != 1 {
+				wrong += 1
+			}
+		}
+		testing.expectf(t, wrong == 0, "capacity %v: %v values not received exactly once", capacity, wrong)
+	}
+}
 

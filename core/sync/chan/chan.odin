@@ -5,6 +5,7 @@ import "base:intrinsics"
 import "base:runtime"
 import "core:sync"
 import "core:math/rand"
+import "core:time"
 
 when ODIN_TEST {
 /*
@@ -76,19 +77,20 @@ Raw_Chan :: struct {
 	allocation_size: int,
 	msg_size:        u16,
 	closed:          b16, // guarded by `mutex`
+	msg_offset:      u32, // buffered; here to fill the padding
 	mutex:           sync.Mutex,
-	r_cond:          sync.Cond,
-	w_cond:          sync.Cond,
-	r_waiting:       int,  // guarded by `mutex`
-	w_waiting:       int,  // guarded by `mutex`
-
-	did_read: bool, // lets a sender know if the value was read
+	r_waiters:       sync.Wait_Queue, // guarded by `mutex`
+	w_waiters:       sync.Wait_Queue, // guarded by `mutex`
 
 	// Buffered
-	queue: ^Raw_Queue,
+	ring:      ^Raw_Ring,
+	r_waiting: int, // receivers in or entering `r_waiters`
+	w_waiting: int, // senders in or entering `w_waiters`
 
-	// Unbuffered
-	unbuffered_data: rawptr,
+	slots:     [^]u8,
+	cap:       uint,
+	stride:    uint,
+	mark:      uint,
 }
 
 /*
@@ -256,19 +258,13 @@ Example:
 @(require_results)
 create_raw_unbuffered :: proc(#any_int msg_size, msg_alignment: int, allocator: runtime.Allocator, loc := #caller_location) -> (c: ^Raw_Chan, err: runtime.Allocator_Error) {
 	assert(msg_size <= int(max(u16)))
-	align := max(align_of(Raw_Chan), msg_alignment)
 
-	size := runtime.align_forward_int(size_of(Raw_Chan), align)
-	offset := size
-	size += msg_size
-	size = runtime.align_forward_int(size, align)
+	data := runtime.mem_alloc(size_of(Raw_Chan), align_of(Raw_Chan), allocator, loc) or_return
 
-	data := runtime.mem_alloc(size, align, allocator, loc) or_return
 	c = (^Raw_Chan)(raw_data(data))
-	c.allocator = allocator
-	c.allocation_size = size
-	c.unbuffered_data = raw_data(data[offset:])
-	c.msg_size = u16(msg_size)
+	c.allocator       = allocator
+	c.allocation_size = size_of(Raw_Chan)
+	c.msg_size        = u16(msg_size)
 	return
 }
 
@@ -305,27 +301,36 @@ create_raw_buffered :: proc(#any_int msg_size, msg_alignment: int, #any_int cap:
 		return create_raw_unbuffered(msg_size, msg_alignment, allocator)
 	}
 
-	align := max(align_of(Raw_Chan), msg_alignment, align_of(Raw_Queue))
+	msg_offset := runtime.align_forward_int(size_of(uint), msg_alignment)
+	stride     := runtime.align_forward_int(msg_offset + msg_size, max(align_of(uint), msg_alignment))
+	if stride > CACHE_LINE/2 {
+		stride = runtime.align_forward_int(stride, CACHE_LINE)
+	}
+	align := max(RING_PAD, msg_alignment)
 
-	size := runtime.align_forward_int(size_of(Raw_Chan), align)
-	q_offset := size
-	size = runtime.align_forward_int(q_offset + size_of(Raw_Queue), msg_alignment)
-	offset := size
-	size += msg_size * cap
-	size = runtime.align_forward_int(size, align)
+	ring_offset  := runtime.align_forward_int(size_of(Raw_Chan), RING_PAD)
+	slots_offset := runtime.align_forward_int(ring_offset + size_of(Raw_Ring), align)
+	size         := slots_offset + stride*cap
 
 	data := runtime.mem_alloc(size, align, allocator, loc) or_return
 	ptr  := raw_data(data)
-	c = (^Raw_Chan)(raw_data(data))
-	c.allocator = allocator
+
+	c = (^Raw_Chan)(ptr)
+	c.allocator       = allocator
 	c.allocation_size = size
-
-	bptr := ([^]byte)(ptr)
-
-	c.queue = (^Raw_Queue)(bptr[q_offset:])
-	c.msg_size = u16(msg_size)
-
-	raw_queue_init(c.queue, ([^]byte)(bptr[offset:]), cap, msg_size)
+	c.msg_size        = u16(msg_size)
+	c.msg_offset      = u32(msg_offset)
+	c.ring            = (^Raw_Ring)(ptr[ring_offset:])
+	c.slots           = ptr[slots_offset:]
+	c.cap             = uint(cap)
+	c.stride          = uint(stride)
+	c.mark            = 1
+	for c.mark <= c.cap {
+		c.mark <<= 1
+	}
+	for i in 0..<c.cap {
+		(^uint)(c.slots[i*c.stride:])^ = i
+	}
 	return
 }
 
@@ -459,17 +464,14 @@ send :: proc "contextless" (c: $C/Chan($T, $D), data: T) -> (ok: bool) where C.D
 }
 
 /*
-Tries sending the specified message which is:
-- blocking: given the channel is unbuffered
-- non-blocking: given the channel is buffered
+Tries sending the specified message without blocking. On an unbuffered channel, this only succeeds when a receiver is already waiting.
 
 **Inputs**
 - `c`: The channel
 - `data`: The message to send
 
 **Returns**
-- `true` if the message was sent, `false` when the channel was
-already closed or the channel's buffer was full
+- `true` if the message was sent; `false` when the channel was already closed, the channel's buffer was full, or no receiver was waiting on an unbuffered channel
 
 Example:
 
@@ -565,6 +567,92 @@ try_recv :: proc "contextless" (c: $C/Chan($T, $D)) -> (data: T, ok: bool) where
 	return
 }
 
+/*
+The result of a send or receive with a timeout.
+*/
+Timeout_Status :: enum {
+	Ok,        // the message was sent or received
+	Timed_Out, // the timeout passed first
+	Closed,    // the channel was closed; when receiving, also empty
+}
+
+/*
+Sends the specified message, blocking the current thread until it is sent, the channel is closed, or `duration` has passed.
+
+**Inputs**
+- `c`: The channel
+- `data`: The message to send
+- `duration`: The longest time to wait
+
+**Returns**
+- `.Ok` if the message was sent, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed
+
+Example:
+
+	import "core:sync/chan"
+	import "core:time"
+
+	send_with_timeout_example :: proc() {
+		c, err := chan.create(chan.Chan(int), 1, context.allocator)
+		assert(err == .None)
+		defer chan.destroy(c)
+
+		assert(chan.send_with_timeout(c, 1, time.Millisecond) == .Ok)
+
+		// the buffer is full and will give up after a millisecond
+		assert(chan.send_with_timeout(c, 2, time.Millisecond) == .Timed_Out)
+
+		chan.close(c)
+		assert(chan.send_with_timeout(c, 3, time.Millisecond) == .Closed)
+	}
+*/
+@(require_results, synchronizes=.Release)
+send_with_timeout :: proc "contextless" (c: $C/Chan($T, $D), data: T, duration: time.Duration) -> Timeout_Status where C.D <= .Both {
+	data := data
+	return send_raw_with_timeout(c, &data, duration)
+}
+
+/*
+Reads a message from the channel, blocking the current thread until one is available, the channel is closed and empty, or `duration` has passed.
+
+**Inputs**
+- `c`: The channel
+- `duration`: The longest time to wait
+
+**Returns**
+- The message
+- `.Ok` if a message was received, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed and empty
+
+Example:
+
+	import "core:sync/chan"
+	import "core:time"
+
+	recv_with_timeout_example :: proc() {
+		c, err := chan.create(chan.Chan(int), 1, context.allocator)
+		assert(err == .None)
+		defer chan.destroy(c)
+
+		// the channel is empty and will give up after a millisecond
+		_, status := chan.recv_with_timeout(c, time.Millisecond)
+		assert(status == .Timed_Out)
+
+		assert(chan.send(c, 2))
+		value: int
+		value, status = chan.recv_with_timeout(c, time.Millisecond)
+		assert(status == .Ok && value == 2)
+
+		chan.close(c)
+		_, status = chan.recv_with_timeout(c, time.Millisecond)
+		assert(status == .Closed)
+	}
+*/
+@(require_results, synchronizes=.Acquire)
+recv_with_timeout :: proc "contextless" (c: $C/Chan($T, $D), duration: time.Duration) -> (data: T, status: Timeout_Status) where C.D >= .Both {
+	status = recv_raw_with_timeout(c, &data, duration)
+	return
+}
+
 
 /*
 Sends the specified message, blocking the current thread if:
@@ -605,52 +693,7 @@ Example:
 */
 @(require_results, synchronizes=.Release)
 send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) {
-	if c == nil {
-		return
-	}
-	if c.queue != nil { // buffered
-		sync.guard(&c.mutex)
-		for !c.closed && c.queue.len == c.queue.cap {
-			c.w_waiting += 1
-			sync.wait(&c.w_cond, &c.mutex)
-			c.w_waiting -= 1
-		}
-
-		if c.closed {
-			return false
-		}
-
-		ok = raw_queue_push(c.queue, msg_in)
-		if c.r_waiting > 0 {
-			sync.signal(&c.r_cond)
-		}
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
-
-		if c.closed {
-			return false
-		}
-
-		c.did_read = false
-		defer c.did_read = false
-
-		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
-
-		c.w_waiting += 1
-
-		if c.r_waiting > 0 {
-			sync.signal(&c.r_cond)
-		}
-
-		sync.wait(&c.w_cond, &c.mutex)
-
-		if c.closed && !c.did_read {
-			return false
-		}
-
-		ok = true
-	}
-	return
+	return send_blocking(c, msg_in, false, 0) == .Ok
 }
 
 /*
@@ -695,58 +738,12 @@ Example:
 */
 @(require_results, synchronizes=.Acquire)
 recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> (ok: bool) {
-	if c == nil {
-		return
-	}
-	if c.queue != nil { // buffered
-		sync.guard(&c.mutex)
-		for c.queue.len == 0 {
-			if c.closed {
-				return
-			}
-
-			c.r_waiting += 1
-			sync.wait(&c.r_cond, &c.mutex)
-			c.r_waiting -= 1
-		}
-
-		msg := raw_queue_pop(c.queue)
-		if msg != nil {
-			intrinsics.mem_copy(msg_out, msg, int(c.msg_size))
-		}
-
-		if c.w_waiting > 0 {
-			sync.signal(&c.w_cond)
-		}
-		ok = true
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
-
-		for !c.closed && c.w_waiting == 0 {
-			c.r_waiting += 1
-			sync.wait(&c.r_cond, &c.mutex)
-			c.r_waiting -= 1
-		}
-
-		if c.closed {
-			return
-		}
-
-		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
-		c.w_waiting -= 1
-
-		c.did_read = true
-		sync.signal(&c.w_cond)
-		ok = true
-	}
-	return
+	return recv_blocking(c, msg_out, false, 0) == .Ok
 }
 
 
 /*
-Tries sending the specified message which is:
-- blocking: given the channel is unbuffered
-- non-blocking: given the channel is buffered
+Tries sending the specified message without blocking. On an unbuffered channel, this only succeeds when a receiver is already waiting.
 
 Note: The message referenced by `msg_out` must match the size
 and alignment used when the `Raw_Chan` was created.
@@ -756,8 +753,7 @@ and alignment used when the `Raw_Chan` was created.
 - `msg_out`: pointer to the data to send
 
 **Returns**
-- `true` if the message was sent, `false` when the channel was
-already closed or the channel's buffer was full
+- `true` if the message was sent; `false` when the channel was already closed, the channel's buffer was full, or no receiver was waiting on an unbuffered channel
 
 Example:
 
@@ -778,33 +774,31 @@ try_send_raw :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr) -> (ok: bool) 
 	if c == nil {
 		return false
 	}
-	if c.queue != nil { // buffered
-		sync.guard(&c.mutex)
-		if c.queue.len == c.queue.cap {
+	if c.ring != nil { // buffered
+		if ring_send(c, msg_in, int(c.msg_size)) != .Ok {
+			return false
+		}
+		wake_one(c, &c.r_waiting, &c.r_waiters)
+		ok = true
+	} else { // unbuffered
+		if sync.wait_queue_is_empty(&c.r_waiters) {
+			return false
+		}
+		size := int(c.msg_size)
+
+		sync.lock(&c.mutex)
+		r: ^sync.Waiter
+		if !c.closed {
+			r = sync.wait_queue_pop(&c.r_waiters)
+		}
+		sync.unlock(&c.mutex)
+
+		if r == nil {
 			return false
 		}
 
-		if c.closed {
-			return false
-		}
-
-		ok = raw_queue_push(c.queue, msg_in)
-		if c.r_waiting > 0 {
-			sync.signal(&c.r_cond)
-		}
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
-
-		if c.closed || c.r_waiting - c.w_waiting <= 0 {
-			return false
-		}
-
-		intrinsics.mem_copy(c.unbuffered_data, msg_in, int(c.msg_size))
-		c.w_waiting += 1
-		if c.r_waiting > 0 {
-			sync.signal(&c.r_cond)
-		}
-		sync.wait(&c.w_cond, &c.mutex)
+		intrinsics.mem_copy_non_overlapping(r.data, msg_in, size)
+		sync.waiter_wake(r, true)
 		ok = true
 	}
 	return
@@ -841,35 +835,71 @@ try_recv_raw :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr) -> bool {
 	if c == nil {
 		return false
 	}
-	if c.queue != nil { // buffered
-		sync.guard(&c.mutex)
-		if c.queue.len == 0 {
+	if c.ring != nil { // buffered
+		if ring_recv(c, msg_out, int(c.msg_size)) != .Ok {
 			return false
 		}
-
-		msg := raw_queue_pop(c.queue)
-		if msg != nil {
-			intrinsics.mem_copy(msg_out, msg, int(c.msg_size))
-		}
-
-		if c.w_waiting > 0 {
-			sync.signal(&c.w_cond)
-		}
+		wake_one(c, &c.w_waiting, &c.w_waiters)
 		return true
-	} else if c.unbuffered_data != nil { // unbuffered
-		sync.guard(&c.mutex)
+	} else { // unbuffered
+		if sync.wait_queue_is_empty(&c.w_waiters) {
+			return false
+		}
+		size := int(c.msg_size)
 
-		if c.closed || c.w_waiting - c.r_waiting <= 0 {
+		sync.lock(&c.mutex)
+		s: ^sync.Waiter
+		if !c.closed {
+			s = sync.wait_queue_pop(&c.w_waiters)
+		}
+		sync.unlock(&c.mutex)
+
+		if s == nil {
 			return false
 		}
 
-		intrinsics.mem_copy(msg_out, c.unbuffered_data, int(c.msg_size))
-		c.w_waiting -= 1
-
-		sync.signal(&c.w_cond)
+		intrinsics.mem_copy_non_overlapping(msg_out, s.data, size)
+		sync.waiter_wake(s, true)
 		return true
 	}
-	return false
+}
+
+/*
+Sends the specified message, blocking the current thread until it is sent, the channel is closed, or `duration` has passed.
+
+Note: The message referenced by `msg_in` must match the size
+and alignment used when the `Raw_Chan` was created.
+
+**Inputs**
+- `c`: The channel
+- `msg_in`: Pointer to the data to send
+- `duration`: The longest time to wait
+
+**Returns**
+- `.Ok` if the message was sent, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed
+*/
+@(require_results, synchronizes=.Release)
+send_raw_with_timeout :: proc "contextless" (c: ^Raw_Chan, msg_in: rawptr, duration: time.Duration) -> Timeout_Status {
+	return send_blocking(c, msg_in, true, duration)
+}
+
+/*
+Reads a message from the channel, blocking the current thread until one is available, the channel is closed and empty, or `duration` has passed.
+
+Note: The location pointed to by `msg_out` must match the size
+and alignment used when the `Raw_Chan` was created.
+
+**Inputs**
+- `c`: The channel
+- `msg_out`: Pointer to where the message should be stored
+- `duration`: The longest time to wait
+
+**Returns**
+- `.Ok` if a message was received, `.Timed_Out` if `duration` passed first, or `.Closed` if the channel was closed and empty
+*/
+@(require_results, synchronizes=.Acquire)
+recv_raw_with_timeout :: proc "contextless" (c: ^Raw_Chan, msg_out: rawptr, duration: time.Duration) -> Timeout_Status {
+	return recv_blocking(c, msg_out, true, duration)
 }
 
 
@@ -895,7 +925,7 @@ Example:
 */
 @(require_results)
 is_buffered :: proc "contextless" (c: ^Raw_Chan) -> bool {
-	return c != nil && c.queue != nil
+	return c != nil && c.ring != nil
 }
 
 /*
@@ -919,7 +949,7 @@ Example:
 */
 @(require_results)
 is_unbuffered :: proc "contextless" (c: ^Raw_Chan) -> bool {
-	return c != nil && c.unbuffered_data != nil
+	return c != nil && c.ring == nil
 }
 
 /*
@@ -955,11 +985,29 @@ Output:
 */
 @(require_results)
 len :: proc "contextless" (c: ^Raw_Chan) -> int {
-	if c != nil && c.queue != nil {
-		sync.guard(&c.mutex)
-		return c.queue.len
+	if c == nil || c.ring == nil {
+		return 0
 	}
-	return 0
+	r := c.ring
+	for {
+		tail := sync.atomic_load_explicit(&r.tail, .Seq_Cst)
+		head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
+		if sync.atomic_load_explicit(&r.tail, .Seq_Cst) != tail {
+			continue
+		}
+		hix := head & (c.mark - 1)
+		tix := tail & (c.mark - 1)
+		switch {
+		case hix < tix:
+			return int(tix - hix)
+		case hix > tix:
+			return int(c.cap - hix + tix)
+		case (tail &~ c.mark) == head:
+			return 0
+		case:
+			return int(c.cap)
+		}
+	}
 }
 
 /*
@@ -992,9 +1040,8 @@ Output:
 */
 @(require_results)
 cap :: proc "contextless" (c: ^Raw_Chan) -> int {
-	if c != nil && c.queue != nil {
-		sync.guard(&c.mutex)
-		return c.queue.cap
+	if c != nil {
+		return int(c.cap)
 	}
 	return 0
 }
@@ -1034,13 +1081,31 @@ close :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c == nil {
 		return false
 	}
+	if r := c.ring; r != nil {
+		tail := sync.atomic_or_explicit(&r.tail, c.mark, .Seq_Cst)
+		if (tail & c.mark) != 0 {
+			return false
+		}
+	}
 	sync.guard(&c.mutex)
 	if c.closed {
 		return false
 	}
-	c.closed = true
-	sync.broadcast(&c.r_cond)
-	sync.broadcast(&c.w_cond)
+	sync.atomic_store_explicit(&c.closed, true, .Relaxed)
+
+	for w := sync.wait_queue_pop(&c.r_waiters); w != nil; w = sync.wait_queue_pop(&c.r_waiters) {
+		if c.ring != nil {
+			sync.atomic_sub_explicit(&c.r_waiting, 1, .Relaxed)
+		}
+		sync.waiter_wake(w, false)
+	}
+
+	for w := sync.wait_queue_pop(&c.w_waiters); w != nil; w = sync.wait_queue_pop(&c.w_waiters) {
+		if c.ring != nil {
+			sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
+		}
+		sync.waiter_wake(w, false)
+	}
 	return true
 }
 
@@ -1057,6 +1122,10 @@ Returns if the channel is closed or not
 is_closed :: proc "contextless" (c: ^Raw_Chan) -> bool {
 	if c == nil {
 		return true
+	}
+	if r := c.ring; r != nil {
+		tail := sync.atomic_load_explicit(&r.tail, .Acquire)
+		return (tail & c.mark) != 0
 	}
 	sync.guard(&c.mutex)
 	return bool(c.closed)
@@ -1089,11 +1158,12 @@ Example:
 */
 @(require_results)
 can_recv :: proc "contextless" (c: ^Raw_Chan) -> bool {
-	sync.guard(&c.mutex)
-	if is_buffered(c) {
-		return c.queue.len > 0
+	if r := c.ring; r != nil {
+		head := sync.atomic_load_explicit(&r.head, .Relaxed)
+		tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
+		return (tail &~ c.mark) != head
 	}
-	return c.w_waiting - c.r_waiting > 0
+	return !sync.wait_queue_is_empty(&c.w_waiters)
 }
 
 
@@ -1124,11 +1194,12 @@ Example:
 */
 @(require_results)
 can_send :: proc "contextless" (c: ^Raw_Chan) -> bool {
-	sync.guard(&c.mutex)
-	if is_buffered(c) {
-		return c.queue.len < c.queue.cap
+	if r := c.ring; r != nil {
+		tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
+		head := sync.atomic_load_explicit(&r.head, .Relaxed)
+		return (head + (c.mark << 1)) != (tail &~ c.mark)
 	}
-	return c.r_waiting - c.w_waiting > 0
+	return !sync.wait_queue_is_empty(&c.r_waiters)
 }
 
 /*
@@ -1221,7 +1292,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 		count := 0
 
 		for c, i in recvs {
-			if !c.closed && can_recv(c) {
+			if !sync.atomic_load_explicit(&c.closed, .Relaxed) && can_recv(c) {
 				candidates[count] = {
 					is_recv = true,
 					idx     = i,
@@ -1234,7 +1305,7 @@ try_select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs
 			if i > builtin.len(send_msgs)-1 || send_msgs[i] == nil {
 				continue
 			}
-			if !c.closed && can_send(c)  {
+			if !sync.atomic_load_explicit(&c.closed, .Relaxed) && can_send(c) {
 				candidates[count] = {
 					is_recv = false,
 					idx     = i,
@@ -1277,135 +1348,311 @@ select_raw :: proc "odin" (recvs: []^Raw_Chan, sends: []^Raw_Chan, send_msgs: []
 	return try_select_raw(recvs, sends, send_msgs, recv_out)
 }
 
-/*
-`Raw_Queue` is a non-thread-safe queue implementation designed to store messages
-of fixed size and alignment.
-
-Note: For most use cases, it is recommended to use `core:container/queue` instead,
-as `Raw_Queue` is used internally by `Raw_Chan` and may not provide the desired
-level of convenience for typical applications.
-*/
 @(private)
-Raw_Queue :: struct {
-	data: [^]byte,
-	len:  int,
-	cap:  int,
-	next: int,
-	size: int, // element size
-}
+CACHE_LINE :: 64 // TODO(bill): actually use the correct cache line size for whatever platform we are targeting
 
-/*
-Initializes a `Raw_Queue`
-
-**Inputs**
-- `q`: A pointert to the `Raw_Queue` to initialize
-- `data`: The pointer to backing slice storing the messages
-- `cap`: The capacity of the queue
-- `size`: The size of a message
-
-Example:
-
-	import "core:sync/chan"
-
-	raw_queue_init_example :: proc() {
-		// use a stack allocated array as backing storage
-		storage: [100]int
-
-		rq: chan.Raw_Queue
-		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
-	}
-*/
 @(private)
-raw_queue_init :: proc "contextless" (q: ^Raw_Queue, data: rawptr, cap: int, size: int) {
-	q.data = ([^]byte)(data)
-	q.len  = 0
-	q.cap  = cap
-	q.next = 0
-	q.size = size
+RING_PAD :: 2*CACHE_LINE
+
+#assert(size_of(Raw_Chan) <= RING_PAD)
+
+@(private)
+Raw_Ring :: struct {
+	tail: uint,
+	_:    [RING_PAD - size_of(uint)]u8,
+	head: uint,
+	_:    [RING_PAD - size_of(uint)]u8,
 }
 
-/*
-Add an element to the queue.
-
-Note: The message referenced by `data` must match the size
-and alignment used when the `Raw_Queue` was initialized.
-
-**Inputs**
-- `q`: A pointert to the `Raw_Queue`
-- `data`: The pointer to message to add
-
-**Returns**
-- `true` if the element was added, `false` when the queue is already full
-
-Example:
-
-	import "core:sync/chan"
-
-	raw_queue_push_example :: proc() {
-		storage: [100]int
-		rq: chan.Raw_Queue
-		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
-
-		value := 2
-		assert(chan.raw_queue_push(&rq, &value), "there was enough space")
-	}
-*/
-@(private, require_results)
-raw_queue_push :: proc "contextless" (q: ^Raw_Queue, data: rawptr) -> bool {
-	if q.len == q.cap {
-		return false
-	}
-	pos := q.next + q.len
-	if pos >= q.cap {
-		pos -= q.cap
-	}
-
-	val_ptr := q.data[pos*q.size:]
-	intrinsics.mem_copy(val_ptr, data, q.size)
-	q.len += 1
-	return true
+@(private)
+Ring_Status :: enum u8 {
+	Ok,
+	Blocked,
+	Closed,
 }
 
-/*
-Removes and returns the first element of the queue.
-
-Note: The returned element is only guaranteed to be valid until the next
-`raw_queue_push` operation. Accessing it after that point may result in
-undefined behavior.
-
-**Inputs**
-- `c`: A pointer to the `Raw_Queue`.
-
-**Returns**
-- A pointer to the first element in the queue, or `nil` if the queue is empty.
-
-Example:
-
-	import "core:sync/chan"
-
-	raw_queue_pop_example :: proc() {
-		storage: [100]int
-		rq: chan.Raw_Queue
-		chan.raw_queue_init(&rq, &storage, cap(storage), size_of(int))
-
-		assert(chan.raw_queue_pop(&rq) == nil, "queue was empty")
-
-		// add an element to the queue
-		value := 2
-		assert(chan.raw_queue_push(&rq, &value), "there was enough space")
-
-		assert((cast(^int)chan.raw_queue_pop(&rq))^ == 2, "retrieved the element")
-	}
-*/
 @(private, require_results)
-raw_queue_pop :: proc "contextless" (q: ^Raw_Queue) -> (data: rawptr) {
-	if q.len > 0 {
-		data = q.data[q.next*q.size:]
-		q.next += 1
-		q.len -= 1
-		if q.next >= q.cap {
-			q.next -= q.cap
+ring_next :: proc "contextless" (c: ^Raw_Chan, pos: uint) -> uint {
+	index := pos & (c.mark - 1)
+	if (index + 1) == c.cap {
+		one_lap := c.mark << 1
+		return (pos &~ (one_lap - 1)) + one_lap
+	}
+	return pos + 1
+}
+
+@(private, require_results)
+ring_send :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_in: rawptr, size: int) -> Ring_Status {
+	r := c.ring
+	one_lap := c.mark << 1
+	tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
+	backoff := 1
+	for {
+		if (tail & c.mark) != 0 {
+			return .Closed
+		}
+		index := tail & (c.mark - 1)
+		slot  := c.slots[index*c.stride:]
+		stamp := sync.atomic_load_explicit((^uint)(slot), .Acquire)
+		switch {
+		case stamp == tail:
+			next := ring_next(c, tail)
+			if t, ok := sync.atomic_compare_exchange_weak_explicit(&r.tail, tail, next, .Seq_Cst, .Relaxed); ok {
+				intrinsics.mem_copy_non_overlapping(slot[c.msg_offset:], msg_in, size)
+				sync.atomic_store_explicit((^uint)(slot), tail + 1, .Release)
+				return .Ok
+			} else {
+				tail = t
+				for _ in 0..<backoff {
+					sync.cpu_relax()
+				}
+				backoff = min(backoff*2, 64)
+			}
+		case (stamp + one_lap) == (tail + 1):
+			sync.atomic_thread_fence(.Seq_Cst)
+			head := sync.atomic_load_explicit(&r.head, .Relaxed)
+			if (head + one_lap) == tail {
+				return .Blocked
+			}
+			sync.cpu_relax()
+			tail = sync.atomic_load_explicit(&r.tail, .Relaxed)
+		case:
+			sync.cpu_relax()
+			tail = sync.atomic_load_explicit(&r.tail, .Relaxed)
 		}
 	}
-	return
+}
+
+@(private, require_results)
+ring_recv :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_out: rawptr, size: int) -> Ring_Status {
+	r := c.ring
+	one_lap := c.mark << 1
+	head := sync.atomic_load_explicit(&r.head, .Relaxed)
+	backoff := 1
+	for {
+		index := head & (c.mark - 1)
+		slot  := c.slots[index*c.stride:]
+		stamp := sync.atomic_load_explicit((^uint)(slot), .Acquire)
+		switch {
+		case stamp == (head + 1):
+			next := ring_next(c, head)
+			if h, ok := sync.atomic_compare_exchange_weak_explicit(&r.head, head, next, .Seq_Cst, .Relaxed); ok {
+				intrinsics.mem_copy_non_overlapping(msg_out, slot[c.msg_offset:], size)
+				sync.atomic_store_explicit((^uint)(slot), head + one_lap, .Release)
+				return .Ok
+			} else {
+				head = h
+				for _ in 0..<backoff {
+					sync.cpu_relax()
+				}
+				backoff = min(backoff*2, 64)
+			}
+		case stamp == head:
+			sync.atomic_thread_fence(.Seq_Cst)
+			tail := sync.atomic_load_explicit(&r.tail, .Relaxed)
+			if (tail &~ c.mark) == head {
+				if (tail & c.mark) != 0 {
+					return .Closed
+				}
+				return .Blocked
+			}
+			sync.cpu_relax()
+			head = sync.atomic_load_explicit(&r.head, .Relaxed)
+		case:
+			sync.cpu_relax()
+			head = sync.atomic_load_explicit(&r.head, .Relaxed)
+		}
+	}
+}
+
+@(private, require_results)
+send_blocking :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_in: rawptr, timed: bool, duration: time.Duration) -> Timeout_Status {
+	if c == nil {
+		return .Closed
+	}
+
+	start: time.Tick
+	if timed {
+		start = time.tick_now()
+	}
+
+	size := int(c.msg_size)
+	if r := c.ring; r != nil { // buffered
+		for spin := 0; ; spin += 1 {
+			switch ring_send(c, msg_in, size) {
+			case .Ok:
+				wake_one(c, &c.r_waiting, &c.r_waiters)
+				return .Ok
+			case .Closed:
+				return .Closed
+			case .Blocked:
+			}
+
+			remaining: time.Duration
+			if timed {
+				remaining = duration - time.tick_since(start)
+				if remaining <= 0 {
+					return .Timed_Out
+				}
+			}
+
+			if spin < 7 {
+				for _ in 0..<(1<<uint(spin)) {
+					sync.cpu_relax()
+				}
+				continue
+			}
+
+			sync.lock(&c.mutex)
+			sync.atomic_add_explicit(&c.w_waiting, 1, .Seq_Cst)
+			tail := sync.atomic_load_explicit(&r.tail, .Seq_Cst)
+			head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
+
+			switch {
+			case (head + (c.mark << 1)) != tail:
+				sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
+				sync.unlock(&c.mutex)
+			case !timed:
+				sync.wait_queue_wait(&c.w_waiters, &c.mutex, nil)
+			case:
+				if woken, _ := sync.wait_queue_wait_with_timeout(&c.w_waiters, &c.mutex, nil, remaining); !woken {
+					sync.atomic_sub_explicit(&c.w_waiting, 1, .Relaxed)
+				}
+			}
+		}
+	} else { // unbuffered
+		sync.lock(&c.mutex)
+		if c.closed {
+			sync.unlock(&c.mutex)
+			return .Closed
+		}
+
+		if r := sync.wait_queue_pop(&c.r_waiters); r != nil {
+			sync.unlock(&c.mutex)
+			intrinsics.mem_copy_non_overlapping(r.data, msg_in, size)
+			sync.waiter_wake(r, true)
+			return .Ok
+		}
+
+		if !timed {
+			if sync.wait_queue_wait(&c.w_waiters, &c.mutex, msg_in) {
+				return .Ok
+			}
+			return .Closed
+		}
+
+		woken, ok := sync.wait_queue_wait_with_timeout(&c.w_waiters, &c.mutex, msg_in, duration - time.tick_since(start))
+		switch {
+		case !woken:
+			return .Timed_Out
+		case ok:
+			return .Ok
+		case:
+			return .Closed
+		}
+	}
+}
+
+@(private, require_results)
+recv_blocking :: #force_inline proc "contextless" (c: ^Raw_Chan, msg_out: rawptr, timed: bool, duration: time.Duration) -> Timeout_Status {
+	if c == nil {
+		return .Closed
+	}
+
+	start: time.Tick
+	if timed {
+		start = time.tick_now()
+	}
+
+	size := int(c.msg_size)
+	if r := c.ring; r != nil { // buffered
+		for spin := 0; ; spin += 1 {
+			switch ring_recv(c, msg_out, size) {
+			case .Ok:
+				wake_one(c, &c.w_waiting, &c.w_waiters)
+				return .Ok
+			case .Closed:
+				return .Closed
+			case .Blocked:
+			}
+
+			remaining: time.Duration
+			if timed {
+				remaining = duration - time.tick_since(start)
+				if remaining <= 0 {
+					return .Timed_Out
+				}
+			}
+
+			if spin < 7 {
+				for _ in 0..<(1<<uint(spin)) {
+					sync.cpu_relax()
+				}
+				continue
+			}
+
+			sync.lock(&c.mutex)
+			sync.atomic_add_explicit(&c.r_waiting, 1, .Seq_Cst)
+			tail := sync.atomic_load_explicit(&r.tail, .Seq_Cst)
+			head := sync.atomic_load_explicit(&r.head, .Seq_Cst)
+
+			switch {
+			case head != tail:
+				sync.atomic_sub_explicit(&c.r_waiting, 1, .Relaxed)
+				sync.unlock(&c.mutex)
+			case !timed:
+				sync.wait_queue_wait(&c.r_waiters, &c.mutex, nil)
+			case:
+				if woken, _ := sync.wait_queue_wait_with_timeout(&c.r_waiters, &c.mutex, nil, remaining); !woken {
+					sync.atomic_sub_explicit(&c.r_waiting, 1, .Relaxed)
+				}
+			}
+		}
+	} else { // unbuffered
+		sync.lock(&c.mutex)
+		if c.closed {
+			sync.unlock(&c.mutex)
+			return .Closed
+		}
+
+		if s := sync.wait_queue_pop(&c.w_waiters); s != nil {
+			sync.unlock(&c.mutex)
+			intrinsics.mem_copy_non_overlapping(msg_out, s.data, size)
+			sync.waiter_wake(s, true)
+			return .Ok
+		}
+
+		if !timed {
+			if sync.wait_queue_wait(&c.r_waiters, &c.mutex, msg_out) {
+				return .Ok
+			}
+			return .Closed
+		}
+
+		woken, ok := sync.wait_queue_wait_with_timeout(&c.r_waiters, &c.mutex, msg_out, duration - time.tick_since(start))
+		switch {
+		case !woken:
+			return .Timed_Out
+		case ok:
+			return .Ok
+		case:
+			return .Closed
+		}
+	}
+}
+
+@(private)
+wake_one :: proc "contextless" (c: ^Raw_Chan, waiting: ^int, q: ^sync.Wait_Queue) {
+	if sync.atomic_load_explicit(waiting, .Seq_Cst) == 0 {
+		return
+	}
+	sync.lock(&c.mutex)
+	w := sync.wait_queue_pop(q)
+	if w == nil {
+		sync.unlock(&c.mutex)
+		return
+	}
+	sync.atomic_sub_explicit(waiting, 1, .Relaxed)
+	sync.unlock(&c.mutex)
+	sync.waiter_wake(w, true)
 }
