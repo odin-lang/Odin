@@ -1991,7 +1991,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 			o->type = t_invalid;
 		}
 		if (o->type != nullptr && o->type->kind == Type_Named && o->type->Named.type_name->TypeName.is_type_alias) {
-			Type *bt = base_type(o->type);
+			Type *bt = base_named_type(o->type);
 			if (bt == nullptr && e->state == EntityState_InProgress) {
 				bt = check_in_progress_type_alias(c, e);
 			}
