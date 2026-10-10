@@ -4351,6 +4351,15 @@ gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
 	return false;
 }
 
+gb_internal isize first_non_deferrable_arg(Slice<Ast *> const &args) {
+	for_array(i, args) {
+		if (!arg_is_deferrable_untyped_expr(args[i])) {
+			return i;
+		}
+	}
+	return 0;
+}
+
 gb_internal bool can_use_other_type_as_type_hint(bool use_lhs_as_type_hint, Type *other_type) {
 	if (use_lhs_as_type_hint) { // RHS in this case
 		return other_type != nullptr && other_type != t_invalid && is_type_typed(other_type);
@@ -4589,8 +4598,8 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 	case Token_CmpEq:
 	case Token_NotEq: {
 		// NOTE(bill): Allow comparisons between types
-		if (is_ise_expr(be->left)) {
-			// Evalute the right before the left for an '.X' expression
+		if (arg_is_deferrable_untyped_expr(be->left) &&
+		    !arg_is_deferrable_untyped_expr(be->right)) {
 			check_expr_or_type(c, y, be->right, nullptr /* ignore type hint */);
 			check_expr_or_type(c, x, be->left, y->type);
 		} else {
@@ -4719,9 +4728,14 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		return;
 	}
 
-	default:
-		if (is_ise_expr(be->left)) {
-			// Evalute the right before the left for an '.X' expression
+	default: {
+		bool right_first = is_ise_expr(be->left);
+		if (type_hint == nullptr || token_is_comparison(op.kind)) {
+			// NOTE(bill): '{...}' keeps an outer type hint, e.g. `v: [2]f32 = {1, 2} * scalar`
+			right_first = arg_is_deferrable_untyped_expr(be->left) &&
+			              !arg_is_deferrable_untyped_expr(be->right);
+		}
+		if (right_first) {
 			check_expr_or_type(c, y, be->right, token_is_comparison(op.kind) ? nullptr : type_hint);
 
 			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, y->type)) { // RHS in this case
@@ -4738,6 +4752,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			}
 		}
 		break;
+	}
 	}
 	if (x->mode == Addressing_Invalid) {
 		return;
@@ -9967,12 +9982,31 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, bool is_for_loop, Ope
 
 	ast_node(ie, BinaryExpr, node);
 
-	check_expr_with_type_hint(c, x, ie->left, type_hint);
-	if (x->mode == Addressing_Invalid) {
+	Operand *a = x;
+	Operand *b = y;
+	Ast *a_expr = ie->left;
+	Ast *b_expr = ie->right;
+	if (type_hint == nullptr &&
+	    arg_is_deferrable_untyped_expr(ie->left) &&
+	    !arg_is_deferrable_untyped_expr(ie->right)) {
+		a = y;
+		b = x;
+		a_expr = ie->right;
+		b_expr = ie->left;
+	}
+
+	check_expr_with_type_hint(c, a, a_expr, type_hint);
+	if (a->mode == Addressing_Invalid) {
 		return false;
 	}
-	check_expr_with_type_hint(c, y, ie->right, type_hint);
-	if (y->mode == Addressing_Invalid) {
+
+	Type *b_hint = type_hint;
+	if (b_hint == nullptr && arg_is_deferrable_untyped_expr(b_expr)) {
+		b_hint = a->type;
+	}
+
+	check_expr_with_type_hint(c, b, b_expr, b_hint);
+	if (b->mode == Addressing_Invalid) {
 		return false;
 	}
 
