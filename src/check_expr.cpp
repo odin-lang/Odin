@@ -747,7 +747,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 
-	{
+	// NOTE(bill): Only re-check a polymorphic procedure's signature after a probe (`no_polymorphic_errors`)
+	if (old_c->no_polymorphic_errors) {
 		// LEAK NOTE(bill): This is technically a memory leak as it has to generate the type twice
 		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
 		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
