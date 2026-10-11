@@ -2191,11 +2191,14 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	}
 }
 
-gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
-	Token const &token = identifier->Ident.token;
+gb_internal void add_semantic_ident(CheckerInfo *i, Token const &token, Entity *entity, bool definition) {
 	if (build_context.export_semantics_format != SemanticsFormat_Invalid && (token.flags & TokenFlag_Synthesized) == 0 && !is_error_muted()) {
 		per_thread_array_add(&i->semantic_ident_queue, SemanticIdent{entity, token.pos.file_id, token.pos.offset, definition});
 	}
+}
+
+gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
+	add_semantic_ident(i, identifier->Ident.token, entity, definition);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -6191,6 +6194,7 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		                                     scope);
 
 		add_entity(ctx, parent_scope, nullptr, e);
+		add_semantic_ident(ctx->info, id->import_name, e, true);
 		if (force_use) {
 			add_entity_use(ctx, nullptr, e);
 		}
@@ -6414,6 +6418,7 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	e->LibraryName.decl = decl;
 	add_entity_flags_from_file(ctx, e, parent_scope);
 	add_entity(ctx, scope, nullptr, e);
+	add_semantic_ident(ctx->info, fl->library_name, e, true);
 
 	mpsc_enqueue(&ctx->info->foreign_imports_to_check_fullpaths, e);
 

@@ -7340,6 +7340,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 			visited[param_index] = true;
 			ordered_operands[param_index] = operand;
+			if (show_error) {
+				add_semantic_ident(c->info, fv->field, pt->params->Tuple.variables[param_index], false);
+			}
 		}
 	}
 

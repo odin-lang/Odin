@@ -3465,6 +3465,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gb_string_free(type_str);
 			return false;
 		}
+		add_semantic_ident(c->info, field_arg, sel.entity, false);
 
 		operand->mode = Addressing_Constant;
 		operand->value = exact_value_i64(type_offset_of_from_selection(type, sel));
