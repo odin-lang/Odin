@@ -379,8 +379,8 @@ class WebGPUInterface {
 		off(4); // vendorID
 		off(4); // deviceID
 
-		this.mem.storeI32(off(4), info.subGroupMinSize);
-		this.mem.storeI32(off(4), info.subGroupMaxSize);
+		this.mem.storeI32(off(4), info.subgroupMinSize);
+		this.mem.storeI32(off(4), info.subgroupMaxSize);
 
 		return STATUS_SUCCESS;
 	}
