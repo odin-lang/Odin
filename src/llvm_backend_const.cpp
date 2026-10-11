@@ -1234,18 +1234,25 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		isize width = 1;
 		String s = value.value_string;
 
-		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
+		Rune *runes = gb_alloc_array(temporary_allocator(), Rune, cast(isize)count);
 
 		for (i64 i = 0; i < count && offset < s.len; i++) {
 			width = utf8_decode(s.text+offset, s.len-offset, &rune);
 			offset += width;
 
-			elems[i] = LLVMConstInt(et, rune, true);
-
+			runes[i] = rune;
 		}
 		GB_ASSERT(offset == s.len);
 
+	#if LLVM_VERSION_MAJOR >= 21
+		res.value = LLVMConstDataArray(et, cast(char const *)runes, cast(size_t)count*gb_size_of(Rune));
+	#else
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
+		for (i64 i = 0; i < count; i++) {
+			elems[i] = LLVMConstInt(et, runes[i], true);
+		}
 		res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
+	#endif
 		return res;
 	} else if (is_type_u16_array(type) && (value.kind == ExactValue_String || value.kind == ExactValue_String16) && !is_type_u8(core_array_type(type))) {
 		i64 count  = type->Array.count;
@@ -1259,6 +1266,9 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			s = string_to_string16(temporary_allocator(), value.value_string);
 		}
 
+	#if LLVM_VERSION_MAJOR >= 21
+		res.value = LLVMConstDataArray(et, cast(char const *)s.text, cast(size_t)count*gb_size_of(u16));
+	#else
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 
 		for (isize i = 0; i < s.len; i++) {
@@ -1267,6 +1277,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		}
 
 		res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
+	#endif
 		return res;
 	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
 		GB_ASSERT(type->Array.count == value.value_string.len);
@@ -1422,20 +1433,20 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		/*fallthrough*/
 	case ExactValue_Float:
 		if (is_type_different_to_arch_endianness(type)) {
-			if (type->Basic.kind == Basic_f32le || type->Basic.kind == Basic_f32be) {
-				f32 f = static_cast<float>(value.value_float);
-				u32 u = bit_cast<u32>(f);
-				u = gb_endian_swap32(u);
-				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f32>(u));
-			} else if (type->Basic.kind == Basic_f16le || type->Basic.kind == Basic_f16be) {
-				f32 f = static_cast<float>(value.value_float);
-				u16 u = f32_to_f16(f);
-				u = gb_endian_swap16(u);
-				res.value = LLVMConstReal(lb_type(m, original_type), f16_to_f32(u));
-			} else {
-				u64 u = bit_cast<u64>(value.value_float);
-				u = gb_endian_swap64(u);
-				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+			// swapped bits can be a signalling NaN, which a float conversion would quieten
+			switch (type->Basic.kind) {
+			case Basic_f16le:
+			case Basic_f16be:
+				res.value = lb_const_f16(m, cast(f32)value.value_float, original_type);
+				break;
+			case Basic_f32le:
+			case Basic_f32be:
+				res.value = lb_const_f32(m, cast(f32)value.value_float, original_type);
+				break;
+			default: {
+				u64 u = gb_endian_swap64(bit_cast<u64>(value.value_float));
+				res.value = LLVMConstBitCast(LLVMConstInt(LLVMInt64TypeInContext(ctx), u, false), lb_type(m, original_type));
+			} break;
 			}
 		} else {
 			res.value = LLVMConstReal(lb_type(m, original_type), value.value_float);
