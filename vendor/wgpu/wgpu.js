@@ -1183,7 +1183,8 @@ class WebGPUInterface {
 			 * @returns {number}
 			 */
 			wgpuAdapterGetInfo: (adapterIdx, infoPtr) => {
-				return this.genericGetAdapterInfo(infoPtr);
+				const adapter = this.adapters.get(adapterIdx);
+				return this.genericGetAdapterInfo(infoPtr, adapter.info);
 			},
 
 			/**
@@ -2214,7 +2215,8 @@ class WebGPUInterface {
 			 * @returns {number}
 			 */
 			wgpuDeviceGetAdapterInfo: (deviceIdx, infoPtr) => {
-				return this.genericGetAdapterInfo(infoPtr);
+				const device = this.devices.get(deviceIdx);
+				return this.genericGetAdapterInfo(infoPtr, device.adapterInfo);
 			},
 
 			/**
