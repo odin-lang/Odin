@@ -2007,12 +2007,10 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 			if (bt == nullptr && e->state == EntityState_InProgress) {
 				bt = check_in_progress_type_alias(c, e);
 			}
-			// Keep struct aliases named so recursive fields retain their alias edge.
 			if (bt != nullptr && bt->kind != Type_Struct) {
 				if (bt->kind == Type_Union) {
 					o->type = base_named_type(o->type);
-				}
-				else {
+				} else {
 					o->type = bt;
 				}
 			}
