@@ -288,6 +288,32 @@ test_parse_error_recovery_unclosed_block :: proc(t: ^testing.T) {
 		vd, ok := file.decls[1].derived.(^ast.Value_Decl)
 		testing.expectf(t, ok && vd.names[0].derived.(^ast.Ident).name == "after", "source %d: the procedure after it did not survive", i)
 	}
+
+	// the blocks left unclosed all end at the same declaration, which is reported once
+	src := "package p\n\ntest :: proc() {\n\tif x {\n\t\tif y {\n\t\t\tfoo()\n}\n\nafter :: proc() {}\n"
+	file := ast.File{src = src, fullpath = "test"}
+	p := parser.default_parser()
+	p.err = nil
+	parser.parse_file(&p, &file)
+
+	testing.expect_value(t, file.syntax_error_count, 1)
+	testing.expect_value(t, len(file.decls), 2)
+}
+
+@test
+test_parse_unindented_decls :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	// a declaration starting a line in a block that is closed later is only unindented
+	src := "package p\n\ntest :: proc() {\n\t{\nHellope :: \"Hellope\"\nx := 1\n@(static) y := 2\n\t}\n}\n"
+	file := ast.File{src = src, fullpath = "test"}
+	p := parser.default_parser()
+	p.err = nil
+	parser.parse_file(&p, &file)
+
+	testing.expect_value(t, file.syntax_error_count, 0)
+	testing.expect_value(t, len(file.decls), 1)
 }
 
 @test
