@@ -8,7 +8,7 @@ gb_internal bool is_diverging_expr(Ast *expr) {
 		return name == "panic";
 	}
 	Ast *proc = unparen_expr(expr->CallExpr.proc);
-	TypeAndValue tv = proc->tav;
+	TypeAndValue tv = type_and_value_of_expr(proc);
 	if (tv.mode == Addressing_Builtin) {
 		Entity *e = entity_of_node(proc);
 		BuiltinProcId id = BuiltinProc_Invalid;
@@ -339,7 +339,7 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(ws, WhenStmt, node);
 		// TODO(bill): Is this logic correct for when statements?
-		auto const &tv = ws->cond->tav;
+		AstTypeAndValue const &tv = ws->cond->tav;
 		if (tv.mode != Addressing_Constant) {
 			// NOTE(bill): Check the things regardless as a bug occurred earlier
 			if (ws->else_stmt != nullptr) {
@@ -351,8 +351,8 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 			return false;
 		}
 
-		if (tv.value.kind == ExactValue_Bool) {
-			if (tv.value.value_bool) {
+		if (tv.value().kind == ExactValue_Bool) {
+			if (tv.value().value_bool) {
 				return check_is_terminating(ws->body, label);
 			} else {
 				if (ws->else_stmt == nullptr) {
@@ -544,7 +544,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		Ast *ln = unparen_expr(lhs->expr);
 		if (ln->kind == Ast_IndexExpr) {
 			Ast *x = ln->IndexExpr.expr;
-			TypeAndValue tav = x->tav;
+			TypeAndValue tav = type_and_value_of_expr(x);
 			GB_ASSERT(tav.mode != Addressing_Invalid);
 			if (tav.mode != Addressing_Variable) {
 				if (!is_type_pointer(tav.type)) {
@@ -2825,16 +2825,16 @@ gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 			    cond->BinaryExpr.op.kind == Token_GtEq &&
 			    type_of_expr(cond->BinaryExpr.left) != nullptr &&
 			    is_type_unsigned(type_of_expr(cond->BinaryExpr.left)) &&
-			    cond->BinaryExpr.right->tav.value.kind == ExactValue_Integer &&
-			    is_exact_value_zero(cond->BinaryExpr.right->tav.value)) {
+			    cond->BinaryExpr.right->tav.value().kind == ExactValue_Integer &&
+			    is_exact_value_zero(cond->BinaryExpr.right->tav.value())) {
 				warning(cond, "Expression is always true since unsigned numbers are always >= 0");
 			} else if (cond && cond->kind == Ast_BinaryExpr &&
 			    cond->BinaryExpr.left && cond->BinaryExpr.right &&
 			    cond->BinaryExpr.op.kind == Token_LtEq &&
 			    type_of_expr(cond->BinaryExpr.right) != nullptr &&
 			    is_type_unsigned(type_of_expr(cond->BinaryExpr.right)) &&
-			    cond->BinaryExpr.left->tav.value.kind == ExactValue_Integer &&
-			    is_exact_value_zero(cond->BinaryExpr.left->tav.value)) {
+			    cond->BinaryExpr.left->tav.value().kind == ExactValue_Integer &&
+			    is_exact_value_zero(cond->BinaryExpr.left->tav.value())) {
 				warning(cond, "Expression is always true since unsigned numbers are always >= 0");
 			}
 		}

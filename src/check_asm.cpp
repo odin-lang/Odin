@@ -1654,7 +1654,7 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					if (m->classify.scale == nullptr || m->classify.scale->tav.mode != Addressing_Constant) {
 						continue;
 					}
-					i64 raw = exact_value_to_i64(exact_value_to_integer(m->classify.scale->tav.value));
+					i64 raw = exact_value_to_i64(exact_value_to_integer(m->classify.scale->tav.value()));
 					// Normalise the '*' form to a shift amount; '<<'/'>>' are already shifts.
 					i64 shift = raw;
 					if (m->classify.scale_op.kind == Token_Mul) {

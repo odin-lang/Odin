@@ -1694,8 +1694,8 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 		{
 			lbValue arg0 = lb_build_expr(p, ce->args[0]);
 
-			GB_ASSERT(ce->args[1]->tav.value.kind == ExactValue_Integer);
-			int n = cast(int)exact_value_to_i64(ce->args[1]->tav.value);
+			GB_ASSERT(ce->args[1]->tav.value().kind == ExactValue_Integer);
+			int n = cast(int)exact_value_to_i64(ce->args[1]->tav.value());
 
 			if (n == 1) {
 				res.value = arg0.value;
@@ -2452,7 +2452,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			u64 max_count = cast(u64)vt->SimdVector.count;
 
 			GB_ASSERT(ce->args[1]->tav.mode == Addressing_Constant);
-			u64 n = exact_value_to_u64(ce->args[1]->tav.value);
+			u64 n = exact_value_to_u64(ce->args[1]->tav.value());
 			GB_ASSERT(max_count >= n);
 			GB_ASSERT(max_count % n == 0);
 
@@ -2803,8 +2803,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			BigInt bi_count = {};
 			big_int_from_i64(&bi_count, count);
 
-			TypeAndValue const &tv = ce->args[1]->tav;
-			ExactValue val = exact_value_to_integer(tv.value);
+			ExactValue val = exact_value_to_integer(ce->args[1]->tav.value());
 			GB_ASSERT(val.kind == ExactValue_Integer);
 			BigInt *bi = &val.value_integer;
 			if (builtin_id == BuiltinProc_simd_lanes_rotate_right) {
@@ -3804,7 +3803,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			if (id == BuiltinProc_return_address || id == BuiltinProc_frame_address) {
 				u64 level = 0;
 				if (ce->args.count > 0) {
-					level = cast(u64)exact_value_to_i64(ce->args[0]->tav.value);
+					level = cast(u64)exact_value_to_i64(ce->args[0]->tav.value());
 				}
 				args[arg_count++] = LLVMConstInt(lb_type(p->module, t_u32), level, false);
 			}
@@ -4370,7 +4369,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_prefetch_write_data:
 		{
 			lbValue ptr = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_rawptr);
-			unsigned long long locality = cast(unsigned long long)exact_value_to_i64(ce->args[1]->tav.value);
+			unsigned long long locality = cast(unsigned long long)exact_value_to_i64(ce->args[1]->tav.value());
 			unsigned long long rw = 0;
 			unsigned long long cache = 0;
 			switch (id) {
@@ -5320,7 +5319,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 	}
 
 	if (proc_expr->tav.mode == Addressing_Constant) {
-		ExactValue v = proc_expr->tav.value;
+		ExactValue v = proc_expr->tav.value();
 		switch (v.kind) {
 		case ExactValue_Integer:
 			{

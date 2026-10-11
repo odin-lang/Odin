@@ -167,8 +167,8 @@ gb_internal i32 syntactic_visibility(Array<Ast *> const &attributes) {
 			    elem->FieldValue.field->kind == Ast_Ident &&
 			    elem->FieldValue.field->Ident.token.string == "private") {
 				Ast *value = elem->FieldValue.value;
-				if (value != nullptr && value->tav.value.kind == ExactValue_String) {
-					return value->tav.value.value_string == "file" ? EntityVisiblity_PrivateToFile : EntityVisiblity_PrivateToPackage;
+				if (value != nullptr && value->tav.value().kind == ExactValue_String) {
+					return value->tav.value().value_string == "file" ? EntityVisiblity_PrivateToFile : EntityVisiblity_PrivateToPackage;
 				}
 				return -1;
 			}

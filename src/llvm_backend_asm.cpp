@@ -363,7 +363,7 @@ struct lbAsmGenerate {
 						if (op_index > 0) {
 							write_cstr(", ");
 						}
-						ExactValue ev = exact_value_to_integer(op->tav.value);
+						ExactValue ev = exact_value_to_integer(op->tav.value());
 						GB_ASSERT(ev.kind == ExactValue_Integer);
 						i64 v = exact_value_to_i64(ev);
 						write_int(cast(int)v);
@@ -372,7 +372,7 @@ struct lbAsmGenerate {
 				} else if (name == "align") {
 					GB_ASSERT(dir->operands.count == 1);
 					auto const &op = dir->operands[0];
-					ExactValue ev = exact_value_to_integer(op->tav.value);
+					ExactValue ev = exact_value_to_integer(op->tav.value());
 					GB_ASSERT(ev.kind == ExactValue_Integer);
 					u64 v = exact_value_to_u64(ev);
 					write_cstr(".p2align ");
@@ -380,14 +380,14 @@ struct lbAsmGenerate {
 				} else if (name == "skip") {
 					GB_ASSERT(dir->operands.count == 1);
 					auto const &op = dir->operands[0];
-					ExactValue ev = exact_value_to_integer(op->tav.value);
+					ExactValue ev = exact_value_to_integer(op->tav.value());
 					GB_ASSERT(ev.kind == ExactValue_Integer);
 					write_cstr(".skip ");
 					write_u64(exact_value_to_u64(ev));
 				} else if (name == "nop") {
 					GB_ASSERT(dir->operands.count == 1);
 					auto const &op = dir->operands[0];
-					ExactValue ev = exact_value_to_integer(op->tav.value);
+					ExactValue ev = exact_value_to_integer(op->tav.value());
 					GB_ASSERT(ev.kind == ExactValue_Integer);
 					write_cstr(".nops ");
 					write_u64(exact_value_to_u64(ev));
@@ -655,8 +655,8 @@ struct lbAsmGenerate_amd64 : lbAsmGenerate {
 	void write_constant_operand(Ast *op, u32 flags) override {
 		GB_ASSERT(op->tav.mode == Addressing_Constant);
 
-		op->tav.value = exact_value_to_integer(op->tav.value);
-		ExactValue ev = op->tav.value;
+		op->tav.set_value(exact_value_to_integer(op->tav.value()));
+		ExactValue ev = op->tav.value();
 		GB_ASSERT(ev.kind != ExactValue_Invalid);
 		switch (ev.kind) {
 		case ExactValue_Integer: {
@@ -1086,8 +1086,8 @@ struct lbAsmGenerate_riscv64 : lbAsmGenerate {
 	// RISC-V immediates are bare integers (no '$' prefix); no scale/log2 forms exist.
 	void write_constant_operand(Ast *op, u32 flags) override {
 		GB_ASSERT(op->tav.mode == Addressing_Constant);
-		op->tav.value = exact_value_to_integer(op->tav.value);
-		ExactValue ev = op->tav.value;
+		op->tav.set_value(exact_value_to_integer(op->tav.value()));
+		ExactValue ev = op->tav.value();
 		GB_ASSERT(ev.kind != ExactValue_Invalid);
 		switch (ev.kind) {
 		case ExactValue_Integer: {
@@ -1359,8 +1359,8 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 	// ARM64 immediates are written '#<value>'; no scale/log2 addressing forms.
 	void write_constant_operand(Ast *op, u32 flags) override {
 		GB_ASSERT(op->tav.mode == Addressing_Constant);
-		op->tav.value = exact_value_to_integer(op->tav.value);
-		ExactValue ev = op->tav.value;
+		op->tav.set_value(exact_value_to_integer(op->tav.value()));
+		ExactValue ev = op->tav.value();
 		GB_ASSERT(ev.kind != ExactValue_Invalid);
 		switch (ev.kind) {
 		case ExactValue_Integer: {
@@ -1408,7 +1408,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 			// A condition-code slot is a constant in the frontend but must print as a
 			// mnemonic (gt/lt/...), never '#<n>'.
 			if (instr != nullptr && this->arm64_is_cond_slot(instr, opi)) {
-				i64 e = exact_value_to_i64(exact_value_to_integer(op->tav.value));
+				i64 e = exact_value_to_i64(exact_value_to_integer(op->tav.value()));
 				char const *cc = arm64_cond_name(e);
 				GB_ASSERT_MSG(cc != nullptr, "asm: bad ARM64 condition encoding %lld", cast(long long)e);
 				write_cstr(cc);
@@ -1523,7 +1523,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 				// Literal lane: value folded onto the index node by the checker.
 				GB_ASSERT_MSG(index->tav.mode == Addressing_Constant,
 				              "asm: AArch64 lane index reached lowering unfolded");
-				ExactValue ev = exact_value_to_integer(index->tav.value);
+				ExactValue ev = exact_value_to_integer(index->tav.value());
 				GB_ASSERT(ev.kind == ExactValue_Integer);
 				lane      = exact_value_to_i64(ev);
 				have_lane = true;
@@ -1626,7 +1626,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 
 			Ast *amount = be->right;
 			if (amount->tav.mode == Addressing_Constant) {
-				raw = exact_value_to_i64(exact_value_to_integer(amount->tav.value));
+				raw = exact_value_to_i64(exact_value_to_integer(amount->tav.value()));
 			} else {
 				Entity *e  = entity_of_node(amount);
 				auto   *ed = entity_op(e);
@@ -1704,7 +1704,7 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 		GB_ASSERT(scale != nullptr);
 		GB_ASSERT_MSG(scale->tav.mode == Addressing_Constant,
 		              "asm: ARM64 memory scale must be a constant shift amount");
-		ExactValue ev = exact_value_to_integer(scale->tav.value);
+		ExactValue ev = exact_value_to_integer(scale->tav.value());
 		GB_ASSERT(ev.kind == ExactValue_Integer);
 		i64 v = exact_value_to_i64(ev);
 

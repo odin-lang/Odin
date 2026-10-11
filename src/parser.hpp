@@ -48,8 +48,33 @@ gb_global String const addressing_mode_strings[] = {
 struct TypeAndValue {
 	Type *         type;
 	AddressingMode mode;
-	bool           is_lhs;            // Debug info
+	bool           is_lhs; // Debug info
 	ExactValue     value;
+};
+
+struct AstTypeAndValue {
+	Type *            type;
+	AddressingMode    mode;
+	bool              is_lhs;    // Debug info
+	ExactValue const *value_ptr; // nullptr if there is no value
+
+	ExactValue const &value() const {
+		if (value_ptr != nullptr) {
+			return *value_ptr;
+		}
+		return empty_exact_value;
+	}
+
+	void set_value(ExactValue const &value) {
+		// a missing constant still keeps the union variant it is converted to
+		if (value.kind == ExactValue_Invalid && value.variant_type == nullptr) {
+			value_ptr = nullptr;
+			return;
+		}
+		ExactValue *v = permanent_alloc_item<ExactValue>();
+		*v = value;
+		value_ptr = v;
+	}
 };
 
 
@@ -946,7 +971,7 @@ struct AstCommonStuff {
 	u8              state_flags;
 	std::atomic<u8> viral_state_flags;
 	i32             file_id;
-	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
+	AstTypeAndValue tav;
 };
 
 struct Ast {
@@ -954,7 +979,7 @@ struct Ast {
 	u8              state_flags;
 	std::atomic<u8> viral_state_flags;
 	i32             file_id;
-	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
+	AstTypeAndValue tav;
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {

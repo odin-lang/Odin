@@ -1568,10 +1568,10 @@ gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr) {
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, expr);
-		if (te->cond == nullptr || te->cond->tav.value.kind != ExactValue_Bool) {
+		if (te->cond == nullptr || te->cond->tav.value().kind != ExactValue_Bool) {
 			break;
 		}
-		if (te->cond->tav.value.value_bool) {
+		if (te->cond->tav.value().value_bool) {
 			escape_nil_scan(ea, te->x);
 		} else {
 			escape_nil_scan(ea, te->y);
@@ -2096,7 +2096,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 		return escape_value();
 	}
 
-	TypeAndValue const &tav = expr->tav;
+	AstTypeAndValue const &tav = expr->tav;
 	if (tav.mode == Addressing_Constant) {
 		if (tav.type == nullptr || !is_type_slice(tav.type) || is_load_directive_call(expr)) {
 			return escape_value();
@@ -2309,10 +2309,10 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, expr);
-		if (te->cond == nullptr || te->cond->tav.value.kind != ExactValue_Bool) {
+		if (te->cond == nullptr || te->cond->tav.value().kind != ExactValue_Bool) {
 			return escape_value();
 		}
-		if (te->cond->tav.value.value_bool) {
+		if (te->cond->tav.value().value_bool) {
 			return escape_expr(ea, te->x);
 		}
 		return escape_expr(ea, te->y);
@@ -2932,8 +2932,8 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 		if (cond != nullptr) {
 			may_exit = true;
 			if (cond->tav.mode == Addressing_Constant &&
-			    cond->tav.value.kind == ExactValue_Bool &&
-			    cond->tav.value.value_bool) {
+			    cond->tav.value().kind == ExactValue_Bool &&
+			    cond->tav.value().value_bool) {
 				may_exit = false;
 			}
 		}

@@ -252,10 +252,10 @@ gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, E
 			if (we->cond == nullptr) {
 				return false;
 			}
-			if (we->cond->tav.value.kind != ExactValue_Bool) {
+			if (we->cond->tav.value().kind != ExactValue_Bool) {
 				return false;
 			}
-			init = we->cond->tav.value.value_bool ? we->x : we->y;
+			init = we->cond->tav.value().value_bool ? we->x : we->y;
 			goto retry_proc_lit;
 		} if (init->kind == Ast_ProcLit) {
 			// NOTE(bill, 2024-07-04): Override as a procedure entity because this could be within a `when` statement

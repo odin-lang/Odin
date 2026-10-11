@@ -460,7 +460,7 @@ gb_internal void check_atomic_first(Ast **site, Ast *call) {
 }
 
 gb_internal OdinAtomicMemoryOrder check_atomic_order_of(Ast *expr) {
-	return cast(OdinAtomicMemoryOrder)exact_value_to_i64(expr->tav.value);
+	return cast(OdinAtomicMemoryOrder)exact_value_to_i64(expr->tav.value());
 }
 
 gb_internal bool check_atomic_order_acquires(OdinAtomicMemoryOrder order) {
@@ -948,8 +948,8 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, node);
-		if (te->cond != nullptr && te->cond->tav.value.kind == ExactValue_Bool) {
-			if (te->cond->tav.value.value_bool) {
+		if (te->cond != nullptr && te->cond->tav.value().kind == ExactValue_Bool) {
+			if (te->cond->tav.value().value_bool) {
 				check_atomic_scan(s, te->x, false);
 			} else {
 				check_atomic_scan(s, te->y, false);

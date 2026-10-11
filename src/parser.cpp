@@ -993,7 +993,7 @@ gb_internal Ast *ast_basic_lit(AstFile *f, Token basic_lit) {
 	Ast *result = alloc_ast_node(f, Ast_BasicLit);
 	result->BasicLit.token = basic_lit;
 	result->tav.mode = Addressing_Constant;
-	result->tav.value = exact_value_from_token(f, basic_lit);
+	result->tav.set_value(exact_value_from_token(f, basic_lit));
 	return result;
 }
 

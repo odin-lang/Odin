@@ -1929,15 +1929,17 @@ gb_internal void destroy_checker(Checker *c) {
 gb_internal TypeAndValue type_and_value_of_expr(Ast *expr) {
 	TypeAndValue tav = {};
 	if (expr != nullptr) {
-		tav = expr->tav;
+		tav.type   = expr->tav.type;
+		tav.mode   = expr->tav.mode;
+		tav.is_lhs = expr->tav.is_lhs;
+		tav.value  = expr->tav.value();
 	}
 	return tav;
 }
 
 gb_internal Type *type_of_expr(Ast *expr) {
-	TypeAndValue tav = expr->tav;
-	if (tav.mode != Addressing_Invalid) {
-		return tav.type;
+	if (expr->tav.mode != Addressing_Invalid) {
+		return expr->tav.type;
 	}
 	{
 		Entity *entity = entity_of_node(expr);
@@ -1983,10 +1985,10 @@ retry:;
 		if (we->cond == nullptr) {
 			break;
 		}
-		if (we->cond->tav.value.kind != ExactValue_Bool) {
+		if (we->cond->tav.value().kind != ExactValue_Bool) {
 			break;
 		}
-		expr = we->cond->tav.value.value_bool ? we->x : we->y;
+		expr = we->cond->tav.value().value_bool ? we->x : we->y;
 		goto retry;
 	case_end;
 	case_ast_node(label, AsmLabelDecl, expr);
@@ -2160,11 +2162,11 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		}
 
 		if (mode == Addressing_Constant || mode == Addressing_Invalid) {
-			expr->tav.value = value;
+			expr->tav.set_value(value);
 		} else if (mode == Addressing_Value && type != nullptr && is_type_typeid(type)) {
-			expr->tav.value = value;
+			expr->tav.set_value(value);
 		} else if (mode == Addressing_Value && type != nullptr && is_type_proc(type)) {
-			expr->tav.value = value;
+			expr->tav.set_value(value);
 		}
 		mutex_unlock(mutex);
 
@@ -5369,8 +5371,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				if (value != nullptr) {
 					if (value->kind == Ast_BasicLit && value->BasicLit.token.kind == Token_String) {
 						String v = {};
-						if (value->tav.value.kind == ExactValue_String) {
-							v = value->tav.value.value_string;
+						if (value->tav.value().kind == ExactValue_String) {
+							v = value->tav.value().value_string;
 						}
 						if (v == "file") {
 							kind = EntityVisiblity_PrivateToFile;

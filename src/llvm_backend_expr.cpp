@@ -2138,9 +2138,9 @@ handle_op:;
 }
 
 gb_internal bool lb_is_empty_string_constant(Ast *expr) {
-	if (expr->tav.value.kind == ExactValue_String &&
+	if (expr->tav.value().kind == ExactValue_String &&
 	    is_type_string(expr->tav.type)) {
-		String s = expr->tav.value.value_string;
+		String s = expr->tav.value().value_string;
 		return s.len == 0;
 	}
 	return false;
@@ -5182,8 +5182,8 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 			}
 			if (is_ast_range(fv->field)) {
 				ast_node(ie, BinaryExpr, fv->field);
-				TypeAndValue lo_tav = ie->left->tav;
-				TypeAndValue hi_tav = ie->right->tav;
+				TypeAndValue lo_tav = type_and_value_of_expr(ie->left);
+				TypeAndValue hi_tav = type_and_value_of_expr(ie->right);
 				GB_ASSERT(lo_tav.mode == Addressing_Constant);
 				GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
@@ -5224,7 +5224,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 					}
 				}
 			} else {
-				auto tav = fv->field->tav;
+				TypeAndValue tav = type_and_value_of_expr(fv->field);
 				GB_ASSERT(tav.mode == Addressing_Constant);
 				i64 index = exact_value_to_i64(tav.value);
 
@@ -7061,7 +7061,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				builtin_id = BuiltinProc_DIRECTIVE;
 			}
 		}
-		auto const &tv = expr->tav;
+		TypeAndValue tv = type_and_value_of_expr(expr);
 		if (builtin_id == BuiltinProc_swizzle &&
 		    is_type_array(tv.type)) {
 		    	// NOTE(bill, 2021-08-09): `swizzle` has some bizarre semantics so it needs to be
@@ -7178,7 +7178,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 		}
 
 		GB_ASSERT(block != nullptr);
-		TypeAndValue tv = expr->tav;
+		TypeAndValue tv = type_and_value_of_expr(expr);
 
 		lbValue lhs = {};
 		lbValue rhs = {};

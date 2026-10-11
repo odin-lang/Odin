@@ -2237,7 +2237,7 @@ gb_internal i64 check_atomic_address_alignment(Ast *x) {
 		i64 align = check_atomic_address_alignment(ie->expr);
 		i64 offset = type_size_of(t->Array.elem);
 		if (ie->index->tav.mode == Addressing_Constant) {
-			offset *= exact_value_to_i64(ie->index->tav.value);
+			offset *= exact_value_to_i64(ie->index->tav.value());
 		}
 		if (offset != 0) {
 			align = gb_min(align, offset & -offset);
@@ -5746,7 +5746,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		isize count_needed = 0;
 
 		for (Ast *arg : ce->args) {
-			ExactValue value = arg->tav.value;
+			ExactValue value = arg->tav.value();
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
 			count_needed += is_type_array(arg->tav.type)
@@ -5761,7 +5761,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		zero_context.type_hint_expr = nullptr;
 
 		for (Ast *arg : ce->args) {
-			ExactValue value = arg->tav.value;
+			ExactValue value = arg->tav.value();
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
 			array_add_elems(&new_elems, cl->elems.data, cl->elems.count);
@@ -8837,7 +8837,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			TypeAndValue tav = proc->tav;
+			TypeAndValue tav = type_and_value_of_expr(proc);
 
 
 			operand->type       = e->type;
