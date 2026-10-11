@@ -119,6 +119,7 @@ package all
 
 @(require) import "core:odin/ast"
 @(require) import doc_format "core:odin/doc-format"
+@(require) import tool_format "core:odin/tool-format"
 @(require) import "core:odin/parser"
 @(require) import "core:odin/tokenizer"
 

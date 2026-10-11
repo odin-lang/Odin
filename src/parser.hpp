@@ -116,6 +116,7 @@ struct AstFile {
 	String       fullpath;
 	String       filename;
 	String       directory;
+	std::atomic<String *> debug_checksum; // the backend's MD5 of the source as hex, made when debug info first needs it
 
 	Tokenizer    tokenizer;
 	Array<Token> lookahead; // read by peeking, before the parser reaches them
@@ -132,8 +133,10 @@ struct AstFile {
 
 	u64          vet_flags;
 	u64          feature_flags;
+	u64          analysis_flags;
 	bool         vet_flags_set;
 	bool         feature_flags_set;
+	bool         analysis_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause

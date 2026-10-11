@@ -343,6 +343,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 		Token token = ast_token(node);
 		token.kind = Token_String;
 		token.string = named_type->Named.name;
+		token.flags |= TokenFlag_Synthesized;
 
 		Ast *node = ast_ident(nullptr, token);
 
@@ -716,6 +717,7 @@ gb_internal void set_polymorphic_record_instantiation_name(Type *named_type, Typ
 	named_type->Named.name = new_name;
 	if (named_type->Named.type_name) {
 		named_type->Named.type_name->token.string = new_name;
+		named_type->Named.type_name->token.flags |= TokenFlag_Synthesized;
 	}
 }
 
@@ -2663,7 +2665,28 @@ gb_internal bool ast_is_context_free_constant(Ast *e) {
 	return false;
 }
 
-gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Type *poly_type, Ast *expr) {
+gb_internal Type *context_free_constant_type(CheckerContext *ctx, Ast *e) {
+	if (!ast_is_context_free_constant(e)) {
+		return nullptr;
+	}
+	Operand o = {};
+	Ast *trial = clone_ast(e);
+	i64 muted_before = error_mute_count();
+	begin_error_mute();
+	check_expr(ctx, &o, trial);
+	end_error_mute();
+	if (o.mode == Addressing_Invalid || o.type == nullptr || o.type == t_invalid ||
+	    error_mute_count() != muted_before) {
+		return nullptr;
+	}
+	Type *t = default_type(o.type);
+	if (t == nullptr || t == t_invalid || is_type_polymorphic(t)) {
+		return nullptr;
+	}
+	return t;
+}
+
+gb_internal Type *poly_array_source_from_compound_lit(CheckerContext *ctx, Type *poly_type, Ast *expr) {
 	if (expr == nullptr) {
 		return nullptr;
 	}
@@ -2711,21 +2734,8 @@ gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Typ
 	if (elem_is_poly) {
 		// Determine the element type from the (homogeneous, context-free) elements.
 		for (Ast *e : elems) {
-			if (!ast_is_context_free_constant(e)) {
-				return nullptr;
-			}
-			Operand o = {};
-			Ast *trial = clone_ast(e);
-			i64 muted_before = error_mute_count();
-			begin_error_mute();
-			check_expr(ctx, &o, trial);
-			end_error_mute();
-			if (o.mode == Addressing_Invalid || o.type == nullptr || o.type == t_invalid ||
-			    error_mute_count() != muted_before) {
-				return nullptr;
-			}
-			Type *et = is_type_untyped(o.type) ? default_type(o.type) : o.type;
-			if (et == nullptr || et == t_invalid || is_type_polymorphic(et)) {
+			Type *et = context_free_constant_type(ctx, e);
+			if (et == nullptr) {
 				return nullptr;
 			}
 			if (elem_type == nullptr) {
@@ -2757,19 +2767,105 @@ gb_internal Type *determine_poly_elem_from_compound_lit(CheckerContext *ctx, Typ
 	case Type_Slice:        source = alloc_type_slice(elem_type);         break;
 	case Type_DynamicArray: source = alloc_type_dynamic_array(elem_type); break;
 	}
-	if (source == nullptr) {
+	return source;
+}
+
+gb_internal Type *poly_record_source_from_compound_lit(CheckerContext *ctx, Type *poly_type, Ast *expr) {
+	expr = unparen_expr(expr);
+	if (expr == nullptr || expr->kind != Ast_CompoundLit || expr->CompoundLit.type != nullptr) {
 		return nullptr;
+	}
+	Type *bt = base_type(poly_type);
+	if (bt->kind != Type_Struct || bt->Struct.polymorphic_parent == nullptr) {
+		return nullptr;
+	}
+	Type *original_type = bt->Struct.polymorphic_parent;
+	Type *ob = base_type(original_type);
+	TypeTuple *params = get_record_polymorphic_params(bt);
+	if (params == nullptr || ob->kind != Type_Struct || ob->Struct.node == nullptr) {
+		return nullptr;
+	}
+	Slice<Ast *> const &elems = expr->CompoundLit.elems;
+	if (elems.count == 0) {
+		return nullptr;
+	}
+	ast_node(st, StructType, ob->Struct.node);
+
+	Type **bound = temporary_alloc_array<Type *>(params->variables.count);
+	isize position = 0;
+	for (Ast *field : st->fields) {
+		if (field->kind != Ast_Field) {
+			continue;
+		}
+		ast_node(f, Field, field);
+		Ast *field_type = unparen_expr(f->type);
+		for (Ast *name : f->names) {
+			Ast *value = nullptr;
+			for (isize i = 0; i < elems.count; i++) {
+				Ast *elem = elems[i];
+				if (elem->kind == Ast_FieldValue) {
+					Ast *key = elem->FieldValue.field;
+					if (key->kind == Ast_Ident &&
+					    name->kind == Ast_Ident &&
+					    key->Ident.token.string == name->Ident.token.string) {
+						value = elem->FieldValue.value;
+					}
+				} else if (i == position) {
+					value = elem;
+				}
+			}
+			position += 1;
+
+			if (value == nullptr || field_type == nullptr || field_type->kind != Ast_Ident) {
+				continue;
+			}
+			isize param_index = -1;
+			for_array(j, params->variables) {
+				Entity *p = params->variables[j];
+				if (p->kind == Entity_TypeName && p->token.string == field_type->Ident.token.string) {
+					param_index = j;
+				}
+			}
+			if (param_index < 0) {
+				continue;
+			}
+			Type *t = context_free_constant_type(ctx, value);
+			if (t == nullptr) {
+				return nullptr;
+			}
+			if (bound[param_index] == nullptr) {
+				bound[param_index] = t;
+			} else if (!are_types_identical(bound[param_index], t)) {
+				return nullptr;
+			}
+		}
 	}
 
-	PolySubst subst = {};
-	subst.items.allocator = heap_allocator();
-	defer (array_free(&subst.items));
-	if (subst_unify(ctx, poly_type, source, &subst) != Subst_Matched) {
-		return nullptr;
+	auto operands = array_make<Operand>(permanent_allocator(), params->variables.count);
+	for_array(j, params->variables) {
+		Entity *p = params->variables[j];
+		Operand o = {};
+		o.expr = expr;
+		if (p->kind == Entity_TypeName) {
+			o.mode = Addressing_Type;
+			o.type = p->type;
+			if (is_type_polymorphic(p->type)) {
+				if (p->type->kind != Type_Generic || bound[j] == nullptr) {
+					return nullptr;
+				}
+				o.type = bound[j];
+			}
+		} else if (p->kind == Entity_Constant && !is_type_polymorphic(p->type)) {
+			o.mode = Addressing_Constant;
+			o.type = p->type;
+			o.value = p->Constant.value;
+		} else {
+			return nullptr;
+		}
+		operands[j] = o;
 	}
-	Type *applied = subst_apply(ctx, poly_type, source, &subst);
-	subst_bind_entities(&subst);
-	return applied;
+
+	return instantiate_polymorphic_record(ctx, original_type, operands, expr);
 }
 
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
@@ -2777,8 +2873,19 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
 		if (operand.deferred_untyped_arg && modify_type) {
-			if (Type *determined = determine_poly_elem_from_compound_lit(ctx, poly_type, operand.expr)) {
-				return determined;
+			Type *source = poly_array_source_from_compound_lit(ctx, poly_type, operand.expr);
+			if (source == nullptr) {
+				source = poly_record_source_from_compound_lit(ctx, poly_type, operand.expr);
+			}
+			if (source != nullptr) {
+				PolySubst subst = {};
+				subst.items.allocator = heap_allocator();
+				defer (array_free(&subst.items));
+				if (subst_unify(ctx, poly_type, source, &subst) == Subst_Matched) {
+					Type *applied = subst_apply(ctx, poly_type, source, &subst);
+					subst_bind_entities(&subst);
+					return applied;
+				}
 			}
 		}
 		if (operand.deferred_untyped_arg && !modify_type) {
@@ -2867,6 +2974,94 @@ gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *pol
 		}
 	}
 	return t_invalid;
+}
+
+gb_internal Array<Operand> poly_operands_with_definite_types(CheckerContext *c, TypeProc *pt, Array<Operand> const &operands) {
+	Array<Operand> result = {};
+	if (pt->params == nullptr) {
+		return result;
+	}
+	Slice<Entity *> const &params = pt->params->Tuple.variables;
+	isize n = gb_min(params.count, operands.count);
+
+	auto is_untyped_declaring_generic = [&](isize i) -> bool {
+		Entity *p = params[i];
+		Operand const &o = operands[i];
+		if (p->kind != Entity_Variable || p->type->kind != Type_Generic) {
+			return false;
+		}
+		if (!o.deferred_untyped_arg && !(is_operand_value(o) && is_type_untyped(o.type))) {
+			return false;
+		}
+
+		// NOTE(bill): `$T` is written after the names of the parameters it declares
+		Entity *te = poly_generic_entity(p->type);
+		if (te == nullptr || te->token.pos <= p->token.pos) {
+			return false;
+		}
+		for (isize k = 0; k < i; k++) {
+			if (params[k]->type == p->type) {
+				return false;
+			}
+		}
+		return true;
+	};
+
+	bool any_untyped = false;
+	for (isize i = 0; i < n; i++) {
+		if (is_untyped_declaring_generic(i)) {
+			any_untyped = true;
+			break;
+		}
+	}
+	if (!any_untyped) {
+		return result;
+	}
+
+	PolySubst subst = {};
+	subst.items.allocator = temporary_allocator();
+	for (isize i = 0; i < n; i++) {
+		Entity *p = params[i];
+		Operand const &o = operands[i];
+		bool definite = false;
+		if (p->kind == Entity_TypeName) {
+			definite = o.mode == Addressing_Type;
+		} else if (p->kind == Entity_Variable) {
+			definite = !o.deferred_untyped_arg && is_operand_value(o) && is_type_typed(o.type);
+		}
+		if (!definite || !is_type_polymorphic(p->type) || is_type_polymorphic(o.type)) {
+			continue;
+		}
+		PolySubst one = {};
+		one.items.allocator = temporary_allocator();
+		if (subst_unify(c, p->type, o.type, &one) == Subst_Matched) {
+			for (PolyBinding const &b : one.items) {
+				poly_subst_add(&subst, b.key, b);
+			}
+		}
+	}
+
+	for (isize i = 0; i < n; i++) {
+		if (!is_untyped_declaring_generic(i)) {
+			continue;
+		}
+		PolyBinding *b = poly_subst_find(&subst, poly_generic_entity(params[i]->type));
+		if (b == nullptr || b->kind != PolyBind_Type) {
+			continue;
+		}
+		if (!operands[i].deferred_untyped_arg && are_types_identical(b->type, default_type(operands[i].type))) {
+			continue;
+		}
+		if (result.data == nullptr) {
+			result = array_make<Operand>(temporary_allocator(), operands.count);
+			array_copy(&result, operands, 0);
+		}
+		Operand bound = {Addressing_Value};
+		bound.type = b->type;
+		bound.expr = operands[i].expr;
+		result[i] = bound;
+	}
+	return result;
 }
 
 gb_internal bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
@@ -4200,6 +4395,10 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 
 	if (is_type_cstring(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_cstring");
+	} else if (is_type_cstring16(key)) {
+		add_package_dependency(ctx, "runtime", "default_hasher_cstring16");
+	} else if (is_type_string16(key)) {
+		add_package_dependency(ctx, "runtime", "default_hasher_string16");
 	} else if (is_type_string(key)) {
 		add_package_dependency(ctx, "runtime", "default_hasher_string");
 	} else if (!is_type_polymorphic(key)) {
@@ -4651,9 +4850,9 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 	if (is_complete) {
 		add_type_info_type(ctx, soa_struct);
 		wait_signal_set(&soa_struct->Struct.fields_wait_signal);
-	} else if (global_group_soa_types != nullptr) {
+	} else if (global_group_context.soa_types != nullptr) {
 		// NOTE: no task waits on the element type, which could hold every thread of the pool
-		array_add(global_group_soa_types, soa_struct);
+		array_add(global_group_context.soa_types, soa_struct);
 	} else {
 		SoaTypeWorkerData *wd = permanent_alloc_item<SoaTypeWorkerData>();
 		wd->ctx = *ctx;

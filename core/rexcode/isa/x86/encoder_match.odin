@@ -102,16 +102,20 @@ match_key :: #force_inline proc "contextless" (inst: ^Instruction) -> (key: u64,
 
 @(private, require_results)
 match_cache_get :: #force_inline proc "contextless" (key: u64) -> (form_index: int, hit: bool) {
-	v := intrinsics.atomic_load_explicit(&MATCH_CACHE[match_hash(key)], .Relaxed)
-	if v != 0 && (v >> 16) == key {
-		return int(v & 0xFFFF) - 1, true
+	when intrinsics.atomic_type_is_lock_free(u64) {
+		v := intrinsics.atomic_load_explicit(&MATCH_CACHE[match_hash(key)], .Relaxed)
+		if v != 0 && (v >> 16) == key {
+			return int(v & 0xFFFF) - 1, true
+		}
 	}
 	return -1, false
 }
 
 @(private)
 match_cache_put :: #force_inline proc "contextless" (key: u64, form_index: int) {
-	intrinsics.atomic_store_explicit(&MATCH_CACHE[match_hash(key)], (key << 16) | u64(form_index + 1), .Relaxed)
+	when intrinsics.atomic_type_is_lock_free(u64) {
+		intrinsics.atomic_store_explicit(&MATCH_CACHE[match_hash(key)], (key << 16) | u64(form_index + 1), .Relaxed)
+	}
 }
 
 // Resolve an instruction to its encoding form on the matcher path: long-mode

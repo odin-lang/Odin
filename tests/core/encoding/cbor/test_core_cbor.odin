@@ -404,6 +404,34 @@ test_marshalling_union :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_marshalling_deterministic_map :: proc(t: ^testing.T) {
+	// Keys that are not strings are each encoded into their own buffer to be sorted.
+	m := map[int]int{1 = 10, 2 = 20, 300 = 30, -4 = 40}
+	defer delete(m)
+
+	data, err := cbor.marshal(m, cbor.ENCODE_FULLY_DETERMINISTIC)
+	defer delete(data)
+	testing.expect_value(t, err, nil)
+
+	val, derr := cbor.decode(string(data))
+	defer cbor.destroy(val)
+	testing.expect_value(t, derr, nil)
+
+	diag := cbor.to_diagnostic_format(val, -1)
+	defer delete(diag)
+	testing.expect_value(t, diag, "{1: 10, 2: 20, 300: 30, -4: 40}")
+
+	dest: map[int]int
+	defer delete(dest)
+	uerr := cbor.unmarshal(string(data), &dest)
+	testing.expect_value(t, uerr, nil)
+	testing.expect_value(t, len(dest), len(m))
+	for k, v in m {
+		testing.expect_value(t, dest[k], v)
+	}
+}
+
+@(test)
 test_lying_length_array :: proc(t: ^testing.T) {
 	// Input says this is an array of length max(u64), this should not allocate that amount.
 	input := []byte{0x9B, 0x00, 0x00, 0x42, 0xFA, 0x42, 0xFA, 0x42, 0xFA, 0x42}

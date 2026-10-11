@@ -166,6 +166,8 @@ Required if maps are used
 * `default_hasher_fixed`
 * `default_hasher_cstring`
 * `default_hasher_string`
+* `default_hasher_cstring16`
+* `default_hasher_string16`
 
 ### Pseudo-CRT required procedured due to LLVM but useful in general
 

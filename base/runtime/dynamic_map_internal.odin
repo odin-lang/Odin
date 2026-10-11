@@ -1055,6 +1055,20 @@ default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> ui
 	}
 	return default_hasher_fixed(ptr, seed, n)
 }
+default_hasher_string16 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
+	str := (^[]u16)(data)
+	return default_hasher_fixed(raw_data(str^), seed, len(str)*size_of(u16))
+}
+default_hasher_cstring16 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
+	ptr := (^[^]u16)(data)^
+	n := 0
+	if ptr != nil {
+		for ptr[n] != 0 {
+			n += 1
+		}
+	}
+	return default_hasher_fixed(ptr, seed, n*size_of(u16))
+}
 
 default_hasher_f64 :: proc "contextless" (f: f64, seed: uintptr) -> uintptr {
 	f := f

@@ -13,7 +13,10 @@ FUTEX_PRIVATE_FLAG :: 128
 FUTEX_WAIT_PRIVATE :: (FUTEX_WAIT | FUTEX_PRIVATE_FLAG)
 FUTEX_WAKE_PRIVATE :: (FUTEX_WAKE | FUTEX_PRIVATE_FLAG)
 
+EINTR     :: 4
+EAGAIN    :: 35
 ETIMEDOUT :: 60
+ECANCELED :: 88
 
 
 foreign import libc "system:c"
@@ -32,7 +35,10 @@ _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
 		return true
 	}
 
-	if __errno()^ == ETIMEDOUT {
+	switch __errno()^ {
+	case EINTR, EAGAIN, ECANCELED:
+		return true
+	case ETIMEDOUT:
 		return false
 	}
 
@@ -58,7 +64,10 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		return true
 	}
 
-	if __errno()^ == ETIMEDOUT {
+	switch __errno()^ {
+	case EINTR, EAGAIN, ECANCELED:
+		return true
+	case ETIMEDOUT:
 		return false
 	}
 

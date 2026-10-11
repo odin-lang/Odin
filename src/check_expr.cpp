@@ -47,16 +47,19 @@ struct CallArgumentData {
 	Entity *gen_entity;
 	i64     score;
 	Type *  result_type;
+	bool    bound_by_later_arg;
 };
 
 struct PolyProcData {
 	Entity *  gen_entity;
 	ProcInfo *proc_info;
+	bool      bound_by_later_arg;
 };
 
 struct ValidIndexAndScore {
 	isize index;
 	i64   score;
+	bool  bound_by_later_arg;
 };
 
 gb_internal int valid_index_and_score_cmp(void const *a, void const *b) {
@@ -126,6 +129,7 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr);
 
 gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands);
+gb_internal Array<Operand> poly_operands_with_definite_types(CheckerContext *c, TypeProc *pt, Array<Operand> const &operands);
 
 gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finish);
 
@@ -580,6 +584,138 @@ gb_internal bool reuse_gen_polymorphic_procedure(Entity *other, PolyProcData *po
 	return true;
 }
 
+gb_internal bool poly_proc_lookup_operands(Type *src, Type *dst, Array<Operand> const &operands, Array<PolyProcLookupOperand> *out, u64 *hash_) {
+	Slice<Entity *> params = {};
+	if (src->Proc.params != nullptr) {
+		params = src->Proc.params->Tuple.variables;
+	}
+
+	u64 h = 0xcbf29ce484222325ull;
+	auto mix = [&](u64 x) {
+		h = (h ^ x) * 0x100000001b3ull;
+	};
+	mix(cast(u64)cast(uintptr)dst);
+	mix(cast(u64)operands.count);
+
+	for_array(i, operands) {
+		Operand const &o = operands[i];
+		if (o.deferred_untyped_arg) {
+			return false;
+		}
+
+		bool is_constant_param = true;
+		if (params.count > 0) {
+			is_constant_param = params[gb_min(i, params.count-1)]->kind == Entity_Constant;
+		}
+
+		PolyProcLookupOperand lo = {};
+		lo.type       = o.type;
+		lo.proc_group = o.proc_group;
+		lo.builtin_id = o.builtin_id;
+		lo.mode       = o.mode;
+		lo.has_expr   = o.expr != nullptr;
+
+		switch (o.mode) {
+		case Addressing_Constant:
+			if (is_constant_param) {
+				lo.value = o.value;
+			} else {
+				lo.mode = Addressing_Value;
+			}
+			break;
+		case Addressing_Value:
+		case Addressing_Context:
+		case Addressing_Variable:
+		case Addressing_MapIndex:
+		case Addressing_OptionalOk:
+		case Addressing_OptionalOkPtr:
+		case Addressing_SoaVariable:
+		case Addressing_SwizzleValue:
+		case Addressing_SwizzleVariable:
+			lo.mode = Addressing_Value;
+			break;
+		}
+
+		mix(cast(u64)lo.mode);
+		mix(cast(u64)cast(uintptr)lo.type);
+		mix(cast(u64)cast(uintptr)lo.proc_group);
+		mix(cast(u64)lo.builtin_id);
+		mix(cast(u64)lo.has_expr);
+
+		ExactValue const &v = lo.value;
+		mix(cast(u64)v.kind);
+		switch (v.kind) {
+		case ExactValue_Invalid:
+			break;
+		case ExactValue_Bool:
+			mix(cast(u64)v.value_bool);
+			break;
+		case ExactValue_String:
+			mix(fnv64a(v.value_string.text, v.value_string.len));
+			break;
+		case ExactValue_Integer:
+			mix(cast(u64)big_int_to_i64(&v.value_integer));
+			break;
+		case ExactValue_Float: {
+			u64 bits = 0;
+			gb_memmove(&bits, &v.value_float, gb_size_of(bits));
+			mix(bits);
+			break;
+		}
+		case ExactValue_Pointer:
+			mix(cast(u64)v.value_pointer);
+			break;
+		case ExactValue_Typeid:
+			mix(cast(u64)cast(uintptr)v.value_typeid);
+			break;
+		case ExactValue_Procedure:
+			mix(cast(u64)cast(uintptr)v.value_procedure);
+			break;
+		case ExactValue_Compound:
+			mix(cast(u64)cast(uintptr)v.value_compound);
+			break;
+		default:
+			return false;
+		}
+
+		array_add(out, lo);
+	}
+
+	*hash_ = h;
+	return true;
+}
+
+gb_internal bool poly_proc_lookup_operands_equal(Slice<PolyProcLookupOperand> const &a, Array<PolyProcLookupOperand> const &b) {
+	if (a.count != b.count) {
+		return false;
+	}
+	for_array(i, a) {
+		PolyProcLookupOperand const &x = a[i];
+		PolyProcLookupOperand const &y = b[i];
+		if (x.type       != y.type       ||
+		    x.proc_group != y.proc_group ||
+		    x.builtin_id != y.builtin_id ||
+		    x.mode       != y.mode       ||
+		    x.has_expr   != y.has_expr   ||
+		    x.value.kind != y.value.kind) {
+			return false;
+		}
+		ExactValue const &vx = x.value;
+		ExactValue const &vy = y.value;
+		switch (vx.kind) {
+		case ExactValue_Bool:      if (vx.value_bool      != vy.value_bool)      return false; break;
+		case ExactValue_String:    if (vx.value_string    != vy.value_string)    return false; break;
+		case ExactValue_Integer:   if (big_int_cmp(&vx.value_integer, &vy.value_integer) != 0) return false; break;
+		case ExactValue_Float:     if (gb_memcompare(&vx.value_float, &vy.value_float, gb_size_of(f64)) != 0) return false; break;
+		case ExactValue_Pointer:   if (vx.value_pointer   != vy.value_pointer)   return false; break;
+		case ExactValue_Typeid:    if (vx.value_typeid    != vy.value_typeid)    return false; break;
+		case ExactValue_Procedure: if (vx.value_procedure != vy.value_procedure) return false; break;
+		case ExactValue_Compound:  if (vx.value_compound  != vy.value_compound)  return false; break;
+		}
+	}
+	return true;
+}
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -658,6 +794,13 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	Array<Operand> operands = {};
 	if (param_operands) {
 		operands = *param_operands;
+		Array<Operand> bound = poly_operands_with_definite_types(old_c, &src->Proc, operands);
+		if (bound.data != nullptr) {
+			operands = bound;
+			if (poly_proc_data) {
+				poly_proc_data->bound_by_later_arg = true;
+			}
+		}
 	} else {
 		operands = array_make<Operand>(a, 0, dst->Proc.param_count);
 		for (isize i = 0; i < dst->Proc.param_count; i++) {
@@ -673,6 +816,92 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	});
 
 
+	GB_ASSERT(base_entity->identifier.load()->kind == Ast_Ident);
+	GB_ASSERT(base_entity->kind == Entity_Procedure);
+
+	GenProcsData *gen_procs = nullptr;
+
+	mutex_lock(&base_entity->Procedure.gen_procs_mutex);
+	gen_procs = base_entity->Procedure.gen_procs;
+	if (gen_procs == nullptr) {
+		gen_procs = permanent_alloc_item<GenProcsData>();
+		gen_procs->procs.allocator   = heap_allocator();
+		gen_procs->hashes.allocator  = heap_allocator();
+		gen_procs->lookups.allocator = heap_allocator();
+		base_entity->Procedure.gen_procs = gen_procs;
+	}
+	mutex_unlock(&base_entity->Procedure.gen_procs_mutex);
+
+	bool is_probe = old_c->no_polymorphic_errors;
+
+	auto lookup_operands = array_make<PolyProcLookupOperand>(heap_allocator(), 0, operands.count);
+	defer (array_free(&lookup_operands));
+	u64 lookup_hash = 0;
+	bool use_lookup = old_c->decl != nullptr && poly_proc_lookup_operands(src, dst, operands, &lookup_operands, &lookup_hash);
+	if (use_lookup) {
+		PolyProcLookup found = {};
+		bool is_found = false;
+		rw_mutex_shared_lock(&gen_procs->mutex);
+		for (PolyProcLookup const &l : gen_procs->lookups) {
+			if (l.hash == lookup_hash && l.dst == dst && poly_proc_lookup_operands_equal(l.operands, lookup_operands)) {
+				found = l;
+				is_found = true;
+				break;
+			}
+		}
+		rw_mutex_shared_unlock(&gen_procs->mutex);
+
+		// NOTE(bill): A failed candidate is checked again when called directly to get its errors reported
+		if (is_found && (found.result != nullptr || is_probe)) {
+			for (Entity *e : found.deps) {
+				add_dependency(info, old_c->decl, e);
+				poly_dep_capture_entity(old_c, e);
+			}
+			for (Type *t : found.type_info_deps) {
+				add_type_info_dependency(info, old_c->decl, t);
+				poly_dep_capture_type_info(old_c, t);
+			}
+			if (found.result == nullptr) {
+				return false;
+			}
+			return reuse_gen_polymorphic_procedure(found.result, poly_proc_data);
+		}
+	}
+
+	PolyProcDepCapture capture = {};
+	capture.parent = old_c->poly_dep_capture;
+	capture.decl   = old_c->decl;
+	capture.deps.allocator           = heap_allocator();
+	capture.type_info_deps.allocator = heap_allocator();
+	defer (array_free(&capture.deps));
+	defer (array_free(&capture.type_info_deps));
+
+	i64 errors_before = global_error_collector.count.load() + global_error_collector.held_count.load();
+
+	auto const record_lookup = [&](Entity *result) {
+		if (!use_lookup || capture.unreplayable) {
+			return;
+		}
+		if (!is_probe) {
+			// NOTE(bill): a check which reported errors is not recorded meaning that every later call reports them too
+			i64 errors_now = global_error_collector.count.load() + global_error_collector.held_count.load();
+			if (result == nullptr || errors_now != errors_before) {
+				return;
+			}
+		}
+		PolyProcLookup l = {};
+		l.hash           = lookup_hash;
+		l.dst            = dst;
+		l.operands       = slice_clone_from_array(permanent_allocator(), lookup_operands);
+		l.result         = result;
+		l.deps           = slice_clone_from_array(permanent_allocator(), capture.deps);
+		l.type_info_deps = slice_clone_from_array(permanent_allocator(), capture.type_info_deps);
+
+		rw_mutex_lock(&gen_procs->mutex);
+		array_add(&gen_procs->lookups, l);
+		rw_mutex_unlock(&gen_procs->mutex);
+	};
+
 	CheckerContext nctx = *old_c;
 
 	Scope *scope = create_scope(info, nullptr);
@@ -682,6 +911,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
 	nctx.polymorphic_scope = scope;
+	if (use_lookup) {
+		nctx.poly_dep_capture = &capture;
+	}
 
 
 	auto *pt = &src->Proc;
@@ -690,95 +922,54 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
 	// NOTE: a clone, as other threads may be instantiating the same procedure, from the same AST
-	bool success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+	bool success = false;
+	if (is_probe) {
+		// A procedure group candidate is checked with its polymorphic parameters bound but quietly
+		nctx.no_polymorphic_errors = false;
+		i64 muted_before = error_mute_count();
+		begin_error_mute();
+		success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+		end_error_mute();
+		nctx.no_polymorphic_errors = true;
+		if (error_mute_count() != muted_before) {
+			success = false;
+		}
+	} else {
+		success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+	}
+	nctx.poly_dep_capture = old_c->poly_dep_capture;
 
 	if (!success) {
+		record_lookup(nullptr);
 		return false;
 	}
 
-	GenProcsData *gen_procs = nullptr;
-
-	GB_ASSERT(base_entity->identifier.load()->kind == Ast_Ident);
-	GB_ASSERT(base_entity->kind == Entity_Procedure);
-
-	mutex_lock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
-	gen_procs = base_entity->Procedure.gen_procs;
-	if (gen_procs) {
-		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
-
-		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
-
-		u64 hash = proc_type_identity_hash(final_proc_type);
-		for_array(i, gen_procs->procs) {
-			if (gen_procs->hashes[i] != hash) {
-				continue;
-			}
-			Entity *other = gen_procs->procs[i];
-			Type *pt = base_type(proc_entity_full_type(other));
-			// NOTE(bill): parameter names need to be included too as `typeid`s and link names include them
-			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
-				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-
-				if (poly_proc_data) {
-					poly_proc_data->gen_entity = other;
-				}
-				return true;
-			}
+	u64 final_hash = proc_type_identity_hash(final_proc_type);
+	rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
+	for_array(i, gen_procs->procs) {
+		if (gen_procs->hashes[i] != final_hash) {
+			continue;
 		}
-
-		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-	} else {
-		gen_procs = permanent_alloc_item<GenProcsData>();
-		gen_procs->procs.allocator = heap_allocator();
-		gen_procs->hashes.allocator = heap_allocator();
-		base_entity->Procedure.gen_procs = gen_procs;
-		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
+		Entity *other = gen_procs->procs[i];
+		Type *pt = base_type(proc_entity_full_type(other));
+		// NOTE(bill): parameter names need to be included too as `typeid`s and link names include them
+		if (are_types_identical_unique_tuples(pt, final_proc_type)) {
+			rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
+			record_lookup(other);
+			return reuse_gen_polymorphic_procedure(other, poly_proc_data);
+		}
 	}
-
-
-	{
-		// LEAK NOTE(bill): This is technically a memory leak as it has to generate the type twice
-		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
-		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
-		nctx.no_polymorphic_errors = false;
-
-		// NOTE(bill): Reset scope from the failed procedure type
-		scope->head_child.store(nullptr, std::memory_order_relaxed);
-		scope_map_clear(&scope->elements);
-		ptr_set_clear(&scope->imported);
-
-		// LEAK NOTE(bill): Cloning this AST may be leaky but this is not really an issue due to arena-based allocation
-		Ast *cloned_proc_type_node = clone_ast(pt->node);
-		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
-		if (!success) {
-			return false;
-		}
-
-		u64 hash = proc_type_identity_hash(final_proc_type);
-		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
-		for_array(i, gen_procs->procs) {
-			if (gen_procs->hashes[i] != hash) {
-				continue;
-			}
-			Entity *other = gen_procs->procs[i];
-			Type *pt = base_type(proc_entity_full_type(other));
-			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
-				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-				return reuse_gen_polymorphic_procedure(other, poly_proc_data);
-			}
-		}
-		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-	}
+	rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
 
 	// Re-check under the exclusive lock (the lookups above ran under a released shared lock) and
 	// hold it across construction + array_add so find-then-publish is atomic. (@local-mutex)
-	u64 final_hash = proc_type_identity_hash(final_proc_type);
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
 	for_array(i, gen_procs->procs) {
 		Entity *other = gen_procs->procs[i];
 		if (gen_procs->hashes[i] == final_hash && are_types_identical_unique_tuples(base_type(proc_entity_full_type(other)), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
+			record_lookup(other);
 			return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 		}
 	}
@@ -838,6 +1029,10 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	entity->flags = 0;
 
 	entity->Procedure.optimization_mode = base_entity->Procedure.optimization_mode;
+	entity->Procedure.futex = base_entity->Procedure.futex;
+	entity->Procedure.futex_parameter = base_entity->Procedure.futex_parameter;
+	entity->Procedure.synchronizes        = base_entity->Procedure.synchronizes;
+	entity->Procedure.synchronizes_shared = base_entity->Procedure.synchronizes_shared;
 	entity->Procedure.generated_from_polymorphic = true;
 
 	if (base_entity->flags & EntityFlag_Cold) {
@@ -860,6 +1055,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->tags  = tags;
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
+	proc_info->poly_parent   = global_error_context.instantiations.proc;
 
 	// Before it can be found by another thread which could use it first
 	d->gen_proc_info.store(proc_info);
@@ -867,6 +1063,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	array_add(&gen_procs->procs, entity);
 	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
+
+	record_lookup(entity);
 
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;
@@ -1417,10 +1615,11 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		Type *elem_type = core_broadcastable_elem_type(type);
-		if (is_type_union(elem_type)) {
+		if (is_type_union(elem_type) && !is_type_untyped_nil(operand->type)) {
 			target_type = elem_type;
 		}
-		if (type == nullptr || is_type_any(elem_type)) {
+		if (type == nullptr || is_type_any(type) ||
+		    (is_type_any(elem_type) && !is_type_untyped_nil(operand->type) && !is_type_untyped_uninit(operand->type))) {
 			if (type == nullptr && is_type_untyped_uninit(operand->type)) {
 				String article = error_article(context_name); // Grab definite or indefinite article matching `context_name`, or "" if not found.
 
@@ -1990,9 +2189,12 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 			if (bt == nullptr && e->state == EntityState_InProgress) {
 				bt = check_in_progress_type_alias(c, e);
 			}
-			// Keep struct aliases named so recursive fields retain their alias edge.
 			if (bt != nullptr && bt->kind != Type_Struct) {
-				o->type = bt;
+				if (bt->kind == Type_Union) {
+					o->type = base_named_type(o->type);
+				} else {
+					o->type = bt;
+				}
 			}
 		}
 		break;
@@ -2236,10 +2438,10 @@ gb_internal bool check_update_float_precision(ExactValue *value, Type *type) {
 	case Basic_f32be:
 		{
 			f64 x_64 = exact_value_to_f64(*value);
-			f32 x_32 = cast(f32)x_64;
-			if (cast(f64)x_32 != x_64) {
+			f32 x_32 = f64_to_f32(x_64);
+			if (f32_to_f64(x_32) != x_64) {
 				// make sure there IS precision loss
-				*value = exact_value_float(cast(f64)x_32);
+				*value = exact_value_float(f32_to_f64(x_32));
 				return true;
 			}
 		}
@@ -2740,23 +2942,7 @@ gb_internal char const *zero_value_suggestion(Operand *o, Type *type) {
 	if (!is_exact_value_zero(o->value)) {
 		return nullptr;
 	}
-
-	char const *suggestion = nullptr;
-	if (is_type_string(type)) {
-		suggestion = "\"\"";
-	} else if (is_type_boolean(type)) {
-		suggestion = "false";
-	} else if (is_type_bit_set(type)) {
-		// A bit_set accepts both `nil` and `{}`. `{}` is a bit more idiomatic
-		// because `{.Something}` becomes `{}` when no bits are set.
-		suggestion = "{}";
-	} else if (type_has_nil(type)) {
-		suggestion = "nil";
-	} else {
-		suggestion = "{}";
-	}
-
-	return suggestion;
+	return type_zero_value_string(type);
 }
 
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type, i64 max_bit_size) {
@@ -2822,7 +3008,13 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 	Type *src = base_type(o->type);
 	Type *dst = base_type(type);
 
-	if (is_type_array(src) && is_type_slice(dst)) {
+	if (is_type_proc(src) && is_type_polymorphic(src)) {
+		if (is_type_proc(dst)) {
+			error_line("\tNote: the polymorphic procedure cannot be specialized to this procedure type\n");
+		} else {
+			error_line("\tNote: a polymorphic procedure has no value until it is specialized, e.g. by assigning it to a concrete procedure type\n");
+		}
+	} else if (is_type_array(src) && is_type_slice(dst)) {
 		Type *s = src->Array.elem;
 		Type *d = dst->Slice.elem;
 		if (are_types_identical(s, d)) {
@@ -3176,6 +3368,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 			}
 			o->mode = Addressing_Invalid;
 			return;
+		}
+		if (analysis_in_use(AnalysisFlag_Atomic)) {
+			if (Entity *e = check_atomic_location(o->expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
 		}
 
 		Type *soa_for_in_type = nullptr;
@@ -4041,12 +4238,13 @@ gb_internal bool check_is_castable_to(CheckerContext *c, Operand *operand, Type 
 			}
 			return false;
 		}
-		return true;
+		// a polymorphic procedure has no value until it is specialized, which only assignment does
+		return !is_type_polymorphic(src);
 	}
 
 	// proc -> rawptr
 	if (is_type_proc(src) && is_type_rawptr(dst)) {
-		return true;
+		return !is_type_polymorphic(src);
 	}
 	// rawptr -> proc
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
@@ -4292,6 +4490,17 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		return true;
 	}
 
+	if (is_type_proc(src_bt) && is_type_polymorphic(src_bt)) {
+		gbString expr_str = expr_to_string(o->expr);
+		gbString type_str = type_to_string(src_t);
+		error(o->expr, "Cannot transmute the non-specialized polymorphic procedure '%s' of type '%s'", expr_str, type_str);
+		gb_string_free(type_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return false;
+	}
+
 
 	i64 srcz = type_size_of(src_t);
 	i64 dstz = type_size_of(dst_t);
@@ -4424,6 +4633,13 @@ gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
 		return node->CompoundLit.type == nullptr;
 	case Ast_ImplicitSelectorExpr:
 		return true;
+	case Ast_UnaryExpr: {
+		Ast *expr = unparen_expr(node->UnaryExpr.expr);
+		return node->UnaryExpr.op.kind == Token_And &&
+		       expr != nullptr &&
+		       expr->kind == Ast_CompoundLit &&
+		       expr->CompoundLit.type == nullptr;
+	}
 	case Ast_TernaryIfExpr:
 		return arg_is_deferrable_untyped_expr(node->TernaryIfExpr.x) &&
 		       arg_is_deferrable_untyped_expr(node->TernaryIfExpr.y);
@@ -4432,6 +4648,15 @@ gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
 		       arg_is_deferrable_untyped_expr(node->TernaryWhenExpr.y);
 	}
 	return false;
+}
+
+gb_internal isize first_non_deferrable_arg(Slice<Ast *> const &args) {
+	for_array(i, args) {
+		if (!arg_is_deferrable_untyped_expr(args[i])) {
+			return i;
+		}
+	}
+	return 0;
 }
 
 gb_internal bool can_use_other_type_as_type_hint(bool use_lhs_as_type_hint, Type *other_type) {
@@ -4672,8 +4897,8 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 	case Token_CmpEq:
 	case Token_NotEq: {
 		// NOTE(bill): Allow comparisons between types
-		if (is_ise_expr(be->left)) {
-			// Evalute the right before the left for an '.X' expression
+		if (arg_is_deferrable_untyped_expr(be->left) &&
+		    !arg_is_deferrable_untyped_expr(be->right)) {
 			check_expr_or_type(c, y, be->right, nullptr /* ignore type hint */);
 			check_expr_or_type(c, x, be->left, y->type);
 		} else {
@@ -4802,9 +5027,14 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		return;
 	}
 
-	default:
-		if (is_ise_expr(be->left)) {
-			// Evalute the right before the left for an '.X' expression
+	default: {
+		bool right_first = is_ise_expr(be->left);
+		if (type_hint == nullptr || token_is_comparison(op.kind)) {
+			// NOTE(bill): '{...}' keeps an outer type hint, e.g. `v: [2]f32 = {1, 2} * scalar`
+			right_first = arg_is_deferrable_untyped_expr(be->left) &&
+			              !arg_is_deferrable_untyped_expr(be->right);
+		}
+		if (right_first) {
 			check_expr_or_type(c, y, be->right, token_is_comparison(op.kind) ? nullptr : type_hint);
 
 			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, y->type)) { // RHS in this case
@@ -4821,6 +5051,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			}
 		}
 		break;
+	}
 	}
 	if (x->mode == Addressing_Invalid) {
 		return;
@@ -5397,7 +5628,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 			elem = core_broadcastable_elem_type(elem);
 			operand->mode = Addressing_Value;
 			convert_to_typed(c, operand, elem, /*no_final_update*/true);
-			if (is_type_union(elem)) {
+			if (is_type_union(elem) && !is_type_untyped_nil(operand->type)) {
 				target_type = operand->type;
 			}
 		} else {
@@ -6002,6 +6233,7 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 			Token token = {Token_Integer};
 			token.string = copy_string(permanent_allocator(), make_string_c(gb_bprintf("%td", i)));
 			token.pos    = ast_token(nodes[i]).pos;
+			token.flags  = TokenFlag_Synthesized;
 
 			Ast *index = alloc_ast_node(f, Ast_BasicLit);
 			index->BasicLit.token = token;
@@ -6711,20 +6943,6 @@ gb_internal bool is_type_normal_pointer(Type *ptr, Type **elem) {
 	return false;
 }
 
-gb_internal bool is_type_valid_atomic_type(Type *elem) {
-	elem = core_type(elem);
-	if (is_type_internally_pointer_like(elem)) {
-		return true;
-	}
-	if (elem->kind == Type_BitSet) {
-		elem = bit_set_to_int(elem);
-	}
-	if (elem->kind != Type_Basic) {
-		return false;
-	}
-	return (elem->Basic.flags & (BasicFlag_Boolean|BasicFlag_OrderedNumeric)) != 0;
-}
-
 gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **out_scope = nullptr) {
 	switch (node->kind) {
 	case_ast_node(i, Ident, node);
@@ -7121,6 +7339,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 	Type *final_proc_type = proc_type;
 	Entity *gen_entity = nullptr;
+	bool bound_by_later_arg = false;
 
 	if (vari_expand && !variadic) {
 		if (show_error) {
@@ -7306,6 +7525,11 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 						ordered_operands[i].type = e->type;
 						if (e->Variable.param_value.kind == ParameterValue_Nil)
 							ordered_operands[i].type = t_untyped_nil;
+						if (e->Variable.param_value.kind == ParameterValue_Constant) {
+							// so a `#const` parameter accepts its own default
+							ordered_operands[i].mode  = Addressing_Constant;
+							ordered_operands[i].value = e->Variable.param_value.value;
+						}
 						ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
 					}
 
@@ -7447,6 +7671,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			PolyProcData poly_proc_data = {};
 			if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
 				gen_entity = poly_proc_data.gen_entity;
+				bound_by_later_arg = poly_proc_data.bound_by_later_arg;
 				Type *gept = base_type(proc_entity_full_type(gen_entity));
 				GB_ASSERT(is_type_proc(gept));
 				final_proc_type = proc_entity_full_type(gen_entity);
@@ -7461,6 +7686,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			Operand *o = &ordered_operands[i];
 			if (o->deferred_untyped_arg) {
 				materialize_deferred_untyped_arg(c, o, pt->params->Tuple.variables[i]->type, show_error);
+				if (o->mode == Addressing_Invalid) {
+					err = CallArgumentError_WrongTypes;
+				}
 			}
 			if (o->mode == Addressing_Invalid) {
 				continue;
@@ -7517,6 +7745,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				deferred_local = *o;
 				materialize_deferred_untyped_arg(c, &deferred_local, vari_expand ? slice : elem, show_error);
 				o = &deferred_local;
+				if (o->mode == Addressing_Invalid) {
+					err = CallArgumentError_WrongTypes;
+				}
 			}
 			if (vari_expand) {
 				t = slice;
@@ -7543,6 +7774,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		if (!vari_expand && variadic_operands.count != 0) {
 			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
 			if (c->decl) {
+				poly_dep_capture_unreplayable(c);
 				bool found = false;
 				for (auto &vr : c->decl->variadic_reuses) {
 					if (are_types_identical(slice, vr.slice_type)) {
@@ -7567,6 +7799,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
+		data->bound_by_later_arg = bound_by_later_arg;
 
 
 		Ast *proc_lit = nullptr;
@@ -8139,6 +8372,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 			ValidIndexAndScore item = {};
 			item.score = data.score;
+			item.bound_by_later_arg = data.bound_by_later_arg;
 
 			if (data.gen_entity != nullptr) {
 				array_add(&proc_entities, data.gen_entity);
@@ -8184,6 +8418,16 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 	}
 	c->in_proc_group = false;
+
+	isize direct_count = 0;
+	for (ValidIndexAndScore const &v : valids) {
+		if (!v.bound_by_later_arg) {
+			valids[direct_count++] = v;
+		}
+	}
+	if (direct_count > 0) {
+		valids.count = direct_count;
+	}
 
 	if (max_matched_features > 0) {
 		for_array(i, valids) {
@@ -8948,6 +9192,81 @@ gb_internal isize lookup_polymorphic_record_parameter(Type *t, String parameter_
 }
 
 
+gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *original_type, Array<Operand> ordered_operands, Ast *call) {
+	isize param_count = get_record_polymorphic_params(original_type)->variables.count;
+
+	GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
+	mutex_lock(&found_gen_types->mutex);
+
+	// NOTE(bill, 2026-1010):
+	// check_struct_type/check_union_type release this mutex early (after publishing, before checking members)
+	// to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit path keeps it until scope end.
+	bool gen_types_locked = true;
+	defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
+
+	Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
+	if (found_entity) {
+		add_declaration_dependency(c, found_entity);
+		return found_entity->type;
+	}
+
+	CheckerContext ctx = *c;
+
+	// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
+	ctx.scope = polymorphic_record_parent_scope(original_type);
+
+	// NOTE(bill): the instance's members are only checked by its first use because their dependencies are the instance's own and each use depends on the instance instead
+	ctx.decl = make_decl_info(ctx.scope, nullptr);
+
+	if (original_type->Named.type_name && original_type->Named.type_name->file) {
+		ctx.file = original_type->Named.type_name->file;
+		ctx.pkg = ctx.file->pkg;
+	}
+	GB_ASSERT(ctx.scope != nullptr);
+
+	Type *bt = base_type(original_type);
+	String generated_name = make_string_c(expr_to_string(call));
+
+	Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
+	ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
+	global_error_context.instantiations.records = &instantiation;
+	if (bt->kind == Type_Struct) {
+		Ast *node = clone_ast(bt->Struct.node);
+
+		Type *struct_type = alloc_type_struct();
+		struct_type->Struct.node = node;
+		struct_type->Struct.polymorphic_parent = original_type;
+		set_base_type(named_type, struct_type);
+
+		check_open_scope(&ctx, node);
+		check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+
+		// check_struct_type released found_gen_types->mutex after publishing the instantiation.
+		gen_types_locked = false;
+		check_close_scope(&ctx);
+	} else if (bt->kind == Type_Union) {
+		Ast *node = clone_ast(bt->Union.node);
+
+		Type *union_type = alloc_type_union();
+		union_type->Union.node = node;
+		union_type->Union.polymorphic_parent = original_type;
+		set_base_type(named_type, union_type);
+
+		check_open_scope(&ctx, node);
+		check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+
+		// check_union_type released found_gen_types->mutex after publishing the instantiation.
+		gen_types_locked = false;
+		check_close_scope(&ctx);
+	} else {
+		GB_PANIC("Unsupported parametric polymorphic record type");
+	}
+	global_error_context.instantiations.records = instantiation.prev;
+
+	add_declaration_dependency(c, named_type->Named.type_name);
+	return named_type;
+}
+
 gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *operand, Ast *call) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
@@ -9234,72 +9553,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		return err;
 	}
 
-	{
-		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
-		mutex_lock(&found_gen_types->mutex);
-		// check_struct_type/check_union_type release this mutex early (after publishing, before
-		// checking members) to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit
-		// path keeps it until scope end.
-		bool gen_types_locked = true;
-		defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
-
-		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
-		if (found_entity) {
-			add_declaration_dependency(c, found_entity);
-			operand->mode = Addressing_Type;
-			operand->type = found_entity->type;
-			return err;
-		}
-
-		CheckerContext ctx = *c;
-		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
-		ctx.scope = polymorphic_record_parent_scope(original_type);
-		// NOTE(bill): the instance's members are only checked by its first use, so their dependencies are
-		// the instance's own, and each use depends on the instance instead
-		ctx.decl = make_decl_info(ctx.scope, nullptr);
-
-		if (original_type->Named.type_name && original_type->Named.type_name->file) {
-			ctx.file = original_type->Named.type_name->file;
-			ctx.pkg = ctx.file->pkg;
-		}
-		GB_ASSERT(ctx.scope != nullptr);
-
-		Type *bt = base_type(original_type);
-		String generated_name = make_string_c(expr_to_string(call));
-
-		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
-		if (bt->kind == Type_Struct) {
-			Ast *node = clone_ast(bt->Struct.node);
-			Type *struct_type = alloc_type_struct();
-			struct_type->Struct.node = node;
-			struct_type->Struct.polymorphic_parent = original_type;
-			set_base_type(named_type, struct_type);
-
-			check_open_scope(&ctx, node);
-			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
-			// check_struct_type released found_gen_types->mutex after publishing the instantiation.
-			gen_types_locked = false;
-			check_close_scope(&ctx);
-		} else if (bt->kind == Type_Union) {
-			Ast *node = clone_ast(bt->Union.node);
-			Type *union_type = alloc_type_union();
-			union_type->Union.node = node;
-			union_type->Union.polymorphic_parent = original_type;
-			set_base_type(named_type, union_type);
-
-			check_open_scope(&ctx, node);
-			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
-			// check_union_type released found_gen_types->mutex after publishing the instantiation.
-			gen_types_locked = false;
-			check_close_scope(&ctx);
-		} else {
-			GB_PANIC("Unsupported parametric polymorphic record type");
-		}
-
-		add_declaration_dependency(c, named_type->Named.type_name);
-		operand->mode = Addressing_Type;
-		operand->type = named_type;
-	}
+	operand->mode = Addressing_Type;
+	operand->type = instantiate_polymorphic_record(c, original_type, ordered_operands, call);
 	return err;
 }
 
@@ -9515,6 +9770,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	c->allow_in_progress_type_operand = false;
 	defer (c->allow_in_progress_type_operand = prev_allow_in_progress);
 
+	Ast *prev_call_proc_hint = c->call_proc_hint;
+	c->call_proc_hint = unparen_expr(proc != nullptr ? proc : operand->expr);
+	defer (c->call_proc_hint = prev_call_proc_hint);
+
 	if (proc != nullptr &&
 	    proc->kind == Ast_BasicDirective) {
 		ast_node(bd, BasicDirective, proc);
@@ -9557,6 +9816,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				// NOTE(bill): asm templates can only be used within as a declaration OR within a procedure call directly
 				ast_node(at, AsmTemplate, unnested_proc);
 				Token token = at->token;
+				poly_dep_capture_unreplayable(c);
 				DeclInfo *d = make_decl_info(c->scope, c->decl);
 				Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, unnested_proc);
 				d->init_expr = unnested_proc;
@@ -9609,6 +9869,12 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
+		} else if (analysis_in_use(AnalysisFlag_Atomic)) {
+			bool is_atomic   = BuiltinProc_atomic_thread_fence <= id && id <= BuiltinProc_atomic_compare_exchange_weak_explicit;
+			bool is_volatile = id == BuiltinProc_volatile_store || id == BuiltinProc_volatile_load;
+			if (is_atomic || is_volatile) {
+				per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, id});
+			}
 		}
 		operand->expr = call;
 		return builtin_procs[id].kind;
@@ -9622,6 +9888,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (initial_entity->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 			if (c->decl) {
+				poly_dep_capture_unreplayable(c);
 				c->decl->defer_used += 1;
 			}
 		}
@@ -9660,14 +9927,22 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	gb_zero_item(operand);
 	operand->expr = call;
 
-	if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0) {
-		// NOTE: which procedure of a group is called is only known once its arguments are checked
-		Entity *e = entity_of_node(call->CallExpr.proc);
-		if (e != nullptr && e->kind == Entity_Procedure && e->Procedure.deferred_procedure.entity != nullptr) {
+	// NOTE: which procedure of a group is called is only known once its arguments are checked
+	Entity *callee = entity_of_node(call->CallExpr.proc);
+	if (callee != nullptr && callee->kind == Entity_Procedure) {
+		if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0 &&
+		    callee->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 			if (c->decl) {
+				poly_dep_capture_unreplayable(c);
 				c->decl->defer_used += 1;
 			}
+		}
+		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
+			per_thread_array_add(&c->info->checked_calls_queue, CheckedCall{c->curr_proc_decl, callee});
+		}
+		if (callee->Procedure.futex != ProcedureFutex_None && call->CallExpr.args.count > 0 && analysis_in_use(AnalysisFlag_Atomic)) {
+			per_thread_array_add(&c->info->checked_atomics_queue, CheckedAtomic{call, c->curr_proc_decl, BuiltinProc_Invalid, callee->Procedure.futex});
 		}
 	}
 
@@ -10038,12 +10313,31 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, bool is_for_loop, Ope
 
 	ast_node(ie, BinaryExpr, node);
 
-	check_expr_with_type_hint(c, x, ie->left, type_hint);
-	if (x->mode == Addressing_Invalid) {
+	Operand *a = x;
+	Operand *b = y;
+	Ast *a_expr = ie->left;
+	Ast *b_expr = ie->right;
+	if (type_hint == nullptr &&
+	    arg_is_deferrable_untyped_expr(ie->left) &&
+	    !arg_is_deferrable_untyped_expr(ie->right)) {
+		a = y;
+		b = x;
+		a_expr = ie->right;
+		b_expr = ie->left;
+	}
+
+	check_expr_with_type_hint(c, a, a_expr, type_hint);
+	if (a->mode == Addressing_Invalid) {
 		return false;
 	}
-	check_expr_with_type_hint(c, y, ie->right, type_hint);
-	if (y->mode == Addressing_Invalid) {
+
+	Type *b_hint = type_hint;
+	if (b_hint == nullptr && arg_is_deferrable_untyped_expr(b_expr)) {
+		b_hint = a->type;
+	}
+
+	check_expr_with_type_hint(c, b, b_expr, b_hint);
+	if (b->mode == Addressing_Invalid) {
 		return false;
 	}
 
@@ -10215,18 +10509,22 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 	o->expr = node;
 	o->mode = Addressing_Invalid;
 
-	Type *th = type_hint;
-
-	if (th == nullptr) {
+	if (type_hint == nullptr) {
 		gbString str = expr_to_string(node);
 		error(node, "Cannot determine type for implicit selector expression '%s'", str);
 		gb_string_free(str);
 		return Expr_Expr;
 	}
+	Type *th = core_broadcastable_elem_type(type_hint);
 	o->type = th;
 
 	bool ok = attempt_implicit_selector_expr(c, o, ise, th);
-	if (!ok) {
+	if (ok) {
+		Type *bt = base_type(o->type);
+		if (bt->kind == Type_Enum) {
+			add_entity_use(c, ise->selector, scope_lookup_current(bt->Enum.scope, ise->selector->Ident.interned));
+		}
+	} else {
 		String name = ise->selector->Ident.token.string;
 
 		if (is_type_enum(th)) {
@@ -10240,17 +10538,17 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 			error(node, "Undeclared name '%.*s' for type '%s'", LIT(name), typ);
 
 			check_did_you_mean_type(name, bt->Enum.fields);
-		} else if (is_type_bit_set(th) && is_type_enum(th->BitSet.elem)) {
+		} else if (is_type_bit_set(type_hint) && is_type_enum(type_hint->BitSet.elem)) {
 			ERROR_BLOCK();
 
-			gbString typ = type_to_string(th);
+			gbString typ = type_to_string(type_hint);
 			gbString str = expr_to_string(node);
 			error(node, "Cannot convert enum value to '%s'", typ);
 			error_line("\tSuggestion: Did you mean '{ %s }'?\n", str);
 			gb_string_free(typ);
 			gb_string_free(str);
 		} else {
-			gbString typ = type_to_string(th);
+			gbString typ = type_to_string(type_hint);
 			gbString str = expr_to_string(node);
 			error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
 			gb_string_free(str);
@@ -13002,6 +13300,11 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->expr = node;
 			return kind;
 		}
+		if (analysis_in_use(AnalysisFlag_Atomic) && !is_type_pointer(o->type)) {
+			if (Entity *e = check_atomic_location(node->SliceExpr.expr)) {
+				per_thread_array_add(&c->info->checked_addresses_queue, CheckedAddress{node, e});
+			}
+		}
 		o->type = alloc_type_slice(t->Array.elem);
 		break;
 
@@ -13337,6 +13640,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		Type *type = alloc_type(Type_Proc);
 		check_open_scope(&ctx, pl->type);
 		{
+			poly_dep_capture_unreplayable(c);
 			decl = make_decl_info(ctx.scope, ctx.decl);
 			decl->proc_lit  = node;
 			ctx.decl = decl;

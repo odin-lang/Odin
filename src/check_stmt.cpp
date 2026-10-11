@@ -710,8 +710,13 @@ gb_internal void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags
 		error(ws->cond, "Invalid body for 'when' statement");
 		return;
 	}
-	if (operand.value.kind == ExactValue_Bool &&
-	    operand.value.value_bool) {
+
+	bool taken = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+		per_thread_array_add(&ctx->info->semantic_when_queue, SemanticWhen{ws, taken});
+	}
+
+	if (taken) {
 		check_stmt_list(ctx, ws->body->BlockStmt.stmts, flags);
 	} else if (ws->else_stmt) {
 		switch (ws->else_stmt->kind) {
@@ -1193,6 +1198,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 		Token token  = {};
 		token.pos    = ast_token(ss->body).pos;
 		token.string = str_lit("true");
+		token.flags  = TokenFlag_Synthesized;
 
 		x.expr = alloc_ast_node(nullptr, Ast_Ident);
 		x.expr->Ident.token = token;
@@ -1269,6 +1275,17 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					continue;
 				}
 
+				// NOTE: like a single case value, the bounds take the type of the switch tag, otherwise
+				// untyped bounds would default to their own type (e.g. 'string' for a 'cstring' tag) (#7853)
+				convert_to_typed(ctx, &lhs, x.type);
+				if (lhs.mode == Addressing_Invalid) {
+					continue;
+				}
+				convert_to_typed(ctx, &rhs, x.type);
+				if (rhs.mode == Addressing_Invalid) {
+					continue;
+				}
+
 				TokenKind upper_op = Token_Invalid;
 				switch (be->op.kind) {
 				case Token_Ellipsis:  upper_op = Token_LtEq; break;
@@ -1298,7 +1315,13 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
 				}
 
-				if (is_type_string16(x.type)) {
+				if (is_type_cstring16(x.type)) {
+					add_package_dependency(ctx, "runtime", "cstring16_le");
+					add_package_dependency(ctx, "runtime", "cstring16_lt");
+				} else if (is_type_cstring(x.type)) {
+					add_package_dependency(ctx, "runtime", "cstring_le");
+					add_package_dependency(ctx, "runtime", "cstring_lt");
+				} else if (is_type_string16(x.type)) {
 					// NOTE(bill): Force dependency for strings here
 					add_package_dependency(ctx, "runtime", "string16_le");
 					add_package_dependency(ctx, "runtime", "string16_lt");
@@ -2109,6 +2132,11 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_addressed) {
 					if (is_possibly_addressable && i == addressable_index) {
 						entity->flags &= ~EntityFlag_Value;
+						if (analysis_in_use(AnalysisFlag_Atomic)) {
+							if (Entity *e = check_atomic_location(expr)) {
+								per_thread_array_add(&ctx->info->checked_addresses_queue, CheckedAddress{node, e});
+							}
+						}
 					} else {
 						char const *idx_name = is_map ? "key" : (is_bit_set || i == 0) ? "element" : "index";
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
@@ -2195,6 +2223,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 			if (found == nullptr) {
 				entity = alloc_entity_variable(ctx->scope, token, nullptr);
 				entity->identifier = name;
+				add_semantic_ident(ctx->info, name, entity, true);
 
 				Ast *fl = ctx->foreign_context.curr_library;
 				if (fl != nullptr) {
@@ -2287,6 +2316,7 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 		if (ac.link_name.len > 0) {
 			e->Variable.link_name = ac.link_name;
 		}
+		e->Variable.custom_align = ac.align;
 
 		e->flags &= ~EntityFlag_Static;
 		if (ac.is_static) {
@@ -2633,10 +2663,8 @@ gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-// NOTE(bill): This is very basic escape analysis
-// This needs to be improved tremendously, and a lot of it done during the
-// middle-end (or LLVM side) to improve checks and error messages
-void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
+// returning stack memory made by the returned expression itself, where the escape analysis is disabled
+gb_internal void check_unsafe_return(Operand const &o, Type *type, Ast *expr) {
 	auto const unsafe_return_error = [](Operand const &o, char const *msg, Type *extra_type=nullptr) {
 		gbString s = expr_to_string(o.expr);
 		if (extra_type) {
@@ -2769,6 +2797,9 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 		}
 	}
 
+	if (ast_file_analysis(node->file(), AnalysisFlag_Escape)) {
+		return;
+	}
 	for (Operand &o : operands) {
 		if (o.expr == nullptr) {
 			continue;
@@ -2787,7 +2818,6 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 
 		check_unsafe_return(o, o.type, expr);
 	}
-
 }
 
 gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {

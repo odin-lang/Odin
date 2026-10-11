@@ -34,7 +34,7 @@ If an object's lifecycle needs to be extended beyond the `AutoreleasePool`'s sco
 
 You can find a more-detailed introduction to the memory management rules here: https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/MemoryMgmt/Articles/mmRules.html.
 
-For more details about the application's RunLoop, please find its documentation here: https://developer.apple.com/documentation/foundation/nsrunloop
+For more details about the application's RunLoop, please find its documentation here: https://developer.apple.com/documentation/foundation/runloop?language=objc
 
 ### Use and debug AutoreleasePools
 

@@ -140,6 +140,13 @@ enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_FavorSize,
 };
 
+// see `@(futex=...)`
+enum ProcedureFutex : u8 {
+	ProcedureFutex_None,
+	ProcedureFutex_Wait,
+	ProcedureFutex_Wake,
+};
+
 
 BlockingMutex global_type_name_objc_metadata_mutex;
 
@@ -235,6 +242,7 @@ struct Entity {
 
 	std::atomic<struct lbModule *> code_gen_module;
 	std::atomic<struct lbProcedure *> code_gen_procedure;
+	std::atomic<String *>             ir_mangled_name; // the backend's name for it, published once as modules may name it in parallel
 
 	u64         order_in_src;
 	String      deprecated_message;
@@ -273,6 +281,7 @@ struct Entity {
 			String     link_prefix;
 			String     link_suffix;
 			String     link_section;
+			i64        custom_align;
 			CommentGroup *docs;
 			CommentGroup *comment;
 			bool       is_foreign;
@@ -283,7 +292,6 @@ struct Entity {
 		struct {
 			Type * type_parameter_specialization;
 			Type * original_type_for_parapoly;
-			String ir_mangled_name;
 			bool   is_type_alias;
 			bool   objc_is_implementation;
 			Type*  objc_superclass;
@@ -307,6 +315,10 @@ struct Entity {
 			struct GenProcsData *gen_procs;
 			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
+			ProcedureFutex            futex;
+			i32                       futex_parameter; // the index of what `futex` waits on or wakes
+			u8                        synchronizes;        // OdinAtomicMemoryOrder, see `@(synchronizes=...)`
+			bool                      synchronizes_shared; // see `@(synchronizes_shared=...)`
 
 			u64     fast_math_flags;
 

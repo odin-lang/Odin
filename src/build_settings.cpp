@@ -318,7 +318,10 @@ enum VetFlags : u64 {
 	VetFlag_UnusedProcedures = 1u<<10,
 	VetFlag_ExplicitAllocators = 1u<<11,
 	VetFlag_WhenShadowing   = 1u<<12,
-	VetFlag_PackedFieldAddr = 1u<<13,
+	VetFlag_NilDeref        = 1u<<13,
+	VetFlag_Uninitialized   = 1u<<14,
+	VetFlag_AtomicAccess    = 1u<<15,
+	VetFlag_PackedFieldAddr = 1u<<16,
 
 	VetFlag_Unused = VetFlag_UnusedVariables|VetFlag_UnusedImports,
 
@@ -326,6 +329,23 @@ enum VetFlags : u64 {
 
 	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
 };
+
+enum AnalysisFlags : u64 {
+	AnalysisFlag_NONE   = 0,
+	AnalysisFlag_Escape = 1u<<0,
+	AnalysisFlag_Atomic = 1u<<1,
+
+	AnalysisFlag_All = AnalysisFlag_Escape|AnalysisFlag_Atomic,
+};
+
+u64 get_analysis_flag_from_name(String const &name) {
+	if (name == "escape") {
+		return AnalysisFlag_Escape;
+	} else if (name == "atomic") {
+		return AnalysisFlag_Atomic;
+	}
+	return AnalysisFlag_NONE;
+}
 
 u64 get_vet_flag_from_name(String const &name) {
 	if (name == "unused") {
@@ -356,6 +376,12 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_ExplicitAllocators;
 	} else if (name == "when-shadowing") {
 		return VetFlag_WhenShadowing;
+	} else if (name == "nil-deref") {
+		return VetFlag_NilDeref;
+	} else if (name == "uninitialized") {
+		return VetFlag_Uninitialized;
+	} else if (name == "atomic-access") {
+		return VetFlag_AtomicAccess;
 	} else if (name == "packed-field-addr") {
 		return VetFlag_PackedFieldAddr;
 	}
@@ -482,6 +508,12 @@ enum OptimizationLevel : i32 {
 	OptimizationLevel_Aggressive =  3,
 };
 
+enum SemanticsFormat : u8 {
+	SemanticsFormat_Invalid,
+	SemanticsFormat_Json,
+	SemanticsFormat_Cbor,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -548,6 +580,13 @@ struct BuildContext {
 	bool   show_more_timings;
 	bool   show_defineables;
 	String export_defineables_file;
+	String overlay_file;
+	bool   workspace;
+
+	SemanticsFormat export_semantics_format;
+	String          export_semantics_file;
+	Array<String>   export_semantics_for; // specific files
+
 	bool   ignore_unused_defineables;
 	bool   show_system_calls;
 	bool   keep_temp_files;
@@ -560,6 +599,7 @@ struct BuildContext {
 	bool   no_crt;
 	bool   no_rpath;
 	bool   no_entry_point;
+	u64    no_analysis_flags; // AnalysisFlags, by -no-<name>-analysis
 	bool   no_thread_local;
 	bool   cross_compiling;
 	bool   different_os;

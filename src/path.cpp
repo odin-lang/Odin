@@ -514,3 +514,67 @@ gb_internal bool write_directory(String path) {
 	return true;
 }
 #endif
+
+
+struct OverlayEntry {
+	String path;
+	String replacement; // empty when the file is deleted
+};
+
+gb_global Array<OverlayEntry> global_overlays;
+
+gb_internal bool overlay_path_eq(String const &a, String const &b) {
+#if defined(GB_SYSTEM_WINDOWS)
+	return str_eq_ignore_case(a, b);
+#else
+	return a == b;
+#endif
+}
+
+gb_internal OverlayEntry *overlay_find(String const &fullpath) {
+	for (OverlayEntry &e : global_overlays) {
+		if (overlay_path_eq(e.path, fullpath)) {
+			return &e;
+		}
+	}
+	return nullptr;
+}
+
+gb_internal void overlay_directory(String dir, Array<FileInfo> *list) {
+	if (global_overlays.count == 0) {
+		return;
+	}
+	while (dir.len > 0 && (dir[dir.len-1] == '/' || dir[dir.len-1] == '\\')) {
+		dir.len -= 1;
+	}
+	for (isize i = list->count-1; i >= 0; i--) {
+		OverlayEntry *e = overlay_find((*list)[i].fullpath);
+		if (e == nullptr) {
+			continue;
+		}
+		if (e->replacement.len == 0) {
+			array_ordered_remove(list, i);
+		} else {
+			(*list)[i].size = get_file_size(e->replacement);
+		}
+	}
+	for (OverlayEntry const &e : global_overlays) {
+		if (e.replacement.len == 0 || !overlay_path_eq(directory_from_path(e.path), dir)) {
+			continue;
+		}
+		bool on_disk = false;
+		for (FileInfo const &fi : *list) {
+			if (overlay_path_eq(fi.fullpath, e.path)) {
+				on_disk = true;
+				break;
+			}
+		}
+		if (!on_disk) {
+			FileInfo fi = {};
+			fi.name     = filename_without_directory(e.path);
+			fi.fullpath = concatenate3_strings(permanent_allocator(), dir, str_lit("/"), fi.name);
+			fi.size     = get_file_size(e.replacement);
+			array_add(list, fi);
+		}
+	}
+}

@@ -38,7 +38,7 @@ test_tlsf_bitscan :: proc(t: ^testing.T) {
 			testing.expectf(t, res == test.exp, "Expected tlsf.fls(0x%08x) == %v, got %v", test.v, test.exp, res)
 		case .fls_uint:
 			res := tlsf.fls_uint(test.v.?)
-			testing.expectf(t, res == test.exp, "Expected tlsf.fls_uint(0x%16x) == %v, got %v", test.v, test.exp, res)
+			testing.expectf(t, res == test.exp, "Expected tlsf.fls_uint(0x%016x) == %v, got %v", test.v, test.exp, res)
 		}
 	}
 }

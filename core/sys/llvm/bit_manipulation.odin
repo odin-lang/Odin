@@ -2,7 +2,6 @@
 
 package sys_llvm
 
-/*
 @(default_calling_convention="none")
 foreign _ {
 	@(link_name="llvm.bitreverse.i8")
@@ -36,28 +35,28 @@ foreign _ {
 	@(link_name="llvm.ctpop.i128")
 	ctpop_u128 :: proc(u128) -> u128 ---
 
+	// `is_zero_poison` makes a zero input give a poison result
 	@(link_name="llvm.ctlz.i8")
-	ctlz_u8 :: proc(u8) -> u8 ---
+	ctlz_u8 :: proc(x: u8, #const is_zero_poison: bool = false) -> u8 ---
 	@(link_name="llvm.ctlz.i16")
-	ctlz_u16 :: proc(u16) -> u16 ---
+	ctlz_u16 :: proc(x: u16, #const is_zero_poison: bool = false) -> u16 ---
 	@(link_name="llvm.ctlz.i32")
-	ctlz_u32 :: proc(u32) -> u32 ---
+	ctlz_u32 :: proc(x: u32, #const is_zero_poison: bool = false) -> u32 ---
 	@(link_name="llvm.ctlz.i64")
-	ctlz_u64 :: proc(u64) -> u64 ---
+	ctlz_u64 :: proc(x: u64, #const is_zero_poison: bool = false) -> u64 ---
 	@(link_name="llvm.ctlz.i128")
-	ctlz_u128 :: proc(u128) -> u128 ---
+	ctlz_u128 :: proc(x: u128, #const is_zero_poison: bool = false) -> u128 ---
 
 	@(link_name="llvm.cttz.i8")
-	cttz_u8 :: proc(u8) -> u8 ---
+	cttz_u8 :: proc(x: u8, #const is_zero_poison: bool = false) -> u8 ---
 	@(link_name="llvm.cttz.i16")
-	cttz_u16 :: proc(u16) -> u16 ---
+	cttz_u16 :: proc(x: u16, #const is_zero_poison: bool = false) -> u16 ---
 	@(link_name="llvm.cttz.i32")
-	cttz_u32 :: proc(u32) -> u32 ---
+	cttz_u32 :: proc(x: u32, #const is_zero_poison: bool = false) -> u32 ---
 	@(link_name="llvm.cttz.i64")
-	cttz_u64 :: proc(u64) -> u64 ---
+	cttz_u64 :: proc(x: u64, #const is_zero_poison: bool = false) -> u64 ---
 	@(link_name="llvm.cttz.i128")
-	cttz_u128 :: proc(u128) -> u128 ---
-
+	cttz_u128 :: proc(x: u128, #const is_zero_poison: bool = false) -> u128 ---
 
 	@(link_name="llvm.fshl.i8")
 	fshl_u8 :: proc(a, b, c: u8) -> u8 ---
@@ -81,4 +80,3 @@ foreign _ {
 	@(link_name="llvm.fshr.i128")
 	fshr_u128 :: proc(a, b, c: u128) -> u128 ---
 }
-*/

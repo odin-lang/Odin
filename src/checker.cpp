@@ -13,6 +13,7 @@ gb_internal void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *ex
 gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 gb_internal Type *check_type(CheckerContext *ctx, Ast *e);
 gb_internal void check_procedure_later(Checker *c, ProcInfo *info);
+gb_internal void check_escapes(Checker *c);
 
 gb_internal bool is_operand_value(Operand o) {
 	switch (o.mode) {
@@ -947,6 +948,50 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
+gb_internal void poly_dep_capture_entity(CheckerContext *c, Entity *e) {
+	for (PolyProcDepCapture *cap = c->poly_dep_capture; cap != nullptr; cap = cap->parent) {
+		if (cap->decl != c->decl) {
+			continue;
+		}
+		bool found = false;
+		for (Entity *dep : cap->deps) {
+			if (dep == e) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			array_add(&cap->deps, e);
+		}
+	}
+}
+
+gb_internal void poly_dep_capture_type_info(CheckerContext *c, Type *t) {
+	for (PolyProcDepCapture *cap = c->poly_dep_capture; cap != nullptr; cap = cap->parent) {
+		if (cap->decl != c->decl) {
+			continue;
+		}
+		bool found = false;
+		for (Type *dep : cap->type_info_deps) {
+			if (dep == t) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			array_add(&cap->type_info_deps, t);
+		}
+	}
+}
+
+gb_internal void poly_dep_capture_unreplayable(CheckerContext *c) {
+	for (PolyProcDepCapture *cap = c->poly_dep_capture; cap != nullptr; cap = cap->parent) {
+		if (cap->decl == c->decl) {
+			cap->unreplayable = true;
+		}
+	}
+}
+
 
 gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
 	String name = str_lit("runtime");
@@ -1016,6 +1061,7 @@ gb_internal void add_package_dependency(CheckerContext *c, char const *package_n
 		e->flags |= EntityFlag_Require;
 	}
 	add_dependency(c->info, c->decl, e);
+	poly_dep_capture_entity(c, e);
 }
 
 gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
@@ -1030,6 +1076,7 @@ gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *pa
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
 	add_dependency(c->info, c->decl, e);
+	poly_dep_capture_entity(c, e);
 }
 
 gb_internal char const *runtime_default_hasher_fixed_name(CheckerInfo *info) {
@@ -1067,6 +1114,7 @@ gb_internal void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	}
 	if (c->decl != nullptr) {
 		add_dependency(c->info, c->decl, e);
+		poly_dep_capture_entity(c, e);
 	}
 }
 
@@ -1195,6 +1243,9 @@ gb_internal void init_universal(void) {
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
+		basic_types[i].kind  = Type_Basic;
+		basic_types[i].Basic = basic_type_table[i];
+
 		String const &name = basic_types[i].Basic.name;
 		if (build_context.bedrock) {
 			if ((basic_types[i].Basic.flags & BasicFlag_Integer) != 0 &&
@@ -1387,6 +1438,17 @@ gb_internal void init_universal(void) {
 		add_global_enum_type(str_lit("Atomic_Memory_Order"), values, gb_count_of(values), &t_atomic_memory_order);
 		GB_ASSERT(t_atomic_memory_order->kind == Type_Named);
 		scope_insert(intrinsics_pkg->scope, t_atomic_memory_order->Named.type_name);
+	}
+
+	{
+		GlobalEnumValue values[OdinFutexOperation_COUNT] = {
+			{OdinFutexOperation_strings[OdinFutexOperation_Wait], OdinFutexOperation_Wait},
+			{OdinFutexOperation_strings[OdinFutexOperation_Wake], OdinFutexOperation_Wake},
+		};
+
+		add_global_enum_type(str_lit("Futex_Operation"), values, gb_count_of(values), &t_futex_operation);
+		GB_ASSERT(t_futex_operation->kind == Type_Named);
+		scope_insert(intrinsics_pkg->scope, t_futex_operation->Named.type_name);
 	}
 
 	{
@@ -1705,6 +1767,12 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->entity_queue,     global_thread_pool.threads.count);
 	i->entities_by_file = true;
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->semantic_ident_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->semantic_when_queue,  global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_atomics_queue,   global_thread_pool.threads.count);
+	per_thread_array_init(&i->checked_addresses_queue, global_thread_pool.threads.count);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
 	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
 	mpsc_init(&i->foreign_imports_to_check_fullpaths, a); // 1<<10);
@@ -1739,6 +1807,12 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 
 	per_thread_array_destroy(&i->entity_queue);
 	per_thread_array_destroy(&i->definition_queue);
+	per_thread_array_destroy(&i->semantic_ident_queue);
+	per_thread_array_destroy(&i->semantic_when_queue);
+	per_thread_array_destroy(&i->checked_bodies_queue);
+	per_thread_array_destroy(&i->checked_calls_queue);
+	per_thread_array_destroy(&i->checked_atomics_queue);
+	per_thread_array_destroy(&i->checked_addresses_queue);
 	mpsc_destroy(&i->required_global_variable_queue);
 	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 	mpsc_destroy(&i->foreign_imports_to_check_fullpaths);
@@ -2113,6 +2187,13 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	}
 }
 
+gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
+	Token const &token = identifier->Ident.token;
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && (token.flags & TokenFlag_Synthesized) == 0 && !is_error_muted()) {
+		per_thread_array_add(&i->semantic_ident_queue, SemanticIdent{entity, token.pos.file_id, token.pos.offset, definition});
+	}
+}
+
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
 	if (identifier->kind != Ast_Ident) {
@@ -2126,6 +2207,7 @@ gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
 	per_thread_array_add(&i->definition_queue, entity);
+	add_semantic_ident(i, identifier, entity, true);
 }
 
 gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
@@ -2240,6 +2322,20 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (entity == nullptr) {
 		return;
 	}
+	if (identifier != nullptr && identifier->kind == Ast_Ident) {
+		add_semantic_ident(c->info, identifier, entity, false);
+	}
+	if ((entity->flags & EntityFlag_Disabled) && identifier != nullptr && c->decl != nullptr) {
+		// calls to a disabled procedure are dropped, but its value may still be taken
+		Ast *node = unparen_expr(identifier);
+		Ast *callee = c->call_proc_hint;
+		bool is_callee = node == callee ||
+		                 (callee != nullptr && callee->kind == Ast_SelectorExpr && node == unparen_expr(callee->SelectorExpr.selector));
+		if (!is_callee) {
+			add_dependency(c->info, c->decl, entity);
+			poly_dep_capture_entity(c, entity);
+		}
+	}
 	add_declaration_dependency(c, entity);
 	entity->flags |= EntityFlag_Used;
 	if (entity->kind == Entity_Procedure && entity->Procedure.generated_from_polymorphic) {
@@ -2267,6 +2363,10 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 
 	identifier->Ident.entity = entity;
 
+	if (c->in_proc_group_decl) {
+		// a call which picks this member reports it instead
+		return;
+	}
 	String dmsg = entity->deprecated_message;
 	if (dmsg.len > 0) {
 		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
@@ -2446,6 +2546,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	}
 
 	add_type_info_dependency(c->info, c->decl, t);
+	poly_dep_capture_type_info(c, t);
 #if 0
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
 		if (type_set_update(&c->info->type_info_set, t)) {
@@ -2719,6 +2820,7 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 	info->type  = type;
 	info->body  = body;
 	info->tags  = tags;
+	info->poly_parent = global_error_context.instantiations.proc;
 	check_procedure_later(c, info);
 }
 
@@ -3431,6 +3533,13 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("slice_expr_error_lo_hi_with_context"),
 		str_lit("multi_pointer_slice_expr_error_contextless"),
 		str_lit("multi_pointer_slice_expr_error_with_context"),
+
+		// Runtimes from before the `contextless`/`with_context` split
+		str_lit("bounds_check_error"),
+		str_lit("matrix_bounds_check_error"),
+		str_lit("slice_expr_error_hi"),
+		str_lit("slice_expr_error_lo_hi"),
+		str_lit("multi_pointer_slice_expr_error"),
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(c->info.objc_class_implementations.count.load(std::memory_order_relaxed) > 0,
@@ -4599,6 +4708,49 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			}
 		}
 		return true;
+	} else if (name == "futex") {
+		ExactValue ev = check_decl_attribute_value(c, value, t_futex_operation);
+		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
+			return true;
+		}
+		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_futex_operation)) {
+			error(elem, "Expected a constant of type 'intrinsics.Futex_Operation' for '%.*s', i.e. '.Wait' or '.Wake'", LIT(name));
+			return true;
+		}
+		switch (exact_value_to_i64(ev)) {
+		case OdinFutexOperation_Wait: ac->futex = ProcedureFutex_Wait; break;
+		case OdinFutexOperation_Wake: ac->futex = ProcedureFutex_Wake; break;
+		}
+		return true;
+	} else if (name == "synchronizes" || name == "synchronizes_shared") {
+		ExactValue ev = check_decl_attribute_value(c, value, t_atomic_memory_order);
+		if (value != nullptr && value->tav.mode == Addressing_Invalid) {
+			return true;
+		}
+		if (value == nullptr || ev.kind != ExactValue_Integer || !are_types_identical(value->tav.type, t_atomic_memory_order)) {
+			error(elem, "Expected a constant of type 'intrinsics.Atomic_Memory_Order' for '%.*s', e.g. '.Acquire' or '.Release'", LIT(name));
+			return true;
+		}
+		i64 order = exact_value_to_i64(ev);
+		if (order == OdinAtomicMemoryOrder_relaxed) {
+			error(elem, "'%.*s' cannot be '.Relaxed', which synchronizes nothing", LIT(name));
+			return true;
+		}
+		if (ac->synchronizes != OdinAtomicMemoryOrder_relaxed) {
+			error(elem, "'synchronizes' and 'synchronizes_shared' cannot both be used");
+			return true;
+		}
+		ac->synchronizes        = cast(u8)order;
+		ac->synchronizes_shared = name == "synchronizes_shared";
+		return true;
+	} else if (name == "futex_parameter") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String || ev.value_string.len == 0) {
+			error(elem, "Expected the name of a parameter for '%.*s'", LIT(name));
+		} else {
+			ac->futex_parameter = ev.value_string;
+		}
+		return true;
 	}
 	return false;
 }
@@ -4651,6 +4803,24 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 			}
 		} else {
 			error(elem, "Expected either no value or a string for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "align") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_Integer) {
+			error(elem, "Expected a constant integer for '%.*s'", LIT(name));
+			return true;
+		}
+		i64 align = exact_value_to_i64(ev);
+		if (ev.value_integer.used > 1 ||
+		    align < 1 ||
+		    align > (1ll<<31) ||
+		    !gb_is_power_of_two(cast(isize)align)) {
+			gbString str = exact_value_to_string(ev);
+			error(elem, "'%.*s' must be a power of 2 no greater than 2^31, got %s", LIT(name), str);
+			gb_string_free(str);
+		} else {
+			ac->align = align;
 		}
 		return true;
 	}
@@ -4906,6 +5076,8 @@ gb_internal DECL_ATTRIBUTE_PROC(asm_decl_attribute) {
 #include "name_canonicalization.cpp"
 #include "check_decl.cpp"
 #include "check_stmt.cpp"
+#include "check_escape.cpp"
+#include "check_atomics.cpp"
 
 
 
@@ -5078,6 +5250,9 @@ gb_internal void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhe
 
 		ws->is_cond_determined = true;
 		ws->determined_cond = operand.value.kind == ExactValue_Bool && operand.value.value_bool;
+		if (build_context.export_semantics_format != SemanticsFormat_Invalid) {
+			per_thread_array_add(&c->info->semantic_when_queue, SemanticWhen{ws, ws->determined_cond});
+		}
 	}
 
 	if (ws->body == nullptr || ws->body->kind != Ast_BlockStmt) {
@@ -6264,9 +6439,9 @@ gb_internal WORKER_TASK_PROC(check_collect_entities_worker_proc) {
 	AstFile *f = cast(AstFile *)data;
 	reset_checker_context(ctx, f, untyped);
 
-	global_error_hold = true;
+	global_error_context.hold = true;
 	check_collect_entities(ctx, f->decls);
-	global_error_hold = false;
+	global_error_context.hold = false;
 
 	add_untyped_expressions(&c->info, ctx->untyped);
 
@@ -6695,6 +6870,70 @@ gb_internal WORKER_TASK_PROC(calculate_global_init_order_worker) {
 	return 0;
 }
 
+// NOTE(bill): Appends to the current error where each polymorphic instantiation it is within was instantiated
+// e.g.
+//     main.odin(9:7) instantiated as 'add($T=bool)'
+gb_internal void error_out_instantiations(void) {
+	isize const max_shown = 8;
+	isize count = 0;
+	for (ErrorRecordInstantiation *r = global_error_context.instantiations.records; r != nullptr; r = r->prev) {
+		if (count++ < max_shown) {
+			error_out("\t%s instantiated as '%.*s'\n", token_pos_to_string(ast_token(r->site).pos), LIT(r->named_type->Named.name));
+		}
+	}
+	for (ProcInfo *pi = global_error_context.instantiations.proc; pi != nullptr; pi = pi->poly_parent) {
+		if (count++ >= max_shown) {
+			continue;
+		}
+
+		// NOTE(bill): the polymorphic parameters are the type names and constants declared before the body
+		Scope *scope = pi->type->Proc.scope;
+		i32 body_offset = ast_token(pi->body).pos.offset;
+		auto params = array_make<Entity *>(heap_allocator(), 0, 8);
+		defer (array_free(&params));
+		rw_mutex_shared_lock(&scope->mutex);
+		for (auto const &entry : scope->elements) {
+			Entity *e = entry.value;
+			if (e == nullptr || (e->kind != Entity_TypeName && e->kind != Entity_Constant) || e->token.pos.offset >= body_offset) {
+				continue;
+			}
+			array_add(&params, e);
+			for (isize j = params.count-1; j > 0 && params[j-1]->token.pos.offset > e->token.pos.offset; j--) {
+				params[j] = params[j-1];
+				params[j-1] = e;
+			}
+		}
+		rw_mutex_shared_unlock(&scope->mutex);
+
+		gbString s = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(s));
+		s = gb_string_append_fmt(s, "%.*s(", LIT(pi->token.string));
+		for_array(i, params) {
+			Entity *e = params[i];
+			s = gb_string_append_fmt(s, "%s$%.*s", i > 0 ? ", " : "", LIT(e->token.string));
+			if (e->kind == Entity_TypeName) {
+				if (e->type != nullptr && e->type->kind != Type_Generic) {
+					s = gb_string_append_fmt(s, "=");
+					s = write_type_to_string(s, e->type, false);
+				}
+			} else if (e->Constant.value.kind != ExactValue_Invalid) {
+				s = gb_string_append_fmt(s, "=");
+				s = write_exact_value_to_string(s, e->Constant.value);
+			}
+		}
+		s = gb_string_append_fmt(s, ")");
+
+		if (pi->poly_def_node != nullptr) {
+			error_out("\t%s instantiated as '%s'\n", token_pos_to_string(ast_token(pi->poly_def_node).pos), s);
+		} else {
+			error_out("\tinstantiated as '%s'\n", s);
+		}
+	}
+	if (count > max_shown) {
+		error_out("\t... and %td more\n", count - max_shown);
+	}
+}
+
 gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
 		return false;
@@ -6774,9 +7013,16 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		ctx.state_flags &= ~StateFlag_type_assert;
 	}
 
+	ErrorInstantiations prev_instantiations = global_error_context.instantiations;
+	global_error_context.instantiations = {pi->generated_from_polymorphic ? pi : pi->poly_parent, nullptr};
 	bool body_was_checked = check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+	global_error_context.instantiations = prev_instantiations;
 
 	if (body_was_checked) {
+		pi->decl->proc_info = pi;
+		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic)) {
+			per_thread_array_add(&c->info.checked_bodies_queue, pi);
+		}
 		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
@@ -7613,6 +7859,11 @@ gb_internal bool check_unique_package_names(Checker *c) {
 
 		ok = false;
 
+		if (build_context.workspace) {
+			// packages checked together may be of different programs, so a name may be used by each
+			continue;
+		}
+
 		begin_error_block();
 		error(curr, "Duplicate declaration of 'package %.*s'", LIT(name));
 		error_line("\tA package name must be unique\n"
@@ -7995,6 +8246,17 @@ gb_internal void check_parsed_files(Checker *c) {
 	}
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+
+	// before the escape analysis, which takes the checked bodies
+	if (analysis_in_use(AnalysisFlag_Atomic)) {
+		TIME_SECTION("check atomics");
+		check_atomics(c);
+	}
+
+	if (analysis_in_use(AnalysisFlag_Escape)) {
+		TIME_SECTION("check escapes");
+		check_escapes(c);
+	}
 
 	TIME_SECTION("check unique link names");
 	check_link_name_uses(c);

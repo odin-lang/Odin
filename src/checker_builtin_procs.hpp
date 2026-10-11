@@ -71,6 +71,11 @@ enum BuiltinProcId {
 	BuiltinProc_read_cycle_counter,
 	BuiltinProc_read_cycle_counter_frequency,
 
+	BuiltinProc_return_address,
+	BuiltinProc_frame_address,
+	BuiltinProc_stack_pointer,
+	BuiltinProc_address_of_return_address,
+
 	BuiltinProc_count_ones,
 	BuiltinProc_count_zeros,
 	BuiltinProc_count_trailing_zeros,
@@ -480,6 +485,11 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("read_cycle_counter_frequency"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("return_address"),            0, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("frame_address"),             0, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("stack_pointer"),             0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("address_of_return_address"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("count_ones"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("count_zeros"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

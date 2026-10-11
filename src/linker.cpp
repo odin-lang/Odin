@@ -1204,6 +1204,43 @@ try_cross_linking:;
 				if (result) {
 					return result;
 				}
+
+				// NOTE(bill): lldb runs the pretty printers of `base/runtime/odin_debugger.py` from the dSYM,
+				// once the user sets `target.load-script-from-symbol-file`. lldb looks for the binary's name with
+				// `.`, ` ` and `-` replaced by `_`, and `_` put before a Python keyword.
+				String script = concatenate_strings(temporary_allocator(), odin_root_dir(), str_lit("base/runtime/odin_debugger.py"));
+				if (gb_file_exists(alloc_cstring(temporary_allocator(), script))) {
+					String name = copy_string(temporary_allocator(), filename_without_directory(output_filename));
+					for (isize i = 0; i < name.len; i++) {
+						switch (name.text[i]) {
+						case '.':
+						case ' ':
+						case '-':
+							name.text[i] = '_';
+							break;
+						}
+					}
+					gb_local_persist char const *keywords[] = {
+						"False", "None", "True", "and", "as", "assert", "async", "await", "break", "class", "continue",
+						"def", "del", "elif", "else", "except", "finally", "for", "from", "global", "if", "import", "in",
+						"is", "lambda", "nonlocal", "not", "or", "pass", "raise", "return", "try", "while", "with", "yield",
+					};
+					for (char const *keyword : keywords) {
+						if (name == make_string_c(keyword)) {
+							name = concatenate_strings(temporary_allocator(), str_lit("_"), name);
+							break;
+						}
+					}
+
+					String dir = concatenate_strings(temporary_allocator(), output_filename, str_lit(".dSYM/Contents/Resources/Python"));
+					check_if_exists_directory_otherwise_create(dir);
+
+					String dst = concatenate4_strings(temporary_allocator(), dir, str_lit("/"), name, str_lit(".py"));
+
+					if (!gb_file_copy(alloc_cstring(temporary_allocator(), script), alloc_cstring(temporary_allocator(), dst), false)) {
+						gb_printf_err("Warning: could not copy the debugger script into the dSYM, %.*s\n", LIT(dst));
+					}
+				}
 			}
 		}
 	}

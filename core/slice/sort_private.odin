@@ -163,19 +163,20 @@ _smoothsort :: proc(base: [^]byte, nel: uint, width: uint, cmp: Generic_Cmp, arg
 	}
 
 	cycle :: proc "contextless" (width: uint, data: [][^]byte, n: int) {
-		if len(data) < 2 {
+		if len(data) < 2 || n < 1 {
 			return
 		}
 		buf: [256]u8 = ---
-		data[n] = raw_data(buf[:])
 		width := width
 		for width != 0 {
 			l := builtin.min(size_of(buf), int(width))
-			copy(data[n][:l], data[0][:l])
-			for i in 0..<n {
+			copy(buf[:l], data[0][:l])
+			for i in 0..<n-1 {
 				copy(data[i][:l], data[i+1][:l])
 				data[i] = data[i][l:]
 			}
+			copy(data[n-1][:l], buf[:l])
+			data[n-1] = data[n-1][l:]
 			width -= uint(l)
 		}
 	}

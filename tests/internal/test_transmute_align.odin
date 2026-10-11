@@ -62,3 +62,21 @@ transmute_from_less_aligned_src :: proc(t: ^testing.T) {
 	odd := (^[8]u8)(&bytes[1])
 	testing.expect_value(t, transmute(u64)odd^, u64(0x08_07_06_05_04_03_02_01))
 }
+
+Helper :: struct #min_field_align(16) {
+	p: ^[4]f32,  // align 16 for the storage of the pointer
+}
+
+@(export)
+transmute_pointed_array :: #force_no_inline proc (s: ^Helper) -> #simd[4]f32 {
+	return transmute(#simd[4]f32)s.p^
+}
+
+@(test)
+transmute_through_aligned_pointer_storage :: proc(t: ^testing.T) {
+	arr := [8]f32{0, 1, 2, 3, 4, 5, 6, 7}
+	s := Helper{p = (^[4]f32)(&arr[1])}  // [4]f32 and arr[1] are both align 4
+
+	v := transmute_pointed_array(&s)
+	testing.expect_value(t, transmute([4]f32)v, [4]f32{1, 2, 3, 4})
+}

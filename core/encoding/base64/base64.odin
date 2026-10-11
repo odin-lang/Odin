@@ -533,5 +533,5 @@ decoded_len :: proc(data: string) -> int {
 		}
 	}
 
-	return ((length * 6) >> 3) - padding
+	return max(0, ((length * 6) >> 3) - padding)
 }

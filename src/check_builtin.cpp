@@ -250,6 +250,9 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	map_set(&c->info->objc_msgSend_types, call, data);
 	mutex_unlock(&c->info->objc_objc_msgSend_mutex);
 
+	// the Objective-C setup looks up the receiver's class and the selector of every message
+	try_to_add_package_dependency(c, "runtime", "objc_lookUpClass");
+	try_to_add_package_dependency(c, "runtime", "sel_registerName");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
@@ -636,16 +639,19 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 		ident.kind   = Token_Ident;
 		ident.string = str_lit("Objc_Block");
 		ident.pos    = ast_token(call).pos;
+		ident.flags  = TokenFlag_Synthesized;
 
 		Token l_paren = {};
 		l_paren.kind   = Token_OpenParen;
 		l_paren.string = str_lit("(");
 		l_paren.pos    = ident.pos;
+		l_paren.flags  = TokenFlag_Synthesized;
 
 		Token r_paren = {};
 		r_paren.kind   = Token_CloseParen;
-		l_paren.string = str_lit(")");
+		r_paren.string = str_lit(")");
 		r_paren.pos    = ident.pos;
+		r_paren.flags  = TokenFlag_Synthesized;
 
 		// Remove the capture args from the resulting Objc_Block type signature
 		Ast* handler_proc_type_copy = clone_ast(handler_type_proc.node);
@@ -2169,13 +2175,170 @@ gb_internal bool is_valid_type_for_load(Type *type) {
 	return false;
 }
 
-gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
+// the `&x` an atomic operation's pointer is, through any conversions of it, unless it is a pointer from elsewhere
+gb_internal Ast *check_atomic_address_of(Ast *ptr) {
+	ptr = unparen_expr(ptr);
+	for (;;) {
+		if (ptr->kind == Ast_CallExpr && ptr->CallExpr.proc->tav.mode == Addressing_Type && ptr->CallExpr.args.count == 1) {
+			ptr = unparen_expr(ptr->CallExpr.args[0]);
+		} else if (ptr->kind == Ast_TypeCast) {
+			ptr = unparen_expr(ptr->TypeCast.expr);
+		} else if (ptr->kind == Ast_AutoCast) {
+			ptr = unparen_expr(ptr->AutoCast.expr);
+		} else {
+			break;
+		}
+	}
+	if (ptr->kind != Ast_UnaryExpr || ptr->UnaryExpr.op.kind != Token_And) {
+		return nullptr;
+	}
+	return ptr;
+}
+
+gb_internal i64 check_atomic_address_alignment(Ast *x) {
+	x = unparen_expr(x);
+	switch (x->kind) {
+	case_ast_node(i, Ident, x);
+		Entity *e = entity_of_node(x);
+		if (e != nullptr && e->kind == Entity_Variable) {
+			return gb_max(type_align_of(e->type), e->Variable.custom_align);
+		}
+	case_end;
+
+	case_ast_node(se, SelectorExpr, x);
+		Entity *pkg = entity_of_node(se->expr);
+		if (pkg != nullptr && pkg->kind == Entity_ImportName) {
+			return check_atomic_address_alignment(se->selector);
+		}
+		if (se->swizzle_count > 0 || se->is_bit_field) {
+			break;
+		}
+		Type *t = type_deref(se->expr->tav.type);
+		Selection sel = lookup_field(t, se->selector->Ident.interned, false);
+		if (sel.entity == nullptr || sel.indirect) {
+			break;
+		}
+		i64 align = type_align_of(t);
+		if (!is_type_pointer(se->expr->tav.type)) {
+			align = check_atomic_address_alignment(se->expr);
+		}
+		i64 offset = type_offset_of_from_selection(t, sel);
+		if (offset != 0) {
+			align = gb_min(align, offset & -offset);
+		}
+		return align;
+	case_end;
+
+	case_ast_node(ie, IndexExpr, x);
+		Type *t = base_type(ie->expr->tav.type);
+		if (t == nullptr || t->kind != Type_Array) {
+			break;
+		}
+		i64 align = check_atomic_address_alignment(ie->expr);
+		i64 offset = type_size_of(t->Array.elem);
+		if (ie->index->tav.mode == Addressing_Constant) {
+			offset *= exact_value_to_i64(ie->index->tav.value);
+		}
+		if (offset != 0) {
+			align = gb_min(align, offset & -offset);
+		}
+		return align;
+	case_end;
+	}
+	return type_align_of(x->tav.type);
+}
+
+gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem, bool writes) {
 	if (!is_type_valid_atomic_type(elem)) {
 		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
 		return false;
 	}
-	return true;
+	if (!target_atomics_are_plain() && !is_type_lock_free(elem)) {
+		ERROR_BLOCK();
+		gbString str = type_to_string(elem);
+		error(operand->expr, "'%s' cannot be used as an atomic for '%.*s' on this target, as it is not lock-free", str, LIT(builtin_name));
+		gb_string_free(str);
+		if (build_context.metrics.arch == TargetArch_amd64 && type_size_of(elem) == 16) {
+			error_line("\tSuggestion: A 16 byte atomic needs 'cx16', e.g. with -microarch:x86-64-v2 or later\n");
+		}
+		return false;
+	}
 
+	Ast *ptr = check_atomic_address_of(operand->expr);
+	if (ptr == nullptr) {
+		return true;
+	}
+
+	// what is within a #packed struct may be at any address, where an atomic access faults on some targets
+	for (Ast *x = unparen_expr(ptr->UnaryExpr.expr); /**/; /**/) {
+		Ast *base = nullptr;
+		if (x->kind == Ast_SelectorExpr) {
+			base = x->SelectorExpr.expr;
+		} else if (x->kind == Ast_IndexExpr && is_type_array_like(x->IndexExpr.expr->tav.type)) {
+			base = x->IndexExpr.expr;
+		} else {
+			break;
+		}
+		Type *t = base_type(type_deref(base->tav.type));
+		if (t != nullptr && t->kind == Type_Struct && t->Struct.is_packed) {
+			gbString str = expr_to_string(ptr->UnaryExpr.expr);
+			error(operand->expr, "'%s' may be misaligned for '%.*s', as it is within a #packed struct", str, LIT(builtin_name));
+			gb_string_free(str);
+			return false;
+		}
+		if (is_type_pointer(base->tav.type)) {
+			break;
+		}
+		x = unparen_expr(base);
+	}
+
+	// e.g. a `u32` converted to a `^u64`, which an atomic access faults on, or splits, when misaligned
+	i64 align = check_atomic_address_alignment(ptr->UnaryExpr.expr);
+	if (align < type_size_of(elem)) {
+		gbString str = expr_to_string(ptr->UnaryExpr.expr);
+		gbString type_str = type_to_string(elem);
+		error(operand->expr, "'%s' may be misaligned for '%.*s' of '%s', as it is only known to be %lld byte aligned", str, LIT(builtin_name), type_str, cast(long long)align);
+		gb_string_free(type_str);
+		gb_string_free(str);
+		return false;
+	}
+
+	// what is within @(rodata) faults when written, which a compare-exchange does even when it fails
+	if (writes) {
+		Ast *x = unparen_expr(ptr->UnaryExpr.expr);
+		for (;;) {
+			if (x->kind == Ast_SelectorExpr) {
+				Entity *pkg = entity_of_node(x->SelectorExpr.expr);
+				if (pkg != nullptr && pkg->kind == Entity_ImportName) {
+					x = x->SelectorExpr.selector;
+					break;
+				}
+				if (is_type_pointer(x->SelectorExpr.expr->tav.type)) {
+					break;
+				}
+				x = unparen_expr(x->SelectorExpr.expr);
+			} else if (x->kind == Ast_IndexExpr && is_type_array_like(x->IndexExpr.expr->tav.type)) {
+				x = unparen_expr(x->IndexExpr.expr);
+			} else {
+				break;
+			}
+		}
+		Entity *e = nullptr;
+		if (x->kind == Ast_Ident) {
+			e = entity_of_node(x);
+		}
+		if (e != nullptr && e->kind == Entity_Variable && e->Variable.is_rodata) {
+			gbString str = expr_to_string(ptr->UnaryExpr.expr);
+			if (x == unparen_expr(ptr->UnaryExpr.expr)) {
+				error(operand->expr, "'%s' is @(rodata), which faults when written, as '%.*s' does", str, LIT(builtin_name));
+			} else {
+				error(operand->expr, "'%s' is within @(rodata) '%.*s', which faults when written, as '%.*s' does", str, LIT(e->token.string), LIT(builtin_name));
+			}
+			gb_string_free(str);
+			return false;
+		}
+	}
+	return true;
 }
 
 gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
@@ -2845,6 +3008,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		if (c->decl) {
 			defineable.docs = c->decl->docs;
 		}
+		poly_dep_capture_unreplayable(c);
 
 		MUTEX_GUARD(&c->info->defineables_mutex);
 		array_add(&c->info->defineables, defineable);
@@ -2891,6 +3055,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_cap:
 	case BuiltinProc_min:
 	case BuiltinProc_max:
+	case BuiltinProc_clamp:
 	case BuiltinProc_type_is_subtype_of:
 	case BuiltinProc_type_is_superset_of:
 	case BuiltinProc_objc_send:
@@ -4203,6 +4368,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Token token = {};
 			token.kind = Token_Ident;
 			token.pos = ast_token(call).pos;
+			token.flags = TokenFlag_Synthesized;
 
 			isize index = 0;
 			for_array(i, ce->args) {
@@ -4254,7 +4420,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// min :: proc($T: typeid) -> ordered
 		// min :: proc(a: ..ordered) -> ordered
 
-		check_multi_expr_or_type(c, operand, ce->args[0]);
+		isize first = first_non_deferrable_arg(ce->args);
+		if (arg_is_deferrable_untyped_expr(ce->args[first])) {
+			check_expr_with_type_hint(c, operand, ce->args[first], type_hint);
+		} else {
+			check_multi_expr_or_type(c, operand, ce->args[first]);
+		}
 
 		if (!operand->type) {
 			return false;
@@ -4342,18 +4513,30 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		bool all_constant = operand->mode == Addressing_Constant;
 
-		auto operands = array_make<Operand>(heap_allocator(), 0, ce->args.count);
+		auto operands = array_make<Operand>(heap_allocator(), ce->args.count, ce->args.count);
 		defer (array_free(&operands));
 
-		array_add(&operands, *operand);
+		operands[first] = *operand;
 
-		for (isize i = 1; i < ce->args.count; i++) {
+		Type *arg_hint = type_hint;
+		if (is_type_typed(operand->type)) {
+			arg_hint = operand->type;
+		}
+
+		for (isize k = 1; k < ce->args.count; k++) {
+			isize i = (first + k) % ce->args.count;
 			Ast *other_arg = ce->args[i];
 			Operand b = {};
-			check_expr(c, &b, other_arg);
+			if (arg_is_deferrable_untyped_expr(other_arg)) {
+				check_expr_with_type_hint(c, &b, other_arg, arg_hint);
+			} else {
+				check_expr(c, &b, other_arg);
+			}
+
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
+
 			if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 				gbString type_str = type_to_string(b.type);
 				error(call,
@@ -4362,7 +4545,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gb_string_free(type_str);
 				return false;
 			}
-			array_add(&operands, b);
+
+			operands[i] = b;
 
 			if (all_constant) {
 				all_constant = b.mode == Addressing_Constant;
@@ -4431,7 +4615,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// max :: proc($T: typeid) -> ordered
 		// max :: proc(a: ..ordered) -> ordered
 
-		check_multi_expr_or_type(c, operand, ce->args[0]);
+		isize first = first_non_deferrable_arg(ce->args);
+		if (arg_is_deferrable_untyped_expr(ce->args[first])) {
+			check_expr_with_type_hint(c, operand, ce->args[first], type_hint);
+		} else {
+			check_multi_expr_or_type(c, operand, ce->args[first]);
+		}
 
 		if (!operand->type) {
 			return false;
@@ -4524,16 +4713,25 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		bool all_constant = operand->mode == Addressing_Constant;
 
-		auto operands = array_make<Operand>(heap_allocator(), 0, ce->args.count);
+		auto operands = array_make<Operand>(heap_allocator(), ce->args.count, ce->args.count);
 		defer (array_free(&operands));
 
-		array_add(&operands, *operand);
+		operands[first] = *operand;
 
+		Type *arg_hint = type_hint;
+		if (is_type_typed(operand->type)) {
+			arg_hint = operand->type;
+		}
 
-		for (isize i = 1; i < ce->args.count; i++) {
+		for (isize k = 1; k < ce->args.count; k++) {
+			isize i = (first + k) % ce->args.count;
 			Ast *arg = ce->args[i];
 			Operand b = {};
-			check_expr(c, &b, arg);
+			if (arg_is_deferrable_untyped_expr(arg)) {
+				check_expr_with_type_hint(c, &b, arg, arg_hint);
+			} else {
+				check_expr(c, &b, arg);
+			}
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
@@ -4545,7 +4743,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gb_string_free(type_str);
 				return false;
 			}
-			array_add(&operands, b);
+			operands[i] = b;
 
 			if (all_constant) {
 				all_constant = b.mode == Addressing_Constant;
@@ -4686,45 +4884,36 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_clamp: {
 		// clamp :: proc(a, min, max: ordered) -> ordered
-		if (!operand->type) {
-			return false;
-		}
-
-		Type *type = operand->type;
-		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
-			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
-		}
-
-		Ast *min_arg = ce->args[1];
-		Ast *max_arg = ce->args[2];
-		Operand x = *operand;
+		Operand x = {};
 		Operand y = {};
 		Operand z = {};
+		Operand *ops[3] = {&x, &y, &z};
 
-		check_expr(c, &y, min_arg);
-		if (y.mode == Addressing_Invalid) {
-			return false;
-		}
-		if (!is_type_ordered(y.type) || !(is_type_numeric(y.type) || is_type_string(y.type))) {
-			gbString type_str = type_to_string(y.type);
-			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
+		isize first = first_non_deferrable_arg(ce->args);
+		Type *arg_hint = type_hint;
+		for (isize k = 0; k < 3; k++) {
+			isize i = (first + k) % 3;
+			Operand *o = ops[i];
+			if (arg_is_deferrable_untyped_expr(ce->args[i])) {
+				check_expr_with_type_hint(c, o, ce->args[i], arg_hint);
+			} else {
+				check_expr(c, o, ce->args[i]);
+			}
+			if (o->mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_ordered(o->type) || !(is_type_numeric(o->type) || is_type_string(o->type))) {
+				gbString type_str = type_to_string(o->type);
+				error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
+				gb_string_free(type_str);
+				return false;
+			}
+			if (k == 0 && is_type_typed(o->type)) {
+				arg_hint = o->type;
+			}
 		}
 
-		check_expr(c, &z, max_arg);
-		if (z.mode == Addressing_Invalid) {
-			return false;
-		}
-		if (!is_type_ordered(z.type) || !(is_type_numeric(z.type) || is_type_string(z.type))) {
-			gbString type_str = type_to_string(z.type);
-			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
-		}
+		Type *type = x.type;
 
 		if (x.mode == Addressing_Constant &&
 		    y.mode == Addressing_Constant &&
@@ -4748,14 +4937,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Value;
 			operand->type = type;
 
-			Operand *ops[3] = {&x, &y, &z};
 			for (isize i = 0; i < 3; i++) {
 				Operand *a = ops[i];
 				for (isize j = 0; j < 3; j++) {
-					if (i == j) continue;
+					if (i == j) {
+						continue;
+					}
 					Operand *b = ops[j];
 					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) return false;
+					if (a->mode == Addressing_Invalid) {
+						return false;
+					}
 				}
 			}
 
@@ -5745,6 +5937,76 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		operand->type = t_i64;
 		break;
 
+	case BuiltinProc_return_address:
+	case BuiltinProc_frame_address:
+		{
+			if (ce->args.count > 1) {
+				error(ce->args[1], "'%.*s' expects either 0 or 1 arguments, got %td", LIT(builtin_name), ce->args.count);
+				return false;
+			}
+			i64 level = 0;
+			if (ce->args.count > 0) {
+				Operand x = {};
+				check_expr(c, &x, ce->args[0]);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+				if (x.mode != Addressing_Constant || !is_type_integer(x.type)) {
+					error(x.expr, "'%.*s' expects a constant integer level", LIT(builtin_name));
+					return false;
+				}
+				// convert constant from BigInt to a type before `exact_value_to_i64`
+				convert_to_typed(c, &x, t_int);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+				level = exact_value_to_i64(x.value);
+				if (level < 0 || level > U32_MAX) {
+					error(x.expr, "'%.*s' expects a level in the range 0..=%u, got %lld", LIT(builtin_name), U32_MAX, cast(long long)level);
+					return false;
+				}
+			}
+			if (is_arch_wasm()) {
+				// wasm has no addressable return addresses, and LLVM has no frames above the current one
+				if (id == BuiltinProc_return_address) {
+					error(call, "'%.*s' is not allowed on wasm targets", LIT(builtin_name));
+					return false;
+				} else if (level > 0) {
+					error(call, "'%.*s' with a level above 0 is not allowed on wasm targets", LIT(builtin_name));
+					return false;
+				}
+			}
+			if (level > 0 &&
+			    build_context.metrics.arch == TargetArch_amd64 &&
+			    (build_context.metrics.os == TargetOs_windows || build_context.metrics.abi == TargetABI_Win64)) {
+				// frames can only be walked with the unwind tables, so LLVM ignores the level
+				error(call, "'%.*s' with a level above 0 is not allowed on Windows amd64 targets", LIT(builtin_name));
+				return false;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = t_rawptr;
+		}
+		break;
+
+	case BuiltinProc_stack_pointer:
+		operand->mode = Addressing_Value;
+		operand->type = t_rawptr;
+		break;
+
+	case BuiltinProc_address_of_return_address:
+		switch (build_context.metrics.arch) {
+		case TargetArch_amd64:
+		case TargetArch_i386:
+		case TargetArch_arm64:
+			break;
+		default:
+			error(call, "'%.*s' is only allowed on amd64, i386, and arm64 targets", LIT(builtin_name));
+			return false;
+		}
+		operand->mode = Addressing_Value;
+		operand->type = alloc_type_pointer(t_rawptr);
+		break;
+
 	case BuiltinProc_count_ones:
 	case BuiltinProc_count_zeros:
 	case BuiltinProc_count_trailing_zeros:
@@ -6398,7 +6660,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (id == BuiltinProc_atomic_store && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (id == BuiltinProc_atomic_store && !check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6417,7 +6679,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6452,7 +6714,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (id == BuiltinProc_atomic_load && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (id == BuiltinProc_atomic_load && !check_atomic_ptr_argument(operand, builtin_name, elem, false)) {
 				return false;
 			}
 
@@ -6468,7 +6730,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, false)) {
 				return false;
 			}
 
@@ -6502,7 +6764,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6540,7 +6802,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6578,7 +6840,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6608,7 +6870,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
-			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem, true)) {
 				return false;
 			}
 			Operand x = {};
@@ -6757,6 +7019,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			i64 sz = 8*type_size_of(x.type);
 			if (n > sz) {
 				error(z.expr, "Scale parameter in '%.*s' is larger than the base integer bit width, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)sz);
+				return false;
+			}
+			// the sign bit cannot hold a fraction bit
+			if (n == sz && !is_type_unsigned(x.type)) {
+				error(z.expr, "Scale parameter in '%.*s' must be less than the bit width of a signed integer, got %lld, expected a maximum of %lld", LIT(builtin_name), cast(long long)n, cast(long long)(sz-1));
 				return false;
 			}
 

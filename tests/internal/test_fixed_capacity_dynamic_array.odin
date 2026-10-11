@@ -91,3 +91,25 @@ test_fixed_capacity_dynamic_array_resize :: proc(t: ^testing.T) {
 	resize(&array, 4)
 	testing.expect(t, slice_equal(array[:], []int{0, 0, 0, 0}), "Expected resize to set length 4 with zeroed values")
 }
+
+// Constant slice indices are checked against the length, not the capacity.
+@(test)
+test_fixed_capacity_dynamic_array_constant_slice :: proc(t: ^testing.T) {
+	array: [dynamic; 4]int
+	append(&array, 1, 2, 3)
+	testing.expect(t, slice_equal(array[0:3], []int{1, 2, 3}))
+	testing.expect(t, slice_equal(array[1:2], []int{2}))
+}
+
+// AddressSanitizer on Windows ends the process on the bounds check trap before the test runner can catch it.
+when !(ODIN_OS == .Windows && .Address in ODIN_SANITIZER_FLAGS) {
+	@(test)
+	test_fixed_capacity_dynamic_array_constant_slice_out_of_range :: proc(t: ^testing.T) {
+		array: [dynamic; 4]int
+		append(&array, 1, 2, 3)
+		pop(&array)
+		testing.expect_assert(t, "0:3 is out of range 0..<2")
+		s := array[0:3]
+		testing.expectf(t, false, "slicing past the length gave %v", s)
+	}
+}

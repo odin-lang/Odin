@@ -91,6 +91,24 @@ gb_internal u64 ast_file_vet_flags(AstFile *f) {
 	return 0;
 }
 
+// the analyses a file with `#+analysis` has, so that each runs for them when the command line disables it otherwise
+gb_global std::atomic<u64> global_tagged_analysis_flags;
+
+gb_internal u64 ast_file_analysis_flags(AstFile *f) {
+	if (f != nullptr && f->analysis_flags_set) {
+		return f->analysis_flags;
+	}
+	return AnalysisFlag_All &~ build_context.no_analysis_flags;
+}
+
+gb_internal bool ast_file_analysis(AstFile *f, AnalysisFlags flag) {
+	return (ast_file_analysis_flags(f) & flag) != 0;
+}
+
+gb_internal bool analysis_in_use(AnalysisFlags flag) {
+	return (build_context.no_analysis_flags & flag) == 0 || (global_tagged_analysis_flags.load(std::memory_order_relaxed) & flag) != 0;
+}
+
 gb_internal bool ast_file_vet_style(AstFile *f) {
 	return (ast_file_vet_flags(f) & VetFlag_Style) != 0;
 }
@@ -895,25 +913,6 @@ gb_internal Ast *ast_uninit(AstFile *f, Token token) {
 }
 
 gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
-	auto token_pos_at_offset = [](Token const &token, isize offset) -> TokenPos {
-		TokenPos pos = token.pos;
-		if (offset <= 0) {
-			return pos;
-		}
-		String s = token.string;
-		isize n = gb_min(offset, s.len);
-		for (isize i = 0; i < n; i++) {
-			if (s.text[i] == '\n') {
-				pos.line += 1;
-				pos.column = 1;
-			} else {
-				pos.column += 1;
-			}
-			pos.offset += 1;
-		}
-		return pos;
-	};
-
 	String s = token.string;
 	string_interner_insert(s);
 	switch (token.kind) {
@@ -929,7 +928,9 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 			TripleStringErrorKind terr = TripleStringError_None;
 			isize terr_off = -1;
 			if (!unquote_string_triple(ast_allocator(f), &s, string_contains_char(s, '\r'), &terr, &terr_off)) {
-				TokenPos pos = token_pos_at_offset(token, terr_off);
+				Token prefix = token;
+				prefix.string = substring(token.string, 0, gb_clamp(terr_off, 0, token.string.len));
+				TokenPos pos = token_pos_end(prefix);
 				switch (terr) {
 				case TripleStringError_ContentOnOpeningLine:
 					syntax_error(pos, "A multi-line string literal must begin on the line after the opening delimiter");
@@ -1797,16 +1798,11 @@ gb_internal Token expect_token(AstFile *f, TokenKind kind) {
 		}
 
 		end_error_block();
-
-		if (prev.kind == Token_EOF) {
-			if (f->invalid_token_pos.line != 0) {
-				end_error_mute();
-			}
-			exit_with_errors();
-		}
 	}
 
-	advance_token(f);
+	if (prev.kind != Token_EOF) {
+		advance_token(f);
+	}
 	return prev;
 }
 
@@ -1988,9 +1984,7 @@ gb_internal Token expect_closing(AstFile *f, TokenKind kind, String const &conte
 	    f->curr_token.kind == Token_Semicolon &&
 	    (f->curr_token.string == "\n" || f->curr_token.kind == Token_EOF)) {
 	    	if (f->allow_newline) {
-			Token tok = f->prev_token;
-			tok.pos.column += cast(i32)tok.string.len;
-			syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
+			syntax_error(token_pos_end(f->prev_token), "Missing ',' before newline in %.*s", LIT(context));
 		}
 		advance_token(f);
 	}
@@ -2059,8 +2053,7 @@ gb_internal void expect_semicolon(AstFile *f) {
 
 	if (f->curr_token.pos.line == f->prev_token.pos.line) {
 		String p = token_to_string(f->curr_token);
-		prev_token.pos = token_pos_end(prev_token);
-		syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
+		syntax_error(token_pos_end(prev_token), "Expected ';', got %.*s", LIT(p));
 		fix_advance_to_next_stmt(f);
 	}
 }
@@ -5840,6 +5833,7 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		break;
 	default:
 		import_name.pos = f->curr_token.pos;
+		import_name.flags |= TokenFlag_Synthesized;
 		break;
 	}
 
@@ -5888,6 +5882,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 			break;
 		default:
 			lib_name.pos = token.pos;
+			lib_name.flags |= TokenFlag_Synthesized;
 			break;
 		}
 		if (is_blank_ident(lib_name)) {
@@ -6252,7 +6247,8 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 				Token ident = f->curr_token;
 				if (allow_token(f, Token_Ident) &&
 				    name.pos.line == f->curr_token.pos.line) {
-					if (f->curr_token.kind == Token_OpenParen && f->curr_token.pos.column == ident.pos.column+ident.string.len) {
+					if (f->curr_token.kind == Token_OpenParen &&
+					    f->curr_token.pos.offset == ident.pos.offset+ident.string.len) {
 						call_like = true;
 						(void)parse_call_expr(f, nullptr);
 					}
@@ -6584,6 +6580,10 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 		fi.fullpath = path;
 		fi.size = get_file_size(path);
 		fi.is_dir = false;
+		OverlayEntry *overlay = overlay_find(path);
+		if (overlay != nullptr && overlay->replacement.len != 0) {
+			fi.size = get_file_size(overlay->replacement);
+		}
 
 		array_reserve(&pkg->files, 1);
 		pkg->is_single_file = true;
@@ -6597,6 +6597,13 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const
 	Array<FileInfo> list = {};
 	ReadDirectoryError rd_err = read_directory(path, &list);
 	defer (array_free(&list));
+	if (rd_err == ReadDirectory_None || rd_err == ReadDirectory_Empty) {
+		overlay_directory(path, &list);
+		rd_err = ReadDirectory_None;
+		if (list.count == 0) {
+			rd_err = ReadDirectory_Empty;
+		}
+	}
 
 	if (list.count == 1) {
 		GB_ASSERT(path != list[0].fullpath);
@@ -7261,11 +7268,64 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s, u64 base_vet_flags)
 			error_line("\ttabs\n");
 			error_line("\texplicit-allocators\n");
 			error_line("\twhen-shadowing\n");
+			error_line("\tnil-deref\n");
+			error_line("\tuninitialized\n");
+			error_line("\tatomic-access\n");
 			return vet_flags;
 		}
 	}
 
 	return vet_flags;
+}
+
+gb_internal u64 parse_analysis_tag(Token token_for_pos, String s, u64 base_analysis_flags) {
+	String const prefix = str_lit("analysis");
+	GB_ASSERT(string_starts_with(s, prefix));
+	if (build_require_space_after(s, prefix)) {
+		syntax_error(token_for_pos, "Expected a space after #+%.*s", LIT(prefix));
+		return base_analysis_flags;
+	}
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	u64 analysis_flags = base_analysis_flags;
+
+	if (s.len == 0) {
+		analysis_flags |= AnalysisFlag_All;
+	}
+
+	while (s.len > 0) {
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s, /*allow_colon*/false));
+		if (p.len == 0) {
+			break;
+		}
+
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				syntax_error(token_for_pos, "Expected an analysis name after '!'");
+				return analysis_flags;
+			}
+		}
+
+		u64 flag = get_analysis_flag_from_name(p);
+		if (flag == AnalysisFlag_NONE) {
+			ERROR_BLOCK();
+			syntax_error(token_for_pos, "Invalid analysis name: %.*s", LIT(p));
+			error_line("\tExpected one of the following\n");
+			error_line("\tescape\n");
+			error_line("\tatomic\n");
+			return analysis_flags;
+		}
+		if (is_notted) {
+			analysis_flags &= ~flag;
+		} else {
+			analysis_flags |= flag;
+		}
+	}
+
+	return analysis_flags;
 }
 
 gb_internal u64 parse_feature_tag(Token token_for_pos, String s) {
@@ -7452,6 +7512,10 @@ gb_internal bool parse_file_tag(const String &lc, const Token &tok, AstFile *f) 
 	} else if (string_starts_with(lc, str_lit("vet"))) {
 		f->vet_flags = parse_vet_tag(tok, lc, ast_file_vet_flags(f));
 		f->vet_flags_set = true;
+	} else if (string_starts_with(lc, str_lit("analysis"))) {
+		f->analysis_flags = parse_analysis_tag(tok, lc, ast_file_analysis_flags(f));
+		f->analysis_flags_set = true;
+		global_tagged_analysis_flags.fetch_or(f->analysis_flags, std::memory_order_relaxed);
 	} else if (string_starts_with(lc, str_lit("test"))) {
 		if ((build_context.command_kind & Command_test) == 0) {
 			return false;
@@ -7753,6 +7817,10 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 	p->init_fullpath = init_fullpath;
 
+	StringSet extra_fullpaths = {};
+	string_set_init(&extra_fullpaths);
+	defer (string_set_destroy(&extra_fullpaths));
+
 	{ // Add these packages serially and then process them parallel
 		TokenPos init_pos = {};
 		{
@@ -7785,10 +7853,8 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 					return ParseFile_WrongExtension;
 				}
 			}
-			AstPackage *pkg = try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
-			if (pkg) {
-				pkg->is_extra = true;
-			}
+			string_set_add(&extra_fullpaths, fullpath);
+			try_add_import_path(p, fullpath, fullpath, init_pos, Package_Normal);
 		}
 	}
 	
@@ -7800,6 +7866,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	}
 
 	for (AstPackage *pkg : p->packages) {
+		pkg->is_extra = string_set_exists(&extra_fullpaths, pkg->fullpath);
 		for (AstFile *file : pkg->files) {
 			p->total_seen_load_directive_count += file->seen_load_directive_count;
 		}

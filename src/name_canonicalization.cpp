@@ -411,6 +411,9 @@ bool type_writer_append_fmt(TypeWriter *w, char const *fmt, ...) {
 
 TYPE_WRITER_PROC(type_writer_string_writer_proc) {
 	gbString *s = cast(gbString *)&w->user_data;
+	if (gb_string_available_space(*s) < len) {
+		*s = gb_string_make_space_for(*s, gb_max(len, gb_string_length(*s)));
+	}
 	*s = gb_string_append_length(*s, ptr, len);
 	return true;
 }

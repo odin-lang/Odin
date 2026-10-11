@@ -36,15 +36,17 @@ scan_hex_float :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, ne
 		saw_digits ||= s[i] == '0'
 		i += 1
 	}
-	for i+8 <= n && nd+8 <= MAX_HEX_DIGITS {
-		v := read8_to_u64(s, i)
-		if !is_eight_hex_digits(v) {
-			break
+	when FAST_FLOAT {
+		for i+8 <= n && nd+8 <= MAX_HEX_DIGITS {
+			v := read8_to_u64(s, i)
+			if !is_eight_hex_digits(v) {
+				break
+			}
+			mantissa = mantissa<<32 | parse_eight_hex_digits(v)
+			nd += 8
+			i += 8
+			saw_digits = true
 		}
-		mantissa = mantissa<<32 | parse_eight_hex_digits(v)
-		nd += 8
-		i += 8
-		saw_digits = true
 	}
 	for i < n {
 		d := hex_digit_table[s[i]]
@@ -76,26 +78,28 @@ scan_hex_float :: proc "contextless" (s: string) -> (mantissa: u64, exp: int, ne
 				i += 1
 			}
 		}
-		for i+8 <= n && nd+8 <= MAX_HEX_DIGITS {
-			v := read8_to_u64(s, i)
-			if !is_eight_hex_digits(v) {
-				break
-			}
-			mantissa = mantissa<<32 | parse_eight_hex_digits(v)
-			nd += 8
-			exp -= 32
-			i += 8
-			saw_digits = true
-		}
-		if i+4 <= n && nd+4 <= MAX_HEX_DIGITS {
-			// Four digits: pad them with "0000" and use the 8-digit code.
-			v := u64(read4_to_u32(s, i)) | 0x3030_3030 << 32
-			if is_eight_hex_digits(v) {
-				mantissa = mantissa<<16 | parse_eight_hex_digits(v) >> 16
-				nd += 4
-				exp -= 16
-				i += 4
+		when FAST_FLOAT {
+			for i+8 <= n && nd+8 <= MAX_HEX_DIGITS {
+				v := read8_to_u64(s, i)
+				if !is_eight_hex_digits(v) {
+					break
+				}
+				mantissa = mantissa<<32 | parse_eight_hex_digits(v)
+				nd += 8
+				exp -= 32
+				i += 8
 				saw_digits = true
+			}
+			if i+4 <= n && nd+4 <= MAX_HEX_DIGITS {
+				// Four digits: pad them with "0000" and use the 8-digit code.
+				v := u64(read4_to_u32(s, i)) | 0x3030_3030 << 32
+				if is_eight_hex_digits(v) {
+					mantissa = mantissa<<16 | parse_eight_hex_digits(v) >> 16
+					nd += 4
+					exp -= 16
+					i += 4
+					saw_digits = true
+				}
 			}
 		}
 		for i < n {

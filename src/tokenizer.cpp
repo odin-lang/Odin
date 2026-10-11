@@ -248,8 +248,9 @@ TokenPos token_pos_add_column(TokenPos pos) {
 }
 
 enum TokenFlag : u8 {
-	TokenFlag_Remove  = 1<<1,
-	TokenFlag_Replace = 1<<2,
+	TokenFlag_Remove      = 1<<1,
+	TokenFlag_Replace     = 1<<2,
+	TokenFlag_Synthesized = 1<<3, // NOTE(bill): `string` is not the source text at `pos`
 };
 
 struct Token {
@@ -260,14 +261,14 @@ struct Token {
 };
 
 Token empty_token = {Token_Invalid};
-Token blank_token = {Token_Ident, 0, {cast(u8 *)"_", 1}};
+Token blank_token = {Token_Ident, TokenFlag_Synthesized, {cast(u8 *)"_", 1}};
 
 gb_internal Token make_token_ident(String s) {
-	Token t = {Token_Ident, 0, s};
+	Token t = {Token_Ident, TokenFlag_Synthesized, s};
 	return t;
 }
 gb_internal Token make_token_ident(char const *s) {
-	Token t = {Token_Ident, 0, make_string_c(s)};
+	Token t = {Token_Ident, TokenFlag_Synthesized, make_string_c(s)};
 	return t;
 }
 
@@ -438,8 +439,13 @@ gb_global TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT
 };
 
 gb_internal TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
+	String load_path = fullpath;
+	OverlayEntry *overlay = overlay_find(fullpath);
+	if (overlay != nullptr && overlay->replacement.len != 0) {
+		load_path = overlay->replacement;
+	}
 	LoadedFileError file_err = load_file_32(
-		alloc_cstring(temporary_allocator(), fullpath), 
+		alloc_cstring(temporary_allocator(), load_path),
 		&t->loaded_file,
 		copy_file_contents
 	);

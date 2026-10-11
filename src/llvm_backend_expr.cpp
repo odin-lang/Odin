@@ -130,9 +130,10 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		i32 count = cast(i32)get_array_type_count(tl);
 
 		LLVMTypeRef vector_type = nullptr;
-		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type)) {
+		i64 vector_load_alignment = 0;
+		if (op != Token_Not && lb_try_vector_cast(p->module, val, &vector_type, &vector_load_alignment)) {
 			LLVMValueRef vp = LLVMBuildPointerCast(p->builder, val.value, LLVMPointerType(vector_type, 0), "");
-			LLVMValueRef v = OdinLLVMBuildLoad(p, vector_type, vp);
+			LLVMValueRef v = OdinLLVMBuildLoadAligned(p, vector_type, vp, vector_load_alignment);
 
 			LLVMValueRef opv = nullptr;
 			switch (op) {
@@ -438,8 +439,10 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 
 	LLVMTypeRef vector_type0 = nullptr;
 	LLVMTypeRef vector_type1 = nullptr;
-	if (lb_try_vector_cast(p->module, lhs_ptr, &vector_type0) &&
-	    lb_try_vector_cast(p->module, rhs_ptr, &vector_type1)) {
+	i64 lhs_alignment = 0;
+	i64 rhs_alignment = 0;
+	if (lb_try_vector_cast(p->module, lhs_ptr, &vector_type0, &lhs_alignment) &&
+	    lb_try_vector_cast(p->module, rhs_ptr, &vector_type1, &rhs_alignment)) {
 		GB_ASSERT(vector_type0 == vector_type1);
 		LLVMTypeRef vector_type = vector_type0;
 
@@ -460,8 +463,8 @@ gb_internal bool lb_try_direct_vector_arith(lbProcedure *p, TokenKind op, lbValu
 
 		LLVMValueRef lhs_vp = LLVMBuildPointerCast(p->builder, lhs_ptr.value, LLVMPointerType(vector_type, 0), "");
 		LLVMValueRef rhs_vp = LLVMBuildPointerCast(p->builder, rhs_ptr.value, LLVMPointerType(vector_type, 0), "");
-		LLVMValueRef x = OdinLLVMBuildLoad(p, vector_type, lhs_vp);
-		LLVMValueRef y = OdinLLVMBuildLoad(p, vector_type, rhs_vp);
+		LLVMValueRef x = OdinLLVMBuildLoadAligned(p, vector_type, lhs_vp, lhs_alignment);
+		LLVMValueRef y = OdinLLVMBuildLoadAligned(p, vector_type, rhs_vp, rhs_alignment);
 		LLVMValueRef z = nullptr;
 
 		if (is_type_float(integral_type)) {
@@ -1585,6 +1588,46 @@ gb_internal LLVMValueRef lb_integer_division(lbProcedure *p, LLVMValueRef lhs, L
 	return res;
 }
 
+// LLVM legalizes a 64-bit [su]div.fix into a 128-bit division with remainder, which has no
+// library call, so it is built here from 128-bit division, rounded down like LLVM's expansion.
+gb_internal LLVMValueRef lb_fixed_point_div_128(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, bool is_signed, bool is_sat) {
+	LLVMBuilderRef b = p->builder;
+	LLVMTypeRef type = LLVMTypeOf(lhs);
+	unsigned bits = LLVMGetIntTypeWidth(type);
+	LLVMTypeRef wide = LLVMIntTypeInContext(p->module->ctx, 128);
+	LLVMValueRef zero = LLVMConstNull(wide);
+
+	LLVMValueRef x = is_signed ? LLVMBuildSExt(b, lhs, wide, "") : LLVMBuildZExt(b, lhs, wide, "");
+	LLVMValueRef y = is_signed ? LLVMBuildSExt(b, rhs, wide, "") : LLVMBuildZExt(b, rhs, wide, "");
+	LLVMValueRef n = LLVMBuildShl(b, x, LLVMConstInt(wide, LLVMConstIntGetZExtValue(scale), false), "");
+	LLVMValueRef q = nullptr;
+	if (is_signed) {
+		// the quotient truncates, one less when a remainder is left and the signs differ
+		q = LLVMBuildSDiv(b, n, y, "");
+		LLVMValueRef r = LLVMBuildSRem(b, n, y, "");
+		LLVMValueRef inexact = LLVMBuildICmp(b, LLVMIntNE, r, zero, "");
+		LLVMValueRef differ = LLVMBuildICmp(b, LLVMIntSLT, LLVMBuildXor(b, r, y, ""), zero, "");
+		LLVMValueRef down = LLVMBuildAnd(b, inexact, differ, "");
+		q = LLVMBuildSub(b, q, LLVMBuildZExt(b, down, wide, ""), "");
+	} else {
+		q = LLVMBuildUDiv(b, n, y, "");
+	}
+
+	if (is_sat) {
+		if (is_signed) {
+			u64 max = (1ull << (bits-1)) - 1;
+			LLVMValueRef hi = LLVMConstInt(wide, max, false);
+			LLVMValueRef lo = LLVMConstInt(wide, ~max, true);
+			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntSGT, q, hi, ""), hi, q, "");
+			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntSLT, q, lo, ""), lo, q, "");
+		} else {
+			LLVMValueRef hi = LLVMConstInt(wide, bits == 64 ? ~0ull : (1ull << bits) - 1, false);
+			q = LLVMBuildSelect(b, LLVMBuildICmp(b, LLVMIntUGT, q, hi, ""), hi, q, "");
+		}
+	}
+	return LLVMBuildTrunc(b, q, type, "");
+}
+
 gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure *p, LLVMValueRef lhs, LLVMValueRef rhs, LLVMValueRef scale, Type *platform_type, char const *name) {
 	LLVMTypeRef type = LLVMTypeOf(rhs);
 	GB_ASSERT(LLVMTypeOf(lhs) == type);
@@ -1594,6 +1637,10 @@ gb_internal LLVMValueRef lb_integer_division_fixed_point_intrinsics(lbProcedure 
 	auto behaviour = lb_check_for_integer_division_by_zero_behaviour(p);
 
 	auto const do_op = [&]() -> LLVMValueRef {
+		if (type_size_of(platform_type) == 8) {
+			bool is_sat = string_ends_with(make_string_c(name), str_lit(".sat"));
+			return lb_fixed_point_div_128(p, lhs, rhs, scale, !is_type_unsigned(platform_type), is_sat);
+		}
 		LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
 
 		LLVMValueRef args[3] = {
@@ -2343,7 +2390,8 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				String str = lb_get_const_string(m, value);
 				lbValue res = {};
 				res.type = t;
-				res.value = llvm_cstring(m, str);
+				// NOTE: as with a constant 'cstring', even "" points to its terminator rather than being nil
+				res.value = lb_find_or_add_entity_string_ptr(m, str, false);
 				return res;
 			} else if (src->kind == Type_Basic && src->Basic.kind == Basic_string16 && dst->Basic.kind == Basic_cstring16) {
 				GB_PANIC("TODO(bill): UTF-16 string");
@@ -5859,13 +5907,9 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_fixed_capacity_dynamic_array_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		bool low_const  = type_and_value_of_expr(se->low).mode  == Addressing_Constant;
-		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
-
-		if (!low_const || !high_const) {
-			if (!no_indices) {
-				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
-			}
+		// unlike a fixed array, the length is only known at runtime, so constant indices are checked too
+		if (!no_indices) {
+			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 		lbValue data_ptr = lb_addr_get_ptr(p, addr);
 		lbValue array_ptr = lb_emit_struct_ep(p, data_ptr, 0);

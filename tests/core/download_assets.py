@@ -698,6 +698,8 @@ def main():
 		debug = True
 
 	for suite in TEST_SUITES:
+		print("Downloading test assets: {}\n".format(suite))
+		sys.stdout.flush()
 		base_path = sys.argv[1] + "/{}".format(suite)
 		# Make assets path
 		try:
@@ -712,6 +714,7 @@ def main():
 
 		# We could fall back on downloading the PNG files individually, but it's slow
 		print("Done downloading {} assets.\n".format(suite))
+		sys.stdout.flush()
 
 	return 0
 

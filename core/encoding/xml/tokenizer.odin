@@ -187,9 +187,9 @@ skip_whitespace :: proc(t: ^Tokenizer) {
 is_letter :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		switch r {
-		case '_':
-			return true
 		case 'A'..='Z', 'a'..='z':
+			return true
+		case '_':
 			return true
 		}
 	}
@@ -352,11 +352,9 @@ scan_string :: proc(t: ^Tokenizer, offset: int, close: rune = '<', consume_close
 	return lit, err
 }
 
-peek :: proc(t: ^Tokenizer) -> (token: Token) {
-	old  := t^
-	token = scan(t)
-	t^ = old
-	return token
+peek :: #force_inline proc(t: ^Tokenizer) -> (token: Token) {
+	tmp := t^
+	return scan(&tmp)
 }
 
 scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
@@ -367,10 +365,10 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	kind: Token_Kind
 	err:  Error
 	lit:  string
-	pos := offset_to_pos(t, offset)
+	pos := #force_inline offset_to_pos(t, offset)
 
 	switch ch := t.ch; true {
-	case is_letter(ch):
+	case #force_inline is_letter(ch):
 		lit = scan_identifier(t)
 		kind = .Ident
 
@@ -411,5 +409,6 @@ scan :: proc(t: ^Tokenizer, multiline_string := false) -> Token {
 	if kind != .String && lit == "" {
 		lit = string(t.src[offset : t.offset])
 	}
+
 	return Token{kind, lit, pos}
 }
