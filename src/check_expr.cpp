@@ -2256,10 +2256,10 @@ gb_internal bool check_update_float_precision(ExactValue *value, Type *type) {
 	case Basic_f32be:
 		{
 			f64 x_64 = exact_value_to_f64(*value);
-			f32 x_32 = cast(f32)x_64;
-			if (cast(f64)x_32 != x_64) {
+			f32 x_32 = f64_to_f32(x_64);
+			if (f32_to_f64(x_32) != x_64) {
 				// make sure there IS precision loss
-				*value = exact_value_float(cast(f64)x_32);
+				*value = exact_value_float(f32_to_f64(x_32));
 				return true;
 			}
 		}

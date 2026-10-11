@@ -355,10 +355,10 @@ gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value) {
 	return res;
 }
 
-gb_internal LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
+gb_internal LLVMValueRef lb_const_f16(lbModule *m, f64 f, Type *type=t_f16) {
 	GB_ASSERT(type_size_of(type) == 2);
 
-	u16 u = f32_to_f16(f);
+	u16 u = f32_to_f16(f64_to_f32(f));
 	if (is_type_different_to_arch_endianness(type)) {
 		u = gb_endian_swap16(u);
 	}
@@ -366,9 +366,10 @@ gb_internal LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
 	return LLVMConstBitCast(i, lb_type(m, type));
 }
 
-gb_internal LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
+gb_internal LLVMValueRef lb_const_f32(lbModule *m, f64 f, Type *type=t_f32) {
 	GB_ASSERT(type_size_of(type) == 4);
-	u32 u = bit_cast<u32>(f);
+	f32 f_32 = f64_to_f32(f);
+	u32 u = bit_cast<u32>(f_32);
 	if (is_type_different_to_arch_endianness(type)) {
 		u = gb_endian_swap32(u);
 	}
@@ -1432,19 +1433,24 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		value = exact_value_to_float(value);
 		/*fallthrough*/
 	case ExactValue_Float:
-		if (is_type_different_to_arch_endianness(type)) {
-			// swapped bits can be a signalling NaN, which a float conversion would quieten
+		if (is_type_different_to_arch_endianness(type) || isnan(value.value_float)) {
+			// a float conversion would quieten a signalling NaN, and swapped bits can be one
 			switch (type->Basic.kind) {
+			case Basic_f16:
 			case Basic_f16le:
 			case Basic_f16be:
-				res.value = lb_const_f16(m, cast(f32)value.value_float, original_type);
+				res.value = lb_const_f16(m, value.value_float, original_type);
 				break;
+			case Basic_f32:
 			case Basic_f32le:
 			case Basic_f32be:
-				res.value = lb_const_f32(m, cast(f32)value.value_float, original_type);
+				res.value = lb_const_f32(m, value.value_float, original_type);
 				break;
 			default: {
-				u64 u = gb_endian_swap64(bit_cast<u64>(value.value_float));
+				u64 u = bit_cast<u64>(value.value_float);
+				if (is_type_different_to_arch_endianness(type)) {
+					u = gb_endian_swap64(u);
+				}
 				res.value = LLVMConstBitCast(LLVMConstInt(LLVMInt64TypeInContext(ctx), u, false), lb_type(m, original_type));
 			} break;
 			}
@@ -1457,12 +1463,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			LLVMValueRef values[2] = {};
 			switch (8*type_size_of(type)) {
 			case 32:
-				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->real));
-				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
+				values[0] = lb_const_f16(m, exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f16(m, exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 64:
-				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->real));
-				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
+				values[0] = lb_const_f32(m, exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f32(m, exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 128:
 				values[0] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_complex->real));
@@ -1480,17 +1486,17 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			switch (8*type_size_of(type)) {
 			case 64:
 				// @QuaternionLayout
-				values[3] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
-				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
-				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
-				values[2] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
+				values[3] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 128:
 				// @QuaternionLayout
-				values[3] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
-				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
-				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
-				values[2] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
+				values[3] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 256:
 				// @QuaternionLayout
