@@ -4447,6 +4447,12 @@ gb_internal void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		} else if (key->kind == Type_Array) {
 			add_package_dependency(ctx, "runtime", "default_hasher");
 			add_map_key_type_dependencies(ctx, key->Array.elem);
+		} else if (key->kind == Type_Matrix) {
+			add_package_dependency(ctx, "runtime", "default_hasher");
+			add_map_key_type_dependencies(ctx, key->Matrix.elem);
+		} else if (key->kind == Type_SimdVector) {
+			add_package_dependency(ctx, "runtime", "default_hasher");
+			add_map_key_type_dependencies(ctx, key->SimdVector.elem);
 		}
 	}
 }

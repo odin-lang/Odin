@@ -580,6 +580,36 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 
 		lbValue vres = lb_addr_load(p, res);
 		LLVMBuildRet(p->builder, vres.value);
+	} else if (type->kind == Type_Matrix || type->kind == Type_SimdVector) {
+		// NOTE: only reached when the element type is not simple compare (e.g. floats), so hash each
+		// element with its own hasher, which keeps `+0` and `-0` hashing the same as they compare equal
+		Type *elem = base_array_type(type);
+		i64 count = 0;
+		if (type->kind == Type_Matrix) {
+			// matrices have no padding between columns (rows if #row_major)
+			count = matrix_type_total_internal_elems(type);
+		} else {
+			count = type->SimdVector.count;
+		}
+
+		lbAddr res = lb_add_local_generated(p, t_uintptr, false);
+		lb_addr_store(p, res, seed);
+
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
+		lbValue elem_hasher = lb_hasher_proc_for_type(m, elem);
+
+		auto loop_data = lb_loop_start(p, cast(isize)count, t_i32);
+
+		lbValue elem_ptr = lb_emit_conv(p, data, alloc_type_pointer(elem));
+		args[0] = lb_emit_ptr_offset(p, elem_ptr, loop_data.idx);
+		args[1] = lb_addr_load(p, res);
+		lbValue new_seed = lb_emit_call(p, elem_hasher, args);
+		lb_addr_store(p, res, new_seed);
+
+		lb_loop_end(p, loop_data);
+
+		lbValue vres = lb_addr_load(p, res);
+		LLVMBuildRet(p->builder, vres.value);
 	} else if (is_type_cstring(type)) {
 		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = data;
