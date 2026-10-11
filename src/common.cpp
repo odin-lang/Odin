@@ -711,6 +711,26 @@ gb_internal f32 f16_to_f32(u16 value) {
 	return v.f;
 }
 
+// NOTE(bill): Unlike a normal cast, these keep a signalling NaN signalling
+gb_internal f64 f32_to_f64(f32 value) {
+	u32 i = bit_cast<u32>(value);
+	if ((i & 0x7f800000) != 0x7f800000 || (i & 0x007fffff) == 0) {
+		return cast(f64)value;
+	}
+	u64 u = (cast(u64)(i & 0x80000000) << 32) | 0x7ff0000000000000ull | (cast(u64)(i & 0x007fffff) << 29);
+	return bit_cast<f64>(u);
+}
+
+gb_internal f32 f64_to_f32(f64 value) {
+	u64 i = bit_cast<u64>(value);
+	if ((i & 0x7ff0000000000000ull) != 0x7ff0000000000000ull || (i & 0x000fffffffffffffull) == 0) {
+		return cast(f32)value;
+	}
+	u32 m = cast(u32)(i >> 29) & 0x007fffff;
+	u32 u = (cast(u32)(i >> 32) & 0x80000000) | 0x7f800000 | m | (m == 0);
+	return bit_cast<f32>(u);
+}
+
 gb_internal gb_inline f64 gb_sqrt(f64 x) {
 	return sqrt(x);
 }

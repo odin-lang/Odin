@@ -355,10 +355,10 @@ gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value) {
 	return res;
 }
 
-gb_internal LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
+gb_internal LLVMValueRef lb_const_f16(lbModule *m, f64 f, Type *type=t_f16) {
 	GB_ASSERT(type_size_of(type) == 2);
 
-	u16 u = f32_to_f16(f);
+	u16 u = f32_to_f16(f64_to_f32(f));
 	if (is_type_different_to_arch_endianness(type)) {
 		u = gb_endian_swap16(u);
 	}
@@ -366,9 +366,10 @@ gb_internal LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
 	return LLVMConstBitCast(i, lb_type(m, type));
 }
 
-gb_internal LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
+gb_internal LLVMValueRef lb_const_f32(lbModule *m, f64 f, Type *type=t_f32) {
 	GB_ASSERT(type_size_of(type) == 4);
-	u32 u = bit_cast<u32>(f);
+	f32 f_32 = f64_to_f32(f);
+	u32 u = bit_cast<u32>(f_32);
 	if (is_type_different_to_arch_endianness(type)) {
 		u = gb_endian_swap32(u);
 	}
@@ -1234,18 +1235,25 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		isize width = 1;
 		String s = value.value_string;
 
-		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
+		Rune *runes = gb_alloc_array(temporary_allocator(), Rune, cast(isize)count);
 
 		for (i64 i = 0; i < count && offset < s.len; i++) {
 			width = utf8_decode(s.text+offset, s.len-offset, &rune);
 			offset += width;
 
-			elems[i] = LLVMConstInt(et, rune, true);
-
+			runes[i] = rune;
 		}
 		GB_ASSERT(offset == s.len);
 
+	#if LLVM_VERSION_MAJOR >= 21
+		res.value = LLVMConstDataArray(et, cast(char const *)runes, cast(size_t)count*gb_size_of(Rune));
+	#else
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
+		for (i64 i = 0; i < count; i++) {
+			elems[i] = LLVMConstInt(et, runes[i], true);
+		}
 		res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
+	#endif
 		return res;
 	} else if (is_type_u16_array(type) && (value.kind == ExactValue_String || value.kind == ExactValue_String16) && !is_type_u8(core_array_type(type))) {
 		i64 count  = type->Array.count;
@@ -1259,6 +1267,9 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			s = string_to_string16(temporary_allocator(), value.value_string);
 		}
 
+	#if LLVM_VERSION_MAJOR >= 21
+		res.value = LLVMConstDataArray(et, cast(char const *)s.text, cast(size_t)count*gb_size_of(u16));
+	#else
 		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, cast(isize)count);
 
 		for (isize i = 0; i < s.len; i++) {
@@ -1267,6 +1278,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		}
 
 		res.value = llvm_const_array(m, et, elems, cast(unsigned)count);
+	#endif
 		return res;
 	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
 		GB_ASSERT(type->Array.count == value.value_string.len);
@@ -1421,21 +1433,26 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 		value = exact_value_to_float(value);
 		/*fallthrough*/
 	case ExactValue_Float:
-		if (is_type_different_to_arch_endianness(type)) {
-			if (type->Basic.kind == Basic_f32le || type->Basic.kind == Basic_f32be) {
-				f32 f = static_cast<float>(value.value_float);
-				u32 u = bit_cast<u32>(f);
-				u = gb_endian_swap32(u);
-				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f32>(u));
-			} else if (type->Basic.kind == Basic_f16le || type->Basic.kind == Basic_f16be) {
-				f32 f = static_cast<float>(value.value_float);
-				u16 u = f32_to_f16(f);
-				u = gb_endian_swap16(u);
-				res.value = LLVMConstReal(lb_type(m, original_type), f16_to_f32(u));
-			} else {
+		if (is_type_different_to_arch_endianness(type) || isnan(value.value_float)) {
+			// a float conversion would quieten a signalling NaN, and swapped bits can be one
+			switch (type->Basic.kind) {
+			case Basic_f16:
+			case Basic_f16le:
+			case Basic_f16be:
+				res.value = lb_const_f16(m, value.value_float, original_type);
+				break;
+			case Basic_f32:
+			case Basic_f32le:
+			case Basic_f32be:
+				res.value = lb_const_f32(m, value.value_float, original_type);
+				break;
+			default: {
 				u64 u = bit_cast<u64>(value.value_float);
-				u = gb_endian_swap64(u);
-				res.value = LLVMConstReal(lb_type(m, original_type), bit_cast<f64>(u));
+				if (is_type_different_to_arch_endianness(type)) {
+					u = gb_endian_swap64(u);
+				}
+				res.value = LLVMConstBitCast(LLVMConstInt(LLVMInt64TypeInContext(ctx), u, false), lb_type(m, original_type));
+			} break;
 			}
 		} else {
 			res.value = LLVMConstReal(lb_type(m, original_type), value.value_float);
@@ -1446,12 +1463,12 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			LLVMValueRef values[2] = {};
 			switch (8*type_size_of(type)) {
 			case 32:
-				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->real));
-				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
+				values[0] = lb_const_f16(m, exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f16(m, exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 64:
-				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->real));
-				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_complex->imag));
+				values[0] = lb_const_f32(m, exact_value_to_f64(value.value_complex->real));
+				values[1] = lb_const_f32(m, exact_value_to_f64(value.value_complex->imag));
 				break;
 			case 128:
 				values[0] = LLVMConstReal(lb_type(m, t_f64), exact_value_to_f64(value.value_complex->real));
@@ -1469,17 +1486,17 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, lb
 			switch (8*type_size_of(type)) {
 			case 64:
 				// @QuaternionLayout
-				values[3] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
-				values[0] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
-				values[1] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
-				values[2] = lb_const_f16(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
+				values[3] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f16(m, exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 128:
 				// @QuaternionLayout
-				values[3] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->real));
-				values[0] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->imag));
-				values[1] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->jmag));
-				values[2] = lb_const_f32(m, cast(f32)exact_value_to_f64(value.value_quaternion->kmag));
+				values[3] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->real));
+				values[0] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->imag));
+				values[1] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->jmag));
+				values[2] = lb_const_f32(m, exact_value_to_f64(value.value_quaternion->kmag));
 				break;
 			case 256:
 				// @QuaternionLayout
