@@ -119,3 +119,23 @@ memchr :: proc "c" (str: [^]byte, c: i32, n: uint) -> [^]byte {
 
 	return str[idx:]
 }
+
+@(require, linkage="strong", link_name="strcasecmp")
+strcasecmp :: proc "c" (lhs: cstring, rhs: cstring) -> i32 {
+	return strncasecmp(lhs, rhs, max(uint))
+}
+
+@(require, linkage="strong", link_name="strncasecmp")
+strncasecmp :: proc "c" (lhs: cstring, rhs: cstring, count: uint) -> i32 {
+	lower :: proc "contextless" (b: byte) -> byte {
+		return b + ('a' - 'A') if b >= 'A' && b <= 'Z' else b
+	}
+	l, r := ([^]byte)(lhs), ([^]byte)(rhs)
+	for i in 0..<count {
+		a, b := lower(l[i]), lower(r[i])
+		if a != b || a == 0 {
+			return i32(a) - i32(b)
+		}
+	}
+	return 0
+}

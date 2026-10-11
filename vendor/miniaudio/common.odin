@@ -9,11 +9,18 @@ when MINIAUDIO_SHARED {
 }
 
 @(private)
-LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/miniaudio.a"
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
+
+// On wasm, miniaudio is built with vendor:libc-shim (`build_miniaudio.sh wasm`) and with
+// MA_NO_DEVICE_IO + MA_NO_THREADING: there is no device or thread to open. Drive an engine
+// created with `noDevice = true` and pull frames with `engine_read_pcm_frames`, e.g. from a
+// Web Audio callback in the host page.
+@(private)
+LIB :: "lib/miniaudio.lib" when ODIN_OS == .Windows else "lib/miniaudio_wasm.o" when IS_WASM else "lib/miniaudio.a"
 
 when !#exists(LIB) {
 	// Windows library is shipped with the compiler, so a Windows specific message should not be needed.
-	#panic("Could not find the compiled miniaudio library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio.sh\"`")
+	#panic("Could not find the compiled miniaudio library, it can be compiled by running `\"" + ODIN_ROOT + "vendor/miniaudio/src/build_miniaudio.sh" + (" wasm" when IS_WASM else "") + "\"`")
 }
 
 foreign import lib { LIB }
@@ -303,7 +310,8 @@ lcg :: struct {
 /* Spinlocks are 32-bit for compatibility reasons. */
 spinlock :: distinct u32
 
-NO_THREADING :: false
+NO_THREADING  :: IS_WASM // MA_NO_THREADING
+NO_DEVICE_IO  :: IS_WASM // MA_NO_DEVICE_IO
 
 when !NO_THREADING {
 /* Thread priorities should be ordered such that the default priority of the worker thread is 0. */

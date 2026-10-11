@@ -319,12 +319,13 @@ engine_process_proc :: #type proc "c" (pUserData: rawptr, pFramesOut: [^]f32, fr
 
 engine_config :: struct {
 	pResourceManager:             ^resource_manager,      /* Can be null in which case a resource manager will be created for you. */
-	pContext:                     ^context_type,
-	pDevice:                      ^device,                /* If set, the caller is responsible for calling ma_engine_data_callback() in the device's data callback. */
-	pPlaybackDeviceID:            ^device_id,             /* The ID of the playback device to use with the default listener. */
+	// Absent from the C struct under MA_NO_DEVICE_IO (wasm); the zero-sized types keep the layout.
+	pContext:             (^context_type             when !NO_DEVICE_IO else struct {}),
+	pDevice:              (^device                   when !NO_DEVICE_IO else struct {}), /* If set, the caller is responsible for calling ma_engine_data_callback() in the device's data callback. */
+	pPlaybackDeviceID:    (^device_id                when !NO_DEVICE_IO else struct {}), /* The ID of the playback device to use with the default listener. */
 
-	dataCallback:         device_data_proc,               /* Can be null. Can be used to provide a custom device data callback. */
-	notificationCallback: device_notification_proc,
+	dataCallback:         (device_data_proc          when !NO_DEVICE_IO else struct {}), /* Can be null. Can be used to provide a custom device data callback. */
+	notificationCallback: (device_notification_proc  when !NO_DEVICE_IO else struct {}),
 
 	pLog:                         ^log,                   /* When set to NULL, will use the context's log. */
 	listenerCount:                u32,                    /* Must be between 1 and MA_ENGINE_MAX_LISTENERS. */
@@ -352,7 +353,7 @@ engine_config :: struct {
 engine :: struct {
 	nodeGraph:              node_graph,                   /* An engine is a node graph. It should be able to be plugged into any ma_node_graph API (with a cast) which means this must be the first member of this struct. */
 	pResourceManager:       ^resource_manager,
-	pDevice:                ^device,                      /* Optionally set via the config, otherwise allocated by the engine in ma_engine_init(). */
+	pDevice:                (^device when !NO_DEVICE_IO else struct {}), /* Optionally set via the config, otherwise allocated by the engine in ma_engine_init(). */
 	pLog:                   ^log,
 	sampleRate:             u32,
 	listenerCount:          u32,
