@@ -25,6 +25,11 @@ add :: proc{add_int, add_f32}
 Axis :: enum {X, Y}
 Side :: enum {X, Left}
 
+Nibbles :: bit_field u8 {
+	lo: u8 | 4,
+	hi: u8 | 4,
+}
+
 axis :: proc(a: Axis, i: int) -> int {
 	return int(a) + i
 }

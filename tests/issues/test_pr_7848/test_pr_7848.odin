@@ -145,6 +145,16 @@ test_pr_7848_export :: proc(t: ^testing.T) {
 		testing.expect_value(t, x.offset, offset_of(t, path, "X, Y"))
 	}
 
+	// the fields of an enum and of a bit_field are definitions
+	for field in ([]struct{name, at: string}{{"Y", "Y}"}, {"hi", "hi: u8"}}) {
+		at := offset_of(t, path, field.at)
+		ids = tf.find_idents(b.definitions, at)
+		if testing.expectf(t, len(ids) == 1, "%s should have one definition, got %d", field.name, len(ids)) {
+			testing.expect_value(t, s.entities[ids[0].entity].name, field.name)
+			testing.expect_value(t, s.entities[ids[0].entity].offset, at)
+		}
+	}
+
 	// the `when` branch that is not taken
 	untaken := offset_of(t, path, "c += 100")
 	inactive := false

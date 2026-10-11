@@ -1153,6 +1153,7 @@ gb_internal void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *nam
 			error(ident, "'%.*s' is already declared in this enumeration", LIT(name));
 		} else {
 			add_entity(ctx, ctx->scope, nullptr, e);
+			add_semantic_ident(ctx->info, ident, e, true);
 			array_add(&fields, e);
 			// TODO(bill): Should I add a use for the enum value?
 			add_entity_use(ctx, field, e);
@@ -1300,6 +1301,7 @@ gb_internal void check_bit_field_type(CheckerContext *ctx, Type *bit_field_type,
 			e->flags |= EntityFlag_BitFieldField;
 
 			add_entity(ctx, ctx->scope, nullptr, e);
+			add_semantic_ident(ctx->info, f->name, e, true);
 			array_add(&fields, e);
 			array_add(&bit_sizes, bit_size_u8);
 
