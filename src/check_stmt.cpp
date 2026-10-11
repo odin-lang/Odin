@@ -756,8 +756,8 @@ gb_internal void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 	GB_ASSERT(ctx->decl != nullptr);
 
 	bool ok = true;
-	for_array(i, ctx->decl->labels) {
-		BlockLabel bl = ctx->decl->labels[i];
+	for_array(i, ctx->decl->proc->labels) {
+		BlockLabel bl = ctx->decl->proc->labels[i];
 		if (bl.name == name) {
 			error(label, "Duplicate label with the name '%.*s'", LIT(name));
 			ok = false;
@@ -771,7 +771,7 @@ gb_internal void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 
 	if (ok) {
 		BlockLabel bl = {name, label};
-		array_add(&ctx->decl->labels, bl);
+		array_add(&ctx->decl->proc->labels, bl);
 	}
 }
 
@@ -2917,8 +2917,8 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			ctx->in_defer = true;
 			check_stmt(ctx, ds->stmt, 0);
 			ctx->in_defer = out_in_defer;
-			if (ctx->decl) {
-				ctx->decl->defer_used += 1;
+			if (ctx->decl && ctx->decl->proc) {
+				ctx->decl->proc->defer_used += 1;
 			}
 
 			// NOTE(bill): Handling errors/warnings

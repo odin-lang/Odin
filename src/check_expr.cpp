@@ -1006,12 +1006,12 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	Ast *ident = clone_ast(base_entity->identifier);
 	Token token = ident->Ident.token;
 	DeclInfo *d = make_decl_info(scope, old_decl->parent);
-	d->gen_proc_type = final_proc_type;
+	init_decl_info_proc(d, proc_lit);
+	d->proc->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
-	d->proc_lit = proc_lit;
-	d->proc_checked_state = ProcCheckedState_Unchecked;
-	d->defer_use_checked = false;
-	d->para_poly_original = old_decl->entity;
+	d->proc->proc_checked_state = ProcCheckedState_Unchecked;
+	d->proc->defer_use_checked = false;
+	d->proc->para_poly_original = old_decl->entity;
 
 	Type *entity_type = final_proc_type;
 	if (final_proc_type->Proc.is_poly_specialized) {
@@ -1058,7 +1058,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->poly_parent   = global_error_context.instantiations.proc;
 
 	// Before it can be found by another thread which could use it first
-	d->gen_proc_info.store(proc_info);
+	d->proc->gen_proc_info.store(proc_info);
 
 	array_add(&gen_procs->procs, entity);
 	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
@@ -7677,10 +7677,10 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 		if (!vari_expand && variadic_operands.count != 0) {
 			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
-			if (c->decl) {
+			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);
 				bool found = false;
-				for (auto &vr : c->decl->variadic_reuses) {
+				for (auto &vr : c->decl->proc->variadic_reuses) {
 					if (are_types_identical(slice, vr.slice_type)) {
 						vr.max_count = gb_max(vr.max_count, variadic_operands.count);
 						found = true;
@@ -7688,7 +7688,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					}
 				}
 				if (!found) {
-					array_add(&c->decl->variadic_reuses, VariadicReuseData{slice, variadic_operands.count});
+					array_add(&c->decl->proc->variadic_reuses, VariadicReuseData{slice, variadic_operands.count});
 				}
 			}
 		}
@@ -9791,9 +9791,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	if (initial_entity != nullptr && initial_entity->kind == Entity_Procedure) {
 		if (initial_entity->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
-			if (c->decl) {
+			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);
-				c->decl->defer_used += 1;
+				c->decl->proc->defer_used += 1;
 			}
 		}
 		add_entity_use(c, operand->expr, initial_entity);
@@ -9837,9 +9837,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0 &&
 		    callee->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
-			if (c->decl) {
+			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);
-				c->decl->defer_used += 1;
+				c->decl->proc->defer_used += 1;
 			}
 		}
 		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
@@ -13546,7 +13546,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		{
 			poly_dep_capture_unreplayable(c);
 			decl = make_decl_info(ctx.scope, ctx.decl);
-			decl->proc_lit  = node;
+			init_decl_info_proc(decl, node);
 			ctx.decl = decl;
 			defer (ctx.decl = ctx.decl->parent);
 

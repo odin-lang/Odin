@@ -209,13 +209,39 @@ struct VariadicReuseData {
 	i64 max_count;
 };
 
-// DeclInfo is used to store information of certain declarations to allow for "any order" usage
-struct DeclInfo {
-	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
-
+struct ProcDeclInfo {
 	BlockingMutex next_mutex; // for `nested_to_check`
 
 	Array<struct ProcInfo *> nested_to_check; // nested procedures to check once this body is checked
+
+	Type *  gen_proc_type; // Precalculated
+	Entity *para_poly_original;
+	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
+	struct ProcInfo *proc_info; // its body, once checked
+
+	BlockingMutex                 proc_checked_mutex;
+	std::atomic<ProcCheckedState> proc_checked_state;
+	std::atomic<bool>             defer_use_checked;
+	isize                         defer_used;
+
+	i32               escape_index; // of its body, see `EscapeGraph`
+	std::atomic<bool> escapes_analysed;
+	Slice<struct EscapeFlow> escape_flows; // see `escape_call`
+
+	Array<BlockLabel> labels;
+
+	Array<VariadicReuseData> variadic_reuses;
+	i64 variadic_reuse_max_bytes;
+	i64 variadic_reuse_max_align;
+
+	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
+	std::atomic<struct lbModule *> code_gen_module;
+	std::atomic<String *>          local_proc_name; // the backend's name for a procedure declared in a procedure body
+};
+
+// DeclInfo is used to store information of certain declarations to allow for "any order" usage
+struct DeclInfo {
+	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
 
 	Scope *       scope;
 
@@ -225,25 +251,14 @@ struct DeclInfo {
 	Ast *         type_expr;
 	Ast *         init_expr;
 	Array<Ast *>  attributes;
-	Ast *         proc_lit;      // Ast_ProcLit
-	Type *        gen_proc_type; // Precalculated
+	Ast *         proc_lit; // Ast_ProcLit
+	ProcDeclInfo *proc;     // set with `proc_lit`, see `init_decl_info_proc`
 
-	Entity *     para_poly_original;
-	std::atomic<struct ProcInfo *> gen_proc_info; // a specialization's body, queued for checking when it is first used
-	struct ProcInfo *proc_info; // its body, once checked
+	bool              is_using;
+	bool              foreign_require_results;
+	std::atomic<bool> where_clauses_evaluated;
 
-	i32               escape_index; // of its body, see `EscapeGraph`
-	std::atomic<bool> escapes_analysed;
-	Slice<struct EscapeFlow> escape_flows; // see `escape_call`
-
-	bool                          is_using;
-	bool                          foreign_require_results;
-	std::atomic<bool>             where_clauses_evaluated;
-	std::atomic<ProcCheckedState> proc_checked_state;
-
-	BlockingMutex     proc_checked_mutex;
-	isize             defer_used;
-	std::atomic<bool> defer_use_checked;
+	i32 scope_index;
 
 	CommentGroup *comment;
 	CommentGroup *docs;
@@ -253,20 +268,6 @@ struct DeclInfo {
 
 	RwMutex type_info_deps_mutex;
 	TypeSet type_info_deps;
-
-	BlockingMutex type_and_value_mutex;
-
-	Array<BlockLabel> labels;
-
-	i32 scope_index;
-
-	Array<VariadicReuseData> variadic_reuses;
-	i64 variadic_reuse_max_bytes;
-	i64 variadic_reuse_max_align;
-
-	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
-	std::atomic<struct lbModule *> code_gen_module;
-	std::atomic<String *>          local_proc_name; // the backend's name for a procedure declared in a procedure body
 };
 
 // ProcInfo stores the information needed for checking a procedure
@@ -844,8 +845,6 @@ struct CheckerInfo {
 	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
 	                                   // as it needs to be iterated across afterwards
 	BlockingMutex builtin_mutex;
-
-	BlockingMutex type_and_value_mutex;
 
 	RecursiveMutex lazy_mutex; // for adding checked lazy entities to `entities`
 

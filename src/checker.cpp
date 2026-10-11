@@ -205,17 +205,24 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->scope  = scope;
 	ptr_set_init(&d->deps, 0);
 	type_set_init(&d->type_info_deps, 0);
-	d->labels.allocator = heap_allocator();
-	d->nested_to_check.allocator = heap_allocator();
-	d->variadic_reuses.allocator = heap_allocator();
-	d->variadic_reuse_max_bytes = 0;
-	d->variadic_reuse_max_align = 1;
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 	DeclInfo *d = permanent_alloc_item<DeclInfo>();
 	init_decl_info(d, scope, parent);
 	return d;
+}
+
+gb_internal void init_decl_info_proc(DeclInfo *d, Ast *proc_lit) {
+	d->proc_lit = proc_lit;
+	if (d->proc == nullptr) {
+		ProcDeclInfo *p = permanent_alloc_item<ProcDeclInfo>();
+		p->nested_to_check.allocator = heap_allocator();
+		p->labels.allocator = heap_allocator();
+		p->variadic_reuses.allocator = heap_allocator();
+		p->variadic_reuse_max_align = 1;
+		d->proc = p;
+	}
 }
 
 // gb_internal void destroy_declaration_info(DeclInfo *d) {
@@ -2009,8 +2016,8 @@ gb_internal DeclInfo *decl_info_of_entity(Entity *e) {
 }
 
 gb_internal Type *proc_entity_full_type(Entity *e) {
-	if (e->kind == Entity_Procedure && e->decl_info != nullptr && e->decl_info->gen_proc_type != nullptr) {
-		return e->decl_info->gen_proc_type;
+	if (e->kind == Entity_Procedure && e->decl_info != nullptr && e->decl_info->proc->gen_proc_type != nullptr) {
+		return e->decl_info->proc->gen_proc_type;
 	}
 	return e->type;
 }
@@ -2138,15 +2145,6 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	if (mode == Addressing_Constant && type == t_invalid) {
 		return;
 	}
-
-	/* Previous logic:
-		BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
-		if (ctx->decl) {
-			mutex = &ctx->decl->type_and_value_mutex;
-		} else if (ctx->pkg) {
-			mutex = &ctx->pkg->type_and_value_mutex;
-		}
-	*/
 
 	bool has_value = false;
 	if (mode == Addressing_Constant || mode == Addressing_Invalid) {
@@ -2348,7 +2346,7 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 		// Check the specialization body later
 		DeclInfo *decl = entity->decl_info;
 		if (decl != nullptr) {
-			ProcInfo *pi = decl->gen_proc_info.exchange(nullptr);
+			ProcInfo *pi = decl->proc->gen_proc_info.exchange(nullptr);
 			if (pi != nullptr) {
 				check_procedure_later(c->checker, pi);
 			}
@@ -3083,7 +3081,7 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (entity->type != nullptr &&
 	    is_type_polymorphic(entity->type)) {
 		DeclInfo *decl = decl_info_of_entity(entity);
-		if (decl != nullptr && decl->gen_proc_type == nullptr) {
+		if (decl != nullptr && (decl->proc == nullptr || decl->proc->gen_proc_type == nullptr)) {
 			return;
 		}
 	}
@@ -3135,7 +3133,7 @@ gb_internal bool min_dep_visit(Entity *entity) {
 	if (entity->type != nullptr &&
 	    is_type_polymorphic(entity->type)) {
 		DeclInfo *decl = decl_info_of_entity(entity);
-		if (decl != nullptr && decl->gen_proc_type == nullptr) {
+		if (decl != nullptr && (decl->proc == nullptr || decl->proc->gen_proc_type == nullptr)) {
 			return false;
 		}
 	}
@@ -5564,7 +5562,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 					GB_ASSERT(cc != ProcCC_Invalid);
 					pl->type->ProcType.calling_convention = cc;
 				}
-				d->proc_lit = init;
+				init_decl_info_proc(d, init);
 				d->init_expr = init;
 
 				if (is_test) {
@@ -6942,13 +6940,13 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		return false;
 	}
 
-	if (!mutex_try_lock(&pi->decl->proc_checked_mutex)) {
+	if (!mutex_try_lock(&pi->decl->proc->proc_checked_mutex)) {
 		return false;
 	}
-	defer (mutex_unlock(&pi->decl->proc_checked_mutex));
+	defer (mutex_unlock(&pi->decl->proc->proc_checked_mutex));
 
 	Entity *e = pi->decl->entity;
-	switch (pi->decl->proc_checked_state.load()) {
+	switch (pi->decl->proc->proc_checked_state.load()) {
 	case ProcCheckedState_InProgress:
 		if (e) {
 			GB_ASSERT(global_procedure_body_in_worker_queue.load() != 0);
@@ -6963,7 +6961,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		// okay
 		break;
 	}
-	pi->decl->proc_checked_state.store(ProcCheckedState_InProgress);
+	pi->decl->proc->proc_checked_state.store(ProcCheckedState_InProgress);
 
 	GB_ASSERT(pi->type->kind == Type_Proc);
 	TypeProc *pt = &pi->type->Proc;
@@ -6975,7 +6973,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 			token = ast_token(pi->poly_def_node);
 		}
 		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
-		pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
+		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Unchecked);
 		return false;
 	}
 
@@ -7019,11 +7017,11 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	global_error_context.instantiations = prev_instantiations;
 
 	if (body_was_checked) {
-		pi->decl->proc_info = pi;
+		pi->decl->proc->proc_info = pi;
 		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic)) {
 			per_thread_array_add(&c->info.checked_bodies_queue, pi);
 		}
-		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
+		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Checked);
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
 			if (e != nullptr) {
@@ -7031,7 +7029,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 			}
 		}
 	} else {
-		pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
+		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Unchecked);
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
 			if (e != nullptr) {
@@ -7041,11 +7039,12 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	}
 
 	// NOTE(bill): the nested procedures that waited for this body, see `check_proc_info_worker_proc`
-	mutex_lock(&pi->decl->next_mutex);
-	Array<ProcInfo *> nested = pi->decl->nested_to_check;
-	pi->decl->nested_to_check = {};
-	pi->decl->nested_to_check.allocator = heap_allocator();
-	mutex_unlock(&pi->decl->next_mutex);
+	mutex_lock(&pi->decl->proc->next_mutex);
+	Array<ProcInfo *> nested = pi->decl->proc->nested_to_check;
+	pi->decl->proc->nested_to_check = {};
+	pi->decl->proc->nested_to_check.allocator = heap_allocator();
+	mutex_unlock(&pi->decl->proc->next_mutex);
+
 	for (ProcInfo *nested_pi : nested) {
 		thread_pool_add_task(check_proc_info_worker_proc, nested_pi);
 	}
@@ -7105,7 +7104,7 @@ gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
 		GB_ASSERT(pi != nullptr);
 		GB_ASSERT(pi->decl != nullptr);
 		Entity *e = pi->decl->entity;
-		auto proc_checked_state = pi->decl->proc_checked_state.load();
+		auto proc_checked_state = pi->decl->proc->proc_checked_state.load();
 		gb_unused(proc_checked_state);
 		if (e && ((e->flags & EntityFlag_ProcBodyChecked) == 0)) {
 			if ((e->flags & EntityFlag_Used) != 0) {
@@ -7149,7 +7148,7 @@ gb_global std::atomic<isize> total_bodies_checked;
 
 gb_internal bool consume_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	GB_ASSERT(pi->decl != nullptr);
-	switch (pi->decl->proc_checked_state.load()) {
+	switch (pi->decl->proc->proc_checked_state.load()) {
 	case ProcCheckedState_InProgress:
 		return false;
 	case ProcCheckedState_Checked:
@@ -7205,12 +7204,12 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 				// NOTE(bill): waits for the parent's body to be checked, which then adds it again,
 				// rather than adding itself again and again until then
 				DeclInfo *pd = pi->decl->parent;
-				mutex_lock(&pd->next_mutex);
+				mutex_lock(&pd->proc->next_mutex);
 				bool waiting = (parent->flags & EntityFlag_ProcBodyChecked) == 0;
 				if (waiting) {
-					array_add(&pd->nested_to_check, pi);
+					array_add(&pd->proc->nested_to_check, pi);
 				}
-				mutex_unlock(&pd->next_mutex);
+				mutex_unlock(&pd->proc->next_mutex);
 				if (waiting) {
 					return 1;
 				}

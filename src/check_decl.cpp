@@ -262,7 +262,7 @@ gb_internal bool check_try_override_const_decl(CheckerContext *ctx, Entity *e, E
 			e->kind = Entity_Procedure;
 			e->type = nullptr;
 			DeclInfo *d = decl_info_of_entity(e);
-			d->proc_lit = init;
+			init_decl_info_proc(d, init);
 			check_proc_decl(ctx, e, d);
 			return true;
 		}
@@ -1365,8 +1365,8 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 
 	Type *proc_type = e->type;
-	if (d->gen_proc_type != nullptr) {
-		proc_type = d->gen_proc_type;
+	if (d->proc->gen_proc_type != nullptr) {
+		proc_type = d->proc->gen_proc_type;
 	} else {
 		proc_type = alloc_type_proc(e->scope, nullptr, 0, nullptr, 0, false, default_calling_convention());
 	}
@@ -2521,16 +2521,16 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 			// NOTE(bill): Don't err here
 		}
 
-		GB_ASSERT(decl->proc_checked_state != ProcCheckedState_Checked);
-		if (decl->defer_use_checked.load(std::memory_order_relaxed)) {
+		GB_ASSERT(decl->proc->proc_checked_state != ProcCheckedState_Checked);
+		if (decl->proc->defer_use_checked.load(std::memory_order_relaxed)) {
 			GB_ASSERT(is_type_polymorphic(type, true));
 			error(token, "Defer Use Checked: %.*s", LIT(decl->entity.load()->token.string));
-			GB_ASSERT(decl->defer_use_checked.load(std::memory_order_relaxed) == false);
+			GB_ASSERT(decl->proc->defer_use_checked.load(std::memory_order_relaxed) == false);
 		}
 
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
 
-		decl->defer_use_checked.store(true, std::memory_order_relaxed);
+		decl->proc->defer_use_checked.store(true, std::memory_order_relaxed);
 
 		for (Ast *stmt : bs->stmts) {
 			if (stmt->kind == Ast_ValueDecl) {
@@ -2572,13 +2572,13 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	add_deps_from_child_to_parent(decl);
 
-	for (VariadicReuseData const &vr : decl->variadic_reuses) {
+	for (VariadicReuseData const &vr : decl->proc->variadic_reuses) {
 		GB_ASSERT(vr.slice_type->kind == Type_Slice);
 		Type *elem = vr.slice_type->Slice.elem;
 		i64 size = type_size_of(elem);
 		i64 align = type_align_of(elem);
-		decl->variadic_reuse_max_bytes = gb_max(decl->variadic_reuse_max_bytes, size*vr.max_count);
-		decl->variadic_reuse_max_align = gb_max(decl->variadic_reuse_max_align, align);
+		decl->proc->variadic_reuse_max_bytes = gb_max(decl->proc->variadic_reuse_max_bytes, size*vr.max_count);
+		decl->proc->variadic_reuse_max_align = gb_max(decl->proc->variadic_reuse_max_align, align);
 	}
 
 	return true;

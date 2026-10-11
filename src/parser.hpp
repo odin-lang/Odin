@@ -252,7 +252,6 @@ struct AstPackage {
 
 	BlockingMutex         files_mutex;
 	BlockingMutex         foreign_files_mutex;
-	BlockingMutex         type_and_value_mutex;
 	BlockingMutex         name_mutex;
 
 	// NOTE(bill): This must be a MPMCQueue

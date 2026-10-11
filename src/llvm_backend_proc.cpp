@@ -618,8 +618,8 @@ gb_internal void lb_set_debug_position_to_procedure_end(lbProcedure *p) {
 gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	DeclInfo *decl = decl_info_of_entity(p->entity);
 	if (decl != nullptr) {
-		for_array(i, decl->labels) {
-			BlockLabel bl = decl->labels[i];
+		for_array(i, decl->proc->labels) {
+			BlockLabel bl = decl->proc->labels[i];
 			lbBranchBlocks bb = {bl.label, nullptr, nullptr};
 			array_add(&p->branch_blocks, bb);
 		}
@@ -775,8 +775,8 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 
 					lbAddr res = {};
 					if (p->entity && p->entity->decl_info &&
-					    p->entity->decl_info->defer_use_checked.load(std::memory_order_relaxed) &&
-					    p->entity->decl_info->defer_used == 0) {
+					    p->entity->decl_info->proc->defer_use_checked.load(std::memory_order_relaxed) &&
+					    p->entity->decl_info->proc->defer_used == 0) {
 
 						// NOTE(bill): this is a bodge to get around the issue of the problem BELOW
 						// We check to see if we ever use a defer statement ever within a procedure and if it
@@ -5220,7 +5220,7 @@ gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, Type *slice_type, Sl
 
 	DeclInfo *d = decl_info_of_entity(p->entity);
 	if (d != nullptr && slice.addr.value == nullptr) {
-		for (auto const &vr : d->variadic_reuses) {
+		for (auto const &vr : d->proc->variadic_reuses) {
 			if (are_types_identical(vr.slice_type, slice_type)) {
 				#if LLVM_VERSION_MAJOR >= 13
 					// NOTE(bill): No point wasting even more memory, just reuse this stack variable too
@@ -5243,8 +5243,8 @@ gb_internal lbValue lb_build_variadic_slice(lbProcedure *p, Type *slice_type, Sl
 	lbValue base_array_ptr = p->variadic_reuse_base_array_ptr.addr;
 	if (base_array_ptr.value == nullptr) {
 		if (d != nullptr) {
-			i64 max_bytes = d->variadic_reuse_max_bytes;
-			i64 max_align = gb_max(d->variadic_reuse_max_align, 16);
+			i64 max_bytes = d->proc->variadic_reuse_max_bytes;
+			i64 max_align = gb_max(d->proc->variadic_reuse_max_align, 16);
 			p->variadic_reuse_base_array_ptr = lb_add_local_generated(p, alloc_type_array(t_u8, max_bytes), true);
 			lb_try_update_alignment(p->variadic_reuse_base_array_ptr.addr, cast(unsigned)max_align);
 			base_array_ptr = p->variadic_reuse_base_array_ptr.addr;

@@ -3278,7 +3278,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 			}
 
 			DeclInfo *d = e->decl_info;
-			Entity *para_poly_parent = d->para_poly_original;
+			Entity *para_poly_parent = d->proc->para_poly_original;
 			if (para_poly_parent == nullptr) {
 				continue;
 			}
