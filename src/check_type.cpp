@@ -778,7 +778,11 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	}
 
 
-#define ST_ALIGN(_name) if (st->_name != nullptr) {                                                \
+	// NOTE: a polymorphic specialization (e.g. `Foo(T)` named within `Foo` itself) has no layout and is never
+	// cached, so checking its alignment again would instantiate it again whenever the alignment names it (#7867)
+	bool check_align = !(struct_type->Struct.is_polymorphic && poly_operands != nullptr);
+
+#define ST_ALIGN(_name) if (st->_name != nullptr && check_align) {                                 \
 		if (st->is_packed) {                                                               \
 			error(st->_name, "'#%s' cannot be applied with '#packed'", #_name); \
 		} else {                                                                           \
@@ -965,7 +969,8 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 		break;
 	}
 
-	if (ut->align != nullptr) {
+	// NOTE: see check_struct_type, a polymorphic specialization has no layout to align (#7867)
+	if (ut->align != nullptr && !(union_type->Union.is_polymorphic && poly_operands != nullptr)) {
 		i64 custom_align = 1;
 		if (check_custom_align(ctx, ut->align, &custom_align, "align")) {
 			if (variants.count == 0) {
