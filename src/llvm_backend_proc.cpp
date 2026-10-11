@@ -12,35 +12,35 @@ gb_internal LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLV
 	return LLVMBuildCall2(p->builder, call_type, ip, args, arg_count, "");
 }
 
-// alignment to claim for a ptr operand of a mem copy intrinsic;
-// the pointed value's type alignment is the default but overridden by
-// anything provable about the value itself through lb_try_get_alignment;
-// the result can be below the default (e.g. ptr to field in #packed struct)
-gb_internal unsigned lb_mem_copy_ptr_alignment(lbProcedure *p, lbValue ptr_value) {
-	unsigned def = 1;  // align 1 for raw ptrs
-	if (ptr_value.type != nullptr) {
-		Type *bt = base_type(ptr_value.type);
-		Type *elem = nullptr;
-		if (bt->kind == Type_Pointer) {
-			elem = bt->Pointer.elem;
-		} else if (bt->kind == Type_MultiPointer) {
-			elem = bt->MultiPointer.elem;
-		}
-		if (elem != nullptr) {
-			def = cast(unsigned)type_align_of(elem);
-		}
-	}
-	return lb_try_get_alignment(p->module, ptr_value.value, def);
-}
-
-// llvm.va_start, llvm.va_end and llvm.va_copy are overloaded on the pointer type since LLVM 19
-gb_internal void lb_call_va_intrinsic(lbProcedure *p, char const *name, LLVMValueRef *args, unsigned arg_count) {
-#if LLVM_VERSION_MAJOR >= 19
-	LLVMTypeRef types[] = {LLVMTypeOf(args[0])};
-	lb_call_intrinsic(p, name, args, arg_count, types, gb_count_of(types));
-#else
-	lb_call_intrinsic(p, name, args, arg_count, nullptr, 0);
-#endif
+// alignment to claim for a ptr operand of a mem copy intrinsic;
+// the pointed value's type alignment is the default but overridden by
+// anything provable about the value itself through lb_try_get_alignment;
+// the result can be below the default (e.g. ptr to field in #packed struct)
+gb_internal unsigned lb_mem_copy_ptr_alignment(lbProcedure *p, lbValue ptr_value) {
+	unsigned def = 1;  // align 1 for raw ptrs
+	if (ptr_value.type != nullptr) {
+		Type *bt = base_type(ptr_value.type);
+		Type *elem = nullptr;
+		if (bt->kind == Type_Pointer) {
+			elem = bt->Pointer.elem;
+		} else if (bt->kind == Type_MultiPointer) {
+			elem = bt->MultiPointer.elem;
+		}
+		if (elem != nullptr) {
+			def = cast(unsigned)type_align_of(elem);
+		}
+	}
+	return lb_try_get_alignment(p->module, ptr_value.value, def);
+}
+
+// llvm.va_start, llvm.va_end and llvm.va_copy are overloaded on the pointer type since LLVM 19
+gb_internal void lb_call_va_intrinsic(lbProcedure *p, char const *name, LLVMValueRef *args, unsigned arg_count) {
+#if LLVM_VERSION_MAJOR >= 19
+	LLVMTypeRef types[] = {LLVMTypeOf(args[0])};
+	lb_call_intrinsic(p, name, args, arg_count, types, gb_count_of(types));
+#else
+	lb_call_intrinsic(p, name, args, arg_count, nullptr, 0);
+#endif
 }
 
 gb_internal void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
