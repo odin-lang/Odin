@@ -1242,6 +1242,16 @@ gb_internal bool lb_bounds_check_short_circuit(lbProcedure *p, lbValue index, lb
 	return false;
 }
 
+gb_internal void lb_emit_bounds_check_handler_call(lbProcedure *p, char const *handler, char const *old_handler, Array<lbValue> const &args) {
+	Scope *scope = p->module->info->runtime_package->scope;
+	Entity *e = scope_lookup_current(scope, string_interner_insert(make_string_c(handler)));
+	if (e == nullptr) {
+		e = scope_lookup_current(scope, string_interner_insert(make_string_c(old_handler)));
+	}
+	GB_ASSERT_MSG(e != nullptr, "Runtime procedure not found: %s", handler);
+	lb_emit_call(p, lb_find_procedure_value_from_entity(p->module, e), args);
+}
+
 gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index, lbValue len) {
 	if (lb_bounds_check_short_circuit(p, index, len)) {
 		return;
@@ -1261,7 +1271,7 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 	if (p->context_stack.count > 0) {
 		handler = "bounds_check_error_with_context";
 	}
-	lb_emit_runtime_call(p, handler, args);
+	lb_emit_bounds_check_handler_call(p, handler, "bounds_check_error", args);
 }
 
 gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValue row_index, lbValue column_index, lbValue row_count, lbValue column_count) {
@@ -1287,7 +1297,7 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 	if (p->context_stack.count > 0) {
 		handler = "matrix_bounds_check_error_with_context";
 	}
-	lb_emit_runtime_call(p, handler, args);
+	lb_emit_bounds_check_handler_call(p, handler, "matrix_bounds_check_error", args);
 }
 
 
@@ -1317,7 +1327,7 @@ gb_internal void lb_emit_multi_pointer_slice_bounds_check(lbProcedure *p, Token 
 	if (p->context_stack.count > 0) {
 		handler = "multi_pointer_slice_expr_error_with_context";
 	}
-	lb_emit_runtime_call(p, handler, args);
+	lb_emit_bounds_check_handler_call(p, handler, "multi_pointer_slice_expr_error", args);
 }
 
 gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValue high, lbValue len, bool lower_value_used) {
@@ -1346,7 +1356,7 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		if (p->context_stack.count > 0) {
 			handler = "slice_expr_error_hi_with_context";
 		}
-		lb_emit_runtime_call(p, handler, args);
+		lb_emit_bounds_check_handler_call(p, handler, "slice_expr_error_hi", args);
 	} else {
 		// No need to convert unless used
 		low  = lb_emit_conv(p, low, t_int);
@@ -1361,7 +1371,7 @@ gb_internal void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue
 		if (p->context_stack.count > 0) {
 			handler = "slice_expr_error_lo_hi_with_context";
 		}
-		lb_emit_runtime_call(p, handler, args);
+		lb_emit_bounds_check_handler_call(p, handler, "slice_expr_error_lo_hi", args);
 	}
 }
 

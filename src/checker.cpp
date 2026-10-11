@@ -3481,6 +3481,13 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("slice_expr_error_lo_hi_with_context"),
 		str_lit("multi_pointer_slice_expr_error_contextless"),
 		str_lit("multi_pointer_slice_expr_error_with_context"),
+
+		// Runtimes from before the `contextless`/`with_context` split
+		str_lit("bounds_check_error"),
+		str_lit("matrix_bounds_check_error"),
+		str_lit("slice_expr_error_hi"),
+		str_lit("slice_expr_error_lo_hi"),
+		str_lit("multi_pointer_slice_expr_error"),
 	);
 
 	FORCE_ADD_RUNTIME_ENTITIES(c->info.objc_class_implementations.count.load(std::memory_order_relaxed) > 0,
