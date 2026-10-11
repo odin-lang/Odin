@@ -4753,8 +4753,6 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		soa_struct->Struct.fields = permanent_slice_make<Entity *>(field_count+extra_field_count);
 		soa_struct->Struct.tags = gb_alloc_array(permanent_allocator(), String, field_count+extra_field_count);
 
-		scope_map_init(&scope->elements);
-
 		String params_xyzw[4] = {
 			str_lit("x"),
 			str_lit("y"),

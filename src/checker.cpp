@@ -247,7 +247,6 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 
 gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent) {
 	Scope *s = permanent_alloc_item<Scope>();
-	scope_map_init(&s->elements);
 	s->parent = parent;
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
@@ -318,17 +317,6 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 	s->flags |= ScopeFlag_ContextDefined;
 
 	return s;
-}
-
-gb_internal void destroy_scope(Scope *scope) {
-	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
-		destroy_scope(child);
-	}
-
-	// string_map_destroy(&scope->elements);
-	ptr_set_destroy(&scope->imported);
-
-	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
 
 
@@ -1341,7 +1329,7 @@ gb_internal void init_universal(void) {
 	}
 
 	add_global_string_constant("ODIN_MICROARCH_STRING", get_final_microarchitecture());
-	
+
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
 			{"Executable", BuildMode_Executable},
@@ -5966,7 +5954,6 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 
 		import_graph_node_set_add(&parent->succ, child);
 		import_graph_node_set_add(&child->pred, parent);
-		ptr_set_add(&parent->scope->imported, child->scope);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
@@ -6155,11 +6142,6 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 	GB_ASSERT(scope->flags&ScopeFlag_Pkg);
 
-
-	ptr_set_add(&parent_scope->imported, scope);
-	// if (ptr_set_update(&parent_scope->imported, scope)) {
-	// 	// error(token, "Multiple import of the same file within this scope");
-	// }
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
 	if (is_blank_ident(import_name)) {

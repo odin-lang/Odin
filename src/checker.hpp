@@ -323,11 +323,10 @@ struct ScopeMapSlot {
 	Entity *value;
 };
 
-enum { SCOPE_MAP_INLINE_CAP = 16 };
+enum { SCOPE_MAP_MIN_CAP = 4 };
 
+// NOTE(bill): Most scopes declare nothing; the table is only allocated on the first insert
 struct ScopeMap {
-	InternedString  inline_keys [SCOPE_MAP_INLINE_CAP];
-	ScopeMapSlot    inline_slots[SCOPE_MAP_INLINE_CAP];
 	InternedString *keys;
 	ScopeMapSlot *  slots;
 	u32             count;
@@ -336,12 +335,6 @@ struct ScopeMap {
 
 gb_internal gb_inline u32 scope_map_max_load(u32 cap) {
 	return cap - (cap>>2); // 75%
-}
-
-gb_internal gb_inline void scope_map_init(ScopeMap *m) {
-	m->cap = SCOPE_MAP_INLINE_CAP;
-	m->slots = m->inline_slots;
-	m->keys = m->inline_keys;
 }
 
 
@@ -397,7 +390,7 @@ gb_internal gb_inline void scope_map_allocate_entries(u32 cap, InternedString **
 
 
 gb_internal void scope_map_grow(ScopeMap *m) {
-	u32 new_cap = m->cap << 1;
+	u32 new_cap = gb_max(m->cap << 1, cast(u32)SCOPE_MAP_MIN_CAP);
 	u32 new_mask = new_cap - 1;
 
 	InternedString *new_keys;
@@ -419,11 +412,11 @@ gb_internal void scope_map_grow(ScopeMap *m) {
 }
 
 gb_internal void scope_map_reserve(ScopeMap *m, isize capacity) {
-	if (m->slots == nullptr) {
-		scope_map_init(m);
+	if (capacity <= 0) {
+		return;
 	}
-	u32 new_cap = next_pow2_u32(cast(u32)capacity);
-	if (m->cap < new_cap && new_cap > SCOPE_MAP_INLINE_CAP) {
+	u32 new_cap = gb_max(next_pow2_u32(cast(u32)capacity), cast(u32)SCOPE_MAP_MIN_CAP);
+	if (m->cap < new_cap) {
 		scope_map_allocate_entries(new_cap, &m->keys, &m->slots);
 		m->cap   = new_cap;
 	}
@@ -432,9 +425,6 @@ gb_internal void scope_map_reserve(ScopeMap *m, isize capacity) {
 
 
 gb_internal Entity *scope_map_insert(ScopeMap *m, InternedString key, u32 hash, Entity *value) {
-	if (m->slots == nullptr) {
-		scope_map_init(m);
-	}
 	if (m->count >= scope_map_max_load(m->cap)) {
 		scope_map_grow(m);
 	}
@@ -483,6 +473,9 @@ gb_internal Entity *scope_map_insert(ScopeMap *m, InternedString key, u32 hash, 
 }
 
 gb_internal Entity *scope_map_get(ScopeMap *m, InternedString key, u32 hash) {
+	if (m->count == 0) {
+		return nullptr;
+	}
 	u32 mask = m->cap-1;
 	u32 pos = hash & mask;
 	u32 dist = 0;
@@ -622,7 +615,6 @@ struct Scope {
 
 	RwMutex mutex;
 	ScopeMap elements;
-	PtrSet<Scope *> imported;
 	PtrMap<u64, struct GlobalDeclSource *> *placeholders; // multi-map; names a global 'when' or 'foreign' block may declare, until all are resolved
 
 	DeclInfo *decl_info;
