@@ -28,7 +28,7 @@ _ :: bits // needed for STRCONV_FAST_FLOAT=false
 
 /*
 	Disable with `-define:STRCONV_FAST_FLOAT=false` to drop the Eisel-Lemire step
-	and its table.
+	and its table, and to read digits one at a time (instead of eight).
 */
 FAST_FLOAT :: #config(STRCONV_FAST_FLOAT, true)
 
@@ -183,7 +183,9 @@ parse_number_string :: #force_inline proc "contextless" (s: string) -> (mantissa
 	if i < n && s[i] == '.' {
 		i += 1
 		frac_start := i
-		i, mantissa = loop_parse_if_eight_digits(s, i, mantissa)
+		when FAST_FLOAT {
+			i, mantissa = loop_parse_if_eight_digits(s, i, mantissa)
+		}
 		for i < n && s[i] - '0' <= 9 {
 			mantissa = mantissa*10 + u64(s[i] - '0')
 			i += 1

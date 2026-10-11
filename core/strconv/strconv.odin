@@ -974,24 +974,28 @@ parse_float_prefix_generic :: proc($T: typeid, str: string) -> (value: T, nr: in
 		i := 2
 		// Read 8 hex digits at a time, then 4 digits at a time (like "0h3c00" or groups
 		// between `_` separators), then single digits and `_` separators.
-		for i+8 <= len(str) {
-			v := read8_to_u64(str, i)
-			if !is_eight_hex_digits(v) {
-				break
+		when FAST_FLOAT {
+			for i+8 <= len(str) {
+				v := read8_to_u64(str, i)
+				if !is_eight_hex_digits(v) {
+					break
+				}
+				as_int = as_int<<32 | parse_eight_hex_digits(v)
+				digits += 8
+				i += 8
 			}
-			as_int = as_int<<32 | parse_eight_hex_digits(v)
-			digits += 8
-			i += 8
 		}
 		for i < len(str) {
-			if i+4 <= len(str) {
-				// Four digits: pad them with "0000" and use the 8-digit code.
-				v := u64(read4_to_u32(str, i)) | 0x3030_3030 << 32
-				if is_eight_hex_digits(v) {
-					as_int = as_int<<16 | parse_eight_hex_digits(v) >> 16
-					digits += 4
-					i += 4
-					continue
+			when FAST_FLOAT {
+				if i+4 <= len(str) {
+					// Four digits: pad them with "0000" and use the 8-digit code.
+					v := u64(read4_to_u32(str, i)) | 0x3030_3030 << 32
+					if is_eight_hex_digits(v) {
+						as_int = as_int<<16 | parse_eight_hex_digits(v) >> 16
+						digits += 4
+						i += 4
+						continue
+					}
 				}
 			}
 			if str[i] != '_' {
