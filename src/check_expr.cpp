@@ -701,7 +701,21 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
 	// NOTE: a clone, as other threads may be instantiating the same procedure, from the same AST
-	bool success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+	bool success = false;
+	if (old_c->no_polymorphic_errors) {
+		// A procedure group candidate is checked with its polymorphic parameters bound but quietly
+		nctx.no_polymorphic_errors = false;
+		i64 muted_before = error_mute_count();
+		begin_error_mute();
+		success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+		end_error_mute();
+		nctx.no_polymorphic_errors = true;
+		if (error_mute_count() != muted_before) {
+			success = false;
+		}
+	} else {
+		success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+	}
 
 	if (!success) {
 		return false;
@@ -744,42 +758,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		gen_procs->hashes.allocator = heap_allocator();
 		base_entity->Procedure.gen_procs = gen_procs;
 		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
-	}
-
-
-	// NOTE(bill): Only re-check a polymorphic procedure's signature after a probe (`no_polymorphic_errors`)
-	if (old_c->no_polymorphic_errors) {
-		// LEAK NOTE(bill): This is technically a memory leak as it has to generate the type twice
-		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
-		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
-		nctx.no_polymorphic_errors = false;
-
-		// NOTE(bill): Reset scope from the failed procedure type
-		scope->head_child.store(nullptr, std::memory_order_relaxed);
-		scope_map_clear(&scope->elements);
-		ptr_set_clear(&scope->imported);
-
-		// LEAK NOTE(bill): Cloning this AST may be leaky but this is not really an issue due to arena-based allocation
-		Ast *cloned_proc_type_node = clone_ast(pt->node);
-		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
-		if (!success) {
-			return false;
-		}
-
-		u64 hash = proc_type_identity_hash(final_proc_type);
-		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
-		for_array(i, gen_procs->procs) {
-			if (gen_procs->hashes[i] != hash) {
-				continue;
-			}
-			Entity *other = gen_procs->procs[i];
-			Type *pt = base_type(proc_entity_full_type(other));
-			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
-				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-				return reuse_gen_polymorphic_procedure(other, poly_proc_data);
-			}
-		}
-		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 	}
 
 
