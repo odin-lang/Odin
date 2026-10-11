@@ -1297,10 +1297,9 @@ gb_internal lbValue lb_emit_matrix_mul_vector(lbProcedure *p, lbValue lhs, lbVal
 		if (LLVMIsALoadInst(rhs.value)) {
 			LLVMValueRef rhs_ptr = LLVMGetOperand(rhs.value, 0);
 			LLVMTypeRef vector_type = LLVMVectorType(lb_type(p->module, elem), cast(unsigned)vector_count);
-			LLVMValueRef rhs_vector = LLVMBuildLoad2(p->builder, vector_type, rhs_ptr, "");
 			// The alignment of what is being loaded, which is the right-hand vector. `type` is the
 			// result, and asking it cannot be right except by coincidence.
-			LLVMSetAlignment(rhs_vector, cast(unsigned)type_align_of(vt));
+			LLVMValueRef rhs_vector = OdinLLVMBuildLoadAligned(p, vector_type, rhs_ptr, type_align_of(vt));
 
 			for (unsigned i = 0; i < column_count; i++) {
 				LLVMValueRef mask = llvm_mask_same(p->module, i, row_count);
@@ -3164,8 +3163,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
 					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
 
-					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
-					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+					LLVMValueRef src_vector = OdinLLVMBuildLoadAligned(p, src_vector_type, src_ptr, type_align_of(se));
 
 					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
 
@@ -3198,8 +3196,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, psrc.value, LLVMPointerType(src_vector_type, 0), "");
 					LLVMValueRef dst_ptr = LLVMBuildPointerCast(p->builder, pdst.value, LLVMPointerType(dst_vector_type, 0), "");
 
-					LLVMValueRef src_vector = LLVMBuildLoad2(p->builder, src_vector_type, src_ptr, "");
-					LLVMSetAlignment(src_vector, cast(unsigned)type_align_of(se));
+					LLVMValueRef src_vector = OdinLLVMBuildLoadAligned(p, src_vector_type, src_ptr, type_align_of(se));
 
 					LLVMValueRef dst_vector = LLVMBuildCast(p->builder, op, src_vector, dst_vector_type, "");
 					LLVMValueRef dst_zero = LLVMConstNull(dst_vector_type);
