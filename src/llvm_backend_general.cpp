@@ -401,7 +401,7 @@ gb_internal void lb_split_instances_into_modules(lbGenerator *gen, Checker *c, P
 			}
 			loads[best] += inst.size;
 			if (best != 0) {
-				inst.e->decl_info->code_gen_module.store(parts[best], std::memory_order_relaxed);
+				inst.e->decl_info->proc->code_gen_module.store(parts[best], std::memory_order_relaxed);
 			}
 		}
 	}
@@ -870,7 +870,7 @@ gb_internal lbModule *lb_module_of_entity_internal(lbGenerator *gen, Entity *e, 
 	lbModule **found = nullptr;
 
 	if (e->kind == Entity_Procedure && e->decl_info) {
-	    	lbModule *mod = e->decl_info->code_gen_module.load(std::memory_order_relaxed);
+	    	lbModule *mod = e->decl_info->proc->code_gen_module.load(std::memory_order_relaxed);
 		if (mod) {
 			return mod;
 		}
@@ -2513,7 +2513,7 @@ gb_internal DeclInfo *lb_enclosing_proc_decl(DeclInfo *decl) {
 }
 
 gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
-	String *cached = decl->local_proc_name.load();
+	String *cached = decl->proc->local_proc_name.load();
 	if (cached != nullptr) {
 		return *cached;
 	}
@@ -2536,7 +2536,7 @@ gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
 		isize name_len = prefix.len + 1 + pd_name.len + 1 + 10 + 1 + 16 + 1;
 		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
 		i32 guid = e->token.pos.offset;
-		if (decl->para_poly_original != nullptr) {
+		if (decl->proc->para_poly_original != nullptr) {
 			name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d-%llx", LIT(prefix), LIT(pd_name), guid,
 			                       cast(unsigned long long)type_hash_canonical_type(proc_entity_full_type(e)));
 		} else {
@@ -2557,7 +2557,7 @@ gb_internal String lb_local_proc_name(lbModule *m, DeclInfo *decl) {
 
 	String *s = permanent_alloc_item<String>();
 	*s = name;
-	if (!decl->local_proc_name.compare_exchange_strong(cached, s)) {
+	if (!decl->proc->local_proc_name.compare_exchange_strong(cached, s)) {
 		return *cached;
 	}
 	return name;
@@ -4285,7 +4285,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, Ast *expr, lbPro
 		// NOTE: another module may be making one for the same literal at the same time
 		if (pl->decl->entity.compare_exchange_strong(e, new_e)) {
 			e = new_e;
-			pl->decl->code_gen_module = target_module;
+			pl->decl->proc->code_gen_module = target_module;
 		}
 	}
 

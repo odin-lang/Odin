@@ -460,7 +460,7 @@ gb_internal void check_atomic_first(Ast **site, Ast *call) {
 }
 
 gb_internal OdinAtomicMemoryOrder check_atomic_order_of(Ast *expr) {
-	return cast(OdinAtomicMemoryOrder)exact_value_to_i64(expr->tav.value);
+	return cast(OdinAtomicMemoryOrder)exact_value_to_i64(expr->tav.value());
 }
 
 gb_internal bool check_atomic_order_acquires(OdinAtomicMemoryOrder order) {
@@ -541,14 +541,14 @@ gb_internal AtomicProcedure *check_atomic_procedure(PtrMap<DeclInfo *, AtomicPro
 	p.signal_acquires = array_make<Ast *>(temporary_allocator(), 0, 0);
 	p.signal_releases = array_make<Ast *>(temporary_allocator(), 0, 0);
 
-	if (decl->proc_info != nullptr) {
+	if (decl->proc->proc_info != nullptr) {
 		AtomicScan s = {};
 		s.reads  = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
 		s.writes = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
 		s.syncs  = array_make<AtomicSync>(temporary_allocator(), 0, 0);
 		s.arms   = array_make<AtomicArm> (temporary_allocator(), 0, 0);
 		s.places = &p.places;
-		check_atomic_scan(&s, decl->proc_info->body, false);
+		check_atomic_scan(&s, decl->proc->proc_info->body, false);
 	}
 
 	map_set(procedures, decl, p);
@@ -948,8 +948,8 @@ gb_internal void check_atomic_scan(AtomicScan *s, Ast *node, bool addr) {
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, node);
-		if (te->cond != nullptr && te->cond->tav.value.kind == ExactValue_Bool) {
-			if (te->cond->tav.value.value_bool) {
+		if (te->cond != nullptr && te->cond->tav.value().kind == ExactValue_Bool) {
+			if (te->cond->tav.value().value_bool) {
 				check_atomic_scan(s, te->x, false);
 			} else {
 				check_atomic_scan(s, te->y, false);
@@ -1197,14 +1197,14 @@ gb_internal bool check_atomic_synchronized(Array<AtomicSync> const &syncs, Atomi
 
 gb_internal void check_atomic_infer(PtrSet<DeclInfo *> *inferring, DeclInfo *decl) {
 	Entity *pe = decl->entity;
-	if (map_get(&atomic_effects, decl) != nullptr || decl->proc_info == nullptr || decl->proc_info->body == nullptr ||
+	if (map_get(&atomic_effects, decl) != nullptr || decl->proc->proc_info == nullptr || decl->proc->proc_info->body == nullptr ||
 	    (pe != nullptr && pe->kind == Entity_Procedure && pe->Procedure.synchronizes != OdinAtomicMemoryOrder_relaxed)) {
 		return;
 	}
 	// nothing, while within itself
 	map_set(&atomic_effects, decl, Slice<AtomicEffect>{});
 
-	ProcInfo *pi = decl->proc_info;
+	ProcInfo *pi = decl->proc->proc_info;
 	auto exits = array_make<AtomicExit>(temporary_allocator(), 0, 0);
 	AtomicScan s = {};
 	s.reads     = array_make<AtomicAt>  (temporary_allocator(), 0, 0);
@@ -1701,7 +1701,7 @@ gb_internal void check_atomics(Checker *c) {
 		PtrSet<DeclInfo *> walked = {};
 		for (auto const &entry : locals) {
 			DeclInfo *decl = entry.value.decl;
-			if (decl->proc_info == nullptr || ptr_set_update(&walked, decl)) {
+			if (decl->proc->proc_info == nullptr || ptr_set_update(&walked, decl)) {
 				continue;
 			}
 			AtomicScan s = {};
@@ -1710,7 +1710,7 @@ gb_internal void check_atomics(Checker *c) {
 			s.syncs  = array_make<AtomicSync>(temporary_allocator(), 0, 0);
 			s.arms   = array_make<AtomicArm> (temporary_allocator(), 0, 0);
 			s.locals = &locals;
-			check_atomic_scan(&s, decl->proc_info->body, false);
+			check_atomic_scan(&s, decl->proc->proc_info->body, false);
 		}
 		ptr_set_destroy(&walked);
 		for (auto const &entry : locals) {

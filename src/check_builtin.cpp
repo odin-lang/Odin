@@ -259,7 +259,7 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_stret");
 
 	Slice<Ast *> args = call->CallExpr.args;
-	if (args.count > 0 && args[0]->tav.objc_super_target) {
+	if (args.count > 0 && args[0]->kind == Ast_CallExpr && args[0]->CallExpr.objc_super_target) {
 		try_to_add_package_dependency(c, "runtime", "objc_msgSendSuper2");
 		try_to_add_package_dependency(c, "runtime", "objc_msgSendSuper2_stret");
 	}
@@ -734,7 +734,7 @@ gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operan
 
 		// NOTE(harold) Track original type before transforming it to the superclass.
 		//              This is needed because objc_msgSendSuper2 must start its search on the subclass, not the superclass.
-		call->tav.objc_super_target = obj_type;
+		call->CallExpr.objc_super_target = obj_type;
 
 		// The superclass type must be known at compile time. We require this so that the selector method expressions
 		// methods are resolved to the superclass's methods instead of the subclass's.
@@ -2237,7 +2237,7 @@ gb_internal i64 check_atomic_address_alignment(Ast *x) {
 		i64 align = check_atomic_address_alignment(ie->expr);
 		i64 offset = type_size_of(t->Array.elem);
 		if (ie->index->tav.mode == Addressing_Constant) {
-			offset *= exact_value_to_i64(ie->index->tav.value);
+			offset *= exact_value_to_i64(ie->index->tav.value());
 		}
 		if (offset != 0) {
 			align = gb_min(align, offset & -offset);
@@ -5746,7 +5746,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		isize count_needed = 0;
 
 		for (Ast *arg : ce->args) {
-			ExactValue value = arg->tav.value;
+			ExactValue value = arg->tav.value();
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
 			count_needed += is_type_array(arg->tav.type)
@@ -5761,7 +5761,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		zero_context.type_hint_expr = nullptr;
 
 		for (Ast *arg : ce->args) {
-			ExactValue value = arg->tav.value;
+			ExactValue value = arg->tav.value();
 			GB_ASSERT(value.kind == ExactValue_Compound);
 			ast_node(cl, CompoundLit, value.value_compound);
 			array_add_elems(&new_elems, cl->elems.data, cl->elems.count);
@@ -8837,7 +8837,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				return false;
 			}
 
-			TypeAndValue tav = proc->tav;
+			TypeAndValue tav = type_and_value_of_expr(proc);
 
 
 			operand->type       = e->type;

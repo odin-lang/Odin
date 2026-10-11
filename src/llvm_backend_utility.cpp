@@ -2986,7 +2986,7 @@ gb_internal lbValue lb_handle_objc_super(lbProcedure *p, Ast *expr) {
 gb_internal lbValue lb_handle_objc_find_selector(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	return lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, name));
@@ -2996,7 +2996,7 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 	ast_node(ce, CallExpr, expr);
 	lbModule *m = p->module;
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	lbAddr dst = lb_handle_objc_find_or_register_selector(p, name);
@@ -3013,7 +3013,7 @@ gb_internal lbValue lb_handle_objc_register_selector(lbProcedure *p, Ast *expr) 
 gb_internal lbValue lb_handle_objc_find_class(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	return lb_addr_load(p, lb_handle_objc_find_or_register_class(p, name, nullptr));
@@ -3023,7 +3023,7 @@ gb_internal lbValue lb_handle_objc_register_class(lbProcedure *p, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 	lbModule *m = p->module;
 
-	auto tav = ce->args[0]->tav;
+	TypeAndValue tav = type_and_value_of_expr(ce->args[0]);
 	GB_ASSERT(tav.value.kind == ExactValue_String);
 	String name = tav.value.value_string;
 	lbAddr dst = lb_handle_objc_find_or_register_class(p, name, nullptr);
@@ -3069,8 +3069,8 @@ gb_internal lbValue lb_handle_objc_send(lbProcedure *p, Ast *expr) {
 
 	lbValue id = lb_handle_objc_id(p, ce->args[1]);
 	Ast *sel_expr = ce->args[2];
-	GB_ASSERT(sel_expr->tav.value.kind == ExactValue_String);
-	lbValue sel = lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, sel_expr->tav.value.value_string));
+	GB_ASSERT(sel_expr->tav.value().kind == ExactValue_String);
+	lbValue sel = lb_addr_load(p, lb_handle_objc_find_or_register_selector(p, sel_expr->tav.value().value_string));
 
 	array_add(&args, id);
 	array_add(&args, sel);
@@ -3116,7 +3116,10 @@ gb_internal lbValue lb_handle_objc_auto_send(lbProcedure *p, Ast *expr, Slice<lb
 
 	Type *objc_super_orig_type = nullptr;
 	if (ce->args.count > 0) {
-		objc_super_orig_type = unparen_expr(ce->args[0])->tav.objc_super_target;
+		Ast *arg = unparen_expr(ce->args[0]);
+		if (arg->kind == Ast_CallExpr) {
+			objc_super_orig_type = arg->CallExpr.objc_super_target;
+		}
 	}
 
 	isize arg_offset = 1;
@@ -3275,7 +3278,7 @@ gb_internal void lb_do_para_poly_diagnostics(lbGenerator *gen) {
 			}
 
 			DeclInfo *d = e->decl_info;
-			Entity *para_poly_parent = d->para_poly_original;
+			Entity *para_poly_parent = d->proc->para_poly_original;
 			if (para_poly_parent == nullptr) {
 				continue;
 			}

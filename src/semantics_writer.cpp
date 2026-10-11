@@ -361,8 +361,8 @@ gb_internal void semantics_type_strings(SemanticsEntity *items, isize count) {
 		Type *type = e->type;
 		// NOTE(bill): The copies that a generic procedure's instantiations make are one entity which have the generic's type
 		if (e->kind == Entity_Procedure && e->Procedure.generated_from_polymorphic &&
-		    e->decl_info != nullptr && e->decl_info->para_poly_original != nullptr) {
-			type = e->decl_info->para_poly_original->type;
+		    e->decl_info != nullptr && e->decl_info->proc->para_poly_original != nullptr) {
+			type = e->decl_info->proc->para_poly_original->type;
 		}
 		if (e->kind == Entity_TypeName && type != nullptr) {
 			type = base_type(type);

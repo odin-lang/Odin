@@ -1006,12 +1006,12 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	Ast *ident = clone_ast(base_entity->identifier);
 	Token token = ident->Ident.token;
 	DeclInfo *d = make_decl_info(scope, old_decl->parent);
-	d->gen_proc_type = final_proc_type;
+	init_decl_info_proc(d, proc_lit);
+	d->proc->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
-	d->proc_lit = proc_lit;
-	d->proc_checked_state = ProcCheckedState_Unchecked;
-	d->defer_use_checked = false;
-	d->para_poly_original = old_decl->entity;
+	d->proc->proc_checked_state = ProcCheckedState_Unchecked;
+	d->proc->defer_use_checked = false;
+	d->proc->para_poly_original = old_decl->entity;
 
 	Type *entity_type = final_proc_type;
 	if (final_proc_type->Proc.is_poly_specialized) {
@@ -1058,7 +1058,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->poly_parent   = global_error_context.instantiations.proc;
 
 	// Before it can be found by another thread which could use it first
-	d->gen_proc_info.store(proc_info);
+	d->proc->gen_proc_info.store(proc_info);
 
 	array_add(&gen_procs->procs, entity);
 	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
@@ -3112,7 +3112,7 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 			return true;
 		}
 		ast_node(ta, TypeAssertion, expr);
-		TypeAndValue tv = ta->expr->tav;
+		TypeAndValue tv = type_and_value_of_expr(ta->expr);
 		if (is_type_pointer(tv.type)) {
 			return false;
 		}
@@ -5256,7 +5256,7 @@ gb_internal Operand make_operand_from_node(Ast *node) {
 	x.expr  = node;
 	x.mode  = node->tav.mode;
 	x.type  = node->tav.type;
-	x.value = node->tav.value;
+	x.value = node->tav.value();
 	return x;
 }
 
@@ -5267,7 +5267,7 @@ gb_internal void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type,
 	if (old == nullptr) {
 		if (type != nullptr && type != t_invalid) {
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
-				add_type_and_value(c, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
+				add_type_and_value(c, e, e->tav.mode, type ? type : e->tav.type, e->tav.value());
 				if (e->kind == Ast_TernaryIfExpr) {
 					update_untyped_expr_type(c, e->TernaryIfExpr.x, type, final);
 					update_untyped_expr_type(c, e->TernaryIfExpr.y, type, final);
@@ -5909,7 +5909,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					Selection sub_sel = lookup_field(node->tav.type, name, false);
 					if (sub_sel.index.count > 0 &&
 					    sub_sel.index[0] == index) {
-						value = fv->value->tav.value;
+						value = fv->value->tav.value();
 						found = true;
 						break;
 					}
@@ -5926,8 +5926,8 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					ast_node(fv, FieldValue, elem);
 					if (is_ast_range(fv->field)) {
 						ast_node(ie, BinaryExpr, fv->field);
-						TypeAndValue lo_tav = ie->left->tav;
-						TypeAndValue hi_tav = ie->right->tav;
+						TypeAndValue lo_tav = type_and_value_of_expr(ie->left);
+						TypeAndValue hi_tav = type_and_value_of_expr(ie->right);
 						GB_ASSERT(lo_tav.mode == Addressing_Constant);
 						GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
@@ -5944,21 +5944,21 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 						}
 						if (op != Token_RangeHalf) {
 							if (lo <= corrected_index && corrected_index <= hi) {
-								TypeAndValue tav = fv->value->tav;
+								TypeAndValue tav = type_and_value_of_expr(fv->value);
 								if (success_) *success_ = true;
 								if (finish_) *finish_ = false;
 								return tav.value;
 							}
 						} else {
 							if (lo <= corrected_index && corrected_index < hi) {
-								TypeAndValue tav = fv->value->tav;
+								TypeAndValue tav = type_and_value_of_expr(fv->value);
 								if (success_) *success_ = true;
 								if (finish_) *finish_ = false;
 								return tav.value;
 							}
 						}
 					} else {
-						TypeAndValue index_tav = fv->field->tav;
+						TypeAndValue index_tav = type_and_value_of_expr(fv->field);
 						if (index_tav.mode != Addressing_Constant) {
 							if (success_) *success_ = false;
 							if (finish_) *finish_ = true;
@@ -5974,7 +5974,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 
 						i64 field_index = exact_value_to_i64(index_value);
 						if (index == field_index) {
-							TypeAndValue tav = fv->value->tav;
+							TypeAndValue tav = type_and_value_of_expr(fv->value);
 							if (success_) *success_ = true;
 							if (finish_) *finish_ = false;
 							return tav.value;
@@ -5996,7 +5996,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				return value;
 			}
 
-			TypeAndValue tav = cl->elems[index]->tav;
+			TypeAndValue tav = type_and_value_of_expr(cl->elems[index]);
 			if (tav.mode == Addressing_Constant) {
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
@@ -6042,15 +6042,15 @@ gb_internal Ast *constant_compound_elem_node(AstCompoundLit *cl, i64 index) {
 		ast_node(fv, FieldValue, elem);
 		if (is_ast_range(fv->field)) {
 			ast_node(ie, BinaryExpr, fv->field);
-			i64 lo = exact_value_to_i64(ie->left->tav.value);
-			i64 hi = exact_value_to_i64(ie->right->tav.value);
+			i64 lo = exact_value_to_i64(ie->left->tav.value());
+			i64 hi = exact_value_to_i64(ie->right->tav.value());
 			if (ie->op.kind != Token_RangeHalf) {
 				hi += 1;
 			}
 			if (lo <= index && index < hi) {
 				return fv->value;
 			}
-		} else if (fv->field->tav.mode == Addressing_Constant && exact_value_to_i64(fv->field->tav.value) == index) {
+		} else if (fv->field->tav.mode == Addressing_Constant && exact_value_to_i64(fv->field->tav.value()) == index) {
 			return fv->value;
 		}
 	}
@@ -6085,10 +6085,10 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 
 	for (isize i = 0; i < count; i++) {
 		Ast *en = constant_compound_elem_node(cl, i);
-		if (en == nullptr || en->tav.value.kind == ExactValue_Invalid) {
+		if (en == nullptr || en->tav.value().kind == ExactValue_Invalid) {
 			continue;
 		}
-		ExactValue ev = en->tav.value;
+		ExactValue ev = en->tav.value();
 		if (ev.kind != ExactValue_Compound || ev.value_compound->kind != Ast_CompoundLit) {
 			return empty_exact_value;
 		}
@@ -6110,7 +6110,7 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 			continue;
 		}
 
-		ExactValue fvalue = fn->tav.value;
+		ExactValue fvalue = fn->tav.value();
 		if (fn->tav.mode == Addressing_Type) {
 			fvalue = exact_value_typeid(fn->tav.type);
 		}
@@ -6122,7 +6122,7 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 		gb_memmove(node, fn, ast_node_size(fn->kind));
 		node->tav.mode  = Addressing_Constant;
 		node->tav.type  = field_elem_type;
-		node->tav.value = fvalue;
+		node->tav.set_value(fvalue);
 
 		nodes[i] = node;
 		has_gaps |= last+1 != i;
@@ -6143,7 +6143,7 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 			index->BasicLit.token = token;
 			index->tav.mode  = Addressing_Constant;
 			index->tav.type  = t_untyped_integer;
-			index->tav.value = exact_value_i64(i);
+			index->tav.set_value(exact_value_i64(i));
 
 			Token eq = {Token_Eq};
 			eq.string = str_lit("=");
@@ -6154,10 +6154,10 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 	Ast *result = ast_compound_lit(f, nullptr, elems, cl->open, cl->close);
 	result->tav.mode  = Addressing_Constant;
 	result->tav.type  = field->type;
-	result->tav.value = exact_value_compound(result);
+	result->tav.set_value(exact_value_compound(result));
 
 	if (success_) *success_ = true;
-	return result->tav.value;
+	return result->tav.value();
 }
 
 gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selection sel, bool *success_) {
@@ -6297,10 +6297,10 @@ gb_internal Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *
 		if (we->cond->tav.mode != Addressing_Constant) {
 			return nullptr;
 		}
-		if (we->cond->tav.value.kind != ExactValue_Bool) {
+		if (we->cond->tav.value().kind != ExactValue_Bool) {
 			return nullptr;
 		}
-		if (we->cond->tav.value.value_bool) {
+		if (we->cond->tav.value().value_bool) {
 			return check_entity_from_ident_or_selector(c, we->x, ident_only);
 		} else {
 			Entity *e = check_entity_from_ident_or_selector(c, we->y, ident_only);
@@ -7677,10 +7677,10 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 		if (!vari_expand && variadic_operands.count != 0) {
 			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
-			if (c->decl) {
+			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);
 				bool found = false;
-				for (auto &vr : c->decl->variadic_reuses) {
+				for (auto &vr : c->decl->proc->variadic_reuses) {
 					if (are_types_identical(slice, vr.slice_type)) {
 						vr.max_count = gb_max(vr.max_count, variadic_operands.count);
 						found = true;
@@ -7688,7 +7688,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					}
 				}
 				if (!found) {
-					array_add(&c->decl->variadic_reuses, VariadicReuseData{slice, variadic_operands.count});
+					array_add(&c->decl->proc->variadic_reuses, VariadicReuseData{slice, variadic_operands.count});
 				}
 			}
 		}
@@ -7707,8 +7707,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 
 		Ast *proc_lit = nullptr;
-		if (ce->proc->tav.value.kind == ExactValue_Procedure) {
-			Ast *vp = unparen_expr(ce->proc->tav.value.value_procedure);
+		if (ce->proc->tav.value().kind == ExactValue_Procedure) {
+			Ast *vp = unparen_expr(ce->proc->tav.value().value_procedure);
 			if (vp && vp->kind == Ast_ProcLit) {
 				proc_lit = vp;
 			}
@@ -9639,7 +9639,7 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 		GB_ASSERT(ce->args.count > 0);
 		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
 
-		if (ce->args[0]->tav.objc_super_target) {
+		if (ce->args[0]->kind == Ast_CallExpr && ce->args[0]->CallExpr.objc_super_target) {
 			self_type = t_objc_super_ptr;
 		} else {
 			self_type = ce->args[0]->tav.type;
@@ -9791,9 +9791,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	if (initial_entity != nullptr && initial_entity->kind == Entity_Procedure) {
 		if (initial_entity->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
-			if (c->decl) {
+			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);
-				c->decl->defer_used += 1;
+				c->decl->proc->defer_used += 1;
 			}
 		}
 		add_entity_use(c, operand->expr, initial_entity);
@@ -9837,9 +9837,9 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if ((call->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) == 0 &&
 		    callee->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
-			if (c->decl) {
+			if (c->decl && c->decl->proc) {
 				poly_dep_capture_unreplayable(c);
-				c->decl->defer_used += 1;
+				c->decl->proc->defer_used += 1;
 			}
 		}
 		if (c->curr_proc_decl != nullptr && analysis_in_use(AnalysisFlag_Escape)) {
@@ -12667,7 +12667,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			for (Ast *e : cl->elems) {
 				GB_ASSERT(e->kind != Ast_FieldValue);
 
-				TypeAndValue tav = e->tav;
+				TypeAndValue tav = type_and_value_of_expr(e);
 				if (tav.mode != Addressing_Constant) {
 					continue;
 				}
@@ -12885,7 +12885,7 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 		// Prevent double evaluation
 		o->expr  = node;
 		o->type  = node->tav.type;
-		o->value = node->tav.value;
+		o->value = node->tav.value();
 		o->mode  = node->tav.mode;
 		return Expr_Expr;
 	}
@@ -12951,7 +12951,7 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 		Operand y = {};
 		y.mode = first_arg->tav.mode;
 		y.type = first_arg->tav.type;
-		y.value = first_arg->tav.value;
+		y.value = first_arg->tav.value();
 
 		if (check_is_assignable_to(c, &y, first_type)) {
 			// Do nothing, it's valid
@@ -13495,7 +13495,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 	case_ast_node(bl, BasicLit, node);
 		Type *t = t_invalid;
-		switch (node->tav.value.kind) {
+		switch (node->tav.value().kind) {
 		case ExactValue_String:     t = t_untyped_string;     break;
 		case ExactValue_String16:   t = t_string16;           break; // TODO(bill): determine this correctly
 		case ExactValue_Float:      t = t_untyped_float;      break;
@@ -13519,7 +13519,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 		o->mode  = Addressing_Constant;
 		o->type  = t;
-		o->value = node->tav.value;
+		o->value = node->tav.value();
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
@@ -13546,7 +13546,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		{
 			poly_dep_capture_unreplayable(c);
 			decl = make_decl_info(ctx.scope, ctx.decl);
-			decl->proc_lit  = node;
+			init_decl_info_proc(decl, node);
 			ctx.decl = decl;
 			defer (ctx.decl = ctx.decl->parent);
 
@@ -13976,7 +13976,7 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 					if (elem->tav.mode != Addressing_Constant) {
 						return false;
 					}
-					if (!is_exact_value_zero(elem->tav.value)) {
+					if (!is_exact_value_zero(elem->tav.value())) {
 						return false;
 					}
 				}
@@ -13994,7 +13994,7 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 		if (v.value_variant->tav.mode != Addressing_Constant) {
 			return false;
 		}
-		return is_exact_value_zero(v.value_variant->tav.value);
+		return is_exact_value_zero(v.value_variant->tav.value());
 	}
 	return true;
 
@@ -14033,15 +14033,15 @@ gb_internal bool compound_lit_elem_index(Type *type, Ast *elem, isize positional
 	if (fv->field->tav.mode != Addressing_Constant) {
 		return false;
 	}
-	*index = exact_value_to_i64(fv->field->tav.value);
+	*index = exact_value_to_i64(fv->field->tav.value());
 	return true;
 }
 
 gb_internal ExactValue compound_lit_elem_value(Ast *elem) {
 	if (elem->kind == Ast_FieldValue) {
-		return elem->FieldValue.value->tav.value;
+		return elem->FieldValue.value->tav.value();
 	}
-	return elem->tav.value;
+	return elem->tav.value();
 }
 
 gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, ExactValue y) {
@@ -14096,7 +14096,7 @@ gb_internal bool compare_exact_values_compound_lit(TokenKind op, ExactValue x, E
 	for (isize i = 0; i < x_cl->elems.count; i++) {
 		Ast *lhs = x_cl->elems[i];
 		Ast *rhs = y_cl->elems[i];
-		if (compare_exact_values(op, lhs->tav.value, rhs->tav.value) != test) {
+		if (compare_exact_values(op, lhs->tav.value(), rhs->tav.value()) != test) {
 			return !test;
 		}
 	}
@@ -14107,19 +14107,19 @@ gb_internal bool compare_exact_values_variant(TokenKind op, ExactValue x, ExactV
 	Ast *lhs = x.value_variant;
 	Ast *rhs = y.value_variant;
 
-	return compare_exact_values(op, lhs->tav.value, rhs->tav.value);
+	return compare_exact_values(op, lhs->tav.value(), rhs->tav.value());
 }
 
 gb_internal void match_exact_values_variant(ExactValue *x, ExactValue *y) {
 	GB_ASSERT(x->kind == ExactValue_Variant);
 	while (x->value_variant != nullptr &&
 	    x->value_variant->tav.mode == Addressing_Constant) {
-		*x = x->value_variant->tav.value;
+		*x = x->value_variant->tav.value();
 	}
 	while (y->kind == ExactValue_Variant &&
 	    y->value_variant != nullptr &&
 	    y->value_variant->tav.mode == Addressing_Constant) {
-		*y = y->value_variant->tav.value;
+		*y = y->value_variant->tav.value();
 	}
 	match_exact_values(x, y);
 }

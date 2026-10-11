@@ -48,9 +48,35 @@ gb_global String const addressing_mode_strings[] = {
 struct TypeAndValue {
 	Type *         type;
 	AddressingMode mode;
-	bool           is_lhs;            // Debug info
-	Type *         objc_super_target; // Original type of the Obj-C object before being converted to the superclass' type by the objc_super() intrinsic.
+	bool           is_lhs; // Debug info
 	ExactValue     value;
+};
+
+gb_internal ExactValue const *alloc_tav_value(ExactValue const &value) {
+	if (value.kind == ExactValue_Invalid && value.variant_type == nullptr) {
+		return nullptr;
+	}
+	ExactValue *v = permanent_alloc_item<ExactValue>();
+	*v = value;
+	return v;
+}
+
+struct AstTypeAndValue {
+	Type *            type;
+	AddressingMode    mode;
+	bool              is_lhs;    // Debug info
+	ExactValue const *value_ptr; // nullptr if there is no value
+
+	ExactValue const &value() const {
+		if (value_ptr != nullptr) {
+			return *value_ptr;
+		}
+		return empty_exact_value;
+	}
+
+	void set_value(ExactValue const &value) {
+		value_ptr = alloc_tav_value(value);
+	}
 };
 
 
@@ -226,7 +252,6 @@ struct AstPackage {
 
 	BlockingMutex         files_mutex;
 	BlockingMutex         foreign_files_mutex;
-	BlockingMutex         type_and_value_mutex;
 	BlockingMutex         name_mutex;
 
 	// NOTE(bill): This must be a MPMCQueue
@@ -592,6 +617,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		bool         was_selector; \
 		AstSplitArgs *split_args; \
 		Entity *entity_procedure_of; \
+		Type *objc_super_target; /* objc_super(): the object's type before it was converted to the superclass */ \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
@@ -946,7 +972,7 @@ struct AstCommonStuff {
 	u8              state_flags;
 	std::atomic<u8> viral_state_flags;
 	i32             file_id;
-	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
+	AstTypeAndValue tav;
 };
 
 struct Ast {
@@ -954,7 +980,7 @@ struct Ast {
 	u8              state_flags;
 	std::atomic<u8> viral_state_flags;
 	i32             file_id;
-	TypeAndValue    tav; // NOTE(bill): Making this a pointer is slower
+	AstTypeAndValue tav;
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {

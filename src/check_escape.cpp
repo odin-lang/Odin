@@ -1568,10 +1568,10 @@ gb_internal void escape_nil_scan(EscapeAnalysis *ea, Ast *expr) {
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, expr);
-		if (te->cond == nullptr || te->cond->tav.value.kind != ExactValue_Bool) {
+		if (te->cond == nullptr || te->cond->tav.value().kind != ExactValue_Bool) {
 			break;
 		}
-		if (te->cond->tav.value.value_bool) {
+		if (te->cond->tav.value().value_bool) {
 			escape_nil_scan(ea, te->x);
 		} else {
 			escape_nil_scan(ea, te->y);
@@ -1919,13 +1919,13 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 
 			// none for a foreign procedure or one whose body was not checked, and what it has so far while its group settles
 			DeclInfo *d = e->decl_info;
-			bool known = d != nullptr && d->proc_info != nullptr;
-			if (known && !d->escapes_analysed.load()) {
+			bool known = d != nullptr && d->proc->proc_info != nullptr;
+			if (known && !d->proc->escapes_analysed.load()) {
 				// otherwise a call the checker did not record, which should not happen
-				known = ea->graph->group_of[d->escape_index] == ea->group;
+				known = ea->graph->group_of[d->proc->escape_index] == ea->group;
 			}
 			if (known && !ea->calls_unknown) {
-				flows = d->escape_flows;
+				flows = d->proc->escape_flows;
 			}
 		}
 	}
@@ -2096,7 +2096,7 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 		return escape_value();
 	}
 
-	TypeAndValue const &tav = expr->tav;
+	AstTypeAndValue const &tav = expr->tav;
 	if (tav.mode == Addressing_Constant) {
 		if (tav.type == nullptr || !is_type_slice(tav.type) || is_load_directive_call(expr)) {
 			return escape_value();
@@ -2309,10 +2309,10 @@ gb_internal EscapeValue escape_expr(EscapeAnalysis *ea, Ast *expr) {
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, expr);
-		if (te->cond == nullptr || te->cond->tav.value.kind != ExactValue_Bool) {
+		if (te->cond == nullptr || te->cond->tav.value().kind != ExactValue_Bool) {
 			return escape_value();
 		}
-		if (te->cond->tav.value.value_bool) {
+		if (te->cond->tav.value().value_bool) {
 			return escape_expr(ea, te->x);
 		}
 		return escape_expr(ea, te->y);
@@ -2932,8 +2932,8 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 		if (cond != nullptr) {
 			may_exit = true;
 			if (cond->tav.mode == Addressing_Constant &&
-			    cond->tav.value.kind == ExactValue_Bool &&
-			    cond->tav.value.value_bool) {
+			    cond->tav.value().kind == ExactValue_Bool &&
+			    cond->tav.value().value_bool) {
 				may_exit = false;
 			}
 		}
@@ -3617,17 +3617,17 @@ gb_internal void escape_update_member(EscapeGraph *g, Slice<EscapeMemberTask> ta
 	DeclInfo *d = g->procs[t.v]->decl;
 
 	// the same flows, in any order
-	bool same = t.flows.count == d->escape_flows.count;
+	bool same = t.flows.count == d->proc->escape_flows.count;
 	for (isize i = 0; same && i < t.flows.count; i++) {
 		same = false;
-		for (EscapeFlow const &other : d->escape_flows) {
+		for (EscapeFlow const &other : d->proc->escape_flows) {
 			same |= escape_flow_eq(t.flows[i], other);
 		}
 	}
 	if (same) {
 		return;
 	}
-	d->escape_flows = t.flows;
+	d->proc->escape_flows = t.flows;
 	for (i32 caller : t.callers) {
 		tasks[caller].stale = true;
 	}
@@ -3649,8 +3649,8 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 	}
 	if (!recursive) {
 		DeclInfo *d = g->procs[first]->decl;
-		d->escape_flows = escape_analyse(g, first, nullptr);
-		d->escapes_analysed.store(true);
+		d->proc->escape_flows = escape_analyse(g, first, nullptr);
+		d->proc->escapes_analysed.store(true);
 		return;
 	}
 
@@ -3701,19 +3701,19 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 		global_error_context.instantiations = prev_instantiations;
 		array_free(&t.reports);
 
-		pi->decl->escape_flows = t.flows;
-		pi->decl->escapes_analysed.store(true);
+		pi->decl->proc->escape_flows = t.flows;
+		pi->decl->proc->escapes_analysed.store(true);
 	}
 }
 
 gb_internal bool escape_call_edge(CheckedCall const &call, i32 *caller, i32 *callee) {
 	DeclInfo *d = call.callee->decl_info;
-	if (call.caller->proc_info == nullptr || d == nullptr || d->proc_info == nullptr) {
+	if (call.caller->proc->proc_info == nullptr || d == nullptr || d->proc->proc_info == nullptr) {
 		// e.g. in a body which failed to check, or to a foreign procedure
 		return false;
 	}
-	*caller = call.caller->escape_index;
-	*callee = d->escape_index;
+	*caller = call.caller->proc->escape_index;
+	*callee = d->proc->escape_index;
 	return true;
 }
 
@@ -3743,7 +3743,7 @@ gb_internal void escape_graph_number_procs(ProcInfo **procs, isize count) {
 	EscapeGraph *g = &escape_graph;
 	i32 first = cast(i32)(procs - g->procs.data);
 	for (isize k = 0; k < count; k++) {
-		procs[k]->decl->escape_index = first + cast(i32)k;
+		procs[k]->decl->proc->escape_index = first + cast(i32)k;
 	}
 }
 
