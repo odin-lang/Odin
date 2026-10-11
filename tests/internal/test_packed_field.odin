@@ -294,3 +294,28 @@ test_packed_field_array_conv :: proc(t: ^testing.T) {
 	w := #force_no_inline mul_matrix(&m, &p5)
 	testing.expect(t, w == [4]f32{3, 5, 7, 9}) // exact float
 }
+
+
+// zero stores to a #packed field
+
+@(export)
+p6: Packed_Small
+
+@(private="file")
+zero_v :: proc(p: ^Packed_Small) {
+	p.v = {}
+}
+
+@(test)
+test_packed_field_zero_store :: proc(t: ^testing.T) {
+	p6.v = {1, 2, 3, 4}
+	p6.n = -1
+	p6.v = {} // folded const GEP
+	p6.n = 0
+	testing.expect(t, simd.to_array(p6.v) == [4]f32{})
+	testing.expect(t, p6.n == 0)
+
+	p6.v = {5, 6, 7, 8}
+	#force_no_inline zero_v(&p6) // GEP with packed metadata
+	testing.expect(t, simd.to_array(p6.v) == [4]f32{})
+}

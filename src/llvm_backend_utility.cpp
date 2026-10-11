@@ -173,7 +173,10 @@ gb_internal void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, u
 		}
 		break;
 	default:
-		LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+		{
+			LLVMValueRef store = LLVMBuildStore(p->builder, LLVMConstNull(lb_type(p->module, type)), ptr);
+			lb_lower_store_alignment_to_known(p, store, ptr);
+		}
 		break;
 	}
 }
