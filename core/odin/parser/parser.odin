@@ -708,9 +708,27 @@ is_top_level_decl_in_proc :: proc(p: ^Parser) -> bool {
 	}
 	#partial switch p.curr_tok.kind {
 	case .At, .Import, .Foreign:
-		return true
+	case:
+		if !is_decl_on_later_line(p) {
+			return false
+		}
 	}
-	return is_decl_on_later_line(p)
+
+	t := p.tok
+	t.err = nil
+	depth := 0
+	for tok := tokenizer.scan(&t); tok.kind != .EOF; tok = tokenizer.scan(&t) {
+		#partial switch tok.kind {
+		case .Open_Brace:
+			depth += 1
+		case .Close_Brace:
+			depth -= 1
+			if depth < 0 {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 expect_block_close :: proc(p: ^Parser) -> tokenizer.Token {

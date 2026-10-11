@@ -291,6 +291,22 @@ test_parse_error_recovery_unclosed_block :: proc(t: ^testing.T) {
 }
 
 @test
+test_parse_unindented_decls :: proc(t: ^testing.T) {
+	context.allocator = context.temp_allocator
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	// a declaration starting a line in a block that is closed later is only unindented
+	src := "package p\n\ntest :: proc() {\n\t{\nHellope :: \"Hellope\"\nx := 1\n@(static) y := 2\n\t}\n}\n"
+	file := ast.File{src = src, fullpath = "test"}
+	p := parser.default_parser()
+	p.err = nil
+	parser.parse_file(&p, &file)
+
+	testing.expect_value(t, file.syntax_error_count, 0)
+	testing.expect_value(t, len(file.decls), 1)
+}
+
+@test
 test_parse_error_recovery_case_clause :: proc(t: ^testing.T) {
 	context.allocator = context.temp_allocator
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
