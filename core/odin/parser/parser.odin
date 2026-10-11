@@ -45,6 +45,7 @@ Parser :: struct {
 	curr_proc: ^ast.Node,
 
 	error_count: int,
+	block_close_error: tokenizer.Pos, // where the blocks left unclosed were last reported, as they all end there
 
 	fix_count: int,
 	fix_prev_pos: tokenizer.Pos,
@@ -133,15 +134,16 @@ is_package_name_reserved :: proc(name: string) -> bool {
 
 parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	zero_parser: {
-		p.prev_tok         = {}
-		p.curr_tok         = {}
-		p.expr_level       = 0
-		p.allow_range      = false
-		p.allow_in_expr    = false
-		p.in_foreign_block = false
-		p.allow_type       = false
-		p.lead_comment     = nil
-		p.line_comment     = nil
+		p.prev_tok          = {}
+		p.curr_tok          = {}
+		p.expr_level        = 0
+		p.allow_range       = false
+		p.allow_in_expr     = false
+		p.in_foreign_block  = false
+		p.allow_type        = false
+		p.lead_comment      = nil
+		p.line_comment      = nil
+		p.block_close_error = {}
 	}
 
 	p.tok.flags += {.Insert_Semicolon}
@@ -733,7 +735,10 @@ is_top_level_decl_in_proc :: proc(p: ^Parser) -> bool {
 
 expect_block_close :: proc(p: ^Parser) -> tokenizer.Token {
 	if is_top_level_decl_in_proc(p) {
-		error(p, p.curr_tok.pos, "expected '%s', got '%s'", tokenizer.to_string(.Close_Brace), tokenizer.token_to_string(p.curr_tok))
+		if p.block_close_error != p.curr_tok.pos {
+			error(p, p.curr_tok.pos, "expected '%s', got '%s'", tokenizer.to_string(.Close_Brace), tokenizer.token_to_string(p.curr_tok))
+			p.block_close_error = p.curr_tok.pos
+		}
 		return {kind = .Close_Brace, pos = p.curr_tok.pos}
 	}
 	return expect_token(p, .Close_Brace)
