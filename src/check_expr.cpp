@@ -961,6 +961,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 	rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
+	// NOTE(bill): Clone a polymorphic procedure's body before taking `gen_procs`' exclusive lock so lookups of it don't wait on the clone
+	Ast *proc_lit = clone_ast(old_decl->proc_lit);
+	Ast *ident = clone_ast(base_entity->identifier);
 
 	// Re-check under the exclusive lock (the lookups above ran under a released shared lock) and
 	// hold it across construction + array_add so find-then-publish is atomic. (@local-mutex)
@@ -974,7 +977,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 
-	Ast *proc_lit = clone_ast(old_decl->proc_lit);
 	ast_node(pl, ProcLit, proc_lit);
 	// NOTE(bill): Associate the scope declared above withinth this procedure declaration's type
 	add_scope(&nctx, pl->type, final_proc_type->Proc.scope);
@@ -1003,7 +1005,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 	u64 tags = base_entity->Procedure.tags;
-	Ast *ident = clone_ast(base_entity->identifier);
 	Token token = ident->Ident.token;
 	DeclInfo *d = make_decl_info(scope, old_decl->parent);
 	init_decl_info_proc(d, proc_lit);
