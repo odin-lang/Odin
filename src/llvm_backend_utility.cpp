@@ -1786,7 +1786,7 @@ gb_internal lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isi
 	GB_ASSERT(is_type_pointer(t));
 	Type *mt = base_type(type_deref(t));
 
-	if (!mt->Matrix.is_row_major) {
+	if (!is_type_matrix(mt) || !mt->Matrix.is_row_major) {
 		if (column == 0) {
 			GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
 			return lb_emit_epi(p, s, row);
