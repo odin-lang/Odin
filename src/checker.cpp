@@ -2157,11 +2157,9 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		has_value = true;
 	}
 
-	// shared by the expression and its unparenthesized one
+	// NOTE(bill): This is shared by the expression and its unparenthesized one unless it already has an identical one
 	ExactValue const *value_ptr = nullptr;
-	if (has_value) {
-		value_ptr = alloc_tav_value(value);
-	}
+	bool value_ptr_allocated = false;
 
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
@@ -2177,7 +2175,14 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		}
 
 		if (has_value) {
-			expr->tav.value_ptr = value_ptr;
+			ExactValue const *old = expr->tav.value_ptr;
+			if (old == nullptr || !are_exact_values_identical(*old, value)) {
+				if (!value_ptr_allocated) {
+					value_ptr = alloc_tav_value(value);
+					value_ptr_allocated = true;
+				}
+				expr->tav.value_ptr = value_ptr;
+			}
 		}
 		mutex_unlock(mutex);
 
