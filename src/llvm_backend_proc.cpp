@@ -4032,10 +4032,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			ptr1 = lb_emit_conv(p, ptr1, t_int);
 
 			lbValue diff = lb_emit_arith(p, Token_Sub, ptr0, ptr1, t_int);
-			lbValue res = {};
-			res.type = t_int;
-			res.value = LLVMBuildExactSDiv(p->builder, diff.value, lb_const_int(p->module, t_int, type_size_of(elem)).value, "");
-			return res;
+			return lb_emit_arith(p, Token_Quo, diff, lb_const_int(p->module, t_int, type_size_of(elem)), t_int);
 		}
 
 
