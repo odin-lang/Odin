@@ -2043,22 +2043,20 @@ gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operan
 	return false;
 }
 
-// NOTE(bill, 2026-10-02) The cache entry of `path` loaded to at least `tier`.
-// The map is only locked to find or add the entry, and the file is loaded under the entry's own mutex, so different files load at once.
-gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const &path, LoadFileTier tier) {
-	LoadFileCache *cache = nullptr;
-	mutex_lock(&info->load_file_mutex);
-	LoadFileCache **cache_ptr = string_map_get(&info->load_file_cache, path);
+// NOTE(bill): `info->load_file_mutex` must be held
+gb_internal LoadFileCache *load_file_cache_find_or_add(CheckerInfo *info, StringHashKey const &key) {
+	LoadFileCache **cache_ptr = string_map_get(&info->load_file_cache, key);
 	if (cache_ptr != nullptr) {
-		cache = *cache_ptr;
-	} else {
-		cache = permanent_alloc_item<LoadFileCache>();
-		cache->path = path;
-		string_map_init(&cache->hashes, 32);
-		string_map_set(&info->load_file_cache, path, cache);
+		return *cache_ptr;
 	}
-	mutex_unlock(&info->load_file_mutex);
+	LoadFileCache *cache = permanent_alloc_item<LoadFileCache>();
+	cache->path = key.string;
+	string_map_set(&info->load_file_cache, key, cache);
+	return cache;
+}
 
+gb_internal void load_file_cache_load(LoadFileCache *cache, LoadFileTier tier) {
+	String const &path = cache->path;
 	MUTEX_GUARD(&cache->mutex);
 	if (tier > cache->tier) {
 		cache->tier = tier;
@@ -2066,8 +2064,13 @@ gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const
 		TEMPORARY_ALLOCATOR_GUARD();
 		char *c_str = alloc_cstring(temporary_allocator(), path);
 
+		// NOTE(bill): not `gb_file_open`, whose `gb_file_last_write_time` looks the path up a second time
 		gbFile f = {};
-		cache->file_error = gb_file_open(&f, c_str);
+	#if defined(GB_SYSTEM_WINDOWS)
+		cache->file_error = gb__win32_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+	#else
+		cache->file_error = gb__posix_file_open(&f.fd, &f.ops, gbFileMode_Read, c_str);
+	#endif
 		defer (gb_file_close(&f));
 
 		if (cache->file_error == gbFileError_None) {
@@ -2094,6 +2097,16 @@ gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const
 			};
 		}
 	}
+}
+
+// NOTE(bill, 2026-10-02) The cache entry of `path` loaded to at least `tier`.
+gb_internal LoadFileCache *load_file_cache_entry(CheckerInfo *info, String const &path, LoadFileTier tier) {
+	StringHashKey key = string_hash_string(path);
+	mutex_lock(&info->load_file_mutex);
+	LoadFileCache *cache = load_file_cache_find_or_add(info, key);
+	mutex_unlock(&info->load_file_mutex);
+
+	load_file_cache_load(cache, tier);
 	return cache;
 }
 
@@ -2418,20 +2431,19 @@ gb_internal int file_cache_sort_cmp(void const *x, void const *y) {
 // This thread and a few helper tasks take them in turn and this thread only waits for the ones a running helper has taken,
 // and the job is freed by whichever of them finishes with it last.
 struct LoadDirectoryPrefetch {
-	CheckerInfo *      info;
-	Array<String>      paths;
-	std::atomic<isize> next;
-	std::atomic<isize> done;
-	std::atomic<i32>   refs;
+	Array<LoadFileCache *> files;
+	std::atomic<isize>     next;
+	std::atomic<isize>     done;
+	std::atomic<i32>       refs;
 };
 
 gb_internal void load_directory_prefetch_run(LoadDirectoryPrefetch *job) {
-	for (isize i = job->next.fetch_add(1); i < job->paths.count; i = job->next.fetch_add(1)) {
-		load_file_cache_entry(job->info, job->paths[i], LoadFileTier_Contents);
+	for (isize i = job->next.fetch_add(1); i < job->files.count; i = job->next.fetch_add(1)) {
+		load_file_cache_load(job->files[i], LoadFileTier_Contents);
 		job->done.fetch_add(1);
 	}
 	if (job->refs.fetch_sub(1) == 1) {
-		array_free(&job->paths);
+		array_free(&job->files);
 		gb_free(heap_allocator(), job);
 	}
 }
@@ -2445,16 +2457,21 @@ gb_internal void load_directory_prefetch(CheckerInfo *info, Array<FileInfo> cons
 	isize const FILES_PER_HELPER = 64;
 
 	LoadDirectoryPrefetch *job = gb_alloc_item(heap_allocator(), LoadDirectoryPrefetch);
-	job->info = info;
-	array_init(&job->paths, heap_allocator(), 0, list.count);
+	array_init(&job->files, heap_allocator(), 0, list.count);
+
+	mutex_lock(&info->load_file_mutex);
 	for (FileInfo const &fi : list) {
 		if (!fi.is_dir) {
-			array_add(&job->paths, fi.fullpath);
+			array_add(&job->files, load_file_cache_find_or_add(info, string_hash_string(fi.fullpath)));
 		}
 	}
-	isize count = job->paths.count;
+	mutex_unlock(&info->load_file_mutex);
+
+	isize count   = job->files.count;
 	isize helpers = gb_min(global_thread_pool.threads.count - 1, count/FILES_PER_HELPER);
+
 	job->refs.store(cast(i32)(helpers + 1));
+
 	for (isize i = 0; i < helpers; i++) {
 		thread_pool_add_task(load_directory_prefetch_worker, job);
 	}
@@ -2464,8 +2481,9 @@ gb_internal void load_directory_prefetch(CheckerInfo *info, Array<FileInfo> cons
 	while (job->done.load() < count) {
 		yield_thread();
 	}
+
 	if (job->refs.fetch_sub(1) == 1) {
-		array_free(&job->paths);
+		array_free(&job->files);
 		gb_free(heap_allocator(), job);
 	}
 }
