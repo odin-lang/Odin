@@ -2633,6 +2633,20 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 			gb_printf_err("Total File Size - %td\n", total_file_size);
 			gb_printf_err("\n");
 		}
+		{
+			isize total = 0;
+			isize total_bytes = 0;
+			gb_printf_err("     Count     Size  Type Kind\n");
+			for (isize kind = 1; kind < Type_Count; kind++) {
+				isize count = global_type_kind_counts[kind].load(std::memory_order_relaxed);
+				isize size = type_alloc_size(cast(TypeKind)kind);
+				total += count;
+				total_bytes += count*size;
+				gb_printf_err("%10td %8td  %.*s\n", count, size, LIT(type_strings[kind]));
+			}
+			gb_printf_err("Total Types     - %td (%td bytes)\n", total, total_bytes);
+			gb_printf_err("\n");
+		}
 		show_parse_timings(p, t);
 		{
 			TimeStamp ts = {};

@@ -748,10 +748,37 @@ struct LoadDirectoryCache {
 };
 
 
+struct PolyProcLookupOperand {
+	Type *         type;
+	ExactValue     value; // only for a `$` parameter
+	Entity *       proc_group;
+	BuiltinProcId  builtin_id;
+	AddressingMode mode;
+	bool           has_expr;
+};
+
+struct PolyProcLookup {
+	u64                          hash;
+	Type *                       dst;
+	Slice<PolyProcLookupOperand> operands;
+	Entity *                     result; // nullptr if it failed as a procedure group candidate
+	Slice<Entity *>              deps;
+	Slice<Type *>                type_info_deps;
+};
+
 struct GenProcsData {
-	Array<Entity *> procs;
-	Array<u64>      hashes; // `proc_type_identity_hash` of each of `procs`
-	RwMutex         mutex;
+	Array<Entity *>        procs;
+	Array<u64>             hashes; // `proc_type_identity_hash` of each of `procs`
+	Array<PolyProcLookup>  lookups;
+	RwMutex                mutex;
+};
+
+struct PolyProcDepCapture {
+	PolyProcDepCapture *parent;
+	DeclInfo *          decl;
+	Array<Entity *>     deps;
+	Array<Type *>       type_info_deps;
+	bool                unreplayable; // the check did more to `decl` than add dependencies
 };
 
 struct GenTypesData {
@@ -948,6 +975,8 @@ struct CheckerContext {
 	Ast *assignment_lhs_hint;
 	Ast *asm_template_hint;
 	Ast *call_proc_hint; // the callee of the call being checked
+
+	PolyProcDepCapture *poly_dep_capture;
 };
 
 gb_internal u64 check_vet_flags(CheckerContext *c);

@@ -584,6 +584,138 @@ gb_internal bool reuse_gen_polymorphic_procedure(Entity *other, PolyProcData *po
 	return true;
 }
 
+gb_internal bool poly_proc_lookup_operands(Type *src, Type *dst, Array<Operand> const &operands, Array<PolyProcLookupOperand> *out, u64 *hash_) {
+	Slice<Entity *> params = {};
+	if (src->Proc.params != nullptr) {
+		params = src->Proc.params->Tuple.variables;
+	}
+
+	u64 h = 0xcbf29ce484222325ull;
+	auto mix = [&](u64 x) {
+		h = (h ^ x) * 0x100000001b3ull;
+	};
+	mix(cast(u64)cast(uintptr)dst);
+	mix(cast(u64)operands.count);
+
+	for_array(i, operands) {
+		Operand const &o = operands[i];
+		if (o.deferred_untyped_arg) {
+			return false;
+		}
+
+		bool is_constant_param = true;
+		if (params.count > 0) {
+			is_constant_param = params[gb_min(i, params.count-1)]->kind == Entity_Constant;
+		}
+
+		PolyProcLookupOperand lo = {};
+		lo.type       = o.type;
+		lo.proc_group = o.proc_group;
+		lo.builtin_id = o.builtin_id;
+		lo.mode       = o.mode;
+		lo.has_expr   = o.expr != nullptr;
+
+		switch (o.mode) {
+		case Addressing_Constant:
+			if (is_constant_param) {
+				lo.value = o.value;
+			} else {
+				lo.mode = Addressing_Value;
+			}
+			break;
+		case Addressing_Value:
+		case Addressing_Context:
+		case Addressing_Variable:
+		case Addressing_MapIndex:
+		case Addressing_OptionalOk:
+		case Addressing_OptionalOkPtr:
+		case Addressing_SoaVariable:
+		case Addressing_SwizzleValue:
+		case Addressing_SwizzleVariable:
+			lo.mode = Addressing_Value;
+			break;
+		}
+
+		mix(cast(u64)lo.mode);
+		mix(cast(u64)cast(uintptr)lo.type);
+		mix(cast(u64)cast(uintptr)lo.proc_group);
+		mix(cast(u64)lo.builtin_id);
+		mix(cast(u64)lo.has_expr);
+
+		ExactValue const &v = lo.value;
+		mix(cast(u64)v.kind);
+		switch (v.kind) {
+		case ExactValue_Invalid:
+			break;
+		case ExactValue_Bool:
+			mix(cast(u64)v.value_bool);
+			break;
+		case ExactValue_String:
+			mix(fnv64a(v.value_string.text, v.value_string.len));
+			break;
+		case ExactValue_Integer:
+			mix(cast(u64)big_int_to_i64(&v.value_integer));
+			break;
+		case ExactValue_Float: {
+			u64 bits = 0;
+			gb_memmove(&bits, &v.value_float, gb_size_of(bits));
+			mix(bits);
+			break;
+		}
+		case ExactValue_Pointer:
+			mix(cast(u64)v.value_pointer);
+			break;
+		case ExactValue_Typeid:
+			mix(cast(u64)cast(uintptr)v.value_typeid);
+			break;
+		case ExactValue_Procedure:
+			mix(cast(u64)cast(uintptr)v.value_procedure);
+			break;
+		case ExactValue_Compound:
+			mix(cast(u64)cast(uintptr)v.value_compound);
+			break;
+		default:
+			return false;
+		}
+
+		array_add(out, lo);
+	}
+
+	*hash_ = h;
+	return true;
+}
+
+gb_internal bool poly_proc_lookup_operands_equal(Slice<PolyProcLookupOperand> const &a, Array<PolyProcLookupOperand> const &b) {
+	if (a.count != b.count) {
+		return false;
+	}
+	for_array(i, a) {
+		PolyProcLookupOperand const &x = a[i];
+		PolyProcLookupOperand const &y = b[i];
+		if (x.type       != y.type       ||
+		    x.proc_group != y.proc_group ||
+		    x.builtin_id != y.builtin_id ||
+		    x.mode       != y.mode       ||
+		    x.has_expr   != y.has_expr   ||
+		    x.value.kind != y.value.kind) {
+			return false;
+		}
+		ExactValue const &vx = x.value;
+		ExactValue const &vy = y.value;
+		switch (vx.kind) {
+		case ExactValue_Bool:      if (vx.value_bool      != vy.value_bool)      return false; break;
+		case ExactValue_String:    if (vx.value_string    != vy.value_string)    return false; break;
+		case ExactValue_Integer:   if (big_int_cmp(&vx.value_integer, &vy.value_integer) != 0) return false; break;
+		case ExactValue_Float:     if (gb_memcompare(&vx.value_float, &vy.value_float, gb_size_of(f64)) != 0) return false; break;
+		case ExactValue_Pointer:   if (vx.value_pointer   != vy.value_pointer)   return false; break;
+		case ExactValue_Typeid:    if (vx.value_typeid    != vy.value_typeid)    return false; break;
+		case ExactValue_Procedure: if (vx.value_procedure != vy.value_procedure) return false; break;
+		case ExactValue_Compound:  if (vx.value_compound  != vy.value_compound)  return false; break;
+		}
+	}
+	return true;
+}
+
 gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
                                                         Array<Operand> const *param_operands, Ast *poly_def_node, PolyProcData *poly_proc_data) {
 	///////////////////////////////////////////////////////////////////////////////
@@ -684,6 +816,92 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	});
 
 
+	GB_ASSERT(base_entity->identifier.load()->kind == Ast_Ident);
+	GB_ASSERT(base_entity->kind == Entity_Procedure);
+
+	GenProcsData *gen_procs = nullptr;
+
+	mutex_lock(&base_entity->Procedure.gen_procs_mutex);
+	gen_procs = base_entity->Procedure.gen_procs;
+	if (gen_procs == nullptr) {
+		gen_procs = permanent_alloc_item<GenProcsData>();
+		gen_procs->procs.allocator   = heap_allocator();
+		gen_procs->hashes.allocator  = heap_allocator();
+		gen_procs->lookups.allocator = heap_allocator();
+		base_entity->Procedure.gen_procs = gen_procs;
+	}
+	mutex_unlock(&base_entity->Procedure.gen_procs_mutex);
+
+	bool is_probe = old_c->no_polymorphic_errors;
+
+	auto lookup_operands = array_make<PolyProcLookupOperand>(heap_allocator(), 0, operands.count);
+	defer (array_free(&lookup_operands));
+	u64 lookup_hash = 0;
+	bool use_lookup = old_c->decl != nullptr && poly_proc_lookup_operands(src, dst, operands, &lookup_operands, &lookup_hash);
+	if (use_lookup) {
+		PolyProcLookup found = {};
+		bool is_found = false;
+		rw_mutex_shared_lock(&gen_procs->mutex);
+		for (PolyProcLookup const &l : gen_procs->lookups) {
+			if (l.hash == lookup_hash && l.dst == dst && poly_proc_lookup_operands_equal(l.operands, lookup_operands)) {
+				found = l;
+				is_found = true;
+				break;
+			}
+		}
+		rw_mutex_shared_unlock(&gen_procs->mutex);
+
+		// NOTE(bill): A failed candidate is checked again when called directly to get its errors reported
+		if (is_found && (found.result != nullptr || is_probe)) {
+			for (Entity *e : found.deps) {
+				add_dependency(info, old_c->decl, e);
+				poly_dep_capture_entity(old_c, e);
+			}
+			for (Type *t : found.type_info_deps) {
+				add_type_info_dependency(info, old_c->decl, t);
+				poly_dep_capture_type_info(old_c, t);
+			}
+			if (found.result == nullptr) {
+				return false;
+			}
+			return reuse_gen_polymorphic_procedure(found.result, poly_proc_data);
+		}
+	}
+
+	PolyProcDepCapture capture = {};
+	capture.parent = old_c->poly_dep_capture;
+	capture.decl   = old_c->decl;
+	capture.deps.allocator           = heap_allocator();
+	capture.type_info_deps.allocator = heap_allocator();
+	defer (array_free(&capture.deps));
+	defer (array_free(&capture.type_info_deps));
+
+	i64 errors_before = global_error_collector.count.load() + global_error_collector.held_count.load();
+
+	auto const record_lookup = [&](Entity *result) {
+		if (!use_lookup || capture.unreplayable) {
+			return;
+		}
+		if (!is_probe) {
+			// NOTE(bill): a check which reported errors is not recorded meaning that every later call reports them too
+			i64 errors_now = global_error_collector.count.load() + global_error_collector.held_count.load();
+			if (result == nullptr || errors_now != errors_before) {
+				return;
+			}
+		}
+		PolyProcLookup l = {};
+		l.hash           = lookup_hash;
+		l.dst            = dst;
+		l.operands       = slice_clone_from_array(permanent_allocator(), lookup_operands);
+		l.result         = result;
+		l.deps           = slice_clone_from_array(permanent_allocator(), capture.deps);
+		l.type_info_deps = slice_clone_from_array(permanent_allocator(), capture.type_info_deps);
+
+		rw_mutex_lock(&gen_procs->mutex);
+		array_add(&gen_procs->lookups, l);
+		rw_mutex_unlock(&gen_procs->mutex);
+	};
+
 	CheckerContext nctx = *old_c;
 
 	Scope *scope = create_scope(info, nullptr);
@@ -693,6 +911,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	nctx.scope = scope;
 	nctx.allow_polymorphic_types = true;
 	nctx.polymorphic_scope = scope;
+	if (use_lookup) {
+		nctx.poly_dep_capture = &capture;
+	}
 
 
 	auto *pt = &src->Proc;
@@ -701,95 +922,54 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	// Maybe it's better to check with the previous types first?
 	Type *final_proc_type = alloc_type_proc(scope, nullptr, 0, nullptr, 0, false, pt->calling_convention);
 	// NOTE: a clone, as other threads may be instantiating the same procedure, from the same AST
-	bool success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+	bool success = false;
+	if (is_probe) {
+		// A procedure group candidate is checked with its polymorphic parameters bound but quietly
+		nctx.no_polymorphic_errors = false;
+		i64 muted_before = error_mute_count();
+		begin_error_mute();
+		success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+		end_error_mute();
+		nctx.no_polymorphic_errors = true;
+		if (error_mute_count() != muted_before) {
+			success = false;
+		}
+	} else {
+		success = check_procedure_type(&nctx, final_proc_type, clone_ast(pt->node), &operands);
+	}
+	nctx.poly_dep_capture = old_c->poly_dep_capture;
 
 	if (!success) {
+		record_lookup(nullptr);
 		return false;
 	}
 
-	GenProcsData *gen_procs = nullptr;
-
-	GB_ASSERT(base_entity->identifier.load()->kind == Ast_Ident);
-	GB_ASSERT(base_entity->kind == Entity_Procedure);
-
-	mutex_lock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
-	gen_procs = base_entity->Procedure.gen_procs;
-	if (gen_procs) {
-		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
-
-		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
-
-		u64 hash = proc_type_identity_hash(final_proc_type);
-		for_array(i, gen_procs->procs) {
-			if (gen_procs->hashes[i] != hash) {
-				continue;
-			}
-			Entity *other = gen_procs->procs[i];
-			Type *pt = base_type(proc_entity_full_type(other));
-			// NOTE(bill): parameter names need to be included too as `typeid`s and link names include them
-			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
-				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-
-				if (poly_proc_data) {
-					poly_proc_data->gen_entity = other;
-				}
-				return true;
-			}
+	u64 final_hash = proc_type_identity_hash(final_proc_type);
+	rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
+	for_array(i, gen_procs->procs) {
+		if (gen_procs->hashes[i] != final_hash) {
+			continue;
 		}
-
-		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-	} else {
-		gen_procs = permanent_alloc_item<GenProcsData>();
-		gen_procs->procs.allocator = heap_allocator();
-		gen_procs->hashes.allocator = heap_allocator();
-		base_entity->Procedure.gen_procs = gen_procs;
-		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
+		Entity *other = gen_procs->procs[i];
+		Type *pt = base_type(proc_entity_full_type(other));
+		// NOTE(bill): parameter names need to be included too as `typeid`s and link names include them
+		if (are_types_identical_unique_tuples(pt, final_proc_type)) {
+			rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
+			record_lookup(other);
+			return reuse_gen_polymorphic_procedure(other, poly_proc_data);
+		}
 	}
-
-
-	{
-		// LEAK NOTE(bill): This is technically a memory leak as it has to generate the type twice
-		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
-		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
-		nctx.no_polymorphic_errors = false;
-
-		// NOTE(bill): Reset scope from the failed procedure type
-		scope->head_child.store(nullptr, std::memory_order_relaxed);
-		scope_map_clear(&scope->elements);
-		ptr_set_clear(&scope->imported);
-
-		// LEAK NOTE(bill): Cloning this AST may be leaky but this is not really an issue due to arena-based allocation
-		Ast *cloned_proc_type_node = clone_ast(pt->node);
-		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
-		if (!success) {
-			return false;
-		}
-
-		u64 hash = proc_type_identity_hash(final_proc_type);
-		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
-		for_array(i, gen_procs->procs) {
-			if (gen_procs->hashes[i] != hash) {
-				continue;
-			}
-			Entity *other = gen_procs->procs[i];
-			Type *pt = base_type(proc_entity_full_type(other));
-			if (are_types_identical_unique_tuples(pt, final_proc_type)) {
-				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-				return reuse_gen_polymorphic_procedure(other, poly_proc_data);
-			}
-		}
-		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-	}
+	rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
 
 	// Re-check under the exclusive lock (the lookups above ran under a released shared lock) and
 	// hold it across construction + array_add so find-then-publish is atomic. (@local-mutex)
-	u64 final_hash = proc_type_identity_hash(final_proc_type);
 	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
 	for_array(i, gen_procs->procs) {
 		Entity *other = gen_procs->procs[i];
 		if (gen_procs->hashes[i] == final_hash && are_types_identical_unique_tuples(base_type(proc_entity_full_type(other)), final_proc_type)) {
 			rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
+			record_lookup(other);
 			return reuse_gen_polymorphic_procedure(other, poly_proc_data);
 		}
 	}
@@ -883,6 +1063,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	array_add(&gen_procs->procs, entity);
 	array_add(&gen_procs->hashes, proc_type_identity_hash(final_proc_type));
 	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
+
+	record_lookup(entity);
 
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;
@@ -7496,6 +7678,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		if (!vari_expand && variadic_operands.count != 0) {
 			// NOTE(bill, 2024-07-14): minimize the stack usage for variadic parameters with the backing array
 			if (c->decl) {
+				poly_dep_capture_unreplayable(c);
 				bool found = false;
 				for (auto &vr : c->decl->variadic_reuses) {
 					if (are_types_identical(slice, vr.slice_type)) {
@@ -9537,6 +9720,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				// NOTE(bill): asm templates can only be used within as a declaration OR within a procedure call directly
 				ast_node(at, AsmTemplate, unnested_proc);
 				Token token = at->token;
+				poly_dep_capture_unreplayable(c);
 				DeclInfo *d = make_decl_info(c->scope, c->decl);
 				Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, unnested_proc);
 				d->init_expr = unnested_proc;
@@ -9608,6 +9792,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		if (initial_entity->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 			if (c->decl) {
+				poly_dep_capture_unreplayable(c);
 				c->decl->defer_used += 1;
 			}
 		}
@@ -9653,6 +9838,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		    callee->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 			if (c->decl) {
+				poly_dep_capture_unreplayable(c);
 				c->decl->defer_used += 1;
 			}
 		}
@@ -13358,6 +13544,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		Type *type = alloc_type(Type_Proc);
 		check_open_scope(&ctx, pl->type);
 		{
+			poly_dep_capture_unreplayable(c);
 			decl = make_decl_info(ctx.scope, ctx.decl);
 			decl->proc_lit  = node;
 			ctx.decl = decl;
