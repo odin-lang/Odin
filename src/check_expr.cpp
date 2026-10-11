@@ -9639,7 +9639,7 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 		GB_ASSERT(ce->args.count > 0);
 		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
 
-		if (ce->args[0]->tav.objc_super_target) {
+		if (ce->args[0]->kind == Ast_CallExpr && ce->args[0]->CallExpr.objc_super_target) {
 			self_type = t_objc_super_ptr;
 		} else {
 			self_type = ce->args[0]->tav.type;

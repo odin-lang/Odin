@@ -49,7 +49,6 @@ struct TypeAndValue {
 	Type *         type;
 	AddressingMode mode;
 	bool           is_lhs;            // Debug info
-	Type *         objc_super_target; // Original type of the Obj-C object before being converted to the superclass' type by the objc_super() intrinsic.
 	ExactValue     value;
 };
 
@@ -592,6 +591,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		bool         was_selector; \
 		AstSplitArgs *split_args; \
 		Entity *entity_procedure_of; \
+		Type *objc_super_target; /* objc_super(): the object's type before it was converted to the superclass */ \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(EnumFieldValue,  "enum field value",         struct { \

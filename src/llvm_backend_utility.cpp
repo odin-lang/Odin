@@ -3116,7 +3116,10 @@ gb_internal lbValue lb_handle_objc_auto_send(lbProcedure *p, Ast *expr, Slice<lb
 
 	Type *objc_super_orig_type = nullptr;
 	if (ce->args.count > 0) {
-		objc_super_orig_type = unparen_expr(ce->args[0])->tav.objc_super_target;
+		Ast *arg = unparen_expr(ce->args[0]);
+		if (arg->kind == Ast_CallExpr) {
+			objc_super_orig_type = arg->CallExpr.objc_super_target;
+		}
 	}
 
 	isize arg_offset = 1;
