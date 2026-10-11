@@ -2560,10 +2560,14 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	    lb_enclosing_proc_decl(e->decl_info) != nullptr) {
 		return lb_local_proc_name(m, e->decl_info);
 	}
-	if (e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
-		return e->TypeName.ir_mangled_name;
-	} else if (e->kind == Entity_Procedure && e->Procedure.link_name.len != 0) {
+	if (e->kind == Entity_Procedure && e->Procedure.link_name.len != 0) {
+		// NOTE: a name given by the checker (e.g. `@(link_name)` or `foreign`), so it is set before code generation
 		return e->Procedure.link_name;
+	}
+
+	String *cached = e->ir_mangled_name.load();
+	if (cached != nullptr) {
+		return *cached;
 	}
 
 	if (e->pkg == nullptr) {
@@ -2573,17 +2577,14 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e) {
 	gbString w = string_canonical_entity_name(heap_allocator(), e);
 	defer (gb_string_free(w));
 
-	String name = copy_string(permanent_allocator(), make_string(cast(u8 const *)w, gb_string_length(w)));
-
-	if (e->kind == Entity_TypeName) {
-		e->TypeName.ir_mangled_name = name;
-	} else if (e->kind == Entity_Procedure) {
-		e->Procedure.link_name = name;
-	} else if (e->kind == Entity_Variable) {
-		e->Variable.link_name = name;
+	// NOTE: with `-use-separate-modules`, modules are generated in parallel and may name the same entity at the same time,
+	// so publish the whole name at once, and leave `link_name` alone as other threads read it whilst canonicalizing names
+	String *s = permanent_alloc_item<String>();
+	*s = copy_string(permanent_allocator(), make_string(cast(u8 const *)w, gb_string_length(w)));
+	if (!e->ir_mangled_name.compare_exchange_strong(cached, s)) {
+		return *cached;
 	}
-
-	return name;
+	return *s;
 }
 
 
