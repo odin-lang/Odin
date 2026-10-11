@@ -2392,7 +2392,8 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 				String str = lb_get_const_string(m, value);
 				lbValue res = {};
 				res.type = t;
-				res.value = llvm_cstring(m, str);
+				// NOTE: as with a constant 'cstring', even "" points to its terminator rather than being nil
+				res.value = lb_find_or_add_entity_string_ptr(m, str, false);
 				return res;
 			} else if (src->kind == Type_Basic && src->Basic.kind == Basic_string16 && dst->Basic.kind == Basic_cstring16) {
 				GB_PANIC("TODO(bill): UTF-16 string");

@@ -1275,6 +1275,17 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					continue;
 				}
 
+				// NOTE: like a single case value, the bounds take the type of the switch tag, otherwise
+				// untyped bounds would default to their own type (e.g. 'string' for a 'cstring' tag) (#7853)
+				convert_to_typed(ctx, &lhs, x.type);
+				if (lhs.mode == Addressing_Invalid) {
+					continue;
+				}
+				convert_to_typed(ctx, &rhs, x.type);
+				if (rhs.mode == Addressing_Invalid) {
+					continue;
+				}
+
 				TokenKind upper_op = Token_Invalid;
 				switch (be->op.kind) {
 				case Token_Ellipsis:  upper_op = Token_LtEq; break;
@@ -1304,7 +1315,13 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 					add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
 				}
 
-				if (is_type_string16(x.type)) {
+				if (is_type_cstring16(x.type)) {
+					add_package_dependency(ctx, "runtime", "cstring16_le");
+					add_package_dependency(ctx, "runtime", "cstring16_lt");
+				} else if (is_type_cstring(x.type)) {
+					add_package_dependency(ctx, "runtime", "cstring_le");
+					add_package_dependency(ctx, "runtime", "cstring_lt");
+				} else if (is_type_string16(x.type)) {
 					// NOTE(bill): Force dependency for strings here
 					add_package_dependency(ctx, "runtime", "string16_le");
 					add_package_dependency(ctx, "runtime", "string16_lt");

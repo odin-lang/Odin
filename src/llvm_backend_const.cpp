@@ -76,8 +76,15 @@ gb_internal String lb_get_const_string(lbModule *m, lbValue value) {
 	LLVMValueRef underlying_ptr = llvm_const_extract_value(m, value.value, ptr_indices, gb_count_of(ptr_indices));
 	LLVMValueRef underlying_len = llvm_const_extract_value(m, value.value, len_indices, gb_count_of(len_indices));
 
-	GB_ASSERT(LLVMGetConstOpcode(underlying_ptr) == LLVMGetElementPtr);
-	underlying_ptr = LLVMGetOperand(underlying_ptr, 0);
+	if (LLVMIsNull(underlying_ptr)) {
+		// NOTE: an empty string has no data
+		return {};
+	}
+	// NOTE: LLVM folds the zero index GEP into the string's data to the global itself
+	if (LLVMIsAConstantExpr(underlying_ptr)) {
+		GB_ASSERT(LLVMGetConstOpcode(underlying_ptr) == LLVMGetElementPtr);
+		underlying_ptr = LLVMGetOperand(underlying_ptr, 0);
+	}
 	GB_ASSERT(LLVMIsAGlobalVariable(underlying_ptr));
 	underlying_ptr = LLVMGetInitializer(underlying_ptr);
 
