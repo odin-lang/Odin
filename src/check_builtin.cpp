@@ -3008,6 +3008,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		if (c->decl) {
 			defineable.docs = c->decl->docs;
 		}
+		poly_dep_capture_unreplayable(c);
 
 		MUTEX_GUARD(&c->info->defineables_mutex);
 		array_add(&c->info->defineables, defineable);

@@ -948,6 +948,50 @@ gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *
 	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
+gb_internal void poly_dep_capture_entity(CheckerContext *c, Entity *e) {
+	for (PolyProcDepCapture *cap = c->poly_dep_capture; cap != nullptr; cap = cap->parent) {
+		if (cap->decl != c->decl) {
+			continue;
+		}
+		bool found = false;
+		for (Entity *dep : cap->deps) {
+			if (dep == e) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			array_add(&cap->deps, e);
+		}
+	}
+}
+
+gb_internal void poly_dep_capture_type_info(CheckerContext *c, Type *t) {
+	for (PolyProcDepCapture *cap = c->poly_dep_capture; cap != nullptr; cap = cap->parent) {
+		if (cap->decl != c->decl) {
+			continue;
+		}
+		bool found = false;
+		for (Type *dep : cap->type_info_deps) {
+			if (dep == t) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			array_add(&cap->type_info_deps, t);
+		}
+	}
+}
+
+gb_internal void poly_dep_capture_unreplayable(CheckerContext *c) {
+	for (PolyProcDepCapture *cap = c->poly_dep_capture; cap != nullptr; cap = cap->parent) {
+		if (cap->decl == c->decl) {
+			cap->unreplayable = true;
+		}
+	}
+}
+
 
 gb_internal AstPackage *get_runtime_package(CheckerInfo *info) {
 	String name = str_lit("runtime");
@@ -1017,6 +1061,7 @@ gb_internal void add_package_dependency(CheckerContext *c, char const *package_n
 		e->flags |= EntityFlag_Require;
 	}
 	add_dependency(c->info, c->decl, e);
+	poly_dep_capture_entity(c, e);
 }
 
 gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
@@ -1031,6 +1076,7 @@ gb_internal void try_to_add_package_dependency(CheckerContext *c, char const *pa
 	GB_ASSERT(c->decl != nullptr);
 	e->flags |= EntityFlag_Used;
 	add_dependency(c->info, c->decl, e);
+	poly_dep_capture_entity(c, e);
 }
 
 gb_internal char const *runtime_default_hasher_fixed_name(CheckerInfo *info) {
@@ -1068,6 +1114,7 @@ gb_internal void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	}
 	if (c->decl != nullptr) {
 		add_dependency(c->info, c->decl, e);
+		poly_dep_capture_entity(c, e);
 	}
 }
 
@@ -2286,6 +2333,7 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 		                 (callee != nullptr && callee->kind == Ast_SelectorExpr && node == unparen_expr(callee->SelectorExpr.selector));
 		if (!is_callee) {
 			add_dependency(c->info, c->decl, entity);
+			poly_dep_capture_entity(c, entity);
 		}
 	}
 	add_declaration_dependency(c, entity);
@@ -2498,6 +2546,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	}
 
 	add_type_info_dependency(c->info, c->decl, t);
+	poly_dep_capture_type_info(c, t);
 #if 0
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
 		if (type_set_update(&c->info->type_info_set, t)) {
