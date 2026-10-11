@@ -52,6 +52,15 @@ struct TypeAndValue {
 	ExactValue     value;
 };
 
+gb_internal ExactValue const *alloc_tav_value(ExactValue const &value) {
+	if (value.kind == ExactValue_Invalid && value.variant_type == nullptr) {
+		return nullptr;
+	}
+	ExactValue *v = permanent_alloc_item<ExactValue>();
+	*v = value;
+	return v;
+}
+
 struct AstTypeAndValue {
 	Type *            type;
 	AddressingMode    mode;
@@ -66,14 +75,7 @@ struct AstTypeAndValue {
 	}
 
 	void set_value(ExactValue const &value) {
-		// a missing constant still keeps the union variant it is converted to
-		if (value.kind == ExactValue_Invalid && value.variant_type == nullptr) {
-			value_ptr = nullptr;
-			return;
-		}
-		ExactValue *v = permanent_alloc_item<ExactValue>();
-		*v = value;
-		value_ptr = v;
+		value_ptr = alloc_tav_value(value);
 	}
 };
 

@@ -2148,6 +2148,21 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 		}
 	*/
 
+	bool has_value = false;
+	if (mode == Addressing_Constant || mode == Addressing_Invalid) {
+		has_value = true;
+	} else if (mode == Addressing_Value && type != nullptr && is_type_typeid(type)) {
+		has_value = true;
+	} else if (mode == Addressing_Value && type != nullptr && is_type_proc(type)) {
+		has_value = true;
+	}
+
+	// shared by the expression and its unparenthesized one
+	ExactValue const *value_ptr = nullptr;
+	if (has_value) {
+		value_ptr = alloc_tav_value(value);
+	}
+
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
@@ -2161,12 +2176,8 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 			expr->tav.type = type;
 		}
 
-		if (mode == Addressing_Constant || mode == Addressing_Invalid) {
-			expr->tav.set_value(value);
-		} else if (mode == Addressing_Value && type != nullptr && is_type_typeid(type)) {
-			expr->tav.set_value(value);
-		} else if (mode == Addressing_Value && type != nullptr && is_type_proc(type)) {
-			expr->tav.set_value(value);
+		if (has_value) {
+			expr->tav.value_ptr = value_ptr;
 		}
 		mutex_unlock(mutex);
 
