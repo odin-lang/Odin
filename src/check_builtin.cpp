@@ -3054,6 +3054,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_cap:
 	case BuiltinProc_min:
 	case BuiltinProc_max:
+	case BuiltinProc_clamp:
 	case BuiltinProc_type_is_subtype_of:
 	case BuiltinProc_type_is_superset_of:
 	case BuiltinProc_objc_send:
@@ -4418,7 +4419,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// min :: proc($T: typeid) -> ordered
 		// min :: proc(a: ..ordered) -> ordered
 
-		check_multi_expr_or_type(c, operand, ce->args[0]);
+		isize first = first_non_deferrable_arg(ce->args);
+		if (arg_is_deferrable_untyped_expr(ce->args[first])) {
+			check_expr_with_type_hint(c, operand, ce->args[first], type_hint);
+		} else {
+			check_multi_expr_or_type(c, operand, ce->args[first]);
+		}
 
 		if (!operand->type) {
 			return false;
@@ -4506,18 +4512,30 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		bool all_constant = operand->mode == Addressing_Constant;
 
-		auto operands = array_make<Operand>(heap_allocator(), 0, ce->args.count);
+		auto operands = array_make<Operand>(heap_allocator(), ce->args.count, ce->args.count);
 		defer (array_free(&operands));
 
-		array_add(&operands, *operand);
+		operands[first] = *operand;
 
-		for (isize i = 1; i < ce->args.count; i++) {
+		Type *arg_hint = type_hint;
+		if (is_type_typed(operand->type)) {
+			arg_hint = operand->type;
+		}
+
+		for (isize k = 1; k < ce->args.count; k++) {
+			isize i = (first + k) % ce->args.count;
 			Ast *other_arg = ce->args[i];
 			Operand b = {};
-			check_expr(c, &b, other_arg);
+			if (arg_is_deferrable_untyped_expr(other_arg)) {
+				check_expr_with_type_hint(c, &b, other_arg, arg_hint);
+			} else {
+				check_expr(c, &b, other_arg);
+			}
+
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
+
 			if (!is_type_ordered(b.type) || !(is_type_numeric(b.type) || is_type_string(b.type))) {
 				gbString type_str = type_to_string(b.type);
 				error(call,
@@ -4526,7 +4544,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gb_string_free(type_str);
 				return false;
 			}
-			array_add(&operands, b);
+
+			operands[i] = b;
 
 			if (all_constant) {
 				all_constant = b.mode == Addressing_Constant;
@@ -4595,7 +4614,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		// max :: proc($T: typeid) -> ordered
 		// max :: proc(a: ..ordered) -> ordered
 
-		check_multi_expr_or_type(c, operand, ce->args[0]);
+		isize first = first_non_deferrable_arg(ce->args);
+		if (arg_is_deferrable_untyped_expr(ce->args[first])) {
+			check_expr_with_type_hint(c, operand, ce->args[first], type_hint);
+		} else {
+			check_multi_expr_or_type(c, operand, ce->args[first]);
+		}
 
 		if (!operand->type) {
 			return false;
@@ -4688,16 +4712,25 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 		bool all_constant = operand->mode == Addressing_Constant;
 
-		auto operands = array_make<Operand>(heap_allocator(), 0, ce->args.count);
+		auto operands = array_make<Operand>(heap_allocator(), ce->args.count, ce->args.count);
 		defer (array_free(&operands));
 
-		array_add(&operands, *operand);
+		operands[first] = *operand;
 
+		Type *arg_hint = type_hint;
+		if (is_type_typed(operand->type)) {
+			arg_hint = operand->type;
+		}
 
-		for (isize i = 1; i < ce->args.count; i++) {
+		for (isize k = 1; k < ce->args.count; k++) {
+			isize i = (first + k) % ce->args.count;
 			Ast *arg = ce->args[i];
 			Operand b = {};
-			check_expr(c, &b, arg);
+			if (arg_is_deferrable_untyped_expr(arg)) {
+				check_expr_with_type_hint(c, &b, arg, arg_hint);
+			} else {
+				check_expr(c, &b, arg);
+			}
 			if (b.mode == Addressing_Invalid) {
 				return false;
 			}
@@ -4709,7 +4742,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				gb_string_free(type_str);
 				return false;
 			}
-			array_add(&operands, b);
+			operands[i] = b;
 
 			if (all_constant) {
 				all_constant = b.mode == Addressing_Constant;
@@ -4850,45 +4883,36 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 	case BuiltinProc_clamp: {
 		// clamp :: proc(a, min, max: ordered) -> ordered
-		if (!operand->type) {
-			return false;
-		}
-
-		Type *type = operand->type;
-		if (!is_type_ordered(type) || !(is_type_numeric(type) || is_type_string(type))) {
-			gbString type_str = type_to_string(operand->type);
-			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
-		}
-
-		Ast *min_arg = ce->args[1];
-		Ast *max_arg = ce->args[2];
-		Operand x = *operand;
+		Operand x = {};
 		Operand y = {};
 		Operand z = {};
+		Operand *ops[3] = {&x, &y, &z};
 
-		check_expr(c, &y, min_arg);
-		if (y.mode == Addressing_Invalid) {
-			return false;
-		}
-		if (!is_type_ordered(y.type) || !(is_type_numeric(y.type) || is_type_string(y.type))) {
-			gbString type_str = type_to_string(y.type);
-			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
+		isize first = first_non_deferrable_arg(ce->args);
+		Type *arg_hint = type_hint;
+		for (isize k = 0; k < 3; k++) {
+			isize i = (first + k) % 3;
+			Operand *o = ops[i];
+			if (arg_is_deferrable_untyped_expr(ce->args[i])) {
+				check_expr_with_type_hint(c, o, ce->args[i], arg_hint);
+			} else {
+				check_expr(c, o, ce->args[i]);
+			}
+			if (o->mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_ordered(o->type) || !(is_type_numeric(o->type) || is_type_string(o->type))) {
+				gbString type_str = type_to_string(o->type);
+				error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
+				gb_string_free(type_str);
+				return false;
+			}
+			if (k == 0 && is_type_typed(o->type)) {
+				arg_hint = o->type;
+			}
 		}
 
-		check_expr(c, &z, max_arg);
-		if (z.mode == Addressing_Invalid) {
-			return false;
-		}
-		if (!is_type_ordered(z.type) || !(is_type_numeric(z.type) || is_type_string(z.type))) {
-			gbString type_str = type_to_string(z.type);
-			error(call, "Expected an ordered numeric or string type to 'clamp', got '%s'", type_str);
-			gb_string_free(type_str);
-			return false;
-		}
+		Type *type = x.type;
 
 		if (x.mode == Addressing_Constant &&
 		    y.mode == Addressing_Constant &&
@@ -4912,14 +4936,17 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			operand->mode = Addressing_Value;
 			operand->type = type;
 
-			Operand *ops[3] = {&x, &y, &z};
 			for (isize i = 0; i < 3; i++) {
 				Operand *a = ops[i];
 				for (isize j = 0; j < 3; j++) {
-					if (i == j) continue;
+					if (i == j) {
+						continue;
+					}
 					Operand *b = ops[j];
 					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) return false;
+					if (a->mode == Addressing_Invalid) {
+						return false;
+					}
 				}
 			}
 

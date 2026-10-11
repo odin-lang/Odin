@@ -47,16 +47,19 @@ struct CallArgumentData {
 	Entity *gen_entity;
 	i64     score;
 	Type *  result_type;
+	bool    bound_by_later_arg;
 };
 
 struct PolyProcData {
 	Entity *  gen_entity;
 	ProcInfo *proc_info;
+	bool      bound_by_later_arg;
 };
 
 struct ValidIndexAndScore {
 	isize index;
 	i64   score;
+	bool  bound_by_later_arg;
 };
 
 gb_internal int valid_index_and_score_cmp(void const *a, void const *b) {
@@ -126,6 +129,7 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 gb_internal bool is_expr_inferred_fixed_array(Ast *type_expr);
 
 gb_internal Entity *find_polymorphic_record_entity(GenTypesData *found_gen_types, isize param_count, Array<Operand> const &ordered_operands);
+gb_internal Array<Operand> poly_operands_with_definite_types(CheckerContext *c, TypeProc *pt, Array<Operand> const &operands);
 
 gb_internal bool complete_soa_type(Checker *checker, Type *t, bool wait_to_finish);
 
@@ -658,6 +662,13 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	Array<Operand> operands = {};
 	if (param_operands) {
 		operands = *param_operands;
+		Array<Operand> bound = poly_operands_with_definite_types(old_c, &src->Proc, operands);
+		if (bound.data != nullptr) {
+			operands = bound;
+			if (poly_proc_data) {
+				poly_proc_data->bound_by_later_arg = true;
+			}
+		}
 	} else {
 		operands = array_make<Operand>(a, 0, dst->Proc.param_count);
 		for (isize i = 0; i < dst->Proc.param_count; i++) {
@@ -4341,6 +4352,13 @@ gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
 		return node->CompoundLit.type == nullptr;
 	case Ast_ImplicitSelectorExpr:
 		return true;
+	case Ast_UnaryExpr: {
+		Ast *expr = unparen_expr(node->UnaryExpr.expr);
+		return node->UnaryExpr.op.kind == Token_And &&
+		       expr != nullptr &&
+		       expr->kind == Ast_CompoundLit &&
+		       expr->CompoundLit.type == nullptr;
+	}
 	case Ast_TernaryIfExpr:
 		return arg_is_deferrable_untyped_expr(node->TernaryIfExpr.x) &&
 		       arg_is_deferrable_untyped_expr(node->TernaryIfExpr.y);
@@ -4349,6 +4367,15 @@ gb_internal bool arg_is_deferrable_untyped_expr(Ast *node) {
 		       arg_is_deferrable_untyped_expr(node->TernaryWhenExpr.y);
 	}
 	return false;
+}
+
+gb_internal isize first_non_deferrable_arg(Slice<Ast *> const &args) {
+	for_array(i, args) {
+		if (!arg_is_deferrable_untyped_expr(args[i])) {
+			return i;
+		}
+	}
+	return 0;
 }
 
 gb_internal bool can_use_other_type_as_type_hint(bool use_lhs_as_type_hint, Type *other_type) {
@@ -4589,8 +4616,8 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 	case Token_CmpEq:
 	case Token_NotEq: {
 		// NOTE(bill): Allow comparisons between types
-		if (is_ise_expr(be->left)) {
-			// Evalute the right before the left for an '.X' expression
+		if (arg_is_deferrable_untyped_expr(be->left) &&
+		    !arg_is_deferrable_untyped_expr(be->right)) {
 			check_expr_or_type(c, y, be->right, nullptr /* ignore type hint */);
 			check_expr_or_type(c, x, be->left, y->type);
 		} else {
@@ -4719,9 +4746,14 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 		return;
 	}
 
-	default:
-		if (is_ise_expr(be->left)) {
-			// Evalute the right before the left for an '.X' expression
+	default: {
+		bool right_first = is_ise_expr(be->left);
+		if (type_hint == nullptr || token_is_comparison(op.kind)) {
+			// NOTE(bill): '{...}' keeps an outer type hint, e.g. `v: [2]f32 = {1, 2} * scalar`
+			right_first = arg_is_deferrable_untyped_expr(be->left) &&
+			              !arg_is_deferrable_untyped_expr(be->right);
+		}
+		if (right_first) {
 			check_expr_or_type(c, y, be->right, token_is_comparison(op.kind) ? nullptr : type_hint);
 
 			if (can_use_other_type_as_type_hint(use_lhs_as_type_hint, y->type)) { // RHS in this case
@@ -4738,6 +4770,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 			}
 		}
 		break;
+	}
 	}
 	if (x->mode == Addressing_Invalid) {
 		return;
@@ -7025,6 +7058,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 	Type *final_proc_type = proc_type;
 	Entity *gen_entity = nullptr;
+	bool bound_by_later_arg = false;
 
 	if (vari_expand && !variadic) {
 		if (show_error) {
@@ -7356,6 +7390,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			PolyProcData poly_proc_data = {};
 			if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
 				gen_entity = poly_proc_data.gen_entity;
+				bound_by_later_arg = poly_proc_data.bound_by_later_arg;
 				Type *gept = base_type(proc_entity_full_type(gen_entity));
 				GB_ASSERT(is_type_proc(gept));
 				final_proc_type = proc_entity_full_type(gen_entity);
@@ -7370,6 +7405,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			Operand *o = &ordered_operands[i];
 			if (o->deferred_untyped_arg) {
 				materialize_deferred_untyped_arg(c, o, pt->params->Tuple.variables[i]->type, show_error);
+				if (o->mode == Addressing_Invalid) {
+					err = CallArgumentError_WrongTypes;
+				}
 			}
 			if (o->mode == Addressing_Invalid) {
 				continue;
@@ -7426,6 +7464,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				deferred_local = *o;
 				materialize_deferred_untyped_arg(c, &deferred_local, vari_expand ? slice : elem, show_error);
 				o = &deferred_local;
+				if (o->mode == Addressing_Invalid) {
+					err = CallArgumentError_WrongTypes;
+				}
 			}
 			if (vari_expand) {
 				t = slice;
@@ -7476,6 +7517,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
+		data->bound_by_later_arg = bound_by_later_arg;
 
 
 		Ast *proc_lit = nullptr;
@@ -8048,6 +8090,7 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 
 			ValidIndexAndScore item = {};
 			item.score = data.score;
+			item.bound_by_later_arg = data.bound_by_later_arg;
 
 			if (data.gen_entity != nullptr) {
 				array_add(&proc_entities, data.gen_entity);
@@ -8093,6 +8136,16 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		}
 	}
 	c->in_proc_group = false;
+
+	isize direct_count = 0;
+	for (ValidIndexAndScore const &v : valids) {
+		if (!v.bound_by_later_arg) {
+			valids[direct_count++] = v;
+		}
+	}
+	if (direct_count > 0) {
+		valids.count = direct_count;
+	}
 
 	if (max_matched_features > 0) {
 		for_array(i, valids) {
@@ -8857,6 +8910,81 @@ gb_internal isize lookup_polymorphic_record_parameter(Type *t, String parameter_
 }
 
 
+gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *original_type, Array<Operand> ordered_operands, Ast *call) {
+	isize param_count = get_record_polymorphic_params(original_type)->variables.count;
+
+	GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
+	mutex_lock(&found_gen_types->mutex);
+
+	// NOTE(bill, 2026-1010):
+	// check_struct_type/check_union_type release this mutex early (after publishing, before checking members)
+	// to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit path keeps it until scope end.
+	bool gen_types_locked = true;
+	defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
+
+	Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
+	if (found_entity) {
+		add_declaration_dependency(c, found_entity);
+		return found_entity->type;
+	}
+
+	CheckerContext ctx = *c;
+
+	// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
+	ctx.scope = polymorphic_record_parent_scope(original_type);
+
+	// NOTE(bill): the instance's members are only checked by its first use because their dependencies are the instance's own and each use depends on the instance instead
+	ctx.decl = make_decl_info(ctx.scope, nullptr);
+
+	if (original_type->Named.type_name && original_type->Named.type_name->file) {
+		ctx.file = original_type->Named.type_name->file;
+		ctx.pkg = ctx.file->pkg;
+	}
+	GB_ASSERT(ctx.scope != nullptr);
+
+	Type *bt = base_type(original_type);
+	String generated_name = make_string_c(expr_to_string(call));
+
+	Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
+	ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
+	global_error_context.instantiations.records = &instantiation;
+	if (bt->kind == Type_Struct) {
+		Ast *node = clone_ast(bt->Struct.node);
+
+		Type *struct_type = alloc_type_struct();
+		struct_type->Struct.node = node;
+		struct_type->Struct.polymorphic_parent = original_type;
+		set_base_type(named_type, struct_type);
+
+		check_open_scope(&ctx, node);
+		check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+
+		// check_struct_type released found_gen_types->mutex after publishing the instantiation.
+		gen_types_locked = false;
+		check_close_scope(&ctx);
+	} else if (bt->kind == Type_Union) {
+		Ast *node = clone_ast(bt->Union.node);
+
+		Type *union_type = alloc_type_union();
+		union_type->Union.node = node;
+		union_type->Union.polymorphic_parent = original_type;
+		set_base_type(named_type, union_type);
+
+		check_open_scope(&ctx, node);
+		check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
+
+		// check_union_type released found_gen_types->mutex after publishing the instantiation.
+		gen_types_locked = false;
+		check_close_scope(&ctx);
+	} else {
+		GB_PANIC("Unsupported parametric polymorphic record type");
+	}
+	global_error_context.instantiations.records = instantiation.prev;
+
+	add_declaration_dependency(c, named_type->Named.type_name);
+	return named_type;
+}
+
 gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *operand, Ast *call) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
@@ -9143,75 +9271,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		return err;
 	}
 
-	{
-		GenTypesData *found_gen_types = ensure_polymorphic_record_entity_has_gen_types(c, original_type);
-		mutex_lock(&found_gen_types->mutex);
-		// check_struct_type/check_union_type release this mutex early (after publishing, before
-		// checking members) to avoid a cross-record ABBA, clearing gen_types_locked. The cache-hit
-		// path keeps it until scope end.
-		bool gen_types_locked = true;
-		defer (if (gen_types_locked) mutex_unlock(&found_gen_types->mutex));
-
-		Entity *found_entity = find_polymorphic_record_entity(found_gen_types, param_count, ordered_operands);
-		if (found_entity) {
-			add_declaration_dependency(c, found_entity);
-			operand->mode = Addressing_Type;
-			operand->type = found_entity->type;
-			return err;
-		}
-
-		CheckerContext ctx = *c;
-		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
-		ctx.scope = polymorphic_record_parent_scope(original_type);
-		// NOTE(bill): the instance's members are only checked by its first use, so their dependencies are
-		// the instance's own, and each use depends on the instance instead
-		ctx.decl = make_decl_info(ctx.scope, nullptr);
-
-		if (original_type->Named.type_name && original_type->Named.type_name->file) {
-			ctx.file = original_type->Named.type_name->file;
-			ctx.pkg = ctx.file->pkg;
-		}
-		GB_ASSERT(ctx.scope != nullptr);
-
-		Type *bt = base_type(original_type);
-		String generated_name = make_string_c(expr_to_string(call));
-
-		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
-		ErrorRecordInstantiation instantiation = {global_error_context.instantiations.records, call, named_type};
-		global_error_context.instantiations.records = &instantiation;
-		if (bt->kind == Type_Struct) {
-			Ast *node = clone_ast(bt->Struct.node);
-			Type *struct_type = alloc_type_struct();
-			struct_type->Struct.node = node;
-			struct_type->Struct.polymorphic_parent = original_type;
-			set_base_type(named_type, struct_type);
-
-			check_open_scope(&ctx, node);
-			check_struct_type(&ctx, struct_type, node, &ordered_operands, named_type, original_type, found_gen_types);
-			// check_struct_type released found_gen_types->mutex after publishing the instantiation.
-			gen_types_locked = false;
-			check_close_scope(&ctx);
-		} else if (bt->kind == Type_Union) {
-			Ast *node = clone_ast(bt->Union.node);
-			Type *union_type = alloc_type_union();
-			union_type->Union.node = node;
-			union_type->Union.polymorphic_parent = original_type;
-			set_base_type(named_type, union_type);
-
-			check_open_scope(&ctx, node);
-			check_union_type(&ctx, union_type, node, &ordered_operands, named_type, original_type, found_gen_types);
-			// check_union_type released found_gen_types->mutex after publishing the instantiation.
-			gen_types_locked = false;
-			check_close_scope(&ctx);
-		} else {
-			GB_PANIC("Unsupported parametric polymorphic record type");
-		}
-		global_error_context.instantiations.records = instantiation.prev;
-
-		add_declaration_dependency(c, named_type->Named.type_name);
-		operand->mode = Addressing_Type;
-		operand->type = named_type;
-	}
+	operand->mode = Addressing_Type;
+	operand->type = instantiate_polymorphic_record(c, original_type, ordered_operands, call);
 	return err;
 }
 
@@ -9967,12 +10028,31 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, bool is_for_loop, Ope
 
 	ast_node(ie, BinaryExpr, node);
 
-	check_expr_with_type_hint(c, x, ie->left, type_hint);
-	if (x->mode == Addressing_Invalid) {
+	Operand *a = x;
+	Operand *b = y;
+	Ast *a_expr = ie->left;
+	Ast *b_expr = ie->right;
+	if (type_hint == nullptr &&
+	    arg_is_deferrable_untyped_expr(ie->left) &&
+	    !arg_is_deferrable_untyped_expr(ie->right)) {
+		a = y;
+		b = x;
+		a_expr = ie->right;
+		b_expr = ie->left;
+	}
+
+	check_expr_with_type_hint(c, a, a_expr, type_hint);
+	if (a->mode == Addressing_Invalid) {
 		return false;
 	}
-	check_expr_with_type_hint(c, y, ie->right, type_hint);
-	if (y->mode == Addressing_Invalid) {
+
+	Type *b_hint = type_hint;
+	if (b_hint == nullptr && arg_is_deferrable_untyped_expr(b_expr)) {
+		b_hint = a->type;
+	}
+
+	check_expr_with_type_hint(c, b, b_expr, b_hint);
+	if (b->mode == Addressing_Invalid) {
 		return false;
 	}
 
@@ -10144,14 +10224,13 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 	o->expr = node;
 	o->mode = Addressing_Invalid;
 
-	Type *th = type_hint;
-
-	if (th == nullptr) {
+	if (type_hint == nullptr) {
 		gbString str = expr_to_string(node);
 		error(node, "Cannot determine type for implicit selector expression '%s'", str);
 		gb_string_free(str);
 		return Expr_Expr;
 	}
+	Type *th = core_broadcastable_elem_type(type_hint);
 	o->type = th;
 
 	bool ok = attempt_implicit_selector_expr(c, o, ise, th);
@@ -10174,17 +10253,17 @@ gb_internal ExprKind check_implicit_selector_expr(CheckerContext *c, Operand *o,
 			error(node, "Undeclared name '%.*s' for type '%s'", LIT(name), typ);
 
 			check_did_you_mean_type(name, bt->Enum.fields);
-		} else if (is_type_bit_set(th) && is_type_enum(th->BitSet.elem)) {
+		} else if (is_type_bit_set(type_hint) && is_type_enum(type_hint->BitSet.elem)) {
 			ERROR_BLOCK();
 
-			gbString typ = type_to_string(th);
+			gbString typ = type_to_string(type_hint);
 			gbString str = expr_to_string(node);
 			error(node, "Cannot convert enum value to '%s'", typ);
 			error_line("\tSuggestion: Did you mean '{ %s }'?\n", str);
 			gb_string_free(typ);
 			gb_string_free(str);
 		} else {
-			gbString typ = type_to_string(th);
+			gbString typ = type_to_string(type_hint);
 			gbString str = expr_to_string(node);
 			error(node, "Invalid type '%s' for implicit selector expression '%s'", typ, str);
 			gb_string_free(str);
