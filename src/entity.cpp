@@ -242,6 +242,7 @@ struct Entity {
 
 	std::atomic<struct lbModule *> code_gen_module;
 	std::atomic<struct lbProcedure *> code_gen_procedure;
+	std::atomic<String *>             ir_mangled_name; // the backend's name for it, published once as modules may name it in parallel
 
 	u64         order_in_src;
 	String      deprecated_message;
@@ -291,7 +292,6 @@ struct Entity {
 		struct {
 			Type * type_parameter_specialization;
 			Type * original_type_for_parapoly;
-			String ir_mangled_name;
 			bool   is_type_alias;
 			bool   objc_is_implementation;
 			Type*  objc_superclass;

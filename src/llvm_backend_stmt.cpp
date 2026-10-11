@@ -175,7 +175,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			continue;
 		}
 
-		if (e->TypeName.ir_mangled_name.len != 0) {
+		if (e->ir_mangled_name.load() != nullptr) {
 			// NOTE(bill): Already set
 			continue;
 		}
