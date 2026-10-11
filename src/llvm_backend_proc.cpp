@@ -1146,7 +1146,7 @@ gb_internal lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue
 gb_internal lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name) {
 	AstPackage *pkg = m->info->runtime_package;
 	Entity *e = scope_lookup_current(pkg->scope, string_interner_insert(name));
-	GB_ASSERT_MSG(e != nullptr, "Runtime procedure not found: %s", name);
+	GB_ASSERT_MSG(e != nullptr, "Runtime procedure not found: %.*s", LIT(name));
 	return lb_find_procedure_value_from_entity(m, e);
 }
 
