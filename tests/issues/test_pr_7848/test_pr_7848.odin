@@ -137,6 +137,14 @@ test_pr_7848_export :: proc(t: ^testing.T) {
 		testing.expect_value(t, z.kind, tf.Entity_Kind.Field)
 	}
 
+	// an implicit selector refers to the field of the enum the picked procedure takes
+	ids = tf.find_idents(b.uses, offset_of(t, path, ".X, 1") + 1)
+	if testing.expect_value(t, len(ids), 1) {
+		x := s.entities[ids[0].entity]
+		testing.expect_value(t, x.name, "X")
+		testing.expect_value(t, x.offset, offset_of(t, path, "X, Y"))
+	}
+
 	// the `when` branch that is not taken
 	untaken := offset_of(t, path, "c += 100")
 	inactive := false

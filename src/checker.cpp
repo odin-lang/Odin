@@ -2139,7 +2139,7 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 
 gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
 	Token const &token = identifier->Ident.token;
-	if (build_context.export_semantics_format != SemanticsFormat_Invalid && (token.flags & TokenFlag_Synthesized) == 0) {
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && (token.flags & TokenFlag_Synthesized) == 0 && !is_error_muted()) {
 		per_thread_array_add(&i->semantic_ident_queue, SemanticIdent{entity, token.pos.file_id, token.pos.offset, definition});
 	}
 }
