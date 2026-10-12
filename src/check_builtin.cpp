@@ -3037,6 +3037,32 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 	return true;
 }
 
+// NOTE: shared by 'offset_of' and 'offset_of_by_string', the struct must have a layout to take an offset into
+gb_internal bool check_offset_of_struct_type(Type *type, Ast *field_arg, String const &builtin_name) {
+	Type *bt = base_type(type);
+	if (bt->kind != Type_Struct || bt->Struct.scope == nullptr) {
+		return true;
+	}
+	if (is_type_polymorphic(bt)) {
+		gbString t = type_to_string(type);
+		error(field_arg, "Cannot use '%.*s' on an unspecialized polymorphic struct type, got '%s'", LIT(builtin_name), t);
+		gb_string_free(t);
+		return false;
+	} else if (bt->Struct.checking_thread.load() == cast(i32)current_thread_index() + 1) {
+		// e.g. `Foo :: struct #align(offset_of(Foo, x)) {...}`, its fields are not known yet
+		gbString t = type_to_string(type);
+		error(field_arg, "Cannot use '%.*s' on '%s' within its own declaration", LIT(builtin_name), t);
+		gb_string_free(t);
+		return false;
+	} else if (bt->Struct.fields.count == 0 && bt->Struct.node == nullptr) {
+		gbString t = type_to_string(type);
+		error(field_arg, "Cannot use '%.*s' on incomplete struct declaration, got '%s'", LIT(builtin_name), t);
+		gb_string_free(t);
+		return false;
+	}
+	return true;
+}
+
 gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	if (ce->inlining != ProcInlining_none) {
@@ -3429,19 +3455,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			return false;
 		}
 
-		Type *bt = base_type(type);
-		if (bt->kind == Type_Struct && bt->Struct.scope != nullptr) {
-			if (is_type_polymorphic(bt)) {
-				gbString t = type_to_string(type);
-				error(field_arg, "Cannot use '%.*s' on an unspecialized polymorphic struct type, got '%s'", LIT(builtin_name), t);
-				gb_string_free(t);
-				return false;
-			} else if (bt->Struct.fields.count == 0 && bt->Struct.node == nullptr) {
-				gbString t = type_to_string(type);
-				error(field_arg, "Cannot use '%.*s' on incomplete struct declaration, got '%s'", LIT(builtin_name), t);
-				gb_string_free(t);
-				return false;
-			}
+		if (!check_offset_of_struct_type(type, field_arg, builtin_name)) {
+			return false;
 		}
 		
 		Selection sel = lookup_field(type, field_name, false);
@@ -3516,6 +3531,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			gbString t = type_to_string(type);
 			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
 			gb_string_free(t);
+			return false;
+		}
+		if (!check_offset_of_struct_type(type, field_arg, builtin_name)) {
 			return false;
 		}
 		

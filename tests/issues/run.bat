@@ -58,6 +58,7 @@ set ODIN=..\..\..\odin
 %ODIN% check "..\test_issue_atomic_orderings" -no-entry-point %COMMON% 2>&1 | find /c "Warning:" | findstr /x "13" || exit /b
 %ODIN% check "..\test_issue_atomic_errors" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
 %ODIN% check "..\test_issue_atomic_access" -no-entry-point -vet-atomic-access %COMMON% 2>&1 | find /c "Error:" | findstr /x "11" || exit /b
+%ODIN% check "..\test_issue_7867" -no-entry-point %COMMON% 2>&1 | find /c "Error:" | findstr /x "7" || exit /b
 
 @rem #########################################################################################################
 
