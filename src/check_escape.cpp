@@ -101,12 +101,15 @@ enum EscapeAtomKind : u8 {
 	EscapeAtom_Local, // an integer local `escape_bounds_entity` allows
 	EscapeAtom_Len,   // the length of such a local slice, string or dynamic array
 	EscapeAtom_End,   // the length of the slice or string a range statement goes over, as it began
+
+	EscapeAtom_NonZero, // only as the `b` of a limit, which is then that its `a` is not zero
 };
 
 struct EscapeAtom {
 	EscapeAtomKind kind;
 	Entity *       e;
 	Ast *          stmt;
+	Ast *          field; // of `e`, e.g. `e.a.b`
 };
 
 struct EscapeLimit {
@@ -478,6 +481,9 @@ gb_internal bool escape_bounds_term_eq(Ast *a, Ast *b) {
 	switch (a->kind) {
 	case Ast_Ident:
 		return entity_of_node(a) == entity_of_node(b);
+	case Ast_SelectorExpr:
+		return entity_of_node(a->SelectorExpr.selector) == entity_of_node(b->SelectorExpr.selector) &&
+		       escape_bounds_term_eq(a->SelectorExpr.expr, b->SelectorExpr.expr);
 	case Ast_UnaryExpr:
 		return a->UnaryExpr.op.kind == b->UnaryExpr.op.kind && escape_bounds_term_eq(a->UnaryExpr.expr, b->UnaryExpr.expr);
 	case Ast_BinaryExpr:
@@ -511,7 +517,7 @@ gb_internal bool escape_bounds_length_eq(Ast *a, Ast *b) {
 	case Type_EnumeratedArray: return are_types_identical(x, y);
 	case Type_MultiPointer:    return true;
 	}
-	return entity_of_node(unparen_expr(a)) == entity_of_node(unparen_expr(b));
+	return escape_bounds_term_eq(a, b);
 }
 
 gb_internal bool escape_bounds_check_eq(Ast *a, Ast *b) {
@@ -537,7 +543,13 @@ gb_internal bool escape_bounds_passed(Array<Ast *> const &checks, Ast *node) {
 }
 
 gb_internal bool escape_atom_eq(EscapeAtom const &x, EscapeAtom const &y) {
-	return x.kind == y.kind && x.e == y.e && x.stmt == y.stmt;
+	if (x.kind != y.kind || x.e != y.e) {
+		return false;
+	}
+	if (x.stmt != y.stmt) {
+		return false;
+	}
+	return escape_bounds_term_eq(x.field, y.field);
 }
 
 gb_internal bool escape_limits_join(Array<EscapeLimit> *dst, Array<EscapeLimit> const &src) {
@@ -990,13 +1002,24 @@ gb_internal bool escape_bounds_mentions(Ast *x, Entity *e) {
 		return false;
 	}
 	switch (x->kind) {
-	case Ast_Ident:      return entity_of_node(x) == e;
-	case Ast_UnaryExpr:  return escape_bounds_mentions(x->UnaryExpr.expr, e);
-	case Ast_BinaryExpr: return escape_bounds_mentions(x->BinaryExpr.left, e) || escape_bounds_mentions(x->BinaryExpr.right, e);
-	case Ast_CallExpr:   return x->CallExpr.args.count == 1 && escape_bounds_mentions(x->CallExpr.args[0], e);
-	case Ast_TypeCast:   return escape_bounds_mentions(x->TypeCast.expr, e);
-	case Ast_AutoCast:   return escape_bounds_mentions(x->AutoCast.expr, e);
-	case Ast_IndexExpr:  return escape_bounds_mentions(x->IndexExpr.expr, e) || escape_bounds_mentions(x->IndexExpr.index, e);
+	case Ast_Ident:
+		return entity_of_node(x) == e;
+	case Ast_UnaryExpr:
+		return escape_bounds_mentions(x->UnaryExpr.expr, e);
+	case Ast_BinaryExpr:
+		return escape_bounds_mentions(x->BinaryExpr.left, e) ||
+		       escape_bounds_mentions(x->BinaryExpr.right, e);
+	case Ast_CallExpr:
+		return x->CallExpr.args.count == 1 && escape_bounds_mentions(x->CallExpr.args[0], e);
+	case Ast_TypeCast:
+		return escape_bounds_mentions(x->TypeCast.expr, e);
+	case Ast_AutoCast:
+		return escape_bounds_mentions(x->AutoCast.expr, e);
+	case Ast_SelectorExpr:
+		return escape_bounds_mentions(x->SelectorExpr.expr, e);
+	case Ast_IndexExpr:
+		return escape_bounds_mentions(x->IndexExpr.expr, e) ||
+		       escape_bounds_mentions(x->IndexExpr.index, e);
 	case Ast_SliceExpr:
 		return escape_bounds_mentions(x->SliceExpr.expr, e) ||
 		       escape_bounds_mentions(x->SliceExpr.low,  e) ||
@@ -1848,8 +1871,62 @@ gb_internal bool escape_bounds_entity(EscapeAnalysis *ea, Entity *e) {
 	return !escape_is_param(e) || ((e->flags & EntityFlag_ByPtr) == 0 && type_size_of(e->type) <= 16);
 }
 
-gb_internal Entity *escape_bounds_len_of(EscapeAnalysis *ea, Ast *x) {
-	// the local of `len(x)`, when it is such a slice, string or dynamic array
+gb_internal Entity *escape_bounds_local(EscapeAnalysis *ea, Ast *x) {
+	x = unparen_expr(x);
+	switch (x->kind) {
+	case_ast_node(i, Ident, x);
+		Entity *e = entity_of_node(x);
+		if (escape_bounds_entity(ea, e)) {
+			return e;
+		}
+	case_end;
+
+	case_ast_node(se, SelectorExpr, x);
+		Entity *f = entity_of_node(se->selector);
+		if (f == nullptr || f->kind != Entity_Variable) {
+			return nullptr;
+		}
+		if ((f->flags & EntityFlag_Field) == 0) {
+			return nullptr;
+		}
+
+		Type *t = base_type(se->expr->tav.type);
+		if (t == nullptr || t->kind != Type_Struct) {
+			return nullptr;
+		}
+
+		if (t->Struct.is_raw_union || t->Struct.soa_kind != StructSoa_None) {
+			return nullptr;
+		}
+
+		i32 index = f->Variable.field_index;
+		if (index < 0 || index >= t->Struct.fields.count) {
+			return nullptr;
+		}
+
+		if (t->Struct.fields[index] != f) {
+			return nullptr;
+		}
+		return escape_bounds_local(ea, se->expr);
+	case_end;
+	}
+	return nullptr;
+}
+
+gb_internal bool escape_bounds_atom(EscapeAnalysis *ea, EscapeAtomKind kind, Ast *x, EscapeAtom *out) {
+	x = unparen_expr(x);
+	Entity *e = escape_bounds_local(ea, x);
+	if (e == nullptr) {
+		return false;
+	}
+	*out = EscapeAtom{kind, e};
+	if (x->kind == Ast_SelectorExpr) {
+		out->field = x;
+	}
+	return true;
+}
+
+gb_internal Ast *escape_bounds_len_of(EscapeAnalysis *ea, Ast *x) {
 	x = unparen_expr(x);
 	if (x->kind != Ast_CallExpr || x->CallExpr.args.count != 1) {
 		return nullptr;
@@ -1861,24 +1938,22 @@ gb_internal Entity *escape_bounds_len_of(EscapeAnalysis *ea, Ast *x) {
 	}
 	Ast *arg = unparen_expr(x->CallExpr.args[0]);
 	Type *t = base_type(arg->tav.type);
-	Entity *e = entity_of_node(arg);
-	if (arg->kind != Ast_Ident || t == nullptr || !escape_bounds_entity(ea, e)) {
+	if (t == nullptr || escape_bounds_local(ea, arg) == nullptr) {
 		return nullptr;
 	}
 	switch (t->kind) {
 	case Type_Slice:
 	case Type_DynamicArray:
-		return e;
+		return arg;
 	case Type_Basic:
 		if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_string16) {
-			return e;
+			return arg;
 		}
 		break;
 	}
 	return nullptr;
 }
 
-// an integer reading only such locals and constants, so the same expression has the same value until one is assigned
 gb_internal bool escape_bounds_term(EscapeAnalysis *ea, Ast *x) {
 	x = unparen_expr(x);
 	if (x == nullptr || !(is_type_integer(x->tav.type) || is_type_enum(x->tav.type))) {
@@ -1888,9 +1963,9 @@ gb_internal bool escape_bounds_term(EscapeAnalysis *ea, Ast *x) {
 		return true;
 	}
 	switch (x->kind) {
-	case_ast_node(i, Ident, x);
-		return escape_bounds_entity(ea, entity_of_node(x));
-	case_end;
+	case Ast_Ident:
+	case Ast_SelectorExpr:
+		return escape_bounds_local(ea, x) != nullptr;
 
 	case_ast_node(ue, UnaryExpr, x);
 		switch (ue->op.kind) {
@@ -1966,13 +2041,13 @@ gb_internal bool escape_bounds_checkable(EscapeAnalysis *ea, Ast *node) {
 	}
 	bool deref = is_type_pointer(t);
 	t = base_type(type_deref(t));
+
 	Ast *local = unparen_expr(container);
-	bool is_local = !deref && local->kind == Ast_Ident && escape_bounds_entity(ea, entity_of_node(local));
+	bool is_local = !deref && escape_bounds_local(ea, local) != nullptr;
 
 	switch (t->kind) {
 	case Type_Array:
 	case Type_EnumeratedArray:
-		// a constant index is checked as it is compiled
 		return node->kind == Ast_SliceExpr || node->IndexExpr.index->tav.mode != Addressing_Constant;
 	case Type_MultiPointer:
 		return node->kind == Ast_SliceExpr && node->SliceExpr.high != nullptr;
@@ -2029,8 +2104,13 @@ gb_internal bool escape_atom_range(EscapeAtom const &atom, EscapeIntRange *r) {
 	case EscapeAtom_Zero:
 		*r = {};
 		return true;
-	case EscapeAtom_Local:
-		return escape_int_range(atom.e->type, r);
+	case EscapeAtom_Local: {
+		Type *t = atom.e->type;
+		if (atom.field != nullptr) {
+			t = atom.field->tav.type;
+		}
+		return escape_int_range(t, r);
+	}
 	}
 	return escape_int_range(t_int, r);
 }
@@ -2074,6 +2154,9 @@ gb_internal Array<EscapeReach> escape_limits_reach(Array<EscapeLimit> const &lim
 	for (isize step = 0; step < MAX_STEPS; step++) {
 		bool changed = false;
 		for (EscapeLimit const &l : limits) {
+			if (l.b.kind == EscapeAtom_NonZero) {
+				continue;
+			}
 			// `from <= a+d` and `a-b <= k` give `from <= b+d+k`; `b-from <= d` gives `a-from <= d+k`
 			EscapeAtom src = l.b;
 			EscapeAtom dst = l.a;
@@ -2161,21 +2244,16 @@ gb_internal bool escape_bounds_linear(EscapeAnalysis *ea, Array<EscapeLimit> con
 
 	Ast *converted = nullptr;
 	switch (x->kind) {
-	case_ast_node(i, Ident, x);
-		Entity *e = entity_of_node(x);
-		if (!escape_bounds_entity(ea, e)) {
-			return false;
-		}
-		out->atom = EscapeAtom{EscapeAtom_Local, e};
-		return true;
-	case_end;
+	case Ast_Ident:
+	case Ast_SelectorExpr:
+		return escape_bounds_atom(ea, EscapeAtom_Local, x, &out->atom);
 
 	case_ast_node(ce, CallExpr, x);
-		Entity *e = escape_bounds_len_of(ea, x);
-		if (e != nullptr) {
-			out->atom = EscapeAtom{EscapeAtom_Len, e};
-			return true;
+		Ast *of = escape_bounds_len_of(ea, x);
+		if (of != nullptr) {
+			return escape_bounds_atom(ea, EscapeAtom_Len, of, &out->atom);
 		}
+
 		if (ce->proc->tav.mode == Addressing_Type && ce->args.count == 1) {
 			converted = ce->args[0];
 		}
@@ -2320,8 +2398,20 @@ gb_internal void escape_limits_refine(EscapeAnalysis *ea, Array<EscapeLimit> *li
 			escape_limit_add(limits, l, r, 0);
 			escape_limit_add(limits, r, l, 0);
 			break;
-		case Token_NotEq:
-			// above what it is known to be at least, e.g. an unsigned against zero
+		case Token_NotEq: {
+			EscapeAtom nonzero = {};
+			if (r.atom.kind == EscapeAtom_Zero && r.c == l.c) {
+				nonzero = l.atom;
+			} else if (l.atom.kind == EscapeAtom_Zero && l.c == r.c) {
+				nonzero = r.atom;
+			}
+
+			if (nonzero.kind != EscapeAtom_Zero) {
+				EscapeLinear p = {nonzero};
+				EscapeLinear q = {EscapeAtom{EscapeAtom_NonZero}};
+				escape_limit_add(limits, p, q, 0);
+			}
+
 			if (escape_limits_le(*limits, r, l, 0)) {
 				escape_limit_add(limits, r, l, -1);
 			} else if (escape_limits_le(*limits, l, r, 0)) {
@@ -2329,12 +2419,13 @@ gb_internal void escape_limits_refine(EscapeAnalysis *ea, Array<EscapeLimit> *li
 			}
 			break;
 		}
+		}
 	case_end;
 	}
 }
 
 // what the index of a checkable index or slice expression is compared with
-gb_internal bool escape_limits_length(Ast *node, EscapeLinear *len) {
+gb_internal bool escape_limits_length(EscapeAnalysis *ea, Ast *node, EscapeLinear *len) {
 	enum : i64 { MAX_LENGTH = 1ll<<40 };
 	Ast *container = node->SliceExpr.expr;
 	if (node->kind == Ast_IndexExpr) {
@@ -2353,8 +2444,7 @@ gb_internal bool escape_limits_length(Ast *node, EscapeLinear *len) {
 	case Type_MultiPointer:
 		return true;
 	}
-	len->atom = EscapeAtom{EscapeAtom_Len, entity_of_node(unparen_expr(container))};
-	return true;
+	return escape_bounds_atom(ea, EscapeAtom_Len, container, &len->atom);
 }
 
 // `p - q <= k`
@@ -2369,7 +2459,7 @@ gb_internal bool escape_limits_slice(EscapeAnalysis *ea, Array<EscapeLimit> cons
 	ast_node(se, SliceExpr, node);
 	EscapeLinear zero = {};
 	EscapeLinear len  = {};
-	if (!escape_limits_length(node, &len)) {
+	if (!escape_limits_length(ea, node, &len)) {
 		return false;
 	}
 	EscapeLinear lo = zero;
@@ -2416,26 +2506,76 @@ gb_internal bool escape_limits_prove(EscapeAnalysis *ea, Array<EscapeLimit> cons
 		return true;
 	}
 
-	// as unsigned, so `0 <= j` and `j < len`, or `0 <= j <= i` with `i` an index which passed the same check
+	// NOTE(bill): With unsigned, so `0 <= j` and `j < len`, or `0 <= j <= i` with `i` an index which passed the same check,
+	// or with `len` not zero, `j` zero or `len - 1` wrapping as `int`s do
 	ast_node(ie, IndexExpr, node);
 	EscapeLinear len = {};
 	EscapeLinear j   = {};
-	if (!escape_limits_length(node, &len) ||
-	    !escape_bounds_linear(ea, limits, ie->index, &j) ||
-	    !escape_limits_le(limits, zero, j, 0)) {
+	if (!escape_limits_length(ea, node, &len)) {
 		return false;
 	}
-	if (escape_limits_le(limits, j, len, -1)) {
-		return true;
-	}
-	for (Ast *c : checks) {
-		EscapeLinear i = {};
-		if (c->kind == Ast_IndexExpr && escape_bounds_length_eq(c->IndexExpr.expr, ie->expr) &&
-		    escape_bounds_linear(ea, limits, c->IndexExpr.index, &i) && escape_limits_le(limits, j, i, 0)) {
+	bool exact = escape_bounds_linear(ea, limits, ie->index, &j);
+	bool above = exact && escape_limits_le(limits, zero, j, 0);
+	if (above) {
+		if (escape_limits_le(limits, j, len, -1)) {
 			return true;
 		}
+		for (Ast *c : checks) {
+			EscapeLinear i = {};
+			if (c->kind == Ast_IndexExpr && escape_bounds_length_eq(c->IndexExpr.expr, ie->expr) &&
+			    escape_bounds_linear(ea, limits, c->IndexExpr.index, &i) && escape_limits_le(limits, j, i, 0)) {
+				return true;
+			}
+		}
 	}
-	return false;
+
+	bool nonzero = escape_limits_le(limits, zero, len, -1) || escape_limits_le(limits, len, zero, -1);
+	for (EscapeLimit const &l : limits) {
+		if (nonzero) {
+			break;
+		}
+		if (l.b.kind != EscapeAtom_NonZero) {
+			continue;
+		}
+		EscapeLinear a = {l.a};
+		nonzero = escape_limits_le(limits, a, len, 0) && escape_limits_le(limits, len, a, 0);
+	}
+
+	if (!nonzero) {
+		return false;
+	}
+
+	if (above && escape_limits_le(limits, j, zero, 0)) {
+		return true;
+	}
+
+	Ast *index = unparen_expr(ie->index);
+	if (index->kind != Ast_BinaryExpr) {
+		return false;
+	}
+
+	ast_node(be, BinaryExpr, index);
+	if (be->op.kind != Token_Sub) {
+		return false;
+	}
+
+	if (type_size_of(index->tav.type) < type_size_of(t_int)) {
+		return false;
+	}
+
+	EscapeLinear x   = {};
+	EscapeLinear one = {};
+	if (!escape_bounds_linear(ea, limits, be->left, &x)) {
+		return false;
+	}
+	if (!escape_bounds_linear(ea, limits, be->right, &one)) {
+		return false;
+	}
+
+	if (one.atom.kind != EscapeAtom_Zero || one.c != 1) {
+		return false;
+	}
+	return escape_limits_le(limits, x, len, 0) && escape_limits_le(limits, len, x, 0);
 }
 
 // what a local of an integer holds once set to a value
@@ -2539,15 +2679,12 @@ gb_internal void escape_limits_range(EscapeAnalysis *ea, Ast *stmt, Ast *range, 
 		}
 		len.atom = EscapeAtom{EscapeAtom_End, nullptr, stmt};
 		break;
-	case Type_DynamicArray: {
+	case Type_DynamicArray:
 		escape_limit_add(&ea->state.limits, zero, index, 0);
-		Entity *e = entity_of_node(range);
-		if (by_ptr || range->kind != Ast_Ident || !escape_bounds_entity(ea, e)) {
+		if (by_ptr || !escape_bounds_atom(ea, EscapeAtom_Len, range, &len.atom)) {
 			return;
 		}
-		len.atom = EscapeAtom{EscapeAtom_Len, e};
 		break;
-	}
 	default:
 		return;
 	}
@@ -2556,7 +2693,15 @@ gb_internal void escape_limits_range(EscapeAnalysis *ea, Ast *stmt, Ast *range, 
 }
 
 gb_internal void escape_limits_shift(Array<EscapeLimit> *limits, Entity *e, i64 c) {
-	for (EscapeLimit &l : *limits) {
+	for (isize i = limits->count-1; i >= 0; i--) {
+		EscapeLimit &l = (*limits)[i];
+		if (l.b.kind == EscapeAtom_NonZero) {
+			if (l.a.kind == EscapeAtom_Local && l.a.e == e) {
+				array_unordered_remove(limits, i);
+			}
+			continue;
+		}
+
 		if (l.a.kind == EscapeAtom_Local && l.a.e == e) {
 			l.k += c;
 		}
@@ -4091,14 +4236,15 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 		}
 		Ast *x = unparen_expr(range);
 		Type *t = base_type(x->tav.type);
-		Entity *e = entity_of_node(x);
+
 		bool sized = t != nullptr && (t->kind == Type_Slice ||
 		             (t->kind == Type_Basic && (t->Basic.kind == Basic_string || t->Basic.kind == Basic_string16)));
-		if (x->kind == Ast_Ident && sized && escape_bounds_entity(ea, e)) {
-			EscapeLinear end = {};
-			EscapeLinear len = {};
+
+		EscapeLinear end = {};
+		EscapeLinear len = {};
+
+		if (sized && escape_bounds_atom(ea, EscapeAtom_Len, x, &len.atom)) {
 			end.atom = EscapeAtom{EscapeAtom_End, nullptr, stmt};
-			len.atom = EscapeAtom{EscapeAtom_Len, e};
 			escape_limit_add(&ea->state.limits, end, len, 0);
 			escape_limit_add(&ea->state.limits, len, end, 0);
 		}
@@ -4894,17 +5040,19 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.muted = !enabled;
 
 	u64 vet_flags = ast_file_vet_flags(body->file());
+
 	ea.nil_deref    = enabled && (vet_flags & VetFlag_NilDeref) != 0;
 	ea.uninit       = enabled && (vet_flags & VetFlag_Uninitialized) != 0;
+
 	ea.nil_uses     = array_make<EscapeNilUse>(temporary_allocator(), 0, 0);
-	ea.nil_escaped  = array_make<Entity *>(temporary_allocator(), 0, 0);
-	ea.uninit_decls = array_make<Entity *>(temporary_allocator(), 0, 0);
+	ea.nil_escaped  = array_make<Entity *>    (temporary_allocator(), 0, 0);
+	ea.uninit_decls = array_make<Entity *>    (temporary_allocator(), 0, 0);
 
 	ea.bounds         = !build_context.no_bounds_check;
 	ea.bounds_found   = array_make<EscapeBoundsCheck>(temporary_allocator(), 0, 0);
 	ea.bounds_uses    = array_make<EscapeBoundsCheck>(temporary_allocator(), 0, 0);
-	ea.bounds_escaped = array_make<Entity *>(temporary_allocator(), 0, 0);
-	ea.bounds_context = array_make<EscapeRefine>(temporary_allocator(), 0, 0);
+	ea.bounds_escaped = array_make<Entity *>         (temporary_allocator(), 0, 0);
+	ea.bounds_context = array_make<EscapeRefine>     (temporary_allocator(), 0, 0);
 
 	if (ea.pt->variadic &&
 	    !ea.pt->c_vararg &&
@@ -4931,6 +5079,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	if (ea.state.reachable && !ea.too_large) {
 		escape_exit(&ea, body, {}, {});
 	}
+
 	if ((ea.nil_deref || ea.uninit) && !ea.too_large) {
 		// a use is reported only when what it goes through is nil, or unset, every time it is reached, e.g. in a defer
 		// run at several exits
@@ -4968,6 +5117,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 			i = j;
 		}
 	}
+
 	if (reports == nullptr) {
 		for (EscapeReport const &r : own_reports) {
 			escape_report_emit(r);
