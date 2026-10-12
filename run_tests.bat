@@ -70,7 +70,7 @@ call run.bat || exit /b
 
 @rem The ABI tests can be disabled here because they require clang at the moment.
 @rem   TODO: Maybe try to make them work with msvc as well?
-if not defined ODIN_TESTS_NO_CLANG (
+@if not defined ODIN_TESTS_NO_CLANG (
 
 	@rem Run ABI tests
 	@pushd .
@@ -85,7 +85,7 @@ if not defined ODIN_TESTS_NO_CLANG (
 
 @rem More extensive tests (non-slim):
 
-if not defined SLIM (
+@if not defined SLIM (
 
 	@echo Running extended tests...
 
@@ -118,6 +118,6 @@ if not defined SLIM (
 
 )
 
-if defined ODIN_TESTS_NO_CLANG (
+@if defined ODIN_TESTS_NO_CLANG (
 	@echo WARNING:  ODIN_TESTS_NO_CLANG specified - ABI tests have been skipped.
 )
