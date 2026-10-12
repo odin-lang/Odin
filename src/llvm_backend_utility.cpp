@@ -1426,6 +1426,10 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		}
 		u64 align_max = bt->Struct.custom_max_field_align;
 		u64 align_min = bt->Struct.custom_min_field_align;
+		u64 align_custom = cast(u64)bt->Struct.custom_align;
+		if (align_custom != 0) {
+			align_max = align_max ? gb_min(align_max, align_custom) : align_custom;
+		}
 		GB_ASSERT(align_min == 0 || align_max == 0 || align_min <= align_max);
 		if (align_max) {
 			lb_set_metadata_custom_u64(p->module, gep.value, ODIN_METADATA_MAX_ALIGN, align_max);
@@ -1644,8 +1648,7 @@ gb_internal lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection 
 			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_raw_union(type)) {
 			type = get_struct_field_type(type, index);
-			GB_ASSERT(is_type_pointer(e.type));
-			e = lb_emit_transmute(p, e, alloc_type_pointer(type));
+			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_struct(type)) {
 			type = get_struct_field_type(type, index);
 			e = lb_emit_struct_ep(p, e, index);
