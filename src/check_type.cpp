@@ -890,9 +890,10 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 
 	for_array(i, ut->variants) {
 		Ast *node = ut->variants[i];
-		if (union_type->Union.is_polymorphic && poly_operands == nullptr) {
-			// Skip checking variant types of an unspecialized template: a variant may reference a
-			// mutually-recursive polymorphic union and recurse unboundedly. Mirrors check_struct_type.
+		if (union_type->Union.is_polymorphic) {
+			// Skip checking variant types of a template that is unspecialized or instantiated with
+			// polymorphic operands (e.g. `Maybe(Box($T))`): a variant may reference a mutually-recursive
+			// polymorphic union and recurse unboundedly. Mirrors check_struct_type.
 			continue;
 		}
 		Type *t = check_type_expr(ctx, node, nullptr);
@@ -953,7 +954,7 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	union_type->Union.kind = ut->kind;
 	switch (ut->kind) {
 	case UnionType_no_nil:
-		if (union_type->Union.is_polymorphic && poly_operands == nullptr) {
+		if (union_type->Union.is_polymorphic) {
 			GB_ASSERT(variants.count == 0);
 			if (ut->variants.count != 1) {
 				break;
