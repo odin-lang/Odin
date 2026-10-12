@@ -373,24 +373,20 @@ WM_CTLINIT                        :: 0x0387
 WM_PENEVENT                       :: 0x0388
 WM_PENWINLAST                     :: 0x038f
 DDM_SETFMT                        :: 0x0400
-DM_GETDEFID                       :: 0x0400
 NIN_SELECT                        :: 0x0400
 TBM_GETPOS                        :: 0x0400
 WM_USER                           :: 0x0400
 CBEM_INSERTITEMA                  :: 0x0401
 DDM_DRAW                          :: 0x0401
-DM_SETDEFID                       :: 0x0401
 HKM_SETHOTKEY                     :: 0x0401
 PBM_SETRANGE                      :: 0x0401
 RB_INSERTBANDA                    :: 0x0401
 SB_SETTEXTA                       :: 0x0401
 TB_ENABLEBUTTON                   :: 0x0401
 TBM_GETRANGEMIN                   :: 0x0401
-TTM_ACTIVATE                      :: 0x0401
 WM_CHOOSEFONT_GETLOGFONT          :: 0x0401
 CBEM_SETIMAGELIST                 :: 0x0402
 DDM_CLOSE                         :: 0x0402
-DM_REPOSITION                     :: 0x0402
 HKM_GETHOTKEY                     :: 0x0402
 PBM_SETPOS                        :: 0x0402
 RB_DELETEBAND                     :: 0x0402
@@ -405,7 +401,6 @@ RB_GETBARINFO                     :: 0x0403
 SB_GETTEXTLENGTHA                 :: 0x0403
 TBM_GETTIC                        :: 0x0403
 TB_PRESSBUTTON                    :: 0x0403
-TTM_SETDELAYTIME                  :: 0x0403
 CBEM_GETITEMA                     :: 0x0404
 DDM_END                           :: 0x0404
 PBM_SETSTEP                       :: 0x0404
@@ -413,31 +408,26 @@ RB_SETBARINFO                     :: 0x0404
 SB_SETPARTS                       :: 0x0404
 TB_HIDEBUTTON                     :: 0x0404
 TBM_SETTIC                        :: 0x0404
-TTM_ADDTOOLA                      :: 0x0404
 CBEM_SETITEMA                     :: 0x0405
 PBM_STEPIT                        :: 0x0405
 TB_INDETERMINATE                  :: 0x0405
 TBM_SETPOS                        :: 0x0405
-TTM_DELTOOLA                      :: 0x0405
 CBEM_GETCOMBOCONTROL              :: 0x0406
 PBM_SETRANGE32                    :: 0x0406
 RB_SETBANDINFOA                   :: 0x0406
 SB_GETPARTS                       :: 0x0406
 TB_MARKBUTTON                     :: 0x0406
 TBM_SETRANGE                      :: 0x0406
-TTM_NEWTOOLRECTA                  :: 0x0406
 CBEM_GETEDITCONTROL               :: 0x0407
 PBM_GETRANGE                      :: 0x0407
 RB_SETPARENT                      :: 0x0407
 SB_GETBORDERS                     :: 0x0407
 TBM_SETRANGEMIN                   :: 0x0407
-TTM_RELAYEVENT                    :: 0x0407
 CBEM_SETEXSTYLE                   :: 0x0408
 PBM_GETPOS                        :: 0x0408
 RB_HITTEST                        :: 0x0408
 SB_SETMINHEIGHT                   :: 0x0408
 TBM_SETRANGEMAX                   :: 0x0408
-TTM_GETTOOLINFOA                  :: 0x0408
 CBEM_GETEXSTYLE                   :: 0x0409
 CBEM_GETEXTENDEDSTYLE             :: 0x0409
 PBM_SETBARCOLOR                   :: 0x0409
@@ -445,120 +435,95 @@ RB_GETRECT                        :: 0x0409
 SB_SIMPLE                         :: 0x0409
 TB_ISBUTTONENABLED                :: 0x0409
 TBM_CLEARTICS                     :: 0x0409
-TTM_SETTOOLINFOA                  :: 0x0409
 CBEM_HASEDITCHANGED               :: 0x040a
 PBM_SETMARQUEE                    :: 0x040a
 RB_INSERTBANDW                    :: 0x040a
 SB_GETRECT                        :: 0x040a
 TB_ISBUTTONCHECKED                :: 0x040a
 TBM_SETSEL                        :: 0x040a
-TTM_HITTESTA                      :: 0x040a
 WIZ_QUERYNUMPAGES                 :: 0x040a
 CBEM_INSERTITEMW                  :: 0x040b
 RB_SETBANDINFOW                   :: 0x040b
 SB_SETTEXTW                       :: 0x040b
 TB_ISBUTTONPRESSED                :: 0x040b
 TBM_SETSELSTART                   :: 0x040b
-TTM_GETTEXTA                      :: 0x040b
 WIZ_NEXT                          :: 0x040b
 CBEM_SETITEMW                     :: 0x040c
 RB_GETBANDCOUNT                   :: 0x040c
 SB_GETTEXTLENGTHW                 :: 0x040c
 TB_ISBUTTONHIDDEN                 :: 0x040c
 TBM_SETSELEND                     :: 0x040c
-TTM_UPDATETIPTEXTA                :: 0x040c
 WIZ_PREV                          :: 0x040c
 CBEM_GETITEMW                     :: 0x040d
 RB_GETROWCOUNT                    :: 0x040d
 SB_GETTEXTW                       :: 0x040d
 TB_ISBUTTONINDETERMINATE          :: 0x040d
-TTM_GETTOOLCOUNT                  :: 0x040d
 CBEM_SETEXTENDEDSTYLE             :: 0x040e
 RB_GETROWHEIGHT                   :: 0x040e
 SB_ISSIMPLE                       :: 0x040e
 TB_ISBUTTONHIGHLIGHTED            :: 0x040e
 TBM_GETPTICS                      :: 0x040e
-TTM_ENUMTOOLSA                    :: 0x040e
 SB_SETICON                        :: 0x040f
 TBM_GETTICPOS                     :: 0x040f
-TTM_GETCURRENTTOOLA               :: 0x040f
 PBM_SETSTATE                      :: 0x0410
 RB_IDTOINDEX                      :: 0x0410
 SB_SETTIPTEXTA                    :: 0x0410
 TBM_GETNUMTICS                    :: 0x0410
-TTM_WINDOWFROMPOINT               :: 0x0410
 PBM_GETSTATE                      :: 0x0411
 RB_GETTOOLTIPS                    :: 0x0411
 SB_SETTIPTEXTW                    :: 0x0411
 TBM_GETSELSTART                   :: 0x0411
 TB_SETSTATE                       :: 0x0411
-TTM_TRACKACTIVATE                 :: 0x0411
 RB_SETTOOLTIPS                    :: 0x0412
 SB_GETTIPTEXTA                    :: 0x0412
 TB_GETSTATE                       :: 0x0412
 TBM_GETSELEND                     :: 0x0412
-TTM_TRACKPOSITION                 :: 0x0412
 RB_SETBKCOLOR                     :: 0x0413
 SB_GETTIPTEXTW                    :: 0x0413
 TB_ADDBITMAP                      :: 0x0413
 TBM_CLEARSEL                      :: 0x0413
-TTM_SETTIPBKCOLOR                 :: 0x0413
 RB_GETBKCOLOR                     :: 0x0414
 SB_GETICON                        :: 0x0414
 TB_ADDBUTTONSA                    :: 0x0414
 TBM_SETTICFREQ                    :: 0x0414
-TTM_SETTIPTEXTCOLOR               :: 0x0414
 RB_SETTEXTCOLOR                   :: 0x0415
 TB_INSERTBUTTONA                  :: 0x0415
 TBM_SETPAGESIZE                   :: 0x0415
-TTM_GETDELAYTIME                  :: 0x0415
 RB_GETTEXTCOLOR                   :: 0x0416
 TB_DELETEBUTTON                   :: 0x0416
 TBM_GETPAGESIZE                   :: 0x0416
-TTM_GETTIPBKCOLOR                 :: 0x0416
 RB_SIZETORECT                     :: 0x0417
 TB_GETBUTTON                      :: 0x0417
 TBM_SETLINESIZE                   :: 0x0417
-TTM_GETTIPTEXTCOLOR               :: 0x0417
 RB_BEGINDRAG                      :: 0x0418
 TB_BUTTONCOUNT                    :: 0x0418
 TBM_GETLINESIZE                   :: 0x0418
-TTM_SETMAXTIPWIDTH                :: 0x0418
 RB_ENDDRAG                        :: 0x0419
 TB_COMMANDTOINDEX                 :: 0x0419
 TBM_GETTHUMBRECT                  :: 0x0419
-TTM_GETMAXTIPWIDTH                :: 0x0419
 RB_DRAGMOVE                       :: 0x041a
 TBM_GETCHANNELRECT                :: 0x041a
 TB_SAVERESTOREA                   :: 0x041a
-TTM_SETMARGIN                     :: 0x041a
 RB_GETBARHEIGHT                   :: 0x041b
 TB_CUSTOMIZE                      :: 0x041b
 TBM_SETTHUMBLENGTH                :: 0x041b
-TTM_GETMARGIN                     :: 0x041b
 RB_GETBANDINFOW                   :: 0x041c
 TB_ADDSTRINGA                     :: 0x041c
 TBM_GETTHUMBLENGTH                :: 0x041c
-TTM_POP                           :: 0x041c
 RB_GETBANDINFOA                   :: 0x041d
 TB_GETITEMRECT                    :: 0x041d
 TBM_SETTOOLTIPS                   :: 0x041d
-TTM_UPDATE                        :: 0x041d
 RB_MINIMIZEBAND                   :: 0x041e
 TB_BUTTONSTRUCTSIZE               :: 0x041e
 TBM_GETTOOLTIPS                   :: 0x041e
-TTM_GETBUBBLESIZE                 :: 0x041e
 RB_MAXIMIZEBAND                   :: 0x041f
 TBM_SETTIPSIDE                    :: 0x041f
 TB_SETBUTTONSIZE                  :: 0x041f
-TTM_ADJUSTRECT                    :: 0x041f
 TBM_SETBUDDY                      :: 0x0420
 TB_SETBITMAPSIZE                  :: 0x0420
-TTM_SETTITLEA                     :: 0x0420
 MSG_FTS_JUMP_VA                   :: 0x0421
 TB_AUTOSIZE                       :: 0x0421
 TBM_GETBUDDY                      :: 0x0421
-TTM_SETTITLEW                     :: 0x0421
 RB_GETBANDBORDERS                 :: 0x0422
 MSG_FTS_JUMP_QWORD                :: 0x0423
 RB_SHOWBAND                       :: 0x0423
@@ -585,34 +550,24 @@ TB_SETIMAGELIST                   :: 0x0430
 TB_GETIMAGELIST                   :: 0x0431
 TB_LOADIMAGES                     :: 0x0432
 EM_CANPASTE                       :: 0x0432
-TTM_ADDTOOLW                      :: 0x0432
 EM_DISPLAYBAND                    :: 0x0433
 TB_GETRECT                        :: 0x0433
-TTM_DELTOOLW                      :: 0x0433
 EM_EXGETSEL                       :: 0x0434
 TB_SETHOTIMAGELIST                :: 0x0434
-TTM_NEWTOOLRECTW                  :: 0x0434
 EM_EXLIMITTEXT                    :: 0x0435
 TB_GETHOTIMAGELIST                :: 0x0435
-TTM_GETTOOLINFOW                  :: 0x0435
 EM_EXLINEFROMCHAR                 :: 0x0436
 TB_SETDISABLEDIMAGELIST           :: 0x0436
-TTM_SETTOOLINFOW                  :: 0x0436
 EM_EXSETSEL                       :: 0x0437
 TB_GETDISABLEDIMAGELIST           :: 0x0437
-TTM_HITTESTW                      :: 0x0437
 EM_FINDTEXT                       :: 0x0438
 TB_SETSTYLE                       :: 0x0438
-TTM_GETTEXTW                      :: 0x0438
 EM_FORMATRANGE                    :: 0x0439
 TB_GETSTYLE                       :: 0x0439
-TTM_UPDATETIPTEXTW                :: 0x0439
 EM_GETCHARFORMAT                  :: 0x043a
 TB_GETBUTTONSIZE                  :: 0x043a
-TTM_ENUMTOOLSW                    :: 0x043a
 EM_GETEVENTMASK                   :: 0x043b
 TB_SETBUTTONWIDTH                 :: 0x043b
-TTM_GETCURRENTTOOLW               :: 0x043b
 EM_GETOLEINTERFACE                :: 0x043c
 TB_SETMAXTEXTROWS                 :: 0x043c
 EM_GETPARAFORMAT                  :: 0x043d
@@ -1072,6 +1027,66 @@ LVM_GETFOOTERITEM                 :: 0x10d0
 LVM_GETITEMINDEXRECT              :: 0x10d1
 LVM_SETITEMINDEXSTATE             :: 0x10d2
 LVM_GETNEXTITEMINDEX              :: 0x10d3
+
+// Tool Tip Messages
+
+TTM_ACTIVATE                      :: WM_USER +  1
+TTM_SETDELAYTIME                  :: WM_USER +  3
+TTM_ADDTOOLA                      :: WM_USER +  4
+TTM_ADDTOOLW                      :: WM_USER + 50
+TTM_DELTOOLA                      :: WM_USER +  5
+TTM_DELTOOLW                      :: WM_USER + 51
+TTM_NEWTOOLRECTA                  :: WM_USER +  6
+TTM_NEWTOOLRECTW                  :: WM_USER + 52
+TTM_RELAYEVENT                    :: WM_USER +  7 // Win7: `wParam` = `GetMessageExtraInfo()` when relaying `WM_MOUSEMOVE`
+TTM_GETTOOLINFOA                  :: WM_USER +  8
+TTM_GETTOOLINFOW                  :: WM_USER + 53
+TTM_SETTOOLINFOA                  :: WM_USER +  9
+TTM_SETTOOLINFOW                  :: WM_USER + 54
+TTM_HITTESTA                      :: WM_USER + 10
+TTM_HITTESTW                      :: WM_USER + 55
+TTM_GETTEXTA                      :: WM_USER + 11
+TTM_GETTEXTW                      :: WM_USER + 56
+TTM_UPDATETIPTEXTA                :: WM_USER + 12
+TTM_UPDATETIPTEXTW                :: WM_USER + 57
+TTM_GETTOOLCOUNT                  :: WM_USER + 13
+TTM_ENUMTOOLSA                    :: WM_USER + 14
+TTM_ENUMTOOLSW                    :: WM_USER + 58
+TTM_GETCURRENTTOOLA               :: WM_USER + 15
+TTM_GETCURRENTTOOLW               :: WM_USER + 59
+TTM_WINDOWFROMPOINT               :: WM_USER + 16
+TTM_TRACKACTIVATE                 :: WM_USER + 17  // `wParam` = `TRUE`/`FALSE` start end  `lparam` = `LPTOOLINFO`
+TTM_TRACKPOSITION                 :: WM_USER + 18  // `lParam` = `dwPos`
+TTM_SETTIPBKCOLOR                 :: WM_USER + 19
+TTM_SETTIPTEXTCOLOR               :: WM_USER + 20
+TTM_GETDELAYTIME                  :: WM_USER + 21
+TTM_GETTIPBKCOLOR                 :: WM_USER + 22
+TTM_GETTIPTEXTCOLOR               :: WM_USER + 23
+TTM_SETMAXTIPWIDTH                :: WM_USER + 24
+TTM_GETMAXTIPWIDTH                :: WM_USER + 25
+TTM_SETMARGIN                     :: WM_USER + 26  // `lParam` = `lprc`
+TTM_GETMARGIN                     :: WM_USER + 27  // `lParam` = `lprc`
+TTM_POP                           :: WM_USER + 28
+TTM_UPDATE                        :: WM_USER + 29
+TTM_GETBUBBLESIZE                 :: WM_USER + 30
+TTM_ADJUSTRECT                    :: WM_USER + 31
+TTM_SETTITLEA                     :: WM_USER + 32  // `wParam` = `TTI_*`, `lParam` = `char* szTitle`
+TTM_SETTITLEW                     :: WM_USER + 33  // `wParam` = `TTI_*`, `lParam` = `wchar* szTitle`
+TTM_POPUP                         :: WM_USER + 34
+TTM_GETTITLE                      :: WM_USER + 35  // `wParam` = `0`, `lParam` = `TTGETTITLE*`
+TTM_ADDTOOL                       :: TTM_ADDTOOLW
+TTM_DELTOOL                       :: TTM_DELTOOLW
+TTM_NEWTOOLRECT                   :: TTM_NEWTOOLRECTW
+TTM_GETTOOLINFO                   :: TTM_GETTOOLINFOW
+TTM_SETTOOLINFO                   :: TTM_SETTOOLINFOW
+TTM_HITTEST                       :: TTM_HITTESTW
+TTM_GETTEXT                       :: TTM_GETTEXTW
+TTM_UPDATETIPTEXT                 :: TTM_UPDATETIPTEXTW
+TTM_ENUMTOOLS                     :: TTM_ENUMTOOLSW
+TTM_GETCURRENTTOOL                :: TTM_GETCURRENTTOOLW
+TTM_SETTITLE                      :: TTM_SETTITLEW
+TTM_SETWINDOWTHEME                :: CCM_SETWINDOWTHEME
+
 TV_FIRST                          :: 0x1100
 TVM_INSERTITEMA                   :: (TV_FIRST+0)
 TVM_DELETEITEM                    :: (TV_FIRST+1)
