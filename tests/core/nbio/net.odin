@@ -305,7 +305,9 @@ poll :: proc(t: ^testing.T) {
 				// Fill the socket until sending actually blocks. How much that takes depends
 				// on the machine's socket buffers, so keep sending rather than assuming a
 				// fixed amount does it. Nothing is reading yet, so this terminates.
-				buf, mem_err := make([]byte, mem.Gigabyte*4, context.temp_allocator)
+				// NOTE: Don't make the chunk too large; we need the system to be able to send
+				//       at least one chunk.
+				buf, mem_err := make([]byte, mem.Megabyte*512, context.temp_allocator)
 				ev(t, mem_err, nil)
 
 				// Use `core:net` as example external code that doesn't care about the event loop.
@@ -313,13 +315,18 @@ poll :: proc(t: ^testing.T) {
 
 				n: int
 				send_err: net.Network_Error
-				for _ in 0..<16 {
+				// Send up to 64 GiB total.
+				for i in 0..<128 {
 					sent: int
 					sent, send_err = net.send(op.poll.socket, buf)
 					n += sent
 					if send_err != nil {
+						log.debugf("net.send failed on iteration %v with error %v", i, send_err)
 						break
 					}
+				}
+				if send_err == nil {
+					log.warnf("We were expecting the TCP socket send buffer to be full at some point, but the system just ate it. The maximum amount of data sent by this test may need to be increased.")
 				}
 				ev(t, send_err, net.TCP_Send_Error.Would_Block)
 
