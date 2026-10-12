@@ -121,3 +121,9 @@ call run.bat || exit /b
 @if defined ODIN_TESTS_NO_CLANG (
 	@echo WARNING:  ODIN_TESTS_NO_CLANG specified - ABI tests have been skipped.
 )
+
+@if defined ODIN_DONT_DOWNLOAD_TEST_ASSETS (
+	@echo WARNING:  ODIN_DONT_DOWNLOAD_TEST_ASSETS specified - core test assets might be stale.
+) else (
+	@echo Note:     You may skip downloading core test assets in future runs by setting  ODIN_DONT_DOWNLOAD_TEST_ASSETS=1
+)

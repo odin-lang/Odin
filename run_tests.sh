@@ -119,3 +119,9 @@ fi
 if [[ -n "${ODIN_TESTS_NO_CLANG:-}" ]]; then
 	echo "WARNING:  ODIN_TESTS_NO_CLANG specified - ABI tests have been skipped."
 fi
+
+if [[ -n "${ODIN_DONT_DOWNLOAD_TEST_ASSETS:-}" ]]; then
+	echo "WARNING:  ODIN_DONT_DOWNLOAD_TEST_ASSETS specified - core test assets might be stale."
+else
+	echo "Note:     You may skip downloading core test assets in future runs by exporting  ODIN_DONT_DOWNLOAD_TEST_ASSETS=1"
+fi

@@ -693,6 +693,10 @@ def main():
 		print("Usage: {} <path to assets> [debug]".format(sys.argv[0]))
 		return 1
 
+	if "ODIN_DONT_DOWNLOAD_TEST_ASSETS" in os.environ:
+		print("WARNING:  Downloading test assets skipped (ODIN_DONT_DOWNLOAD_TEST_ASSETS set).\n")
+		return 0
+
 	debug = False
 	if len(sys.argv) >= 3 and sys.argv[2] == "debug":
 		debug = True
