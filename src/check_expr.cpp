@@ -1714,8 +1714,9 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 	if (check_is_assignable_to(c, operand, type)) {
 		if (operand->mode == Addressing_Constant && type_conversion_is_variant(type, operand->type)) {
-			Operand o = {};
-			check_expr_with_type_hint(c, &o, operand->expr, type);
+			// NOTE(bill): : never re-check the expression because a procedure literal within it would have its body checked twice
+			operand->value.variant_type = operand->type;
+			add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 			operand->value = exact_value_variant(operand->expr);
 		}
 		if (operand->mode == Addressing_Type && is_type_typeid(type)) {
