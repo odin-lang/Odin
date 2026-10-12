@@ -50,6 +50,7 @@ package tests_issues
 @(require) import "test_issue_7781"
 @(require) import "test_issue_7817"
 @(require) import "test_issue_7853"
+@(require) import "test_issue_7875_7471"
 @(require) import "test_issue_7889"
 @(require) import "test_issue_fast_isel_lowering"
 @(require) import "test_issue_omitted_field_union"
