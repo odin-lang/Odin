@@ -1981,7 +1981,12 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 	}
 
 	lhs = lb_emit_conv(p, lhs, type);
-	rhs = lb_emit_conv(p, rhs, type);
+	if ((op == Token_Shl || op == Token_Shr) && type_size_of(rhs.type) > type_size_of(type)) {
+		// NOTE: Keep a wider shift amount wide until it has been tested against the bit width of `type`
+		rhs = lb_emit_conv(p, rhs, integer_endian_type_to_platform_type(rhs.type));
+	} else {
+		rhs = lb_emit_conv(p, rhs, type);
+	}
 
 	if (is_type_integer(type) && is_type_different_to_arch_endianness(type)) {
 		switch (op) {
@@ -1994,7 +1999,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 
 		Type *platform_type = integer_endian_type_to_platform_type(type);
 		lbValue x = lb_emit_byte_swap(p, lhs, integer_endian_type_to_platform_type(lhs.type));
-		lbValue y = lb_emit_byte_swap(p, rhs, integer_endian_type_to_platform_type(rhs.type));
+		lbValue y = lb_emit_conv(p, rhs, integer_endian_type_to_platform_type(rhs.type));
 
 		lbValue res = lb_emit_arith(p, op, x, y, platform_type);
 
@@ -2088,13 +2093,12 @@ handle_op:;
 		return res;
 	case Token_Shl:
 		{
+			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, rhs.value, bit_size, "");
+
 			rhs = lb_emit_conv(p, rhs, lhs.type);
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
-
-			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
-
-			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			res.value = LLVMBuildShl(p->builder, lhsval, bits, "");
 			LLVMValueRef zero = LLVMConstNull(lb_type(p->module, lhs.type));
@@ -2103,12 +2107,13 @@ handle_op:;
 		}
 	case Token_Shr:
 		{
+			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
+			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, rhs.value, bit_size, "");
+
 			rhs = lb_emit_conv(p, rhs, lhs.type);
 			LLVMValueRef lhsval = lhs.value;
 			LLVMValueRef bits = rhs.value;
 			bool is_unsigned = is_type_unsigned(integral_type);
-			LLVMValueRef bit_size = LLVMConstInt(lb_type(p->module, rhs.type), 8*type_size_of(lhs.type), false);
-			LLVMValueRef width_test = LLVMBuildICmp(p->builder, LLVMIntULT, bits, bit_size, "");
 
 			if (is_unsigned) {
 				res.value = LLVMBuildLShr(p->builder, lhsval, bits, "");

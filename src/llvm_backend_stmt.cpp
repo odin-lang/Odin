@@ -3305,7 +3305,11 @@ gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 			lbValue old_value = lb_addr_load(p, lhs);
 			Type *type = old_value.type;
 
-			lbValue change = lb_emit_conv(p, value, type);
+			// NOTE: A typed shift amount is converted by `lb_emit_arith`, as it may be wider than `type`
+			lbValue change = value;
+			if (!(op == Token_Shl || op == Token_Shr) || lb_is_expr_untyped_const(as->rhs[0])) {
+				change = lb_emit_conv(p, value, type);
+			}
 			lbValue new_value = lb_emit_arith(p, op, old_value, change, type);
 			lb_addr_store(p, lhs, new_value);
 		}
