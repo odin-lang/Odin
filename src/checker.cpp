@@ -7023,9 +7023,11 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 
 	if (body_was_checked) {
 		pi->decl->proc->proc_info = pi;
-		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic)) {
+
+		if (analysis_in_use(AnalysisFlag_Escape) || analysis_in_use(AnalysisFlag_Atomic) || !build_context.no_bounds_check) {
 			per_thread_array_add(&c->info.checked_bodies_queue, pi);
 		}
+
 		pi->decl->proc->proc_checked_state.store(ProcCheckedState_Checked);
 		if (pi->body) {
 			Entity *e = pi->decl->entity;
@@ -8257,7 +8259,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		check_atomics(c);
 	}
 
-	if (analysis_in_use(AnalysisFlag_Escape)) {
+	if (analysis_in_use(AnalysisFlag_Escape) || !build_context.no_bounds_check) {
 		TIME_SECTION("check escapes");
 		check_escapes(c);
 	}
