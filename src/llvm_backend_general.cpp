@@ -2644,17 +2644,10 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 		if (is_type_proc(single_ret)) {
 			single_ret = t_rawptr;
 		}
+		ret = lb_type(m, single_ret);
 		if (is_type_tuple(single_ret)) {
 			return_is_tuple = true;
-			// if we have a multiple return tuple, if one of the values is a proc,
-			// we have to avoid infinite recursion.
-			for_array(i, single_ret->Tuple.variables) {
-				if (is_type_proc(single_ret->Tuple.variables[i]->type)) {
-					single_ret = t_rawptr;
-				}
-			}
 		}
-		ret = lb_type(m, single_ret);
 		if (is_type_boolean(single_ret) &&
 		    is_calling_convention_none(type->Proc.calling_convention) &&
 		    type_size_of(single_ret) <= 1) {
