@@ -5361,7 +5361,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr, lbVal
 
 	Type *callee_type = proc_expr->tav.type;
 	if (value.value != nullptr && callee_type != nullptr && callee_type != value.type &&
-	    is_type_proc(callee_type) && base_type(callee_type)->Proc.is_poly_specialized) {
+	    is_type_proc(callee_type) &&
+	    (base_type(callee_type)->Proc.is_poly_specialized || are_types_identical(callee_type, value.type))) {
+		// NOTE(bill): identical proc types may differ in parameter names which named arguments use
 		value.type = callee_type;
 		proc_value_type = callee_type;
 	}
