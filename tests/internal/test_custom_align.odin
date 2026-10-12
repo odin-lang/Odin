@@ -36,6 +36,38 @@ test_align_lowered_struct_access :: proc(t: ^testing.T) {
 }
 
 
+// pass by val, the callee gets a ptr to the caller's storage;
+// there is no temp copy, the struct only requires align 1
+
+// big enough to get passed indirect
+Under_Aligned_Big :: struct #align(1) {
+	v: #simd[4]f32,
+	w: #simd[4]f32,
+}
+
+Big_Helper :: struct {
+	force: #simd[4]f32,        // force align to 16
+	_:     u8,
+	s:     Under_Aligned_Big, // offs 17, guaranteed misaligned
+}
+
+@(export)
+u5: Big_Helper
+
+@(private="file")
+sum_fields :: proc(s: Under_Aligned_Big) -> #simd[4]f32 {
+	return s.v + s.w
+}
+
+@(test)
+test_align_lowered_struct_by_value :: proc(t: ^testing.T) {
+	u5.s = {v = {1, 2, 3, 4}, w = {5, 6, 7, 8}}
+
+	y := #force_no_inline sum_fields(u5.s)
+	testing.expect(t, simd.to_array(y) == [4]f32{6, 8, 10, 12})
+}
+
+
 // #align(N) #raw_union below the type alignment
 
 Under_Raw :: struct #raw_union #align(1) {
