@@ -101,6 +101,14 @@ struct EscapeState {
 	Array<EscapeFact>       facts;
 	Array<EscapeOuterStore> outers;
 	Array<EscapeNil>        nils;
+	Array<Ast *>            checks; // index and slice expressions whose bounds checks passed on every path reaching here, with what they read unchanged since
+};
+
+
+struct EscapeBoundsCheck {
+	Ast *node;
+	bool fact;   // evaluated whenever its statement is, so its check passed once the statement is done
+	bool proven; // the same check passed before its statement on every path reaching it
 };
 
 enum EscapeTargetKind : u8 {
@@ -202,6 +210,14 @@ struct EscapeAnalysis {
 	Array<EscapeNilUse>  nil_uses;
 	Array<Entity *>      nil_escaped;  // locals whose address was taken, which anything may change from then on
 	Array<Entity *>      uninit_decls; // locals declared with `---`, whose reads are kept
+
+	// bounds checks made again on what passed one before are left out
+	bool                     bounds;
+	bool                     bounds_off;     // within `#no_bounds_check`
+	bool                     bounds_exits;   // the statement may leave part way, e.g. with `or_return`
+	Array<EscapeBoundsCheck> bounds_found;   // of the statement being analysed
+	Array<EscapeBoundsCheck> bounds_uses;
+	Array<Entity *>          bounds_escaped; // locals whose address was taken
 };
 
 gb_global EscapeGraph escape_graph;
@@ -375,9 +391,10 @@ gb_internal EscapeValue escape_value_project(EscapeValue const &v, EscapePath co
 
 gb_internal EscapeState escape_state_unreachable(void) {
 	EscapeState s = {};
-	s.facts  = array_make<EscapeFact>(temporary_allocator(), 0, 0);
+	s.facts  = array_make<EscapeFact>      (temporary_allocator(), 0, 0);
 	s.outers = array_make<EscapeOuterStore>(temporary_allocator(), 0, 0);
-	s.nils   = array_make<EscapeNil>(temporary_allocator(), 0, 0);
+	s.nils   = array_make<EscapeNil>       (temporary_allocator(), 0, 0);
+	s.checks = array_make<Ast *>           (temporary_allocator(), 0, 0);
 	return s;
 }
 
@@ -387,6 +404,7 @@ gb_internal EscapeState escape_state_clone(EscapeState const &s) {
 	c.facts  = array_clone(temporary_allocator(), s.facts);
 	c.outers = array_clone(temporary_allocator(), s.outers);
 	c.nils   = array_clone(temporary_allocator(), s.nils);
+	c.checks = array_clone(temporary_allocator(), s.checks);
 	return c;
 }
 
@@ -408,6 +426,78 @@ gb_internal void escape_add_fact(Array<EscapeFact> *facts, EscapeFact const &f) 
 		}
 	}
 	array_add(facts, f);
+}
+
+// whether two integer expressions reading only unchanged locals and constants have the same value; as integers wrap,
+// this is only ever equality, never e.g. `i < i+1`
+gb_internal bool escape_bounds_term_eq(Ast *a, Ast *b) {
+	a = unparen_expr(a);
+	b = unparen_expr(b);
+	if (a == nullptr || b == nullptr) {
+		return a == b;
+	}
+	if (!are_types_identical(a->tav.type, b->tav.type)) {
+		return false;
+	}
+	if (a->tav.mode == Addressing_Constant || b->tav.mode == Addressing_Constant) {
+		return a->tav.mode == b->tav.mode && compare_exact_values(Token_CmpEq, a->tav.value(), b->tav.value());
+	}
+	if (a->kind != b->kind) {
+		return false;
+	}
+	switch (a->kind) {
+	case Ast_Ident:
+		return entity_of_node(a) == entity_of_node(b);
+	case Ast_UnaryExpr:
+		return a->UnaryExpr.op.kind == b->UnaryExpr.op.kind && escape_bounds_term_eq(a->UnaryExpr.expr, b->UnaryExpr.expr);
+	case Ast_BinaryExpr:
+		return a->BinaryExpr.op.kind == b->BinaryExpr.op.kind &&
+		       escape_bounds_term_eq(a->BinaryExpr.left,  b->BinaryExpr.left) &&
+		       escape_bounds_term_eq(a->BinaryExpr.right, b->BinaryExpr.right);
+	case Ast_CallExpr: // a conversion, to the same type
+		return escape_bounds_term_eq(a->CallExpr.args[0], b->CallExpr.args[0]);
+	case Ast_TypeCast:
+		return a->TypeCast.token.kind == b->TypeCast.token.kind && escape_bounds_term_eq(a->TypeCast.expr, b->TypeCast.expr);
+	case Ast_AutoCast:
+		return escape_bounds_term_eq(a->AutoCast.expr, b->AutoCast.expr);
+	}
+	return false;
+}
+
+gb_internal bool escape_bounds_length_eq(Ast *a, Ast *b) {
+	Type *x = base_type(type_deref(a->tav.type));
+	Type *y = base_type(type_deref(b->tav.type));
+	if (x->kind != y->kind) {
+		return false;
+	}
+	switch (x->kind) {
+	case Type_Array:           return x->Array.count == y->Array.count;
+	case Type_EnumeratedArray: return are_types_identical(x, y);
+	case Type_MultiPointer:    return true;
+	}
+	return entity_of_node(unparen_expr(a)) == entity_of_node(unparen_expr(b));
+}
+
+gb_internal bool escape_bounds_check_eq(Ast *a, Ast *b) {
+	if (a->kind != b->kind) {
+		return false;
+	}
+	if (a->kind == Ast_IndexExpr) {
+		return escape_bounds_length_eq(a->IndexExpr.expr, b->IndexExpr.expr) &&
+		       escape_bounds_term_eq(a->IndexExpr.index, b->IndexExpr.index);
+	}
+	return escape_bounds_length_eq(a->SliceExpr.expr, b->SliceExpr.expr) &&
+	       escape_bounds_term_eq(a->SliceExpr.low,  b->SliceExpr.low) &&
+	       escape_bounds_term_eq(a->SliceExpr.high, b->SliceExpr.high);
+}
+
+gb_internal bool escape_bounds_passed(Array<Ast *> const &checks, Ast *node) {
+	for (Ast *c : checks) {
+		if (escape_bounds_check_eq(c, node)) {
+			return true;
+		}
+	}
+	return false;
 }
 
 gb_internal bool escape_state_join(EscapeState *dst, EscapeState const &src) {
@@ -457,6 +547,18 @@ gb_internal bool escape_state_join(EscapeState *dst, EscapeState const &src) {
 			}
 		}
 		dst->nils = nils;
+	}
+
+	// passed only where it did on both
+	if (dst->checks.count > 0) {
+		auto checks = array_make<Ast *>(temporary_allocator(), 0, dst->checks.count);
+		for (Ast *c : dst->checks) {
+			if (escape_bounds_passed(src.checks, c)) {
+				array_add(&checks, c);
+			}
+		}
+		changed |= checks.count != dst->checks.count;
+		dst->checks = checks;
 	}
 	return changed;
 }
@@ -820,6 +922,38 @@ gb_internal void escape_nil_forget(EscapeAnalysis *ea, Entity *e) {
 	}
 }
 
+gb_internal bool escape_bounds_mentions(Ast *x, Entity *e) {
+	x = unparen_expr(x);
+	if (x == nullptr) {
+		return false;
+	}
+	switch (x->kind) {
+	case Ast_Ident:      return entity_of_node(x) == e;
+	case Ast_UnaryExpr:  return escape_bounds_mentions(x->UnaryExpr.expr, e);
+	case Ast_BinaryExpr: return escape_bounds_mentions(x->BinaryExpr.left, e) || escape_bounds_mentions(x->BinaryExpr.right, e);
+	case Ast_CallExpr:   return x->CallExpr.args.count == 1 && escape_bounds_mentions(x->CallExpr.args[0], e);
+	case Ast_TypeCast:   return escape_bounds_mentions(x->TypeCast.expr, e);
+	case Ast_AutoCast:   return escape_bounds_mentions(x->AutoCast.expr, e);
+	case Ast_IndexExpr:  return escape_bounds_mentions(x->IndexExpr.expr, e) || escape_bounds_mentions(x->IndexExpr.index, e);
+	case Ast_SliceExpr:
+		return escape_bounds_mentions(x->SliceExpr.expr, e) ||
+		       escape_bounds_mentions(x->SliceExpr.low,  e) ||
+		       escape_bounds_mentions(x->SliceExpr.high, e);
+	}
+	return false;
+}
+
+gb_internal void escape_bounds_forget(EscapeAnalysis *ea, Entity *e) {
+	if (e == nullptr) {
+		return;
+	}
+	for (isize i = ea->state.checks.count-1; i >= 0; i--) {
+		if (escape_bounds_mentions(ea->state.checks[i], e)) {
+			array_unordered_remove(&ea->state.checks, i);
+		}
+	}
+}
+
 gb_internal void escape_forget_entity(EscapeAnalysis *ea, Entity *e) {
 	if (e == nullptr) {
 		return;
@@ -830,6 +964,7 @@ gb_internal void escape_forget_entity(EscapeAnalysis *ea, Entity *e) {
 		}
 	}
 	escape_nil_forget(ea, e);
+	escape_bounds_forget(ea, e);
 }
 
 gb_internal void escape_forget(EscapeAnalysis *ea, Ast *decl) {
@@ -1632,6 +1767,315 @@ gb_internal int escape_nil_use_cmp(void const *a, void const *b) {
 		return +1;
 	}
 	return cast(int)x->kind - cast(int)y->kind;
+}
+
+// a local only an assignment changes, as its address was not taken and it is not the caller's memory
+gb_internal bool escape_bounds_entity(EscapeAnalysis *ea, Entity *e) {
+	if (!escape_is_local(e) || escape_is_using_field(e) || escape_is_reference(e) ||
+	    e->Variable.thread_local_model.len != 0 || escape_entity_in(ea->bounds_escaped, e)) {
+		return false;
+	}
+	// a larger parameter, or one passed `#by_ptr`, is the caller's own value
+	return !escape_is_param(e) || ((e->flags & EntityFlag_ByPtr) == 0 && type_size_of(e->type) <= 16);
+}
+
+// an integer reading only such locals and constants, so the same expression has the same value until one is assigned
+gb_internal bool escape_bounds_term(EscapeAnalysis *ea, Ast *x) {
+	x = unparen_expr(x);
+	if (x == nullptr || !(is_type_integer(x->tav.type) || is_type_enum(x->tav.type))) {
+		return false;
+	}
+	if (x->tav.mode == Addressing_Constant) {
+		return true;
+	}
+	switch (x->kind) {
+	case_ast_node(i, Ident, x);
+		return escape_bounds_entity(ea, entity_of_node(x));
+	case_end;
+
+	case_ast_node(ue, UnaryExpr, x);
+		switch (ue->op.kind) {
+		case Token_Add:
+		case Token_Sub:
+		case Token_Xor:
+			return escape_bounds_term(ea, ue->expr);
+		}
+		return false;
+	case_end;
+
+	case_ast_node(be, BinaryExpr, x);
+		switch (be->op.kind) {
+		case Token_Add:
+		case Token_Sub:
+		case Token_Mul:
+		case Token_Quo:
+		case Token_Mod:
+		case Token_ModMod:
+		case Token_And:
+		case Token_Or:
+		case Token_Xor:
+		case Token_AndNot:
+		case Token_Shl:
+		case Token_Shr:
+			return escape_bounds_term(ea, be->left) && escape_bounds_term(ea, be->right);
+		}
+		return false;
+	case_end;
+
+	case_ast_node(ce, CallExpr, x);
+		return ce->proc->tav.mode == Addressing_Type && ce->args.count == 1 && escape_bounds_term(ea, ce->args[0]);
+	case_end;
+
+	case_ast_node(tc, TypeCast, x);
+		return escape_bounds_term(ea, tc->expr);
+	case_end;
+
+	case_ast_node(ac, AutoCast, x);
+		return escape_bounds_term(ea, ac->expr);
+	case_end;
+	}
+	return false;
+}
+
+// whether the expression makes a bounds check which passes again whenever it passed before with nothing it reads
+// assigned since
+gb_internal bool escape_bounds_checkable(EscapeAnalysis *ea, Ast *node) {
+	Ast *container = nullptr;
+	switch (node->kind) {
+	case_ast_node(ie, IndexExpr, node);
+		if (!escape_bounds_term(ea, ie->index)) {
+			return false;
+		}
+		container = ie->expr;
+	case_end;
+
+	case_ast_node(se, SliceExpr, node);
+		if ((se->low  != nullptr && !escape_bounds_term(ea, se->low)) ||
+		    (se->high != nullptr && !escape_bounds_term(ea, se->high))) {
+			return false;
+		}
+		container = se->expr;
+	case_end;
+	}
+
+	Type *t = base_type(container->tav.type);
+	if (t == nullptr) {
+		return false;
+	}
+	bool deref = is_type_pointer(t);
+	t = base_type(type_deref(t));
+	Ast *local = unparen_expr(container);
+	bool is_local = !deref && local->kind == Ast_Ident && escape_bounds_entity(ea, entity_of_node(local));
+
+	switch (t->kind) {
+	case Type_Array:
+	case Type_EnumeratedArray:
+		// a constant index is checked as it is compiled
+		return node->kind == Ast_SliceExpr || node->IndexExpr.index->tav.mode != Addressing_Constant;
+	case Type_MultiPointer:
+		return node->kind == Ast_SliceExpr && node->SliceExpr.high != nullptr;
+	case Type_Slice:
+	case Type_DynamicArray:
+		return is_local;
+	case Type_Basic:
+		return is_local && (t->Basic.kind == Basic_string || t->Basic.kind == Basic_string16);
+	}
+	return false;
+}
+
+// finds the bounds checks an expression makes; the addresses it takes count before any check is looked at, as the
+// backend may evaluate its parts in another order; a check whose expression may not be evaluated, e.g. after `&&` or
+// in the arguments of a disabled procedure, is not kept as passed
+gb_internal void escape_bounds_scan(EscapeAnalysis *ea, Ast *expr, bool fact) {
+	if (!ea->bounds || expr == nullptr || expr->tav.mode == Addressing_Constant || expr->tav.mode == Addressing_Type) {
+		return;
+	}
+	// the backend keeps an expression's own `#bounds_check` only where it is not an address
+	bool bounds_off = ea->bounds_off;
+	defer (ea->bounds_off = bounds_off);
+	if (expr->state_flags & StateFlag_no_bounds_check) {
+		ea->bounds_off = true;
+	}
+
+	switch (expr->kind) {
+	case_ast_node(pe, ParenExpr, expr);
+		escape_bounds_scan(ea, pe->expr, fact);
+	case_end;
+
+	case_ast_node(ue, UnaryExpr, expr);
+		if (ue->op.kind == Token_And) {
+			Entity *root = escape_nil_root(ue->expr);
+			if (root != nullptr && !escape_entity_in(ea->bounds_escaped, root)) {
+				array_add(&ea->bounds_escaped, root);
+				escape_bounds_forget(ea, root);
+			}
+		}
+		escape_bounds_scan(ea, ue->expr, fact);
+	case_end;
+
+	case_ast_node(be, BinaryExpr, expr);
+		escape_bounds_scan(ea, be->left, fact);
+		escape_bounds_scan(ea, be->right, fact && be->op.kind != Token_CmpAnd && be->op.kind != Token_CmpOr);
+	case_end;
+
+	case_ast_node(se, SelectorExpr, expr);
+		if (escape_package_selector(expr) == nullptr) {
+			escape_bounds_scan(ea, se->expr, fact);
+		}
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		escape_bounds_scan(ea, ie->expr, fact);
+		escape_bounds_scan(ea, ie->index, fact);
+		if (!ea->bounds_off) {
+			array_add(&ea->bounds_found, EscapeBoundsCheck{expr, fact});
+		}
+	case_end;
+
+	case_ast_node(se, SliceExpr, expr);
+		escape_bounds_scan(ea, se->expr, fact);
+		escape_bounds_scan(ea, se->low,  fact);
+		escape_bounds_scan(ea, se->high, fact);
+		if (!ea->bounds_off) {
+			array_add(&ea->bounds_found, EscapeBoundsCheck{expr, fact});
+		}
+	case_end;
+
+	case_ast_node(mie, MatrixIndexExpr, expr);
+		escape_bounds_scan(ea, mie->expr,         fact);
+		escape_bounds_scan(ea, mie->row_index,    fact);
+		escape_bounds_scan(ea, mie->column_index, fact);
+	case_end;
+
+	case_ast_node(de, DerefExpr, expr);
+		escape_bounds_scan(ea, de->expr, fact);
+	case_end;
+
+	case_ast_node(ce, CallExpr, expr);
+		Ast *proc = unparen_expr(ce->proc);
+		bool evaluated = fact;
+		if (proc->tav.mode == Addressing_Builtin) {
+			// which arguments a builtin evaluates depends on the builtin
+			evaluated = false;
+		} else if (proc->tav.mode != Addressing_Type) {
+			Entity *e = nullptr;
+			if (proc->kind == Ast_Ident || proc->kind == Ast_SelectorExpr) {
+				e = entity_of_node(proc);
+			}
+			// nothing of a call to a disabled procedure is evaluated
+			if (e != nullptr && (e->flags & EntityFlag_Disabled) != 0) {
+				evaluated = false;
+			}
+			escape_bounds_scan(ea, ce->proc, evaluated);
+		}
+		for (Ast *arg : ce->args) {
+			escape_bounds_scan(ea, arg, evaluated);
+		}
+	case_end;
+
+	case_ast_node(sce, SelectorCallExpr, expr);
+		escape_bounds_scan(ea, sce->call, fact);
+	case_end;
+
+	case_ast_node(cl, CompoundLit, expr);
+		for (Ast *elem : cl->elems) {
+			escape_bounds_scan(ea, elem, fact);
+		}
+	case_end;
+
+	case_ast_node(fv, FieldValue, expr);
+		escape_bounds_scan(ea, fv->value, fact);
+	case_end;
+
+	case_ast_node(e, Ellipsis, expr);
+		escape_bounds_scan(ea, e->expr, fact);
+	case_end;
+
+	case_ast_node(te, TernaryIfExpr, expr);
+		escape_bounds_scan(ea, te->cond, fact);
+		escape_bounds_scan(ea, te->x, false);
+		escape_bounds_scan(ea, te->y, false);
+	case_end;
+
+	case_ast_node(te, TernaryWhenExpr, expr);
+		if (te->cond == nullptr || te->cond->tav.value().kind != ExactValue_Bool) {
+			break;
+		}
+		if (te->cond->tav.value().value_bool) {
+			escape_bounds_scan(ea, te->x, fact);
+		} else {
+			escape_bounds_scan(ea, te->y, fact);
+		}
+	case_end;
+
+	case_ast_node(oe, OrElseExpr, expr);
+		escape_bounds_scan(ea, oe->x, fact);
+		escape_bounds_scan(ea, oe->y, false);
+	case_end;
+
+	case_ast_node(re, OrReturnExpr, expr);
+		ea->bounds_exits = true;
+		escape_bounds_scan(ea, re->expr, fact);
+	case_end;
+
+	case_ast_node(be, OrBranchExpr, expr);
+		ea->bounds_exits = true;
+		escape_bounds_scan(ea, be->expr, fact);
+	case_end;
+
+	case_ast_node(ta, TypeAssertion, expr);
+		escape_bounds_scan(ea, ta->expr, fact);
+	case_end;
+
+	case_ast_node(tc, TypeCast, expr);
+		escape_bounds_scan(ea, tc->expr, fact);
+	case_end;
+
+	case_ast_node(ac, AutoCast, expr);
+		escape_bounds_scan(ea, ac->expr, fact);
+	case_end;
+
+	case_ast_node(te, TagExpr, expr);
+		escape_bounds_scan(ea, te->expr, fact);
+	case_end;
+	}
+}
+
+// the checks of a statement, against what passed before it, as nothing it evaluates changes a local whose address
+// it does not take; then what passed once it is done, unless it may leave part way, where what runs then, e.g. a
+// defer, would see them
+gb_internal void escape_bounds_flush(EscapeAnalysis *ea) {
+	enum : isize { MAX_CHECK_COUNT = 1<<10 };
+
+	for (EscapeBoundsCheck &c : ea->bounds_found) {
+		if (!escape_bounds_checkable(ea, c.node)) {
+			c.fact = false;
+			continue;
+		}
+		c.proven = escape_bounds_passed(ea->state.checks, c.node);
+		array_add(&ea->bounds_uses, c);
+	}
+	if (!ea->bounds_exits) {
+		for (EscapeBoundsCheck const &c : ea->bounds_found) {
+			if (c.fact && ea->state.checks.count < MAX_CHECK_COUNT && !escape_bounds_passed(ea->state.checks, c.node)) {
+				array_add(&ea->state.checks, c.node);
+			}
+		}
+	}
+	array_clear(&ea->bounds_found);
+	ea->bounds_exits = false;
+}
+
+gb_internal int escape_bounds_check_cmp(void const *a, void const *b) {
+	EscapeBoundsCheck const *x = cast(EscapeBoundsCheck const *)a;
+	EscapeBoundsCheck const *y = cast(EscapeBoundsCheck const *)b;
+	if (x->node == y->node) {
+		return 0;
+	}
+	if (cast(uintptr)x->node < cast(uintptr)y->node) {
+		return -1;
+	}
+	return +1;
 }
 
 
@@ -2631,6 +3075,10 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 	isize result_count = 0;
 	if (pt->results != nullptr) {
 		result_count = pt->results->Tuple.variables.count;
+		// a return, or `or_return`, may set the named results
+		for (Entity *e : pt->results->Tuple.variables) {
+			escape_bounds_forget(ea, e);
+		}
 	}
 
 	// what is returned is fixed before the defers run, and is what the named results hold for them
@@ -2701,7 +3149,7 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 	ea->state.reachable = false;
 }
 
-// returns whether the location is exact, so that a later store to it replaces this one
+// returns whether the location is exact meaning that a later store to it replaces this one
 gb_internal bool escape_outer_location(Ast *lhs, Entity **root, EscapePath *path) {
 	lhs = unparen_expr(lhs);
 	*root = nullptr;
@@ -2819,7 +3267,7 @@ gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue
 				case EscapeOrigin_Param:
 				case EscapeOrigin_ParamLoad:
 				case EscapeOrigin_ParamDeep:
-					// never reported, only made into a flow, so where it is stored does not need telling apart
+					// never reported, only made into a flow meaning where it is stored does not need telling apart
 					s.node = nullptr;
 					break;
 				}
@@ -2919,12 +3367,16 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 
 	enum : isize { MAX_ITERATION_COUNT = 16 };
 
-	// what is nil only shrinks to what holds for every iteration, so only the uses of the last round are kept
-	isize nil_use_count = ea->nil_uses.count;
+	// what is nil, or passed, only shrinks to what holds for every iteration meaning only the uses of the last round are kept
+	isize nil_use_count    = ea->nil_uses.count;
+	isize bounds_use_count = ea->bounds_uses.count;
 	bool settled = false;
 	for (isize iteration = 0; iteration < MAX_ITERATION_COUNT; iteration++) {
-		ea->nil_uses.count = nil_use_count;
+		ea->nil_uses.count    = nil_use_count;
+		ea->bounds_uses.count = bounds_use_count;
 		ea->state = escape_state_clone(head);
+		escape_bounds_scan(ea, cond, true);
+		escape_bounds_flush(ea);
 		escape_nil_scan(ea, cond);
 		escape_visit_exits(ea, cond);
 
@@ -3032,6 +3484,8 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 	if (!settled) {
 		ea->nil_uses.count = nil_use_count;
 		array_clear(&exit.nils);
+		// what passed in its later iterations may have reached labelled targets and exits meaning no check is left out
+		ea->bounds = false;
 	}
 	array_pop(&ea->targets);
 	ea->state = exit;
@@ -3073,6 +3527,11 @@ gb_internal void escape_switch(EscapeAnalysis *ea, Ast *stmt, Ast *body, Ast *ty
 		ea->state = escape_state_clone(entry);
 		escape_state_join(&ea->state, ea->fallthrough);
 		ea->fallthrough = escape_state_unreachable();
+		// only those up to the one matching are evaluated
+		for (Ast *e : cc->list) {
+			escape_bounds_scan(ea, e, false);
+		}
+		escape_bounds_flush(ea);
 		for (Ast *e : cc->list) {
 			escape_nil_scan(ea, e);
 			escape_visit_exits(ea, e);
@@ -3106,6 +3565,18 @@ gb_internal void escape_switch(EscapeAnalysis *ea, Ast *stmt, Ast *body, Ast *ty
 		escape_state_join(&exit, entry);
 	}
 	escape_state_join(&exit, ea->targets[target_index].breaks);
+	if (!has_default && exhaustive) {
+		// a value no case names, e.g. `Side(99)`, or a nil union, matches none meaning what passed must have before it
+		if (!exit.reachable) {
+			// nor is what runs after it then analysed
+			ea->bounds = false;
+		}
+		for (isize i = exit.checks.count-1; i >= 0; i--) {
+			if (!escape_bounds_passed(entry.checks, exit.checks[i])) {
+				array_unordered_remove(&exit.checks, i);
+			}
+		}
+	}
 	array_pop(&ea->targets);
 	ea->state = exit;
 }
@@ -3118,8 +3589,20 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	if (escape_too_large(ea)) {
 		return;
 	}
+
+	// as the backend meaning a defer has those of where it runs
+	bool bounds_off = ea->bounds_off;
+	defer (ea->bounds_off = bounds_off);
+	if (node->state_flags & StateFlag_bounds_check) {
+		ea->bounds_off = false;
+	} else if (node->state_flags & StateFlag_no_bounds_check) {
+		ea->bounds_off = true;
+	}
+
 	switch (node->kind) {
 	case_ast_node(es, ExprStmt, node);
+		escape_bounds_scan(ea, es->expr, true);
+		escape_bounds_flush(ea);
 		escape_nil_scan(ea, es->expr);
 		escape_visit_exits(ea, es->expr);
 		if (is_diverging_stmt(node)) {
@@ -3131,6 +3614,14 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		if (!vd->is_mutable) {
 			break;
 		}
+		for (Ast *value : vd->values) {
+			escape_bounds_scan(ea, value, true);
+		}
+		escape_bounds_flush(ea);
+		for (Ast *name : vd->names) {
+			escape_bounds_forget(ea, entity_of_node(name));
+		}
+
 		auto nil_paths = array_make<Array<EscapePath> >(temporary_allocator(), 0, 0);
 		for (Ast *value : vd->values) {
 			escape_nil_scan(ea, value);
@@ -3203,6 +3694,20 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
+		for (Ast *lhs : as->lhs) {
+			escape_bounds_scan(ea, lhs, true);
+		}
+		for (Ast *rhs : as->rhs) {
+			escape_bounds_scan(ea, rhs, true);
+		}
+		escape_bounds_flush(ea);
+		for (Ast *lhs : as->lhs) {
+			Entity *root = escape_nil_root(lhs);
+			if (root != nullptr) {
+				escape_bounds_forget(ea, root);
+			}
+		}
+
 		auto nil_paths = array_make<Array<EscapePath> >(temporary_allocator(), 0, 0);
 		for (Ast *rhs : as->rhs) {
 			escape_nil_scan(ea, rhs);
@@ -3305,6 +3810,8 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		}
 
 		escape_stmt(ea, is->init);
+		escape_bounds_scan(ea, is->cond, true);
+		escape_bounds_flush(ea);
 		escape_nil_scan(ea, is->cond);
 		escape_visit_exits(ea, is->cond);
 
@@ -3339,6 +3846,10 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
+		for (Ast *expr : rs->results) {
+			escape_bounds_scan(ea, expr, true);
+		}
+		escape_bounds_flush(ea);
 		for (Ast *expr : rs->results) {
 			escape_nil_scan(ea, expr);
 		}
@@ -3409,6 +3920,9 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		for (Ast *val : rs->vals) {
 			by_ref |= val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And;
 		}
+		// evaluated once, before the first iteration
+		escape_bounds_scan(ea, rs->expr, true);
+		escape_bounds_flush(ea);
 		// iterating a local by reference does not read it
 		if (by_ref && escape_nil_root(rs->expr) != nullptr) {
 			escape_nil_escape(ea, rs->expr);
@@ -3427,6 +3941,8 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		for (Ast *val : vals) {
 			by_ref |= val != nullptr && val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And;
 		}
+		escape_bounds_scan(ea, rs->expr, true);
+		escape_bounds_flush(ea);
 		if (by_ref && escape_nil_root(rs->expr) != nullptr) {
 			escape_nil_escape(ea, rs->expr);
 			escape_nil_scan_addr(ea, rs->expr);
@@ -3439,6 +3955,8 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 
 	case_ast_node(ss, SwitchStmt, node);
 		escape_stmt(ea, ss->init);
+		escape_bounds_scan(ea, ss->tag, true);
+		escape_bounds_flush(ea);
 		escape_nil_scan(ea, ss->tag);
 		escape_visit_exits(ea, ss->tag);
 		bool exhaustive = false;
@@ -3458,6 +3976,8 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		if (rhs == nullptr) {
 			break;
 		}
+		escape_bounds_scan(ea, rhs, true);
+		escape_bounds_flush(ea);
 		escape_nil_scan(ea, rhs);
 		escape_switch(ea, node, ss->body, rhs, !ss->partial);
 	case_end;
@@ -3525,6 +4045,11 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 	ea.nil_escaped  = array_make<Entity *>(temporary_allocator(), 0, 0);
 	ea.uninit_decls = array_make<Entity *>(temporary_allocator(), 0, 0);
 
+	ea.bounds         = !build_context.no_bounds_check;
+	ea.bounds_found   = array_make<EscapeBoundsCheck>(temporary_allocator(), 0, 0);
+	ea.bounds_uses    = array_make<EscapeBoundsCheck>(temporary_allocator(), 0, 0);
+	ea.bounds_escaped = array_make<Entity *>(temporary_allocator(), 0, 0);
+
 	if (ea.pt->variadic &&
 	    !ea.pt->c_vararg &&
 	    ea.pt->params != nullptr &&
@@ -3571,6 +4096,22 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 			i = j;
 		}
 	}
+	if (ea.bounds && !ea.too_large) {
+		// left out only when the same check passed every time it is reached, e.g. in a defer run at several exits
+		array_sort(ea.bounds_uses, escape_bounds_check_cmp);
+		for (isize i = 0; i < ea.bounds_uses.count; /**/) {
+			Ast *node = ea.bounds_uses[i].node;
+			bool proven = true;
+			isize j = i;
+			for (/**/; j < ea.bounds_uses.count && ea.bounds_uses[j].node == node; j++) {
+				proven &= ea.bounds_uses[j].proven;
+			}
+			if (proven) {
+				node->state_flags |= StateFlag_bounds_check_proven;
+			}
+			i = j;
+		}
+	}
 	if (reports == nullptr) {
 		for (EscapeReport const &r : own_reports) {
 			escape_report_emit(r);
@@ -3595,7 +4136,7 @@ gb_internal WORKER_TASK_PROC(escape_member_worker) {
 	return 0;
 }
 
-// each stale one is analysed with the flows the others had before, so the order they are analysed in does not matter
+// each stale one is analysed with the flows the others had before meaning the order they are analysed in does not matter
 gb_internal void escape_analyse_members(EscapeGraph *g, Slice<EscapeMemberTask> tasks) {
 	TaskGroup group = {};
 	for (EscapeMemberTask &t : tasks) {
@@ -3641,6 +4182,12 @@ gb_internal void escape_analyse_group(EscapeGraph *g, i32 gi) {
 
 	i32 first = g->members[start];
 	if (g->skipped[first]) {
+		if (!build_context.no_bounds_check) {
+			// only for the bounds checks it may leave out, which do not need what its calls do
+			for (i32 k = start; k < end; k++) {
+				escape_analyse(g, g->members[k], nullptr, true);
+			}
+		}
 		return;
 	}
 	bool recursive = end - start > 1;

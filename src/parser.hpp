@@ -376,6 +376,8 @@ enum StateFlag : u8 {
 	StateFlag_type_assert     = 1<<2,
 	StateFlag_no_type_assert  = 1<<3,
 
+	StateFlag_bounds_check_proven = 1<<4, // the bounds check of this index or slice expression itself passes, see check_escape.cpp
+
 	StateFlag_SelectorCallExpr = 1<<5,
 	StateFlag_DirectiveWasFalse = 1<<6,
 

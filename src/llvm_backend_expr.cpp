@@ -5326,6 +5326,7 @@ gb_internal lbAddr lb_build_addr_soa_elem_index(lbProcedure *p, Ast *expr, lbAdd
 
 gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 	ast_node(ie, IndexExpr, expr);
+	bool proven = (expr->state_flags & StateFlag_bounds_check_proven) != 0; // see check_escape.cpp
 
 	Type *t = base_type(type_of_expr(ie->expr));
 
@@ -5434,7 +5435,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue elem = lb_emit_array_ep(p, array, index);
 
 		auto index_tv = type_and_value_of_expr(ie->index);
-		if (index_tv.mode != Addressing_Constant) {
+		if (index_tv.mode != Addressing_Constant && !proven) {
 			lbValue len = lb_const_int(p->module, t_int, t->Array.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
@@ -5489,7 +5490,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 		lbValue elem = lb_emit_array_ep(p, array, index);
 
-		if (index_tv.mode != Addressing_Constant) {
+		if (index_tv.mode != Addressing_Constant && !proven) {
 			lbValue len = lb_const_int(p->module, t_int, t->EnumeratedArray.count);
 			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
 		}
@@ -5505,7 +5506,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue elem = lb_slice_elem(p, slice);
 		lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
 		lbValue len = lb_slice_len(p, slice);
-		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		if (!proven) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
 		lbValue v = lb_emit_ptr_offset(p, elem, index);
 		return lb_addr(v);
 	}
@@ -5535,7 +5538,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue elem = lb_dynamic_array_elem(p, dynamic_array);
 		lbValue len = lb_dynamic_array_len(p, dynamic_array);
 		lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		if (!proven) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
 		lbValue v = lb_emit_ptr_offset(p, elem, index);
 		return lb_addr(v);
 	}
@@ -5584,7 +5589,9 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		len = lb_string_len(p, str);
 
 		index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		if (!proven) {
+			lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
 
 		return lb_addr(lb_emit_ptr_offset(p, elem, index));
 	}
@@ -5595,6 +5602,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);
+	bool proven = (expr->state_flags & StateFlag_bounds_check_proven) != 0; // see check_escape.cpp
 
 	if (true) {
 		// NOTE(bill): Fused nested slice chain: src[a:b][c:d][e:f]...
@@ -5667,7 +5675,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 					}
 
 					bool no_indices = s->low == nullptr && s->high == nullptr;
-					if (!no_indices) {
+					if (!no_indices && (chain[i]->state_flags & StateFlag_bounds_check_proven) == 0) {
 						lb_emit_slice_bounds_check(p, s->open, lo, hi, cur_len, s->low != nullptr);
 					}
 
@@ -5711,7 +5719,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_slice_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5730,7 +5738,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_dynamic_array_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5748,7 +5756,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 			lbValue len = lb_string_len(p, base);
 			if (high.value == nullptr) high = len;
 
-			if (!no_indices) {
+			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 
@@ -5763,7 +5771,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5783,7 +5791,9 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 		low = lb_emit_conv(p, low, t_int);
 		high = lb_emit_conv(p, high, t_int);
 
-		lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+		if (!proven) {
+			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+		}
 
 		LLVMValueRef indices[1] = {low.value};
 		lbValue ptr = {};
@@ -5805,6 +5815,7 @@ gb_internal lbValue lb_build_slice_expr_value(lbProcedure *p, Ast *expr) {
 
 gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	ast_node(se, SliceExpr, expr);
+	bool proven = (expr->state_flags & StateFlag_bounds_check_proven) != 0; // see check_escape.cpp
 
 	lbAddr addr = lb_build_addr(p, se->expr);
 	lbValue base = lb_addr_load(p, addr);
@@ -5835,7 +5846,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_slice_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5854,7 +5865,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_dynamic_array_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
@@ -5877,7 +5888,9 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			low = lb_emit_conv(p, low, t_int);
 			high = lb_emit_conv(p, high, t_int);
 
-			lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+			if (!proven) {
+				lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+			}
 
 			LLVMValueRef indices[1] = {low.value};
 			LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base_type(base.type)->MultiPointer.elem), base.value, indices, 1, "");
@@ -5901,7 +5914,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		bool high_const = type_and_value_of_expr(se->high).mode == Addressing_Constant;
 
 		if (!low_const || !high_const) {
-			if (!no_indices) {
+			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 		}
@@ -5940,7 +5953,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 			lbValue len = lb_string_len(p, base);
 			if (high.value == nullptr) high = len;
 
-			if (!no_indices) {
+			if (!no_indices && !proven) {
 				lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 			}
 
@@ -5955,7 +5968,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;
 
-		if (!no_indices) {
+		if (!no_indices && !proven) {
 			lb_emit_slice_bounds_check(p, se->open, low, high, len, se->low != nullptr);
 		}
 
