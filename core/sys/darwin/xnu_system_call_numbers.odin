@@ -1,3 +1,4 @@
+#+build darwin
 package darwin
 
 // IMPORTANT NOTE: direct syscall usage is not allowed by Apple's review process of apps and should

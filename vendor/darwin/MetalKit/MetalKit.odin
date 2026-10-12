@@ -1,3 +1,4 @@
+#+build darwin
 // Bindings for [[ MetalKit ; https://developer.apple.com/documentation/metalkit ]].
 package objc_MetalKit
 
