@@ -837,7 +837,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_AndroidKeystorePassword, str_lit("android-keystore-password"), BuildFlagParam_String,  Command_bundle_android);
 
 #if !defined(GB_SYSTEM_WINDOWS)
-	add_flag(&build_flags, BuildFlag_WindowsSDKRoot,          str_lit("windows-sdk-root"),          BuildFlagParam_String,  Command_build);
+	add_flag(&build_flags, BuildFlag_WindowsSDKRoot,          str_lit("windows-sdk-root"),          BuildFlagParam_String,  Command__does_build);
 #endif
 
 
@@ -3605,7 +3605,7 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 #if !defined(GB_SYSTEM_WINDOWS)
-	if (build) {
+	if (run_or_build) {
 		if (print_flag("-windows-sdk-root:<string>")) {
 			print_usage_line(2, "Path to the root directory of the Windows SDK for cross-linking.");
 			print_usage_line(2, "Requires '-linker:lld' flag and 'lld-link' installation.");
@@ -4576,9 +4576,16 @@ int main(int arg_count, char const **arg_ptr) {
 	// }
 
 #if !defined(GB_SYSTEM_WINDOWS)
-	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0) {
-		gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
-		gb_exit(1);
+	if (build_context.metrics.os == TargetOs_windows && build_context.windows_sdk_root.len == 0 &&
+	    (build_context.command_kind & Command__does_build) != 0) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_StaticLibrary:
+		case BuildMode_DynamicLibrary:
+			gb_printf_err("-windows-sdk-root:<path> must be used to target Windows\n");
+			gb_exit(1);
+			break;
+		}
 	}
 #endif
 
