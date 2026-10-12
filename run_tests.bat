@@ -14,7 +14,7 @@ for %%A in (%*) do (
 		set ODIN_TESTS_NO_CLANG=1
 	) else (
 		echo Unrecognized argument: %%A
-		exit /b
+		exit /b 1
 	)
 )
 
