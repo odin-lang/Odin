@@ -145,13 +145,21 @@ test_pr_7848_export :: proc(t: ^testing.T) {
 		testing.expect_value(t, x.offset, offset_of(t, path, "X, Y"))
 	}
 
-	// the fields of an enum and of a bit_field are definitions
-	for field in ([]struct{name, at: string}{{"Y", "Y}"}, {"hi", "hi: u8"}}) {
+	// the fields of an enum and of a bit_field, and the names of imports and foreign imports, are definitions
+	for field in ([]struct{name, at: string}{{"Y", "Y}"}, {"hi", "hi: u8"}, {"str", "str \""}, {"tool_lib", "tool_lib \""}}) {
 		at := offset_of(t, path, field.at)
 		ids = tf.find_idents(b.definitions, at)
 		if testing.expectf(t, len(ids) == 1, "%s should have one definition, got %d", field.name, len(ids)) {
 			testing.expect_value(t, s.entities[ids[0].entity].name, field.name)
 			testing.expect_value(t, s.entities[ids[0].entity].offset, at)
+		}
+	}
+
+	// a named argument refers to the parameter, not the local of the same name, and `offset_of` to the field
+	for use in ([]struct{at, def: string}{{"b = 1", "b: int"}, {"y)", "y: f32"}}) {
+		ids = tf.find_idents(b.uses, offset_of(t, path, use.at))
+		if testing.expectf(t, len(ids) == 1, "%q should refer to one entity, got %d", use.at, len(ids)) {
+			testing.expect_value(t, s.entities[ids[0].entity].offset, offset_of(t, path, use.def))
 		}
 	}
 

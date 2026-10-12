@@ -1,5 +1,13 @@
 package pkg_a
 
+import str "core:strings"
+
+foreign import tool_lib "system:tool_lib"
+
+foreign tool_lib {
+	tool_value :: proc "c" () -> i32 ---
+}
+
 Point :: struct {
 	x: f32,
 	y: f32,
@@ -44,7 +52,10 @@ use_all :: proc() -> int {
 	p := Point{1, 2, 3}
 	a := twice(int(p.z))
 	b := twice(p.x)
-	c := add(a, FIVE) + int(b) + pick(.X, 1)
+	c := add(a, FIVE) + int(b) + pick(.X, 1) + add_int(b = 1, a = 2) + int(offset_of(Point, y))
+	if str.contains("ab", "a") {
+		c += 1
+	}
 	when FIVE == 6 {
 		c += 100
 	} else {
