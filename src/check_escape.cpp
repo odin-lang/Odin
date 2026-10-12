@@ -3358,7 +3358,7 @@ gb_internal void escape_block(EscapeAnalysis *ea, Slice<Ast *> const &stmts) {
 }
 
 
-gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post, Ast *body, Ast *val0, Ast *val1, Ast *range) {
+gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post, Ast *body, Ast *val0, Ast *val1, Ast *range, Ast *each) {
 	isize target_index = escape_push_target(ea, stmt, EscapeTarget_Loop);
 	isize alias_count  = ea->aliases.count;
 
@@ -3374,9 +3374,13 @@ gb_internal void escape_loop(EscapeAnalysis *ea, Ast *stmt, Ast *cond, Ast *post
 	for (isize iteration = 0; iteration < MAX_ITERATION_COUNT; iteration++) {
 		ea->nil_uses.count    = nil_use_count;
 		ea->bounds_uses.count = bounds_use_count;
+
 		ea->state = escape_state_clone(head);
+
 		escape_bounds_scan(ea, cond, true);
+		escape_bounds_scan(ea, each, true);
 		escape_bounds_flush(ea);
+
 		escape_nil_scan(ea, cond);
 		escape_visit_exits(ea, cond);
 
@@ -3902,7 +3906,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 
 	case_ast_node(fs, ForStmt, node);
 		escape_stmt(ea, fs->init);
-		escape_loop(ea, node, fs->cond, fs->post, fs->body, nullptr, nullptr, nullptr);
+		escape_loop(ea, node, fs->cond, fs->post, fs->body, nullptr, nullptr, nullptr, nullptr);
 		escape_forget(ea, fs->init);
 	case_end;
 
@@ -3920,17 +3924,29 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		for (Ast *val : rs->vals) {
 			by_ref |= val->kind == Ast_UnaryExpr && val->UnaryExpr.op.kind == Token_And;
 		}
-		// evaluated once, before the first iteration
-		escape_bounds_scan(ea, rs->expr, true);
+
+		Ast *range = unparen_expr(rs->expr);
+		Type *range_type = base_type(type_deref(range->tav.type));
+		Ast *each = nullptr;
+		if (is_ast_range(range)) {
+			escape_bounds_scan(ea, range->BinaryExpr.left, true);
+			each = range->BinaryExpr.right;
+		} else if (range->tav.mode != Addressing_Type && range_type != nullptr && range_type->kind == Type_Tuple) {
+			each = range;
+		} else {
+			escape_bounds_scan(ea, range, true);
+		}
+
 		escape_bounds_flush(ea);
-		// iterating a local by reference does not read it
+
 		if (by_ref && escape_nil_root(rs->expr) != nullptr) {
 			escape_nil_escape(ea, rs->expr);
 			escape_nil_scan_addr(ea, rs->expr);
 		} else {
 			escape_nil_scan(ea, rs->expr);
 		}
-		escape_loop(ea, node, nullptr, nullptr, rs->body, val0, val1, rs->expr);
+
+		escape_loop(ea, node, nullptr, nullptr, rs->body, val0, val1, rs->expr, each);
 		escape_forget(ea, rs->init);
 	case_end;
 
@@ -3949,7 +3965,7 @@ gb_internal void escape_stmt(EscapeAnalysis *ea, Ast *node) {
 		} else {
 			escape_nil_scan(ea, rs->expr);
 		}
-		escape_loop(ea, node, nullptr, nullptr, rs->body, rs->val0, rs->val1, rs->expr);
+		escape_loop(ea, node, nullptr, nullptr, rs->body, rs->val0, rs->val1, rs->expr, nullptr);
 		escape_forget(ea, rs->init);
 	case_end;
 
