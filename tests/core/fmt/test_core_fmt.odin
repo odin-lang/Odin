@@ -167,6 +167,12 @@ test_fmt_width_precision :: proc(t: ^testing.T) {
 	check(t, "3.140", "%*[1].*[2][0]f", 3.14, 5, 3)
 	check(t, "3.140", "%*[2].*[1]f",    3.14, 3, 5)
 	check(t, "3.140", "%5.*[1]f",       3.14, 3)
+
+	// Width in runes, not bytes
+	check(t, "|     naive|", "|%10s|", "naive")
+	check(t, "|     naïve|", "|%10s|", "naïve")
+	check(t, "|naive     |", "|%-10s|", "naive")
+	check(t, "|naïve     |", "|%-10s|", "naïve")
 }
 
 @(test)

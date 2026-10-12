@@ -1509,12 +1509,13 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	switch verb {
 	case 's', 'v':
 		if fi.width_set {
-			if fi.width > len(s) {
+			rune_count := utf8.rune_count(s)
+			if fi.width > rune_count {
 				if fi.minus {
 					io.write_string(fi.writer, s, &fi.n)
 				}
 
-				for _ in 0..<fi.width - len(s) {
+				for _ in 0..<fi.width - rune_count {
 					io.write_byte(fi.writer, ' ', &fi.n)
 				}
 
