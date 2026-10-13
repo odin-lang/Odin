@@ -2480,7 +2480,8 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 			do_require = t->Proc.require_results;
 		} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
 			auto const &bp = builtin_procs[builtin_id];
-			do_require = bp.kind == Expr_Expr && !bp.ignore_results;
+			// NOTE(Jeroen): diverging builtins like `unreachable` have no results to be handled
+			do_require = bp.kind == Expr_Expr && !bp.ignore_results && !bp.diverging;
 		}
 		if (do_require) {
 			gbString expr_str = expr_to_string(ce->proc);
