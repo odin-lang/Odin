@@ -62,11 +62,14 @@ to_upper :: proc(r: rune) -> rune #no_bounds_check {
 @(require_results)
 to_title :: proc(r: rune) -> rune #no_bounds_check {
 	c := i32(r)
-	p := binary_search(c, to_upper_singlets[:], len(to_title_singlets)/2, 2)
-	if p >= 0 && c == to_upper_singlets[p] {
+	p := binary_search(c, to_title_singlets[:], len(to_title_singlets)/2, 2)
+	if p >= 0 && c == to_title_singlets[p] {
 		return rune(c + to_title_singlets[p+1] - 500)
 	}
-	return rune(c)
+	if is_title(r) {
+		return r
+	}
+	return to_upper(r)
 }
 
 
@@ -115,7 +118,7 @@ is_letter :: proc(r: rune) -> bool #no_bounds_check {
 
 @(require_results)
 is_title :: proc(r: rune) -> bool {
-	return is_upper(r) && is_lower(r)
+	return in_range(r, lt_ranges)
 }
 
 /*

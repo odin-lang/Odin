@@ -2,6 +2,7 @@ package test_core_unicode
 
 import "core:log"
 import "core:testing"
+import "core:unicode"
 import "core:unicode/utf8"
 
 Test_Case :: struct {
@@ -202,5 +203,36 @@ test_grapheme_cluster_text :: proc(t: ^testing.T) {
 			i += 1
 		}
 		testing.expectf(t, i == len(c.expected_output), "%q: expected %d clusters, got %d", c.str, len(c.expected_output), i)
+	}
+}
+
+@test
+test_to_title :: proc(t: ^testing.T) {
+	cases :: [][2]rune{
+		{'a',      'A'},
+		{'A',      'A'},
+		{'1',      '1'},
+		{'\u00ff', '\u0178'}, // ÿ -> Ÿ
+		{'\u01c4', '\u01c5'}, // Ǆ -> ǅ
+		{'\u01c5', '\u01c5'}, // ǅ -> ǅ
+		{'\u01c6', '\u01c5'}, // ǆ -> ǅ
+		{'\u01c7', '\u01c8'}, // Ǉ -> ǈ
+		{'\u01cc', '\u01cb'}, // ǌ -> ǋ
+		{'\u01f1', '\u01f2'}, // Ǳ -> ǲ
+		{'\u1f80', '\u1f88'}, // ᾀ -> ᾈ
+		{'\u1f88', '\u1f88'}, // ᾈ -> ᾈ
+	}
+	for c in cases {
+		testing.expectf(t, unicode.to_title(c[0]) == c[1], "to_title(%U): expected %U, got %U", c[0], c[1], unicode.to_title(c[0]))
+	}
+}
+
+@test
+test_is_title :: proc(t: ^testing.T) {
+	for r in ([]rune{'\u01c5', '\u01c8', '\u01cb', '\u01f2', '\u1f88', '\u1faf', '\u1fbc', '\u1ffc'}) {
+		testing.expectf(t, unicode.is_title(r), "is_title(%U): expected true", r)
+	}
+	for r in ([]rune{'a', 'A', '1', '\u01c4', '\u01c6', '\u1f80', '\u1fb3'}) {
+		testing.expectf(t, !unicode.is_title(r), "is_title(%U): expected false", r)
 	}
 }
