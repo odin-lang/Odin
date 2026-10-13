@@ -30,3 +30,37 @@ test_clone :: proc(t: ^testing.T) {
 
 	os.close(clone)
 }
+
+@(test)
+test_open_create_default_permissions :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		// Windows derives the permissions from file attributes, not `perm`
+		return
+	}
+
+	dir, dir_err := os.make_directory_temp("", "test_open_perm_*", context.temp_allocator)
+	if !testing.expect_value(t, dir_err, nil) {
+		return
+	}
+	defer os.remove_all(dir)
+
+	opened, _ := os.join_path({dir, "opened"}, context.temp_allocator)
+	created, _ := os.join_path({dir, "created"}, context.temp_allocator)
+
+	f, err := os.open(opened, {.Write, .Create})
+	testing.expect_value(t, err, nil)
+	os.close(f)
+
+	f, err = os.create(created)
+	testing.expect_value(t, err, nil)
+	os.close(f)
+
+	opened_fi, opened_err := os.stat(opened, context.temp_allocator)
+	testing.expect_value(t, opened_err, nil)
+	created_fi, created_err := os.stat(created, context.temp_allocator)
+	testing.expect_value(t, created_err, nil)
+
+	// A file created by `open` without an explicit `perm` is a regular file, not executable
+	testing.expect_value(t, opened_fi.mode & os.Permissions_Execute_All, os.Permissions{})
+	testing.expect_value(t, opened_fi.mode, created_fi.mode)
+}

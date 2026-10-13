@@ -144,8 +144,7 @@ stderr: ^File = nil // OS-Specific
 	`create` creates or truncates a named file `name`.
 	If the file already exists, it is truncated.
 	If the file does not exist, it is created with the `Permissions_Default_File` permissions.
-	If successful, a `^File` is return which can be used for I/O.
-	And error is returned if any is encountered.
+	Returns a `^File` which can be used for I/O, or an error if any is encountered.
 */
 @(require_results)
 create :: proc(name: string) -> (^File, Error) {
@@ -154,13 +153,12 @@ create :: proc(name: string) -> (^File, Error) {
 
 /*
 	`open` is a generalized open call, which defaults to opening for reading.
-	If the file does not exist, and the `{.Create}` flag is passed, it is created with the permissions `perm`,
-	and please note that the containing directory must exist otherwise and an error will be returned.
-	If successful, a `^File` is return which can be used for I/O.
-	And error is returned if any is encountered.
+	If the file does not exist and the `{.Create}` flag is passed, it is created with the permissions `perm`
+	(`Permissions_Default_File` by default). The containing directory must exist, otherwise an error is returned.
+	Returns a `^File` which can be used for I/O, or an error if any is encountered.
 */
 @(require_results)
-open :: proc(name: string, flags := File_Flags{.Read}, perm := Permissions_Default) -> (^File, Error) {
+open :: proc(name: string, flags := File_Flags{.Read}, perm := Permissions_Default_File) -> (^File, Error) {
 	return _open(name, flags, perm)
 }
 
