@@ -68,6 +68,45 @@ test_align_lowered_struct_by_value :: proc(t: ^testing.T) {
 }
 
 
+// #align(N) union below the variant alignment
+
+Under_Union :: union #align(1) {
+	#simd[4]f32,
+	u8,
+}
+
+Union_Helper :: struct {
+	force: #simd[4]f32, // force align to 16
+	_:     u8,
+	u:     Under_Union, // offs 17, guaranteed misaligned
+}
+
+@(export)
+u2: Union_Helper
+
+@(private="file")
+read_variant :: proc(u: ^Under_Union) -> #simd[4]f32 {
+	return u.(#simd[4]f32)
+}
+
+@(private="file")
+write_variant :: proc(u: ^Under_Union, x: #simd[4]f32) {
+	u^ = x
+}
+
+@(test)
+test_align_lowered_union_variant :: proc(t: ^testing.T) {
+	#force_no_inline write_variant(&u2.u, {1, 2, 3, 4})
+	y := #force_no_inline read_variant(&u2.u)
+	testing.expect(t, simd.to_array(y) == [4]f32{1, 2, 3, 4})
+
+	u2.u = u8(7)
+	b, ok := u2.u.(u8)
+	testing.expect(t, ok)
+	testing.expect(t, b == 7)
+}
+
+
 // #align(N) #raw_union below the type alignment
 
 Under_Raw :: struct #raw_union #align(1) {
