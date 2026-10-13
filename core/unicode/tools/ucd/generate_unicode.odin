@@ -113,6 +113,26 @@ write_range :: proc(writer: io.Writer, name: union{string, General_Category}, ra
 	return
 }
 
+/*
+Writes a `Case_Table` as the `<name>_ranges` and `<name>_singlets` arrays used by
+`to_upper`, `to_lower` and `to_title`.
+*/
+write_case_table :: proc(writer: io.Writer, name: string, ct: Case_Table) {
+	fmt.wprintln(writer, "@(rodata)")
+	fmt.wprintfln(writer, "%s_ranges := [?]i32{{", name)
+	for r in ct.ranges {
+		fmt.wprintfln(writer, "\t0x%04X, 0x%04X, %d,", r[0], r[1], r[2])
+	}
+	fmt.wprintln(writer, "}\n")
+
+	fmt.wprintln(writer, "@(rodata)")
+	fmt.wprintfln(writer, "%s_singlets := [?]i32{{", name)
+	for r in ct.singlets {
+		fmt.wprintfln(writer, "\t0x%04X, %d,", r[0], r[1])
+	}
+	fmt.wprintln(writer, "}\n")
+}
+
 GENERATED :: `/*
 	------ GENERATED ------ DO NOT EDIT ------ GENERATED ------ DO NOT EDIT ------ GENERATED ------
 */
@@ -278,6 +298,18 @@ main :: proc() {
 	write_range(writer, "extra_digits",    extra_digits)
 	write_range(writer, "other_lowercase", proplist[.Other_Lowercase])
 	write_range(writer, "other_uppercase", proplist[.Other_Uppercase])
+
+	to_upper := case_table(&unicode_data, .Upper)
+	defer destroy_case_table(to_upper)
+	write_case_table(writer, "to_upper", to_upper)
+
+	to_lower := case_table(&unicode_data, .Lower)
+	defer destroy_case_table(to_lower)
+	write_case_table(writer, "to_lower", to_lower)
+
+	to_title := case_table(&unicode_data, .Title)
+	defer destroy_case_table(to_title)
+	write_case_table(writer, "to_title", to_title)
 
 	file_name := ODIN_ROOT + "core/unicode/generated.odin"
 
