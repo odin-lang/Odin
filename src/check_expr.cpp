@@ -9119,7 +9119,15 @@ gb_internal Type *instantiate_polymorphic_record(CheckerContext *c, Type *origin
 		return found_entity->type;
 	}
 
+	if (c->polymorphic_record_depth >= MAX_POLYMORPHIC_RECORD_DEPTH) {
+		gbString s = type_to_string(original_type);
+		error(call, "Polymorphic record instantiation of '%s' exceeds the maximum nesting depth of %d", s, MAX_POLYMORPHIC_RECORD_DEPTH);
+		gb_string_free(s);
+		return t_invalid;
+	}
+
 	CheckerContext ctx = *c;
+	ctx.polymorphic_record_depth += 1;
 
 	// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
 	ctx.scope = polymorphic_record_parent_scope(original_type);
@@ -9464,6 +9472,9 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 	operand->mode = Addressing_Type;
 	operand->type = instantiate_polymorphic_record(c, original_type, ordered_operands, call);
+	if (operand->type == t_invalid) {
+		operand->mode = Addressing_Invalid;
+	}
 	return err;
 }
 
@@ -9524,7 +9535,7 @@ gb_internal ExprKind check_call_expr_as_type_cast(CheckerContext *c, Operand *op
 			return Expr_Expr;
 		}
 		auto err = check_polymorphic_record_type(c, operand, call);
-		if (err == 0) {
+		if (err == 0 && operand->mode != Addressing_Invalid) {
 			Ast *ident = operand->expr;
 			while (ident->kind == Ast_SelectorExpr) {
 				Ast *s = ident->SelectorExpr.selector;
