@@ -105,7 +105,7 @@ _listen_error :: proc() -> Listen_Error {
 		return .Invalid_Argument
 	case .WSAEISCONN:
 		return .Already_Connected
-	case .WSAEOPNOTSUPP, .WSAEINVAL:
+	case .WSAEOPNOTSUPP, .WSAEPFNOSUPPORT, .WSAESOCKTNOSUPPORT, .WSAEPROTONOSUPPORT, .WSAEINVAL:
 		return .Unsupported_Socket
 	case:
 		return .Unknown
@@ -175,6 +175,27 @@ _udp_recv_error :: proc() -> UDP_Recv_Error {
 	}
 }
 
+_unix_recv_error :: proc() -> Unix_Recv_Error {
+	#partial switch win.System_Error(win.WSAGetLastError()) {
+	case .WSANOTINITIALISED, .WSAENETDOWN:
+		return .Network_Unreachable
+	case .WSAEFAULT, .WSAEINPROGRESS, .WSAENOTSOCK, .WSAEMSGSIZE, .WSAEINVAL, .WSAEOPNOTSUPP:
+		return .Invalid_Argument
+	case .WSAENOTCONN:
+		return .Not_Connected
+	case .WSAEINTR:
+		return .Interrupted
+	case .WSAENETRESET, .WSAESHUTDOWN, .WSAECONNABORTED, .WSAECONNRESET:
+		return .Connection_Closed
+	case .WSAEWOULDBLOCK:
+		return .Would_Block
+	case .WSAETIMEDOUT:
+		return .Timeout
+	case:
+		return .Unknown
+	}
+}
+
 _tcp_send_error :: proc() -> TCP_Send_Error {
 	#partial switch win.System_Error(win.WSAGetLastError()) {
 	case .WSANOTINITIALISED, .WSAENETDOWN:
@@ -216,6 +237,31 @@ _udp_send_error :: proc() -> UDP_Send_Error {
 		return .Would_Block
 	case .WSAETIMEDOUT:
 		return .Timeout
+	case:
+		return .Unknown
+	}
+}
+
+_unix_send_error :: proc() -> Unix_Send_Error {
+	#partial switch win.System_Error(win.WSAGetLastError()) {
+	case .WSANOTINITIALISED, .WSAENETDOWN:
+		return .Network_Unreachable
+	case .WSAENOBUFS:
+		return .Insufficient_Resources
+	case .WSAEACCES, .WSAEINPROGRESS, .WSAEFAULT, .WSAENOTSOCK, .WSAEOPNOTSUPP, .WSAEMSGSIZE, .WSAEINVAL:
+		return .Invalid_Argument
+	case .WSAEINTR:
+		return .Interrupted
+	case .WSAENETRESET, .WSAESHUTDOWN, .WSAECONNABORTED, .WSAECONNRESET:
+		return .Connection_Closed
+	case .WSAENOTCONN:
+		return .Not_Connected
+	case .WSAEWOULDBLOCK:
+		return .Would_Block
+	case .WSAETIMEDOUT:
+		return .Timeout
+	case .WSAEHOSTUNREACH:
+		return .Host_Unreachable
 	case:
 		return .Unknown
 	}

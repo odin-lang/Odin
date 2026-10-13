@@ -330,6 +330,18 @@ Socket_Address_Basic :: struct #packed {
 	data: [14]c.char,
 }
 
+SUNPATHLEN :: 104
+
+// NOTE(tetra, 2026-06-08): We can't really use the header here since
+// the data field in the header takes up some of `path` in this.
+Socket_Address_Unix :: struct #packed {
+	len: c.uchar,           /* address length */
+	family: Address_Family, /* address family */
+	path: [SUNPATHLEN]byte,
+}
+
+SOCK_MAXADDRLEN :: 255
+
 /*
  * howto arguments for shutdown(2), specified by Posix.1g.
  */
