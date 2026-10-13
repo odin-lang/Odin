@@ -273,6 +273,12 @@ $ODIN run ../test_issue_7482 $COMMON
 $ODIN run ../test_issue_7564 $COMMON
 $ODIN run ../test_issue_7596 $COMMON
 $ODIN run ../test_issue_7798 $COMMON
+if [[ $($ODIN run ../test_issue_7774 $COMMON 2>&1 | grep -c "atexit handler ran") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 #########################################################################################################
 

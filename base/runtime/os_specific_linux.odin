@@ -76,14 +76,23 @@ _rand_bytes :: proc "contextless" (dst: []byte) {
 }
 
 _exit :: proc "contextless" (code: int) -> ! {
-	SYS_exit_group ::
-		231 when ODIN_ARCH == .amd64 else
-		248 when ODIN_ARCH == .arm32 else
-		94  when ODIN_ARCH == .arm64 else
-		252 when ODIN_ARCH == .i386  else
-		94  when ODIN_ARCH == .riscv64 else
-		0
+	when ODIN_NO_CRT {
+		SYS_exit_group ::
+			231 when ODIN_ARCH == .amd64 else
+			248 when ODIN_ARCH == .arm32 else
+			94  when ODIN_ARCH == .arm64 else
+			252 when ODIN_ARCH == .i386  else
+			94  when ODIN_ARCH == .riscv64 else
+			0
 
-	intrinsics.syscall(uintptr(SYS_exit_group), uintptr(i32(code)))
-	unreachable()
+		intrinsics.syscall(uintptr(SYS_exit_group), uintptr(i32(code)))
+		unreachable()
+	} else {
+		// NOTE: libc's `exit` runs the `atexit` handlers (e.g. the sanitizer runtimes' finalisers), `exit_group` does not
+		@(default_calling_convention="c")
+		foreign {
+			exit :: proc(status: i32) -> ! ---
+		}
+		exit(i32(code))
+	}
 }
