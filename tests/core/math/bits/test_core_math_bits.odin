@@ -169,3 +169,29 @@ test_insert_extract :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_div_u32 :: proc(t: ^testing.T) {
+	// `div_u32` asserted whenever the quotient fit and truncated it whenever it did not
+	quo, rem := bits.div_u32(0, 100, 7)
+	testing.expect_value(t, quo, 14)
+	testing.expect_value(t, rem, 2)
+
+	// 2^32 / 3
+	quo, rem = bits.div_u32(1, 0, 3)
+	testing.expect_value(t, quo, 1431655765)
+	testing.expect_value(t, rem, 1)
+
+	// The largest quotient that fits in 32 bits
+	quo, rem = bits.div_u32(max(u32) - 1, max(u32), max(u32))
+	testing.expect_value(t, quo, max(u32))
+	testing.expect_value(t, rem, max(u32) - 1)
+}
+
+@test
+test_div_u32_overflow :: proc(t: ^testing.T) {
+	// 5 * 2^32 / 3 does not fit in 32 bits
+	testing.expect_assert(t, "overflow error")
+	quo, rem := bits.div_u32(5, 0, 3)
+	testing.expectf(t, false, "an overflowing division gave %v rem %v", quo, rem)
+}
