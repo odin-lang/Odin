@@ -16,6 +16,9 @@
 #endif
 
 #define LLVM_SET_INTERNAL_WEAK_LINKAGE(value) LLVMSetLinkage(value, USE_SEPARATE_MODULES ? LLVMWeakAnyLinkage : LLVMInternalLinkage);
+// NOTE: A global variable is only defined in its own module, so it does not need weak linkage,
+// which would also stop AddressSanitizer from instrumenting it
+#define LLVM_SET_INTERNAL_GLOBAL_LINKAGE(value) LLVMSetLinkage(value, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
 
 
 #include "llvm_backend.hpp"
@@ -193,7 +196,7 @@ gb_internal void lb_correct_entity_linkage(lbGenerator *gen) {
 		if (ec.e->kind == Entity_Variable) {
 			other_global = LLVMGetNamedGlobal(ec.other_module->mod, ec.cname);
 			if (other_global && !LLVMIsDeclaration(other_global)) {
-				LLVM_SET_INTERNAL_WEAK_LINKAGE(other_global);
+				LLVM_SET_INTERNAL_GLOBAL_LINKAGE(other_global);
 				if (!ec.e->Variable.is_export && !ec.e->Variable.is_foreign) {
 					LLVMSetVisibility(other_global, LLVMHiddenVisibility);
 				}
@@ -2456,7 +2459,10 @@ gb_internal void lb_create_global_variable(lbModule *m, lbGlobalVariable *var) {
 		LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 		LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 	} else if (!is_foreign) {
-		LLVM_SET_INTERNAL_WEAK_LINKAGE(g.value);
+		LLVM_SET_INTERNAL_GLOBAL_LINKAGE(g.value);
+		if (USE_SEPARATE_MODULES) {
+			LLVMSetVisibility(g.value, LLVMHiddenVisibility);
+		}
 	}
 	lb_set_linkage_from_entity_flags(m, g.value, e->flags);
 	LLVMSetAlignment(g.value, cast(u32)gb_max(type_align_of(e->type), e->Variable.custom_align));
