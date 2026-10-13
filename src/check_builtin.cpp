@@ -5878,6 +5878,13 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 
 	case BuiltinProc_unreachable:
+		if (ce->args.count > 1) {
+			error(ce->args[1], "'%.*s' expects either 0 or 1 arguments, got %td", LIT(builtin_name), ce->args.count);
+			return false;
+		}
+		operand->mode = Addressing_NoValue;
+		break;
+
 	case BuiltinProc_trap:
 	case BuiltinProc_debug_trap:
 		operand->mode = Addressing_NoValue;
