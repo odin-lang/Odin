@@ -321,6 +321,26 @@ bug_5931 :: proc(t: ^testing.T) {
 }
 
 @(test)
+bug_7770 :: proc(t: ^testing.T) {
+	// `int_shr` into a separate destination clamped the source rather than the result,
+	// leaving zero digits at the top of the result
+	x, one, r, z: big.Int
+	defer big.destroy(&x, &one, &r, &z)
+
+	big.pow(&x, 2, 128)
+	big.int_shr(&r, &x, 100)
+	bits, _ := big.count_bits(&r)
+	testing.expect_value(t, r.used, 1)
+	testing.expect_value(t, bits, 29)
+
+	big.set(&one, 1)
+	big.int_shr(&z, &one, 1)
+	zero, _ := big.is_zero(&z)
+	testing.expect_value(t, z.used, 0)
+	testing.expect(t, zero)
+}
+
+@(test)
 bug_rat_mul_rat_square :: proc(t: ^testing.T) {
 	x, square: big.Rat
 	defer big.destroy(&x, &square)

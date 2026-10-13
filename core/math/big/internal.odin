@@ -2675,7 +2675,7 @@ internal_int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, all
 		}
 
 	}
-	return internal_clamp(numerator)
+	return internal_clamp(quotient)
 }
 internal_shrmod :: proc { internal_int_shrmod, }
 
