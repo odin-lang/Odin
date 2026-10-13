@@ -1,7 +1,8 @@
 package debug_pe
 
-Section_Header32 :: struct {
-	name:                    [8]u8,
+// The section header of images and objects
+Section_Header32 :: struct #packed {
+	name:                    [8]u8, // NUL-padded, or "/<decimal>" or "//<base64>" string table offset in objects
 	virtual_size:            u32le,
 	virtual_address:         u32le,
 	size_of_raw_data:        u32le,
@@ -12,20 +13,31 @@ Section_Header32 :: struct {
 	number_of_line_numbers:  u16le,
 	characteristics:         IMAGE_SCN_CHARACTERISTICS,
 }
+#assert(size_of(Section_Header32) == 40)
 
-Reloc :: struct {
+// A COFF relocation
+Reloc :: struct #packed {
 	virtual_address:    u32le,
 	symbol_table_index: u32le,
-	type:               IMAGE_REL,
+	type:               u16le, // IMAGE_REL_* of the machine
 }
+#assert(size_of(Reloc) == 10)
 
+// The relocation count at which `LNK_NRELOC_OVFL` is set and the first relocation holds the real count
+IMAGE_SCN_MAX_RELOC :: 0xFFFF
+
+// The alignment field of the characteristics, log2(alignment)+1
+IMAGE_SCN_ALIGN_MASK  :: 0x00F0_0000
+IMAGE_SCN_ALIGN_SHIFT :: 20
+
+// The section flags and the `ALIGN_*` values
 IMAGE_SCN_CHARACTERISTICS :: enum u32le {
-	TYPE_NO_PAD            = 0x00000008, // The section should not be padded to the next boundary. This flag is obsolete and is replaced by IMAGE_SCN_ALIGN_1BYTES. This is valid only for object files. = 0x00000010, // Reserved for future use.
+	TYPE_NO_PAD            = 0x00000008, // The section should not be padded to the next boundary. This flag is obsolete and is replaced by IMAGE_SCN_ALIGN_1BYTES. This is valid only for object files.
 	CNT_CODE               = 0x00000020, // The section contains executable code.
 	CNT_INITIALIZED_DATA   = 0x00000040, // The section contains initialized data.
 	CNT_UNINITIALIZED_DATA = 0x00000080, // The section contains uninitialized data.
 	LNK_OTHER              = 0x00000100, // Reserved for future use.
-	LNK_INFO               = 0x00000200, // The section contains comments or other information. The .drectve section has this type. This is valid for object files only. = 0x00000400, // Reserved for future use.
+	LNK_INFO               = 0x00000200, // The section contains comments or other information. The .drectve section has this type. This is valid for object files only.
 	LNK_REMOVE             = 0x00000800, // The section will not become part of the image. This is valid only for object files.
 	LNK_COMDAT             = 0x00001000, // The section contains COMDAT data. For more information, see COMDAT Sections (Object Only). This is valid only for object files.
 	GPREL                  = 0x00008000, // The section contains data referenced through the global pointer (GP).
@@ -58,71 +70,83 @@ IMAGE_SCN_CHARACTERISTICS :: enum u32le {
 }
 
 
-IMAGE_REL :: enum u16le {
-	I386_ABSOLUTE         = 0x0000,
-	I386_DIR16            = 0x0001,
-	I386_REL16            = 0x0002,
-	I386_DIR32            = 0x0006,
-	I386_DIR32NB          = 0x0007,
-	I386_SEG12            = 0x0009,
-	I386_SECTION          = 0x000A,
-	I386_SECREL           = 0x000B,
-	I386_TOKEN            = 0x000C,
-	I386_SECREL7          = 0x000D,
-	I386_REL32            = 0x0014,
+// The relocation types, one enum per machine
 
-	AMD64_ABSOLUTE        = 0x0000,
-	AMD64_ADDR64          = 0x0001,
-	AMD64_ADDR32          = 0x0002,
-	AMD64_ADDR32NB        = 0x0003,
-	AMD64_REL32           = 0x0004,
-	AMD64_REL32_1         = 0x0005,
-	AMD64_REL32_2         = 0x0006,
-	AMD64_REL32_3         = 0x0007,
-	AMD64_REL32_4         = 0x0008,
-	AMD64_REL32_5         = 0x0009,
-	AMD64_SECTION         = 0x000A,
-	AMD64_SECREL          = 0x000B,
-	AMD64_SECREL7         = 0x000C,
-	AMD64_TOKEN           = 0x000D,
-	AMD64_SREL32          = 0x000E,
-	AMD64_PAIR            = 0x000F,
-	AMD64_SSPAN32         = 0x0010,
-
-	ARM_ABSOLUTE          = 0x0000,
-	ARM_ADDR32            = 0x0001,
-	ARM_ADDR32NB          = 0x0002,
-	ARM_BRANCH24          = 0x0003,
-	ARM_BRANCH11          = 0x0004,
-	ARM_SECTION           = 0x000E,
-	ARM_SECREL            = 0x000F,
-	ARM_MOV32             = 0x0010,
-
-	THUMB_MOV32           = 0x0011,
-	THUMB_BRANCH20        = 0x0012,
-	THUMB_BRANCH24        = 0x0014,
-	THUMB_BLX23           = 0x0015,
-
-	ARM_PAIR              = 0x0016,
-
-	ARM64_ABSOLUTE        = 0x0000,
-	ARM64_ADDR32          = 0x0001,
-	ARM64_ADDR32NB        = 0x0002,
-	ARM64_BRANCH26        = 0x0003,
-	ARM64_PAGEBASE_REL21  = 0x0004,
-	ARM64_REL21           = 0x0005,
-	ARM64_PAGEOFFSET_12A  = 0x0006,
-	ARM64_PAGEOFFSET_12L  = 0x0007,
-	ARM64_SECREL          = 0x0008,
-	ARM64_SECREL_LOW12A   = 0x0009,
-	ARM64_SECREL_HIGH12A  = 0x000A,
-	ARM64_SECREL_LOW12L   = 0x000B,
-	ARM64_TOKEN           = 0x000C,
-	ARM64_SECTION         = 0x000D,
-	ARM64_ADDR64          = 0x000E,
-	ARM64_BRANCH19        = 0x000F,
-	ARM64_BRANCH14        = 0x0010,
-	ARM64_REL32           = 0x0011,
+IMAGE_REL_I386 :: enum u16le {
+	ABSOLUTE = 0x0000,
+	DIR16    = 0x0001,
+	REL16    = 0x0002,
+	DIR32    = 0x0006,
+	DIR32NB  = 0x0007,
+	SEG12    = 0x0009,
+	SECTION  = 0x000A,
+	SECREL   = 0x000B,
+	TOKEN    = 0x000C,
+	SECREL7  = 0x000D,
+	REL32    = 0x0014,
 }
 
-PE_CODE_VIEW_SIGNATURE_RSDS :: u32le(0x5344_5352)
+IMAGE_REL_AMD64 :: enum u16le {
+	ABSOLUTE = 0x0000,
+	ADDR64   = 0x0001,
+	ADDR32   = 0x0002,
+	ADDR32NB = 0x0003,
+	REL32    = 0x0004,
+	REL32_1  = 0x0005,
+	REL32_2  = 0x0006,
+	REL32_3  = 0x0007,
+	REL32_4  = 0x0008,
+	REL32_5  = 0x0009,
+	SECTION  = 0x000A,
+	SECREL   = 0x000B,
+	SECREL7  = 0x000C,
+	TOKEN    = 0x000D,
+	SREL32   = 0x000E,
+	PAIR     = 0x000F,
+	SSPAN32  = 0x0010,
+}
+
+// ARM and Thumb (ARMNT)
+IMAGE_REL_ARM :: enum u16le {
+	ABSOLUTE       = 0x0000,
+	ADDR32         = 0x0001,
+	ADDR32NB       = 0x0002,
+	BRANCH24       = 0x0003,
+	BRANCH11       = 0x0004,
+	TOKEN          = 0x0005,
+	GPREL12        = 0x0006,
+	GPREL7         = 0x0007,
+	BLX24          = 0x0008,
+	BLX11          = 0x0009,
+	REL32          = 0x000A,
+	SECTION        = 0x000E,
+	SECREL         = 0x000F,
+	MOV32          = 0x0010,
+	THUMB_MOV32    = 0x0011,
+	THUMB_BRANCH20 = 0x0012,
+	THUMB_BRANCH24 = 0x0014,
+	THUMB_BLX23    = 0x0015,
+	PAIR           = 0x0016,
+}
+
+// ARM64, ARM64EC and ARM64X
+IMAGE_REL_ARM64 :: enum u16le {
+	ABSOLUTE       = 0x0000,
+	ADDR32         = 0x0001,
+	ADDR32NB       = 0x0002,
+	BRANCH26       = 0x0003,
+	PAGEBASE_REL21 = 0x0004,
+	REL21          = 0x0005,
+	PAGEOFFSET_12A = 0x0006,
+	PAGEOFFSET_12L = 0x0007,
+	SECREL         = 0x0008,
+	SECREL_LOW12A  = 0x0009,
+	SECREL_HIGH12A = 0x000A,
+	SECREL_LOW12L  = 0x000B,
+	TOKEN          = 0x000C,
+	SECTION        = 0x000D,
+	ADDR64         = 0x000E,
+	BRANCH19       = 0x000F,
+	BRANCH14       = 0x0010,
+	REL32          = 0x0011,
+}
