@@ -3834,6 +3834,17 @@ gb_internal bool ast_references_poly_params(Scope *scope, Ast *node) {
 		return ast_references_poly_params(scope, node->CompoundLit.type);
 	case Ast_UnaryExpr:
 		return ast_references_poly_params(scope, node->UnaryExpr.expr);
+	case Ast_BinaryExpr:
+		return ast_references_poly_params(scope, node->BinaryExpr.left) ||
+		       ast_references_poly_params(scope, node->BinaryExpr.right);
+	case Ast_TernaryIfExpr:
+		return ast_references_poly_params(scope, node->TernaryIfExpr.x)    ||
+		       ast_references_poly_params(scope, node->TernaryIfExpr.cond) ||
+		       ast_references_poly_params(scope, node->TernaryIfExpr.y);
+	case Ast_TernaryWhenExpr:
+		return ast_references_poly_params(scope, node->TernaryWhenExpr.x)    ||
+		       ast_references_poly_params(scope, node->TernaryWhenExpr.cond) ||
+		       ast_references_poly_params(scope, node->TernaryWhenExpr.y);
 	case Ast_ParenExpr:
 		return ast_references_poly_params(scope, node->ParenExpr.expr);
 	case Ast_DerefExpr:
