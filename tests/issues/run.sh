@@ -172,6 +172,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_escape_stored_field -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "Warning:") -eq 3 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 #########################################################################################################
 
 #

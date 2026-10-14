@@ -58,10 +58,12 @@ struct EscapeFlow {
 	EscapeFlowTargetKind target;
 	isize                target_index; // of the result, or of the argument it is stored through
 	EscapePath           target_path;  // within the result, or of the pointer within that argument
+	EscapePath           value_path;   // within what is stored through a loaded pointer, where the argument's pointers are
 };
 
 struct EscapeOrigin {
 	EscapeOriginKind kind;
+	bool             offset_lost; // an offset into the memory of a 'ParamLoad' or 'ParamDeep' was dropped
 	EscapeObject     obj;
 	EscapePath       path;
 };
@@ -86,6 +88,7 @@ struct EscapeOuterStore {
 	Ast *        node;   // the left hand side, or a call storing into memory it was given, unless what is stored is the caller's
 	EscapeOrigin dest;   // what it is stored through
 	EscapeOrigin origin; // of what is stored
+	EscapePath   value_path; // where in what is stored the pointer of that origin is
 };
 
 // what is at the path within a local is nil on every path reaching here, as is all of it, with -vet-nil-deref; or,
@@ -314,6 +317,7 @@ gb_internal bool escape_object_eq(EscapeObject const &a, EscapeObject const &b) 
 
 gb_internal bool escape_origin_eq(EscapeOrigin const &a, EscapeOrigin const &b) {
 	return a.kind == b.kind               &&
+	       a.offset_lost == b.offset_lost &&
 	       escape_object_eq(a.obj, b.obj) &&
 	       escape_path_eq(a.path, b.path);
 }
@@ -324,7 +328,8 @@ gb_internal bool escape_outer_eq(EscapeOuterStore const &a, EscapeOuterStore con
 	       a.exact == b.exact             &&
 	       a.node  == b.node              &&
 	       escape_origin_eq(a.dest,   b.dest) &&
-	       escape_origin_eq(a.origin, b.origin);
+	       escape_origin_eq(a.origin, b.origin) &&
+	       escape_path_eq(a.value_path, b.value_path);
 }
 
 gb_internal EscapeValue escape_value(void) {
@@ -356,7 +361,7 @@ gb_internal EscapeValue escape_value_of(EscapeOriginKind kind, EscapeObject cons
 	EscapeValue v = escape_value();
 	// the stack memory is made by the expression itself
 	bool definite = kind == EscapeOrigin_Local || kind == EscapeOrigin_Temp;
-	escape_value_add(&v, {}, EscapeOrigin{kind, obj, path}, definite);
+	escape_value_add(&v, {}, EscapeOrigin{kind, false, obj, path}, definite);
 	return v;
 }
 
@@ -370,24 +375,31 @@ gb_internal isize escape_path_deref_index(EscapePath const &p) {
 }
 
 
+gb_internal EscapeOrigin escape_origin_offset(EscapeOrigin o, EscapePath const &extra) {
+	switch (o.kind) {
+	case EscapeOrigin_Local:
+	case EscapeOrigin_Temp:
+	case EscapeOrigin_Owned:
+		o.path = escape_path_concat(o.path, extra);
+		break;
+	case EscapeOrigin_Param:
+		if (extra.count > 0 && escape_path_deref_index(o.path) == o.path.count) {
+			o.path = escape_path_concat(o.path, escape_path_of(EscapeStep_Deref));
+		}
+		o.path = escape_path_concat(o.path, extra);
+		break;
+	case EscapeOrigin_ParamLoad:
+	case EscapeOrigin_ParamDeep:
+		o.offset_lost |= extra.count > 0;
+		break;
+	}
+	return o;
+}
+
 gb_internal EscapeValue escape_pointer_offset(EscapeValue const &v, EscapePath const &extra) {
 	EscapeValue w = escape_value();
 	for (EscapeValueFact const &f : v) {
-		EscapeOrigin o = f.origin;
-		switch (o.kind) {
-		case EscapeOrigin_Local:
-		case EscapeOrigin_Temp:
-		case EscapeOrigin_Owned:
-			o.path = escape_path_concat(o.path, extra);
-			break;
-		case EscapeOrigin_Param:
-			if (extra.count > 0 && escape_path_deref_index(o.path) == o.path.count) {
-				o.path = escape_path_concat(o.path, escape_path_of(EscapeStep_Deref));
-			}
-			o.path = escape_path_concat(o.path, extra);
-			break;
-		}
-		escape_value_add(&w, {}, o, f.definite);
+		escape_value_add(&w, {}, escape_origin_offset(f.origin, extra), f.definite);
 	}
 	return w;
 }
@@ -920,6 +932,7 @@ gb_internal EscapeOrigin escape_param_loaded(EscapeOrigin o) {
 	case EscapeOrigin_Param:     o.kind = EscapeOrigin_ParamLoad; break;
 	case EscapeOrigin_ParamLoad: o.kind = EscapeOrigin_ParamDeep; break;
 	}
+	o.offset_lost = false;
 	return o;
 }
 
@@ -942,14 +955,14 @@ gb_internal EscapeValue escape_load(EscapeAnalysis *ea, EscapeValue const &ptr, 
 				escape_value_add(&v, {}, o);
 			} else {
 				// its elements are the caller's arguments
-				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_ParamLoad, o.obj, o.path});
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_ParamLoad, false, o.obj, o.path});
 			}
 			break;
 		}
 		case EscapeOrigin_Local:
 			if (escape_is_param(o.obj.entity)) {
 				// what a parameter holds is the caller's
-				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Param, o.obj, o.path});
+				escape_value_add(&v, {}, EscapeOrigin{EscapeOrigin_Param, false, o.obj, o.path});
 				break;
 			}
 			/*fallthrough*/
@@ -1091,7 +1104,7 @@ gb_internal EscapeValue escape_elems_at(EscapeAnalysis *ea, EscapeValue const &a
 			case EscapeOrigin_Local:
 				if (escape_is_param(o.obj.entity)) {
 					// the buffer of a parameter is the caller's
-					escape_value_add(&ptr, {}, EscapeOrigin{EscapeOrigin_Param, o.obj, o.path});
+					escape_value_add(&ptr, {}, EscapeOrigin{EscapeOrigin_Param, false, o.obj, o.path});
 					break;
 				}
 				/*fallthrough*/
@@ -3174,6 +3187,29 @@ gb_internal EscapeValue escape_arg_pointers(EscapeValue const &arg, Type *type, 
 	return escape_pointer_offset(escape_as_pointer(escape_value_project(arg, value_path)), offset);
 }
 
+// NOTE(bill): What a callee stores through the pointers it loads, with the argument's pointers at a path within what it stores,
+// unless that path is not one within the memory a local pointer points to
+// e.g. through a cast, where it is all of it as before
+gb_internal void escape_store_loaded(EscapeAnalysis *ea, Ast *call, EscapeValue const &ptr, EscapeValue const &v, EscapePath const &value_path) {
+	EscapeValue within = escape_value();
+	for (EscapeValueFact const &f : v) {
+		escape_value_add(&within, escape_path_concat(value_path, f.path), f.origin, f.definite);
+	}
+	for (EscapeValueFact const &pf : ptr) {
+		bool fits = true;
+		switch (pf.origin.kind) {
+		case EscapeOrigin_Local:
+		case EscapeOrigin_Temp:
+		case EscapeOrigin_Owned:
+			fits = escape_type_within(escape_type_at(pf.origin.obj, pf.origin.path), value_path) != nullptr;
+			break;
+		}
+		EscapeValue single = escape_value();
+		escape_value_add(&single, pf.path, pf.origin, pf.definite);
+		escape_store_through(ea, call, single, fits ? within : v, EscapeUpdate_Add);
+	}
+}
+
 gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 	ast_node(ce, CallExpr, call);
 	escape_visit_exits(ea, ce->proc);
@@ -3376,7 +3412,11 @@ gb_internal Array<EscapeValue> escape_call(EscapeAnalysis *ea, Ast *call) {
 				if (flow.target == EscapeFlowTarget_Deep) {
 					ptr = escape_reachable(ea, ptr);
 				}
-				escape_store_through(ea, call, ptr, v, EscapeUpdate_Add);
+				if (flow.value_path.count > 0) {
+					escape_store_loaded(ea, call, ptr, v, flow.value_path);
+				} else {
+					escape_store_through(ea, call, ptr, v, EscapeUpdate_Add);
+				}
 			}
 			break;
 
@@ -3891,7 +3931,8 @@ gb_internal bool escape_flow_eq(EscapeFlow const &a, EscapeFlow const &b) {
 	       a.target       == b.target       &&
 	       a.target_index == b.target_index &&
 	       escape_path_eq(a.param_path,  b.param_path) &&
-	       escape_path_eq(a.target_path, b.target_path);
+	       escape_path_eq(a.target_path, b.target_path) &&
+	       escape_path_eq(a.value_path,  b.value_path);
 }
 
 // a path is cut before a step repeating an earlier one, as otherwise a recursive procedure could make its flows
@@ -3915,6 +3956,7 @@ gb_internal EscapePath escape_path_widen(EscapePath const &p) {
 gb_internal void escape_add_flow(EscapeAnalysis *ea, EscapeFlow flow) {
 	flow.param_path  = escape_path_widen(flow.param_path);
 	flow.target_path = escape_path_widen(flow.target_path);
+	flow.value_path  = escape_path_widen(flow.value_path);
 	for (EscapeFlow const &g : ea->flows) {
 		if (escape_flow_eq(g, flow)) {
 			return;
@@ -3996,7 +4038,13 @@ gb_internal void escape_exit(EscapeAnalysis *ea, Ast *node, Slice<Ast *> const &
 			continue;
 		}
 		if (flow.target != EscapeFlowTarget_Outer) {
+			// NOTE(bill): where in what is stored its pointer is, which for memory loaded through the argument is only known without an offset into it
 			flow.target_path = s.dest.path;
+			if (flow.target == EscapeFlowTarget_Pointee) {
+				flow.target_path = escape_origin_offset(s.dest, s.value_path).path;
+			} else if (!s.dest.offset_lost) {
+				flow.value_path = s.value_path;
+			}
 			if (!escape_param_index(ea->pt, s.dest.obj.entity, &flow.target_index)) {
 				continue;
 			}
@@ -4124,8 +4172,9 @@ gb_internal void escape_store_through(EscapeAnalysis *ea, Ast *node, EscapeValue
 			}
 
 			for (EscapeValueFact const &vf : v) {
-				s.node   = node;
-				s.origin = vf.origin;
+				s.node       = node;
+				s.origin     = vf.origin;
+				s.value_path = vf.path;
 				switch (vf.origin.kind) {
 				case EscapeOrigin_Outer:
 					continue;
@@ -5131,6 +5180,7 @@ gb_internal Slice<EscapeFlow> escape_analyse(EscapeGraph *g, i32 v, Array<Escape
 		flows[i] = ea.flows[i];
 		flows[i].target_path = slice_clone(permanent_allocator(), ea.flows[i].target_path);
 		flows[i].param_path  = slice_clone(permanent_allocator(), ea.flows[i].param_path);
+		flows[i].value_path  = slice_clone(permanent_allocator(), ea.flows[i].value_path);
 	}
 	return flows;
 }
