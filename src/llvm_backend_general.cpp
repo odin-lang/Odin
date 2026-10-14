@@ -2439,6 +2439,30 @@ gb_internal lbValue lb_emit_union_tag_value(lbProcedure *p, lbValue u) {
 	return lb_emit_load(p, tag_ptr);
 }
 
+// pointer to the variant data at the start of the union
+gb_internal lbValue lb_emit_union_variant_ptr(lbProcedure *p, lbValue u, Type *variant_type) {
+	Type *ut = base_type(type_deref(u.type));
+	GB_ASSERT(ut->kind == Type_Union);
+	Type *ptr_type = alloc_type_pointer(variant_type);
+
+	// constant GEPs can't have metadata,
+	// lb_known_address_alignment resolves it from the global's alignment and the GEP offsets
+	if (ut->Union.custom_align == 0 || lb_is_const(u)) {
+		return lb_emit_conv(p, u, ptr_type);
+	}
+
+	// a union #align(N) can be below the variant's alignment,
+	// so the ptr is a zero-offset GEP with N as its max align metadata
+	// (a ptr cast wouldn't work, no instruction to put the metadata on)
+	lbModule *m = p->module;
+	LLVMValueRef indices[1] = {llvm_zero(m)};
+	lbValue res = {};
+	res.type = ptr_type;
+	res.value = LLVMBuildGEP2(p->builder, lb_type(m, t_u8), u.value, indices, 1, "");
+	lb_set_metadata_custom_u64(m, res.value, ODIN_METADATA_MAX_ALIGN, cast(u64)ut->Union.custom_align);
+	return res;
+}
+
 
 gb_internal void lb_emit_store_union_variant_tag(lbProcedure *p, lbValue parent, Type *variant_type) {
 	Type *t = type_deref(parent.type);

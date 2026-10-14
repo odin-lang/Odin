@@ -876,8 +876,8 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 	lbValue value_  = lb_address_from_load_or_generate_local(p, value);
 
 	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
-		// just do a bit cast of the data at the front
-		lbValue ptr = lb_emit_conv(p, value_, alloc_type_pointer(type));
+		// no tag check, just load the variant data at the front
+		lbValue ptr = lb_emit_union_variant_ptr(p, value_, dst);
 		return lb_emit_load(p, ptr);
 	}
 
@@ -890,7 +890,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 	lbValue gep1 = lb_emit_struct_ep(p, v.addr, 1);
 
 	if (is_type_union_maybe_pointer(src)) {
-		data = lb_emit_load(p, lb_emit_conv(p, value_, gep0.type));
+		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
 	} else {
 		tag     = lb_emit_load(p, lb_emit_union_tag_ptr(p, value_));
 		dst_tag = lb_const_union_tag(m, src, dst);
@@ -912,7 +912,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 
 
 	if (data.value == nullptr) {
-		data = lb_emit_load(p, lb_emit_conv(p, value_, gep0.type));
+		data = lb_emit_load(p, lb_emit_union_variant_ptr(p, value_, dst));
 	}
 	lb_emit_store(p, gep0, data);
 	lb_emit_store(p, gep1, lb_const_bool(m, t_bool, true));
