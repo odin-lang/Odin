@@ -150,6 +150,22 @@ gb_internal LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is
 // 	return LLVMPointerType(func_type, 0);
 // }
 
+// whether to pin the context ptr parameter to a callee-saved register;
+// swiftself implementation (r13 on x64, x20 on arm64, r10 on arm32);
+// NOTE: this is part of the Odin CC ABI, every Odin CC proc and every call to an Odin CC proc
+// in a process, across static or dynamic linking, must agree on it
+gb_internal bool lb_context_ptr_is_pinned_to_register(void) {
+	// swiftself does nothing on i386 and RiscV64, and wasm has no registers
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:
+	case TargetArch_arm64:
+	case TargetArch_arm32:
+		return true;
+	default:
+		return false;
+	}
+}
+
 gb_internal lbCallingConventionKind lb_calling_convention_kind(ProcCallingConvention cc) {
 	if (selected_subtarget == Subtarget_Playdate) {
 		return lbCallingConvention_ARM_AAPCS_VFP;
@@ -235,6 +251,9 @@ gb_internal void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType
 		LLVMAddAttributeAtIndex(fn, context_index, noalias_attr);
 		LLVMAddAttributeAtIndex(fn, context_index, nonnull_attr);
 		LLVMAddAttributeAtIndex(fn, context_index, nocapture_attr);
+		if (lb_context_ptr_is_pinned_to_register()) {
+			LLVMAddAttributeAtIndex(fn, context_index, lb_create_enum_attribute(c, "swiftself"));
+		}
 	}
 
 }
