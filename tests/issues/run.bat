@@ -142,6 +142,8 @@ set ODIN=..\..\..\odin
 fc /b pr_7848.cbor pr_7848_again.cbor > nul || exit /b
 %ODIN% test "..\test_pr_7848" %COMMON% || exit /b
 
+%ODIN% test "..\test_issue_7774" %COMMON% 2>&1 | find /c "atexit handler ran" | findstr /x "1" || exit /b
+
 @rem It seems at this point 7010 is not for Windows.
 @rem @if "%ODIN_TESTS_NO_CLANG%" == "" (
 @rem 	clang -c "..\test_issue_7010\test_issue_7010.c" -o test_issue_7010_c.o || exit /b

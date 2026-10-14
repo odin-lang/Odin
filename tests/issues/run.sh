@@ -273,12 +273,6 @@ $ODIN run ../test_issue_7482 $COMMON
 $ODIN run ../test_issue_7564 $COMMON
 $ODIN run ../test_issue_7596 $COMMON
 $ODIN run ../test_issue_7798 $COMMON
-if [[ $($ODIN run ../test_issue_7774 $COMMON 2>&1 | grep -c "atexit handler ran") -eq 1 ]]; then
-	echo "SUCCESSFUL 1/1"
-else
-	echo "SUCCESSFUL 0/1"
-	exit 1
-fi
 
 #########################################################################################################
 
@@ -330,6 +324,12 @@ $ODIN check ../test_pr_7848/pkg_b ../test_pr_7848/pkg_a -no-entry-point -workspa
 $ODIN check ../test_pr_7848/pkg_b ../test_pr_7848/pkg_a -no-entry-point -workspace -overlay:../test_pr_7848/overlay.json $COMMON_CHECK -export-semantics:cbor -export-semantics-file:pr_7848_again.cbor
 cmp pr_7848.cbor pr_7848_again.cbor
 $ODIN test ../test_pr_7848 $COMMON
+if [[ $($ODIN test ../test_issue_7774 $COMMON 2>&1 | grep -c "atexit handler ran") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
 
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_7010/test_issue_7010.c -o test_issue_7010_c.o
