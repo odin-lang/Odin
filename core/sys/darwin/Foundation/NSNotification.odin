@@ -57,7 +57,7 @@ NotificationCenter_addObserverForName_old :: proc "c" (self: ^NotificationCenter
 	return msgSend(^Object, self, "addObserverForName:object:queue:usingBlock:", name, pObj, pQueue, block)
 }
 
-NotificationCenter_addObserverForName_new :: proc "c" (self: ^NotificationCenter, name: NotificationName, pObj: ^Object, pQueue: rawptr, block: ^Objc_Block) -> ^Object {
+NotificationCenter_addObserverForName_new :: proc "c" (self: ^NotificationCenter, name: NotificationName, pObj: ^Object, pQueue: rawptr, block: ^Objc_Block(proc "c" (notification: ^Notification))) -> ^Object {
 	return msgSend(^Object, self, "addObserverForName:object:queue:usingBlock:", name, pObj, pQueue, block)
 }
 
