@@ -155,6 +155,15 @@ This is a dire bug and should be reported to the Odin developers.
 		intrinsics.atomic_store(&stop_test_alert, 1)
 	}
 
+	for {
+		// TODO: This is a deeper problem.
+		//       We must wait here until the test runner thread has called `TerminateThread` on us.
+		//       Which is a function that Raymond Chen describes as "having no valid use cases, period".
+		//       A much better approach would be to look into a cooperative cancellation mechanism.
+		// Keep the exception from propagating as an unhandled process-level exception.
+		intrinsics.cpu_relax()
+	}
+
 	// Pass on the exeption to the next handler. As we don't want to recover from it.
 	// This also allows debuggers handle it properly.
 	return win32.EXCEPTION_CONTINUE_SEARCH
