@@ -1,0 +1,13 @@
+// Tests intended to be ran with optimizations on
+package tests_core
+
+@(require) import "crypto"
+@(require) import "crypto/bigint"
+@(require) import "hash"
+@(require) import "image"
+@(require) import "math/big"
+@(require) import "runtime"
+
+@(require) import "crypto/wycheproof"
+@(require) import "crypto/noise"
+@(require) import "crypto/x509_limbo"

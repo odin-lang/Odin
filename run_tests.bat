@@ -94,21 +94,6 @@ call run.bat || exit /b
 	..\..\odin test speed.odin -o:speed -file -all-packages -vet -vet-tabs -strict-style -vet-style -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true || exit /b
 	@popd
 
-	@rem Wycheproof tests
-	@pushd tests\core
-	..\..\odin test crypto/wycheproof -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
-	@popd
-
-	@rem Noise Protocol Framework tests
-	@pushd tests\core
-	..\..\odin test crypto/noise -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
-	@popd
-
-	@rem X.509 limbo tests
-	@pushd tests\core
-	..\..\odin test crypto/x509_limbo -vet -vet-tabs -strict-style -vet-style -vet-cast -warnings-as-errors -disallow-do -define:ODIN_TEST_FANCY=false -o:speed || exit /b
-	@popd
-
 	@echo SUCCESS:  Extended tests have been executed successfully.
 	@echo           Note: You can call  "run_tests slim"  to omit some of the slower tests.
 
