@@ -1518,6 +1518,41 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 	bool  matched          = false;
 	isize valid_form_index = -1;
 
+	// Some instructions have no explicit operands but encode an implicit register
+	// (exp. in/out use AL, AX, or EAX with DX). The template exposes this
+	// register as a pinned parameter, whose width determines the encoding.
+	//
+	// Without this check, all zero-operand forms score equally, and the first
+	// matching table entry wins.
+	auto implicit_operands_match_pins = [&](typename AsmCtx::Encoding const &form) {
+		GB_ASSERT(tmpl_entity->kind == Entity_AsmTemplate);
+		auto const &decls = tmpl_entity->AsmTemplate.decls;
+
+		for (auto slot : form.ops) {
+			if (slot == asm_ctx->OP_NONE || !asm_ctx->operand_type_is_implicit(slot)) {
+				continue;
+			}
+
+			u16 implicit_bit = asm_ctx->clobber_bit_for_reg_name(asm_ctx->implicit_reg_name(slot));
+			i32 implicit_width = asm_ctx->operand_type_bit_width(slot);
+			if (implicit_bit == 0 || implicit_width == 0) {
+				continue;
+			}
+
+			for (auto const &decl : decls) {
+				if (decl.pin.len == 0 || asm_ctx->clobber_bit_for_reg_name(decl.pin) != implicit_bit) {
+					continue;
+				}
+				// A pin names a physical register family: %eax and %al share
+				// RAX clobber bit -> its type supplies the sub-register width
+				if (decl.entity != nullptr && check_asm_operand_bit_width(decl.entity->type) != implicit_width) {
+					return false;
+				}
+			}
+		}
+		return true;
+	};
+
 	isize best_form  = -1;
 	int   best_score = -1;
 	int   best_dist  = I32_MAX; // secondary: prefer smaller width distance
@@ -1529,6 +1564,9 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 		if (is_pseudo && cast(int)form.explicit_count() < target_explicit_count) {
 			continue;
 		} else if (operands.count != cast(int)form.explicit_count()) {
+			continue;
+		}
+		if (!implicit_operands_match_pins(form)) {
 			continue;
 		}
 
