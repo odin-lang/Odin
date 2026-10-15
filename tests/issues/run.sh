@@ -179,6 +179,21 @@ else
 	exit 1
 fi
 
+# Objective-C tests target darwin, which can be checked and built for from any host
+if [[ $($ODIN check ../test_issue_objc_import_missing_selector -no-entry-point -target:darwin_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "is required for imported Objective-C methods") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
+if [[ $($ODIN check ../test_issue_objc_deferred_import -no-entry-point -target:darwin_arm64 $COMMON_CHECK 2>&1 >/dev/null | grep -c "cannot be used as a deferred_out procedure") -eq 1 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 #########################################################################################################
 
 #
@@ -186,6 +201,9 @@ fi
 #
 
 $ODIN build ../test_issue_2113 $COMMON -debug
+
+# $COMMON_CHECK, as $COMMON's -microarch:native does not apply to a darwin_arm64 cross build
+$ODIN build ../test_issue_objc_class_method_calls -target:darwin_arm64 -build-mode:obj $COMMON_CHECK
 
 if [[ $($ODIN build ../test_issue_2395 $COMMON 2>&1 >/dev/null | grep -c "Error:") -eq 2 ]]; then
 	echo "SUCCESSFUL 1/1"
