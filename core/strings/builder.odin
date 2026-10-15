@@ -446,17 +446,23 @@ write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int,
 	return n1-n0, nil
 }
 /*
-Appends a single rune to the Builder and returns the number of bytes written and an `io.Error`
+Appends a single rune `r` as its UTF-8 encoded byte sequence to the Builder `b`, and returns the number of bytes written.
 
-Inputs:
-- b: A pointer to the Builder
-- r: The rune to be appended
+**Inputs:**
+- `b`: A pointer to the Builder
+- `r`: The rune to be appended
 
-Returns:
-- res: The number of bytes written
-- err: An io.Error if one occured, `nil` otherwise
+**Returns:**
+- `n`: The number of bytes written
+- `err`: An allocator error if one occured, `nil` otherwise
 
-NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+**Remarks:**
+
+The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+
+The rune is encoded as-is. It is not escaped or quoted.
+
+If the rune cannot be encoded as a valid Unicode codepoint, this will append a Replacement Character (`\ufffd`) instead.
 
 Example:
 
@@ -489,12 +495,15 @@ write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int, er
 /*
 Appends a quoted rune to the Builder and returns the number of bytes written
 
-Inputs:
-- b: A pointer to the Builder
-- r: The rune to be appended
+**Inputs:**
+- `b`: A pointer to the Builder
+- `r`: The rune to be appended
 
-Returns:
-- n: The number of bytes written
+// xxxx TODO complete documentation everywhere in this file.
+
+**Returns:**
+- `n`: The number of bytes written
+- `err`: An allocator error if one occured, `nil` otherwise
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
@@ -516,8 +525,12 @@ Output:
 	abc'ä'abc
 
 */
-write_quoted_rune :: proc(b: ^Builder, r: rune) -> (n: int) {
-	return io.write_quoted_rune(to_writer(b), r)
+write_quoted_rune :: proc(b: ^Builder, r: rune, ascii_compatible := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	buf: [32]byte
+	s := strconv.quote_rune(buf[:], r, ascii_compatible = ascii_compatible)
+	return write_string(b, s, loc=loc)
+	//io.write_quoted_rune()
+	// xxxx test
 }
 /*
 Appends a string to the Builder and returns the number of bytes written
@@ -624,9 +637,9 @@ Output:
 	"a"'bc'"xyz"
 
 */
-write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', loc := #caller_location) -> (n: int) {
-	n, _ = io.write_quoted_string(to_writer(b), str, quote)
-	return
+write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', ascii_compatible := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	result := strconv.quote_string_dynamic_array(&b.buf, str, quote, ascii_compatible = ascii_compatible, loc = loc) or_return
+	return len(result), nil
 }
 /*
 Appends a rune to the Builder and returns the number of bytes written
@@ -659,9 +672,21 @@ Output:
 	a'"'x
 
 */
-write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true, loc := #caller_location) -> (n: int) {
-	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
-	return
+write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true, ascii_compatible := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	if write_quote {
+		buf: [12]byte
+		quoted, quote_rune_ok := strconv.quote_rune(buf[:], r, ascii_compatible = ascii_compatible)
+		assert(quote_rune_ok == true)
+		return write_string(b, quoted, loc=loc)
+	} else {
+		buf: [10]byte
+		encoded, encode_and_escape_rune_ok := strconv.encode_and_escape_rune(buf[:], r, 0, ascii_compatible = ascii_compatible)
+		assert(encode_and_escape_rune_ok == true)
+		return write_string(b, encoded, loc=loc)
+	}
+	// TODO xxxx cleanup
+	//n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
+	//return
 }
 /*
 Appends an escaped rune to the Builder and returns the number of bytes written
@@ -683,6 +708,7 @@ Returns:
 - n: The number of bytes written
 */
 write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false, loc := #caller_location) -> (n: int) {
+	// xxxx
 	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
 	return
 }
@@ -708,6 +734,7 @@ write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_
 	// If the result starts with a `+` then unless we always want signed results,
 	// we skip it unless it's followed by an `I` (because of +Inf).
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
 		s = s[1:]
 	}
 	return write_string(b, s, loc=loc)
@@ -730,6 +757,7 @@ write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false, loc :=
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
 		s = s[1:]
 	}
 	return write_string(b, s, loc=loc)
@@ -770,6 +798,7 @@ write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false, loc :=
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
 		s = s[1:]
 	}
 	return write_string(b, s, loc=loc)
@@ -792,6 +821,7 @@ write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false, loc :=
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
 		s = s[1:]
 	}
 	return write_string(b, s, loc=loc)
@@ -885,7 +915,7 @@ builder_replace_all :: proc(b: ^Builder, old, new: string, loc := #caller_locati
 }
 
 /*
-Replaces n instances of `old` in the string in a Builder `b` with the `new` string
+Replaces up to `n` instances of `old` in the string in a Builder `b` with the `new` string
 
 *Allocates Using The Allocator On The Builder*
 
@@ -893,7 +923,7 @@ Inputs:
 - b: The input `Builder`
 - old: The substring to be replaced
 - new: The replacement string
-- n: The number of instances to replace (if `n < 0`, no limit on the number of replacements)
+- n: The maximum number of instances to replace (if `n < 0`, no limit on the number of replacements)
 
 Returns:
 - replaced: The number of replacements
@@ -904,6 +934,7 @@ builder_replace :: proc(b: ^Builder, old, new: string, n: int, loc := #caller_lo
 		return
 	}
 
+	// TODO(bplu4t2f): This whole procedure can be made more efficient.
 	if m := count(to_string(b^), old); m == 0 {
 		return
 	}
