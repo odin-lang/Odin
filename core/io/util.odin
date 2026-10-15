@@ -106,217 +106,238 @@ write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: E
 	}
 
 	return write_string(w, string(s), n_written)
-}	
-
-
-
-
-@(private="file")
-DIGITS_LOWER := "0123456789abcdefx"
-
-@(private="file")
-n_wrapper :: proc(n: int, err: Error, bytes_processed: ^int) -> Error {
-	bytes_processed^ += n
-	return err
 }
 
 
+
+
+/*
+Writes rune `r` to the Writer `w` as UTF-8, optionally enclosed in single quotes.
+
+**Inputs:**
+- `w`:            The Writer to write to.
+- `r`:            The rune to write.
+- `write_quote`:  If true (the default), writes the rune as a quoted rune literal; otherwise writes it unquoted.
+- `n_written`:    Optional pointer to a counter to which the number of bytes written is added.
+
+**Returns:**
+- `n`:            The number of bytes written.
+- `err`:          An error encountered while writing, or `nil` on success.
+
+**Remarks:**
+
+When `write_quote` is `true`, the output is escaped and quoted as a rune literal.
+
+When `write_quote` is `false`, the rune is written unquoted and neither single nor double quotes are escaped.
+
+If the Writer writes only part of the output before returning an error, `n` reports the number of bytes written.
+*/
 write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^int = nil) -> (n: int, err: Error) {
-	defer if n_written != nil {
-		n_written^ += n
-	}
 	if write_quote {
-		write_byte(w, '\'', &n) or_return
+		return write_quoted_rune(w, r, n_written = n_written)
+	} else {
+		// COMPAT: Originally, this procedure would never escape the quote character.
+		//         It does now when `write_quote` is true (that was arguably a bug),
+		//         but for compatibility, we still don't escape the quote in this branch.
+		return write_encoded_and_escaped_rune(w, r, 0, n_written = n_written)
 	}
-	switch r {
-	case '\a': write_string(w, `\a`, &n) or_return
-	case '\b': write_string(w, `\b`, &n) or_return
-	case '\e': write_string(w, `\e`, &n) or_return
-	case '\f': write_string(w, `\f`, &n) or_return
-	case '\n': write_string(w, `\n`, &n) or_return
-	case '\r': write_string(w, `\r`, &n) or_return
-	case '\t': write_string(w, `\t`, &n) or_return
-	case '\v': write_string(w, `\v`, &n) or_return
-	case:
-		if r < 32 {
-			write_string(w, `\x`, &n) or_return
-			
-			buf: [2]byte
-			s := strconv.write_bits(buf[:], u64(r), 16, true, 64, strconv.digits, nil)
-			switch len(s) {
-			case 0: 
-				write_string(w, "00", &n) or_return
-			case 1: 
-				write_byte(w, '0',    &n) or_return
-				fallthrough
-			case 2: 
-				write_string(w, s,    &n) or_return
-			}
-		} else {
-			write_rune(w, r, &n) or_return
-		}
-
-	}
-	if write_quote {
-		write_byte(w, '\'', &n) or_return
-	}
-	return
 }
 
+/*
+Writes rune `r` to the Writer `w` as UTF-8, escaping it as needed and escaping `quote` when it occurs.
+
+**Inputs:**
+- `w`:          The Writer to write to.
+- `r`:          The rune to write.
+- `quote`:      An enclosing quote character to escape; pass `0` to disable quote-character escaping.
+- `html_safe`:  If `true`, also escapes `<`, `>` and `&` using hexadecimal escapes (`\x##`).
+- `n_written`:  Optional pointer to a counter to which the number of bytes written is added.
+
+**Returns:**
+- `n`:          The number of bytes written.
+- `err`:        An error encountered while writing, or `nil` on success.
+
+**Remarks:**
+
+The rune is not surrounded by quotes. For quoted output, use `write_quoted_rune` or `write_quoted_string`.
+
+If the Writer writes only part of the output before returning an error, `n` reports the number of bytes written.
+*/
 write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, n_written: ^int = nil) -> (n: int, err: Error) {
-	is_printable :: proc(r: rune) -> bool {
-		if r <= 0xff {
-			switch r {
-			case 0x20..=0x7e:
-				return true
-			case 0xa1..=0xff: // ¡ through ÿ except for the soft hyphen
-				return r != 0xad //
-			}
-		}
-
-		// TODO(bill): A proper unicode library will be needed!
-		return false
-	}
-	defer if n_written != nil {
-		n_written^ += n
-	}
-
+	options: strconv.Rune_Escaping_Options
 	if html_safe {
-		switch r {
-		case '<', '>', '&':
-			write_byte(w, '\\', &n) or_return
-			write_byte(w, 'u', &n)  or_return
-			for s := 12; s >= 0; s -= 4 {
-				write_byte(w, DIGITS_LOWER[r>>uint(s) & 0xf], &n) or_return
-			}
-			return
-		}
+		options |= { .html_safe }
 	}
-
-	if r == rune(quote) || r == '\\' {
-		write_byte(w, '\\', &n)    or_return
-		write_byte(w, byte(r), &n) or_return
-		return
-	} else if is_printable(r) {
-		write_encoded_rune(w, r, false, &n) or_return
-		return
-	}
-
-	switch r {
-	case '\a': write_string(w, `\a`, &n) or_return
-	case '\b': write_string(w, `\b`, &n) or_return
-	case '\e': write_string(w, `\e`, &n) or_return
-	case '\f': write_string(w, `\f`, &n) or_return
-	case '\n': write_string(w, `\n`, &n) or_return
-	case '\r': write_string(w, `\r`, &n) or_return
-	case '\t': write_string(w, `\t`, &n) or_return
-	case '\v': write_string(w, `\v`, &n) or_return
-	case:
-		switch c := r; {
-		case c < ' ':
-			write_byte(w, '\\', &n)                      or_return
-			write_byte(w, 'x', &n)                       or_return
-			write_byte(w, DIGITS_LOWER[byte(c)>>4], &n)  or_return
-			write_byte(w, DIGITS_LOWER[byte(c)&0xf], &n) or_return
-
-		case c > utf8.MAX_RUNE:
-			// Encoding error - fall back to the Replacement Character
-			c = utf8.RUNE_ERROR
-			fallthrough
-		case c < 0x10000:
-			write_byte(w, '\\', &n) or_return
-			write_byte(w, 'u', &n)  or_return
-			for s := 12; s >= 0; s -= 4 {
-				write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
-			}
-		case:
-			write_byte(w, '\\', &n) or_return
-			write_byte(w, 'U', &n)  or_return
-			for s := 28; s >= 0; s -= 4 {
-				write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
-			}
-		}
-	}
-	return
+	return write_encoded_and_escaped_rune(w, r, quote, options, n_written)
 }
 
-write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written: ^int = nil) -> (n: int, err: Error) {
+/*
+Writes rune `r` to the Writer `w` as UTF-8, escaping it as needed and escaping `quote` when it occurs.
+
+**Inputs:**
+- `w`:          The Writer to write to.
+- `r`:          The rune to write.
+- `quote`:      An enclosing quote character to escape; pass `0` to disable quote-character escaping.
+- `options`:    Controls how the rune is escaped.
+- `n_written`:  Optional pointer to a counter to which the number of bytes written is added.
+
+**Returns:**
+- `n`:          The number of bytes written.
+- `err`:        An error encountered while writing, or `nil` on success.
+
+**Remarks:**
+
+The rune is not surrounded by quotes. Use `write_quoted_rune` or `write_quoted_string` to produce quoted output.
+
+If the Writer writes only part of the output before returning an error, `n` reports the number of bytes written.
+*/
+write_encoded_and_escaped_rune :: proc(w: Writer, r: rune, quote: byte, options: strconv.Rune_Escaping_Options = nil, n_written: ^int = nil) -> (n: int, err: Error) {
+	buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+	str, encode_and_escape_rune_ok := strconv.encode_and_escape_rune(buf[:], r, quote, options)
+	assert(encode_and_escape_rune_ok == true)
+	return write_string(w, str, n_written)
+}
+
+/*
+Writes `str` to the Writer `w`, enclosed in `quote` characters, escaping runes as needed.
+
+**Inputs:**
+- `w`:          The Writer to write to.
+- `str`:        The string to quote and write.
+- `quote`:      The enclosing quote character (double quote by default).
+- `n_written`:  Optional pointer to a counter to which the number of bytes written is added.
+- `options`:    Controls how runes in the string are escaped.
+
+**Returns:**
+- `n`:          The number of bytes written.
+- `err`:        An error encountered while writing, or `nil` on success.
+
+**Remarks:**
+
+With the default double quote and escaping options, the output is quoted and escaped as an Odin string literal.
+
+Invalid UTF-8 bytes in `str` are written as hexadecimal byte escapes. If the Writer writes only part of the
+output before returning an error, `n` reports the number of bytes written.
+*/
+write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written: ^int = nil, options: strconv.Rune_Escaping_Options = nil) -> (n: int, err: Error) {
 	defer if n_written != nil {
 		n_written^ += n
 	}
+
 	write_byte(w, quote, &n) or_return
-	for width, s := 0, str; len(s) > 0; s = s[width:] {
-		r := rune(s[0])
-		width = 1
-		if r >= utf8.RUNE_SELF {
+
+	s := str
+
+	for len(s) > 0 {
+		r := cast(rune)s[0]
+		width := 1
+		if r < utf8.RUNE_SELF {
+			// r contains the entire UTF-8 codepoint already.
+		} else {
+			// Multi-byte codepoint. Must decode.
 			r, width = utf8.decode_rune_in_string(s)
+			assert(width > 0)
 		}
 		if width == 1 && r == utf8.RUNE_ERROR {
-			// Indicates a UTF-8 encoding error. In this case, preserve the
-			// byte exactly as it was found in the input string (`\x##`).
-			write_byte(w, '\\', &n)                   or_return
-			write_byte(w, 'x', &n)                    or_return
-			write_byte(w, DIGITS_LOWER[s[0]>>4], &n)  or_return
-			write_byte(w, DIGITS_LOWER[s[0]&0xf], &n) or_return
-			continue
+			// Indicates UTF-8 encoding error.
+			// Encode the byte exactly as it was found in the input string: `\x##`
+			write_string(w, `\x`, &n)                     or_return
+			write_byte(w, strconv.digits[s[0] >> 4], &n)  or_return
+			write_byte(w, strconv.digits[s[0] & 0xf], &n) or_return
+		} else {
+			encoded_rune_buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+			encoded_rune, encode_rune_ok := strconv.encode_and_escape_rune(encoded_rune_buf[:], r, quote, options = options)
+			assert(encode_rune_ok == true)
+			write_string(w, encoded_rune, &n) or_return
 		}
-
-		n_wrapper(write_escaped_rune(w, r, quote, false, nil), &n) or_return
+		// Advance input cursor to the next codepoint.
+		s = s[width:]
 	}
+
 	write_byte(w, quote, &n) or_return
+
 	return
 }
 
-write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_written: ^int = nil) -> (n: int, err: Error) {
+/*
+Writes `str` to the Writer `w`, enclosed in `quote` characters, escaping runes as needed.
+
+**NOTE:** The UTF-16 input string is encoded as UTF-8 in the output.
+
+**Inputs:**
+- `w`:          The Writer to write to.
+- `str`:        The UTF-16 string to quote and write.
+- `quote`:      The enclosing quote character (double quote by default).
+- `n_written`:  Optional pointer to a counter to which the number of bytes written is added.
+- `options`:    Controls how runes in the string are escaped.
+
+**Returns:**
+- `n`:          The number of UTF-8 bytes written.
+- `err`:        An error encountered while writing, or `nil` on success.
+
+**Remarks:**
+
+With the default double quote and escaping options, the output is quoted and escaped as an Odin string literal.
+
+Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. If the Writer writes only part
+of the output before returning an error, `n` reports the number of bytes written.
+*/
+write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_written: ^int = nil, options: strconv.Rune_Escaping_Options = nil) -> (n: int, err: Error) {
 	defer if n_written != nil {
 		n_written^ += n
 	}
+
 	write_byte(w, quote, &n) or_return
-	for width, s := 0, str; len(s) > 0; s = s[width:] {
-		r := rune(s[0])
-		width = 1
-		if r >= utf8.RUNE_SELF {
-			r, width = utf16.decode_rune_in_string(s)
-		}
+
+	s := str
+
+	for len(s) > 0 {
+		r, width := utf16.decode_rune_in_string(s)
+		assert(width > 0)
 		if width == 1 && r == utf8.RUNE_ERROR {
 			// TODO: It's not obvious that this works the same way as the UTF-8 version.
 			//       Add some test coverage for this!
-			write_byte(w, '\\', &n)                   or_return
-			write_byte(w, 'x', &n)                    or_return
-			write_byte(w, DIGITS_LOWER[s[0]>>4], &n)  or_return
-			write_byte(w, DIGITS_LOWER[s[0]&0xf], &n) or_return
-			continue
+			write_string(w, `\x`, &n)                     or_return
+			write_byte(w, strconv.digits[s[0] >> 4], &n)  or_return
+			write_byte(w, strconv.digits[s[0] & 0xf], &n) or_return
+		} else {
+			encoded_rune_buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+			encoded_rune, encode_rune_ok := strconv.encode_and_escape_rune(encoded_rune_buf[:], r, quote, options = options)
+			assert(encode_rune_ok == true)
+			write_string(w, encoded_rune, &n) or_return
 		}
 
-		n_wrapper(write_escaped_rune(w, r, quote, false, nil), &n) or_return
+		s = s[width:]
 	}
+
 	write_byte(w, quote, &n) or_return
+
 	return
 }
 
-// Write a quoted (`'`) rune into `w`.
-//
-// Returns the total number of bytes written.
-write_quoted_rune :: proc(w: Writer, r: rune) -> (n: int) {
-	_write_byte :: #force_inline proc(w: Writer, c: byte) -> int {
-		err := write_byte(w, c)
-		return 1 if err == nil else 0
-	}
+/*
+Writes rune `r` to the Writer `w` as a quoted rune literal, escaping it as needed.
 
-	quote := byte('\'')
-	n += _write_byte(w, quote)
-	buf, width := utf8.encode_rune(r)
-	if width == 1 && r == utf8.RUNE_ERROR {
-		n += _write_byte(w, '\\')
-		n += _write_byte(w, 'x')
-		n += _write_byte(w, DIGITS_LOWER[buf[0]>>4])
-		n += _write_byte(w, DIGITS_LOWER[buf[0]&0xf])
-	} else {
-		i, _ := write_escaped_rune(w, r, quote)
-		n += i
-	}
-	n += _write_byte(w, quote)
-	return
+**Inputs:**
+- `w`:          The Writer to write to.
+- `r`:          The rune to quote and write.
+- `options`:    Controls how the rune is escaped.
+- `n_written`:  Optional pointer to a counter to which the number of bytes written is added.
+
+**Returns:**
+- `n`:          The number of bytes written.
+- `err`:        An error encountered while writing, or `nil` on success.
+
+**Remarks:**
+
+The result is enclosed in single quotes. If the Writer writes only part of the output before returning an
+error, `n` reports the number of bytes written.
+*/
+write_quoted_rune :: proc(w: Writer, r: rune, options: strconv.Rune_Escaping_Options = nil, n_written: ^int = nil) -> (n: int, err: Error) {
+	buf: [strconv.QUOTED_RUNE_MAX_NEEDED_BYTES]byte
+	str, quote_rune_ok := strconv.quote_rune(buf[:], r, options)
+	assert(quote_rune_ok == true)
+	return write_string(w, str, n_written)
 }
 
 

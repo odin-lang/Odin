@@ -1301,7 +1301,8 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	case 'c', 'r', 'v':
 		io.write_rune(fi.writer, r, &fi.n)
 	case 'q', 'w':
-		fi.n += io.write_quoted_rune(fi.writer, r)
+		n, _ := io.write_quoted_rune(fi.writer, r)
+		fi.n += n
 	case:
 		fmt_int(fi, u64(u32(r)), false, 32, verb)
 	}
