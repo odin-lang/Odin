@@ -45,9 +45,16 @@ MakeConstantString :: proc "c" (#const c: cstring) -> ^String {
 }
 
 // Creates an autorelease pool which is drained at the end of the enclosing scope.
-@(deferred_out=AutoreleasePool_drain)
+@(deferred_out=scoped_autoreleasepool_drain)
 scoped_autoreleasepool :: proc "c" () -> ^AutoreleasePool {
 	return AutoreleasePool.alloc()->init()
+}
+
+// NOTE: `deferred_out` cannot refer to `AutoreleasePool_drain` directly, as imported Objective-C
+// methods are only messages and have no procedure to call.
+@(private)
+scoped_autoreleasepool_drain :: proc "c" (pool: ^AutoreleasePool) {
+	pool->drain()
 }
 
 

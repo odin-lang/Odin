@@ -1,13 +1,13 @@
-#+build darwin
+#+build darwin:default
 
 package glfw
 
-import NS "core:sys/darwin/Foundation"
+import AK "vendor:darwin/AppKit"
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign {
-	GetCocoaWindow :: proc(window: WindowHandle) -> ^NS.Window ---
-	GetCocoaView   :: proc(window: WindowHandle) -> ^NS.View   ---
+	GetCocoaWindow :: proc(window: WindowHandle) -> ^AK.Window ---
+	GetCocoaView   :: proc(window: WindowHandle) -> ^AK.View   ---
 }
 
 // TODO:
