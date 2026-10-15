@@ -454,23 +454,25 @@ DistanceFormatterUnitStyle :: enum cffi.ulong {
 	Full        = 2,
 }
 
-LocalSearchResultType :: enum cffi.ulong {
-	Address         = 1,
-	PointOfInterest = 2,
-	PhysicalFeature = 4,
+LocalSearchResultTypeFlag :: enum cffi.ulong {
+	Address         = 0,
+	PointOfInterest = 1,
+	PhysicalFeature = 2,
 }
+LocalSearchResultType :: bit_set[LocalSearchResultTypeFlag; cffi.ulong]
 
 SearchCompletionFilterType :: enum cffi.long {
 	LocationsAndQueries = 0,
 	LocationsOnly       = 1,
 }
 
-LocalSearchCompleterResultType :: enum cffi.ulong {
-	Address         = 1,
-	PointOfInterest = 2,
-	Query           = 4,
-	PhysicalFeature = 8,
+LocalSearchCompleterResultTypeFlag :: enum cffi.ulong {
+	Address         = 0,
+	PointOfInterest = 1,
+	Query           = 2,
+	PhysicalFeature = 3,
 }
+LocalSearchCompleterResultType :: bit_set[LocalSearchCompleterResultTypeFlag; cffi.ulong]
 
 MapElevationStyle :: enum cffi.long {
 	Flat      = 0,

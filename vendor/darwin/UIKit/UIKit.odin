@@ -1188,9 +1188,9 @@ AccessibilityContainerType :: enum cffi.long {
 }
 
 AccessibilityDirectTouchOptions :: enum cffi.ulong {
-	OptionNone               = 0,
-	ilentOnTouch             = 1,
-	OptionRequiresActivation = 2,
+	None               = 0,
+	SilentOnTouch      = 1,
+	RequiresActivation = 2,
 }
 
 AccessibilityExpandedStatus :: enum cffi.long {
@@ -1403,13 +1403,14 @@ NSLineBreakStrategy :: enum cffi.ulong {
 	Standard           = 65535,
 }
 
-NSStringDrawingOptions :: enum cffi.long {
-	UsesLineFragmentOrigin           = 1,
-	UsesFontLeading                  = 2,
-	UsesDeviceMetrics                = 8,
-	TruncatesLastVisibleLine         = 32,
-	ResolvesNaturalAlignmentWithBaseWritingDirection = 512,
+NSStringDrawingOption :: enum cffi.long {
+	UsesLineFragmentOrigin                           = 0,
+	UsesFontLeading                                  = 1,
+	UsesDeviceMetrics                                = 3,
+	TruncatesLastVisibleLine                         = 5,
+	ResolvesNaturalAlignmentWithBaseWritingDirection = 9,
 }
+NSStringDrawingOptions :: bit_set[NSStringDrawingOption; cffi.long]
 
 MenuElementState :: enum cffi.long {
 	Off   = 0,
@@ -1417,12 +1418,13 @@ MenuElementState :: enum cffi.long {
 	Mixed = 2,
 }
 
-MenuElementAttributes :: enum cffi.ulong {
-	Disabled           = 1,
-	Destructive        = 2,
-	Hidden             = 4,
-	KeepsMenuPresented = 8,
+MenuElementAttribute :: enum cffi.ulong {
+	Disabled           = 0,
+	Destructive        = 1,
+	Hidden             = 2,
+	KeepsMenuPresented = 3,
 }
+MenuElementAttributes :: bit_set[MenuElementAttribute; cffi.ulong]
 
 MenuElementRepeatBehavior :: enum cffi.long {
 	Automatic     = 0,
@@ -1430,12 +1432,13 @@ MenuElementRepeatBehavior :: enum cffi.long {
 	NonRepeatable = 2,
 }
 
-MenuOptions :: enum cffi.ulong {
-	DisplayInline    = 1,
-	Destructive      = 2,
-	SingleSelection  = 32,
-	DisplayAsPalette = 128,
+MenuOption :: enum cffi.ulong {
+	DisplayInline    = 0,
+	Destructive      = 1,
+	SingleSelection  = 5,
+	DisplayAsPalette = 7,
 }
+MenuOptions :: bit_set[MenuOption; cffi.ulong]
 
 MenuElementSize :: enum cffi.long {
 	Small     = 0,
@@ -1703,13 +1706,14 @@ TouchType :: enum cffi.long {
 	IndirectPointer = 3,
 }
 
-TouchProperties :: enum cffi.long {
-	PropertyForce    = 1,
-	PropertyAzimuth  = 2,
-	PropertyAltitude = 4,
-	PropertyLocation = 8,
-	PropertyRoll     = 16,
+TouchProperty :: enum cffi.long {
+	PropertyForce    = 0,
+	PropertyAzimuth  = 1,
+	PropertyAltitude = 2,
+	PropertyLocation = 3,
+	PropertyRoll     = 4,
 }
+TouchProperties :: bit_set[TouchProperty; cffi.long]
 
 SceneActivationState :: enum cffi.long {
 	Unattached         = -1,
@@ -1754,17 +1758,18 @@ SplitViewControllerLayoutEnvironment :: enum cffi.long {
 	Collapsed = 2,
 }
 
-FocusHeading :: enum cffi.ulong {
-	None     = 0,
-	Up       = 1,
-	Down     = 2,
-	Left     = 4,
-	Right    = 8,
-	Next     = 16,
-	Previous = 32,
-	First    = 256,
-	Last     = 512,
+FocusHeadingFlag :: enum cffi.ulong {
+	Up       = 0,
+	Down     = 1,
+	Left     = 2,
+	Right    = 3,
+	Next     = 4,
+	Previous = 5,
+	First    = 8,
+	Last     = 9,
 }
+FocusHeading :: bit_set[FocusHeadingFlag; cffi.ulong]
+FocusHeading_None :: FocusHeading{}
 
 FocusItemDeferralMode :: enum cffi.long {
 	Automatic = 0,
@@ -1815,43 +1820,44 @@ ViewAnimationTransition :: enum cffi.long {
 	CurlDown      = 4,
 }
 
-ViewAutoresizing :: enum cffi.ulong {
-	None                 = 0,
-	FlexibleLeftMargin   = 1,
-	FlexibleWidth        = 2,
-	FlexibleRightMargin  = 4,
-	FlexibleTopMargin    = 8,
-	FlexibleHeight       = 16,
-	FlexibleBottomMargin = 32,
+ViewAutoresizingFlag :: enum cffi.ulong {
+	FlexibleLeftMargin   = 0,
+	FlexibleWidth        = 1,
+	FlexibleRightMargin  = 2,
+	FlexibleTopMargin    = 3,
+	FlexibleHeight       = 4,
+	FlexibleBottomMargin = 5,
 }
+ViewAutoresizing :: bit_set[ViewAutoresizingFlag; cffi.ulong]
+ViewAutoresizing_None :: ViewAutoresizing{}
 
 ViewAnimationOptions :: enum cffi.ulong {
-	OptionLayoutSubviews             = 1,
-	OptionAllowUserInteraction       = 2,
-	OptionBeginFromCurrentState      = 4,
-	OptionRepeat                     = 8,
-	OptionAutoreverse                = 16,
-	OptionOverrideInheritedDuration  = 32,
-	OptionOverrideInheritedCurve     = 64,
-	OptionAllowAnimatedContent       = 128,
-	howHideTransitionViews           = 256,
-	OptionOverrideInheritedOptions   = 512,
-	OptionCurveEaseInOut             = 0,
-	OptionCurveEaseIn                = 65536,
-	OptionCurveEaseOut               = 131072,
-	OptionCurveLinear                = 196608,
-	OptionTransitionNone             = 0,
-	OptionTransitionFlipFromLeft     = 1048576,
-	OptionTransitionFlipFromRight    = 2097152,
-	OptionTransitionCurlUp           = 3145728,
-	OptionTransitionCurlDown         = 4194304,
-	OptionTransitionCrossDissolve    = 5242880,
-	OptionTransitionFlipFromTop      = 6291456,
-	OptionTransitionFlipFromBottom   = 7340032,
-	OptionPreferredFramesPerSecondDefault = 0,
-	OptionPreferredFramesPerSecond60 = 50331648,
-	OptionPreferredFramesPerSecond30 = 117440512,
-	OptionFlushUpdates               = 268435456,
+	LayoutSubviews                  = 1,
+	AllowUserInteraction            = 2,
+	BeginFromCurrentState           = 4,
+	Repeat                          = 8,
+	Autoreverse                     = 16,
+	OverrideInheritedDuration       = 32,
+	OverrideInheritedCurve          = 64,
+	AllowAnimatedContent            = 128,
+	ShowHideTransitionViews         = 256,
+	OverrideInheritedOptions        = 512,
+	CurveEaseInOut                  = 0,
+	CurveEaseIn                     = 65536,
+	CurveEaseOut                    = 131072,
+	CurveLinear                     = 196608,
+	TransitionNone                  = 0,
+	TransitionFlipFromLeft          = 1048576,
+	TransitionFlipFromRight         = 2097152,
+	TransitionCurlUp                = 3145728,
+	TransitionCurlDown              = 4194304,
+	TransitionCrossDissolve         = 5242880,
+	TransitionFlipFromTop           = 6291456,
+	TransitionFlipFromBottom        = 7340032,
+	PreferredFramesPerSecondDefault = 0,
+	PreferredFramesPerSecond60      = 50331648,
+	PreferredFramesPerSecond30      = 117440512,
+	FlushUpdates                    = 268435456,
 }
 
 ViewKeyframeAnimationOptions :: enum cffi.ulong {
@@ -1910,27 +1916,27 @@ ContextMenuInteractionAppearance :: enum cffi.long {
 }
 
 ControlEvents :: enum cffi.ulong {
-	EventTouchDown              = 1,
-	EventTouchDownRepeat        = 2,
-	EventTouchDragInside        = 4,
-	EventTouchDragOutside       = 8,
-	EventTouchDragEnter         = 16,
-	EventTouchDragExit          = 32,
-	EventTouchUpInside          = 64,
-	EventTouchUpOutside         = 128,
-	EventTouchCancel            = 256,
-	EventValueChanged           = 4096,
-	EventPrimaryActionTriggered = 8192,
-	EventMenuActionTriggered    = 16384,
-	EventEditingDidBegin        = 65536,
-	EventEditingChanged         = 131072,
-	EventEditingDidEnd          = 262144,
-	EventEditingDidEndOnExit    = 524288,
-	EventAllTouchEvents         = 4095,
-	EventAllEditingEvents       = 983040,
-	EventApplicationReserved    = 251658240,
-	ystemReserved               = 4026531840,
-	EventAllEvents              = 4294967295,
+	TouchDown              = 1,
+	TouchDownRepeat        = 2,
+	TouchDragInside        = 4,
+	TouchDragOutside       = 8,
+	TouchDragEnter         = 16,
+	TouchDragExit          = 32,
+	TouchUpInside          = 64,
+	TouchUpOutside         = 128,
+	TouchCancel            = 256,
+	ValueChanged           = 4096,
+	PrimaryActionTriggered = 8192,
+	MenuActionTriggered    = 16384,
+	EditingDidBegin        = 65536,
+	EditingChanged         = 131072,
+	EditingDidEnd          = 262144,
+	EditingDidEndOnExit    = 524288,
+	AllTouchEvents         = 4095,
+	AllEditingEvents       = 983040,
+	ApplicationReserved    = 251658240,
+	SystemReserved         = 4026531840,
+	AllEvents              = 4294967295,
 }
 
 ControlContentVerticalAlignment :: enum cffi.long {
@@ -2079,14 +2085,15 @@ WritingToolsBehavior :: enum cffi.long {
 	Limited  = 2,
 }
 
-WritingToolsResultOptions :: enum cffi.ulong {
-	Default            = 0,
-	PlainText          = 1,
-	RichText           = 2,
-	List               = 4,
-	Table              = 8,
-	PresentationIntent = 16,
+WritingToolsResultOption :: enum cffi.ulong {
+	PlainText          = 0,
+	RichText           = 1,
+	List               = 2,
+	Table              = 3,
+	PresentationIntent = 4,
 }
+WritingToolsResultOptions :: bit_set[WritingToolsResultOption; cffi.ulong]
+WritingToolsResultOptions_Default :: WritingToolsResultOptions{}
 
 TextStorageDirection :: enum cffi.long {
 	Forward  = 0,
@@ -2182,8 +2189,8 @@ ViewAnimatingPosition :: enum cffi.long {
 }
 
 TextDragOptions :: enum cffi.long {
-	None                      = 0,
-	tripTextColorFromPreviews = 1,
+	None                       = 0,
+	StripTextColorFromPreviews = 1,
 }
 
 TextDropAction :: enum cffi.ulong {
@@ -2260,13 +2267,14 @@ StatusBarAnimation :: enum cffi.long {
 	Slide = 2,
 }
 
-RemoteNotificationType :: enum cffi.ulong {
-	None                         = 0,
-	Badge                        = 1,
-	Sound                        = 2,
-	Alert                        = 4,
-	NewsstandContentAvailability = 8,
+RemoteNotificationTypeFlag :: enum cffi.ulong {
+	Badge                        = 0,
+	Sound                        = 1,
+	Alert                        = 2,
+	NewsstandContentAvailability = 3,
 }
+RemoteNotificationType :: bit_set[RemoteNotificationTypeFlag; cffi.ulong]
+RemoteNotificationType_None :: RemoteNotificationType{}
 
 BackgroundFetchResult :: enum cffi.ulong {
 	NewData = 0,
@@ -2363,13 +2371,14 @@ GuidedAccessRestrictionState :: enum cffi.long {
 	Deny  = 1,
 }
 
-GuidedAccessAccessibilityFeature :: enum cffi.ulong {
-	VoiceOver        = 1,
-	Zoom             = 2,
-	AssistiveTouch   = 4,
-	InvertColors     = 8,
-	GrayscaleDisplay = 16,
+GuidedAccessAccessibilityFeatureFlag :: enum cffi.ulong {
+	VoiceOver        = 0,
+	Zoom             = 1,
+	AssistiveTouch   = 2,
+	InvertColors     = 3,
+	GrayscaleDisplay = 4,
 }
+GuidedAccessAccessibilityFeature :: bit_set[GuidedAccessAccessibilityFeatureFlag; cffi.ulong]
 
 AccessibilityScrollDirection :: enum cffi.long {
 	Right    = 1,
@@ -2502,15 +2511,16 @@ BarButtonSystemItem :: enum cffi.long {
 	WritingTools  = 25,
 }
 
-CollectionViewScrollPosition :: enum cffi.ulong {
-	None                 = 0,
-	Top                  = 1,
-	CenteredVertically   = 2,
-	Bottom               = 4,
-	Left                 = 8,
-	CenteredHorizontally = 16,
-	Right                = 32,
+CollectionViewScrollPositionFlag :: enum cffi.ulong {
+	Top                  = 0,
+	CenteredVertically   = 1,
+	Bottom               = 2,
+	Left                 = 3,
+	CenteredHorizontally = 4,
+	Right                = 5,
 }
+CollectionViewScrollPosition :: bit_set[CollectionViewScrollPositionFlag; cffi.ulong]
+CollectionViewScrollPosition_None :: CollectionViewScrollPosition{}
 
 CollectionViewReorderingCadence :: enum cffi.long {
 	Immediate = 0,
@@ -2611,12 +2621,13 @@ GestureRecognizerState :: enum cffi.long {
 	Recognized = 3,
 }
 
-SwipeGestureRecognizerDirection :: enum cffi.ulong {
-	Right = 1,
-	Left  = 2,
-	Up    = 4,
-	Down  = 8,
+SwipeGestureRecognizerDirectionFlag :: enum cffi.ulong {
+	Right = 0,
+	Left  = 1,
+	Up    = 2,
+	Down  = 3,
 }
+SwipeGestureRecognizerDirection :: bit_set[SwipeGestureRecognizerDirectionFlag; cffi.ulong]
 
 ContextualActionStyle :: enum cffi.long {
 	Normal      = 0,
@@ -2966,17 +2977,17 @@ KeyboardHIDUsage :: enum cffi.long {
 }
 
 DataDetectorTypes :: enum cffi.ulong {
-	TypePhoneNumber       = 1,
-	TypeLink              = 2,
-	TypeAddress           = 4,
-	TypeCalendarEvent     = 8,
-	hipmentTrackingNumber = 16,
-	TypeFlightNumber      = 32,
-	TypeLookupSuggestion  = 64,
-	TypeMoney             = 128,
-	TypePhysicalValue     = 256,
-	TypeNone              = 0,
-	TypeAll               = 18446744073709551615,
+	PhoneNumber            = 1,
+	Link                   = 2,
+	Address                = 4,
+	CalendarEvent          = 8,
+	ShipmentTrackingNumber = 16,
+	FlightNumber           = 32,
+	LookupSuggestion       = 64,
+	Money                  = 128,
+	PhysicalValue          = 256,
+	None                   = 0,
+	All                    = 18446744073709551615,
 }
 
 DatePickerMode :: enum cffi.long {
@@ -3034,14 +3045,15 @@ DocumentSaveOperation :: enum cffi.long {
 	ForOverwriting = 1,
 }
 
-DocumentState :: enum cffi.ulong {
-	Normal            = 0,
-	Closed            = 1,
-	InConflict        = 2,
-	SavingError       = 4,
-	EditingDisabled   = 8,
-	ProgressAvailable = 16,
+DocumentStateFlag :: enum cffi.ulong {
+	Closed            = 0,
+	InConflict        = 1,
+	SavingError       = 2,
+	EditingDisabled   = 3,
+	ProgressAvailable = 4,
 }
+DocumentState :: bit_set[DocumentStateFlag; cffi.ulong]
+DocumentState_Normal :: DocumentState{}
 
 DocumentPickerMode :: enum cffi.ulong {
 	Import          = 0,
@@ -3055,13 +3067,14 @@ DocumentMenuOrder :: enum cffi.ulong {
 	Last  = 1,
 }
 
-CloudSharingPermissionOptions :: enum cffi.ulong {
-	Standard       = 0,
-	AllowPublic    = 1,
-	AllowPrivate   = 2,
-	AllowReadOnly  = 4,
-	AllowReadWrite = 8,
+CloudSharingPermissionOption :: enum cffi.ulong {
+	AllowPublic    = 0,
+	AllowPrivate   = 1,
+	AllowReadOnly  = 2,
+	AllowReadWrite = 3,
 }
+CloudSharingPermissionOptions :: bit_set[CloudSharingPermissionOption; cffi.ulong]
+CloudSharingPermissionOptions_Standard :: CloudSharingPermissionOptions{}
 
 NSFileProviderItemCapabilities :: enum cffi.ulong {
 	AllowsReading            = 1,
@@ -3077,19 +3090,20 @@ NSFileProviderItemCapabilities :: enum cffi.ulong {
 	AllowsAll                = 63,
 }
 
-NSFileProviderItemFields :: enum cffi.ulong {
-	Contents                = 1,
-	Filename                = 2,
-	ParentItemIdentifier    = 4,
-	LastUsedDate            = 8,
-	TagData                 = 16,
-	FavoriteRank            = 32,
-	CreationDate            = 64,
-	ContentModificationDate = 128,
-	FileSystemFlags         = 256,
-	ExtendedAttributes      = 512,
-	TypeAndCreator          = 1024,
+NSFileProviderItemField :: enum cffi.ulong {
+	Contents                = 0,
+	Filename                = 1,
+	ParentItemIdentifier    = 2,
+	LastUsedDate            = 3,
+	TagData                 = 4,
+	FavoriteRank            = 5,
+	CreationDate            = 6,
+	ContentModificationDate = 7,
+	FileSystemFlags         = 8,
+	ExtendedAttributes      = 9,
+	TypeAndCreator          = 10,
 }
+NSFileProviderItemFields :: bit_set[NSFileProviderItemField; cffi.ulong]
 
 NSFileProviderFileSystemFlag :: enum cffi.ulong {
 	UserExecutable      = 0,
@@ -3251,12 +3265,13 @@ ApplicationShortcutIconType :: enum cffi.long {
 	Update        = 28,
 }
 
-UserNotificationType :: enum cffi.ulong {
-	None  = 0,
-	Badge = 1,
-	Sound = 2,
-	Alert = 4,
+UserNotificationTypeFlag :: enum cffi.ulong {
+	Badge = 0,
+	Sound = 1,
+	Alert = 2,
 }
+UserNotificationType :: bit_set[UserNotificationTypeFlag; cffi.ulong]
+UserNotificationType_None :: UserNotificationType{}
 
 UserNotificationActionBehavior :: enum cffi.ulong {
 	Default   = 0,
@@ -3643,8 +3658,8 @@ StackViewAlignment :: enum cffi.long {
 }
 
 NSTextStorageEditActions :: enum cffi.ulong {
-	edAttributes = 1,
-	edCharacters = 2,
+	EditedAttributes = 1,
+	EditedCharacters = 2,
 }
 
 NSTextLayoutOrientation :: enum cffi.long {
@@ -3652,21 +3667,23 @@ NSTextLayoutOrientation :: enum cffi.long {
 	Vertical   = 1,
 }
 
-NSGlyphProperty :: enum cffi.long {
-	Null             = 1,
-	ControlCharacter = 2,
-	Elastic          = 4,
-	NonBaseCharacter = 8,
+NSGlyphPropertyFlag :: enum cffi.long {
+	Null             = 0,
+	ControlCharacter = 1,
+	Elastic          = 2,
+	NonBaseCharacter = 3,
 }
+NSGlyphProperty :: bit_set[NSGlyphPropertyFlag; cffi.long]
 
-NSControlCharacterAction :: enum cffi.long {
-	ZeroAdvancement = 1,
-	Whitespace      = 2,
-	HorizontalTab   = 4,
-	LineBreak       = 8,
-	ParagraphBreak  = 16,
-	ContainerBreak  = 32,
+NSControlCharacterActionFlag :: enum cffi.long {
+	ZeroAdvancement = 0,
+	Whitespace      = 1,
+	HorizontalTab   = 2,
+	LineBreak       = 3,
+	ParagraphBreak  = 4,
+	ContainerBreak  = 5,
 }
+NSControlCharacterAction :: bit_set[NSControlCharacterActionFlag; cffi.long]
 
 PushBehaviorMode :: enum cffi.long {
 	Continuous    = 0,
@@ -3895,11 +3912,12 @@ NSTextSelectionNavigationDestination :: enum cffi.long {
 	Document  = 6,
 }
 
-NSTextSelectionNavigationModifier :: enum cffi.ulong {
-	Extend   = 1,
-	Visual   = 2,
-	Multiple = 4,
+NSTextSelectionNavigationModifierFlag :: enum cffi.ulong {
+	Extend   = 0,
+	Visual   = 1,
+	Multiple = 2,
 }
+NSTextSelectionNavigationModifier :: bit_set[NSTextSelectionNavigationModifierFlag; cffi.ulong]
 
 NSTextSelectionNavigationWritingDirection :: enum cffi.long {
 	LeftToRight = 0,
@@ -3916,13 +3934,14 @@ NSTextContentManagerEnumerationOptions :: enum cffi.ulong {
 	Reverse = 1,
 }
 
-NSTextLayoutFragmentEnumerationOptions :: enum cffi.ulong {
-	None                     = 0,
-	Reverse                  = 1,
-	EstimatesSize            = 2,
-	EnsuresLayout            = 4,
-	EnsuresExtraLineFragment = 8,
+NSTextLayoutFragmentEnumerationOption :: enum cffi.ulong {
+	Reverse                  = 0,
+	EstimatesSize            = 1,
+	EnsuresLayout            = 2,
+	EnsuresExtraLineFragment = 3,
 }
+NSTextLayoutFragmentEnumerationOptions :: bit_set[NSTextLayoutFragmentEnumerationOption; cffi.ulong]
+NSTextLayoutFragmentEnumerationOptions_None :: NSTextLayoutFragmentEnumerationOptions{}
 
 NSTextLayoutFragmentState :: enum cffi.ulong {
 	None                  = 0,
@@ -3937,14 +3956,15 @@ NSTextLayoutManagerSegmentType :: enum cffi.long {
 	Highlight = 2,
 }
 
-NSTextLayoutManagerSegmentOptions :: enum cffi.ulong {
-	None                    = 0,
-	RangeNotRequired        = 1,
-	MiddleFragmentsExcluded = 2,
-	HeadSegmentExtended     = 4,
-	TailSegmentExtended     = 8,
-	UpstreamAffinity        = 16,
+NSTextLayoutManagerSegmentOption :: enum cffi.ulong {
+	RangeNotRequired        = 0,
+	MiddleFragmentsExcluded = 1,
+	HeadSegmentExtended     = 2,
+	TailSegmentExtended     = 3,
+	UpstreamAffinity        = 4,
 }
+NSTextLayoutManagerSegmentOptions :: bit_set[NSTextLayoutManagerSegmentOption; cffi.ulong]
+NSTextLayoutManagerSegmentOptions_None :: NSTextLayoutManagerSegmentOptions{}
 
 DocumentBrowserErrorCode :: enum cffi.long {
 	Generic             = 1,
@@ -3983,23 +4003,24 @@ ActivitySectionTypes :: enum cffi.ulong {
 	PeopleSuggestions = 1,
 }
 
-PrinterJobTypes :: enum cffi.long {
-	TypeUnknown     = 0,
-	TypeDocument    = 1,
-	TypeEnvelope    = 2,
-	TypeLabel       = 4,
-	TypePhoto       = 8,
-	TypeReceipt     = 16,
-	TypeRoll        = 32,
-	TypeLargeFormat = 64,
-	TypePostcard    = 128,
+PrinterJobType :: enum cffi.long {
+	TypeDocument    = 0,
+	TypeEnvelope    = 1,
+	TypeLabel       = 2,
+	TypePhoto       = 3,
+	TypeReceipt     = 4,
+	TypeRoll        = 5,
+	TypeLargeFormat = 6,
+	TypePostcard    = 7,
 }
+PrinterJobTypes :: bit_set[PrinterJobType; cffi.long]
+PrinterJobTypes_TypeUnknown :: PrinterJobTypes{}
 
 PrintErrorCode :: enum cffi.long {
-	ingNotAvailableError    = 1,
-	NoContentError          = 2,
-	UnknownImageFormatError = 3,
-	JobFailedError          = 4,
+	PrintingNotAvailableError = 1,
+	NoContentError            = 2,
+	UnknownImageFormatError   = 3,
+	JobFailedError            = 4,
 }
 
 PrintInfoOutputType :: enum cffi.long {

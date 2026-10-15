@@ -4417,9 +4417,9 @@ ComponentFlag :: enum cffi.uint {
 ComponentFlags :: bit_set[ComponentFlag; cffi.uint]
 
 ComponentInstantiationOption :: enum cffi.uint {
-	OutOfProcess = 0,
-	InProcess    = 1,
-	edRemotely   = 31,
+	OutOfProcess   = 0,
+	InProcess      = 1,
+	LoadedRemotely = 31,
 }
 
 ComponentInstantiationOptions :: bit_set[ComponentInstantiationOption; cffi.uint]
@@ -4558,10 +4558,10 @@ AUSpatializationAlgorithm :: enum cffi.uint {
 }
 
 AUSpatialMixerSourceMode :: enum cffi.uint {
-	izeIfMono   = 0,
-	Bypass      = 1,
-	PointSource = 2,
-	AmbienceBed = 3,
+	SpatializeIfMono = 0,
+	Bypass           = 1,
+	PointSource      = 2,
+	AmbienceBed      = 3,
 }
 
 AUReverbRoomType :: enum cffi.uint {
@@ -4595,9 +4595,9 @@ AUSpatialMixerRenderingFlag :: enum cffi.uint {
 AUSpatialMixerRenderingFlags :: bit_set[AUSpatialMixerRenderingFlag; cffi.uint]
 
 AUSpatialMixerPersonalizedHRTFMode :: enum cffi.uint {
-	Off = 0,
-	On  = 1,
-	to  = 2,
+	Off  = 0,
+	On   = 1,
+	Auto = 2,
 }
 
 AUSpatialMixerOutputType :: enum cffi.uint {

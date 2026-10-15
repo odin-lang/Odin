@@ -140,11 +140,12 @@ ChallengeComposeCompletionBlock :: ^Objc_Block(proc "c" ( composeController: ^UI
 ChallengeComposeHandler :: ^Objc_Block(proc "c" ( composeController: ^UI_ViewController, didIssueChallenge: bool, sentPlayers: ^NS.Array ))
 InviteeResponse :: distinct InviteRecipientResponse
 
-MeshGraphTriangulationMode :: enum cffi.ulong {
-	Vertices      = 1,
-	Centers       = 2,
-	EdgeMidpoints = 4,
+MeshGraphTriangulationModeFlag :: enum cffi.ulong {
+	Vertices      = 0,
+	Centers       = 1,
+	EdgeMidpoints = 2,
 }
+MeshGraphTriangulationMode :: bit_set[MeshGraphTriangulationModeFlag; cffi.ulong]
 
 RTreeSplitStrategy :: enum cffi.long {
 	Halve         = 0,
@@ -330,18 +331,18 @@ TurnBasedExchangeStatus :: enum cffi.schar {
 }
 
 InviteRecipientResponse :: enum cffi.long {
-	Accepted                 = 0,
-	Declined                 = 1,
-	Failed                   = 2,
-	Incompatible             = 3,
-	UnableToConnect          = 4,
-	NoAnswer                 = 5,
-	eResponseAccepted        = 0,
-	eResponseDeclined        = 1,
-	eResponseFailed          = 2,
-	eResponseIncompatible    = 3,
-	eResponseUnableToConnect = 4,
-	eResponseNoAnswer        = 5,
+	Accepted                       = 0,
+	Declined                       = 1,
+	Failed                         = 2,
+	Incompatible                   = 3,
+	UnableToConnect                = 4,
+	NoAnswer                       = 5,
+	InviteeResponseAccepted        = 0,
+	InviteeResponseDeclined        = 1,
+	InviteeResponseFailed          = 2,
+	InviteeResponseIncompatible    = 3,
+	InviteeResponseUnableToConnect = 4,
+	InviteeResponseNoAnswer        = 5,
 }
 
 MatchType :: enum cffi.ulong {

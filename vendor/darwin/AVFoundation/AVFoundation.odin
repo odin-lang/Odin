@@ -3967,12 +3967,13 @@ CaptionFontStyle :: enum cffi.long {
 	Italic  = 2,
 }
 
-CaptionDecoration :: enum cffi.ulong {
-	None        = 0,
-	Underline   = 1,
-	LineThrough = 2,
-	Overline    = 4,
+CaptionDecorationFlag :: enum cffi.ulong {
+	Underline   = 0,
+	LineThrough = 1,
+	Overline    = 2,
 }
+CaptionDecoration :: bit_set[CaptionDecorationFlag; cffi.ulong]
+CaptionDecoration_None :: CaptionDecoration{}
 
 CaptionTextCombine :: enum cffi.long {
 	All         = -1,
@@ -4216,11 +4217,12 @@ PlayerActionAtItemEnd :: enum cffi.long {
 	None    = 2,
 }
 
-PlayerHDRMode :: enum cffi.long {
-	HLG         = 1,
-	HDR10       = 2,
-	DolbyVision = 4,
+PlayerHDRModeFlag :: enum cffi.long {
+	HLG         = 0,
+	HDR10       = 1,
+	DolbyVision = 2,
 }
+PlayerHDRMode :: bit_set[PlayerHDRModeFlag; cffi.long]
 
 PlayerAudiovisualBackgroundPlaybackPolicy :: enum cffi.long {
 	Automatic           = 1,
@@ -4253,8 +4255,8 @@ PlayerItemStatus :: enum cffi.long {
 }
 
 VariantPreferences :: enum cffi.ulong {
-	PreferenceNone            = 0,
-	calabilityToLosslessAudio = 1,
+	None                       = 0,
+	ScalabilityToLosslessAudio = 1,
 }
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
@@ -4534,7 +4536,7 @@ AudioSessionInterruptionType :: enum cffi.ulong {
 }
 
 AudioSessionInterruptionOption :: enum cffi.ulong {
-	houldResume = 0,
+	ShouldResume = 0,
 }
 
 AudioSessionInterruptionOptions :: bit_set[AudioSessionInterruptionOption; cffi.ulong]
@@ -4780,12 +4782,13 @@ CapturePrimaryConstituentDeviceSwitchingBehavior :: enum cffi.long {
 	Locked      = 3,
 }
 
-CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions :: enum cffi.ulong {
-	ConditionNone                = 0,
-	ConditionVideoZoomChanged    = 1,
-	ConditionFocusModeChanged    = 2,
-	ConditionExposureModeChanged = 4,
+CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorCondition :: enum cffi.ulong {
+	ConditionVideoZoomChanged    = 0,
+	ConditionFocusModeChanged    = 1,
+	ConditionExposureModeChanged = 2,
 }
+CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions :: bit_set[CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorCondition; cffi.ulong]
+CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions_ConditionNone :: CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions{}
 
 CaptureFlashMode :: enum cffi.long {
 	Off  = 0,
@@ -4957,13 +4960,14 @@ CaptureMultichannelAudioMode :: enum cffi.long {
 	FirstOrderAmbisonics = 2,
 }
 
-CaptureSystemPressureFactors :: enum cffi.ulong {
-	FactorNone                   = 0,
-	ystemTemperature             = 1,
-	FactorPeakPower              = 2,
-	FactorDepthModuleTemperature = 4,
-	FactorCameraTemperature      = 8,
+CaptureSystemPressureFactor :: enum cffi.ulong {
+	SystemTemperature      = 0,
+	PeakPower              = 1,
+	DepthModuleTemperature = 2,
+	CameraTemperature      = 3,
 }
+CaptureSystemPressureFactors :: bit_set[CaptureSystemPressureFactor; cffi.ulong]
+CaptureSystemPressureFactors_None :: CaptureSystemPressureFactors{}
 
 CaptureTimecodeSourceType :: enum cffi.long {
 	FrameCount    = 0,

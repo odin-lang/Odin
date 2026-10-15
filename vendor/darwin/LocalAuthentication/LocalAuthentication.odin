@@ -41,11 +41,12 @@ BiometryType :: enum cffi.long {
 	// None = 0,
 }
 
-CompanionType :: enum cffi.long {
-	Watch  = 1,
-	Mac    = 2,
-	Vision = 4,
+CompanionTypeFlag :: enum cffi.long {
+	Watch  = 0,
+	Mac    = 1,
+	Vision = 2,
 }
+CompanionType :: bit_set[CompanionTypeFlag; cffi.long]
 
 Policy :: enum cffi.long {
 	DeviceOwnerAuthenticationWithBiometrics = 1,

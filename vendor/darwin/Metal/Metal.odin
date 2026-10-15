@@ -571,6 +571,7 @@ TextureUsageFlag :: enum cffi.ulong {
 	ShaderAtomic    = 5,
 }
 TextureUsage :: bit_set[TextureUsageFlag; cffi.ulong]
+TextureUsage_Unknown :: TextureUsage{}
 
 TextureCompressionType :: enum cffi.long {
 	Lossless = 0,
@@ -1257,6 +1258,7 @@ AccelerationStructureUsageFlag :: enum cffi.ulong {
 	MinimizeMemory         = 5,
 }
 AccelerationStructureUsage :: bit_set[AccelerationStructureUsageFlag; cffi.ulong]
+AccelerationStructureUsage_None :: AccelerationStructureUsage{}
 
 AccelerationStructureInstanceOption :: enum cffi.uint {
 	DisableTriangleCulling           = 0,
@@ -1409,6 +1411,7 @@ IntersectionFunctionSignatureFlag :: enum cffi.ulong {
 	UserData                   = 9,
 }
 IntersectionFunctionSignature :: bit_set[IntersectionFunctionSignatureFlag; cffi.ulong]
+IntersectionFunctionSignature_None :: IntersectionFunctionSignature{}
 
 StitchedLibraryOption :: enum cffi.ulong {
 	FailOnBinaryArchiveMiss          = 0,

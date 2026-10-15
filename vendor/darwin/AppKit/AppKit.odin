@@ -3104,6 +3104,7 @@ EventPhaseFlag :: enum cffi.ulong {
 	MayBegin   = 5,
 }
 EventPhase :: bit_set[EventPhaseFlag; cffi.ulong]
+EventPhase_None :: EventPhase{}
 
 EventGestureAxis :: enum cffi.long {
 	None       = 0,
@@ -3410,6 +3411,7 @@ CellHitResultFlag :: enum cffi.ulong {
 	TrackableArea    = 2,
 }
 CellHitResult :: bit_set[CellHitResultFlag; cffi.ulong]
+CellHitResult_None :: CellHitResult{}
 
 BackgroundStyle :: enum cffi.long {
 	Normal     = 0,
@@ -3543,6 +3545,7 @@ RemoteNotificationTypeFlag :: enum cffi.ulong {
 	Alert = 2,
 }
 RemoteNotificationType :: bit_set[RemoteNotificationTypeFlag; cffi.ulong]
+RemoteNotificationType_None :: RemoteNotificationType{}
 
 ColorType :: enum cffi.long {
 	ComponentBased = 0,
@@ -3686,6 +3689,7 @@ CollectionViewScrollPositionFlag :: enum cffi.ulong {
 	NearestVerticalEdge   = 8,
 }
 CollectionViewScrollPosition :: bit_set[CollectionViewScrollPositionFlag; cffi.ulong]
+CollectionViewScrollPosition_None :: CollectionViewScrollPosition{}
 
 CollectionElementCategory :: enum cffi.long {
 	Item              = 0,
@@ -3868,6 +3872,7 @@ WindowCollectionBehaviorFlag :: enum cffi.ulong {
 	CanJoinAllApplications    = 18,
 }
 WindowCollectionBehavior :: bit_set[WindowCollectionBehaviorFlag; cffi.ulong]
+WindowCollectionBehavior_Default :: WindowCollectionBehavior{}
 
 WindowAnimationBehavior :: enum cffi.long {
 	Default        = 0,
@@ -4363,10 +4368,10 @@ ScrollerKnobStyle :: enum cffi.long {
 }
 
 ScrollArrowPosition :: enum cffi.ulong {
-	erArrowsMaxEnd         = 0,
-	erArrowsMinEnd         = 1,
-	erArrowsDefaultSetting = 0,
-	erArrowsNone           = 2,
+	MaxEnd         = 0,
+	MinEnd         = 1,
+	DefaultSetting = 0,
+	None           = 2,
 }
 
 ScrollerArrow :: enum cffi.ulong {
@@ -4566,8 +4571,8 @@ SpellingState :: enum cffi.long {
 }
 
 TextStorageEditActions :: enum cffi.ulong {
-	edAttributes = 1,
-	edCharacters = 2,
+	EditedAttributes = 1,
+	EditedCharacters = 2,
 }
 
 TextLayoutOrientation :: enum cffi.long {
@@ -4727,6 +4732,7 @@ TableViewGridLineStyleFlag :: enum cffi.ulong {
 	DashedHorizontalGridLineMask = 3,
 }
 TableViewGridLineStyle :: bit_set[TableViewGridLineStyleFlag; cffi.ulong]
+TableViewGridLineStyle_None :: TableViewGridLineStyle{}
 
 TableViewRowSizeStyle :: enum cffi.long {
 	Default = -1,

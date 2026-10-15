@@ -1455,12 +1455,13 @@ RubyPosition :: enum cffi.uchar {
 	Count          = 4,
 }
 
-RunStatus :: enum cffi.uint {
-	NoStatus             = 0,
-	RightToLeft          = 1,
-	NonMonotonic         = 2,
-	HasNonIdentityMatrix = 4,
+RunStatusFlag :: enum cffi.uint {
+	RightToLeft          = 0,
+	NonMonotonic         = 1,
+	HasNonIdentityMatrix = 2,
 }
+RunStatus :: bit_set[RunStatusFlag; cffi.uint]
+RunStatus_NoStatus :: RunStatus{}
 
 UnderlineStyle :: enum cffi.int {
 	None   = 0,

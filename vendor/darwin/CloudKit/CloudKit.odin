@@ -213,12 +213,13 @@ QueryNotificationReason :: enum cffi.long {
 	RecordDeleted = 3,
 }
 
-RecordZoneCapabilities :: enum cffi.ulong {
-	apabilityFetchChanges    = 1,
-	apabilityAtomic          = 2,
-	apabilitySharing         = 4,
-	apabilityZoneWideSharing = 8,
+RecordZoneCapabilityFlag :: enum cffi.ulong {
+	FetchChanges    = 0,
+	Atomic          = 1,
+	Sharing         = 2,
+	ZoneWideSharing = 3,
 }
+RecordZoneCapabilities :: bit_set[RecordZoneCapabilityFlag; cffi.ulong]
 
 RecordZoneEncryptionScope :: enum cffi.long {
 	PerRecord = 0,

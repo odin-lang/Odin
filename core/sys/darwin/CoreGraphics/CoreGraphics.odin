@@ -2869,16 +2869,17 @@ PDFBox :: enum cffi.int {
 	ArtBox   = 4,
 }
 
-PDFAccessPermissions :: enum cffi.uint {
-	AllowsLowQualityPrinting   = 1,
-	AllowsHighQualityPrinting  = 2,
-	AllowsDocumentChanges      = 4,
-	AllowsDocumentAssembly     = 8,
-	AllowsContentCopying       = 16,
-	AllowsContentAccessibility = 32,
-	AllowsCommenting           = 64,
-	AllowsFormFieldEntry       = 128,
+PDFAccessPermission :: enum cffi.uint {
+	AllowsLowQualityPrinting   = 0,
+	AllowsHighQualityPrinting  = 1,
+	AllowsDocumentChanges      = 2,
+	AllowsDocumentAssembly     = 3,
+	AllowsContentCopying       = 4,
+	AllowsContentAccessibility = 5,
+	AllowsCommenting           = 6,
+	AllowsFormFieldEntry       = 7,
 }
+PDFAccessPermissions :: bit_set[PDFAccessPermission; cffi.uint]
 
 ToneMapping :: enum cffi.uint {
 	Default                  = 0,
@@ -2952,14 +2953,15 @@ BlendMode :: enum cffi.int {
 	PlusLighter     = 27,
 }
 
-ColorModel :: enum cffi.uint {
-	NoColorant = 0,
-	Gray       = 1,
-	RGB        = 2,
-	CMYK       = 4,
-	Lab        = 8,
-	DeviceN    = 16,
+ColorModelFlag :: enum cffi.uint {
+	Gray    = 0,
+	RGB     = 1,
+	CMYK    = 2,
+	Lab     = 3,
+	DeviceN = 4,
 }
+ColorModel :: bit_set[ColorModelFlag; cffi.uint]
+ColorModel_NoColorant :: ColorModel{}
 
 Component :: enum cffi.uint {
 	Unknown      = 0,

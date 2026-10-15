@@ -111,7 +111,8 @@ ALIAS_FIXES = {
 
 # Enums which are flag sets (`NS_OPTIONS`) in the SDK but which csgen emitted as plain enums of masks.
 # Each becomes `<element> :: enum` of bit indices plus `<name> :: bit_set[<element>; T]`, keeping
-# `<name>` so every method using it takes the bit_set. Members equal to 0 are dropped (use `{}`).
+# `<name>` so every method using it takes the bit_set. A member equal to 0 becomes the constant
+# `<name>_<member> :: <name>{}`, and a member of several bits a constant of those bits.
 FLAG_ENUMS = {
 	"AppKit": [
 		"BitmapFormat", "CellHitResult", "CollectionViewScrollPosition", "ControlCharacterAction",
@@ -119,22 +120,117 @@ FLAG_ENUMS = {
 		"RemoteNotificationType", "TableViewGridLineStyle", "TextSelectionNavigationModifier",
 		"TypesetterControlCharacterAction", "WindowCollectionBehavior",
 	],
+	"AVFoundation": [
+		"CaptionDecoration", "CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions",
+		"CaptureSystemPressureFactors", "PlayerHDRMode",
+	],
+	"CloudKit": [
+		"RecordZoneCapabilities",
+	],
+	"CoreFoundation": [
+		"CalendarUnit", "dispatch_block_flags_t", "FileSecurityClearOptions", "StreamEventType",
+		"StringTokenizerTokenType", "URLBookmarkCreationOptions", "URLBookmarkResolutionOptions",
+		"URLEnumeratorOptions",
+	],
+	"CoreGraphics": [
+		"ColorModel", "PDFAccessPermissions",
+	],
+	"CoreText": [
+		"RunStatus",
+	],
 	"Foundation": [
-		"BinarySearchingOptions", "CalendarOptions", "ComparisonPredicateOptions", "DataBase64EncodingOptions",
-		"DataReadingOptions", "DirectoryEnumerationOptions", "FileCoordinatorReadingOptions",
-		"FileCoordinatorWritingOptions", "JSONReadingOptions", "JSONWritingOptions", "KeyValueObservingOptions",
-		"LinguisticTaggerOptions", "MatchingOptions", "MeasurementFormatterUnitOptions",
-		"OrderedCollectionDifferenceCalculationOptions", "RegularExpressionOptions", "StringCompareOptions",
-		"URLBookmarkCreationOptions", "URLBookmarkResolutionOptions",
+		"BinarySearchingOptions", "CalendarOptions", "CalendarUnit", "ComparisonPredicateOptions",
+		"DataBase64EncodingOptions", "DataReadingOptions", "DirectoryEnumerationOptions",
+		"FileCoordinatorReadingOptions", "FileCoordinatorWritingOptions", "InlinePresentationIntent",
+		"JSONReadingOptions", "JSONWritingOptions", "KeyValueObservingOptions", "LinguisticTaggerOptions",
+		"MatchingOptions", "MeasurementFormatterUnitOptions", "OrderedCollectionDifferenceCalculationOptions",
+		"RegularExpressionOptions", "StreamEvent", "StringCompareOptions", "TextCheckingType",
+		"URLBookmarkCreationOptions", "URLBookmarkResolutionOptions", "xpc_listener_create_flags_t",
+	],
+	"GameController": [
+		"PhysicalInputSourceDirection",
+	],
+	"GameKit": [
+		"MeshGraphTriangulationMode",
+	],
+	"LocalAuthentication": [
+		"CompanionType",
+	],
+	"MapKit": [
+		"LocalSearchCompleterResultType", "LocalSearchResultType",
 	],
 	"Metal": [
 		"AccelerationStructureUsage", "BarrierScope", "IndirectCommandType", "IntersectionFunctionSignature",
 		"ResourceUsage", "TensorUsage", "TextureUsage",
 	],
+	"UIKit": [
+		"CloudSharingPermissionOptions", "CollectionViewScrollPosition", "DocumentState", "FocusHeading",
+		"GuidedAccessAccessibilityFeature", "MenuElementAttributes", "MenuOptions", "NSControlCharacterAction",
+		"NSFileProviderItemFields", "NSGlyphProperty", "NSStringDrawingOptions",
+		"NSTextLayoutFragmentEnumerationOptions", "NSTextLayoutManagerSegmentOptions",
+		"NSTextSelectionNavigationModifier", "PrinterJobTypes", "RemoteNotificationType",
+		"SwipeGestureRecognizerDirection", "TouchProperties", "UserNotificationType", "ViewAutoresizing",
+		"WritingToolsResultOptions",
+	],
 }
 
 # Element enum names which do not follow `flag_element_name`
-FLAG_ELEMENT_NAMES = {}
+FLAG_ELEMENT_NAMES = {
+	"RecordZoneCapabilities":      "RecordZoneCapabilityFlag",
+	"dispatch_block_flags_t":      "dispatch_block_flag_t",
+	"xpc_listener_create_flags_t": "xpc_listener_create_flag_t",
+}
+
+# Enum members mangled by csgen's prefix removal, which cuts into a word when every member happens to
+# share its first letters, or leaves part of the prefix on some members.
+# framework -> {enum: (prefix stripped from every member, {member: new name, or None to remove it})}
+ENUM_MEMBER_FIXES = {
+	"AppKit": {
+		"ScrollArrowPosition":    ("erArrows", {}),
+		"TextStorageEditActions": ("", {"edAttributes": "EditedAttributes", "edCharacters": "EditedCharacters"}),
+	},
+	"AudioToolbox": {
+		"AUSpatialMixerPersonalizedHRTFMode": ("", {"to": "Auto"}),
+		"AUSpatialMixerSourceMode":           ("", {"izeIfMono": "SpatializeIfMono"}),
+		"ComponentInstantiationOption":       ("", {"edRemotely": "LoadedRemotely"}),
+	},
+	"AVFoundation": {
+		"AudioSessionInterruptionOption": ("", {"houldResume": "ShouldResume"}),
+		"CaptureSystemPressureFactors":   ("Factor", {"ystemTemperature": "SystemTemperature"}),
+		"VariantPreferences":             ("Preference", {"calabilityToLosslessAudio": "ScalabilityToLosslessAudio"}),
+	},
+	"CloudKit": {
+		"RecordZoneCapabilities": ("apability", {}),
+	},
+	"CoreFoundation": {
+		"GregorianUnitFlag":            ("s", {}),
+		# Deprecated `kCFBookmarkResolution*` aliases of `WithoutUIMask` and `WithoutMountingMask`
+		"URLBookmarkResolutionOptions": ("", {"kWithoutUIMask": None, "kWithoutMountingMask": None}),
+	},
+	"Foundation": {
+		"RelativeDateTimeFormatterStyle": ("", {"umeric": "Numeric", "amed": "Named"}),
+	},
+	"GameKit": {
+		# Deprecated `GKInviteeResponse*` aliases
+		"InviteRecipientResponse": ("", {
+			"eResponseAccepted":         "InviteeResponseAccepted",
+			"eResponseDeclined":         "InviteeResponseDeclined",
+			"eResponseFailed":           "InviteeResponseFailed",
+			"eResponseIncompatible":     "InviteeResponseIncompatible",
+			"eResponseUnableToConnect":  "InviteeResponseUnableToConnect",
+			"eResponseNoAnswer":         "InviteeResponseNoAnswer",
+		}),
+	},
+	"UIKit": {
+		"AccessibilityDirectTouchOptions": ("Option", {"ilentOnTouch": "SilentOnTouch"}),
+		"ControlEvents":                   ("Event", {"ystemReserved": "SystemReserved"}),
+		"DataDetectorTypes":               ("Type", {"hipmentTrackingNumber": "ShipmentTrackingNumber"}),
+		"NSTextStorageEditActions":        ("", {"edAttributes": "EditedAttributes", "edCharacters": "EditedCharacters"}),
+		"PrintErrorCode":                  ("", {"ingNotAvailableError": "PrintingNotAvailableError"}),
+		"TextDragOptions":                 ("", {"tripTextColorFromPreviews": "StripTextColorFromPreviews"}),
+		"ViewAnimationOptions":            ("Option", {"howHideTransitionViews": "ShowHideTransitionViews"}),
+	},
+}
 
 # A hand-written procedure named `<generated proc>` + one of these suffixes is added to the overload
 # group `<generated proc>`; a single generated method becomes a group, with the method renamed `<name>_`.
@@ -555,9 +651,58 @@ def flag_element_name(name):
 		return FLAG_ELEMENT_NAMES[name]
 	if name.endswith("ies"):
 		return name[:-3] + "y"
-	if name.endswith("s"):
+	if name.endswith("s") and not name.endswith(("ss", "us")): # e.g. not `Status`
 		return name[:-1]
 	return name + "Flag"
+
+
+def apply_enum_member_fixes(pkg):
+	wanted = dict(ENUM_MEMBER_FIXES.get(pkg.name, {}))
+	if not wanted:
+		return
+	for fname, lines in pkg.files.items():
+		k = 0
+		while k < len(lines):
+			m = re.match(r"^\s*(\w+) :: enum [\w.]+ \{\s*$", lines[k])
+			if not m or m.group(1) not in wanted:
+				k += 1
+				continue
+			name = m.group(1)
+			prefix, renames = wanted.pop(name)
+
+			j = k+1
+			members = []
+			while not re.match(r"^\s*\}", lines[j]):
+				mm = re.match(r"^(\s*)(\w+)\s*=\s*(.*)$", lines[j])
+				if not mm:
+					raise SystemExit(f"{pkg.name}/{fname}: cannot parse member of enum {name}: {lines[j]!r}")
+				members.append(mm.groups())
+				j += 1
+
+			fixed = []
+			unused = set(renames)
+			for indent, member, rest in members:
+				new = member
+				if member in renames:
+					unused.discard(member)
+					new = renames[member]
+					if new is None:
+						continue
+				elif prefix and member.startswith(prefix) and len(member) > len(prefix):
+					new = member[len(prefix):]
+				fixed.append((indent, new, rest))
+			if unused:
+				pkg.report["enum member fix no longer applies"].append(f"{name}: {', '.join(sorted(unused))}")
+			new_names = [n for _, n, _ in fixed]
+			if len(set(new_names)) != len(new_names):
+				raise SystemExit(f"{pkg.name}/{fname}: fixing the members of {name} makes duplicate names")
+
+			width = max(len(n) for n in new_names)
+			lines[k+1:j] = [f"{indent}{n.ljust(width)} = {rest}" for indent, n, rest in fixed]
+			pkg.report["enum members fixed"].append(f"{name}: {', '.join(new_names)}")
+			k = j
+	for name in sorted(wanted):
+		pkg.report["enum for member fix not found"].append(name)
 
 
 def apply_flag_enums(pkg):
@@ -592,17 +737,21 @@ def apply_flag_enums(pkg):
 			names.add(elem)
 
 			flags     = [(n, v) for n, v in members if v > 0 and v & (v-1) == 0]
-			composite = [(n, v) for n, v in members if v > 0 and v & (v-1) != 0]
-			dropped   = [n for n, v in members if v == 0]
+			constants = [(n, v) for n, v in members if v == 0 or v & (v-1) != 0]
 			width = max(len(n) for n, _ in flags)
 			out = [f"{elem} :: enum {backing} {{"]
 			out += [f"\t{n.ljust(width)} = {v.bit_length()-1}," for n, v in flags]
 			out += ["}", f"{name} :: bit_set[{elem}; {backing}]"]
-			for n, v in composite:
+			for n, v in constants:
+				const_name = f"{name}_{n}"
+				if const_name in names:
+					raise SystemExit(f"{pkg.name}/{fname}: constant {const_name} for flag enum {name} is already declared")
+				names.add(const_name)
 				bits = ", ".join(f".{fn}" for fn, fv in flags if v & fv)
-				out.append(f"{name}_{n} :: {name}{{{bits}}}")
+				out.append(f"{const_name} :: {name}{{{bits}}}")
 			lines[k:j+1] = out
-			pkg.report["flag enums converted"].append(f"{name} -> bit_set[{elem}]" + (f" (dropped {', '.join(dropped)})" if dropped else ""))
+			consts = ", ".join(f"{name}_{n}" for n, _ in constants)
+			pkg.report["flag enums converted"].append(f"{name} -> bit_set[{elem}]" + (f" (constants {consts})" if consts else ""))
 			k += len(out)
 	for name in sorted(wanted):
 		pkg.report["flag enum not found"].append(name)
@@ -821,6 +970,7 @@ def main():
 
 		rewrite_imports(pkg, framework_of_path)
 		apply_alias_fixes(pkg)
+		apply_enum_member_fixes(pkg)
 		apply_flag_enums(pkg)
 		pkg.scan()
 		apply_known_fixes(pkg)

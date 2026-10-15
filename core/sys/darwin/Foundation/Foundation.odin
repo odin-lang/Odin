@@ -3406,12 +3406,13 @@ xpc_session_create_flags_t :: enum cffi.ulonglong {
 	MACH_PRIVILEGED = 2,
 }
 
-xpc_listener_create_flags_t :: enum cffi.ulonglong {
-	NONE             = 0,
-	INACTIVE         = 1,
-	FORCE_MACH       = 2,
-	FORCE_XPCSERVICE = 4,
+xpc_listener_create_flag_t :: enum cffi.ulonglong {
+	INACTIVE         = 0,
+	FORCE_MACH       = 1,
+	FORCE_XPCSERVICE = 2,
 }
+xpc_listener_create_flags_t :: bit_set[xpc_listener_create_flag_t; cffi.ulonglong]
+xpc_listener_create_flags_t_NONE :: xpc_listener_create_flags_t{}
 
 ComparisonResult :: enum cffi.long {
 	OrderedAscending  = -1,
@@ -3505,43 +3506,44 @@ StringEnumerationOptions :: enum cffi.ulong {
 	Localized                    = 1024,
 }
 
-CalendarUnit :: enum cffi.ulong {
-	Era                           = 2,
-	Year                          = 4,
-	Month                         = 8,
-	Day                           = 16,
-	Hour                          = 32,
-	Minute                        = 64,
-	Second                        = 128,
-	Weekday                       = 512,
-	WeekdayOrdinal                = 1024,
-	Quarter                       = 2048,
-	WeekOfMonth                   = 4096,
-	WeekOfYear                    = 8192,
-	YearForWeekOfYear             = 16384,
-	Nanosecond                    = 32768,
-	DayOfYear                     = 65536,
-	Calendar                      = 1048576,
-	TimeZone                      = 2097152,
-	IsLeapMonth                   = 1073741824,
-	IsRepeatedDay                 = 2147483648,
-	EraCalendarUnit               = 2,
-	YearCalendarUnit              = 4,
-	MonthCalendarUnit             = 8,
-	DayCalendarUnit               = 16,
-	HourCalendarUnit              = 32,
-	MinuteCalendarUnit            = 64,
-	SecondCalendarUnit            = 128,
-	WeekCalendarUnit              = 256,
-	WeekdayCalendarUnit           = 512,
-	WeekdayOrdinalCalendarUnit    = 1024,
-	QuarterCalendarUnit           = 2048,
-	WeekOfMonthCalendarUnit       = 4096,
-	WeekOfYearCalendarUnit        = 8192,
-	YearForWeekOfYearCalendarUnit = 16384,
-	CalendarUnit                  = 1048576,
-	TimeZoneCalendarUnit          = 2097152,
+CalendarUnitFlag :: enum cffi.ulong {
+	Era                           = 1,
+	Year                          = 2,
+	Month                         = 3,
+	Day                           = 4,
+	Hour                          = 5,
+	Minute                        = 6,
+	Second                        = 7,
+	Weekday                       = 9,
+	WeekdayOrdinal                = 10,
+	Quarter                       = 11,
+	WeekOfMonth                   = 12,
+	WeekOfYear                    = 13,
+	YearForWeekOfYear             = 14,
+	Nanosecond                    = 15,
+	DayOfYear                     = 16,
+	Calendar                      = 20,
+	TimeZone                      = 21,
+	IsLeapMonth                   = 30,
+	IsRepeatedDay                 = 31,
+	EraCalendarUnit               = 1,
+	YearCalendarUnit              = 2,
+	MonthCalendarUnit             = 3,
+	DayCalendarUnit               = 4,
+	HourCalendarUnit              = 5,
+	MinuteCalendarUnit            = 6,
+	SecondCalendarUnit            = 7,
+	WeekCalendarUnit              = 8,
+	WeekdayCalendarUnit           = 9,
+	WeekdayOrdinalCalendarUnit    = 10,
+	QuarterCalendarUnit           = 11,
+	WeekOfMonthCalendarUnit       = 12,
+	WeekOfYearCalendarUnit        = 13,
+	YearForWeekOfYearCalendarUnit = 14,
+	CalendarUnit                  = 20,
+	TimeZoneCalendarUnit          = 21,
 }
+CalendarUnit :: bit_set[CalendarUnitFlag; cffi.ulong]
 
 CalendarOption :: enum cffi.ulong {
 	WrapComponents                          = 0,
@@ -3611,16 +3613,17 @@ AttributedStringEnumerationOptions :: enum cffi.ulong {
 	LongestEffectiveRangeNotRequired = 1048576,
 }
 
-InlinePresentationIntent :: enum cffi.ulong {
-	Emphasized         = 1,
-	StronglyEmphasized = 2,
-	Code               = 4,
-	Strikethrough      = 32,
-	SoftBreak          = 64,
-	LineBreak          = 128,
-	InlineHTML         = 256,
-	BlockHTML          = 512,
+InlinePresentationIntentFlag :: enum cffi.ulong {
+	Emphasized         = 0,
+	StronglyEmphasized = 1,
+	Code               = 2,
+	Strikethrough      = 5,
+	SoftBreak          = 6,
+	LineBreak          = 7,
+	InlineHTML         = 8,
+	BlockHTML          = 9,
 }
+InlinePresentationIntent :: bit_set[InlinePresentationIntentFlag; cffi.ulong]
 
 AttributedStringMarkdownParsingFailurePolicy :: enum cffi.long {
 	ReturnError                     = 0,
@@ -3817,8 +3820,8 @@ PersonNameComponentsFormatterOptions :: enum cffi.ulong {
 }
 
 RelativeDateTimeFormatterStyle :: enum cffi.long {
-	umeric = 0,
-	amed   = 1,
+	Numeric = 0,
+	Named   = 1,
 }
 
 RelativeDateTimeFormatterUnitsStyle :: enum cffi.long {
@@ -4193,21 +4196,22 @@ ProcessInfoThermalState :: enum cffi.long {
 	Critical = 3,
 }
 
-TextCheckingType :: enum cffi.ulonglong {
-	Orthography        = 1,
-	Spelling           = 2,
-	Grammar            = 4,
-	Date               = 8,
-	Address            = 16,
-	Link               = 32,
-	Quote              = 64,
-	Dash               = 128,
-	Replacement        = 256,
-	Correction         = 512,
-	RegularExpression  = 1024,
-	PhoneNumber        = 2048,
-	TransitInformation = 4096,
+TextCheckingTypeFlag :: enum cffi.ulonglong {
+	Orthography        = 0,
+	Spelling           = 1,
+	Grammar            = 2,
+	Date               = 3,
+	Address            = 4,
+	Link               = 5,
+	Quote              = 6,
+	Dash               = 7,
+	Replacement        = 8,
+	Correction         = 9,
+	RegularExpression  = 10,
+	PhoneNumber        = 11,
+	TransitInformation = 12,
 }
+TextCheckingType :: bit_set[TextCheckingTypeFlag; cffi.ulonglong]
 
 RegularExpressionOption :: enum cffi.ulong {
 	CaseInsensitive            = 0,
@@ -4250,14 +4254,15 @@ StreamStatus :: enum cffi.ulong {
 	Error   = 7,
 }
 
-StreamEvent :: enum cffi.ulong {
-	None              = 0,
-	OpenCompleted     = 1,
-	HasBytesAvailable = 2,
-	HasSpaceAvailable = 4,
-	ErrorOccurred     = 8,
-	EndEncountered    = 16,
+StreamEventFlag :: enum cffi.ulong {
+	OpenCompleted     = 0,
+	HasBytesAvailable = 1,
+	HasSpaceAvailable = 2,
+	ErrorOccurred     = 3,
+	EndEncountered    = 4,
 }
+StreamEvent :: bit_set[StreamEventFlag; cffi.ulong]
+StreamEvent_None :: StreamEvent{}
 
 TimeZoneNameStyle :: enum cffi.long {
 	Standard            = 0,

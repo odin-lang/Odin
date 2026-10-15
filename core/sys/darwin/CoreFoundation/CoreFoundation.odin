@@ -4220,14 +4220,15 @@ dispatch_autorelease_frequency_t :: enum cffi.ulong {
 	NEVER     = 2,
 }
 
-dispatch_block_flags_t :: enum cffi.ulong {
-	BARRIER           = 1,
-	DETACHED          = 2,
-	ASSIGN_CURRENT    = 4,
-	NO_QOS_CLASS      = 8,
-	INHERIT_QOS_CLASS = 16,
-	ENFORCE_QOS_CLASS = 32,
+dispatch_block_flag_t :: enum cffi.ulong {
+	BARRIER           = 0,
+	DETACHED          = 1,
+	ASSIGN_CURRENT    = 2,
+	NO_QOS_CLASS      = 3,
+	INHERIT_QOS_CLASS = 4,
+	ENFORCE_QOS_CLASS = 5,
 }
+dispatch_block_flags_t :: bit_set[dispatch_block_flag_t; cffi.ulong]
 
 ComparisonResult :: enum cffi.long {
 	LessThan    = -1,
@@ -4257,12 +4258,12 @@ LocaleLanguageDirection :: enum cffi.long {
 }
 
 GregorianUnitFlag :: enum cffi.ulong {
-	sYears   = 0,
-	sMonths  = 1,
-	sDays    = 2,
-	sHours   = 3,
-	sMinutes = 4,
-	sSeconds = 5,
+	Years   = 0,
+	Months  = 1,
+	Days    = 2,
+	Hours   = 3,
+	Minutes = 4,
+	Seconds = 5,
 }
 
 GregorianUnitFlags :: bit_set[GregorianUnitFlag; cffi.ulong]
@@ -4339,23 +4340,24 @@ TimeZoneNameStyle :: enum cffi.long {
 	ShortGeneric        = 5,
 }
 
-CalendarUnit :: enum cffi.ulong {
-	Era               = 2,
-	Year              = 4,
-	Month             = 8,
-	Day               = 16,
-	Hour              = 32,
-	Minute            = 64,
-	Second            = 128,
-	Week              = 256,
-	Weekday           = 512,
-	WeekdayOrdinal    = 1024,
-	Quarter           = 2048,
-	WeekOfMonth       = 4096,
-	WeekOfYear        = 8192,
-	YearForWeekOfYear = 16384,
-	DayOfYear         = 65536,
+CalendarUnitFlag :: enum cffi.ulong {
+	Era               = 1,
+	Year              = 2,
+	Month             = 3,
+	Day               = 4,
+	Hour              = 5,
+	Minute            = 6,
+	Second            = 7,
+	Week              = 8,
+	Weekday           = 9,
+	WeekdayOrdinal    = 10,
+	Quarter           = 11,
+	WeekOfMonth       = 12,
+	WeekOfYear        = 13,
+	YearForWeekOfYear = 14,
+	DayOfYear         = 16,
 }
+CalendarUnit :: bit_set[CalendarUnitFlag; cffi.ulong]
 
 DateFormatterStyle :: enum cffi.long {
 	NoStyle     = 0,
@@ -4459,23 +4461,23 @@ URLComponentType :: enum cffi.long {
 	Fragment          = 12,
 }
 
-URLBookmarkCreationOptions :: enum cffi.ulong {
-	MinimalBookmarkMask              = 512,
-	SuitableForBookmarkFile          = 1024,
-	WithSecurityScope                = 2048,
-	SecurityScopeAllowOnlyReadAccess = 4096,
-	WithoutImplicitSecurityScope     = 536870912,
-	PreferFileIDResolutionMask       = 256,
+URLBookmarkCreationOption :: enum cffi.ulong {
+	MinimalBookmarkMask              = 9,
+	SuitableForBookmarkFile          = 10,
+	WithSecurityScope                = 11,
+	SecurityScopeAllowOnlyReadAccess = 12,
+	WithoutImplicitSecurityScope     = 29,
+	PreferFileIDResolutionMask       = 8,
 }
+URLBookmarkCreationOptions :: bit_set[URLBookmarkCreationOption; cffi.ulong]
 
-URLBookmarkResolutionOptions :: enum cffi.ulong {
-	WithoutUIMask                 = 256,
-	WithoutMountingMask           = 512,
-	WithSecurityScope             = 1024,
-	WithoutImplicitStartAccessing = 32768,
-	kWithoutUIMask                = 256,
-	kWithoutMountingMask          = 512,
+URLBookmarkResolutionOption :: enum cffi.ulong {
+	WithoutUIMask                 = 8,
+	WithoutMountingMask           = 9,
+	WithSecurityScope             = 10,
+	WithoutImplicitStartAccessing = 15,
 }
+URLBookmarkResolutionOptions :: bit_set[URLBookmarkResolutionOption; cffi.ulong]
 
 RunLoopRunResult :: enum cffi.int {
 	Finished      = 1,
@@ -4520,14 +4522,15 @@ StreamStatus :: enum cffi.long {
 	Error   = 7,
 }
 
-StreamEventType :: enum cffi.ulong {
-	None              = 0,
-	OpenCompleted     = 1,
-	HasBytesAvailable = 2,
-	CanAcceptBytes    = 4,
-	ErrorOccurred     = 8,
-	EndEncountered    = 16,
+StreamEventTypeFlag :: enum cffi.ulong {
+	OpenCompleted     = 0,
+	HasBytesAvailable = 1,
+	CanAcceptBytes    = 2,
+	ErrorOccurred     = 3,
+	EndEncountered    = 4,
 }
+StreamEventType :: bit_set[StreamEventTypeFlag; cffi.ulong]
+StreamEventType_None :: StreamEventType{}
 
 StreamErrorDomain :: enum cffi.long {
 	Custom      = -1,
@@ -4691,16 +4694,17 @@ URLError :: enum cffi.long {
 	TimeoutError                 = -18,
 }
 
-URLEnumeratorOptions :: enum cffi.ulong {
-	DefaultBehavior             = 0,
-	DescendRecursively          = 1,
-	SkipInvisibles              = 2,
-	GenerateFileReferenceURLs   = 4,
-	SkipPackageContents         = 8,
-	IncludeDirectoriesPreOrder  = 16,
-	IncludeDirectoriesPostOrder = 32,
-	GenerateRelativePathURLs    = 64,
+URLEnumeratorOption :: enum cffi.ulong {
+	DescendRecursively          = 0,
+	SkipInvisibles              = 1,
+	GenerateFileReferenceURLs   = 2,
+	SkipPackageContents         = 3,
+	IncludeDirectoriesPreOrder  = 4,
+	IncludeDirectoriesPostOrder = 5,
+	GenerateRelativePathURLs    = 6,
 }
+URLEnumeratorOptions :: bit_set[URLEnumeratorOption; cffi.ulong]
+URLEnumeratorOptions_DefaultBehavior :: URLEnumeratorOptions{}
 
 URLEnumeratorResult :: enum cffi.long {
 	Success                   = 1,
@@ -4709,24 +4713,26 @@ URLEnumeratorResult :: enum cffi.long {
 	DirectoryPostOrderSuccess = 4,
 }
 
-FileSecurityClearOptions :: enum cffi.ulong {
-	Owner             = 1,
-	Group             = 2,
-	Mode              = 4,
-	OwnerUUID         = 8,
-	GroupUUID         = 16,
-	AccessControlList = 32,
+FileSecurityClearOption :: enum cffi.ulong {
+	Owner             = 0,
+	Group             = 1,
+	Mode              = 2,
+	OwnerUUID         = 3,
+	GroupUUID         = 4,
+	AccessControlList = 5,
 }
+FileSecurityClearOptions :: bit_set[FileSecurityClearOption; cffi.ulong]
 
-StringTokenizerTokenType :: enum cffi.ulong {
-	None                    = 0,
-	Normal                  = 1,
-	HasSubTokensMask        = 2,
-	HasDerivedSubTokensMask = 4,
-	HasHasNumbersMask       = 8,
-	HasNonLettersMask       = 16,
-	IsCJWordMask            = 32,
+StringTokenizerTokenTypeFlag :: enum cffi.ulong {
+	Normal                  = 0,
+	HasSubTokensMask        = 1,
+	HasDerivedSubTokensMask = 2,
+	HasHasNumbersMask       = 3,
+	HasNonLettersMask       = 4,
+	IsCJWordMask            = 5,
 }
+StringTokenizerTokenType :: bit_set[StringTokenizerTokenTypeFlag; cffi.ulong]
+StringTokenizerTokenType_None :: StringTokenizerTokenType{}
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	XMLNodeTypeCode :: enum cffi.long {

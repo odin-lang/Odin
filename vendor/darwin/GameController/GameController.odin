@@ -1162,13 +1162,14 @@ DevicePhysicalInputElementChange :: enum cffi.long {
 	Changed       = 1,
 }
 
-PhysicalInputSourceDirection :: enum cffi.ulong {
-	NotApplicable = 0,
-	Up            = 1,
-	Right         = 2,
-	Down          = 4,
-	Left          = 8,
+PhysicalInputSourceDirectionFlag :: enum cffi.ulong {
+	Up    = 0,
+	Right = 1,
+	Down  = 2,
+	Left  = 3,
 }
+PhysicalInputSourceDirection :: bit_set[PhysicalInputSourceDirectionFlag; cffi.ulong]
+PhysicalInputSourceDirection_NotApplicable :: PhysicalInputSourceDirection{}
 
 DeviceBatteryState :: enum cffi.long {
 	Unknown     = -1,

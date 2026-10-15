@@ -46,7 +46,10 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
   provided.
 - Enums which are flag sets in the SDK but which csgen emitted as plain enums (`FLAG_ENUMS`) become a
   `bit_set` of the same name over an element enum of bit indices, e.g. `MTL.TextureUsage` is
-  `bit_set[MTL.TextureUsageFlag]`. Members equal to 0 are dropped, use `{}` instead.
+  `bit_set[MTL.TextureUsageFlag]`. A member equal to 0 becomes a constant equal to `{}`, e.g.
+  `MTL.TextureUsage_Unknown`.
+- Enum members mangled by csgen's prefix removal are renamed (`ENUM_MEMBER_FIXES`), e.g.
+  `AVFoundation.CaptureSystemPressureFactors` has `SystemTemperature` rather than `ystemTemperature`.
 - Known problems in the generated output are patched (`KNOWN_FIXES`, `ALIAS_FIXES`).
 
 ## Hand-written files
