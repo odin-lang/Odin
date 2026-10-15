@@ -2,6 +2,7 @@
 package strconv
 
 import "base:runtime"
+import "core:unicode"
 import "core:unicode/utf8"
 import "decimal"
 /*
@@ -1546,7 +1547,7 @@ digit_to_int :: proc(r: rune) -> (value: int, ok: bool) {
 
 	Returns `true` on success, `false` if `buf` was not large enough.
 */
-_write_byte :: proc(buf: []byte, i: ^int, b: byte) -> bool {
+_write_byte :: #force_inline proc(buf: []byte, i: ^int, b: byte) -> bool {
 	if i^ < len(buf) {
 		buf[i^] = b
 		i^ += 1
@@ -1564,7 +1565,7 @@ _write_byte :: proc(buf: []byte, i: ^int, b: byte) -> bool {
 
 	Returns `true` on success, `false` if `buf` was not large enough.
 */
-_write_string :: proc(buf: []byte, i: ^int, s: string) -> bool {
+_write_string :: #force_inline proc(buf: []byte, i: ^int, s: string) -> bool {
 	if i^ < len(buf) {
 		n := copy(buf[i^:], s)
 		i^ += n
@@ -1574,49 +1575,70 @@ _write_string :: proc(buf: []byte, i: ^int, s: string) -> bool {
 	}
 }
 
-
 /*
 	Encodes a single rune as UTF-8 and escapes it if appropriate,
 	and places the encoded bytes into `buf` at position `i^`, and advances `i^` by how many bytes have been written.
 
-	- `ascii_compatible`: If `true`, this procedure will escape all runes such that their encoded byte representation
-	                      only contains ASCII characters.
-
 	Returns `true` on success, `false` if `buf` was not large enough.
+
+	NOTE: The maximum number of bytes written to `buf` is 10 (`ESCAPED_RUNE_MAX_NEEDED_BYTES`).
 */
-_write_rune :: proc(buf: []byte, i: ^int, r: rune, ascii_compatible: bool) -> bool {
-	remaining := len(buf) - i^
-	if remaining <= 0 {
+_write_rune :: proc(buf: []byte, i: ^int, r: rune, quote_char: byte, options: Rune_Escaping_Options) -> bool {
+
+	if len(buf) <= i^ {
 		return false
-	} else if utf8.is_printable(r) && (r <= 0x7f || !ascii_compatible) {
+	}
+
+	if r == '\\' || (r == cast(rune)quote_char && quote_char != 0) {
+		_write_byte(buf, i, '\\') or_return
+		_write_byte(buf, i, byte(r)) or_return
+		return true
+	}
+
+	if .html_safe in options {
+		switch r {
+		case '<', '>', '&':
+			_write_string(buf, i, `\x`) or_return
+			_write_hex_code(buf, i, cast(u32)r, 2) or_return
+			return true
+		}
+	}
+
+	if unicode.is_printable(r) && (r <= 0x7f || (.ascii_compatible not_in options)) {
 		b, w := utf8.encode_rune(r)
 		n := copy(buf[i^:], b[:w])
 		i^ += n
 		return n == w
-	} else {
+	}
+
+	switch r {
+	case '\a': _write_string(buf, i, `\a`) or_return
+	case '\b': _write_string(buf, i, `\b`) or_return
+	case '\e': _write_string(buf, i, `\e`) or_return
+	case '\f': _write_string(buf, i, `\f`) or_return
+	case '\n': _write_string(buf, i, `\n`) or_return
+	case '\r': _write_string(buf, i, `\r`) or_return
+	case '\t': _write_string(buf, i, `\t`) or_return
+	case '\v': _write_string(buf, i, `\v`) or_return
+	case:
 		// Print it in escaped form:
 		//  \x##  -or-  \u####  -or-  \U########
-		c := r
-		// if c > utf8.MAX_RUNE {
-		// 	// Encoding error - fall back to the Replacement Character
-		// 	c = utf8.RUNE_ERROR
-		// } TODO xxxx cleanup
-
-		if c <= 0xff {
+		if r <= 0xff {
 			// \x##
-			_write_string(buf, i, "\\x") or_return
-			_write_hex_code(buf, i, c, 2) or_return
-		} else if c <= 0xffff {
+			_write_string(buf, i, `\x`) or_return
+			_write_hex_code(buf, i, cast(u32)r, 2) or_return
+		} else if r <= 0xffff {
 			// \u####
-			_write_string(buf, i, "\\u") or_return
-			_write_hex_code(buf, i, c, 4) or_return
+			_write_string(buf, i, `\u`) or_return
+			_write_hex_code(buf, i, cast(u32)r, 4) or_return
 		} else {
 			// \U########
-			_write_string(buf, i, "\\U") or_return
-			_write_hex_code(buf, i, c, 8) or_return
+			_write_string(buf, i, `\U`) or_return
+			_write_hex_code(buf, i, cast(u32)r, 8) or_return
 		}
-		return true
 	}
+
+	return true
 }
 
 
@@ -1630,7 +1652,7 @@ _write_rune :: proc(buf: []byte, i: ^int, r: rune, ascii_compatible: bool) -> bo
 
 	Returns `true` on success, `false` if `buf` was not large enough.
 */
-_write_hex_code :: proc(buf: []byte, i: ^int, r: rune, w: int) -> bool {
+_write_hex_code :: proc(buf: []byte, i: ^int, r: u32, w: int) -> bool {
 	if len(buf) - i^ < w {
 		return false
 	}
@@ -1650,30 +1672,30 @@ quote :: proc(buf: []byte, str: string) -> string {
 	return quote_weird(buf, str)
 }
 /*
-Writes a quoted string representation of the input string to a given byte slice and returns the result as a string
+	Writes a quoted string representation of the input string to a given byte slice and returns the result as a string
 
-**Inputs**
-- buf: The byte slice to which the quoted string will be written
-- str: The input string to be quoted
+	**Inputs**
+	- buf: The byte slice to which the quoted string will be written
+	- str: The input string to be quoted
 
-!! ISSUE !! NOT EXPECTED -- `"\"hello\""` was expected
+	!! ISSUE !! NOT EXPECTED -- `"\"hello\""` was expected
 
-Example:
+	Example:
 
-	import "core:fmt"
-	import "core:strconv"
-	quote_example :: proc() {
-		buf: [20]byte
-		result := strconv.quote(buf[:], "hello")
-		fmt.println(result, buf)
-	}
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [20]byte
+			result := strconv.quote(buf[:], "hello")
+			fmt.println(result, buf)
+		}
 
-Output:
+	Output:
 
-	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]
+		"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]
 
-**Returns**
-- The resulting string after writing the quoted string representation
+	**Returns**
+	- The resulting string after writing the quoted string representation
 */
 quote_weird ::  proc(buf: []byte, str: string) -> string {
 	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
@@ -1716,35 +1738,49 @@ quote_weird ::  proc(buf: []byte, str: string) -> string {
 
 
 /*
-TODO xxxx fix doc of procedure group
-Writes a quoted string representation of the input string to a given byte buffer, and returns the result as a string.
+	Writes a quoted string representation of the input string to a given byte buffer, and returns the result as a string.
 
-The string is formatted such that it would parse back as the same string in Odin syntax.
-
-**Inputs**
-- buf: The byte slice to which the quoted string will be written
-- str: The input string to be quoted
-
-Example:
-
-	import "core:fmt"
-	import "core:strconv"
-	quote_example :: proc() {
-		buf: [20]byte
-		result := strconv.quote(buf[:], "hello")
-		fmt.println(result, buf)
-	}
-
-Output:
-
-	"hello" [34, 104, 101, 108, 108, 111, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-
-**Returns**
-- The resulting string after writing the quoted string representation
+	The string is formatted such that it would parse back as the same string in Odin syntax.
 */
 quote_string :: proc { quote_string_buf, quote_string_dynamic_array }
 
-quote_string_buf :: proc(buf: []byte, str: string, quote: byte = '"', ascii_compatible := false) -> (result: string, ok: bool) #optional_ok {
+
+/*
+	Writes a quoted string representation of the input string to byte buffer `buf`, and returns the result as a string.
+
+	The string is formatted such that it would parse back as the same string in Odin syntax.
+
+	**Inputs**
+	- `buf`:      The byte slice to which the quoted string will be written.
+	- `str`:      The input string to be quoted.
+	- `quote`:    The quote character used to surround the string. This character is also escaped
+	              when it is encountered in the string.
+	- `options`:  Controls how characters in the string are escaped.
+
+	**Returns**
+	- `result`:   The resulting string after writing the quoted string representation.
+	- `ok`:       `true` on success; `false` if `buf` was not large enough.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [20]byte
+			result := strconv.quote_string_buf(buf[:], "hello")
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		"hello" [34, 104, 101, 108, 108, 111, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+*/
+quote_string_buf :: proc(
+	buf:      []byte,
+	str:      string,
+	quote:    byte = '"',
+	options:  Rune_Escaping_Options = nil,
+) -> (result: string, ok: bool) #optional_ok {
 	i := 0
 
 	_write_byte(buf, &i, quote) or_return
@@ -1768,7 +1804,8 @@ quote_string_buf :: proc(buf: []byte, str: string, quote: byte = '"', ascii_comp
 			_write_byte(buf, &i, digits[s[0] >> 4]) or_return
 			_write_byte(buf, &i, digits[s[0] & 0xf]) or_return
 		} else {
-			encode_and_escape_rune(buf[i:], r, quote, ascii_compatible = ascii_compatible) or_return
+			encoded := encode_and_escape_rune(buf[i:], r, quote, options = options) or_return
+			i += len(encoded)
 		}
 		// Advance input cursor to the next codepoint.
 		s = s[width:]
@@ -1780,7 +1817,44 @@ quote_string_buf :: proc(buf: []byte, str: string, quote: byte = '"', ascii_comp
 	return
 }
 
-quote_string_dynamic_array :: proc(buf: ^[dynamic]byte, str: string, quote: byte = '"', ascii_compatible := false, loc := #caller_location) -> (result: string, err: runtime.Allocator_Error) #optional_allocator_error {
+
+/*
+	Appends a quoted string representation of the input string to the end of `buf`, and returns the appended part as a string.
+
+	The string is formatted such that it would parse back as the same string in Odin syntax.
+
+	**Inputs**
+	- `buf`:      The dynamic array to which the quoted string will be appended.
+	- `str`:      The input string to be quoted.
+	- `quote`:    The quote character used to surround the string. This character is also escaped
+	              when it is encountered in the string.
+	- `options`:  Controls how characters in the string are escaped.
+
+	**Returns**
+	- `result`:   The resulting string after writing the quoted string representation.
+	- `err`:      Allocator error if one occurred, otherwise `nil`.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [dynamic]byte
+			result := strconv.quote_string_dynamic_array(&buf, "hello")
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		"hello" [34, 104, 101, 108, 108, 111, 34]
+*/
+quote_string_dynamic_array :: proc(
+	buf:      ^[dynamic]byte,
+	str:      string,
+	quote:    byte = '"',
+	options:  Rune_Escaping_Options = nil,
+	loc := #caller_location,
+) -> (result: string, err: runtime.Allocator_Error) #optional_allocator_error {
 	n := 0
 	n += append(buf, quote, loc=loc) or_return
 
@@ -1803,9 +1877,9 @@ quote_string_dynamic_array :: proc(buf: ^[dynamic]byte, str: string, quote: byte
 			n += append(buf, digits[s[0] >> 4], loc=loc) or_return
 			n += append(buf, digits[s[0] & 0xf], loc=loc) or_return
 		} else {
-			// CONSIDER: ensure 10 bytes free capacity in buf, and put it there directly?
-			encoded_rune_buf: [10]byte
-			encoded_rune, encode_rune_ok := encode_and_escape_rune(encoded_rune_buf[:], r, quote, ascii_compatible = ascii_compatible)
+			// CONSIDER: ensure ESCAPED_RUNE_MAX_NEEDED_BYTES bytes free capacity in buf, and put it there directly?
+			encoded_rune_buf: [ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+			encoded_rune, encode_rune_ok := encode_and_escape_rune(encoded_rune_buf[:], r, quote, options = options)
 			assert(encode_rune_ok == true, "encode_rune should have worked - 10 bytes should be enough to accomodate for any encoded rune representation (max. = \"\\U########\").")
 			n += append(buf, encoded_rune, loc=loc) or_return
 		}
@@ -1814,35 +1888,62 @@ quote_string_dynamic_array :: proc(buf: ^[dynamic]byte, str: string, quote: byte
 	}
 
 	n += append(buf, quote, loc=loc) or_return
-	result = transmute(string)buf[len(buf)-n:] // xxxx bizarre
+	result = transmute(string)buf[len(buf)-n:]
 	return
 }
+
+
 /*
-Writes a quoted rune representation of the input rune to a given byte slice and returns the result as a string
-
-**Inputs**
-- buf: The byte slice to which the quoted rune will be written
-- r: The input rune to be quoted
-
-**Returns**
-- The resulting string after writing the quoted rune representation.
-  If `buf` was too small to hold the quoted rune, this procedure will return `""` instead.
-
-Example:
-
-	import "core:fmt"
-	import "core:strconv"
-	quote_rune_example :: proc() {
-		buf: [4]byte
-		result := strconv.quote_rune(buf[:], 'A')
-		fmt.println(result, buf)
-	}
-
-Output:
-
-	'A' [39, 65, 39, 0]
+	Maximum number of free buffer bytes needed by `encode_and_escape_rune` in the worst case,
+	which is `\U########`.
 */
-quote_rune :: proc(buf: []byte, r: rune, ascii_compatible := false) -> (result: string, ok: bool) #optional_ok {
+ESCAPED_RUNE_MAX_NEEDED_BYTES  :: 10
+
+
+/*
+	Maximum number of free buffer bytes needed by `quote_rune` in the worst case.
+*/
+QUOTED_RUNE_MAX_NEEDED_BYTES   :: ESCAPED_RUNE_MAX_NEEDED_BYTES + 2
+
+
+/*
+	Writes a quoted rune representation of the input rune, encoded as UTF-8, to a given byte slice and returns the result as a string.
+
+	**Inputs**
+	- `buf`:      The byte slice to which the quoted rune will be written.
+	- `r`:        The input rune to be quoted.
+	- `options`:  Controls how characters in the string are escaped.
+
+	**Returns**
+	- `result`:   On success, the resulting string after writing the quoted rune representation.
+	              Otherwise, the procedure will return `""` instead.
+	- `ok`:       `true` on success; `false` if `buf` was not large enough.
+
+	**Remarks**
+
+	The rune is quoted such that it would parse back as a valid rune literal in Odin syntax.
+
+	This implies that single quotes (`'`) are used.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_rune_example :: proc() {
+			buf: [4]byte
+			result := strconv.quote_rune(buf[:], 'A')
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		'A' [39, 65, 39, 0]
+*/
+quote_rune :: proc(
+	buf: []byte,
+	r: rune,
+	options: Rune_Escaping_Options = nil,
+) -> (result: string, ok: bool) #optional_ok {
 	if buf == nil || r < 0 {
 		return "", false
 	}
@@ -1850,7 +1951,7 @@ quote_rune :: proc(buf: []byte, r: rune, ascii_compatible := false) -> (result: 
 	i := 0
 	_write_byte(buf, &i, '\'') or_return
 
-	encoded := encode_and_escape_rune(buf[i:], r, '\'', ascii_compatible = ascii_compatible) or_return
+	encoded := encode_and_escape_rune(buf[i:], r, '\'', options = options) or_return
 	i += len(encoded)
 
 	_write_byte(buf, &i, '\'') or_return
@@ -1859,22 +1960,42 @@ quote_rune :: proc(buf: []byte, r: rune, ascii_compatible := false) -> (result: 
 }
 
 
+Rune_Escaping_Option :: enum {
+	// When set, runes will be escaped such that their encoded byte representation
+	// only contains ASCII characters.
+	ascii_compatible,
+
+	// When set, the runes `<`, `>` and `&` will be escaped as `\x3c`, `\x3e` and `\x26` respectively,
+	// making them suitable for text content nodes in HTML (and XML) documents.
+	//
+	// **NOTE:** This does NOT encode them as HTML entities `&lt;`, `&gt;` or `&amp;`.
+	html_safe,
+}
+
+/*
+	Lets callers configure how individual runes are escaped when using:
+	- `quote_rune`
+	- `quote_string_buf`
+	- `quote_string_dynamic_array`
+	- `encode_and_escape_rune`
+*/
+Rune_Escaping_Options :: bit_set[Rune_Escaping_Option]
+
 /*
 	Encodes a single rune `r` as UTF-8, escaping it if appropriate, and palces the result into `buf`.
 
 	**Inputs**
-	- `buf`:               The byte buffer into which the encoded and escaped rune will be written.
-	- `r`:                 The rune which should be encoded.
-	- `quote_char`:        A character which this procedure will consider necessary to escape.
-	                       Usually, this is `'` if this is called to encode a single quoted rune (e.g. `'a'`),
-	                       or `"` if this is called to encode runes in a quoted string (e.g. `"abc"`).
-	                       Specify `quote_char = 0` to disable this feature.
-	- `ascii_compatible`:  If `true`, this procedure will escape the rune such that its encoded byte representation
-	                       only contains ASCII characters.
+	- `buf`:         The byte buffer into which the encoded and escaped rune will be written.
+	- `r`:           The rune which should be encoded.
+	- `quote_char`:  A character which this procedure will consider necessary to escape.
+	                 Usually, this is `'` if this is called to encode a single quoted rune (e.g. `'a'`),
+	                 or `"` if this is called to encode runes in a quoted string (e.g. `"abc"`).
+	                 Specify `quote_char = 0` to disable this feature.
+	- `options`:     Specify extended options.
 	
 	**Returns**
-	- `result`:            The encoded and escaped representation of the rune, if successful.
-	- `ok`:                `true` on success, `false` if `buf` was not large enough.
+	- `result`:      The encoded and escaped representation of the rune, if successful.
+	- `ok`:          `true` on success, `false` if `buf` was not large enough.
 
 	**Remarks**
 
@@ -1884,31 +2005,13 @@ quote_rune :: proc(buf: []byte, r: rune, ascii_compatible := false) -> (result: 
 	This includes, but may not be limited to, control characters, invisible characters, and characters which
 	would likely cause display issues such as combining marks (see: `unicode.is_printable`).
 */
-encode_and_escape_rune :: proc(buf: []byte, r: rune, quote_char: byte, ascii_compatible := false) -> (result: string, ok: bool) #optional_ok {
+encode_and_escape_rune :: proc(buf: []byte, r: rune, quote_char: byte, options: Rune_Escaping_Options = nil) -> (result: string, ok: bool) #optional_ok {
 	if buf == nil || r < 0 {
 		return "", false
 	}
 
 	i := 0
-	switch r {
-	case '\a': _write_string(buf, &i, `\a`) or_return // // TODO xxxx is this the job of _write_rune?
-	case '\b': _write_string(buf, &i, `\b`) or_return
-	case '\e': _write_string(buf, &i, `\e`) or_return
-	case '\f': _write_string(buf, &i, `\f`) or_return
-	case '\n': _write_string(buf, &i, `\n`) or_return
-	case '\r': _write_string(buf, &i, `\r`) or_return
-	case '\t': _write_string(buf, &i, `\t`) or_return
-	case '\v': _write_string(buf, &i, `\v`) or_return
-	case '\\': _write_string(buf, &i, `\\`) or_return
-	case:
-		if r == cast(rune)quote_char && quote_char != 0 {
-			_write_byte(buf, &i, '\\') or_return
-			_write_byte(buf, &i, quote_char) or_return
-		} else {
-			_write_rune(buf, &i, r, ascii_compatible) or_return
-		}
-	}
-
+	_write_rune(buf, &i, r, quote_char, options) or_return
 	return string(buf[:i]), true
 }
 

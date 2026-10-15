@@ -525,9 +525,9 @@ Output:
 	abc'ä'abc
 
 */
-write_quoted_rune :: proc(b: ^Builder, r: rune, ascii_compatible := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	buf: [32]byte
-	s := strconv.quote_rune(buf[:], r, ascii_compatible = ascii_compatible)
+write_quoted_rune :: proc(b: ^Builder, r: rune, options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	buf: [strconv.QUOTED_RUNE_MAX_NEEDED_BYTES]byte
+	s := strconv.quote_rune(buf[:], r, options = options)
 	return write_string(b, s, loc=loc)
 	//io.write_quoted_rune()
 	// xxxx test
@@ -637,8 +637,8 @@ Output:
 	"a"'bc'"xyz"
 
 */
-write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', ascii_compatible := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	result := strconv.quote_string_dynamic_array(&b.buf, str, quote, ascii_compatible = ascii_compatible, loc = loc) or_return
+write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	result := strconv.quote_string_dynamic_array(&b.buf, str, quote, options = options, loc = loc) or_return
 	return len(result), nil
 }
 /*
@@ -672,21 +672,21 @@ Output:
 	a'"'x
 
 */
-write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true, ascii_compatible := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+// TODO xxxx deprecation notice?
+write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	if write_quote {
-		buf: [12]byte
-		quoted, quote_rune_ok := strconv.quote_rune(buf[:], r, ascii_compatible = ascii_compatible)
+		buf: [strconv.QUOTED_RUNE_MAX_NEEDED_BYTES]byte
+		quoted, quote_rune_ok := strconv.quote_rune(buf[:], r)
 		assert(quote_rune_ok == true)
 		return write_string(b, quoted, loc=loc)
 	} else {
-		buf: [10]byte
-		encoded, encode_and_escape_rune_ok := strconv.encode_and_escape_rune(buf[:], r, 0, ascii_compatible = ascii_compatible)
-		assert(encode_and_escape_rune_ok == true)
-		return write_string(b, encoded, loc=loc)
+		// NOTE: Previously, this procedure would never escape the quote character.
+		return write_encoded_and_escaped_rune(b, r, 0, loc=loc)
 	}
+	// TODO xxxx !!!! write_encoded_rune and write_escaped_rune was *almost* the same. write_encoded_rune only escaped *some* character (like \t), but not others (like \u0300, or even its own quote character), while write_escaped_rune escaped way more.
 	// TODO xxxx cleanup
-	//n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
-	//return
+	// n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
+	// return
 }
 /*
 Appends an escaped rune to the Builder and returns the number of bytes written
@@ -707,10 +707,20 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of bytes written
 */
-write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false, loc := #caller_location) -> (n: int) {
-	// xxxx
-	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
-	return
+// TODO xxxx deprecation notice?
+write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) {
+	options: strconv.Rune_Escaping_Options
+	if html_safe {
+		options |= { .html_safe }
+	}
+	return write_encoded_and_escaped_rune(b, r, quote, options, loc=loc)
+}
+
+write_encoded_and_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) {
+	buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+	encoded, encode_and_escape_rune_ok := strconv.encode_and_escape_rune(buf[:], r, 0, options = options)
+	assert(encode_and_escape_rune_ok == true)
+	return write_string(b, encoded, loc=loc)
 }
 /*
 Writes a f64 value to the Builder and returns the number of characters written
