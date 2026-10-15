@@ -40,7 +40,7 @@ unparse_to_writer :: proc(w: io.Writer, value: Value, opt: ^Marshal_Options) -> 
 		base := 16 if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) else 10
 		io.write_i64(w, v, base) or_return
 	case Float:
-		io.write_f64(w, v) or_return
+		write_float(w, v, 64) or_return
 	case Boolean:
 		io.write_string(w, "true" if v else "false") or_return
 	case String:
