@@ -19,9 +19,24 @@ when ODIN_BUILD_MODE == .Dynamic {
 			#force_no_inline _cleanup_runtime()
 		}
 	}
-	@(link_name="main", linkage="strong", require)
-	main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
-		return 0
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// On Android the shared object is not initialized when it is loaded (see the
+		// linker). The native glue calls `main` from `android_main`, so start the
+		// runtime and run the user's entry point here.
+		@(link_name="main", linkage="strong", require)
+		main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
+			args__ = argv[:argc]
+			context = default_context()
+			when !ODIN_BEDROCK { #force_no_inline _startup_runtime() }
+			intrinsics.__entry_point()
+			when !ODIN_BEDROCK { #force_no_inline _cleanup_runtime() }
+			return 0
+		}
+	} else {
+		@(link_name="main", linkage="strong", require)
+		main :: proc "c" (argc: i32, argv: [^]cstring) -> i32 {
+			return 0
+		}
 	}
 } else when !ODIN_TEST && !ODIN_NO_ENTRY_POINT {
 	when ODIN_NO_CRT {

@@ -953,7 +953,13 @@ try_cross_linking:;
 				// correctly this way since all the other dependencies provided implicitly
 				// by the compiler frontend are still needed and most of the command
 				// line arguments prepared previously are incompatible with ld.
-				if (build_context.metrics.os == TargetOs_darwin) {
+				//
+				// NOTE: Android does not use this. The shared object is loaded by the
+				// Java runtime before any `android_app` exists, and the application is
+				// started later through `android_main`, which calls `main` in base:runtime.
+				if (is_android) {
+					// ignore
+				} else if (build_context.metrics.os == TargetOs_darwin) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-init,__odin_entry_point ");
 					// NOTE(weshardee): __odin_exit_point should also be added, but -fini
 					// does not exist on MacOS
