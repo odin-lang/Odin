@@ -279,8 +279,10 @@ Writes `str` to the Writer `w`, enclosed in `quote` characters, escaping runes a
 
 With the default double quote and escaping options, the output is quoted and escaped as an Odin string literal.
 
-Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. If the Writer writes only part
-of the output before returning an error, `n` reports the number of bytes written.
+Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+distinguish malformed sequences from literal replacement characters, so both are written identically.
+
+If the Writer writes only part of the output before returning an error, `n` reports the number of bytes written.
 */
 write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_written: ^int = nil, options: strconv.Rune_Escaping_Options = nil) -> (n: int, err: Error) {
 	defer if n_written != nil {
@@ -294,19 +296,11 @@ write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_wri
 	for len(s) > 0 {
 		r, width := utf16.decode_rune_in_string(s)
 		assert(width > 0)
-		if width == 1 && r == utf8.RUNE_ERROR {
-			// TODO: It's not obvious that this works the same way as the UTF-8 version.
-			//       Add some test coverage for this!
-			write_string(w, `\x`, &n)                     or_return
-			write_byte(w, strconv.digits[s[0] >> 4], &n)  or_return
-			write_byte(w, strconv.digits[s[0] & 0xf], &n) or_return
-		} else {
-			encoded_rune_buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
-			encoded_rune, encode_rune_ok := strconv.encode_and_escape_rune(encoded_rune_buf[:], r, quote, options = options)
-			assert(encode_rune_ok == true)
-			write_string(w, encoded_rune, &n) or_return
-		}
-
+		encoded_rune_buf: [strconv.ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+		encoded_rune, encode_rune_ok := strconv.encode_and_escape_rune(encoded_rune_buf[:], r, quote, options = options)
+		assert(encode_rune_ok == true)
+		write_string(w, encoded_rune, &n) or_return
+		// Advance input cursor to the next codepoint.
 		s = s[width:]
 	}
 

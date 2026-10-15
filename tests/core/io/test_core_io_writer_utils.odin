@@ -71,6 +71,19 @@ test_io_write_quoted_rune :: proc(t: T) {
 }
 
 @(test)
+test_io_write_quoted_string16_replacement_characters :: proc(t: T) {
+	sb := strings.builder_make()
+	defer strings.builder_destroy(&sb)
+	writer := strings.to_writer(&sb)
+
+	// Unpaired surrogates decode as REPLACEMENT_CHAR, just like a literal \ufffd.
+	units := []u16{0xd800, 'A', 0xdc00, 0xfffd}
+	io.write_quoted_string16(writer, transmute(string16)units)
+
+	testing.expect_value(t, strings.to_string(sb), "\"\ufffdA\ufffd\ufffd\"")
+}
+
+@(test)
 test_strconv_quote_rune :: proc(t: T) {
 	buf: [150]byte
 	b := buf[:]
