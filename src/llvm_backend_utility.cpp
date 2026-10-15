@@ -3151,12 +3151,14 @@ gb_internal lbValue lb_handle_objc_auto_send(lbProcedure *p, Ast *expr, Slice<lb
 		}
 	} else {
 		Entity *objc_class = objc_method_ent->Procedure.objc_class;
-		if (ce->proc->kind == Ast_SelectorExpr) {
+		Ast *proc_expr = unparen_expr(ce->proc);
+		// NOTE(bill): `pkg.Foo_alloc()` is also a selector expression, but its lhs is a package rather than a type
+		if (proc_expr->kind == Ast_SelectorExpr && proc_expr->SelectorExpr.expr->tav.mode == Addressing_Type) {
 			// NOTE (harold): If called via a selector expression (ex: Foo.alloc()), then we should use
 			//                the lhs-side to determine the class. This allows for class methods to be called
 			//                with the correct class as the target, even when the method is defined in a superclass.
-			ast_node(se, SelectorExpr, ce->proc);
-			GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
+			ast_node(se, SelectorExpr, proc_expr);
+			GB_ASSERT(se->expr->tav.type->kind == Type_Named);
 
 			objc_class = entity_from_expr(se->expr);
 			GB_ASSERT(objc_class);

@@ -9626,15 +9626,15 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 
 	if (proc_entity->Procedure.is_objc_class_method) {
 		if (is_return_instancetype) {
-			if (ce->proc->kind == Ast_SelectorExpr) {
-				ast_node(se, SelectorExpr, ce->proc);
-
-				// NOTE(harold): These should have already been checked, right?
-				GB_ASSERT(se->expr->tav.mode == Addressing_Type && se->expr->tav.type->kind == Type_Named);
-
-				return_type = alloc_type_pointer(se->expr->tav.type);
+			Ast *proc_expr = unparen_expr(ce->proc);
+			if (proc_expr->kind == Ast_SelectorExpr && proc_expr->SelectorExpr.expr->tav.mode == Addressing_Type) {
+				// NOTE(bill): `Type.method()`
+				Type *type = proc_expr->SelectorExpr.expr->tav.type;
+				GB_ASSERT(type->kind == Type_Named);
+				return_type = alloc_type_pointer(type);
 			} else {
-				return_type = proc_entity->Procedure.objc_class->type;
+				// `Type_method()` or `pkg.Type_method()`
+				return_type = alloc_type_pointer(proc_entity->Procedure.objc_class->type);
 			}
 		}
 

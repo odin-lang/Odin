@@ -1156,7 +1156,8 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 					}
 				}
 			} else if (!has_body) {
-				if (ac.objc_selector == "The @(objc_selector) attribute is required for imported Objective-C methods.") {
+				if (ac.objc_selector == "") {
+					error(e->token, "The @(objc_selector) attribute is required for imported Objective-C methods");
 					return;
 				} else if (proc.calling_convention != ProcCC_CDecl) {
 					error(e->token, "Imported Objective-C methods must use the \"c\" calling convention");
