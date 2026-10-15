@@ -2,12 +2,12 @@
 
 package glfw
 
-import AK "vendor:darwin/AppKit"
+import NS "vendor:darwin/AppKit"
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign {
-	GetCocoaWindow :: proc(window: WindowHandle) -> ^AK.Window ---
-	GetCocoaView   :: proc(window: WindowHandle) -> ^AK.View   ---
+	GetCocoaWindow :: proc(window: WindowHandle) -> ^NS.Window ---
+	GetCocoaView   :: proc(window: WindowHandle) -> ^NS.View   ---
 }
 
 // TODO:

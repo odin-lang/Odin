@@ -53,6 +53,9 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
 - Enum members mangled by csgen's prefix removal are renamed (`ENUM_MEMBER_FIXES`), e.g.
   `AVFoundation.CaptureSystemPressureFactors` has `SystemTemperature` rather than `ystemTemperature`.
 - Known problems in the generated output are patched (`KNOWN_FIXES`, `ALIAS_FIXES`).
+- AppKit's `Foundation.Exports.odin`, which csgen generates so that `import NS "vendor:darwin/AppKit"`
+  provides all of Foundation, also gets aliases for Foundation's hand-written top-level declarations
+  (`NS.AT`, `NS.scoped_autoreleasepool`, …).
 
 ## Hand-written files
 

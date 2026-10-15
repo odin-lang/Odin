@@ -22,12 +22,22 @@ import ObjC "core:sys/darwin/ObjectiveC"
 import NS   "core:sys/darwin/Foundation"
 import CF   "core:sys/darwin/CoreFoundation"
 import CG   "core:sys/darwin/CoreGraphics"
-import AK   "vendor:darwin/AppKit"
 import UI   "vendor:darwin/UIKit"
 import CA   "vendor:darwin/QuartzCore"
 import MTL  "vendor:darwin/Metal"
 import MTK  "vendor:darwin/MetalKit"
 ```
+
+Foundation and AppKit share the `NS` prefix, and AppKit re-exports all of Foundation, as
+`#import <AppKit/AppKit.h>` does in Objective-C. Code using AppKit (macOS only) therefore imports it
+as `NS` instead of Foundation, and gets both `NS.Window` and `NS.String`:
+
+```odin
+import NS "vendor:darwin/AppKit"
+```
+
+The re-exported declarations are aliases, so values pass freely between code which imports
+Foundation and code which imports AppKit.
 
 ## Using the bindings
 
@@ -61,7 +71,7 @@ desc->release()
 - Odin-specific helpers live in the `*_extras.odin` files of each package.
 
 ```odin
-window := AK.Window.alloc()->initWithContentRect(NS.Rect{{0, 0}, {640, 480}}, {.Titled, .Closable, .Resizable}, .Buffered, false)
+window := NS.Window.alloc()->initWithContentRect(NS.Rect{{0, 0}, {640, 480}}, {.Titled, .Closable, .Resizable}, .Buffered, false)
 window->setTitle(NS.AT("Hellope"))
 
 layer := CA.MetalLayer.layer()
@@ -104,7 +114,7 @@ Classes, delegates and protocols can be implemented in Odin with the `@(objc_imp
 on the type and its methods; call the superclass with `intrinsics.objc_super(self)->init()`.
 For common cases there are helpers which do not need it:
 
-- `AK.application_delegate_register_and_alloc` and `AK.window_delegate_register_and_alloc` create
+- `NS.application_delegate_register_and_alloc` and `NS.window_delegate_register_and_alloc` (AppKit) create
   an application or window delegate from a struct of Odin procedures.
 - `view->setOdinDelegate(&delegate)` drives an `MTK.View` with an `MTK.OdinViewDelegate`.
 - `ObjC.register_subclass` registers a subclass whose methods are added by an Odin procedure.
@@ -116,8 +126,9 @@ These packages replace the hand-written `core:sys/darwin/Foundation`, `CoreFound
 same import paths. The main differences:
 
 - **AppKit** classes (`Window`, `View`, `Application`, `Event`, `Menu`, `Screen`, `Color`, `Cursor`,
-  `OpenPanel`, …) moved from `core:sys/darwin/Foundation` to `vendor:darwin/AppKit`:
-  `NS.Window` becomes `AK.Window` with `import AK "vendor:darwin/AppKit"`.
+  `OpenPanel`, …) moved from `core:sys/darwin/Foundation` to `vendor:darwin/AppKit`. Code using
+  them keeps writing `NS.Window` by importing AppKit as `NS` instead of Foundation:
+  `import NS "vendor:darwin/AppKit"`.
 - **Objective-C runtime** procedures (`objc_lookUpClass`, `class_addMethod`, `class_getName`,
   `sel_registerName`, …) and `register_subclass` and its helpers moved to `core:sys/darwin/ObjectiveC`.
 - **Method names** follow the selectors, so some hand-picked names changed:
@@ -149,7 +160,7 @@ same import paths. The main differences:
   `CA.MetalLayer` now takes `MTL.Device` and `MTL.PixelFormat` directly.
 - **MetalKit.** `view->setDelegate` takes an `MTKViewDelegate` object; the struct of Odin procedures
   is now `MTK.OdinViewDelegate`, set with `view->setOdinDelegate`.
-- **Delegate templates** return the `AK.ApplicationDelegate` and `AK.WindowDelegate` protocol types,
+- **Delegate templates** return the `NS.ApplicationDelegate` and `NS.WindowDelegate` protocol types,
   which `setDelegate` takes directly.
 - **Subclassing.** `super_msg_send` does not exist; use `intrinsics.objc_super(self)->method()`,
   which resolves the superclass statically.

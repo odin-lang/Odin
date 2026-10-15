@@ -1903,3 +1903,34 @@ foreign Foundation_exports {
 	@(link_name="NSGrammarCorrections") GrammarCorrections: ^String
 	@(link_name="NSUserNotificationDefaultSoundName") UserNotificationDefaultSoundName: ^String
 }
+
+
+// Hand-written declarations of core:sys/darwin/Foundation
+BOOL                       :: NS.BOOL
+YES                        :: NS.YES
+NO                         :: NS.NO
+IntegerMax                 :: NS.IntegerMax
+IntegerMin                 :: NS.IntegerMin
+UIntegerMax                :: NS.UIntegerMax
+Float                      :: NS.Float
+Point                      :: NS.Point
+MinX                       :: NS.MinX
+MinY                       :: NS.MinY
+MidX                       :: NS.MidX
+MidY                       :: NS.MidY
+MaxX                       :: NS.MaxX
+MaxY                       :: NS.MaxY
+AT                         :: NS.AT
+MakeConstantString         :: NS.MakeConstantString
+scoped_autoreleasepool     :: NS.scoped_autoreleasepool
+alloc                      :: NS.alloc
+new                        :: NS.new
+bridgingCast               :: NS.bridgingCast
+methodSignatureForSelector :: NS.methodSignatureForSelector
+respondsToSelector         :: NS.respondsToSelector
+msgSendSafeCheck           :: NS.msgSendSafeCheck
+Range_Make                 :: NS.Range_Make
+Range_Equal                :: NS.Range_Equal
+Range_LocationInRange      :: NS.Range_LocationInRange
+Range_Max                  :: NS.Range_Max
+Block                      :: NS.Block

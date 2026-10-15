@@ -4,12 +4,12 @@ package wgpu_sdl2_glue
 import    "vendor:sdl2"
 import    "vendor:wgpu"
 import CA "vendor:darwin/QuartzCore"
-import AK "vendor:darwin/AppKit"
+import NS "vendor:darwin/AppKit"
 
 GetSurface :: proc(instance: wgpu.Instance, window: ^sdl2.Window) -> wgpu.Surface {
 	window_info: sdl2.SysWMinfo 
 	sdl2.GetWindowWMInfo(window, &window_info)
-	ns_window := cast(^AK.Window)window_info.info.cocoa.window
+	ns_window := cast(^NS.Window)window_info.info.cocoa.window
 	metal_layer := CA.MetalLayer.layer()
 	ns_window->contentView()->setLayer(metal_layer)
 	return wgpu.InstanceCreateSurface(

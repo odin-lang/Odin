@@ -932,6 +932,47 @@ def apply_extra_overloads(pkg, handwritten):
 			lines[at:at] = new_lines
 
 
+def reexport_foundation_extras(pkg, foundation_dest):
+	"""
+	csgen's `Foundation.Exports.odin` (in AppKit) re-exports every generated Foundation declaration, so that
+	`import NS "vendor:darwin/AppKit"` gives all of `NS`, as `#import <AppKit/AppKit.h>` does in Objective-C.
+	Add the hand-written top-level declarations of Foundation to it as well.
+	"""
+	exports = "Foundation.Exports.odin"
+	if exports not in pkg.files or not os.path.isdir(foundation_dest):
+		return
+	names = pkg.all_decl_names()
+	added, skipped = [], []
+	for f in sorted(os.listdir(foundation_dest)):
+		p = os.path.join(foundation_dest, f)
+		if not f.endswith(".odin") or is_generated(p):
+			continue
+		lines = read_lines(p)
+		for i, line in enumerate(lines):
+			m = re.match(r"^(\w+)\s*::", line)
+			if not m:
+				continue
+			prev = lines[i-1] if i else ""
+			if prev.startswith("@(") and ("private" in prev or "objc_type" in prev):
+				continue # private, or a method which is reached through its (aliased) type
+			name = m.group(1)
+			if name in names:
+				skipped.append(name)
+			elif name not in added:
+				added.append(name)
+
+	if added:
+		lines = pkg.files[exports]
+		while lines and lines[-1].strip() == "":
+			lines.pop()
+		width = max(len(n) for n in added)
+		lines += ["", "", "// Hand-written declarations of core:sys/darwin/Foundation"]
+		lines += [f"{n.ljust(width)} :: NS.{n}" for n in added]
+		lines.append("")
+	pkg.report["Foundation extras re-exported"].extend(added)
+	pkg.report["Foundation extras not re-exported (name taken)"].extend(skipped)
+
+
 def guard_conditional_imports(pkg):
 	"""Imports only used inside `when` blocks are unused on other platforms, which `-vet` rejects."""
 	for fname, lines in pkg.files.items():
@@ -1042,7 +1083,9 @@ def main():
 		apply_error_wrappers(pkg)
 		fix_class_method_groups(pkg)
 		apply_extra_overloads(pkg, find_handwritten_procs(dest_of[fw]))
-		guard_conditional_imports(pkg) # last, as it shifts lines
+		guard_conditional_imports(pkg) # shifts lines
+		if "Foundation" in dest_of:
+			reexport_foundation_extras(pkg, dest_of["Foundation"])
 		total_wrappers += len(pkg.wrappers)
 
 		dest = dest_of[fw]
