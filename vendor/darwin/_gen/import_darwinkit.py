@@ -210,6 +210,7 @@ FLAG_ELEMENT_NAMES = {
 # framework -> {enum: (prefix stripped from every member, {member: new name, or None to remove it})}
 ENUM_MEMBER_FIXES = {
 	"AppKit": {
+		"MenuProperties":         ("Property", {}),
 		"ScrollArrowPosition":    ("erArrows", {}),
 		"TextStorageEditActions": ("", {"edAttributes": "EditedAttributes", "edCharacters": "EditedCharacters"}),
 	},
@@ -231,6 +232,7 @@ ENUM_MEMBER_FIXES = {
 	"AVFoundation": {
 		"AssetReferenceRestrictions":          ("Restriction", {}),
 		"AudioSessionInterruptionOption":      ("", {"houldResume": "ShouldResume"}),
+		"CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions": ("Condition", {}),
 		"CaptureSystemPressureFactors":        ("Factor", {"ystemTemperature": "SystemTemperature"}),
 		"PlayerInterstitialEventRestrictions": ("Restriction", {}),
 		"SpeechSynthesisVoiceTraits":          ("Trait", {}),
@@ -249,6 +251,7 @@ ENUM_MEMBER_FIXES = {
 		# Same members as CoreFoundation's `ISO8601DateFormatOptions`, which csgen emits without `With`
 		"ISO8601DateFormatOptions":       ("With", {}),
 		"ItemProviderFileOptions":        ("Option", {}),
+		"KeyValueObservingOptions":       ("Option", {}),
 		"RelativeDateTimeFormatterStyle": ("", {"umeric": "Numeric", "amed": "Named"}),
 	},
 	"GameKit": {
@@ -268,7 +271,9 @@ ENUM_MEMBER_FIXES = {
 		"DataDetectorTypes":               ("Type", {"hipmentTrackingNumber": "ShipmentTrackingNumber"}),
 		"NSTextStorageEditActions":        ("", {"edAttributes": "EditedAttributes", "edCharacters": "EditedCharacters"}),
 		"PrintErrorCode":                  ("", {"ingNotAvailableError": "PrintingNotAvailableError"}),
+		"PrinterJobTypes":                 ("Type", {}),
 		"TextDragOptions":                 ("", {"tripTextColorFromPreviews": "StripTextColorFromPreviews"}),
+		"TouchProperties":                 ("Property", {}),
 		"ViewAnimationOptions":            ("Option", {"howHideTransitionViews": "ShowHideTransitionViews"}),
 		"ViewKeyframeAnimationOptions":    ("Option", {}),
 	},

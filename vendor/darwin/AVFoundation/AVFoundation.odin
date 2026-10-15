@@ -4787,12 +4787,12 @@ CapturePrimaryConstituentDeviceSwitchingBehavior :: enum cffi.long {
 }
 
 CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorCondition :: enum cffi.ulong {
-	ConditionVideoZoomChanged    = 0,
-	ConditionFocusModeChanged    = 1,
-	ConditionExposureModeChanged = 2,
+	VideoZoomChanged    = 0,
+	FocusModeChanged    = 1,
+	ExposureModeChanged = 2,
 }
 CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions :: bit_set[CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorCondition; cffi.ulong]
-CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions_ConditionNone :: CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions{}
+CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions_None :: CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions{}
 
 CaptureFlashMode :: enum cffi.long {
 	Off  = 0,

@@ -1713,11 +1713,11 @@ TouchType :: enum cffi.long {
 }
 
 TouchProperty :: enum cffi.long {
-	PropertyForce    = 0,
-	PropertyAzimuth  = 1,
-	PropertyAltitude = 2,
-	PropertyLocation = 3,
-	PropertyRoll     = 4,
+	Force    = 0,
+	Azimuth  = 1,
+	Altitude = 2,
+	Location = 3,
+	Roll     = 4,
 }
 TouchProperties :: bit_set[TouchProperty; cffi.long]
 
@@ -4021,17 +4021,17 @@ ActivitySectionTypes :: bit_set[ActivitySectionType; cffi.ulong]
 ActivitySectionTypes_None :: ActivitySectionTypes{}
 
 PrinterJobType :: enum cffi.long {
-	TypeDocument    = 0,
-	TypeEnvelope    = 1,
-	TypeLabel       = 2,
-	TypePhoto       = 3,
-	TypeReceipt     = 4,
-	TypeRoll        = 5,
-	TypeLargeFormat = 6,
-	TypePostcard    = 7,
+	Document    = 0,
+	Envelope    = 1,
+	Label       = 2,
+	Photo       = 3,
+	Receipt     = 4,
+	Roll        = 5,
+	LargeFormat = 6,
+	Postcard    = 7,
 }
 PrinterJobTypes :: bit_set[PrinterJobType; cffi.long]
-PrinterJobTypes_TypeUnknown :: PrinterJobTypes{}
+PrinterJobTypes_Unknown :: PrinterJobTypes{}
 
 PrintErrorCode :: enum cffi.long {
 	PrintingNotAvailableError = 1,

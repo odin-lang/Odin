@@ -3435,12 +3435,12 @@ MenuSelectionMode :: enum cffi.long {
 }
 
 MenuProperty :: enum cffi.ulong {
-	PropertyItemTitle                    = 0,
-	PropertyItemAttributedTitle          = 1,
-	PropertyItemKeyEquivalent            = 2,
-	PropertyItemImage                    = 3,
-	PropertyItemEnabled                  = 4,
-	PropertyItemAccessibilityDescription = 5,
+	ItemTitle                    = 0,
+	ItemAttributedTitle          = 1,
+	ItemKeyEquivalent            = 2,
+	ItemImage                    = 3,
+	ItemEnabled                  = 4,
+	ItemAccessibilityDescription = 5,
 }
 MenuProperties :: bit_set[MenuProperty; cffi.ulong]
 

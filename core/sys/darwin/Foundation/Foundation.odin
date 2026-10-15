@@ -4012,10 +4012,10 @@ JSONWritingOption :: enum cffi.ulong {
 JSONWritingOptions :: bit_set[JSONWritingOption; cffi.ulong]
 
 KeyValueObservingOption :: enum cffi.ulong {
-	OptionNew     = 0,
-	OptionOld     = 1,
-	OptionInitial = 2,
-	OptionPrior   = 3,
+	New     = 0,
+	Old     = 1,
+	Initial = 2,
+	Prior   = 3,
 }
 KeyValueObservingOptions :: bit_set[KeyValueObservingOption; cffi.ulong]
 
