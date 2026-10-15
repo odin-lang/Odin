@@ -114,6 +114,7 @@ write_f64 :: proc(w: Writer, val: f64, n_written: ^int = nil) -> (n: int, err: E
 @(private="file")
 DIGITS_LOWER := "0123456789abcdefx"
 
+@(private="file")
 n_wrapper :: proc(n: int, err: Error, bytes_processed: ^int) -> Error {
 	bytes_processed^ += n
 	return err
@@ -278,6 +279,8 @@ write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written
 			r, width = utf8.decode_rune_in_string(s)
 		}
 		if width == 1 && r == utf8.RUNE_ERROR {
+			// Indicates a UTF-8 encoding error. In this case, preserve the
+			// byte exactly as it was found in the input string (`\x##`).
 			write_byte(w, '\\', &n)                   or_return
 			write_byte(w, 'x', &n)                    or_return
 			write_byte(w, DIGITS_LOWER[s[0]>>4], &n)  or_return
@@ -304,6 +307,8 @@ write_quoted_string16 :: proc(w: Writer, str: string16, quote: byte = '"', n_wri
 			r, width = utf16.decode_rune_in_string(s)
 		}
 		if width == 1 && r == utf8.RUNE_ERROR {
+			// TODO: It's not obvious that this works the same way as the UTF-8 version.
+			//       Add some test coverage for this!
 			write_byte(w, '\\', &n)                   or_return
 			write_byte(w, 'x', &n)                    or_return
 			write_byte(w, DIGITS_LOWER[s[0]>>4], &n)  or_return
