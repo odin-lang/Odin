@@ -2430,7 +2430,11 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 
 			} else { // by reference
 				GB_ASSERT(by_reference);
-				ptr = lb_emit_conv(p, data, ct_ptr);
+				if (switch_kind == TypeSwitch_Union) {
+					ptr = lb_emit_union_variant_ptr(p, parent_ptr, ct);
+				} else {
+					ptr = lb_emit_conv(p, data, ct_ptr);
+				}
 			}
 			GB_ASSERT(are_types_identical(case_entity->type, type_deref(ptr.type)));
 			lb_add_entity(p->module, case_entity, ptr);
