@@ -207,10 +207,19 @@ to_writer :: proc(b: ^Builder) -> (res: io.Writer) {
 /*
 Deletes the Builder byte buffer content
 
+NOTE: If the Builder is re-used after this operation, be aware that its stored allocator
+      has been cleared as well.
+      Consider calling `builder_init` to reinstate a specific allocator, if needed.
+
 Inputs:
 - b: A pointer to the Builder
 */
 builder_destroy :: proc(b: ^Builder, loc := #caller_location) {
+	// NOTE: Delete might not be supported (e.g. arena allocator).
+	//       In this case, we set the buffer to nil anyway, which effectively
+	//       behaves as if it got freed.
+	//       If a real error occurred while freeing the memory, this will
+	//       cause a memory leak.
 	delete(b.buf, loc=loc)
 	b.buf = nil
 }
@@ -221,8 +230,8 @@ Inputs:
 - b: A pointer to the Builder
 - cap: The desired capacity for the Builder's buffer
 */
-builder_grow :: proc(b: ^Builder, cap: int, loc := #caller_location) {
-	reserve(&b.buf, cap, loc=loc)
+builder_grow :: proc(b: ^Builder, cap: int, loc := #caller_location) -> (err: runtime.Allocator_Error) {
+	return reserve(&b.buf, cap, loc=loc)
 }
 /*
 Clears the Builder byte buffer content (sets len to zero)
@@ -305,10 +314,10 @@ Returns:
 - res: A cstring of the Builder's buffer
 */
 @(require_results)
-unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring) {
-	append(&b.buf, 0, loc)
+unsafe_to_cstring :: proc(b: ^Builder, loc := #caller_location) -> (res: cstring, err: runtime.Allocator_Error) #optional_allocator_error {
+	append(&b.buf, 0, loc) or_return
 	pop(&b.buf)
-	return cstring(raw_data(b.buf))
+	return cstring(raw_data(b.buf)), nil
 }
 /*
 Appends a trailing null byte after the end of the current Builder byte buffer and then casts it to a cstring
@@ -400,11 +409,11 @@ Output:
 	ab
 
 */
-write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int) {
+write_byte :: proc(b: ^Builder, x: byte, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
-	append(&b.buf, x, loc)
+	append(&b.buf, x, loc) or_return
 	n1 := len(b.buf)
-	return n1-n0
+	return n1-n0, nil
 }
 /*
 Appends a slice of bytes to the Builder and returns the number of bytes appended
@@ -430,11 +439,11 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of bytes appended
 */
-write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int) {
+write_bytes :: proc(b: ^Builder, x: []byte, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
-	append(&b.buf, ..x, loc=loc)
+	append(&b.buf, ..x, loc=loc) or_return
 	n1 := len(b.buf)
-	return n1-n0
+	return n1-n0, nil
 }
 /*
 Appends a single rune to the Builder and returns the number of bytes written and an `io.Error`
@@ -466,16 +475,16 @@ Output:
 	äb
 
 */
-write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int) {
+write_rune :: proc(b: ^Builder, r: rune, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
 	if r < utf8.RUNE_SELF {
-		append(&b.buf, cast(byte)r, loc)
+		append(&b.buf, cast(byte)r, loc) or_return
 	} else {
 		buf, w := utf8.encode_rune(r)
-		append(&b.buf, ..buf[:w], loc=loc)
+		append(&b.buf, ..buf[:w], loc=loc) or_return
 	}
 	n1 := len(b.buf)
-	return n1-n0
+	return n1-n0, nil
 }
 /*
 Appends a quoted rune to the Builder and returns the number of bytes written
@@ -539,11 +548,11 @@ Output:
 	abc
 
 */
-write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int) {
+write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	n0 := len(b.buf)
-	append(&b.buf, s, loc)
+	append(&b.buf, s, loc) or_return
 	n1 := len(b.buf)
-	return n1-n0
+	return n1-n0, nil
 }
 /*
 Pops and returns the last byte in the Builder or 0 when the Builder is empty
@@ -653,7 +662,6 @@ Output:
 write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true, loc := #caller_location) -> (n: int) {
 	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
 	return
-
 }
 /*
 Appends an escaped rune to the Builder and returns the number of bytes written
@@ -694,7 +702,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false, loc := #caller_location) -> (n: int) {
+write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f, fmt, prec, bit_size)
 	// If the result starts with a `+` then unless we always want signed results,
@@ -718,7 +726,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int) {
+write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
@@ -758,7 +766,7 @@ Output:
 	3.14159012 - -1.23000003e-01
 
 */
-write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int) {
+write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
@@ -780,7 +788,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int) {
+write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
@@ -801,7 +809,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_u64 :: proc(b: ^Builder, i: u64, base: int = 10, loc := #caller_location) -> (n: int) {
+write_u64 :: proc(b: ^Builder, i: u64, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [32]byte
 	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
 	return write_string(b, s, loc=loc)
@@ -819,7 +827,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_i64 :: proc(b: ^Builder, i: i64, base: int = 10, loc := #caller_location) -> (n: int) {
+write_i64 :: proc(b: ^Builder, i: i64, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	buf: [32]byte
 	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
 	return write_string(b, s, loc=loc)
@@ -837,7 +845,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_uint :: proc(b: ^Builder, i: uint, base: int = 10, loc := #caller_location) -> (n: int) {
+write_uint :: proc(b: ^Builder, i: uint, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	return write_u64(b, u64(i), base, loc=loc)
 }
 /*
@@ -853,7 +861,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_int :: proc(b: ^Builder, i: int, base: int = 10, loc := #caller_location) -> (n: int) {
+write_int :: proc(b: ^Builder, i: int, base: int = 10, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	return write_i64(b, i64(i), base, loc=loc)
 }
 
