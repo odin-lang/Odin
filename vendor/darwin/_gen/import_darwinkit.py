@@ -116,61 +116,85 @@ ALIAS_FIXES = {
 FLAG_ENUMS = {
 	"AppKit": [
 		"BitmapFormat", "CellHitResult", "CollectionViewScrollPosition", "ControlCharacterAction",
-		"EventPhase", "FontCollectionVisibility", "GlyphProperty", "MediaLibrary", "MenuProperties",
-		"RemoteNotificationType", "TableViewGridLineStyle", "TextSelectionNavigationModifier",
-		"TypesetterControlCharacterAction", "WindowCollectionBehavior",
+		"CursorFrameResizeDirections", "CursorFrameResizePosition", "DirectionalRectEdge", "DragOperation",
+		"EventPhase", "FontCollectionVisibility", "GlyphProperty", "HorizontalDirections", "LineBreakStrategy",
+		"MediaLibrary", "MenuProperties", "RemoteNotificationType", "StatusItemBehavior", "TableViewGridLineStyle",
+		"TextSelectionNavigationModifier", "TextStorageEditActions", "TouchPhase", "TypesetterControlCharacterAction",
+		"VerticalDirections", "WindowCollectionBehavior",
+	],
+	"AudioToolbox": [
+		"FFormatFlags",
 	],
 	"AVFoundation": [
-		"CaptionDecoration", "CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions",
-		"CaptureSystemPressureFactors", "PlayerHDRMode",
+		"AssetReferenceRestrictions", "CaptionDecoration",
+		"CapturePrimaryConstituentDeviceRestrictedSwitchingBehaviorConditions", "CaptureSystemPressureFactors",
+		"PlayerHDRMode", "PlayerInterstitialEventRestrictions", "SpeechSynthesisVoiceTraits", "VariantPreferences",
 	],
 	"CloudKit": [
-		"RecordZoneCapabilities",
+		"ApplicationPermissions", "RecordZoneCapabilities",
 	],
 	"CoreFoundation": [
-		"CalendarUnit", "dispatch_block_flags_t", "FileSecurityClearOptions", "StreamEventType",
-		"StringTokenizerTokenType", "URLBookmarkCreationOptions", "URLBookmarkResolutionOptions",
-		"URLEnumeratorOptions",
+		"CalendarUnit", "dispatch_block_flags_t", "FileSecurityClearOptions", "ISO8601DateFormatOptions",
+		"PropertyListMutabilityOptions", "RunLoopActivity", "StreamEventType", "StringTokenizerTokenType",
+		"URLBookmarkCreationOptions", "URLBookmarkResolutionOptions", "URLEnumeratorOptions", "XMLParserOptions",
 	],
 	"CoreGraphics": [
-		"ColorModel", "PDFAccessPermissions",
+		"CaptureOptions", "ColorModel", "EventTapOptions", "GradientDrawingOptions", "PDFAccessPermissions",
+		"ScreenUpdateOperation",
 	],
 	"CoreText": [
 		"RunStatus",
 	],
 	"Foundation": [
-		"BinarySearchingOptions", "CalendarOptions", "CalendarUnit", "ComparisonPredicateOptions",
-		"DataBase64EncodingOptions", "DataReadingOptions", "DirectoryEnumerationOptions",
-		"FileCoordinatorReadingOptions", "FileCoordinatorWritingOptions", "InlinePresentationIntent",
-		"JSONReadingOptions", "JSONWritingOptions", "KeyValueObservingOptions", "LinguisticTaggerOptions",
-		"MatchingOptions", "MeasurementFormatterUnitOptions", "OrderedCollectionDifferenceCalculationOptions",
-		"RegularExpressionOptions", "StreamEvent", "StringCompareOptions", "TextCheckingType",
-		"URLBookmarkCreationOptions", "URLBookmarkResolutionOptions", "xpc_listener_create_flags_t",
+		"ActivityOptions", "AlignmentOptions", "AttributedStringEnumerationOptions",
+		"AttributedStringFormattingOptions", "BinarySearchingOptions", "CalendarOptions", "CalendarUnit",
+		"ComparisonPredicateOptions", "DataBase64DecodingOptions", "DataBase64EncodingOptions", "DataReadingOptions",
+		"DataSearchOptions", "DateComponentsFormatterZeroFormattingBehavior", "DirectoryEnumerationOptions",
+		"DistributedNotificationOptions", "EnumerationOptions", "FileCoordinatorReadingOptions",
+		"FileCoordinatorWritingOptions", "FileManagerItemReplacementOptions", "FileManagerUnmountOptions",
+		"FileVersionAddingOptions", "FileVersionReplacingOptions", "FileWrapperReadingOptions",
+		"FileWrapperWritingOptions", "InlinePresentationIntent", "ISO8601DateFormatOptions",
+		"ItemProviderFileOptions", "JSONReadingOptions", "JSONWritingOptions", "KeyValueObservingOptions",
+		"LinguisticTaggerOptions", "MachPortOptions", "MatchingOptions", "MeasurementFormatterUnitOptions",
+		"NetServiceOptions", "OrderedCollectionDifferenceCalculationOptions", "PersonNameComponentsFormatterOptions",
+		"PropertyListMutabilityOptions", "RegularExpressionOptions", "SortOptions", "StreamEvent",
+		"StringCompareOptions", "StringEncodingConversionOptions", "TextCheckingType", "URLBookmarkCreationOptions",
+		"URLBookmarkResolutionOptions", "VolumeEnumerationOptions", "XMLNodeOptions", "xpc_listener_create_flags_t",
+		"XPCConnectionOptions",
 	],
 	"GameController": [
-		"PhysicalInputSourceDirection",
+		"PhysicalInputSourceDirection", "UIEventTypes",
 	],
 	"GameKit": [
 		"MeshGraphTriangulationMode",
+	],
+	"IOKit": [
+		"IOMediaAttributeMask",
 	],
 	"LocalAuthentication": [
 		"CompanionType",
 	],
 	"MapKit": [
-		"LocalSearchCompleterResultType", "LocalSearchResultType",
+		"DirectionsTransportType", "LocalSearchCompleterResultType", "LocalSearchResultType",
 	],
 	"Metal": [
 		"AccelerationStructureUsage", "BarrierScope", "IndirectCommandType", "IntersectionFunctionSignature",
-		"ResourceUsage", "TensorUsage", "TextureUsage",
+		"ResourceUsage", "Stages", "TensorUsage", "TextureUsage",
+	],
+	"Security": [
+		"SecKeyUsage", "SecTrustSettingsKeyUsage",
 	],
 	"UIKit": [
-		"CloudSharingPermissionOptions", "CollectionViewScrollPosition", "DocumentState", "FocusHeading",
-		"GuidedAccessAccessibilityFeature", "MenuElementAttributes", "MenuOptions", "NSControlCharacterAction",
-		"NSFileProviderItemFields", "NSGlyphProperty", "NSStringDrawingOptions",
-		"NSTextLayoutFragmentEnumerationOptions", "NSTextLayoutManagerSegmentOptions",
-		"NSTextSelectionNavigationModifier", "PrinterJobTypes", "RemoteNotificationType",
-		"SwipeGestureRecognizerDirection", "TouchProperties", "UserNotificationType", "ViewAutoresizing",
-		"WritingToolsResultOptions",
+		"AccessibilityDirectTouchOptions", "AccessibilityHearingDeviceEar", "ActivitySectionTypes",
+		"CloudSharingPermissionOptions", "CollectionViewScrollPosition", "CollisionBehaviorMode", "ControlEvents",
+		"DataDetectorTypes", "DirectionalRectEdge", "DocumentState", "FocusHeading", "GuidedAccessAccessibilityFeature",
+		"MenuElementAttributes", "MenuOptions", "NSControlCharacterAction", "NSDirectionalRectEdge",
+		"NSFileProviderItemCapabilities", "NSFileProviderItemFields", "NSGlyphProperty", "NSLineBreakStrategy",
+		"NSStringDrawingOptions", "NSTextContentManagerEnumerationOptions", "NSTextLayoutFragmentEnumerationOptions",
+		"NSTextLayoutManagerSegmentOptions", "NSTextListOptions", "NSTextSelectionNavigationModifier",
+		"NSTextStorageEditActions", "PopoverArrowDirection", "PrinterJobTypes", "RectCorner", "RectEdge",
+		"RemoteNotificationType", "SwipeGestureRecognizerDirection", "TextDragOptions", "TouchProperties",
+		"UserNotificationType", "ViewAutoresizing", "WritingToolsResultOptions",
 	],
 }
 
@@ -189,17 +213,31 @@ ENUM_MEMBER_FIXES = {
 		"ScrollArrowPosition":    ("erArrows", {}),
 		"TextStorageEditActions": ("", {"edAttributes": "EditedAttributes", "edCharacters": "EditedCharacters"}),
 	},
+	"CoreGraphics": {
+		"EventTapOptions": ("Option", {}),
+	},
+	"Metal": {
+		"Stages": ("Stage", {}),
+	},
+	"Security": {
+		"SecKeyUsage":              ("kSecKeyUsage", {}),
+		"SecTrustSettingsKeyUsage": ("kSecTrustSettingsKeyUse", {}),
+	},
 	"AudioToolbox": {
 		"AUSpatialMixerPersonalizedHRTFMode": ("", {"to": "Auto"}),
 		"AUSpatialMixerSourceMode":           ("", {"izeIfMono": "SpatializeIfMono"}),
 		"ComponentInstantiationOption":       ("", {"edRemotely": "LoadedRemotely"}),
 	},
 	"AVFoundation": {
-		"AudioSessionInterruptionOption": ("", {"houldResume": "ShouldResume"}),
-		"CaptureSystemPressureFactors":   ("Factor", {"ystemTemperature": "SystemTemperature"}),
-		"VariantPreferences":             ("Preference", {"calabilityToLosslessAudio": "ScalabilityToLosslessAudio"}),
+		"AssetReferenceRestrictions":          ("Restriction", {}),
+		"AudioSessionInterruptionOption":      ("", {"houldResume": "ShouldResume"}),
+		"CaptureSystemPressureFactors":        ("Factor", {"ystemTemperature": "SystemTemperature"}),
+		"PlayerInterstitialEventRestrictions": ("Restriction", {}),
+		"SpeechSynthesisVoiceTraits":          ("Trait", {}),
+		"VariantPreferences":                  ("Preference", {"calabilityToLosslessAudio": "ScalabilityToLosslessAudio"}),
 	},
 	"CloudKit": {
+		"ApplicationPermissions": ("Permission", {}),
 		"RecordZoneCapabilities": ("apability", {}),
 	},
 	"CoreFoundation": {
@@ -208,6 +246,9 @@ ENUM_MEMBER_FIXES = {
 		"URLBookmarkResolutionOptions": ("", {"kWithoutUIMask": None, "kWithoutMountingMask": None}),
 	},
 	"Foundation": {
+		# Same members as CoreFoundation's `ISO8601DateFormatOptions`, which csgen emits without `With`
+		"ISO8601DateFormatOptions":       ("With", {}),
+		"ItemProviderFileOptions":        ("Option", {}),
 		"RelativeDateTimeFormatterStyle": ("", {"umeric": "Numeric", "amed": "Named"}),
 	},
 	"GameKit": {
@@ -229,6 +270,7 @@ ENUM_MEMBER_FIXES = {
 		"PrintErrorCode":                  ("", {"ingNotAvailableError": "PrintingNotAvailableError"}),
 		"TextDragOptions":                 ("", {"tripTextColorFromPreviews": "StripTextColorFromPreviews"}),
 		"ViewAnimationOptions":            ("Option", {"howHideTransitionViews": "ShowHideTransitionViews"}),
+		"ViewKeyframeAnimationOptions":    ("Option", {}),
 	},
 }
 
@@ -710,15 +752,15 @@ def apply_flag_enums(pkg):
 	if not wanted:
 		return
 	names = pkg.all_decl_names()
+	elem_of = {} # an enum may be declared once per platform in separate `when` blocks
 	for fname, lines in pkg.files.items():
 		k = 0
 		while k < len(lines):
-			m = re.match(r"^(\w+) :: enum ([\w.]+) \{\s*$", lines[k])
-			if not m or m.group(1) not in wanted:
+			m = re.match(r"^(\s*)(\w+) :: enum ([\w.]+) \{\s*$", lines[k])
+			if not m or m.group(2) not in wanted:
 				k += 1
 				continue
-			name, backing = m.group(1), m.group(2)
-			wanted.discard(name)
+			indent, name, backing = m.group(1), m.group(2), m.group(3)
 
 			members = []
 			j = k+1
@@ -729,31 +771,47 @@ def apply_flag_enums(pkg):
 				members.append((mm.group(1), int(mm.group(2), 0)))
 				j += 1
 
-			elem = flag_element_name(name)
-			if elem in names:
-				elem = name + "Flag"
-			if elem in names:
-				raise SystemExit(f"{pkg.name}/{fname}: no free element name for flag enum {name}")
-			names.add(elem)
+			first = name not in elem_of
+			if first:
+				elem = flag_element_name(name)
+				if elem in names:
+					elem = name + "Flag"
+				if elem in names:
+					raise SystemExit(f"{pkg.name}/{fname}: no free element name for flag enum {name}")
+				names.add(elem)
+				elem_of[name] = elem
+			elem = elem_of[name]
 
 			flags     = [(n, v) for n, v in members if v > 0 and v & (v-1) == 0]
 			constants = [(n, v) for n, v in members if v == 0 or v & (v-1) != 0]
+			named_bits = 0
+			for _, v in flags:
+				named_bits |= v
 			width = max(len(n) for n, _ in flags)
 			out = [f"{elem} :: enum {backing} {{"]
 			out += [f"\t{n.ljust(width)} = {v.bit_length()-1}," for n, v in flags]
 			out += ["}", f"{name} :: bit_set[{elem}; {backing}]"]
 			for n, v in constants:
 				const_name = f"{name}_{n}"
-				if const_name in names:
+				if first and const_name in names:
 					raise SystemExit(f"{pkg.name}/{fname}: constant {const_name} for flag enum {name} is already declared")
 				names.add(const_name)
-				bits = ", ".join(f".{fn}" for fn, fv in flags if v & fv)
-				out.append(f"{const_name} :: {name}{{{bits}}}")
+				if v & ~named_bits:
+					# sets bits which no member names, e.g. `All = 0xffffffff`
+					out.append(f"{const_name} :: transmute({name}){backing}({hex(v)})")
+					continue
+				bits, seen = [], 0
+				for fn, fv in flags:
+					if v & fv and not seen & fv: # one name per bit, skipping aliases
+						bits.append(f".{fn}")
+						seen |= fv
+				out.append(f"{const_name} :: {name}{{{', '.join(bits)}}}")
+			out = [indent + l for l in out]
 			lines[k:j+1] = out
 			consts = ", ".join(f"{name}_{n}" for n, _ in constants)
 			pkg.report["flag enums converted"].append(f"{name} -> bit_set[{elem}]" + (f" (constants {consts})" if consts else ""))
 			k += len(out)
-	for name in sorted(wanted):
+	for name in sorted(wanted - set(elem_of)):
 		pkg.report["flag enum not found"].append(name)
 
 

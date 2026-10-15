@@ -4367,22 +4367,23 @@ DateFormatterStyle :: enum cffi.long {
 	FullStyle   = 4,
 }
 
-ISO8601DateFormatOptions :: enum cffi.ulong {
-	Year                     = 1,
-	Month                    = 2,
-	WeekOfYear               = 4,
-	Day                      = 16,
-	Time                     = 32,
-	TimeZone                 = 64,
-	SpaceBetweenDateAndTime  = 128,
-	DashSeparatorInDate      = 256,
-	ColonSeparatorInTime     = 512,
-	ColonSeparatorInTimeZone = 1024,
-	FractionalSeconds        = 2048,
-	FullDate                 = 275,
-	FullTime                 = 1632,
-	InternetDateTime         = 1907,
+ISO8601DateFormatOption :: enum cffi.ulong {
+	Year                     = 0,
+	Month                    = 1,
+	WeekOfYear               = 2,
+	Day                      = 4,
+	Time                     = 5,
+	TimeZone                 = 6,
+	SpaceBetweenDateAndTime  = 7,
+	DashSeparatorInDate      = 8,
+	ColonSeparatorInTime     = 9,
+	ColonSeparatorInTimeZone = 10,
+	FractionalSeconds        = 11,
 }
+ISO8601DateFormatOptions :: bit_set[ISO8601DateFormatOption; cffi.ulong]
+ISO8601DateFormatOptions_FullDate :: ISO8601DateFormatOptions{.Year, .Month, .Day, .DashSeparatorInDate}
+ISO8601DateFormatOptions_FullTime :: ISO8601DateFormatOptions{.Time, .TimeZone, .ColonSeparatorInTime, .ColonSeparatorInTimeZone}
+ISO8601DateFormatOptions_InternetDateTime :: ISO8601DateFormatOptions{.Year, .Month, .Day, .Time, .TimeZone, .DashSeparatorInDate, .ColonSeparatorInTime, .ColonSeparatorInTimeZone}
 
 NumberType :: enum cffi.long {
 	SInt8Type     = 1,
@@ -4486,15 +4487,16 @@ RunLoopRunResult :: enum cffi.int {
 	HandledSource = 4,
 }
 
-RunLoopActivity :: enum cffi.ulong {
-	Entry         = 1,
-	BeforeTimers  = 2,
-	BeforeSources = 4,
-	BeforeWaiting = 32,
-	AfterWaiting  = 64,
-	Exit          = 128,
-	AllActivities = 268435455,
+RunLoopActivityFlag :: enum cffi.ulong {
+	Entry         = 0,
+	BeforeTimers  = 1,
+	BeforeSources = 2,
+	BeforeWaiting = 5,
+	AfterWaiting  = 6,
+	Exit          = 7,
 }
+RunLoopActivity :: bit_set[RunLoopActivityFlag; cffi.ulong]
+RunLoopActivity_AllActivities :: transmute(RunLoopActivity)cffi.ulong(0xfffffff)
 
 SocketError :: enum cffi.long {
 	Success = 0,
@@ -4538,11 +4540,12 @@ StreamErrorDomain :: enum cffi.long {
 	MacOSStatus = 2,
 }
 
-PropertyListMutabilityOptions :: enum cffi.ulong {
-	Immutable                  = 0,
-	MutableContainers          = 1,
-	MutableContainersAndLeaves = 2,
+PropertyListMutabilityOption :: enum cffi.ulong {
+	MutableContainers          = 0,
+	MutableContainersAndLeaves = 1,
 }
+PropertyListMutabilityOptions :: bit_set[PropertyListMutabilityOption; cffi.ulong]
+PropertyListMutabilityOptions_Immutable :: PropertyListMutabilityOptions{}
 
 PropertyListFormat :: enum cffi.long {
 	OpenStepFormat    = 1,
@@ -4761,16 +4764,17 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		Character      = 4,
 	}
 
-	XMLParserOptions :: enum cffi.ulong {
-		ValidateDocument        = 1,
-		SkipMetaData            = 2,
-		ReplacePhysicalEntities = 4,
-		SkipWhitespace          = 8,
-		ResolveExternalEntities = 16,
-		AddImpliedAttributes    = 32,
-		AllOptions              = 16777215,
-		NoOptions               = 0,
+	XMLParserOption :: enum cffi.ulong {
+		ValidateDocument        = 0,
+		SkipMetaData            = 1,
+		ReplacePhysicalEntities = 2,
+		SkipWhitespace          = 3,
+		ResolveExternalEntities = 4,
+		AddImpliedAttributes    = 5,
 	}
+	XMLParserOptions :: bit_set[XMLParserOption; cffi.ulong]
+	XMLParserOptions_AllOptions :: transmute(XMLParserOptions)cffi.ulong(0xffffff)
+	XMLParserOptions_NoOptions :: XMLParserOptions{}
 
 	XMLParserStatusCode :: enum cffi.long {
 		ParseNotBegun                    = -2,

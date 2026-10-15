@@ -428,13 +428,14 @@ LocalSearchRegionPriority :: enum cffi.long {
 	Required = 1,
 }
 
-DirectionsTransportType :: enum cffi.ulong {
-	Automobile = 1,
-	Walking    = 2,
-	Transit    = 4,
-	Cycling    = 8,
-	Any        = 268435455,
+DirectionsTransportTypeFlag :: enum cffi.ulong {
+	Automobile = 0,
+	Walking    = 1,
+	Transit    = 2,
+	Cycling    = 3,
 }
+DirectionsTransportType :: bit_set[DirectionsTransportTypeFlag; cffi.ulong]
+DirectionsTransportType_Any :: transmute(DirectionsTransportType)cffi.ulong(0xfffffff)
 
 DirectionsRoutePreference :: enum cffi.long {
 	Any   = 0,

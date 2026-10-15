@@ -46,8 +46,10 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
   provided.
 - Enums which are flag sets in the SDK but which csgen emitted as plain enums (`FLAG_ENUMS`) become a
   `bit_set` of the same name over an element enum of bit indices, e.g. `MTL.TextureUsage` is
-  `bit_set[MTL.TextureUsageFlag]`. A member equal to 0 becomes a constant equal to `{}`, e.g.
-  `MTL.TextureUsage_Unknown`.
+  `bit_set[MTL.TextureUsageFlag]`. A member equal to 0 or to a combination of bits becomes a
+  constant, e.g. `MTL.TextureUsage_Unknown :: MTL.TextureUsage{}`; a combination which sets bits
+  no member names becomes a `transmute`, e.g. `MTL.Stages_All`. Enums which mix flags with
+  enumerated fields are left as they are, see `mixed_flag_enums.md`.
 - Enum members mangled by csgen's prefix removal are renamed (`ENUM_MEMBER_FIXES`), e.g.
   `AVFoundation.CaptureSystemPressureFactors` has `SystemTemperature` rather than `ystemTemperature`.
 - Known problems in the generated output are patched (`KNOWN_FIXES`, `ALIAS_FIXES`).

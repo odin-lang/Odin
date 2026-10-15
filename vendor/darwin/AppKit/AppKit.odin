@@ -2972,15 +2972,16 @@ WorkspaceLaunchOption :: enum cffi.ulong {
 }
 WorkspaceLaunchOptions :: bit_set[WorkspaceLaunchOption; cffi.ulong]
 
-TouchPhase :: enum cffi.ulong {
-	Began      = 1,
-	Moved      = 2,
-	Stationary = 4,
-	Ended      = 8,
-	Cancelled  = 16,
-	Touching   = 7,
-	Any        = 18446744073709551615,
+TouchPhaseFlag :: enum cffi.ulong {
+	Began      = 0,
+	Moved      = 1,
+	Stationary = 2,
+	Ended      = 3,
+	Cancelled  = 4,
 }
+TouchPhase :: bit_set[TouchPhaseFlag; cffi.ulong]
+TouchPhase_Touching :: TouchPhase{.Began, .Moved, .Stationary}
+TouchPhase_Any :: transmute(TouchPhase)cffi.ulong(0xffffffffffffffff)
 
 TouchType :: enum cffi.long {
 	Direct   = 0,
@@ -3190,18 +3191,19 @@ AnimationBlockingMode :: enum cffi.ulong {
 	NonblockingThreaded = 2,
 }
 
-DragOperation :: enum cffi.ulong {
-	None         = 0,
-	Copy         = 1,
-	Link         = 2,
-	Generic      = 4,
-	Private      = 8,
-	Move         = 16,
-	Delete       = 32,
-	Every        = 18446744073709551615,
-	All_Obsolete = 15,
-	All          = 15,
+DragOperationFlag :: enum cffi.ulong {
+	Copy    = 0,
+	Link    = 1,
+	Generic = 2,
+	Private = 3,
+	Move    = 4,
+	Delete  = 5,
 }
+DragOperation :: bit_set[DragOperationFlag; cffi.ulong]
+DragOperation_None :: DragOperation{}
+DragOperation_Every :: transmute(DragOperation)cffi.ulong(0xffffffffffffffff)
+DragOperation_All_Obsolete :: DragOperation{.Copy, .Link, .Generic, .Private}
+DragOperation_All :: DragOperation{.Copy, .Link, .Generic, .Private}
 
 DraggingFormation :: enum cffi.long {
 	Default = 0,
@@ -3320,12 +3322,13 @@ LineBreakMode :: enum cffi.ulong {
 	ByTruncatingMiddle = 5,
 }
 
-LineBreakStrategy :: enum cffi.ulong {
-	None               = 0,
-	PushOut            = 1,
-	HangulWordPriority = 2,
-	Standard           = 65535,
+LineBreakStrategyFlag :: enum cffi.ulong {
+	PushOut            = 0,
+	HangulWordPriority = 1,
 }
+LineBreakStrategy :: bit_set[LineBreakStrategyFlag; cffi.ulong]
+LineBreakStrategy_None :: LineBreakStrategy{}
+LineBreakStrategy_Standard :: transmute(LineBreakStrategy)cffi.ulong(0xffff)
 
 TextTabType :: enum cffi.ulong {
 	LeftTabStopType    = 0,
@@ -3711,14 +3714,15 @@ CollectionViewScrollDirection :: enum cffi.long {
 	Horizontal = 1,
 }
 
-DirectionalRectEdge :: enum cffi.ulong {
-	None     = 0,
-	Top      = 1,
-	Leading  = 2,
-	Bottom   = 4,
-	Trailing = 8,
-	All      = 15,
+DirectionalRectEdgeFlag :: enum cffi.ulong {
+	Top      = 0,
+	Leading  = 1,
+	Bottom   = 2,
+	Trailing = 3,
 }
+DirectionalRectEdge :: bit_set[DirectionalRectEdgeFlag; cffi.ulong]
+DirectionalRectEdge_None :: DirectionalRectEdge{}
+DirectionalRectEdge_All :: DirectionalRectEdge{.Top, .Leading, .Bottom, .Trailing}
 
 RectAlignment :: enum cffi.long {
 	None           = 0,
@@ -3741,17 +3745,19 @@ CollectionLayoutSectionOrthogonalScrollingBehavior :: enum cffi.long {
 	GroupPagingCentered            = 5,
 }
 
-HorizontalDirections :: enum cffi.ulong {
-	Left  = 1,
-	Right = 2,
-	All   = 3,
+HorizontalDirection :: enum cffi.ulong {
+	Left  = 0,
+	Right = 1,
 }
+HorizontalDirections :: bit_set[HorizontalDirection; cffi.ulong]
+HorizontalDirections_All :: HorizontalDirections{.Left, .Right}
 
-VerticalDirections :: enum cffi.ulong {
-	Up   = 1,
-	Down = 2,
-	All  = 3,
+VerticalDirection :: enum cffi.ulong {
+	Up   = 0,
+	Down = 1,
 }
+VerticalDirections :: bit_set[VerticalDirection; cffi.ulong]
+VerticalDirections_All :: VerticalDirections{.Up, .Down}
 
 FontDescriptorSymbolicTraits :: enum cffi.uint {
 	TraitItalic             = 1,
@@ -4074,22 +4080,24 @@ ColorWellStyle :: enum cffi.long {
 	Expanded = 2,
 }
 
-CursorFrameResizePosition :: enum cffi.ulong {
-	Top         = 1,
-	Left        = 2,
-	Bottom      = 4,
-	Right       = 8,
-	TopLeft     = 3,
-	TopRight    = 9,
-	BottomLeft  = 6,
-	BottomRight = 12,
+CursorFrameResizePositionFlag :: enum cffi.ulong {
+	Top    = 0,
+	Left   = 1,
+	Bottom = 2,
+	Right  = 3,
 }
+CursorFrameResizePosition :: bit_set[CursorFrameResizePositionFlag; cffi.ulong]
+CursorFrameResizePosition_TopLeft :: CursorFrameResizePosition{.Top, .Left}
+CursorFrameResizePosition_TopRight :: CursorFrameResizePosition{.Top, .Right}
+CursorFrameResizePosition_BottomLeft :: CursorFrameResizePosition{.Left, .Bottom}
+CursorFrameResizePosition_BottomRight :: CursorFrameResizePosition{.Bottom, .Right}
 
-CursorFrameResizeDirections :: enum cffi.ulong {
-	Inward  = 1,
-	Outward = 2,
-	All     = 3,
+CursorFrameResizeDirection :: enum cffi.ulong {
+	Inward  = 0,
+	Outward = 1,
 }
+CursorFrameResizeDirections :: bit_set[CursorFrameResizeDirection; cffi.ulong]
+CursorFrameResizeDirections_All :: CursorFrameResizeDirections{.Inward, .Outward}
 
 GradientDrawingOption :: enum cffi.ulong {
 	DrawsBeforeStartingLocation = 0,
@@ -4570,10 +4578,11 @@ SpellingState :: enum cffi.long {
 	GrammarFlag  = 2,
 }
 
-TextStorageEditActions :: enum cffi.ulong {
-	EditedAttributes = 1,
-	EditedCharacters = 2,
+TextStorageEditAction :: enum cffi.ulong {
+	EditedAttributes = 0,
+	EditedCharacters = 1,
 }
+TextStorageEditActions :: bit_set[TextStorageEditAction; cffi.ulong]
 
 TextLayoutOrientation :: enum cffi.long {
 	Horizontal = 0,
@@ -4881,10 +4890,11 @@ BezierPathElement :: enum cffi.ulong {
 	CurveTo          = 2,
 }
 
-StatusItemBehavior :: enum cffi.ulong {
-	RemovalAllowed       = 2,
-	TerminationOnRemoval = 4,
+StatusItemBehaviorFlag :: enum cffi.ulong {
+	RemovalAllowed       = 1,
+	TerminationOnRemoval = 2,
 }
+StatusItemBehavior :: bit_set[StatusItemBehaviorFlag; cffi.ulong]
 
 DrawerState :: enum cffi.ulong {
 	ClosedState  = 0,

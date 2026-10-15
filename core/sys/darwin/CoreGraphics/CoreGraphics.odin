@@ -2767,10 +2767,11 @@ GlyphDeprecatedEnum :: enum cffi.int {
 	Max = 1,
 }
 
-GradientDrawingOptions :: enum cffi.uint {
-	DrawsBeforeStartLocation = 1,
-	DrawsAfterEndLocation    = 2,
+GradientDrawingOption :: enum cffi.uint {
+	DrawsBeforeStartLocation = 0,
+	DrawsAfterEndLocation    = 1,
 }
+GradientDrawingOptions :: bit_set[GradientDrawingOption; cffi.uint]
 
 ImageAlphaInfo :: enum cffi.uint {
 	None               = 0,
@@ -3117,10 +3118,11 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		NumberOfWindowLevelKeys         = 21,
 	}
 
-	CaptureOptions :: enum cffi.uint {
-		NoOptions = 0,
-		NoFill    = 1,
+	CaptureOption :: enum cffi.uint {
+		NoFill = 0,
 	}
+	CaptureOptions :: bit_set[CaptureOption; cffi.uint]
+	CaptureOptions_NoOptions :: CaptureOptions{}
 
 	ConfigureOption :: enum cffi.uint {
 		ForAppOnly  = 0,
@@ -3158,11 +3160,12 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		Stopped       = 3,
 	}
 
-	ScreenUpdateOperation :: enum cffi.uint {
-		Refresh                    = 0,
-		Move                       = 1,
-		ReducedDirtyRectangleCount = 2147483648,
+	ScreenUpdateOperationFlag :: enum cffi.uint {
+		Move                       = 0,
+		ReducedDirtyRectangleCount = 31,
 	}
+	ScreenUpdateOperation :: bit_set[ScreenUpdateOperationFlag; cffi.uint]
+	ScreenUpdateOperation_Refresh :: ScreenUpdateOperation{}
 
 	EventFilterMaskFlag :: enum cffi.uint {
 		PermitLocalMouseEvents    = 0,
@@ -3334,10 +3337,11 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		TailAppendEventTap = 1,
 	}
 
-	EventTapOptions :: enum cffi.uint {
-		OptionDefault    = 0,
-		OptionListenOnly = 1,
+	EventTapOption :: enum cffi.uint {
+		ListenOnly = 0,
 	}
+	EventTapOptions :: bit_set[EventTapOption; cffi.uint]
+	EventTapOptions_Default :: EventTapOptions{}
 
 	EventSourceStateID :: enum cffi.int {
 		Private              = -1,

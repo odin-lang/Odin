@@ -4815,10 +4815,11 @@ UnitEventType :: enum cffi.uint {
 	PropertyChange              = 3,
 }
 
-FFormatFlags :: enum cffi.uint {
-	Float        = 1,
-	LittleEndian = 2,
+FFormatFlag :: enum cffi.uint {
+	Float        = 0,
+	LittleEndian = 1,
 }
+FFormatFlags :: bit_set[FFormatFlag; cffi.uint]
 
 FRegionFlag :: enum cffi.uint {
 	LoopEnable   = 0,

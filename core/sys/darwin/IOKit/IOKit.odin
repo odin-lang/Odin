@@ -263,11 +263,12 @@ kMediaInvalidStartupDiskKey :: "Invalid Startup Disk"
  * Indicates whether the media is removable from the drive mechanism.
  */
 
-IOMediaAttributeMask :: enum u32 {
-	EjectableMask = 0x00000001,
-	RemovableMask = 0x00000002,
-	ReservedMask  = 0xFFFFFFFC,
+IOMediaAttributeMaskFlag :: enum u32 {
+	EjectableMask = 0,
+	RemovableMask = 1,
 }
+IOMediaAttributeMask :: bit_set[IOMediaAttributeMaskFlag; u32]
+IOMediaAttributeMask_ReservedMask :: transmute(IOMediaAttributeMask)u32(0xfffffffc)
 
 
 

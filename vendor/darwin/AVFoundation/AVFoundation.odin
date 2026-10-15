@@ -3869,15 +3869,16 @@ ExternalContentProtectionStatus :: enum cffi.long {
 	Insufficient = 2,
 }
 
-AssetReferenceRestrictions :: enum cffi.ulong {
-	RestrictionForbidNone            = 0,
-	RestrictionForbidRemoteReferenceToLocal = 1,
-	RestrictionForbidLocalReferenceToRemote = 2,
-	RestrictionForbidCrossSiteReference = 4,
-	RestrictionForbidLocalReferenceToLocal = 8,
-	RestrictionForbidAll             = 65535,
-	RestrictionDefaultPolicy         = 2,
+AssetReferenceRestriction :: enum cffi.ulong {
+	ForbidRemoteReferenceToLocal = 0,
+	ForbidLocalReferenceToRemote = 1,
+	ForbidCrossSiteReference     = 2,
+	ForbidLocalReferenceToLocal  = 3,
+	DefaultPolicy                = 1,
 }
+AssetReferenceRestrictions :: bit_set[AssetReferenceRestriction; cffi.ulong]
+AssetReferenceRestrictions_ForbidNone :: AssetReferenceRestrictions{}
+AssetReferenceRestrictions_ForbidAll :: transmute(AssetReferenceRestrictions)cffi.ulong(0xffff)
 
 AudioSpatializationFormats :: enum cffi.ulong {
 	FormatNone                      = 0,
@@ -4254,10 +4255,11 @@ PlayerItemStatus :: enum cffi.long {
 	Failed      = 2,
 }
 
-VariantPreferences :: enum cffi.ulong {
-	None                       = 0,
-	ScalabilityToLosslessAudio = 1,
+VariantPreference :: enum cffi.ulong {
+	ScalabilityToLosslessAudio = 0,
 }
+VariantPreferences :: bit_set[VariantPreference; cffi.ulong]
+VariantPreferences_None :: VariantPreferences{}
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	ContentAuthorizationStatus :: enum cffi.long {
@@ -4283,12 +4285,13 @@ PlayerLooperItemOrdering :: enum cffi.long {
 	LoopingItemsFollowExistingItems  = 1,
 }
 
-PlayerInterstitialEventRestrictions :: enum cffi.ulong {
-	RestrictionNone                  = 0,
-	RestrictionConstrainsSeekingForwardInPrimaryContent = 1,
-	RestrictionRequiresPlaybackAtPreferredRateForAdvancement = 4,
-	RestrictionDefaultPolicy         = 0,
+PlayerInterstitialEventRestriction :: enum cffi.ulong {
+	ConstrainsSeekingForwardInPrimaryContent      = 0,
+	RequiresPlaybackAtPreferredRateForAdvancement = 2,
 }
+PlayerInterstitialEventRestrictions :: bit_set[PlayerInterstitialEventRestriction; cffi.ulong]
+PlayerInterstitialEventRestrictions_None :: PlayerInterstitialEventRestrictions{}
+PlayerInterstitialEventRestrictions_DefaultPolicy :: PlayerInterstitialEventRestrictions{}
 
 PlayerInterstitialEventTimelineOccupancy :: enum cffi.long {
 	SinglePoint = 0,
@@ -4750,11 +4753,12 @@ SpeechSynthesisPersonalVoiceAuthorizationStatus :: enum cffi.ulong {
 	Authorized    = 3,
 }
 
-SpeechSynthesisVoiceTraits :: enum cffi.ulong {
-	TraitNone            = 0,
-	TraitIsNoveltyVoice  = 1,
-	TraitIsPersonalVoice = 2,
+SpeechSynthesisVoiceTrait :: enum cffi.ulong {
+	IsNoveltyVoice  = 0,
+	IsPersonalVoice = 1,
 }
+SpeechSynthesisVoiceTraits :: bit_set[SpeechSynthesisVoiceTrait; cffi.ulong]
+SpeechSynthesisVoiceTraits_None :: SpeechSynthesisVoiceTraits{}
 
 AudioApplicationRecordPermission :: enum cffi.long {
 	Undetermined = 1970168948,

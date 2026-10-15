@@ -3975,21 +3975,22 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		DT_InhibitAnyPolicy         = 20,
 	}
 
-	SecKeyUsage :: enum cffi.uint {
-		kSecKeyUsageUnspecified       = 0,
-		kSecKeyUsageDigitalSignature  = 1,
-		kSecKeyUsageNonRepudiation    = 2,
-		kSecKeyUsageContentCommitment = 2,
-		kSecKeyUsageKeyEncipherment   = 4,
-		kSecKeyUsageDataEncipherment  = 8,
-		kSecKeyUsageKeyAgreement      = 16,
-		kSecKeyUsageKeyCertSign       = 32,
-		kSecKeyUsageCRLSign           = 64,
-		kSecKeyUsageEncipherOnly      = 128,
-		kSecKeyUsageDecipherOnly      = 256,
-		kSecKeyUsageCritical          = 2147483648,
-		kSecKeyUsageAll               = 2147483647,
+	SecKeyUsageFlag :: enum cffi.uint {
+		DigitalSignature  = 0,
+		NonRepudiation    = 1,
+		ContentCommitment = 1,
+		KeyEncipherment   = 2,
+		DataEncipherment  = 3,
+		KeyAgreement      = 4,
+		KeyCertSign       = 5,
+		CRLSign           = 6,
+		EncipherOnly      = 7,
+		DecipherOnly      = 8,
+		Critical          = 31,
 	}
+	SecKeyUsage :: bit_set[SecKeyUsageFlag; cffi.uint]
+	SecKeyUsage_Unspecified :: SecKeyUsage{}
+	SecKeyUsage_All :: transmute(SecKeyUsage)cffi.uint(0x7fffffff)
 }
 
 SecAccessControlCreateFlag :: enum cffi.ulong {
@@ -4357,15 +4358,16 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		kSecAlias                      = 1634494835,
 	}
 
-	SecTrustSettingsKeyUsage :: enum cffi.uint {
-		kSecTrustSettingsKeyUseSignature = 1,
-		kSecTrustSettingsKeyUseEnDecryptData = 2,
-		kSecTrustSettingsKeyUseEnDecryptKey = 4,
-		kSecTrustSettingsKeyUseSignCert  = 8,
-		kSecTrustSettingsKeyUseSignRevocation = 16,
-		kSecTrustSettingsKeyUseKeyExchange = 32,
-		kSecTrustSettingsKeyUseAny       = 4294967295,
+	SecTrustSettingsKeyUsageFlag :: enum cffi.uint {
+		Signature      = 0,
+		EnDecryptData  = 1,
+		EnDecryptKey   = 2,
+		SignCert       = 3,
+		SignRevocation = 4,
+		KeyExchange    = 5,
 	}
+	SecTrustSettingsKeyUsage :: bit_set[SecTrustSettingsKeyUsageFlag; cffi.uint]
+	SecTrustSettingsKeyUsage_Any :: transmute(SecTrustSettingsKeyUsage)cffi.uint(0xffffffff)
 
 	SecTrustSettingsResult :: enum cffi.uint {
 		kSecTrustSettingsResultInvalid   = 0,

@@ -1230,11 +1230,12 @@ ControllerPlayerIndex :: enum cffi.long {
 }
 
 when ODIN_PLATFORM_SUBTARGET_IOS {
-	UIEventTypes :: enum cffi.ulong {
-		None    = 0,
-		Gamepad = 1,
-		Stylus  = 2,
+	UIEventType :: enum cffi.ulong {
+		Gamepad = 0,
+		Stylus  = 1,
 	}
+	UIEventTypes :: bit_set[UIEventType; cffi.ulong]
+	UIEventTypes_None :: UIEventTypes{}
 }
 
 Point2 :: struct #align (4) {

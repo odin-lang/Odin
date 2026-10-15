@@ -149,9 +149,10 @@ AccountStatus :: enum cffi.long {
 	TemporarilyUnavailable = 4,
 }
 
-ApplicationPermissions :: enum cffi.ulong {
-	PermissionUserDiscoverability = 1,
+ApplicationPermission :: enum cffi.ulong {
+	UserDiscoverability = 0,
 }
+ApplicationPermissions :: bit_set[ApplicationPermission; cffi.ulong]
 
 ApplicationPermissionStatus :: enum cffi.long {
 	InitialState     = 0,
