@@ -1532,6 +1532,11 @@ digit_to_int :: proc(r: rune) -> (value: int, ok: bool) {
 	}
 	return -1, false
 }
+
+@(deprecated="This will almost certainly not do what you are expecting. If you actually meant to call this, call `quote_weird` instead. Otherwise, you are probably looking for `quote_string`.")
+quote :: proc(buf: []byte, str: string) -> string {
+	return quote_weird(buf, str)
+}
 /*
 Writes a quoted string representation of the input string to a given byte slice and returns the result as a string
 
@@ -1558,7 +1563,7 @@ Output:
 **Returns**
 - The resulting string after writing the quoted string representation
 */
-quote :: proc(buf: []byte, str: string) -> string {
+quote_weird ::  proc(buf: []byte, str: string) -> string {
 	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
 		if i^ >= len(buf) {
 			return
@@ -1587,6 +1592,7 @@ quote :: proc(buf: []byte, str: string) -> string {
 			write_byte(buf, &i, digits[s[0]>>4])
 			write_byte(buf, &i, digits[s[0]&0xf])
 		}
+		// No else !?
 		if i < len(buf) {
 			x := quote_rune(buf[i:], r)
 			i += len(x)
