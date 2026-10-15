@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSSortDescriptor", objc_superclass=Object)
 SortDescriptor :: struct {
 	using _: Object,

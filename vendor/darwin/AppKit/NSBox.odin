@@ -5,10 +5,6 @@ package darwin_AppKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSBox", objc_superclass=View)
 Box :: struct { using _: View}
 

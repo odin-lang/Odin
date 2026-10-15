@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSInflectionRule", objc_superclass=Object)
 InflectionRule :: struct {
 	using _: Object,
@@ -22,4 +21,16 @@ foreign lib {
 
 	@(objc_type=InflectionRule, objc_selector="canInflectPreferredLocalization", objc_name="canInflectPreferredLocalization", objc_is_class_method=true)
 	InflectionRule_canInflectPreferredLocalization :: proc() -> bool ---
+}
+
+
+@(objc_class="NSInflectionRuleExplicit", objc_superclass=InflectionRule)
+InflectionRuleExplicit :: struct { using _: InflectionRule}
+
+foreign lib {
+	@(objc_type=InflectionRuleExplicit, objc_selector="initWithMorphology:", objc_name="initWithMorphology")
+	InflectionRuleExplicit_initWithMorphology :: proc(self: ^InflectionRuleExplicit, morphology: ^Morphology) -> instancetype ---
+
+	@(objc_type=InflectionRuleExplicit, objc_selector="morphology", objc_name="morphology")
+	InflectionRuleExplicit_morphology :: proc(self: ^InflectionRuleExplicit) -> ^Morphology ---
 }

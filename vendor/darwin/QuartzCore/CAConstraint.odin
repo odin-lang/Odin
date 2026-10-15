@@ -48,3 +48,15 @@ Constraint_constraintWithAttribute :: proc {
 	Constraint_constraintWithAttribute_relativeTo_attribute_offset,
 	Constraint_constraintWithAttribute_relativeTo_attribute,
 }
+
+
+@(objc_class="CAConstraintLayoutManager", objc_superclass=NS.Object)
+ConstraintLayoutManager :: struct {
+	using _: NS.Object,
+	using _: LayoutManager,
+}
+
+foreign lib {
+	@(objc_type=ConstraintLayoutManager, objc_selector="layoutManager", objc_name="layoutManager", objc_is_class_method=true)
+	ConstraintLayoutManager_layoutManager :: proc() -> instancetype ---
+}

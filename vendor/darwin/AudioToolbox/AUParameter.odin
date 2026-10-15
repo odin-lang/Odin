@@ -67,3 +67,108 @@ AUParameter_setValue :: proc {
 	AUParameter_setValue_originator_atHostTime_eventType,
 	AUParameter_setValue_,
 }
+
+
+@(objc_class="AUParameterGroup", objc_superclass=AUParameterNode)
+AUParameterGroup :: struct {
+	using _: AUParameterNode,
+	using _: NS.SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=AUParameterGroup, objc_selector="children", objc_name="children")
+	AUParameterGroup_children :: proc(self: ^AUParameterGroup) -> ^NS.Array ---
+
+	@(objc_type=AUParameterGroup, objc_selector="allParameters", objc_name="allParameters")
+	AUParameterGroup_allParameters :: proc(self: ^AUParameterGroup) -> ^NS.Array ---
+}
+
+
+@(objc_class="AUParameterNode", objc_superclass=NS.Object)
+AUParameterNode :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=AUParameterNode, objc_selector="displayNameWithLength:", objc_name="displayNameWithLength")
+	AUParameterNode_displayNameWithLength :: proc(self: ^AUParameterNode, maximumLength: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=AUParameterNode, objc_selector="tokenByAddingParameterObserver:", objc_name="tokenByAddingParameterObserver")
+	AUParameterNode_tokenByAddingParameterObserver :: proc(self: ^AUParameterNode, observer: AUParameterObserver) -> AUParameterObserverToken ---
+
+	@(objc_type=AUParameterNode, objc_selector="tokenByAddingParameterRecordingObserver:", objc_name="tokenByAddingParameterRecordingObserver")
+	AUParameterNode_tokenByAddingParameterRecordingObserver :: proc(self: ^AUParameterNode, observer: AUParameterRecordingObserver) -> AUParameterObserverToken ---
+
+	@(objc_type=AUParameterNode, objc_selector="tokenByAddingParameterAutomationObserver:", objc_name="tokenByAddingParameterAutomationObserver")
+	AUParameterNode_tokenByAddingParameterAutomationObserver :: proc(self: ^AUParameterNode, observer: AUParameterAutomationObserver) -> AUParameterObserverToken ---
+
+	@(objc_type=AUParameterNode, objc_selector="removeParameterObserver:", objc_name="removeParameterObserver")
+	AUParameterNode_removeParameterObserver :: proc(self: ^AUParameterNode, token: AUParameterObserverToken) ---
+
+	@(objc_type=AUParameterNode, objc_selector="identifier", objc_name="identifier")
+	AUParameterNode_identifier :: proc(self: ^AUParameterNode) -> ^NS.String ---
+
+	@(objc_type=AUParameterNode, objc_selector="keyPath", objc_name="keyPath")
+	AUParameterNode_keyPath :: proc(self: ^AUParameterNode) -> ^NS.String ---
+
+	@(objc_type=AUParameterNode, objc_selector="displayName", objc_name="displayName")
+	AUParameterNode_displayName :: proc(self: ^AUParameterNode) -> ^NS.String ---
+
+	@(objc_type=AUParameterNode, objc_selector="implementorValueObserver", objc_name="implementorValueObserver")
+	AUParameterNode_implementorValueObserver :: proc(self: ^AUParameterNode) -> AUImplementorValueObserver ---
+
+	@(objc_type=AUParameterNode, objc_selector="setImplementorValueObserver:", objc_name="setImplementorValueObserver")
+	AUParameterNode_setImplementorValueObserver :: proc(self: ^AUParameterNode, implementorValueObserver: AUImplementorValueObserver) ---
+
+	@(objc_type=AUParameterNode, objc_selector="implementorValueProvider", objc_name="implementorValueProvider")
+	AUParameterNode_implementorValueProvider :: proc(self: ^AUParameterNode) -> AUImplementorValueProvider ---
+
+	@(objc_type=AUParameterNode, objc_selector="setImplementorValueProvider:", objc_name="setImplementorValueProvider")
+	AUParameterNode_setImplementorValueProvider :: proc(self: ^AUParameterNode, implementorValueProvider: AUImplementorValueProvider) ---
+
+	@(objc_type=AUParameterNode, objc_selector="implementorStringFromValueCallback", objc_name="implementorStringFromValueCallback")
+	AUParameterNode_implementorStringFromValueCallback :: proc(self: ^AUParameterNode) -> AUImplementorStringFromValueCallback ---
+
+	@(objc_type=AUParameterNode, objc_selector="setImplementorStringFromValueCallback:", objc_name="setImplementorStringFromValueCallback")
+	AUParameterNode_setImplementorStringFromValueCallback :: proc(self: ^AUParameterNode, implementorStringFromValueCallback: AUImplementorStringFromValueCallback) ---
+
+	@(objc_type=AUParameterNode, objc_selector="implementorValueFromStringCallback", objc_name="implementorValueFromStringCallback")
+	AUParameterNode_implementorValueFromStringCallback :: proc(self: ^AUParameterNode) -> AUImplementorValueFromStringCallback ---
+
+	@(objc_type=AUParameterNode, objc_selector="setImplementorValueFromStringCallback:", objc_name="setImplementorValueFromStringCallback")
+	AUParameterNode_setImplementorValueFromStringCallback :: proc(self: ^AUParameterNode, implementorValueFromStringCallback: AUImplementorValueFromStringCallback) ---
+
+	@(objc_type=AUParameterNode, objc_selector="implementorDisplayNameWithLengthCallback", objc_name="implementorDisplayNameWithLengthCallback")
+	AUParameterNode_implementorDisplayNameWithLengthCallback :: proc(self: ^AUParameterNode) -> AUImplementorDisplayNameWithLengthCallback ---
+
+	@(objc_type=AUParameterNode, objc_selector="setImplementorDisplayNameWithLengthCallback:", objc_name="setImplementorDisplayNameWithLengthCallback")
+	AUParameterNode_setImplementorDisplayNameWithLengthCallback :: proc(self: ^AUParameterNode, implementorDisplayNameWithLengthCallback: AUImplementorDisplayNameWithLengthCallback) ---
+}
+
+
+@(objc_class="AUParameterTree", objc_superclass=AUParameterGroup)
+AUParameterTree :: struct {
+	using _: AUParameterGroup,
+	using _: NS.SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=AUParameterTree, objc_selector="parameterWithAddress:", objc_name="parameterWithAddress")
+	AUParameterTree_parameterWithAddress :: proc(self: ^AUParameterTree, address: AUParameterAddress) -> ^AUParameter ---
+
+	@(objc_type=AUParameterTree, objc_selector="parameterWithID:scope:element:", objc_name="parameterWithID")
+	AUParameterTree_parameterWithID :: proc(self: ^AUParameterTree, paramID: UnitParameterID, scope: UnitScope, element: UnitElement) -> ^AUParameter ---
+
+	@(objc_type=AUParameterTree, objc_selector="createParameterWithIdentifier:name:address:min:max:unit:unitName:flags:valueStrings:dependentParameters:", objc_name="createParameterWithIdentifier", objc_is_class_method=true)
+	AUParameterTree_createParameterWithIdentifier :: proc(identifier: ^NS.String, name: ^NS.String, address: AUParameterAddress, min: AUValue, max: AUValue, unit: UnitParameterUnit, unitName: ^NS.String, flags: UnitParameterOptions, valueStrings: ^NS.Array, dependentParameters: ^NS.Array) -> ^AUParameter ---
+
+	@(objc_type=AUParameterTree, objc_selector="createGroupWithIdentifier:name:children:", objc_name="createGroupWithIdentifier", objc_is_class_method=true)
+	AUParameterTree_createGroupWithIdentifier :: proc(identifier: ^NS.String, name: ^NS.String, children: ^NS.Array) -> ^AUParameterGroup ---
+
+	@(objc_type=AUParameterTree, objc_selector="createGroupTemplate:", objc_name="createGroupTemplate", objc_is_class_method=true)
+	AUParameterTree_createGroupTemplate :: proc(children: ^NS.Array) -> ^AUParameterGroup ---
+
+	@(objc_type=AUParameterTree, objc_selector="createGroupFromTemplate:identifier:name:addressOffset:", objc_name="createGroupFromTemplate", objc_is_class_method=true)
+	AUParameterTree_createGroupFromTemplate :: proc(templateGroup: ^AUParameterGroup, identifier: ^NS.String, name: ^NS.String, addressOffset: AUParameterAddress) -> ^AUParameterGroup ---
+
+	@(objc_type=AUParameterTree, objc_selector="createTreeWithChildren:", objc_name="createTreeWithChildren", objc_is_class_method=true)
+	AUParameterTree_createTreeWithChildren :: proc(children: ^NS.Array) -> ^AUParameterTree ---
+}

@@ -47,3 +47,12 @@ Octree_removeElement :: proc {
 	Octree_removeElement_,
 	Octree_removeElement_withNode,
 }
+
+
+@(objc_class="GKOctreeNode", objc_superclass=NS.Object)
+OctreeNode :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=OctreeNode, objc_selector="box", objc_name="box")
+	OctreeNode_box :: proc(self: ^OctreeNode) -> Box ---
+}

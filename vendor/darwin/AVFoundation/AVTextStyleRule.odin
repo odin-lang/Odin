@@ -3,6 +3,7 @@
 package darwin_AVFoundation
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="AVTextStyleRule", objc_superclass=NS.Object)
 TextStyleRule :: struct {
@@ -55,3 +56,7 @@ TextStyleRule_initWithTextMarkupAttributes :: proc {
 	TextStyleRule_initWithTextMarkupAttributes_,
 	TextStyleRule_initWithTextMarkupAttributes_textSelector,
 }
+
+
+@(objc_class="AVTextStyleRuleInternal")
+TextStyleRuleInternal :: struct { using _: intrinsics.objc_object}

@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIStoryboard", objc_superclass=NS.Object)
 Storyboard :: struct { using _: NS.Object}
 
@@ -33,4 +29,61 @@ foreign lib {
 Storyboard_instantiateViewControllerWithIdentifier :: proc {
 	Storyboard_instantiateViewControllerWithIdentifier_,
 	Storyboard_instantiateViewControllerWithIdentifier_creator,
+}
+
+
+@(objc_class="UIStoryboardPopoverSegue", objc_superclass=StoryboardSegue)
+StoryboardPopoverSegue :: struct { using _: StoryboardSegue}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=StoryboardPopoverSegue, objc_selector="popoverController", objc_name="popoverController")
+	StoryboardPopoverSegue_popoverController :: proc(self: ^StoryboardPopoverSegue) -> ^PopoverController ---
+}
+
+
+@(objc_class="UIStoryboardSegue", objc_superclass=NS.Object)
+StoryboardSegue :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=StoryboardSegue, objc_selector="segueWithIdentifier:source:destination:performHandler:", objc_name="segueWithIdentifier", objc_is_class_method=true)
+	StoryboardSegue_segueWithIdentifier :: proc(identifier: ^NS.String, source: ^ViewController, destination: ^ViewController, performHandler: ^Objc_Block(proc "c" ())) -> instancetype ---
+
+	@(objc_type=StoryboardSegue, objc_selector="initWithIdentifier:source:destination:", objc_name="initWithIdentifier")
+	StoryboardSegue_initWithIdentifier :: proc(self: ^StoryboardSegue, identifier: ^NS.String, source: ^ViewController, destination: ^ViewController) -> instancetype ---
+
+	@(objc_type=StoryboardSegue, objc_selector="init", objc_name="init")
+	StoryboardSegue_init :: proc(self: ^StoryboardSegue) -> instancetype ---
+
+	@(objc_type=StoryboardSegue, objc_selector="perform", objc_name="perform")
+	StoryboardSegue_perform :: proc(self: ^StoryboardSegue) ---
+
+	@(objc_type=StoryboardSegue, objc_selector="identifier", objc_name="identifier")
+	StoryboardSegue_identifier :: proc(self: ^StoryboardSegue) -> ^NS.String ---
+
+	@(objc_type=StoryboardSegue, objc_selector="sourceViewController", objc_name="sourceViewController")
+	StoryboardSegue_sourceViewController :: proc(self: ^StoryboardSegue) -> ^ViewController ---
+
+	@(objc_type=StoryboardSegue, objc_selector="destinationViewController", objc_name="destinationViewController")
+	StoryboardSegue_destinationViewController :: proc(self: ^StoryboardSegue) -> ^ViewController ---
+}
+
+
+@(objc_class="UIStoryboardUnwindSegueSource", objc_superclass=NS.Object)
+StoryboardUnwindSegueSource :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=StoryboardUnwindSegueSource, objc_selector="init", objc_name="init")
+	StoryboardUnwindSegueSource_init :: proc(self: ^StoryboardUnwindSegueSource) -> instancetype ---
+
+	@(objc_type=StoryboardUnwindSegueSource, objc_selector="sourceViewController", objc_name="sourceViewController")
+	StoryboardUnwindSegueSource_sourceViewController :: proc(self: ^StoryboardUnwindSegueSource) -> ^ViewController ---
+
+	@(objc_type=StoryboardUnwindSegueSource, objc_selector="unwindAction", objc_name="unwindAction")
+	StoryboardUnwindSegueSource_unwindAction :: proc(self: ^StoryboardUnwindSegueSource) -> SEL ---
+
+	@(objc_type=StoryboardUnwindSegueSource, objc_selector="sender", objc_name="sender")
+	StoryboardUnwindSegueSource_sender :: proc(self: ^StoryboardUnwindSegueSource) -> id ---
 }

@@ -3,6 +3,8 @@
 package darwin_GameKit
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
+import cffi "core:c"
 
 @(objc_class="GKMatch", objc_superclass=NS.Object)
 Match :: struct { using _: NS.Object}
@@ -73,4 +75,144 @@ Match_sendDataToAllPlayers :: #force_inline proc "c" (self: ^Match, data: ^NS.Da
 Match_sendData_toPlayers_withDataMode :: #force_inline proc "c" (self: ^Match, data: ^NS.Data, playerIDs: ^NS.Array, mode: MatchSendDataMode) -> (ok: bool, err: ^NS.Error) {
 	ok = Match_sendData_toPlayers_withDataMode_error(self, data, playerIDs, mode, &err)
 	return
+}
+
+
+@(objc_class="GKMatchDelegate")
+MatchDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=MatchDelegate, objc_selector="match:didReceiveData:fromRemotePlayer:", objc_name="match_didReceiveData_fromRemotePlayer")
+	MatchDelegate_match_didReceiveData_fromRemotePlayer :: proc(self: ^MatchDelegate, match: ^Match, data: ^NS.Data, player: ^Player) ---
+
+	@(objc_type=MatchDelegate, objc_selector="match:didReceiveData:forRecipient:fromRemotePlayer:", objc_name="match_didReceiveData_forRecipient_fromRemotePlayer")
+	MatchDelegate_match_didReceiveData_forRecipient_fromRemotePlayer :: proc(self: ^MatchDelegate, match: ^Match, data: ^NS.Data, recipient: ^Player, player: ^Player) ---
+
+	@(objc_type=MatchDelegate, objc_selector="match:player:didChangeConnectionState:", objc_name="match_player_didChangeConnectionState")
+	MatchDelegate_match_player_didChangeConnectionState :: proc(self: ^MatchDelegate, match: ^Match, player: ^Player, state: PlayerConnectionState) ---
+
+	@(objc_type=MatchDelegate, objc_selector="match:didFailWithError:", objc_name="match_didFailWithError")
+	MatchDelegate_match_didFailWithError :: proc(self: ^MatchDelegate, match: ^Match, error: ^NS.Error) ---
+
+	@(objc_type=MatchDelegate, objc_selector="match:shouldReinviteDisconnectedPlayer:", objc_name="match_shouldReinviteDisconnectedPlayer")
+	MatchDelegate_match_shouldReinviteDisconnectedPlayer :: proc(self: ^MatchDelegate, match: ^Match, player: ^Player) -> bool ---
+
+	@(objc_type=MatchDelegate, objc_selector="match:didReceiveData:fromPlayer:", objc_name="match_didReceiveData_fromPlayer")
+	MatchDelegate_match_didReceiveData_fromPlayer :: proc(self: ^MatchDelegate, match: ^Match, data: ^NS.Data, playerID: ^NS.String) ---
+
+	@(objc_type=MatchDelegate, objc_selector="match:player:didChangeState:", objc_name="match_player_didChangeState")
+	MatchDelegate_match_player_didChangeState :: proc(self: ^MatchDelegate, match: ^Match, playerID: ^NS.String, state: PlayerConnectionState) ---
+
+	@(objc_type=MatchDelegate, objc_selector="match:shouldReinvitePlayer:", objc_name="match_shouldReinvitePlayer")
+	MatchDelegate_match_shouldReinvitePlayer :: proc(self: ^MatchDelegate, match: ^Match, playerID: ^NS.String) -> bool ---
+}
+
+
+
+@(objc_type=MatchDelegate, objc_name="match")
+MatchDelegate_match :: proc {
+	MatchDelegate_match_didReceiveData_fromRemotePlayer,
+	MatchDelegate_match_didReceiveData_forRecipient_fromRemotePlayer,
+	MatchDelegate_match_player_didChangeConnectionState,
+	MatchDelegate_match_didFailWithError,
+	MatchDelegate_match_shouldReinviteDisconnectedPlayer,
+	MatchDelegate_match_didReceiveData_fromPlayer,
+	MatchDelegate_match_player_didChangeState,
+	MatchDelegate_match_shouldReinvitePlayer,
+}
+
+
+@(objc_class="GKMatchRequest", objc_superclass=NS.Object)
+MatchRequest :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=MatchRequest, objc_selector="maxPlayersAllowedForMatchOfType:", objc_name="maxPlayersAllowedForMatchOfType", objc_is_class_method=true)
+	MatchRequest_maxPlayersAllowedForMatchOfType :: proc(matchType: MatchType) -> NS.UInteger ---
+
+	@(objc_type=MatchRequest, objc_selector="minPlayers", objc_name="minPlayers")
+	MatchRequest_minPlayers :: proc(self: ^MatchRequest) -> NS.UInteger ---
+
+	@(objc_type=MatchRequest, objc_selector="setMinPlayers:", objc_name="setMinPlayers")
+	MatchRequest_setMinPlayers :: proc(self: ^MatchRequest, minPlayers: NS.UInteger) ---
+
+	@(objc_type=MatchRequest, objc_selector="maxPlayers", objc_name="maxPlayers")
+	MatchRequest_maxPlayers :: proc(self: ^MatchRequest) -> NS.UInteger ---
+
+	@(objc_type=MatchRequest, objc_selector="setMaxPlayers:", objc_name="setMaxPlayers")
+	MatchRequest_setMaxPlayers :: proc(self: ^MatchRequest, maxPlayers: NS.UInteger) ---
+
+	@(objc_type=MatchRequest, objc_selector="playerGroup", objc_name="playerGroup")
+	MatchRequest_playerGroup :: proc(self: ^MatchRequest) -> NS.UInteger ---
+
+	@(objc_type=MatchRequest, objc_selector="setPlayerGroup:", objc_name="setPlayerGroup")
+	MatchRequest_setPlayerGroup :: proc(self: ^MatchRequest, playerGroup: NS.UInteger) ---
+
+	@(objc_type=MatchRequest, objc_selector="playerAttributes", objc_name="playerAttributes")
+	MatchRequest_playerAttributes :: proc(self: ^MatchRequest) -> cffi.uint32_t ---
+
+	@(objc_type=MatchRequest, objc_selector="setPlayerAttributes:", objc_name="setPlayerAttributes")
+	MatchRequest_setPlayerAttributes :: proc(self: ^MatchRequest, playerAttributes: cffi.uint32_t) ---
+
+	@(objc_type=MatchRequest, objc_selector="recipients", objc_name="recipients")
+	MatchRequest_recipients :: proc(self: ^MatchRequest) -> ^NS.Array ---
+
+	@(objc_type=MatchRequest, objc_selector="setRecipients:", objc_name="setRecipients")
+	MatchRequest_setRecipients :: proc(self: ^MatchRequest, recipients: ^NS.Array) ---
+
+	@(objc_type=MatchRequest, objc_selector="inviteMessage", objc_name="inviteMessage")
+	MatchRequest_inviteMessage :: proc(self: ^MatchRequest) -> ^NS.String ---
+
+	@(objc_type=MatchRequest, objc_selector="setInviteMessage:", objc_name="setInviteMessage")
+	MatchRequest_setInviteMessage :: proc(self: ^MatchRequest, inviteMessage: ^NS.String) ---
+
+	@(objc_type=MatchRequest, objc_selector="defaultNumberOfPlayers", objc_name="defaultNumberOfPlayers")
+	MatchRequest_defaultNumberOfPlayers :: proc(self: ^MatchRequest) -> NS.UInteger ---
+
+	@(objc_type=MatchRequest, objc_selector="setDefaultNumberOfPlayers:", objc_name="setDefaultNumberOfPlayers")
+	MatchRequest_setDefaultNumberOfPlayers :: proc(self: ^MatchRequest, defaultNumberOfPlayers: NS.UInteger) ---
+
+	@(objc_type=MatchRequest, objc_selector="restrictToAutomatch", objc_name="restrictToAutomatch")
+	MatchRequest_restrictToAutomatch :: proc(self: ^MatchRequest) -> bool ---
+
+	@(objc_type=MatchRequest, objc_selector="setRestrictToAutomatch:", objc_name="setRestrictToAutomatch")
+	MatchRequest_setRestrictToAutomatch :: proc(self: ^MatchRequest, restrictToAutomatch: bool) ---
+
+	@(objc_type=MatchRequest, objc_selector="recipientResponseHandler", objc_name="recipientResponseHandler")
+	MatchRequest_recipientResponseHandler :: proc(self: ^MatchRequest) -> ^Objc_Block(proc "c" ()) ---
+
+	@(objc_type=MatchRequest, objc_selector="setRecipientResponseHandler:", objc_name="setRecipientResponseHandler")
+	MatchRequest_setRecipientResponseHandler :: proc(self: ^MatchRequest, recipientResponseHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=MatchRequest, objc_selector="inviteeResponseHandler", objc_name="inviteeResponseHandler")
+	MatchRequest_inviteeResponseHandler :: proc(self: ^MatchRequest) -> ^Objc_Block(proc "c" ()) ---
+
+	@(objc_type=MatchRequest, objc_selector="setInviteeResponseHandler:", objc_name="setInviteeResponseHandler")
+	MatchRequest_setInviteeResponseHandler :: proc(self: ^MatchRequest, inviteeResponseHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=MatchRequest, objc_selector="playersToInvite", objc_name="playersToInvite")
+	MatchRequest_playersToInvite :: proc(self: ^MatchRequest) -> ^NS.Array ---
+
+	@(objc_type=MatchRequest, objc_selector="setPlayersToInvite:", objc_name="setPlayersToInvite")
+	MatchRequest_setPlayersToInvite :: proc(self: ^MatchRequest, playersToInvite: ^NS.Array) ---
+
+	@(objc_type=MatchRequest, objc_selector="queueName", objc_name="queueName")
+	MatchRequest_queueName :: proc(self: ^MatchRequest) -> ^NS.String ---
+
+	@(objc_type=MatchRequest, objc_selector="setQueueName:", objc_name="setQueueName")
+	MatchRequest_setQueueName :: proc(self: ^MatchRequest, queueName: ^NS.String) ---
+
+	@(objc_type=MatchRequest, objc_selector="properties", objc_name="properties")
+	MatchRequest_properties :: proc(self: ^MatchRequest) -> ^MatchProperties ---
+
+	@(objc_type=MatchRequest, objc_selector="setProperties:", objc_name="setProperties")
+	MatchRequest_setProperties :: proc(self: ^MatchRequest, properties: ^MatchProperties) ---
+
+	@(objc_type=MatchRequest, objc_selector="recipientProperties", objc_name="recipientProperties")
+	MatchRequest_recipientProperties :: proc(self: ^MatchRequest) -> ^NS.Dictionary ---
+
+	@(objc_type=MatchRequest, objc_selector="setRecipientProperties:", objc_name="setRecipientProperties")
+	MatchRequest_setRecipientProperties :: proc(self: ^MatchRequest, recipientProperties: ^NS.Dictionary) ---
 }

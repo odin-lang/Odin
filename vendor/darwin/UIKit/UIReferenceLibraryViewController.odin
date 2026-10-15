@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIReferenceLibraryViewController", objc_superclass=ViewController)
 ReferenceLibraryViewController :: struct { using _: ViewController}
 

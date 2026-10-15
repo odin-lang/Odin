@@ -3,6 +3,7 @@
 package darwin_Foundation
 
 import cffi "core:c"
+import CF "core:sys/darwin/CoreFoundation"
 
 @(objc_class="NSOperation", objc_superclass=Object)
 Operation :: struct { using _: Object}
@@ -76,4 +77,91 @@ foreign lib {
 
 	@(objc_type=Operation, objc_selector="setName:", objc_name="setName")
 	Operation_setName :: proc(self: ^Operation, name: ^String) ---
+}
+
+
+@(objc_class="NSBlockOperation", objc_superclass=Operation)
+BlockOperation :: struct { using _: Operation}
+
+foreign lib {
+	@(objc_type=BlockOperation, objc_selector="blockOperationWithBlock:", objc_name="blockOperationWithBlock", objc_is_class_method=true)
+	BlockOperation_blockOperationWithBlock :: proc(block: ^Objc_Block(proc "c" ())) -> instancetype ---
+
+	@(objc_type=BlockOperation, objc_selector="addExecutionBlock:", objc_name="addExecutionBlock")
+	BlockOperation_addExecutionBlock :: proc(self: ^BlockOperation, block: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=BlockOperation, objc_selector="executionBlocks", objc_name="executionBlocks")
+	BlockOperation_executionBlocks :: proc(self: ^BlockOperation) -> ^Array ---
+}
+
+
+@(objc_class="NSOperationQueue", objc_superclass=Object)
+OperationQueue :: struct {
+	using _: Object,
+	using _: ProgressReporting,
+}
+
+foreign lib {
+	@(objc_type=OperationQueue, objc_selector="addOperation:", objc_name="addOperation")
+	OperationQueue_addOperation :: proc(self: ^OperationQueue, op: ^Operation) ---
+
+	@(objc_type=OperationQueue, objc_selector="addOperations:waitUntilFinished:", objc_name="addOperations")
+	OperationQueue_addOperations :: proc(self: ^OperationQueue, ops: ^Array, wait: bool) ---
+
+	@(objc_type=OperationQueue, objc_selector="addOperationWithBlock:", objc_name="addOperationWithBlock")
+	OperationQueue_addOperationWithBlock :: proc(self: ^OperationQueue, block: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=OperationQueue, objc_selector="addBarrierBlock:", objc_name="addBarrierBlock")
+	OperationQueue_addBarrierBlock :: proc(self: ^OperationQueue, barrier: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=OperationQueue, objc_selector="cancelAllOperations", objc_name="cancelAllOperations")
+	OperationQueue_cancelAllOperations :: proc(self: ^OperationQueue) ---
+
+	@(objc_type=OperationQueue, objc_selector="waitUntilAllOperationsAreFinished", objc_name="waitUntilAllOperationsAreFinished")
+	OperationQueue_waitUntilAllOperationsAreFinished :: proc(self: ^OperationQueue) ---
+
+	@(objc_type=OperationQueue, objc_selector="progress", objc_name="progress")
+	OperationQueue_progress :: proc(self: ^OperationQueue) -> ^Progress ---
+
+	@(objc_type=OperationQueue, objc_selector="maxConcurrentOperationCount", objc_name="maxConcurrentOperationCount")
+	OperationQueue_maxConcurrentOperationCount :: proc(self: ^OperationQueue) -> Integer ---
+
+	@(objc_type=OperationQueue, objc_selector="setMaxConcurrentOperationCount:", objc_name="setMaxConcurrentOperationCount")
+	OperationQueue_setMaxConcurrentOperationCount :: proc(self: ^OperationQueue, maxConcurrentOperationCount: Integer) ---
+
+	@(objc_type=OperationQueue, objc_selector="isSuspended", objc_name="isSuspended")
+	OperationQueue_isSuspended :: proc(self: ^OperationQueue) -> bool ---
+
+	@(objc_type=OperationQueue, objc_selector="setSuspended:", objc_name="setSuspended")
+	OperationQueue_setSuspended :: proc(self: ^OperationQueue, suspended: bool) ---
+
+	@(objc_type=OperationQueue, objc_selector="name", objc_name="name")
+	OperationQueue_name :: proc(self: ^OperationQueue) -> ^String ---
+
+	@(objc_type=OperationQueue, objc_selector="setName:", objc_name="setName")
+	OperationQueue_setName :: proc(self: ^OperationQueue, name: ^String) ---
+
+	@(objc_type=OperationQueue, objc_selector="qualityOfService", objc_name="qualityOfService")
+	OperationQueue_qualityOfService :: proc(self: ^OperationQueue) -> QualityOfService ---
+
+	@(objc_type=OperationQueue, objc_selector="setQualityOfService:", objc_name="setQualityOfService")
+	OperationQueue_setQualityOfService :: proc(self: ^OperationQueue, qualityOfService: QualityOfService) ---
+
+	@(objc_type=OperationQueue, objc_selector="underlyingQueue", objc_name="underlyingQueue")
+	OperationQueue_underlyingQueue :: proc(self: ^OperationQueue) -> CF.dispatch_queue_t ---
+
+	@(objc_type=OperationQueue, objc_selector="setUnderlyingQueue:", objc_name="setUnderlyingQueue")
+	OperationQueue_setUnderlyingQueue :: proc(self: ^OperationQueue, underlyingQueue: CF.dispatch_queue_t) ---
+
+	@(objc_type=OperationQueue, objc_selector="currentQueue", objc_name="currentQueue", objc_is_class_method=true)
+	OperationQueue_currentQueue :: proc() -> ^OperationQueue ---
+
+	@(objc_type=OperationQueue, objc_selector="mainQueue", objc_name="mainQueue", objc_is_class_method=true)
+	OperationQueue_mainQueue :: proc() -> ^OperationQueue ---
+
+	@(objc_type=OperationQueue, objc_selector="operations", objc_name="operations")
+	OperationQueue_operations :: proc(self: ^OperationQueue) -> ^Array ---
+
+	@(objc_type=OperationQueue, objc_selector="operationCount", objc_name="operationCount")
+	OperationQueue_operationCount :: proc(self: ^OperationQueue) -> UInteger ---
 }

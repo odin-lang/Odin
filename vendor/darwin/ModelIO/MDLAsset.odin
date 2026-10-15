@@ -4,6 +4,7 @@ package darwin_ModelIO
 
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="MDLAsset", objc_superclass=NS.Object)
 Asset :: struct {
@@ -150,4 +151,73 @@ Asset_exportAssetToURL :: proc {
 Asset_initWithURL_vertexDescriptor_bufferAllocator_preserveTopology :: #force_inline proc "c" (self: ^Asset, _URL: ^NS.URL, vertexDescriptor: ^VertexDescriptor, bufferAllocator: ^MeshBufferAllocator, preserveTopology: bool) -> (res: ^Asset, err: ^NS.Error) {
 	res = Asset_initWithURL_vertexDescriptor_bufferAllocator_preserveTopology_error(self, _URL, vertexDescriptor, bufferAllocator, preserveTopology, &err)
 	return
+}
+
+
+@(objc_class="MDLAssetResolver")
+AssetResolver :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=AssetResolver, objc_selector="canResolveAssetNamed:", objc_name="canResolveAssetNamed")
+	AssetResolver_canResolveAssetNamed :: proc(self: ^AssetResolver, name: ^NS.String) -> bool ---
+
+	@(objc_type=AssetResolver, objc_selector="resolveAssetNamed:", objc_name="resolveAssetNamed")
+	AssetResolver_resolveAssetNamed :: proc(self: ^AssetResolver, name: ^NS.String) -> ^NS.URL ---
+}
+
+
+@(objc_class="MDLBundleAssetResolver", objc_superclass=NS.Object)
+BundleAssetResolver :: struct {
+	using _: NS.Object,
+	using _: AssetResolver,
+}
+
+foreign lib {
+	@(objc_type=BundleAssetResolver, objc_selector="initWithBundle:", objc_name="initWithBundle")
+	BundleAssetResolver_initWithBundle :: proc(self: ^BundleAssetResolver, path: ^NS.String) -> instancetype ---
+
+	@(objc_type=BundleAssetResolver, objc_selector="path", objc_name="path")
+	BundleAssetResolver_path :: proc(self: ^BundleAssetResolver) -> ^NS.String ---
+
+	@(objc_type=BundleAssetResolver, objc_selector="setPath:", objc_name="setPath")
+	BundleAssetResolver_setPath :: proc(self: ^BundleAssetResolver, path: ^NS.String) ---
+}
+
+
+@(objc_class="MDLPathAssetResolver", objc_superclass=NS.Object)
+PathAssetResolver :: struct {
+	using _: NS.Object,
+	using _: AssetResolver,
+}
+
+foreign lib {
+	@(objc_type=PathAssetResolver, objc_selector="initWithPath:", objc_name="initWithPath")
+	PathAssetResolver_initWithPath :: proc(self: ^PathAssetResolver, path: ^NS.String) -> instancetype ---
+
+	@(objc_type=PathAssetResolver, objc_selector="path", objc_name="path")
+	PathAssetResolver_path :: proc(self: ^PathAssetResolver) -> ^NS.String ---
+
+	@(objc_type=PathAssetResolver, objc_selector="setPath:", objc_name="setPath")
+	PathAssetResolver_setPath :: proc(self: ^PathAssetResolver, path: ^NS.String) ---
+}
+
+
+@(objc_class="MDLRelativeAssetResolver", objc_superclass=NS.Object)
+RelativeAssetResolver :: struct {
+	using _: NS.Object,
+	using _: AssetResolver,
+}
+
+foreign lib {
+	@(objc_type=RelativeAssetResolver, objc_selector="initWithAsset:", objc_name="initWithAsset")
+	RelativeAssetResolver_initWithAsset :: proc(self: ^RelativeAssetResolver, asset: ^Asset) -> instancetype ---
+
+	@(objc_type=RelativeAssetResolver, objc_selector="asset", objc_name="asset")
+	RelativeAssetResolver_asset :: proc(self: ^RelativeAssetResolver) -> ^Asset ---
+
+	@(objc_type=RelativeAssetResolver, objc_selector="setAsset:", objc_name="setAsset")
+	RelativeAssetResolver_setAsset :: proc(self: ^RelativeAssetResolver, asset: ^Asset) ---
 }

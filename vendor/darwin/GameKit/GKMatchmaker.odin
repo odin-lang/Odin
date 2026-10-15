@@ -3,6 +3,7 @@
 package darwin_GameKit
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="GKMatchmaker", objc_superclass=NS.Object)
 Matchmaker :: struct { using _: NS.Object}
@@ -70,4 +71,110 @@ foreign lib {
 
 	@(objc_type=Matchmaker, objc_selector="findPlayersForHostedMatchRequest:withCompletionHandler:", objc_name="findPlayersForHostedMatchRequest")
 	Matchmaker_findPlayersForHostedMatchRequest :: proc(self: ^Matchmaker, request: ^MatchRequest, completionHandler: ^Objc_Block(proc "c" ( playerIDs: ^NS.Array, error: ^NS.Error ))) ---
+}
+
+
+when ODIN_PLATFORM_SUBTARGET == .Default {
+	@(objc_class="GKMatchmakerViewController", objc_superclass=UI_ViewController)
+	MatchmakerViewController :: struct {
+		using _: UI_ViewController,
+		using _: ViewController,
+	}
+} else when ODIN_PLATFORM_SUBTARGET_IOS {
+	@(objc_class="GKMatchmakerViewController", objc_superclass=UI_NavigationController)
+	MatchmakerViewController :: struct { using _: UI_NavigationController}
+}
+
+foreign lib {
+	@(objc_type=MatchmakerViewController, objc_selector="initWithMatchRequest:", objc_name="initWithMatchRequest")
+	MatchmakerViewController_initWithMatchRequest :: proc(self: ^MatchmakerViewController, request: ^MatchRequest) -> id ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="initWithInvite:", objc_name="initWithInvite")
+	MatchmakerViewController_initWithInvite :: proc(self: ^MatchmakerViewController, invite: ^Invite) -> id ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="addPlayersToMatch:", objc_name="addPlayersToMatch")
+	MatchmakerViewController_addPlayersToMatch :: proc(self: ^MatchmakerViewController, match: ^Match) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setHostedPlayer:didConnect:", objc_name="setHostedPlayer_didConnect")
+	MatchmakerViewController_setHostedPlayer_didConnect :: proc(self: ^MatchmakerViewController, player: ^Player, connected: bool) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="matchmakerDelegate", objc_name="matchmakerDelegate")
+	MatchmakerViewController_matchmakerDelegate :: proc(self: ^MatchmakerViewController) -> ^MatchmakerViewControllerDelegate ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setMatchmakerDelegate:", objc_name="setMatchmakerDelegate")
+	MatchmakerViewController_setMatchmakerDelegate :: proc(self: ^MatchmakerViewController, matchmakerDelegate: ^MatchmakerViewControllerDelegate) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="matchRequest", objc_name="matchRequest")
+	MatchmakerViewController_matchRequest :: proc(self: ^MatchmakerViewController) -> ^MatchRequest ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="isHosted", objc_name="isHosted")
+	MatchmakerViewController_isHosted :: proc(self: ^MatchmakerViewController) -> bool ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setHosted:", objc_name="setHosted")
+	MatchmakerViewController_setHosted :: proc(self: ^MatchmakerViewController, hosted: bool) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="matchmakingMode", objc_name="matchmakingMode")
+	MatchmakerViewController_matchmakingMode :: proc(self: ^MatchmakerViewController) -> MatchmakingMode ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setMatchmakingMode:", objc_name="setMatchmakingMode")
+	MatchmakerViewController_setMatchmakingMode :: proc(self: ^MatchmakerViewController, matchmakingMode: MatchmakingMode) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="canStartWithMinimumPlayers", objc_name="canStartWithMinimumPlayers")
+	MatchmakerViewController_canStartWithMinimumPlayers :: proc(self: ^MatchmakerViewController) -> bool ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setCanStartWithMinimumPlayers:", objc_name="setCanStartWithMinimumPlayers")
+	MatchmakerViewController_setCanStartWithMinimumPlayers :: proc(self: ^MatchmakerViewController, canStartWithMinimumPlayers: bool) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="defaultInvitationMessage", objc_name="defaultInvitationMessage")
+	MatchmakerViewController_defaultInvitationMessage :: proc(self: ^MatchmakerViewController) -> ^NS.String ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setDefaultInvitationMessage:", objc_name="setDefaultInvitationMessage")
+	MatchmakerViewController_setDefaultInvitationMessage :: proc(self: ^MatchmakerViewController, defaultInvitationMessage: ^NS.String) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setHostedPlayer:connected:", objc_name="setHostedPlayer_connected")
+	MatchmakerViewController_setHostedPlayer_connected :: proc(self: ^MatchmakerViewController, playerID: ^NS.String, connected: bool) ---
+
+	@(objc_type=MatchmakerViewController, objc_selector="setHostedPlayerReady:", objc_name="setHostedPlayerReady")
+	MatchmakerViewController_setHostedPlayerReady :: proc(self: ^MatchmakerViewController, playerID: ^NS.String) ---
+}
+
+
+
+@(objc_type=MatchmakerViewController, objc_name="setHostedPlayer")
+MatchmakerViewController_setHostedPlayer :: proc {
+	MatchmakerViewController_setHostedPlayer_didConnect,
+	MatchmakerViewController_setHostedPlayer_connected,
+}
+
+
+@(objc_class="GKMatchmakerViewControllerDelegate")
+MatchmakerViewControllerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewControllerWasCancelled:", objc_name="matchmakerViewControllerWasCancelled")
+	MatchmakerViewControllerDelegate_matchmakerViewControllerWasCancelled :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController) ---
+
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewController:didFailWithError:", objc_name="matchmakerViewController_didFailWithError")
+	MatchmakerViewControllerDelegate_matchmakerViewController_didFailWithError :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController, error: ^NS.Error) ---
+
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewController:didFindMatch:", objc_name="matchmakerViewController_didFindMatch")
+	MatchmakerViewControllerDelegate_matchmakerViewController_didFindMatch :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController, match: ^Match) ---
+
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewController:didFindHostedPlayers:", objc_name="matchmakerViewController_didFindHostedPlayers")
+	MatchmakerViewControllerDelegate_matchmakerViewController_didFindHostedPlayers :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController, players: ^NS.Array) ---
+
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewController:hostedPlayerDidAccept:", objc_name="matchmakerViewController_hostedPlayerDidAccept")
+	MatchmakerViewControllerDelegate_matchmakerViewController_hostedPlayerDidAccept :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController, player: ^Player) ---
+
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewController:getMatchPropertiesForRecipient:withCompletionHandler:", objc_name="matchmakerViewController_getMatchPropertiesForRecipient_withCompletionHandler")
+	MatchmakerViewControllerDelegate_matchmakerViewController_getMatchPropertiesForRecipient_withCompletionHandler :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController, recipient: ^Player, completionHandler: ^Objc_Block(proc "c" ( recipientProperties: ^MatchProperties ))) ---
+
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewController:didFindPlayers:", objc_name="matchmakerViewController_didFindPlayers")
+	MatchmakerViewControllerDelegate_matchmakerViewController_didFindPlayers :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController, playerIDs: ^NS.Array) ---
+
+	@(objc_type=MatchmakerViewControllerDelegate, objc_selector="matchmakerViewController:didReceiveAcceptFromHostedPlayer:", objc_name="matchmakerViewController_didReceiveAcceptFromHostedPlayer")
+	MatchmakerViewControllerDelegate_matchmakerViewController_didReceiveAcceptFromHostedPlayer :: proc(self: ^MatchmakerViewControllerDelegate, viewController: ^MatchmakerViewController, playerID: ^NS.String) ---
 }

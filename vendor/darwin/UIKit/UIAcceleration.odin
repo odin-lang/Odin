@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIAcceleration", objc_superclass=NS.Object)
 Acceleration :: struct { using _: NS.Object}
 

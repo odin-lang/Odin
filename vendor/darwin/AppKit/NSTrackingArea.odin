@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSTrackingArea", objc_superclass=NS.Object)
 TrackingArea :: struct {
 	using _: NS.Object,

@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSTimeZone", objc_superclass=Object)
 TimeZone :: struct {
 	using _: Object,

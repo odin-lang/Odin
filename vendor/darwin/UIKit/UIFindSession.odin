@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIFindSession", objc_superclass=NS.Object)
 FindSession :: struct { using _: NS.Object}
 

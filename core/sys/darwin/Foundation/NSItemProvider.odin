@@ -2,6 +2,7 @@
 #+build darwin
 package darwin_Foundation
 
+import "base:intrinsics"
 
 @(objc_class="NSItemProvider", objc_superclass=Object)
 ItemProvider :: struct {
@@ -81,4 +82,52 @@ foreign lib {
 
 	@(objc_type=ItemProvider, objc_selector="setPreviewImageHandler:", objc_name="setPreviewImageHandler")
 	ItemProvider_setPreviewImageHandler :: proc(self: ^ItemProvider, previewImageHandler: ItemProviderLoadHandler) ---
+}
+
+
+@(objc_class="NSItemProviderReading")
+ItemProviderReading :: struct {
+	using _: intrinsics.objc_object,
+	using _: ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=ItemProviderReading, objc_selector="objectWithItemProviderData:typeIdentifier:error:", objc_name="objectWithItemProviderData_error", objc_is_class_method=true)
+	ItemProviderReading_objectWithItemProviderData_error :: proc(data: ^Data, typeIdentifier: ^String, outError: ^^Error) -> instancetype ---
+
+	@(objc_type=ItemProviderReading, objc_selector="readableTypeIdentifiersForItemProvider", objc_name="readableTypeIdentifiersForItemProvider", objc_is_class_method=true)
+	ItemProviderReading_readableTypeIdentifiersForItemProvider :: proc() -> ^Array ---
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=ItemProviderReading, objc_name="objectWithItemProviderData", objc_is_class_method=true)
+ItemProviderReading_objectWithItemProviderData :: #force_inline proc "c" (data: ^Data, typeIdentifier: ^String) -> (res: ^ItemProviderReading, err: ^Error) {
+	res = ItemProviderReading.objectWithItemProviderData_error(data, typeIdentifier, &err)
+	return
+}
+
+
+@(objc_class="NSItemProviderWriting")
+ItemProviderWriting :: struct {
+	using _: intrinsics.objc_object,
+	using _: ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=ItemProviderWriting, objc_selector="itemProviderVisibilityForRepresentationWithTypeIdentifier:", objc_name="itemProviderVisibilityForRepresentationWithTypeIdentifierStatic", objc_is_class_method=true)
+	ItemProviderWriting_itemProviderVisibilityForRepresentationWithTypeIdentifierStatic :: proc(typeIdentifier: ^String) -> ItemProviderRepresentationVisibility ---
+
+	@(objc_type=ItemProviderWriting, objc_selector="itemProviderVisibilityForRepresentationWithTypeIdentifier:", objc_name="itemProviderVisibilityForRepresentationWithTypeIdentifier")
+	ItemProviderWriting_itemProviderVisibilityForRepresentationWithTypeIdentifier :: proc(self: ^ItemProviderWriting, typeIdentifier: ^String) -> ItemProviderRepresentationVisibility ---
+
+	@(objc_type=ItemProviderWriting, objc_selector="loadDataWithTypeIdentifier:forItemProviderCompletionHandler:", objc_name="loadDataWithTypeIdentifier")
+	ItemProviderWriting_loadDataWithTypeIdentifier :: proc(self: ^ItemProviderWriting, typeIdentifier: ^String, completionHandler: ^Objc_Block(proc "c" ( data: ^Data, error: ^Error ))) -> ^Progress ---
+
+	@(objc_type=ItemProviderWriting, objc_selector="writableTypeIdentifiersForItemProvider", objc_name="writableTypeIdentifiersForItemProviderStatic", objc_is_class_method=true)
+	ItemProviderWriting_writableTypeIdentifiersForItemProviderStatic :: proc() -> ^Array ---
+
+	@(objc_type=ItemProviderWriting, objc_selector="writableTypeIdentifiersForItemProvider", objc_name="writableTypeIdentifiersForItemProvider")
+	ItemProviderWriting_writableTypeIdentifiersForItemProvider :: proc(self: ^ItemProviderWriting) -> ^Array ---
 }

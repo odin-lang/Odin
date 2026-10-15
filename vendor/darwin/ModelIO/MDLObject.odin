@@ -3,6 +3,7 @@
 package darwin_ModelIO
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="MDLObject", objc_superclass=NS.Object)
 Object :: struct {
@@ -70,4 +71,36 @@ foreign lib {
 
 	@(objc_type=Object, objc_selector="setHidden:", objc_name="setHidden")
 	Object_setHidden :: proc(self: ^Object, hidden: bool) ---
+}
+
+
+@(objc_class="MDLObjectContainer", objc_superclass=NS.Object)
+ObjectContainer :: struct {
+	using _: NS.Object,
+	using _: ObjectContainerComponent,
+}
+
+
+@(objc_class="MDLObjectContainerComponent")
+ObjectContainerComponent :: struct {
+	using _: intrinsics.objc_object,
+	using _: Component,
+	using _: NS.FastEnumeration,
+}
+
+foreign lib {
+	@(objc_type=ObjectContainerComponent, objc_selector="addObject:", objc_name="addObject")
+	ObjectContainerComponent_addObject :: proc(self: ^ObjectContainerComponent, object: ^Object) ---
+
+	@(objc_type=ObjectContainerComponent, objc_selector="removeObject:", objc_name="removeObject")
+	ObjectContainerComponent_removeObject :: proc(self: ^ObjectContainerComponent, object: ^Object) ---
+
+	@(objc_type=ObjectContainerComponent, objc_selector="objectAtIndexedSubscript:", objc_name="objectAtIndexedSubscript")
+	ObjectContainerComponent_objectAtIndexedSubscript :: proc(self: ^ObjectContainerComponent, index: NS.UInteger) -> ^Object ---
+
+	@(objc_type=ObjectContainerComponent, objc_selector="count", objc_name="count")
+	ObjectContainerComponent_count :: proc(self: ^ObjectContainerComponent) -> NS.UInteger ---
+
+	@(objc_type=ObjectContainerComponent, objc_selector="objects", objc_name="objects")
+	ObjectContainerComponent_objects :: proc(self: ^ObjectContainerComponent) -> ^NS.Array ---
 }

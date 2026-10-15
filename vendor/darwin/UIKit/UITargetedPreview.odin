@@ -5,10 +5,6 @@ package darwin_UIKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UITargetedPreview", objc_superclass=NS.Object)
 TargetedPreview :: struct {
 	using _: NS.Object,
@@ -53,4 +49,26 @@ TargetedPreview_initWithView :: proc {
 	TargetedPreview_initWithView_parameters_target,
 	TargetedPreview_initWithView_parameters,
 	TargetedPreview_initWithView_,
+}
+
+
+@(objc_class="UITargetedDragPreview", objc_superclass=TargetedPreview)
+TargetedDragPreview :: struct { using _: TargetedPreview}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=TargetedDragPreview, objc_selector="retargetedPreviewWithTarget:", objc_name="retargetedPreviewWithTarget")
+	TargetedDragPreview_retargetedPreviewWithTarget :: proc(self: ^TargetedDragPreview, newTarget: ^DragPreviewTarget) -> ^TargetedDragPreview ---
+
+	@(objc_type=TargetedDragPreview, objc_selector="previewForURL:target:", objc_name="previewForURL_target", objc_is_class_method=true)
+	TargetedDragPreview_previewForURL_target :: proc(url: ^NS.URL, target: ^DragPreviewTarget) -> instancetype ---
+
+	@(objc_type=TargetedDragPreview, objc_selector="previewForURL:title:target:", objc_name="previewForURL_title_target", objc_is_class_method=true)
+	TargetedDragPreview_previewForURL_title_target :: proc(url: ^NS.URL, title: ^NS.String, target: ^DragPreviewTarget) -> instancetype ---
+}
+
+@(objc_type=TargetedDragPreview, objc_name="previewForURL", objc_is_class_method=true)
+TargetedDragPreview_previewForURL :: proc {
+	TargetedDragPreview_previewForURL_target,
+	TargetedDragPreview_previewForURL_title_target,
 }

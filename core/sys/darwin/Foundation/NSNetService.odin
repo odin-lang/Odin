@@ -3,6 +3,7 @@
 package darwin_Foundation
 
 import cffi "core:c"
+import "base:intrinsics"
 
 @(objc_class="NSNetService", objc_superclass=Object)
 NetService :: struct { using _: Object}
@@ -93,4 +94,109 @@ foreign lib {
 NetService_initWithDomain :: proc {
 	NetService_initWithDomain_type_name_port,
 	NetService_initWithDomain_type_name,
+}
+
+
+@(objc_class="NSNetServiceDelegate")
+NetServiceDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=NetServiceDelegate, objc_selector="netServiceWillPublish:", objc_name="netServiceWillPublish")
+	NetServiceDelegate_netServiceWillPublish :: proc(self: ^NetServiceDelegate, sender: ^NetService) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netServiceDidPublish:", objc_name="netServiceDidPublish")
+	NetServiceDelegate_netServiceDidPublish :: proc(self: ^NetServiceDelegate, sender: ^NetService) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netService:didNotPublish:", objc_name="netService_didNotPublish")
+	NetServiceDelegate_netService_didNotPublish :: proc(self: ^NetServiceDelegate, sender: ^NetService, errorDict: ^Dictionary) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netServiceWillResolve:", objc_name="netServiceWillResolve")
+	NetServiceDelegate_netServiceWillResolve :: proc(self: ^NetServiceDelegate, sender: ^NetService) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netServiceDidResolveAddress:", objc_name="netServiceDidResolveAddress")
+	NetServiceDelegate_netServiceDidResolveAddress :: proc(self: ^NetServiceDelegate, sender: ^NetService) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netService:didNotResolve:", objc_name="netService_didNotResolve")
+	NetServiceDelegate_netService_didNotResolve :: proc(self: ^NetServiceDelegate, sender: ^NetService, errorDict: ^Dictionary) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netServiceDidStop:", objc_name="netServiceDidStop")
+	NetServiceDelegate_netServiceDidStop :: proc(self: ^NetServiceDelegate, sender: ^NetService) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netService:didUpdateTXTRecordData:", objc_name="netService_didUpdateTXTRecordData")
+	NetServiceDelegate_netService_didUpdateTXTRecordData :: proc(self: ^NetServiceDelegate, sender: ^NetService, data: ^Data) ---
+
+	@(objc_type=NetServiceDelegate, objc_selector="netService:didAcceptConnectionWithInputStream:outputStream:", objc_name="netService_didAcceptConnectionWithInputStream_outputStream")
+	NetServiceDelegate_netService_didAcceptConnectionWithInputStream_outputStream :: proc(self: ^NetServiceDelegate, sender: ^NetService, inputStream: ^InputStream, outputStream: ^OutputStream) ---
+}
+
+
+@(objc_class="NSNetServiceBrowser", objc_superclass=Object)
+NetServiceBrowser :: struct { using _: Object}
+
+foreign lib {
+	@(objc_type=NetServiceBrowser, objc_selector="init", objc_name="init")
+	NetServiceBrowser_init :: proc(self: ^NetServiceBrowser) -> instancetype ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="scheduleInRunLoop:forMode:", objc_name="scheduleInRunLoop")
+	NetServiceBrowser_scheduleInRunLoop :: proc(self: ^NetServiceBrowser, aRunLoop: ^RunLoop, mode: ^String) ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="removeFromRunLoop:forMode:", objc_name="removeFromRunLoop")
+	NetServiceBrowser_removeFromRunLoop :: proc(self: ^NetServiceBrowser, aRunLoop: ^RunLoop, mode: ^String) ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="searchForBrowsableDomains", objc_name="searchForBrowsableDomains")
+	NetServiceBrowser_searchForBrowsableDomains :: proc(self: ^NetServiceBrowser) ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="searchForRegistrationDomains", objc_name="searchForRegistrationDomains")
+	NetServiceBrowser_searchForRegistrationDomains :: proc(self: ^NetServiceBrowser) ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="searchForServicesOfType:inDomain:", objc_name="searchForServicesOfType")
+	NetServiceBrowser_searchForServicesOfType :: proc(self: ^NetServiceBrowser, type: ^String, domainString: ^String) ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="stop", objc_name="stop")
+	NetServiceBrowser_stop :: proc(self: ^NetServiceBrowser) ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="delegate", objc_name="delegate")
+	NetServiceBrowser_delegate :: proc(self: ^NetServiceBrowser) -> ^NetServiceBrowserDelegate ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="setDelegate:", objc_name="setDelegate")
+	NetServiceBrowser_setDelegate :: proc(self: ^NetServiceBrowser, delegate: ^NetServiceBrowserDelegate) ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="includesPeerToPeer", objc_name="includesPeerToPeer")
+	NetServiceBrowser_includesPeerToPeer :: proc(self: ^NetServiceBrowser) -> bool ---
+
+	@(objc_type=NetServiceBrowser, objc_selector="setIncludesPeerToPeer:", objc_name="setIncludesPeerToPeer")
+	NetServiceBrowser_setIncludesPeerToPeer :: proc(self: ^NetServiceBrowser, includesPeerToPeer: bool) ---
+}
+
+
+@(objc_class="NSNetServiceBrowserDelegate")
+NetServiceBrowserDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=NetServiceBrowserDelegate, objc_selector="netServiceBrowserWillSearch:", objc_name="netServiceBrowserWillSearch")
+	NetServiceBrowserDelegate_netServiceBrowserWillSearch :: proc(self: ^NetServiceBrowserDelegate, browser: ^NetServiceBrowser) ---
+
+	@(objc_type=NetServiceBrowserDelegate, objc_selector="netServiceBrowserDidStopSearch:", objc_name="netServiceBrowserDidStopSearch")
+	NetServiceBrowserDelegate_netServiceBrowserDidStopSearch :: proc(self: ^NetServiceBrowserDelegate, browser: ^NetServiceBrowser) ---
+
+	@(objc_type=NetServiceBrowserDelegate, objc_selector="netServiceBrowser:didNotSearch:", objc_name="netServiceBrowser_didNotSearch")
+	NetServiceBrowserDelegate_netServiceBrowser_didNotSearch :: proc(self: ^NetServiceBrowserDelegate, browser: ^NetServiceBrowser, errorDict: ^Dictionary) ---
+
+	@(objc_type=NetServiceBrowserDelegate, objc_selector="netServiceBrowser:didFindDomain:moreComing:", objc_name="netServiceBrowser_didFindDomain_moreComing")
+	NetServiceBrowserDelegate_netServiceBrowser_didFindDomain_moreComing :: proc(self: ^NetServiceBrowserDelegate, browser: ^NetServiceBrowser, domainString: ^String, moreComing: bool) ---
+
+	@(objc_type=NetServiceBrowserDelegate, objc_selector="netServiceBrowser:didFindService:moreComing:", objc_name="netServiceBrowser_didFindService_moreComing")
+	NetServiceBrowserDelegate_netServiceBrowser_didFindService_moreComing :: proc(self: ^NetServiceBrowserDelegate, browser: ^NetServiceBrowser, service: ^NetService, moreComing: bool) ---
+
+	@(objc_type=NetServiceBrowserDelegate, objc_selector="netServiceBrowser:didRemoveDomain:moreComing:", objc_name="netServiceBrowser_didRemoveDomain_moreComing")
+	NetServiceBrowserDelegate_netServiceBrowser_didRemoveDomain_moreComing :: proc(self: ^NetServiceBrowserDelegate, browser: ^NetServiceBrowser, domainString: ^String, moreComing: bool) ---
+
+	@(objc_type=NetServiceBrowserDelegate, objc_selector="netServiceBrowser:didRemoveService:moreComing:", objc_name="netServiceBrowser_didRemoveService_moreComing")
+	NetServiceBrowserDelegate_netServiceBrowser_didRemoveService_moreComing :: proc(self: ^NetServiceBrowserDelegate, browser: ^NetServiceBrowser, service: ^NetService, moreComing: bool) ---
 }

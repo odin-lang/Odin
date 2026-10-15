@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_MapKit
 
-
 @(objc_class="MKPitchControl", objc_superclass=UI_View)
 PitchControl :: struct { using _: UI_View}
 

@@ -4,12 +4,29 @@ package darwin_AppKit
 
 import "base:intrinsics"
 
-
-
-
-
 @(objc_class="NSPersistentStore")
 PersistentStore :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSPersistentStoreCoordinator")
+PersistentStoreCoordinator :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSPersistentStoreRequest")
+PersistentStoreRequest :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSPersistentStoreResult")
+PersistentStoreResult :: struct { using _: intrinsics.objc_object}
 
 @(default_calling_convention="c")
 foreign lib {}

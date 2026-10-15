@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSPasteboard", objc_superclass=NS.Object)
 Pasteboard :: struct { using _: NS.Object}
@@ -120,4 +117,121 @@ foreign lib {
 
 	@(objc_type=Pasteboard, objc_selector="readFileWrapper", objc_name="readFileWrapper")
 	Pasteboard_readFileWrapper :: proc(self: ^Pasteboard) -> ^NS.FileWrapper ---
+}
+
+
+@(objc_class="NSPasteboardItem", objc_superclass=NS.Object)
+PasteboardItem :: struct {
+	using _: NS.Object,
+	using _: PasteboardWriting,
+	using _: PasteboardReading,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PasteboardItem, objc_selector="availableTypeFromArray:", objc_name="availableTypeFromArray")
+	PasteboardItem_availableTypeFromArray :: proc(self: ^PasteboardItem, types: ^NS.Array) -> ^NS.String ---
+
+	@(objc_type=PasteboardItem, objc_selector="setDataProvider:forTypes:", objc_name="setDataProvider")
+	PasteboardItem_setDataProvider :: proc(self: ^PasteboardItem, dataProvider: ^PasteboardItemDataProvider, types: ^NS.Array) -> bool ---
+
+	@(objc_type=PasteboardItem, objc_selector="setData:forType:", objc_name="setData")
+	PasteboardItem_setData :: proc(self: ^PasteboardItem, data: ^NS.Data, type: ^NS.String) -> bool ---
+
+	@(objc_type=PasteboardItem, objc_selector="setString:forType:", objc_name="setString")
+	PasteboardItem_setString :: proc(self: ^PasteboardItem, string: ^NS.String, type: ^NS.String) -> bool ---
+
+	@(objc_type=PasteboardItem, objc_selector="setPropertyList:forType:", objc_name="setPropertyList")
+	PasteboardItem_setPropertyList :: proc(self: ^PasteboardItem, propertyList: id, type: ^NS.String) -> bool ---
+
+	@(objc_type=PasteboardItem, objc_selector="dataForType:", objc_name="dataForType")
+	PasteboardItem_dataForType :: proc(self: ^PasteboardItem, type: ^NS.String) -> ^NS.Data ---
+
+	@(objc_type=PasteboardItem, objc_selector="stringForType:", objc_name="stringForType")
+	PasteboardItem_stringForType :: proc(self: ^PasteboardItem, type: ^NS.String) -> ^NS.String ---
+
+	@(objc_type=PasteboardItem, objc_selector="propertyListForType:", objc_name="propertyListForType")
+	PasteboardItem_propertyListForType :: proc(self: ^PasteboardItem, type: ^NS.String) -> id ---
+
+	@(objc_type=PasteboardItem, objc_selector="detectPatternsForPatterns:completionHandler:", objc_name="detectPatternsForPatterns")
+	PasteboardItem_detectPatternsForPatterns :: proc(self: ^PasteboardItem, patterns: ^NS.Set, completionHandler: ^Objc_Block(proc "c" ( detectedPatterns: ^NS.Set, error: ^NS.Error ))) ---
+
+	@(objc_type=PasteboardItem, objc_selector="detectValuesForPatterns:completionHandler:", objc_name="detectValuesForPatterns")
+	PasteboardItem_detectValuesForPatterns :: proc(self: ^PasteboardItem, patterns: ^NS.Set, completionHandler: ^Objc_Block(proc "c" ( detectedValues: ^NS.Dictionary, error: ^NS.Error ))) ---
+
+	@(objc_type=PasteboardItem, objc_selector="detectMetadataForTypes:completionHandler:", objc_name="detectMetadataForTypes")
+	PasteboardItem_detectMetadataForTypes :: proc(self: ^PasteboardItem, types: ^NS.Set, completionHandler: ^Objc_Block(proc "c" ( detectedMetadata: ^NS.Dictionary, error: ^NS.Error ))) ---
+
+	@(objc_type=PasteboardItem, objc_selector="types", objc_name="types")
+	PasteboardItem_types :: proc(self: ^PasteboardItem) -> ^NS.Array ---
+}
+
+
+@(objc_class="NSPasteboardItemDataProvider")
+PasteboardItemDataProvider :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PasteboardItemDataProvider, objc_selector="pasteboard:item:provideDataForType:", objc_name="pasteboard")
+	PasteboardItemDataProvider_pasteboard :: proc(self: ^PasteboardItemDataProvider, pasteboard: ^Pasteboard, item: ^PasteboardItem, type: ^NS.String) ---
+
+	@(objc_type=PasteboardItemDataProvider, objc_selector="pasteboardFinishedWithDataProvider:", objc_name="pasteboardFinishedWithDataProvider")
+	PasteboardItemDataProvider_pasteboardFinishedWithDataProvider :: proc(self: ^PasteboardItemDataProvider, pasteboard: ^Pasteboard) ---
+}
+
+
+@(objc_class="NSPasteboardReading")
+PasteboardReading :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PasteboardReading, objc_selector="readableTypesForPasteboard:", objc_name="readableTypesForPasteboard", objc_is_class_method=true)
+	PasteboardReading_readableTypesForPasteboard :: proc(pasteboard: ^Pasteboard) -> ^NS.Array ---
+
+	@(objc_type=PasteboardReading, objc_selector="readingOptionsForType:pasteboard:", objc_name="readingOptionsForType", objc_is_class_method=true)
+	PasteboardReading_readingOptionsForType :: proc(type: ^NS.String, pasteboard: ^Pasteboard) -> PasteboardReadingOptions ---
+
+	@(objc_type=PasteboardReading, objc_selector="initWithPasteboardPropertyList:ofType:", objc_name="initWithPasteboardPropertyList")
+	PasteboardReading_initWithPasteboardPropertyList :: proc(self: ^PasteboardReading, propertyList: id, type: ^NS.String) -> id ---
+}
+
+
+@(objc_class="NSPasteboardTypeOwner")
+PasteboardTypeOwner :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PasteboardTypeOwner, objc_selector="pasteboard:provideDataForType:", objc_name="pasteboard")
+	PasteboardTypeOwner_pasteboard :: proc(self: ^PasteboardTypeOwner, sender: ^Pasteboard, type: ^NS.String) ---
+
+	@(objc_type=PasteboardTypeOwner, objc_selector="pasteboardChangedOwner:", objc_name="pasteboardChangedOwner")
+	PasteboardTypeOwner_pasteboardChangedOwner :: proc(self: ^PasteboardTypeOwner, sender: ^Pasteboard) ---
+}
+
+
+@(objc_class="NSPasteboardWriting")
+PasteboardWriting :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PasteboardWriting, objc_selector="writableTypesForPasteboard:", objc_name="writableTypesForPasteboard")
+	PasteboardWriting_writableTypesForPasteboard :: proc(self: ^PasteboardWriting, pasteboard: ^Pasteboard) -> ^NS.Array ---
+
+	@(objc_type=PasteboardWriting, objc_selector="writingOptionsForType:pasteboard:", objc_name="writingOptionsForType")
+	PasteboardWriting_writingOptionsForType :: proc(self: ^PasteboardWriting, type: ^NS.String, pasteboard: ^Pasteboard) -> PasteboardWritingOptions ---
+
+	@(objc_type=PasteboardWriting, objc_selector="pasteboardPropertyListForType:", objc_name="pasteboardPropertyListForType")
+	PasteboardWriting_pasteboardPropertyListForType :: proc(self: ^PasteboardWriting, type: ^NS.String) -> id ---
 }

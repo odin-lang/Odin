@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import cffi "core:c"
 
-
-
-
-
 @(objc_class="UIStepper", objc_superclass=Control)
 Stepper :: struct { using _: Control}
 

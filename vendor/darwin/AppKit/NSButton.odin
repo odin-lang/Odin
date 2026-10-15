@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import CG "core:sys/darwin/CoreGraphics"
 
 @(objc_class="NSButton", objc_superclass=Control)
 Button :: struct {
@@ -225,4 +222,253 @@ foreign lib {
 Button_buttonWithTitle :: proc {
 	Button_buttonWithTitle_image_target_action,
 	Button_buttonWithTitle_target_action,
+}
+
+
+@(objc_class="NSButtonCell", objc_superclass=ActionCell)
+ButtonCell :: struct { using _: ActionCell}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ButtonCell, objc_selector="initTextCell:", objc_name="initTextCell")
+	ButtonCell_initTextCell :: proc(self: ^ButtonCell, string: ^NS.String) -> instancetype ---
+
+	@(objc_type=ButtonCell, objc_selector="initImageCell:", objc_name="initImageCell")
+	ButtonCell_initImageCell :: proc(self: ^ButtonCell, image: ^Image) -> instancetype ---
+
+	@(objc_type=ButtonCell, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ButtonCell_initWithCoder :: proc(self: ^ButtonCell, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ButtonCell, objc_selector="setButtonType:", objc_name="setButtonType")
+	ButtonCell_setButtonType :: proc(self: ^ButtonCell, type: ButtonType) ---
+
+	@(objc_type=ButtonCell, objc_selector="setPeriodicDelay:interval:", objc_name="setPeriodicDelay")
+	ButtonCell_setPeriodicDelay :: proc(self: ^ButtonCell, delay: cffi.float, interval: cffi.float) ---
+
+	@(objc_type=ButtonCell, objc_selector="getPeriodicDelay:interval:", objc_name="getPeriodicDelay")
+	ButtonCell_getPeriodicDelay :: proc(self: ^ButtonCell, delay: ^cffi.float, interval: ^cffi.float) ---
+
+	@(objc_type=ButtonCell, objc_selector="performClick:", objc_name="performClick")
+	ButtonCell_performClick :: proc(self: ^ButtonCell, sender: id) ---
+
+	@(objc_type=ButtonCell, objc_selector="mouseEntered:", objc_name="mouseEntered")
+	ButtonCell_mouseEntered :: proc(self: ^ButtonCell, event: ^Event) ---
+
+	@(objc_type=ButtonCell, objc_selector="mouseExited:", objc_name="mouseExited")
+	ButtonCell_mouseExited :: proc(self: ^ButtonCell, event: ^Event) ---
+
+	@(objc_type=ButtonCell, objc_selector="drawBezelWithFrame:inView:", objc_name="drawBezelWithFrame")
+	ButtonCell_drawBezelWithFrame :: proc(self: ^ButtonCell, frame: NS.Rect, controlView: ^View) ---
+
+	@(objc_type=ButtonCell, objc_selector="drawImage:withFrame:inView:", objc_name="drawImage")
+	ButtonCell_drawImage :: proc(self: ^ButtonCell, image: ^Image, frame: NS.Rect, controlView: ^View) ---
+
+	@(objc_type=ButtonCell, objc_selector="drawTitle:withFrame:inView:", objc_name="drawTitle")
+	ButtonCell_drawTitle :: proc(self: ^ButtonCell, title: ^NS.AttributedString, frame: NS.Rect, controlView: ^View) -> NS.Rect ---
+
+	@(objc_type=ButtonCell, objc_selector="bezelStyle", objc_name="bezelStyle")
+	ButtonCell_bezelStyle :: proc(self: ^ButtonCell) -> BezelStyle ---
+
+	@(objc_type=ButtonCell, objc_selector="setBezelStyle:", objc_name="setBezelStyle")
+	ButtonCell_setBezelStyle :: proc(self: ^ButtonCell, bezelStyle: BezelStyle) ---
+
+	@(objc_type=ButtonCell, objc_selector="highlightsBy", objc_name="highlightsBy")
+	ButtonCell_highlightsBy :: proc(self: ^ButtonCell) -> CellStyleMask ---
+
+	@(objc_type=ButtonCell, objc_selector="setHighlightsBy:", objc_name="setHighlightsBy")
+	ButtonCell_setHighlightsBy :: proc(self: ^ButtonCell, highlightsBy: CellStyleMask) ---
+
+	@(objc_type=ButtonCell, objc_selector="showsStateBy", objc_name="showsStateBy")
+	ButtonCell_showsStateBy :: proc(self: ^ButtonCell) -> CellStyleMask ---
+
+	@(objc_type=ButtonCell, objc_selector="setShowsStateBy:", objc_name="setShowsStateBy")
+	ButtonCell_setShowsStateBy :: proc(self: ^ButtonCell, showsStateBy: CellStyleMask) ---
+
+	@(objc_type=ButtonCell, objc_selector="title", objc_name="title")
+	ButtonCell_title :: proc(self: ^ButtonCell) -> ^NS.String ---
+
+	@(objc_type=ButtonCell, objc_selector="setTitle:", objc_name="setTitle")
+	ButtonCell_setTitle :: proc(self: ^ButtonCell, title: ^NS.String) ---
+
+	@(objc_type=ButtonCell, objc_selector="attributedTitle", objc_name="attributedTitle")
+	ButtonCell_attributedTitle :: proc(self: ^ButtonCell) -> ^NS.AttributedString ---
+
+	@(objc_type=ButtonCell, objc_selector="setAttributedTitle:", objc_name="setAttributedTitle")
+	ButtonCell_setAttributedTitle :: proc(self: ^ButtonCell, attributedTitle: ^NS.AttributedString) ---
+
+	@(objc_type=ButtonCell, objc_selector="alternateTitle", objc_name="alternateTitle")
+	ButtonCell_alternateTitle :: proc(self: ^ButtonCell) -> ^NS.String ---
+
+	@(objc_type=ButtonCell, objc_selector="setAlternateTitle:", objc_name="setAlternateTitle")
+	ButtonCell_setAlternateTitle :: proc(self: ^ButtonCell, alternateTitle: ^NS.String) ---
+
+	@(objc_type=ButtonCell, objc_selector="attributedAlternateTitle", objc_name="attributedAlternateTitle")
+	ButtonCell_attributedAlternateTitle :: proc(self: ^ButtonCell) -> ^NS.AttributedString ---
+
+	@(objc_type=ButtonCell, objc_selector="setAttributedAlternateTitle:", objc_name="setAttributedAlternateTitle")
+	ButtonCell_setAttributedAlternateTitle :: proc(self: ^ButtonCell, attributedAlternateTitle: ^NS.AttributedString) ---
+
+	@(objc_type=ButtonCell, objc_selector="alternateImage", objc_name="alternateImage")
+	ButtonCell_alternateImage :: proc(self: ^ButtonCell) -> ^Image ---
+
+	@(objc_type=ButtonCell, objc_selector="setAlternateImage:", objc_name="setAlternateImage")
+	ButtonCell_setAlternateImage :: proc(self: ^ButtonCell, alternateImage: ^Image) ---
+
+	@(objc_type=ButtonCell, objc_selector="imagePosition", objc_name="imagePosition")
+	ButtonCell_imagePosition :: proc(self: ^ButtonCell) -> CellImagePosition ---
+
+	@(objc_type=ButtonCell, objc_selector="setImagePosition:", objc_name="setImagePosition")
+	ButtonCell_setImagePosition :: proc(self: ^ButtonCell, imagePosition: CellImagePosition) ---
+
+	@(objc_type=ButtonCell, objc_selector="imageScaling", objc_name="imageScaling")
+	ButtonCell_imageScaling :: proc(self: ^ButtonCell) -> ImageScaling ---
+
+	@(objc_type=ButtonCell, objc_selector="setImageScaling:", objc_name="setImageScaling")
+	ButtonCell_setImageScaling :: proc(self: ^ButtonCell, imageScaling: ImageScaling) ---
+
+	@(objc_type=ButtonCell, objc_selector="keyEquivalent", objc_name="keyEquivalent")
+	ButtonCell_keyEquivalent :: proc(self: ^ButtonCell) -> ^NS.String ---
+
+	@(objc_type=ButtonCell, objc_selector="setKeyEquivalent:", objc_name="setKeyEquivalent")
+	ButtonCell_setKeyEquivalent :: proc(self: ^ButtonCell, keyEquivalent: ^NS.String) ---
+
+	@(objc_type=ButtonCell, objc_selector="keyEquivalentModifierMask", objc_name="keyEquivalentModifierMask")
+	ButtonCell_keyEquivalentModifierMask :: proc(self: ^ButtonCell) -> EventModifierFlags ---
+
+	@(objc_type=ButtonCell, objc_selector="setKeyEquivalentModifierMask:", objc_name="setKeyEquivalentModifierMask")
+	ButtonCell_setKeyEquivalentModifierMask :: proc(self: ^ButtonCell, keyEquivalentModifierMask: EventModifierFlags) ---
+
+	@(objc_type=ButtonCell, objc_selector="isTransparent", objc_name="isTransparent")
+	ButtonCell_isTransparent :: proc(self: ^ButtonCell) -> bool ---
+
+	@(objc_type=ButtonCell, objc_selector="setTransparent:", objc_name="setTransparent")
+	ButtonCell_setTransparent :: proc(self: ^ButtonCell, transparent: bool) ---
+
+	@(objc_type=ButtonCell, objc_selector="isOpaque", objc_name="isOpaque")
+	ButtonCell_isOpaque :: proc(self: ^ButtonCell) -> bool ---
+
+	@(objc_type=ButtonCell, objc_selector="imageDimsWhenDisabled", objc_name="imageDimsWhenDisabled")
+	ButtonCell_imageDimsWhenDisabled :: proc(self: ^ButtonCell) -> bool ---
+
+	@(objc_type=ButtonCell, objc_selector="setImageDimsWhenDisabled:", objc_name="setImageDimsWhenDisabled")
+	ButtonCell_setImageDimsWhenDisabled :: proc(self: ^ButtonCell, imageDimsWhenDisabled: bool) ---
+
+	@(objc_type=ButtonCell, objc_selector="showsBorderOnlyWhileMouseInside", objc_name="showsBorderOnlyWhileMouseInside")
+	ButtonCell_showsBorderOnlyWhileMouseInside :: proc(self: ^ButtonCell) -> bool ---
+
+	@(objc_type=ButtonCell, objc_selector="setShowsBorderOnlyWhileMouseInside:", objc_name="setShowsBorderOnlyWhileMouseInside")
+	ButtonCell_setShowsBorderOnlyWhileMouseInside :: proc(self: ^ButtonCell, showsBorderOnlyWhileMouseInside: bool) ---
+
+	@(objc_type=ButtonCell, objc_selector="sound", objc_name="sound")
+	ButtonCell_sound :: proc(self: ^ButtonCell) -> ^Sound ---
+
+	@(objc_type=ButtonCell, objc_selector="setSound:", objc_name="setSound")
+	ButtonCell_setSound :: proc(self: ^ButtonCell, sound: ^Sound) ---
+
+	@(objc_type=ButtonCell, objc_selector="backgroundColor", objc_name="backgroundColor")
+	ButtonCell_backgroundColor :: proc(self: ^ButtonCell) -> ^Color ---
+
+	@(objc_type=ButtonCell, objc_selector="setBackgroundColor:", objc_name="setBackgroundColor")
+	ButtonCell_setBackgroundColor :: proc(self: ^ButtonCell, backgroundColor: ^Color) ---
+
+	@(objc_type=ButtonCell, objc_selector="setTitleWithMnemonic:", objc_name="setTitleWithMnemonic")
+	ButtonCell_setTitleWithMnemonic :: proc(self: ^ButtonCell, stringWithAmpersand: ^NS.String) ---
+
+	@(objc_type=ButtonCell, objc_selector="setAlternateTitleWithMnemonic:", objc_name="setAlternateTitleWithMnemonic")
+	ButtonCell_setAlternateTitleWithMnemonic :: proc(self: ^ButtonCell, stringWithAmpersand: ^NS.String) ---
+
+	@(objc_type=ButtonCell, objc_selector="setAlternateMnemonicLocation:", objc_name="setAlternateMnemonicLocation")
+	ButtonCell_setAlternateMnemonicLocation :: proc(self: ^ButtonCell, location: NS.UInteger) ---
+
+	@(objc_type=ButtonCell, objc_selector="alternateMnemonicLocation", objc_name="alternateMnemonicLocation")
+	ButtonCell_alternateMnemonicLocation :: proc(self: ^ButtonCell) -> NS.UInteger ---
+
+	@(objc_type=ButtonCell, objc_selector="alternateMnemonic", objc_name="alternateMnemonic")
+	ButtonCell_alternateMnemonic :: proc(self: ^ButtonCell) -> ^NS.String ---
+
+	@(objc_type=ButtonCell, objc_selector="setKeyEquivalentFont:size:", objc_name="setKeyEquivalentFont_size")
+	ButtonCell_setKeyEquivalentFont_size :: proc(self: ^ButtonCell, fontName: ^NS.String, fontSize: CG.Float) ---
+
+	@(objc_type=ButtonCell, objc_selector="gradientType", objc_name="gradientType")
+	ButtonCell_gradientType :: proc(self: ^ButtonCell) -> GradientType ---
+
+	@(objc_type=ButtonCell, objc_selector="setGradientType:", objc_name="setGradientType")
+	ButtonCell_setGradientType :: proc(self: ^ButtonCell, gradientType: GradientType) ---
+
+	@(objc_type=ButtonCell, objc_selector="keyEquivalentFont", objc_name="keyEquivalentFont")
+	ButtonCell_keyEquivalentFont :: proc(self: ^ButtonCell) -> ^Font ---
+
+	@(objc_type=ButtonCell, objc_selector="setKeyEquivalentFont:", objc_name="setKeyEquivalentFont_")
+	ButtonCell_setKeyEquivalentFont_ :: proc(self: ^ButtonCell, keyEquivalentFont: ^Font) ---
+}
+
+@(objc_type=ButtonCell, objc_name="setKeyEquivalentFont")
+ButtonCell_setKeyEquivalentFont :: proc {
+	ButtonCell_setKeyEquivalentFont_size,
+	ButtonCell_setKeyEquivalentFont_,
+}
+
+
+@(objc_class="NSButtonTouchBarItem", objc_superclass=TouchBarItem)
+ButtonTouchBarItem :: struct { using _: TouchBarItem}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ButtonTouchBarItem, objc_selector="buttonTouchBarItemWithIdentifier:title:target:action:", objc_name="buttonTouchBarItemWithIdentifier_title_target_action", objc_is_class_method=true)
+	ButtonTouchBarItem_buttonTouchBarItemWithIdentifier_title_target_action :: proc(identifier: ^NS.String, title: ^NS.String, target: id, action: SEL) -> instancetype ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="buttonTouchBarItemWithIdentifier:image:target:action:", objc_name="buttonTouchBarItemWithIdentifier_image_target_action", objc_is_class_method=true)
+	ButtonTouchBarItem_buttonTouchBarItemWithIdentifier_image_target_action :: proc(identifier: ^NS.String, image: ^Image, target: id, action: SEL) -> instancetype ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="buttonTouchBarItemWithIdentifier:title:image:target:action:", objc_name="buttonTouchBarItemWithIdentifier_title_image_target_action", objc_is_class_method=true)
+	ButtonTouchBarItem_buttonTouchBarItemWithIdentifier_title_image_target_action :: proc(identifier: ^NS.String, title: ^NS.String, image: ^Image, target: id, action: SEL) -> instancetype ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="title", objc_name="title")
+	ButtonTouchBarItem_title :: proc(self: ^ButtonTouchBarItem) -> ^NS.String ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="setTitle:", objc_name="setTitle")
+	ButtonTouchBarItem_setTitle :: proc(self: ^ButtonTouchBarItem, title: ^NS.String) ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="image", objc_name="image")
+	ButtonTouchBarItem_image :: proc(self: ^ButtonTouchBarItem) -> ^Image ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="setImage:", objc_name="setImage")
+	ButtonTouchBarItem_setImage :: proc(self: ^ButtonTouchBarItem, image: ^Image) ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="bezelColor", objc_name="bezelColor")
+	ButtonTouchBarItem_bezelColor :: proc(self: ^ButtonTouchBarItem) -> ^Color ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="setBezelColor:", objc_name="setBezelColor")
+	ButtonTouchBarItem_setBezelColor :: proc(self: ^ButtonTouchBarItem, bezelColor: ^Color) ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="target", objc_name="target")
+	ButtonTouchBarItem_target :: proc(self: ^ButtonTouchBarItem) -> id ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="setTarget:", objc_name="setTarget")
+	ButtonTouchBarItem_setTarget :: proc(self: ^ButtonTouchBarItem, target: id) ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="action", objc_name="action")
+	ButtonTouchBarItem_action :: proc(self: ^ButtonTouchBarItem) -> SEL ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="setAction:", objc_name="setAction")
+	ButtonTouchBarItem_setAction :: proc(self: ^ButtonTouchBarItem, action: SEL) ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="isEnabled", objc_name="isEnabled")
+	ButtonTouchBarItem_isEnabled :: proc(self: ^ButtonTouchBarItem) -> bool ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="setEnabled:", objc_name="setEnabled")
+	ButtonTouchBarItem_setEnabled :: proc(self: ^ButtonTouchBarItem, enabled: bool) ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="customizationLabel", objc_name="customizationLabel")
+	ButtonTouchBarItem_customizationLabel :: proc(self: ^ButtonTouchBarItem) -> ^NS.String ---
+
+	@(objc_type=ButtonTouchBarItem, objc_selector="setCustomizationLabel:", objc_name="setCustomizationLabel")
+	ButtonTouchBarItem_setCustomizationLabel :: proc(self: ^ButtonTouchBarItem, customizationLabel: ^NS.String) ---
+}
+
+@(objc_type=ButtonTouchBarItem, objc_name="buttonTouchBarItemWithIdentifier", objc_is_class_method=true)
+ButtonTouchBarItem_buttonTouchBarItemWithIdentifier :: proc {
+	ButtonTouchBarItem_buttonTouchBarItemWithIdentifier_title_target_action,
+	ButtonTouchBarItem_buttonTouchBarItemWithIdentifier_image_target_action,
+	ButtonTouchBarItem_buttonTouchBarItemWithIdentifier_title_image_target_action,
 }

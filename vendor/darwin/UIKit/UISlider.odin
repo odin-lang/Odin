@@ -6,10 +6,6 @@ import cffi "core:c"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UISlider", objc_superclass=Control)
 Slider :: struct {
 	using _: Control,
@@ -140,4 +136,89 @@ foreign lib {
 Slider_setValue :: proc {
 	Slider_setValue_animated,
 	Slider_setValue_,
+}
+
+
+@(objc_class="UISliderTick", objc_superclass=NS.Object)
+SliderTick :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=SliderTick, objc_selector="tickWithPosition:title:image:", objc_name="tickWithPosition", objc_is_class_method=true)
+	SliderTick_tickWithPosition :: proc(position: cffi.float, title: ^NS.String, image: ^Image) -> instancetype ---
+
+	@(objc_type=SliderTick, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	SliderTick_new :: proc() -> ^SliderTick ---
+
+	@(objc_type=SliderTick, objc_selector="init", objc_name="init")
+	SliderTick_init :: proc(self: ^SliderTick) -> instancetype ---
+
+	@(objc_type=SliderTick, objc_selector="position", objc_name="position")
+	SliderTick_position :: proc(self: ^SliderTick) -> cffi.float ---
+
+	@(objc_type=SliderTick, objc_selector="title", objc_name="title")
+	SliderTick_title :: proc(self: ^SliderTick) -> ^NS.String ---
+
+	@(objc_type=SliderTick, objc_selector="setTitle:", objc_name="setTitle")
+	SliderTick_setTitle :: proc(self: ^SliderTick, title: ^NS.String) ---
+
+	@(objc_type=SliderTick, objc_selector="image", objc_name="image")
+	SliderTick_image :: proc(self: ^SliderTick) -> ^Image ---
+
+	@(objc_type=SliderTick, objc_selector="setImage:", objc_name="setImage")
+	SliderTick_setImage :: proc(self: ^SliderTick, image: ^Image) ---
+}
+
+
+@(objc_class="UISliderTrackConfiguration", objc_superclass=NS.Object)
+SliderTrackConfiguration :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=SliderTrackConfiguration, objc_selector="configurationWithTicks:", objc_name="configurationWithTicks", objc_is_class_method=true)
+	SliderTrackConfiguration_configurationWithTicks :: proc(ticks: ^NS.Array) -> instancetype ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="configurationWithNumberOfTicks:", objc_name="configurationWithNumberOfTicks", objc_is_class_method=true)
+	SliderTrackConfiguration_configurationWithNumberOfTicks :: proc(ticks: NS.Integer) -> instancetype ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	SliderTrackConfiguration_new :: proc() -> ^SliderTrackConfiguration ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="init", objc_name="init")
+	SliderTrackConfiguration_init :: proc(self: ^SliderTrackConfiguration) -> instancetype ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="allowsTickValuesOnly", objc_name="allowsTickValuesOnly")
+	SliderTrackConfiguration_allowsTickValuesOnly :: proc(self: ^SliderTrackConfiguration) -> bool ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="setAllowsTickValuesOnly:", objc_name="setAllowsTickValuesOnly")
+	SliderTrackConfiguration_setAllowsTickValuesOnly :: proc(self: ^SliderTrackConfiguration, allowsTickValuesOnly: bool) ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="neutralValue", objc_name="neutralValue")
+	SliderTrackConfiguration_neutralValue :: proc(self: ^SliderTrackConfiguration) -> cffi.float ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="setNeutralValue:", objc_name="setNeutralValue")
+	SliderTrackConfiguration_setNeutralValue :: proc(self: ^SliderTrackConfiguration, neutralValue: cffi.float) ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="minimumEnabledValue", objc_name="minimumEnabledValue")
+	SliderTrackConfiguration_minimumEnabledValue :: proc(self: ^SliderTrackConfiguration) -> cffi.float ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="setMinimumEnabledValue:", objc_name="setMinimumEnabledValue")
+	SliderTrackConfiguration_setMinimumEnabledValue :: proc(self: ^SliderTrackConfiguration, minimumEnabledValue: cffi.float) ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="maximumEnabledValue", objc_name="maximumEnabledValue")
+	SliderTrackConfiguration_maximumEnabledValue :: proc(self: ^SliderTrackConfiguration) -> cffi.float ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="setMaximumEnabledValue:", objc_name="setMaximumEnabledValue")
+	SliderTrackConfiguration_setMaximumEnabledValue :: proc(self: ^SliderTrackConfiguration, maximumEnabledValue: cffi.float) ---
+
+	@(objc_type=SliderTrackConfiguration, objc_selector="ticks", objc_name="ticks")
+	SliderTrackConfiguration_ticks :: proc(self: ^SliderTrackConfiguration) -> ^NS.Array ---
 }

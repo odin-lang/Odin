@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSSearchField", objc_superclass=TextField)
 SearchField :: struct { using _: TextField}
@@ -78,4 +75,99 @@ foreign lib {
 
 	@(objc_type=SearchField, objc_selector="setCentersPlaceholder:", objc_name="setCentersPlaceholder")
 	SearchField_setCentersPlaceholder :: proc(self: ^SearchField, centersPlaceholder: bool) ---
+}
+
+
+@(objc_class="NSSearchFieldDelegate")
+SearchFieldDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: TextFieldDelegate,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=SearchFieldDelegate, objc_selector="searchFieldDidStartSearching:", objc_name="searchFieldDidStartSearching")
+	SearchFieldDelegate_searchFieldDidStartSearching :: proc(self: ^SearchFieldDelegate, sender: ^SearchField) ---
+
+	@(objc_type=SearchFieldDelegate, objc_selector="searchFieldDidEndSearching:", objc_name="searchFieldDidEndSearching")
+	SearchFieldDelegate_searchFieldDidEndSearching :: proc(self: ^SearchFieldDelegate, sender: ^SearchField) ---
+}
+
+
+@(objc_class="NSSearchFieldCell", objc_superclass=TextFieldCell)
+SearchFieldCell :: struct { using _: TextFieldCell}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=SearchFieldCell, objc_selector="initTextCell:", objc_name="initTextCell")
+	SearchFieldCell_initTextCell :: proc(self: ^SearchFieldCell, string: ^NS.String) -> instancetype ---
+
+	@(objc_type=SearchFieldCell, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	SearchFieldCell_initWithCoder :: proc(self: ^SearchFieldCell, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=SearchFieldCell, objc_selector="initImageCell:", objc_name="initImageCell")
+	SearchFieldCell_initImageCell :: proc(self: ^SearchFieldCell, image: ^Image) -> instancetype ---
+
+	@(objc_type=SearchFieldCell, objc_selector="resetSearchButtonCell", objc_name="resetSearchButtonCell")
+	SearchFieldCell_resetSearchButtonCell :: proc(self: ^SearchFieldCell) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="resetCancelButtonCell", objc_name="resetCancelButtonCell")
+	SearchFieldCell_resetCancelButtonCell :: proc(self: ^SearchFieldCell) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="searchTextRectForBounds:", objc_name="searchTextRectForBounds")
+	SearchFieldCell_searchTextRectForBounds :: proc(self: ^SearchFieldCell, rect: NS.Rect) -> NS.Rect ---
+
+	@(objc_type=SearchFieldCell, objc_selector="searchButtonRectForBounds:", objc_name="searchButtonRectForBounds")
+	SearchFieldCell_searchButtonRectForBounds :: proc(self: ^SearchFieldCell, rect: NS.Rect) -> NS.Rect ---
+
+	@(objc_type=SearchFieldCell, objc_selector="cancelButtonRectForBounds:", objc_name="cancelButtonRectForBounds")
+	SearchFieldCell_cancelButtonRectForBounds :: proc(self: ^SearchFieldCell, rect: NS.Rect) -> NS.Rect ---
+
+	@(objc_type=SearchFieldCell, objc_selector="searchButtonCell", objc_name="searchButtonCell")
+	SearchFieldCell_searchButtonCell :: proc(self: ^SearchFieldCell) -> ^ButtonCell ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setSearchButtonCell:", objc_name="setSearchButtonCell")
+	SearchFieldCell_setSearchButtonCell :: proc(self: ^SearchFieldCell, searchButtonCell: ^ButtonCell) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="cancelButtonCell", objc_name="cancelButtonCell")
+	SearchFieldCell_cancelButtonCell :: proc(self: ^SearchFieldCell) -> ^ButtonCell ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setCancelButtonCell:", objc_name="setCancelButtonCell")
+	SearchFieldCell_setCancelButtonCell :: proc(self: ^SearchFieldCell, cancelButtonCell: ^ButtonCell) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="searchMenuTemplate", objc_name="searchMenuTemplate")
+	SearchFieldCell_searchMenuTemplate :: proc(self: ^SearchFieldCell) -> ^Menu ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setSearchMenuTemplate:", objc_name="setSearchMenuTemplate")
+	SearchFieldCell_setSearchMenuTemplate :: proc(self: ^SearchFieldCell, searchMenuTemplate: ^Menu) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="sendsWholeSearchString", objc_name="sendsWholeSearchString")
+	SearchFieldCell_sendsWholeSearchString :: proc(self: ^SearchFieldCell) -> bool ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setSendsWholeSearchString:", objc_name="setSendsWholeSearchString")
+	SearchFieldCell_setSendsWholeSearchString :: proc(self: ^SearchFieldCell, sendsWholeSearchString: bool) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="maximumRecents", objc_name="maximumRecents")
+	SearchFieldCell_maximumRecents :: proc(self: ^SearchFieldCell) -> NS.Integer ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setMaximumRecents:", objc_name="setMaximumRecents")
+	SearchFieldCell_setMaximumRecents :: proc(self: ^SearchFieldCell, maximumRecents: NS.Integer) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="recentSearches", objc_name="recentSearches")
+	SearchFieldCell_recentSearches :: proc(self: ^SearchFieldCell) -> ^NS.Array ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setRecentSearches:", objc_name="setRecentSearches")
+	SearchFieldCell_setRecentSearches :: proc(self: ^SearchFieldCell, recentSearches: ^NS.Array) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="recentsAutosaveName", objc_name="recentsAutosaveName")
+	SearchFieldCell_recentsAutosaveName :: proc(self: ^SearchFieldCell) -> ^NS.String ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setRecentsAutosaveName:", objc_name="setRecentsAutosaveName")
+	SearchFieldCell_setRecentsAutosaveName :: proc(self: ^SearchFieldCell, recentsAutosaveName: ^NS.String) ---
+
+	@(objc_type=SearchFieldCell, objc_selector="sendsSearchStringImmediately", objc_name="sendsSearchStringImmediately")
+	SearchFieldCell_sendsSearchStringImmediately :: proc(self: ^SearchFieldCell) -> bool ---
+
+	@(objc_type=SearchFieldCell, objc_selector="setSendsSearchStringImmediately:", objc_name="setSendsSearchStringImmediately")
+	SearchFieldCell_setSendsSearchStringImmediately :: proc(self: ^SearchFieldCell, sendsSearchStringImmediately: bool) ---
 }

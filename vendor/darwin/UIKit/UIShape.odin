@@ -4,10 +4,7 @@ package darwin_UIKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIShape", objc_superclass=NS.Object)
 Shape :: struct {
@@ -79,4 +76,33 @@ Shape_fixedRectShapeWithRect :: proc {
 	Shape_fixedRectShapeWithRect_,
 	Shape_fixedRectShapeWithRect_cornerRadius,
 	Shape_fixedRectShapeWithRect_cornerRadius_cornerCurve_maskedCorners,
+}
+
+
+@(objc_class="UIShapeProvider")
+ShapeProvider :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ShapeProvider, objc_selector="resolvedShapeInContext:", objc_name="resolvedShapeInContext")
+	ShapeProvider_resolvedShapeInContext :: proc(self: ^ShapeProvider, _context: ^ShapeResolutionContext) -> ^ResolvedShape ---
+}
+
+
+@(objc_class="UIShapeResolutionContext", objc_superclass=NS.Object)
+ShapeResolutionContext :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ShapeResolutionContext, objc_selector="init", objc_name="init")
+	ShapeResolutionContext_init :: proc(self: ^ShapeResolutionContext) -> instancetype ---
+
+	@(objc_type=ShapeResolutionContext, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	ShapeResolutionContext_new :: proc() -> ^ShapeResolutionContext ---
+
+	@(objc_type=ShapeResolutionContext, objc_selector="contentShape", objc_name="contentShape")
+	ShapeResolutionContext_contentShape :: proc(self: ^ShapeResolutionContext) -> ^ResolvedShape ---
 }

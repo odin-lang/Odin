@@ -3,10 +3,8 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
+import CG "core:sys/darwin/CoreGraphics"
 
 @(objc_class="NSWritingToolsCoordinator", objc_superclass=NS.Object)
 WritingToolsCoordinator :: struct { using _: NS.Object}
@@ -72,4 +70,106 @@ foreign lib {
 
 	@(objc_type=WritingToolsCoordinator, objc_selector="setIncludesTextListMarkers:", objc_name="setIncludesTextListMarkers")
 	WritingToolsCoordinator_setIncludesTextListMarkers :: proc(self: ^WritingToolsCoordinator, includesTextListMarkers: bool) ---
+}
+
+
+@(objc_class="NSWritingToolsCoordinatorDelegate")
+WritingToolsCoordinatorDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsContextsForScope:completion:", objc_name="writingToolsCoordinator_requestsContextsForScope_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsContextsForScope_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, scope: WritingToolsCoordinatorContextScope, completion: ^Objc_Block(proc "c" ( _0: ^NS.Array ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:replaceRange:inContext:proposedText:reason:animationParameters:completion:", objc_name="writingToolsCoordinator_replaceRange_inContext_proposedText_reason_animationParameters_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_replaceRange_inContext_proposedText_reason_animationParameters_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, replacementText: ^NS.AttributedString, reason: WritingToolsCoordinatorTextReplacementReason, animationParameters: ^WritingToolsCoordinatorAnimationParameters, completion: ^Objc_Block(proc "c" ( attributedString: ^NS.AttributedString ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:selectRanges:inContext:completion:", objc_name="writingToolsCoordinator_selectRanges_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_selectRanges_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, ranges: ^NS.Array, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsBoundingBezierPathsForRange:inContext:completion:", objc_name="writingToolsCoordinator_requestsBoundingBezierPathsForRange_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsBoundingBezierPathsForRange_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ( bezierPaths: ^NS.Array ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsUnderlinePathsForRange:inContext:completion:", objc_name="writingToolsCoordinator_requestsUnderlinePathsForRange_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsUnderlinePathsForRange_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ( bezierPaths: ^NS.Array ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:prepareForTextAnimation:forRange:inContext:completion:", objc_name="writingToolsCoordinator_prepareForTextAnimation_forRange_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_prepareForTextAnimation_forRange_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, textAnimation: WritingToolsCoordinatorTextAnimation, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsPreviewForTextAnimation:ofRange:inContext:completion:", objc_name="writingToolsCoordinator_requestsPreviewForTextAnimation_ofRange_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsPreviewForTextAnimation_ofRange_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, textAnimation: WritingToolsCoordinatorTextAnimation, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ( textPreviews: ^NS.Array ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsPreviewForRect:inContext:completion:", objc_name="writingToolsCoordinator_requestsPreviewForRect_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsPreviewForRect_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, rect: NS.Rect, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ( textPreview: ^TextPreview ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:finishTextAnimation:forRange:inContext:completion:", objc_name="writingToolsCoordinator_finishTextAnimation_forRange_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_finishTextAnimation_forRange_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, textAnimation: WritingToolsCoordinatorTextAnimation, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsSingleContainerSubrangesOfRange:inContext:completion:", objc_name="writingToolsCoordinator_requestsSingleContainerSubrangesOfRange_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsSingleContainerSubrangesOfRange_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ( _0: ^NS.Array ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsDecorationContainerViewForRange:inContext:completion:", objc_name="writingToolsCoordinator_requestsDecorationContainerViewForRange_inContext_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsDecorationContainerViewForRange_inContext_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, range: NS._NSRange, _context: ^WritingToolsCoordinatorContext, completion: ^Objc_Block(proc "c" ( _0: ^View ))) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:willChangeToState:completion:", objc_name="writingToolsCoordinator_willChangeToState_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_willChangeToState_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, newState: WritingToolsCoordinatorState, completion: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=WritingToolsCoordinatorDelegate, objc_selector="writingToolsCoordinator:requestsRangeInContextWithIdentifierForPoint:completion:", objc_name="writingToolsCoordinator_requestsRangeInContextWithIdentifierForPoint_completion")
+	WritingToolsCoordinatorDelegate_writingToolsCoordinator_requestsRangeInContextWithIdentifierForPoint_completion :: proc(self: ^WritingToolsCoordinatorDelegate, writingToolsCoordinator: ^WritingToolsCoordinator, point: CG.Point, completion: ^Objc_Block(proc "c" ( range: NS._NSRange, contextID: ^NS.UUID ))) ---
+}
+
+
+@(objc_class="NSWritingToolsCoordinatorAnimationParameters", objc_superclass=NS.Object)
+WritingToolsCoordinatorAnimationParameters :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WritingToolsCoordinatorAnimationParameters, objc_selector="init", objc_name="init")
+	WritingToolsCoordinatorAnimationParameters_init :: proc(self: ^WritingToolsCoordinatorAnimationParameters) -> instancetype ---
+
+	@(objc_type=WritingToolsCoordinatorAnimationParameters, objc_selector="duration", objc_name="duration")
+	WritingToolsCoordinatorAnimationParameters_duration :: proc(self: ^WritingToolsCoordinatorAnimationParameters) -> CG.Float ---
+
+	@(objc_type=WritingToolsCoordinatorAnimationParameters, objc_selector="delay", objc_name="delay")
+	WritingToolsCoordinatorAnimationParameters_delay :: proc(self: ^WritingToolsCoordinatorAnimationParameters) -> CG.Float ---
+
+	@(objc_type=WritingToolsCoordinatorAnimationParameters, objc_selector="progressHandler", objc_name="progressHandler")
+	WritingToolsCoordinatorAnimationParameters_progressHandler :: proc(self: ^WritingToolsCoordinatorAnimationParameters) -> ^Objc_Block(proc "c" ()) ---
+
+	@(objc_type=WritingToolsCoordinatorAnimationParameters, objc_selector="setProgressHandler:", objc_name="setProgressHandler")
+	WritingToolsCoordinatorAnimationParameters_setProgressHandler :: proc(self: ^WritingToolsCoordinatorAnimationParameters, progressHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=WritingToolsCoordinatorAnimationParameters, objc_selector="completionHandler", objc_name="completionHandler")
+	WritingToolsCoordinatorAnimationParameters_completionHandler :: proc(self: ^WritingToolsCoordinatorAnimationParameters) -> ^Objc_Block(proc "c" ()) ---
+
+	@(objc_type=WritingToolsCoordinatorAnimationParameters, objc_selector="setCompletionHandler:", objc_name="setCompletionHandler")
+	WritingToolsCoordinatorAnimationParameters_setCompletionHandler :: proc(self: ^WritingToolsCoordinatorAnimationParameters, completionHandler: ^Objc_Block(proc "c" ())) ---
+}
+
+
+@(objc_class="NSWritingToolsCoordinatorContext", objc_superclass=NS.Object)
+WritingToolsCoordinatorContext :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WritingToolsCoordinatorContext, objc_selector="initWithAttributedString:range:", objc_name="initWithAttributedString")
+	WritingToolsCoordinatorContext_initWithAttributedString :: proc(self: ^WritingToolsCoordinatorContext, attributedString: ^NS.AttributedString, range: NS._NSRange) -> instancetype ---
+
+	@(objc_type=WritingToolsCoordinatorContext, objc_selector="init", objc_name="init")
+	WritingToolsCoordinatorContext_init :: proc(self: ^WritingToolsCoordinatorContext) -> instancetype ---
+
+	@(objc_type=WritingToolsCoordinatorContext, objc_selector="attributedString", objc_name="attributedString")
+	WritingToolsCoordinatorContext_attributedString :: proc(self: ^WritingToolsCoordinatorContext) -> ^NS.AttributedString ---
+
+	@(objc_type=WritingToolsCoordinatorContext, objc_selector="range", objc_name="range")
+	WritingToolsCoordinatorContext_range :: proc(self: ^WritingToolsCoordinatorContext) -> NS._NSRange ---
+
+	@(objc_type=WritingToolsCoordinatorContext, objc_selector="identifier", objc_name="identifier")
+	WritingToolsCoordinatorContext_identifier :: proc(self: ^WritingToolsCoordinatorContext) -> ^NS.UUID ---
+
+	@(objc_type=WritingToolsCoordinatorContext, objc_selector="resolvedRange", objc_name="resolvedRange")
+	WritingToolsCoordinatorContext_resolvedRange :: proc(self: ^WritingToolsCoordinatorContext) -> NS._NSRange ---
 }

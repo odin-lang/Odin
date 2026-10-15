@@ -27,3 +27,45 @@ foreign lib {
 	@(objc_type=Strategist, objc_selector="setRandomSource:", objc_name="setRandomSource")
 	Strategist_setRandomSource :: proc(self: ^Strategist, randomSource: ^Random) ---
 }
+
+
+@(objc_class="GKMinmaxStrategist", objc_superclass=NS.Object)
+MinmaxStrategist :: struct {
+	using _: NS.Object,
+	using _: Strategist,
+}
+
+foreign lib {
+	@(objc_type=MinmaxStrategist, objc_selector="bestMoveForPlayer:", objc_name="bestMoveForPlayer")
+	MinmaxStrategist_bestMoveForPlayer :: proc(self: ^MinmaxStrategist, player: ^GameModelPlayer) -> ^GameModelUpdate ---
+
+	@(objc_type=MinmaxStrategist, objc_selector="randomMoveForPlayer:fromNumberOfBestMoves:", objc_name="randomMoveForPlayer")
+	MinmaxStrategist_randomMoveForPlayer :: proc(self: ^MinmaxStrategist, player: ^GameModelPlayer, numMovesToConsider: NS.Integer) -> ^GameModelUpdate ---
+
+	@(objc_type=MinmaxStrategist, objc_selector="maxLookAheadDepth", objc_name="maxLookAheadDepth")
+	MinmaxStrategist_maxLookAheadDepth :: proc(self: ^MinmaxStrategist) -> NS.Integer ---
+
+	@(objc_type=MinmaxStrategist, objc_selector="setMaxLookAheadDepth:", objc_name="setMaxLookAheadDepth")
+	MinmaxStrategist_setMaxLookAheadDepth :: proc(self: ^MinmaxStrategist, maxLookAheadDepth: NS.Integer) ---
+}
+
+
+@(objc_class="GKMonteCarloStrategist", objc_superclass=NS.Object)
+MonteCarloStrategist :: struct {
+	using _: NS.Object,
+	using _: Strategist,
+}
+
+foreign lib {
+	@(objc_type=MonteCarloStrategist, objc_selector="budget", objc_name="budget")
+	MonteCarloStrategist_budget :: proc(self: ^MonteCarloStrategist) -> NS.UInteger ---
+
+	@(objc_type=MonteCarloStrategist, objc_selector="setBudget:", objc_name="setBudget")
+	MonteCarloStrategist_setBudget :: proc(self: ^MonteCarloStrategist, budget: NS.UInteger) ---
+
+	@(objc_type=MonteCarloStrategist, objc_selector="explorationParameter", objc_name="explorationParameter")
+	MonteCarloStrategist_explorationParameter :: proc(self: ^MonteCarloStrategist) -> NS.UInteger ---
+
+	@(objc_type=MonteCarloStrategist, objc_selector="setExplorationParameter:", objc_name="setExplorationParameter")
+	MonteCarloStrategist_setExplorationParameter :: proc(self: ^MonteCarloStrategist, explorationParameter: NS.UInteger) ---
+}

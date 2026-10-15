@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSAutoreleasePool", objc_superclass=Object)
 AutoreleasePool :: struct { using _: Object}
 

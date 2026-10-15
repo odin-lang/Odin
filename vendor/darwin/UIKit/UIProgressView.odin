@@ -6,10 +6,6 @@ import cffi "core:c"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIProgressView", objc_superclass=View)
 ProgressView :: struct {
 	using _: View,

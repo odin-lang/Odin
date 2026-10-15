@@ -7,10 +7,6 @@ import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 import CA "vendor:darwin/QuartzCore"
 
-
-
-
-
 @(objc_class="UIScreen", objc_superclass=NS.Object)
 Screen :: struct {
 	using _: NS.Object,
@@ -114,4 +110,30 @@ foreign lib {
 
 	@(objc_type=Screen, objc_selector="snapshotViewAfterScreenUpdates:", objc_name="snapshotViewAfterScreenUpdates")
 	Screen_snapshotViewAfterScreenUpdates :: proc(self: ^Screen, afterUpdates: bool) -> ^View ---
+}
+
+
+@(objc_class="UIScreenEdgePanGestureRecognizer", objc_superclass=PanGestureRecognizer)
+ScreenEdgePanGestureRecognizer :: struct { using _: PanGestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScreenEdgePanGestureRecognizer, objc_selector="edges", objc_name="edges")
+	ScreenEdgePanGestureRecognizer_edges :: proc(self: ^ScreenEdgePanGestureRecognizer) -> RectEdge ---
+
+	@(objc_type=ScreenEdgePanGestureRecognizer, objc_selector="setEdges:", objc_name="setEdges")
+	ScreenEdgePanGestureRecognizer_setEdges :: proc(self: ^ScreenEdgePanGestureRecognizer, edges: RectEdge) ---
+}
+
+
+@(objc_class="UIScreenMode", objc_superclass=NS.Object)
+ScreenMode :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScreenMode, objc_selector="size", objc_name="size")
+	ScreenMode_size :: proc(self: ^ScreenMode) -> CG.Size ---
+
+	@(objc_type=ScreenMode, objc_selector="pixelAspectRatio", objc_name="pixelAspectRatio")
+	ScreenMode_pixelAspectRatio :: proc(self: ^ScreenMode) -> CG.Float ---
 }

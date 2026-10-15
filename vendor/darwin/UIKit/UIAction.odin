@@ -3,10 +3,8 @@
 package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import CG "core:sys/darwin/CoreGraphics"
+import "base:intrinsics"
 
 @(objc_class="UIAction", objc_superclass=MenuElement)
 Action :: struct {
@@ -66,4 +64,105 @@ foreign lib {
 
 	@(objc_type=Action, objc_selector="captureTextFromCameraActionForResponder:identifier:", objc_name="captureTextFromCameraActionForResponder", objc_is_class_method=true)
 	Action_captureTextFromCameraActionForResponder :: proc(responder: ^Responder, identifier: ^NS.String) -> instancetype ---
+}
+
+
+@(objc_class="UIActionSheet", objc_superclass=View)
+ActionSheet :: struct { using _: View}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ActionSheet, objc_selector="initWithTitle:delegate:cancelButtonTitle:destructiveButtonTitle:otherButtonTitles:", objc_name="initWithTitle")
+	ActionSheet_initWithTitle :: proc(self: ^ActionSheet, title: ^NS.String, delegate: ^ActionSheetDelegate, cancelButtonTitle: ^NS.String, destructiveButtonTitle: ^NS.String, otherButtonTitles: ^NS.String) -> instancetype ---
+
+	@(objc_type=ActionSheet, objc_selector="addButtonWithTitle:", objc_name="addButtonWithTitle")
+	ActionSheet_addButtonWithTitle :: proc(self: ^ActionSheet, title: ^NS.String) -> NS.Integer ---
+
+	@(objc_type=ActionSheet, objc_selector="buttonTitleAtIndex:", objc_name="buttonTitleAtIndex")
+	ActionSheet_buttonTitleAtIndex :: proc(self: ^ActionSheet, buttonIndex: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=ActionSheet, objc_selector="showFromToolbar:", objc_name="showFromToolbar")
+	ActionSheet_showFromToolbar :: proc(self: ^ActionSheet, view: ^Toolbar) ---
+
+	@(objc_type=ActionSheet, objc_selector="showFromTabBar:", objc_name="showFromTabBar")
+	ActionSheet_showFromTabBar :: proc(self: ^ActionSheet, view: ^TabBar) ---
+
+	@(objc_type=ActionSheet, objc_selector="showFromBarButtonItem:animated:", objc_name="showFromBarButtonItem")
+	ActionSheet_showFromBarButtonItem :: proc(self: ^ActionSheet, item: ^BarButtonItem, animated: bool) ---
+
+	@(objc_type=ActionSheet, objc_selector="showFromRect:inView:animated:", objc_name="showFromRect")
+	ActionSheet_showFromRect :: proc(self: ^ActionSheet, rect: CG.Rect, view: ^View, animated: bool) ---
+
+	@(objc_type=ActionSheet, objc_selector="showInView:", objc_name="showInView")
+	ActionSheet_showInView :: proc(self: ^ActionSheet, view: ^View) ---
+
+	@(objc_type=ActionSheet, objc_selector="dismissWithClickedButtonIndex:animated:", objc_name="dismissWithClickedButtonIndex")
+	ActionSheet_dismissWithClickedButtonIndex :: proc(self: ^ActionSheet, buttonIndex: NS.Integer, animated: bool) ---
+
+	@(objc_type=ActionSheet, objc_selector="delegate", objc_name="delegate")
+	ActionSheet_delegate :: proc(self: ^ActionSheet) -> ^ActionSheetDelegate ---
+
+	@(objc_type=ActionSheet, objc_selector="setDelegate:", objc_name="setDelegate")
+	ActionSheet_setDelegate :: proc(self: ^ActionSheet, delegate: ^ActionSheetDelegate) ---
+
+	@(objc_type=ActionSheet, objc_selector="title", objc_name="title")
+	ActionSheet_title :: proc(self: ^ActionSheet) -> ^NS.String ---
+
+	@(objc_type=ActionSheet, objc_selector="setTitle:", objc_name="setTitle")
+	ActionSheet_setTitle :: proc(self: ^ActionSheet, title: ^NS.String) ---
+
+	@(objc_type=ActionSheet, objc_selector="actionSheetStyle", objc_name="actionSheetStyle")
+	ActionSheet_actionSheetStyle :: proc(self: ^ActionSheet) -> ActionSheetStyle ---
+
+	@(objc_type=ActionSheet, objc_selector="setActionSheetStyle:", objc_name="setActionSheetStyle")
+	ActionSheet_setActionSheetStyle :: proc(self: ^ActionSheet, actionSheetStyle: ActionSheetStyle) ---
+
+	@(objc_type=ActionSheet, objc_selector="numberOfButtons", objc_name="numberOfButtons")
+	ActionSheet_numberOfButtons :: proc(self: ^ActionSheet) -> NS.Integer ---
+
+	@(objc_type=ActionSheet, objc_selector="cancelButtonIndex", objc_name="cancelButtonIndex")
+	ActionSheet_cancelButtonIndex :: proc(self: ^ActionSheet) -> NS.Integer ---
+
+	@(objc_type=ActionSheet, objc_selector="setCancelButtonIndex:", objc_name="setCancelButtonIndex")
+	ActionSheet_setCancelButtonIndex :: proc(self: ^ActionSheet, cancelButtonIndex: NS.Integer) ---
+
+	@(objc_type=ActionSheet, objc_selector="destructiveButtonIndex", objc_name="destructiveButtonIndex")
+	ActionSheet_destructiveButtonIndex :: proc(self: ^ActionSheet) -> NS.Integer ---
+
+	@(objc_type=ActionSheet, objc_selector="setDestructiveButtonIndex:", objc_name="setDestructiveButtonIndex")
+	ActionSheet_setDestructiveButtonIndex :: proc(self: ^ActionSheet, destructiveButtonIndex: NS.Integer) ---
+
+	@(objc_type=ActionSheet, objc_selector="firstOtherButtonIndex", objc_name="firstOtherButtonIndex")
+	ActionSheet_firstOtherButtonIndex :: proc(self: ^ActionSheet) -> NS.Integer ---
+
+	@(objc_type=ActionSheet, objc_selector="isVisible", objc_name="isVisible")
+	ActionSheet_isVisible :: proc(self: ^ActionSheet) -> bool ---
+}
+
+
+@(objc_class="UIActionSheetDelegate")
+ActionSheetDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ActionSheetDelegate, objc_selector="actionSheet:clickedButtonAtIndex:", objc_name="actionSheet_clickedButtonAtIndex")
+	ActionSheetDelegate_actionSheet_clickedButtonAtIndex :: proc(self: ^ActionSheetDelegate, actionSheet: ^ActionSheet, buttonIndex: NS.Integer) ---
+
+	@(objc_type=ActionSheetDelegate, objc_selector="actionSheetCancel:", objc_name="actionSheetCancel")
+	ActionSheetDelegate_actionSheetCancel :: proc(self: ^ActionSheetDelegate, actionSheet: ^ActionSheet) ---
+
+	@(objc_type=ActionSheetDelegate, objc_selector="willPresentActionSheet:", objc_name="willPresentActionSheet")
+	ActionSheetDelegate_willPresentActionSheet :: proc(self: ^ActionSheetDelegate, actionSheet: ^ActionSheet) ---
+
+	@(objc_type=ActionSheetDelegate, objc_selector="didPresentActionSheet:", objc_name="didPresentActionSheet")
+	ActionSheetDelegate_didPresentActionSheet :: proc(self: ^ActionSheetDelegate, actionSheet: ^ActionSheet) ---
+
+	@(objc_type=ActionSheetDelegate, objc_selector="actionSheet:willDismissWithButtonIndex:", objc_name="actionSheet_willDismissWithButtonIndex")
+	ActionSheetDelegate_actionSheet_willDismissWithButtonIndex :: proc(self: ^ActionSheetDelegate, actionSheet: ^ActionSheet, buttonIndex: NS.Integer) ---
+
+	@(objc_type=ActionSheetDelegate, objc_selector="actionSheet:didDismissWithButtonIndex:", objc_name="actionSheet_didDismissWithButtonIndex")
+	ActionSheetDelegate_actionSheet_didDismissWithButtonIndex :: proc(self: ^ActionSheetDelegate, actionSheet: ^ActionSheet, buttonIndex: NS.Integer) ---
 }

@@ -4,6 +4,7 @@ package darwin_GameKit
 
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="GKAgent", objc_superclass=Component)
 Agent :: struct {
@@ -53,4 +54,76 @@ foreign lib {
 
 	@(objc_type=Agent, objc_selector="setMaxSpeed:", objc_name="setMaxSpeed")
 	Agent_setMaxSpeed :: proc(self: ^Agent, maxSpeed: cffi.float) ---
+}
+
+
+@(objc_class="GKAgentDelegate")
+AgentDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=AgentDelegate, objc_selector="agentWillUpdate:", objc_name="agentWillUpdate")
+	AgentDelegate_agentWillUpdate :: proc(self: ^AgentDelegate, agent: ^Agent) ---
+
+	@(objc_type=AgentDelegate, objc_selector="agentDidUpdate:", objc_name="agentDidUpdate")
+	AgentDelegate_agentDidUpdate :: proc(self: ^AgentDelegate, agent: ^Agent) ---
+}
+
+
+@(objc_class="GKAgent2D", objc_superclass=Agent)
+Agent2D :: struct {
+	using _: Agent,
+	using _: NS.SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=Agent2D, objc_selector="updateWithDeltaTime:", objc_name="updateWithDeltaTime")
+	Agent2D_updateWithDeltaTime :: proc(self: ^Agent2D, seconds: NS.TimeInterval) ---
+
+	@(objc_type=Agent2D, objc_selector="position", objc_name="position")
+	Agent2D_position :: proc(self: ^Agent2D) -> vector_float2 ---
+
+	@(objc_type=Agent2D, objc_selector="setPosition:", objc_name="setPosition")
+	Agent2D_setPosition :: proc(self: ^Agent2D, position: ^vector_float2) ---
+
+	@(objc_type=Agent2D, objc_selector="velocity", objc_name="velocity")
+	Agent2D_velocity :: proc(self: ^Agent2D) -> vector_float2 ---
+
+	@(objc_type=Agent2D, objc_selector="rotation", objc_name="rotation")
+	Agent2D_rotation :: proc(self: ^Agent2D) -> cffi.float ---
+
+	@(objc_type=Agent2D, objc_selector="setRotation:", objc_name="setRotation")
+	Agent2D_setRotation :: proc(self: ^Agent2D, rotation: cffi.float) ---
+}
+
+
+@(objc_class="GKAgent3D", objc_superclass=Agent)
+Agent3D :: struct { using _: Agent}
+
+foreign lib {
+	@(objc_type=Agent3D, objc_selector="updateWithDeltaTime:", objc_name="updateWithDeltaTime")
+	Agent3D_updateWithDeltaTime :: proc(self: ^Agent3D, seconds: NS.TimeInterval) ---
+
+	@(objc_type=Agent3D, objc_selector="position", objc_name="position")
+	Agent3D_position :: proc(self: ^Agent3D) -> vector_float3 ---
+
+	@(objc_type=Agent3D, objc_selector="setPosition:", objc_name="setPosition")
+	Agent3D_setPosition :: proc(self: ^Agent3D, position: ^vector_float3) ---
+
+	@(objc_type=Agent3D, objc_selector="velocity", objc_name="velocity")
+	Agent3D_velocity :: proc(self: ^Agent3D) -> vector_float3 ---
+
+	@(objc_type=Agent3D, objc_selector="rightHanded", objc_name="rightHanded")
+	Agent3D_rightHanded :: proc(self: ^Agent3D) -> bool ---
+
+	@(objc_type=Agent3D, objc_selector="setRightHanded:", objc_name="setRightHanded")
+	Agent3D_setRightHanded :: proc(self: ^Agent3D, rightHanded: bool) ---
+
+	@(objc_type=Agent3D, objc_selector="rotation", objc_name="rotation")
+	Agent3D_rotation :: proc(self: ^Agent3D) -> matrix[3,3]f32 ---
+
+	@(objc_type=Agent3D, objc_selector="setRotation:", objc_name="setRotation")
+	Agent3D_setRotation :: proc(self: ^Agent3D, rotation: matrix[3,3]f32) ---
 }

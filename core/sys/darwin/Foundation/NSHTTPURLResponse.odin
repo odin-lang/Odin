@@ -2,6 +2,7 @@
 #+build darwin
 package darwin_Foundation
 
+import "base:intrinsics"
 
 @(objc_class="NSHTTPURLResponse", objc_superclass=URLResponse)
 HTTPURLResponse :: struct { using _: URLResponse}
@@ -22,3 +23,7 @@ foreign lib {
 	@(objc_type=HTTPURLResponse, objc_selector="allHeaderFields", objc_name="allHeaderFields")
 	HTTPURLResponse_allHeaderFields :: proc(self: ^HTTPURLResponse) -> ^Dictionary ---
 }
+
+
+@(objc_class="NSHTTPURLResponseInternal")
+HTTPURLResponseInternal :: struct { using _: intrinsics.objc_object}

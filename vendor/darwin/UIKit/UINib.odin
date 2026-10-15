@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UINib", objc_superclass=NS.Object)
 Nib :: struct { using _: NS.Object}
 

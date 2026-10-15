@@ -4,6 +4,7 @@ package darwin_AVFoundation
 
 import CM "vendor:darwin/CoreMedia"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="AVOutputSettingsAssistant", objc_superclass=NS.Object)
 OutputSettingsAssistant :: struct { using _: NS.Object}
@@ -54,3 +55,7 @@ foreign lib {
 	@(objc_type=OutputSettingsAssistant, objc_selector="setSourceVideoMinFrameDuration:", objc_name="setSourceVideoMinFrameDuration")
 	OutputSettingsAssistant_setSourceVideoMinFrameDuration :: proc(self: ^OutputSettingsAssistant, sourceVideoMinFrameDuration: CM.Time) ---
 }
+
+
+@(objc_class="AVOutputSettingsAssistantInternal")
+OutputSettingsAssistantInternal :: struct { using _: intrinsics.objc_object}

@@ -4,10 +4,7 @@ package darwin_UIKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIGestureRecognizer", objc_superclass=NS.Object)
 GestureRecognizer :: struct { using _: NS.Object}
@@ -160,4 +157,198 @@ foreign lib {
 
 	@(objc_type=GestureRecognizer, objc_selector="setState:", objc_name="setState")
 	GestureRecognizer_setState :: proc(self: ^GestureRecognizer, state: GestureRecognizerState) ---
+}
+
+
+@(objc_class="UIGestureRecognizerDelegate")
+GestureRecognizerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizerShouldBegin:", objc_name="gestureRecognizerShouldBegin")
+	GestureRecognizerDelegate_gestureRecognizerShouldBegin :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:", objc_name="gestureRecognizer_shouldRecognizeSimultaneouslyWithGestureRecognizer")
+	GestureRecognizerDelegate_gestureRecognizer_shouldRecognizeSimultaneouslyWithGestureRecognizer :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, otherGestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldRequireFailureOfGestureRecognizer:", objc_name="gestureRecognizer_shouldRequireFailureOfGestureRecognizer")
+	GestureRecognizerDelegate_gestureRecognizer_shouldRequireFailureOfGestureRecognizer :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, otherGestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldBeRequiredToFailByGestureRecognizer:", objc_name="gestureRecognizer_shouldBeRequiredToFailByGestureRecognizer")
+	GestureRecognizerDelegate_gestureRecognizer_shouldBeRequiredToFailByGestureRecognizer :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, otherGestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldReceiveTouch:", objc_name="gestureRecognizer_shouldReceiveTouch")
+	GestureRecognizerDelegate_gestureRecognizer_shouldReceiveTouch :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, touch: ^Touch) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldReceivePress:", objc_name="gestureRecognizer_shouldReceivePress")
+	GestureRecognizerDelegate_gestureRecognizer_shouldReceivePress :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, press: ^Press) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldReceiveEvent:", objc_name="gestureRecognizer_shouldReceiveEvent")
+	GestureRecognizerDelegate_gestureRecognizer_shouldReceiveEvent :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, event: ^Event) -> bool ---
+}
+
+
+@(objc_class="UIHoverGestureRecognizer", objc_superclass=GestureRecognizer)
+HoverGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=HoverGestureRecognizer, objc_selector="azimuthAngleInView:", objc_name="azimuthAngleInView")
+	HoverGestureRecognizer_azimuthAngleInView :: proc(self: ^HoverGestureRecognizer, view: ^View) -> CG.Float ---
+
+	@(objc_type=HoverGestureRecognizer, objc_selector="azimuthUnitVectorInView:", objc_name="azimuthUnitVectorInView")
+	HoverGestureRecognizer_azimuthUnitVectorInView :: proc(self: ^HoverGestureRecognizer, view: ^View) -> CG.Vector ---
+
+	@(objc_type=HoverGestureRecognizer, objc_selector="zOffset", objc_name="zOffset")
+	HoverGestureRecognizer_zOffset :: proc(self: ^HoverGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=HoverGestureRecognizer, objc_selector="altitudeAngle", objc_name="altitudeAngle")
+	HoverGestureRecognizer_altitudeAngle :: proc(self: ^HoverGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=HoverGestureRecognizer, objc_selector="rollAngle", objc_name="rollAngle")
+	HoverGestureRecognizer_rollAngle :: proc(self: ^HoverGestureRecognizer) -> CG.Float ---
+}
+
+
+@(objc_class="UILongPressGestureRecognizer", objc_superclass=GestureRecognizer)
+LongPressGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=LongPressGestureRecognizer, objc_selector="numberOfTapsRequired", objc_name="numberOfTapsRequired")
+	LongPressGestureRecognizer_numberOfTapsRequired :: proc(self: ^LongPressGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=LongPressGestureRecognizer, objc_selector="setNumberOfTapsRequired:", objc_name="setNumberOfTapsRequired")
+	LongPressGestureRecognizer_setNumberOfTapsRequired :: proc(self: ^LongPressGestureRecognizer, numberOfTapsRequired: NS.UInteger) ---
+
+	@(objc_type=LongPressGestureRecognizer, objc_selector="numberOfTouchesRequired", objc_name="numberOfTouchesRequired")
+	LongPressGestureRecognizer_numberOfTouchesRequired :: proc(self: ^LongPressGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=LongPressGestureRecognizer, objc_selector="setNumberOfTouchesRequired:", objc_name="setNumberOfTouchesRequired")
+	LongPressGestureRecognizer_setNumberOfTouchesRequired :: proc(self: ^LongPressGestureRecognizer, numberOfTouchesRequired: NS.UInteger) ---
+
+	@(objc_type=LongPressGestureRecognizer, objc_selector="minimumPressDuration", objc_name="minimumPressDuration")
+	LongPressGestureRecognizer_minimumPressDuration :: proc(self: ^LongPressGestureRecognizer) -> NS.TimeInterval ---
+
+	@(objc_type=LongPressGestureRecognizer, objc_selector="setMinimumPressDuration:", objc_name="setMinimumPressDuration")
+	LongPressGestureRecognizer_setMinimumPressDuration :: proc(self: ^LongPressGestureRecognizer, minimumPressDuration: NS.TimeInterval) ---
+
+	@(objc_type=LongPressGestureRecognizer, objc_selector="allowableMovement", objc_name="allowableMovement")
+	LongPressGestureRecognizer_allowableMovement :: proc(self: ^LongPressGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=LongPressGestureRecognizer, objc_selector="setAllowableMovement:", objc_name="setAllowableMovement")
+	LongPressGestureRecognizer_setAllowableMovement :: proc(self: ^LongPressGestureRecognizer, allowableMovement: CG.Float) ---
+}
+
+
+@(objc_class="UIPanGestureRecognizer", objc_superclass=GestureRecognizer)
+PanGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PanGestureRecognizer, objc_selector="translationInView:", objc_name="translationInView")
+	PanGestureRecognizer_translationInView :: proc(self: ^PanGestureRecognizer, view: ^View) -> CG.Point ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="setTranslation:inView:", objc_name="setTranslation")
+	PanGestureRecognizer_setTranslation :: proc(self: ^PanGestureRecognizer, translation: CG.Point, view: ^View) ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="velocityInView:", objc_name="velocityInView")
+	PanGestureRecognizer_velocityInView :: proc(self: ^PanGestureRecognizer, view: ^View) -> CG.Point ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="minimumNumberOfTouches", objc_name="minimumNumberOfTouches")
+	PanGestureRecognizer_minimumNumberOfTouches :: proc(self: ^PanGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="setMinimumNumberOfTouches:", objc_name="setMinimumNumberOfTouches")
+	PanGestureRecognizer_setMinimumNumberOfTouches :: proc(self: ^PanGestureRecognizer, minimumNumberOfTouches: NS.UInteger) ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="maximumNumberOfTouches", objc_name="maximumNumberOfTouches")
+	PanGestureRecognizer_maximumNumberOfTouches :: proc(self: ^PanGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="setMaximumNumberOfTouches:", objc_name="setMaximumNumberOfTouches")
+	PanGestureRecognizer_setMaximumNumberOfTouches :: proc(self: ^PanGestureRecognizer, maximumNumberOfTouches: NS.UInteger) ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="allowedScrollTypesMask", objc_name="allowedScrollTypesMask")
+	PanGestureRecognizer_allowedScrollTypesMask :: proc(self: ^PanGestureRecognizer) -> ScrollTypeMask ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="setAllowedScrollTypesMask:", objc_name="setAllowedScrollTypesMask")
+	PanGestureRecognizer_setAllowedScrollTypesMask :: proc(self: ^PanGestureRecognizer, allowedScrollTypesMask: ScrollTypeMask) ---
+}
+
+
+@(objc_class="UIPinchGestureRecognizer", objc_superclass=GestureRecognizer)
+PinchGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PinchGestureRecognizer, objc_selector="scale", objc_name="scale")
+	PinchGestureRecognizer_scale :: proc(self: ^PinchGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=PinchGestureRecognizer, objc_selector="setScale:", objc_name="setScale")
+	PinchGestureRecognizer_setScale :: proc(self: ^PinchGestureRecognizer, scale: CG.Float) ---
+
+	@(objc_type=PinchGestureRecognizer, objc_selector="velocity", objc_name="velocity")
+	PinchGestureRecognizer_velocity :: proc(self: ^PinchGestureRecognizer) -> CG.Float ---
+}
+
+
+@(objc_class="UIRotationGestureRecognizer", objc_superclass=GestureRecognizer)
+RotationGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=RotationGestureRecognizer, objc_selector="rotation", objc_name="rotation")
+	RotationGestureRecognizer_rotation :: proc(self: ^RotationGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=RotationGestureRecognizer, objc_selector="setRotation:", objc_name="setRotation")
+	RotationGestureRecognizer_setRotation :: proc(self: ^RotationGestureRecognizer, rotation: CG.Float) ---
+
+	@(objc_type=RotationGestureRecognizer, objc_selector="velocity", objc_name="velocity")
+	RotationGestureRecognizer_velocity :: proc(self: ^RotationGestureRecognizer) -> CG.Float ---
+}
+
+
+@(objc_class="UISwipeGestureRecognizer", objc_superclass=GestureRecognizer)
+SwipeGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=SwipeGestureRecognizer, objc_selector="numberOfTouchesRequired", objc_name="numberOfTouchesRequired")
+	SwipeGestureRecognizer_numberOfTouchesRequired :: proc(self: ^SwipeGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=SwipeGestureRecognizer, objc_selector="setNumberOfTouchesRequired:", objc_name="setNumberOfTouchesRequired")
+	SwipeGestureRecognizer_setNumberOfTouchesRequired :: proc(self: ^SwipeGestureRecognizer, numberOfTouchesRequired: NS.UInteger) ---
+
+	@(objc_type=SwipeGestureRecognizer, objc_selector="direction", objc_name="direction")
+	SwipeGestureRecognizer_direction :: proc(self: ^SwipeGestureRecognizer) -> SwipeGestureRecognizerDirection ---
+
+	@(objc_type=SwipeGestureRecognizer, objc_selector="setDirection:", objc_name="setDirection")
+	SwipeGestureRecognizer_setDirection :: proc(self: ^SwipeGestureRecognizer, direction: SwipeGestureRecognizerDirection) ---
+}
+
+
+@(objc_class="UITapGestureRecognizer", objc_superclass=GestureRecognizer)
+TapGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=TapGestureRecognizer, objc_selector="numberOfTapsRequired", objc_name="numberOfTapsRequired")
+	TapGestureRecognizer_numberOfTapsRequired :: proc(self: ^TapGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=TapGestureRecognizer, objc_selector="setNumberOfTapsRequired:", objc_name="setNumberOfTapsRequired")
+	TapGestureRecognizer_setNumberOfTapsRequired :: proc(self: ^TapGestureRecognizer, numberOfTapsRequired: NS.UInteger) ---
+
+	@(objc_type=TapGestureRecognizer, objc_selector="numberOfTouchesRequired", objc_name="numberOfTouchesRequired")
+	TapGestureRecognizer_numberOfTouchesRequired :: proc(self: ^TapGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=TapGestureRecognizer, objc_selector="setNumberOfTouchesRequired:", objc_name="setNumberOfTouchesRequired")
+	TapGestureRecognizer_setNumberOfTouchesRequired :: proc(self: ^TapGestureRecognizer, numberOfTouchesRequired: NS.UInteger) ---
+
+	@(objc_type=TapGestureRecognizer, objc_selector="buttonMaskRequired", objc_name="buttonMaskRequired")
+	TapGestureRecognizer_buttonMaskRequired :: proc(self: ^TapGestureRecognizer) -> EventButtonMask ---
+
+	@(objc_type=TapGestureRecognizer, objc_selector="setButtonMaskRequired:", objc_name="setButtonMaskRequired")
+	TapGestureRecognizer_setButtonMaskRequired :: proc(self: ^TapGestureRecognizer, buttonMaskRequired: EventButtonMask) ---
 }

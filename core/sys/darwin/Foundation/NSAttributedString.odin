@@ -145,3 +145,129 @@ AttributedString_initWithMarkdownString :: #force_inline proc "c" (self: ^Attrib
 	res = AttributedString_initWithMarkdownString_error(self, markdownString, options, baseURL, &err)
 	return
 }
+
+
+@(objc_class="NSMutableAttributedString", objc_superclass=AttributedString)
+MutableAttributedString :: struct { using _: AttributedString}
+
+foreign lib {
+	@(objc_type=MutableAttributedString, objc_selector="replaceCharactersInRange:withString:", objc_name="replaceCharactersInRange_withString")
+	MutableAttributedString_replaceCharactersInRange_withString :: proc(self: ^MutableAttributedString, range: _NSRange, str: ^String) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="setAttributes:range:", objc_name="setAttributes")
+	MutableAttributedString_setAttributes :: proc(self: ^MutableAttributedString, attrs: ^Dictionary, range: _NSRange) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="addAttribute:value:range:", objc_name="addAttribute")
+	MutableAttributedString_addAttribute :: proc(self: ^MutableAttributedString, name: ^String, value: id, range: _NSRange) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="addAttributes:range:", objc_name="addAttributes")
+	MutableAttributedString_addAttributes :: proc(self: ^MutableAttributedString, attrs: ^Dictionary, range: _NSRange) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="removeAttribute:range:", objc_name="removeAttribute")
+	MutableAttributedString_removeAttribute :: proc(self: ^MutableAttributedString, name: ^String, range: _NSRange) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="replaceCharactersInRange:withAttributedString:", objc_name="replaceCharactersInRange_withAttributedString")
+	MutableAttributedString_replaceCharactersInRange_withAttributedString :: proc(self: ^MutableAttributedString, range: _NSRange, attrString: ^AttributedString) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="insertAttributedString:atIndex:", objc_name="insertAttributedString")
+	MutableAttributedString_insertAttributedString :: proc(self: ^MutableAttributedString, attrString: ^AttributedString, loc: UInteger) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="appendAttributedString:", objc_name="appendAttributedString")
+	MutableAttributedString_appendAttributedString :: proc(self: ^MutableAttributedString, attrString: ^AttributedString) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="deleteCharactersInRange:", objc_name="deleteCharactersInRange")
+	MutableAttributedString_deleteCharactersInRange :: proc(self: ^MutableAttributedString, range: _NSRange) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="setAttributedString:", objc_name="setAttributedString")
+	MutableAttributedString_setAttributedString :: proc(self: ^MutableAttributedString, attrString: ^AttributedString) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="beginEditing", objc_name="beginEditing")
+	MutableAttributedString_beginEditing :: proc(self: ^MutableAttributedString) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="endEditing", objc_name="endEditing")
+	MutableAttributedString_endEditing :: proc(self: ^MutableAttributedString) ---
+
+	@(objc_type=MutableAttributedString, objc_selector="mutableString", objc_name="mutableString")
+	MutableAttributedString_mutableString :: proc(self: ^MutableAttributedString) -> ^MutableString ---
+
+	@(objc_type=MutableAttributedString, objc_selector="appendLocalizedFormat:", objc_name="appendLocalizedFormat")
+	MutableAttributedString_appendLocalizedFormat :: proc(self: ^MutableAttributedString, format: ^AttributedString) ---
+}
+
+
+
+@(objc_type=MutableAttributedString, objc_name="replaceCharactersInRange")
+MutableAttributedString_replaceCharactersInRange :: proc {
+	MutableAttributedString_replaceCharactersInRange_withString,
+	MutableAttributedString_replaceCharactersInRange_withAttributedString,
+}
+
+
+@(objc_class="NSAttributedStringMarkdownParsingOptions", objc_superclass=Object)
+AttributedStringMarkdownParsingOptions :: struct {
+	using _: Object,
+	using _: Copying,
+}
+
+foreign lib {
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="init", objc_name="init")
+	AttributedStringMarkdownParsingOptions_init :: proc(self: ^AttributedStringMarkdownParsingOptions) -> instancetype ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="allowsExtendedAttributes", objc_name="allowsExtendedAttributes")
+	AttributedStringMarkdownParsingOptions_allowsExtendedAttributes :: proc(self: ^AttributedStringMarkdownParsingOptions) -> bool ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="setAllowsExtendedAttributes:", objc_name="setAllowsExtendedAttributes")
+	AttributedStringMarkdownParsingOptions_setAllowsExtendedAttributes :: proc(self: ^AttributedStringMarkdownParsingOptions, allowsExtendedAttributes: bool) ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="interpretedSyntax", objc_name="interpretedSyntax")
+	AttributedStringMarkdownParsingOptions_interpretedSyntax :: proc(self: ^AttributedStringMarkdownParsingOptions) -> AttributedStringMarkdownInterpretedSyntax ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="setInterpretedSyntax:", objc_name="setInterpretedSyntax")
+	AttributedStringMarkdownParsingOptions_setInterpretedSyntax :: proc(self: ^AttributedStringMarkdownParsingOptions, interpretedSyntax: AttributedStringMarkdownInterpretedSyntax) ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="failurePolicy", objc_name="failurePolicy")
+	AttributedStringMarkdownParsingOptions_failurePolicy :: proc(self: ^AttributedStringMarkdownParsingOptions) -> AttributedStringMarkdownParsingFailurePolicy ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="setFailurePolicy:", objc_name="setFailurePolicy")
+	AttributedStringMarkdownParsingOptions_setFailurePolicy :: proc(self: ^AttributedStringMarkdownParsingOptions, failurePolicy: AttributedStringMarkdownParsingFailurePolicy) ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="languageCode", objc_name="languageCode")
+	AttributedStringMarkdownParsingOptions_languageCode :: proc(self: ^AttributedStringMarkdownParsingOptions) -> ^String ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="setLanguageCode:", objc_name="setLanguageCode")
+	AttributedStringMarkdownParsingOptions_setLanguageCode :: proc(self: ^AttributedStringMarkdownParsingOptions, languageCode: ^String) ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="appliesSourcePositionAttributes", objc_name="appliesSourcePositionAttributes")
+	AttributedStringMarkdownParsingOptions_appliesSourcePositionAttributes :: proc(self: ^AttributedStringMarkdownParsingOptions) -> bool ---
+
+	@(objc_type=AttributedStringMarkdownParsingOptions, objc_selector="setAppliesSourcePositionAttributes:", objc_name="setAppliesSourcePositionAttributes")
+	AttributedStringMarkdownParsingOptions_setAppliesSourcePositionAttributes :: proc(self: ^AttributedStringMarkdownParsingOptions, appliesSourcePositionAttributes: bool) ---
+}
+
+
+@(objc_class="NSAttributedStringMarkdownSourcePosition", objc_superclass=Object)
+AttributedStringMarkdownSourcePosition :: struct {
+	using _: Object,
+	using _: Copying,
+	using _: SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=AttributedStringMarkdownSourcePosition, objc_selector="initWithStartLine:startColumn:endLine:endColumn:", objc_name="initWithStartLine")
+	AttributedStringMarkdownSourcePosition_initWithStartLine :: proc(self: ^AttributedStringMarkdownSourcePosition, startLine: Integer, startColumn: Integer, endLine: Integer, endColumn: Integer) -> instancetype ---
+
+	@(objc_type=AttributedStringMarkdownSourcePosition, objc_selector="rangeInString:", objc_name="rangeInString")
+	AttributedStringMarkdownSourcePosition_rangeInString :: proc(self: ^AttributedStringMarkdownSourcePosition, string: ^String) -> _NSRange ---
+
+	@(objc_type=AttributedStringMarkdownSourcePosition, objc_selector="startLine", objc_name="startLine")
+	AttributedStringMarkdownSourcePosition_startLine :: proc(self: ^AttributedStringMarkdownSourcePosition) -> Integer ---
+
+	@(objc_type=AttributedStringMarkdownSourcePosition, objc_selector="startColumn", objc_name="startColumn")
+	AttributedStringMarkdownSourcePosition_startColumn :: proc(self: ^AttributedStringMarkdownSourcePosition) -> Integer ---
+
+	@(objc_type=AttributedStringMarkdownSourcePosition, objc_selector="endLine", objc_name="endLine")
+	AttributedStringMarkdownSourcePosition_endLine :: proc(self: ^AttributedStringMarkdownSourcePosition) -> Integer ---
+
+	@(objc_type=AttributedStringMarkdownSourcePosition, objc_selector="endColumn", objc_name="endColumn")
+	AttributedStringMarkdownSourcePosition_endColumn :: proc(self: ^AttributedStringMarkdownSourcePosition) -> Integer ---
+}

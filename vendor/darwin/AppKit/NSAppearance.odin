@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSAppearance", objc_superclass=NS.Object)
 Appearance :: struct {
@@ -45,4 +42,23 @@ foreign lib {
 
 	@(objc_type=Appearance, objc_selector="allowsVibrancy", objc_name="allowsVibrancy")
 	Appearance_allowsVibrancy :: proc(self: ^Appearance) -> bool ---
+}
+
+
+@(objc_class="NSAppearanceCustomization")
+AppearanceCustomization :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AppearanceCustomization, objc_selector="appearance", objc_name="appearance")
+	AppearanceCustomization_appearance :: proc(self: ^AppearanceCustomization) -> ^Appearance ---
+
+	@(objc_type=AppearanceCustomization, objc_selector="setAppearance:", objc_name="setAppearance")
+	AppearanceCustomization_setAppearance :: proc(self: ^AppearanceCustomization, appearance: ^Appearance) ---
+
+	@(objc_type=AppearanceCustomization, objc_selector="effectiveAppearance", objc_name="effectiveAppearance")
+	AppearanceCustomization_effectiveAppearance :: proc(self: ^AppearanceCustomization) -> ^Appearance ---
 }

@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSAlert", objc_superclass=NS.Object)
 Alert :: struct { using _: NS.Object}
@@ -102,4 +99,17 @@ foreign lib {
 Alert_beginSheetModalForWindow :: proc {
 	Alert_beginSheetModalForWindow_completionHandler,
 	Alert_beginSheetModalForWindow_modalDelegate_didEndSelector_contextInfo,
+}
+
+
+@(objc_class="NSAlertDelegate")
+AlertDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AlertDelegate, objc_selector="alertShowHelp:", objc_name="alertShowHelp")
+	AlertDelegate_alertShowHelp :: proc(self: ^AlertDelegate, alert: ^Alert) -> bool ---
 }

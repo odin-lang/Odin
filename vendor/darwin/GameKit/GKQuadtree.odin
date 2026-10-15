@@ -47,3 +47,12 @@ Quadtree_removeElement :: proc {
 	Quadtree_removeElement_,
 	Quadtree_removeElement_withNode,
 }
+
+
+@(objc_class="GKQuadtreeNode", objc_superclass=NS.Object)
+QuadtreeNode :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=QuadtreeNode, objc_selector="quad", objc_name="quad")
+	QuadtreeNode_quad :: proc(self: ^QuadtreeNode) -> Quad ---
+}

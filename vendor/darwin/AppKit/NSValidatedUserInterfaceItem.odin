@@ -5,10 +5,6 @@ package darwin_AppKit
 import "base:intrinsics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSValidatedUserInterfaceItem")
 ValidatedUserInterfaceItem :: struct { using _: intrinsics.objc_object}
 

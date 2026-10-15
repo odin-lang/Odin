@@ -5,6 +5,7 @@ package darwin_AudioToolbox
 import cffi "core:c"
 import CF "core:sys/darwin/CoreFoundation"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="AUAudioUnit", objc_superclass=NS.Object)
 AUAudioUnit :: struct { using _: NS.Object}
@@ -405,4 +406,195 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		ok = AUAudioUnit_setDeviceID_error(self, deviceID, &err)
 		return
 	}
+}
+
+
+@(objc_class="AUAudioUnitBus", objc_superclass=NS.Object)
+AUAudioUnitBus :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=AUAudioUnitBus, objc_selector="setFormat:error:", objc_name="setFormat_error")
+	AUAudioUnitBus_setFormat_error :: proc(self: ^AUAudioUnitBus, format: ^AVAudioFormat, outError: ^^NS.Error) -> bool ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="format", objc_name="format")
+	AUAudioUnitBus_format :: proc(self: ^AUAudioUnitBus) -> ^AVAudioFormat ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="shouldAllocateBuffer", objc_name="shouldAllocateBuffer")
+	AUAudioUnitBus_shouldAllocateBuffer :: proc(self: ^AUAudioUnitBus) -> bool ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="setShouldAllocateBuffer:", objc_name="setShouldAllocateBuffer")
+	AUAudioUnitBus_setShouldAllocateBuffer :: proc(self: ^AUAudioUnitBus, shouldAllocateBuffer: bool) ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="isEnabled", objc_name="isEnabled")
+	AUAudioUnitBus_isEnabled :: proc(self: ^AUAudioUnitBus) -> bool ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="setEnabled:", objc_name="setEnabled")
+	AUAudioUnitBus_setEnabled :: proc(self: ^AUAudioUnitBus, enabled: bool) ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="name", objc_name="name")
+	AUAudioUnitBus_name :: proc(self: ^AUAudioUnitBus) -> ^NS.String ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="setName:", objc_name="setName")
+	AUAudioUnitBus_setName :: proc(self: ^AUAudioUnitBus, name: ^NS.String) ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="index", objc_name="index")
+	AUAudioUnitBus_index :: proc(self: ^AUAudioUnitBus) -> NS.UInteger ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="busType", objc_name="busType")
+	AUAudioUnitBus_busType :: proc(self: ^AUAudioUnitBus) -> AUAudioUnitBusType ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="ownerAudioUnit", objc_name="ownerAudioUnit")
+	AUAudioUnitBus_ownerAudioUnit :: proc(self: ^AUAudioUnitBus) -> ^AUAudioUnit ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="supportedChannelLayoutTags", objc_name="supportedChannelLayoutTags")
+	AUAudioUnitBus_supportedChannelLayoutTags :: proc(self: ^AUAudioUnitBus) -> ^NS.Array ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="contextPresentationLatency", objc_name="contextPresentationLatency")
+	AUAudioUnitBus_contextPresentationLatency :: proc(self: ^AUAudioUnitBus) -> NS.TimeInterval ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="setContextPresentationLatency:", objc_name="setContextPresentationLatency")
+	AUAudioUnitBus_setContextPresentationLatency :: proc(self: ^AUAudioUnitBus, contextPresentationLatency: NS.TimeInterval) ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="initWithFormat:error:", objc_name="initWithFormat_error")
+	AUAudioUnitBus_initWithFormat_error :: proc(self: ^AUAudioUnitBus, format: ^AVAudioFormat, outError: ^^NS.Error) -> instancetype ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="supportedChannelCounts", objc_name="supportedChannelCounts")
+	AUAudioUnitBus_supportedChannelCounts :: proc(self: ^AUAudioUnitBus) -> ^NS.Array ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="setSupportedChannelCounts:", objc_name="setSupportedChannelCounts")
+	AUAudioUnitBus_setSupportedChannelCounts :: proc(self: ^AUAudioUnitBus, supportedChannelCounts: ^NS.Array) ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="maximumChannelCount", objc_name="maximumChannelCount")
+	AUAudioUnitBus_maximumChannelCount :: proc(self: ^AUAudioUnitBus) -> AUAudioChannelCount ---
+
+	@(objc_type=AUAudioUnitBus, objc_selector="setMaximumChannelCount:", objc_name="setMaximumChannelCount")
+	AUAudioUnitBus_setMaximumChannelCount :: proc(self: ^AUAudioUnitBus, maximumChannelCount: AUAudioChannelCount) ---
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=AUAudioUnitBus, objc_name="setFormat")
+AUAudioUnitBus_setFormat :: #force_inline proc "c" (self: ^AUAudioUnitBus, format: ^AVAudioFormat) -> (ok: bool, err: ^NS.Error) {
+	ok = AUAudioUnitBus_setFormat_error(self, format, &err)
+	return
+}
+
+@(objc_type=AUAudioUnitBus, objc_name="initWithFormat")
+AUAudioUnitBus_initWithFormat :: #force_inline proc "c" (self: ^AUAudioUnitBus, format: ^AVAudioFormat) -> (res: ^AUAudioUnitBus, err: ^NS.Error) {
+	res = AUAudioUnitBus_initWithFormat_error(self, format, &err)
+	return
+}
+
+
+@(objc_class="AUAudioUnitBusArray", objc_superclass=NS.Object)
+AUAudioUnitBusArray :: struct {
+	using _: NS.Object,
+	using _: NS.FastEnumeration,
+}
+
+foreign lib {
+	@(objc_type=AUAudioUnitBusArray, objc_selector="init", objc_name="init")
+	AUAudioUnitBusArray_init :: proc(self: ^AUAudioUnitBusArray) -> instancetype ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="initWithAudioUnit:busType:busses:", objc_name="initWithAudioUnit_busType_busses")
+	AUAudioUnitBusArray_initWithAudioUnit_busType_busses :: proc(self: ^AUAudioUnitBusArray, owner: ^AUAudioUnit, busType: AUAudioUnitBusType, busArray: ^NS.Array) -> instancetype ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="initWithAudioUnit:busType:", objc_name="initWithAudioUnit_busType")
+	AUAudioUnitBusArray_initWithAudioUnit_busType :: proc(self: ^AUAudioUnitBusArray, owner: ^AUAudioUnit, busType: AUAudioUnitBusType) -> instancetype ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="objectAtIndexedSubscript:", objc_name="objectAtIndexedSubscript")
+	AUAudioUnitBusArray_objectAtIndexedSubscript :: proc(self: ^AUAudioUnitBusArray, index: NS.UInteger) -> ^AUAudioUnitBus ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="setBusCount:error:", objc_name="setBusCount_error")
+	AUAudioUnitBusArray_setBusCount_error :: proc(self: ^AUAudioUnitBusArray, count: NS.UInteger, outError: ^^NS.Error) -> bool ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="addObserverToAllBusses:forKeyPath:options:context:", objc_name="addObserverToAllBusses")
+	AUAudioUnitBusArray_addObserverToAllBusses :: proc(self: ^AUAudioUnitBusArray, observer: ^NS.Object, keyPath: ^NS.String, options: NS.KeyValueObservingOptions, _context: rawptr) ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="removeObserverFromAllBusses:forKeyPath:context:", objc_name="removeObserverFromAllBusses")
+	AUAudioUnitBusArray_removeObserverFromAllBusses :: proc(self: ^AUAudioUnitBusArray, observer: ^NS.Object, keyPath: ^NS.String, _context: rawptr) ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="count", objc_name="count")
+	AUAudioUnitBusArray_count :: proc(self: ^AUAudioUnitBusArray) -> NS.UInteger ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="isCountChangeable", objc_name="isCountChangeable")
+	AUAudioUnitBusArray_isCountChangeable :: proc(self: ^AUAudioUnitBusArray) -> bool ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="ownerAudioUnit", objc_name="ownerAudioUnit")
+	AUAudioUnitBusArray_ownerAudioUnit :: proc(self: ^AUAudioUnitBusArray) -> ^AUAudioUnit ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="busType", objc_name="busType")
+	AUAudioUnitBusArray_busType :: proc(self: ^AUAudioUnitBusArray) -> AUAudioUnitBusType ---
+
+	@(objc_type=AUAudioUnitBusArray, objc_selector="replaceBusses:", objc_name="replaceBusses")
+	AUAudioUnitBusArray_replaceBusses :: proc(self: ^AUAudioUnitBusArray, busArray: ^NS.Array) ---
+}
+
+
+
+@(objc_type=AUAudioUnitBusArray, objc_name="initWithAudioUnit")
+AUAudioUnitBusArray_initWithAudioUnit :: proc {
+	AUAudioUnitBusArray_initWithAudioUnit_busType_busses,
+	AUAudioUnitBusArray_initWithAudioUnit_busType,
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=AUAudioUnitBusArray, objc_name="setBusCount")
+AUAudioUnitBusArray_setBusCount :: #force_inline proc "c" (self: ^AUAudioUnitBusArray, count: NS.UInteger) -> (ok: bool, err: ^NS.Error) {
+	ok = AUAudioUnitBusArray_setBusCount_error(self, count, &err)
+	return
+}
+
+
+@(objc_class="AUAudioUnitFactory")
+AUAudioUnitFactory :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ExtensionRequestHandling,
+}
+
+foreign lib {
+	@(objc_type=AUAudioUnitFactory, objc_selector="createAudioUnitWithComponentDescription:error:", objc_name="createAudioUnitWithComponentDescription_error")
+	AUAudioUnitFactory_createAudioUnitWithComponentDescription_error :: proc(self: ^AUAudioUnitFactory, desc: ComponentDescription, error: ^^NS.Error) -> ^AUAudioUnit ---
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=AUAudioUnitFactory, objc_name="createAudioUnitWithComponentDescription")
+AUAudioUnitFactory_createAudioUnitWithComponentDescription :: #force_inline proc "c" (self: ^AUAudioUnitFactory, desc: ComponentDescription) -> (res: ^AUAudioUnit, err: ^NS.Error) {
+	res = AUAudioUnitFactory_createAudioUnitWithComponentDescription_error(self, desc, &err)
+	return
+}
+
+
+@(objc_class="AUAudioUnitPreset", objc_superclass=NS.Object)
+AUAudioUnitPreset :: struct {
+	using _: NS.Object,
+	using _: NS.SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=AUAudioUnitPreset, objc_selector="number", objc_name="number")
+	AUAudioUnitPreset_number :: proc(self: ^AUAudioUnitPreset) -> NS.Integer ---
+
+	@(objc_type=AUAudioUnitPreset, objc_selector="setNumber:", objc_name="setNumber")
+	AUAudioUnitPreset_setNumber :: proc(self: ^AUAudioUnitPreset, number: NS.Integer) ---
+
+	@(objc_type=AUAudioUnitPreset, objc_selector="name", objc_name="name")
+	AUAudioUnitPreset_name :: proc(self: ^AUAudioUnitPreset) -> ^NS.String ---
+
+	@(objc_type=AUAudioUnitPreset, objc_selector="setName:", objc_name="setName")
+	AUAudioUnitPreset_setName :: proc(self: ^AUAudioUnitPreset, name: ^NS.String) ---
+}
+
+
+@(objc_class="AUAudioUnitV2Bridge", objc_superclass=AUAudioUnit)
+AUAudioUnitV2Bridge :: struct { using _: AUAudioUnit}
+
+foreign lib {
+	@(objc_type=AUAudioUnitV2Bridge, objc_selector="audioUnit", objc_name="audioUnit")
+	AUAudioUnitV2Bridge_audioUnit :: proc(self: ^AUAudioUnitV2Bridge) -> Unit ---
 }

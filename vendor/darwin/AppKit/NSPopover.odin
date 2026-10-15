@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSPopover", objc_superclass=Responder)
 Popover :: struct {
@@ -92,4 +89,96 @@ foreign lib {
 
 	@(objc_type=Popover, objc_selector="setHasFullSizeContent:", objc_name="setHasFullSizeContent")
 	Popover_setHasFullSizeContent :: proc(self: ^Popover, hasFullSizeContent: bool) ---
+}
+
+
+@(objc_class="NSPopoverDelegate")
+PopoverDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PopoverDelegate, objc_selector="popoverShouldClose:", objc_name="popoverShouldClose")
+	PopoverDelegate_popoverShouldClose :: proc(self: ^PopoverDelegate, popover: ^Popover) -> bool ---
+
+	@(objc_type=PopoverDelegate, objc_selector="popoverShouldDetach:", objc_name="popoverShouldDetach")
+	PopoverDelegate_popoverShouldDetach :: proc(self: ^PopoverDelegate, popover: ^Popover) -> bool ---
+
+	@(objc_type=PopoverDelegate, objc_selector="popoverDidDetach:", objc_name="popoverDidDetach")
+	PopoverDelegate_popoverDidDetach :: proc(self: ^PopoverDelegate, popover: ^Popover) ---
+
+	@(objc_type=PopoverDelegate, objc_selector="detachableWindowForPopover:", objc_name="detachableWindowForPopover")
+	PopoverDelegate_detachableWindowForPopover :: proc(self: ^PopoverDelegate, popover: ^Popover) -> ^Window ---
+
+	@(objc_type=PopoverDelegate, objc_selector="popoverWillShow:", objc_name="popoverWillShow")
+	PopoverDelegate_popoverWillShow :: proc(self: ^PopoverDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=PopoverDelegate, objc_selector="popoverDidShow:", objc_name="popoverDidShow")
+	PopoverDelegate_popoverDidShow :: proc(self: ^PopoverDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=PopoverDelegate, objc_selector="popoverWillClose:", objc_name="popoverWillClose")
+	PopoverDelegate_popoverWillClose :: proc(self: ^PopoverDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=PopoverDelegate, objc_selector="popoverDidClose:", objc_name="popoverDidClose")
+	PopoverDelegate_popoverDidClose :: proc(self: ^PopoverDelegate, notification: ^NS.Notification) ---
+}
+
+
+@(objc_class="NSPopoverTouchBarItem", objc_superclass=TouchBarItem)
+PopoverTouchBarItem :: struct { using _: TouchBarItem}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PopoverTouchBarItem, objc_selector="showPopover:", objc_name="showPopover")
+	PopoverTouchBarItem_showPopover :: proc(self: ^PopoverTouchBarItem, sender: id) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="dismissPopover:", objc_name="dismissPopover")
+	PopoverTouchBarItem_dismissPopover :: proc(self: ^PopoverTouchBarItem, sender: id) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="makeStandardActivatePopoverGestureRecognizer", objc_name="makeStandardActivatePopoverGestureRecognizer")
+	PopoverTouchBarItem_makeStandardActivatePopoverGestureRecognizer :: proc(self: ^PopoverTouchBarItem) -> ^GestureRecognizer ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="popoverTouchBar", objc_name="popoverTouchBar")
+	PopoverTouchBarItem_popoverTouchBar :: proc(self: ^PopoverTouchBarItem) -> ^TouchBar ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="setPopoverTouchBar:", objc_name="setPopoverTouchBar")
+	PopoverTouchBarItem_setPopoverTouchBar :: proc(self: ^PopoverTouchBarItem, popoverTouchBar: ^TouchBar) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="customizationLabel", objc_name="customizationLabel")
+	PopoverTouchBarItem_customizationLabel :: proc(self: ^PopoverTouchBarItem) -> ^NS.String ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="setCustomizationLabel:", objc_name="setCustomizationLabel")
+	PopoverTouchBarItem_setCustomizationLabel :: proc(self: ^PopoverTouchBarItem, customizationLabel: ^NS.String) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="collapsedRepresentation", objc_name="collapsedRepresentation")
+	PopoverTouchBarItem_collapsedRepresentation :: proc(self: ^PopoverTouchBarItem) -> ^View ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="setCollapsedRepresentation:", objc_name="setCollapsedRepresentation")
+	PopoverTouchBarItem_setCollapsedRepresentation :: proc(self: ^PopoverTouchBarItem, collapsedRepresentation: ^View) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="collapsedRepresentationImage", objc_name="collapsedRepresentationImage")
+	PopoverTouchBarItem_collapsedRepresentationImage :: proc(self: ^PopoverTouchBarItem) -> ^Image ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="setCollapsedRepresentationImage:", objc_name="setCollapsedRepresentationImage")
+	PopoverTouchBarItem_setCollapsedRepresentationImage :: proc(self: ^PopoverTouchBarItem, collapsedRepresentationImage: ^Image) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="collapsedRepresentationLabel", objc_name="collapsedRepresentationLabel")
+	PopoverTouchBarItem_collapsedRepresentationLabel :: proc(self: ^PopoverTouchBarItem) -> ^NS.String ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="setCollapsedRepresentationLabel:", objc_name="setCollapsedRepresentationLabel")
+	PopoverTouchBarItem_setCollapsedRepresentationLabel :: proc(self: ^PopoverTouchBarItem, collapsedRepresentationLabel: ^NS.String) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="pressAndHoldTouchBar", objc_name="pressAndHoldTouchBar")
+	PopoverTouchBarItem_pressAndHoldTouchBar :: proc(self: ^PopoverTouchBarItem) -> ^TouchBar ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="setPressAndHoldTouchBar:", objc_name="setPressAndHoldTouchBar")
+	PopoverTouchBarItem_setPressAndHoldTouchBar :: proc(self: ^PopoverTouchBarItem, pressAndHoldTouchBar: ^TouchBar) ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="showsCloseButton", objc_name="showsCloseButton")
+	PopoverTouchBarItem_showsCloseButton :: proc(self: ^PopoverTouchBarItem) -> bool ---
+
+	@(objc_type=PopoverTouchBarItem, objc_selector="setShowsCloseButton:", objc_name="setShowsCloseButton")
+	PopoverTouchBarItem_setShowsCloseButton :: proc(self: ^PopoverTouchBarItem, showsCloseButton: bool) ---
 }

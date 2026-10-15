@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSControl", objc_superclass=View)
 Control :: struct { using _: View}
@@ -259,4 +256,44 @@ foreign lib {
 
 	@(objc_type=Control, objc_selector="invalidateIntrinsicContentSizeForCell:", objc_name="invalidateIntrinsicContentSizeForCell")
 	Control_invalidateIntrinsicContentSizeForCell :: proc(self: ^Control, cell: ^Cell) ---
+}
+
+
+@(objc_class="NSControlTextEditingDelegate")
+ControlTextEditingDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ControlTextEditingDelegate, objc_selector="controlTextDidBeginEditing:", objc_name="controlTextDidBeginEditing")
+	ControlTextEditingDelegate_controlTextDidBeginEditing :: proc(self: ^ControlTextEditingDelegate, obj: ^NS.Notification) ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="controlTextDidEndEditing:", objc_name="controlTextDidEndEditing")
+	ControlTextEditingDelegate_controlTextDidEndEditing :: proc(self: ^ControlTextEditingDelegate, obj: ^NS.Notification) ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="controlTextDidChange:", objc_name="controlTextDidChange")
+	ControlTextEditingDelegate_controlTextDidChange :: proc(self: ^ControlTextEditingDelegate, obj: ^NS.Notification) ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="control:textShouldBeginEditing:", objc_name="control_textShouldBeginEditing")
+	ControlTextEditingDelegate_control_textShouldBeginEditing :: proc(self: ^ControlTextEditingDelegate, control: ^Control, fieldEditor: ^Text) -> bool ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="control:textShouldEndEditing:", objc_name="control_textShouldEndEditing")
+	ControlTextEditingDelegate_control_textShouldEndEditing :: proc(self: ^ControlTextEditingDelegate, control: ^Control, fieldEditor: ^Text) -> bool ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="control:didFailToFormatString:errorDescription:", objc_name="control_didFailToFormatString_errorDescription")
+	ControlTextEditingDelegate_control_didFailToFormatString_errorDescription :: proc(self: ^ControlTextEditingDelegate, control: ^Control, string: ^NS.String, error: ^NS.String) -> bool ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="control:didFailToValidatePartialString:errorDescription:", objc_name="control_didFailToValidatePartialString_errorDescription")
+	ControlTextEditingDelegate_control_didFailToValidatePartialString_errorDescription :: proc(self: ^ControlTextEditingDelegate, control: ^Control, string: ^NS.String, error: ^NS.String) ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="control:isValidObject:", objc_name="control_isValidObject")
+	ControlTextEditingDelegate_control_isValidObject :: proc(self: ^ControlTextEditingDelegate, control: ^Control, obj: id) -> bool ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="control:textView:doCommandBySelector:", objc_name="control_textView_doCommandBySelector")
+	ControlTextEditingDelegate_control_textView_doCommandBySelector :: proc(self: ^ControlTextEditingDelegate, control: ^Control, textView: ^TextView, commandSelector: SEL) -> bool ---
+
+	@(objc_type=ControlTextEditingDelegate, objc_selector="control:textView:completions:forPartialWordRange:indexOfSelectedItem:", objc_name="control_textView_completions_forPartialWordRange_indexOfSelectedItem")
+	ControlTextEditingDelegate_control_textView_completions_forPartialWordRange_indexOfSelectedItem :: proc(self: ^ControlTextEditingDelegate, control: ^Control, textView: ^TextView, words: ^NS.Array, charRange: NS._NSRange, index: ^NS.Integer) -> ^NS.Array ---
 }

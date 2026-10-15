@@ -3,6 +3,7 @@
 package darwin_GameKit
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="GKSession", objc_superclass=NS.Object)
 Session :: struct { using _: NS.Object}
@@ -94,4 +95,35 @@ Session_sendDataToAllPeers :: #force_inline proc "c" (self: ^Session, data: ^NS.
 Session_acceptConnectionFromPeer :: #force_inline proc "c" (self: ^Session, peerID: ^NS.String) -> (ok: bool, err: ^NS.Error) {
 	ok = Session_acceptConnectionFromPeer_error(self, peerID, &err)
 	return
+}
+
+
+@(objc_class="GKSessionDelegate")
+SessionDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=SessionDelegate, objc_selector="session:peer:didChangeState:", objc_name="session_peer_didChangeState")
+	SessionDelegate_session_peer_didChangeState :: proc(self: ^SessionDelegate, session: ^Session, peerID: ^NS.String, state: PeerConnectionState) ---
+
+	@(objc_type=SessionDelegate, objc_selector="session:didReceiveConnectionRequestFromPeer:", objc_name="session_didReceiveConnectionRequestFromPeer")
+	SessionDelegate_session_didReceiveConnectionRequestFromPeer :: proc(self: ^SessionDelegate, session: ^Session, peerID: ^NS.String) ---
+
+	@(objc_type=SessionDelegate, objc_selector="session:connectionWithPeerFailed:withError:", objc_name="session_connectionWithPeerFailed_withError")
+	SessionDelegate_session_connectionWithPeerFailed_withError :: proc(self: ^SessionDelegate, session: ^Session, peerID: ^NS.String, error: ^NS.Error) ---
+
+	@(objc_type=SessionDelegate, objc_selector="session:didFailWithError:", objc_name="session_didFailWithError")
+	SessionDelegate_session_didFailWithError :: proc(self: ^SessionDelegate, session: ^Session, error: ^NS.Error) ---
+}
+
+
+
+@(objc_type=SessionDelegate, objc_name="session")
+SessionDelegate_session :: proc {
+	SessionDelegate_session_peer_didChangeState,
+	SessionDelegate_session_didReceiveConnectionRequestFromPeer,
+	SessionDelegate_session_connectionWithPeerFailed_withError,
+	SessionDelegate_session_didFailWithError,
 }

@@ -55,3 +55,24 @@ foreign lib {
 	@(objc_type=ResidencySet, objc_selector="allocationCount", objc_name="allocationCount")
 	ResidencySet_allocationCount :: proc(self: ^ResidencySet) -> NS.UInteger ---
 }
+
+
+@(objc_class="MTLResidencySetDescriptor", objc_superclass=NS.Object)
+ResidencySetDescriptor :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=ResidencySetDescriptor, objc_selector="label", objc_name="label")
+	ResidencySetDescriptor_label :: proc(self: ^ResidencySetDescriptor) -> ^NS.String ---
+
+	@(objc_type=ResidencySetDescriptor, objc_selector="setLabel:", objc_name="setLabel")
+	ResidencySetDescriptor_setLabel :: proc(self: ^ResidencySetDescriptor, label: ^NS.String) ---
+
+	@(objc_type=ResidencySetDescriptor, objc_selector="initialCapacity", objc_name="initialCapacity")
+	ResidencySetDescriptor_initialCapacity :: proc(self: ^ResidencySetDescriptor) -> NS.UInteger ---
+
+	@(objc_type=ResidencySetDescriptor, objc_selector="setInitialCapacity:", objc_name="setInitialCapacity")
+	ResidencySetDescriptor_setInitialCapacity :: proc(self: ^ResidencySetDescriptor, initialCapacity: NS.UInteger) ---
+}

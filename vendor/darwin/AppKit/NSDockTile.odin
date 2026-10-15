@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSDockTile", objc_superclass=NS.Object)
 DockTile :: struct { using _: NS.Object}
@@ -39,4 +36,20 @@ foreign lib {
 
 	@(objc_type=DockTile, objc_selector="owner", objc_name="owner")
 	DockTile_owner :: proc(self: ^DockTile) -> id ---
+}
+
+
+@(objc_class="NSDockTilePlugIn")
+DockTilePlugIn :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=DockTilePlugIn, objc_selector="setDockTile:", objc_name="setDockTile")
+	DockTilePlugIn_setDockTile :: proc(self: ^DockTilePlugIn, dockTile: ^DockTile) ---
+
+	@(objc_type=DockTilePlugIn, objc_selector="dockMenu", objc_name="dockMenu")
+	DockTilePlugIn_dockMenu :: proc(self: ^DockTilePlugIn) -> ^Menu ---
 }

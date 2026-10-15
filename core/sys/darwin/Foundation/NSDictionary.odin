@@ -266,3 +266,60 @@ Dictionary_writeToURL_ :: #force_inline proc "c" (self: ^Dictionary, url: ^URL) 
 	ok = Dictionary_writeToURL_error(self, url, &err)
 	return
 }
+
+
+@(objc_class="NSMutableDictionary", objc_superclass=Dictionary)
+MutableDictionary :: struct { using _: Dictionary}
+
+foreign lib {
+	@(objc_type=MutableDictionary, objc_selector="removeObjectForKey:", objc_name="removeObjectForKey")
+	MutableDictionary_removeObjectForKey :: proc(self: ^MutableDictionary, aKey: id) ---
+
+	@(objc_type=MutableDictionary, objc_selector="setObject:forKey:", objc_name="setObject_forKey")
+	MutableDictionary_setObject_forKey :: proc(self: ^MutableDictionary, anObject: id, aKey: ^Copying) ---
+
+	@(objc_type=MutableDictionary, objc_selector="init", objc_name="init")
+	MutableDictionary_init :: proc(self: ^MutableDictionary) -> instancetype ---
+
+	@(objc_type=MutableDictionary, objc_selector="initWithCapacity:", objc_name="initWithCapacity")
+	MutableDictionary_initWithCapacity :: proc(self: ^MutableDictionary, numItems: UInteger) -> instancetype ---
+
+	@(objc_type=MutableDictionary, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	MutableDictionary_initWithCoder :: proc(self: ^MutableDictionary, coder: ^Coder) -> instancetype ---
+
+	@(objc_type=MutableDictionary, objc_selector="addEntriesFromDictionary:", objc_name="addEntriesFromDictionary")
+	MutableDictionary_addEntriesFromDictionary :: proc(self: ^MutableDictionary, otherDictionary: ^Dictionary) ---
+
+	@(objc_type=MutableDictionary, objc_selector="removeAllObjects", objc_name="removeAllObjects")
+	MutableDictionary_removeAllObjects :: proc(self: ^MutableDictionary) ---
+
+	@(objc_type=MutableDictionary, objc_selector="removeObjectsForKeys:", objc_name="removeObjectsForKeys")
+	MutableDictionary_removeObjectsForKeys :: proc(self: ^MutableDictionary, keyArray: ^Array) ---
+
+	@(objc_type=MutableDictionary, objc_selector="setDictionary:", objc_name="setDictionary")
+	MutableDictionary_setDictionary :: proc(self: ^MutableDictionary, otherDictionary: ^Dictionary) ---
+
+	@(objc_type=MutableDictionary, objc_selector="setObject:forKeyedSubscript:", objc_name="setObject_forKeyedSubscript")
+	MutableDictionary_setObject_forKeyedSubscript :: proc(self: ^MutableDictionary, obj: id, key: ^Copying) ---
+
+	@(objc_type=MutableDictionary, objc_selector="dictionaryWithCapacity:", objc_name="dictionaryWithCapacity", objc_is_class_method=true)
+	MutableDictionary_dictionaryWithCapacity :: proc(numItems: UInteger) -> instancetype ---
+
+	@(objc_type=MutableDictionary, objc_selector="dictionaryWithContentsOfFile:", objc_name="dictionaryWithContentsOfFile", objc_is_class_method=true)
+	MutableDictionary_dictionaryWithContentsOfFile :: proc(path: ^String) -> ^MutableDictionary ---
+
+	@(objc_type=MutableDictionary, objc_selector="dictionaryWithContentsOfURL:", objc_name="dictionaryWithContentsOfURL", objc_is_class_method=true)
+	MutableDictionary_dictionaryWithContentsOfURL :: proc(url: ^URL) -> ^MutableDictionary ---
+
+	@(objc_type=MutableDictionary, objc_selector="initWithContentsOfFile:", objc_name="initWithContentsOfFile")
+	MutableDictionary_initWithContentsOfFile :: proc(self: ^MutableDictionary, path: ^String) -> ^MutableDictionary ---
+
+	@(objc_type=MutableDictionary, objc_selector="initWithContentsOfURL:", objc_name="initWithContentsOfURL")
+	MutableDictionary_initWithContentsOfURL :: proc(self: ^MutableDictionary, url: ^URL) -> ^MutableDictionary ---
+
+	@(objc_type=MutableDictionary, objc_selector="dictionaryWithSharedKeySet:", objc_name="dictionaryWithSharedKeySet", objc_is_class_method=true)
+	MutableDictionary_dictionaryWithSharedKeySet :: proc(keyset: id) -> ^MutableDictionary ---
+
+	@(objc_type=MutableDictionary, objc_selector="setValue:forKey:", objc_name="setValue")
+	MutableDictionary_setValue :: proc(self: ^MutableDictionary, value: id, key: ^String) ---
+}

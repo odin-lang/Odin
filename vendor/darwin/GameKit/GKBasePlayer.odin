@@ -17,3 +17,12 @@ foreign lib {
 	@(objc_type=BasePlayer, objc_selector="displayName", objc_name="displayName")
 	BasePlayer_displayName :: proc(self: ^BasePlayer) -> ^NS.String ---
 }
+
+
+@(objc_class="GKCloudPlayer", objc_superclass=BasePlayer)
+CloudPlayer :: struct { using _: BasePlayer}
+
+foreign lib {
+	@(objc_type=CloudPlayer, objc_selector="getCurrentSignedInPlayerForContainer:completionHandler:", objc_name="getCurrentSignedInPlayerForContainer", objc_is_class_method=true)
+	CloudPlayer_getCurrentSignedInPlayerForContainer :: proc(containerName: ^NS.String, handler: ^Objc_Block(proc "c" ( player: ^CloudPlayer, error: ^NS.Error ))) ---
+}

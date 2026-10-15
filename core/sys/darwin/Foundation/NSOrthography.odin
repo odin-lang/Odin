@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSOrthography", objc_superclass=Object)
 Orthography :: struct {
 	using _: Object,

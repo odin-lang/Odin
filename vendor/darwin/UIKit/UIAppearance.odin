@@ -5,10 +5,6 @@ package darwin_UIKit
 import "base:intrinsics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIAppearance")
 Appearance :: struct {
 	using _: intrinsics.objc_object,
@@ -42,3 +38,13 @@ Appearance_appearanceForTraitCollection :: proc {
 	Appearance_appearanceForTraitCollection_whenContainedIn,
 	Appearance_appearanceForTraitCollection_whenContainedInInstancesOfClasses,
 }
+
+
+@(objc_class="UIAppearanceContainer")
+AppearanceContainer :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {}

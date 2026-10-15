@@ -3,6 +3,7 @@
 package darwin_AVFoundation
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="AVRouteDetector", objc_superclass=NS.Object)
 RouteDetector :: struct { using _: NS.Object}
@@ -23,3 +24,7 @@ foreign lib {
 	@(objc_type=RouteDetector, objc_selector="setDetectsCustomRoutes:", objc_name="setDetectsCustomRoutes")
 	RouteDetector_setDetectsCustomRoutes :: proc(self: ^RouteDetector, detectsCustomRoutes: bool) ---
 }
+
+
+@(objc_class="AVRouteDetectorInternal")
+RouteDetectorInternal :: struct { using _: intrinsics.objc_object}

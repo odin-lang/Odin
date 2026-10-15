@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import "base:intrinsics"
 
-
-
-
-
 @(objc_class="NSIgnoreMisspelledWords")
 IgnoreMisspelledWords :: struct { using _: intrinsics.objc_object}
 

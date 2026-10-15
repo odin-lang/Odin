@@ -41,3 +41,48 @@ MTL4ArgumentTable_setAddress :: proc {
 	MTL4ArgumentTable_setAddress_atIndex,
 	MTL4ArgumentTable_setAddress_attributeStride_atIndex,
 }
+
+
+@(objc_class="MTL4ArgumentTableDescriptor", objc_superclass=NS.Object)
+MTL4ArgumentTableDescriptor :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="maxBufferBindCount", objc_name="maxBufferBindCount")
+	MTL4ArgumentTableDescriptor_maxBufferBindCount :: proc(self: ^MTL4ArgumentTableDescriptor) -> NS.UInteger ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="setMaxBufferBindCount:", objc_name="setMaxBufferBindCount")
+	MTL4ArgumentTableDescriptor_setMaxBufferBindCount :: proc(self: ^MTL4ArgumentTableDescriptor, maxBufferBindCount: NS.UInteger) ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="maxTextureBindCount", objc_name="maxTextureBindCount")
+	MTL4ArgumentTableDescriptor_maxTextureBindCount :: proc(self: ^MTL4ArgumentTableDescriptor) -> NS.UInteger ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="setMaxTextureBindCount:", objc_name="setMaxTextureBindCount")
+	MTL4ArgumentTableDescriptor_setMaxTextureBindCount :: proc(self: ^MTL4ArgumentTableDescriptor, maxTextureBindCount: NS.UInteger) ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="maxSamplerStateBindCount", objc_name="maxSamplerStateBindCount")
+	MTL4ArgumentTableDescriptor_maxSamplerStateBindCount :: proc(self: ^MTL4ArgumentTableDescriptor) -> NS.UInteger ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="setMaxSamplerStateBindCount:", objc_name="setMaxSamplerStateBindCount")
+	MTL4ArgumentTableDescriptor_setMaxSamplerStateBindCount :: proc(self: ^MTL4ArgumentTableDescriptor, maxSamplerStateBindCount: NS.UInteger) ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="initializeBindings", objc_name="initializeBindings")
+	MTL4ArgumentTableDescriptor_initializeBindings :: proc(self: ^MTL4ArgumentTableDescriptor) -> bool ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="setInitializeBindings:", objc_name="setInitializeBindings")
+	MTL4ArgumentTableDescriptor_setInitializeBindings :: proc(self: ^MTL4ArgumentTableDescriptor, initializeBindings: bool) ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="supportAttributeStrides", objc_name="supportAttributeStrides")
+	MTL4ArgumentTableDescriptor_supportAttributeStrides :: proc(self: ^MTL4ArgumentTableDescriptor) -> bool ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="setSupportAttributeStrides:", objc_name="setSupportAttributeStrides")
+	MTL4ArgumentTableDescriptor_setSupportAttributeStrides :: proc(self: ^MTL4ArgumentTableDescriptor, supportAttributeStrides: bool) ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="label", objc_name="label")
+	MTL4ArgumentTableDescriptor_label :: proc(self: ^MTL4ArgumentTableDescriptor) -> ^NS.String ---
+
+	@(objc_type=MTL4ArgumentTableDescriptor, objc_selector="setLabel:", objc_name="setLabel")
+	MTL4ArgumentTableDescriptor_setLabel :: proc(self: ^MTL4ArgumentTableDescriptor, label: ^NS.String) ---
+}

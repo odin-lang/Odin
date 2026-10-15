@@ -5,10 +5,6 @@ package darwin_UIKit
 import "base:intrinsics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UITimingCurveProvider")
 TimingCurveProvider :: struct {
 	using _: intrinsics.objc_object,

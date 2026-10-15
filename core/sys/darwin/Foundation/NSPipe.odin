@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSPipe", objc_superclass=Object)
 Pipe :: struct { using _: Object}
 

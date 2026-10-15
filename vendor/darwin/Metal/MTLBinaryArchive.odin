@@ -87,3 +87,18 @@ BinaryArchive_addFunctionWithDescriptor :: #force_inline proc "c" (self: ^Binary
 	ok = BinaryArchive_addFunctionWithDescriptor_error(self, descriptor, library, &err)
 	return
 }
+
+
+@(objc_class="MTLBinaryArchiveDescriptor", objc_superclass=NS.Object)
+BinaryArchiveDescriptor :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=BinaryArchiveDescriptor, objc_selector="url", objc_name="url")
+	BinaryArchiveDescriptor_url :: proc(self: ^BinaryArchiveDescriptor) -> ^NS.URL ---
+
+	@(objc_type=BinaryArchiveDescriptor, objc_selector="setUrl:", objc_name="setUrl")
+	BinaryArchiveDescriptor_setUrl :: proc(self: ^BinaryArchiveDescriptor, url: ^NS.URL) ---
+}

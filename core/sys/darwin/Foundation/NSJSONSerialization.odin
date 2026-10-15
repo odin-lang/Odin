@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSJSONSerialization", objc_superclass=Object)
 JSONSerialization :: struct { using _: Object}
 

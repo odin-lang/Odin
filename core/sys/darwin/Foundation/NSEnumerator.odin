@@ -2,6 +2,7 @@
 #+build darwin
 package darwin_Foundation
 
+import "base:intrinsics"
 
 @(objc_class="NSEnumerator", objc_superclass=Object)
 Enumerator :: struct {
@@ -15,4 +16,37 @@ foreign lib {
 
 	@(objc_type=Enumerator, objc_selector="allObjects", objc_name="allObjects")
 	Enumerator_allObjects :: proc(self: ^Enumerator) -> ^Array ---
+}
+
+
+@(objc_class="NSDirectoryEnumerator", objc_superclass=Enumerator)
+DirectoryEnumerator :: struct { using _: Enumerator}
+
+foreign lib {
+	@(objc_type=DirectoryEnumerator, objc_selector="skipDescendents", objc_name="skipDescendents")
+	DirectoryEnumerator_skipDescendents :: proc(self: ^DirectoryEnumerator) ---
+
+	@(objc_type=DirectoryEnumerator, objc_selector="skipDescendants", objc_name="skipDescendants")
+	DirectoryEnumerator_skipDescendants :: proc(self: ^DirectoryEnumerator) ---
+
+	@(objc_type=DirectoryEnumerator, objc_selector="fileAttributes", objc_name="fileAttributes")
+	DirectoryEnumerator_fileAttributes :: proc(self: ^DirectoryEnumerator) -> ^Dictionary ---
+
+	@(objc_type=DirectoryEnumerator, objc_selector="directoryAttributes", objc_name="directoryAttributes")
+	DirectoryEnumerator_directoryAttributes :: proc(self: ^DirectoryEnumerator) -> ^Dictionary ---
+
+	@(objc_type=DirectoryEnumerator, objc_selector="isEnumeratingDirectoryPostOrder", objc_name="isEnumeratingDirectoryPostOrder")
+	DirectoryEnumerator_isEnumeratingDirectoryPostOrder :: proc(self: ^DirectoryEnumerator) -> bool ---
+
+	@(objc_type=DirectoryEnumerator, objc_selector="level", objc_name="level")
+	DirectoryEnumerator_level :: proc(self: ^DirectoryEnumerator) -> UInteger ---
+}
+
+
+@(objc_class="NSFastEnumeration")
+FastEnumeration :: struct { using _: intrinsics.objc_object}
+
+foreign lib {
+	@(objc_type=FastEnumeration, objc_selector="countByEnumeratingWithState:objects:count:", objc_name="countByEnumeratingWithState")
+	FastEnumeration_countByEnumeratingWithState :: proc(self: ^FastEnumeration, state: ^FastEnumerationState, buffer: ^id, len: UInteger) -> UInteger ---
 }

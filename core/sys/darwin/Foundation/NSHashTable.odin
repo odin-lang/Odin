@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSHashTable", objc_superclass=Object)
 HashTable :: struct {
 	using _: Object,

@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSCalendar", objc_superclass=Object)
 Calendar :: struct {
 	using _: Object,

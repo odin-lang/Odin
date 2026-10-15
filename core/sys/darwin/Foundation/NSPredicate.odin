@@ -3,6 +3,7 @@
 package darwin_Foundation
 
 import cffi "core:c"
+import "base:intrinsics"
 
 @(objc_class="NSPredicate", objc_superclass=Object)
 Predicate :: struct {
@@ -70,5 +71,137 @@ Predicate_evaluateWithObject :: proc {
 @(objc_type=Predicate, objc_name="allowEvaluationWithValidator")
 Predicate_allowEvaluationWithValidator :: #force_inline proc "c" (self: ^Predicate, validator: ^PredicateValidating) -> (ok: bool, err: ^Error) {
 	ok = Predicate_allowEvaluationWithValidator_error(self, validator, &err)
+	return
+}
+
+
+@(objc_class="NSComparisonPredicate", objc_superclass=Predicate)
+ComparisonPredicate :: struct { using _: Predicate}
+
+foreign lib {
+	@(objc_type=ComparisonPredicate, objc_selector="predicateWithLeftExpression:rightExpression:modifier:type:options:", objc_name="predicateWithLeftExpression_rightExpression_modifier_type_options", objc_is_class_method=true)
+	ComparisonPredicate_predicateWithLeftExpression_rightExpression_modifier_type_options :: proc(lhs: ^Expression, rhs: ^Expression, modifier: ComparisonPredicateModifier, type: PredicateOperatorType, options: ComparisonPredicateOptions) -> ^ComparisonPredicate ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="predicateWithLeftExpression:rightExpression:customSelector:", objc_name="predicateWithLeftExpression_rightExpression_customSelector", objc_is_class_method=true)
+	ComparisonPredicate_predicateWithLeftExpression_rightExpression_customSelector :: proc(lhs: ^Expression, rhs: ^Expression, selector: SEL) -> ^ComparisonPredicate ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="initWithLeftExpression:rightExpression:modifier:type:options:", objc_name="initWithLeftExpression_rightExpression_modifier_type_options")
+	ComparisonPredicate_initWithLeftExpression_rightExpression_modifier_type_options :: proc(self: ^ComparisonPredicate, lhs: ^Expression, rhs: ^Expression, modifier: ComparisonPredicateModifier, type: PredicateOperatorType, options: ComparisonPredicateOptions) -> instancetype ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="initWithLeftExpression:rightExpression:customSelector:", objc_name="initWithLeftExpression_rightExpression_customSelector")
+	ComparisonPredicate_initWithLeftExpression_rightExpression_customSelector :: proc(self: ^ComparisonPredicate, lhs: ^Expression, rhs: ^Expression, selector: SEL) -> instancetype ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ComparisonPredicate_initWithCoder :: proc(self: ^ComparisonPredicate, coder: ^Coder) -> instancetype ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="predicateOperatorType", objc_name="predicateOperatorType")
+	ComparisonPredicate_predicateOperatorType :: proc(self: ^ComparisonPredicate) -> PredicateOperatorType ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="comparisonPredicateModifier", objc_name="comparisonPredicateModifier")
+	ComparisonPredicate_comparisonPredicateModifier :: proc(self: ^ComparisonPredicate) -> ComparisonPredicateModifier ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="leftExpression", objc_name="leftExpression")
+	ComparisonPredicate_leftExpression :: proc(self: ^ComparisonPredicate) -> ^Expression ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="rightExpression", objc_name="rightExpression")
+	ComparisonPredicate_rightExpression :: proc(self: ^ComparisonPredicate) -> ^Expression ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="customSelector", objc_name="customSelector")
+	ComparisonPredicate_customSelector :: proc(self: ^ComparisonPredicate) -> SEL ---
+
+	@(objc_type=ComparisonPredicate, objc_selector="options", objc_name="options")
+	ComparisonPredicate_options :: proc(self: ^ComparisonPredicate) -> ComparisonPredicateOptions ---
+}
+
+
+
+@(objc_type=ComparisonPredicate, objc_name="predicateWithLeftExpression", objc_is_class_method=true)
+ComparisonPredicate_predicateWithLeftExpression :: proc {
+	ComparisonPredicate_predicateWithLeftExpression_rightExpression_modifier_type_options,
+	ComparisonPredicate_predicateWithLeftExpression_rightExpression_customSelector,
+}
+
+@(objc_type=ComparisonPredicate, objc_name="initWithLeftExpression")
+ComparisonPredicate_initWithLeftExpression :: proc {
+	ComparisonPredicate_initWithLeftExpression_rightExpression_modifier_type_options,
+	ComparisonPredicate_initWithLeftExpression_rightExpression_customSelector,
+}
+
+
+@(objc_class="NSCompoundPredicate", objc_superclass=Predicate)
+CompoundPredicate :: struct { using _: Predicate}
+
+foreign lib {
+	@(objc_type=CompoundPredicate, objc_selector="initWithType:subpredicates:", objc_name="initWithType")
+	CompoundPredicate_initWithType :: proc(self: ^CompoundPredicate, type: CompoundPredicateType, subpredicates: ^Array) -> instancetype ---
+
+	@(objc_type=CompoundPredicate, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	CompoundPredicate_initWithCoder :: proc(self: ^CompoundPredicate, coder: ^Coder) -> instancetype ---
+
+	@(objc_type=CompoundPredicate, objc_selector="andPredicateWithSubpredicates:", objc_name="andPredicateWithSubpredicates", objc_is_class_method=true)
+	CompoundPredicate_andPredicateWithSubpredicates :: proc(subpredicates: ^Array) -> ^CompoundPredicate ---
+
+	@(objc_type=CompoundPredicate, objc_selector="orPredicateWithSubpredicates:", objc_name="orPredicateWithSubpredicates", objc_is_class_method=true)
+	CompoundPredicate_orPredicateWithSubpredicates :: proc(subpredicates: ^Array) -> ^CompoundPredicate ---
+
+	@(objc_type=CompoundPredicate, objc_selector="notPredicateWithSubpredicate:", objc_name="notPredicateWithSubpredicate", objc_is_class_method=true)
+	CompoundPredicate_notPredicateWithSubpredicate :: proc(predicate: ^Predicate) -> ^CompoundPredicate ---
+
+	@(objc_type=CompoundPredicate, objc_selector="compoundPredicateType", objc_name="compoundPredicateType")
+	CompoundPredicate_compoundPredicateType :: proc(self: ^CompoundPredicate) -> CompoundPredicateType ---
+
+	@(objc_type=CompoundPredicate, objc_selector="subpredicates", objc_name="subpredicates")
+	CompoundPredicate_subpredicates :: proc(self: ^CompoundPredicate) -> ^Array ---
+}
+
+
+@(objc_class="NSPredicateOperator")
+PredicateOperator :: struct { using _: intrinsics.objc_object}
+
+
+@(objc_class="NSPredicateValidating")
+PredicateValidating :: struct {
+	using _: intrinsics.objc_object,
+	using _: ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=PredicateValidating, objc_selector="visitPredicate:error:", objc_name="visitPredicate_error")
+	PredicateValidating_visitPredicate_error :: proc(self: ^PredicateValidating, predicate: ^Predicate, error: ^^Error) -> bool ---
+
+	@(objc_type=PredicateValidating, objc_selector="visitExpression:error:", objc_name="visitExpression_error")
+	PredicateValidating_visitExpression_error :: proc(self: ^PredicateValidating, expression: ^Expression, error: ^^Error) -> bool ---
+
+	@(objc_type=PredicateValidating, objc_selector="visitOperatorType:error:", objc_name="visitOperatorType_error")
+	PredicateValidating_visitOperatorType_error :: proc(self: ^PredicateValidating, operatorType: PredicateOperatorType, error: ^^Error) -> bool ---
+
+	@(objc_type=PredicateValidating, objc_selector="visitExpressionKeyPath:scope:key:error:", objc_name="visitExpressionKeyPath_error")
+	PredicateValidating_visitExpressionKeyPath_error :: proc(self: ^PredicateValidating, expression: ^Expression, scope: ^String, key: ^String, error: ^^Error) -> bool ---
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=PredicateValidating, objc_name="visitPredicate")
+PredicateValidating_visitPredicate :: #force_inline proc "c" (self: ^PredicateValidating, predicate: ^Predicate) -> (ok: bool, err: ^Error) {
+	ok = PredicateValidating_visitPredicate_error(self, predicate, &err)
+	return
+}
+
+@(objc_type=PredicateValidating, objc_name="visitExpression")
+PredicateValidating_visitExpression :: #force_inline proc "c" (self: ^PredicateValidating, expression: ^Expression) -> (ok: bool, err: ^Error) {
+	ok = PredicateValidating_visitExpression_error(self, expression, &err)
+	return
+}
+
+@(objc_type=PredicateValidating, objc_name="visitOperatorType")
+PredicateValidating_visitOperatorType :: #force_inline proc "c" (self: ^PredicateValidating, operatorType: PredicateOperatorType) -> (ok: bool, err: ^Error) {
+	ok = PredicateValidating_visitOperatorType_error(self, operatorType, &err)
+	return
+}
+
+@(objc_type=PredicateValidating, objc_name="visitExpressionKeyPath")
+PredicateValidating_visitExpressionKeyPath :: #force_inline proc "c" (self: ^PredicateValidating, expression: ^Expression, scope: ^String, key: ^String) -> (ok: bool, err: ^Error) {
+	ok = PredicateValidating_visitExpressionKeyPath_error(self, expression, scope, key, &err)
 	return
 }

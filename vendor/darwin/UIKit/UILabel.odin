@@ -5,10 +5,6 @@ package darwin_UIKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UILabel", objc_superclass=View)
 Label :: struct {
 	using _: View,

@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSRuleEditor", objc_superclass=Control)
 RuleEditor :: struct { using _: Control}
@@ -139,4 +136,37 @@ foreign lib {
 
 	@(objc_type=RuleEditor, objc_selector="setDisplayValuesKeyPath:", objc_name="setDisplayValuesKeyPath")
 	RuleEditor_setDisplayValuesKeyPath :: proc(self: ^RuleEditor, displayValuesKeyPath: ^NS.String) ---
+}
+
+
+@(objc_class="NSRuleEditorDelegate")
+RuleEditorDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=RuleEditorDelegate, objc_selector="ruleEditor:numberOfChildrenForCriterion:withRowType:", objc_name="ruleEditor_numberOfChildrenForCriterion_withRowType")
+	RuleEditorDelegate_ruleEditor_numberOfChildrenForCriterion_withRowType :: proc(self: ^RuleEditorDelegate, editor: ^RuleEditor, criterion: id, rowType: RuleEditorRowType) -> NS.Integer ---
+
+	@(objc_type=RuleEditorDelegate, objc_selector="ruleEditor:child:forCriterion:withRowType:", objc_name="ruleEditor_child_forCriterion_withRowType")
+	RuleEditorDelegate_ruleEditor_child_forCriterion_withRowType :: proc(self: ^RuleEditorDelegate, editor: ^RuleEditor, index: NS.Integer, criterion: id, rowType: RuleEditorRowType) -> id ---
+
+	@(objc_type=RuleEditorDelegate, objc_selector="ruleEditor:displayValueForCriterion:inRow:", objc_name="ruleEditor_displayValueForCriterion_inRow")
+	RuleEditorDelegate_ruleEditor_displayValueForCriterion_inRow :: proc(self: ^RuleEditorDelegate, editor: ^RuleEditor, criterion: id, row: NS.Integer) -> id ---
+
+	@(objc_type=RuleEditorDelegate, objc_selector="ruleEditor:predicatePartsForCriterion:withDisplayValue:inRow:", objc_name="ruleEditor_predicatePartsForCriterion_withDisplayValue_inRow")
+	RuleEditorDelegate_ruleEditor_predicatePartsForCriterion_withDisplayValue_inRow :: proc(self: ^RuleEditorDelegate, editor: ^RuleEditor, criterion: id, value: id, row: NS.Integer) -> ^NS.Dictionary ---
+
+	@(objc_type=RuleEditorDelegate, objc_selector="ruleEditorRowsDidChange:", objc_name="ruleEditorRowsDidChange")
+	RuleEditorDelegate_ruleEditorRowsDidChange :: proc(self: ^RuleEditorDelegate, notification: ^NS.Notification) ---
+}
+
+@(objc_type=RuleEditorDelegate, objc_name="ruleEditor")
+RuleEditorDelegate_ruleEditor :: proc {
+	RuleEditorDelegate_ruleEditor_numberOfChildrenForCriterion_withRowType,
+	RuleEditorDelegate_ruleEditor_child_forCriterion_withRowType,
+	RuleEditorDelegate_ruleEditor_displayValueForCriterion_inRow,
+	RuleEditorDelegate_ruleEditor_predicatePartsForCriterion_withDisplayValue_inRow,
 }

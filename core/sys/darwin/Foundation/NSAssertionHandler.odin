@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSAssertionHandler", objc_superclass=Object)
 AssertionHandler :: struct { using _: Object}
 

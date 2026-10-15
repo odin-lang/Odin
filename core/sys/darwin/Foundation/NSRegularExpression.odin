@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSRegularExpression", objc_superclass=Object)
 RegularExpression :: struct {
 	using _: Object,

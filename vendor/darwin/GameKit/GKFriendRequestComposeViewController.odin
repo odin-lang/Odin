@@ -3,6 +3,7 @@
 package darwin_GameKit
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	@(objc_class="GKFriendRequestComposeViewController", objc_superclass=UI_ViewController)
@@ -36,4 +37,13 @@ foreign lib {
 
 	@(objc_type=FriendRequestComposeViewController, objc_selector="setComposeViewDelegate:", objc_name="setComposeViewDelegate")
 	FriendRequestComposeViewController_setComposeViewDelegate :: proc(self: ^FriendRequestComposeViewController, composeViewDelegate: ^FriendRequestComposeViewControllerDelegate) ---
+}
+
+
+@(objc_class="GKFriendRequestComposeViewControllerDelegate")
+FriendRequestComposeViewControllerDelegate :: struct { using _: intrinsics.objc_object}
+
+foreign lib {
+	@(objc_type=FriendRequestComposeViewControllerDelegate, objc_selector="friendRequestComposeViewControllerDidFinish:", objc_name="friendRequestComposeViewControllerDidFinish")
+	FriendRequestComposeViewControllerDelegate_friendRequestComposeViewControllerDidFinish :: proc(self: ^FriendRequestComposeViewControllerDelegate, viewController: ^FriendRequestComposeViewController) ---
 }

@@ -5,10 +5,6 @@ package darwin_AppKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSHelpManager", objc_superclass=NS.Object)
 HelpManager :: struct { using _: NS.Object}
 

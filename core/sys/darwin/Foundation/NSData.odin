@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSData", objc_superclass=Object)
 Data :: struct {
 	using _: Object,
@@ -246,4 +245,118 @@ Data_decompressedDataUsingAlgorithm :: #force_inline proc "c" (self: ^Data, algo
 Data_compressedDataUsingAlgorithm :: #force_inline proc "c" (self: ^Data, algorithm: DataCompressionAlgorithm) -> (res: ^Data, err: ^Error) {
 	res = Data_compressedDataUsingAlgorithm_error(self, algorithm, &err)
 	return
+}
+
+
+@(objc_class="NSMutableData", objc_superclass=Data)
+MutableData :: struct { using _: Data}
+
+foreign lib {
+	@(objc_type=MutableData, objc_selector="mutableBytes", objc_name="mutableBytes")
+	MutableData_mutableBytes :: proc(self: ^MutableData) -> rawptr ---
+
+	@(objc_type=MutableData, objc_selector="length", objc_name="length")
+	MutableData_length :: proc(self: ^MutableData) -> UInteger ---
+
+	@(objc_type=MutableData, objc_selector="setLength:", objc_name="setLength")
+	MutableData_setLength :: proc(self: ^MutableData, length: UInteger) ---
+
+	@(objc_type=MutableData, objc_selector="appendBytes:length:", objc_name="appendBytes")
+	MutableData_appendBytes :: proc(self: ^MutableData, bytes: rawptr, length: UInteger) ---
+
+	@(objc_type=MutableData, objc_selector="appendData:", objc_name="appendData")
+	MutableData_appendData :: proc(self: ^MutableData, other: ^Data) ---
+
+	@(objc_type=MutableData, objc_selector="increaseLengthBy:", objc_name="increaseLengthBy")
+	MutableData_increaseLengthBy :: proc(self: ^MutableData, extraLength: UInteger) ---
+
+	@(objc_type=MutableData, objc_selector="replaceBytesInRange:withBytes:", objc_name="replaceBytesInRange_withBytes")
+	MutableData_replaceBytesInRange_withBytes :: proc(self: ^MutableData, range: _NSRange, bytes: rawptr) ---
+
+	@(objc_type=MutableData, objc_selector="resetBytesInRange:", objc_name="resetBytesInRange")
+	MutableData_resetBytesInRange :: proc(self: ^MutableData, range: _NSRange) ---
+
+	@(objc_type=MutableData, objc_selector="setData:", objc_name="setData")
+	MutableData_setData :: proc(self: ^MutableData, data: ^Data) ---
+
+	@(objc_type=MutableData, objc_selector="replaceBytesInRange:withBytes:length:", objc_name="replaceBytesInRange_withBytes_length")
+	MutableData_replaceBytesInRange_withBytes_length :: proc(self: ^MutableData, range: _NSRange, replacementBytes: rawptr, replacementLength: UInteger) ---
+
+	@(objc_type=MutableData, objc_selector="dataWithCapacity:", objc_name="dataWithCapacity", objc_is_class_method=true)
+	MutableData_dataWithCapacity :: proc(aNumItems: UInteger) -> instancetype ---
+
+	@(objc_type=MutableData, objc_selector="dataWithLength:", objc_name="dataWithLength", objc_is_class_method=true)
+	MutableData_dataWithLength :: proc(length: UInteger) -> instancetype ---
+
+	@(objc_type=MutableData, objc_selector="initWithCapacity:", objc_name="initWithCapacity")
+	MutableData_initWithCapacity :: proc(self: ^MutableData, capacity: UInteger) -> instancetype ---
+
+	@(objc_type=MutableData, objc_selector="initWithLength:", objc_name="initWithLength")
+	MutableData_initWithLength :: proc(self: ^MutableData, length: UInteger) -> instancetype ---
+
+	@(objc_type=MutableData, objc_selector="decompressUsingAlgorithm:error:", objc_name="decompressUsingAlgorithm_error")
+	MutableData_decompressUsingAlgorithm_error :: proc(self: ^MutableData, algorithm: DataCompressionAlgorithm, error: ^^Error) -> bool ---
+
+	@(objc_type=MutableData, objc_selector="compressUsingAlgorithm:error:", objc_name="compressUsingAlgorithm_error")
+	MutableData_compressUsingAlgorithm_error :: proc(self: ^MutableData, algorithm: DataCompressionAlgorithm, error: ^^Error) -> bool ---
+}
+
+
+
+@(objc_type=MutableData, objc_name="replaceBytesInRange")
+MutableData_replaceBytesInRange :: proc {
+	MutableData_replaceBytesInRange_withBytes,
+	MutableData_replaceBytesInRange_withBytes_length,
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=MutableData, objc_name="decompressUsingAlgorithm")
+MutableData_decompressUsingAlgorithm :: #force_inline proc "c" (self: ^MutableData, algorithm: DataCompressionAlgorithm) -> (ok: bool, err: ^Error) {
+	ok = MutableData_decompressUsingAlgorithm_error(self, algorithm, &err)
+	return
+}
+
+@(objc_type=MutableData, objc_name="compressUsingAlgorithm")
+MutableData_compressUsingAlgorithm :: #force_inline proc "c" (self: ^MutableData, algorithm: DataCompressionAlgorithm) -> (ok: bool, err: ^Error) {
+	ok = MutableData_compressUsingAlgorithm_error(self, algorithm, &err)
+	return
+}
+
+
+@(objc_class="NSDataDetector", objc_superclass=RegularExpression)
+DataDetector :: struct { using _: RegularExpression}
+
+foreign lib {
+	@(objc_type=DataDetector, objc_selector="dataDetectorWithTypes:error:", objc_name="dataDetectorWithTypes_error", objc_is_class_method=true)
+	DataDetector_dataDetectorWithTypes_error :: proc(checkingTypes: TextCheckingTypes, error: ^^Error) -> ^DataDetector ---
+
+	@(objc_type=DataDetector, objc_selector="initWithTypes:error:", objc_name="initWithTypes_error")
+	DataDetector_initWithTypes_error :: proc(self: ^DataDetector, checkingTypes: TextCheckingTypes, error: ^^Error) -> instancetype ---
+
+	@(objc_type=DataDetector, objc_selector="checkingTypes", objc_name="checkingTypes")
+	DataDetector_checkingTypes :: proc(self: ^DataDetector) -> TextCheckingTypes ---
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=DataDetector, objc_name="dataDetectorWithTypes", objc_is_class_method=true)
+DataDetector_dataDetectorWithTypes :: #force_inline proc "c" (checkingTypes: TextCheckingTypes) -> (res: ^DataDetector, err: ^Error) {
+	res = DataDetector.dataDetectorWithTypes_error(checkingTypes, &err)
+	return
+}
+
+@(objc_type=DataDetector, objc_name="initWithTypes")
+DataDetector_initWithTypes :: #force_inline proc "c" (self: ^DataDetector, checkingTypes: TextCheckingTypes) -> (res: ^DataDetector, err: ^Error) {
+	res = DataDetector_initWithTypes_error(self, checkingTypes, &err)
+	return
+}
+
+
+@(objc_class="NSPurgeableData", objc_superclass=MutableData)
+PurgeableData :: struct {
+	using _: MutableData,
+	using _: DiscardableContent,
 }

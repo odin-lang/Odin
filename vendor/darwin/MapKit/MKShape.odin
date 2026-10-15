@@ -3,6 +3,8 @@
 package darwin_MapKit
 
 import NS "core:sys/darwin/Foundation"
+import CG "core:sys/darwin/CoreGraphics"
+import CL "vendor:darwin/CoreLocation"
 
 @(objc_class="MKShape", objc_superclass=NS.Object)
 Shape :: struct {
@@ -22,4 +24,54 @@ foreign lib {
 
 	@(objc_type=Shape, objc_selector="setSubtitle:", objc_name="setSubtitle")
 	Shape_setSubtitle :: proc(self: ^Shape, subtitle: ^NS.String) ---
+}
+
+
+@(objc_class="MKMultiPoint", objc_superclass=Shape)
+MultiPoint :: struct { using _: Shape}
+
+foreign lib {
+	@(objc_type=MultiPoint, objc_selector="points", objc_name="points")
+	MultiPoint_points :: proc(self: ^MultiPoint) -> ^MapPoint ---
+
+	@(objc_type=MultiPoint, objc_selector="getCoordinates:range:", objc_name="getCoordinates")
+	MultiPoint_getCoordinates :: proc(self: ^MultiPoint, coords: ^CL.LocationCoordinate2D, range: NS._NSRange) ---
+
+	@(objc_type=MultiPoint, objc_selector="locationAtPointIndex:", objc_name="locationAtPointIndex")
+	MultiPoint_locationAtPointIndex :: proc(self: ^MultiPoint, index: NS.UInteger) -> CG.Float ---
+
+	@(objc_type=MultiPoint, objc_selector="locationsAtPointIndexes:", objc_name="locationsAtPointIndexes")
+	MultiPoint_locationsAtPointIndexes :: proc(self: ^MultiPoint, indexes: ^NS.IndexSet) -> ^NS.Array ---
+
+	@(objc_type=MultiPoint, objc_selector="pointCount", objc_name="pointCount")
+	MultiPoint_pointCount :: proc(self: ^MultiPoint) -> NS.UInteger ---
+}
+
+
+@(objc_class="MKPointAnnotation", objc_superclass=Shape)
+PointAnnotation :: struct { using _: Shape}
+
+foreign lib {
+	@(objc_type=PointAnnotation, objc_selector="init", objc_name="init")
+	PointAnnotation_init :: proc(self: ^PointAnnotation) -> instancetype ---
+
+	@(objc_type=PointAnnotation, objc_selector="initWithCoordinate:", objc_name="initWithCoordinate_")
+	PointAnnotation_initWithCoordinate_ :: proc(self: ^PointAnnotation, coordinate: CL.LocationCoordinate2D) -> instancetype ---
+
+	@(objc_type=PointAnnotation, objc_selector="initWithCoordinate:title:subtitle:", objc_name="initWithCoordinate_title_subtitle")
+	PointAnnotation_initWithCoordinate_title_subtitle :: proc(self: ^PointAnnotation, coordinate: CL.LocationCoordinate2D, title: ^NS.String, subtitle: ^NS.String) -> instancetype ---
+
+	@(objc_type=PointAnnotation, objc_selector="coordinate", objc_name="coordinate")
+	PointAnnotation_coordinate :: proc(self: ^PointAnnotation) -> CL.LocationCoordinate2D ---
+
+	@(objc_type=PointAnnotation, objc_selector="setCoordinate:", objc_name="setCoordinate")
+	PointAnnotation_setCoordinate :: proc(self: ^PointAnnotation, coordinate: CL.LocationCoordinate2D) ---
+}
+
+
+
+@(objc_type=PointAnnotation, objc_name="initWithCoordinate")
+PointAnnotation_initWithCoordinate :: proc {
+	PointAnnotation_initWithCoordinate_,
+	PointAnnotation_initWithCoordinate_title_subtitle,
 }

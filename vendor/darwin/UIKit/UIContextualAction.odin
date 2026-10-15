@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIContextualAction", objc_superclass=NS.Object)
 ContextualAction :: struct { using _: NS.Object}
 

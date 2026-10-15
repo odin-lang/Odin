@@ -36,3 +36,42 @@ foreign lib {
 	@(objc_type=Measurement, objc_selector="doubleValue", objc_name="doubleValue")
 	Measurement_doubleValue :: proc(self: ^Measurement) -> cffi.double ---
 }
+
+
+@(objc_class="NSMeasurementFormatter", objc_superclass=Formatter)
+MeasurementFormatter :: struct {
+	using _: Formatter,
+	using _: SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=MeasurementFormatter, objc_selector="stringFromMeasurement:", objc_name="stringFromMeasurement")
+	MeasurementFormatter_stringFromMeasurement :: proc(self: ^MeasurementFormatter, measurement: ^Measurement) -> ^String ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="stringFromUnit:", objc_name="stringFromUnit")
+	MeasurementFormatter_stringFromUnit :: proc(self: ^MeasurementFormatter, unit: ^Unit) -> ^String ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="unitOptions", objc_name="unitOptions")
+	MeasurementFormatter_unitOptions :: proc(self: ^MeasurementFormatter) -> MeasurementFormatterUnitOptions ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="setUnitOptions:", objc_name="setUnitOptions")
+	MeasurementFormatter_setUnitOptions :: proc(self: ^MeasurementFormatter, unitOptions: MeasurementFormatterUnitOptions) ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="unitStyle", objc_name="unitStyle")
+	MeasurementFormatter_unitStyle :: proc(self: ^MeasurementFormatter) -> FormattingUnitStyle ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="setUnitStyle:", objc_name="setUnitStyle")
+	MeasurementFormatter_setUnitStyle :: proc(self: ^MeasurementFormatter, unitStyle: FormattingUnitStyle) ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="locale", objc_name="locale")
+	MeasurementFormatter_locale :: proc(self: ^MeasurementFormatter) -> ^Locale ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="setLocale:", objc_name="setLocale")
+	MeasurementFormatter_setLocale :: proc(self: ^MeasurementFormatter, locale: ^Locale) ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="numberFormatter", objc_name="numberFormatter")
+	MeasurementFormatter_numberFormatter :: proc(self: ^MeasurementFormatter) -> ^NumberFormatter ---
+
+	@(objc_type=MeasurementFormatter, objc_selector="setNumberFormatter:", objc_name="setNumberFormatter")
+	MeasurementFormatter_setNumberFormatter :: proc(self: ^MeasurementFormatter, numberFormatter: ^NumberFormatter) ---
+}

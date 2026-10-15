@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIDatePicker", objc_superclass=Control)
 DatePicker :: struct {
 	using _: Control,

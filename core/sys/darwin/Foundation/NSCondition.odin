@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSCondition", objc_superclass=Object)
 Condition :: struct {
 	using _: Object,
@@ -27,4 +26,51 @@ foreign lib {
 
 	@(objc_type=Condition, objc_selector="setName:", objc_name="setName")
 	Condition_setName :: proc(self: ^Condition, name: ^String) ---
+}
+
+
+@(objc_class="NSConditionLock", objc_superclass=Object)
+ConditionLock :: struct {
+	using _: Object,
+	using _: Locking,
+}
+
+foreign lib {
+	@(objc_type=ConditionLock, objc_selector="initWithCondition:", objc_name="initWithCondition")
+	ConditionLock_initWithCondition :: proc(self: ^ConditionLock, condition: Integer) -> instancetype ---
+
+	@(objc_type=ConditionLock, objc_selector="lockWhenCondition:", objc_name="lockWhenCondition_")
+	ConditionLock_lockWhenCondition_ :: proc(self: ^ConditionLock, condition: Integer) ---
+
+	@(objc_type=ConditionLock, objc_selector="tryLock", objc_name="tryLock")
+	ConditionLock_tryLock :: proc(self: ^ConditionLock) -> bool ---
+
+	@(objc_type=ConditionLock, objc_selector="tryLockWhenCondition:", objc_name="tryLockWhenCondition")
+	ConditionLock_tryLockWhenCondition :: proc(self: ^ConditionLock, condition: Integer) -> bool ---
+
+	@(objc_type=ConditionLock, objc_selector="unlockWithCondition:", objc_name="unlockWithCondition")
+	ConditionLock_unlockWithCondition :: proc(self: ^ConditionLock, condition: Integer) ---
+
+	@(objc_type=ConditionLock, objc_selector="lockBeforeDate:", objc_name="lockBeforeDate")
+	ConditionLock_lockBeforeDate :: proc(self: ^ConditionLock, limit: ^Date) -> bool ---
+
+	@(objc_type=ConditionLock, objc_selector="lockWhenCondition:beforeDate:", objc_name="lockWhenCondition_beforeDate")
+	ConditionLock_lockWhenCondition_beforeDate :: proc(self: ^ConditionLock, condition: Integer, limit: ^Date) -> bool ---
+
+	@(objc_type=ConditionLock, objc_selector="condition", objc_name="condition")
+	ConditionLock_condition :: proc(self: ^ConditionLock) -> Integer ---
+
+	@(objc_type=ConditionLock, objc_selector="name", objc_name="name")
+	ConditionLock_name :: proc(self: ^ConditionLock) -> ^String ---
+
+	@(objc_type=ConditionLock, objc_selector="setName:", objc_name="setName")
+	ConditionLock_setName :: proc(self: ^ConditionLock, name: ^String) ---
+}
+
+
+
+@(objc_type=ConditionLock, objc_name="lockWhenCondition")
+ConditionLock_lockWhenCondition :: proc {
+	ConditionLock_lockWhenCondition_,
+	ConditionLock_lockWhenCondition_beforeDate,
 }

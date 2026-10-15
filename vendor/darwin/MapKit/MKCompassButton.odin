@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_MapKit
 
-
 @(objc_class="MKCompassButton", objc_superclass=UI_View)
 CompassButton :: struct { using _: UI_View}
 

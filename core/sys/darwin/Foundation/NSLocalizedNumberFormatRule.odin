@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSLocalizedNumberFormatRule", objc_superclass=Object)
 LocalizedNumberFormatRule :: struct {
 	using _: Object,

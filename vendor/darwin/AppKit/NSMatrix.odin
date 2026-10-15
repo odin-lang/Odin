@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSMatrix", objc_superclass=Control)
 Matrix :: struct {
@@ -340,3 +337,13 @@ Matrix_sendAction :: proc {
 	Matrix_sendAction_to_forAllCells,
 	Matrix_sendAction_,
 }
+
+
+@(objc_class="NSMatrixDelegate")
+MatrixDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: ControlTextEditingDelegate,
+}
+
+@(default_calling_convention="c")
+foreign lib {}

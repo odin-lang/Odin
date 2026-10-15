@@ -5,10 +5,6 @@ package darwin_UIKit
 import CT "core:sys/darwin/CoreText"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSAdaptiveImageGlyph", objc_superclass=NS.Object)
 NSAdaptiveImageGlyph :: struct {
 	using _: NS.Object,

@@ -3,6 +3,7 @@
 package darwin_CoreLocation
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="CLPlacemark", objc_superclass=NS.Object)
 Placemark :: struct {
@@ -75,3 +76,7 @@ foreign lib {
 	@(objc_type=Placemark, objc_selector="postalAddress", objc_name="postalAddress")
 	Placemark_postalAddress :: proc(self: ^Placemark) -> ^CNPostalAddress ---
 }
+
+
+@(objc_class="CLPlacemarkInternal")
+PlacemarkInternal :: struct { using _: intrinsics.objc_object}

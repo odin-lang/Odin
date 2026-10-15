@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSNull", objc_superclass=Object)
 Null :: struct {
 	using _: Object,

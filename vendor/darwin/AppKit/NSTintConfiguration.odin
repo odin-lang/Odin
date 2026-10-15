@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSTintConfiguration", objc_superclass=NS.Object)
 TintConfiguration :: struct {
 	using _: NS.Object,

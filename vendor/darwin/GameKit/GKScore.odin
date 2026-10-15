@@ -103,3 +103,15 @@ Score_reportScores :: proc {
 	Score_reportScores_withCompletionHandler,
 	Score_reportScores_withEligibleChallenges_withCompletionHandler,
 }
+
+
+@(objc_class="GKScoreChallenge", objc_superclass=Challenge)
+ScoreChallenge :: struct { using _: Challenge}
+
+foreign lib {
+	@(objc_type=ScoreChallenge, objc_selector="score", objc_name="score")
+	ScoreChallenge_score :: proc(self: ^ScoreChallenge) -> ^Score ---
+
+	@(objc_type=ScoreChallenge, objc_selector="leaderboardEntry", objc_name="leaderboardEntry")
+	ScoreChallenge_leaderboardEntry :: proc(self: ^ScoreChallenge) -> ^LeaderboardEntry ---
+}

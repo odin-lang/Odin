@@ -5,6 +5,7 @@ package darwin_AVFoundation
 import cffi "core:c"
 import CM "vendor:darwin/CoreMedia"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="AVFrameRateRange", objc_superclass=NS.Object)
 FrameRateRange :: struct { using _: NS.Object}
@@ -28,3 +29,7 @@ foreign lib {
 	@(objc_type=FrameRateRange, objc_selector="minFrameDuration", objc_name="minFrameDuration")
 	FrameRateRange_minFrameDuration :: proc(self: ^FrameRateRange) -> CM.Time ---
 }
+
+
+@(objc_class="AVFrameRateRangeInternal")
+FrameRateRangeInternal :: struct { using _: intrinsics.objc_object}

@@ -20,3 +20,30 @@ foreign lib {
 	@(objc_type=Mouse, objc_selector="current", objc_name="current", objc_is_class_method=true)
 	Mouse_current :: proc() -> ^Mouse ---
 }
+
+
+@(objc_class="GCMouseInput", objc_superclass=PhysicalInputProfile)
+MouseInput :: struct { using _: PhysicalInputProfile}
+
+foreign lib {
+	@(objc_type=MouseInput, objc_selector="mouseMovedHandler", objc_name="mouseMovedHandler")
+	MouseInput_mouseMovedHandler :: proc(self: ^MouseInput) -> MouseMoved ---
+
+	@(objc_type=MouseInput, objc_selector="setMouseMovedHandler:", objc_name="setMouseMovedHandler")
+	MouseInput_setMouseMovedHandler :: proc(self: ^MouseInput, mouseMovedHandler: MouseMoved) ---
+
+	@(objc_type=MouseInput, objc_selector="scroll", objc_name="scroll")
+	MouseInput_scroll :: proc(self: ^MouseInput) -> ^DeviceCursor ---
+
+	@(objc_type=MouseInput, objc_selector="leftButton", objc_name="leftButton")
+	MouseInput_leftButton :: proc(self: ^MouseInput) -> ^ControllerButtonInput ---
+
+	@(objc_type=MouseInput, objc_selector="rightButton", objc_name="rightButton")
+	MouseInput_rightButton :: proc(self: ^MouseInput) -> ^ControllerButtonInput ---
+
+	@(objc_type=MouseInput, objc_selector="middleButton", objc_name="middleButton")
+	MouseInput_middleButton :: proc(self: ^MouseInput) -> ^ControllerButtonInput ---
+
+	@(objc_type=MouseInput, objc_selector="auxiliaryButtons", objc_name="auxiliaryButtons")
+	MouseInput_auxiliaryButtons :: proc(self: ^MouseInput) -> ^NS.Array ---
+}

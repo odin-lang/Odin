@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSPopUpButton", objc_superclass=Button)
 PopUpButton :: struct { using _: Button}
 
@@ -153,4 +149,152 @@ foreign lib {
 PopUpButton_pullDownButtonWithTitle :: proc {
 	PopUpButton_pullDownButtonWithTitle_menu,
 	PopUpButton_pullDownButtonWithTitle_image_menu,
+}
+
+
+@(objc_class="NSPopUpButtonCell", objc_superclass=MenuItemCell)
+PopUpButtonCell :: struct {
+	using _: MenuItemCell,
+	using _: MenuItemValidation,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PopUpButtonCell, objc_selector="initTextCell:pullsDown:", objc_name="initTextCell")
+	PopUpButtonCell_initTextCell :: proc(self: ^PopUpButtonCell, stringValue: ^NS.String, pullDown: bool) -> instancetype ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	PopUpButtonCell_initWithCoder :: proc(self: ^PopUpButtonCell, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="addItemWithTitle:", objc_name="addItemWithTitle")
+	PopUpButtonCell_addItemWithTitle :: proc(self: ^PopUpButtonCell, title: ^NS.String) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="addItemsWithTitles:", objc_name="addItemsWithTitles")
+	PopUpButtonCell_addItemsWithTitles :: proc(self: ^PopUpButtonCell, itemTitles: ^NS.Array) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="insertItemWithTitle:atIndex:", objc_name="insertItemWithTitle")
+	PopUpButtonCell_insertItemWithTitle :: proc(self: ^PopUpButtonCell, title: ^NS.String, index: NS.Integer) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="removeItemWithTitle:", objc_name="removeItemWithTitle")
+	PopUpButtonCell_removeItemWithTitle :: proc(self: ^PopUpButtonCell, title: ^NS.String) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="removeItemAtIndex:", objc_name="removeItemAtIndex")
+	PopUpButtonCell_removeItemAtIndex :: proc(self: ^PopUpButtonCell, index: NS.Integer) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="removeAllItems", objc_name="removeAllItems")
+	PopUpButtonCell_removeAllItems :: proc(self: ^PopUpButtonCell) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="indexOfItem:", objc_name="indexOfItem")
+	PopUpButtonCell_indexOfItem :: proc(self: ^PopUpButtonCell, item: ^MenuItem) -> NS.Integer ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="indexOfItemWithTitle:", objc_name="indexOfItemWithTitle")
+	PopUpButtonCell_indexOfItemWithTitle :: proc(self: ^PopUpButtonCell, title: ^NS.String) -> NS.Integer ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="indexOfItemWithTag:", objc_name="indexOfItemWithTag")
+	PopUpButtonCell_indexOfItemWithTag :: proc(self: ^PopUpButtonCell, tag: NS.Integer) -> NS.Integer ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="indexOfItemWithRepresentedObject:", objc_name="indexOfItemWithRepresentedObject")
+	PopUpButtonCell_indexOfItemWithRepresentedObject :: proc(self: ^PopUpButtonCell, obj: id) -> NS.Integer ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="indexOfItemWithTarget:andAction:", objc_name="indexOfItemWithTarget")
+	PopUpButtonCell_indexOfItemWithTarget :: proc(self: ^PopUpButtonCell, target: id, actionSelector: SEL) -> NS.Integer ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="itemAtIndex:", objc_name="itemAtIndex")
+	PopUpButtonCell_itemAtIndex :: proc(self: ^PopUpButtonCell, index: NS.Integer) -> ^MenuItem ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="itemWithTitle:", objc_name="itemWithTitle")
+	PopUpButtonCell_itemWithTitle :: proc(self: ^PopUpButtonCell, title: ^NS.String) -> ^MenuItem ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="selectItem:", objc_name="selectItem")
+	PopUpButtonCell_selectItem :: proc(self: ^PopUpButtonCell, item: ^MenuItem) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="selectItemAtIndex:", objc_name="selectItemAtIndex")
+	PopUpButtonCell_selectItemAtIndex :: proc(self: ^PopUpButtonCell, index: NS.Integer) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="selectItemWithTitle:", objc_name="selectItemWithTitle")
+	PopUpButtonCell_selectItemWithTitle :: proc(self: ^PopUpButtonCell, title: ^NS.String) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="selectItemWithTag:", objc_name="selectItemWithTag")
+	PopUpButtonCell_selectItemWithTag :: proc(self: ^PopUpButtonCell, tag: NS.Integer) -> bool ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setTitle:", objc_name="setTitle")
+	PopUpButtonCell_setTitle :: proc(self: ^PopUpButtonCell, string: ^NS.String) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="synchronizeTitleAndSelectedItem", objc_name="synchronizeTitleAndSelectedItem")
+	PopUpButtonCell_synchronizeTitleAndSelectedItem :: proc(self: ^PopUpButtonCell) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="itemTitleAtIndex:", objc_name="itemTitleAtIndex")
+	PopUpButtonCell_itemTitleAtIndex :: proc(self: ^PopUpButtonCell, index: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="attachPopUpWithFrame:inView:", objc_name="attachPopUpWithFrame")
+	PopUpButtonCell_attachPopUpWithFrame :: proc(self: ^PopUpButtonCell, cellFrame: NS.Rect, controlView: ^View) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="dismissPopUp", objc_name="dismissPopUp")
+	PopUpButtonCell_dismissPopUp :: proc(self: ^PopUpButtonCell) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="performClickWithFrame:inView:", objc_name="performClickWithFrame")
+	PopUpButtonCell_performClickWithFrame :: proc(self: ^PopUpButtonCell, frame: NS.Rect, controlView: ^View) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="menu", objc_name="menu")
+	PopUpButtonCell_menu :: proc(self: ^PopUpButtonCell) -> ^Menu ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setMenu:", objc_name="setMenu")
+	PopUpButtonCell_setMenu :: proc(self: ^PopUpButtonCell, menu: ^Menu) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="pullsDown", objc_name="pullsDown")
+	PopUpButtonCell_pullsDown :: proc(self: ^PopUpButtonCell) -> bool ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setPullsDown:", objc_name="setPullsDown")
+	PopUpButtonCell_setPullsDown :: proc(self: ^PopUpButtonCell, pullsDown: bool) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="autoenablesItems", objc_name="autoenablesItems")
+	PopUpButtonCell_autoenablesItems :: proc(self: ^PopUpButtonCell) -> bool ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setAutoenablesItems:", objc_name="setAutoenablesItems")
+	PopUpButtonCell_setAutoenablesItems :: proc(self: ^PopUpButtonCell, autoenablesItems: bool) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="preferredEdge", objc_name="preferredEdge")
+	PopUpButtonCell_preferredEdge :: proc(self: ^PopUpButtonCell) -> NS.RectEdge ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setPreferredEdge:", objc_name="setPreferredEdge")
+	PopUpButtonCell_setPreferredEdge :: proc(self: ^PopUpButtonCell, preferredEdge: NS.RectEdge) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="usesItemFromMenu", objc_name="usesItemFromMenu")
+	PopUpButtonCell_usesItemFromMenu :: proc(self: ^PopUpButtonCell) -> bool ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setUsesItemFromMenu:", objc_name="setUsesItemFromMenu")
+	PopUpButtonCell_setUsesItemFromMenu :: proc(self: ^PopUpButtonCell, usesItemFromMenu: bool) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="altersStateOfSelectedItem", objc_name="altersStateOfSelectedItem")
+	PopUpButtonCell_altersStateOfSelectedItem :: proc(self: ^PopUpButtonCell) -> bool ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setAltersStateOfSelectedItem:", objc_name="setAltersStateOfSelectedItem")
+	PopUpButtonCell_setAltersStateOfSelectedItem :: proc(self: ^PopUpButtonCell, altersStateOfSelectedItem: bool) ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="itemArray", objc_name="itemArray")
+	PopUpButtonCell_itemArray :: proc(self: ^PopUpButtonCell) -> ^NS.Array ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="numberOfItems", objc_name="numberOfItems")
+	PopUpButtonCell_numberOfItems :: proc(self: ^PopUpButtonCell) -> NS.Integer ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="lastItem", objc_name="lastItem")
+	PopUpButtonCell_lastItem :: proc(self: ^PopUpButtonCell) -> ^MenuItem ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="selectedItem", objc_name="selectedItem")
+	PopUpButtonCell_selectedItem :: proc(self: ^PopUpButtonCell) -> ^MenuItem ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="indexOfSelectedItem", objc_name="indexOfSelectedItem")
+	PopUpButtonCell_indexOfSelectedItem :: proc(self: ^PopUpButtonCell) -> NS.Integer ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="itemTitles", objc_name="itemTitles")
+	PopUpButtonCell_itemTitles :: proc(self: ^PopUpButtonCell) -> ^NS.Array ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="titleOfSelectedItem", objc_name="titleOfSelectedItem")
+	PopUpButtonCell_titleOfSelectedItem :: proc(self: ^PopUpButtonCell) -> ^NS.String ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="arrowPosition", objc_name="arrowPosition")
+	PopUpButtonCell_arrowPosition :: proc(self: ^PopUpButtonCell) -> PopUpArrowPosition ---
+
+	@(objc_type=PopUpButtonCell, objc_selector="setArrowPosition:", objc_name="setArrowPosition")
+	PopUpButtonCell_setArrowPosition :: proc(self: ^PopUpButtonCell, arrowPosition: PopUpArrowPosition) ---
 }

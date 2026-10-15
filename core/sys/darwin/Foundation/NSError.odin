@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSError", objc_superclass=Object)
 Error :: struct {
 	using _: Object,

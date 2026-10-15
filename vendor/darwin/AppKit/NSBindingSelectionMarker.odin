@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSBindingSelectionMarker", objc_superclass=NS.Object)
 BindingSelectionMarker :: struct {
 	using _: NS.Object,

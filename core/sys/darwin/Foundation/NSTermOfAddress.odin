@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSTermOfAddress", objc_superclass=Object)
 TermOfAddress :: struct {
 	using _: Object,

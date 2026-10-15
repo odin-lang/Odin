@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSTimer", objc_superclass=Object)
 Timer :: struct { using _: Object}
 

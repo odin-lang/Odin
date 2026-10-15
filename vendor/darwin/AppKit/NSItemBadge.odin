@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSItemBadge", objc_superclass=NS.Object)
 ItemBadge :: struct { using _: NS.Object}
 

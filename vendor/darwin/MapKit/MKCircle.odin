@@ -3,6 +3,7 @@
 package darwin_MapKit
 
 import CL "vendor:darwin/CoreLocation"
+import CG "core:sys/darwin/CoreGraphics"
 
 @(objc_class="MKCircle", objc_superclass=Shape)
 Circle :: struct {
@@ -25,4 +26,28 @@ foreign lib {
 
 	@(objc_type=Circle, objc_selector="boundingMapRect", objc_name="boundingMapRect")
 	Circle_boundingMapRect :: proc(self: ^Circle) -> MapRect ---
+}
+
+
+@(objc_class="MKCircleRenderer", objc_superclass=OverlayPathRenderer)
+CircleRenderer :: struct { using _: OverlayPathRenderer}
+
+foreign lib {
+	@(objc_type=CircleRenderer, objc_selector="initWithCircle:", objc_name="initWithCircle")
+	CircleRenderer_initWithCircle :: proc(self: ^CircleRenderer, circle: ^Circle) -> instancetype ---
+
+	@(objc_type=CircleRenderer, objc_selector="circle", objc_name="circle")
+	CircleRenderer_circle :: proc(self: ^CircleRenderer) -> ^Circle ---
+
+	@(objc_type=CircleRenderer, objc_selector="strokeStart", objc_name="strokeStart")
+	CircleRenderer_strokeStart :: proc(self: ^CircleRenderer) -> CG.Float ---
+
+	@(objc_type=CircleRenderer, objc_selector="setStrokeStart:", objc_name="setStrokeStart")
+	CircleRenderer_setStrokeStart :: proc(self: ^CircleRenderer, strokeStart: CG.Float) ---
+
+	@(objc_type=CircleRenderer, objc_selector="strokeEnd", objc_name="strokeEnd")
+	CircleRenderer_strokeEnd :: proc(self: ^CircleRenderer) -> CG.Float ---
+
+	@(objc_type=CircleRenderer, objc_selector="setStrokeEnd:", objc_name="setStrokeEnd")
+	CircleRenderer_setStrokeEnd :: proc(self: ^CircleRenderer, strokeEnd: CG.Float) ---
 }

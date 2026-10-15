@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSDrawer", objc_superclass=Responder)
 Drawer :: struct {
@@ -110,4 +107,35 @@ Drawer_open :: proc {
 Drawer_close :: proc {
 	Drawer_close_,
 	Drawer_close_sender,
+}
+
+
+@(objc_class="NSDrawerDelegate")
+DrawerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=DrawerDelegate, objc_selector="drawerShouldOpen:", objc_name="drawerShouldOpen")
+	DrawerDelegate_drawerShouldOpen :: proc(self: ^DrawerDelegate, sender: ^Drawer) -> bool ---
+
+	@(objc_type=DrawerDelegate, objc_selector="drawerShouldClose:", objc_name="drawerShouldClose")
+	DrawerDelegate_drawerShouldClose :: proc(self: ^DrawerDelegate, sender: ^Drawer) -> bool ---
+
+	@(objc_type=DrawerDelegate, objc_selector="drawerWillResizeContents:toSize:", objc_name="drawerWillResizeContents")
+	DrawerDelegate_drawerWillResizeContents :: proc(self: ^DrawerDelegate, sender: ^Drawer, contentSize: NS.Size) -> NS.Size ---
+
+	@(objc_type=DrawerDelegate, objc_selector="drawerWillOpen:", objc_name="drawerWillOpen")
+	DrawerDelegate_drawerWillOpen :: proc(self: ^DrawerDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=DrawerDelegate, objc_selector="drawerDidOpen:", objc_name="drawerDidOpen")
+	DrawerDelegate_drawerDidOpen :: proc(self: ^DrawerDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=DrawerDelegate, objc_selector="drawerWillClose:", objc_name="drawerWillClose")
+	DrawerDelegate_drawerWillClose :: proc(self: ^DrawerDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=DrawerDelegate, objc_selector="drawerDidClose:", objc_name="drawerDidClose")
+	DrawerDelegate_drawerDidClose :: proc(self: ^DrawerDelegate, notification: ^NS.Notification) ---
 }

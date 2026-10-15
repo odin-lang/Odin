@@ -5,10 +5,7 @@ package darwin_UIKit
 import cffi "core:c"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIImage", objc_superclass=NS.Object)
 Image :: struct {
@@ -330,4 +327,587 @@ Image_resizableImageWithCapInsets :: proc {
 Image_imageWithTintColor :: proc {
 	Image_imageWithTintColor_,
 	Image_imageWithTintColor_renderingMode,
+}
+
+
+@(objc_class="UIImageConfiguration", objc_superclass=NS.Object)
+ImageConfiguration :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+	using _: NS.SecureCoding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImageConfiguration, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	ImageConfiguration_new :: proc() -> ^ImageConfiguration ---
+
+	@(objc_type=ImageConfiguration, objc_selector="init", objc_name="init")
+	ImageConfiguration_init :: proc(self: ^ImageConfiguration) -> instancetype ---
+
+	@(objc_type=ImageConfiguration, objc_selector="configurationWithTraitCollection:", objc_name="configurationWithTraitCollection")
+	ImageConfiguration_configurationWithTraitCollection :: proc(self: ^ImageConfiguration, traitCollection: ^TraitCollection) -> instancetype ---
+
+	@(objc_type=ImageConfiguration, objc_selector="configurationWithTraitCollection:", objc_name="configurationWithTraitCollectionStatic", objc_is_class_method=true)
+	ImageConfiguration_configurationWithTraitCollectionStatic :: proc(traitCollection: ^TraitCollection) -> instancetype ---
+
+	@(objc_type=ImageConfiguration, objc_selector="configurationWithLocale:", objc_name="configurationWithLocale")
+	ImageConfiguration_configurationWithLocale :: proc(self: ^ImageConfiguration, locale: ^NS.Locale) -> instancetype ---
+
+	@(objc_type=ImageConfiguration, objc_selector="configurationWithLocale:", objc_name="configurationWithLocaleStatic", objc_is_class_method=true)
+	ImageConfiguration_configurationWithLocaleStatic :: proc(locale: ^NS.Locale) -> instancetype ---
+
+	@(objc_type=ImageConfiguration, objc_selector="configurationByApplyingConfiguration:", objc_name="configurationByApplyingConfiguration")
+	ImageConfiguration_configurationByApplyingConfiguration :: proc(self: ^ImageConfiguration, otherConfiguration: ^ImageConfiguration) -> instancetype ---
+
+	@(objc_type=ImageConfiguration, objc_selector="traitCollection", objc_name="traitCollection")
+	ImageConfiguration_traitCollection :: proc(self: ^ImageConfiguration) -> ^TraitCollection ---
+
+	@(objc_type=ImageConfiguration, objc_selector="locale", objc_name="locale")
+	ImageConfiguration_locale :: proc(self: ^ImageConfiguration) -> ^NS.Locale ---
+}
+
+
+@(objc_class="UIImageConfiguration")
+ImageConfigurationProtocol :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="UIImageAsset", objc_superclass=NS.Object)
+ImageAsset :: struct {
+	using _: NS.Object,
+	using _: NS.SecureCoding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImageAsset, objc_selector="init", objc_name="init")
+	ImageAsset_init :: proc(self: ^ImageAsset) -> instancetype ---
+
+	@(objc_type=ImageAsset, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ImageAsset_initWithCoder :: proc(self: ^ImageAsset, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ImageAsset, objc_selector="imageWithConfiguration:", objc_name="imageWithConfiguration")
+	ImageAsset_imageWithConfiguration :: proc(self: ^ImageAsset, configuration: ^ImageConfiguration) -> ^Image ---
+
+	@(objc_type=ImageAsset, objc_selector="registerImage:withConfiguration:", objc_name="registerImage_withConfiguration")
+	ImageAsset_registerImage_withConfiguration :: proc(self: ^ImageAsset, image: ^Image, configuration: ^ImageConfiguration) ---
+
+	@(objc_type=ImageAsset, objc_selector="unregisterImageWithConfiguration:", objc_name="unregisterImageWithConfiguration")
+	ImageAsset_unregisterImageWithConfiguration :: proc(self: ^ImageAsset, configuration: ^ImageConfiguration) ---
+
+	@(objc_type=ImageAsset, objc_selector="imageWithTraitCollection:", objc_name="imageWithTraitCollection")
+	ImageAsset_imageWithTraitCollection :: proc(self: ^ImageAsset, traitCollection: ^TraitCollection) -> ^Image ---
+
+	@(objc_type=ImageAsset, objc_selector="registerImage:withTraitCollection:", objc_name="registerImage_withTraitCollection")
+	ImageAsset_registerImage_withTraitCollection :: proc(self: ^ImageAsset, image: ^Image, traitCollection: ^TraitCollection) ---
+
+	@(objc_type=ImageAsset, objc_selector="unregisterImageWithTraitCollection:", objc_name="unregisterImageWithTraitCollection")
+	ImageAsset_unregisterImageWithTraitCollection :: proc(self: ^ImageAsset, traitCollection: ^TraitCollection) ---
+}
+
+@(objc_type=ImageAsset, objc_name="registerImage")
+ImageAsset_registerImage :: proc {
+	ImageAsset_registerImage_withConfiguration,
+	ImageAsset_registerImage_withTraitCollection,
+}
+
+
+@(objc_class="UIImagePickerController", objc_superclass=NavigationController)
+ImagePickerController :: struct {
+	using _: NavigationController,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImagePickerController, objc_selector="isSourceTypeAvailable:", objc_name="isSourceTypeAvailable", objc_is_class_method=true)
+	ImagePickerController_isSourceTypeAvailable :: proc(sourceType: ImagePickerControllerSourceType) -> bool ---
+
+	@(objc_type=ImagePickerController, objc_selector="availableMediaTypesForSourceType:", objc_name="availableMediaTypesForSourceType", objc_is_class_method=true)
+	ImagePickerController_availableMediaTypesForSourceType :: proc(sourceType: ImagePickerControllerSourceType) -> ^NS.Array ---
+
+	@(objc_type=ImagePickerController, objc_selector="isCameraDeviceAvailable:", objc_name="isCameraDeviceAvailable", objc_is_class_method=true)
+	ImagePickerController_isCameraDeviceAvailable :: proc(cameraDevice: ImagePickerControllerCameraDevice) -> bool ---
+
+	@(objc_type=ImagePickerController, objc_selector="isFlashAvailableForCameraDevice:", objc_name="isFlashAvailableForCameraDevice", objc_is_class_method=true)
+	ImagePickerController_isFlashAvailableForCameraDevice :: proc(cameraDevice: ImagePickerControllerCameraDevice) -> bool ---
+
+	@(objc_type=ImagePickerController, objc_selector="availableCaptureModesForCameraDevice:", objc_name="availableCaptureModesForCameraDevice", objc_is_class_method=true)
+	ImagePickerController_availableCaptureModesForCameraDevice :: proc(cameraDevice: ImagePickerControllerCameraDevice) -> ^NS.Array ---
+
+	@(objc_type=ImagePickerController, objc_selector="takePicture", objc_name="takePicture")
+	ImagePickerController_takePicture :: proc(self: ^ImagePickerController) ---
+
+	@(objc_type=ImagePickerController, objc_selector="startVideoCapture", objc_name="startVideoCapture")
+	ImagePickerController_startVideoCapture :: proc(self: ^ImagePickerController) -> bool ---
+
+	@(objc_type=ImagePickerController, objc_selector="stopVideoCapture", objc_name="stopVideoCapture")
+	ImagePickerController_stopVideoCapture :: proc(self: ^ImagePickerController) ---
+
+	@(objc_type=ImagePickerController, objc_selector="delegate", objc_name="delegate")
+	ImagePickerController_delegate :: proc(self: ^ImagePickerController) -> ^id ---
+
+	@(objc_type=ImagePickerController, objc_selector="setDelegate:", objc_name="setDelegate")
+	ImagePickerController_setDelegate :: proc(self: ^ImagePickerController, delegate: ^id) ---
+
+	@(objc_type=ImagePickerController, objc_selector="sourceType", objc_name="sourceType")
+	ImagePickerController_sourceType :: proc(self: ^ImagePickerController) -> ImagePickerControllerSourceType ---
+
+	@(objc_type=ImagePickerController, objc_selector="setSourceType:", objc_name="setSourceType")
+	ImagePickerController_setSourceType :: proc(self: ^ImagePickerController, sourceType: ImagePickerControllerSourceType) ---
+
+	@(objc_type=ImagePickerController, objc_selector="mediaTypes", objc_name="mediaTypes")
+	ImagePickerController_mediaTypes :: proc(self: ^ImagePickerController) -> ^NS.Array ---
+
+	@(objc_type=ImagePickerController, objc_selector="setMediaTypes:", objc_name="setMediaTypes")
+	ImagePickerController_setMediaTypes :: proc(self: ^ImagePickerController, mediaTypes: ^NS.Array) ---
+
+	@(objc_type=ImagePickerController, objc_selector="allowsEditing", objc_name="allowsEditing")
+	ImagePickerController_allowsEditing :: proc(self: ^ImagePickerController) -> bool ---
+
+	@(objc_type=ImagePickerController, objc_selector="setAllowsEditing:", objc_name="setAllowsEditing")
+	ImagePickerController_setAllowsEditing :: proc(self: ^ImagePickerController, allowsEditing: bool) ---
+
+	@(objc_type=ImagePickerController, objc_selector="allowsImageEditing", objc_name="allowsImageEditing")
+	ImagePickerController_allowsImageEditing :: proc(self: ^ImagePickerController) -> bool ---
+
+	@(objc_type=ImagePickerController, objc_selector="setAllowsImageEditing:", objc_name="setAllowsImageEditing")
+	ImagePickerController_setAllowsImageEditing :: proc(self: ^ImagePickerController, allowsImageEditing: bool) ---
+
+	@(objc_type=ImagePickerController, objc_selector="imageExportPreset", objc_name="imageExportPreset")
+	ImagePickerController_imageExportPreset :: proc(self: ^ImagePickerController) -> ImagePickerControllerImageURLExportPreset ---
+
+	@(objc_type=ImagePickerController, objc_selector="setImageExportPreset:", objc_name="setImageExportPreset")
+	ImagePickerController_setImageExportPreset :: proc(self: ^ImagePickerController, imageExportPreset: ImagePickerControllerImageURLExportPreset) ---
+
+	@(objc_type=ImagePickerController, objc_selector="videoMaximumDuration", objc_name="videoMaximumDuration")
+	ImagePickerController_videoMaximumDuration :: proc(self: ^ImagePickerController) -> NS.TimeInterval ---
+
+	@(objc_type=ImagePickerController, objc_selector="setVideoMaximumDuration:", objc_name="setVideoMaximumDuration")
+	ImagePickerController_setVideoMaximumDuration :: proc(self: ^ImagePickerController, videoMaximumDuration: NS.TimeInterval) ---
+
+	@(objc_type=ImagePickerController, objc_selector="videoQuality", objc_name="videoQuality")
+	ImagePickerController_videoQuality :: proc(self: ^ImagePickerController) -> ImagePickerControllerQualityType ---
+
+	@(objc_type=ImagePickerController, objc_selector="setVideoQuality:", objc_name="setVideoQuality")
+	ImagePickerController_setVideoQuality :: proc(self: ^ImagePickerController, videoQuality: ImagePickerControllerQualityType) ---
+
+	@(objc_type=ImagePickerController, objc_selector="videoExportPreset", objc_name="videoExportPreset")
+	ImagePickerController_videoExportPreset :: proc(self: ^ImagePickerController) -> ^NS.String ---
+
+	@(objc_type=ImagePickerController, objc_selector="setVideoExportPreset:", objc_name="setVideoExportPreset")
+	ImagePickerController_setVideoExportPreset :: proc(self: ^ImagePickerController, videoExportPreset: ^NS.String) ---
+
+	@(objc_type=ImagePickerController, objc_selector="showsCameraControls", objc_name="showsCameraControls")
+	ImagePickerController_showsCameraControls :: proc(self: ^ImagePickerController) -> bool ---
+
+	@(objc_type=ImagePickerController, objc_selector="setShowsCameraControls:", objc_name="setShowsCameraControls")
+	ImagePickerController_setShowsCameraControls :: proc(self: ^ImagePickerController, showsCameraControls: bool) ---
+
+	@(objc_type=ImagePickerController, objc_selector="cameraOverlayView", objc_name="cameraOverlayView")
+	ImagePickerController_cameraOverlayView :: proc(self: ^ImagePickerController) -> ^View ---
+
+	@(objc_type=ImagePickerController, objc_selector="setCameraOverlayView:", objc_name="setCameraOverlayView")
+	ImagePickerController_setCameraOverlayView :: proc(self: ^ImagePickerController, cameraOverlayView: ^View) ---
+
+	@(objc_type=ImagePickerController, objc_selector="cameraViewTransform", objc_name="cameraViewTransform")
+	ImagePickerController_cameraViewTransform :: proc(self: ^ImagePickerController) -> CG.AffineTransform ---
+
+	@(objc_type=ImagePickerController, objc_selector="setCameraViewTransform:", objc_name="setCameraViewTransform")
+	ImagePickerController_setCameraViewTransform :: proc(self: ^ImagePickerController, cameraViewTransform: CG.AffineTransform) ---
+
+	@(objc_type=ImagePickerController, objc_selector="cameraCaptureMode", objc_name="cameraCaptureMode")
+	ImagePickerController_cameraCaptureMode :: proc(self: ^ImagePickerController) -> ImagePickerControllerCameraCaptureMode ---
+
+	@(objc_type=ImagePickerController, objc_selector="setCameraCaptureMode:", objc_name="setCameraCaptureMode")
+	ImagePickerController_setCameraCaptureMode :: proc(self: ^ImagePickerController, cameraCaptureMode: ImagePickerControllerCameraCaptureMode) ---
+
+	@(objc_type=ImagePickerController, objc_selector="cameraDevice", objc_name="cameraDevice")
+	ImagePickerController_cameraDevice :: proc(self: ^ImagePickerController) -> ImagePickerControllerCameraDevice ---
+
+	@(objc_type=ImagePickerController, objc_selector="setCameraDevice:", objc_name="setCameraDevice")
+	ImagePickerController_setCameraDevice :: proc(self: ^ImagePickerController, cameraDevice: ImagePickerControllerCameraDevice) ---
+
+	@(objc_type=ImagePickerController, objc_selector="cameraFlashMode", objc_name="cameraFlashMode")
+	ImagePickerController_cameraFlashMode :: proc(self: ^ImagePickerController) -> ImagePickerControllerCameraFlashMode ---
+
+	@(objc_type=ImagePickerController, objc_selector="setCameraFlashMode:", objc_name="setCameraFlashMode")
+	ImagePickerController_setCameraFlashMode :: proc(self: ^ImagePickerController, cameraFlashMode: ImagePickerControllerCameraFlashMode) ---
+}
+
+
+@(objc_class="UIImagePickerControllerDelegate")
+ImagePickerControllerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImagePickerControllerDelegate, objc_selector="imagePickerController:didFinishPickingImage:editingInfo:", objc_name="imagePickerController_didFinishPickingImage_editingInfo")
+	ImagePickerControllerDelegate_imagePickerController_didFinishPickingImage_editingInfo :: proc(self: ^ImagePickerControllerDelegate, picker: ^ImagePickerController, image: ^Image, editingInfo: ^NS.Dictionary) ---
+
+	@(objc_type=ImagePickerControllerDelegate, objc_selector="imagePickerController:didFinishPickingMediaWithInfo:", objc_name="imagePickerController_didFinishPickingMediaWithInfo")
+	ImagePickerControllerDelegate_imagePickerController_didFinishPickingMediaWithInfo :: proc(self: ^ImagePickerControllerDelegate, picker: ^ImagePickerController, info: ^NS.Dictionary) ---
+
+	@(objc_type=ImagePickerControllerDelegate, objc_selector="imagePickerControllerDidCancel:", objc_name="imagePickerControllerDidCancel")
+	ImagePickerControllerDelegate_imagePickerControllerDidCancel :: proc(self: ^ImagePickerControllerDelegate, picker: ^ImagePickerController) ---
+}
+
+@(objc_type=ImagePickerControllerDelegate, objc_name="imagePickerController")
+ImagePickerControllerDelegate_imagePickerController :: proc {
+	ImagePickerControllerDelegate_imagePickerController_didFinishPickingImage_editingInfo,
+	ImagePickerControllerDelegate_imagePickerController_didFinishPickingMediaWithInfo,
+}
+
+
+@(objc_class="UIImageReader", objc_superclass=NS.Object)
+ImageReader :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImageReader, objc_selector="readerWithConfiguration:", objc_name="readerWithConfiguration", objc_is_class_method=true)
+	ImageReader_readerWithConfiguration :: proc(configuration: ^ImageReaderConfiguration) -> instancetype ---
+
+	@(objc_type=ImageReader, objc_selector="imageWithContentsOfFileURL:", objc_name="imageWithContentsOfFileURL_")
+	ImageReader_imageWithContentsOfFileURL_ :: proc(self: ^ImageReader, url: ^NS.URL) -> ^Image ---
+
+	@(objc_type=ImageReader, objc_selector="imageWithData:", objc_name="imageWithData_")
+	ImageReader_imageWithData_ :: proc(self: ^ImageReader, data: ^NS.Data) -> ^Image ---
+
+	@(objc_type=ImageReader, objc_selector="imageWithContentsOfFileURL:completion:", objc_name="imageWithContentsOfFileURL_completion")
+	ImageReader_imageWithContentsOfFileURL_completion :: proc(self: ^ImageReader, url: ^NS.URL, completion: ^Objc_Block(proc "c" ( _0: ^Image ))) ---
+
+	@(objc_type=ImageReader, objc_selector="imageWithData:completion:", objc_name="imageWithData_completion")
+	ImageReader_imageWithData_completion :: proc(self: ^ImageReader, data: ^NS.Data, completion: ^Objc_Block(proc "c" ( _0: ^Image ))) ---
+
+	@(objc_type=ImageReader, objc_selector="defaultReader", objc_name="defaultReader", objc_is_class_method=true)
+	ImageReader_defaultReader :: proc() -> ^ImageReader ---
+
+	@(objc_type=ImageReader, objc_selector="configuration", objc_name="configuration")
+	ImageReader_configuration :: proc(self: ^ImageReader) -> ^ImageReaderConfiguration ---
+}
+
+@(objc_type=ImageReader, objc_name="imageWithContentsOfFileURL")
+ImageReader_imageWithContentsOfFileURL :: proc {
+	ImageReader_imageWithContentsOfFileURL_,
+	ImageReader_imageWithContentsOfFileURL_completion,
+}
+
+@(objc_type=ImageReader, objc_name="imageWithData")
+ImageReader_imageWithData :: proc {
+	ImageReader_imageWithData_,
+	ImageReader_imageWithData_completion,
+}
+
+
+@(objc_class="UIImageReaderConfiguration", objc_superclass=NS.Object)
+ImageReaderConfiguration :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImageReaderConfiguration, objc_selector="prefersHighDynamicRange", objc_name="prefersHighDynamicRange")
+	ImageReaderConfiguration_prefersHighDynamicRange :: proc(self: ^ImageReaderConfiguration) -> bool ---
+
+	@(objc_type=ImageReaderConfiguration, objc_selector="setPrefersHighDynamicRange:", objc_name="setPrefersHighDynamicRange")
+	ImageReaderConfiguration_setPrefersHighDynamicRange :: proc(self: ^ImageReaderConfiguration, prefersHighDynamicRange: bool) ---
+
+	@(objc_type=ImageReaderConfiguration, objc_selector="preparesImagesForDisplay", objc_name="preparesImagesForDisplay")
+	ImageReaderConfiguration_preparesImagesForDisplay :: proc(self: ^ImageReaderConfiguration) -> bool ---
+
+	@(objc_type=ImageReaderConfiguration, objc_selector="setPreparesImagesForDisplay:", objc_name="setPreparesImagesForDisplay")
+	ImageReaderConfiguration_setPreparesImagesForDisplay :: proc(self: ^ImageReaderConfiguration, preparesImagesForDisplay: bool) ---
+
+	@(objc_type=ImageReaderConfiguration, objc_selector="preferredThumbnailSize", objc_name="preferredThumbnailSize")
+	ImageReaderConfiguration_preferredThumbnailSize :: proc(self: ^ImageReaderConfiguration) -> CG.Size ---
+
+	@(objc_type=ImageReaderConfiguration, objc_selector="setPreferredThumbnailSize:", objc_name="setPreferredThumbnailSize")
+	ImageReaderConfiguration_setPreferredThumbnailSize :: proc(self: ^ImageReaderConfiguration, preferredThumbnailSize: CG.Size) ---
+
+	@(objc_type=ImageReaderConfiguration, objc_selector="pixelsPerInch", objc_name="pixelsPerInch")
+	ImageReaderConfiguration_pixelsPerInch :: proc(self: ^ImageReaderConfiguration) -> CG.Float ---
+
+	@(objc_type=ImageReaderConfiguration, objc_selector="setPixelsPerInch:", objc_name="setPixelsPerInch")
+	ImageReaderConfiguration_setPixelsPerInch :: proc(self: ^ImageReaderConfiguration, pixelsPerInch: CG.Float) ---
+}
+
+
+@(objc_class="UIImageSymbolConfiguration", objc_superclass=ImageConfiguration)
+ImageSymbolConfiguration :: struct { using _: ImageConfiguration}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithScale:", objc_name="configurationWithScale", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithScale :: proc(scale: ImageSymbolScale) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithPointSize:", objc_name="configurationWithPointSize_", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithPointSize_ :: proc(pointSize: CG.Float) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithWeight:", objc_name="configurationWithWeight", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithWeight :: proc(weight: ImageSymbolWeight) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithPointSize:weight:", objc_name="configurationWithPointSize_weight", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithPointSize_weight :: proc(pointSize: CG.Float, weight: ImageSymbolWeight) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithPointSize:weight:scale:", objc_name="configurationWithPointSize_weight_scale", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithPointSize_weight_scale :: proc(pointSize: CG.Float, weight: ImageSymbolWeight, scale: ImageSymbolScale) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithTextStyle:", objc_name="configurationWithTextStyle_", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithTextStyle_ :: proc(textStyle: ^NS.String) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithTextStyle:scale:", objc_name="configurationWithTextStyle_scale", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithTextStyle_scale :: proc(textStyle: ^NS.String, scale: ImageSymbolScale) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithFont:", objc_name="configurationWithFont_", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithFont_ :: proc(font: ^Font) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithFont:scale:", objc_name="configurationWithFont_scale", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithFont_scale :: proc(font: ^Font, scale: ImageSymbolScale) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithHierarchicalColor:", objc_name="configurationWithHierarchicalColor", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithHierarchicalColor :: proc(hierarchicalColor: ^Color) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithPaletteColors:", objc_name="configurationWithPaletteColors", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithPaletteColors :: proc(paletteColors: ^NS.Array) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationPreferringMulticolor", objc_name="configurationPreferringMulticolor", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationPreferringMulticolor :: proc() -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationPreferringMonochrome", objc_name="configurationPreferringMonochrome", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationPreferringMonochrome :: proc() -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithVariableValueMode:", objc_name="configurationWithVariableValueMode", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithVariableValueMode :: proc(variableValueMode: ImageSymbolVariableValueMode) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithColorRenderingMode:", objc_name="configurationWithColorRenderingMode", objc_is_class_method=true)
+	ImageSymbolConfiguration_configurationWithColorRenderingMode :: proc(mode: ImageSymbolColorRenderingMode) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithoutTextStyle", objc_name="configurationWithoutTextStyle")
+	ImageSymbolConfiguration_configurationWithoutTextStyle :: proc(self: ^ImageSymbolConfiguration) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithoutScale", objc_name="configurationWithoutScale")
+	ImageSymbolConfiguration_configurationWithoutScale :: proc(self: ^ImageSymbolConfiguration) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithoutWeight", objc_name="configurationWithoutWeight")
+	ImageSymbolConfiguration_configurationWithoutWeight :: proc(self: ^ImageSymbolConfiguration) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="configurationWithoutPointSizeAndWeight", objc_name="configurationWithoutPointSizeAndWeight")
+	ImageSymbolConfiguration_configurationWithoutPointSizeAndWeight :: proc(self: ^ImageSymbolConfiguration) -> instancetype ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="isEqualToConfiguration:", objc_name="isEqualToConfiguration")
+	ImageSymbolConfiguration_isEqualToConfiguration :: proc(self: ^ImageSymbolConfiguration, otherConfiguration: ^ImageSymbolConfiguration) -> bool ---
+
+	@(objc_type=ImageSymbolConfiguration, objc_selector="unspecifiedConfiguration", objc_name="unspecifiedConfiguration", objc_is_class_method=true)
+	ImageSymbolConfiguration_unspecifiedConfiguration :: proc() -> ^ImageSymbolConfiguration ---
+}
+
+@(objc_type=ImageSymbolConfiguration, objc_name="configurationWithPointSize", objc_is_class_method=true)
+ImageSymbolConfiguration_configurationWithPointSize :: proc {
+	ImageSymbolConfiguration_configurationWithPointSize_,
+	ImageSymbolConfiguration_configurationWithPointSize_weight,
+	ImageSymbolConfiguration_configurationWithPointSize_weight_scale,
+}
+
+@(objc_type=ImageSymbolConfiguration, objc_name="configurationWithTextStyle", objc_is_class_method=true)
+ImageSymbolConfiguration_configurationWithTextStyle :: proc {
+	ImageSymbolConfiguration_configurationWithTextStyle_,
+	ImageSymbolConfiguration_configurationWithTextStyle_scale,
+}
+
+@(objc_type=ImageSymbolConfiguration, objc_name="configurationWithFont", objc_is_class_method=true)
+ImageSymbolConfiguration_configurationWithFont :: proc {
+	ImageSymbolConfiguration_configurationWithFont_,
+	ImageSymbolConfiguration_configurationWithFont_scale,
+}
+
+
+@(objc_class="UIImageView", objc_superclass=View)
+ImageView :: struct { using _: View}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ImageView, objc_selector="initWithImage:", objc_name="initWithImage_")
+	ImageView_initWithImage_ :: proc(self: ^ImageView, image: ^Image) -> instancetype ---
+
+	@(objc_type=ImageView, objc_selector="initWithImage:highlightedImage:", objc_name="initWithImage_highlightedImage")
+	ImageView_initWithImage_highlightedImage :: proc(self: ^ImageView, image: ^Image, highlightedImage: ^Image) -> instancetype ---
+
+	@(objc_type=ImageView, objc_selector="startAnimating", objc_name="startAnimating")
+	ImageView_startAnimating :: proc(self: ^ImageView) ---
+
+	@(objc_type=ImageView, objc_selector="stopAnimating", objc_name="stopAnimating")
+	ImageView_stopAnimating :: proc(self: ^ImageView) ---
+
+	@(objc_type=ImageView, objc_selector="image", objc_name="image")
+	ImageView_image :: proc(self: ^ImageView) -> ^Image ---
+
+	@(objc_type=ImageView, objc_selector="setImage:", objc_name="setImage")
+	ImageView_setImage :: proc(self: ^ImageView, image: ^Image) ---
+
+	@(objc_type=ImageView, objc_selector="highlightedImage", objc_name="highlightedImage")
+	ImageView_highlightedImage :: proc(self: ^ImageView) -> ^Image ---
+
+	@(objc_type=ImageView, objc_selector="setHighlightedImage:", objc_name="setHighlightedImage")
+	ImageView_setHighlightedImage :: proc(self: ^ImageView, highlightedImage: ^Image) ---
+
+	@(objc_type=ImageView, objc_selector="preferredSymbolConfiguration", objc_name="preferredSymbolConfiguration")
+	ImageView_preferredSymbolConfiguration :: proc(self: ^ImageView) -> ^ImageSymbolConfiguration ---
+
+	@(objc_type=ImageView, objc_selector="setPreferredSymbolConfiguration:", objc_name="setPreferredSymbolConfiguration")
+	ImageView_setPreferredSymbolConfiguration :: proc(self: ^ImageView, preferredSymbolConfiguration: ^ImageSymbolConfiguration) ---
+
+	@(objc_type=ImageView, objc_selector="isUserInteractionEnabled", objc_name="isUserInteractionEnabled")
+	ImageView_isUserInteractionEnabled :: proc(self: ^ImageView) -> bool ---
+
+	@(objc_type=ImageView, objc_selector="setUserInteractionEnabled:", objc_name="setUserInteractionEnabled")
+	ImageView_setUserInteractionEnabled :: proc(self: ^ImageView, userInteractionEnabled: bool) ---
+
+	@(objc_type=ImageView, objc_selector="isHighlighted", objc_name="isHighlighted")
+	ImageView_isHighlighted :: proc(self: ^ImageView) -> bool ---
+
+	@(objc_type=ImageView, objc_selector="setHighlighted:", objc_name="setHighlighted")
+	ImageView_setHighlighted :: proc(self: ^ImageView, highlighted: bool) ---
+
+	@(objc_type=ImageView, objc_selector="animationImages", objc_name="animationImages")
+	ImageView_animationImages :: proc(self: ^ImageView) -> ^NS.Array ---
+
+	@(objc_type=ImageView, objc_selector="setAnimationImages:", objc_name="setAnimationImages")
+	ImageView_setAnimationImages :: proc(self: ^ImageView, animationImages: ^NS.Array) ---
+
+	@(objc_type=ImageView, objc_selector="highlightedAnimationImages", objc_name="highlightedAnimationImages")
+	ImageView_highlightedAnimationImages :: proc(self: ^ImageView) -> ^NS.Array ---
+
+	@(objc_type=ImageView, objc_selector="setHighlightedAnimationImages:", objc_name="setHighlightedAnimationImages")
+	ImageView_setHighlightedAnimationImages :: proc(self: ^ImageView, highlightedAnimationImages: ^NS.Array) ---
+
+	@(objc_type=ImageView, objc_selector="animationDuration", objc_name="animationDuration")
+	ImageView_animationDuration :: proc(self: ^ImageView) -> NS.TimeInterval ---
+
+	@(objc_type=ImageView, objc_selector="setAnimationDuration:", objc_name="setAnimationDuration")
+	ImageView_setAnimationDuration :: proc(self: ^ImageView, animationDuration: NS.TimeInterval) ---
+
+	@(objc_type=ImageView, objc_selector="animationRepeatCount", objc_name="animationRepeatCount")
+	ImageView_animationRepeatCount :: proc(self: ^ImageView) -> NS.Integer ---
+
+	@(objc_type=ImageView, objc_selector="setAnimationRepeatCount:", objc_name="setAnimationRepeatCount")
+	ImageView_setAnimationRepeatCount :: proc(self: ^ImageView, animationRepeatCount: NS.Integer) ---
+
+	@(objc_type=ImageView, objc_selector="tintColor", objc_name="tintColor")
+	ImageView_tintColor :: proc(self: ^ImageView) -> ^Color ---
+
+	@(objc_type=ImageView, objc_selector="setTintColor:", objc_name="setTintColor")
+	ImageView_setTintColor :: proc(self: ^ImageView, tintColor: ^Color) ---
+
+	@(objc_type=ImageView, objc_selector="isAnimating", objc_name="isAnimating")
+	ImageView_isAnimating :: proc(self: ^ImageView) -> bool ---
+
+	@(objc_type=ImageView, objc_selector="preferredImageDynamicRange", objc_name="preferredImageDynamicRange")
+	ImageView_preferredImageDynamicRange :: proc(self: ^ImageView) -> ImageDynamicRange ---
+
+	@(objc_type=ImageView, objc_selector="setPreferredImageDynamicRange:", objc_name="setPreferredImageDynamicRange")
+	ImageView_setPreferredImageDynamicRange :: proc(self: ^ImageView, preferredImageDynamicRange: ImageDynamicRange) ---
+
+	@(objc_type=ImageView, objc_selector="imageDynamicRange", objc_name="imageDynamicRange")
+	ImageView_imageDynamicRange :: proc(self: ^ImageView) -> ImageDynamicRange ---
+
+	@(objc_type=ImageView, objc_selector="adjustsImageWhenAncestorFocused", objc_name="adjustsImageWhenAncestorFocused")
+	ImageView_adjustsImageWhenAncestorFocused :: proc(self: ^ImageView) -> bool ---
+
+	@(objc_type=ImageView, objc_selector="setAdjustsImageWhenAncestorFocused:", objc_name="setAdjustsImageWhenAncestorFocused")
+	ImageView_setAdjustsImageWhenAncestorFocused :: proc(self: ^ImageView, adjustsImageWhenAncestorFocused: bool) ---
+
+	@(objc_type=ImageView, objc_selector="focusedFrameGuide", objc_name="focusedFrameGuide")
+	ImageView_focusedFrameGuide :: proc(self: ^ImageView) -> ^LayoutGuide ---
+
+	@(objc_type=ImageView, objc_selector="overlayContentView", objc_name="overlayContentView")
+	ImageView_overlayContentView :: proc(self: ^ImageView) -> ^View ---
+
+	@(objc_type=ImageView, objc_selector="masksFocusEffectToContents", objc_name="masksFocusEffectToContents")
+	ImageView_masksFocusEffectToContents :: proc(self: ^ImageView) -> bool ---
+
+	@(objc_type=ImageView, objc_selector="setMasksFocusEffectToContents:", objc_name="setMasksFocusEffectToContents")
+	ImageView_setMasksFocusEffectToContents :: proc(self: ^ImageView, masksFocusEffectToContents: bool) ---
+
+	@(objc_type=ImageView, objc_selector="addSymbolEffect:", objc_name="addSymbolEffect_")
+	ImageView_addSymbolEffect_ :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect) ---
+
+	@(objc_type=ImageView, objc_selector="addSymbolEffect:options:", objc_name="addSymbolEffect_options")
+	ImageView_addSymbolEffect_options :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect, options: ^NSSymbolEffectOptions) ---
+
+	@(objc_type=ImageView, objc_selector="addSymbolEffect:options:animated:", objc_name="addSymbolEffect_options_animated")
+	ImageView_addSymbolEffect_options_animated :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect, options: ^NSSymbolEffectOptions, animated: bool) ---
+
+	@(objc_type=ImageView, objc_selector="addSymbolEffect:options:animated:completion:", objc_name="addSymbolEffect_options_animated_completion")
+	ImageView_addSymbolEffect_options_animated_completion :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect, options: ^NSSymbolEffectOptions, animated: bool, completionHandler: SymbolEffectCompletion) ---
+
+	@(objc_type=ImageView, objc_selector="removeSymbolEffectOfType:", objc_name="removeSymbolEffectOfType_")
+	ImageView_removeSymbolEffectOfType_ :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect) ---
+
+	@(objc_type=ImageView, objc_selector="removeSymbolEffectOfType:options:", objc_name="removeSymbolEffectOfType_options")
+	ImageView_removeSymbolEffectOfType_options :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect, options: ^NSSymbolEffectOptions) ---
+
+	@(objc_type=ImageView, objc_selector="removeSymbolEffectOfType:options:animated:", objc_name="removeSymbolEffectOfType_options_animated")
+	ImageView_removeSymbolEffectOfType_options_animated :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect, options: ^NSSymbolEffectOptions, animated: bool) ---
+
+	@(objc_type=ImageView, objc_selector="removeSymbolEffectOfType:options:animated:completion:", objc_name="removeSymbolEffectOfType_options_animated_completion")
+	ImageView_removeSymbolEffectOfType_options_animated_completion :: proc(self: ^ImageView, symbolEffect: ^NSSymbolEffect, options: ^NSSymbolEffectOptions, animated: bool, completionHandler: SymbolEffectCompletion) ---
+
+	@(objc_type=ImageView, objc_selector="removeAllSymbolEffects", objc_name="removeAllSymbolEffects")
+	ImageView_removeAllSymbolEffects :: proc(self: ^ImageView) ---
+
+	@(objc_type=ImageView, objc_selector="removeAllSymbolEffectsWithOptions:", objc_name="removeAllSymbolEffectsWithOptions_")
+	ImageView_removeAllSymbolEffectsWithOptions_ :: proc(self: ^ImageView, options: ^NSSymbolEffectOptions) ---
+
+	@(objc_type=ImageView, objc_selector="removeAllSymbolEffectsWithOptions:animated:", objc_name="removeAllSymbolEffectsWithOptions_animated")
+	ImageView_removeAllSymbolEffectsWithOptions_animated :: proc(self: ^ImageView, options: ^NSSymbolEffectOptions, animated: bool) ---
+
+	@(objc_type=ImageView, objc_selector="setSymbolImage:withContentTransition:", objc_name="setSymbolImage_withContentTransition")
+	ImageView_setSymbolImage_withContentTransition :: proc(self: ^ImageView, symbolImage: ^Image, transition: ^NSSymbolContentTransition) ---
+
+	@(objc_type=ImageView, objc_selector="setSymbolImage:withContentTransition:options:", objc_name="setSymbolImage_withContentTransition_options")
+	ImageView_setSymbolImage_withContentTransition_options :: proc(self: ^ImageView, symbolImage: ^Image, transition: ^NSSymbolContentTransition, options: ^NSSymbolEffectOptions) ---
+
+	@(objc_type=ImageView, objc_selector="setSymbolImage:withContentTransition:options:completion:", objc_name="setSymbolImage_withContentTransition_options_completion")
+	ImageView_setSymbolImage_withContentTransition_options_completion :: proc(self: ^ImageView, symbolImage: ^Image, transition: ^NSSymbolContentTransition, options: ^NSSymbolEffectOptions, completionHandler: SymbolEffectCompletion) ---
+}
+
+@(objc_type=ImageView, objc_name="initWithImage")
+ImageView_initWithImage :: proc {
+	ImageView_initWithImage_,
+	ImageView_initWithImage_highlightedImage,
+}
+
+@(objc_type=ImageView, objc_name="addSymbolEffect")
+ImageView_addSymbolEffect :: proc {
+	ImageView_addSymbolEffect_,
+	ImageView_addSymbolEffect_options,
+	ImageView_addSymbolEffect_options_animated,
+	ImageView_addSymbolEffect_options_animated_completion,
+}
+
+@(objc_type=ImageView, objc_name="removeSymbolEffectOfType")
+ImageView_removeSymbolEffectOfType :: proc {
+	ImageView_removeSymbolEffectOfType_,
+	ImageView_removeSymbolEffectOfType_options,
+	ImageView_removeSymbolEffectOfType_options_animated,
+	ImageView_removeSymbolEffectOfType_options_animated_completion,
+}
+
+@(objc_type=ImageView, objc_name="removeAllSymbolEffectsWithOptions")
+ImageView_removeAllSymbolEffectsWithOptions :: proc {
+	ImageView_removeAllSymbolEffectsWithOptions_,
+	ImageView_removeAllSymbolEffectsWithOptions_animated,
+}
+
+@(objc_type=ImageView, objc_name="setSymbolImage")
+ImageView_setSymbolImage :: proc {
+	ImageView_setSymbolImage_withContentTransition,
+	ImageView_setSymbolImage_withContentTransition_options,
+	ImageView_setSymbolImage_withContentTransition_options_completion,
 }

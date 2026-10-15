@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSDataAsset", objc_superclass=NS.Object)
 DataAsset :: struct {
 	using _: NS.Object,

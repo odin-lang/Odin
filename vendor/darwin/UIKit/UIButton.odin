@@ -5,10 +5,6 @@ package darwin_UIKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIButton", objc_superclass=Control)
 Button :: struct {
 	using _: Control,
@@ -280,4 +276,231 @@ Button_initWithFrame :: proc {
 Button_buttonWithType :: proc {
 	Button_buttonWithType_,
 	Button_buttonWithType_primaryAction,
+}
+
+
+@(objc_class="UIButtonConfiguration", objc_superclass=NS.Object)
+ButtonConfiguration :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+	using _: NS.SecureCoding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ButtonConfiguration, objc_selector="plainButtonConfiguration", objc_name="plainButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_plainButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="tintedButtonConfiguration", objc_name="tintedButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_tintedButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="grayButtonConfiguration", objc_name="grayButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_grayButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="filledButtonConfiguration", objc_name="filledButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_filledButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="borderlessButtonConfiguration", objc_name="borderlessButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_borderlessButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="borderedButtonConfiguration", objc_name="borderedButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_borderedButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="borderedTintedButtonConfiguration", objc_name="borderedTintedButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_borderedTintedButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="borderedProminentButtonConfiguration", objc_name="borderedProminentButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_borderedProminentButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="glassButtonConfiguration", objc_name="glassButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_glassButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="prominentGlassButtonConfiguration", objc_name="prominentGlassButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_prominentGlassButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="clearGlassButtonConfiguration", objc_name="clearGlassButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_clearGlassButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="prominentClearGlassButtonConfiguration", objc_name="prominentClearGlassButtonConfiguration", objc_is_class_method=true)
+	ButtonConfiguration_prominentClearGlassButtonConfiguration :: proc() -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	ButtonConfiguration_new :: proc() -> ^ButtonConfiguration ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="init", objc_name="init")
+	ButtonConfiguration_init :: proc(self: ^ButtonConfiguration) -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="updatedConfigurationForButton:", objc_name="updatedConfigurationForButton")
+	ButtonConfiguration_updatedConfigurationForButton :: proc(self: ^ButtonConfiguration, button: ^Button) -> instancetype ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setDefaultContentInsets", objc_name="setDefaultContentInsets")
+	ButtonConfiguration_setDefaultContentInsets :: proc(self: ^ButtonConfiguration) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="background", objc_name="background")
+	ButtonConfiguration_background :: proc(self: ^ButtonConfiguration) -> ^BackgroundConfiguration ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setBackground:", objc_name="setBackground")
+	ButtonConfiguration_setBackground :: proc(self: ^ButtonConfiguration, background: ^BackgroundConfiguration) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="cornerStyle", objc_name="cornerStyle")
+	ButtonConfiguration_cornerStyle :: proc(self: ^ButtonConfiguration) -> ButtonConfigurationCornerStyle ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setCornerStyle:", objc_name="setCornerStyle")
+	ButtonConfiguration_setCornerStyle :: proc(self: ^ButtonConfiguration, cornerStyle: ButtonConfigurationCornerStyle) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="buttonSize", objc_name="buttonSize")
+	ButtonConfiguration_buttonSize :: proc(self: ^ButtonConfiguration) -> ButtonConfigurationSize ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setButtonSize:", objc_name="setButtonSize")
+	ButtonConfiguration_setButtonSize :: proc(self: ^ButtonConfiguration, buttonSize: ButtonConfigurationSize) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="macIdiomStyle", objc_name="macIdiomStyle")
+	ButtonConfiguration_macIdiomStyle :: proc(self: ^ButtonConfiguration) -> ButtonConfigurationMacIdiomStyle ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setMacIdiomStyle:", objc_name="setMacIdiomStyle")
+	ButtonConfiguration_setMacIdiomStyle :: proc(self: ^ButtonConfiguration, macIdiomStyle: ButtonConfigurationMacIdiomStyle) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="baseForegroundColor", objc_name="baseForegroundColor")
+	ButtonConfiguration_baseForegroundColor :: proc(self: ^ButtonConfiguration) -> ^Color ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setBaseForegroundColor:", objc_name="setBaseForegroundColor")
+	ButtonConfiguration_setBaseForegroundColor :: proc(self: ^ButtonConfiguration, baseForegroundColor: ^Color) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="baseBackgroundColor", objc_name="baseBackgroundColor")
+	ButtonConfiguration_baseBackgroundColor :: proc(self: ^ButtonConfiguration) -> ^Color ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setBaseBackgroundColor:", objc_name="setBaseBackgroundColor")
+	ButtonConfiguration_setBaseBackgroundColor :: proc(self: ^ButtonConfiguration, baseBackgroundColor: ^Color) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="image", objc_name="image")
+	ButtonConfiguration_image :: proc(self: ^ButtonConfiguration) -> ^Image ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setImage:", objc_name="setImage")
+	ButtonConfiguration_setImage :: proc(self: ^ButtonConfiguration, image: ^Image) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="imageColorTransformer", objc_name="imageColorTransformer")
+	ButtonConfiguration_imageColorTransformer :: proc(self: ^ButtonConfiguration) -> ConfigurationColorTransformer ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setImageColorTransformer:", objc_name="setImageColorTransformer")
+	ButtonConfiguration_setImageColorTransformer :: proc(self: ^ButtonConfiguration, imageColorTransformer: ConfigurationColorTransformer) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="preferredSymbolConfigurationForImage", objc_name="preferredSymbolConfigurationForImage")
+	ButtonConfiguration_preferredSymbolConfigurationForImage :: proc(self: ^ButtonConfiguration) -> ^ImageSymbolConfiguration ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setPreferredSymbolConfigurationForImage:", objc_name="setPreferredSymbolConfigurationForImage")
+	ButtonConfiguration_setPreferredSymbolConfigurationForImage :: proc(self: ^ButtonConfiguration, preferredSymbolConfigurationForImage: ^ImageSymbolConfiguration) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="symbolContentTransition", objc_name="symbolContentTransition")
+	ButtonConfiguration_symbolContentTransition :: proc(self: ^ButtonConfiguration) -> ^SymbolContentTransition ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setSymbolContentTransition:", objc_name="setSymbolContentTransition")
+	ButtonConfiguration_setSymbolContentTransition :: proc(self: ^ButtonConfiguration, symbolContentTransition: ^SymbolContentTransition) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="showsActivityIndicator", objc_name="showsActivityIndicator")
+	ButtonConfiguration_showsActivityIndicator :: proc(self: ^ButtonConfiguration) -> bool ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setShowsActivityIndicator:", objc_name="setShowsActivityIndicator")
+	ButtonConfiguration_setShowsActivityIndicator :: proc(self: ^ButtonConfiguration, showsActivityIndicator: bool) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="activityIndicatorColorTransformer", objc_name="activityIndicatorColorTransformer")
+	ButtonConfiguration_activityIndicatorColorTransformer :: proc(self: ^ButtonConfiguration) -> ConfigurationColorTransformer ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setActivityIndicatorColorTransformer:", objc_name="setActivityIndicatorColorTransformer")
+	ButtonConfiguration_setActivityIndicatorColorTransformer :: proc(self: ^ButtonConfiguration, activityIndicatorColorTransformer: ConfigurationColorTransformer) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="title", objc_name="title")
+	ButtonConfiguration_title :: proc(self: ^ButtonConfiguration) -> ^NS.String ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setTitle:", objc_name="setTitle")
+	ButtonConfiguration_setTitle :: proc(self: ^ButtonConfiguration, title: ^NS.String) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="attributedTitle", objc_name="attributedTitle")
+	ButtonConfiguration_attributedTitle :: proc(self: ^ButtonConfiguration) -> ^NS.AttributedString ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setAttributedTitle:", objc_name="setAttributedTitle")
+	ButtonConfiguration_setAttributedTitle :: proc(self: ^ButtonConfiguration, attributedTitle: ^NS.AttributedString) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="titleTextAttributesTransformer", objc_name="titleTextAttributesTransformer")
+	ButtonConfiguration_titleTextAttributesTransformer :: proc(self: ^ButtonConfiguration) -> ConfigurationTextAttributesTransformer ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setTitleTextAttributesTransformer:", objc_name="setTitleTextAttributesTransformer")
+	ButtonConfiguration_setTitleTextAttributesTransformer :: proc(self: ^ButtonConfiguration, titleTextAttributesTransformer: ConfigurationTextAttributesTransformer) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="titleLineBreakMode", objc_name="titleLineBreakMode")
+	ButtonConfiguration_titleLineBreakMode :: proc(self: ^ButtonConfiguration) -> NSLineBreakMode ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setTitleLineBreakMode:", objc_name="setTitleLineBreakMode")
+	ButtonConfiguration_setTitleLineBreakMode :: proc(self: ^ButtonConfiguration, titleLineBreakMode: NSLineBreakMode) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="subtitle", objc_name="subtitle")
+	ButtonConfiguration_subtitle :: proc(self: ^ButtonConfiguration) -> ^NS.String ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setSubtitle:", objc_name="setSubtitle")
+	ButtonConfiguration_setSubtitle :: proc(self: ^ButtonConfiguration, subtitle: ^NS.String) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="attributedSubtitle", objc_name="attributedSubtitle")
+	ButtonConfiguration_attributedSubtitle :: proc(self: ^ButtonConfiguration) -> ^NS.AttributedString ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setAttributedSubtitle:", objc_name="setAttributedSubtitle")
+	ButtonConfiguration_setAttributedSubtitle :: proc(self: ^ButtonConfiguration, attributedSubtitle: ^NS.AttributedString) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="subtitleTextAttributesTransformer", objc_name="subtitleTextAttributesTransformer")
+	ButtonConfiguration_subtitleTextAttributesTransformer :: proc(self: ^ButtonConfiguration) -> ConfigurationTextAttributesTransformer ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setSubtitleTextAttributesTransformer:", objc_name="setSubtitleTextAttributesTransformer")
+	ButtonConfiguration_setSubtitleTextAttributesTransformer :: proc(self: ^ButtonConfiguration, subtitleTextAttributesTransformer: ConfigurationTextAttributesTransformer) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="subtitleLineBreakMode", objc_name="subtitleLineBreakMode")
+	ButtonConfiguration_subtitleLineBreakMode :: proc(self: ^ButtonConfiguration) -> NSLineBreakMode ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setSubtitleLineBreakMode:", objc_name="setSubtitleLineBreakMode")
+	ButtonConfiguration_setSubtitleLineBreakMode :: proc(self: ^ButtonConfiguration, subtitleLineBreakMode: NSLineBreakMode) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="indicator", objc_name="indicator")
+	ButtonConfiguration_indicator :: proc(self: ^ButtonConfiguration) -> ButtonConfigurationIndicator ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setIndicator:", objc_name="setIndicator")
+	ButtonConfiguration_setIndicator :: proc(self: ^ButtonConfiguration, indicator: ButtonConfigurationIndicator) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="indicatorColorTransformer", objc_name="indicatorColorTransformer")
+	ButtonConfiguration_indicatorColorTransformer :: proc(self: ^ButtonConfiguration) -> ConfigurationColorTransformer ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setIndicatorColorTransformer:", objc_name="setIndicatorColorTransformer")
+	ButtonConfiguration_setIndicatorColorTransformer :: proc(self: ^ButtonConfiguration, indicatorColorTransformer: ConfigurationColorTransformer) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="contentInsets", objc_name="contentInsets")
+	ButtonConfiguration_contentInsets :: proc(self: ^ButtonConfiguration) -> NSDirectionalEdgeInsets ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setContentInsets:", objc_name="setContentInsets")
+	ButtonConfiguration_setContentInsets :: proc(self: ^ButtonConfiguration, contentInsets: NSDirectionalEdgeInsets) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="imagePlacement", objc_name="imagePlacement")
+	ButtonConfiguration_imagePlacement :: proc(self: ^ButtonConfiguration) -> NSDirectionalRectEdge ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setImagePlacement:", objc_name="setImagePlacement")
+	ButtonConfiguration_setImagePlacement :: proc(self: ^ButtonConfiguration, imagePlacement: NSDirectionalRectEdge) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="imagePadding", objc_name="imagePadding")
+	ButtonConfiguration_imagePadding :: proc(self: ^ButtonConfiguration) -> CG.Float ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setImagePadding:", objc_name="setImagePadding")
+	ButtonConfiguration_setImagePadding :: proc(self: ^ButtonConfiguration, imagePadding: CG.Float) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="titlePadding", objc_name="titlePadding")
+	ButtonConfiguration_titlePadding :: proc(self: ^ButtonConfiguration) -> CG.Float ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setTitlePadding:", objc_name="setTitlePadding")
+	ButtonConfiguration_setTitlePadding :: proc(self: ^ButtonConfiguration, titlePadding: CG.Float) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="titleAlignment", objc_name="titleAlignment")
+	ButtonConfiguration_titleAlignment :: proc(self: ^ButtonConfiguration) -> ButtonConfigurationTitleAlignment ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setTitleAlignment:", objc_name="setTitleAlignment")
+	ButtonConfiguration_setTitleAlignment :: proc(self: ^ButtonConfiguration, titleAlignment: ButtonConfigurationTitleAlignment) ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="automaticallyUpdateForSelection", objc_name="automaticallyUpdateForSelection")
+	ButtonConfiguration_automaticallyUpdateForSelection :: proc(self: ^ButtonConfiguration) -> bool ---
+
+	@(objc_type=ButtonConfiguration, objc_selector="setAutomaticallyUpdateForSelection:", objc_name="setAutomaticallyUpdateForSelection")
+	ButtonConfiguration_setAutomaticallyUpdateForSelection :: proc(self: ^ButtonConfiguration, automaticallyUpdateForSelection: bool) ---
 }

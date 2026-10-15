@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSColor", objc_superclass=NS.Object)
 Color :: struct {
@@ -511,4 +508,488 @@ Color_colorNamed :: proc {
 Color_colorUsingColorSpaceName :: proc {
 	Color_colorUsingColorSpaceName_device,
 	Color_colorUsingColorSpaceName_,
+}
+
+
+@(objc_class="NSColorChanging")
+ColorChanging :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorChanging, objc_selector="changeColor:", objc_name="changeColor")
+	ColorChanging_changeColor :: proc(self: ^ColorChanging, sender: ^ColorPanel) ---
+}
+
+
+@(objc_class="NSColorList", objc_superclass=NS.Object)
+ColorList :: struct {
+	using _: NS.Object,
+	using _: NS.SecureCoding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorList, objc_selector="colorListNamed:", objc_name="colorListNamed", objc_is_class_method=true)
+	ColorList_colorListNamed :: proc(name: ^NS.String) -> ^ColorList ---
+
+	@(objc_type=ColorList, objc_selector="initWithName:", objc_name="initWithName_")
+	ColorList_initWithName_ :: proc(self: ^ColorList, name: ^NS.String) -> instancetype ---
+
+	@(objc_type=ColorList, objc_selector="initWithName:fromFile:", objc_name="initWithName_fromFile")
+	ColorList_initWithName_fromFile :: proc(self: ^ColorList, name: ^NS.String, path: ^NS.String) -> instancetype ---
+
+	@(objc_type=ColorList, objc_selector="setColor:forKey:", objc_name="setColor")
+	ColorList_setColor :: proc(self: ^ColorList, color: ^Color, key: ^NS.String) ---
+
+	@(objc_type=ColorList, objc_selector="insertColor:key:atIndex:", objc_name="insertColor")
+	ColorList_insertColor :: proc(self: ^ColorList, color: ^Color, key: ^NS.String, loc: NS.UInteger) ---
+
+	@(objc_type=ColorList, objc_selector="removeColorWithKey:", objc_name="removeColorWithKey")
+	ColorList_removeColorWithKey :: proc(self: ^ColorList, key: ^NS.String) ---
+
+	@(objc_type=ColorList, objc_selector="colorWithKey:", objc_name="colorWithKey")
+	ColorList_colorWithKey :: proc(self: ^ColorList, key: ^NS.String) -> ^Color ---
+
+	@(objc_type=ColorList, objc_selector="writeToURL:error:", objc_name="writeToURL_error")
+	ColorList_writeToURL_error :: proc(self: ^ColorList, url: ^NS.URL, errPtr: ^^NS.Error) -> bool ---
+
+	@(objc_type=ColorList, objc_selector="writeToFile:", objc_name="writeToFile")
+	ColorList_writeToFile :: proc(self: ^ColorList, path: ^NS.String) -> bool ---
+
+	@(objc_type=ColorList, objc_selector="removeFile", objc_name="removeFile")
+	ColorList_removeFile :: proc(self: ^ColorList) ---
+
+	@(objc_type=ColorList, objc_selector="availableColorLists", objc_name="availableColorLists", objc_is_class_method=true)
+	ColorList_availableColorLists :: proc() -> ^NS.Array ---
+
+	@(objc_type=ColorList, objc_selector="name", objc_name="name")
+	ColorList_name :: proc(self: ^ColorList) -> ^NS.String ---
+
+	@(objc_type=ColorList, objc_selector="allKeys", objc_name="allKeys")
+	ColorList_allKeys :: proc(self: ^ColorList) -> ^NS.Array ---
+
+	@(objc_type=ColorList, objc_selector="isEditable", objc_name="isEditable")
+	ColorList_isEditable :: proc(self: ^ColorList) -> bool ---
+}
+
+@(objc_type=ColorList, objc_name="initWithName")
+ColorList_initWithName :: proc {
+	ColorList_initWithName_,
+	ColorList_initWithName_fromFile,
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=ColorList, objc_name="writeToURL")
+ColorList_writeToURL :: #force_inline proc "c" (self: ^ColorList, url: ^NS.URL) -> (ok: bool, err: ^NS.Error) {
+	ok = ColorList_writeToURL_error(self, url, &err)
+	return
+}
+
+
+@(objc_class="NSColorPanel", objc_superclass=Panel)
+ColorPanel :: struct { using _: Panel}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorPanel, objc_selector="dragColor:withEvent:fromView:", objc_name="dragColor", objc_is_class_method=true)
+	ColorPanel_dragColor :: proc(color: ^Color, event: ^Event, sourceView: ^View) -> bool ---
+
+	@(objc_type=ColorPanel, objc_selector="setPickerMask:", objc_name="setPickerMask", objc_is_class_method=true)
+	ColorPanel_setPickerMask :: proc(mask: ColorPanelOptions) ---
+
+	@(objc_type=ColorPanel, objc_selector="setPickerMode:", objc_name="setPickerMode", objc_is_class_method=true)
+	ColorPanel_setPickerMode :: proc(mode: ColorPanelMode) ---
+
+	@(objc_type=ColorPanel, objc_selector="setAction:", objc_name="setAction")
+	ColorPanel_setAction :: proc(self: ^ColorPanel, selector: SEL) ---
+
+	@(objc_type=ColorPanel, objc_selector="setTarget:", objc_name="setTarget")
+	ColorPanel_setTarget :: proc(self: ^ColorPanel, target: id) ---
+
+	@(objc_type=ColorPanel, objc_selector="attachColorList:", objc_name="attachColorList")
+	ColorPanel_attachColorList :: proc(self: ^ColorPanel, colorList: ^ColorList) ---
+
+	@(objc_type=ColorPanel, objc_selector="detachColorList:", objc_name="detachColorList")
+	ColorPanel_detachColorList :: proc(self: ^ColorPanel, colorList: ^ColorList) ---
+
+	@(objc_type=ColorPanel, objc_selector="sharedColorPanel", objc_name="sharedColorPanel", objc_is_class_method=true)
+	ColorPanel_sharedColorPanel :: proc() -> ^ColorPanel ---
+
+	@(objc_type=ColorPanel, objc_selector="sharedColorPanelExists", objc_name="sharedColorPanelExists", objc_is_class_method=true)
+	ColorPanel_sharedColorPanelExists :: proc() -> bool ---
+
+	@(objc_type=ColorPanel, objc_selector="accessoryView", objc_name="accessoryView")
+	ColorPanel_accessoryView :: proc(self: ^ColorPanel) -> ^View ---
+
+	@(objc_type=ColorPanel, objc_selector="setAccessoryView:", objc_name="setAccessoryView")
+	ColorPanel_setAccessoryView :: proc(self: ^ColorPanel, accessoryView: ^View) ---
+
+	@(objc_type=ColorPanel, objc_selector="isContinuous", objc_name="isContinuous")
+	ColorPanel_isContinuous :: proc(self: ^ColorPanel) -> bool ---
+
+	@(objc_type=ColorPanel, objc_selector="setContinuous:", objc_name="setContinuous")
+	ColorPanel_setContinuous :: proc(self: ^ColorPanel, continuous: bool) ---
+
+	@(objc_type=ColorPanel, objc_selector="showsAlpha", objc_name="showsAlpha")
+	ColorPanel_showsAlpha :: proc(self: ^ColorPanel) -> bool ---
+
+	@(objc_type=ColorPanel, objc_selector="setShowsAlpha:", objc_name="setShowsAlpha")
+	ColorPanel_setShowsAlpha :: proc(self: ^ColorPanel, showsAlpha: bool) ---
+
+	@(objc_type=ColorPanel, objc_selector="mode", objc_name="mode")
+	ColorPanel_mode :: proc(self: ^ColorPanel) -> ColorPanelMode ---
+
+	@(objc_type=ColorPanel, objc_selector="setMode:", objc_name="setMode")
+	ColorPanel_setMode :: proc(self: ^ColorPanel, mode: ColorPanelMode) ---
+
+	@(objc_type=ColorPanel, objc_selector="color", objc_name="color")
+	ColorPanel_color :: proc(self: ^ColorPanel) -> ^Color ---
+
+	@(objc_type=ColorPanel, objc_selector="setColor:", objc_name="setColor")
+	ColorPanel_setColor :: proc(self: ^ColorPanel, color: ^Color) ---
+
+	@(objc_type=ColorPanel, objc_selector="alpha", objc_name="alpha")
+	ColorPanel_alpha :: proc(self: ^ColorPanel) -> CG.Float ---
+
+	@(objc_type=ColorPanel, objc_selector="maximumLinearExposure", objc_name="maximumLinearExposure")
+	ColorPanel_maximumLinearExposure :: proc(self: ^ColorPanel) -> CG.Float ---
+
+	@(objc_type=ColorPanel, objc_selector="setMaximumLinearExposure:", objc_name="setMaximumLinearExposure")
+	ColorPanel_setMaximumLinearExposure :: proc(self: ^ColorPanel, maximumLinearExposure: CG.Float) ---
+}
+
+
+@(objc_class="NSColorPicker", objc_superclass=NS.Object)
+ColorPicker :: struct {
+	using _: NS.Object,
+	using _: ColorPickingDefault,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorPicker, objc_selector="initWithPickerMask:colorPanel:", objc_name="initWithPickerMask")
+	ColorPicker_initWithPickerMask :: proc(self: ^ColorPicker, mask: NS.UInteger, owningColorPanel: ^ColorPanel) -> instancetype ---
+
+	@(objc_type=ColorPicker, objc_selector="insertNewButtonImage:in:", objc_name="insertNewButtonImage")
+	ColorPicker_insertNewButtonImage :: proc(self: ^ColorPicker, newButtonImage: ^Image, buttonCell: ^ButtonCell) ---
+
+	@(objc_type=ColorPicker, objc_selector="viewSizeChanged:", objc_name="viewSizeChanged")
+	ColorPicker_viewSizeChanged :: proc(self: ^ColorPicker, sender: id) ---
+
+	@(objc_type=ColorPicker, objc_selector="attachColorList:", objc_name="attachColorList")
+	ColorPicker_attachColorList :: proc(self: ^ColorPicker, colorList: ^ColorList) ---
+
+	@(objc_type=ColorPicker, objc_selector="detachColorList:", objc_name="detachColorList")
+	ColorPicker_detachColorList :: proc(self: ^ColorPicker, colorList: ^ColorList) ---
+
+	@(objc_type=ColorPicker, objc_selector="setMode:", objc_name="setMode")
+	ColorPicker_setMode :: proc(self: ^ColorPicker, mode: ColorPanelMode) ---
+
+	@(objc_type=ColorPicker, objc_selector="colorPanel", objc_name="colorPanel")
+	ColorPicker_colorPanel :: proc(self: ^ColorPicker) -> ^ColorPanel ---
+
+	@(objc_type=ColorPicker, objc_selector="provideNewButtonImage", objc_name="provideNewButtonImage")
+	ColorPicker_provideNewButtonImage :: proc(self: ^ColorPicker) -> ^Image ---
+
+	@(objc_type=ColorPicker, objc_selector="buttonToolTip", objc_name="buttonToolTip")
+	ColorPicker_buttonToolTip :: proc(self: ^ColorPicker) -> ^NS.String ---
+
+	@(objc_type=ColorPicker, objc_selector="minContentSize", objc_name="minContentSize")
+	ColorPicker_minContentSize :: proc(self: ^ColorPicker) -> NS.Size ---
+}
+
+
+@(objc_class="NSColorPickerTouchBarItem", objc_superclass=TouchBarItem)
+ColorPickerTouchBarItem :: struct { using _: TouchBarItem}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="colorPickerWithIdentifier:", objc_name="colorPickerWithIdentifier_", objc_is_class_method=true)
+	ColorPickerTouchBarItem_colorPickerWithIdentifier_ :: proc(identifier: ^NS.String) -> instancetype ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="textColorPickerWithIdentifier:", objc_name="textColorPickerWithIdentifier", objc_is_class_method=true)
+	ColorPickerTouchBarItem_textColorPickerWithIdentifier :: proc(identifier: ^NS.String) -> instancetype ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="strokeColorPickerWithIdentifier:", objc_name="strokeColorPickerWithIdentifier", objc_is_class_method=true)
+	ColorPickerTouchBarItem_strokeColorPickerWithIdentifier :: proc(identifier: ^NS.String) -> instancetype ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="colorPickerWithIdentifier:buttonImage:", objc_name="colorPickerWithIdentifier_buttonImage", objc_is_class_method=true)
+	ColorPickerTouchBarItem_colorPickerWithIdentifier_buttonImage :: proc(identifier: ^NS.String, image: ^Image) -> instancetype ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="color", objc_name="color")
+	ColorPickerTouchBarItem_color :: proc(self: ^ColorPickerTouchBarItem) -> ^Color ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setColor:", objc_name="setColor")
+	ColorPickerTouchBarItem_setColor :: proc(self: ^ColorPickerTouchBarItem, color: ^Color) ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="showsAlpha", objc_name="showsAlpha")
+	ColorPickerTouchBarItem_showsAlpha :: proc(self: ^ColorPickerTouchBarItem) -> bool ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setShowsAlpha:", objc_name="setShowsAlpha")
+	ColorPickerTouchBarItem_setShowsAlpha :: proc(self: ^ColorPickerTouchBarItem, showsAlpha: bool) ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="allowedColorSpaces", objc_name="allowedColorSpaces")
+	ColorPickerTouchBarItem_allowedColorSpaces :: proc(self: ^ColorPickerTouchBarItem) -> ^NS.Array ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setAllowedColorSpaces:", objc_name="setAllowedColorSpaces")
+	ColorPickerTouchBarItem_setAllowedColorSpaces :: proc(self: ^ColorPickerTouchBarItem, allowedColorSpaces: ^NS.Array) ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="colorList", objc_name="colorList")
+	ColorPickerTouchBarItem_colorList :: proc(self: ^ColorPickerTouchBarItem) -> ^ColorList ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setColorList:", objc_name="setColorList")
+	ColorPickerTouchBarItem_setColorList :: proc(self: ^ColorPickerTouchBarItem, colorList: ^ColorList) ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="customizationLabel", objc_name="customizationLabel")
+	ColorPickerTouchBarItem_customizationLabel :: proc(self: ^ColorPickerTouchBarItem) -> ^NS.String ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setCustomizationLabel:", objc_name="setCustomizationLabel")
+	ColorPickerTouchBarItem_setCustomizationLabel :: proc(self: ^ColorPickerTouchBarItem, customizationLabel: ^NS.String) ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="target", objc_name="target")
+	ColorPickerTouchBarItem_target :: proc(self: ^ColorPickerTouchBarItem) -> id ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setTarget:", objc_name="setTarget")
+	ColorPickerTouchBarItem_setTarget :: proc(self: ^ColorPickerTouchBarItem, target: id) ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="action", objc_name="action")
+	ColorPickerTouchBarItem_action :: proc(self: ^ColorPickerTouchBarItem) -> SEL ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setAction:", objc_name="setAction")
+	ColorPickerTouchBarItem_setAction :: proc(self: ^ColorPickerTouchBarItem, action: SEL) ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="isEnabled", objc_name="isEnabled")
+	ColorPickerTouchBarItem_isEnabled :: proc(self: ^ColorPickerTouchBarItem) -> bool ---
+
+	@(objc_type=ColorPickerTouchBarItem, objc_selector="setEnabled:", objc_name="setEnabled")
+	ColorPickerTouchBarItem_setEnabled :: proc(self: ^ColorPickerTouchBarItem, enabled: bool) ---
+}
+
+@(objc_type=ColorPickerTouchBarItem, objc_name="colorPickerWithIdentifier", objc_is_class_method=true)
+ColorPickerTouchBarItem_colorPickerWithIdentifier :: proc {
+	ColorPickerTouchBarItem_colorPickerWithIdentifier_,
+	ColorPickerTouchBarItem_colorPickerWithIdentifier_buttonImage,
+}
+
+
+@(objc_class="NSColorPickingCustom")
+ColorPickingCustom :: struct {
+	using _: intrinsics.objc_object,
+	using _: ColorPickingDefault,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorPickingCustom, objc_selector="supportsMode:", objc_name="supportsMode")
+	ColorPickingCustom_supportsMode :: proc(self: ^ColorPickingCustom, mode: ColorPanelMode) -> bool ---
+
+	@(objc_type=ColorPickingCustom, objc_selector="currentMode", objc_name="currentMode")
+	ColorPickingCustom_currentMode :: proc(self: ^ColorPickingCustom) -> ColorPanelMode ---
+
+	@(objc_type=ColorPickingCustom, objc_selector="provideNewView:", objc_name="provideNewView")
+	ColorPickingCustom_provideNewView :: proc(self: ^ColorPickingCustom, initialRequest: bool) -> ^View ---
+
+	@(objc_type=ColorPickingCustom, objc_selector="setColor:", objc_name="setColor")
+	ColorPickingCustom_setColor :: proc(self: ^ColorPickingCustom, newColor: ^Color) ---
+}
+
+
+@(objc_class="NSColorPickingDefault")
+ColorPickingDefault :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorPickingDefault, objc_selector="initWithPickerMask:colorPanel:", objc_name="initWithPickerMask")
+	ColorPickingDefault_initWithPickerMask :: proc(self: ^ColorPickingDefault, mask: NS.UInteger, owningColorPanel: ^ColorPanel) -> instancetype ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="provideNewButtonImage", objc_name="provideNewButtonImage")
+	ColorPickingDefault_provideNewButtonImage :: proc(self: ^ColorPickingDefault) -> ^Image ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="insertNewButtonImage:in:", objc_name="insertNewButtonImage")
+	ColorPickingDefault_insertNewButtonImage :: proc(self: ^ColorPickingDefault, newButtonImage: ^Image, buttonCell: ^ButtonCell) ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="viewSizeChanged:", objc_name="viewSizeChanged")
+	ColorPickingDefault_viewSizeChanged :: proc(self: ^ColorPickingDefault, sender: id) ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="alphaControlAddedOrRemoved:", objc_name="alphaControlAddedOrRemoved")
+	ColorPickingDefault_alphaControlAddedOrRemoved :: proc(self: ^ColorPickingDefault, sender: id) ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="attachColorList:", objc_name="attachColorList")
+	ColorPickingDefault_attachColorList :: proc(self: ^ColorPickingDefault, colorList: ^ColorList) ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="detachColorList:", objc_name="detachColorList")
+	ColorPickingDefault_detachColorList :: proc(self: ^ColorPickingDefault, colorList: ^ColorList) ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="setMode:", objc_name="setMode")
+	ColorPickingDefault_setMode :: proc(self: ^ColorPickingDefault, mode: ColorPanelMode) ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="buttonToolTip", objc_name="buttonToolTip")
+	ColorPickingDefault_buttonToolTip :: proc(self: ^ColorPickingDefault) -> ^NS.String ---
+
+	@(objc_type=ColorPickingDefault, objc_selector="minContentSize", objc_name="minContentSize")
+	ColorPickingDefault_minContentSize :: proc(self: ^ColorPickingDefault) -> NS.Size ---
+}
+
+
+@(objc_class="NSColorSampler", objc_superclass=NS.Object)
+ColorSampler :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorSampler, objc_selector="showSamplerWithSelectionHandler:", objc_name="showSamplerWithSelectionHandler")
+	ColorSampler_showSamplerWithSelectionHandler :: proc(self: ^ColorSampler, selectionHandler: ^Objc_Block(proc "c" ( selectedColor: ^Color ))) ---
+}
+
+
+@(objc_class="NSColorSpace", objc_superclass=NS.Object)
+ColorSpace :: struct {
+	using _: NS.Object,
+	using _: NS.SecureCoding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorSpace, objc_selector="initWithICCProfileData:", objc_name="initWithICCProfileData")
+	ColorSpace_initWithICCProfileData :: proc(self: ^ColorSpace, iccData: ^NS.Data) -> instancetype ---
+
+	@(objc_type=ColorSpace, objc_selector="initWithColorSyncProfile:", objc_name="initWithColorSyncProfile")
+	ColorSpace_initWithColorSyncProfile :: proc(self: ^ColorSpace, prof: rawptr) -> instancetype ---
+
+	@(objc_type=ColorSpace, objc_selector="initWithCGColorSpace:", objc_name="initWithCGColorSpace")
+	ColorSpace_initWithCGColorSpace :: proc(self: ^ColorSpace, cgColorSpace: CG.ColorSpaceRef) -> instancetype ---
+
+	@(objc_type=ColorSpace, objc_selector="availableColorSpacesWithModel:", objc_name="availableColorSpacesWithModel", objc_is_class_method=true)
+	ColorSpace_availableColorSpacesWithModel :: proc(model: ColorSpaceModel) -> ^NS.Array ---
+
+	@(objc_type=ColorSpace, objc_selector="ICCProfileData", objc_name="ICCProfileData")
+	ColorSpace_ICCProfileData :: proc(self: ^ColorSpace) -> ^NS.Data ---
+
+	@(objc_type=ColorSpace, objc_selector="colorSyncProfile", objc_name="colorSyncProfile")
+	ColorSpace_colorSyncProfile :: proc(self: ^ColorSpace) -> rawptr ---
+
+	@(objc_type=ColorSpace, objc_selector="CGColorSpace", objc_name="CGColorSpace")
+	ColorSpace_CGColorSpace :: proc(self: ^ColorSpace) -> CG.ColorSpaceRef ---
+
+	@(objc_type=ColorSpace, objc_selector="numberOfColorComponents", objc_name="numberOfColorComponents")
+	ColorSpace_numberOfColorComponents :: proc(self: ^ColorSpace) -> NS.Integer ---
+
+	@(objc_type=ColorSpace, objc_selector="colorSpaceModel", objc_name="colorSpaceModel")
+	ColorSpace_colorSpaceModel :: proc(self: ^ColorSpace) -> ColorSpaceModel ---
+
+	@(objc_type=ColorSpace, objc_selector="localizedName", objc_name="localizedName")
+	ColorSpace_localizedName :: proc(self: ^ColorSpace) -> ^NS.String ---
+
+	@(objc_type=ColorSpace, objc_selector="sRGBColorSpace", objc_name="sRGBColorSpace", objc_is_class_method=true)
+	ColorSpace_sRGBColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="genericGamma22GrayColorSpace", objc_name="genericGamma22GrayColorSpace", objc_is_class_method=true)
+	ColorSpace_genericGamma22GrayColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="extendedSRGBColorSpace", objc_name="extendedSRGBColorSpace", objc_is_class_method=true)
+	ColorSpace_extendedSRGBColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="extendedGenericGamma22GrayColorSpace", objc_name="extendedGenericGamma22GrayColorSpace", objc_is_class_method=true)
+	ColorSpace_extendedGenericGamma22GrayColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="displayP3ColorSpace", objc_name="displayP3ColorSpace", objc_is_class_method=true)
+	ColorSpace_displayP3ColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="adobeRGB1998ColorSpace", objc_name="adobeRGB1998ColorSpace", objc_is_class_method=true)
+	ColorSpace_adobeRGB1998ColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="genericRGBColorSpace", objc_name="genericRGBColorSpace", objc_is_class_method=true)
+	ColorSpace_genericRGBColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="genericGrayColorSpace", objc_name="genericGrayColorSpace", objc_is_class_method=true)
+	ColorSpace_genericGrayColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="genericCMYKColorSpace", objc_name="genericCMYKColorSpace", objc_is_class_method=true)
+	ColorSpace_genericCMYKColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="deviceRGBColorSpace", objc_name="deviceRGBColorSpace", objc_is_class_method=true)
+	ColorSpace_deviceRGBColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="deviceGrayColorSpace", objc_name="deviceGrayColorSpace", objc_is_class_method=true)
+	ColorSpace_deviceGrayColorSpace :: proc() -> ^ColorSpace ---
+
+	@(objc_type=ColorSpace, objc_selector="deviceCMYKColorSpace", objc_name="deviceCMYKColorSpace", objc_is_class_method=true)
+	ColorSpace_deviceCMYKColorSpace :: proc() -> ^ColorSpace ---
+}
+
+
+@(objc_class="NSColorWell", objc_superclass=Control)
+ColorWell :: struct { using _: Control}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorWell, objc_selector="colorWellWithStyle:", objc_name="colorWellWithStyle", objc_is_class_method=true)
+	ColorWell_colorWellWithStyle :: proc(style: ColorWellStyle) -> instancetype ---
+
+	@(objc_type=ColorWell, objc_selector="deactivate", objc_name="deactivate")
+	ColorWell_deactivate :: proc(self: ^ColorWell) ---
+
+	@(objc_type=ColorWell, objc_selector="activate:", objc_name="activate")
+	ColorWell_activate :: proc(self: ^ColorWell, exclusive: bool) ---
+
+	@(objc_type=ColorWell, objc_selector="drawWellInside:", objc_name="drawWellInside")
+	ColorWell_drawWellInside :: proc(self: ^ColorWell, insideRect: NS.Rect) ---
+
+	@(objc_type=ColorWell, objc_selector="takeColorFrom:", objc_name="takeColorFrom")
+	ColorWell_takeColorFrom :: proc(self: ^ColorWell, sender: id) ---
+
+	@(objc_type=ColorWell, objc_selector="isActive", objc_name="isActive")
+	ColorWell_isActive :: proc(self: ^ColorWell) -> bool ---
+
+	@(objc_type=ColorWell, objc_selector="isBordered", objc_name="isBordered")
+	ColorWell_isBordered :: proc(self: ^ColorWell) -> bool ---
+
+	@(objc_type=ColorWell, objc_selector="setBordered:", objc_name="setBordered")
+	ColorWell_setBordered :: proc(self: ^ColorWell, bordered: bool) ---
+
+	@(objc_type=ColorWell, objc_selector="color", objc_name="color")
+	ColorWell_color :: proc(self: ^ColorWell) -> ^Color ---
+
+	@(objc_type=ColorWell, objc_selector="setColor:", objc_name="setColor")
+	ColorWell_setColor :: proc(self: ^ColorWell, color: ^Color) ---
+
+	@(objc_type=ColorWell, objc_selector="colorWellStyle", objc_name="colorWellStyle")
+	ColorWell_colorWellStyle :: proc(self: ^ColorWell) -> ColorWellStyle ---
+
+	@(objc_type=ColorWell, objc_selector="setColorWellStyle:", objc_name="setColorWellStyle")
+	ColorWell_setColorWellStyle :: proc(self: ^ColorWell, colorWellStyle: ColorWellStyle) ---
+
+	@(objc_type=ColorWell, objc_selector="image", objc_name="image")
+	ColorWell_image :: proc(self: ^ColorWell) -> ^Image ---
+
+	@(objc_type=ColorWell, objc_selector="setImage:", objc_name="setImage")
+	ColorWell_setImage :: proc(self: ^ColorWell, image: ^Image) ---
+
+	@(objc_type=ColorWell, objc_selector="pulldownTarget", objc_name="pulldownTarget")
+	ColorWell_pulldownTarget :: proc(self: ^ColorWell) -> id ---
+
+	@(objc_type=ColorWell, objc_selector="setPulldownTarget:", objc_name="setPulldownTarget")
+	ColorWell_setPulldownTarget :: proc(self: ^ColorWell, pulldownTarget: id) ---
+
+	@(objc_type=ColorWell, objc_selector="pulldownAction", objc_name="pulldownAction")
+	ColorWell_pulldownAction :: proc(self: ^ColorWell) -> SEL ---
+
+	@(objc_type=ColorWell, objc_selector="setPulldownAction:", objc_name="setPulldownAction")
+	ColorWell_setPulldownAction :: proc(self: ^ColorWell, pulldownAction: SEL) ---
+
+	@(objc_type=ColorWell, objc_selector="supportsAlpha", objc_name="supportsAlpha")
+	ColorWell_supportsAlpha :: proc(self: ^ColorWell) -> bool ---
+
+	@(objc_type=ColorWell, objc_selector="setSupportsAlpha:", objc_name="setSupportsAlpha")
+	ColorWell_setSupportsAlpha :: proc(self: ^ColorWell, supportsAlpha: bool) ---
+
+	@(objc_type=ColorWell, objc_selector="maximumLinearExposure", objc_name="maximumLinearExposure")
+	ColorWell_maximumLinearExposure :: proc(self: ^ColorWell) -> CG.Float ---
+
+	@(objc_type=ColorWell, objc_selector="setMaximumLinearExposure:", objc_name="setMaximumLinearExposure")
+	ColorWell_setMaximumLinearExposure :: proc(self: ^ColorWell, maximumLinearExposure: CG.Float) ---
 }

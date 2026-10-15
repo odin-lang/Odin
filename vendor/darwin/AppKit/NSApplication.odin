@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSApplication", objc_superclass=Responder)
 Application :: struct {
@@ -396,4 +393,149 @@ Application_beginModalSessionForWindow :: proc {
 Application_endSheet :: proc {
 	Application_endSheet_,
 	Application_endSheet_returnCode,
+}
+
+
+@(objc_class="NSApplicationDelegate")
+ApplicationDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ApplicationDelegate, objc_selector="applicationShouldTerminate:", objc_name="applicationShouldTerminate")
+	ApplicationDelegate_applicationShouldTerminate :: proc(self: ^ApplicationDelegate, sender: ^Application) -> ApplicationTerminateReply ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:openURLs:", objc_name="application_openURLs")
+	ApplicationDelegate_application_openURLs :: proc(self: ^ApplicationDelegate, application: ^Application, urls: ^NS.Array) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:openFile:", objc_name="application_openFile")
+	ApplicationDelegate_application_openFile :: proc(self: ^ApplicationDelegate, sender: ^Application, filename: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:openFiles:", objc_name="application_openFiles")
+	ApplicationDelegate_application_openFiles :: proc(self: ^ApplicationDelegate, sender: ^Application, filenames: ^NS.Array) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:openTempFile:", objc_name="application_openTempFile")
+	ApplicationDelegate_application_openTempFile :: proc(self: ^ApplicationDelegate, sender: ^Application, filename: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationShouldOpenUntitledFile:", objc_name="applicationShouldOpenUntitledFile")
+	ApplicationDelegate_applicationShouldOpenUntitledFile :: proc(self: ^ApplicationDelegate, sender: ^Application) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationOpenUntitledFile:", objc_name="applicationOpenUntitledFile")
+	ApplicationDelegate_applicationOpenUntitledFile :: proc(self: ^ApplicationDelegate, sender: ^Application) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:openFileWithoutUI:", objc_name="application_openFileWithoutUI")
+	ApplicationDelegate_application_openFileWithoutUI :: proc(self: ^ApplicationDelegate, sender: id, filename: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:printFile:", objc_name="application_printFile")
+	ApplicationDelegate_application_printFile :: proc(self: ^ApplicationDelegate, sender: ^Application, filename: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:printFiles:withSettings:showPrintPanels:", objc_name="application_printFiles_withSettings_showPrintPanels")
+	ApplicationDelegate_application_printFiles_withSettings_showPrintPanels :: proc(self: ^ApplicationDelegate, application: ^Application, fileNames: ^NS.Array, printSettings: ^NS.Dictionary, showPrintPanels: bool) -> ApplicationPrintReply ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationShouldTerminateAfterLastWindowClosed:", objc_name="applicationShouldTerminateAfterLastWindowClosed")
+	ApplicationDelegate_applicationShouldTerminateAfterLastWindowClosed :: proc(self: ^ApplicationDelegate, sender: ^Application) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationShouldHandleReopen:hasVisibleWindows:", objc_name="applicationShouldHandleReopen")
+	ApplicationDelegate_applicationShouldHandleReopen :: proc(self: ^ApplicationDelegate, sender: ^Application, hasVisibleWindows: bool) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDockMenu:", objc_name="applicationDockMenu")
+	ApplicationDelegate_applicationDockMenu :: proc(self: ^ApplicationDelegate, sender: ^Application) -> ^Menu ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willPresentError:", objc_name="application_willPresentError")
+	ApplicationDelegate_application_willPresentError :: proc(self: ^ApplicationDelegate, application: ^Application, error: ^NS.Error) -> ^NS.Error ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didRegisterForRemoteNotificationsWithDeviceToken:", objc_name="application_didRegisterForRemoteNotificationsWithDeviceToken")
+	ApplicationDelegate_application_didRegisterForRemoteNotificationsWithDeviceToken :: proc(self: ^ApplicationDelegate, application: ^Application, deviceToken: ^NS.Data) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didFailToRegisterForRemoteNotificationsWithError:", objc_name="application_didFailToRegisterForRemoteNotificationsWithError")
+	ApplicationDelegate_application_didFailToRegisterForRemoteNotificationsWithError :: proc(self: ^ApplicationDelegate, application: ^Application, error: ^NS.Error) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didReceiveRemoteNotification:", objc_name="application_didReceiveRemoteNotification")
+	ApplicationDelegate_application_didReceiveRemoteNotification :: proc(self: ^ApplicationDelegate, application: ^Application, userInfo: ^NS.Dictionary) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationSupportsSecureRestorableState:", objc_name="applicationSupportsSecureRestorableState")
+	ApplicationDelegate_applicationSupportsSecureRestorableState :: proc(self: ^ApplicationDelegate, app: ^Application) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handlerForIntent:", objc_name="application_handlerForIntent")
+	ApplicationDelegate_application_handlerForIntent :: proc(self: ^ApplicationDelegate, application: ^Application, intent: ^INIntent) -> id ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willEncodeRestorableState:", objc_name="application_willEncodeRestorableState")
+	ApplicationDelegate_application_willEncodeRestorableState :: proc(self: ^ApplicationDelegate, app: ^Application, coder: ^NS.Coder) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didDecodeRestorableState:", objc_name="application_didDecodeRestorableState")
+	ApplicationDelegate_application_didDecodeRestorableState :: proc(self: ^ApplicationDelegate, app: ^Application, coder: ^NS.Coder) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willContinueUserActivityWithType:", objc_name="application_willContinueUserActivityWithType")
+	ApplicationDelegate_application_willContinueUserActivityWithType :: proc(self: ^ApplicationDelegate, application: ^Application, userActivityType: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:continueUserActivity:restorationHandler:", objc_name="application_continueUserActivity_restorationHandler")
+	ApplicationDelegate_application_continueUserActivity_restorationHandler :: proc(self: ^ApplicationDelegate, application: ^Application, userActivity: ^NS.UserActivity, restorationHandler: ^Objc_Block(proc "c" ( restorableObjects: ^NS.Array ))) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didFailToContinueUserActivityWithType:error:", objc_name="application_didFailToContinueUserActivityWithType_error")
+	ApplicationDelegate_application_didFailToContinueUserActivityWithType_error :: proc(self: ^ApplicationDelegate, application: ^Application, userActivityType: ^NS.String, error: ^NS.Error) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didUpdateUserActivity:", objc_name="application_didUpdateUserActivity")
+	ApplicationDelegate_application_didUpdateUserActivity :: proc(self: ^ApplicationDelegate, application: ^Application, userActivity: ^NS.UserActivity) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:userDidAcceptCloudKitShareWithMetadata:", objc_name="application_userDidAcceptCloudKitShareWithMetadata")
+	ApplicationDelegate_application_userDidAcceptCloudKitShareWithMetadata :: proc(self: ^ApplicationDelegate, application: ^Application, metadata: ^CKShareMetadata) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:delegateHandlesKey:", objc_name="application_delegateHandlesKey")
+	ApplicationDelegate_application_delegateHandlesKey :: proc(self: ^ApplicationDelegate, sender: ^Application, key: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationShouldAutomaticallyLocalizeKeyEquivalents:", objc_name="applicationShouldAutomaticallyLocalizeKeyEquivalents")
+	ApplicationDelegate_applicationShouldAutomaticallyLocalizeKeyEquivalents :: proc(self: ^ApplicationDelegate, application: ^Application) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillFinishLaunching:", objc_name="applicationWillFinishLaunching")
+	ApplicationDelegate_applicationWillFinishLaunching :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidFinishLaunching:", objc_name="applicationDidFinishLaunching")
+	ApplicationDelegate_applicationDidFinishLaunching :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillHide:", objc_name="applicationWillHide")
+	ApplicationDelegate_applicationWillHide :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidHide:", objc_name="applicationDidHide")
+	ApplicationDelegate_applicationDidHide :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillUnhide:", objc_name="applicationWillUnhide")
+	ApplicationDelegate_applicationWillUnhide :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidUnhide:", objc_name="applicationDidUnhide")
+	ApplicationDelegate_applicationDidUnhide :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillBecomeActive:", objc_name="applicationWillBecomeActive")
+	ApplicationDelegate_applicationWillBecomeActive :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidBecomeActive:", objc_name="applicationDidBecomeActive")
+	ApplicationDelegate_applicationDidBecomeActive :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillResignActive:", objc_name="applicationWillResignActive")
+	ApplicationDelegate_applicationWillResignActive :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidResignActive:", objc_name="applicationDidResignActive")
+	ApplicationDelegate_applicationDidResignActive :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillUpdate:", objc_name="applicationWillUpdate")
+	ApplicationDelegate_applicationWillUpdate :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidUpdate:", objc_name="applicationDidUpdate")
+	ApplicationDelegate_applicationDidUpdate :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillTerminate:", objc_name="applicationWillTerminate")
+	ApplicationDelegate_applicationWillTerminate :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidChangeScreenParameters:", objc_name="applicationDidChangeScreenParameters")
+	ApplicationDelegate_applicationDidChangeScreenParameters :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidChangeOcclusionState:", objc_name="applicationDidChangeOcclusionState")
+	ApplicationDelegate_applicationDidChangeOcclusionState :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationProtectedDataWillBecomeUnavailable:", objc_name="applicationProtectedDataWillBecomeUnavailable")
+	ApplicationDelegate_applicationProtectedDataWillBecomeUnavailable :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationProtectedDataDidBecomeAvailable:", objc_name="applicationProtectedDataDidBecomeAvailable")
+	ApplicationDelegate_applicationProtectedDataDidBecomeAvailable :: proc(self: ^ApplicationDelegate, notification: ^NS.Notification) ---
 }

@@ -7,10 +7,6 @@ import cffi "core:c"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSAccessibility")
 Accessibility :: struct {
 	using _: intrinsics.objc_object,
@@ -840,4 +836,557 @@ foreign lib {
 
 	@(objc_type=Accessibility, objc_selector="setAccessibilityCustomActions:", objc_name="setAccessibilityCustomActions")
 	Accessibility_setAccessibilityCustomActions :: proc(self: ^Accessibility, accessibilityCustomActions: ^NS.Array) ---
+}
+
+
+@(objc_class="NSAccessibilityButton")
+AccessibilityButton :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityElementProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityButton, objc_selector="accessibilityLabel", objc_name="accessibilityLabel")
+	AccessibilityButton_accessibilityLabel :: proc(self: ^AccessibilityButton) -> ^NS.String ---
+
+	@(objc_type=AccessibilityButton, objc_selector="accessibilityPerformPress", objc_name="accessibilityPerformPress")
+	AccessibilityButton_accessibilityPerformPress :: proc(self: ^AccessibilityButton) -> bool ---
+}
+
+
+@(objc_class="NSAccessibilityCheckBox")
+AccessibilityCheckBox :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityButton,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityCheckBox, objc_selector="accessibilityValue", objc_name="accessibilityValue")
+	AccessibilityCheckBox_accessibilityValue :: proc(self: ^AccessibilityCheckBox) -> ^NS.Number ---
+}
+
+
+@(objc_class="NSAccessibilityColor")
+AccessibilityColor :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityColor, objc_selector="accessibilityName", objc_name="accessibilityName")
+	AccessibilityColor_accessibilityName :: proc(self: ^AccessibilityColor) -> ^NS.String ---
+}
+
+
+@(objc_class="NSAccessibilityContainsTransientUI")
+AccessibilityContainsTransientUI :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityElementProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityContainsTransientUI, objc_selector="accessibilityPerformShowAlternateUI", objc_name="accessibilityPerformShowAlternateUI")
+	AccessibilityContainsTransientUI_accessibilityPerformShowAlternateUI :: proc(self: ^AccessibilityContainsTransientUI) -> bool ---
+
+	@(objc_type=AccessibilityContainsTransientUI, objc_selector="accessibilityPerformShowDefaultUI", objc_name="accessibilityPerformShowDefaultUI")
+	AccessibilityContainsTransientUI_accessibilityPerformShowDefaultUI :: proc(self: ^AccessibilityContainsTransientUI) -> bool ---
+
+	@(objc_type=AccessibilityContainsTransientUI, objc_selector="isAccessibilityAlternateUIVisible", objc_name="isAccessibilityAlternateUIVisible")
+	AccessibilityContainsTransientUI_isAccessibilityAlternateUIVisible :: proc(self: ^AccessibilityContainsTransientUI) -> bool ---
+}
+
+
+@(objc_class="NSAccessibilityCustomAction", objc_superclass=NS.Object)
+AccessibilityCustomAction :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityCustomAction, objc_selector="initWithName:handler:", objc_name="initWithName_handler")
+	AccessibilityCustomAction_initWithName_handler :: proc(self: ^AccessibilityCustomAction, name: ^NS.String, handler: ^Objc_Block(proc "c" () -> bool)) -> instancetype ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="initWithName:target:selector:", objc_name="initWithName_target_selector")
+	AccessibilityCustomAction_initWithName_target_selector :: proc(self: ^AccessibilityCustomAction, name: ^NS.String, target: ^NS.ObjectProtocol, selector: SEL) -> instancetype ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="name", objc_name="name")
+	AccessibilityCustomAction_name :: proc(self: ^AccessibilityCustomAction) -> ^NS.String ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="setName:", objc_name="setName")
+	AccessibilityCustomAction_setName :: proc(self: ^AccessibilityCustomAction, name: ^NS.String) ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="handler", objc_name="handler")
+	AccessibilityCustomAction_handler :: proc(self: ^AccessibilityCustomAction) -> ^Objc_Block(proc "c" () -> bool) ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="setHandler:", objc_name="setHandler")
+	AccessibilityCustomAction_setHandler :: proc(self: ^AccessibilityCustomAction, handler: ^Objc_Block(proc "c" () -> bool)) ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="target", objc_name="target")
+	AccessibilityCustomAction_target :: proc(self: ^AccessibilityCustomAction) -> ^NS.ObjectProtocol ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="setTarget:", objc_name="setTarget")
+	AccessibilityCustomAction_setTarget :: proc(self: ^AccessibilityCustomAction, target: ^NS.ObjectProtocol) ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="selector", objc_name="selector")
+	AccessibilityCustomAction_selector :: proc(self: ^AccessibilityCustomAction) -> SEL ---
+
+	@(objc_type=AccessibilityCustomAction, objc_selector="setSelector:", objc_name="setSelector")
+	AccessibilityCustomAction_setSelector :: proc(self: ^AccessibilityCustomAction, selector: SEL) ---
+}
+
+@(objc_type=AccessibilityCustomAction, objc_name="initWithName")
+AccessibilityCustomAction_initWithName :: proc {
+	AccessibilityCustomAction_initWithName_handler,
+	AccessibilityCustomAction_initWithName_target_selector,
+}
+
+
+@(objc_class="NSAccessibilityCustomRotor", objc_superclass=NS.Object)
+AccessibilityCustomRotor :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityCustomRotor, objc_selector="initWithLabel:itemSearchDelegate:", objc_name="initWithLabel")
+	AccessibilityCustomRotor_initWithLabel :: proc(self: ^AccessibilityCustomRotor, label: ^NS.String, itemSearchDelegate: ^AccessibilityCustomRotorItemSearchDelegate) -> instancetype ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="initWithRotorType:itemSearchDelegate:", objc_name="initWithRotorType")
+	AccessibilityCustomRotor_initWithRotorType :: proc(self: ^AccessibilityCustomRotor, rotorType: AccessibilityCustomRotorType, itemSearchDelegate: ^AccessibilityCustomRotorItemSearchDelegate) -> instancetype ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="type", objc_name="type")
+	AccessibilityCustomRotor_type :: proc(self: ^AccessibilityCustomRotor) -> AccessibilityCustomRotorType ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="setType:", objc_name="setType")
+	AccessibilityCustomRotor_setType :: proc(self: ^AccessibilityCustomRotor, type: AccessibilityCustomRotorType) ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="label", objc_name="label")
+	AccessibilityCustomRotor_label :: proc(self: ^AccessibilityCustomRotor) -> ^NS.String ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="setLabel:", objc_name="setLabel")
+	AccessibilityCustomRotor_setLabel :: proc(self: ^AccessibilityCustomRotor, label: ^NS.String) ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="itemSearchDelegate", objc_name="itemSearchDelegate")
+	AccessibilityCustomRotor_itemSearchDelegate :: proc(self: ^AccessibilityCustomRotor) -> ^AccessibilityCustomRotorItemSearchDelegate ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="setItemSearchDelegate:", objc_name="setItemSearchDelegate")
+	AccessibilityCustomRotor_setItemSearchDelegate :: proc(self: ^AccessibilityCustomRotor, itemSearchDelegate: ^AccessibilityCustomRotorItemSearchDelegate) ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="itemLoadingDelegate", objc_name="itemLoadingDelegate")
+	AccessibilityCustomRotor_itemLoadingDelegate :: proc(self: ^AccessibilityCustomRotor) -> ^AccessibilityElementLoading ---
+
+	@(objc_type=AccessibilityCustomRotor, objc_selector="setItemLoadingDelegate:", objc_name="setItemLoadingDelegate")
+	AccessibilityCustomRotor_setItemLoadingDelegate :: proc(self: ^AccessibilityCustomRotor, itemLoadingDelegate: ^AccessibilityElementLoading) ---
+}
+
+
+@(objc_class="NSAccessibilityCustomRotorItemLoadDelegate")
+AccessibilityCustomRotorItemLoadDelegate :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSAccessibilityCustomRotorItemResult", objc_superclass=NS.Object)
+AccessibilityCustomRotorItemResult :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	AccessibilityCustomRotorItemResult_new :: proc() -> ^AccessibilityCustomRotorItemResult ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="init", objc_name="init")
+	AccessibilityCustomRotorItemResult_init :: proc(self: ^AccessibilityCustomRotorItemResult) -> instancetype ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="initWithTargetElement:", objc_name="initWithTargetElement")
+	AccessibilityCustomRotorItemResult_initWithTargetElement :: proc(self: ^AccessibilityCustomRotorItemResult, targetElement: ^AccessibilityElementProtocol) -> instancetype ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="initWithItemLoadingToken:customLabel:", objc_name="initWithItemLoadingToken")
+	AccessibilityCustomRotorItemResult_initWithItemLoadingToken :: proc(self: ^AccessibilityCustomRotorItemResult, itemLoadingToken: ^id, customLabel: ^NS.String) -> instancetype ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="targetElement", objc_name="targetElement")
+	AccessibilityCustomRotorItemResult_targetElement :: proc(self: ^AccessibilityCustomRotorItemResult) -> ^AccessibilityElementProtocol ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="itemLoadingToken", objc_name="itemLoadingToken")
+	AccessibilityCustomRotorItemResult_itemLoadingToken :: proc(self: ^AccessibilityCustomRotorItemResult) -> ^id ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="targetRange", objc_name="targetRange")
+	AccessibilityCustomRotorItemResult_targetRange :: proc(self: ^AccessibilityCustomRotorItemResult) -> NS._NSRange ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="setTargetRange:", objc_name="setTargetRange")
+	AccessibilityCustomRotorItemResult_setTargetRange :: proc(self: ^AccessibilityCustomRotorItemResult, targetRange: NS._NSRange) ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="customLabel", objc_name="customLabel")
+	AccessibilityCustomRotorItemResult_customLabel :: proc(self: ^AccessibilityCustomRotorItemResult) -> ^NS.String ---
+
+	@(objc_type=AccessibilityCustomRotorItemResult, objc_selector="setCustomLabel:", objc_name="setCustomLabel")
+	AccessibilityCustomRotorItemResult_setCustomLabel :: proc(self: ^AccessibilityCustomRotorItemResult, customLabel: ^NS.String) ---
+}
+
+
+@(objc_class="NSAccessibilityCustomRotorItemSearchDelegate")
+AccessibilityCustomRotorItemSearchDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityCustomRotorItemSearchDelegate, objc_selector="rotor:resultForSearchParameters:", objc_name="rotor")
+	AccessibilityCustomRotorItemSearchDelegate_rotor :: proc(self: ^AccessibilityCustomRotorItemSearchDelegate, rotor: ^AccessibilityCustomRotor, searchParameters: ^AccessibilityCustomRotorSearchParameters) -> ^AccessibilityCustomRotorItemResult ---
+}
+
+
+@(objc_class="NSAccessibilityCustomRotorSearchParameters", objc_superclass=NS.Object)
+AccessibilityCustomRotorSearchParameters :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityCustomRotorSearchParameters, objc_selector="currentItem", objc_name="currentItem")
+	AccessibilityCustomRotorSearchParameters_currentItem :: proc(self: ^AccessibilityCustomRotorSearchParameters) -> ^AccessibilityCustomRotorItemResult ---
+
+	@(objc_type=AccessibilityCustomRotorSearchParameters, objc_selector="setCurrentItem:", objc_name="setCurrentItem")
+	AccessibilityCustomRotorSearchParameters_setCurrentItem :: proc(self: ^AccessibilityCustomRotorSearchParameters, currentItem: ^AccessibilityCustomRotorItemResult) ---
+
+	@(objc_type=AccessibilityCustomRotorSearchParameters, objc_selector="searchDirection", objc_name="searchDirection")
+	AccessibilityCustomRotorSearchParameters_searchDirection :: proc(self: ^AccessibilityCustomRotorSearchParameters) -> AccessibilityCustomRotorSearchDirection ---
+
+	@(objc_type=AccessibilityCustomRotorSearchParameters, objc_selector="setSearchDirection:", objc_name="setSearchDirection")
+	AccessibilityCustomRotorSearchParameters_setSearchDirection :: proc(self: ^AccessibilityCustomRotorSearchParameters, searchDirection: AccessibilityCustomRotorSearchDirection) ---
+
+	@(objc_type=AccessibilityCustomRotorSearchParameters, objc_selector="filterString", objc_name="filterString")
+	AccessibilityCustomRotorSearchParameters_filterString :: proc(self: ^AccessibilityCustomRotorSearchParameters) -> ^NS.String ---
+
+	@(objc_type=AccessibilityCustomRotorSearchParameters, objc_selector="setFilterString:", objc_name="setFilterString")
+	AccessibilityCustomRotorSearchParameters_setFilterString :: proc(self: ^AccessibilityCustomRotorSearchParameters, filterString: ^NS.String) ---
+}
+
+
+@(objc_class="NSAccessibilityElement", objc_superclass=NS.Object)
+AccessibilityElement :: struct {
+	using _: NS.Object,
+	using _: Accessibility,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityElement, objc_selector="accessibilityElementWithRole:frame:label:parent:", objc_name="accessibilityElementWithRole", objc_is_class_method=true)
+	AccessibilityElement_accessibilityElementWithRole :: proc(role: ^NS.String, frame: NS.Rect, label: ^NS.String, parent: id) -> id ---
+
+	@(objc_type=AccessibilityElement, objc_selector="accessibilityAddChildElement:", objc_name="accessibilityAddChildElement")
+	AccessibilityElement_accessibilityAddChildElement :: proc(self: ^AccessibilityElement, childElement: ^AccessibilityElement) ---
+
+	@(objc_type=AccessibilityElement, objc_selector="accessibilityFrameInParentSpace", objc_name="accessibilityFrameInParentSpace")
+	AccessibilityElement_accessibilityFrameInParentSpace :: proc(self: ^AccessibilityElement) -> NS.Rect ---
+
+	@(objc_type=AccessibilityElement, objc_selector="setAccessibilityFrameInParentSpace:", objc_name="setAccessibilityFrameInParentSpace")
+	AccessibilityElement_setAccessibilityFrameInParentSpace :: proc(self: ^AccessibilityElement, accessibilityFrameInParentSpace: NS.Rect) ---
+}
+
+
+@(objc_class="NSAccessibilityElement")
+AccessibilityElementProtocol :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityElementProtocol, objc_selector="accessibilityFrame", objc_name="accessibilityFrame")
+	AccessibilityElementProtocol_accessibilityFrame :: proc(self: ^AccessibilityElementProtocol) -> NS.Rect ---
+
+	@(objc_type=AccessibilityElementProtocol, objc_selector="accessibilityParent", objc_name="accessibilityParent")
+	AccessibilityElementProtocol_accessibilityParent :: proc(self: ^AccessibilityElementProtocol) -> id ---
+
+	@(objc_type=AccessibilityElementProtocol, objc_selector="isAccessibilityFocused", objc_name="isAccessibilityFocused")
+	AccessibilityElementProtocol_isAccessibilityFocused :: proc(self: ^AccessibilityElementProtocol) -> bool ---
+
+	@(objc_type=AccessibilityElementProtocol, objc_selector="accessibilityIdentifier", objc_name="accessibilityIdentifier")
+	AccessibilityElementProtocol_accessibilityIdentifier :: proc(self: ^AccessibilityElementProtocol) -> ^NS.String ---
+}
+
+
+@(objc_class="NSAccessibilityElementLoading")
+AccessibilityElementLoading :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityElementLoading, objc_selector="accessibilityElementWithToken:", objc_name="accessibilityElementWithToken")
+	AccessibilityElementLoading_accessibilityElementWithToken :: proc(self: ^AccessibilityElementLoading, token: ^id) -> ^AccessibilityElementProtocol ---
+
+	@(objc_type=AccessibilityElementLoading, objc_selector="accessibilityRangeInTargetElementWithToken:", objc_name="accessibilityRangeInTargetElementWithToken")
+	AccessibilityElementLoading_accessibilityRangeInTargetElementWithToken :: proc(self: ^AccessibilityElementLoading, token: ^id) -> NS._NSRange ---
+}
+
+
+@(objc_class="NSAccessibilityGroup")
+AccessibilityGroup :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityElementProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSAccessibilityImage")
+AccessibilityImage :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityElementProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityImage, objc_selector="accessibilityLabel", objc_name="accessibilityLabel")
+	AccessibilityImage_accessibilityLabel :: proc(self: ^AccessibilityImage) -> ^NS.String ---
+}
+
+
+@(objc_class="NSAccessibilityLayoutArea")
+AccessibilityLayoutArea :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityGroup,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityLayoutArea, objc_selector="accessibilityLabel", objc_name="accessibilityLabel")
+	AccessibilityLayoutArea_accessibilityLabel :: proc(self: ^AccessibilityLayoutArea) -> ^NS.String ---
+
+	@(objc_type=AccessibilityLayoutArea, objc_selector="accessibilityChildren", objc_name="accessibilityChildren")
+	AccessibilityLayoutArea_accessibilityChildren :: proc(self: ^AccessibilityLayoutArea) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityLayoutArea, objc_selector="accessibilitySelectedChildren", objc_name="accessibilitySelectedChildren")
+	AccessibilityLayoutArea_accessibilitySelectedChildren :: proc(self: ^AccessibilityLayoutArea) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityLayoutArea, objc_selector="accessibilityFocusedUIElement", objc_name="accessibilityFocusedUIElement")
+	AccessibilityLayoutArea_accessibilityFocusedUIElement :: proc(self: ^AccessibilityLayoutArea) -> id ---
+}
+
+
+@(objc_class="NSAccessibilityLayoutItem")
+AccessibilityLayoutItem :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityGroup,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityLayoutItem, objc_selector="setAccessibilityFrame:", objc_name="setAccessibilityFrame")
+	AccessibilityLayoutItem_setAccessibilityFrame :: proc(self: ^AccessibilityLayoutItem, frame: NS.Rect) ---
+}
+
+
+@(objc_class="NSAccessibilityList")
+AccessibilityList :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityTable,
+}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSAccessibilityNavigableStaticText")
+AccessibilityNavigableStaticText :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityStaticText,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityNavigableStaticText, objc_selector="accessibilityStringForRange:", objc_name="accessibilityStringForRange")
+	AccessibilityNavigableStaticText_accessibilityStringForRange :: proc(self: ^AccessibilityNavigableStaticText, range: NS._NSRange) -> ^NS.String ---
+
+	@(objc_type=AccessibilityNavigableStaticText, objc_selector="accessibilityLineForIndex:", objc_name="accessibilityLineForIndex")
+	AccessibilityNavigableStaticText_accessibilityLineForIndex :: proc(self: ^AccessibilityNavigableStaticText, index: NS.Integer) -> NS.Integer ---
+
+	@(objc_type=AccessibilityNavigableStaticText, objc_selector="accessibilityRangeForLine:", objc_name="accessibilityRangeForLine")
+	AccessibilityNavigableStaticText_accessibilityRangeForLine :: proc(self: ^AccessibilityNavigableStaticText, lineNumber: NS.Integer) -> NS._NSRange ---
+
+	@(objc_type=AccessibilityNavigableStaticText, objc_selector="accessibilityFrameForRange:", objc_name="accessibilityFrameForRange")
+	AccessibilityNavigableStaticText_accessibilityFrameForRange :: proc(self: ^AccessibilityNavigableStaticText, range: NS._NSRange) -> NS.Rect ---
+}
+
+
+@(objc_class="NSAccessibilityOutline")
+AccessibilityOutline :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityTable,
+}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSAccessibilityProgressIndicator")
+AccessibilityProgressIndicator :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityGroup,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityProgressIndicator, objc_selector="accessibilityValue", objc_name="accessibilityValue")
+	AccessibilityProgressIndicator_accessibilityValue :: proc(self: ^AccessibilityProgressIndicator) -> ^NS.Number ---
+}
+
+
+@(objc_class="NSAccessibilityRadioButton")
+AccessibilityRadioButton :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityButton,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityRadioButton, objc_selector="accessibilityValue", objc_name="accessibilityValue")
+	AccessibilityRadioButton_accessibilityValue :: proc(self: ^AccessibilityRadioButton) -> ^NS.Number ---
+}
+
+
+@(objc_class="NSAccessibilityRow")
+AccessibilityRow :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityGroup,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityRow, objc_selector="accessibilityIndex", objc_name="accessibilityIndex")
+	AccessibilityRow_accessibilityIndex :: proc(self: ^AccessibilityRow) -> NS.Integer ---
+
+	@(objc_type=AccessibilityRow, objc_selector="accessibilityDisclosureLevel", objc_name="accessibilityDisclosureLevel")
+	AccessibilityRow_accessibilityDisclosureLevel :: proc(self: ^AccessibilityRow) -> NS.Integer ---
+}
+
+
+@(objc_class="NSAccessibilitySlider")
+AccessibilitySlider :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityElementProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilitySlider, objc_selector="accessibilityLabel", objc_name="accessibilityLabel")
+	AccessibilitySlider_accessibilityLabel :: proc(self: ^AccessibilitySlider) -> ^NS.String ---
+
+	@(objc_type=AccessibilitySlider, objc_selector="accessibilityValue", objc_name="accessibilityValue")
+	AccessibilitySlider_accessibilityValue :: proc(self: ^AccessibilitySlider) -> id ---
+
+	@(objc_type=AccessibilitySlider, objc_selector="accessibilityPerformIncrement", objc_name="accessibilityPerformIncrement")
+	AccessibilitySlider_accessibilityPerformIncrement :: proc(self: ^AccessibilitySlider) -> bool ---
+
+	@(objc_type=AccessibilitySlider, objc_selector="accessibilityPerformDecrement", objc_name="accessibilityPerformDecrement")
+	AccessibilitySlider_accessibilityPerformDecrement :: proc(self: ^AccessibilitySlider) -> bool ---
+}
+
+
+@(objc_class="NSAccessibilityStaticText")
+AccessibilityStaticText :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityElementProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityStaticText, objc_selector="accessibilityValue", objc_name="accessibilityValue")
+	AccessibilityStaticText_accessibilityValue :: proc(self: ^AccessibilityStaticText) -> ^NS.String ---
+
+	@(objc_type=AccessibilityStaticText, objc_selector="accessibilityAttributedStringForRange:", objc_name="accessibilityAttributedStringForRange")
+	AccessibilityStaticText_accessibilityAttributedStringForRange :: proc(self: ^AccessibilityStaticText, range: NS._NSRange) -> ^NS.AttributedString ---
+
+	@(objc_type=AccessibilityStaticText, objc_selector="accessibilityVisibleCharacterRange", objc_name="accessibilityVisibleCharacterRange")
+	AccessibilityStaticText_accessibilityVisibleCharacterRange :: proc(self: ^AccessibilityStaticText) -> NS._NSRange ---
+}
+
+
+@(objc_class="NSAccessibilityStepper")
+AccessibilityStepper :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityElementProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityStepper, objc_selector="accessibilityLabel", objc_name="accessibilityLabel")
+	AccessibilityStepper_accessibilityLabel :: proc(self: ^AccessibilityStepper) -> ^NS.String ---
+
+	@(objc_type=AccessibilityStepper, objc_selector="accessibilityPerformIncrement", objc_name="accessibilityPerformIncrement")
+	AccessibilityStepper_accessibilityPerformIncrement :: proc(self: ^AccessibilityStepper) -> bool ---
+
+	@(objc_type=AccessibilityStepper, objc_selector="accessibilityPerformDecrement", objc_name="accessibilityPerformDecrement")
+	AccessibilityStepper_accessibilityPerformDecrement :: proc(self: ^AccessibilityStepper) -> bool ---
+
+	@(objc_type=AccessibilityStepper, objc_selector="accessibilityValue", objc_name="accessibilityValue")
+	AccessibilityStepper_accessibilityValue :: proc(self: ^AccessibilityStepper) -> id ---
+}
+
+
+@(objc_class="NSAccessibilitySwitch")
+AccessibilitySwitch :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityButton,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilitySwitch, objc_selector="accessibilityValue", objc_name="accessibilityValue")
+	AccessibilitySwitch_accessibilityValue :: proc(self: ^AccessibilitySwitch) -> ^NS.String ---
+
+	@(objc_type=AccessibilitySwitch, objc_selector="accessibilityPerformIncrement", objc_name="accessibilityPerformIncrement")
+	AccessibilitySwitch_accessibilityPerformIncrement :: proc(self: ^AccessibilitySwitch) -> bool ---
+
+	@(objc_type=AccessibilitySwitch, objc_selector="accessibilityPerformDecrement", objc_name="accessibilityPerformDecrement")
+	AccessibilitySwitch_accessibilityPerformDecrement :: proc(self: ^AccessibilitySwitch) -> bool ---
+}
+
+
+@(objc_class="NSAccessibilityTable")
+AccessibilityTable :: struct {
+	using _: intrinsics.objc_object,
+	using _: AccessibilityGroup,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityLabel", objc_name="accessibilityLabel")
+	AccessibilityTable_accessibilityLabel :: proc(self: ^AccessibilityTable) -> ^NS.String ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityRows", objc_name="accessibilityRows")
+	AccessibilityTable_accessibilityRows :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilitySelectedRows", objc_name="accessibilitySelectedRows")
+	AccessibilityTable_accessibilitySelectedRows :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="setAccessibilitySelectedRows:", objc_name="setAccessibilitySelectedRows")
+	AccessibilityTable_setAccessibilitySelectedRows :: proc(self: ^AccessibilityTable, selectedRows: ^NS.Array) ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityVisibleRows", objc_name="accessibilityVisibleRows")
+	AccessibilityTable_accessibilityVisibleRows :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityColumns", objc_name="accessibilityColumns")
+	AccessibilityTable_accessibilityColumns :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityVisibleColumns", objc_name="accessibilityVisibleColumns")
+	AccessibilityTable_accessibilityVisibleColumns :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilitySelectedColumns", objc_name="accessibilitySelectedColumns")
+	AccessibilityTable_accessibilitySelectedColumns :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityHeaderGroup", objc_name="accessibilityHeaderGroup")
+	AccessibilityTable_accessibilityHeaderGroup :: proc(self: ^AccessibilityTable) -> ^NS.String ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilitySelectedCells", objc_name="accessibilitySelectedCells")
+	AccessibilityTable_accessibilitySelectedCells :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityVisibleCells", objc_name="accessibilityVisibleCells")
+	AccessibilityTable_accessibilityVisibleCells :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityRowHeaderUIElements", objc_name="accessibilityRowHeaderUIElements")
+	AccessibilityTable_accessibilityRowHeaderUIElements :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
+
+	@(objc_type=AccessibilityTable, objc_selector="accessibilityColumnHeaderUIElements", objc_name="accessibilityColumnHeaderUIElements")
+	AccessibilityTable_accessibilityColumnHeaderUIElements :: proc(self: ^AccessibilityTable) -> ^NS.Array ---
 }

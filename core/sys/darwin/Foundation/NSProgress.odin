@@ -3,6 +3,7 @@
 package darwin_Foundation
 
 import cffi "core:c"
+import "base:intrinsics"
 
 @(objc_class="NSProgress", objc_superclass=Object)
 Progress :: struct { using _: Object}
@@ -183,4 +184,16 @@ foreign lib {
 Progress_progressWithTotalUnitCount :: proc {
 	Progress_progressWithTotalUnitCount_,
 	Progress_progressWithTotalUnitCount_parent_pendingUnitCount,
+}
+
+
+@(objc_class="NSProgressReporting")
+ProgressReporting :: struct {
+	using _: intrinsics.objc_object,
+	using _: ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=ProgressReporting, objc_selector="progress", objc_name="progress")
+	ProgressReporting_progress :: proc(self: ^ProgressReporting) -> ^Progress ---
 }

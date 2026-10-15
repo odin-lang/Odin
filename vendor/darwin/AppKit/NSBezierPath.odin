@@ -5,10 +5,6 @@ package darwin_AppKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSBezierPath", objc_superclass=NS.Object)
 BezierPath :: struct {
 	using _: NS.Object,

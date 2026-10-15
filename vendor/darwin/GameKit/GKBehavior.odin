@@ -57,3 +57,47 @@ Behavior_behaviorWithGoals :: proc {
 	Behavior_behaviorWithGoals_,
 	Behavior_behaviorWithGoals_andWeights,
 }
+
+
+@(objc_class="GKCompositeBehavior", objc_superclass=Behavior)
+CompositeBehavior :: struct { using _: Behavior}
+
+foreign lib {
+	@(objc_type=CompositeBehavior, objc_selector="behaviorWithBehaviors:", objc_name="behaviorWithBehaviors_", objc_is_class_method=true)
+	CompositeBehavior_behaviorWithBehaviors_ :: proc(behaviors: ^NS.Array) -> instancetype ---
+
+	@(objc_type=CompositeBehavior, objc_selector="behaviorWithBehaviors:andWeights:", objc_name="behaviorWithBehaviors_andWeights", objc_is_class_method=true)
+	CompositeBehavior_behaviorWithBehaviors_andWeights :: proc(behaviors: ^NS.Array, weights: ^NS.Array) -> instancetype ---
+
+	@(objc_type=CompositeBehavior, objc_selector="setWeight:forBehavior:", objc_name="setWeight")
+	CompositeBehavior_setWeight :: proc(self: ^CompositeBehavior, weight: cffi.float, behavior: ^Behavior) ---
+
+	@(objc_type=CompositeBehavior, objc_selector="weightForBehavior:", objc_name="weightForBehavior")
+	CompositeBehavior_weightForBehavior :: proc(self: ^CompositeBehavior, behavior: ^Behavior) -> cffi.float ---
+
+	@(objc_type=CompositeBehavior, objc_selector="removeBehavior:", objc_name="removeBehavior")
+	CompositeBehavior_removeBehavior :: proc(self: ^CompositeBehavior, behavior: ^Behavior) ---
+
+	@(objc_type=CompositeBehavior, objc_selector="removeAllBehaviors", objc_name="removeAllBehaviors")
+	CompositeBehavior_removeAllBehaviors :: proc(self: ^CompositeBehavior) ---
+
+	@(objc_type=CompositeBehavior, objc_selector="objectAtIndexedSubscript:", objc_name="objectAtIndexedSubscript")
+	CompositeBehavior_objectAtIndexedSubscript :: proc(self: ^CompositeBehavior, idx: NS.UInteger) -> ^Behavior ---
+
+	@(objc_type=CompositeBehavior, objc_selector="setObject:forKeyedSubscript:", objc_name="setObject")
+	CompositeBehavior_setObject :: proc(self: ^CompositeBehavior, weight: ^NS.Number, behavior: ^Behavior) ---
+
+	@(objc_type=CompositeBehavior, objc_selector="objectForKeyedSubscript:", objc_name="objectForKeyedSubscript")
+	CompositeBehavior_objectForKeyedSubscript :: proc(self: ^CompositeBehavior, behavior: ^Behavior) -> ^NS.Number ---
+
+	@(objc_type=CompositeBehavior, objc_selector="behaviorCount", objc_name="behaviorCount")
+	CompositeBehavior_behaviorCount :: proc(self: ^CompositeBehavior) -> NS.Integer ---
+}
+
+
+
+@(objc_type=CompositeBehavior, objc_name="behaviorWithBehaviors", objc_is_class_method=true)
+CompositeBehavior_behaviorWithBehaviors :: proc {
+	CompositeBehavior_behaviorWithBehaviors_,
+	CompositeBehavior_behaviorWithBehaviors_andWeights,
+}

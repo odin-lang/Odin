@@ -5,10 +5,6 @@ package darwin_AppKit
 import NS "core:sys/darwin/Foundation"
 import posix "core:sys/posix"
 
-
-
-
-
 @(objc_class="NSRunningApplication", objc_superclass=NS.Object)
 RunningApplication :: struct { using _: NS.Object}
 

@@ -6,10 +6,7 @@ import cffi "core:c"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 import CA "vendor:darwin/QuartzCore"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIView", objc_superclass=Responder)
 View :: struct {
@@ -778,4 +775,1186 @@ View_systemLayoutSizeFittingSize :: proc {
 View_drawRect :: proc {
 	View_drawRect_,
 	View_drawRect_forViewPrintFormatter,
+}
+
+
+@(objc_class="UIViewConfigurationState", objc_superclass=NS.Object)
+ViewConfigurationState :: struct {
+	using _: NS.Object,
+	using _: ConfigurationState,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewConfigurationState, objc_selector="initWithTraitCollection:", objc_name="initWithTraitCollection")
+	ViewConfigurationState_initWithTraitCollection :: proc(self: ^ViewConfigurationState, traitCollection: ^TraitCollection) -> instancetype ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ViewConfigurationState_initWithCoder :: proc(self: ^ViewConfigurationState, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="init", objc_name="init")
+	ViewConfigurationState_init :: proc(self: ^ViewConfigurationState) -> instancetype ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	ViewConfigurationState_new :: proc() -> ^ViewConfigurationState ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="traitCollection", objc_name="traitCollection")
+	ViewConfigurationState_traitCollection :: proc(self: ^ViewConfigurationState) -> ^TraitCollection ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="setTraitCollection:", objc_name="setTraitCollection")
+	ViewConfigurationState_setTraitCollection :: proc(self: ^ViewConfigurationState, traitCollection: ^TraitCollection) ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="isDisabled", objc_name="isDisabled")
+	ViewConfigurationState_isDisabled :: proc(self: ^ViewConfigurationState) -> bool ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="setDisabled:", objc_name="setDisabled")
+	ViewConfigurationState_setDisabled :: proc(self: ^ViewConfigurationState, disabled: bool) ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="isHighlighted", objc_name="isHighlighted")
+	ViewConfigurationState_isHighlighted :: proc(self: ^ViewConfigurationState) -> bool ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="setHighlighted:", objc_name="setHighlighted")
+	ViewConfigurationState_setHighlighted :: proc(self: ^ViewConfigurationState, highlighted: bool) ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="isSelected", objc_name="isSelected")
+	ViewConfigurationState_isSelected :: proc(self: ^ViewConfigurationState) -> bool ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="setSelected:", objc_name="setSelected")
+	ViewConfigurationState_setSelected :: proc(self: ^ViewConfigurationState, selected: bool) ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="isFocused", objc_name="isFocused")
+	ViewConfigurationState_isFocused :: proc(self: ^ViewConfigurationState) -> bool ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="setFocused:", objc_name="setFocused")
+	ViewConfigurationState_setFocused :: proc(self: ^ViewConfigurationState, focused: bool) ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="isPinned", objc_name="isPinned")
+	ViewConfigurationState_isPinned :: proc(self: ^ViewConfigurationState) -> bool ---
+
+	@(objc_type=ViewConfigurationState, objc_selector="setPinned:", objc_name="setPinned")
+	ViewConfigurationState_setPinned :: proc(self: ^ViewConfigurationState, pinned: bool) ---
+}
+
+
+@(objc_class="UIViewAnimating")
+ViewAnimating :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewAnimating, objc_selector="startAnimation", objc_name="startAnimation")
+	ViewAnimating_startAnimation :: proc(self: ^ViewAnimating) ---
+
+	@(objc_type=ViewAnimating, objc_selector="startAnimationAfterDelay:", objc_name="startAnimationAfterDelay")
+	ViewAnimating_startAnimationAfterDelay :: proc(self: ^ViewAnimating, delay: NS.TimeInterval) ---
+
+	@(objc_type=ViewAnimating, objc_selector="pauseAnimation", objc_name="pauseAnimation")
+	ViewAnimating_pauseAnimation :: proc(self: ^ViewAnimating) ---
+
+	@(objc_type=ViewAnimating, objc_selector="stopAnimation:", objc_name="stopAnimation")
+	ViewAnimating_stopAnimation :: proc(self: ^ViewAnimating, withoutFinishing: bool) ---
+
+	@(objc_type=ViewAnimating, objc_selector="finishAnimationAtPosition:", objc_name="finishAnimationAtPosition")
+	ViewAnimating_finishAnimationAtPosition :: proc(self: ^ViewAnimating, finalPosition: ViewAnimatingPosition) ---
+
+	@(objc_type=ViewAnimating, objc_selector="state", objc_name="state")
+	ViewAnimating_state :: proc(self: ^ViewAnimating) -> ViewAnimatingState ---
+
+	@(objc_type=ViewAnimating, objc_selector="isRunning", objc_name="isRunning")
+	ViewAnimating_isRunning :: proc(self: ^ViewAnimating) -> bool ---
+
+	@(objc_type=ViewAnimating, objc_selector="isReversed", objc_name="isReversed")
+	ViewAnimating_isReversed :: proc(self: ^ViewAnimating) -> bool ---
+
+	@(objc_type=ViewAnimating, objc_selector="setReversed:", objc_name="setReversed")
+	ViewAnimating_setReversed :: proc(self: ^ViewAnimating, reversed: bool) ---
+
+	@(objc_type=ViewAnimating, objc_selector="fractionComplete", objc_name="fractionComplete")
+	ViewAnimating_fractionComplete :: proc(self: ^ViewAnimating) -> CG.Float ---
+
+	@(objc_type=ViewAnimating, objc_selector="setFractionComplete:", objc_name="setFractionComplete")
+	ViewAnimating_setFractionComplete :: proc(self: ^ViewAnimating, fractionComplete: CG.Float) ---
+}
+
+
+@(objc_class="UIViewController", objc_superclass=Responder)
+ViewController :: struct {
+	using _: Responder,
+	using _: NS.Coding,
+	using _: AppearanceContainer,
+	using _: TraitEnvironment,
+	using _: ContentContainer,
+	using _: FocusEnvironment,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewController, objc_selector="initWithNibName:bundle:", objc_name="initWithNibName")
+	ViewController_initWithNibName :: proc(self: ^ViewController, nibNameOrNil: ^NS.String, nibBundleOrNil: ^NS.Bundle) -> instancetype ---
+
+	@(objc_type=ViewController, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ViewController_initWithCoder :: proc(self: ^ViewController, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ViewController, objc_selector="loadView", objc_name="loadView")
+	ViewController_loadView :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="loadViewIfNeeded", objc_name="loadViewIfNeeded")
+	ViewController_loadViewIfNeeded :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewWillUnload", objc_name="viewWillUnload")
+	ViewController_viewWillUnload :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidUnload", objc_name="viewDidUnload")
+	ViewController_viewDidUnload :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidLoad", objc_name="viewDidLoad")
+	ViewController_viewDidLoad :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="performSegueWithIdentifier:sender:", objc_name="performSegueWithIdentifier")
+	ViewController_performSegueWithIdentifier :: proc(self: ^ViewController, identifier: ^NS.String, sender: id) ---
+
+	@(objc_type=ViewController, objc_selector="shouldPerformSegueWithIdentifier:sender:", objc_name="shouldPerformSegueWithIdentifier")
+	ViewController_shouldPerformSegueWithIdentifier :: proc(self: ^ViewController, identifier: ^NS.String, sender: id) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="prepareForSegue:sender:", objc_name="prepareForSegue")
+	ViewController_prepareForSegue :: proc(self: ^ViewController, segue: ^StoryboardSegue, sender: id) ---
+
+	@(objc_type=ViewController, objc_selector="canPerformUnwindSegueAction:fromViewController:sender:", objc_name="canPerformUnwindSegueAction_fromViewController_sender")
+	ViewController_canPerformUnwindSegueAction_fromViewController_sender :: proc(self: ^ViewController, action: SEL, fromViewController: ^ViewController, sender: id) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="canPerformUnwindSegueAction:fromViewController:withSender:", objc_name="canPerformUnwindSegueAction_fromViewController_withSender")
+	ViewController_canPerformUnwindSegueAction_fromViewController_withSender :: proc(self: ^ViewController, action: SEL, fromViewController: ^ViewController, sender: id) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="allowedChildViewControllersForUnwindingFromSource:", objc_name="allowedChildViewControllersForUnwindingFromSource")
+	ViewController_allowedChildViewControllersForUnwindingFromSource :: proc(self: ^ViewController, source: ^StoryboardUnwindSegueSource) -> ^NS.Array ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerContainingSegueSource:", objc_name="childViewControllerContainingSegueSource")
+	ViewController_childViewControllerContainingSegueSource :: proc(self: ^ViewController, source: ^StoryboardUnwindSegueSource) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="viewControllerForUnwindSegueAction:fromViewController:withSender:", objc_name="viewControllerForUnwindSegueAction")
+	ViewController_viewControllerForUnwindSegueAction :: proc(self: ^ViewController, action: SEL, fromViewController: ^ViewController, sender: id) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="unwindForSegue:towardsViewController:", objc_name="unwindForSegue")
+	ViewController_unwindForSegue :: proc(self: ^ViewController, unwindSegue: ^StoryboardSegue, subsequentVC: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="segueForUnwindingToViewController:fromViewController:identifier:", objc_name="segueForUnwindingToViewController")
+	ViewController_segueForUnwindingToViewController :: proc(self: ^ViewController, toViewController: ^ViewController, fromViewController: ^ViewController, identifier: ^NS.String) -> ^StoryboardSegue ---
+
+	@(objc_type=ViewController, objc_selector="viewWillAppear:", objc_name="viewWillAppear")
+	ViewController_viewWillAppear :: proc(self: ^ViewController, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="viewIsAppearing:", objc_name="viewIsAppearing")
+	ViewController_viewIsAppearing :: proc(self: ^ViewController, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidAppear:", objc_name="viewDidAppear")
+	ViewController_viewDidAppear :: proc(self: ^ViewController, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="viewWillDisappear:", objc_name="viewWillDisappear")
+	ViewController_viewWillDisappear :: proc(self: ^ViewController, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidDisappear:", objc_name="viewDidDisappear")
+	ViewController_viewDidDisappear :: proc(self: ^ViewController, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateProperties", objc_name="setNeedsUpdateProperties")
+	ViewController_setNeedsUpdateProperties :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="updateProperties", objc_name="updateProperties")
+	ViewController_updateProperties :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="updatePropertiesIfNeeded", objc_name="updatePropertiesIfNeeded")
+	ViewController_updatePropertiesIfNeeded :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewWillLayoutSubviews", objc_name="viewWillLayoutSubviews")
+	ViewController_viewWillLayoutSubviews :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidLayoutSubviews", objc_name="viewDidLayoutSubviews")
+	ViewController_viewDidLayoutSubviews :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="didReceiveMemoryWarning", objc_name="didReceiveMemoryWarning")
+	ViewController_didReceiveMemoryWarning :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="presentViewController:animated:completion:", objc_name="presentViewController")
+	ViewController_presentViewController :: proc(self: ^ViewController, viewControllerToPresent: ^ViewController, flag: bool, completion: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ViewController, objc_selector="dismissViewControllerAnimated:completion:", objc_name="dismissViewControllerAnimated")
+	ViewController_dismissViewControllerAnimated :: proc(self: ^ViewController, flag: bool, completion: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ViewController, objc_selector="presentModalViewController:animated:", objc_name="presentModalViewController")
+	ViewController_presentModalViewController :: proc(self: ^ViewController, modalViewController: ^ViewController, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="dismissModalViewControllerAnimated:", objc_name="dismissModalViewControllerAnimated")
+	ViewController_dismissModalViewControllerAnimated :: proc(self: ^ViewController, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="setContentScrollView:forEdge:", objc_name="setContentScrollView")
+	ViewController_setContentScrollView :: proc(self: ^ViewController, scrollView: ^ScrollView, edge: NSDirectionalRectEdge) ---
+
+	@(objc_type=ViewController, objc_selector="contentScrollViewForEdge:", objc_name="contentScrollViewForEdge")
+	ViewController_contentScrollViewForEdge :: proc(self: ^ViewController, edge: NSDirectionalRectEdge) -> ^ScrollView ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsStatusBarAppearanceUpdate", objc_name="setNeedsStatusBarAppearanceUpdate")
+	ViewController_setNeedsStatusBarAppearanceUpdate :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="targetViewControllerForAction:sender:", objc_name="targetViewControllerForAction")
+	ViewController_targetViewControllerForAction :: proc(self: ^ViewController, action: SEL, sender: id) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="showViewController:sender:", objc_name="showViewController")
+	ViewController_showViewController :: proc(self: ^ViewController, vc: ^ViewController, sender: id) ---
+
+	@(objc_type=ViewController, objc_selector="showDetailViewController:sender:", objc_name="showDetailViewController")
+	ViewController_showDetailViewController :: proc(self: ^ViewController, vc: ^ViewController, sender: id) ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUserInterfaceAppearanceUpdate", objc_name="setNeedsUserInterfaceAppearanceUpdate")
+	ViewController_setNeedsUserInterfaceAppearanceUpdate :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="view", objc_name="view")
+	ViewController_view :: proc(self: ^ViewController) -> ^View ---
+
+	@(objc_type=ViewController, objc_selector="setView:", objc_name="setView")
+	ViewController_setView :: proc(self: ^ViewController, view: ^View) ---
+
+	@(objc_type=ViewController, objc_selector="viewIfLoaded", objc_name="viewIfLoaded")
+	ViewController_viewIfLoaded :: proc(self: ^ViewController) -> ^View ---
+
+	@(objc_type=ViewController, objc_selector="isViewLoaded", objc_name="isViewLoaded")
+	ViewController_isViewLoaded :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="nibName", objc_name="nibName")
+	ViewController_nibName :: proc(self: ^ViewController) -> ^NS.String ---
+
+	@(objc_type=ViewController, objc_selector="nibBundle", objc_name="nibBundle")
+	ViewController_nibBundle :: proc(self: ^ViewController) -> ^NS.Bundle ---
+
+	@(objc_type=ViewController, objc_selector="storyboard", objc_name="storyboard")
+	ViewController_storyboard :: proc(self: ^ViewController) -> ^Storyboard ---
+
+	@(objc_type=ViewController, objc_selector="title", objc_name="title")
+	ViewController_title :: proc(self: ^ViewController) -> ^NS.String ---
+
+	@(objc_type=ViewController, objc_selector="setTitle:", objc_name="setTitle")
+	ViewController_setTitle :: proc(self: ^ViewController, title: ^NS.String) ---
+
+	@(objc_type=ViewController, objc_selector="parentViewController", objc_name="parentViewController")
+	ViewController_parentViewController :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="modalViewController", objc_name="modalViewController")
+	ViewController_modalViewController :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="presentedViewController", objc_name="presentedViewController")
+	ViewController_presentedViewController :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="presentingViewController", objc_name="presentingViewController")
+	ViewController_presentingViewController :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="definesPresentationContext", objc_name="definesPresentationContext")
+	ViewController_definesPresentationContext :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setDefinesPresentationContext:", objc_name="setDefinesPresentationContext")
+	ViewController_setDefinesPresentationContext :: proc(self: ^ViewController, definesPresentationContext: bool) ---
+
+	@(objc_type=ViewController, objc_selector="providesPresentationContextTransitionStyle", objc_name="providesPresentationContextTransitionStyle")
+	ViewController_providesPresentationContextTransitionStyle :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setProvidesPresentationContextTransitionStyle:", objc_name="setProvidesPresentationContextTransitionStyle")
+	ViewController_setProvidesPresentationContextTransitionStyle :: proc(self: ^ViewController, providesPresentationContextTransitionStyle: bool) ---
+
+	@(objc_type=ViewController, objc_selector="restoresFocusAfterTransition", objc_name="restoresFocusAfterTransition")
+	ViewController_restoresFocusAfterTransition :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setRestoresFocusAfterTransition:", objc_name="setRestoresFocusAfterTransition")
+	ViewController_setRestoresFocusAfterTransition :: proc(self: ^ViewController, restoresFocusAfterTransition: bool) ---
+
+	@(objc_type=ViewController, objc_selector="focusGroupIdentifier", objc_name="focusGroupIdentifier")
+	ViewController_focusGroupIdentifier :: proc(self: ^ViewController) -> ^NS.String ---
+
+	@(objc_type=ViewController, objc_selector="setFocusGroupIdentifier:", objc_name="setFocusGroupIdentifier")
+	ViewController_setFocusGroupIdentifier :: proc(self: ^ViewController, focusGroupIdentifier: ^NS.String) ---
+
+	@(objc_type=ViewController, objc_selector="interactionActivityTrackingBaseName", objc_name="interactionActivityTrackingBaseName")
+	ViewController_interactionActivityTrackingBaseName :: proc(self: ^ViewController) -> ^NS.String ---
+
+	@(objc_type=ViewController, objc_selector="setInteractionActivityTrackingBaseName:", objc_name="setInteractionActivityTrackingBaseName")
+	ViewController_setInteractionActivityTrackingBaseName :: proc(self: ^ViewController, interactionActivityTrackingBaseName: ^NS.String) ---
+
+	@(objc_type=ViewController, objc_selector="isBeingPresented", objc_name="isBeingPresented")
+	ViewController_isBeingPresented :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="isBeingDismissed", objc_name="isBeingDismissed")
+	ViewController_isBeingDismissed :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="isMovingToParentViewController", objc_name="isMovingToParentViewController")
+	ViewController_isMovingToParentViewController :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="isMovingFromParentViewController", objc_name="isMovingFromParentViewController")
+	ViewController_isMovingFromParentViewController :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="modalTransitionStyle", objc_name="modalTransitionStyle")
+	ViewController_modalTransitionStyle :: proc(self: ^ViewController) -> ModalTransitionStyle ---
+
+	@(objc_type=ViewController, objc_selector="setModalTransitionStyle:", objc_name="setModalTransitionStyle")
+	ViewController_setModalTransitionStyle :: proc(self: ^ViewController, modalTransitionStyle: ModalTransitionStyle) ---
+
+	@(objc_type=ViewController, objc_selector="preferredTransition", objc_name="preferredTransition")
+	ViewController_preferredTransition :: proc(self: ^ViewController) -> ^ViewControllerTransition ---
+
+	@(objc_type=ViewController, objc_selector="setPreferredTransition:", objc_name="setPreferredTransition")
+	ViewController_setPreferredTransition :: proc(self: ^ViewController, preferredTransition: ^ViewControllerTransition) ---
+
+	@(objc_type=ViewController, objc_selector="modalPresentationStyle", objc_name="modalPresentationStyle")
+	ViewController_modalPresentationStyle :: proc(self: ^ViewController) -> ModalPresentationStyle ---
+
+	@(objc_type=ViewController, objc_selector="setModalPresentationStyle:", objc_name="setModalPresentationStyle")
+	ViewController_setModalPresentationStyle :: proc(self: ^ViewController, modalPresentationStyle: ModalPresentationStyle) ---
+
+	@(objc_type=ViewController, objc_selector="modalPresentationCapturesStatusBarAppearance", objc_name="modalPresentationCapturesStatusBarAppearance")
+	ViewController_modalPresentationCapturesStatusBarAppearance :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setModalPresentationCapturesStatusBarAppearance:", objc_name="setModalPresentationCapturesStatusBarAppearance")
+	ViewController_setModalPresentationCapturesStatusBarAppearance :: proc(self: ^ViewController, modalPresentationCapturesStatusBarAppearance: bool) ---
+
+	@(objc_type=ViewController, objc_selector="disablesAutomaticKeyboardDismissal", objc_name="disablesAutomaticKeyboardDismissal")
+	ViewController_disablesAutomaticKeyboardDismissal :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="wantsFullScreenLayout", objc_name="wantsFullScreenLayout")
+	ViewController_wantsFullScreenLayout :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setWantsFullScreenLayout:", objc_name="setWantsFullScreenLayout")
+	ViewController_setWantsFullScreenLayout :: proc(self: ^ViewController, wantsFullScreenLayout: bool) ---
+
+	@(objc_type=ViewController, objc_selector="edgesForExtendedLayout", objc_name="edgesForExtendedLayout")
+	ViewController_edgesForExtendedLayout :: proc(self: ^ViewController) -> RectEdge ---
+
+	@(objc_type=ViewController, objc_selector="setEdgesForExtendedLayout:", objc_name="setEdgesForExtendedLayout")
+	ViewController_setEdgesForExtendedLayout :: proc(self: ^ViewController, edgesForExtendedLayout: RectEdge) ---
+
+	@(objc_type=ViewController, objc_selector="extendedLayoutIncludesOpaqueBars", objc_name="extendedLayoutIncludesOpaqueBars")
+	ViewController_extendedLayoutIncludesOpaqueBars :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setExtendedLayoutIncludesOpaqueBars:", objc_name="setExtendedLayoutIncludesOpaqueBars")
+	ViewController_setExtendedLayoutIncludesOpaqueBars :: proc(self: ^ViewController, extendedLayoutIncludesOpaqueBars: bool) ---
+
+	@(objc_type=ViewController, objc_selector="automaticallyAdjustsScrollViewInsets", objc_name="automaticallyAdjustsScrollViewInsets")
+	ViewController_automaticallyAdjustsScrollViewInsets :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setAutomaticallyAdjustsScrollViewInsets:", objc_name="setAutomaticallyAdjustsScrollViewInsets")
+	ViewController_setAutomaticallyAdjustsScrollViewInsets :: proc(self: ^ViewController, automaticallyAdjustsScrollViewInsets: bool) ---
+
+	@(objc_type=ViewController, objc_selector="preferredContentSize", objc_name="preferredContentSize")
+	ViewController_preferredContentSize :: proc(self: ^ViewController) -> CG.Size ---
+
+	@(objc_type=ViewController, objc_selector="setPreferredContentSize:", objc_name="setPreferredContentSize")
+	ViewController_setPreferredContentSize :: proc(self: ^ViewController, preferredContentSize: CG.Size) ---
+
+	@(objc_type=ViewController, objc_selector="preferredStatusBarStyle", objc_name="preferredStatusBarStyle")
+	ViewController_preferredStatusBarStyle :: proc(self: ^ViewController) -> StatusBarStyle ---
+
+	@(objc_type=ViewController, objc_selector="prefersStatusBarHidden", objc_name="prefersStatusBarHidden")
+	ViewController_prefersStatusBarHidden :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="preferredStatusBarUpdateAnimation", objc_name="preferredStatusBarUpdateAnimation")
+	ViewController_preferredStatusBarUpdateAnimation :: proc(self: ^ViewController) -> StatusBarAnimation ---
+
+	@(objc_type=ViewController, objc_selector="preferredUserInterfaceStyle", objc_name="preferredUserInterfaceStyle")
+	ViewController_preferredUserInterfaceStyle :: proc(self: ^ViewController) -> UserInterfaceStyle ---
+
+	@(objc_type=ViewController, objc_selector="overrideUserInterfaceStyle", objc_name="overrideUserInterfaceStyle")
+	ViewController_overrideUserInterfaceStyle :: proc(self: ^ViewController) -> UserInterfaceStyle ---
+
+	@(objc_type=ViewController, objc_selector="setOverrideUserInterfaceStyle:", objc_name="setOverrideUserInterfaceStyle")
+	ViewController_setOverrideUserInterfaceStyle :: proc(self: ^ViewController, overrideUserInterfaceStyle: UserInterfaceStyle) ---
+
+	@(objc_type=ViewController, objc_selector="attemptRotationToDeviceOrientation", objc_name="attemptRotationToDeviceOrientation", objc_is_class_method=true)
+	ViewController_attemptRotationToDeviceOrientation :: proc() ---
+
+	@(objc_type=ViewController, objc_selector="shouldAutorotateToInterfaceOrientation:", objc_name="shouldAutorotateToInterfaceOrientation")
+	ViewController_shouldAutorotateToInterfaceOrientation :: proc(self: ^ViewController, toInterfaceOrientation: InterfaceOrientation) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateOfSupportedInterfaceOrientations", objc_name="setNeedsUpdateOfSupportedInterfaceOrientations")
+	ViewController_setNeedsUpdateOfSupportedInterfaceOrientations :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="rotatingHeaderView", objc_name="rotatingHeaderView")
+	ViewController_rotatingHeaderView :: proc(self: ^ViewController) -> ^View ---
+
+	@(objc_type=ViewController, objc_selector="rotatingFooterView", objc_name="rotatingFooterView")
+	ViewController_rotatingFooterView :: proc(self: ^ViewController) -> ^View ---
+
+	@(objc_type=ViewController, objc_selector="willRotateToInterfaceOrientation:duration:", objc_name="willRotateToInterfaceOrientation")
+	ViewController_willRotateToInterfaceOrientation :: proc(self: ^ViewController, toInterfaceOrientation: InterfaceOrientation, duration: NS.TimeInterval) ---
+
+	@(objc_type=ViewController, objc_selector="didRotateFromInterfaceOrientation:", objc_name="didRotateFromInterfaceOrientation")
+	ViewController_didRotateFromInterfaceOrientation :: proc(self: ^ViewController, fromInterfaceOrientation: InterfaceOrientation) ---
+
+	@(objc_type=ViewController, objc_selector="willAnimateRotationToInterfaceOrientation:duration:", objc_name="willAnimateRotationToInterfaceOrientation")
+	ViewController_willAnimateRotationToInterfaceOrientation :: proc(self: ^ViewController, toInterfaceOrientation: InterfaceOrientation, duration: NS.TimeInterval) ---
+
+	@(objc_type=ViewController, objc_selector="willAnimateFirstHalfOfRotationToInterfaceOrientation:duration:", objc_name="willAnimateFirstHalfOfRotationToInterfaceOrientation")
+	ViewController_willAnimateFirstHalfOfRotationToInterfaceOrientation :: proc(self: ^ViewController, toInterfaceOrientation: InterfaceOrientation, duration: NS.TimeInterval) ---
+
+	@(objc_type=ViewController, objc_selector="didAnimateFirstHalfOfRotationToInterfaceOrientation:", objc_name="didAnimateFirstHalfOfRotationToInterfaceOrientation")
+	ViewController_didAnimateFirstHalfOfRotationToInterfaceOrientation :: proc(self: ^ViewController, toInterfaceOrientation: InterfaceOrientation) ---
+
+	@(objc_type=ViewController, objc_selector="willAnimateSecondHalfOfRotationFromInterfaceOrientation:duration:", objc_name="willAnimateSecondHalfOfRotationFromInterfaceOrientation")
+	ViewController_willAnimateSecondHalfOfRotationFromInterfaceOrientation :: proc(self: ^ViewController, fromInterfaceOrientation: InterfaceOrientation, duration: NS.TimeInterval) ---
+
+	@(objc_type=ViewController, objc_selector="shouldAutorotate", objc_name="shouldAutorotate")
+	ViewController_shouldAutorotate :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="supportedInterfaceOrientations", objc_name="supportedInterfaceOrientations")
+	ViewController_supportedInterfaceOrientations :: proc(self: ^ViewController) -> InterfaceOrientationMask ---
+
+	@(objc_type=ViewController, objc_selector="preferredInterfaceOrientationForPresentation", objc_name="preferredInterfaceOrientationForPresentation")
+	ViewController_preferredInterfaceOrientationForPresentation :: proc(self: ^ViewController) -> InterfaceOrientation ---
+
+	@(objc_type=ViewController, objc_selector="interfaceOrientation", objc_name="interfaceOrientation")
+	ViewController_interfaceOrientation :: proc(self: ^ViewController) -> InterfaceOrientation ---
+
+	@(objc_type=ViewController, objc_selector="setEditing:animated:", objc_name="setEditing_animated")
+	ViewController_setEditing_animated :: proc(self: ^ViewController, editing: bool, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="isEditing", objc_name="isEditing")
+	ViewController_isEditing :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setEditing:", objc_name="setEditing_")
+	ViewController_setEditing_ :: proc(self: ^ViewController, editing: bool) ---
+
+	@(objc_type=ViewController, objc_selector="editButtonItem", objc_name="editButtonItem")
+	ViewController_editButtonItem :: proc(self: ^ViewController) -> ^BarButtonItem ---
+
+	@(objc_type=ViewController, objc_selector="searchDisplayController", objc_name="searchDisplayController")
+	ViewController_searchDisplayController :: proc(self: ^ViewController) -> ^SearchDisplayController ---
+
+	@(objc_type=ViewController, objc_selector="addChildViewController:", objc_name="addChildViewController")
+	ViewController_addChildViewController :: proc(self: ^ViewController, childController: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="removeFromParentViewController", objc_name="removeFromParentViewController")
+	ViewController_removeFromParentViewController :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="transitionFromViewController:toViewController:duration:options:animations:completion:", objc_name="transitionFromViewController")
+	ViewController_transitionFromViewController :: proc(self: ^ViewController, fromViewController: ^ViewController, toViewController: ^ViewController, duration: NS.TimeInterval, options: ViewAnimationOptions, animations: ^Objc_Block(proc "c" ()), completion: ^Objc_Block(proc "c" ( finished: bool ))) ---
+
+	@(objc_type=ViewController, objc_selector="beginAppearanceTransition:animated:", objc_name="beginAppearanceTransition")
+	ViewController_beginAppearanceTransition :: proc(self: ^ViewController, isAppearing: bool, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="endAppearanceTransition", objc_name="endAppearanceTransition")
+	ViewController_endAppearanceTransition :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="setOverrideTraitCollection:forChildViewController:", objc_name="setOverrideTraitCollection")
+	ViewController_setOverrideTraitCollection :: proc(self: ^ViewController, collection: ^TraitCollection, childViewController: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="overrideTraitCollectionForChildViewController:", objc_name="overrideTraitCollectionForChildViewController")
+	ViewController_overrideTraitCollectionForChildViewController :: proc(self: ^ViewController, childViewController: ^ViewController) -> ^TraitCollection ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllers", objc_name="childViewControllers")
+	ViewController_childViewControllers :: proc(self: ^ViewController) -> ^NS.Array ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForStatusBarStyle", objc_name="childViewControllerForStatusBarStyle")
+	ViewController_childViewControllerForStatusBarStyle :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForStatusBarHidden", objc_name="childViewControllerForStatusBarHidden")
+	ViewController_childViewControllerForStatusBarHidden :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForUserInterfaceStyle", objc_name="childViewControllerForUserInterfaceStyle")
+	ViewController_childViewControllerForUserInterfaceStyle :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="automaticallyForwardAppearanceAndRotationMethodsToChildViewControllers", objc_name="automaticallyForwardAppearanceAndRotationMethodsToChildViewControllers")
+	ViewController_automaticallyForwardAppearanceAndRotationMethodsToChildViewControllers :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="shouldAutomaticallyForwardRotationMethods", objc_name="shouldAutomaticallyForwardRotationMethods")
+	ViewController_shouldAutomaticallyForwardRotationMethods :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="willMoveToParentViewController:", objc_name="willMoveToParentViewController")
+	ViewController_willMoveToParentViewController :: proc(self: ^ViewController, parent: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="didMoveToParentViewController:", objc_name="didMoveToParentViewController")
+	ViewController_didMoveToParentViewController :: proc(self: ^ViewController, parent: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="shouldAutomaticallyForwardAppearanceMethods", objc_name="shouldAutomaticallyForwardAppearanceMethods")
+	ViewController_shouldAutomaticallyForwardAppearanceMethods :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="encodeRestorableStateWithCoder:", objc_name="encodeRestorableStateWithCoder")
+	ViewController_encodeRestorableStateWithCoder :: proc(self: ^ViewController, coder: ^NS.Coder) ---
+
+	@(objc_type=ViewController, objc_selector="decodeRestorableStateWithCoder:", objc_name="decodeRestorableStateWithCoder")
+	ViewController_decodeRestorableStateWithCoder :: proc(self: ^ViewController, coder: ^NS.Coder) ---
+
+	@(objc_type=ViewController, objc_selector="applicationFinishedRestoringState", objc_name="applicationFinishedRestoringState")
+	ViewController_applicationFinishedRestoringState :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="restorationIdentifier", objc_name="restorationIdentifier")
+	ViewController_restorationIdentifier :: proc(self: ^ViewController) -> ^NS.String ---
+
+	@(objc_type=ViewController, objc_selector="setRestorationIdentifier:", objc_name="setRestorationIdentifier")
+	ViewController_setRestorationIdentifier :: proc(self: ^ViewController, restorationIdentifier: ^NS.String) ---
+
+	@(objc_type=ViewController, objc_selector="restorationClass", objc_name="restorationClass")
+	ViewController_restorationClass :: proc(self: ^ViewController) -> ^Class ---
+
+	@(objc_type=ViewController, objc_selector="setRestorationClass:", objc_name="setRestorationClass")
+	ViewController_setRestorationClass :: proc(self: ^ViewController, restorationClass: ^Class) ---
+
+	@(objc_type=ViewController, objc_selector="updateViewConstraints", objc_name="updateViewConstraints")
+	ViewController_updateViewConstraints :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="transitioningDelegate", objc_name="transitioningDelegate")
+	ViewController_transitioningDelegate :: proc(self: ^ViewController) -> ^ViewControllerTransitioningDelegate ---
+
+	@(objc_type=ViewController, objc_selector="setTransitioningDelegate:", objc_name="setTransitioningDelegate")
+	ViewController_setTransitioningDelegate :: proc(self: ^ViewController, transitioningDelegate: ^ViewControllerTransitioningDelegate) ---
+
+	@(objc_type=ViewController, objc_selector="viewLayoutMarginsDidChange", objc_name="viewLayoutMarginsDidChange")
+	ViewController_viewLayoutMarginsDidChange :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewSafeAreaInsetsDidChange", objc_name="viewSafeAreaInsetsDidChange")
+	ViewController_viewSafeAreaInsetsDidChange :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="topLayoutGuide", objc_name="topLayoutGuide")
+	ViewController_topLayoutGuide :: proc(self: ^ViewController) -> ^LayoutSupport ---
+
+	@(objc_type=ViewController, objc_selector="bottomLayoutGuide", objc_name="bottomLayoutGuide")
+	ViewController_bottomLayoutGuide :: proc(self: ^ViewController) -> ^LayoutSupport ---
+
+	@(objc_type=ViewController, objc_selector="additionalSafeAreaInsets", objc_name="additionalSafeAreaInsets")
+	ViewController_additionalSafeAreaInsets :: proc(self: ^ViewController) -> EdgeInsets ---
+
+	@(objc_type=ViewController, objc_selector="setAdditionalSafeAreaInsets:", objc_name="setAdditionalSafeAreaInsets")
+	ViewController_setAdditionalSafeAreaInsets :: proc(self: ^ViewController, additionalSafeAreaInsets: EdgeInsets) ---
+
+	@(objc_type=ViewController, objc_selector="systemMinimumLayoutMargins", objc_name="systemMinimumLayoutMargins")
+	ViewController_systemMinimumLayoutMargins :: proc(self: ^ViewController) -> NSDirectionalEdgeInsets ---
+
+	@(objc_type=ViewController, objc_selector="viewRespectsSystemMinimumLayoutMargins", objc_name="viewRespectsSystemMinimumLayoutMargins")
+	ViewController_viewRespectsSystemMinimumLayoutMargins :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setViewRespectsSystemMinimumLayoutMargins:", objc_name="setViewRespectsSystemMinimumLayoutMargins")
+	ViewController_setViewRespectsSystemMinimumLayoutMargins :: proc(self: ^ViewController, viewRespectsSystemMinimumLayoutMargins: bool) ---
+
+	@(objc_type=ViewController, objc_selector="addKeyCommand:", objc_name="addKeyCommand")
+	ViewController_addKeyCommand :: proc(self: ^ViewController, keyCommand: ^KeyCommand) ---
+
+	@(objc_type=ViewController, objc_selector="removeKeyCommand:", objc_name="removeKeyCommand")
+	ViewController_removeKeyCommand :: proc(self: ^ViewController, keyCommand: ^KeyCommand) ---
+
+	@(objc_type=ViewController, objc_selector="performsActionsWhilePresentingModally", objc_name="performsActionsWhilePresentingModally")
+	ViewController_performsActionsWhilePresentingModally :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="extensionContext", objc_name="extensionContext")
+	ViewController_extensionContext :: proc(self: ^ViewController) -> ^NS.ExtensionContext ---
+
+	@(objc_type=ViewController, objc_selector="presentationController", objc_name="presentationController")
+	ViewController_presentationController :: proc(self: ^ViewController) -> ^PresentationController ---
+
+	@(objc_type=ViewController, objc_selector="sheetPresentationController", objc_name="sheetPresentationController")
+	ViewController_sheetPresentationController :: proc(self: ^ViewController) -> ^SheetPresentationController ---
+
+	@(objc_type=ViewController, objc_selector="popoverPresentationController", objc_name="popoverPresentationController")
+	ViewController_popoverPresentationController :: proc(self: ^ViewController) -> ^PopoverPresentationController ---
+
+	@(objc_type=ViewController, objc_selector="activePresentationController", objc_name="activePresentationController")
+	ViewController_activePresentationController :: proc(self: ^ViewController) -> ^PresentationController ---
+
+	@(objc_type=ViewController, objc_selector="isModalInPresentation", objc_name="isModalInPresentation")
+	ViewController_isModalInPresentation :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setModalInPresentation:", objc_name="setModalInPresentation")
+	ViewController_setModalInPresentation :: proc(self: ^ViewController, modalInPresentation: bool) ---
+
+	@(objc_type=ViewController, objc_selector="registerForPreviewingWithDelegate:sourceView:", objc_name="registerForPreviewingWithDelegate")
+	ViewController_registerForPreviewingWithDelegate :: proc(self: ^ViewController, delegate: ^ViewControllerPreviewingDelegate, sourceView: ^View) -> ^ViewControllerPreviewing ---
+
+	@(objc_type=ViewController, objc_selector="unregisterForPreviewingWithContext:", objc_name="unregisterForPreviewingWithContext")
+	ViewController_unregisterForPreviewingWithContext :: proc(self: ^ViewController, previewing: ^ViewControllerPreviewing) ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateOfScreenEdgesDeferringSystemGestures", objc_name="setNeedsUpdateOfScreenEdgesDeferringSystemGestures")
+	ViewController_setNeedsUpdateOfScreenEdgesDeferringSystemGestures :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForScreenEdgesDeferringSystemGestures", objc_name="childViewControllerForScreenEdgesDeferringSystemGestures")
+	ViewController_childViewControllerForScreenEdgesDeferringSystemGestures :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="preferredScreenEdgesDeferringSystemGestures", objc_name="preferredScreenEdgesDeferringSystemGestures")
+	ViewController_preferredScreenEdgesDeferringSystemGestures :: proc(self: ^ViewController) -> RectEdge ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateOfHomeIndicatorAutoHidden", objc_name="setNeedsUpdateOfHomeIndicatorAutoHidden")
+	ViewController_setNeedsUpdateOfHomeIndicatorAutoHidden :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForHomeIndicatorAutoHidden", objc_name="childViewControllerForHomeIndicatorAutoHidden")
+	ViewController_childViewControllerForHomeIndicatorAutoHidden :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="prefersHomeIndicatorAutoHidden", objc_name="prefersHomeIndicatorAutoHidden")
+	ViewController_prefersHomeIndicatorAutoHidden :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateOfPrefersPointerLocked", objc_name="setNeedsUpdateOfPrefersPointerLocked")
+	ViewController_setNeedsUpdateOfPrefersPointerLocked :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForPointerLock", objc_name="childViewControllerForPointerLock")
+	ViewController_childViewControllerForPointerLock :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="prefersPointerLocked", objc_name="prefersPointerLocked")
+	ViewController_prefersPointerLocked :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="contentUnavailableConfiguration", objc_name="contentUnavailableConfiguration")
+	ViewController_contentUnavailableConfiguration :: proc(self: ^ViewController) -> ^ContentConfiguration ---
+
+	@(objc_type=ViewController, objc_selector="setContentUnavailableConfiguration:", objc_name="setContentUnavailableConfiguration")
+	ViewController_setContentUnavailableConfiguration :: proc(self: ^ViewController, contentUnavailableConfiguration: ^ContentConfiguration) ---
+
+	@(objc_type=ViewController, objc_selector="contentUnavailableConfigurationState", objc_name="contentUnavailableConfigurationState")
+	ViewController_contentUnavailableConfigurationState :: proc(self: ^ViewController) -> ^ContentUnavailableConfigurationState ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateContentUnavailableConfiguration", objc_name="setNeedsUpdateContentUnavailableConfiguration")
+	ViewController_setNeedsUpdateContentUnavailableConfiguration :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="updateContentUnavailableConfigurationUsingState:", objc_name="updateContentUnavailableConfigurationUsingState")
+	ViewController_updateContentUnavailableConfigurationUsingState :: proc(self: ^ViewController, state: ^ContentUnavailableConfigurationState) ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForInterfaceOrientationLock", objc_name="childViewControllerForInterfaceOrientationLock")
+	ViewController_childViewControllerForInterfaceOrientationLock :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="prefersInterfaceOrientationLocked", objc_name="prefersInterfaceOrientationLocked")
+	ViewController_prefersInterfaceOrientationLocked :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateOfPrefersInterfaceOrientationLocked", objc_name="setNeedsUpdateOfPrefersInterfaceOrientationLocked")
+	ViewController_setNeedsUpdateOfPrefersInterfaceOrientationLocked :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="previewActionItems", objc_name="previewActionItems")
+	ViewController_previewActionItems :: proc(self: ^ViewController) -> ^NS.Array ---
+
+	@(objc_type=ViewController, objc_selector="traitOverrides", objc_name="traitOverrides")
+	ViewController_traitOverrides :: proc(self: ^ViewController) -> ^TraitOverrides ---
+
+	@(objc_type=ViewController, objc_selector="updateTraitsIfNeeded", objc_name="updateTraitsIfNeeded")
+	ViewController_updateTraitsIfNeeded :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="preferredContainerBackgroundStyle", objc_name="preferredContainerBackgroundStyle")
+	ViewController_preferredContainerBackgroundStyle :: proc(self: ^ViewController) -> ContainerBackgroundStyle ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllerForPreferredContainerBackgroundStyle", objc_name="childViewControllerForPreferredContainerBackgroundStyle")
+	ViewController_childViewControllerForPreferredContainerBackgroundStyle :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="setNeedsUpdateOfPreferredContainerBackgroundStyle", objc_name="setNeedsUpdateOfPreferredContainerBackgroundStyle")
+	ViewController_setNeedsUpdateOfPreferredContainerBackgroundStyle :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="navigationItem", objc_name="navigationItem")
+	ViewController_navigationItem :: proc(self: ^ViewController) -> ^NavigationItem ---
+
+	@(objc_type=ViewController, objc_selector="hidesBottomBarWhenPushed", objc_name="hidesBottomBarWhenPushed")
+	ViewController_hidesBottomBarWhenPushed :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setHidesBottomBarWhenPushed:", objc_name="setHidesBottomBarWhenPushed")
+	ViewController_setHidesBottomBarWhenPushed :: proc(self: ^ViewController, hidesBottomBarWhenPushed: bool) ---
+
+	@(objc_type=ViewController, objc_selector="navigationController", objc_name="navigationController")
+	ViewController_navigationController :: proc(self: ^ViewController) -> ^NavigationController ---
+
+	@(objc_type=ViewController, objc_selector="setToolbarItems:animated:", objc_name="setToolbarItems_animated")
+	ViewController_setToolbarItems_animated :: proc(self: ^ViewController, toolbarItems: ^NS.Array, animated: bool) ---
+
+	@(objc_type=ViewController, objc_selector="toolbarItems", objc_name="toolbarItems")
+	ViewController_toolbarItems :: proc(self: ^ViewController) -> ^NS.Array ---
+
+	@(objc_type=ViewController, objc_selector="setToolbarItems:", objc_name="setToolbarItems_")
+	ViewController_setToolbarItems_ :: proc(self: ^ViewController, toolbarItems: ^NS.Array) ---
+
+	@(objc_type=ViewController, objc_selector="isModalInPopover", objc_name="isModalInPopover")
+	ViewController_isModalInPopover :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="setModalInPopover:", objc_name="setModalInPopover")
+	ViewController_setModalInPopover :: proc(self: ^ViewController, modalInPopover: bool) ---
+
+	@(objc_type=ViewController, objc_selector="contentSizeForViewInPopover", objc_name="contentSizeForViewInPopover")
+	ViewController_contentSizeForViewInPopover :: proc(self: ^ViewController) -> CG.Size ---
+
+	@(objc_type=ViewController, objc_selector="setContentSizeForViewInPopover:", objc_name="setContentSizeForViewInPopover")
+	ViewController_setContentSizeForViewInPopover :: proc(self: ^ViewController, contentSizeForViewInPopover: CG.Size) ---
+
+	@(objc_type=ViewController, objc_selector="transitionCoordinator", objc_name="transitionCoordinator")
+	ViewController_transitionCoordinator :: proc(self: ^ViewController) -> ^ViewControllerTransitionCoordinator ---
+
+	@(objc_type=ViewController, objc_selector="collapseSecondaryViewController:forSplitViewController:", objc_name="collapseSecondaryViewController")
+	ViewController_collapseSecondaryViewController :: proc(self: ^ViewController, secondaryViewController: ^ViewController, splitViewController: ^SplitViewController) ---
+
+	@(objc_type=ViewController, objc_selector="separateSecondaryViewControllerForSplitViewController:", objc_name="separateSecondaryViewControllerForSplitViewController")
+	ViewController_separateSecondaryViewControllerForSplitViewController :: proc(self: ^ViewController, splitViewController: ^SplitViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="splitViewController", objc_name="splitViewController")
+	ViewController_splitViewController :: proc(self: ^ViewController) -> ^SplitViewController ---
+
+	@(objc_type=ViewController, objc_selector="tabBarItem", objc_name="tabBarItem")
+	ViewController_tabBarItem :: proc(self: ^ViewController) -> ^TabBarItem ---
+
+	@(objc_type=ViewController, objc_selector="setTabBarItem:", objc_name="setTabBarItem")
+	ViewController_setTabBarItem :: proc(self: ^ViewController, tabBarItem: ^TabBarItem) ---
+
+	@(objc_type=ViewController, objc_selector="tabBarController", objc_name="tabBarController")
+	ViewController_tabBarController :: proc(self: ^ViewController) -> ^TabBarController ---
+
+	@(objc_type=ViewController, objc_selector="tabBarObservedScrollView", objc_name="tabBarObservedScrollView")
+	ViewController_tabBarObservedScrollView :: proc(self: ^ViewController) -> ^ScrollView ---
+
+	@(objc_type=ViewController, objc_selector="setTabBarObservedScrollView:", objc_name="setTabBarObservedScrollView")
+	ViewController_setTabBarObservedScrollView :: proc(self: ^ViewController, tabBarObservedScrollView: ^ScrollView) ---
+
+	@(objc_type=ViewController, objc_selector="tab", objc_name="tab")
+	ViewController_tab :: proc(self: ^ViewController) -> ^Tab ---
+}
+
+@(objc_type=ViewController, objc_name="setEditing")
+ViewController_setEditing :: proc {
+	ViewController_setEditing_animated,
+	ViewController_setEditing_,
+}
+
+@(objc_type=ViewController, objc_name="setToolbarItems")
+ViewController_setToolbarItems :: proc {
+	ViewController_setToolbarItems_animated,
+	ViewController_setToolbarItems_,
+}
+
+
+@(objc_class="UIViewControllerAnimatedTransitioning")
+ViewControllerAnimatedTransitioning :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerAnimatedTransitioning, objc_selector="transitionDuration:", objc_name="transitionDuration")
+	ViewControllerAnimatedTransitioning_transitionDuration :: proc(self: ^ViewControllerAnimatedTransitioning, transitionContext: ^ViewControllerContextTransitioning) -> NS.TimeInterval ---
+
+	@(objc_type=ViewControllerAnimatedTransitioning, objc_selector="animateTransition:", objc_name="animateTransition")
+	ViewControllerAnimatedTransitioning_animateTransition :: proc(self: ^ViewControllerAnimatedTransitioning, transitionContext: ^ViewControllerContextTransitioning) ---
+
+	@(objc_type=ViewControllerAnimatedTransitioning, objc_selector="interruptibleAnimatorForTransition:", objc_name="interruptibleAnimatorForTransition")
+	ViewControllerAnimatedTransitioning_interruptibleAnimatorForTransition :: proc(self: ^ViewControllerAnimatedTransitioning, transitionContext: ^ViewControllerContextTransitioning) -> ^ViewImplicitlyAnimating ---
+
+	@(objc_type=ViewControllerAnimatedTransitioning, objc_selector="animationEnded:", objc_name="animationEnded")
+	ViewControllerAnimatedTransitioning_animationEnded :: proc(self: ^ViewControllerAnimatedTransitioning, transitionCompleted: bool) ---
+}
+
+
+@(objc_class="UIViewControllerContextTransitioning")
+ViewControllerContextTransitioning :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="updateInteractiveTransition:", objc_name="updateInteractiveTransition")
+	ViewControllerContextTransitioning_updateInteractiveTransition :: proc(self: ^ViewControllerContextTransitioning, percentComplete: CG.Float) ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="finishInteractiveTransition", objc_name="finishInteractiveTransition")
+	ViewControllerContextTransitioning_finishInteractiveTransition :: proc(self: ^ViewControllerContextTransitioning) ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="cancelInteractiveTransition", objc_name="cancelInteractiveTransition")
+	ViewControllerContextTransitioning_cancelInteractiveTransition :: proc(self: ^ViewControllerContextTransitioning) ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="pauseInteractiveTransition", objc_name="pauseInteractiveTransition")
+	ViewControllerContextTransitioning_pauseInteractiveTransition :: proc(self: ^ViewControllerContextTransitioning) ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="completeTransition:", objc_name="completeTransition")
+	ViewControllerContextTransitioning_completeTransition :: proc(self: ^ViewControllerContextTransitioning, didComplete: bool) ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="viewControllerForKey:", objc_name="viewControllerForKey")
+	ViewControllerContextTransitioning_viewControllerForKey :: proc(self: ^ViewControllerContextTransitioning, key: ^NS.String) -> ^ViewController ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="viewForKey:", objc_name="viewForKey")
+	ViewControllerContextTransitioning_viewForKey :: proc(self: ^ViewControllerContextTransitioning, key: ^NS.String) -> ^View ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="initialFrameForViewController:", objc_name="initialFrameForViewController")
+	ViewControllerContextTransitioning_initialFrameForViewController :: proc(self: ^ViewControllerContextTransitioning, vc: ^ViewController) -> CG.Rect ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="finalFrameForViewController:", objc_name="finalFrameForViewController")
+	ViewControllerContextTransitioning_finalFrameForViewController :: proc(self: ^ViewControllerContextTransitioning, vc: ^ViewController) -> CG.Rect ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="containerView", objc_name="containerView")
+	ViewControllerContextTransitioning_containerView :: proc(self: ^ViewControllerContextTransitioning) -> ^View ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="isAnimated", objc_name="isAnimated")
+	ViewControllerContextTransitioning_isAnimated :: proc(self: ^ViewControllerContextTransitioning) -> bool ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="isInteractive", objc_name="isInteractive")
+	ViewControllerContextTransitioning_isInteractive :: proc(self: ^ViewControllerContextTransitioning) -> bool ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="transitionWasCancelled", objc_name="transitionWasCancelled")
+	ViewControllerContextTransitioning_transitionWasCancelled :: proc(self: ^ViewControllerContextTransitioning) -> bool ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="presentationStyle", objc_name="presentationStyle")
+	ViewControllerContextTransitioning_presentationStyle :: proc(self: ^ViewControllerContextTransitioning) -> ModalPresentationStyle ---
+
+	@(objc_type=ViewControllerContextTransitioning, objc_selector="targetTransform", objc_name="targetTransform")
+	ViewControllerContextTransitioning_targetTransform :: proc(self: ^ViewControllerContextTransitioning) -> CG.AffineTransform ---
+}
+
+
+@(objc_class="UIViewControllerInteractiveTransitioning")
+ViewControllerInteractiveTransitioning :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerInteractiveTransitioning, objc_selector="startInteractiveTransition:", objc_name="startInteractiveTransition")
+	ViewControllerInteractiveTransitioning_startInteractiveTransition :: proc(self: ^ViewControllerInteractiveTransitioning, transitionContext: ^ViewControllerContextTransitioning) ---
+
+	@(objc_type=ViewControllerInteractiveTransitioning, objc_selector="completionSpeed", objc_name="completionSpeed")
+	ViewControllerInteractiveTransitioning_completionSpeed :: proc(self: ^ViewControllerInteractiveTransitioning) -> CG.Float ---
+
+	@(objc_type=ViewControllerInteractiveTransitioning, objc_selector="completionCurve", objc_name="completionCurve")
+	ViewControllerInteractiveTransitioning_completionCurve :: proc(self: ^ViewControllerInteractiveTransitioning) -> ViewAnimationCurve ---
+
+	@(objc_type=ViewControllerInteractiveTransitioning, objc_selector="wantsInteractiveStart", objc_name="wantsInteractiveStart")
+	ViewControllerInteractiveTransitioning_wantsInteractiveStart :: proc(self: ^ViewControllerInteractiveTransitioning) -> bool ---
+}
+
+
+@(objc_class="UIViewControllerPreviewing")
+ViewControllerPreviewing :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerPreviewing, objc_selector="previewingGestureRecognizerForFailureRelationship", objc_name="previewingGestureRecognizerForFailureRelationship")
+	ViewControllerPreviewing_previewingGestureRecognizerForFailureRelationship :: proc(self: ^ViewControllerPreviewing) -> ^GestureRecognizer ---
+
+	@(objc_type=ViewControllerPreviewing, objc_selector="delegate", objc_name="delegate")
+	ViewControllerPreviewing_delegate :: proc(self: ^ViewControllerPreviewing) -> ^ViewControllerPreviewingDelegate ---
+
+	@(objc_type=ViewControllerPreviewing, objc_selector="sourceView", objc_name="sourceView")
+	ViewControllerPreviewing_sourceView :: proc(self: ^ViewControllerPreviewing) -> ^View ---
+
+	@(objc_type=ViewControllerPreviewing, objc_selector="sourceRect", objc_name="sourceRect")
+	ViewControllerPreviewing_sourceRect :: proc(self: ^ViewControllerPreviewing) -> CG.Rect ---
+
+	@(objc_type=ViewControllerPreviewing, objc_selector="setSourceRect:", objc_name="setSourceRect")
+	ViewControllerPreviewing_setSourceRect :: proc(self: ^ViewControllerPreviewing, sourceRect: CG.Rect) ---
+}
+
+
+@(objc_class="UIViewControllerPreviewingDelegate")
+ViewControllerPreviewingDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerPreviewingDelegate, objc_selector="previewingContext:viewControllerForLocation:", objc_name="previewingContext_viewControllerForLocation")
+	ViewControllerPreviewingDelegate_previewingContext_viewControllerForLocation :: proc(self: ^ViewControllerPreviewingDelegate, previewingContext: ^ViewControllerPreviewing, location: CG.Point) -> ^ViewController ---
+
+	@(objc_type=ViewControllerPreviewingDelegate, objc_selector="previewingContext:commitViewController:", objc_name="previewingContext_commitViewController")
+	ViewControllerPreviewingDelegate_previewingContext_commitViewController :: proc(self: ^ViewControllerPreviewingDelegate, previewingContext: ^ViewControllerPreviewing, viewControllerToCommit: ^ViewController) ---
+}
+
+@(objc_type=ViewControllerPreviewingDelegate, objc_name="previewingContext")
+ViewControllerPreviewingDelegate_previewingContext :: proc {
+	ViewControllerPreviewingDelegate_previewingContext_viewControllerForLocation,
+	ViewControllerPreviewingDelegate_previewingContext_commitViewController,
+}
+
+
+@(objc_class="UIViewControllerRestoration")
+ViewControllerRestoration :: struct { using _: intrinsics.objc_object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerRestoration, objc_selector="viewControllerWithRestorationIdentifierPath:coder:", objc_name="viewControllerWithRestorationIdentifierPath", objc_is_class_method=true)
+	ViewControllerRestoration_viewControllerWithRestorationIdentifierPath :: proc(identifierComponents: ^NS.Array, coder: ^NS.Coder) -> ^ViewController ---
+}
+
+
+@(objc_class="UIViewControllerTransition", objc_superclass=NS.Object)
+ViewControllerTransition :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerTransition, objc_selector="zoomWithOptions:sourceViewProvider:", objc_name="zoomWithOptions_sourceViewProvider", objc_is_class_method=true)
+	ViewControllerTransition_zoomWithOptions_sourceViewProvider :: proc(options: ^ZoomTransitionOptions, sourceViewProvider: ^Objc_Block(proc "c" ( _0: ^ZoomTransitionSourceViewProviderContext ) -> ^View)) -> instancetype ---
+
+	@(objc_type=ViewControllerTransition, objc_selector="zoomWithOptions:sourceBarButtonItemProvider:", objc_name="zoomWithOptions_sourceBarButtonItemProvider", objc_is_class_method=true)
+	ViewControllerTransition_zoomWithOptions_sourceBarButtonItemProvider :: proc(options: ^ZoomTransitionOptions, sourceBarButtonItemProvider: ^Objc_Block(proc "c" ( _0: ^ZoomTransitionSourceViewProviderContext ) -> ^BarButtonItem)) -> instancetype ---
+
+	@(objc_type=ViewControllerTransition, objc_selector="coverVerticalTransition", objc_name="coverVerticalTransition", objc_is_class_method=true)
+	ViewControllerTransition_coverVerticalTransition :: proc() -> instancetype ---
+
+	@(objc_type=ViewControllerTransition, objc_selector="flipHorizontalTransition", objc_name="flipHorizontalTransition", objc_is_class_method=true)
+	ViewControllerTransition_flipHorizontalTransition :: proc() -> instancetype ---
+
+	@(objc_type=ViewControllerTransition, objc_selector="crossDissolveTransition", objc_name="crossDissolveTransition", objc_is_class_method=true)
+	ViewControllerTransition_crossDissolveTransition :: proc() -> instancetype ---
+
+	@(objc_type=ViewControllerTransition, objc_selector="partialCurlTransition", objc_name="partialCurlTransition", objc_is_class_method=true)
+	ViewControllerTransition_partialCurlTransition :: proc() -> instancetype ---
+
+	@(objc_type=ViewControllerTransition, objc_selector="init", objc_name="init")
+	ViewControllerTransition_init :: proc(self: ^ViewControllerTransition) -> instancetype ---
+
+	@(objc_type=ViewControllerTransition, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	ViewControllerTransition_new :: proc() -> ^ViewControllerTransition ---
+}
+
+@(objc_type=ViewControllerTransition, objc_name="zoomWithOptions", objc_is_class_method=true)
+ViewControllerTransition_zoomWithOptions :: proc {
+	ViewControllerTransition_zoomWithOptions_sourceViewProvider,
+	ViewControllerTransition_zoomWithOptions_sourceBarButtonItemProvider,
+}
+
+
+@(objc_class="UIViewControllerTransitionCoordinator")
+ViewControllerTransitionCoordinator :: struct {
+	using _: intrinsics.objc_object,
+	using _: ViewControllerTransitionCoordinatorContext,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerTransitionCoordinator, objc_selector="animateAlongsideTransition:completion:", objc_name="animateAlongsideTransition")
+	ViewControllerTransitionCoordinator_animateAlongsideTransition :: proc(self: ^ViewControllerTransitionCoordinator, animation: ^Objc_Block(proc "c" ( _context: ^ViewControllerTransitionCoordinatorContext )), completion: ^Objc_Block(proc "c" ( _context: ^ViewControllerTransitionCoordinatorContext ))) -> bool ---
+
+	@(objc_type=ViewControllerTransitionCoordinator, objc_selector="animateAlongsideTransitionInView:animation:completion:", objc_name="animateAlongsideTransitionInView")
+	ViewControllerTransitionCoordinator_animateAlongsideTransitionInView :: proc(self: ^ViewControllerTransitionCoordinator, view: ^View, animation: ^Objc_Block(proc "c" ( _context: ^ViewControllerTransitionCoordinatorContext )), completion: ^Objc_Block(proc "c" ( _context: ^ViewControllerTransitionCoordinatorContext ))) -> bool ---
+
+	@(objc_type=ViewControllerTransitionCoordinator, objc_selector="notifyWhenInteractionEndsUsingBlock:", objc_name="notifyWhenInteractionEndsUsingBlock")
+	ViewControllerTransitionCoordinator_notifyWhenInteractionEndsUsingBlock :: proc(self: ^ViewControllerTransitionCoordinator, handler: ^Objc_Block(proc "c" ( _context: ^ViewControllerTransitionCoordinatorContext ))) ---
+
+	@(objc_type=ViewControllerTransitionCoordinator, objc_selector="notifyWhenInteractionChangesUsingBlock:", objc_name="notifyWhenInteractionChangesUsingBlock")
+	ViewControllerTransitionCoordinator_notifyWhenInteractionChangesUsingBlock :: proc(self: ^ViewControllerTransitionCoordinator, handler: ^Objc_Block(proc "c" ( _context: ^ViewControllerTransitionCoordinatorContext ))) ---
+}
+
+
+@(objc_class="UIViewControllerTransitionCoordinatorContext")
+ViewControllerTransitionCoordinatorContext :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="viewControllerForKey:", objc_name="viewControllerForKey")
+	ViewControllerTransitionCoordinatorContext_viewControllerForKey :: proc(self: ^ViewControllerTransitionCoordinatorContext, key: ^NS.String) -> ^ViewController ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="viewForKey:", objc_name="viewForKey")
+	ViewControllerTransitionCoordinatorContext_viewForKey :: proc(self: ^ViewControllerTransitionCoordinatorContext, key: ^NS.String) -> ^View ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="isAnimated", objc_name="isAnimated")
+	ViewControllerTransitionCoordinatorContext_isAnimated :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> bool ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="presentationStyle", objc_name="presentationStyle")
+	ViewControllerTransitionCoordinatorContext_presentationStyle :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> ModalPresentationStyle ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="initiallyInteractive", objc_name="initiallyInteractive")
+	ViewControllerTransitionCoordinatorContext_initiallyInteractive :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> bool ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="isInterruptible", objc_name="isInterruptible")
+	ViewControllerTransitionCoordinatorContext_isInterruptible :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> bool ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="isInteractive", objc_name="isInteractive")
+	ViewControllerTransitionCoordinatorContext_isInteractive :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> bool ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="isCancelled", objc_name="isCancelled")
+	ViewControllerTransitionCoordinatorContext_isCancelled :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> bool ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="transitionDuration", objc_name="transitionDuration")
+	ViewControllerTransitionCoordinatorContext_transitionDuration :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> NS.TimeInterval ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="percentComplete", objc_name="percentComplete")
+	ViewControllerTransitionCoordinatorContext_percentComplete :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> CG.Float ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="completionVelocity", objc_name="completionVelocity")
+	ViewControllerTransitionCoordinatorContext_completionVelocity :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> CG.Float ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="completionCurve", objc_name="completionCurve")
+	ViewControllerTransitionCoordinatorContext_completionCurve :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> ViewAnimationCurve ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="containerView", objc_name="containerView")
+	ViewControllerTransitionCoordinatorContext_containerView :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> ^View ---
+
+	@(objc_type=ViewControllerTransitionCoordinatorContext, objc_selector="targetTransform", objc_name="targetTransform")
+	ViewControllerTransitionCoordinatorContext_targetTransform :: proc(self: ^ViewControllerTransitionCoordinatorContext) -> CG.AffineTransform ---
+}
+
+
+@(objc_class="UIViewControllerTransitioningDelegate")
+ViewControllerTransitioningDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerTransitioningDelegate, objc_selector="animationControllerForPresentedController:presentingController:sourceController:", objc_name="animationControllerForPresentedController")
+	ViewControllerTransitioningDelegate_animationControllerForPresentedController :: proc(self: ^ViewControllerTransitioningDelegate, presented: ^ViewController, presenting: ^ViewController, source: ^ViewController) -> ^ViewControllerAnimatedTransitioning ---
+
+	@(objc_type=ViewControllerTransitioningDelegate, objc_selector="animationControllerForDismissedController:", objc_name="animationControllerForDismissedController")
+	ViewControllerTransitioningDelegate_animationControllerForDismissedController :: proc(self: ^ViewControllerTransitioningDelegate, dismissed: ^ViewController) -> ^ViewControllerAnimatedTransitioning ---
+
+	@(objc_type=ViewControllerTransitioningDelegate, objc_selector="interactionControllerForPresentation:", objc_name="interactionControllerForPresentation")
+	ViewControllerTransitioningDelegate_interactionControllerForPresentation :: proc(self: ^ViewControllerTransitioningDelegate, animator: ^ViewControllerAnimatedTransitioning) -> ^ViewControllerInteractiveTransitioning ---
+
+	@(objc_type=ViewControllerTransitioningDelegate, objc_selector="interactionControllerForDismissal:", objc_name="interactionControllerForDismissal")
+	ViewControllerTransitioningDelegate_interactionControllerForDismissal :: proc(self: ^ViewControllerTransitioningDelegate, animator: ^ViewControllerAnimatedTransitioning) -> ^ViewControllerInteractiveTransitioning ---
+
+	@(objc_type=ViewControllerTransitioningDelegate, objc_selector="presentationControllerForPresentedViewController:presentingViewController:sourceViewController:", objc_name="presentationControllerForPresentedViewController")
+	ViewControllerTransitioningDelegate_presentationControllerForPresentedViewController :: proc(self: ^ViewControllerTransitioningDelegate, presented: ^ViewController, presenting: ^ViewController, source: ^ViewController) -> ^PresentationController ---
+}
+
+
+@(objc_class="UIViewImplicitlyAnimating")
+ViewImplicitlyAnimating :: struct {
+	using _: intrinsics.objc_object,
+	using _: ViewAnimating,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewImplicitlyAnimating, objc_selector="addAnimations:delayFactor:", objc_name="addAnimations_delayFactor")
+	ViewImplicitlyAnimating_addAnimations_delayFactor :: proc(self: ^ViewImplicitlyAnimating, animation: ^Objc_Block(proc "c" ()), delayFactor: CG.Float) ---
+
+	@(objc_type=ViewImplicitlyAnimating, objc_selector="addAnimations:", objc_name="addAnimations_")
+	ViewImplicitlyAnimating_addAnimations_ :: proc(self: ^ViewImplicitlyAnimating, animation: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ViewImplicitlyAnimating, objc_selector="addCompletion:", objc_name="addCompletion")
+	ViewImplicitlyAnimating_addCompletion :: proc(self: ^ViewImplicitlyAnimating, completion: ^Objc_Block(proc "c" ( finalPosition: ViewAnimatingPosition ))) ---
+
+	@(objc_type=ViewImplicitlyAnimating, objc_selector="continueAnimationWithTimingParameters:durationFactor:", objc_name="continueAnimationWithTimingParameters")
+	ViewImplicitlyAnimating_continueAnimationWithTimingParameters :: proc(self: ^ViewImplicitlyAnimating, parameters: ^TimingCurveProvider, durationFactor: CG.Float) ---
+}
+
+@(objc_type=ViewImplicitlyAnimating, objc_name="addAnimations")
+ViewImplicitlyAnimating_addAnimations :: proc {
+	ViewImplicitlyAnimating_addAnimations_delayFactor,
+	ViewImplicitlyAnimating_addAnimations_,
+}
+
+
+@(objc_class="UIViewLayoutRegion", objc_superclass=NS.Object)
+ViewLayoutRegion :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewLayoutRegion, objc_selector="safeAreaLayoutRegionWithCornerAdaptation:", objc_name="safeAreaLayoutRegionWithCornerAdaptation", objc_is_class_method=true)
+	ViewLayoutRegion_safeAreaLayoutRegionWithCornerAdaptation :: proc(adaptivityAxis: ViewLayoutRegionAdaptivityAxis) -> ^ViewLayoutRegion ---
+
+	@(objc_type=ViewLayoutRegion, objc_selector="marginsLayoutRegionWithCornerAdaptation:", objc_name="marginsLayoutRegionWithCornerAdaptation", objc_is_class_method=true)
+	ViewLayoutRegion_marginsLayoutRegionWithCornerAdaptation :: proc(adaptivityAxis: ViewLayoutRegionAdaptivityAxis) -> ^ViewLayoutRegion ---
+
+	@(objc_type=ViewLayoutRegion, objc_selector="readableContentLayoutRegionWithCornerAdaptation:", objc_name="readableContentLayoutRegionWithCornerAdaptation", objc_is_class_method=true)
+	ViewLayoutRegion_readableContentLayoutRegionWithCornerAdaptation :: proc(adaptivityAxis: ViewLayoutRegionAdaptivityAxis) -> ^ViewLayoutRegion ---
+
+	@(objc_type=ViewLayoutRegion, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	ViewLayoutRegion_new :: proc() -> ^ViewLayoutRegion ---
+
+	@(objc_type=ViewLayoutRegion, objc_selector="init", objc_name="init")
+	ViewLayoutRegion_init :: proc(self: ^ViewLayoutRegion) -> instancetype ---
+}
+
+
+@(objc_class="UIViewPrintFormatter", objc_superclass=PrintFormatter)
+ViewPrintFormatter :: struct { using _: PrintFormatter}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewPrintFormatter, objc_selector="view", objc_name="view")
+	ViewPrintFormatter_view :: proc(self: ^ViewPrintFormatter) -> ^View ---
+}
+
+
+@(objc_class="UIViewPropertyAnimator", objc_superclass=NS.Object)
+ViewPropertyAnimator :: struct {
+	using _: NS.Object,
+	using _: ViewImplicitlyAnimating,
+	using _: NS.Copying,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewPropertyAnimator, objc_selector="initWithDuration:timingParameters:", objc_name="initWithDuration_timingParameters")
+	ViewPropertyAnimator_initWithDuration_timingParameters :: proc(self: ^ViewPropertyAnimator, duration: NS.TimeInterval, parameters: ^TimingCurveProvider) -> instancetype ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="initWithDuration:curve:animations:", objc_name="initWithDuration_curve_animations")
+	ViewPropertyAnimator_initWithDuration_curve_animations :: proc(self: ^ViewPropertyAnimator, duration: NS.TimeInterval, curve: ViewAnimationCurve, animations: ^Objc_Block(proc "c" ())) -> instancetype ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="initWithDuration:controlPoint1:controlPoint2:animations:", objc_name="initWithDuration_controlPoint1_controlPoint2_animations")
+	ViewPropertyAnimator_initWithDuration_controlPoint1_controlPoint2_animations :: proc(self: ^ViewPropertyAnimator, duration: NS.TimeInterval, point1: CG.Point, point2: CG.Point, animations: ^Objc_Block(proc "c" ())) -> instancetype ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="initWithDuration:dampingRatio:animations:", objc_name="initWithDuration_dampingRatio_animations")
+	ViewPropertyAnimator_initWithDuration_dampingRatio_animations :: proc(self: ^ViewPropertyAnimator, duration: NS.TimeInterval, ratio: CG.Float, animations: ^Objc_Block(proc "c" ())) -> instancetype ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="runningPropertyAnimatorWithDuration:delay:options:animations:completion:", objc_name="runningPropertyAnimatorWithDuration", objc_is_class_method=true)
+	ViewPropertyAnimator_runningPropertyAnimatorWithDuration :: proc(duration: NS.TimeInterval, delay: NS.TimeInterval, options: ViewAnimationOptions, animations: ^Objc_Block(proc "c" ()), completion: ^Objc_Block(proc "c" ( finalPosition: ViewAnimatingPosition ))) -> instancetype ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="addAnimations:delayFactor:", objc_name="addAnimations_delayFactor")
+	ViewPropertyAnimator_addAnimations_delayFactor :: proc(self: ^ViewPropertyAnimator, animation: ^Objc_Block(proc "c" ()), delayFactor: CG.Float) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="addAnimations:", objc_name="addAnimations_")
+	ViewPropertyAnimator_addAnimations_ :: proc(self: ^ViewPropertyAnimator, animation: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="addCompletion:", objc_name="addCompletion")
+	ViewPropertyAnimator_addCompletion :: proc(self: ^ViewPropertyAnimator, completion: ^Objc_Block(proc "c" ( finalPosition: ViewAnimatingPosition ))) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="continueAnimationWithTimingParameters:durationFactor:", objc_name="continueAnimationWithTimingParameters")
+	ViewPropertyAnimator_continueAnimationWithTimingParameters :: proc(self: ^ViewPropertyAnimator, parameters: ^TimingCurveProvider, durationFactor: CG.Float) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="timingParameters", objc_name="timingParameters")
+	ViewPropertyAnimator_timingParameters :: proc(self: ^ViewPropertyAnimator) -> ^TimingCurveProvider ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="duration", objc_name="duration")
+	ViewPropertyAnimator_duration :: proc(self: ^ViewPropertyAnimator) -> NS.TimeInterval ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="delay", objc_name="delay")
+	ViewPropertyAnimator_delay :: proc(self: ^ViewPropertyAnimator) -> NS.TimeInterval ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="isUserInteractionEnabled", objc_name="isUserInteractionEnabled")
+	ViewPropertyAnimator_isUserInteractionEnabled :: proc(self: ^ViewPropertyAnimator) -> bool ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="setUserInteractionEnabled:", objc_name="setUserInteractionEnabled")
+	ViewPropertyAnimator_setUserInteractionEnabled :: proc(self: ^ViewPropertyAnimator, userInteractionEnabled: bool) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="isManualHitTestingEnabled", objc_name="isManualHitTestingEnabled")
+	ViewPropertyAnimator_isManualHitTestingEnabled :: proc(self: ^ViewPropertyAnimator) -> bool ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="setManualHitTestingEnabled:", objc_name="setManualHitTestingEnabled")
+	ViewPropertyAnimator_setManualHitTestingEnabled :: proc(self: ^ViewPropertyAnimator, manualHitTestingEnabled: bool) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="isInterruptible", objc_name="isInterruptible")
+	ViewPropertyAnimator_isInterruptible :: proc(self: ^ViewPropertyAnimator) -> bool ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="setInterruptible:", objc_name="setInterruptible")
+	ViewPropertyAnimator_setInterruptible :: proc(self: ^ViewPropertyAnimator, interruptible: bool) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="scrubsLinearly", objc_name="scrubsLinearly")
+	ViewPropertyAnimator_scrubsLinearly :: proc(self: ^ViewPropertyAnimator) -> bool ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="setScrubsLinearly:", objc_name="setScrubsLinearly")
+	ViewPropertyAnimator_setScrubsLinearly :: proc(self: ^ViewPropertyAnimator, scrubsLinearly: bool) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="pausesOnCompletion", objc_name="pausesOnCompletion")
+	ViewPropertyAnimator_pausesOnCompletion :: proc(self: ^ViewPropertyAnimator) -> bool ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="setPausesOnCompletion:", objc_name="setPausesOnCompletion")
+	ViewPropertyAnimator_setPausesOnCompletion :: proc(self: ^ViewPropertyAnimator, pausesOnCompletion: bool) ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="flushUpdates", objc_name="flushUpdates")
+	ViewPropertyAnimator_flushUpdates :: proc(self: ^ViewPropertyAnimator) -> bool ---
+
+	@(objc_type=ViewPropertyAnimator, objc_selector="setFlushUpdates:", objc_name="setFlushUpdates")
+	ViewPropertyAnimator_setFlushUpdates :: proc(self: ^ViewPropertyAnimator, flushUpdates: bool) ---
+}
+
+@(objc_type=ViewPropertyAnimator, objc_name="initWithDuration")
+ViewPropertyAnimator_initWithDuration :: proc {
+	ViewPropertyAnimator_initWithDuration_timingParameters,
+	ViewPropertyAnimator_initWithDuration_curve_animations,
+	ViewPropertyAnimator_initWithDuration_controlPoint1_controlPoint2_animations,
+	ViewPropertyAnimator_initWithDuration_dampingRatio_animations,
+}
+
+@(objc_type=ViewPropertyAnimator, objc_name="addAnimations")
+ViewPropertyAnimator_addAnimations :: proc {
+	ViewPropertyAnimator_addAnimations_delayFactor,
+	ViewPropertyAnimator_addAnimations_,
 }

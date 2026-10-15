@@ -23,3 +23,78 @@ foreign lib {
 	@(objc_type=Directions, objc_selector="isCalculating", objc_name="isCalculating")
 	Directions_isCalculating :: proc(self: ^Directions) -> bool ---
 }
+
+
+@(objc_class="MKDirectionsRequest", objc_superclass=NS.Object)
+DirectionsRequest :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=DirectionsRequest, objc_selector="setSource:", objc_name="setSource")
+	DirectionsRequest_setSource :: proc(self: ^DirectionsRequest, source: ^MapItem) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="setDestination:", objc_name="setDestination")
+	DirectionsRequest_setDestination :: proc(self: ^DirectionsRequest, destination: ^MapItem) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="source", objc_name="source")
+	DirectionsRequest_source :: proc(self: ^DirectionsRequest) -> ^MapItem ---
+
+	@(objc_type=DirectionsRequest, objc_selector="destination", objc_name="destination")
+	DirectionsRequest_destination :: proc(self: ^DirectionsRequest) -> ^MapItem ---
+
+	@(objc_type=DirectionsRequest, objc_selector="transportType", objc_name="transportType")
+	DirectionsRequest_transportType :: proc(self: ^DirectionsRequest) -> DirectionsTransportType ---
+
+	@(objc_type=DirectionsRequest, objc_selector="setTransportType:", objc_name="setTransportType")
+	DirectionsRequest_setTransportType :: proc(self: ^DirectionsRequest, transportType: DirectionsTransportType) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="requestsAlternateRoutes", objc_name="requestsAlternateRoutes")
+	DirectionsRequest_requestsAlternateRoutes :: proc(self: ^DirectionsRequest) -> bool ---
+
+	@(objc_type=DirectionsRequest, objc_selector="setRequestsAlternateRoutes:", objc_name="setRequestsAlternateRoutes")
+	DirectionsRequest_setRequestsAlternateRoutes :: proc(self: ^DirectionsRequest, requestsAlternateRoutes: bool) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="departureDate", objc_name="departureDate")
+	DirectionsRequest_departureDate :: proc(self: ^DirectionsRequest) -> ^NS.Date ---
+
+	@(objc_type=DirectionsRequest, objc_selector="setDepartureDate:", objc_name="setDepartureDate")
+	DirectionsRequest_setDepartureDate :: proc(self: ^DirectionsRequest, departureDate: ^NS.Date) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="arrivalDate", objc_name="arrivalDate")
+	DirectionsRequest_arrivalDate :: proc(self: ^DirectionsRequest) -> ^NS.Date ---
+
+	@(objc_type=DirectionsRequest, objc_selector="setArrivalDate:", objc_name="setArrivalDate")
+	DirectionsRequest_setArrivalDate :: proc(self: ^DirectionsRequest, arrivalDate: ^NS.Date) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="tollPreference", objc_name="tollPreference")
+	DirectionsRequest_tollPreference :: proc(self: ^DirectionsRequest) -> DirectionsRoutePreference ---
+
+	@(objc_type=DirectionsRequest, objc_selector="setTollPreference:", objc_name="setTollPreference")
+	DirectionsRequest_setTollPreference :: proc(self: ^DirectionsRequest, tollPreference: DirectionsRoutePreference) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="highwayPreference", objc_name="highwayPreference")
+	DirectionsRequest_highwayPreference :: proc(self: ^DirectionsRequest) -> DirectionsRoutePreference ---
+
+	@(objc_type=DirectionsRequest, objc_selector="setHighwayPreference:", objc_name="setHighwayPreference")
+	DirectionsRequest_setHighwayPreference :: proc(self: ^DirectionsRequest, highwayPreference: DirectionsRoutePreference) ---
+
+	@(objc_type=DirectionsRequest, objc_selector="initWithContentsOfURL:", objc_name="initWithContentsOfURL")
+	DirectionsRequest_initWithContentsOfURL :: proc(self: ^DirectionsRequest, url: ^NS.URL) -> instancetype ---
+
+	@(objc_type=DirectionsRequest, objc_selector="isDirectionsRequestURL:", objc_name="isDirectionsRequestURL", objc_is_class_method=true)
+	DirectionsRequest_isDirectionsRequestURL :: proc(url: ^NS.URL) -> bool ---
+}
+
+
+@(objc_class="MKDirectionsResponse", objc_superclass=NS.Object)
+DirectionsResponse :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=DirectionsResponse, objc_selector="source", objc_name="source")
+	DirectionsResponse_source :: proc(self: ^DirectionsResponse) -> ^MapItem ---
+
+	@(objc_type=DirectionsResponse, objc_selector="destination", objc_name="destination")
+	DirectionsResponse_destination :: proc(self: ^DirectionsResponse) -> ^MapItem ---
+
+	@(objc_type=DirectionsResponse, objc_selector="routes", objc_name="routes")
+	DirectionsResponse_routes :: proc(self: ^DirectionsResponse) -> ^NS.Array ---
+}

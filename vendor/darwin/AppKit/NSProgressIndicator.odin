@@ -5,10 +5,6 @@ package darwin_AppKit
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSProgressIndicator", objc_superclass=View)
 ProgressIndicator :: struct {
 	using _: View,

@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIOpenURLContext", objc_superclass=NS.Object)
 OpenURLContext :: struct { using _: NS.Object}
 

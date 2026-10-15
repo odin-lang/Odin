@@ -5,10 +5,6 @@ package darwin_UIKit
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIDevice", objc_superclass=NS.Object)
 Device :: struct { using _: NS.Object}
 

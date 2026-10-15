@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSMapTable", objc_superclass=Object)
 MapTable :: struct {
 	using _: Object,

@@ -2,6 +2,7 @@
 #+build darwin
 package darwin_Foundation
 
+import "base:intrinsics"
 
 @(objc_class="NSCachedURLResponse", objc_superclass=Object)
 CachedURLResponse :: struct {
@@ -37,3 +38,7 @@ CachedURLResponse_initWithResponse :: proc {
 	CachedURLResponse_initWithResponse_data,
 	CachedURLResponse_initWithResponse_data_userInfo_storagePolicy,
 }
+
+
+@(objc_class="NSCachedURLResponseInternal")
+CachedURLResponseInternal :: struct { using _: intrinsics.objc_object}

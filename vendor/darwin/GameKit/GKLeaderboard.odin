@@ -3,6 +3,7 @@
 package darwin_GameKit
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="GKLeaderboard", objc_superclass=NS.Object)
 Leaderboard :: struct { using _: NS.Object}
@@ -135,4 +136,131 @@ foreign lib {
 Leaderboard_submitScore :: proc {
 	Leaderboard_submitScore_context_player_leaderboardIDs_completionHandler,
 	Leaderboard_submitScore_context_player_completionHandler,
+}
+
+
+@(objc_class="GKLeaderboardEntry", objc_superclass=NS.Object)
+LeaderboardEntry :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=LeaderboardEntry, objc_selector="init", objc_name="init")
+	LeaderboardEntry_init :: proc(self: ^LeaderboardEntry) -> instancetype ---
+
+	@(objc_type=LeaderboardEntry, objc_selector="player", objc_name="player")
+	LeaderboardEntry_player :: proc(self: ^LeaderboardEntry) -> ^Player ---
+
+	@(objc_type=LeaderboardEntry, objc_selector="rank", objc_name="rank")
+	LeaderboardEntry_rank :: proc(self: ^LeaderboardEntry) -> NS.Integer ---
+
+	@(objc_type=LeaderboardEntry, objc_selector="score", objc_name="score")
+	LeaderboardEntry_score :: proc(self: ^LeaderboardEntry) -> NS.Integer ---
+
+	@(objc_type=LeaderboardEntry, objc_selector="formattedScore", objc_name="formattedScore")
+	LeaderboardEntry_formattedScore :: proc(self: ^LeaderboardEntry) -> ^NS.String ---
+
+	@(objc_type=LeaderboardEntry, objc_selector="context", objc_name="context")
+	LeaderboardEntry_context :: proc(self: ^LeaderboardEntry) -> NS.UInteger ---
+
+	@(objc_type=LeaderboardEntry, objc_selector="date", objc_name="date")
+	LeaderboardEntry_date :: proc(self: ^LeaderboardEntry) -> ^NS.Date ---
+}
+
+
+@(objc_class="GKLeaderboardScore", objc_superclass=NS.Object)
+LeaderboardScore :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=LeaderboardScore, objc_selector="player", objc_name="player")
+	LeaderboardScore_player :: proc(self: ^LeaderboardScore) -> ^Player ---
+
+	@(objc_type=LeaderboardScore, objc_selector="setPlayer:", objc_name="setPlayer")
+	LeaderboardScore_setPlayer :: proc(self: ^LeaderboardScore, player: ^Player) ---
+
+	@(objc_type=LeaderboardScore, objc_selector="value", objc_name="value")
+	LeaderboardScore_value :: proc(self: ^LeaderboardScore) -> NS.Integer ---
+
+	@(objc_type=LeaderboardScore, objc_selector="setValue:", objc_name="setValue")
+	LeaderboardScore_setValue :: proc(self: ^LeaderboardScore, value: NS.Integer) ---
+
+	@(objc_type=LeaderboardScore, objc_selector="context", objc_name="context")
+	LeaderboardScore_context :: proc(self: ^LeaderboardScore) -> NS.UInteger ---
+
+	@(objc_type=LeaderboardScore, objc_selector="setContext:", objc_name="setContext")
+	LeaderboardScore_setContext :: proc(self: ^LeaderboardScore, _context: NS.UInteger) ---
+
+	@(objc_type=LeaderboardScore, objc_selector="leaderboardID", objc_name="leaderboardID")
+	LeaderboardScore_leaderboardID :: proc(self: ^LeaderboardScore) -> ^NS.String ---
+
+	@(objc_type=LeaderboardScore, objc_selector="setLeaderboardID:", objc_name="setLeaderboardID")
+	LeaderboardScore_setLeaderboardID :: proc(self: ^LeaderboardScore, leaderboardID: ^NS.String) ---
+}
+
+
+@(objc_class="GKLeaderboardSet", objc_superclass=NS.Object)
+LeaderboardSet :: struct {
+	using _: NS.Object,
+	using _: NS.Coding,
+	using _: NS.SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=LeaderboardSet, objc_selector="loadLeaderboardSetsWithCompletionHandler:", objc_name="loadLeaderboardSetsWithCompletionHandler", objc_is_class_method=true)
+	LeaderboardSet_loadLeaderboardSetsWithCompletionHandler :: proc(completionHandler: ^Objc_Block(proc "c" ( leaderboardSets: ^NS.Array, error: ^NS.Error ))) ---
+
+	@(objc_type=LeaderboardSet, objc_selector="loadLeaderboardsWithHandler:", objc_name="loadLeaderboardsWithHandler")
+	LeaderboardSet_loadLeaderboardsWithHandler :: proc(self: ^LeaderboardSet, handler: ^Objc_Block(proc "c" ( leaderboards: ^NS.Array, error: ^NS.Error ))) ---
+
+	@(objc_type=LeaderboardSet, objc_selector="title", objc_name="title")
+	LeaderboardSet_title :: proc(self: ^LeaderboardSet) -> ^NS.String ---
+
+	@(objc_type=LeaderboardSet, objc_selector="groupIdentifier", objc_name="groupIdentifier")
+	LeaderboardSet_groupIdentifier :: proc(self: ^LeaderboardSet) -> ^NS.String ---
+
+	@(objc_type=LeaderboardSet, objc_selector="identifier", objc_name="identifier")
+	LeaderboardSet_identifier :: proc(self: ^LeaderboardSet) -> ^NS.String ---
+
+	@(objc_type=LeaderboardSet, objc_selector="setIdentifier:", objc_name="setIdentifier")
+	LeaderboardSet_setIdentifier :: proc(self: ^LeaderboardSet, identifier: ^NS.String) ---
+
+	@(objc_type=LeaderboardSet, objc_selector="loadLeaderboardsWithCompletionHandler:", objc_name="loadLeaderboardsWithCompletionHandler")
+	LeaderboardSet_loadLeaderboardsWithCompletionHandler :: proc(self: ^LeaderboardSet, completionHandler: ^Objc_Block(proc "c" ( leaderboards: ^NS.Array, error: ^NS.Error ))) ---
+
+	@(objc_type=LeaderboardSet, objc_selector="loadImageWithCompletionHandler:", objc_name="loadImageWithCompletionHandler")
+	LeaderboardSet_loadImageWithCompletionHandler :: proc(self: ^LeaderboardSet, completionHandler: ^Objc_Block(proc "c" ( image: ^UI_Image, error: ^NS.Error ))) ---
+}
+
+
+@(objc_class="GKLeaderboardViewController", objc_superclass=GameCenterViewController)
+LeaderboardViewController :: struct { using _: GameCenterViewController}
+
+foreign lib {
+	@(objc_type=LeaderboardViewController, objc_selector="timeScope", objc_name="timeScope")
+	LeaderboardViewController_timeScope :: proc(self: ^LeaderboardViewController) -> LeaderboardTimeScope ---
+
+	@(objc_type=LeaderboardViewController, objc_selector="setTimeScope:", objc_name="setTimeScope")
+	LeaderboardViewController_setTimeScope :: proc(self: ^LeaderboardViewController, timeScope: LeaderboardTimeScope) ---
+
+	@(objc_type=LeaderboardViewController, objc_selector="category", objc_name="category")
+	LeaderboardViewController_category :: proc(self: ^LeaderboardViewController) -> ^NS.String ---
+
+	@(objc_type=LeaderboardViewController, objc_selector="setCategory:", objc_name="setCategory")
+	LeaderboardViewController_setCategory :: proc(self: ^LeaderboardViewController, category: ^NS.String) ---
+
+	@(objc_type=LeaderboardViewController, objc_selector="leaderboardDelegate", objc_name="leaderboardDelegate")
+	LeaderboardViewController_leaderboardDelegate :: proc(self: ^LeaderboardViewController) -> ^LeaderboardViewControllerDelegate ---
+
+	@(objc_type=LeaderboardViewController, objc_selector="setLeaderboardDelegate:", objc_name="setLeaderboardDelegate")
+	LeaderboardViewController_setLeaderboardDelegate :: proc(self: ^LeaderboardViewController, leaderboardDelegate: ^LeaderboardViewControllerDelegate) ---
+}
+
+
+@(objc_class="GKLeaderboardViewControllerDelegate")
+LeaderboardViewControllerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=LeaderboardViewControllerDelegate, objc_selector="leaderboardViewControllerDidFinish:", objc_name="leaderboardViewControllerDidFinish")
+	LeaderboardViewControllerDelegate_leaderboardViewControllerDidFinish :: proc(self: ^LeaderboardViewControllerDelegate, viewController: ^LeaderboardViewController) ---
 }

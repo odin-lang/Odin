@@ -283,6 +283,35 @@ ENUM_MEMBER_FIXES = {
 # group `<generated proc>`; a single generated method becomes a group, with the method renamed `<name>_`.
 OVERLOAD_SUFFIXES = ("_slice",)
 
+# csgen writes one file per class or protocol; `group_files` merges them into one file per family or topic.
+# See the README for the rules.
+GROUP_CLASS_PREFIXES = ["MTL4FX", "MTLFX", "MTL4", "MTL", "MTK", "MDL", "NS", "UI", "AV", "CK", "GK", "MK", "GC", "CA", "CL", "AU", "LA", "EK", "CH"]
+GROUP_ROLE_SUFFIXES  = ["DescriptorArray", "Descriptor", "Array", "Delegate", "DataSource", "Protocol", "Reflection", "State", "Options", "Configuration", "Internal"]
+# superclasses too general to pull their subclasses in by name (`NSScrollView` stays out of `NSView`)
+GROUP_GENERIC_BASES  = {"View", "ViewController", "Controller", "Control", "Cell", "Object", "Responder", "Layer", "Window", "Panel", "Item", "Button", "Field", "Node"}
+# last words too general to group single types by
+GROUP_GENERIC_KINDS  = {"Item", "Object", "Info", "Context", "Event", "Result", "Request", "Response", "Session", "Manager", "Data", "Set", "Group", "Type", "Value", "Handler", "Provider", "Identifier", "Source", "Element", "Parameters"}
+GROUP_ROOT_CLASSES   = {"NSObject", "NSProxy"}
+GROUP_SMALL_LINES    = 100 # a single type this small goes with its superclass
+GROUP_SINGLE_LINES   = 600 # a single type this big keeps its own file
+# type -> another type whose file it goes in, for what the name rules get wrong
+GROUP_OVERRIDES = {
+	"NSCoding":             "NSObject",
+	"NSCopying":            "NSObject",
+	"NSMutableCopying":     "NSObject",
+	"NSSecureCoding":       "NSObject",
+	"NSDiscardableContent": "NSObject",
+	"NSFastEnumeration":    "NSEnumerator",
+	"NSLocking":            "NSLock",
+	"NSSetCommand":         "NSScriptCommand",
+	"NSPositionalSpecifier": "NSScriptObjectSpecifier",
+	"MTLStencilDescriptor": "MTLDepthStencilDescriptor",
+	"MTLCompileOptions":    "MTLLibrary",
+	"MTLStructMember":      "MTLStructType",
+	"MTLTilePipelineColorAttachmentDescriptor": "MTLTileRenderPipelineDescriptor",
+}
+GROUP_PLATFORM_SUFFIXES = {"darwin:default": "_macos", "darwin:ios": "_ios"}
+
 
 RE_IMPORT        = re.compile(r'^import\s+(\w+)\s+"([^"]+)"\s*$')
 RE_METHOD_ATTR   = re.compile(r'^(\s*)@\(objc_type=(\w+), objc_selector="([^"]+)", objc_name="(\w+)"(, objc_is_class_method=true)?\)\s*$')
@@ -973,6 +1002,268 @@ def reexport_foundation_extras(pkg, foundation_dest):
 	pkg.report["Foundation extras not re-exported (name taken)"].extend(skipped)
 
 
+def group_split_prefix(name):
+	for p in GROUP_CLASS_PREFIXES:
+		if name.startswith(p) and len(name) > len(p) and name[len(p)].isupper():
+			return p, name[len(p):]
+	return "", name
+
+
+def group_stem(name):
+	"""`NSMutableArray` -> `NSArray`, `MTLRenderPipelineColorAttachmentDescriptorArray` -> `MTLRenderPipelineColorAttachment`"""
+	p, rest = group_split_prefix(name)
+	if rest.startswith("Mutable") and len(rest) > 7 and rest[7].isupper():
+		rest = rest[7:]
+	changed = True
+	while changed:
+		changed = False
+		for s in GROUP_ROLE_SUFFIXES:
+			if rest.endswith(s) and len(rest) > len(s):
+				rest = rest[:-len(s)]
+				changed = True
+	return p + rest
+
+
+def group_words(rest):
+	return re.findall(r"OpenGL|[A-Z0-9]+(?![a-z])|[A-Z][a-z0-9]*", rest)
+
+
+def group_plural(word):
+	if re.search(r"[^aeiou]y$", word):
+		return word[:-1] + "ies"
+	if re.search(r"(s|x|ch|sh)$", word):
+		return word + "es"
+	return word + "s"
+
+
+def plan_groups(lines_of, super_of, parents_of):
+	"""
+	lines_of:   type -> line count
+	super_of:   type -> superclass within the package
+	parents_of: type -> superclass and protocols within the package
+	Returns {file name: [types]}, without regard to build tags.
+	"""
+	stems = defaultdict(list)
+	for n in sorted(lines_of):
+		stems[group_stem(n)].append(n)
+	stem_of = {n: s for s, ns in stems.items() for n in ns}
+	names = sorted(stems, key=lambda s: (len(s), s))
+
+	def inherits(s, t):
+		return any(parents_of.get(n, set()) & set(stems[t]) for n in stems[s])
+
+	# families: a tree of stems
+	parent = {}
+	for s in names:
+		best = None
+		# `MTLRenderPipelineState` -> `MTLRenderPipeline`
+		for t in names:
+			if t != s and s.startswith(t) and s[len(t)].isupper() and (best is None or len(t) > len(best)):
+				best = t
+		if best is None:
+			# a subclass named after its superclass (`MTLRenderCommandEncoder` -> `MTLCommandEncoder`, `NSInputStream` -> `NSStream`)
+			# or a descriptor variant (`MTLTileRenderPipelineDescriptor` -> `MTLRenderPipeline`)
+			sp, srest = group_split_prefix(s)
+			sw = group_words(srest)
+			for t in names:
+				tp, trest = group_split_prefix(t)
+				tw = group_words(trest)
+				if t == s or tp != sp or trest in GROUP_GENERIC_BASES:
+					continue
+				if not (len(sw) > len(tw) and sw[-len(tw):] == tw):
+					continue
+				if (inherits(s, t) or (len(tw) >= 2 and s not in stems[s])) and (best is None or len(t) > len(best)):
+					best = t
+		parent[s] = best
+	children = defaultdict(list)
+	for s in names:
+		children[parent[s]].append(s)
+
+	def collect(s):
+		out = [s]
+		for c in sorted(children[s]):
+			out += collect(c)
+		return out
+
+	groups = {}
+	family_of = {}
+	singles = []
+	for root in sorted(children[None]):
+		members = [n for s in collect(root) for n in sorted(stems[s], key=lambda n: (len(n), n))]
+		if len(members) == 1 and lines_of[members[0]] < GROUP_SINGLE_LINES:
+			singles.append(members[0])
+		else:
+			groups[root] = members
+			for n in members:
+				family_of[n] = root
+
+	# small single types go with their superclass (`NSDimension` with `NSUnit`)
+	def home(n, seen=()):
+		if n in family_of:
+			return family_of[n]
+		if n not in singles or lines_of[n] >= GROUP_SMALL_LINES or n in seen:
+			return None
+		p = super_of.get(n)
+		if p is None or p in GROUP_ROOT_CLASSES or group_split_prefix(stem_of[p])[1] in GROUP_GENERIC_BASES:
+			return None
+		return home(p, seen + (n,)) or (p if p in singles else None)
+	attached = {}
+	for n in singles:
+		h = home(n)
+		if h:
+			attached[n] = h
+	singles = [n for n in singles if n not in attached]
+	for n, h in attached.items():
+		if h not in groups:
+			if h in singles:
+				singles.remove(h)
+			groups[h] = [h]
+		groups[h].append(n)
+
+	# topics: families and single types sharing a first word, named after the words they all share
+	def first_word(n):
+		p, rest = group_split_prefix(group_stem(n))
+		w = group_words(rest)
+		return p + (w[0] if w else rest)
+	topics = defaultdict(list)
+	for g, ms in groups.items():
+		topics[first_word(g)].append((g, ms))
+	for n in singles:
+		topics[first_word(n)].append((n, [n]))
+	merged, leftover = {}, []
+	for topic, entries in sorted(topics.items()):
+		if len(entries) == 1:
+			g, ms = entries[0]
+			if g in groups:
+				merged[g] = ms
+			else:
+				leftover.append(g)
+			continue
+		entries.sort(key=lambda e: (e[0] != topic, e[0]))
+		members = [m for _, ms in entries for m in ms]
+		p = group_split_prefix(topic)[0]
+		common = None
+		for m in members:
+			w = group_words(group_split_prefix(group_stem(m))[1])
+			if common is None:
+				common = w
+			else:
+				i = 0
+				while i < min(len(common), len(w)) and common[i] == w[i]:
+					i += 1
+				common = common[:i]
+		merged.setdefault(p + "".join(common) if common else topic, []).extend(members)
+	groups = merged
+
+	# kinds: single types left on their own which share a last word (`NSClipView`, `NSRulerView`, ...)
+	kinds = defaultdict(list)
+	for n in leftover:
+		p, rest = group_split_prefix(group_stem(n))
+		w = group_words(rest)
+		kinds[(p, w[-1] if w else rest)].append(n)
+	for (p, kind), ns in sorted(kinds.items()):
+		if len(ns) >= 3 and kind not in GROUP_GENERIC_KINDS:
+			groups.setdefault(p + group_plural(kind), []).extend(sorted(ns))
+		else:
+			for n in ns:
+				groups[n] = [n]
+
+	for n, dest in GROUP_OVERRIDES.items():
+		if n not in lines_of or dest not in lines_of:
+			continue
+		for g, ms in list(groups.items()):
+			if n in ms:
+				ms.remove(n)
+				if not ms:
+					del groups[g]
+		groups[next(g for g, ms in groups.items() if dest in ms)].append(n)
+	return groups
+
+
+def group_files(pkg):
+	"""Merges csgen's one file per class or protocol into one file per family or topic (see `plan_groups`)."""
+	RE_CLASS     = re.compile(r'^@\(objc_class="(\w+)"[^\n]*\n(\w+) :: struct *\{(.*?)\}', re.M | re.S)
+	RE_ANY_IMPORT = re.compile(r'^import\s+(?:(\w+)\s+)?"([^"]+)"\s*$')
+	kept = {}
+	parsed = {} # type -> (build tag, package line, imports, body)
+	odin_names, raw_super, raw_parents = {}, {}, {}
+	for fname, lines in pkg.files.items():
+		name = fname[:-len(".odin")]
+		if name == pkg.name or name.startswith(pkg.name + "_") or name == "Foundation.Exports":
+			kept[fname] = lines
+			continue
+		k = 0
+		tag = package = None
+		imports = []
+		while k < len(lines):
+			line = lines[k]
+			if line.startswith("#+build "):
+				tag = line[len("#+build "):].strip()
+			elif line.startswith("package "):
+				package = line
+			elif RE_ANY_IMPORT.match(line):
+				imports.append(line)
+			elif line.strip():
+				break
+			k += 1
+		if tag is None or package is None:
+			kept[fname] = lines
+			pkg.report["files not grouped (unexpected header)"].append(fname)
+			continue
+		body = lines[k:]
+		while body and not body[-1].strip():
+			body.pop()
+		parsed[name] = (tag, package, imports, body)
+
+		m = RE_CLASS.search("\n".join(body))
+		if m:
+			odin_names[m.group(2)] = m.group(1)
+			raw_parents[name] = set(re.findall(r"using _: (\w+)\s*[,}\n]", m.group(3) + "\n"))
+			s = re.search(r"objc_superclass=(\w+)\)", m.group(0))
+			if s:
+				raw_super[name] = s.group(1)
+				raw_parents[name].add(s.group(1))
+
+	# as written out: marker, build tag, package, blank, imports and blank, body
+	lines_of   = {n: 4 + (len(p[2]) + 1 if p[2] else 0) + len(p[3]) for n, p in parsed.items()}
+	super_of   = {n: odin_names[p] for n, p in raw_super.items() if p in odin_names}
+	parents_of = {n: {odin_names[p] for p in ps if p in odin_names} for n, ps in raw_parents.items()}
+	groups = plan_groups(lines_of, super_of, parents_of)
+
+	tags_in_pkg = {p[0] for p in parsed.values()}
+	files = dict(kept)
+	for gname, members in sorted(groups.items()):
+		by_tag = defaultdict(list)
+		for n in members:
+			by_tag[parsed[n][0]].append(n)
+		for tag, ns in sorted(by_tag.items()):
+			suffix = GROUP_PLATFORM_SUFFIXES[tag] if len(tags_in_pkg) > 1 and tag != "darwin" else ""
+			fname = f"{gname}{suffix}.odin"
+			if fname in files:
+				raise SystemExit(f"{pkg.name}: grouped file {fname} would replace another file")
+			imports, aliases = [], {}
+			for n in ns:
+				for imp in parsed[n][2]:
+					alias, path = RE_ANY_IMPORT.match(imp).groups()
+					alias = alias or re.split(r"[:/]", path)[-1]
+					if alias not in aliases:
+						aliases[alias] = path
+						imports.append(imp)
+					elif aliases[alias] != path:
+						raise SystemExit(f"{pkg.name}: {fname}: import name {alias} is used for both {aliases[alias]} and {path}")
+			out = [f"#+build {tag}", parsed[ns[0]][1], ""]
+			if imports:
+				out += imports + [""]
+			for i, n in enumerate(ns):
+				if i:
+					out += ["", ""]
+				out += parsed[n][3]
+			out.append("")
+			files[fname] = out
+	pkg.report["files grouped"].append(f"{len(parsed)} -> {len(files) - len(kept)}")
+	pkg.files = files
+
+
 def guard_conditional_imports(pkg):
 	"""Imports only used inside `when` blocks are unused on other platforms, which `-vet` rejects."""
 	for fname, lines in pkg.files.items():
@@ -1083,6 +1374,7 @@ def main():
 		apply_error_wrappers(pkg)
 		fix_class_method_groups(pkg)
 		apply_extra_overloads(pkg, find_handwritten_procs(dest_of[fw]))
+		group_files(pkg)               # replaces pkg.files
 		guard_conditional_imports(pkg) # shifts lines
 		if "Foundation" in dest_of:
 			reexport_foundation_extras(pkg, dest_of["Foundation"])
@@ -1090,7 +1382,7 @@ def main():
 
 		dest = dest_of[fw]
 		rel = os.path.relpath(dest, odin_root).replace(os.sep, "/")
-		summary = f"{rel}: {len(files)} files, {len(pkg.wrappers)} error wrappers"
+		summary = f"{rel}: {len(pkg.files)} files, {len(pkg.wrappers)} error wrappers"
 		for k, v in pkg.report.items():
 			summary += f", {k}: {len(v)}"
 		print(summary)
@@ -1102,7 +1394,7 @@ def main():
 		if os.path.isdir(dest):
 			for f in os.listdir(dest):
 				p = os.path.join(dest, f)
-				if f in files and not is_generated(p):
+				if f in pkg.files and not is_generated(p):
 					conflicts.append(p)
 		if args.dry_run:
 			continue
@@ -1112,7 +1404,7 @@ def main():
 		os.makedirs(dest, exist_ok=True)
 		for f in os.listdir(dest):
 			p = os.path.join(dest, f)
-			if f.endswith(".odin") and f not in files and is_generated(p):
+			if f.endswith(".odin") and f not in pkg.files and is_generated(p):
 				os.remove(p)
 		for f, lines in pkg.files.items():
 			with open(os.path.join(dest, f), "w", encoding="utf-8", newline="\n") as out:

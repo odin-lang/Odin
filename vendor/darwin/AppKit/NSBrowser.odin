@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSBrowser", objc_superclass=Control)
 Browser :: struct { using _: Control}
@@ -373,4 +370,171 @@ foreign lib {
 
 	@(objc_type=Browser, objc_selector="matrixInColumn:", objc_name="matrixInColumn")
 	Browser_matrixInColumn :: proc(self: ^Browser, column: NS.Integer) -> ^Matrix ---
+}
+
+
+@(objc_class="NSBrowserDelegate")
+BrowserDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=BrowserDelegate, objc_selector="browser:numberOfRowsInColumn:", objc_name="browser_numberOfRowsInColumn")
+	BrowserDelegate_browser_numberOfRowsInColumn :: proc(self: ^BrowserDelegate, sender: ^Browser, column: NS.Integer) -> NS.Integer ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:createRowsForColumn:inMatrix:", objc_name="browser_createRowsForColumn_inMatrix")
+	BrowserDelegate_browser_createRowsForColumn_inMatrix :: proc(self: ^BrowserDelegate, sender: ^Browser, column: NS.Integer, _matrix: ^Matrix) ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:numberOfChildrenOfItem:", objc_name="browser_numberOfChildrenOfItem")
+	BrowserDelegate_browser_numberOfChildrenOfItem :: proc(self: ^BrowserDelegate, browser: ^Browser, item: id) -> NS.Integer ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:child:ofItem:", objc_name="browser_child_ofItem")
+	BrowserDelegate_browser_child_ofItem :: proc(self: ^BrowserDelegate, browser: ^Browser, index: NS.Integer, item: id) -> id ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:isLeafItem:", objc_name="browser_isLeafItem")
+	BrowserDelegate_browser_isLeafItem :: proc(self: ^BrowserDelegate, browser: ^Browser, item: id) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:objectValueForItem:", objc_name="browser_objectValueForItem")
+	BrowserDelegate_browser_objectValueForItem :: proc(self: ^BrowserDelegate, browser: ^Browser, item: id) -> id ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:heightOfRow:inColumn:", objc_name="browser_heightOfRow_inColumn")
+	BrowserDelegate_browser_heightOfRow_inColumn :: proc(self: ^BrowserDelegate, browser: ^Browser, row: NS.Integer, columnIndex: NS.Integer) -> CG.Float ---
+
+	@(objc_type=BrowserDelegate, objc_selector="rootItemForBrowser:", objc_name="rootItemForBrowser")
+	BrowserDelegate_rootItemForBrowser :: proc(self: ^BrowserDelegate, browser: ^Browser) -> id ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:setObjectValue:forItem:", objc_name="browser_setObjectValue_forItem")
+	BrowserDelegate_browser_setObjectValue_forItem :: proc(self: ^BrowserDelegate, browser: ^Browser, object: id, item: id) ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:shouldEditItem:", objc_name="browser_shouldEditItem")
+	BrowserDelegate_browser_shouldEditItem :: proc(self: ^BrowserDelegate, browser: ^Browser, item: id) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:willDisplayCell:atRow:column:", objc_name="browser_willDisplayCell_atRow_column")
+	BrowserDelegate_browser_willDisplayCell_atRow_column :: proc(self: ^BrowserDelegate, sender: ^Browser, cell: id, row: NS.Integer, column: NS.Integer) ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:titleOfColumn:", objc_name="browser_titleOfColumn")
+	BrowserDelegate_browser_titleOfColumn :: proc(self: ^BrowserDelegate, sender: ^Browser, column: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:selectCellWithString:inColumn:", objc_name="browser_selectCellWithString_inColumn")
+	BrowserDelegate_browser_selectCellWithString_inColumn :: proc(self: ^BrowserDelegate, sender: ^Browser, title: ^NS.String, column: NS.Integer) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:selectRow:inColumn:", objc_name="browser_selectRow_inColumn")
+	BrowserDelegate_browser_selectRow_inColumn :: proc(self: ^BrowserDelegate, sender: ^Browser, row: NS.Integer, column: NS.Integer) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:isColumnValid:", objc_name="browser_isColumnValid")
+	BrowserDelegate_browser_isColumnValid :: proc(self: ^BrowserDelegate, sender: ^Browser, column: NS.Integer) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browserWillScroll:", objc_name="browserWillScroll")
+	BrowserDelegate_browserWillScroll :: proc(self: ^BrowserDelegate, sender: ^Browser) ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browserDidScroll:", objc_name="browserDidScroll")
+	BrowserDelegate_browserDidScroll :: proc(self: ^BrowserDelegate, sender: ^Browser) ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:shouldSizeColumn:forUserResize:toWidth:", objc_name="browser_shouldSizeColumn_forUserResize_toWidth")
+	BrowserDelegate_browser_shouldSizeColumn_forUserResize_toWidth :: proc(self: ^BrowserDelegate, browser: ^Browser, columnIndex: NS.Integer, forUserResize: bool, suggestedWidth: CG.Float) -> CG.Float ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:sizeToFitWidthOfColumn:", objc_name="browser_sizeToFitWidthOfColumn")
+	BrowserDelegate_browser_sizeToFitWidthOfColumn :: proc(self: ^BrowserDelegate, browser: ^Browser, columnIndex: NS.Integer) -> CG.Float ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browserColumnConfigurationDidChange:", objc_name="browserColumnConfigurationDidChange")
+	BrowserDelegate_browserColumnConfigurationDidChange :: proc(self: ^BrowserDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:shouldShowCellExpansionForRow:column:", objc_name="browser_shouldShowCellExpansionForRow_column")
+	BrowserDelegate_browser_shouldShowCellExpansionForRow_column :: proc(self: ^BrowserDelegate, browser: ^Browser, row: NS.Integer, column: NS.Integer) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:writeRowsWithIndexes:inColumn:toPasteboard:", objc_name="browser_writeRowsWithIndexes_inColumn_toPasteboard")
+	BrowserDelegate_browser_writeRowsWithIndexes_inColumn_toPasteboard :: proc(self: ^BrowserDelegate, browser: ^Browser, rowIndexes: ^NS.IndexSet, column: NS.Integer, pasteboard: ^Pasteboard) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:namesOfPromisedFilesDroppedAtDestination:forDraggedRowsWithIndexes:inColumn:", objc_name="browser_namesOfPromisedFilesDroppedAtDestination_forDraggedRowsWithIndexes_inColumn")
+	BrowserDelegate_browser_namesOfPromisedFilesDroppedAtDestination_forDraggedRowsWithIndexes_inColumn :: proc(self: ^BrowserDelegate, browser: ^Browser, dropDestination: ^NS.URL, rowIndexes: ^NS.IndexSet, column: NS.Integer) -> ^NS.Array ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:canDragRowsWithIndexes:inColumn:withEvent:", objc_name="browser_canDragRowsWithIndexes_inColumn_withEvent")
+	BrowserDelegate_browser_canDragRowsWithIndexes_inColumn_withEvent :: proc(self: ^BrowserDelegate, browser: ^Browser, rowIndexes: ^NS.IndexSet, column: NS.Integer, event: ^Event) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:draggingImageForRowsWithIndexes:inColumn:withEvent:offset:", objc_name="browser_draggingImageForRowsWithIndexes_inColumn_withEvent_offset")
+	BrowserDelegate_browser_draggingImageForRowsWithIndexes_inColumn_withEvent_offset :: proc(self: ^BrowserDelegate, browser: ^Browser, rowIndexes: ^NS.IndexSet, column: NS.Integer, event: ^Event, dragImageOffset: ^CG.Point) -> ^Image ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:validateDrop:proposedRow:column:dropOperation:", objc_name="browser_validateDrop_proposedRow_column_dropOperation")
+	BrowserDelegate_browser_validateDrop_proposedRow_column_dropOperation :: proc(self: ^BrowserDelegate, browser: ^Browser, info: ^DraggingInfo, row: ^NS.Integer, column: ^NS.Integer, dropOperation: ^BrowserDropOperation) -> DragOperation ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:acceptDrop:atRow:column:dropOperation:", objc_name="browser_acceptDrop_atRow_column_dropOperation")
+	BrowserDelegate_browser_acceptDrop_atRow_column_dropOperation :: proc(self: ^BrowserDelegate, browser: ^Browser, info: ^DraggingInfo, row: NS.Integer, column: NS.Integer, dropOperation: BrowserDropOperation) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:typeSelectStringForRow:inColumn:", objc_name="browser_typeSelectStringForRow_inColumn")
+	BrowserDelegate_browser_typeSelectStringForRow_inColumn :: proc(self: ^BrowserDelegate, browser: ^Browser, row: NS.Integer, column: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:shouldTypeSelectForEvent:withCurrentSearchString:", objc_name="browser_shouldTypeSelectForEvent_withCurrentSearchString")
+	BrowserDelegate_browser_shouldTypeSelectForEvent_withCurrentSearchString :: proc(self: ^BrowserDelegate, browser: ^Browser, event: ^Event, searchString: ^NS.String) -> bool ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:nextTypeSelectMatchFromRow:toRow:inColumn:forString:", objc_name="browser_nextTypeSelectMatchFromRow_toRow_inColumn_forString")
+	BrowserDelegate_browser_nextTypeSelectMatchFromRow_toRow_inColumn_forString :: proc(self: ^BrowserDelegate, browser: ^Browser, startRow: NS.Integer, endRow: NS.Integer, column: NS.Integer, searchString: ^NS.String) -> NS.Integer ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:previewViewControllerForLeafItem:", objc_name="browser_previewViewControllerForLeafItem")
+	BrowserDelegate_browser_previewViewControllerForLeafItem :: proc(self: ^BrowserDelegate, browser: ^Browser, item: id) -> ^ViewController ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:headerViewControllerForItem:", objc_name="browser_headerViewControllerForItem")
+	BrowserDelegate_browser_headerViewControllerForItem :: proc(self: ^BrowserDelegate, browser: ^Browser, item: id) -> ^ViewController ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:didChangeLastColumn:toColumn:", objc_name="browser_didChangeLastColumn_toColumn")
+	BrowserDelegate_browser_didChangeLastColumn_toColumn :: proc(self: ^BrowserDelegate, browser: ^Browser, oldLastColumn: NS.Integer, column: NS.Integer) ---
+
+	@(objc_type=BrowserDelegate, objc_selector="browser:selectionIndexesForProposedSelection:inColumn:", objc_name="browser_selectionIndexesForProposedSelection_inColumn")
+	BrowserDelegate_browser_selectionIndexesForProposedSelection_inColumn :: proc(self: ^BrowserDelegate, browser: ^Browser, proposedSelectionIndexes: ^NS.IndexSet, column: NS.Integer) -> ^NS.IndexSet ---
+}
+
+
+@(objc_class="NSBrowserCell", objc_superclass=Cell)
+BrowserCell :: struct { using _: Cell}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=BrowserCell, objc_selector="initTextCell:", objc_name="initTextCell")
+	BrowserCell_initTextCell :: proc(self: ^BrowserCell, string: ^NS.String) -> instancetype ---
+
+	@(objc_type=BrowserCell, objc_selector="initImageCell:", objc_name="initImageCell")
+	BrowserCell_initImageCell :: proc(self: ^BrowserCell, image: ^Image) -> instancetype ---
+
+	@(objc_type=BrowserCell, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	BrowserCell_initWithCoder :: proc(self: ^BrowserCell, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=BrowserCell, objc_selector="highlightColorInView:", objc_name="highlightColorInView")
+	BrowserCell_highlightColorInView :: proc(self: ^BrowserCell, controlView: ^View) -> ^Color ---
+
+	@(objc_type=BrowserCell, objc_selector="reset", objc_name="reset")
+	BrowserCell_reset :: proc(self: ^BrowserCell) ---
+
+	@(objc_type=BrowserCell, objc_selector="set", objc_name="set")
+	BrowserCell_set :: proc(self: ^BrowserCell) ---
+
+	@(objc_type=BrowserCell, objc_selector="branchImage", objc_name="branchImage", objc_is_class_method=true)
+	BrowserCell_branchImage :: proc() -> ^Image ---
+
+	@(objc_type=BrowserCell, objc_selector="highlightedBranchImage", objc_name="highlightedBranchImage", objc_is_class_method=true)
+	BrowserCell_highlightedBranchImage :: proc() -> ^Image ---
+
+	@(objc_type=BrowserCell, objc_selector="isLeaf", objc_name="isLeaf")
+	BrowserCell_isLeaf :: proc(self: ^BrowserCell) -> bool ---
+
+	@(objc_type=BrowserCell, objc_selector="setLeaf:", objc_name="setLeaf")
+	BrowserCell_setLeaf :: proc(self: ^BrowserCell, leaf: bool) ---
+
+	@(objc_type=BrowserCell, objc_selector="isLoaded", objc_name="isLoaded")
+	BrowserCell_isLoaded :: proc(self: ^BrowserCell) -> bool ---
+
+	@(objc_type=BrowserCell, objc_selector="setLoaded:", objc_name="setLoaded")
+	BrowserCell_setLoaded :: proc(self: ^BrowserCell, loaded: bool) ---
+
+	@(objc_type=BrowserCell, objc_selector="image", objc_name="image")
+	BrowserCell_image :: proc(self: ^BrowserCell) -> ^Image ---
+
+	@(objc_type=BrowserCell, objc_selector="setImage:", objc_name="setImage")
+	BrowserCell_setImage :: proc(self: ^BrowserCell, image: ^Image) ---
+
+	@(objc_type=BrowserCell, objc_selector="alternateImage", objc_name="alternateImage")
+	BrowserCell_alternateImage :: proc(self: ^BrowserCell) -> ^Image ---
+
+	@(objc_type=BrowserCell, objc_selector="setAlternateImage:", objc_name="setAlternateImage")
+	BrowserCell_setAlternateImage :: proc(self: ^BrowserCell, alternateImage: ^Image) ---
 }

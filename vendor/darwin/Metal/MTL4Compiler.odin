@@ -198,3 +198,57 @@ MTL4Compiler_newMachineLearningPipelineStateWithDescriptor_ :: #force_inline pro
 	res = MTL4Compiler_newMachineLearningPipelineStateWithDescriptor_error(self, descriptor, &err)
 	return
 }
+
+
+@(objc_class="MTL4CompilerDescriptor", objc_superclass=NS.Object)
+MTL4CompilerDescriptor :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=MTL4CompilerDescriptor, objc_selector="label", objc_name="label")
+	MTL4CompilerDescriptor_label :: proc(self: ^MTL4CompilerDescriptor) -> ^NS.String ---
+
+	@(objc_type=MTL4CompilerDescriptor, objc_selector="setLabel:", objc_name="setLabel")
+	MTL4CompilerDescriptor_setLabel :: proc(self: ^MTL4CompilerDescriptor, label: ^NS.String) ---
+
+	@(objc_type=MTL4CompilerDescriptor, objc_selector="pipelineDataSetSerializer", objc_name="pipelineDataSetSerializer")
+	MTL4CompilerDescriptor_pipelineDataSetSerializer :: proc(self: ^MTL4CompilerDescriptor) -> ^MTL4PipelineDataSetSerializer ---
+
+	@(objc_type=MTL4CompilerDescriptor, objc_selector="setPipelineDataSetSerializer:", objc_name="setPipelineDataSetSerializer")
+	MTL4CompilerDescriptor_setPipelineDataSetSerializer :: proc(self: ^MTL4CompilerDescriptor, pipelineDataSetSerializer: ^MTL4PipelineDataSetSerializer) ---
+}
+
+
+@(objc_class="MTL4CompilerTask")
+MTL4CompilerTask :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=MTL4CompilerTask, objc_selector="waitUntilCompleted", objc_name="waitUntilCompleted")
+	MTL4CompilerTask_waitUntilCompleted :: proc(self: ^MTL4CompilerTask) ---
+
+	@(objc_type=MTL4CompilerTask, objc_selector="compiler", objc_name="compiler")
+	MTL4CompilerTask_compiler :: proc(self: ^MTL4CompilerTask) -> ^MTL4Compiler ---
+
+	@(objc_type=MTL4CompilerTask, objc_selector="status", objc_name="status")
+	MTL4CompilerTask_status :: proc(self: ^MTL4CompilerTask) -> MTL4CompilerTaskStatus ---
+}
+
+
+@(objc_class="MTL4CompilerTaskOptions", objc_superclass=NS.Object)
+MTL4CompilerTaskOptions :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=MTL4CompilerTaskOptions, objc_selector="lookupArchives", objc_name="lookupArchives")
+	MTL4CompilerTaskOptions_lookupArchives :: proc(self: ^MTL4CompilerTaskOptions) -> ^NS.Array ---
+
+	@(objc_type=MTL4CompilerTaskOptions, objc_selector="setLookupArchives:", objc_name="setLookupArchives")
+	MTL4CompilerTaskOptions_setLookupArchives :: proc(self: ^MTL4CompilerTaskOptions, lookupArchives: ^NS.Array) ---
+}

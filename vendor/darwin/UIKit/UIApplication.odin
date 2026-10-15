@@ -4,10 +4,7 @@ package darwin_UIKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIApplication", objc_superclass=Responder)
 Application :: struct { using _: Responder}
@@ -290,4 +287,285 @@ Application_setStatusBarStyle :: proc {
 Application_defaultStatusForCategory :: #force_inline proc "c" (self: ^Application, category: ApplicationCategory) -> (res: ApplicationCategoryDefaultStatus, err: ^NS.Error) {
 	res = Application_defaultStatusForCategory_error(self, category, &err)
 	return
+}
+
+
+@(objc_class="UIApplicationDelegate")
+ApplicationDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidFinishLaunching:", objc_name="applicationDidFinishLaunching")
+	ApplicationDelegate_applicationDidFinishLaunching :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willFinishLaunchingWithOptions:", objc_name="application_willFinishLaunchingWithOptions")
+	ApplicationDelegate_application_willFinishLaunchingWithOptions :: proc(self: ^ApplicationDelegate, application: ^Application, launchOptions: ^NS.Dictionary) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didFinishLaunchingWithOptions:", objc_name="application_didFinishLaunchingWithOptions")
+	ApplicationDelegate_application_didFinishLaunchingWithOptions :: proc(self: ^ApplicationDelegate, application: ^Application, launchOptions: ^NS.Dictionary) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidBecomeActive:", objc_name="applicationDidBecomeActive")
+	ApplicationDelegate_applicationDidBecomeActive :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillResignActive:", objc_name="applicationWillResignActive")
+	ApplicationDelegate_applicationWillResignActive :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidEnterBackground:", objc_name="applicationDidEnterBackground")
+	ApplicationDelegate_applicationDidEnterBackground :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillEnterForeground:", objc_name="applicationWillEnterForeground")
+	ApplicationDelegate_applicationWillEnterForeground :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleOpenURL:", objc_name="application_handleOpenURL")
+	ApplicationDelegate_application_handleOpenURL :: proc(self: ^ApplicationDelegate, application: ^Application, url: ^NS.URL) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:openURL:sourceApplication:annotation:", objc_name="application_openURL_sourceApplication_annotation")
+	ApplicationDelegate_application_openURL_sourceApplication_annotation :: proc(self: ^ApplicationDelegate, application: ^Application, url: ^NS.URL, sourceApplication: ^NS.String, annotation: id) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:openURL:options:", objc_name="application_openURL_options")
+	ApplicationDelegate_application_openURL_options :: proc(self: ^ApplicationDelegate, app: ^Application, url: ^NS.URL, options: ^NS.Dictionary) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationDidReceiveMemoryWarning:", objc_name="applicationDidReceiveMemoryWarning")
+	ApplicationDelegate_applicationDidReceiveMemoryWarning :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationWillTerminate:", objc_name="applicationWillTerminate")
+	ApplicationDelegate_applicationWillTerminate :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationSignificantTimeChange:", objc_name="applicationSignificantTimeChange")
+	ApplicationDelegate_applicationSignificantTimeChange :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willChangeStatusBarOrientation:duration:", objc_name="application_willChangeStatusBarOrientation_duration")
+	ApplicationDelegate_application_willChangeStatusBarOrientation_duration :: proc(self: ^ApplicationDelegate, application: ^Application, newStatusBarOrientation: InterfaceOrientation, duration: NS.TimeInterval) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didChangeStatusBarOrientation:", objc_name="application_didChangeStatusBarOrientation")
+	ApplicationDelegate_application_didChangeStatusBarOrientation :: proc(self: ^ApplicationDelegate, application: ^Application, oldStatusBarOrientation: InterfaceOrientation) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willChangeStatusBarFrame:", objc_name="application_willChangeStatusBarFrame")
+	ApplicationDelegate_application_willChangeStatusBarFrame :: proc(self: ^ApplicationDelegate, application: ^Application, newStatusBarFrame: CG.Rect) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didChangeStatusBarFrame:", objc_name="application_didChangeStatusBarFrame")
+	ApplicationDelegate_application_didChangeStatusBarFrame :: proc(self: ^ApplicationDelegate, application: ^Application, oldStatusBarFrame: CG.Rect) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didRegisterUserNotificationSettings:", objc_name="application_didRegisterUserNotificationSettings")
+	ApplicationDelegate_application_didRegisterUserNotificationSettings :: proc(self: ^ApplicationDelegate, application: ^Application, notificationSettings: ^UserNotificationSettings) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didRegisterForRemoteNotificationsWithDeviceToken:", objc_name="application_didRegisterForRemoteNotificationsWithDeviceToken")
+	ApplicationDelegate_application_didRegisterForRemoteNotificationsWithDeviceToken :: proc(self: ^ApplicationDelegate, application: ^Application, deviceToken: ^NS.Data) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didFailToRegisterForRemoteNotificationsWithError:", objc_name="application_didFailToRegisterForRemoteNotificationsWithError")
+	ApplicationDelegate_application_didFailToRegisterForRemoteNotificationsWithError :: proc(self: ^ApplicationDelegate, application: ^Application, error: ^NS.Error) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didReceiveRemoteNotification:", objc_name="application_didReceiveRemoteNotification")
+	ApplicationDelegate_application_didReceiveRemoteNotification :: proc(self: ^ApplicationDelegate, application: ^Application, userInfo: ^NS.Dictionary) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didReceiveLocalNotification:", objc_name="application_didReceiveLocalNotification")
+	ApplicationDelegate_application_didReceiveLocalNotification :: proc(self: ^ApplicationDelegate, application: ^Application, notification: ^LocalNotification) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleActionWithIdentifier:forLocalNotification:completionHandler:", objc_name="application_handleActionWithIdentifier_forLocalNotification_completionHandler")
+	ApplicationDelegate_application_handleActionWithIdentifier_forLocalNotification_completionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, identifier: ^NS.String, notification: ^LocalNotification, completionHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleActionWithIdentifier:forRemoteNotification:withResponseInfo:completionHandler:", objc_name="application_handleActionWithIdentifier_forRemoteNotification_withResponseInfo_completionHandler")
+	ApplicationDelegate_application_handleActionWithIdentifier_forRemoteNotification_withResponseInfo_completionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, identifier: ^NS.String, userInfo: ^NS.Dictionary, responseInfo: ^NS.Dictionary, completionHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleActionWithIdentifier:forRemoteNotification:completionHandler:", objc_name="application_handleActionWithIdentifier_forRemoteNotification_completionHandler")
+	ApplicationDelegate_application_handleActionWithIdentifier_forRemoteNotification_completionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, identifier: ^NS.String, userInfo: ^NS.Dictionary, completionHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleActionWithIdentifier:forLocalNotification:withResponseInfo:completionHandler:", objc_name="application_handleActionWithIdentifier_forLocalNotification_withResponseInfo_completionHandler")
+	ApplicationDelegate_application_handleActionWithIdentifier_forLocalNotification_withResponseInfo_completionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, identifier: ^NS.String, notification: ^LocalNotification, responseInfo: ^NS.Dictionary, completionHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didReceiveRemoteNotification:fetchCompletionHandler:", objc_name="application_didReceiveRemoteNotification_fetchCompletionHandler")
+	ApplicationDelegate_application_didReceiveRemoteNotification_fetchCompletionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, userInfo: ^NS.Dictionary, completionHandler: ^Objc_Block(proc "c" ( result: BackgroundFetchResult ))) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:performFetchWithCompletionHandler:", objc_name="application_performFetchWithCompletionHandler")
+	ApplicationDelegate_application_performFetchWithCompletionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, completionHandler: ^Objc_Block(proc "c" ( result: BackgroundFetchResult ))) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:performActionForShortcutItem:completionHandler:", objc_name="application_performActionForShortcutItem_completionHandler")
+	ApplicationDelegate_application_performActionForShortcutItem_completionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, shortcutItem: ^ApplicationShortcutItem, completionHandler: ^Objc_Block(proc "c" ( succeeded: bool ))) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleEventsForBackgroundURLSession:completionHandler:", objc_name="application_handleEventsForBackgroundURLSession_completionHandler")
+	ApplicationDelegate_application_handleEventsForBackgroundURLSession_completionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, identifier: ^NS.String, completionHandler: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleWatchKitExtensionRequest:reply:", objc_name="application_handleWatchKitExtensionRequest_reply")
+	ApplicationDelegate_application_handleWatchKitExtensionRequest_reply :: proc(self: ^ApplicationDelegate, application: ^Application, userInfo: ^NS.Dictionary, reply: ^Objc_Block(proc "c" ( replyInfo: ^NS.Dictionary ))) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationShouldRequestHealthAuthorization:", objc_name="applicationShouldRequestHealthAuthorization")
+	ApplicationDelegate_applicationShouldRequestHealthAuthorization :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handlerForIntent:", objc_name="application_handlerForIntent")
+	ApplicationDelegate_application_handlerForIntent :: proc(self: ^ApplicationDelegate, application: ^Application, intent: ^INIntent) -> id ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:handleIntent:completionHandler:", objc_name="application_handleIntent_completionHandler")
+	ApplicationDelegate_application_handleIntent_completionHandler :: proc(self: ^ApplicationDelegate, application: ^Application, intent: ^INIntent, completionHandler: ^Objc_Block(proc "c" ( intentResponse: ^INIntentResponse ))) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationProtectedDataWillBecomeUnavailable:", objc_name="applicationProtectedDataWillBecomeUnavailable")
+	ApplicationDelegate_applicationProtectedDataWillBecomeUnavailable :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationProtectedDataDidBecomeAvailable:", objc_name="applicationProtectedDataDidBecomeAvailable")
+	ApplicationDelegate_applicationProtectedDataDidBecomeAvailable :: proc(self: ^ApplicationDelegate, application: ^Application) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:supportedInterfaceOrientationsForWindow:", objc_name="application_supportedInterfaceOrientationsForWindow")
+	ApplicationDelegate_application_supportedInterfaceOrientationsForWindow :: proc(self: ^ApplicationDelegate, application: ^Application, window: ^Window) -> InterfaceOrientationMask ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:shouldAllowExtensionPointIdentifier:", objc_name="application_shouldAllowExtensionPointIdentifier")
+	ApplicationDelegate_application_shouldAllowExtensionPointIdentifier :: proc(self: ^ApplicationDelegate, application: ^Application, extensionPointIdentifier: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:viewControllerWithRestorationIdentifierPath:coder:", objc_name="application_viewControllerWithRestorationIdentifierPath_coder")
+	ApplicationDelegate_application_viewControllerWithRestorationIdentifierPath_coder :: proc(self: ^ApplicationDelegate, application: ^Application, identifierComponents: ^NS.Array, coder: ^NS.Coder) -> ^ViewController ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:shouldSaveSecureApplicationState:", objc_name="application_shouldSaveSecureApplicationState")
+	ApplicationDelegate_application_shouldSaveSecureApplicationState :: proc(self: ^ApplicationDelegate, application: ^Application, coder: ^NS.Coder) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:shouldRestoreSecureApplicationState:", objc_name="application_shouldRestoreSecureApplicationState")
+	ApplicationDelegate_application_shouldRestoreSecureApplicationState :: proc(self: ^ApplicationDelegate, application: ^Application, coder: ^NS.Coder) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willEncodeRestorableStateWithCoder:", objc_name="application_willEncodeRestorableStateWithCoder")
+	ApplicationDelegate_application_willEncodeRestorableStateWithCoder :: proc(self: ^ApplicationDelegate, application: ^Application, coder: ^NS.Coder) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didDecodeRestorableStateWithCoder:", objc_name="application_didDecodeRestorableStateWithCoder")
+	ApplicationDelegate_application_didDecodeRestorableStateWithCoder :: proc(self: ^ApplicationDelegate, application: ^Application, coder: ^NS.Coder) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:shouldSaveApplicationState:", objc_name="application_shouldSaveApplicationState")
+	ApplicationDelegate_application_shouldSaveApplicationState :: proc(self: ^ApplicationDelegate, application: ^Application, coder: ^NS.Coder) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:shouldRestoreApplicationState:", objc_name="application_shouldRestoreApplicationState")
+	ApplicationDelegate_application_shouldRestoreApplicationState :: proc(self: ^ApplicationDelegate, application: ^Application, coder: ^NS.Coder) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:willContinueUserActivityWithType:", objc_name="application_willContinueUserActivityWithType")
+	ApplicationDelegate_application_willContinueUserActivityWithType :: proc(self: ^ApplicationDelegate, application: ^Application, userActivityType: ^NS.String) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:continueUserActivity:restorationHandler:", objc_name="application_continueUserActivity_restorationHandler")
+	ApplicationDelegate_application_continueUserActivity_restorationHandler :: proc(self: ^ApplicationDelegate, application: ^Application, userActivity: ^NS.UserActivity, restorationHandler: ^Objc_Block(proc "c" ( restorableObjects: ^NS.Array ))) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didFailToContinueUserActivityWithType:error:", objc_name="application_didFailToContinueUserActivityWithType_error")
+	ApplicationDelegate_application_didFailToContinueUserActivityWithType_error :: proc(self: ^ApplicationDelegate, application: ^Application, userActivityType: ^NS.String, error: ^NS.Error) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didUpdateUserActivity:", objc_name="application_didUpdateUserActivity")
+	ApplicationDelegate_application_didUpdateUserActivity :: proc(self: ^ApplicationDelegate, application: ^Application, userActivity: ^NS.UserActivity) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:userDidAcceptCloudKitShareWithMetadata:", objc_name="application_userDidAcceptCloudKitShareWithMetadata")
+	ApplicationDelegate_application_userDidAcceptCloudKitShareWithMetadata :: proc(self: ^ApplicationDelegate, application: ^Application, cloudKitShareMetadata: ^CKShareMetadata) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:configurationForConnectingSceneSession:options:", objc_name="application_configurationForConnectingSceneSession_options")
+	ApplicationDelegate_application_configurationForConnectingSceneSession_options :: proc(self: ^ApplicationDelegate, application: ^Application, connectingSceneSession: ^SceneSession, options: ^SceneConnectionOptions) -> ^SceneConfiguration ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="application:didDiscardSceneSessions:", objc_name="application_didDiscardSceneSessions")
+	ApplicationDelegate_application_didDiscardSceneSessions :: proc(self: ^ApplicationDelegate, application: ^Application, sceneSessions: ^NS.Set) ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="applicationShouldAutomaticallyLocalizeKeyCommands:", objc_name="applicationShouldAutomaticallyLocalizeKeyCommands")
+	ApplicationDelegate_applicationShouldAutomaticallyLocalizeKeyCommands :: proc(self: ^ApplicationDelegate, application: ^Application) -> bool ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="window", objc_name="window")
+	ApplicationDelegate_window :: proc(self: ^ApplicationDelegate) -> ^Window ---
+
+	@(objc_type=ApplicationDelegate, objc_selector="setWindow:", objc_name="setWindow")
+	ApplicationDelegate_setWindow :: proc(self: ^ApplicationDelegate, window: ^Window) ---
+}
+
+
+@(objc_class="UIApplicationShortcutIcon", objc_superclass=NS.Object)
+ApplicationShortcutIcon :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ApplicationShortcutIcon, objc_selector="iconWithType:", objc_name="iconWithType", objc_is_class_method=true)
+	ApplicationShortcutIcon_iconWithType :: proc(type: ApplicationShortcutIconType) -> instancetype ---
+
+	@(objc_type=ApplicationShortcutIcon, objc_selector="iconWithTemplateImageName:", objc_name="iconWithTemplateImageName", objc_is_class_method=true)
+	ApplicationShortcutIcon_iconWithTemplateImageName :: proc(templateImageName: ^NS.String) -> instancetype ---
+
+	@(objc_type=ApplicationShortcutIcon, objc_selector="iconWithSystemImageName:", objc_name="iconWithSystemImageName", objc_is_class_method=true)
+	ApplicationShortcutIcon_iconWithSystemImageName :: proc(systemImageName: ^NS.String) -> instancetype ---
+}
+
+
+@(objc_class="UIApplicationShortcutItem", objc_superclass=NS.Object)
+ApplicationShortcutItem :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+	using _: NS.MutableCopying,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ApplicationShortcutItem, objc_selector="init", objc_name="init")
+	ApplicationShortcutItem_init :: proc(self: ^ApplicationShortcutItem) -> instancetype ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="initWithType:localizedTitle:localizedSubtitle:icon:userInfo:", objc_name="initWithType_localizedTitle_localizedSubtitle_icon_userInfo")
+	ApplicationShortcutItem_initWithType_localizedTitle_localizedSubtitle_icon_userInfo :: proc(self: ^ApplicationShortcutItem, type: ^NS.String, localizedTitle: ^NS.String, localizedSubtitle: ^NS.String, icon: ^ApplicationShortcutIcon, userInfo: ^NS.Dictionary) -> instancetype ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="initWithType:localizedTitle:", objc_name="initWithType_localizedTitle")
+	ApplicationShortcutItem_initWithType_localizedTitle :: proc(self: ^ApplicationShortcutItem, type: ^NS.String, localizedTitle: ^NS.String) -> instancetype ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="type", objc_name="type")
+	ApplicationShortcutItem_type :: proc(self: ^ApplicationShortcutItem) -> ^NS.String ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="localizedTitle", objc_name="localizedTitle")
+	ApplicationShortcutItem_localizedTitle :: proc(self: ^ApplicationShortcutItem) -> ^NS.String ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="localizedSubtitle", objc_name="localizedSubtitle")
+	ApplicationShortcutItem_localizedSubtitle :: proc(self: ^ApplicationShortcutItem) -> ^NS.String ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="icon", objc_name="icon")
+	ApplicationShortcutItem_icon :: proc(self: ^ApplicationShortcutItem) -> ^ApplicationShortcutIcon ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="userInfo", objc_name="userInfo")
+	ApplicationShortcutItem_userInfo :: proc(self: ^ApplicationShortcutItem) -> ^NS.Dictionary ---
+
+	@(objc_type=ApplicationShortcutItem, objc_selector="targetContentIdentifier", objc_name="targetContentIdentifier")
+	ApplicationShortcutItem_targetContentIdentifier :: proc(self: ^ApplicationShortcutItem) -> id ---
+}
+
+@(objc_type=ApplicationShortcutItem, objc_name="initWithType")
+ApplicationShortcutItem_initWithType :: proc {
+	ApplicationShortcutItem_initWithType_localizedTitle_localizedSubtitle_icon_userInfo,
+	ApplicationShortcutItem_initWithType_localizedTitle,
+}
+
+
+@(objc_class="UIMutableApplicationShortcutItem", objc_superclass=ApplicationShortcutItem)
+MutableApplicationShortcutItem :: struct { using _: ApplicationShortcutItem}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="type", objc_name="type")
+	MutableApplicationShortcutItem_type :: proc(self: ^MutableApplicationShortcutItem) -> ^NS.String ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="setType:", objc_name="setType")
+	MutableApplicationShortcutItem_setType :: proc(self: ^MutableApplicationShortcutItem, type: ^NS.String) ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="localizedTitle", objc_name="localizedTitle")
+	MutableApplicationShortcutItem_localizedTitle :: proc(self: ^MutableApplicationShortcutItem) -> ^NS.String ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="setLocalizedTitle:", objc_name="setLocalizedTitle")
+	MutableApplicationShortcutItem_setLocalizedTitle :: proc(self: ^MutableApplicationShortcutItem, localizedTitle: ^NS.String) ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="localizedSubtitle", objc_name="localizedSubtitle")
+	MutableApplicationShortcutItem_localizedSubtitle :: proc(self: ^MutableApplicationShortcutItem) -> ^NS.String ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="setLocalizedSubtitle:", objc_name="setLocalizedSubtitle")
+	MutableApplicationShortcutItem_setLocalizedSubtitle :: proc(self: ^MutableApplicationShortcutItem, localizedSubtitle: ^NS.String) ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="icon", objc_name="icon")
+	MutableApplicationShortcutItem_icon :: proc(self: ^MutableApplicationShortcutItem) -> ^ApplicationShortcutIcon ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="setIcon:", objc_name="setIcon")
+	MutableApplicationShortcutItem_setIcon :: proc(self: ^MutableApplicationShortcutItem, icon: ^ApplicationShortcutIcon) ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="userInfo", objc_name="userInfo")
+	MutableApplicationShortcutItem_userInfo :: proc(self: ^MutableApplicationShortcutItem) -> ^NS.Dictionary ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="setUserInfo:", objc_name="setUserInfo")
+	MutableApplicationShortcutItem_setUserInfo :: proc(self: ^MutableApplicationShortcutItem, userInfo: ^NS.Dictionary) ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="targetContentIdentifier", objc_name="targetContentIdentifier")
+	MutableApplicationShortcutItem_targetContentIdentifier :: proc(self: ^MutableApplicationShortcutItem) -> id ---
+
+	@(objc_type=MutableApplicationShortcutItem, objc_selector="setTargetContentIdentifier:", objc_name="setTargetContentIdentifier")
+	MutableApplicationShortcutItem_setTargetContentIdentifier :: proc(self: ^MutableApplicationShortcutItem, targetContentIdentifier: id) ---
 }

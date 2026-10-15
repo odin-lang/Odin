@@ -2,6 +2,7 @@
 #+build darwin
 package darwin_Foundation
 
+import "base:intrinsics"
 
 @(objc_class="NSHTTPCookie", objc_superclass=Object)
 HTTPCookie :: struct { using _: Object}
@@ -61,3 +62,56 @@ foreign lib {
 	@(objc_type=HTTPCookie, objc_selector="sameSitePolicy", objc_name="sameSitePolicy")
 	HTTPCookie_sameSitePolicy :: proc(self: ^HTTPCookie) -> ^String ---
 }
+
+
+@(objc_class="NSHTTPCookieInternal")
+HTTPCookieInternal :: struct { using _: intrinsics.objc_object}
+
+
+@(objc_class="NSHTTPCookieStorage", objc_superclass=Object)
+HTTPCookieStorage :: struct { using _: Object}
+
+foreign lib {
+	@(objc_type=HTTPCookieStorage, objc_selector="sharedCookieStorageForGroupContainerIdentifier:", objc_name="sharedCookieStorageForGroupContainerIdentifier", objc_is_class_method=true)
+	HTTPCookieStorage_sharedCookieStorageForGroupContainerIdentifier :: proc(identifier: ^String) -> ^HTTPCookieStorage ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="setCookie:", objc_name="setCookie")
+	HTTPCookieStorage_setCookie :: proc(self: ^HTTPCookieStorage, cookie: ^HTTPCookie) ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="deleteCookie:", objc_name="deleteCookie")
+	HTTPCookieStorage_deleteCookie :: proc(self: ^HTTPCookieStorage, cookie: ^HTTPCookie) ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="removeCookiesSinceDate:", objc_name="removeCookiesSinceDate")
+	HTTPCookieStorage_removeCookiesSinceDate :: proc(self: ^HTTPCookieStorage, date: ^Date) ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="cookiesForURL:", objc_name="cookiesForURL")
+	HTTPCookieStorage_cookiesForURL :: proc(self: ^HTTPCookieStorage, _URL: ^URL) -> ^Array ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="setCookies:forURL:mainDocumentURL:", objc_name="setCookies")
+	HTTPCookieStorage_setCookies :: proc(self: ^HTTPCookieStorage, cookies: ^Array, _URL: ^URL, mainDocumentURL: ^URL) ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="sortedCookiesUsingDescriptors:", objc_name="sortedCookiesUsingDescriptors")
+	HTTPCookieStorage_sortedCookiesUsingDescriptors :: proc(self: ^HTTPCookieStorage, sortOrder: ^Array) -> ^Array ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="sharedHTTPCookieStorage", objc_name="sharedHTTPCookieStorage", objc_is_class_method=true)
+	HTTPCookieStorage_sharedHTTPCookieStorage :: proc() -> ^HTTPCookieStorage ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="cookies", objc_name="cookies")
+	HTTPCookieStorage_cookies :: proc(self: ^HTTPCookieStorage) -> ^Array ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="cookieAcceptPolicy", objc_name="cookieAcceptPolicy")
+	HTTPCookieStorage_cookieAcceptPolicy :: proc(self: ^HTTPCookieStorage) -> HTTPCookieAcceptPolicy ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="setCookieAcceptPolicy:", objc_name="setCookieAcceptPolicy")
+	HTTPCookieStorage_setCookieAcceptPolicy :: proc(self: ^HTTPCookieStorage, cookieAcceptPolicy: HTTPCookieAcceptPolicy) ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="storeCookies:forTask:", objc_name="storeCookies")
+	HTTPCookieStorage_storeCookies :: proc(self: ^HTTPCookieStorage, cookies: ^Array, task: ^URLSessionTask) ---
+
+	@(objc_type=HTTPCookieStorage, objc_selector="getCookiesForTask:completionHandler:", objc_name="getCookiesForTask")
+	HTTPCookieStorage_getCookiesForTask :: proc(self: ^HTTPCookieStorage, task: ^URLSessionTask, completionHandler: ^Objc_Block(proc "c" ( cookies: ^Array ))) ---
+}
+
+
+@(objc_class="NSHTTPCookieStorageInternal")
+HTTPCookieStorageInternal :: struct { using _: intrinsics.objc_object}

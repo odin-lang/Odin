@@ -5,6 +5,7 @@ package darwin_AVFoundation
 import cffi "core:c"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="AVCameraCalibrationData", objc_superclass=NS.Object)
 CameraCalibrationData :: struct { using _: NS.Object}
@@ -37,3 +38,7 @@ foreign lib {
 	@(objc_type=CameraCalibrationData, objc_selector="lensDistortionCenter", objc_name="lensDistortionCenter")
 	CameraCalibrationData_lensDistortionCenter :: proc(self: ^CameraCalibrationData) -> CG.Point ---
 }
+
+
+@(objc_class="AVCameraCalibrationDataInternal")
+CameraCalibrationDataInternal :: struct { using _: intrinsics.objc_object}

@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSPropertyListSerialization", objc_superclass=Object)
 PropertyListSerialization :: struct { using _: Object}
 

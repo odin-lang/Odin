@@ -3,10 +3,7 @@
 package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import cffi "core:c"
 
 @(objc_class="UIEvent", objc_superclass=NS.Object)
 Event :: struct { using _: NS.Object}
@@ -45,4 +42,58 @@ foreign lib {
 
 	@(objc_type=Event, objc_selector="allTouches", objc_name="allTouches")
 	Event_allTouches :: proc(self: ^Event) -> ^NS.Set ---
+}
+
+
+@(objc_class="UIEventAttribution", objc_superclass=NS.Object)
+EventAttribution :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=EventAttribution, objc_selector="initWithSourceIdentifier:destinationURL:sourceDescription:purchaser:", objc_name="initWithSourceIdentifier")
+	EventAttribution_initWithSourceIdentifier :: proc(self: ^EventAttribution, sourceIdentifier: cffi.uint8_t, destinationURL: ^NS.URL, sourceDescription: ^NS.String, purchaser: ^NS.String) -> instancetype ---
+
+	@(objc_type=EventAttribution, objc_selector="init", objc_name="init")
+	EventAttribution_init :: proc(self: ^EventAttribution) -> instancetype ---
+
+	@(objc_type=EventAttribution, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	EventAttribution_new :: proc() -> ^EventAttribution ---
+
+	@(objc_type=EventAttribution, objc_selector="sourceIdentifier", objc_name="sourceIdentifier")
+	EventAttribution_sourceIdentifier :: proc(self: ^EventAttribution) -> cffi.uint8_t ---
+
+	@(objc_type=EventAttribution, objc_selector="destinationURL", objc_name="destinationURL")
+	EventAttribution_destinationURL :: proc(self: ^EventAttribution) -> ^NS.URL ---
+
+	@(objc_type=EventAttribution, objc_selector="reportEndpoint", objc_name="reportEndpoint")
+	EventAttribution_reportEndpoint :: proc(self: ^EventAttribution) -> ^NS.URL ---
+
+	@(objc_type=EventAttribution, objc_selector="sourceDescription", objc_name="sourceDescription")
+	EventAttribution_sourceDescription :: proc(self: ^EventAttribution) -> ^NS.String ---
+
+	@(objc_type=EventAttribution, objc_selector="purchaser", objc_name="purchaser")
+	EventAttribution_purchaser :: proc(self: ^EventAttribution) -> ^NS.String ---
+}
+
+
+@(objc_class="UIEventAttributionView", objc_superclass=View)
+EventAttributionView :: struct { using _: View}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="UIPressesEvent", objc_superclass=Event)
+PressesEvent :: struct { using _: Event}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PressesEvent, objc_selector="pressesForGestureRecognizer:", objc_name="pressesForGestureRecognizer")
+	PressesEvent_pressesForGestureRecognizer :: proc(self: ^PressesEvent, gesture: ^GestureRecognizer) -> ^NS.Set ---
+
+	@(objc_type=PressesEvent, objc_selector="allPresses", objc_name="allPresses")
+	PressesEvent_allPresses :: proc(self: ^PressesEvent) -> ^NS.Set ---
 }

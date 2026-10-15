@@ -2,11 +2,6 @@
 #+build darwin:default
 package darwin_AppKit
 
-
-
-
-
-
 @(objc_class="NSSwitch", objc_superclass=Control)
 Switch :: struct {
 	using _: Control,

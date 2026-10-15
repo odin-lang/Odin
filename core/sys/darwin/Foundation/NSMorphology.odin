@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSMorphology", objc_superclass=Object)
 Morphology :: struct {
 	using _: Object,
@@ -79,4 +78,78 @@ foreign lib {
 Morphology_setCustomPronoun :: #force_inline proc "c" (self: ^Morphology, features: ^MorphologyCustomPronoun, language: ^String) -> (ok: bool, err: ^Error) {
 	ok = Morphology_setCustomPronoun_error(self, features, language, &err)
 	return
+}
+
+
+@(objc_class="NSMorphologyCustomPronoun", objc_superclass=Object)
+MorphologyCustomPronoun :: struct {
+	using _: Object,
+	using _: Copying,
+	using _: SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=MorphologyCustomPronoun, objc_selector="isSupportedForLanguage:", objc_name="isSupportedForLanguage", objc_is_class_method=true)
+	MorphologyCustomPronoun_isSupportedForLanguage :: proc(language: ^String) -> bool ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="requiredKeysForLanguage:", objc_name="requiredKeysForLanguage", objc_is_class_method=true)
+	MorphologyCustomPronoun_requiredKeysForLanguage :: proc(language: ^String) -> ^Array ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="subjectForm", objc_name="subjectForm")
+	MorphologyCustomPronoun_subjectForm :: proc(self: ^MorphologyCustomPronoun) -> ^String ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="setSubjectForm:", objc_name="setSubjectForm")
+	MorphologyCustomPronoun_setSubjectForm :: proc(self: ^MorphologyCustomPronoun, subjectForm: ^String) ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="objectForm", objc_name="objectForm")
+	MorphologyCustomPronoun_objectForm :: proc(self: ^MorphologyCustomPronoun) -> ^String ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="setObjectForm:", objc_name="setObjectForm")
+	MorphologyCustomPronoun_setObjectForm :: proc(self: ^MorphologyCustomPronoun, objectForm: ^String) ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="possessiveForm", objc_name="possessiveForm")
+	MorphologyCustomPronoun_possessiveForm :: proc(self: ^MorphologyCustomPronoun) -> ^String ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="setPossessiveForm:", objc_name="setPossessiveForm")
+	MorphologyCustomPronoun_setPossessiveForm :: proc(self: ^MorphologyCustomPronoun, possessiveForm: ^String) ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="possessiveAdjectiveForm", objc_name="possessiveAdjectiveForm")
+	MorphologyCustomPronoun_possessiveAdjectiveForm :: proc(self: ^MorphologyCustomPronoun) -> ^String ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="setPossessiveAdjectiveForm:", objc_name="setPossessiveAdjectiveForm")
+	MorphologyCustomPronoun_setPossessiveAdjectiveForm :: proc(self: ^MorphologyCustomPronoun, possessiveAdjectiveForm: ^String) ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="reflexiveForm", objc_name="reflexiveForm")
+	MorphologyCustomPronoun_reflexiveForm :: proc(self: ^MorphologyCustomPronoun) -> ^String ---
+
+	@(objc_type=MorphologyCustomPronoun, objc_selector="setReflexiveForm:", objc_name="setReflexiveForm")
+	MorphologyCustomPronoun_setReflexiveForm :: proc(self: ^MorphologyCustomPronoun, reflexiveForm: ^String) ---
+}
+
+
+@(objc_class="NSMorphologyPronoun", objc_superclass=Object)
+MorphologyPronoun :: struct {
+	using _: Object,
+	using _: Copying,
+	using _: SecureCoding,
+}
+
+foreign lib {
+	@(objc_type=MorphologyPronoun, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	MorphologyPronoun_new :: proc() -> ^MorphologyPronoun ---
+
+	@(objc_type=MorphologyPronoun, objc_selector="init", objc_name="init")
+	MorphologyPronoun_init :: proc(self: ^MorphologyPronoun) -> instancetype ---
+
+	@(objc_type=MorphologyPronoun, objc_selector="initWithPronoun:morphology:dependentMorphology:", objc_name="initWithPronoun")
+	MorphologyPronoun_initWithPronoun :: proc(self: ^MorphologyPronoun, pronoun: ^String, morphology: ^Morphology, dependentMorphology: ^Morphology) -> instancetype ---
+
+	@(objc_type=MorphologyPronoun, objc_selector="pronoun", objc_name="pronoun")
+	MorphologyPronoun_pronoun :: proc(self: ^MorphologyPronoun) -> ^String ---
+
+	@(objc_type=MorphologyPronoun, objc_selector="morphology", objc_name="morphology")
+	MorphologyPronoun_morphology :: proc(self: ^MorphologyPronoun) -> ^Morphology ---
+
+	@(objc_type=MorphologyPronoun, objc_selector="dependentMorphology", objc_name="dependentMorphology")
+	MorphologyPronoun_dependentMorphology :: proc(self: ^MorphologyPronoun) -> ^Morphology ---
 }

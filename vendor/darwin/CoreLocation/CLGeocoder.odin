@@ -3,6 +3,7 @@
 package darwin_CoreLocation
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="CLGeocoder", objc_superclass=NS.Object)
 Geocoder :: struct { using _: NS.Object}
@@ -63,3 +64,7 @@ Geocoder_geocodePostalAddress :: proc {
 	Geocoder_geocodePostalAddress_completionHandler,
 	Geocoder_geocodePostalAddress_preferredLocale_completionHandler,
 }
+
+
+@(objc_class="CLGeocoderInternal")
+GeocoderInternal :: struct { using _: intrinsics.objc_object}

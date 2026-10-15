@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSStackView", objc_superclass=View)
 StackView :: struct { using _: View}
@@ -121,4 +118,20 @@ foreign lib {
 
 	@(objc_type=StackView, objc_selector="setHasEqualSpacing:", objc_name="setHasEqualSpacing")
 	StackView_setHasEqualSpacing :: proc(self: ^StackView, hasEqualSpacing: bool) ---
+}
+
+
+@(objc_class="NSStackViewDelegate")
+StackViewDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=StackViewDelegate, objc_selector="stackView:willDetachViews:", objc_name="stackView_willDetachViews")
+	StackViewDelegate_stackView_willDetachViews :: proc(self: ^StackViewDelegate, stackView: ^StackView, views: ^NS.Array) ---
+
+	@(objc_type=StackViewDelegate, objc_selector="stackView:didReattachViews:", objc_name="stackView_didReattachViews")
+	StackViewDelegate_stackView_didReattachViews :: proc(self: ^StackViewDelegate, stackView: ^StackView, views: ^NS.Array) ---
 }

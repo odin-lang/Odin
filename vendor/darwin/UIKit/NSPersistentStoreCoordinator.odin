@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import "base:intrinsics"
 
-
-
-
-
 @(objc_class="NSPersistentStoreCoordinator")
 NSPersistentStoreCoordinator :: struct { using _: intrinsics.objc_object}
 

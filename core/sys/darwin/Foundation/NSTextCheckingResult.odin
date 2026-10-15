@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSTextCheckingResult", objc_superclass=Object)
 TextCheckingResult :: struct {
 	using _: Object,

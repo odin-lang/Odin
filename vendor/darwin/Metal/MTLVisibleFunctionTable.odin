@@ -30,3 +30,21 @@ VisibleFunctionTable_setFunctions :: proc {
 	VisibleFunctionTable_setFunctions_,
 	VisibleFunctionTable_setFunctions_slice,
 }
+
+
+@(objc_class="MTLVisibleFunctionTableDescriptor", objc_superclass=NS.Object)
+VisibleFunctionTableDescriptor :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=VisibleFunctionTableDescriptor, objc_selector="visibleFunctionTableDescriptor", objc_name="visibleFunctionTableDescriptor", objc_is_class_method=true)
+	VisibleFunctionTableDescriptor_visibleFunctionTableDescriptor :: proc() -> ^VisibleFunctionTableDescriptor ---
+
+	@(objc_type=VisibleFunctionTableDescriptor, objc_selector="functionCount", objc_name="functionCount")
+	VisibleFunctionTableDescriptor_functionCount :: proc(self: ^VisibleFunctionTableDescriptor) -> NS.UInteger ---
+
+	@(objc_type=VisibleFunctionTableDescriptor, objc_selector="setFunctionCount:", objc_name="setFunctionCount")
+	VisibleFunctionTableDescriptor_setFunctionCount :: proc(self: ^VisibleFunctionTableDescriptor, functionCount: NS.UInteger) ---
+}

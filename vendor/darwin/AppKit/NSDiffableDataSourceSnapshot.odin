@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSDiffableDataSourceSnapshot", objc_superclass=NS.Object)
 DiffableDataSourceSnapshot :: struct {
 	using _: NS.Object,

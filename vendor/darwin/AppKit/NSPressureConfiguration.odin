@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSPressureConfiguration", objc_superclass=NS.Object)
 PressureConfiguration :: struct { using _: NS.Object}
 

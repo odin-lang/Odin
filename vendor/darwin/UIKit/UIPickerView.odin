@@ -4,10 +4,7 @@ package darwin_UIKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIPickerView", objc_superclass=View)
 PickerView :: struct {
@@ -58,4 +55,76 @@ foreign lib {
 
 	@(objc_type=PickerView, objc_selector="numberOfComponents", objc_name="numberOfComponents")
 	PickerView_numberOfComponents :: proc(self: ^PickerView) -> NS.Integer ---
+}
+
+
+@(objc_class="UIPickerViewDelegate")
+PickerViewDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PickerViewDelegate, objc_selector="pickerView:widthForComponent:", objc_name="pickerView_widthForComponent")
+	PickerViewDelegate_pickerView_widthForComponent :: proc(self: ^PickerViewDelegate, pickerView: ^PickerView, component: NS.Integer) -> CG.Float ---
+
+	@(objc_type=PickerViewDelegate, objc_selector="pickerView:rowHeightForComponent:", objc_name="pickerView_rowHeightForComponent")
+	PickerViewDelegate_pickerView_rowHeightForComponent :: proc(self: ^PickerViewDelegate, pickerView: ^PickerView, component: NS.Integer) -> CG.Float ---
+
+	@(objc_type=PickerViewDelegate, objc_selector="pickerView:titleForRow:forComponent:", objc_name="pickerView_titleForRow_forComponent")
+	PickerViewDelegate_pickerView_titleForRow_forComponent :: proc(self: ^PickerViewDelegate, pickerView: ^PickerView, row: NS.Integer, component: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=PickerViewDelegate, objc_selector="pickerView:attributedTitleForRow:forComponent:", objc_name="pickerView_attributedTitleForRow_forComponent")
+	PickerViewDelegate_pickerView_attributedTitleForRow_forComponent :: proc(self: ^PickerViewDelegate, pickerView: ^PickerView, row: NS.Integer, component: NS.Integer) -> ^NS.AttributedString ---
+
+	@(objc_type=PickerViewDelegate, objc_selector="pickerView:viewForRow:forComponent:reusingView:", objc_name="pickerView_viewForRow_forComponent_reusingView")
+	PickerViewDelegate_pickerView_viewForRow_forComponent_reusingView :: proc(self: ^PickerViewDelegate, pickerView: ^PickerView, row: NS.Integer, component: NS.Integer, view: ^View) -> ^View ---
+
+	@(objc_type=PickerViewDelegate, objc_selector="pickerView:didSelectRow:inComponent:", objc_name="pickerView_didSelectRow_inComponent")
+	PickerViewDelegate_pickerView_didSelectRow_inComponent :: proc(self: ^PickerViewDelegate, pickerView: ^PickerView, row: NS.Integer, component: NS.Integer) ---
+}
+
+
+@(objc_class="UIPickerViewDataSource")
+PickerViewDataSource :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PickerViewDataSource, objc_selector="numberOfComponentsInPickerView:", objc_name="numberOfComponentsInPickerView")
+	PickerViewDataSource_numberOfComponentsInPickerView :: proc(self: ^PickerViewDataSource, pickerView: ^PickerView) -> NS.Integer ---
+
+	@(objc_type=PickerViewDataSource, objc_selector="pickerView:numberOfRowsInComponent:", objc_name="pickerView")
+	PickerViewDataSource_pickerView :: proc(self: ^PickerViewDataSource, pickerView: ^PickerView, component: NS.Integer) -> NS.Integer ---
+}
+
+
+@(objc_class="UIPickerViewAccessibilityDelegate")
+PickerViewAccessibilityDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: PickerViewDelegate,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PickerViewAccessibilityDelegate, objc_selector="pickerView:accessibilityLabelForComponent:", objc_name="pickerView_accessibilityLabelForComponent")
+	PickerViewAccessibilityDelegate_pickerView_accessibilityLabelForComponent :: proc(self: ^PickerViewAccessibilityDelegate, pickerView: ^PickerView, component: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=PickerViewAccessibilityDelegate, objc_selector="pickerView:accessibilityHintForComponent:", objc_name="pickerView_accessibilityHintForComponent")
+	PickerViewAccessibilityDelegate_pickerView_accessibilityHintForComponent :: proc(self: ^PickerViewAccessibilityDelegate, pickerView: ^PickerView, component: NS.Integer) -> ^NS.String ---
+
+	@(objc_type=PickerViewAccessibilityDelegate, objc_selector="pickerView:accessibilityUserInputLabelsForComponent:", objc_name="pickerView_accessibilityUserInputLabelsForComponent")
+	PickerViewAccessibilityDelegate_pickerView_accessibilityUserInputLabelsForComponent :: proc(self: ^PickerViewAccessibilityDelegate, pickerView: ^PickerView, component: NS.Integer) -> ^NS.Array ---
+
+	@(objc_type=PickerViewAccessibilityDelegate, objc_selector="pickerView:accessibilityAttributedLabelForComponent:", objc_name="pickerView_accessibilityAttributedLabelForComponent")
+	PickerViewAccessibilityDelegate_pickerView_accessibilityAttributedLabelForComponent :: proc(self: ^PickerViewAccessibilityDelegate, pickerView: ^PickerView, component: NS.Integer) -> ^NS.AttributedString ---
+
+	@(objc_type=PickerViewAccessibilityDelegate, objc_selector="pickerView:accessibilityAttributedHintForComponent:", objc_name="pickerView_accessibilityAttributedHintForComponent")
+	PickerViewAccessibilityDelegate_pickerView_accessibilityAttributedHintForComponent :: proc(self: ^PickerViewAccessibilityDelegate, pickerView: ^PickerView, component: NS.Integer) -> ^NS.AttributedString ---
+
+	@(objc_type=PickerViewAccessibilityDelegate, objc_selector="pickerView:accessibilityAttributedUserInputLabelsForComponent:", objc_name="pickerView_accessibilityAttributedUserInputLabelsForComponent")
+	PickerViewAccessibilityDelegate_pickerView_accessibilityAttributedUserInputLabelsForComponent :: proc(self: ^PickerViewAccessibilityDelegate, pickerView: ^PickerView, component: NS.Integer) -> ^NS.Array ---
 }

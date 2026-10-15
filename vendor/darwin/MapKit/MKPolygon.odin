@@ -4,6 +4,7 @@ package darwin_MapKit
 
 import CL "vendor:darwin/CoreLocation"
 import NS "core:sys/darwin/Foundation"
+import CG "core:sys/darwin/CoreGraphics"
 
 @(objc_class="MKPolygon", objc_superclass=MultiPoint)
 Polygon :: struct {
@@ -40,4 +41,28 @@ Polygon_polygonWithPoints :: proc {
 Polygon_polygonWithCoordinates :: proc {
 	Polygon_polygonWithCoordinates_count,
 	Polygon_polygonWithCoordinates_count_interiorPolygons,
+}
+
+
+@(objc_class="MKPolygonRenderer", objc_superclass=OverlayPathRenderer)
+PolygonRenderer :: struct { using _: OverlayPathRenderer}
+
+foreign lib {
+	@(objc_type=PolygonRenderer, objc_selector="initWithPolygon:", objc_name="initWithPolygon")
+	PolygonRenderer_initWithPolygon :: proc(self: ^PolygonRenderer, polygon: ^Polygon) -> instancetype ---
+
+	@(objc_type=PolygonRenderer, objc_selector="polygon", objc_name="polygon")
+	PolygonRenderer_polygon :: proc(self: ^PolygonRenderer) -> ^Polygon ---
+
+	@(objc_type=PolygonRenderer, objc_selector="strokeStart", objc_name="strokeStart")
+	PolygonRenderer_strokeStart :: proc(self: ^PolygonRenderer) -> CG.Float ---
+
+	@(objc_type=PolygonRenderer, objc_selector="setStrokeStart:", objc_name="setStrokeStart")
+	PolygonRenderer_setStrokeStart :: proc(self: ^PolygonRenderer, strokeStart: CG.Float) ---
+
+	@(objc_type=PolygonRenderer, objc_selector="strokeEnd", objc_name="strokeEnd")
+	PolygonRenderer_strokeEnd :: proc(self: ^PolygonRenderer) -> CG.Float ---
+
+	@(objc_type=PolygonRenderer, objc_selector="setStrokeEnd:", objc_name="setStrokeEnd")
+	PolygonRenderer_setStrokeEnd :: proc(self: ^PolygonRenderer, strokeEnd: CG.Float) ---
 }

@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSInvocation", objc_superclass=Object)
 Invocation :: struct { using _: Object}
 
@@ -51,4 +50,22 @@ foreign lib {
 
 	@(objc_type=Invocation, objc_selector="setSelector:", objc_name="setSelector")
 	Invocation_setSelector :: proc(self: ^Invocation, selector: SEL) ---
+}
+
+
+@(objc_class="NSInvocationOperation", objc_superclass=Operation)
+InvocationOperation :: struct { using _: Operation}
+
+foreign lib {
+	@(objc_type=InvocationOperation, objc_selector="initWithTarget:selector:object:", objc_name="initWithTarget")
+	InvocationOperation_initWithTarget :: proc(self: ^InvocationOperation, target: id, sel: SEL, arg: id) -> instancetype ---
+
+	@(objc_type=InvocationOperation, objc_selector="initWithInvocation:", objc_name="initWithInvocation")
+	InvocationOperation_initWithInvocation :: proc(self: ^InvocationOperation, inv: ^Invocation) -> instancetype ---
+
+	@(objc_type=InvocationOperation, objc_selector="invocation", objc_name="invocation")
+	InvocationOperation_invocation :: proc(self: ^InvocationOperation) -> ^Invocation ---
+
+	@(objc_type=InvocationOperation, objc_selector="result", objc_name="result")
+	InvocationOperation_result :: proc(self: ^InvocationOperation) -> id ---
 }

@@ -32,3 +32,10 @@ foreign lib {
 	@(objc_type=DirectionPadElement, objc_selector="right", objc_name="right")
 	DirectionPadElement_right :: proc(self: ^DirectionPadElement) -> ^id ---
 }
+
+
+@(objc_class="GCDirectionPadElementName")
+DirectionPadElementName :: struct {
+	using _: intrinsics.objc_object,
+	using _: PhysicalInputElementName,
+}

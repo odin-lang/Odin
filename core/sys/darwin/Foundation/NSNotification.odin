@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSNotification", objc_superclass=Object)
 Notification :: struct {
 	using _: Object,
@@ -42,4 +41,77 @@ foreign lib {
 Notification_notificationWithName :: proc {
 	Notification_notificationWithName_object,
 	Notification_notificationWithName_object_userInfo,
+}
+
+
+@(objc_class="NSNotificationCenter", objc_superclass=Object)
+NotificationCenter :: struct { using _: Object}
+
+foreign lib {
+	@(objc_type=NotificationCenter, objc_selector="addObserver:selector:name:object:", objc_name="addObserver")
+	NotificationCenter_addObserver :: proc(self: ^NotificationCenter, observer: id, aSelector: SEL, aName: ^String, anObject: id) ---
+
+	@(objc_type=NotificationCenter, objc_selector="postNotification:", objc_name="postNotification")
+	NotificationCenter_postNotification :: proc(self: ^NotificationCenter, notification: ^Notification) ---
+
+	@(objc_type=NotificationCenter, objc_selector="postNotificationName:object:", objc_name="postNotificationName_object")
+	NotificationCenter_postNotificationName_object :: proc(self: ^NotificationCenter, aName: ^String, anObject: id) ---
+
+	@(objc_type=NotificationCenter, objc_selector="postNotificationName:object:userInfo:", objc_name="postNotificationName_object_userInfo")
+	NotificationCenter_postNotificationName_object_userInfo :: proc(self: ^NotificationCenter, aName: ^String, anObject: id, aUserInfo: ^Dictionary) ---
+
+	@(objc_type=NotificationCenter, objc_selector="removeObserver:", objc_name="removeObserver_")
+	NotificationCenter_removeObserver_ :: proc(self: ^NotificationCenter, observer: id) ---
+
+	@(objc_type=NotificationCenter, objc_selector="removeObserver:name:object:", objc_name="removeObserver_name_object")
+	NotificationCenter_removeObserver_name_object :: proc(self: ^NotificationCenter, observer: id, aName: ^String, anObject: id) ---
+
+	@(objc_type=NotificationCenter, objc_selector="addObserverForName:object:queue:usingBlock:", objc_name="addObserverForName")
+	NotificationCenter_addObserverForName :: proc(self: ^NotificationCenter, name: ^String, obj: id, queue: ^OperationQueue, block: ^Objc_Block(proc "c" ( notification: ^Notification ))) -> ^ObjectProtocol ---
+
+	@(objc_type=NotificationCenter, objc_selector="defaultCenter", objc_name="defaultCenter", objc_is_class_method=true)
+	NotificationCenter_defaultCenter :: proc() -> ^NotificationCenter ---
+}
+
+
+
+@(objc_type=NotificationCenter, objc_name="postNotificationName")
+NotificationCenter_postNotificationName :: proc {
+	NotificationCenter_postNotificationName_object,
+	NotificationCenter_postNotificationName_object_userInfo,
+}
+
+@(objc_type=NotificationCenter, objc_name="removeObserver")
+NotificationCenter_removeObserver :: proc {
+	NotificationCenter_removeObserver_,
+	NotificationCenter_removeObserver_name_object,
+}
+
+
+@(objc_class="NSNotificationQueue", objc_superclass=Object)
+NotificationQueue :: struct { using _: Object}
+
+foreign lib {
+	@(objc_type=NotificationQueue, objc_selector="initWithNotificationCenter:", objc_name="initWithNotificationCenter")
+	NotificationQueue_initWithNotificationCenter :: proc(self: ^NotificationQueue, notificationCenter: ^NotificationCenter) -> instancetype ---
+
+	@(objc_type=NotificationQueue, objc_selector="enqueueNotification:postingStyle:", objc_name="enqueueNotification_postingStyle")
+	NotificationQueue_enqueueNotification_postingStyle :: proc(self: ^NotificationQueue, notification: ^Notification, postingStyle: PostingStyle) ---
+
+	@(objc_type=NotificationQueue, objc_selector="enqueueNotification:postingStyle:coalesceMask:forModes:", objc_name="enqueueNotification_postingStyle_coalesceMask_forModes")
+	NotificationQueue_enqueueNotification_postingStyle_coalesceMask_forModes :: proc(self: ^NotificationQueue, notification: ^Notification, postingStyle: PostingStyle, coalesceMask: NotificationCoalescing, modes: ^Array) ---
+
+	@(objc_type=NotificationQueue, objc_selector="dequeueNotificationsMatching:coalesceMask:", objc_name="dequeueNotificationsMatching")
+	NotificationQueue_dequeueNotificationsMatching :: proc(self: ^NotificationQueue, notification: ^Notification, coalesceMask: UInteger) ---
+
+	@(objc_type=NotificationQueue, objc_selector="defaultQueue", objc_name="defaultQueue", objc_is_class_method=true)
+	NotificationQueue_defaultQueue :: proc() -> ^NotificationQueue ---
+}
+
+
+
+@(objc_type=NotificationQueue, objc_name="enqueueNotification")
+NotificationQueue_enqueueNotification :: proc {
+	NotificationQueue_enqueueNotification_postingStyle,
+	NotificationQueue_enqueueNotification_postingStyle_coalesceMask_forModes,
 }

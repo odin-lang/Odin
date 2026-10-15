@@ -58,3 +58,66 @@ Buffer_newTensorWithDescriptor :: #force_inline proc "c" (self: ^Buffer, descrip
 	res = Buffer_newTensorWithDescriptor_error(self, descriptor, offset, &err)
 	return
 }
+
+
+@(objc_class="MTLBufferBinding")
+BufferBinding :: struct {
+	using _: intrinsics.objc_object,
+	using _: Binding,
+}
+
+foreign lib {
+	@(objc_type=BufferBinding, objc_selector="bufferAlignment", objc_name="bufferAlignment")
+	BufferBinding_bufferAlignment :: proc(self: ^BufferBinding) -> NS.UInteger ---
+
+	@(objc_type=BufferBinding, objc_selector="bufferDataSize", objc_name="bufferDataSize")
+	BufferBinding_bufferDataSize :: proc(self: ^BufferBinding) -> NS.UInteger ---
+
+	@(objc_type=BufferBinding, objc_selector="bufferDataType", objc_name="bufferDataType")
+	BufferBinding_bufferDataType :: proc(self: ^BufferBinding) -> DataType ---
+
+	@(objc_type=BufferBinding, objc_selector="bufferStructType", objc_name="bufferStructType")
+	BufferBinding_bufferStructType :: proc(self: ^BufferBinding) -> ^StructType ---
+
+	@(objc_type=BufferBinding, objc_selector="bufferPointerType", objc_name="bufferPointerType")
+	BufferBinding_bufferPointerType :: proc(self: ^BufferBinding) -> ^PointerType ---
+}
+
+
+@(objc_class="MTLBufferLayoutDescriptor", objc_superclass=NS.Object)
+BufferLayoutDescriptor :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=BufferLayoutDescriptor, objc_selector="stride", objc_name="stride")
+	BufferLayoutDescriptor_stride :: proc(self: ^BufferLayoutDescriptor) -> NS.UInteger ---
+
+	@(objc_type=BufferLayoutDescriptor, objc_selector="setStride:", objc_name="setStride")
+	BufferLayoutDescriptor_setStride :: proc(self: ^BufferLayoutDescriptor, stride: NS.UInteger) ---
+
+	@(objc_type=BufferLayoutDescriptor, objc_selector="stepFunction", objc_name="stepFunction")
+	BufferLayoutDescriptor_stepFunction :: proc(self: ^BufferLayoutDescriptor) -> StepFunction ---
+
+	@(objc_type=BufferLayoutDescriptor, objc_selector="setStepFunction:", objc_name="setStepFunction")
+	BufferLayoutDescriptor_setStepFunction :: proc(self: ^BufferLayoutDescriptor, stepFunction: StepFunction) ---
+
+	@(objc_type=BufferLayoutDescriptor, objc_selector="stepRate", objc_name="stepRate")
+	BufferLayoutDescriptor_stepRate :: proc(self: ^BufferLayoutDescriptor) -> NS.UInteger ---
+
+	@(objc_type=BufferLayoutDescriptor, objc_selector="setStepRate:", objc_name="setStepRate")
+	BufferLayoutDescriptor_setStepRate :: proc(self: ^BufferLayoutDescriptor, stepRate: NS.UInteger) ---
+}
+
+
+@(objc_class="MTLBufferLayoutDescriptorArray", objc_superclass=NS.Object)
+BufferLayoutDescriptorArray :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=BufferLayoutDescriptorArray, objc_selector="objectAtIndexedSubscript:", objc_name="objectAtIndexedSubscript")
+	BufferLayoutDescriptorArray_objectAtIndexedSubscript :: proc(self: ^BufferLayoutDescriptorArray, index: NS.UInteger) -> ^BufferLayoutDescriptor ---
+
+	@(objc_type=BufferLayoutDescriptorArray, objc_selector="setObject:atIndexedSubscript:", objc_name="setObject")
+	BufferLayoutDescriptorArray_setObject :: proc(self: ^BufferLayoutDescriptorArray, bufferDesc: ^BufferLayoutDescriptor, index: NS.UInteger) ---
+}

@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSPresentationIntent", objc_superclass=Object)
 PresentationIntent :: struct {
 	using _: Object,

@@ -6,10 +6,6 @@ import cffi "core:c"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSCell", objc_superclass=NS.Object)
 Cell :: struct {
 	using _: NS.Object,

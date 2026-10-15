@@ -90,3 +90,39 @@ Value_getValue :: proc {
 	Value_getValue_size,
 	Value_getValue_,
 }
+
+
+@(objc_class="NSValueTransformer", objc_superclass=Object)
+ValueTransformer :: struct { using _: Object}
+
+foreign lib {
+	@(objc_type=ValueTransformer, objc_selector="setValueTransformer:forName:", objc_name="setValueTransformer", objc_is_class_method=true)
+	ValueTransformer_setValueTransformer :: proc(transformer: ^ValueTransformer, name: ^String) ---
+
+	@(objc_type=ValueTransformer, objc_selector="valueTransformerForName:", objc_name="valueTransformerForName", objc_is_class_method=true)
+	ValueTransformer_valueTransformerForName :: proc(name: ^String) -> ^ValueTransformer ---
+
+	@(objc_type=ValueTransformer, objc_selector="valueTransformerNames", objc_name="valueTransformerNames", objc_is_class_method=true)
+	ValueTransformer_valueTransformerNames :: proc() -> ^Array ---
+
+	@(objc_type=ValueTransformer, objc_selector="transformedValueClass", objc_name="transformedValueClass", objc_is_class_method=true)
+	ValueTransformer_transformedValueClass :: proc() -> Class ---
+
+	@(objc_type=ValueTransformer, objc_selector="allowsReverseTransformation", objc_name="allowsReverseTransformation", objc_is_class_method=true)
+	ValueTransformer_allowsReverseTransformation :: proc() -> bool ---
+
+	@(objc_type=ValueTransformer, objc_selector="transformedValue:", objc_name="transformedValue")
+	ValueTransformer_transformedValue :: proc(self: ^ValueTransformer, value: id) -> id ---
+
+	@(objc_type=ValueTransformer, objc_selector="reverseTransformedValue:", objc_name="reverseTransformedValue")
+	ValueTransformer_reverseTransformedValue :: proc(self: ^ValueTransformer, value: id) -> id ---
+}
+
+
+@(objc_class="NSSecureUnarchiveFromDataTransformer", objc_superclass=ValueTransformer)
+SecureUnarchiveFromDataTransformer :: struct { using _: ValueTransformer}
+
+foreign lib {
+	@(objc_type=SecureUnarchiveFromDataTransformer, objc_selector="allowedTopLevelClasses", objc_name="allowedTopLevelClasses", objc_is_class_method=true)
+	SecureUnarchiveFromDataTransformer_allowedTopLevelClasses :: proc() -> ^Array ---
+}

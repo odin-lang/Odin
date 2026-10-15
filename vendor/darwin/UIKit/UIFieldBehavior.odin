@@ -5,10 +5,6 @@ package darwin_UIKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIFieldBehavior", objc_superclass=DynamicBehavior)
 FieldBehavior :: struct { using _: DynamicBehavior}
 

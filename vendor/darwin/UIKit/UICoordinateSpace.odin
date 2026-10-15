@@ -6,10 +6,6 @@ import "base:intrinsics"
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UICoordinateSpace")
 CoordinateSpace :: struct {
 	using _: intrinsics.objc_object,

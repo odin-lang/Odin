@@ -541,3 +541,147 @@ Object_validateValue_forKeyPath :: #force_inline proc "c" (self: ^Object, ioValu
 	ok = Object_validateValue_forKeyPath_error(self, ioValue, inKeyPath, &err)
 	return
 }
+
+
+@(objc_type=ObjectProtocol, objc_name="safeRelease")
+safeRelease :: #force_inline proc "c" (self: ^ObjectProtocol) -> instancetype {
+	if self != nil {
+		self->release()
+	}
+
+	return nil
+}
+
+@(objc_class="NSObject")
+ObjectProtocol :: struct { using _: intrinsics.objc_object}
+
+foreign lib {
+	@(objc_type=ObjectProtocol, objc_selector="isEqual:", objc_name="isEqual")
+	ObjectProtocol_isEqual :: proc(self: ^ObjectProtocol, object: id) -> bool ---
+
+	@(objc_type=ObjectProtocol, objc_selector="class", objc_name="class")
+	ObjectProtocol_class :: proc(self: ^ObjectProtocol) -> Class ---
+
+	@(objc_type=ObjectProtocol, objc_selector="self", objc_name="self")
+	ObjectProtocol_self :: proc(self: ^ObjectProtocol) -> instancetype ---
+
+	@(objc_type=ObjectProtocol, objc_selector="performSelector:", objc_name="performSelector_")
+	ObjectProtocol_performSelector_ :: proc(self: ^ObjectProtocol, aSelector: SEL) -> id ---
+
+	@(objc_type=ObjectProtocol, objc_selector="performSelector:withObject:", objc_name="performSelector_withObject")
+	ObjectProtocol_performSelector_withObject :: proc(self: ^ObjectProtocol, aSelector: SEL, object: id) -> id ---
+
+	@(objc_type=ObjectProtocol, objc_selector="performSelector:withObject:withObject:", objc_name="performSelector_withObject_withObject")
+	ObjectProtocol_performSelector_withObject_withObject :: proc(self: ^ObjectProtocol, aSelector: SEL, object1: id, object2: id) -> id ---
+
+	@(objc_type=ObjectProtocol, objc_selector="isProxy", objc_name="isProxy")
+	ObjectProtocol_isProxy :: proc(self: ^ObjectProtocol) -> bool ---
+
+	@(objc_type=ObjectProtocol, objc_selector="isKindOfClass:", objc_name="isKindOfClass")
+	ObjectProtocol_isKindOfClass :: proc(self: ^ObjectProtocol, aClass: Class) -> bool ---
+
+	@(objc_type=ObjectProtocol, objc_selector="isMemberOfClass:", objc_name="isMemberOfClass")
+	ObjectProtocol_isMemberOfClass :: proc(self: ^ObjectProtocol, aClass: Class) -> bool ---
+
+	@(objc_type=ObjectProtocol, objc_selector="conformsToProtocol:", objc_name="conformsToProtocol")
+	ObjectProtocol_conformsToProtocol :: proc(self: ^ObjectProtocol, aProtocol: ^Protocol) -> bool ---
+
+	@(objc_type=ObjectProtocol, objc_selector="respondsToSelector:", objc_name="respondsToSelector")
+	ObjectProtocol_respondsToSelector :: proc(self: ^ObjectProtocol, aSelector: SEL) -> bool ---
+
+	@(objc_type=ObjectProtocol, objc_selector="retain", objc_name="retain")
+	ObjectProtocol_retain :: proc(self: ^ObjectProtocol) -> instancetype ---
+
+	@(objc_type=ObjectProtocol, objc_selector="release", objc_name="release")
+	ObjectProtocol_release :: proc(self: ^ObjectProtocol) ---
+
+	@(objc_type=ObjectProtocol, objc_selector="autorelease", objc_name="autorelease")
+	ObjectProtocol_autorelease :: proc(self: ^ObjectProtocol) -> instancetype ---
+
+	@(objc_type=ObjectProtocol, objc_selector="retainCount", objc_name="retainCount")
+	ObjectProtocol_retainCount :: proc(self: ^ObjectProtocol) -> UInteger ---
+
+	@(objc_type=ObjectProtocol, objc_selector="zone", objc_name="zone")
+	ObjectProtocol_zone :: proc(self: ^ObjectProtocol) -> ^_NSZone ---
+
+	@(objc_type=ObjectProtocol, objc_selector="hash", objc_name="hash")
+	ObjectProtocol_hash :: proc(self: ^ObjectProtocol) -> UInteger ---
+
+	@(objc_type=ObjectProtocol, objc_selector="superclass", objc_name="superclass")
+	ObjectProtocol_superclass :: proc(self: ^ObjectProtocol) -> Class ---
+
+	@(objc_type=ObjectProtocol, objc_selector="description", objc_name="description")
+	ObjectProtocol_description :: proc(self: ^ObjectProtocol) -> ^String ---
+
+	@(objc_type=ObjectProtocol, objc_selector="debugDescription", objc_name="debugDescription")
+	ObjectProtocol_debugDescription :: proc(self: ^ObjectProtocol) -> ^String ---
+}
+
+
+
+@(objc_type=ObjectProtocol, objc_name="performSelector")
+ObjectProtocol_performSelector :: proc {
+	ObjectProtocol_performSelector_,
+	ObjectProtocol_performSelector_withObject,
+	ObjectProtocol_performSelector_withObject_withObject,
+}
+
+
+@(objc_class="NSCoding")
+Coding :: struct { using _: intrinsics.objc_object}
+
+foreign lib {
+	@(objc_type=Coding, objc_selector="encodeWithCoder:", objc_name="encodeWithCoder")
+	Coding_encodeWithCoder :: proc(self: ^Coding, coder: ^Coder) ---
+
+	@(objc_type=Coding, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	Coding_initWithCoder :: proc(self: ^Coding, coder: ^Coder) -> instancetype ---
+}
+
+
+@(objc_class="NSCopying")
+Copying :: struct { using _: intrinsics.objc_object}
+
+foreign lib {
+	@(objc_type=Copying, objc_selector="copyWithZone:", objc_name="copyWithZone")
+	Copying_copyWithZone :: proc(self: ^Copying, zone: ^Zone) -> id ---
+}
+
+
+@(objc_class="NSMutableCopying")
+MutableCopying :: struct { using _: intrinsics.objc_object}
+
+foreign lib {
+	@(objc_type=MutableCopying, objc_selector="mutableCopyWithZone:", objc_name="mutableCopyWithZone")
+	MutableCopying_mutableCopyWithZone :: proc(self: ^MutableCopying, zone: ^Zone) -> id ---
+}
+
+
+@(objc_class="NSSecureCoding")
+SecureCoding :: struct {
+	using _: intrinsics.objc_object,
+	using _: Coding,
+}
+
+foreign lib {
+	@(objc_type=SecureCoding, objc_selector="supportsSecureCoding", objc_name="supportsSecureCoding", objc_is_class_method=true)
+	SecureCoding_supportsSecureCoding :: proc() -> bool ---
+}
+
+
+@(objc_class="NSDiscardableContent")
+DiscardableContent :: struct { using _: intrinsics.objc_object}
+
+foreign lib {
+	@(objc_type=DiscardableContent, objc_selector="beginContentAccess", objc_name="beginContentAccess")
+	DiscardableContent_beginContentAccess :: proc(self: ^DiscardableContent) -> bool ---
+
+	@(objc_type=DiscardableContent, objc_selector="endContentAccess", objc_name="endContentAccess")
+	DiscardableContent_endContentAccess :: proc(self: ^DiscardableContent) ---
+
+	@(objc_type=DiscardableContent, objc_selector="discardContentIfPossible", objc_name="discardContentIfPossible")
+	DiscardableContent_discardContentIfPossible :: proc(self: ^DiscardableContent) ---
+
+	@(objc_type=DiscardableContent, objc_selector="isContentDiscarded", objc_name="isContentDiscarded")
+	DiscardableContent_isContentDiscarded :: proc(self: ^DiscardableContent) -> bool ---
+}

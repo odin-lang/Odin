@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIPasteboard", objc_superclass=NS.Object)
 Pasteboard :: struct { using _: NS.Object}
 

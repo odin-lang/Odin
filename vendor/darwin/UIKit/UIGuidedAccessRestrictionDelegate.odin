@@ -5,10 +5,6 @@ package darwin_UIKit
 import "base:intrinsics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIGuidedAccessRestrictionDelegate")
 GuidedAccessRestrictionDelegate :: struct {
 	using _: intrinsics.objc_object,

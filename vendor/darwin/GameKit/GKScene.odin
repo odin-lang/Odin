@@ -3,6 +3,7 @@
 package darwin_GameKit
 
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="GKScene", objc_superclass=NS.Object)
 Scene :: struct {
@@ -49,4 +50,11 @@ foreign lib {
 Scene_sceneWithFileNamed :: proc {
 	Scene_sceneWithFileNamed_,
 	Scene_sceneWithFileNamed_rootNode,
+}
+
+
+@(objc_class="GKSceneRootNodeType")
+SceneRootNodeType :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
 }

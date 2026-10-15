@@ -3,10 +3,7 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSSavePanel", objc_superclass=Panel)
 SavePanel :: struct { using _: Panel}
@@ -189,4 +186,123 @@ foreign lib {
 
 	@(objc_type=SavePanel, objc_selector="setAllowedFileTypes:", objc_name="setAllowedFileTypes")
 	SavePanel_setAllowedFileTypes :: proc(self: ^SavePanel, allowedFileTypes: ^NS.Array) ---
+}
+
+
+@(objc_class="NSOpenSavePanelDelegate")
+OpenSavePanelDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panel:shouldEnableURL:", objc_name="panel_shouldEnableURL")
+	OpenSavePanelDelegate_panel_shouldEnableURL :: proc(self: ^OpenSavePanelDelegate, sender: id, url: ^NS.URL) -> bool ---
+
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panel:validateURL:error:", objc_name="panel_validateURL_error")
+	OpenSavePanelDelegate_panel_validateURL_error :: proc(self: ^OpenSavePanelDelegate, sender: id, url: ^NS.URL, outError: ^^NS.Error) -> bool ---
+
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panel:didChangeToDirectoryURL:", objc_name="panel_didChangeToDirectoryURL")
+	OpenSavePanelDelegate_panel_didChangeToDirectoryURL :: proc(self: ^OpenSavePanelDelegate, sender: id, url: ^NS.URL) ---
+
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panel:userEnteredFilename:confirmed:", objc_name="panel_userEnteredFilename_confirmed")
+	OpenSavePanelDelegate_panel_userEnteredFilename_confirmed :: proc(self: ^OpenSavePanelDelegate, sender: id, filename: ^NS.String, okFlag: bool) -> ^NS.String ---
+
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panel:willExpand:", objc_name="panel_willExpand")
+	OpenSavePanelDelegate_panel_willExpand :: proc(self: ^OpenSavePanelDelegate, sender: id, expanding: bool) ---
+
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panelSelectionDidChange:", objc_name="panelSelectionDidChange")
+	OpenSavePanelDelegate_panelSelectionDidChange :: proc(self: ^OpenSavePanelDelegate, sender: id) ---
+
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panel:displayNameForType:", objc_name="panel_displayNameForType")
+	OpenSavePanelDelegate_panel_displayNameForType :: proc(self: ^OpenSavePanelDelegate, sender: id, type: ^UTType) -> ^NS.String ---
+
+	@(objc_type=OpenSavePanelDelegate, objc_selector="panel:didSelectType:", objc_name="panel_didSelectType")
+	OpenSavePanelDelegate_panel_didSelectType :: proc(self: ^OpenSavePanelDelegate, sender: id, type: ^UTType) ---
+}
+
+
+// Odin-style wrappers for methods with a trailing `^^Error` out-parameter
+
+@(objc_type=OpenSavePanelDelegate, objc_name="panel_validateURL")
+OpenSavePanelDelegate_panel_validateURL :: #force_inline proc "c" (self: ^OpenSavePanelDelegate, sender: id, url: ^NS.URL) -> (ok: bool, err: ^NS.Error) {
+	ok = OpenSavePanelDelegate_panel_validateURL_error(self, sender, url, &err)
+	return
+}
+
+
+@(objc_class="NSOpenPanel", objc_superclass=SavePanel)
+OpenPanel :: struct { using _: SavePanel}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=OpenPanel, objc_selector="openPanel", objc_name="openPanel", objc_is_class_method=true)
+	OpenPanel_openPanel :: proc() -> ^OpenPanel ---
+
+	@(objc_type=OpenPanel, objc_selector="URLs", objc_name="URLs")
+	OpenPanel_URLs :: proc(self: ^OpenPanel) -> ^NS.Array ---
+
+	@(objc_type=OpenPanel, objc_selector="resolvesAliases", objc_name="resolvesAliases")
+	OpenPanel_resolvesAliases :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setResolvesAliases:", objc_name="setResolvesAliases")
+	OpenPanel_setResolvesAliases :: proc(self: ^OpenPanel, resolvesAliases: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="canChooseDirectories", objc_name="canChooseDirectories")
+	OpenPanel_canChooseDirectories :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setCanChooseDirectories:", objc_name="setCanChooseDirectories")
+	OpenPanel_setCanChooseDirectories :: proc(self: ^OpenPanel, canChooseDirectories: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="allowsMultipleSelection", objc_name="allowsMultipleSelection")
+	OpenPanel_allowsMultipleSelection :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setAllowsMultipleSelection:", objc_name="setAllowsMultipleSelection")
+	OpenPanel_setAllowsMultipleSelection :: proc(self: ^OpenPanel, allowsMultipleSelection: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="canChooseFiles", objc_name="canChooseFiles")
+	OpenPanel_canChooseFiles :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setCanChooseFiles:", objc_name="setCanChooseFiles")
+	OpenPanel_setCanChooseFiles :: proc(self: ^OpenPanel, canChooseFiles: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="canResolveUbiquitousConflicts", objc_name="canResolveUbiquitousConflicts")
+	OpenPanel_canResolveUbiquitousConflicts :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setCanResolveUbiquitousConflicts:", objc_name="setCanResolveUbiquitousConflicts")
+	OpenPanel_setCanResolveUbiquitousConflicts :: proc(self: ^OpenPanel, canResolveUbiquitousConflicts: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="canDownloadUbiquitousContents", objc_name="canDownloadUbiquitousContents")
+	OpenPanel_canDownloadUbiquitousContents :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setCanDownloadUbiquitousContents:", objc_name="setCanDownloadUbiquitousContents")
+	OpenPanel_setCanDownloadUbiquitousContents :: proc(self: ^OpenPanel, canDownloadUbiquitousContents: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="isAccessoryViewDisclosed", objc_name="isAccessoryViewDisclosed")
+	OpenPanel_isAccessoryViewDisclosed :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setAccessoryViewDisclosed:", objc_name="setAccessoryViewDisclosed")
+	OpenPanel_setAccessoryViewDisclosed :: proc(self: ^OpenPanel, accessoryViewDisclosed: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="showsContentTypes", objc_name="showsContentTypes")
+	OpenPanel_showsContentTypes :: proc(self: ^OpenPanel) -> bool ---
+
+	@(objc_type=OpenPanel, objc_selector="setShowsContentTypes:", objc_name="setShowsContentTypes")
+	OpenPanel_setShowsContentTypes :: proc(self: ^OpenPanel, showsContentTypes: bool) ---
+
+	@(objc_type=OpenPanel, objc_selector="filenames", objc_name="filenames")
+	OpenPanel_filenames :: proc(self: ^OpenPanel) -> ^NS.Array ---
+
+	@(objc_type=OpenPanel, objc_selector="beginSheetForDirectory:file:types:modalForWindow:modalDelegate:didEndSelector:contextInfo:", objc_name="beginSheetForDirectory")
+	OpenPanel_beginSheetForDirectory :: proc(self: ^OpenPanel, path: ^NS.String, name: ^NS.String, fileTypes: ^NS.Array, docWindow: ^Window, delegate: id, didEndSelector: SEL, contextInfo: rawptr) ---
+
+	@(objc_type=OpenPanel, objc_selector="beginForDirectory:file:types:modelessDelegate:didEndSelector:contextInfo:", objc_name="beginForDirectory")
+	OpenPanel_beginForDirectory :: proc(self: ^OpenPanel, path: ^NS.String, name: ^NS.String, fileTypes: ^NS.Array, delegate: id, didEndSelector: SEL, contextInfo: rawptr) ---
+
+	@(objc_type=OpenPanel, objc_selector="runModalForDirectory:file:types:", objc_name="runModalForDirectory")
+	OpenPanel_runModalForDirectory :: proc(self: ^OpenPanel, path: ^NS.String, name: ^NS.String, fileTypes: ^NS.Array) -> NS.Integer ---
+
+	@(objc_type=OpenPanel, objc_selector="runModalForTypes:", objc_name="runModalForTypes")
+	OpenPanel_runModalForTypes :: proc(self: ^OpenPanel, fileTypes: ^NS.Array) -> NS.Integer ---
 }

@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSActionCell", objc_superclass=Cell)
 ActionCell :: struct { using _: Cell}
 

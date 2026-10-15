@@ -4,10 +4,7 @@ package darwin_UIKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIColor", objc_superclass=NS.Object)
 Color :: struct {
@@ -311,4 +308,113 @@ foreign lib {
 Color_colorNamed :: proc {
 	Color_colorNamed_,
 	Color_colorNamed_inBundle_compatibleWithTraitCollection,
+}
+
+
+@(objc_class="UIColorEffect", objc_superclass=VisualEffect)
+ColorEffect :: struct { using _: VisualEffect}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorEffect, objc_selector="effectWithColor:", objc_name="effectWithColor", objc_is_class_method=true)
+	ColorEffect_effectWithColor :: proc(color: ^Color) -> instancetype ---
+}
+
+
+@(objc_class="UIColorPickerViewController", objc_superclass=ViewController)
+ColorPickerViewController :: struct { using _: ViewController}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorPickerViewController, objc_selector="initWithNibName:bundle:", objc_name="initWithNibName")
+	ColorPickerViewController_initWithNibName :: proc(self: ^ColorPickerViewController, nibNameOrNil: ^NS.String, nibBundleOrNil: ^NS.Bundle) -> instancetype ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="init", objc_name="init")
+	ColorPickerViewController_init :: proc(self: ^ColorPickerViewController) -> instancetype ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="delegate", objc_name="delegate")
+	ColorPickerViewController_delegate :: proc(self: ^ColorPickerViewController) -> ^ColorPickerViewControllerDelegate ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="setDelegate:", objc_name="setDelegate")
+	ColorPickerViewController_setDelegate :: proc(self: ^ColorPickerViewController, delegate: ^ColorPickerViewControllerDelegate) ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="selectedColor", objc_name="selectedColor")
+	ColorPickerViewController_selectedColor :: proc(self: ^ColorPickerViewController) -> ^Color ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="setSelectedColor:", objc_name="setSelectedColor")
+	ColorPickerViewController_setSelectedColor :: proc(self: ^ColorPickerViewController, selectedColor: ^Color) ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="supportsAlpha", objc_name="supportsAlpha")
+	ColorPickerViewController_supportsAlpha :: proc(self: ^ColorPickerViewController) -> bool ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="setSupportsAlpha:", objc_name="setSupportsAlpha")
+	ColorPickerViewController_setSupportsAlpha :: proc(self: ^ColorPickerViewController, supportsAlpha: bool) ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="supportsEyedropper", objc_name="supportsEyedropper")
+	ColorPickerViewController_supportsEyedropper :: proc(self: ^ColorPickerViewController) -> bool ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="setSupportsEyedropper:", objc_name="setSupportsEyedropper")
+	ColorPickerViewController_setSupportsEyedropper :: proc(self: ^ColorPickerViewController, supportsEyedropper: bool) ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="maximumLinearExposure", objc_name="maximumLinearExposure")
+	ColorPickerViewController_maximumLinearExposure :: proc(self: ^ColorPickerViewController) -> CG.Float ---
+
+	@(objc_type=ColorPickerViewController, objc_selector="setMaximumLinearExposure:", objc_name="setMaximumLinearExposure")
+	ColorPickerViewController_setMaximumLinearExposure :: proc(self: ^ColorPickerViewController, maximumLinearExposure: CG.Float) ---
+}
+
+
+@(objc_class="UIColorPickerViewControllerDelegate")
+ColorPickerViewControllerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorPickerViewControllerDelegate, objc_selector="colorPickerViewControllerDidSelectColor:", objc_name="colorPickerViewControllerDidSelectColor")
+	ColorPickerViewControllerDelegate_colorPickerViewControllerDidSelectColor :: proc(self: ^ColorPickerViewControllerDelegate, viewController: ^ColorPickerViewController) ---
+
+	@(objc_type=ColorPickerViewControllerDelegate, objc_selector="colorPickerViewController:didSelectColor:continuously:", objc_name="colorPickerViewController")
+	ColorPickerViewControllerDelegate_colorPickerViewController :: proc(self: ^ColorPickerViewControllerDelegate, viewController: ^ColorPickerViewController, color: ^Color, continuously: bool) ---
+
+	@(objc_type=ColorPickerViewControllerDelegate, objc_selector="colorPickerViewControllerDidFinish:", objc_name="colorPickerViewControllerDidFinish")
+	ColorPickerViewControllerDelegate_colorPickerViewControllerDidFinish :: proc(self: ^ColorPickerViewControllerDelegate, viewController: ^ColorPickerViewController) ---
+}
+
+
+@(objc_class="UIColorWell", objc_superclass=Control)
+ColorWell :: struct { using _: Control}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ColorWell, objc_selector="title", objc_name="title")
+	ColorWell_title :: proc(self: ^ColorWell) -> ^NS.String ---
+
+	@(objc_type=ColorWell, objc_selector="setTitle:", objc_name="setTitle")
+	ColorWell_setTitle :: proc(self: ^ColorWell, title: ^NS.String) ---
+
+	@(objc_type=ColorWell, objc_selector="supportsAlpha", objc_name="supportsAlpha")
+	ColorWell_supportsAlpha :: proc(self: ^ColorWell) -> bool ---
+
+	@(objc_type=ColorWell, objc_selector="setSupportsAlpha:", objc_name="setSupportsAlpha")
+	ColorWell_setSupportsAlpha :: proc(self: ^ColorWell, supportsAlpha: bool) ---
+
+	@(objc_type=ColorWell, objc_selector="selectedColor", objc_name="selectedColor")
+	ColorWell_selectedColor :: proc(self: ^ColorWell) -> ^Color ---
+
+	@(objc_type=ColorWell, objc_selector="setSelectedColor:", objc_name="setSelectedColor")
+	ColorWell_setSelectedColor :: proc(self: ^ColorWell, selectedColor: ^Color) ---
+
+	@(objc_type=ColorWell, objc_selector="supportsEyedropper", objc_name="supportsEyedropper")
+	ColorWell_supportsEyedropper :: proc(self: ^ColorWell) -> bool ---
+
+	@(objc_type=ColorWell, objc_selector="setSupportsEyedropper:", objc_name="setSupportsEyedropper")
+	ColorWell_setSupportsEyedropper :: proc(self: ^ColorWell, supportsEyedropper: bool) ---
+
+	@(objc_type=ColorWell, objc_selector="maximumLinearExposure", objc_name="maximumLinearExposure")
+	ColorWell_maximumLinearExposure :: proc(self: ^ColorWell) -> CG.Float ---
+
+	@(objc_type=ColorWell, objc_selector="setMaximumLinearExposure:", objc_name="setMaximumLinearExposure")
+	ColorWell_setMaximumLinearExposure :: proc(self: ^ColorWell, maximumLinearExposure: CG.Float) ---
 }

@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSToolbar", objc_superclass=NS.Object)
 Toolbar :: struct { using _: NS.Object}
@@ -148,4 +145,319 @@ foreign lib {
 
 	@(objc_type=Toolbar, objc_selector="configurationDictionary", objc_name="configurationDictionary")
 	Toolbar_configurationDictionary :: proc(self: ^Toolbar) -> ^NS.Dictionary ---
+}
+
+
+@(objc_class="NSToolbarDelegate")
+ToolbarDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ToolbarDelegate, objc_selector="toolbar:itemForItemIdentifier:willBeInsertedIntoToolbar:", objc_name="toolbar_itemForItemIdentifier_willBeInsertedIntoToolbar")
+	ToolbarDelegate_toolbar_itemForItemIdentifier_willBeInsertedIntoToolbar :: proc(self: ^ToolbarDelegate, toolbar: ^Toolbar, itemIdentifier: ^NS.String, flag: bool) -> ^ToolbarItem ---
+
+	@(objc_type=ToolbarDelegate, objc_selector="toolbarDefaultItemIdentifiers:", objc_name="toolbarDefaultItemIdentifiers")
+	ToolbarDelegate_toolbarDefaultItemIdentifiers :: proc(self: ^ToolbarDelegate, toolbar: ^Toolbar) -> ^NS.Array ---
+
+	@(objc_type=ToolbarDelegate, objc_selector="toolbarAllowedItemIdentifiers:", objc_name="toolbarAllowedItemIdentifiers")
+	ToolbarDelegate_toolbarAllowedItemIdentifiers :: proc(self: ^ToolbarDelegate, toolbar: ^Toolbar) -> ^NS.Array ---
+
+	@(objc_type=ToolbarDelegate, objc_selector="toolbarSelectableItemIdentifiers:", objc_name="toolbarSelectableItemIdentifiers")
+	ToolbarDelegate_toolbarSelectableItemIdentifiers :: proc(self: ^ToolbarDelegate, toolbar: ^Toolbar) -> ^NS.Array ---
+
+	@(objc_type=ToolbarDelegate, objc_selector="toolbarImmovableItemIdentifiers:", objc_name="toolbarImmovableItemIdentifiers")
+	ToolbarDelegate_toolbarImmovableItemIdentifiers :: proc(self: ^ToolbarDelegate, toolbar: ^Toolbar) -> ^NS.Set ---
+
+	@(objc_type=ToolbarDelegate, objc_selector="toolbar:itemIdentifier:canBeInsertedAtIndex:", objc_name="toolbar_itemIdentifier_canBeInsertedAtIndex")
+	ToolbarDelegate_toolbar_itemIdentifier_canBeInsertedAtIndex :: proc(self: ^ToolbarDelegate, toolbar: ^Toolbar, itemIdentifier: ^NS.String, index: NS.Integer) -> bool ---
+
+	@(objc_type=ToolbarDelegate, objc_selector="toolbarWillAddItem:", objc_name="toolbarWillAddItem")
+	ToolbarDelegate_toolbarWillAddItem :: proc(self: ^ToolbarDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=ToolbarDelegate, objc_selector="toolbarDidRemoveItem:", objc_name="toolbarDidRemoveItem")
+	ToolbarDelegate_toolbarDidRemoveItem :: proc(self: ^ToolbarDelegate, notification: ^NS.Notification) ---
+}
+
+@(objc_type=ToolbarDelegate, objc_name="toolbar")
+ToolbarDelegate_toolbar :: proc {
+	ToolbarDelegate_toolbar_itemForItemIdentifier_willBeInsertedIntoToolbar,
+	ToolbarDelegate_toolbar_itemIdentifier_canBeInsertedAtIndex,
+}
+
+
+@(objc_class="NSToolbarItem", objc_superclass=NS.Object)
+ToolbarItem :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ToolbarItem, objc_selector="initWithItemIdentifier:", objc_name="initWithItemIdentifier")
+	ToolbarItem_initWithItemIdentifier :: proc(self: ^ToolbarItem, itemIdentifier: ^NS.String) -> instancetype ---
+
+	@(objc_type=ToolbarItem, objc_selector="validate", objc_name="validate")
+	ToolbarItem_validate :: proc(self: ^ToolbarItem) ---
+
+	@(objc_type=ToolbarItem, objc_selector="itemIdentifier", objc_name="itemIdentifier")
+	ToolbarItem_itemIdentifier :: proc(self: ^ToolbarItem) -> ^NS.String ---
+
+	@(objc_type=ToolbarItem, objc_selector="toolbar", objc_name="toolbar")
+	ToolbarItem_toolbar :: proc(self: ^ToolbarItem) -> ^Toolbar ---
+
+	@(objc_type=ToolbarItem, objc_selector="label", objc_name="label")
+	ToolbarItem_label :: proc(self: ^ToolbarItem) -> ^NS.String ---
+
+	@(objc_type=ToolbarItem, objc_selector="setLabel:", objc_name="setLabel")
+	ToolbarItem_setLabel :: proc(self: ^ToolbarItem, label: ^NS.String) ---
+
+	@(objc_type=ToolbarItem, objc_selector="paletteLabel", objc_name="paletteLabel")
+	ToolbarItem_paletteLabel :: proc(self: ^ToolbarItem) -> ^NS.String ---
+
+	@(objc_type=ToolbarItem, objc_selector="setPaletteLabel:", objc_name="setPaletteLabel")
+	ToolbarItem_setPaletteLabel :: proc(self: ^ToolbarItem, paletteLabel: ^NS.String) ---
+
+	@(objc_type=ToolbarItem, objc_selector="possibleLabels", objc_name="possibleLabels")
+	ToolbarItem_possibleLabels :: proc(self: ^ToolbarItem) -> ^NS.Set ---
+
+	@(objc_type=ToolbarItem, objc_selector="setPossibleLabels:", objc_name="setPossibleLabels")
+	ToolbarItem_setPossibleLabels :: proc(self: ^ToolbarItem, possibleLabels: ^NS.Set) ---
+
+	@(objc_type=ToolbarItem, objc_selector="toolTip", objc_name="toolTip")
+	ToolbarItem_toolTip :: proc(self: ^ToolbarItem) -> ^NS.String ---
+
+	@(objc_type=ToolbarItem, objc_selector="setToolTip:", objc_name="setToolTip")
+	ToolbarItem_setToolTip :: proc(self: ^ToolbarItem, toolTip: ^NS.String) ---
+
+	@(objc_type=ToolbarItem, objc_selector="menuFormRepresentation", objc_name="menuFormRepresentation")
+	ToolbarItem_menuFormRepresentation :: proc(self: ^ToolbarItem) -> ^MenuItem ---
+
+	@(objc_type=ToolbarItem, objc_selector="setMenuFormRepresentation:", objc_name="setMenuFormRepresentation")
+	ToolbarItem_setMenuFormRepresentation :: proc(self: ^ToolbarItem, menuFormRepresentation: ^MenuItem) ---
+
+	@(objc_type=ToolbarItem, objc_selector="tag", objc_name="tag")
+	ToolbarItem_tag :: proc(self: ^ToolbarItem) -> NS.Integer ---
+
+	@(objc_type=ToolbarItem, objc_selector="setTag:", objc_name="setTag")
+	ToolbarItem_setTag :: proc(self: ^ToolbarItem, tag: NS.Integer) ---
+
+	@(objc_type=ToolbarItem, objc_selector="target", objc_name="target")
+	ToolbarItem_target :: proc(self: ^ToolbarItem) -> id ---
+
+	@(objc_type=ToolbarItem, objc_selector="setTarget:", objc_name="setTarget")
+	ToolbarItem_setTarget :: proc(self: ^ToolbarItem, target: id) ---
+
+	@(objc_type=ToolbarItem, objc_selector="action", objc_name="action")
+	ToolbarItem_action :: proc(self: ^ToolbarItem) -> SEL ---
+
+	@(objc_type=ToolbarItem, objc_selector="setAction:", objc_name="setAction")
+	ToolbarItem_setAction :: proc(self: ^ToolbarItem, action: SEL) ---
+
+	@(objc_type=ToolbarItem, objc_selector="isEnabled", objc_name="isEnabled")
+	ToolbarItem_isEnabled :: proc(self: ^ToolbarItem) -> bool ---
+
+	@(objc_type=ToolbarItem, objc_selector="setEnabled:", objc_name="setEnabled")
+	ToolbarItem_setEnabled :: proc(self: ^ToolbarItem, enabled: bool) ---
+
+	@(objc_type=ToolbarItem, objc_selector="image", objc_name="image")
+	ToolbarItem_image :: proc(self: ^ToolbarItem) -> ^Image ---
+
+	@(objc_type=ToolbarItem, objc_selector="setImage:", objc_name="setImage")
+	ToolbarItem_setImage :: proc(self: ^ToolbarItem, image: ^Image) ---
+
+	@(objc_type=ToolbarItem, objc_selector="title", objc_name="title")
+	ToolbarItem_title :: proc(self: ^ToolbarItem) -> ^NS.String ---
+
+	@(objc_type=ToolbarItem, objc_selector="setTitle:", objc_name="setTitle")
+	ToolbarItem_setTitle :: proc(self: ^ToolbarItem, title: ^NS.String) ---
+
+	@(objc_type=ToolbarItem, objc_selector="isBordered", objc_name="isBordered")
+	ToolbarItem_isBordered :: proc(self: ^ToolbarItem) -> bool ---
+
+	@(objc_type=ToolbarItem, objc_selector="setBordered:", objc_name="setBordered")
+	ToolbarItem_setBordered :: proc(self: ^ToolbarItem, bordered: bool) ---
+
+	@(objc_type=ToolbarItem, objc_selector="backgroundTintColor", objc_name="backgroundTintColor")
+	ToolbarItem_backgroundTintColor :: proc(self: ^ToolbarItem) -> ^Color ---
+
+	@(objc_type=ToolbarItem, objc_selector="setBackgroundTintColor:", objc_name="setBackgroundTintColor")
+	ToolbarItem_setBackgroundTintColor :: proc(self: ^ToolbarItem, backgroundTintColor: ^Color) ---
+
+	@(objc_type=ToolbarItem, objc_selector="style", objc_name="style")
+	ToolbarItem_style :: proc(self: ^ToolbarItem) -> ToolbarItemStyle ---
+
+	@(objc_type=ToolbarItem, objc_selector="setStyle:", objc_name="setStyle")
+	ToolbarItem_setStyle :: proc(self: ^ToolbarItem, style: ToolbarItemStyle) ---
+
+	@(objc_type=ToolbarItem, objc_selector="isNavigational", objc_name="isNavigational")
+	ToolbarItem_isNavigational :: proc(self: ^ToolbarItem) -> bool ---
+
+	@(objc_type=ToolbarItem, objc_selector="setNavigational:", objc_name="setNavigational")
+	ToolbarItem_setNavigational :: proc(self: ^ToolbarItem, navigational: bool) ---
+
+	@(objc_type=ToolbarItem, objc_selector="view", objc_name="view")
+	ToolbarItem_view :: proc(self: ^ToolbarItem) -> ^View ---
+
+	@(objc_type=ToolbarItem, objc_selector="setView:", objc_name="setView")
+	ToolbarItem_setView :: proc(self: ^ToolbarItem, view: ^View) ---
+
+	@(objc_type=ToolbarItem, objc_selector="isVisible", objc_name="isVisible")
+	ToolbarItem_isVisible :: proc(self: ^ToolbarItem) -> bool ---
+
+	@(objc_type=ToolbarItem, objc_selector="isHidden", objc_name="isHidden")
+	ToolbarItem_isHidden :: proc(self: ^ToolbarItem) -> bool ---
+
+	@(objc_type=ToolbarItem, objc_selector="setHidden:", objc_name="setHidden")
+	ToolbarItem_setHidden :: proc(self: ^ToolbarItem, hidden: bool) ---
+
+	@(objc_type=ToolbarItem, objc_selector="minSize", objc_name="minSize")
+	ToolbarItem_minSize :: proc(self: ^ToolbarItem) -> NS.Size ---
+
+	@(objc_type=ToolbarItem, objc_selector="setMinSize:", objc_name="setMinSize")
+	ToolbarItem_setMinSize :: proc(self: ^ToolbarItem, minSize: NS.Size) ---
+
+	@(objc_type=ToolbarItem, objc_selector="maxSize", objc_name="maxSize")
+	ToolbarItem_maxSize :: proc(self: ^ToolbarItem) -> NS.Size ---
+
+	@(objc_type=ToolbarItem, objc_selector="setMaxSize:", objc_name="setMaxSize")
+	ToolbarItem_setMaxSize :: proc(self: ^ToolbarItem, maxSize: NS.Size) ---
+
+	@(objc_type=ToolbarItem, objc_selector="visibilityPriority", objc_name="visibilityPriority")
+	ToolbarItem_visibilityPriority :: proc(self: ^ToolbarItem) -> ToolbarItemVisibilityPriority ---
+
+	@(objc_type=ToolbarItem, objc_selector="setVisibilityPriority:", objc_name="setVisibilityPriority")
+	ToolbarItem_setVisibilityPriority :: proc(self: ^ToolbarItem, visibilityPriority: ToolbarItemVisibilityPriority) ---
+
+	@(objc_type=ToolbarItem, objc_selector="badge", objc_name="badge")
+	ToolbarItem_badge :: proc(self: ^ToolbarItem) -> ^ItemBadge ---
+
+	@(objc_type=ToolbarItem, objc_selector="setBadge:", objc_name="setBadge")
+	ToolbarItem_setBadge :: proc(self: ^ToolbarItem, badge: ^ItemBadge) ---
+
+	@(objc_type=ToolbarItem, objc_selector="autovalidates", objc_name="autovalidates")
+	ToolbarItem_autovalidates :: proc(self: ^ToolbarItem) -> bool ---
+
+	@(objc_type=ToolbarItem, objc_selector="setAutovalidates:", objc_name="setAutovalidates")
+	ToolbarItem_setAutovalidates :: proc(self: ^ToolbarItem, autovalidates: bool) ---
+
+	@(objc_type=ToolbarItem, objc_selector="allowsDuplicatesInToolbar", objc_name="allowsDuplicatesInToolbar")
+	ToolbarItem_allowsDuplicatesInToolbar :: proc(self: ^ToolbarItem) -> bool ---
+}
+
+
+@(objc_class="NSSearchToolbarItem", objc_superclass=ToolbarItem)
+SearchToolbarItem :: struct { using _: ToolbarItem}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=SearchToolbarItem, objc_selector="beginSearchInteraction", objc_name="beginSearchInteraction")
+	SearchToolbarItem_beginSearchInteraction :: proc(self: ^SearchToolbarItem) ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="endSearchInteraction", objc_name="endSearchInteraction")
+	SearchToolbarItem_endSearchInteraction :: proc(self: ^SearchToolbarItem) ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="searchField", objc_name="searchField")
+	SearchToolbarItem_searchField :: proc(self: ^SearchToolbarItem) -> ^SearchField ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="setSearchField:", objc_name="setSearchField")
+	SearchToolbarItem_setSearchField :: proc(self: ^SearchToolbarItem, searchField: ^SearchField) ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="view", objc_name="view")
+	SearchToolbarItem_view :: proc(self: ^SearchToolbarItem) -> ^View ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="setView:", objc_name="setView")
+	SearchToolbarItem_setView :: proc(self: ^SearchToolbarItem, view: ^View) ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="resignsFirstResponderWithCancel", objc_name="resignsFirstResponderWithCancel")
+	SearchToolbarItem_resignsFirstResponderWithCancel :: proc(self: ^SearchToolbarItem) -> bool ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="setResignsFirstResponderWithCancel:", objc_name="setResignsFirstResponderWithCancel")
+	SearchToolbarItem_setResignsFirstResponderWithCancel :: proc(self: ^SearchToolbarItem, resignsFirstResponderWithCancel: bool) ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="preferredWidthForSearchField", objc_name="preferredWidthForSearchField")
+	SearchToolbarItem_preferredWidthForSearchField :: proc(self: ^SearchToolbarItem) -> CG.Float ---
+
+	@(objc_type=SearchToolbarItem, objc_selector="setPreferredWidthForSearchField:", objc_name="setPreferredWidthForSearchField")
+	SearchToolbarItem_setPreferredWidthForSearchField :: proc(self: ^SearchToolbarItem, preferredWidthForSearchField: CG.Float) ---
+}
+
+
+@(objc_class="NSToolbarItemGroup", objc_superclass=ToolbarItem)
+ToolbarItemGroup :: struct { using _: ToolbarItem}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ToolbarItemGroup, objc_selector="groupWithItemIdentifier:titles:selectionMode:labels:target:action:", objc_name="groupWithItemIdentifier_titles_selectionMode_labels_target_action", objc_is_class_method=true)
+	ToolbarItemGroup_groupWithItemIdentifier_titles_selectionMode_labels_target_action :: proc(itemIdentifier: ^NS.String, titles: ^NS.Array, selectionMode: ToolbarItemGroupSelectionMode, labels: ^NS.Array, target: id, action: SEL) -> instancetype ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="groupWithItemIdentifier:images:selectionMode:labels:target:action:", objc_name="groupWithItemIdentifier_images_selectionMode_labels_target_action", objc_is_class_method=true)
+	ToolbarItemGroup_groupWithItemIdentifier_images_selectionMode_labels_target_action :: proc(itemIdentifier: ^NS.String, images: ^NS.Array, selectionMode: ToolbarItemGroupSelectionMode, labels: ^NS.Array, target: id, action: SEL) -> instancetype ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="setSelected:atIndex:", objc_name="setSelected")
+	ToolbarItemGroup_setSelected :: proc(self: ^ToolbarItemGroup, selected: bool, index: NS.Integer) ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="isSelectedAtIndex:", objc_name="isSelectedAtIndex")
+	ToolbarItemGroup_isSelectedAtIndex :: proc(self: ^ToolbarItemGroup, index: NS.Integer) -> bool ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="subitems", objc_name="subitems")
+	ToolbarItemGroup_subitems :: proc(self: ^ToolbarItemGroup) -> ^NS.Array ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="setSubitems:", objc_name="setSubitems")
+	ToolbarItemGroup_setSubitems :: proc(self: ^ToolbarItemGroup, subitems: ^NS.Array) ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="controlRepresentation", objc_name="controlRepresentation")
+	ToolbarItemGroup_controlRepresentation :: proc(self: ^ToolbarItemGroup) -> ToolbarItemGroupControlRepresentation ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="setControlRepresentation:", objc_name="setControlRepresentation")
+	ToolbarItemGroup_setControlRepresentation :: proc(self: ^ToolbarItemGroup, controlRepresentation: ToolbarItemGroupControlRepresentation) ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="selectionMode", objc_name="selectionMode")
+	ToolbarItemGroup_selectionMode :: proc(self: ^ToolbarItemGroup) -> ToolbarItemGroupSelectionMode ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="setSelectionMode:", objc_name="setSelectionMode")
+	ToolbarItemGroup_setSelectionMode :: proc(self: ^ToolbarItemGroup, selectionMode: ToolbarItemGroupSelectionMode) ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="selectedIndex", objc_name="selectedIndex")
+	ToolbarItemGroup_selectedIndex :: proc(self: ^ToolbarItemGroup) -> NS.Integer ---
+
+	@(objc_type=ToolbarItemGroup, objc_selector="setSelectedIndex:", objc_name="setSelectedIndex")
+	ToolbarItemGroup_setSelectedIndex :: proc(self: ^ToolbarItemGroup, selectedIndex: NS.Integer) ---
+}
+
+
+@(objc_class="NSToolbarItemValidation")
+ToolbarItemValidation :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ToolbarItemValidation, objc_selector="validateToolbarItem:", objc_name="validateToolbarItem")
+	ToolbarItemValidation_validateToolbarItem :: proc(self: ^ToolbarItemValidation, item: ^ToolbarItem) -> bool ---
+}
+
+
+@(objc_class="NSTrackingSeparatorToolbarItem", objc_superclass=ToolbarItem)
+TrackingSeparatorToolbarItem :: struct { using _: ToolbarItem}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=TrackingSeparatorToolbarItem, objc_selector="trackingSeparatorToolbarItemWithIdentifier:splitView:dividerIndex:", objc_name="trackingSeparatorToolbarItemWithIdentifier", objc_is_class_method=true)
+	TrackingSeparatorToolbarItem_trackingSeparatorToolbarItemWithIdentifier :: proc(identifier: ^NS.String, splitView: ^SplitView, dividerIndex: NS.Integer) -> instancetype ---
+
+	@(objc_type=TrackingSeparatorToolbarItem, objc_selector="splitView", objc_name="splitView")
+	TrackingSeparatorToolbarItem_splitView :: proc(self: ^TrackingSeparatorToolbarItem) -> ^SplitView ---
+
+	@(objc_type=TrackingSeparatorToolbarItem, objc_selector="setSplitView:", objc_name="setSplitView")
+	TrackingSeparatorToolbarItem_setSplitView :: proc(self: ^TrackingSeparatorToolbarItem, splitView: ^SplitView) ---
+
+	@(objc_type=TrackingSeparatorToolbarItem, objc_selector="dividerIndex", objc_name="dividerIndex")
+	TrackingSeparatorToolbarItem_dividerIndex :: proc(self: ^TrackingSeparatorToolbarItem) -> NS.Integer ---
+
+	@(objc_type=TrackingSeparatorToolbarItem, objc_selector="setDividerIndex:", objc_name="setDividerIndex")
+	TrackingSeparatorToolbarItem_setDividerIndex :: proc(self: ^TrackingSeparatorToolbarItem, dividerIndex: NS.Integer) ---
 }

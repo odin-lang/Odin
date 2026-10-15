@@ -3,10 +3,7 @@
 package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIVideoEditorController", objc_superclass=NavigationController)
 VideoEditorController :: struct { using _: NavigationController}
@@ -39,4 +36,29 @@ foreign lib {
 
 	@(objc_type=VideoEditorController, objc_selector="setVideoQuality:", objc_name="setVideoQuality")
 	VideoEditorController_setVideoQuality :: proc(self: ^VideoEditorController, videoQuality: ImagePickerControllerQualityType) ---
+}
+
+
+@(objc_class="UIVideoEditorControllerDelegate")
+VideoEditorControllerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=VideoEditorControllerDelegate, objc_selector="videoEditorController:didSaveEditedVideoToPath:", objc_name="videoEditorController_didSaveEditedVideoToPath")
+	VideoEditorControllerDelegate_videoEditorController_didSaveEditedVideoToPath :: proc(self: ^VideoEditorControllerDelegate, editor: ^VideoEditorController, editedVideoPath: ^NS.String) ---
+
+	@(objc_type=VideoEditorControllerDelegate, objc_selector="videoEditorController:didFailWithError:", objc_name="videoEditorController_didFailWithError")
+	VideoEditorControllerDelegate_videoEditorController_didFailWithError :: proc(self: ^VideoEditorControllerDelegate, editor: ^VideoEditorController, error: ^NS.Error) ---
+
+	@(objc_type=VideoEditorControllerDelegate, objc_selector="videoEditorControllerDidCancel:", objc_name="videoEditorControllerDidCancel")
+	VideoEditorControllerDelegate_videoEditorControllerDidCancel :: proc(self: ^VideoEditorControllerDelegate, editor: ^VideoEditorController) ---
+}
+
+@(objc_type=VideoEditorControllerDelegate, objc_name="videoEditorController")
+VideoEditorControllerDelegate_videoEditorController :: proc {
+	VideoEditorControllerDelegate_videoEditorController_didSaveEditedVideoToPath,
+	VideoEditorControllerDelegate_videoEditorController_didFailWithError,
 }

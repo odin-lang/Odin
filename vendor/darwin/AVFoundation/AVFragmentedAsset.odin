@@ -4,6 +4,7 @@ package darwin_AVFoundation
 
 import CM "vendor:darwin/CoreMedia"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="AVFragmentedAsset", objc_superclass=URLAsset)
 FragmentedAsset :: struct {
@@ -36,3 +37,46 @@ foreign lib {
 	@(objc_type=FragmentedAsset, objc_selector="loadTracksWithMediaCharacteristic:completionHandler:", objc_name="loadTracksWithMediaCharacteristic")
 	FragmentedAsset_loadTracksWithMediaCharacteristic :: proc(self: ^FragmentedAsset, mediaCharacteristic: ^NS.String, completionHandler: ^Objc_Block(proc "c" ( _0: ^NS.Array, _1: ^NS.Error ))) ---
 }
+
+
+@(objc_class="AVFragmentedAssetInternal")
+FragmentedAssetInternal :: struct { using _: intrinsics.objc_object}
+
+
+@(objc_class="AVFragmentedAssetMinder", objc_superclass=NS.Object)
+FragmentedAssetMinder :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=FragmentedAssetMinder, objc_selector="fragmentedAssetMinderWithAsset:mindingInterval:", objc_name="fragmentedAssetMinderWithAsset", objc_is_class_method=true)
+	FragmentedAssetMinder_fragmentedAssetMinderWithAsset :: proc(asset: ^Asset, mindingInterval: NS.TimeInterval) -> instancetype ---
+
+	@(objc_type=FragmentedAssetMinder, objc_selector="initWithAsset:mindingInterval:", objc_name="initWithAsset")
+	FragmentedAssetMinder_initWithAsset :: proc(self: ^FragmentedAssetMinder, asset: ^Asset, mindingInterval: NS.TimeInterval) -> instancetype ---
+
+	@(objc_type=FragmentedAssetMinder, objc_selector="addFragmentedAsset:", objc_name="addFragmentedAsset")
+	FragmentedAssetMinder_addFragmentedAsset :: proc(self: ^FragmentedAssetMinder, asset: ^Asset) ---
+
+	@(objc_type=FragmentedAssetMinder, objc_selector="removeFragmentedAsset:", objc_name="removeFragmentedAsset")
+	FragmentedAssetMinder_removeFragmentedAsset :: proc(self: ^FragmentedAssetMinder, asset: ^Asset) ---
+
+	@(objc_type=FragmentedAssetMinder, objc_selector="mindingInterval", objc_name="mindingInterval")
+	FragmentedAssetMinder_mindingInterval :: proc(self: ^FragmentedAssetMinder) -> NS.TimeInterval ---
+
+	@(objc_type=FragmentedAssetMinder, objc_selector="setMindingInterval:", objc_name="setMindingInterval")
+	FragmentedAssetMinder_setMindingInterval :: proc(self: ^FragmentedAssetMinder, mindingInterval: NS.TimeInterval) ---
+
+	@(objc_type=FragmentedAssetMinder, objc_selector="assets", objc_name="assets")
+	FragmentedAssetMinder_assets :: proc(self: ^FragmentedAssetMinder) -> ^NS.Array ---
+}
+
+
+@(objc_class="AVFragmentedAssetMinderInternal")
+FragmentedAssetMinderInternal :: struct { using _: intrinsics.objc_object}
+
+
+@(objc_class="AVFragmentedAssetTrack", objc_superclass=AssetTrack)
+FragmentedAssetTrack :: struct { using _: AssetTrack}
+
+
+@(objc_class="AVFragmentedAssetTrackInternal")
+FragmentedAssetTrackInternal :: struct { using _: intrinsics.objc_object}

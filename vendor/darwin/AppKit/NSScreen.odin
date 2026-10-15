@@ -6,10 +6,6 @@ import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 import CA "vendor:darwin/QuartzCore"
 
-
-
-
-
 @(objc_class="NSScreen", objc_superclass=NS.Object)
 Screen :: struct { using _: NS.Object}
 

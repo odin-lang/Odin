@@ -5,10 +5,7 @@ package darwin_AppKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 import CA "vendor:darwin/QuartzCore"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSWindow", objc_superclass=Responder)
 Window :: struct {
@@ -1103,4 +1100,375 @@ Window_standardWindowButton :: proc {
 Window_nextEventMatchingMask :: proc {
 	Window_nextEventMatchingMask_,
 	Window_nextEventMatchingMask_untilDate_inMode_dequeue,
+}
+
+
+@(objc_class="NSWindowDelegate")
+WindowDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WindowDelegate, objc_selector="windowShouldClose:", objc_name="windowShouldClose")
+	WindowDelegate_windowShouldClose :: proc(self: ^WindowDelegate, sender: ^Window) -> bool ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillReturnFieldEditor:toObject:", objc_name="windowWillReturnFieldEditor")
+	WindowDelegate_windowWillReturnFieldEditor :: proc(self: ^WindowDelegate, sender: ^Window, client: id) -> id ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillResize:toSize:", objc_name="windowWillResize")
+	WindowDelegate_windowWillResize :: proc(self: ^WindowDelegate, sender: ^Window, frameSize: NS.Size) -> NS.Size ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillUseStandardFrame:defaultFrame:", objc_name="windowWillUseStandardFrame")
+	WindowDelegate_windowWillUseStandardFrame :: proc(self: ^WindowDelegate, window: ^Window, newFrame: NS.Rect) -> NS.Rect ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowShouldZoom:toFrame:", objc_name="windowShouldZoom")
+	WindowDelegate_windowShouldZoom :: proc(self: ^WindowDelegate, window: ^Window, newFrame: NS.Rect) -> bool ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillReturnUndoManager:", objc_name="windowWillReturnUndoManager")
+	WindowDelegate_windowWillReturnUndoManager :: proc(self: ^WindowDelegate, window: ^Window) -> ^NS.UndoManager ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:willPositionSheet:usingRect:", objc_name="window_willPositionSheet_usingRect")
+	WindowDelegate_window_willPositionSheet_usingRect :: proc(self: ^WindowDelegate, window: ^Window, sheet: ^Window, rect: NS.Rect) -> NS.Rect ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:shouldPopUpDocumentPathMenu:", objc_name="window_shouldPopUpDocumentPathMenu")
+	WindowDelegate_window_shouldPopUpDocumentPathMenu :: proc(self: ^WindowDelegate, window: ^Window, menu: ^Menu) -> bool ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:shouldDragDocumentWithEvent:from:withPasteboard:", objc_name="window_shouldDragDocumentWithEvent_from_withPasteboard")
+	WindowDelegate_window_shouldDragDocumentWithEvent_from_withPasteboard :: proc(self: ^WindowDelegate, window: ^Window, event: ^Event, dragImageLocation: CG.Point, pasteboard: ^Pasteboard) -> bool ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:willUseFullScreenContentSize:", objc_name="window_willUseFullScreenContentSize")
+	WindowDelegate_window_willUseFullScreenContentSize :: proc(self: ^WindowDelegate, window: ^Window, proposedSize: NS.Size) -> NS.Size ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:willUseFullScreenPresentationOptions:", objc_name="window_willUseFullScreenPresentationOptions")
+	WindowDelegate_window_willUseFullScreenPresentationOptions :: proc(self: ^WindowDelegate, window: ^Window, proposedOptions: ApplicationPresentationOptions) -> ApplicationPresentationOptions ---
+
+	@(objc_type=WindowDelegate, objc_selector="customWindowsToEnterFullScreenForWindow:", objc_name="customWindowsToEnterFullScreenForWindow_")
+	WindowDelegate_customWindowsToEnterFullScreenForWindow_ :: proc(self: ^WindowDelegate, window: ^Window) -> ^NS.Array ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:startCustomAnimationToEnterFullScreenWithDuration:", objc_name="window_startCustomAnimationToEnterFullScreenWithDuration")
+	WindowDelegate_window_startCustomAnimationToEnterFullScreenWithDuration :: proc(self: ^WindowDelegate, window: ^Window, duration: NS.TimeInterval) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidFailToEnterFullScreen:", objc_name="windowDidFailToEnterFullScreen")
+	WindowDelegate_windowDidFailToEnterFullScreen :: proc(self: ^WindowDelegate, window: ^Window) ---
+
+	@(objc_type=WindowDelegate, objc_selector="customWindowsToExitFullScreenForWindow:", objc_name="customWindowsToExitFullScreenForWindow")
+	WindowDelegate_customWindowsToExitFullScreenForWindow :: proc(self: ^WindowDelegate, window: ^Window) -> ^NS.Array ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:startCustomAnimationToExitFullScreenWithDuration:", objc_name="window_startCustomAnimationToExitFullScreenWithDuration")
+	WindowDelegate_window_startCustomAnimationToExitFullScreenWithDuration :: proc(self: ^WindowDelegate, window: ^Window, duration: NS.TimeInterval) ---
+
+	@(objc_type=WindowDelegate, objc_selector="customWindowsToEnterFullScreenForWindow:onScreen:", objc_name="customWindowsToEnterFullScreenForWindow_onScreen")
+	WindowDelegate_customWindowsToEnterFullScreenForWindow_onScreen :: proc(self: ^WindowDelegate, window: ^Window, screen: ^Screen) -> ^NS.Array ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:startCustomAnimationToEnterFullScreenOnScreen:withDuration:", objc_name="window_startCustomAnimationToEnterFullScreenOnScreen_withDuration")
+	WindowDelegate_window_startCustomAnimationToEnterFullScreenOnScreen_withDuration :: proc(self: ^WindowDelegate, window: ^Window, screen: ^Screen, duration: NS.TimeInterval) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidFailToExitFullScreen:", objc_name="windowDidFailToExitFullScreen")
+	WindowDelegate_windowDidFailToExitFullScreen :: proc(self: ^WindowDelegate, window: ^Window) ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:willResizeForVersionBrowserWithMaxPreferredSize:maxAllowedSize:", objc_name="window_willResizeForVersionBrowserWithMaxPreferredSize_maxAllowedSize")
+	WindowDelegate_window_willResizeForVersionBrowserWithMaxPreferredSize_maxAllowedSize :: proc(self: ^WindowDelegate, window: ^Window, maxPreferredFrameSize: NS.Size, maxAllowedFrameSize: NS.Size) -> NS.Size ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:willEncodeRestorableState:", objc_name="window_willEncodeRestorableState")
+	WindowDelegate_window_willEncodeRestorableState :: proc(self: ^WindowDelegate, window: ^Window, state: ^NS.Coder) ---
+
+	@(objc_type=WindowDelegate, objc_selector="window:didDecodeRestorableState:", objc_name="window_didDecodeRestorableState")
+	WindowDelegate_window_didDecodeRestorableState :: proc(self: ^WindowDelegate, window: ^Window, state: ^NS.Coder) ---
+
+	@(objc_type=WindowDelegate, objc_selector="previewRepresentableActivityItemsForWindow:", objc_name="previewRepresentableActivityItemsForWindow")
+	WindowDelegate_previewRepresentableActivityItemsForWindow :: proc(self: ^WindowDelegate, window: ^Window) -> ^NS.Array ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowForSharingRequestFromWindow:", objc_name="windowForSharingRequestFromWindow")
+	WindowDelegate_windowForSharingRequestFromWindow :: proc(self: ^WindowDelegate, window: ^Window) -> ^Window ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidResize:", objc_name="windowDidResize")
+	WindowDelegate_windowDidResize :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidExpose:", objc_name="windowDidExpose")
+	WindowDelegate_windowDidExpose :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillMove:", objc_name="windowWillMove")
+	WindowDelegate_windowWillMove :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidMove:", objc_name="windowDidMove")
+	WindowDelegate_windowDidMove :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidBecomeKey:", objc_name="windowDidBecomeKey")
+	WindowDelegate_windowDidBecomeKey :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidResignKey:", objc_name="windowDidResignKey")
+	WindowDelegate_windowDidResignKey :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidBecomeMain:", objc_name="windowDidBecomeMain")
+	WindowDelegate_windowDidBecomeMain :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidResignMain:", objc_name="windowDidResignMain")
+	WindowDelegate_windowDidResignMain :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillClose:", objc_name="windowWillClose")
+	WindowDelegate_windowWillClose :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillMiniaturize:", objc_name="windowWillMiniaturize")
+	WindowDelegate_windowWillMiniaturize :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidMiniaturize:", objc_name="windowDidMiniaturize")
+	WindowDelegate_windowDidMiniaturize :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidDeminiaturize:", objc_name="windowDidDeminiaturize")
+	WindowDelegate_windowDidDeminiaturize :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidUpdate:", objc_name="windowDidUpdate")
+	WindowDelegate_windowDidUpdate :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidChangeScreen:", objc_name="windowDidChangeScreen")
+	WindowDelegate_windowDidChangeScreen :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidChangeScreenProfile:", objc_name="windowDidChangeScreenProfile")
+	WindowDelegate_windowDidChangeScreenProfile :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidChangeBackingProperties:", objc_name="windowDidChangeBackingProperties")
+	WindowDelegate_windowDidChangeBackingProperties :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillBeginSheet:", objc_name="windowWillBeginSheet")
+	WindowDelegate_windowWillBeginSheet :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidEndSheet:", objc_name="windowDidEndSheet")
+	WindowDelegate_windowDidEndSheet :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillStartLiveResize:", objc_name="windowWillStartLiveResize")
+	WindowDelegate_windowWillStartLiveResize :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidEndLiveResize:", objc_name="windowDidEndLiveResize")
+	WindowDelegate_windowDidEndLiveResize :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillEnterFullScreen:", objc_name="windowWillEnterFullScreen")
+	WindowDelegate_windowWillEnterFullScreen :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidEnterFullScreen:", objc_name="windowDidEnterFullScreen")
+	WindowDelegate_windowDidEnterFullScreen :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillExitFullScreen:", objc_name="windowWillExitFullScreen")
+	WindowDelegate_windowWillExitFullScreen :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidExitFullScreen:", objc_name="windowDidExitFullScreen")
+	WindowDelegate_windowDidExitFullScreen :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillEnterVersionBrowser:", objc_name="windowWillEnterVersionBrowser")
+	WindowDelegate_windowWillEnterVersionBrowser :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidEnterVersionBrowser:", objc_name="windowDidEnterVersionBrowser")
+	WindowDelegate_windowDidEnterVersionBrowser :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowWillExitVersionBrowser:", objc_name="windowWillExitVersionBrowser")
+	WindowDelegate_windowWillExitVersionBrowser :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidExitVersionBrowser:", objc_name="windowDidExitVersionBrowser")
+	WindowDelegate_windowDidExitVersionBrowser :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=WindowDelegate, objc_selector="windowDidChangeOcclusionState:", objc_name="windowDidChangeOcclusionState")
+	WindowDelegate_windowDidChangeOcclusionState :: proc(self: ^WindowDelegate, notification: ^NS.Notification) ---
+}
+
+@(objc_type=WindowDelegate, objc_name="customWindowsToEnterFullScreenForWindow")
+WindowDelegate_customWindowsToEnterFullScreenForWindow :: proc {
+	WindowDelegate_customWindowsToEnterFullScreenForWindow_,
+	WindowDelegate_customWindowsToEnterFullScreenForWindow_onScreen,
+}
+
+
+@(objc_class="NSWindowController", objc_superclass=Responder)
+WindowController :: struct {
+	using _: Responder,
+	using _: SeguePerforming,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WindowController, objc_selector="initWithWindow:", objc_name="initWithWindow")
+	WindowController_initWithWindow :: proc(self: ^WindowController, window: ^Window) -> instancetype ---
+
+	@(objc_type=WindowController, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	WindowController_initWithCoder :: proc(self: ^WindowController, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=WindowController, objc_selector="initWithWindowNibName:", objc_name="initWithWindowNibName_")
+	WindowController_initWithWindowNibName_ :: proc(self: ^WindowController, windowNibName: ^NS.String) -> instancetype ---
+
+	@(objc_type=WindowController, objc_selector="initWithWindowNibName:owner:", objc_name="initWithWindowNibName_owner")
+	WindowController_initWithWindowNibName_owner :: proc(self: ^WindowController, windowNibName: ^NS.String, owner: id) -> instancetype ---
+
+	@(objc_type=WindowController, objc_selector="initWithWindowNibPath:owner:", objc_name="initWithWindowNibPath")
+	WindowController_initWithWindowNibPath :: proc(self: ^WindowController, windowNibPath: ^NS.String, owner: id) -> instancetype ---
+
+	@(objc_type=WindowController, objc_selector="setDocumentEdited:", objc_name="setDocumentEdited")
+	WindowController_setDocumentEdited :: proc(self: ^WindowController, dirtyFlag: bool) ---
+
+	@(objc_type=WindowController, objc_selector="synchronizeWindowTitleWithDocumentName", objc_name="synchronizeWindowTitleWithDocumentName")
+	WindowController_synchronizeWindowTitleWithDocumentName :: proc(self: ^WindowController) ---
+
+	@(objc_type=WindowController, objc_selector="windowTitleForDocumentDisplayName:", objc_name="windowTitleForDocumentDisplayName")
+	WindowController_windowTitleForDocumentDisplayName :: proc(self: ^WindowController, displayName: ^NS.String) -> ^NS.String ---
+
+	@(objc_type=WindowController, objc_selector="windowWillLoad", objc_name="windowWillLoad")
+	WindowController_windowWillLoad :: proc(self: ^WindowController) ---
+
+	@(objc_type=WindowController, objc_selector="windowDidLoad", objc_name="windowDidLoad")
+	WindowController_windowDidLoad :: proc(self: ^WindowController) ---
+
+	@(objc_type=WindowController, objc_selector="loadWindow", objc_name="loadWindow")
+	WindowController_loadWindow :: proc(self: ^WindowController) ---
+
+	@(objc_type=WindowController, objc_selector="close", objc_name="close")
+	WindowController_close :: proc(self: ^WindowController) ---
+
+	@(objc_type=WindowController, objc_selector="showWindow:", objc_name="showWindow")
+	WindowController_showWindow :: proc(self: ^WindowController, sender: id) ---
+
+	@(objc_type=WindowController, objc_selector="windowNibName", objc_name="windowNibName")
+	WindowController_windowNibName :: proc(self: ^WindowController) -> ^NS.String ---
+
+	@(objc_type=WindowController, objc_selector="windowNibPath", objc_name="windowNibPath")
+	WindowController_windowNibPath :: proc(self: ^WindowController) -> ^NS.String ---
+
+	@(objc_type=WindowController, objc_selector="owner", objc_name="owner")
+	WindowController_owner :: proc(self: ^WindowController) -> id ---
+
+	@(objc_type=WindowController, objc_selector="windowFrameAutosaveName", objc_name="windowFrameAutosaveName")
+	WindowController_windowFrameAutosaveName :: proc(self: ^WindowController) -> ^NS.String ---
+
+	@(objc_type=WindowController, objc_selector="setWindowFrameAutosaveName:", objc_name="setWindowFrameAutosaveName")
+	WindowController_setWindowFrameAutosaveName :: proc(self: ^WindowController, windowFrameAutosaveName: ^NS.String) ---
+
+	@(objc_type=WindowController, objc_selector="shouldCascadeWindows", objc_name="shouldCascadeWindows")
+	WindowController_shouldCascadeWindows :: proc(self: ^WindowController) -> bool ---
+
+	@(objc_type=WindowController, objc_selector="setShouldCascadeWindows:", objc_name="setShouldCascadeWindows")
+	WindowController_setShouldCascadeWindows :: proc(self: ^WindowController, shouldCascadeWindows: bool) ---
+
+	@(objc_type=WindowController, objc_selector="previewRepresentableActivityItems", objc_name="previewRepresentableActivityItems")
+	WindowController_previewRepresentableActivityItems :: proc(self: ^WindowController) -> ^NS.Array ---
+
+	@(objc_type=WindowController, objc_selector="setPreviewRepresentableActivityItems:", objc_name="setPreviewRepresentableActivityItems")
+	WindowController_setPreviewRepresentableActivityItems :: proc(self: ^WindowController, previewRepresentableActivityItems: ^NS.Array) ---
+
+	@(objc_type=WindowController, objc_selector="document", objc_name="document")
+	WindowController_document :: proc(self: ^WindowController) -> id ---
+
+	@(objc_type=WindowController, objc_selector="setDocument:", objc_name="setDocument")
+	WindowController_setDocument :: proc(self: ^WindowController, document: id) ---
+
+	@(objc_type=WindowController, objc_selector="shouldCloseDocument", objc_name="shouldCloseDocument")
+	WindowController_shouldCloseDocument :: proc(self: ^WindowController) -> bool ---
+
+	@(objc_type=WindowController, objc_selector="setShouldCloseDocument:", objc_name="setShouldCloseDocument")
+	WindowController_setShouldCloseDocument :: proc(self: ^WindowController, shouldCloseDocument: bool) ---
+
+	@(objc_type=WindowController, objc_selector="contentViewController", objc_name="contentViewController")
+	WindowController_contentViewController :: proc(self: ^WindowController) -> ^ViewController ---
+
+	@(objc_type=WindowController, objc_selector="setContentViewController:", objc_name="setContentViewController")
+	WindowController_setContentViewController :: proc(self: ^WindowController, contentViewController: ^ViewController) ---
+
+	@(objc_type=WindowController, objc_selector="window", objc_name="window")
+	WindowController_window :: proc(self: ^WindowController) -> ^Window ---
+
+	@(objc_type=WindowController, objc_selector="setWindow:", objc_name="setWindow")
+	WindowController_setWindow :: proc(self: ^WindowController, window: ^Window) ---
+
+	@(objc_type=WindowController, objc_selector="isWindowLoaded", objc_name="isWindowLoaded")
+	WindowController_isWindowLoaded :: proc(self: ^WindowController) -> bool ---
+
+	@(objc_type=WindowController, objc_selector="storyboard", objc_name="storyboard")
+	WindowController_storyboard :: proc(self: ^WindowController) -> ^Storyboard ---
+
+	@(objc_type=WindowController, objc_selector="dismissController:", objc_name="dismissController")
+	WindowController_dismissController :: proc(self: ^WindowController, sender: id) ---
+}
+
+@(objc_type=WindowController, objc_name="initWithWindowNibName")
+WindowController_initWithWindowNibName :: proc {
+	WindowController_initWithWindowNibName_,
+	WindowController_initWithWindowNibName_owner,
+}
+
+
+@(objc_class="NSWindowRestoration")
+WindowRestoration :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WindowRestoration, objc_selector="restoreWindowWithIdentifier:state:completionHandler:", objc_name="restoreWindowWithIdentifier", objc_is_class_method=true)
+	WindowRestoration_restoreWindowWithIdentifier :: proc(identifier: ^NS.String, state: ^NS.Coder, completionHandler: ^Objc_Block(proc "c" ( _0: ^Window, _1: ^NS.Error ))) ---
+}
+
+
+@(objc_class="NSWindowTab", objc_superclass=NS.Object)
+WindowTab :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WindowTab, objc_selector="title", objc_name="title")
+	WindowTab_title :: proc(self: ^WindowTab) -> ^NS.String ---
+
+	@(objc_type=WindowTab, objc_selector="setTitle:", objc_name="setTitle")
+	WindowTab_setTitle :: proc(self: ^WindowTab, title: ^NS.String) ---
+
+	@(objc_type=WindowTab, objc_selector="attributedTitle", objc_name="attributedTitle")
+	WindowTab_attributedTitle :: proc(self: ^WindowTab) -> ^NS.AttributedString ---
+
+	@(objc_type=WindowTab, objc_selector="setAttributedTitle:", objc_name="setAttributedTitle")
+	WindowTab_setAttributedTitle :: proc(self: ^WindowTab, attributedTitle: ^NS.AttributedString) ---
+
+	@(objc_type=WindowTab, objc_selector="toolTip", objc_name="toolTip")
+	WindowTab_toolTip :: proc(self: ^WindowTab) -> ^NS.String ---
+
+	@(objc_type=WindowTab, objc_selector="setToolTip:", objc_name="setToolTip")
+	WindowTab_setToolTip :: proc(self: ^WindowTab, toolTip: ^NS.String) ---
+
+	@(objc_type=WindowTab, objc_selector="accessoryView", objc_name="accessoryView")
+	WindowTab_accessoryView :: proc(self: ^WindowTab) -> ^View ---
+
+	@(objc_type=WindowTab, objc_selector="setAccessoryView:", objc_name="setAccessoryView")
+	WindowTab_setAccessoryView :: proc(self: ^WindowTab, accessoryView: ^View) ---
+}
+
+
+@(objc_class="NSWindowTabGroup", objc_superclass=NS.Object)
+WindowTabGroup :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=WindowTabGroup, objc_selector="addWindow:", objc_name="addWindow")
+	WindowTabGroup_addWindow :: proc(self: ^WindowTabGroup, window: ^Window) ---
+
+	@(objc_type=WindowTabGroup, objc_selector="insertWindow:atIndex:", objc_name="insertWindow")
+	WindowTabGroup_insertWindow :: proc(self: ^WindowTabGroup, window: ^Window, index: NS.Integer) ---
+
+	@(objc_type=WindowTabGroup, objc_selector="removeWindow:", objc_name="removeWindow")
+	WindowTabGroup_removeWindow :: proc(self: ^WindowTabGroup, window: ^Window) ---
+
+	@(objc_type=WindowTabGroup, objc_selector="identifier", objc_name="identifier")
+	WindowTabGroup_identifier :: proc(self: ^WindowTabGroup) -> ^NS.String ---
+
+	@(objc_type=WindowTabGroup, objc_selector="windows", objc_name="windows")
+	WindowTabGroup_windows :: proc(self: ^WindowTabGroup) -> ^NS.Array ---
+
+	@(objc_type=WindowTabGroup, objc_selector="isOverviewVisible", objc_name="isOverviewVisible")
+	WindowTabGroup_isOverviewVisible :: proc(self: ^WindowTabGroup) -> bool ---
+
+	@(objc_type=WindowTabGroup, objc_selector="setOverviewVisible:", objc_name="setOverviewVisible")
+	WindowTabGroup_setOverviewVisible :: proc(self: ^WindowTabGroup, overviewVisible: bool) ---
+
+	@(objc_type=WindowTabGroup, objc_selector="isTabBarVisible", objc_name="isTabBarVisible")
+	WindowTabGroup_isTabBarVisible :: proc(self: ^WindowTabGroup) -> bool ---
+
+	@(objc_type=WindowTabGroup, objc_selector="selectedWindow", objc_name="selectedWindow")
+	WindowTabGroup_selectedWindow :: proc(self: ^WindowTabGroup) -> ^Window ---
+
+	@(objc_type=WindowTabGroup, objc_selector="setSelectedWindow:", objc_name="setSelectedWindow")
+	WindowTabGroup_setSelectedWindow :: proc(self: ^WindowTabGroup, selectedWindow: ^Window) ---
 }

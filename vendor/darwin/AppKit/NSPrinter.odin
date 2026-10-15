@@ -5,10 +5,6 @@ package darwin_AppKit
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSPrinter", objc_superclass=NS.Object)
 Printer :: struct {
 	using _: NS.Object,

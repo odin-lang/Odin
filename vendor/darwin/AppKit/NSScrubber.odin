@@ -3,10 +3,8 @@
 package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
+import CG "core:sys/darwin/CoreGraphics"
 
 @(objc_class="NSScrubber", objc_superclass=View)
 Scrubber :: struct { using _: View}
@@ -141,4 +139,284 @@ foreign lib {
 
 	@(objc_type=Scrubber, objc_selector="setBackgroundView:", objc_name="setBackgroundView")
 	Scrubber_setBackgroundView :: proc(self: ^Scrubber, backgroundView: ^View) ---
+}
+
+
+@(objc_class="NSScrubberDelegate")
+ScrubberDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberDelegate, objc_selector="scrubber:didSelectItemAtIndex:", objc_name="scrubber_didSelectItemAtIndex")
+	ScrubberDelegate_scrubber_didSelectItemAtIndex :: proc(self: ^ScrubberDelegate, scrubber: ^Scrubber, selectedIndex: NS.Integer) ---
+
+	@(objc_type=ScrubberDelegate, objc_selector="scrubber:didHighlightItemAtIndex:", objc_name="scrubber_didHighlightItemAtIndex")
+	ScrubberDelegate_scrubber_didHighlightItemAtIndex :: proc(self: ^ScrubberDelegate, scrubber: ^Scrubber, highlightedIndex: NS.Integer) ---
+
+	@(objc_type=ScrubberDelegate, objc_selector="scrubber:didChangeVisibleRange:", objc_name="scrubber_didChangeVisibleRange")
+	ScrubberDelegate_scrubber_didChangeVisibleRange :: proc(self: ^ScrubberDelegate, scrubber: ^Scrubber, visibleRange: NS._NSRange) ---
+
+	@(objc_type=ScrubberDelegate, objc_selector="didBeginInteractingWithScrubber:", objc_name="didBeginInteractingWithScrubber")
+	ScrubberDelegate_didBeginInteractingWithScrubber :: proc(self: ^ScrubberDelegate, scrubber: ^Scrubber) ---
+
+	@(objc_type=ScrubberDelegate, objc_selector="didFinishInteractingWithScrubber:", objc_name="didFinishInteractingWithScrubber")
+	ScrubberDelegate_didFinishInteractingWithScrubber :: proc(self: ^ScrubberDelegate, scrubber: ^Scrubber) ---
+
+	@(objc_type=ScrubberDelegate, objc_selector="didCancelInteractingWithScrubber:", objc_name="didCancelInteractingWithScrubber")
+	ScrubberDelegate_didCancelInteractingWithScrubber :: proc(self: ^ScrubberDelegate, scrubber: ^Scrubber) ---
+}
+
+
+@(objc_class="NSScrubberDataSource")
+ScrubberDataSource :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberDataSource, objc_selector="numberOfItemsForScrubber:", objc_name="numberOfItemsForScrubber")
+	ScrubberDataSource_numberOfItemsForScrubber :: proc(self: ^ScrubberDataSource, scrubber: ^Scrubber) -> NS.Integer ---
+
+	@(objc_type=ScrubberDataSource, objc_selector="scrubber:viewForItemAtIndex:", objc_name="scrubber")
+	ScrubberDataSource_scrubber :: proc(self: ^ScrubberDataSource, scrubber: ^Scrubber, index: NS.Integer) -> ^ScrubberItemView ---
+}
+
+
+@(objc_class="NSScrubberArrangedView", objc_superclass=View)
+ScrubberArrangedView :: struct { using _: View}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberArrangedView, objc_selector="applyLayoutAttributes:", objc_name="applyLayoutAttributes")
+	ScrubberArrangedView_applyLayoutAttributes :: proc(self: ^ScrubberArrangedView, layoutAttributes: ^ScrubberLayoutAttributes) ---
+
+	@(objc_type=ScrubberArrangedView, objc_selector="isSelected", objc_name="isSelected")
+	ScrubberArrangedView_isSelected :: proc(self: ^ScrubberArrangedView) -> bool ---
+
+	@(objc_type=ScrubberArrangedView, objc_selector="setSelected:", objc_name="setSelected")
+	ScrubberArrangedView_setSelected :: proc(self: ^ScrubberArrangedView, selected: bool) ---
+
+	@(objc_type=ScrubberArrangedView, objc_selector="isHighlighted", objc_name="isHighlighted")
+	ScrubberArrangedView_isHighlighted :: proc(self: ^ScrubberArrangedView) -> bool ---
+
+	@(objc_type=ScrubberArrangedView, objc_selector="setHighlighted:", objc_name="setHighlighted")
+	ScrubberArrangedView_setHighlighted :: proc(self: ^ScrubberArrangedView, highlighted: bool) ---
+}
+
+
+@(objc_class="NSScrubberFlowLayout", objc_superclass=ScrubberLayout)
+ScrubberFlowLayout :: struct { using _: ScrubberLayout}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberFlowLayout, objc_selector="invalidateLayoutForItemsAtIndexes:", objc_name="invalidateLayoutForItemsAtIndexes")
+	ScrubberFlowLayout_invalidateLayoutForItemsAtIndexes :: proc(self: ^ScrubberFlowLayout, invalidItemIndexes: ^NS.IndexSet) ---
+
+	@(objc_type=ScrubberFlowLayout, objc_selector="itemSpacing", objc_name="itemSpacing")
+	ScrubberFlowLayout_itemSpacing :: proc(self: ^ScrubberFlowLayout) -> CG.Float ---
+
+	@(objc_type=ScrubberFlowLayout, objc_selector="setItemSpacing:", objc_name="setItemSpacing")
+	ScrubberFlowLayout_setItemSpacing :: proc(self: ^ScrubberFlowLayout, itemSpacing: CG.Float) ---
+
+	@(objc_type=ScrubberFlowLayout, objc_selector="itemSize", objc_name="itemSize")
+	ScrubberFlowLayout_itemSize :: proc(self: ^ScrubberFlowLayout) -> NS.Size ---
+
+	@(objc_type=ScrubberFlowLayout, objc_selector="setItemSize:", objc_name="setItemSize")
+	ScrubberFlowLayout_setItemSize :: proc(self: ^ScrubberFlowLayout, itemSize: NS.Size) ---
+}
+
+
+@(objc_class="NSScrubberFlowLayoutDelegate")
+ScrubberFlowLayoutDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: ScrubberDelegate,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberFlowLayoutDelegate, objc_selector="scrubber:layout:sizeForItemAtIndex:", objc_name="scrubber")
+	ScrubberFlowLayoutDelegate_scrubber :: proc(self: ^ScrubberFlowLayoutDelegate, scrubber: ^Scrubber, layout: ^ScrubberFlowLayout, itemIndex: NS.Integer) -> NS.Size ---
+}
+
+
+@(objc_class="NSScrubberImageItemView", objc_superclass=ScrubberItemView)
+ScrubberImageItemView :: struct { using _: ScrubberItemView}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberImageItemView, objc_selector="imageView", objc_name="imageView")
+	ScrubberImageItemView_imageView :: proc(self: ^ScrubberImageItemView) -> ^ImageView ---
+
+	@(objc_type=ScrubberImageItemView, objc_selector="image", objc_name="image")
+	ScrubberImageItemView_image :: proc(self: ^ScrubberImageItemView) -> ^Image ---
+
+	@(objc_type=ScrubberImageItemView, objc_selector="setImage:", objc_name="setImage")
+	ScrubberImageItemView_setImage :: proc(self: ^ScrubberImageItemView, image: ^Image) ---
+
+	@(objc_type=ScrubberImageItemView, objc_selector="imageAlignment", objc_name="imageAlignment")
+	ScrubberImageItemView_imageAlignment :: proc(self: ^ScrubberImageItemView) -> ImageAlignment ---
+
+	@(objc_type=ScrubberImageItemView, objc_selector="setImageAlignment:", objc_name="setImageAlignment")
+	ScrubberImageItemView_setImageAlignment :: proc(self: ^ScrubberImageItemView, imageAlignment: ImageAlignment) ---
+}
+
+
+@(objc_class="NSScrubberItemView", objc_superclass=ScrubberArrangedView)
+ScrubberItemView :: struct { using _: ScrubberArrangedView}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSScrubberLayout", objc_superclass=NS.Object)
+ScrubberLayout :: struct {
+	using _: NS.Object,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberLayout, objc_selector="init", objc_name="init")
+	ScrubberLayout_init :: proc(self: ^ScrubberLayout) -> instancetype ---
+
+	@(objc_type=ScrubberLayout, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ScrubberLayout_initWithCoder :: proc(self: ^ScrubberLayout, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ScrubberLayout, objc_selector="invalidateLayout", objc_name="invalidateLayout")
+	ScrubberLayout_invalidateLayout :: proc(self: ^ScrubberLayout) ---
+
+	@(objc_type=ScrubberLayout, objc_selector="prepareLayout", objc_name="prepareLayout")
+	ScrubberLayout_prepareLayout :: proc(self: ^ScrubberLayout) ---
+
+	@(objc_type=ScrubberLayout, objc_selector="layoutAttributesForItemAtIndex:", objc_name="layoutAttributesForItemAtIndex")
+	ScrubberLayout_layoutAttributesForItemAtIndex :: proc(self: ^ScrubberLayout, index: NS.Integer) -> ^ScrubberLayoutAttributes ---
+
+	@(objc_type=ScrubberLayout, objc_selector="layoutAttributesForItemsInRect:", objc_name="layoutAttributesForItemsInRect")
+	ScrubberLayout_layoutAttributesForItemsInRect :: proc(self: ^ScrubberLayout, rect: NS.Rect) -> ^NS.Set ---
+
+	@(objc_type=ScrubberLayout, objc_selector="shouldInvalidateLayoutForChangeFromVisibleRect:toVisibleRect:", objc_name="shouldInvalidateLayoutForChangeFromVisibleRect")
+	ScrubberLayout_shouldInvalidateLayoutForChangeFromVisibleRect :: proc(self: ^ScrubberLayout, fromVisibleRect: NS.Rect, toVisibleRect: NS.Rect) -> bool ---
+
+	@(objc_type=ScrubberLayout, objc_selector="layoutAttributesClass", objc_name="layoutAttributesClass", objc_is_class_method=true)
+	ScrubberLayout_layoutAttributesClass :: proc() -> Class ---
+
+	@(objc_type=ScrubberLayout, objc_selector="scrubber", objc_name="scrubber")
+	ScrubberLayout_scrubber :: proc(self: ^ScrubberLayout) -> ^Scrubber ---
+
+	@(objc_type=ScrubberLayout, objc_selector="visibleRect", objc_name="visibleRect")
+	ScrubberLayout_visibleRect :: proc(self: ^ScrubberLayout) -> NS.Rect ---
+
+	@(objc_type=ScrubberLayout, objc_selector="scrubberContentSize", objc_name="scrubberContentSize")
+	ScrubberLayout_scrubberContentSize :: proc(self: ^ScrubberLayout) -> NS.Size ---
+
+	@(objc_type=ScrubberLayout, objc_selector="shouldInvalidateLayoutForSelectionChange", objc_name="shouldInvalidateLayoutForSelectionChange")
+	ScrubberLayout_shouldInvalidateLayoutForSelectionChange :: proc(self: ^ScrubberLayout) -> bool ---
+
+	@(objc_type=ScrubberLayout, objc_selector="shouldInvalidateLayoutForHighlightChange", objc_name="shouldInvalidateLayoutForHighlightChange")
+	ScrubberLayout_shouldInvalidateLayoutForHighlightChange :: proc(self: ^ScrubberLayout) -> bool ---
+
+	@(objc_type=ScrubberLayout, objc_selector="automaticallyMirrorsInRightToLeftLayout", objc_name="automaticallyMirrorsInRightToLeftLayout")
+	ScrubberLayout_automaticallyMirrorsInRightToLeftLayout :: proc(self: ^ScrubberLayout) -> bool ---
+}
+
+
+@(objc_class="NSScrubberLayoutAttributes", objc_superclass=NS.Object)
+ScrubberLayoutAttributes :: struct {
+	using _: NS.Object,
+	using _: NS.Copying,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberLayoutAttributes, objc_selector="layoutAttributesForItemAtIndex:", objc_name="layoutAttributesForItemAtIndex", objc_is_class_method=true)
+	ScrubberLayoutAttributes_layoutAttributesForItemAtIndex :: proc(index: NS.Integer) -> instancetype ---
+
+	@(objc_type=ScrubberLayoutAttributes, objc_selector="itemIndex", objc_name="itemIndex")
+	ScrubberLayoutAttributes_itemIndex :: proc(self: ^ScrubberLayoutAttributes) -> NS.Integer ---
+
+	@(objc_type=ScrubberLayoutAttributes, objc_selector="setItemIndex:", objc_name="setItemIndex")
+	ScrubberLayoutAttributes_setItemIndex :: proc(self: ^ScrubberLayoutAttributes, itemIndex: NS.Integer) ---
+
+	@(objc_type=ScrubberLayoutAttributes, objc_selector="frame", objc_name="frame")
+	ScrubberLayoutAttributes_frame :: proc(self: ^ScrubberLayoutAttributes) -> NS.Rect ---
+
+	@(objc_type=ScrubberLayoutAttributes, objc_selector="setFrame:", objc_name="setFrame")
+	ScrubberLayoutAttributes_setFrame :: proc(self: ^ScrubberLayoutAttributes, frame: NS.Rect) ---
+
+	@(objc_type=ScrubberLayoutAttributes, objc_selector="alpha", objc_name="alpha")
+	ScrubberLayoutAttributes_alpha :: proc(self: ^ScrubberLayoutAttributes) -> CG.Float ---
+
+	@(objc_type=ScrubberLayoutAttributes, objc_selector="setAlpha:", objc_name="setAlpha")
+	ScrubberLayoutAttributes_setAlpha :: proc(self: ^ScrubberLayoutAttributes, alpha: CG.Float) ---
+}
+
+
+@(objc_class="NSScrubberProportionalLayout", objc_superclass=ScrubberLayout)
+ScrubberProportionalLayout :: struct { using _: ScrubberLayout}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberProportionalLayout, objc_selector="initWithNumberOfVisibleItems:", objc_name="initWithNumberOfVisibleItems")
+	ScrubberProportionalLayout_initWithNumberOfVisibleItems :: proc(self: ^ScrubberProportionalLayout, numberOfVisibleItems: NS.Integer) -> instancetype ---
+
+	@(objc_type=ScrubberProportionalLayout, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ScrubberProportionalLayout_initWithCoder :: proc(self: ^ScrubberProportionalLayout, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ScrubberProportionalLayout, objc_selector="numberOfVisibleItems", objc_name="numberOfVisibleItems")
+	ScrubberProportionalLayout_numberOfVisibleItems :: proc(self: ^ScrubberProportionalLayout) -> NS.Integer ---
+
+	@(objc_type=ScrubberProportionalLayout, objc_selector="setNumberOfVisibleItems:", objc_name="setNumberOfVisibleItems")
+	ScrubberProportionalLayout_setNumberOfVisibleItems :: proc(self: ^ScrubberProportionalLayout, numberOfVisibleItems: NS.Integer) ---
+}
+
+
+@(objc_class="NSScrubberSelectionStyle", objc_superclass=NS.Object)
+ScrubberSelectionStyle :: struct {
+	using _: NS.Object,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberSelectionStyle, objc_selector="init", objc_name="init")
+	ScrubberSelectionStyle_init :: proc(self: ^ScrubberSelectionStyle) -> instancetype ---
+
+	@(objc_type=ScrubberSelectionStyle, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ScrubberSelectionStyle_initWithCoder :: proc(self: ^ScrubberSelectionStyle, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ScrubberSelectionStyle, objc_selector="makeSelectionView", objc_name="makeSelectionView")
+	ScrubberSelectionStyle_makeSelectionView :: proc(self: ^ScrubberSelectionStyle) -> ^ScrubberSelectionView ---
+
+	@(objc_type=ScrubberSelectionStyle, objc_selector="outlineOverlayStyle", objc_name="outlineOverlayStyle", objc_is_class_method=true)
+	ScrubberSelectionStyle_outlineOverlayStyle :: proc() -> ^ScrubberSelectionStyle ---
+
+	@(objc_type=ScrubberSelectionStyle, objc_selector="roundedBackgroundStyle", objc_name="roundedBackgroundStyle", objc_is_class_method=true)
+	ScrubberSelectionStyle_roundedBackgroundStyle :: proc() -> ^ScrubberSelectionStyle ---
+}
+
+
+@(objc_class="NSScrubberSelectionView", objc_superclass=ScrubberArrangedView)
+ScrubberSelectionView :: struct { using _: ScrubberArrangedView}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="NSScrubberTextItemView", objc_superclass=ScrubberItemView)
+ScrubberTextItemView :: struct { using _: ScrubberItemView}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScrubberTextItemView, objc_selector="textField", objc_name="textField")
+	ScrubberTextItemView_textField :: proc(self: ^ScrubberTextItemView) -> ^TextField ---
+
+	@(objc_type=ScrubberTextItemView, objc_selector="title", objc_name="title")
+	ScrubberTextItemView_title :: proc(self: ^ScrubberTextItemView) -> ^NS.String ---
+
+	@(objc_type=ScrubberTextItemView, objc_selector="setTitle:", objc_name="setTitle")
+	ScrubberTextItemView_setTitle :: proc(self: ^ScrubberTextItemView, title: ^NS.String) ---
 }

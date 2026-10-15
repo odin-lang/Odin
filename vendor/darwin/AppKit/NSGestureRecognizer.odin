@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSGestureRecognizer", objc_superclass=NS.Object)
 GestureRecognizer :: struct {
@@ -193,4 +190,157 @@ foreign lib {
 
 	@(objc_type=GestureRecognizer, objc_selector="setState:", objc_name="setState")
 	GestureRecognizer_setState :: proc(self: ^GestureRecognizer, state: GestureRecognizerState) ---
+}
+
+
+@(objc_class="NSGestureRecognizerDelegate")
+GestureRecognizerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldAttemptToRecognizeWithEvent:", objc_name="gestureRecognizer_shouldAttemptToRecognizeWithEvent")
+	GestureRecognizerDelegate_gestureRecognizer_shouldAttemptToRecognizeWithEvent :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, event: ^Event) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizerShouldBegin:", objc_name="gestureRecognizerShouldBegin")
+	GestureRecognizerDelegate_gestureRecognizerShouldBegin :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldRecognizeSimultaneouslyWithGestureRecognizer:", objc_name="gestureRecognizer_shouldRecognizeSimultaneouslyWithGestureRecognizer")
+	GestureRecognizerDelegate_gestureRecognizer_shouldRecognizeSimultaneouslyWithGestureRecognizer :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, otherGestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldRequireFailureOfGestureRecognizer:", objc_name="gestureRecognizer_shouldRequireFailureOfGestureRecognizer")
+	GestureRecognizerDelegate_gestureRecognizer_shouldRequireFailureOfGestureRecognizer :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, otherGestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldBeRequiredToFailByGestureRecognizer:", objc_name="gestureRecognizer_shouldBeRequiredToFailByGestureRecognizer")
+	GestureRecognizerDelegate_gestureRecognizer_shouldBeRequiredToFailByGestureRecognizer :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, otherGestureRecognizer: ^GestureRecognizer) -> bool ---
+
+	@(objc_type=GestureRecognizerDelegate, objc_selector="gestureRecognizer:shouldReceiveTouch:", objc_name="gestureRecognizer_shouldReceiveTouch")
+	GestureRecognizerDelegate_gestureRecognizer_shouldReceiveTouch :: proc(self: ^GestureRecognizerDelegate, gestureRecognizer: ^GestureRecognizer, touch: ^Touch) -> bool ---
+}
+
+
+@(objc_class="NSClickGestureRecognizer", objc_superclass=GestureRecognizer)
+ClickGestureRecognizer :: struct {
+	using _: GestureRecognizer,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ClickGestureRecognizer, objc_selector="buttonMask", objc_name="buttonMask")
+	ClickGestureRecognizer_buttonMask :: proc(self: ^ClickGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=ClickGestureRecognizer, objc_selector="setButtonMask:", objc_name="setButtonMask")
+	ClickGestureRecognizer_setButtonMask :: proc(self: ^ClickGestureRecognizer, buttonMask: NS.UInteger) ---
+
+	@(objc_type=ClickGestureRecognizer, objc_selector="numberOfClicksRequired", objc_name="numberOfClicksRequired")
+	ClickGestureRecognizer_numberOfClicksRequired :: proc(self: ^ClickGestureRecognizer) -> NS.Integer ---
+
+	@(objc_type=ClickGestureRecognizer, objc_selector="setNumberOfClicksRequired:", objc_name="setNumberOfClicksRequired")
+	ClickGestureRecognizer_setNumberOfClicksRequired :: proc(self: ^ClickGestureRecognizer, numberOfClicksRequired: NS.Integer) ---
+
+	@(objc_type=ClickGestureRecognizer, objc_selector="numberOfTouchesRequired", objc_name="numberOfTouchesRequired")
+	ClickGestureRecognizer_numberOfTouchesRequired :: proc(self: ^ClickGestureRecognizer) -> NS.Integer ---
+
+	@(objc_type=ClickGestureRecognizer, objc_selector="setNumberOfTouchesRequired:", objc_name="setNumberOfTouchesRequired")
+	ClickGestureRecognizer_setNumberOfTouchesRequired :: proc(self: ^ClickGestureRecognizer, numberOfTouchesRequired: NS.Integer) ---
+}
+
+
+@(objc_class="NSMagnificationGestureRecognizer", objc_superclass=GestureRecognizer)
+MagnificationGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=MagnificationGestureRecognizer, objc_selector="magnification", objc_name="magnification")
+	MagnificationGestureRecognizer_magnification :: proc(self: ^MagnificationGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=MagnificationGestureRecognizer, objc_selector="setMagnification:", objc_name="setMagnification")
+	MagnificationGestureRecognizer_setMagnification :: proc(self: ^MagnificationGestureRecognizer, magnification: CG.Float) ---
+}
+
+
+@(objc_class="NSPanGestureRecognizer", objc_superclass=GestureRecognizer)
+PanGestureRecognizer :: struct {
+	using _: GestureRecognizer,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PanGestureRecognizer, objc_selector="translationInView:", objc_name="translationInView")
+	PanGestureRecognizer_translationInView :: proc(self: ^PanGestureRecognizer, view: ^View) -> CG.Point ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="setTranslation:inView:", objc_name="setTranslation")
+	PanGestureRecognizer_setTranslation :: proc(self: ^PanGestureRecognizer, translation: CG.Point, view: ^View) ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="velocityInView:", objc_name="velocityInView")
+	PanGestureRecognizer_velocityInView :: proc(self: ^PanGestureRecognizer, view: ^View) -> CG.Point ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="buttonMask", objc_name="buttonMask")
+	PanGestureRecognizer_buttonMask :: proc(self: ^PanGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="setButtonMask:", objc_name="setButtonMask")
+	PanGestureRecognizer_setButtonMask :: proc(self: ^PanGestureRecognizer, buttonMask: NS.UInteger) ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="numberOfTouchesRequired", objc_name="numberOfTouchesRequired")
+	PanGestureRecognizer_numberOfTouchesRequired :: proc(self: ^PanGestureRecognizer) -> NS.Integer ---
+
+	@(objc_type=PanGestureRecognizer, objc_selector="setNumberOfTouchesRequired:", objc_name="setNumberOfTouchesRequired")
+	PanGestureRecognizer_setNumberOfTouchesRequired :: proc(self: ^PanGestureRecognizer, numberOfTouchesRequired: NS.Integer) ---
+}
+
+
+@(objc_class="NSPressGestureRecognizer", objc_superclass=GestureRecognizer)
+PressGestureRecognizer :: struct {
+	using _: GestureRecognizer,
+	using _: NS.Coding,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=PressGestureRecognizer, objc_selector="buttonMask", objc_name="buttonMask")
+	PressGestureRecognizer_buttonMask :: proc(self: ^PressGestureRecognizer) -> NS.UInteger ---
+
+	@(objc_type=PressGestureRecognizer, objc_selector="setButtonMask:", objc_name="setButtonMask")
+	PressGestureRecognizer_setButtonMask :: proc(self: ^PressGestureRecognizer, buttonMask: NS.UInteger) ---
+
+	@(objc_type=PressGestureRecognizer, objc_selector="minimumPressDuration", objc_name="minimumPressDuration")
+	PressGestureRecognizer_minimumPressDuration :: proc(self: ^PressGestureRecognizer) -> NS.TimeInterval ---
+
+	@(objc_type=PressGestureRecognizer, objc_selector="setMinimumPressDuration:", objc_name="setMinimumPressDuration")
+	PressGestureRecognizer_setMinimumPressDuration :: proc(self: ^PressGestureRecognizer, minimumPressDuration: NS.TimeInterval) ---
+
+	@(objc_type=PressGestureRecognizer, objc_selector="allowableMovement", objc_name="allowableMovement")
+	PressGestureRecognizer_allowableMovement :: proc(self: ^PressGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=PressGestureRecognizer, objc_selector="setAllowableMovement:", objc_name="setAllowableMovement")
+	PressGestureRecognizer_setAllowableMovement :: proc(self: ^PressGestureRecognizer, allowableMovement: CG.Float) ---
+
+	@(objc_type=PressGestureRecognizer, objc_selector="numberOfTouchesRequired", objc_name="numberOfTouchesRequired")
+	PressGestureRecognizer_numberOfTouchesRequired :: proc(self: ^PressGestureRecognizer) -> NS.Integer ---
+
+	@(objc_type=PressGestureRecognizer, objc_selector="setNumberOfTouchesRequired:", objc_name="setNumberOfTouchesRequired")
+	PressGestureRecognizer_setNumberOfTouchesRequired :: proc(self: ^PressGestureRecognizer, numberOfTouchesRequired: NS.Integer) ---
+}
+
+
+@(objc_class="NSRotationGestureRecognizer", objc_superclass=GestureRecognizer)
+RotationGestureRecognizer :: struct { using _: GestureRecognizer}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=RotationGestureRecognizer, objc_selector="rotation", objc_name="rotation")
+	RotationGestureRecognizer_rotation :: proc(self: ^RotationGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=RotationGestureRecognizer, objc_selector="setRotation:", objc_name="setRotation")
+	RotationGestureRecognizer_setRotation :: proc(self: ^RotationGestureRecognizer, rotation: CG.Float) ---
+
+	@(objc_type=RotationGestureRecognizer, objc_selector="rotationInDegrees", objc_name="rotationInDegrees")
+	RotationGestureRecognizer_rotationInDegrees :: proc(self: ^RotationGestureRecognizer) -> CG.Float ---
+
+	@(objc_type=RotationGestureRecognizer, objc_selector="setRotationInDegrees:", objc_name="setRotationInDegrees")
+	RotationGestureRecognizer_setRotationInDegrees :: proc(self: ^RotationGestureRecognizer, rotationInDegrees: CG.Float) ---
 }

@@ -167,3 +167,45 @@ Camera_lookAt :: proc {
 	Camera_lookAt_,
 	Camera_lookAt_from,
 }
+
+
+@(objc_class="MDLStereoscopicCamera", objc_superclass=Camera)
+StereoscopicCamera :: struct { using _: Camera}
+
+foreign lib {
+	@(objc_type=StereoscopicCamera, objc_selector="interPupillaryDistance", objc_name="interPupillaryDistance")
+	StereoscopicCamera_interPupillaryDistance :: proc(self: ^StereoscopicCamera) -> cffi.float ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="setInterPupillaryDistance:", objc_name="setInterPupillaryDistance")
+	StereoscopicCamera_setInterPupillaryDistance :: proc(self: ^StereoscopicCamera, interPupillaryDistance: cffi.float) ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="leftVergence", objc_name="leftVergence")
+	StereoscopicCamera_leftVergence :: proc(self: ^StereoscopicCamera) -> cffi.float ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="setLeftVergence:", objc_name="setLeftVergence")
+	StereoscopicCamera_setLeftVergence :: proc(self: ^StereoscopicCamera, leftVergence: cffi.float) ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="rightVergence", objc_name="rightVergence")
+	StereoscopicCamera_rightVergence :: proc(self: ^StereoscopicCamera) -> cffi.float ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="setRightVergence:", objc_name="setRightVergence")
+	StereoscopicCamera_setRightVergence :: proc(self: ^StereoscopicCamera, rightVergence: cffi.float) ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="overlap", objc_name="overlap")
+	StereoscopicCamera_overlap :: proc(self: ^StereoscopicCamera) -> cffi.float ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="setOverlap:", objc_name="setOverlap")
+	StereoscopicCamera_setOverlap :: proc(self: ^StereoscopicCamera, overlap: cffi.float) ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="leftViewMatrix", objc_name="leftViewMatrix")
+	StereoscopicCamera_leftViewMatrix :: proc(self: ^StereoscopicCamera) -> matrix[4,4]f32 ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="rightViewMatrix", objc_name="rightViewMatrix")
+	StereoscopicCamera_rightViewMatrix :: proc(self: ^StereoscopicCamera) -> matrix[4,4]f32 ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="leftProjectionMatrix", objc_name="leftProjectionMatrix")
+	StereoscopicCamera_leftProjectionMatrix :: proc(self: ^StereoscopicCamera) -> matrix[4,4]f32 ---
+
+	@(objc_type=StereoscopicCamera, objc_selector="rightProjectionMatrix", objc_name="rightProjectionMatrix")
+	StereoscopicCamera_rightProjectionMatrix :: proc(self: ^StereoscopicCamera) -> matrix[4,4]f32 ---
+}

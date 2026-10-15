@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UISwipeActionsConfiguration", objc_superclass=NS.Object)
 SwipeActionsConfiguration :: struct { using _: NS.Object}
 

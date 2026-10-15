@@ -4,10 +4,6 @@ package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="UIListSeparatorConfiguration", objc_superclass=NS.Object)
 ListSeparatorConfiguration :: struct {
 	using _: NS.Object,

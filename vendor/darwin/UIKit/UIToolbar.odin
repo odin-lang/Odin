@@ -3,10 +3,7 @@
 package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIToolbar", objc_superclass=View)
 Toolbar :: struct {
@@ -96,4 +93,39 @@ foreign lib {
 Toolbar_setItems :: proc {
 	Toolbar_setItems_animated,
 	Toolbar_setItems_,
+}
+
+
+@(objc_class="UIToolbarDelegate")
+ToolbarDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: BarPositioningDelegate,
+}
+
+@(default_calling_convention="c")
+foreign lib {}
+
+
+@(objc_class="UIToolbarAppearance", objc_superclass=BarAppearance)
+ToolbarAppearance :: struct { using _: BarAppearance}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ToolbarAppearance, objc_selector="buttonAppearance", objc_name="buttonAppearance")
+	ToolbarAppearance_buttonAppearance :: proc(self: ^ToolbarAppearance) -> ^BarButtonItemAppearance ---
+
+	@(objc_type=ToolbarAppearance, objc_selector="setButtonAppearance:", objc_name="setButtonAppearance")
+	ToolbarAppearance_setButtonAppearance :: proc(self: ^ToolbarAppearance, buttonAppearance: ^BarButtonItemAppearance) ---
+
+	@(objc_type=ToolbarAppearance, objc_selector="prominentButtonAppearance", objc_name="prominentButtonAppearance")
+	ToolbarAppearance_prominentButtonAppearance :: proc(self: ^ToolbarAppearance) -> ^BarButtonItemAppearance ---
+
+	@(objc_type=ToolbarAppearance, objc_selector="setProminentButtonAppearance:", objc_name="setProminentButtonAppearance")
+	ToolbarAppearance_setProminentButtonAppearance :: proc(self: ^ToolbarAppearance, prominentButtonAppearance: ^BarButtonItemAppearance) ---
+
+	@(objc_type=ToolbarAppearance, objc_selector="doneButtonAppearance", objc_name="doneButtonAppearance")
+	ToolbarAppearance_doneButtonAppearance :: proc(self: ^ToolbarAppearance) -> ^BarButtonItemAppearance ---
+
+	@(objc_type=ToolbarAppearance, objc_selector="setDoneButtonAppearance:", objc_name="setDoneButtonAppearance")
+	ToolbarAppearance_setDoneButtonAppearance :: proc(self: ^ToolbarAppearance, doneButtonAppearance: ^BarButtonItemAppearance) ---
 }

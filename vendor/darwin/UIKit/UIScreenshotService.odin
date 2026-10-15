@@ -3,10 +3,8 @@
 package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
+import CG "core:sys/darwin/CoreGraphics"
 
 @(objc_class="UIScreenshotService", objc_superclass=NS.Object)
 ScreenshotService :: struct { using _: NS.Object}
@@ -27,4 +25,17 @@ foreign lib {
 
 	@(objc_type=ScreenshotService, objc_selector="windowScene", objc_name="windowScene")
 	ScreenshotService_windowScene :: proc(self: ^ScreenshotService) -> ^WindowScene ---
+}
+
+
+@(objc_class="UIScreenshotServiceDelegate")
+ScreenshotServiceDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ScreenshotServiceDelegate, objc_selector="screenshotService:generatePDFRepresentationWithCompletion:", objc_name="screenshotService")
+	ScreenshotServiceDelegate_screenshotService :: proc(self: ^ScreenshotServiceDelegate, screenshotService: ^ScreenshotService, completionHandler: ^Objc_Block(proc "c" ( PDFData: ^NS.Data, indexOfCurrentPage: NS.Integer, rectInCurrentPage: CG.Rect ))) ---
 }

@@ -2,11 +2,6 @@
 #+build darwin:default
 package darwin_AppKit
 
-
-
-
-
-
 @(objc_class="NSPanel", objc_superclass=Window)
 Panel :: struct { using _: Window}
 

@@ -52,3 +52,52 @@ Mesh_newMeshesFromAsset :: #force_inline proc "c" (asset: ^MDL.Asset, device: ^M
 	res = Mesh.newMeshesFromAsset_error(asset, device, sourceMeshes, &err)
 	return
 }
+
+
+@(objc_class="MTKMeshBuffer", objc_superclass=NS.Object)
+MeshBuffer :: struct {
+	using _: NS.Object,
+	using _: MDL.MeshBuffer,
+	using _: MDL.Named,
+}
+
+foreign lib {
+	@(objc_type=MeshBuffer, objc_selector="init", objc_name="init")
+	MeshBuffer_init :: proc(self: ^MeshBuffer) -> instancetype ---
+
+	@(objc_type=MeshBuffer, objc_selector="length", objc_name="length")
+	MeshBuffer_length :: proc(self: ^MeshBuffer) -> NS.UInteger ---
+
+	@(objc_type=MeshBuffer, objc_selector="allocator", objc_name="allocator")
+	MeshBuffer_allocator :: proc(self: ^MeshBuffer) -> ^MeshBufferAllocator ---
+
+	@(objc_type=MeshBuffer, objc_selector="zone", objc_name="zone")
+	MeshBuffer_zone :: proc(self: ^MeshBuffer) -> ^MDL.MeshBufferZone ---
+
+	@(objc_type=MeshBuffer, objc_selector="buffer", objc_name="buffer")
+	MeshBuffer_buffer :: proc(self: ^MeshBuffer) -> ^MTL.Buffer ---
+
+	@(objc_type=MeshBuffer, objc_selector="offset", objc_name="offset")
+	MeshBuffer_offset :: proc(self: ^MeshBuffer) -> NS.UInteger ---
+
+	@(objc_type=MeshBuffer, objc_selector="type", objc_name="type")
+	MeshBuffer_type :: proc(self: ^MeshBuffer) -> MDL.MeshBufferType ---
+}
+
+
+@(objc_class="MTKMeshBufferAllocator", objc_superclass=NS.Object)
+MeshBufferAllocator :: struct {
+	using _: NS.Object,
+	using _: MDL.MeshBufferAllocator,
+}
+
+foreign lib {
+	@(objc_type=MeshBufferAllocator, objc_selector="init", objc_name="init")
+	MeshBufferAllocator_init :: proc(self: ^MeshBufferAllocator) -> instancetype ---
+
+	@(objc_type=MeshBufferAllocator, objc_selector="initWithDevice:", objc_name="initWithDevice")
+	MeshBufferAllocator_initWithDevice :: proc(self: ^MeshBufferAllocator, device: ^MTL.Device) -> instancetype ---
+
+	@(objc_type=MeshBufferAllocator, objc_selector="device", objc_name="device")
+	MeshBufferAllocator_device :: proc(self: ^MeshBufferAllocator) -> ^MTL.Device ---
+}

@@ -3,10 +3,7 @@
 package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UICloudSharingController", objc_superclass=ViewController)
 CloudSharingController :: struct { using _: ViewController}
@@ -42,4 +39,32 @@ foreign lib {
 
 	@(objc_type=CloudSharingController, objc_selector="setAvailablePermissions:", objc_name="setAvailablePermissions")
 	CloudSharingController_setAvailablePermissions :: proc(self: ^CloudSharingController, availablePermissions: CloudSharingPermissionOptions) ---
+}
+
+
+@(objc_class="UICloudSharingControllerDelegate")
+CloudSharingControllerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=CloudSharingControllerDelegate, objc_selector="cloudSharingController:failedToSaveShareWithError:", objc_name="cloudSharingController")
+	CloudSharingControllerDelegate_cloudSharingController :: proc(self: ^CloudSharingControllerDelegate, csc: ^CloudSharingController, error: ^NS.Error) ---
+
+	@(objc_type=CloudSharingControllerDelegate, objc_selector="itemTitleForCloudSharingController:", objc_name="itemTitleForCloudSharingController")
+	CloudSharingControllerDelegate_itemTitleForCloudSharingController :: proc(self: ^CloudSharingControllerDelegate, csc: ^CloudSharingController) -> ^NS.String ---
+
+	@(objc_type=CloudSharingControllerDelegate, objc_selector="itemThumbnailDataForCloudSharingController:", objc_name="itemThumbnailDataForCloudSharingController")
+	CloudSharingControllerDelegate_itemThumbnailDataForCloudSharingController :: proc(self: ^CloudSharingControllerDelegate, csc: ^CloudSharingController) -> ^NS.Data ---
+
+	@(objc_type=CloudSharingControllerDelegate, objc_selector="itemTypeForCloudSharingController:", objc_name="itemTypeForCloudSharingController")
+	CloudSharingControllerDelegate_itemTypeForCloudSharingController :: proc(self: ^CloudSharingControllerDelegate, csc: ^CloudSharingController) -> ^NS.String ---
+
+	@(objc_type=CloudSharingControllerDelegate, objc_selector="cloudSharingControllerDidSaveShare:", objc_name="cloudSharingControllerDidSaveShare")
+	CloudSharingControllerDelegate_cloudSharingControllerDidSaveShare :: proc(self: ^CloudSharingControllerDelegate, csc: ^CloudSharingController) ---
+
+	@(objc_type=CloudSharingControllerDelegate, objc_selector="cloudSharingControllerDidStopSharing:", objc_name="cloudSharingControllerDidStopSharing")
+	CloudSharingControllerDelegate_cloudSharingControllerDidStopSharing :: proc(self: ^CloudSharingControllerDelegate, csc: ^CloudSharingController) ---
 }

@@ -4,10 +4,6 @@ package darwin_AppKit
 
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSMovie", objc_superclass=NS.Object)
 Movie :: struct {
 	using _: NS.Object,

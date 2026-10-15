@@ -2,6 +2,7 @@
 #+build darwin
 package darwin_GameController
 
+import NS "core:sys/darwin/Foundation"
 
 @(objc_class="GCExtendedGamepad", objc_superclass=PhysicalInputProfile)
 ExtendedGamepad :: struct { using _: PhysicalInputProfile}
@@ -69,4 +70,79 @@ foreign lib {
 
 	@(objc_type=ExtendedGamepad, objc_selector="rightThumbstickButton", objc_name="rightThumbstickButton")
 	ExtendedGamepad_rightThumbstickButton :: proc(self: ^ExtendedGamepad) -> ^ControllerButtonInput ---
+}
+
+
+@(objc_class="GCExtendedGamepadSnapshot", objc_superclass=ExtendedGamepad)
+ExtendedGamepadSnapshot :: struct { using _: ExtendedGamepad}
+
+foreign lib {
+	@(objc_type=ExtendedGamepadSnapshot, objc_selector="initWithSnapshotData:", objc_name="initWithSnapshotData")
+	ExtendedGamepadSnapshot_initWithSnapshotData :: proc(self: ^ExtendedGamepadSnapshot, data: ^NS.Data) -> instancetype ---
+
+	@(objc_type=ExtendedGamepadSnapshot, objc_selector="initWithController:snapshotData:", objc_name="initWithController")
+	ExtendedGamepadSnapshot_initWithController :: proc(self: ^ExtendedGamepadSnapshot, controller: ^Controller, data: ^NS.Data) -> instancetype ---
+
+	@(objc_type=ExtendedGamepadSnapshot, objc_selector="snapshotData", objc_name="snapshotData")
+	ExtendedGamepadSnapshot_snapshotData :: proc(self: ^ExtendedGamepadSnapshot) -> ^NS.Data ---
+
+	@(objc_type=ExtendedGamepadSnapshot, objc_selector="setSnapshotData:", objc_name="setSnapshotData")
+	ExtendedGamepadSnapshot_setSnapshotData :: proc(self: ^ExtendedGamepadSnapshot, snapshotData: ^NS.Data) ---
+}
+
+
+@(objc_class="GCDualSenseGamepad", objc_superclass=ExtendedGamepad)
+DualSenseGamepad :: struct { using _: ExtendedGamepad}
+
+foreign lib {
+	@(objc_type=DualSenseGamepad, objc_selector="touchpadButton", objc_name="touchpadButton")
+	DualSenseGamepad_touchpadButton :: proc(self: ^DualSenseGamepad) -> ^ControllerButtonInput ---
+
+	@(objc_type=DualSenseGamepad, objc_selector="touchpadPrimary", objc_name="touchpadPrimary")
+	DualSenseGamepad_touchpadPrimary :: proc(self: ^DualSenseGamepad) -> ^ControllerDirectionPad ---
+
+	@(objc_type=DualSenseGamepad, objc_selector="touchpadSecondary", objc_name="touchpadSecondary")
+	DualSenseGamepad_touchpadSecondary :: proc(self: ^DualSenseGamepad) -> ^ControllerDirectionPad ---
+
+	@(objc_type=DualSenseGamepad, objc_selector="leftTrigger", objc_name="leftTrigger")
+	DualSenseGamepad_leftTrigger :: proc(self: ^DualSenseGamepad) -> ^DualSenseAdaptiveTrigger ---
+
+	@(objc_type=DualSenseGamepad, objc_selector="rightTrigger", objc_name="rightTrigger")
+	DualSenseGamepad_rightTrigger :: proc(self: ^DualSenseGamepad) -> ^DualSenseAdaptiveTrigger ---
+}
+
+
+@(objc_class="GCDualShockGamepad", objc_superclass=ExtendedGamepad)
+DualShockGamepad :: struct { using _: ExtendedGamepad}
+
+foreign lib {
+	@(objc_type=DualShockGamepad, objc_selector="touchpadButton", objc_name="touchpadButton")
+	DualShockGamepad_touchpadButton :: proc(self: ^DualShockGamepad) -> ^ControllerButtonInput ---
+
+	@(objc_type=DualShockGamepad, objc_selector="touchpadPrimary", objc_name="touchpadPrimary")
+	DualShockGamepad_touchpadPrimary :: proc(self: ^DualShockGamepad) -> ^ControllerDirectionPad ---
+
+	@(objc_type=DualShockGamepad, objc_selector="touchpadSecondary", objc_name="touchpadSecondary")
+	DualShockGamepad_touchpadSecondary :: proc(self: ^DualShockGamepad) -> ^ControllerDirectionPad ---
+}
+
+
+@(objc_class="GCXboxGamepad", objc_superclass=ExtendedGamepad)
+XboxGamepad :: struct { using _: ExtendedGamepad}
+
+foreign lib {
+	@(objc_type=XboxGamepad, objc_selector="paddleButton1", objc_name="paddleButton1")
+	XboxGamepad_paddleButton1 :: proc(self: ^XboxGamepad) -> ^ControllerButtonInput ---
+
+	@(objc_type=XboxGamepad, objc_selector="paddleButton2", objc_name="paddleButton2")
+	XboxGamepad_paddleButton2 :: proc(self: ^XboxGamepad) -> ^ControllerButtonInput ---
+
+	@(objc_type=XboxGamepad, objc_selector="paddleButton3", objc_name="paddleButton3")
+	XboxGamepad_paddleButton3 :: proc(self: ^XboxGamepad) -> ^ControllerButtonInput ---
+
+	@(objc_type=XboxGamepad, objc_selector="paddleButton4", objc_name="paddleButton4")
+	XboxGamepad_paddleButton4 :: proc(self: ^XboxGamepad) -> ^ControllerButtonInput ---
+
+	@(objc_type=XboxGamepad, objc_selector="buttonShare", objc_name="buttonShare")
+	XboxGamepad_buttonShare :: proc(self: ^XboxGamepad) -> ^ControllerButtonInput ---
 }

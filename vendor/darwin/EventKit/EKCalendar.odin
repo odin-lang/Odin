@@ -62,3 +62,138 @@ foreign lib {
 	@(objc_type=Calendar, objc_selector="allowedEntityTypes", objc_name="allowedEntityTypes")
 	Calendar_allowedEntityTypes :: proc(self: ^Calendar) -> EntityMasks ---
 }
+
+
+@(objc_class="EKCalendarItem", objc_superclass=Object)
+CalendarItem :: struct { using _: Object}
+
+foreign lib {
+	@(objc_type=CalendarItem, objc_selector="addAlarm:", objc_name="addAlarm")
+	CalendarItem_addAlarm :: proc(self: ^CalendarItem, alarm: ^Alarm) ---
+
+	@(objc_type=CalendarItem, objc_selector="removeAlarm:", objc_name="removeAlarm")
+	CalendarItem_removeAlarm :: proc(self: ^CalendarItem, alarm: ^Alarm) ---
+
+	@(objc_type=CalendarItem, objc_selector="addRecurrenceRule:", objc_name="addRecurrenceRule")
+	CalendarItem_addRecurrenceRule :: proc(self: ^CalendarItem, rule: ^RecurrenceRule) ---
+
+	@(objc_type=CalendarItem, objc_selector="removeRecurrenceRule:", objc_name="removeRecurrenceRule")
+	CalendarItem_removeRecurrenceRule :: proc(self: ^CalendarItem, rule: ^RecurrenceRule) ---
+
+	@(objc_type=CalendarItem, objc_selector="UUID", objc_name="UUID")
+	CalendarItem_UUID :: proc(self: ^CalendarItem) -> ^NS.String ---
+
+	@(objc_type=CalendarItem, objc_selector="calendar", objc_name="calendar")
+	CalendarItem_calendar :: proc(self: ^CalendarItem) -> ^Calendar ---
+
+	@(objc_type=CalendarItem, objc_selector="setCalendar:", objc_name="setCalendar")
+	CalendarItem_setCalendar :: proc(self: ^CalendarItem, calendar: ^Calendar) ---
+
+	@(objc_type=CalendarItem, objc_selector="calendarItemIdentifier", objc_name="calendarItemIdentifier")
+	CalendarItem_calendarItemIdentifier :: proc(self: ^CalendarItem) -> ^NS.String ---
+
+	@(objc_type=CalendarItem, objc_selector="calendarItemExternalIdentifier", objc_name="calendarItemExternalIdentifier")
+	CalendarItem_calendarItemExternalIdentifier :: proc(self: ^CalendarItem) -> ^NS.String ---
+
+	@(objc_type=CalendarItem, objc_selector="title", objc_name="title")
+	CalendarItem_title :: proc(self: ^CalendarItem) -> ^NS.String ---
+
+	@(objc_type=CalendarItem, objc_selector="setTitle:", objc_name="setTitle")
+	CalendarItem_setTitle :: proc(self: ^CalendarItem, title: ^NS.String) ---
+
+	@(objc_type=CalendarItem, objc_selector="location", objc_name="location")
+	CalendarItem_location :: proc(self: ^CalendarItem) -> ^NS.String ---
+
+	@(objc_type=CalendarItem, objc_selector="setLocation:", objc_name="setLocation")
+	CalendarItem_setLocation :: proc(self: ^CalendarItem, location: ^NS.String) ---
+
+	@(objc_type=CalendarItem, objc_selector="notes", objc_name="notes")
+	CalendarItem_notes :: proc(self: ^CalendarItem) -> ^NS.String ---
+
+	@(objc_type=CalendarItem, objc_selector="setNotes:", objc_name="setNotes")
+	CalendarItem_setNotes :: proc(self: ^CalendarItem, notes: ^NS.String) ---
+
+	@(objc_type=CalendarItem, objc_selector="URL", objc_name="URL")
+	CalendarItem_URL :: proc(self: ^CalendarItem) -> ^NS.URL ---
+
+	@(objc_type=CalendarItem, objc_selector="setURL:", objc_name="setURL")
+	CalendarItem_setURL :: proc(self: ^CalendarItem, _URL: ^NS.URL) ---
+
+	@(objc_type=CalendarItem, objc_selector="lastModifiedDate", objc_name="lastModifiedDate")
+	CalendarItem_lastModifiedDate :: proc(self: ^CalendarItem) -> ^NS.Date ---
+
+	@(objc_type=CalendarItem, objc_selector="creationDate", objc_name="creationDate")
+	CalendarItem_creationDate :: proc(self: ^CalendarItem) -> ^NS.Date ---
+
+	@(objc_type=CalendarItem, objc_selector="timeZone", objc_name="timeZone")
+	CalendarItem_timeZone :: proc(self: ^CalendarItem) -> ^NS.TimeZone ---
+
+	@(objc_type=CalendarItem, objc_selector="setTimeZone:", objc_name="setTimeZone")
+	CalendarItem_setTimeZone :: proc(self: ^CalendarItem, timeZone: ^NS.TimeZone) ---
+
+	@(objc_type=CalendarItem, objc_selector="hasAlarms", objc_name="hasAlarms")
+	CalendarItem_hasAlarms :: proc(self: ^CalendarItem) -> bool ---
+
+	@(objc_type=CalendarItem, objc_selector="hasRecurrenceRules", objc_name="hasRecurrenceRules")
+	CalendarItem_hasRecurrenceRules :: proc(self: ^CalendarItem) -> bool ---
+
+	@(objc_type=CalendarItem, objc_selector="hasAttendees", objc_name="hasAttendees")
+	CalendarItem_hasAttendees :: proc(self: ^CalendarItem) -> bool ---
+
+	@(objc_type=CalendarItem, objc_selector="hasNotes", objc_name="hasNotes")
+	CalendarItem_hasNotes :: proc(self: ^CalendarItem) -> bool ---
+
+	@(objc_type=CalendarItem, objc_selector="attendees", objc_name="attendees")
+	CalendarItem_attendees :: proc(self: ^CalendarItem) -> ^NS.Array ---
+
+	@(objc_type=CalendarItem, objc_selector="alarms", objc_name="alarms")
+	CalendarItem_alarms :: proc(self: ^CalendarItem) -> ^NS.Array ---
+
+	@(objc_type=CalendarItem, objc_selector="setAlarms:", objc_name="setAlarms")
+	CalendarItem_setAlarms :: proc(self: ^CalendarItem, alarms: ^NS.Array) ---
+
+	@(objc_type=CalendarItem, objc_selector="recurrenceRules", objc_name="recurrenceRules")
+	CalendarItem_recurrenceRules :: proc(self: ^CalendarItem) -> ^NS.Array ---
+
+	@(objc_type=CalendarItem, objc_selector="setRecurrenceRules:", objc_name="setRecurrenceRules")
+	CalendarItem_setRecurrenceRules :: proc(self: ^CalendarItem, recurrenceRules: ^NS.Array) ---
+}
+
+
+@(objc_class="EKReminder", objc_superclass=CalendarItem)
+Reminder :: struct { using _: CalendarItem}
+
+foreign lib {
+	@(objc_type=Reminder, objc_selector="reminderWithEventStore:", objc_name="reminderWithEventStore", objc_is_class_method=true)
+	Reminder_reminderWithEventStore :: proc(eventStore: ^EventStore) -> ^Reminder ---
+
+	@(objc_type=Reminder, objc_selector="startDateComponents", objc_name="startDateComponents")
+	Reminder_startDateComponents :: proc(self: ^Reminder) -> ^NS.DateComponents ---
+
+	@(objc_type=Reminder, objc_selector="setStartDateComponents:", objc_name="setStartDateComponents")
+	Reminder_setStartDateComponents :: proc(self: ^Reminder, startDateComponents: ^NS.DateComponents) ---
+
+	@(objc_type=Reminder, objc_selector="dueDateComponents", objc_name="dueDateComponents")
+	Reminder_dueDateComponents :: proc(self: ^Reminder) -> ^NS.DateComponents ---
+
+	@(objc_type=Reminder, objc_selector="setDueDateComponents:", objc_name="setDueDateComponents")
+	Reminder_setDueDateComponents :: proc(self: ^Reminder, dueDateComponents: ^NS.DateComponents) ---
+
+	@(objc_type=Reminder, objc_selector="isCompleted", objc_name="isCompleted")
+	Reminder_isCompleted :: proc(self: ^Reminder) -> bool ---
+
+	@(objc_type=Reminder, objc_selector="setCompleted:", objc_name="setCompleted")
+	Reminder_setCompleted :: proc(self: ^Reminder, completed: bool) ---
+
+	@(objc_type=Reminder, objc_selector="completionDate", objc_name="completionDate")
+	Reminder_completionDate :: proc(self: ^Reminder) -> ^NS.Date ---
+
+	@(objc_type=Reminder, objc_selector="setCompletionDate:", objc_name="setCompletionDate")
+	Reminder_setCompletionDate :: proc(self: ^Reminder, completionDate: ^NS.Date) ---
+
+	@(objc_type=Reminder, objc_selector="priority", objc_name="priority")
+	Reminder_priority :: proc(self: ^Reminder) -> NS.UInteger ---
+
+	@(objc_type=Reminder, objc_selector="setPriority:", objc_name="setPriority")
+	Reminder_setPriority :: proc(self: ^Reminder, priority: NS.UInteger) ---
+}

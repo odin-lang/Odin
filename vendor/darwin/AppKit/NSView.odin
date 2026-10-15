@@ -5,10 +5,7 @@ package darwin_AppKit
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
 import CA "vendor:darwin/QuartzCore"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSView", objc_superclass=Responder)
 View :: struct {
@@ -1063,4 +1060,275 @@ View_displayRectIgnoringOpacity :: proc {
 View_showDefinitionForAttributedString :: proc {
 	View_showDefinitionForAttributedString_atPoint,
 	View_showDefinitionForAttributedString_range_options_baselineOriginProvider,
+}
+
+
+@(objc_class="NSViewAnimation", objc_superclass=Animation)
+ViewAnimation :: struct { using _: Animation}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewAnimation, objc_selector="initWithViewAnimations:", objc_name="initWithViewAnimations")
+	ViewAnimation_initWithViewAnimations :: proc(self: ^ViewAnimation, viewAnimations: ^NS.Array) -> instancetype ---
+
+	@(objc_type=ViewAnimation, objc_selector="viewAnimations", objc_name="viewAnimations")
+	ViewAnimation_viewAnimations :: proc(self: ^ViewAnimation) -> ^NS.Array ---
+
+	@(objc_type=ViewAnimation, objc_selector="setViewAnimations:", objc_name="setViewAnimations")
+	ViewAnimation_setViewAnimations :: proc(self: ^ViewAnimation, viewAnimations: ^NS.Array) ---
+}
+
+
+@(objc_class="NSViewContentSelectionInfo")
+ViewContentSelectionInfo :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewContentSelectionInfo, objc_selector="selectionAnchorRect", objc_name="selectionAnchorRect")
+	ViewContentSelectionInfo_selectionAnchorRect :: proc(self: ^ViewContentSelectionInfo) -> NS.Rect ---
+}
+
+
+@(objc_class="NSViewController", objc_superclass=Responder)
+ViewController :: struct {
+	using _: Responder,
+	using _: Editor,
+	using _: SeguePerforming,
+	using _: UserInterfaceItemIdentification,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewController, objc_selector="initWithNibName:bundle:", objc_name="initWithNibName")
+	ViewController_initWithNibName :: proc(self: ^ViewController, nibNameOrNil: ^NS.String, nibBundleOrNil: ^NS.Bundle) -> instancetype ---
+
+	@(objc_type=ViewController, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	ViewController_initWithCoder :: proc(self: ^ViewController, coder: ^NS.Coder) -> instancetype ---
+
+	@(objc_type=ViewController, objc_selector="loadView", objc_name="loadView")
+	ViewController_loadView :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="loadViewIfNeeded", objc_name="loadViewIfNeeded")
+	ViewController_loadViewIfNeeded :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="commitEditingWithDelegate:didCommitSelector:contextInfo:", objc_name="commitEditingWithDelegate")
+	ViewController_commitEditingWithDelegate :: proc(self: ^ViewController, delegate: id, didCommitSelector: SEL, contextInfo: rawptr) ---
+
+	@(objc_type=ViewController, objc_selector="commitEditing", objc_name="commitEditing")
+	ViewController_commitEditing :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="discardEditing", objc_name="discardEditing")
+	ViewController_discardEditing :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidLoad", objc_name="viewDidLoad")
+	ViewController_viewDidLoad :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewWillAppear", objc_name="viewWillAppear")
+	ViewController_viewWillAppear :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidAppear", objc_name="viewDidAppear")
+	ViewController_viewDidAppear :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewWillDisappear", objc_name="viewWillDisappear")
+	ViewController_viewWillDisappear :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidDisappear", objc_name="viewDidDisappear")
+	ViewController_viewDidDisappear :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="updateViewConstraints", objc_name="updateViewConstraints")
+	ViewController_updateViewConstraints :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewWillLayout", objc_name="viewWillLayout")
+	ViewController_viewWillLayout :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewDidLayout", objc_name="viewDidLayout")
+	ViewController_viewDidLayout :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="nibName", objc_name="nibName")
+	ViewController_nibName :: proc(self: ^ViewController) -> ^NS.String ---
+
+	@(objc_type=ViewController, objc_selector="nibBundle", objc_name="nibBundle")
+	ViewController_nibBundle :: proc(self: ^ViewController) -> ^NS.Bundle ---
+
+	@(objc_type=ViewController, objc_selector="representedObject", objc_name="representedObject")
+	ViewController_representedObject :: proc(self: ^ViewController) -> id ---
+
+	@(objc_type=ViewController, objc_selector="setRepresentedObject:", objc_name="setRepresentedObject")
+	ViewController_setRepresentedObject :: proc(self: ^ViewController, representedObject: id) ---
+
+	@(objc_type=ViewController, objc_selector="title", objc_name="title")
+	ViewController_title :: proc(self: ^ViewController) -> ^NS.String ---
+
+	@(objc_type=ViewController, objc_selector="setTitle:", objc_name="setTitle")
+	ViewController_setTitle :: proc(self: ^ViewController, title: ^NS.String) ---
+
+	@(objc_type=ViewController, objc_selector="view", objc_name="view")
+	ViewController_view :: proc(self: ^ViewController) -> ^View ---
+
+	@(objc_type=ViewController, objc_selector="setView:", objc_name="setView")
+	ViewController_setView :: proc(self: ^ViewController, view: ^View) ---
+
+	@(objc_type=ViewController, objc_selector="viewIfLoaded", objc_name="viewIfLoaded")
+	ViewController_viewIfLoaded :: proc(self: ^ViewController) -> ^View ---
+
+	@(objc_type=ViewController, objc_selector="isViewLoaded", objc_name="isViewLoaded")
+	ViewController_isViewLoaded :: proc(self: ^ViewController) -> bool ---
+
+	@(objc_type=ViewController, objc_selector="preferredContentSize", objc_name="preferredContentSize")
+	ViewController_preferredContentSize :: proc(self: ^ViewController) -> NS.Size ---
+
+	@(objc_type=ViewController, objc_selector="setPreferredContentSize:", objc_name="setPreferredContentSize")
+	ViewController_setPreferredContentSize :: proc(self: ^ViewController, preferredContentSize: NS.Size) ---
+
+	@(objc_type=ViewController, objc_selector="presentViewController:animator:", objc_name="presentViewController_animator")
+	ViewController_presentViewController_animator :: proc(self: ^ViewController, viewController: ^ViewController, animator: ^ViewControllerPresentationAnimator) ---
+
+	@(objc_type=ViewController, objc_selector="dismissViewController:", objc_name="dismissViewController")
+	ViewController_dismissViewController :: proc(self: ^ViewController, viewController: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="dismissController:", objc_name="dismissController")
+	ViewController_dismissController :: proc(self: ^ViewController, sender: id) ---
+
+	@(objc_type=ViewController, objc_selector="presentedViewControllers", objc_name="presentedViewControllers")
+	ViewController_presentedViewControllers :: proc(self: ^ViewController) -> ^NS.Array ---
+
+	@(objc_type=ViewController, objc_selector="presentingViewController", objc_name="presentingViewController")
+	ViewController_presentingViewController :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="presentViewControllerAsSheet:", objc_name="presentViewControllerAsSheet")
+	ViewController_presentViewControllerAsSheet :: proc(self: ^ViewController, viewController: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="presentViewControllerAsModalWindow:", objc_name="presentViewControllerAsModalWindow")
+	ViewController_presentViewControllerAsModalWindow :: proc(self: ^ViewController, viewController: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="presentViewController:asPopoverRelativeToRect:ofView:preferredEdge:behavior:", objc_name="presentViewController_asPopoverRelativeToRect_ofView_preferredEdge_behavior")
+	ViewController_presentViewController_asPopoverRelativeToRect_ofView_preferredEdge_behavior :: proc(self: ^ViewController, viewController: ^ViewController, positioningRect: NS.Rect, positioningView: ^View, preferredEdge: NS.RectEdge, behavior: PopoverBehavior) ---
+
+	@(objc_type=ViewController, objc_selector="presentViewController:asPopoverRelativeToRect:ofView:preferredEdge:behavior:hasFullSizeContent:", objc_name="presentViewController_asPopoverRelativeToRect_ofView_preferredEdge_behavior_hasFullSizeContent")
+	ViewController_presentViewController_asPopoverRelativeToRect_ofView_preferredEdge_behavior_hasFullSizeContent :: proc(self: ^ViewController, viewController: ^ViewController, positioningRect: NS.Rect, positioningView: ^View, preferredEdge: NS.RectEdge, behavior: PopoverBehavior, hasFullSizeContent: bool) ---
+
+	@(objc_type=ViewController, objc_selector="transitionFromViewController:toViewController:options:completionHandler:", objc_name="transitionFromViewController")
+	ViewController_transitionFromViewController :: proc(self: ^ViewController, fromViewController: ^ViewController, toViewController: ^ViewController, options: ViewControllerTransitionOptions, completion: ^Objc_Block(proc "c" ())) ---
+
+	@(objc_type=ViewController, objc_selector="addChildViewController:", objc_name="addChildViewController")
+	ViewController_addChildViewController :: proc(self: ^ViewController, childViewController: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="removeFromParentViewController", objc_name="removeFromParentViewController")
+	ViewController_removeFromParentViewController :: proc(self: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="insertChildViewController:atIndex:", objc_name="insertChildViewController")
+	ViewController_insertChildViewController :: proc(self: ^ViewController, childViewController: ^ViewController, index: NS.Integer) ---
+
+	@(objc_type=ViewController, objc_selector="removeChildViewControllerAtIndex:", objc_name="removeChildViewControllerAtIndex")
+	ViewController_removeChildViewControllerAtIndex :: proc(self: ^ViewController, index: NS.Integer) ---
+
+	@(objc_type=ViewController, objc_selector="preferredContentSizeDidChangeForViewController:", objc_name="preferredContentSizeDidChangeForViewController")
+	ViewController_preferredContentSizeDidChangeForViewController :: proc(self: ^ViewController, viewController: ^ViewController) ---
+
+	@(objc_type=ViewController, objc_selector="viewWillTransitionToSize:", objc_name="viewWillTransitionToSize")
+	ViewController_viewWillTransitionToSize :: proc(self: ^ViewController, newSize: NS.Size) ---
+
+	@(objc_type=ViewController, objc_selector="parentViewController", objc_name="parentViewController")
+	ViewController_parentViewController :: proc(self: ^ViewController) -> ^ViewController ---
+
+	@(objc_type=ViewController, objc_selector="childViewControllers", objc_name="childViewControllers")
+	ViewController_childViewControllers :: proc(self: ^ViewController) -> ^NS.Array ---
+
+	@(objc_type=ViewController, objc_selector="setChildViewControllers:", objc_name="setChildViewControllers")
+	ViewController_setChildViewControllers :: proc(self: ^ViewController, childViewControllers: ^NS.Array) ---
+
+	@(objc_type=ViewController, objc_selector="storyboard", objc_name="storyboard")
+	ViewController_storyboard :: proc(self: ^ViewController) -> ^Storyboard ---
+
+	@(objc_type=ViewController, objc_selector="extensionContext", objc_name="extensionContext")
+	ViewController_extensionContext :: proc(self: ^ViewController) -> ^NS.ExtensionContext ---
+
+	@(objc_type=ViewController, objc_selector="sourceItemView", objc_name="sourceItemView")
+	ViewController_sourceItemView :: proc(self: ^ViewController) -> ^View ---
+
+	@(objc_type=ViewController, objc_selector="setSourceItemView:", objc_name="setSourceItemView")
+	ViewController_setSourceItemView :: proc(self: ^ViewController, sourceItemView: ^View) ---
+
+	@(objc_type=ViewController, objc_selector="preferredScreenOrigin", objc_name="preferredScreenOrigin")
+	ViewController_preferredScreenOrigin :: proc(self: ^ViewController) -> CG.Point ---
+
+	@(objc_type=ViewController, objc_selector="setPreferredScreenOrigin:", objc_name="setPreferredScreenOrigin")
+	ViewController_setPreferredScreenOrigin :: proc(self: ^ViewController, preferredScreenOrigin: CG.Point) ---
+
+	@(objc_type=ViewController, objc_selector="preferredMinimumSize", objc_name="preferredMinimumSize")
+	ViewController_preferredMinimumSize :: proc(self: ^ViewController) -> NS.Size ---
+
+	@(objc_type=ViewController, objc_selector="preferredMaximumSize", objc_name="preferredMaximumSize")
+	ViewController_preferredMaximumSize :: proc(self: ^ViewController) -> NS.Size ---
+}
+
+@(objc_type=ViewController, objc_name="presentViewController")
+ViewController_presentViewController :: proc {
+	ViewController_presentViewController_animator,
+	ViewController_presentViewController_asPopoverRelativeToRect_ofView_preferredEdge_behavior,
+	ViewController_presentViewController_asPopoverRelativeToRect_ofView_preferredEdge_behavior_hasFullSizeContent,
+}
+
+
+@(objc_class="NSViewControllerPresentationAnimator")
+ViewControllerPresentationAnimator :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewControllerPresentationAnimator, objc_selector="animatePresentationOfViewController:fromViewController:", objc_name="animatePresentationOfViewController")
+	ViewControllerPresentationAnimator_animatePresentationOfViewController :: proc(self: ^ViewControllerPresentationAnimator, viewController: ^ViewController, fromViewController: ^ViewController) ---
+
+	@(objc_type=ViewControllerPresentationAnimator, objc_selector="animateDismissalOfViewController:fromViewController:", objc_name="animateDismissalOfViewController")
+	ViewControllerPresentationAnimator_animateDismissalOfViewController :: proc(self: ^ViewControllerPresentationAnimator, viewController: ^ViewController, fromViewController: ^ViewController) ---
+}
+
+
+@(objc_class="NSViewLayerContentScaleDelegate")
+ViewLayerContentScaleDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewLayerContentScaleDelegate, objc_selector="layer:shouldInheritContentsScale:fromWindow:", objc_name="layer")
+	ViewLayerContentScaleDelegate_layer :: proc(self: ^ViewLayerContentScaleDelegate, layer: ^CA.Layer, newScale: CG.Float, window: ^Window) -> bool ---
+}
+
+
+@(objc_class="NSViewLayoutRegion", objc_superclass=NS.Object)
+ViewLayoutRegion :: struct { using _: NS.Object}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewLayoutRegion, objc_selector="safeAreaLayoutRegionWithCornerAdaptation:", objc_name="safeAreaLayoutRegionWithCornerAdaptation", objc_is_class_method=true)
+	ViewLayoutRegion_safeAreaLayoutRegionWithCornerAdaptation :: proc(adaptivityAxis: ViewLayoutRegionAdaptivityAxis) -> ^ViewLayoutRegion ---
+
+	@(objc_type=ViewLayoutRegion, objc_selector="marginsLayoutRegionWithCornerAdaptation:", objc_name="marginsLayoutRegionWithCornerAdaptation", objc_is_class_method=true)
+	ViewLayoutRegion_marginsLayoutRegionWithCornerAdaptation :: proc(adaptivityAxis: ViewLayoutRegionAdaptivityAxis) -> ^ViewLayoutRegion ---
+
+	@(objc_type=ViewLayoutRegion, objc_selector="new", objc_name="new", objc_is_class_method=true)
+	ViewLayoutRegion_new :: proc() -> ^ViewLayoutRegion ---
+
+	@(objc_type=ViewLayoutRegion, objc_selector="init", objc_name="init")
+	ViewLayoutRegion_init :: proc(self: ^ViewLayoutRegion) -> instancetype ---
+}
+
+
+@(objc_class="NSViewToolTipOwner")
+ViewToolTipOwner :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=ViewToolTipOwner, objc_selector="view:stringForToolTip:point:userData:", objc_name="view")
+	ViewToolTipOwner_view :: proc(self: ^ViewToolTipOwner, view: ^View, tag: ToolTipTag, point: CG.Point, data: rawptr) -> ^NS.String ---
 }

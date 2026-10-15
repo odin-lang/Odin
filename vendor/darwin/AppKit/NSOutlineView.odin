@@ -4,10 +4,7 @@ package darwin_AppKit
 
 import CG "core:sys/darwin/CoreGraphics"
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="NSOutlineView", objc_superclass=TableView)
 OutlineView :: struct {
@@ -163,4 +160,189 @@ OutlineView_collapseItem :: proc {
 OutlineView_reloadItem :: proc {
 	OutlineView_reloadItem_reloadChildren,
 	OutlineView_reloadItem_,
+}
+
+
+@(objc_class="NSOutlineViewDelegate")
+OutlineViewDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: ControlTextEditingDelegate,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:viewForTableColumn:item:", objc_name="outlineView_viewForTableColumn_item")
+	OutlineViewDelegate_outlineView_viewForTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn, item: id) -> ^View ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:rowViewForItem:", objc_name="outlineView_rowViewForItem")
+	OutlineViewDelegate_outlineView_rowViewForItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> ^TableRowView ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:didAddRowView:forRow:", objc_name="outlineView_didAddRowView_forRow")
+	OutlineViewDelegate_outlineView_didAddRowView_forRow :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, rowView: ^TableRowView, row: NS.Integer) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:didRemoveRowView:forRow:", objc_name="outlineView_didRemoveRowView_forRow")
+	OutlineViewDelegate_outlineView_didRemoveRowView_forRow :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, rowView: ^TableRowView, row: NS.Integer) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:willDisplayCell:forTableColumn:item:", objc_name="outlineView_willDisplayCell_forTableColumn_item")
+	OutlineViewDelegate_outlineView_willDisplayCell_forTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, cell: id, tableColumn: ^TableColumn, item: id) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldEditTableColumn:item:", objc_name="outlineView_shouldEditTableColumn_item")
+	OutlineViewDelegate_outlineView_shouldEditTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="selectionShouldChangeInOutlineView:", objc_name="selectionShouldChangeInOutlineView")
+	OutlineViewDelegate_selectionShouldChangeInOutlineView :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldSelectItem:", objc_name="outlineView_shouldSelectItem")
+	OutlineViewDelegate_outlineView_shouldSelectItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:selectionIndexesForProposedSelection:", objc_name="outlineView_selectionIndexesForProposedSelection")
+	OutlineViewDelegate_outlineView_selectionIndexesForProposedSelection :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, proposedSelectionIndexes: ^NS.IndexSet) -> ^NS.IndexSet ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldSelectTableColumn:", objc_name="outlineView_shouldSelectTableColumn")
+	OutlineViewDelegate_outlineView_shouldSelectTableColumn :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:mouseDownInHeaderOfTableColumn:", objc_name="outlineView_mouseDownInHeaderOfTableColumn")
+	OutlineViewDelegate_outlineView_mouseDownInHeaderOfTableColumn :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:didClickTableColumn:", objc_name="outlineView_didClickTableColumn")
+	OutlineViewDelegate_outlineView_didClickTableColumn :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:didDragTableColumn:", objc_name="outlineView_didDragTableColumn")
+	OutlineViewDelegate_outlineView_didDragTableColumn :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:toolTipForCell:rect:tableColumn:item:mouseLocation:", objc_name="outlineView_toolTipForCell_rect_tableColumn_item_mouseLocation")
+	OutlineViewDelegate_outlineView_toolTipForCell_rect_tableColumn_item_mouseLocation :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, cell: ^Cell, rect: ^NS.Rect, tableColumn: ^TableColumn, item: id, mouseLocation: CG.Point) -> ^NS.String ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:heightOfRowByItem:", objc_name="outlineView_heightOfRowByItem")
+	OutlineViewDelegate_outlineView_heightOfRowByItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> CG.Float ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:tintConfigurationForItem:", objc_name="outlineView_tintConfigurationForItem")
+	OutlineViewDelegate_outlineView_tintConfigurationForItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> ^TintConfiguration ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:typeSelectStringForTableColumn:item:", objc_name="outlineView_typeSelectStringForTableColumn_item")
+	OutlineViewDelegate_outlineView_typeSelectStringForTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn, item: id) -> ^NS.String ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:nextTypeSelectMatchFromItem:toItem:forString:", objc_name="outlineView_nextTypeSelectMatchFromItem_toItem_forString")
+	OutlineViewDelegate_outlineView_nextTypeSelectMatchFromItem_toItem_forString :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, startItem: id, endItem: id, searchString: ^NS.String) -> id ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldTypeSelectForEvent:withCurrentSearchString:", objc_name="outlineView_shouldTypeSelectForEvent_withCurrentSearchString")
+	OutlineViewDelegate_outlineView_shouldTypeSelectForEvent_withCurrentSearchString :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, event: ^Event, searchString: ^NS.String) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldShowCellExpansionForTableColumn:item:", objc_name="outlineView_shouldShowCellExpansionForTableColumn_item")
+	OutlineViewDelegate_outlineView_shouldShowCellExpansionForTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldTrackCell:forTableColumn:item:", objc_name="outlineView_shouldTrackCell_forTableColumn_item")
+	OutlineViewDelegate_outlineView_shouldTrackCell_forTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, cell: ^Cell, tableColumn: ^TableColumn, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:dataCellForTableColumn:item:", objc_name="outlineView_dataCellForTableColumn_item")
+	OutlineViewDelegate_outlineView_dataCellForTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, tableColumn: ^TableColumn, item: id) -> ^Cell ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:isGroupItem:", objc_name="outlineView_isGroupItem")
+	OutlineViewDelegate_outlineView_isGroupItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldExpandItem:", objc_name="outlineView_shouldExpandItem")
+	OutlineViewDelegate_outlineView_shouldExpandItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldCollapseItem:", objc_name="outlineView_shouldCollapseItem")
+	OutlineViewDelegate_outlineView_shouldCollapseItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:willDisplayOutlineCell:forTableColumn:item:", objc_name="outlineView_willDisplayOutlineCell_forTableColumn_item")
+	OutlineViewDelegate_outlineView_willDisplayOutlineCell_forTableColumn_item :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, cell: id, tableColumn: ^TableColumn, item: id) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:sizeToFitWidthOfColumn:", objc_name="outlineView_sizeToFitWidthOfColumn")
+	OutlineViewDelegate_outlineView_sizeToFitWidthOfColumn :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, column: NS.Integer) -> CG.Float ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldReorderColumn:toColumn:", objc_name="outlineView_shouldReorderColumn_toColumn")
+	OutlineViewDelegate_outlineView_shouldReorderColumn_toColumn :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, columnIndex: NS.Integer, newColumnIndex: NS.Integer) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:shouldShowOutlineCellForItem:", objc_name="outlineView_shouldShowOutlineCellForItem")
+	OutlineViewDelegate_outlineView_shouldShowOutlineCellForItem :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:userCanChangeVisibilityOfTableColumn:", objc_name="outlineView_userCanChangeVisibilityOfTableColumn")
+	OutlineViewDelegate_outlineView_userCanChangeVisibilityOfTableColumn :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, column: ^TableColumn) -> bool ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineView:userDidChangeVisibilityOfTableColumns:", objc_name="outlineView_userDidChangeVisibilityOfTableColumns")
+	OutlineViewDelegate_outlineView_userDidChangeVisibilityOfTableColumns :: proc(self: ^OutlineViewDelegate, outlineView: ^OutlineView, columns: ^NS.Array) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewSelectionDidChange:", objc_name="outlineViewSelectionDidChange")
+	OutlineViewDelegate_outlineViewSelectionDidChange :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewColumnDidMove:", objc_name="outlineViewColumnDidMove")
+	OutlineViewDelegate_outlineViewColumnDidMove :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewColumnDidResize:", objc_name="outlineViewColumnDidResize")
+	OutlineViewDelegate_outlineViewColumnDidResize :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewSelectionIsChanging:", objc_name="outlineViewSelectionIsChanging")
+	OutlineViewDelegate_outlineViewSelectionIsChanging :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewItemWillExpand:", objc_name="outlineViewItemWillExpand")
+	OutlineViewDelegate_outlineViewItemWillExpand :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewItemDidExpand:", objc_name="outlineViewItemDidExpand")
+	OutlineViewDelegate_outlineViewItemDidExpand :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewItemWillCollapse:", objc_name="outlineViewItemWillCollapse")
+	OutlineViewDelegate_outlineViewItemWillCollapse :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+
+	@(objc_type=OutlineViewDelegate, objc_selector="outlineViewItemDidCollapse:", objc_name="outlineViewItemDidCollapse")
+	OutlineViewDelegate_outlineViewItemDidCollapse :: proc(self: ^OutlineViewDelegate, notification: ^NS.Notification) ---
+}
+
+
+@(objc_class="NSOutlineViewDataSource")
+OutlineViewDataSource :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:numberOfChildrenOfItem:", objc_name="outlineView_numberOfChildrenOfItem")
+	OutlineViewDataSource_outlineView_numberOfChildrenOfItem :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, item: id) -> NS.Integer ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:child:ofItem:", objc_name="outlineView_child_ofItem")
+	OutlineViewDataSource_outlineView_child_ofItem :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, index: NS.Integer, item: id) -> id ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:isItemExpandable:", objc_name="outlineView_isItemExpandable")
+	OutlineViewDataSource_outlineView_isItemExpandable :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, item: id) -> bool ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:objectValueForTableColumn:byItem:", objc_name="outlineView_objectValueForTableColumn_byItem")
+	OutlineViewDataSource_outlineView_objectValueForTableColumn_byItem :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, tableColumn: ^TableColumn, item: id) -> id ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:setObjectValue:forTableColumn:byItem:", objc_name="outlineView_setObjectValue_forTableColumn_byItem")
+	OutlineViewDataSource_outlineView_setObjectValue_forTableColumn_byItem :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, object: id, tableColumn: ^TableColumn, item: id) ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:itemForPersistentObject:", objc_name="outlineView_itemForPersistentObject")
+	OutlineViewDataSource_outlineView_itemForPersistentObject :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, object: id) -> id ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:persistentObjectForItem:", objc_name="outlineView_persistentObjectForItem")
+	OutlineViewDataSource_outlineView_persistentObjectForItem :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, item: id) -> id ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:sortDescriptorsDidChange:", objc_name="outlineView_sortDescriptorsDidChange")
+	OutlineViewDataSource_outlineView_sortDescriptorsDidChange :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, oldDescriptors: ^NS.Array) ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:pasteboardWriterForItem:", objc_name="outlineView_pasteboardWriterForItem")
+	OutlineViewDataSource_outlineView_pasteboardWriterForItem :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, item: id) -> ^PasteboardWriting ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:draggingSession:willBeginAtPoint:forItems:", objc_name="outlineView_draggingSession_willBeginAtPoint_forItems")
+	OutlineViewDataSource_outlineView_draggingSession_willBeginAtPoint_forItems :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, session: ^DraggingSession, screenPoint: CG.Point, draggedItems: ^NS.Array) ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:draggingSession:endedAtPoint:operation:", objc_name="outlineView_draggingSession_endedAtPoint_operation")
+	OutlineViewDataSource_outlineView_draggingSession_endedAtPoint_operation :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, session: ^DraggingSession, screenPoint: CG.Point, operation: DragOperation) ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:writeItems:toPasteboard:", objc_name="outlineView_writeItems_toPasteboard")
+	OutlineViewDataSource_outlineView_writeItems_toPasteboard :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, items: ^NS.Array, pasteboard: ^Pasteboard) -> bool ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:updateDraggingItemsForDrag:", objc_name="outlineView_updateDraggingItemsForDrag")
+	OutlineViewDataSource_outlineView_updateDraggingItemsForDrag :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, draggingInfo: ^DraggingInfo) ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:validateDrop:proposedItem:proposedChildIndex:", objc_name="outlineView_validateDrop_proposedItem_proposedChildIndex")
+	OutlineViewDataSource_outlineView_validateDrop_proposedItem_proposedChildIndex :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, info: ^DraggingInfo, item: id, index: NS.Integer) -> DragOperation ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:acceptDrop:item:childIndex:", objc_name="outlineView_acceptDrop_item_childIndex")
+	OutlineViewDataSource_outlineView_acceptDrop_item_childIndex :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, info: ^DraggingInfo, item: id, index: NS.Integer) -> bool ---
+
+	@(objc_type=OutlineViewDataSource, objc_selector="outlineView:namesOfPromisedFilesDroppedAtDestination:forDraggedItems:", objc_name="outlineView_namesOfPromisedFilesDroppedAtDestination_forDraggedItems")
+	OutlineViewDataSource_outlineView_namesOfPromisedFilesDroppedAtDestination_forDraggedItems :: proc(self: ^OutlineViewDataSource, outlineView: ^OutlineView, dropDestination: ^NS.URL, items: ^NS.Array) -> ^NS.Array ---
 }

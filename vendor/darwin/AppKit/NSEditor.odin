@@ -5,10 +5,6 @@ package darwin_AppKit
 import "base:intrinsics"
 import NS "core:sys/darwin/Foundation"
 
-
-
-
-
 @(objc_class="NSEditor")
 Editor :: struct {
 	using _: intrinsics.objc_object,
@@ -37,4 +33,20 @@ foreign lib {
 Editor_commitEditingAndReturnError :: #force_inline proc "c" (self: ^Editor) -> (ok: bool, err: ^NS.Error) {
 	ok = Editor_commitEditingAndReturnError_error(self, &err)
 	return
+}
+
+
+@(objc_class="NSEditorRegistration")
+EditorRegistration :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=EditorRegistration, objc_selector="objectDidBeginEditing:", objc_name="objectDidBeginEditing")
+	EditorRegistration_objectDidBeginEditing :: proc(self: ^EditorRegistration, editor: ^Editor) ---
+
+	@(objc_type=EditorRegistration, objc_selector="objectDidEndEditing:", objc_name="objectDidEndEditing")
+	EditorRegistration_objectDidEndEditing :: proc(self: ^EditorRegistration, editor: ^Editor) ---
 }

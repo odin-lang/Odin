@@ -2,6 +2,8 @@
 #+build darwin
 package darwin_Foundation
 
+import "base:intrinsics"
+import cffi "core:c"
 
 @(objc_class="NSStream", objc_superclass=Object)
 Stream :: struct { using _: Object}
@@ -47,4 +49,85 @@ foreign lib {
 
 	@(objc_type=Stream, objc_selector="getBoundStreamsWithBufferSize:inputStream:outputStream:", objc_name="getBoundStreamsWithBufferSize", objc_is_class_method=true)
 	Stream_getBoundStreamsWithBufferSize :: proc(bufferSize: UInteger, inputStream: ^^InputStream, outputStream: ^^OutputStream) ---
+}
+
+
+@(objc_class="NSStreamDelegate")
+StreamDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=StreamDelegate, objc_selector="stream:handleEvent:", objc_name="stream")
+	StreamDelegate_stream :: proc(self: ^StreamDelegate, aStream: ^Stream, eventCode: StreamEvent) ---
+}
+
+
+@(objc_class="NSInputStream", objc_superclass=Stream)
+InputStream :: struct { using _: Stream}
+
+foreign lib {
+	@(objc_type=InputStream, objc_selector="read:maxLength:", objc_name="read")
+	InputStream_read :: proc(self: ^InputStream, buffer: ^cffi.uint8_t, len: UInteger) -> Integer ---
+
+	@(objc_type=InputStream, objc_selector="getBuffer:length:", objc_name="getBuffer")
+	InputStream_getBuffer :: proc(self: ^InputStream, buffer: ^^cffi.uint8_t, len: ^UInteger) -> bool ---
+
+	@(objc_type=InputStream, objc_selector="initWithData:", objc_name="initWithData")
+	InputStream_initWithData :: proc(self: ^InputStream, data: ^Data) -> instancetype ---
+
+	@(objc_type=InputStream, objc_selector="initWithURL:", objc_name="initWithURL")
+	InputStream_initWithURL :: proc(self: ^InputStream, url: ^URL) -> instancetype ---
+
+	@(objc_type=InputStream, objc_selector="hasBytesAvailable", objc_name="hasBytesAvailable")
+	InputStream_hasBytesAvailable :: proc(self: ^InputStream) -> bool ---
+
+	@(objc_type=InputStream, objc_selector="initWithFileAtPath:", objc_name="initWithFileAtPath")
+	InputStream_initWithFileAtPath :: proc(self: ^InputStream, path: ^String) -> instancetype ---
+
+	@(objc_type=InputStream, objc_selector="inputStreamWithData:", objc_name="inputStreamWithData", objc_is_class_method=true)
+	InputStream_inputStreamWithData :: proc(data: ^Data) -> instancetype ---
+
+	@(objc_type=InputStream, objc_selector="inputStreamWithFileAtPath:", objc_name="inputStreamWithFileAtPath", objc_is_class_method=true)
+	InputStream_inputStreamWithFileAtPath :: proc(path: ^String) -> instancetype ---
+
+	@(objc_type=InputStream, objc_selector="inputStreamWithURL:", objc_name="inputStreamWithURL", objc_is_class_method=true)
+	InputStream_inputStreamWithURL :: proc(url: ^URL) -> instancetype ---
+}
+
+
+@(objc_class="NSOutputStream", objc_superclass=Stream)
+OutputStream :: struct { using _: Stream}
+
+foreign lib {
+	@(objc_type=OutputStream, objc_selector="write:maxLength:", objc_name="write")
+	OutputStream_write :: proc(self: ^OutputStream, buffer: ^cffi.uint8_t, len: UInteger) -> Integer ---
+
+	@(objc_type=OutputStream, objc_selector="initToMemory", objc_name="initToMemory")
+	OutputStream_initToMemory :: proc(self: ^OutputStream) -> instancetype ---
+
+	@(objc_type=OutputStream, objc_selector="initToBuffer:capacity:", objc_name="initToBuffer")
+	OutputStream_initToBuffer :: proc(self: ^OutputStream, buffer: ^cffi.uint8_t, capacity: UInteger) -> instancetype ---
+
+	@(objc_type=OutputStream, objc_selector="initWithURL:append:", objc_name="initWithURL")
+	OutputStream_initWithURL :: proc(self: ^OutputStream, url: ^URL, shouldAppend: bool) -> instancetype ---
+
+	@(objc_type=OutputStream, objc_selector="hasSpaceAvailable", objc_name="hasSpaceAvailable")
+	OutputStream_hasSpaceAvailable :: proc(self: ^OutputStream) -> bool ---
+
+	@(objc_type=OutputStream, objc_selector="initToFileAtPath:append:", objc_name="initToFileAtPath")
+	OutputStream_initToFileAtPath :: proc(self: ^OutputStream, path: ^String, shouldAppend: bool) -> instancetype ---
+
+	@(objc_type=OutputStream, objc_selector="outputStreamToMemory", objc_name="outputStreamToMemory", objc_is_class_method=true)
+	OutputStream_outputStreamToMemory :: proc() -> instancetype ---
+
+	@(objc_type=OutputStream, objc_selector="outputStreamToBuffer:capacity:", objc_name="outputStreamToBuffer", objc_is_class_method=true)
+	OutputStream_outputStreamToBuffer :: proc(buffer: ^cffi.uint8_t, capacity: UInteger) -> instancetype ---
+
+	@(objc_type=OutputStream, objc_selector="outputStreamToFileAtPath:append:", objc_name="outputStreamToFileAtPath", objc_is_class_method=true)
+	OutputStream_outputStreamToFileAtPath :: proc(path: ^String, shouldAppend: bool) -> instancetype ---
+
+	@(objc_type=OutputStream, objc_selector="outputStreamWithURL:append:", objc_name="outputStreamWithURL", objc_is_class_method=true)
+	OutputStream_outputStreamWithURL :: proc(url: ^URL, shouldAppend: bool) -> instancetype ---
 }

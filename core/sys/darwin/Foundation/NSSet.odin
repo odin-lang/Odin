@@ -2,7 +2,6 @@
 #+build darwin
 package darwin_Foundation
 
-
 @(objc_class="NSSet", objc_superclass=Object)
 Set :: struct {
 	using _: Object,
@@ -164,4 +163,76 @@ Set_initWithSet :: proc {
 Set_removeObserver :: proc {
 	Set_removeObserver_forKeyPath_context,
 	Set_removeObserver_forKeyPath,
+}
+
+
+@(objc_class="NSMutableSet", objc_superclass=Set)
+MutableSet :: struct { using _: Set}
+
+foreign lib {
+	@(objc_type=MutableSet, objc_selector="addObject:", objc_name="addObject")
+	MutableSet_addObject :: proc(self: ^MutableSet, object: id) ---
+
+	@(objc_type=MutableSet, objc_selector="removeObject:", objc_name="removeObject")
+	MutableSet_removeObject :: proc(self: ^MutableSet, object: id) ---
+
+	@(objc_type=MutableSet, objc_selector="initWithCoder:", objc_name="initWithCoder")
+	MutableSet_initWithCoder :: proc(self: ^MutableSet, coder: ^Coder) -> instancetype ---
+
+	@(objc_type=MutableSet, objc_selector="init", objc_name="init")
+	MutableSet_init :: proc(self: ^MutableSet) -> instancetype ---
+
+	@(objc_type=MutableSet, objc_selector="initWithCapacity:", objc_name="initWithCapacity")
+	MutableSet_initWithCapacity :: proc(self: ^MutableSet, numItems: UInteger) -> instancetype ---
+
+	@(objc_type=MutableSet, objc_selector="addObjectsFromArray:", objc_name="addObjectsFromArray")
+	MutableSet_addObjectsFromArray :: proc(self: ^MutableSet, array: ^Array) ---
+
+	@(objc_type=MutableSet, objc_selector="intersectSet:", objc_name="intersectSet")
+	MutableSet_intersectSet :: proc(self: ^MutableSet, otherSet: ^Set) ---
+
+	@(objc_type=MutableSet, objc_selector="minusSet:", objc_name="minusSet")
+	MutableSet_minusSet :: proc(self: ^MutableSet, otherSet: ^Set) ---
+
+	@(objc_type=MutableSet, objc_selector="removeAllObjects", objc_name="removeAllObjects")
+	MutableSet_removeAllObjects :: proc(self: ^MutableSet) ---
+
+	@(objc_type=MutableSet, objc_selector="unionSet:", objc_name="unionSet")
+	MutableSet_unionSet :: proc(self: ^MutableSet, otherSet: ^Set) ---
+
+	@(objc_type=MutableSet, objc_selector="setSet:", objc_name="setSet")
+	MutableSet_setSet :: proc(self: ^MutableSet, otherSet: ^Set) ---
+
+	@(objc_type=MutableSet, objc_selector="setWithCapacity:", objc_name="setWithCapacity", objc_is_class_method=true)
+	MutableSet_setWithCapacity :: proc(numItems: UInteger) -> instancetype ---
+
+	@(objc_type=MutableSet, objc_selector="filterUsingPredicate:", objc_name="filterUsingPredicate")
+	MutableSet_filterUsingPredicate :: proc(self: ^MutableSet, predicate: ^Predicate) ---
+}
+
+
+@(objc_class="NSCountedSet", objc_superclass=MutableSet)
+CountedSet :: struct { using _: MutableSet}
+
+foreign lib {
+	@(objc_type=CountedSet, objc_selector="initWithCapacity:", objc_name="initWithCapacity")
+	CountedSet_initWithCapacity :: proc(self: ^CountedSet, numItems: UInteger) -> instancetype ---
+
+	@(objc_type=CountedSet, objc_selector="initWithArray:", objc_name="initWithArray")
+	CountedSet_initWithArray :: proc(self: ^CountedSet, array: ^Array) -> instancetype ---
+
+	@(objc_type=CountedSet, objc_selector="initWithSet:", objc_name="initWithSet")
+	CountedSet_initWithSet :: proc(self: ^CountedSet, set: ^Set) -> instancetype ---
+
+	@(objc_type=CountedSet, objc_selector="countForObject:", objc_name="countForObject")
+	CountedSet_countForObject :: proc(self: ^CountedSet, object: id) -> UInteger ---
+
+	@(objc_type=CountedSet, objc_selector="objectEnumerator", objc_name="objectEnumerator")
+	CountedSet_objectEnumerator :: proc(self: ^CountedSet) -> ^Enumerator ---
+
+	@(objc_type=CountedSet, objc_selector="addObject:", objc_name="addObject")
+	CountedSet_addObject :: proc(self: ^CountedSet, object: id) ---
+
+	@(objc_type=CountedSet, objc_selector="removeObject:", objc_name="removeObject")
+	CountedSet_removeObject :: proc(self: ^CountedSet, object: id) ---
 }

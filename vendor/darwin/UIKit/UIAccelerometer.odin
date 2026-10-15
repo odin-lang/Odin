@@ -3,10 +3,7 @@
 package darwin_UIKit
 
 import NS "core:sys/darwin/Foundation"
-
-
-
-
+import "base:intrinsics"
 
 @(objc_class="UIAccelerometer", objc_superclass=NS.Object)
 Accelerometer :: struct { using _: NS.Object}
@@ -27,4 +24,17 @@ foreign lib {
 
 	@(objc_type=Accelerometer, objc_selector="setDelegate:", objc_name="setDelegate")
 	Accelerometer_setDelegate :: proc(self: ^Accelerometer, delegate: ^AccelerometerDelegate) ---
+}
+
+
+@(objc_class="UIAccelerometerDelegate")
+AccelerometerDelegate :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+@(default_calling_convention="c")
+foreign lib {
+	@(objc_type=AccelerometerDelegate, objc_selector="accelerometer:didAccelerate:", objc_name="accelerometer")
+	AccelerometerDelegate_accelerometer :: proc(self: ^AccelerometerDelegate, accelerometer: ^Accelerometer, acceleration: ^Acceleration) ---
 }

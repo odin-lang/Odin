@@ -4,6 +4,7 @@ package darwin_ModelIO
 
 import cffi "core:c"
 import NS "core:sys/darwin/Foundation"
+import "base:intrinsics"
 
 @(objc_class="MDLMesh", objc_superclass=Object)
 Mesh :: struct { using _: Object}
@@ -200,4 +201,142 @@ Mesh_newIcosahedronWithRadius :: proc {
 Mesh_makeVerticesUniqueAndReturnError :: #force_inline proc "c" (self: ^Mesh) -> (ok: bool, err: ^NS.Error) {
 	ok = Mesh_makeVerticesUniqueAndReturnError_error(self, &err)
 	return
+}
+
+
+@(objc_class="MDLMeshBuffer")
+MeshBuffer :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+	using _: NS.Copying,
+}
+
+foreign lib {
+	@(objc_type=MeshBuffer, objc_selector="fillData:offset:", objc_name="fillData")
+	MeshBuffer_fillData :: proc(self: ^MeshBuffer, data: ^NS.Data, offset: NS.UInteger) ---
+
+	@(objc_type=MeshBuffer, objc_selector="map", objc_name="map")
+	MeshBuffer_map :: proc(self: ^MeshBuffer) -> ^MeshBufferMap ---
+
+	@(objc_type=MeshBuffer, objc_selector="length", objc_name="length")
+	MeshBuffer_length :: proc(self: ^MeshBuffer) -> NS.UInteger ---
+
+	@(objc_type=MeshBuffer, objc_selector="allocator", objc_name="allocator")
+	MeshBuffer_allocator :: proc(self: ^MeshBuffer) -> ^MeshBufferAllocator ---
+
+	@(objc_type=MeshBuffer, objc_selector="zone", objc_name="zone")
+	MeshBuffer_zone :: proc(self: ^MeshBuffer) -> ^MeshBufferZone ---
+
+	@(objc_type=MeshBuffer, objc_selector="type", objc_name="type")
+	MeshBuffer_type :: proc(self: ^MeshBuffer) -> MeshBufferType ---
+}
+
+
+@(objc_class="MDLMeshBufferAllocator")
+MeshBufferAllocator :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=MeshBufferAllocator, objc_selector="newZone:", objc_name="newZone")
+	MeshBufferAllocator_newZone :: proc(self: ^MeshBufferAllocator, capacity: NS.UInteger) -> ^MeshBufferZone ---
+
+	@(objc_type=MeshBufferAllocator, objc_selector="newZoneForBuffersWithSize:andType:", objc_name="newZoneForBuffersWithSize")
+	MeshBufferAllocator_newZoneForBuffersWithSize :: proc(self: ^MeshBufferAllocator, sizes: ^NS.Array, types: ^NS.Array) -> ^MeshBufferZone ---
+
+	@(objc_type=MeshBufferAllocator, objc_selector="newBuffer:type:", objc_name="newBuffer")
+	MeshBufferAllocator_newBuffer :: proc(self: ^MeshBufferAllocator, length: NS.UInteger, type: MeshBufferType) -> ^MeshBuffer ---
+
+	@(objc_type=MeshBufferAllocator, objc_selector="newBufferWithData:type:", objc_name="newBufferWithData")
+	MeshBufferAllocator_newBufferWithData :: proc(self: ^MeshBufferAllocator, data: ^NS.Data, type: MeshBufferType) -> ^MeshBuffer ---
+
+	@(objc_type=MeshBufferAllocator, objc_selector="newBufferFromZone:length:type:", objc_name="newBufferFromZone_length_type")
+	MeshBufferAllocator_newBufferFromZone_length_type :: proc(self: ^MeshBufferAllocator, zone: ^MeshBufferZone, length: NS.UInteger, type: MeshBufferType) -> ^MeshBuffer ---
+
+	@(objc_type=MeshBufferAllocator, objc_selector="newBufferFromZone:data:type:", objc_name="newBufferFromZone_data_type")
+	MeshBufferAllocator_newBufferFromZone_data_type :: proc(self: ^MeshBufferAllocator, zone: ^MeshBufferZone, data: ^NS.Data, type: MeshBufferType) -> ^MeshBuffer ---
+}
+
+
+
+@(objc_type=MeshBufferAllocator, objc_name="newBufferFromZone")
+MeshBufferAllocator_newBufferFromZone :: proc {
+	MeshBufferAllocator_newBufferFromZone_length_type,
+	MeshBufferAllocator_newBufferFromZone_data_type,
+}
+
+
+@(objc_class="MDLMeshBufferData", objc_superclass=NS.Object)
+MeshBufferData :: struct {
+	using _: NS.Object,
+	using _: MeshBuffer,
+}
+
+foreign lib {
+	@(objc_type=MeshBufferData, objc_selector="initWithType:length:", objc_name="initWithType_length")
+	MeshBufferData_initWithType_length :: proc(self: ^MeshBufferData, type: MeshBufferType, length: NS.UInteger) -> instancetype ---
+
+	@(objc_type=MeshBufferData, objc_selector="initWithType:data:", objc_name="initWithType_data")
+	MeshBufferData_initWithType_data :: proc(self: ^MeshBufferData, type: MeshBufferType, data: ^NS.Data) -> instancetype ---
+
+	@(objc_type=MeshBufferData, objc_selector="data", objc_name="data")
+	MeshBufferData_data :: proc(self: ^MeshBufferData) -> ^NS.Data ---
+}
+
+
+
+@(objc_type=MeshBufferData, objc_name="initWithType")
+MeshBufferData_initWithType :: proc {
+	MeshBufferData_initWithType_length,
+	MeshBufferData_initWithType_data,
+}
+
+
+@(objc_class="MDLMeshBufferDataAllocator", objc_superclass=NS.Object)
+MeshBufferDataAllocator :: struct {
+	using _: NS.Object,
+	using _: MeshBufferAllocator,
+}
+
+
+@(objc_class="MDLMeshBufferMap", objc_superclass=NS.Object)
+MeshBufferMap :: struct { using _: NS.Object}
+
+foreign lib {
+	@(objc_type=MeshBufferMap, objc_selector="initWithBytes:deallocator:", objc_name="initWithBytes")
+	MeshBufferMap_initWithBytes :: proc(self: ^MeshBufferMap, bytes: rawptr, deallocator: ^Objc_Block(proc "c" ())) -> instancetype ---
+
+	@(objc_type=MeshBufferMap, objc_selector="bytes", objc_name="bytes")
+	MeshBufferMap_bytes :: proc(self: ^MeshBufferMap) -> rawptr ---
+}
+
+
+@(objc_class="MDLMeshBufferZone")
+MeshBufferZone :: struct {
+	using _: intrinsics.objc_object,
+	using _: NS.ObjectProtocol,
+}
+
+foreign lib {
+	@(objc_type=MeshBufferZone, objc_selector="capacity", objc_name="capacity")
+	MeshBufferZone_capacity :: proc(self: ^MeshBufferZone) -> NS.UInteger ---
+
+	@(objc_type=MeshBufferZone, objc_selector="allocator", objc_name="allocator")
+	MeshBufferZone_allocator :: proc(self: ^MeshBufferZone) -> ^MeshBufferAllocator ---
+}
+
+
+@(objc_class="MDLMeshBufferZoneDefault", objc_superclass=NS.Object)
+MeshBufferZoneDefault :: struct {
+	using _: NS.Object,
+	using _: MeshBufferZone,
+}
+
+foreign lib {
+	@(objc_type=MeshBufferZoneDefault, objc_selector="capacity", objc_name="capacity")
+	MeshBufferZoneDefault_capacity :: proc(self: ^MeshBufferZoneDefault) -> NS.UInteger ---
+
+	@(objc_type=MeshBufferZoneDefault, objc_selector="allocator", objc_name="allocator")
+	MeshBufferZoneDefault_allocator :: proc(self: ^MeshBufferZoneDefault) -> ^MeshBufferAllocator ---
 }

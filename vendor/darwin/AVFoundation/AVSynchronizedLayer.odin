@@ -3,6 +3,7 @@
 package darwin_AVFoundation
 
 import CA "vendor:darwin/QuartzCore"
+import "base:intrinsics"
 
 @(objc_class="AVSynchronizedLayer", objc_superclass=CA.Layer)
 SynchronizedLayer :: struct { using _: CA.Layer}
@@ -17,3 +18,7 @@ foreign lib {
 	@(objc_type=SynchronizedLayer, objc_selector="setPlayerItem:", objc_name="setPlayerItem")
 	SynchronizedLayer_setPlayerItem :: proc(self: ^SynchronizedLayer, playerItem: ^PlayerItem) ---
 }
+
+
+@(objc_class="AVSynchronizedLayerInternal")
+SynchronizedLayerInternal :: struct { using _: intrinsics.objc_object}

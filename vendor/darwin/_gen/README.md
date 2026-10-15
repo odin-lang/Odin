@@ -56,6 +56,30 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
 - AppKit's `Foundation.Exports.odin`, which csgen generates so that `import NS "vendor:darwin/AppKit"`
   provides all of Foundation, also gets aliases for Foundation's hand-written top-level declarations
   (`NS.AT`, `NS.scoped_autoreleasepool`, …).
+- csgen's one file per class or protocol is merged into one file per family or topic, see below.
+
+## File grouping
+
+csgen writes every class and protocol to its own file. `group_files` merges them, much as Apple's
+headers do, using only the names and the superclasses:
+
+1. **Families.** A type goes with the type its name extends, ignoring `Mutable` and role suffixes
+   (`GROUP_ROLE_SUFFIXES`: Descriptor, Delegate, State, …): `MTLRenderPipelineState`,
+   `MTLRenderPipelineDescriptor` and `MTLRenderPipelineReflection` go together, and `NSMutableArray` goes with `NSArray`.
+2. **Subclasses named after their superclass**, and descriptor variants: `MTLRenderCommandEncoder` goes
+   with `MTLCommandEncoder`, `NSInputStream` with `NSStream`, `MTLTileRenderPipelineDescriptor` with
+   `MTLRenderPipeline`. Not for the general bases in `GROUP_GENERIC_BASES`, so `NSScrollView` is not
+   put with `NSView`.
+3. **Small types** go with their superclass when it is in the same package: `NSDimension` with `NSUnit`.
+4. **Topics.** Families and single types sharing their first word go in one file, named after the
+   words they all share: `MTLRender.odin`, `NSTable.odin`, `MKLookAround.odin`.
+5. **Kinds.** Single types still on their own that share a last word are put together: `NSViews.odin`.
+6. **Overrides** (`GROUP_OVERRIDES`) for what the name rules get wrong, e.g. `NSCoding` goes in `NSObject.odin`.
+
+Types are only merged with types that have the same build tag. In a package that mixes build tags,
+the macOS-only or iOS-only part of a group goes in `<name>_macos.odin` or `<name>_ios.odin`, as
+csgen already does for the package files (`GameKit_macos.odin`). The package files themselves,
+`Foundation.Exports.odin` and the hand-written files are left as they are.
 
 ## Hand-written files
 
