@@ -205,6 +205,29 @@ FLAG_ELEMENT_NAMES = {
 	"xpc_listener_create_flags_t": "xpc_listener_create_flag_t",
 }
 
+# Flag enums which also hold multi-bit fields, e.g. `UIKit.ViewAnimationOptions` keeps its animation curve
+# in bits 16-17. They are converted like `FLAG_ENUMS`, except that members within the field bits become
+# constants rather than flags: `ViewAnimationOptions_CurveEaseIn :: transmute(ViewAnimationOptions)cffi.ulong(0x10000)`.
+# A field is read back with its mask: `opts & DataWritingOptions_FileProtectionMask == DataWritingOptions_FileProtectionComplete`.
+# framework -> {enum: bits of its fields}
+FLAG_ENUM_FIELDS = {
+	"AppKit": {
+		"FontDescriptorSymbolicTraits": 0xf0000000, # class
+	},
+	"Foundation": {
+		"AppleEventSendOptions":        0x33,       # reply, interaction
+		"DataWritingOptions":           0xf0000000, # file protection
+		"PointerFunctionsOptions":      0xffff,     # memory, personality
+		"StringEnumerationOptions":     0xff,       # unit
+	},
+	"UIKit": {
+		"FontDescriptorSymbolicTraits": 0xf0000000, # class
+		"NSLayoutFormatOptions":        0xb0000,    # direction, spacing
+		"ViewAnimationOptions":         0xf730000,  # curve, transition, preferred frames per second
+		"ViewKeyframeAnimationOptions": 0x1c00,     # calculation mode
+	},
+}
+
 # Plain enums which csgen emits as bit_sets: `SSLSessionOption` holds option indices 0-9, not bits.
 # The bit_set is turned back into its element enum, with the values its members and combination
 # constants stand for, plus the members csgen dropped for being 0.
@@ -976,7 +999,8 @@ def strip_c_member_prefixes(pkg):
 
 
 def apply_flag_enums(pkg):
-	wanted = set(FLAG_ENUMS.get(pkg.name, []))
+	field_bits = FLAG_ENUM_FIELDS.get(pkg.name, {})
+	wanted = set(FLAG_ENUMS.get(pkg.name, [])) | set(field_bits)
 	if not wanted:
 		return
 	names = pkg.all_decl_names()
@@ -1010,8 +1034,10 @@ def apply_flag_enums(pkg):
 				elem_of[name] = elem
 			elem = elem_of[name]
 
-			flags     = [(n, v) for n, v in members if v > 0 and v & (v-1) == 0]
-			constants = [(n, v) for n, v in members if v == 0 or v & (v-1) != 0]
+			fields    = field_bits.get(name, 0)
+			is_flag   = lambda v: v > 0 and v & (v-1) == 0 and not v & fields
+			flags     = [(n, v) for n, v in members if is_flag(v)]
+			constants = [(n, v) for n, v in members if not is_flag(v)]
 			named_bits = 0
 			for _, v in flags:
 				named_bits |= v

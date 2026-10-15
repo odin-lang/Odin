@@ -3497,18 +3497,19 @@ StringEncodingConversionOption :: enum cffi.ulong {
 }
 StringEncodingConversionOptions :: bit_set[StringEncodingConversionOption; cffi.ulong]
 
-StringEnumerationOptions :: enum cffi.ulong {
-	ByLines                      = 0,
-	ByParagraphs                 = 1,
-	ByComposedCharacterSequences = 2,
-	ByWords                      = 3,
-	BySentences                  = 4,
-	ByCaretPositions             = 5,
-	ByDeletionClusters           = 6,
-	Reverse                      = 256,
-	SubstringNotRequired         = 512,
-	Localized                    = 1024,
+StringEnumerationOption :: enum cffi.ulong {
+	Reverse              = 8,
+	SubstringNotRequired = 9,
+	Localized            = 10,
 }
+StringEnumerationOptions :: bit_set[StringEnumerationOption; cffi.ulong]
+StringEnumerationOptions_ByLines :: StringEnumerationOptions{}
+StringEnumerationOptions_ByParagraphs :: transmute(StringEnumerationOptions)cffi.ulong(0x1)
+StringEnumerationOptions_ByComposedCharacterSequences :: transmute(StringEnumerationOptions)cffi.ulong(0x2)
+StringEnumerationOptions_ByWords :: transmute(StringEnumerationOptions)cffi.ulong(0x3)
+StringEnumerationOptions_BySentences :: transmute(StringEnumerationOptions)cffi.ulong(0x4)
+StringEnumerationOptions_ByCaretPositions :: transmute(StringEnumerationOptions)cffi.ulong(0x5)
+StringEnumerationOptions_ByDeletionClusters :: transmute(StringEnumerationOptions)cffi.ulong(0x6)
 
 CalendarUnitFlag :: enum cffi.ulong {
 	Era                           = 1,
@@ -3576,17 +3577,18 @@ DataReadingOption :: enum cffi.ulong {
 }
 DataReadingOptions :: bit_set[DataReadingOption; cffi.ulong]
 
-DataWritingOptions :: enum cffi.ulong {
-	Atomic                           = 1,
-	WithoutOverwriting               = 2,
-	FileProtectionNone               = 268435456,
-	FileProtectionComplete           = 536870912,
-	FileProtectionCompleteUnlessOpen = 805306368,
-	FileProtectionCompleteUntilFirstUserAuthentication = 1073741824,
-	FileProtectionCompleteWhenUserInactive = 1342177280,
-	FileProtectionMask               = 4026531840,
-	AtomicWrite                      = 1,
+DataWritingOption :: enum cffi.ulong {
+	Atomic             = 0,
+	WithoutOverwriting = 1,
+	AtomicWrite        = 0,
 }
+DataWritingOptions :: bit_set[DataWritingOption; cffi.ulong]
+DataWritingOptions_FileProtectionNone :: transmute(DataWritingOptions)cffi.ulong(0x10000000)
+DataWritingOptions_FileProtectionComplete :: transmute(DataWritingOptions)cffi.ulong(0x20000000)
+DataWritingOptions_FileProtectionCompleteUnlessOpen :: transmute(DataWritingOptions)cffi.ulong(0x30000000)
+DataWritingOptions_FileProtectionCompleteUntilFirstUserAuthentication :: transmute(DataWritingOptions)cffi.ulong(0x40000000)
+DataWritingOptions_FileProtectionCompleteWhenUserInactive :: transmute(DataWritingOptions)cffi.ulong(0x50000000)
+DataWritingOptions_FileProtectionMask :: transmute(DataWritingOptions)cffi.ulong(0xf0000000)
 
 DataSearchOption :: enum cffi.ulong {
 	Backwards = 0,
@@ -3971,21 +3973,22 @@ FileManagerUploadLocalVersionConflictPolicy :: enum cffi.long {
 	FailOnConflict = 1,
 }
 
-PointerFunctionsOptions :: enum cffi.ulong {
-	StrongMemory             = 0,
-	ZeroingWeakMemory        = 1,
-	OpaqueMemory             = 2,
-	MallocMemory             = 3,
-	MachVirtualMemory        = 4,
-	WeakMemory               = 5,
-	ObjectPersonality        = 0,
-	OpaquePersonality        = 256,
-	ObjectPointerPersonality = 512,
-	CStringPersonality       = 768,
-	StructPersonality        = 1024,
-	IntegerPersonality       = 1280,
-	CopyIn                   = 65536,
+PointerFunctionsOption :: enum cffi.ulong {
+	CopyIn = 16,
 }
+PointerFunctionsOptions :: bit_set[PointerFunctionsOption; cffi.ulong]
+PointerFunctionsOptions_StrongMemory :: PointerFunctionsOptions{}
+PointerFunctionsOptions_ZeroingWeakMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x1)
+PointerFunctionsOptions_OpaqueMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x2)
+PointerFunctionsOptions_MallocMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x3)
+PointerFunctionsOptions_MachVirtualMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x4)
+PointerFunctionsOptions_WeakMemory :: transmute(PointerFunctionsOptions)cffi.ulong(0x5)
+PointerFunctionsOptions_ObjectPersonality :: PointerFunctionsOptions{}
+PointerFunctionsOptions_OpaquePersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x100)
+PointerFunctionsOptions_ObjectPointerPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x200)
+PointerFunctionsOptions_CStringPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x300)
+PointerFunctionsOptions_StructPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x400)
+PointerFunctionsOptions_IntegerPersonality :: transmute(PointerFunctionsOptions)cffi.ulong(0x500)
 
 HTTPCookieAcceptPolicy :: enum cffi.ulong {
 	Always                     = 0,
@@ -4783,19 +4786,20 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 		TextKind  = 3,
 	}
 
-	AppleEventSendOptions :: enum cffi.ulong {
-		NoReply        = 1,
-		QueueReply     = 2,
-		WaitForReply   = 3,
-		NeverInteract  = 16,
-		CanInteract    = 32,
-		AlwaysInteract = 48,
-		CanSwitchLayer = 64,
-		DontRecord     = 4096,
-		DontExecute    = 8192,
-		DontAnnotate   = 65536,
-		DefaultOptions = 35,
+	AppleEventSendOption :: enum cffi.ulong {
+		CanSwitchLayer = 6,
+		DontRecord     = 12,
+		DontExecute    = 13,
+		DontAnnotate   = 16,
 	}
+	AppleEventSendOptions :: bit_set[AppleEventSendOption; cffi.ulong]
+	AppleEventSendOptions_NoReply :: transmute(AppleEventSendOptions)cffi.ulong(0x1)
+	AppleEventSendOptions_QueueReply :: transmute(AppleEventSendOptions)cffi.ulong(0x2)
+	AppleEventSendOptions_WaitForReply :: transmute(AppleEventSendOptions)cffi.ulong(0x3)
+	AppleEventSendOptions_NeverInteract :: transmute(AppleEventSendOptions)cffi.ulong(0x10)
+	AppleEventSendOptions_CanInteract :: transmute(AppleEventSendOptions)cffi.ulong(0x20)
+	AppleEventSendOptions_AlwaysInteract :: transmute(AppleEventSendOptions)cffi.ulong(0x30)
+	AppleEventSendOptions_DefaultOptions :: transmute(AppleEventSendOptions)cffi.ulong(0x23)
 
 	InsertionPosition :: enum cffi.ulong {
 		After     = 0,

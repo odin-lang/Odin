@@ -3759,30 +3759,31 @@ VerticalDirection :: enum cffi.ulong {
 VerticalDirections :: bit_set[VerticalDirection; cffi.ulong]
 VerticalDirections_All :: VerticalDirections{.Up, .Down}
 
-FontDescriptorSymbolicTraits :: enum cffi.uint {
-	TraitItalic             = 1,
-	TraitBold               = 2,
-	TraitExpanded           = 32,
-	TraitCondensed          = 64,
-	TraitMonoSpace          = 1024,
-	TraitVertical           = 2048,
-	TraitUIOptimized        = 4096,
-	TraitTightLeading       = 32768,
-	TraitLooseLeading       = 65536,
-	TraitEmphasized         = 2,
-	ClassMask               = 4026531840,
-	ClassUnknown            = 0,
-	ClassOldStyleSerifs     = 268435456,
-	ClassTransitionalSerifs = 536870912,
-	ClassModernSerifs       = 805306368,
-	ClassClarendonSerifs    = 1073741824,
-	ClassSlabSerifs         = 1342177280,
-	ClassFreeformSerifs     = 1879048192,
-	ClassSansSerif          = 2147483648,
-	ClassOrnamentals        = 2415919104,
-	ClassScripts            = 2684354560,
-	ClassSymbolic           = 3221225472,
+FontDescriptorSymbolicTrait :: enum cffi.uint {
+	TraitItalic       = 0,
+	TraitBold         = 1,
+	TraitExpanded     = 5,
+	TraitCondensed    = 6,
+	TraitMonoSpace    = 10,
+	TraitVertical     = 11,
+	TraitUIOptimized  = 12,
+	TraitTightLeading = 15,
+	TraitLooseLeading = 16,
+	TraitEmphasized   = 1,
 }
+FontDescriptorSymbolicTraits :: bit_set[FontDescriptorSymbolicTrait; cffi.uint]
+FontDescriptorSymbolicTraits_ClassMask :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xf0000000)
+FontDescriptorSymbolicTraits_ClassUnknown :: FontDescriptorSymbolicTraits{}
+FontDescriptorSymbolicTraits_ClassOldStyleSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x10000000)
+FontDescriptorSymbolicTraits_ClassTransitionalSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x20000000)
+FontDescriptorSymbolicTraits_ClassModernSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x30000000)
+FontDescriptorSymbolicTraits_ClassClarendonSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x40000000)
+FontDescriptorSymbolicTraits_ClassSlabSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x50000000)
+FontDescriptorSymbolicTraits_ClassFreeformSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x70000000)
+FontDescriptorSymbolicTraits_ClassSansSerif :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x80000000)
+FontDescriptorSymbolicTraits_ClassOrnamentals :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x90000000)
+FontDescriptorSymbolicTraits_ClassScripts :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xa0000000)
+FontDescriptorSymbolicTraits_ClassSymbolic :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xc0000000)
 
 FontRenderingMode :: enum cffi.ulong {
 	DefaultRenderingMode             = 0,

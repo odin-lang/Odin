@@ -48,8 +48,18 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
   `bit_set` of the same name over an element enum of bit indices, e.g. `MTL.TextureUsage` is
   `bit_set[MTL.TextureUsageFlag]`. A member equal to 0 or to a combination of bits becomes a
   constant, e.g. `MTL.TextureUsage_Unknown :: MTL.TextureUsage{}`; a combination which sets bits
-  no member names becomes a `transmute`, e.g. `MTL.Stages_All`. Enums which mix flags with
-  enumerated fields are left as they are, see `mixed_flag_enums.md`.
+  no member names becomes a `transmute`, e.g. `MTL.Stages_All`.
+- Flag enums which also hold multi-bit fields (`FLAG_ENUM_FIELDS`), such as `UI.ViewAnimationOptions`
+  with its animation curve in bits 16-17, are converted the same way, except that the field values
+  become constants rather than flags:
+
+  ```odin
+  opts := UI.ViewAnimationOptions{.Repeat, .Autoreverse} | UI.ViewAnimationOptions_CurveEaseIn
+  ```
+
+  A field is read back through its mask, where the SDK has one:
+  `writing & NS.DataWritingOptions_FileProtectionMask == NS.DataWritingOptions_FileProtectionComplete`.
+  `NS.SaveOptions` (exclusive values) and `CF.SocketCallBackType` (a callback gets one type) stay enums.
 - Enum members mangled by csgen's prefix removal are renamed (`ENUM_MEMBER_FIXES`), e.g.
   `AVFoundation.CaptureSystemPressureFactors` has `SystemTemperature` rather than `ystemTemperature`.
 - Enum members which keep a C-style `k` prefix lose it, as csgen does for the rest: `kSecPaddingNone`

@@ -118,6 +118,14 @@ darwin_flag_constants :: proc(t: ^testing.T) {
 	testing.expect_value(t, transmute(c.ulong)MTL.Stages_All, 0x7fffffffffffffff)
 	testing.expect_value(t, transmute(c.ulong)NS.ISO8601DateFormatOptions_InternetDateTime, 0x773)
 	testing.expect_value(t, transmute(c.ulong)NS.StringCompareOptions{.CaseInsensitiveSearch}, 0x1)
+
+	// flag enums with multi-bit fields: the field values are constants, read back through their mask
+	writing := NS.DataWritingOptions{.Atomic} | NS.DataWritingOptions_FileProtectionComplete
+	testing.expect_value(t, transmute(c.ulong)writing, 0x20000001)
+	testing.expect(t, writing & NS.DataWritingOptions_FileProtectionMask == NS.DataWritingOptions_FileProtectionComplete)
+	testing.expect(t, .Atomic in writing)
+	testing.expect_value(t, transmute(c.ulong)(NS.StringEnumerationOptions{.Reverse} | NS.StringEnumerationOptions_ByWords), 0x103)
+	testing.expect_value(t, NS.StringEnumerationOptions_ByLines, NS.StringEnumerationOptions{})
 }
 
 @(test)

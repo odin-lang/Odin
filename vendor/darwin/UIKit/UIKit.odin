@@ -1265,29 +1265,30 @@ ColorProminence :: enum cffi.long {
 	Quaternary = 3,
 }
 
-FontDescriptorSymbolicTraits :: enum cffi.uint {
-	TraitItalic             = 1,
-	TraitBold               = 2,
-	TraitExpanded           = 32,
-	TraitCondensed          = 64,
-	TraitMonoSpace          = 1024,
-	TraitVertical           = 2048,
-	TraitUIOptimized        = 4096,
-	TraitTightLeading       = 32768,
-	TraitLooseLeading       = 65536,
-	ClassMask               = 4026531840,
-	ClassUnknown            = 0,
-	ClassOldStyleSerifs     = 268435456,
-	ClassTransitionalSerifs = 536870912,
-	ClassModernSerifs       = 805306368,
-	ClassClarendonSerifs    = 1073741824,
-	ClassSlabSerifs         = 1342177280,
-	ClassFreeformSerifs     = 1879048192,
-	ClassSansSerif          = 2147483648,
-	ClassOrnamentals        = 2415919104,
-	ClassScripts            = 2684354560,
-	ClassSymbolic           = 3221225472,
+FontDescriptorSymbolicTrait :: enum cffi.uint {
+	TraitItalic       = 0,
+	TraitBold         = 1,
+	TraitExpanded     = 5,
+	TraitCondensed    = 6,
+	TraitMonoSpace    = 10,
+	TraitVertical     = 11,
+	TraitUIOptimized  = 12,
+	TraitTightLeading = 15,
+	TraitLooseLeading = 16,
 }
+FontDescriptorSymbolicTraits :: bit_set[FontDescriptorSymbolicTrait; cffi.uint]
+FontDescriptorSymbolicTraits_ClassMask :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xf0000000)
+FontDescriptorSymbolicTraits_ClassUnknown :: FontDescriptorSymbolicTraits{}
+FontDescriptorSymbolicTraits_ClassOldStyleSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x10000000)
+FontDescriptorSymbolicTraits_ClassTransitionalSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x20000000)
+FontDescriptorSymbolicTraits_ClassModernSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x30000000)
+FontDescriptorSymbolicTraits_ClassClarendonSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x40000000)
+FontDescriptorSymbolicTraits_ClassSlabSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x50000000)
+FontDescriptorSymbolicTraits_ClassFreeformSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x70000000)
+FontDescriptorSymbolicTraits_ClassSansSerif :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x80000000)
+FontDescriptorSymbolicTraits_ClassOrnamentals :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x90000000)
+FontDescriptorSymbolicTraits_ClassScripts :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xa0000000)
+FontDescriptorSymbolicTraits_ClassSymbolic :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xc0000000)
 
 PreferredPresentationStyle :: enum cffi.long {
 	Unspecified = 0,
@@ -1616,27 +1617,28 @@ NSLayoutAttribute :: enum cffi.long {
 	NotAnAttribute       = 0,
 }
 
-NSLayoutFormatOptions :: enum cffi.ulong {
-	AlignAllLeft               = 2,
-	AlignAllRight              = 4,
-	AlignAllTop                = 8,
-	AlignAllBottom             = 16,
-	AlignAllLeading            = 32,
-	AlignAllTrailing           = 64,
-	AlignAllCenterX            = 512,
-	AlignAllCenterY            = 1024,
-	AlignAllLastBaseline       = 2048,
-	AlignAllFirstBaseline      = 4096,
-	AlignAllBaseline           = 2048,
-	AlignmentMask              = 65535,
-	DirectionLeadingToTrailing = 0,
-	DirectionLeftToRight       = 65536,
-	DirectionRightToLeft       = 131072,
-	DirectionMask              = 196608,
-	SpacingEdgeToEdge          = 0,
-	SpacingBaselineToBaseline  = 524288,
-	SpacingMask                = 524288,
+NSLayoutFormatOption :: enum cffi.ulong {
+	AlignAllLeft          = 1,
+	AlignAllRight         = 2,
+	AlignAllTop           = 3,
+	AlignAllBottom        = 4,
+	AlignAllLeading       = 5,
+	AlignAllTrailing      = 6,
+	AlignAllCenterX       = 9,
+	AlignAllCenterY       = 10,
+	AlignAllLastBaseline  = 11,
+	AlignAllFirstBaseline = 12,
+	AlignAllBaseline      = 11,
 }
+NSLayoutFormatOptions :: bit_set[NSLayoutFormatOption; cffi.ulong]
+NSLayoutFormatOptions_AlignmentMask :: transmute(NSLayoutFormatOptions)cffi.ulong(0xffff)
+NSLayoutFormatOptions_DirectionLeadingToTrailing :: NSLayoutFormatOptions{}
+NSLayoutFormatOptions_DirectionLeftToRight :: transmute(NSLayoutFormatOptions)cffi.ulong(0x10000)
+NSLayoutFormatOptions_DirectionRightToLeft :: transmute(NSLayoutFormatOptions)cffi.ulong(0x20000)
+NSLayoutFormatOptions_DirectionMask :: transmute(NSLayoutFormatOptions)cffi.ulong(0x30000)
+NSLayoutFormatOptions_SpacingEdgeToEdge :: NSLayoutFormatOptions{}
+NSLayoutFormatOptions_SpacingBaselineToBaseline :: transmute(NSLayoutFormatOptions)cffi.ulong(0x80000)
+NSLayoutFormatOptions_SpacingMask :: transmute(NSLayoutFormatOptions)cffi.ulong(0x80000)
 
 DeviceOrientation :: enum cffi.long {
 	Unknown            = 0,
@@ -1837,49 +1839,51 @@ ViewAutoresizingFlag :: enum cffi.ulong {
 ViewAutoresizing :: bit_set[ViewAutoresizingFlag; cffi.ulong]
 ViewAutoresizing_None :: ViewAutoresizing{}
 
-ViewAnimationOptions :: enum cffi.ulong {
-	LayoutSubviews                  = 1,
-	AllowUserInteraction            = 2,
-	BeginFromCurrentState           = 4,
-	Repeat                          = 8,
-	Autoreverse                     = 16,
-	OverrideInheritedDuration       = 32,
-	OverrideInheritedCurve          = 64,
-	AllowAnimatedContent            = 128,
-	ShowHideTransitionViews         = 256,
-	OverrideInheritedOptions        = 512,
-	CurveEaseInOut                  = 0,
-	CurveEaseIn                     = 65536,
-	CurveEaseOut                    = 131072,
-	CurveLinear                     = 196608,
-	TransitionNone                  = 0,
-	TransitionFlipFromLeft          = 1048576,
-	TransitionFlipFromRight         = 2097152,
-	TransitionCurlUp                = 3145728,
-	TransitionCurlDown              = 4194304,
-	TransitionCrossDissolve         = 5242880,
-	TransitionFlipFromTop           = 6291456,
-	TransitionFlipFromBottom        = 7340032,
-	PreferredFramesPerSecondDefault = 0,
-	PreferredFramesPerSecond60      = 50331648,
-	PreferredFramesPerSecond30      = 117440512,
-	FlushUpdates                    = 268435456,
+ViewAnimationOption :: enum cffi.ulong {
+	LayoutSubviews            = 0,
+	AllowUserInteraction      = 1,
+	BeginFromCurrentState     = 2,
+	Repeat                    = 3,
+	Autoreverse               = 4,
+	OverrideInheritedDuration = 5,
+	OverrideInheritedCurve    = 6,
+	AllowAnimatedContent      = 7,
+	ShowHideTransitionViews   = 8,
+	OverrideInheritedOptions  = 9,
+	FlushUpdates              = 28,
 }
+ViewAnimationOptions :: bit_set[ViewAnimationOption; cffi.ulong]
+ViewAnimationOptions_CurveEaseInOut :: ViewAnimationOptions{}
+ViewAnimationOptions_CurveEaseIn :: transmute(ViewAnimationOptions)cffi.ulong(0x10000)
+ViewAnimationOptions_CurveEaseOut :: transmute(ViewAnimationOptions)cffi.ulong(0x20000)
+ViewAnimationOptions_CurveLinear :: transmute(ViewAnimationOptions)cffi.ulong(0x30000)
+ViewAnimationOptions_TransitionNone :: ViewAnimationOptions{}
+ViewAnimationOptions_TransitionFlipFromLeft :: transmute(ViewAnimationOptions)cffi.ulong(0x100000)
+ViewAnimationOptions_TransitionFlipFromRight :: transmute(ViewAnimationOptions)cffi.ulong(0x200000)
+ViewAnimationOptions_TransitionCurlUp :: transmute(ViewAnimationOptions)cffi.ulong(0x300000)
+ViewAnimationOptions_TransitionCurlDown :: transmute(ViewAnimationOptions)cffi.ulong(0x400000)
+ViewAnimationOptions_TransitionCrossDissolve :: transmute(ViewAnimationOptions)cffi.ulong(0x500000)
+ViewAnimationOptions_TransitionFlipFromTop :: transmute(ViewAnimationOptions)cffi.ulong(0x600000)
+ViewAnimationOptions_TransitionFlipFromBottom :: transmute(ViewAnimationOptions)cffi.ulong(0x700000)
+ViewAnimationOptions_PreferredFramesPerSecondDefault :: ViewAnimationOptions{}
+ViewAnimationOptions_PreferredFramesPerSecond60 :: transmute(ViewAnimationOptions)cffi.ulong(0x3000000)
+ViewAnimationOptions_PreferredFramesPerSecond30 :: transmute(ViewAnimationOptions)cffi.ulong(0x7000000)
 
-ViewKeyframeAnimationOptions :: enum cffi.ulong {
-	LayoutSubviews            = 1,
-	AllowUserInteraction      = 2,
-	BeginFromCurrentState     = 4,
-	Repeat                    = 8,
-	Autoreverse               = 16,
-	OverrideInheritedDuration = 32,
-	OverrideInheritedOptions  = 512,
-	CalculationModeLinear     = 0,
-	CalculationModeDiscrete   = 1024,
-	CalculationModePaced      = 2048,
-	CalculationModeCubic      = 3072,
-	CalculationModeCubicPaced = 4096,
+ViewKeyframeAnimationOption :: enum cffi.ulong {
+	LayoutSubviews            = 0,
+	AllowUserInteraction      = 1,
+	BeginFromCurrentState     = 2,
+	Repeat                    = 3,
+	Autoreverse               = 4,
+	OverrideInheritedDuration = 5,
+	OverrideInheritedOptions  = 9,
 }
+ViewKeyframeAnimationOptions :: bit_set[ViewKeyframeAnimationOption; cffi.ulong]
+ViewKeyframeAnimationOptions_CalculationModeLinear :: ViewKeyframeAnimationOptions{}
+ViewKeyframeAnimationOptions_CalculationModeDiscrete :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0x400)
+ViewKeyframeAnimationOptions_CalculationModePaced :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0x800)
+ViewKeyframeAnimationOptions_CalculationModeCubic :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0xc00)
+ViewKeyframeAnimationOptions_CalculationModeCubicPaced :: transmute(ViewKeyframeAnimationOptions)cffi.ulong(0x1000)
 
 SystemAnimation :: enum cffi.ulong {
 	Delete = 0,
