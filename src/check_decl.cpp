@@ -1084,8 +1084,9 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 	Entity *tn = t->Named.type_name;
 	GB_ASSERT(tn->kind == Entity_TypeName);
 
-	if (tn->scope != e->scope) {
-		error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
+	// NOTE: Any file of the type's package may add methods to it, but only at file scope.
+	if (tn->pkg != e->pkg || e->scope == nullptr || (e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+		error(e->token, "@(objc_name) attribute may only be applied to procedures at file scope within the same package as the type");
 	} else {
 		// Enable implementation by default if the class is an implementer too and
 		// @objc_implement was not set to false explicitly in this proc.
@@ -1155,7 +1156,8 @@ gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeCon
 					}
 				}
 			} else if (!has_body) {
-				if (ac.objc_selector == "The @(objc_selector) attribute is required for imported Objective-C methods.") {
+				if (ac.objc_selector == "") {
+					error(e->token, "The @(objc_selector) attribute is required for imported Objective-C methods");
 					return;
 				} else if (proc.calling_convention != ProcCC_CDecl) {
 					error(e->token, "Imported Objective-C methods must use the \"c\" calling convention");

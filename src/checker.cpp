@@ -7340,6 +7340,14 @@ gb_internal void check_deferred_procedures(Checker *c) {
 			continue;
 		}
 
+		if (dst->Procedure.is_objc_impl_or_import && dst->Procedure.is_foreign) {
+			// NOTE(bill): An imported Objective-C method is a message send at each call site; there is no procedure to defer to
+			error(src->token,
+			      "Imported Objective-C method '%.*s' cannot be used as a %s procedure, call it from a procedure and use that instead",
+			      LIT(dst->token.string), attribute);
+			continue;
+		}
+
 		bool src_poly = is_type_polymorphic_or_specialized_proc(src->type);
 		bool dst_poly = is_type_polymorphic_or_specialized_proc(dst->type);
 		if (dst_poly && !src_poly) {
