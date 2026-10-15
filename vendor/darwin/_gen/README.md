@@ -77,4 +77,5 @@ script looks for these procedures in the destination package, run it again after
 
 ## License
 
-darwodin is distributed under the BSD 3-Clause license found in [LICENSE.txt](LICENSE.txt).
+The bindings and this script are distributed under the same license as the rest of Odin (see
+`LICENSE` at the root of the repository), with the agreement of darwodin's author, Harold Brenes.
