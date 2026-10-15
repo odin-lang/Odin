@@ -287,3 +287,94 @@ ResourceStateCommandEncoder_updateTextureMappings_slice :: #force_inline proc "c
 VisibleFunctionTable_setFunctions_slice :: #force_inline proc "c" (self: ^VisibleFunctionTable, functions: []^FunctionHandle, range: NS.Range) {
 	msgSend(nil, self, "setFunctions:withRange:", raw_data(functions), range)
 }
+
+
+// `presentDrawable:`, `presentDrawable:atTime:` and `presentDrawable:afterMinimumDuration:` share a name,
+// but the last two have the same parameter types, so csgen emits no overload group for them.
+@(objc_type=CommandBuffer, objc_name="presentDrawable")
+CommandBuffer_presentDrawable :: proc{
+	CommandBuffer_presentDrawable_,
+	CommandBuffer_presentDrawable_atTime,
+}
+
+// `array->object(i)` for `array->objectAtIndexedSubscript(i)`; `setObject` is generated.
+
+@(objc_type=AccelerationStructurePassSampleBufferAttachmentDescriptorArray, objc_name="object")
+AccelerationStructurePassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^AccelerationStructurePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^AccelerationStructurePassSampleBufferAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=AttributeDescriptorArray, objc_name="object")
+AttributeDescriptorArray_object :: #force_inline proc "c" (self: ^AttributeDescriptorArray, index: NS.UInteger) -> ^AttributeDescriptor {
+	return self->objectAtIndexedSubscript(index)
+}
+
+@(objc_type=BlitPassSampleBufferAttachmentDescriptorArray, objc_name="object")
+BlitPassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^BlitPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^BlitPassSampleBufferAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=BufferLayoutDescriptorArray, objc_name="object")
+BufferLayoutDescriptorArray_object :: #force_inline proc "c" (self: ^BufferLayoutDescriptorArray, index: NS.UInteger) -> ^BufferLayoutDescriptor {
+	return self->objectAtIndexedSubscript(index)
+}
+
+@(objc_type=ComputePassSampleBufferAttachmentDescriptorArray, objc_name="object")
+ComputePassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^ComputePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ComputePassSampleBufferAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=MTL4RenderPipelineColorAttachmentDescriptorArray, objc_name="object")
+MTL4RenderPipelineColorAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^MTL4RenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^MTL4RenderPipelineColorAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=PipelineBufferDescriptorArray, objc_name="object")
+PipelineBufferDescriptorArray_object :: #force_inline proc "c" (self: ^PipelineBufferDescriptorArray, bufferIndex: NS.UInteger) -> ^PipelineBufferDescriptor {
+	return self->objectAtIndexedSubscript(bufferIndex)
+}
+
+@(objc_type=RasterizationRateLayerArray, objc_name="object")
+RasterizationRateLayerArray_object :: #force_inline proc "c" (self: ^RasterizationRateLayerArray, layerIndex: NS.UInteger) -> ^RasterizationRateLayerDescriptor {
+	return self->objectAtIndexedSubscript(layerIndex)
+}
+
+@(objc_type=RasterizationRateSampleArray, objc_name="object")
+RasterizationRateSampleArray_object :: #force_inline proc "c" (self: ^RasterizationRateSampleArray, index: NS.UInteger) -> ^NS.Number {
+	return self->objectAtIndexedSubscript(index)
+}
+
+@(objc_type=RenderPassColorAttachmentDescriptorArray, objc_name="object")
+RenderPassColorAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^RenderPassColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassColorAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=RenderPassSampleBufferAttachmentDescriptorArray, objc_name="object")
+RenderPassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^RenderPassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPassSampleBufferAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=RenderPipelineColorAttachmentDescriptorArray, objc_name="object")
+RenderPipelineColorAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^RenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^RenderPipelineColorAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=ResourceStatePassSampleBufferAttachmentDescriptorArray, objc_name="object")
+ResourceStatePassSampleBufferAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^ResourceStatePassSampleBufferAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^ResourceStatePassSampleBufferAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=TileRenderPipelineColorAttachmentDescriptorArray, objc_name="object")
+TileRenderPipelineColorAttachmentDescriptorArray_object :: #force_inline proc "c" (self: ^TileRenderPipelineColorAttachmentDescriptorArray, attachmentIndex: NS.UInteger) -> ^TileRenderPipelineColorAttachmentDescriptor {
+	return self->objectAtIndexedSubscript(attachmentIndex)
+}
+
+@(objc_type=VertexAttributeDescriptorArray, objc_name="object")
+VertexAttributeDescriptorArray_object :: #force_inline proc "c" (self: ^VertexAttributeDescriptorArray, index: NS.UInteger) -> ^VertexAttributeDescriptor {
+	return self->objectAtIndexedSubscript(index)
+}
+
+@(objc_type=VertexBufferLayoutDescriptorArray, objc_name="object")
+VertexBufferLayoutDescriptorArray_object :: #force_inline proc "c" (self: ^VertexBufferLayoutDescriptorArray, index: NS.UInteger) -> ^VertexBufferLayoutDescriptor {
+	return self->objectAtIndexedSubscript(index)
+}

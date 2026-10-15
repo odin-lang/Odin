@@ -120,10 +120,17 @@ same import paths. The main differences:
   `NS.Window` becomes `AK.Window` with `import AK "vendor:darwin/AppKit"`.
 - **Objective-C runtime** procedures (`objc_lookUpClass`, `class_addMethod`, `class_getName`,
   `sel_registerName`, …) and `register_subclass` and its helpers moved to `core:sys/darwin/ObjectiveC`.
-- **Method names** follow the selectors, so some hand-picked names changed, e.g.
-  `device->newSamplerState(desc)` is `device->newSamplerStateWithDescriptor(desc)`,
-  `device->newTexture(desc)` is `device->newTextureWithDescriptor(desc)`, and
-  `CA.MetalLayer_layer()` is `CA.MetalLayer.layer()`.
+- **Method names** follow the selectors, so some hand-picked names changed:
+
+  | Previously | Now |
+  |---|---|
+  | `device->newSamplerState(desc)` | `device->newSamplerStateWithDescriptor(desc)` |
+  | `device->newTexture(desc)` | `device->newTextureWithDescriptor(desc)` |
+  | `device->newDepthStencilState(desc)` | `device->newDepthStencilStateWithDescriptor(desc)` |
+  | `function->newArgumentEncoder(index)` | `function->newArgumentEncoderWithBufferIndex(index)` |
+  | `encoder->setArgumentBufferWithOffset(buffer, offset)` | `encoder->setArgumentBuffer(buffer, offset)` |
+  | `encoder->drawIndexedPrimitivesWithInstanceCount(…)` | `encoder->drawIndexedPrimitives(…)` |
+  | `CA.MetalLayer_layer()` | `CA.MetalLayer.layer()` |
 - **Errors** are returned as `(res, err)` by every method with an `NSError**` out-parameter.
 - **Options.** Every `NS_OPTIONS` type is a `bit_set`, named after the C type, over an element enum
   named in the singular or with `Flag`: e.g. Metal's `PipelineOptions :: bit_set[PipelineOption]`
@@ -137,7 +144,8 @@ same import paths. The main differences:
   those for `int` and `uint` are now `numberWithOdinInt`, `initWithOdinInt`, `odinIntValue` and
   `odinUintValue`, as `numberWithInt` and `intValue` now mean the C `int` versions.
   `uintegerValue` is `unsignedIntegerValue`, and `Integermin` is `IntegerMin`.
-- **Metal.** `buffer->contents()` returns a `rawptr`; use `contentsAsSlice` or `contentsAsType`.
+- **Metal.** `buffer->contents()` returns a `rawptr`, which `contentsPointer()` used to; use `contentsAsSlice`
+  or `contentsAsType` for typed access. `device->newBuffer(length, options)` is `newBufferWithLength`.
   `CA.MetalLayer` now takes `MTL.Device` and `MTL.PixelFormat` directly.
 - **MetalKit.** `view->setDelegate` takes an `MTKViewDelegate` object; the struct of Odin procedures
   is now `MTK.OdinViewDelegate`, set with `view->setOdinDelegate`.
