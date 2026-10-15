@@ -210,8 +210,8 @@ Deletes the Builder byte buffer content
 Inputs:
 - b: A pointer to the Builder
 */
-builder_destroy :: proc(b: ^Builder) {
-	delete(b.buf)
+builder_destroy :: proc(b: ^Builder, loc := #caller_location) {
+	delete(b.buf, loc=loc)
 	b.buf = nil
 }
 /*
@@ -221,8 +221,8 @@ Inputs:
 - b: A pointer to the Builder
 - cap: The desired capacity for the Builder's buffer
 */
-builder_grow :: proc(b: ^Builder, cap: int) {
-	reserve(&b.buf, cap)
+builder_grow :: proc(b: ^Builder, cap: int, loc := #caller_location) {
+	reserve(&b.buf, cap, loc=loc)
 }
 /*
 Clears the Builder byte buffer content (sets len to zero)
@@ -615,7 +615,7 @@ Output:
 	"a"'bc'"xyz"
 
 */
-write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
+write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', loc := #caller_location) -> (n: int) {
 	n, _ = io.write_quoted_string(to_writer(b), str, quote)
 	return
 }
@@ -650,7 +650,7 @@ Output:
 	a'"'x
 
 */
-write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
+write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true, loc := #caller_location) -> (n: int) {
 	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
 	return
 
@@ -674,7 +674,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of bytes written
 */
-write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
+write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false, loc := #caller_location) -> (n: int) {
 	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
 	return
 }
@@ -694,7 +694,7 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
+write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false, loc := #caller_location) -> (n: int) {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f, fmt, prec, bit_size)
 	// If the result starts with a `+` then unless we always want signed results,
@@ -702,7 +702,7 @@ write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a f16 value to the Builder and returns the number of characters written
@@ -718,13 +718,13 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
+write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int) {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a f32 value to the Builder and returns the number of characters written
@@ -758,13 +758,13 @@ Output:
 	3.14159012 - -1.23000003e-01
 
 */
-write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
+write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int) {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a f64 value to the Builder and returns the number of characters written
@@ -780,13 +780,13 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
+write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int) {
 	buf: [384]byte
 	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
 	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
 		s = s[1:]
 	}
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a u64 value to the Builder and returns the number of characters written
@@ -801,10 +801,10 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
+write_u64 :: proc(b: ^Builder, i: u64, base: int = 10, loc := #caller_location) -> (n: int) {
 	buf: [32]byte
 	s := strconv.write_bits(buf[:], i, base, false, 64, strconv.digits, nil)
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a i64 value to the Builder and returns the number of characters written
@@ -819,10 +819,10 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
+write_i64 :: proc(b: ^Builder, i: i64, base: int = 10, loc := #caller_location) -> (n: int) {
 	buf: [32]byte
 	s := strconv.write_bits(buf[:], u64(i), base, true, 64, strconv.digits, nil)
-	return write_string(b, s)
+	return write_string(b, s, loc=loc)
 }
 /*
 Writes a uint value to the Builder and returns the number of characters written
@@ -837,8 +837,8 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_uint :: proc(b: ^Builder, i: uint, base: int = 10) -> (n: int) {
-	return write_u64(b, u64(i), base)
+write_uint :: proc(b: ^Builder, i: uint, base: int = 10, loc := #caller_location) -> (n: int) {
+	return write_u64(b, u64(i), base, loc=loc)
 }
 /*
 Writes a int value to the Builder and returns the number of characters written
@@ -853,8 +853,8 @@ NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` 
 Returns:
 - n: The number of characters written
 */
-write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
-	return write_i64(b, i64(i), base)
+write_int :: proc(b: ^Builder, i: int, base: int = 10, loc := #caller_location) -> (n: int) {
+	return write_i64(b, i64(i), base, loc=loc)
 }
 
 
@@ -872,8 +872,8 @@ Returns:
 - replaced: The number of replacements
 - err: if any allocation errors occurred
 */
-builder_replace_all :: proc(b: ^Builder, old, new: string) -> (replaced: int, err: runtime.Allocator_Error) {
-	return builder_replace(b, old, new, -1)
+builder_replace_all :: proc(b: ^Builder, old, new: string, loc := #caller_location) -> (replaced: int, err: runtime.Allocator_Error) {
+	return builder_replace(b, old, new, -1, loc=loc)
 }
 
 /*
