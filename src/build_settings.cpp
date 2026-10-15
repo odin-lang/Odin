@@ -1657,21 +1657,28 @@ gb_internal void init_android_values(bool with_sdk) {
 	#endif
 
 	if (bc->ODIN_ANDROID_NDK.len != 0 && bc->ODIN_ANDROID_NDK_TOOLCHAIN.len == 0) {
-		String arch = str_lit("x86_64");
-		#if defined (GB_CPU_ARM)
-			// TODO(bill): this is a complete guess
-			arch = str_lit("aarch64");
-		#endif
+		String os_prefix = {};
 		#if defined(GB_SYSTEM_WINDOWS)
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("windows-"), arch);
+			os_prefix = str_lit("windows-");
 		#elif defined(GB_SYSTEM_OSX)
-			// TODO(bill): is this name even correct?
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("darwin-"), arch);
+			os_prefix = str_lit("darwin-");
 		#elif defined(GB_SYSTEM_LINUX)
-			bc->ODIN_ANDROID_NDK_TOOLCHAIN = concatenate4_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"), str_lit("linux-"), arch);
+			os_prefix = str_lit("linux-");
 		#endif
 
-		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), bc->ODIN_ANDROID_NDK_TOOLCHAIN, NIX_SEPARATOR_STRING);
+		String arch = str_lit("x86_64");
+		#if defined (GB_CPU_ARM)
+			arch = str_lit("aarch64");
+		#endif
+
+		String prebuilt = concatenate_strings(temporary_allocator(), bc->ODIN_ANDROID_NDK, str_lit("toolchains/llvm/prebuilt/"));
+		String toolchain = concatenate_strings(temporary_allocator(), prebuilt, concatenate_strings(temporary_allocator(), os_prefix, arch));
+		if (arch != "x86_64" && !path_is_directory(toolchain)) {
+			// NOTE: The NDK only ships x86_64 host toolchains on some platforms (e.g. macOS on Apple Silicon, which runs them through Rosetta).
+			toolchain = concatenate_strings(temporary_allocator(), prebuilt, concatenate_strings(temporary_allocator(), os_prefix, str_lit("x86_64")));
+		}
+
+		bc->ODIN_ANDROID_NDK_TOOLCHAIN = normalize_path(permanent_allocator(), toolchain, NIX_SEPARATOR_STRING);
 	}
 
 	if (bc->ODIN_ANDROID_NDK.len == 0 && !with_sdk)  {
