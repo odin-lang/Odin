@@ -236,7 +236,8 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 			write_byte(w, DIGITS_LOWER[byte(c)&0xf], &n) or_return
 
 		case c > utf8.MAX_RUNE:
-			c = 0xfffd
+			// Encoding error - fall back to the Replacement Character
+			c = utf8.RUNE_ERROR
 			fallthrough
 		case c < 0x10000:
 			write_byte(w, '\\', &n) or_return

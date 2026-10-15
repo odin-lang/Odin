@@ -3,12 +3,15 @@ package utf8
 
 @(require) import "base:runtime"
 
-RUNE_ERROR :: '\ufffd'
-RUNE_SELF  :: 0x80
-RUNE_BOM   :: 0xfeff
-RUNE_EOF   :: ~rune(0)
-MAX_RUNE   :: '\U0010ffff'
-UTF_MAX    :: 4
+import "core:unicode"
+
+RUNE_ERROR        :: unicode.RUNE_ERROR
+RUNE_SELF         :: 0x80
+MAX_RUNE          :: unicode.MAX_RUNE
+REPLACEMENT_CHAR  :: unicode.REPLACEMENT_CHAR
+RUNE_BOM          :: 0xfeff
+RUNE_EOF          :: ~rune(0)
+UTF_MAX           :: 4
 
 SURROGATE_MIN :: 0xd800
 SURROGATE_MAX :: 0xdfff
@@ -82,7 +85,7 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) #no_bounds_check {
 	// Invalid or Surrogate range
 	if i > 0x0010ffff ||
 	   (0xd800 <= i && i <= 0xdfff) {
-		r = 0xfffd
+		r = RUNE_ERROR
 	}
 
 	if i <= 1<<16-1 {
