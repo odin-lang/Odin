@@ -93,26 +93,26 @@ HeadingComponentValue :: distinct cffi.double
 GeocodeCompletionHandler :: ^Objc_Block(proc "c" ( placemarks: ^NS.Array, error: ^NS.Error ))
 
 Error :: enum cffi.long {
-	kCLErrorLocationUnknown          = 0,
-	kCLErrorDenied                   = 1,
-	kCLErrorNetwork                  = 2,
-	kCLErrorHeadingFailure           = 3,
-	kCLErrorRegionMonitoringDenied   = 4,
-	kCLErrorRegionMonitoringFailure  = 5,
-	kCLErrorRegionMonitoringSetupDelayed = 6,
-	kCLErrorRegionMonitoringResponseDelayed = 7,
-	kCLErrorGeocodeFoundNoResult     = 8,
-	kCLErrorGeocodeFoundPartialResult = 9,
-	kCLErrorGeocodeCanceled          = 10,
-	kCLErrorDeferredFailed           = 11,
-	kCLErrorDeferredNotUpdatingLocation = 12,
-	kCLErrorDeferredAccuracyTooLow   = 13,
-	kCLErrorDeferredDistanceFiltered = 14,
-	kCLErrorDeferredCanceled         = 15,
-	kCLErrorRangingUnavailable       = 16,
-	kCLErrorRangingFailure           = 17,
-	kCLErrorPromptDeclined           = 18,
-	kCLErrorHistoricalLocationError  = 19,
+	LocationUnknown                 = 0,
+	Denied                          = 1,
+	Network                         = 2,
+	HeadingFailure                  = 3,
+	RegionMonitoringDenied          = 4,
+	RegionMonitoringFailure         = 5,
+	RegionMonitoringSetupDelayed    = 6,
+	RegionMonitoringResponseDelayed = 7,
+	GeocodeFoundNoResult            = 8,
+	GeocodeFoundPartialResult       = 9,
+	GeocodeCanceled                 = 10,
+	DeferredFailed                  = 11,
+	DeferredNotUpdatingLocation     = 12,
+	DeferredAccuracyTooLow          = 13,
+	DeferredDistanceFiltered        = 14,
+	DeferredCanceled                = 15,
+	RangingUnavailable              = 16,
+	RangingFailure                  = 17,
+	PromptDeclined                  = 18,
+	HistoricalLocationError         = 19,
 }
 
 RegionState :: enum cffi.long {
@@ -154,12 +154,12 @@ DeviceOrientation :: enum cffi.int {
 }
 
 AuthorizationStatus :: enum cffi.int {
-	kCLAuthorizationStatusNotDetermined = 0,
-	kCLAuthorizationStatusRestricted = 1,
-	kCLAuthorizationStatusDenied     = 2,
-	kCLAuthorizationStatusAuthorizedAlways = 3,
-	kCLAuthorizationStatusAuthorizedWhenInUse = 4,
-	kCLAuthorizationStatusAuthorized = 3,
+	NotDetermined       = 0,
+	Restricted          = 1,
+	Denied              = 2,
+	AuthorizedAlways    = 3,
+	AuthorizedWhenInUse = 4,
+	Authorized          = 3,
 }
 
 AccuracyAuthorization :: enum cffi.long {

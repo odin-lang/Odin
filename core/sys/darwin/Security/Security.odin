@@ -3920,11 +3920,6 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 	SecTransformInstanceBlock :: ^Objc_Block(proc "c" () -> CF.ErrorRef)
 	SecTransformImplementationRef :: distinct ^OpaqueSecTransformImplementation
 	SecTransformCreateFP :: proc "c" ( name: CF.StringRef, newTransform: SecTransformRef, ref: SecTransformImplementationRef ) -> SecTransformInstanceBlock
-	SSLSessionOptions_kSSLSessionOptionFalseStart :: SSLSessionOptions { .kSSLSessionOptionBreakOnCertRequested, .kSSLSessionOptionBreakOnClientAuth, }
-	SSLSessionOptions_kSSLSessionOptionAllowServerIdentityChange :: SSLSessionOptions { .kSSLSessionOptionBreakOnCertRequested, .kSSLSessionOptionSendOneByteRecord, }
-	SSLSessionOptions_kSSLSessionOptionFallback :: SSLSessionOptions { .kSSLSessionOptionBreakOnClientAuth, .kSSLSessionOptionSendOneByteRecord, }
-	SSLSessionOptions_kSSLSessionOptionBreakOnClientHello :: SSLSessionOptions { .kSSLSessionOptionBreakOnCertRequested, .kSSLSessionOptionBreakOnClientAuth, .kSSLSessionOptionSendOneByteRecord, }
-	SSLSessionOptions_kSSLSessionOptionEnableSessionTickets :: SSLSessionOptions { .kSSLSessionOptionBreakOnCertRequested, .kSSLSessionOptionAllowRenegotiation, }
 }
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
@@ -3935,44 +3930,44 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 	}
 
 	CE_GeneralNameType :: enum cffi.uint {
-		GNT_OtherName     = 0,
-		GNT_RFC822Name    = 1,
-		GNT_DNSName       = 2,
-		GNT_X400Address   = 3,
-		GNT_DirectoryName = 4,
-		GNT_EdiPartyName  = 5,
-		GNT_URI           = 6,
-		GNT_IPAddress     = 7,
-		GNT_RegisteredID  = 8,
+		OtherName     = 0,
+		RFC822Name    = 1,
+		DNSName       = 2,
+		X400Address   = 3,
+		DirectoryName = 4,
+		EdiPartyName  = 5,
+		URI           = 6,
+		IPAddress     = 7,
+		RegisteredID  = 8,
 	}
 
 	CE_CrlDistributionPointNameType :: enum cffi.uint {
-		DNT_FullName                = 0,
-		DNT_NameRelativeToCrlIssuer = 1,
+		FullName                = 0,
+		NameRelativeToCrlIssuer = 1,
 	}
 
 	CE_DataType :: enum cffi.uint {
-		DT_AuthorityKeyID           = 0,
-		DT_SubjectKeyID             = 1,
-		DT_KeyUsage                 = 2,
-		DT_SubjectAltName           = 3,
-		DT_IssuerAltName            = 4,
-		DT_ExtendedKeyUsage         = 5,
-		DT_BasicConstraints         = 6,
-		DT_CertPolicies             = 7,
-		DT_NetscapeCertType         = 8,
-		DT_CrlNumber                = 9,
-		DT_DeltaCrl                 = 10,
-		DT_CrlReason                = 11,
-		DT_CrlDistributionPoints    = 12,
-		DT_IssuingDistributionPoint = 13,
-		DT_AuthorityInfoAccess      = 14,
-		DT_Other                    = 15,
-		DT_QC_Statements            = 16,
-		DT_NameConstraints          = 17,
-		DT_PolicyMappings           = 18,
-		DT_PolicyConstraints        = 19,
-		DT_InhibitAnyPolicy         = 20,
+		AuthorityKeyID           = 0,
+		SubjectKeyID             = 1,
+		KeyUsage                 = 2,
+		SubjectAltName           = 3,
+		IssuerAltName            = 4,
+		ExtendedKeyUsage         = 5,
+		BasicConstraints         = 6,
+		CertPolicies             = 7,
+		NetscapeCertType         = 8,
+		CrlNumber                = 9,
+		DeltaCrl                 = 10,
+		CrlReason                = 11,
+		CrlDistributionPoints    = 12,
+		IssuingDistributionPoint = 13,
+		AuthorityInfoAccess      = 14,
+		Other                    = 15,
+		QC_Statements            = 16,
+		NameConstraints          = 17,
+		PolicyMappings           = 18,
+		PolicyConstraints        = 19,
+		InhibitAnyPolicy         = 20,
 	}
 
 	SecKeyUsageFlag :: enum cffi.uint {
@@ -3994,66 +3989,66 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 }
 
 SecAccessControlCreateFlag :: enum cffi.ulong {
-	kSecAccessControlUserPresence    = 0,
-	kSecAccessControlBiometryAny     = 1,
-	kSecAccessControlTouchIDAny      = 1,
-	kSecAccessControlBiometryCurrentSet = 3,
-	kSecAccessControlTouchIDCurrentSet = 3,
-	kSecAccessControlDevicePasscode  = 4,
-	kSecAccessControlWatch           = 5,
-	kSecAccessControlCompanion       = 5,
-	kSecAccessControlOr              = 14,
-	kSecAccessControlAnd             = 15,
-	kSecAccessControlPrivateKeyUsage = 30,
-	kSecAccessControlApplicationPassword = 31,
+	UserPresence        = 0,
+	BiometryAny         = 1,
+	TouchIDAny          = 1,
+	BiometryCurrentSet  = 3,
+	TouchIDCurrentSet   = 3,
+	DevicePasscode      = 4,
+	Watch               = 5,
+	Companion           = 5,
+	Or                  = 14,
+	And                 = 15,
+	PrivateKeyUsage     = 30,
+	ApplicationPassword = 31,
 }
 
 SecAccessControlCreateFlags :: bit_set[SecAccessControlCreateFlag; cffi.ulong]
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	SecCredentialType :: enum cffi.uint {
-		kSecCredentialTypeDefault = 0,
-		kSecCredentialTypeWithUI  = 1,
-		kSecCredentialTypeNoUI    = 2,
+		Default = 0,
+		WithUI  = 1,
+		NoUI    = 2,
 	}
 }
 
 SecPadding :: enum cffi.uint {
-	kSecPaddingNone        = 0,
-	kSecPaddingPKCS1       = 1,
-	kSecPaddingOAEP        = 2,
-	kSecPaddingSigRaw      = 16384,
-	kSecPaddingPKCS1MD2    = 32768,
-	kSecPaddingPKCS1MD5    = 32769,
-	kSecPaddingPKCS1SHA1   = 32770,
-	kSecPaddingPKCS1SHA224 = 32771,
-	kSecPaddingPKCS1SHA256 = 32772,
-	kSecPaddingPKCS1SHA384 = 32773,
-	kSecPaddingPKCS1SHA512 = 32774,
+	None        = 0,
+	PKCS1       = 1,
+	OAEP        = 2,
+	SigRaw      = 16384,
+	PKCS1MD2    = 32768,
+	PKCS1MD5    = 32769,
+	PKCS1SHA1   = 32770,
+	PKCS1SHA224 = 32771,
+	PKCS1SHA256 = 32772,
+	PKCS1SHA384 = 32773,
+	PKCS1SHA512 = 32774,
 }
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	SecKeySizes :: enum cffi.uint {
-		kSecDefaultKeySize = 0,
-		kSec3DES192        = 192,
-		kSecAES128         = 128,
-		kSecAES192         = 192,
-		kSecAES256         = 256,
-		kSecp192r1         = 192,
-		kSecp256r1         = 256,
-		kSecp384r1         = 384,
-		kSecp521r1         = 521,
-		kSecRSAMin         = 1024,
-		kSecRSAMax         = 4096,
+		DefaultKeySize = 0,
+		_3DES192       = 192,
+		AES128         = 128,
+		AES192         = 192,
+		AES256         = 256,
+		Secp192r1      = 192,
+		Secp256r1      = 256,
+		Secp384r1      = 384,
+		Secp521r1      = 521,
+		RSAMin         = 1024,
+		RSAMax         = 4096,
 	}
 }
 
 SecKeyOperationType :: enum cffi.long {
-	kSecKeyOperationTypeSign        = 0,
-	kSecKeyOperationTypeVerify      = 1,
-	kSecKeyOperationTypeEncrypt     = 2,
-	kSecKeyOperationTypeDecrypt     = 3,
-	kSecKeyOperationTypeKeyExchange = 4,
+	Sign        = 0,
+	Verify      = 1,
+	Encrypt     = 2,
+	Decrypt     = 3,
+	KeyExchange = 4,
 }
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
@@ -4062,163 +4057,163 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 	}
 
 	SecAuthenticationType :: enum cffi.uint {
-		kSecAuthenticationTypeNTLM       = 1835824238,
-		kSecAuthenticationTypeMSN        = 1634628461,
-		kSecAuthenticationTypeDPA        = 1633775716,
-		kSecAuthenticationTypeRPA        = 1633775730,
-		kSecAuthenticationTypeHTTPBasic  = 1886680168,
-		kSecAuthenticationTypeHTTPDigest = 1685353576,
-		kSecAuthenticationTypeHTMLForm   = 1836216166,
-		kSecAuthenticationTypeDefault    = 1953261156,
-		kSecAuthenticationTypeAny        = 0,
+		NTLM       = 1835824238,
+		MSN        = 1634628461,
+		DPA        = 1633775716,
+		RPA        = 1633775730,
+		HTTPBasic  = 1886680168,
+		HTTPDigest = 1685353576,
+		HTMLForm   = 1836216166,
+		Default    = 1953261156,
+		Any        = 0,
 	}
 
 	SecProtocolType :: enum cffi.uint {
-		kSecProtocolTypeFTP        = 1718906912,
-		kSecProtocolTypeFTPAccount = 1718906977,
-		kSecProtocolTypeHTTP       = 1752462448,
-		kSecProtocolTypeIRC        = 1769104160,
-		kSecProtocolTypeNNTP       = 1852732528,
-		kSecProtocolTypePOP3       = 1886351411,
-		kSecProtocolTypeSMTP       = 1936553072,
-		kSecProtocolTypeSOCKS      = 1936685088,
-		kSecProtocolTypeIMAP       = 1768776048,
-		kSecProtocolTypeLDAP       = 1818517872,
-		kSecProtocolTypeAppleTalk  = 1635019883,
-		kSecProtocolTypeAFP        = 1634103328,
-		kSecProtocolTypeTelnet     = 1952803950,
-		kSecProtocolTypeSSH        = 1936943136,
-		kSecProtocolTypeFTPS       = 1718906995,
-		kSecProtocolTypeHTTPS      = 1752461427,
-		kSecProtocolTypeHTTPProxy  = 1752461432,
-		kSecProtocolTypeHTTPSProxy = 1752462200,
-		kSecProtocolTypeFTPProxy   = 1718907000,
-		kSecProtocolTypeCIFS       = 1667851891,
-		kSecProtocolTypeSMB        = 1936548384,
-		kSecProtocolTypeRTSP       = 1920234352,
-		kSecProtocolTypeRTSPProxy  = 1920234360,
-		kSecProtocolTypeDAAP       = 1684103536,
-		kSecProtocolTypeEPPC       = 1701867619,
-		kSecProtocolTypeIPP        = 1768976416,
-		kSecProtocolTypeNNTPS      = 1853124723,
-		kSecProtocolTypeLDAPS      = 1818521715,
-		kSecProtocolTypeTelnetS    = 1952803955,
-		kSecProtocolTypeIMAPS      = 1768779891,
-		kSecProtocolTypeIRCS       = 1769104243,
-		kSecProtocolTypePOP3S      = 1886351475,
-		kSecProtocolTypeCVSpserver = 1668707184,
-		kSecProtocolTypeSVN        = 1937141280,
-		kSecProtocolTypeAny        = 0,
+		FTP        = 1718906912,
+		FTPAccount = 1718906977,
+		HTTP       = 1752462448,
+		IRC        = 1769104160,
+		NNTP       = 1852732528,
+		POP3       = 1886351411,
+		SMTP       = 1936553072,
+		SOCKS      = 1936685088,
+		IMAP       = 1768776048,
+		LDAP       = 1818517872,
+		AppleTalk  = 1635019883,
+		AFP        = 1634103328,
+		Telnet     = 1952803950,
+		SSH        = 1936943136,
+		FTPS       = 1718906995,
+		HTTPS      = 1752461427,
+		HTTPProxy  = 1752461432,
+		HTTPSProxy = 1752462200,
+		FTPProxy   = 1718907000,
+		CIFS       = 1667851891,
+		SMB        = 1936548384,
+		RTSP       = 1920234352,
+		RTSPProxy  = 1920234360,
+		DAAP       = 1684103536,
+		EPPC       = 1701867619,
+		IPP        = 1768976416,
+		NNTPS      = 1853124723,
+		LDAPS      = 1818521715,
+		TelnetS    = 1952803955,
+		IMAPS      = 1768779891,
+		IRCS       = 1769104243,
+		POP3S      = 1886351475,
+		CVSpserver = 1668707184,
+		SVN        = 1937141280,
+		Any        = 0,
 	}
 
 	SecKeychainEvent :: enum cffi.uint {
-		kSecLockEvent                 = 1,
-		kSecUnlockEvent               = 2,
-		kSecAddEvent                  = 3,
-		kSecDeleteEvent               = 4,
-		kSecUpdateEvent               = 5,
-		kSecPasswordChangedEvent      = 6,
-		kSecDefaultChangedEvent       = 9,
-		kSecDataAccessEvent           = 10,
-		kSecKeychainListChangedEvent  = 11,
-		kSecTrustSettingsChangedEvent = 12,
+		LockEvent                 = 1,
+		UnlockEvent               = 2,
+		AddEvent                  = 3,
+		DeleteEvent               = 4,
+		UpdateEvent               = 5,
+		PasswordChangedEvent      = 6,
+		DefaultChangedEvent       = 9,
+		DataAccessEvent           = 10,
+		KeychainListChangedEvent  = 11,
+		TrustSettingsChangedEvent = 12,
 	}
 
 	SecKeychainEventMask :: enum cffi.uint {
-		kSecLockEventMask                = 1,
-		kSecUnlockEventMask              = 2,
-		kSecAddEventMask                 = 3,
-		kSecDeleteEventMask              = 4,
-		kSecUpdateEventMask              = 5,
-		kSecPasswordChangedEventMask     = 6,
-		kSecDefaultChangedEventMask      = 9,
-		kSecDataAccessEventMask          = 10,
-		kSecKeychainListChangedMask      = 11,
-		kSecTrustSettingsChangedEventMask = 12,
+		LockEventMask                 = 1,
+		UnlockEventMask               = 2,
+		AddEventMask                  = 3,
+		DeleteEventMask               = 4,
+		UpdateEventMask               = 5,
+		PasswordChangedEventMask      = 6,
+		DefaultChangedEventMask       = 9,
+		DataAccessEventMask           = 10,
+		KeychainListChangedMask       = 11,
+		TrustSettingsChangedEventMask = 12,
 	}
 
 	SecKeychainEventMasks :: bit_set[SecKeychainEventMask; cffi.uint]
 
 	SecPreferencesDomain :: enum cffi.int {
-		kSecPreferencesDomainUser    = 0,
-		kSecPreferencesDomainSystem  = 1,
-		kSecPreferencesDomainCommon  = 2,
-		kSecPreferencesDomainDynamic = 3,
+		User    = 0,
+		System  = 1,
+		Common  = 2,
+		Dynamic = 3,
 	}
 
 	SecExternalFormat :: enum cffi.uint {
-		kSecFormatUnknown              = 0,
-		kSecFormatOpenSSL              = 1,
-		kSecFormatSSH                  = 2,
-		kSecFormatBSAFE                = 3,
-		kSecFormatRawKey               = 4,
-		kSecFormatWrappedPKCS8         = 5,
-		kSecFormatWrappedOpenSSL       = 6,
-		kSecFormatWrappedSSH           = 7,
-		kSecFormatWrappedLSH           = 8,
-		kSecFormatX509Cert             = 9,
-		kSecFormatPEMSequence          = 10,
-		kSecFormatPKCS7                = 11,
-		kSecFormatPKCS12               = 12,
-		kSecFormatNetscapeCertSequence = 13,
-		kSecFormatSSHv2                = 14,
+		Unknown              = 0,
+		OpenSSL              = 1,
+		SSH                  = 2,
+		BSAFE                = 3,
+		RawKey               = 4,
+		WrappedPKCS8         = 5,
+		WrappedOpenSSL       = 6,
+		WrappedSSH           = 7,
+		WrappedLSH           = 8,
+		X509Cert             = 9,
+		PEMSequence          = 10,
+		PKCS7                = 11,
+		PKCS12               = 12,
+		NetscapeCertSequence = 13,
+		SSHv2                = 14,
 	}
 
 	SecExternalItemType :: enum cffi.uint {
-		kSecItemTypeUnknown     = 0,
-		kSecItemTypePrivateKey  = 1,
-		kSecItemTypePublicKey   = 2,
-		kSecItemTypeSessionKey  = 3,
-		kSecItemTypeCertificate = 4,
-		kSecItemTypeAggregate   = 5,
+		Unknown     = 0,
+		PrivateKey  = 1,
+		PublicKey   = 2,
+		SessionKey  = 3,
+		Certificate = 4,
+		Aggregate   = 5,
 	}
 
 	SecItemImportExportFlag :: enum cffi.uint {
-		kSecItemPemArmour = 0,
+		PemArmour = 0,
 	}
 
 	SecItemImportExportFlags :: bit_set[SecItemImportExportFlag; cffi.uint]
 
 	SecKeyImportExportFlag :: enum cffi.uint {
-		kSecKeyImportOnlyOne    = 0,
-		kSecKeySecurePassphrase = 1,
-		kSecKeyNoAccessControl  = 2,
+		ImportOnlyOne    = 0,
+		SecurePassphrase = 1,
+		NoAccessControl  = 2,
 	}
 
 	SecKeyImportExportFlags :: bit_set[SecKeyImportExportFlag; cffi.uint]
 }
 
 SecTrustResultType :: enum cffi.uint {
-	kSecTrustResultInvalid           = 0,
-	kSecTrustResultProceed           = 1,
-	kSecTrustResultConfirm           = 2,
-	kSecTrustResultDeny              = 3,
-	kSecTrustResultUnspecified       = 4,
-	kSecTrustResultRecoverableTrustFailure = 5,
-	kSecTrustResultFatalTrustFailure = 6,
-	kSecTrustResultOtherError        = 7,
+	Invalid                 = 0,
+	Proceed                 = 1,
+	Confirm                 = 2,
+	Deny                    = 3,
+	Unspecified             = 4,
+	RecoverableTrustFailure = 5,
+	FatalTrustFailure       = 6,
+	OtherError              = 7,
 }
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	SecTrustOptionFlag :: enum cffi.uint {
-		kSecTrustOptionAllowExpired      = 0,
-		kSecTrustOptionLeafIsCA          = 1,
-		kSecTrustOptionFetchIssuerFromNet = 2,
-		kSecTrustOptionAllowExpiredRoot  = 3,
-		kSecTrustOptionRequireRevPerCert = 4,
-		kSecTrustOptionUseTrustSettings  = 5,
-		kSecTrustOptionImplicitAnchors   = 6,
+		AllowExpired       = 0,
+		LeafIsCA           = 1,
+		FetchIssuerFromNet = 2,
+		AllowExpiredRoot   = 3,
+		RequireRevPerCert  = 4,
+		UseTrustSettings   = 5,
+		ImplicitAnchors    = 6,
 	}
 
 	SecTrustOptionFlags :: bit_set[SecTrustOptionFlag; cffi.uint]
 }
 
 SSLCiphersuiteGroup :: enum cffi.int {
-	kSSLCiphersuiteGroupDefault      = 0,
-	kSSLCiphersuiteGroupCompatibility = 1,
-	kSSLCiphersuiteGroupLegacy       = 2,
-	kSSLCiphersuiteGroupATS          = 3,
-	kSSLCiphersuiteGroupATSCompatibility = 4,
+	Default          = 0,
+	Compatibility    = 1,
+	Legacy           = 2,
+	ATS              = 3,
+	ATSCompatibility = 4,
 }
 
 tls_protocol_version_t :: enum cffi.ushort {
@@ -4268,30 +4263,30 @@ tls_ciphersuite_group_t :: enum cffi.ushort {
 }
 
 SSLProtocol :: enum cffi.int {
-	kSSLProtocolUnknown      = 0,
-	kTLSProtocol1            = 4,
-	kTLSProtocol11           = 7,
-	kTLSProtocol12           = 8,
-	kDTLSProtocol1           = 9,
-	kTLSProtocol13           = 10,
-	kDTLSProtocol12          = 11,
-	kTLSProtocolMaxSupported = 999,
-	kSSLProtocol2            = 1,
-	kSSLProtocol3            = 2,
-	kSSLProtocol3Only        = 3,
-	kTLSProtocol1Only        = 5,
-	kSSLProtocolAll          = 6,
+	SSLProtocolUnknown      = 0,
+	TLSProtocol1            = 4,
+	TLSProtocol11           = 7,
+	TLSProtocol12           = 8,
+	DTLSProtocol1           = 9,
+	TLSProtocol13           = 10,
+	DTLSProtocol12          = 11,
+	TLSProtocolMaxSupported = 999,
+	SSLProtocol2            = 1,
+	SSLProtocol3            = 2,
+	SSLProtocol3Only        = 3,
+	TLSProtocol1Only        = 5,
+	SSLProtocolAll          = 6,
 }
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	AuthorizationFlag :: enum cffi.uint {
-		kAuthorizationFlagInteractionAllowed = 0,
-		kAuthorizationFlagExtendRights   = 1,
-		kAuthorizationFlagPartialRights  = 2,
-		kAuthorizationFlagDestroyRights  = 3,
-		kAuthorizationFlagPreAuthorize   = 4,
-		kAuthorizationFlagSkipInternalAuth = 9,
-		kAuthorizationFlagNoData         = 20,
+		InteractionAllowed = 0,
+		ExtendRights       = 1,
+		PartialRights      = 2,
+		DestroyRights      = 3,
+		PreAuthorize       = 4,
+		SkipInternalAuth   = 9,
+		NoData             = 20,
 	}
 
 	AuthorizationFlags :: bit_set[AuthorizationFlag; cffi.uint]
@@ -4310,52 +4305,52 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 	SessionCreationFlags :: bit_set[SessionCreationFlag; cffi.uint]
 
 	SecKeychainPromptSelector :: enum cffi.ushort {
-		kSecKeychainPromptRequirePassphase = 1,
-		kSecKeychainPromptUnsigned       = 16,
-		kSecKeychainPromptUnsignedAct    = 32,
-		kSecKeychainPromptInvalid        = 64,
-		kSecKeychainPromptInvalidAct     = 128,
+		RequirePassphase = 1,
+		Unsigned         = 16,
+		UnsignedAct      = 32,
+		Invalid          = 64,
+		InvalidAct       = 128,
 	}
 
 	SecItemClass :: enum cffi.uint {
-		kSecInternetPasswordItemClass   = 1768842612,
-		kSecGenericPasswordItemClass    = 1734700656,
-		kSecAppleSharePasswordItemClass = 1634953328,
-		kSecCertificateItemClass        = 2147487744,
-		kSecPublicKeyItemClass          = 15,
-		kSecPrivateKeyItemClass         = 16,
-		kSecSymmetricKeyItemClass       = 17,
+		InternetPasswordItemClass   = 1768842612,
+		GenericPasswordItemClass    = 1734700656,
+		AppleSharePasswordItemClass = 1634953328,
+		CertificateItemClass        = 2147487744,
+		PublicKeyItemClass          = 15,
+		PrivateKeyItemClass         = 16,
+		SymmetricKeyItemClass       = 17,
 	}
 
 	SecItemAttr :: enum cffi.uint {
-		kSecCreationDateItemAttr       = 1667522932,
-		kSecModDateItemAttr            = 1835295092,
-		kSecDescriptionItemAttr        = 1684370275,
-		kSecCommentItemAttr            = 1768123764,
-		kSecCreatorItemAttr            = 1668445298,
-		kSecTypeItemAttr               = 1954115685,
-		kSecScriptCodeItemAttr         = 1935897200,
-		kSecLabelItemAttr              = 1818321516,
-		kSecInvisibleItemAttr          = 1768846953,
-		kSecNegativeItemAttr           = 1852139361,
-		kSecCustomIconItemAttr         = 1668641641,
-		kSecAccountItemAttr            = 1633903476,
-		kSecServiceItemAttr            = 1937138533,
-		kSecGenericItemAttr            = 1734700641,
-		kSecSecurityDomainItemAttr     = 1935961454,
-		kSecServerItemAttr             = 1936881266,
-		kSecAuthenticationTypeItemAttr = 1635023216,
-		kSecPortItemAttr               = 1886351988,
-		kSecPathItemAttr               = 1885434984,
-		kSecVolumeItemAttr             = 1986817381,
-		kSecAddressItemAttr            = 1633969266,
-		kSecSignatureItemAttr          = 1936943463,
-		kSecProtocolItemAttr           = 1886675820,
-		kSecCertificateType            = 1668577648,
-		kSecCertificateEncoding        = 1667591779,
-		kSecCrlType                    = 1668445296,
-		kSecCrlEncoding                = 1668443747,
-		kSecAlias                      = 1634494835,
+		CreationDateItemAttr       = 1667522932,
+		ModDateItemAttr            = 1835295092,
+		DescriptionItemAttr        = 1684370275,
+		CommentItemAttr            = 1768123764,
+		CreatorItemAttr            = 1668445298,
+		TypeItemAttr               = 1954115685,
+		ScriptCodeItemAttr         = 1935897200,
+		LabelItemAttr              = 1818321516,
+		InvisibleItemAttr          = 1768846953,
+		NegativeItemAttr           = 1852139361,
+		CustomIconItemAttr         = 1668641641,
+		AccountItemAttr            = 1633903476,
+		ServiceItemAttr            = 1937138533,
+		GenericItemAttr            = 1734700641,
+		SecurityDomainItemAttr     = 1935961454,
+		ServerItemAttr             = 1936881266,
+		AuthenticationTypeItemAttr = 1635023216,
+		PortItemAttr               = 1886351988,
+		PathItemAttr               = 1885434984,
+		VolumeItemAttr             = 1986817381,
+		AddressItemAttr            = 1633969266,
+		SignatureItemAttr          = 1936943463,
+		ProtocolItemAttr           = 1886675820,
+		CertificateType            = 1668577648,
+		CertificateEncoding        = 1667591779,
+		CrlType                    = 1668445296,
+		CrlEncoding                = 1668443747,
+		Alias                      = 1634494835,
 	}
 
 	SecTrustSettingsKeyUsageFlag :: enum cffi.uint {
@@ -4370,127 +4365,131 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 	SecTrustSettingsKeyUsage_Any :: transmute(SecTrustSettingsKeyUsage)cffi.uint(0xffffffff)
 
 	SecTrustSettingsResult :: enum cffi.uint {
-		kSecTrustSettingsResultInvalid   = 0,
-		kSecTrustSettingsResultTrustRoot = 1,
-		kSecTrustSettingsResultTrustAsRoot = 2,
-		kSecTrustSettingsResultDeny      = 3,
-		kSecTrustSettingsResultUnspecified = 4,
+		Invalid     = 0,
+		TrustRoot   = 1,
+		TrustAsRoot = 2,
+		Deny        = 3,
+		Unspecified = 4,
 	}
 
 	SecTrustSettingsDomain :: enum cffi.uint {
-		kSecTrustSettingsDomainUser   = 0,
-		kSecTrustSettingsDomainAdmin  = 1,
-		kSecTrustSettingsDomainSystem = 2,
+		User   = 0,
+		Admin  = 1,
+		System = 2,
 	}
 
 	SecCSFlag :: enum cffi.uint {
-		kSecCSConsiderExpiration         = 31,
-		kSecCSEnforceRevocationChecks    = 30,
-		kSecCSNoNetworkAccess            = 29,
-		kSecCSReportProgress             = 28,
-		kSecCSCheckTrustedAnchors        = 27,
-		kSecCSQuickCheck                 = 26,
-		kSecCSApplyEmbeddedPolicy        = 25,
-		kSecCSStripDisallowedXattrs      = 24,
-		kSecCSMatchGuestRequirementInKernel = 23,
+		ConsiderExpiration            = 31,
+		EnforceRevocationChecks       = 30,
+		NoNetworkAccess               = 29,
+		ReportProgress                = 28,
+		CheckTrustedAnchors           = 27,
+		QuickCheck                    = 26,
+		ApplyEmbeddedPolicy           = 25,
+		StripDisallowedXattrs         = 24,
+		MatchGuestRequirementInKernel = 23,
 	}
 
 	SecCSFlags :: bit_set[SecCSFlag; cffi.uint]
 
 	SecCodeSignatureFlag :: enum cffi.uint {
-		kSecCodeSignatureHost            = 0,
-		kSecCodeSignatureAdhoc           = 1,
-		kSecCodeSignatureForceHard       = 8,
-		kSecCodeSignatureForceKill       = 9,
-		kSecCodeSignatureForceExpiration = 10,
-		kSecCodeSignatureRestrict        = 11,
-		kSecCodeSignatureEnforcement     = 12,
-		kSecCodeSignatureLibraryValidation = 13,
-		kSecCodeSignatureRuntime         = 16,
-		kSecCodeSignatureLinkerSigned    = 17,
+		Host              = 0,
+		Adhoc             = 1,
+		ForceHard         = 8,
+		ForceKill         = 9,
+		ForceExpiration   = 10,
+		Restrict          = 11,
+		Enforcement       = 12,
+		LibraryValidation = 13,
+		Runtime           = 16,
+		LinkerSigned      = 17,
 	}
 
 	SecCodeSignatureFlags :: bit_set[SecCodeSignatureFlag; cffi.uint]
 
 	SecCodeStatus :: enum cffi.uint {
-		kSecCodeStatusValid    = 1,
-		kSecCodeStatusHard     = 256,
-		kSecCodeStatusKill     = 512,
-		kSecCodeStatusDebugged = 268435456,
-		kSecCodeStatusPlatform = 67108864,
+		Valid    = 1,
+		Hard     = 256,
+		Kill     = 512,
+		Debugged = 268435456,
+		Platform = 67108864,
 	}
 
 	SecRequirementType :: enum cffi.uint {
-		kSecHostRequirementType       = 1,
-		kSecGuestRequirementType      = 2,
-		kSecDesignatedRequirementType = 3,
-		kSecLibraryRequirementType    = 4,
-		kSecPluginRequirementType     = 5,
-		kSecInvalidRequirementType    = 6,
-		kSecRequirementTypeCount      = 6,
+		HostRequirementType       = 1,
+		GuestRequirementType      = 2,
+		DesignatedRequirementType = 3,
+		LibraryRequirementType    = 4,
+		PluginRequirementType     = 5,
+		InvalidRequirementType    = 6,
+		RequirementTypeCount      = 6,
 	}
 
 	SecCSDigestAlgorithm :: enum cffi.uint {
-		kSecCodeSignatureNoHash          = 0,
-		kSecCodeSignatureHashSHA1        = 1,
-		kSecCodeSignatureHashSHA256      = 2,
-		kSecCodeSignatureHashSHA256Truncated = 3,
-		kSecCodeSignatureHashSHA384      = 4,
-		kSecCodeSignatureHashSHA512      = 5,
+		NoHash              = 0,
+		HashSHA1            = 1,
+		HashSHA256          = 2,
+		HashSHA256Truncated = 3,
+		HashSHA384          = 4,
+		HashSHA512          = 5,
 	}
 
 	SSLSessionOption :: enum cffi.int {
-		kSSLSessionOptionBreakOnCertRequested = 0,
-		kSSLSessionOptionBreakOnClientAuth = 1,
-		kSSLSessionOptionSendOneByteRecord = 2,
-		kSSLSessionOptionAllowRenegotiation = 3,
+		BreakOnServerAuth         = 0,
+		BreakOnCertRequested      = 1,
+		BreakOnClientAuth         = 2,
+		FalseStart                = 3,
+		SendOneByteRecord         = 4,
+		AllowServerIdentityChange = 5,
+		Fallback                  = 6,
+		BreakOnClientHello        = 7,
+		AllowRenegotiation        = 8,
+		EnableSessionTickets      = 9,
 	}
 
-	SSLSessionOptions :: bit_set[SSLSessionOption; cffi.int]
-
 	SSLSessionState :: enum cffi.int {
-		kSSLIdle      = 0,
-		kSSLHandshake = 1,
-		kSSLConnected = 2,
-		kSSLClosed    = 3,
-		kSSLAborted   = 4,
+		Idle      = 0,
+		Handshake = 1,
+		Connected = 2,
+		Closed    = 3,
+		Aborted   = 4,
 	}
 
 	SSLClientCertificateState :: enum cffi.int {
-		kSSLClientCertNone      = 0,
-		kSSLClientCertRequested = 1,
-		kSSLClientCertSent      = 2,
-		kSSLClientCertRejected  = 3,
+		None      = 0,
+		Requested = 1,
+		Sent      = 2,
+		Rejected  = 3,
 	}
 
 	SSLProtocolSide :: enum cffi.int {
-		kSSLServerSide = 0,
-		kSSLClientSide = 1,
+		ServerSide = 0,
+		ClientSide = 1,
 	}
 
 	SSLConnectionType :: enum cffi.int {
-		kSSLStreamType   = 0,
-		kSSLDatagramType = 1,
+		StreamType   = 0,
+		DatagramType = 1,
 	}
 
 	SSLAuthenticate :: enum cffi.int {
-		kNeverAuthenticate  = 0,
-		kAlwaysAuthenticate = 1,
-		kTryAuthenticate    = 2,
+		NeverAuthenticate  = 0,
+		AlwaysAuthenticate = 1,
+		TryAuthenticate    = 2,
 	}
 
 	SecTransformMetaAttributeType :: enum cffi.long {
-		kSecTransformMetaAttributeValue  = 0,
-		kSecTransformMetaAttributeName   = 1,
-		kSecTransformMetaAttributeRef    = 2,
-		kSecTransformMetaAttributeRequired = 3,
-		kSecTransformMetaAttributeRequiresOutboundConnection = 4,
-		kSecTransformMetaAttributeDeferred = 5,
-		kSecTransformMetaAttributeStream = 6,
-		kSecTransformMetaAttributeCanCycle = 7,
-		kSecTransformMetaAttributeExternalize = 8,
-		kSecTransformMetaAttributeHasOutboundConnections = 9,
-		kSecTransformMetaAttributeHasInboundConnection = 10,
+		Value                      = 0,
+		Name                       = 1,
+		Ref                        = 2,
+		Required                   = 3,
+		RequiresOutboundConnection = 4,
+		Deferred                   = 5,
+		Stream                     = 6,
+		CanCycle                   = 7,
+		Externalize                = 8,
+		HasOutboundConnections     = 9,
+		HasInboundConnection       = 10,
 	}
 }
 

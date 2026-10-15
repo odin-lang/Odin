@@ -2783,158 +2783,158 @@ MemoryPoolRef :: ^OpaqueCMMemoryPool
 ClockRef :: ^OpaqueCMClock
 TimebaseRef :: ^OpaqueCMTimebase
 ClockOrTimebaseRef :: CF.TypeRef
-TimeFlags_kCMTimeFlags_ImpliedValueFlagsMask :: TimeFlags { .kCMTimeFlags_PositiveInfinity, .kCMTimeFlags_NegativeInfinity, .kCMTimeFlags_Indefinite, }
+TimeFlags_ImpliedValueFlagsMask :: TimeFlags { .PositiveInfinity, .NegativeInfinity, .Indefinite, }
 
 TimeFlag :: enum cffi.uint {
-	kCMTimeFlags_Valid            = 0,
-	kCMTimeFlags_HasBeenRounded   = 1,
-	kCMTimeFlags_PositiveInfinity = 2,
-	kCMTimeFlags_NegativeInfinity = 3,
-	kCMTimeFlags_Indefinite       = 4,
+	Valid            = 0,
+	HasBeenRounded   = 1,
+	PositiveInfinity = 2,
+	NegativeInfinity = 3,
+	Indefinite       = 4,
 }
 
 TimeFlags :: bit_set[TimeFlag; cffi.uint]
 
 TimeRoundingMethod :: enum cffi.uint {
-	kCMTimeRoundingMethod_RoundHalfAwayFromZero = 1,
-	kCMTimeRoundingMethod_RoundTowardZero = 2,
-	kCMTimeRoundingMethod_RoundAwayFromZero = 3,
-	kCMTimeRoundingMethod_QuickTime  = 4,
-	kCMTimeRoundingMethod_RoundTowardPositiveInfinity = 5,
-	kCMTimeRoundingMethod_RoundTowardNegativeInfinity = 6,
-	kCMTimeRoundingMethod_Default    = 1,
+	RoundHalfAwayFromZero       = 1,
+	RoundTowardZero             = 2,
+	RoundAwayFromZero           = 3,
+	QuickTime                   = 4,
+	RoundTowardPositiveInfinity = 5,
+	RoundTowardNegativeInfinity = 6,
+	Default                     = 1,
 }
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	SSignerStatus :: enum cffi.uint {
-		kCMSSignerUnsigned             = 0,
-		kCMSSignerValid                = 1,
-		kCMSSignerNeedsDetachedContent = 2,
-		kCMSSignerInvalidSignature     = 3,
-		kCMSSignerInvalidCert          = 4,
-		kCMSSignerInvalidIndex         = 5,
+		Unsigned             = 0,
+		Valid                = 1,
+		NeedsDetachedContent = 2,
+		InvalidSignature     = 3,
+		InvalidCert          = 4,
+		InvalidIndex         = 5,
 	}
 
 	SSignedAttributes :: enum cffi.uint {
-		kCMSAttrNone                     = 0,
-		kCMSAttrSmimeCapabilities        = 1,
-		kCMSAttrSmimeEncryptionKeyPrefs  = 2,
-		kCMSAttrSmimeMSEncryptionKeyPrefs = 4,
-		kCMSAttrSigningTime              = 8,
-		kCMSAttrAppleCodesigningHashAgility = 16,
-		kCMSAttrAppleCodesigningHashAgilityV2 = 32,
-		kCMSAttrAppleExpirationTime      = 64,
+		None                          = 0,
+		SmimeCapabilities             = 1,
+		SmimeEncryptionKeyPrefs       = 2,
+		SmimeMSEncryptionKeyPrefs     = 4,
+		SigningTime                   = 8,
+		AppleCodesigningHashAgility   = 16,
+		AppleCodesigningHashAgilityV2 = 32,
+		AppleExpirationTime           = 64,
 	}
 
 	SCertificateChainMode :: enum cffi.uint {
-		kCMSCertificateNone              = 0,
-		kCMSCertificateSignerOnly        = 1,
-		kCMSCertificateChain             = 2,
-		kCMSCertificateChainWithRoot     = 3,
-		kCMSCertificateChainWithRootOrFail = 4,
+		None                = 0,
+		SignerOnly          = 1,
+		Chain               = 2,
+		ChainWithRoot       = 3,
+		ChainWithRootOrFail = 4,
 	}
 
 	ColorSyncDataDepth :: enum cffi.uint {
-		kColorSync1BitGamut            = 1,
-		kColorSync8BitInteger          = 2,
-		kColorSync16BitInteger         = 3,
-		kColorSync16BitFloat           = 4,
-		kColorSync32BitInteger         = 5,
-		kColorSync32BitNamedColorIndex = 6,
-		kColorSync32BitFloat           = 7,
-		kColorSync10BitInteger         = 8,
+		_1BitGamut            = 1,
+		_8BitInteger          = 2,
+		_16BitInteger         = 3,
+		_16BitFloat           = 4,
+		_32BitInteger         = 5,
+		_32BitNamedColorIndex = 6,
+		_32BitFloat           = 7,
+		_10BitInteger         = 8,
 	}
 
 	ColorSyncAlphaInfo :: enum cffi.uint {
-		kColorSyncAlphaNone              = 0,
-		kColorSyncAlphaPremultipliedLast = 1,
-		kColorSyncAlphaPremultipliedFirst = 2,
-		kColorSyncAlphaLast              = 3,
-		kColorSyncAlphaFirst             = 4,
-		kColorSyncAlphaNoneSkipLast      = 5,
-		kColorSyncAlphaNoneSkipFirst     = 6,
+		None               = 0,
+		PremultipliedLast  = 1,
+		PremultipliedFirst = 2,
+		Last               = 3,
+		First              = 4,
+		NoneSkipLast       = 5,
+		NoneSkipFirst      = 6,
 	}
 
 	FloatBitmapFlag :: enum cffi.uint {
-		kCMFloatBitmapFlagsAlpha        = 0,
-		kCMFloatBitmapFlagsAlphaPremul  = 1,
-		kCMFloatBitmapFlagsRangeClipped = 2,
+		Alpha        = 0,
+		AlphaPremul  = 1,
+		RangeClipped = 2,
 	}
 
 	FloatBitmapFlags :: bit_set[FloatBitmapFlag; cffi.uint]
 }
 
 TagError :: enum cffi.int {
-	kCMTagError_ParamErr         = -15730,
-	kCMTagError_AllocationFailed = -15731,
+	ParamErr         = -15730,
+	AllocationFailed = -15731,
 }
 
 TagCategory :: enum cffi.uint {
-	kCMTagCategory_Undefined         = 0,
-	kCMTagCategory_MediaType         = 1835297121,
-	kCMTagCategory_MediaSubType      = 1836283234,
-	kCMTagCategory_TrackID           = 1953653099,
-	kCMTagCategory_ChannelID         = 1986226286,
-	kCMTagCategory_VideoLayerID      = 1986814329,
-	kCMTagCategory_PixelFormat       = 1885960294,
-	kCMTagCategory_PackingType       = 1885430635,
-	kCMTagCategory_ProjectionType    = 1886547818,
-	kCMTagCategory_StereoView        = 1702454643,
-	kCMTagCategory_StereoViewInterpretation = 1702455664,
+	Undefined                = 0,
+	MediaType                = 1835297121,
+	MediaSubType             = 1836283234,
+	TrackID                  = 1953653099,
+	ChannelID                = 1986226286,
+	VideoLayerID             = 1986814329,
+	PixelFormat              = 1885960294,
+	PackingType              = 1885430635,
+	ProjectionType           = 1886547818,
+	StereoView               = 1702454643,
+	StereoViewInterpretation = 1702455664,
 }
 
 TagDataType :: enum cffi.uint {
-	kCMTagDataType_Invalid = 0,
-	kCMTagDataType_SInt64  = 2,
-	kCMTagDataType_Float64 = 3,
-	kCMTagDataType_OSType  = 5,
-	kCMTagDataType_Flags   = 7,
+	Invalid = 0,
+	SInt64  = 2,
+	Float64 = 3,
+	OSType  = 5,
+	Flags   = 7,
 }
 
 StereoViewComponents :: enum cffi.ulonglong {
-	kCMStereoView_None     = 0,
-	kCMStereoView_LeftEye  = 1,
-	kCMStereoView_RightEye = 2,
+	None     = 0,
+	LeftEye  = 1,
+	RightEye = 2,
 }
 
 StereoViewInterpretationOption :: enum cffi.ulonglong {
-	kCMStereoViewInterpretation_StereoOrderReversed = 0,
-	kCMStereoViewInterpretation_AdditionalViews = 1,
+	StereoOrderReversed = 0,
+	AdditionalViews     = 1,
 }
 
 StereoViewInterpretationOptions :: bit_set[StereoViewInterpretationOption; cffi.ulonglong]
 
 ProjectionType :: enum cffi.ulonglong {
-	kCMProjectionType_Rectangular    = 1919247220,
-	kCMProjectionType_Equirectangular = 1701934441,
-	kCMProjectionType_HalfEquirectangular = 1751478645,
-	kCMProjectionType_Fisheye        = 1718186856,
-	kCMProjectionType_ParametricImmersive = 1886546285,
+	Rectangular         = 1919247220,
+	Equirectangular     = 1701934441,
+	HalfEquirectangular = 1751478645,
+	Fisheye             = 1718186856,
+	ParametricImmersive = 1886546285,
 }
 
 PackingType :: enum cffi.ulonglong {
-	kCMPackingType_None       = 1852796517,
-	kCMPackingType_SideBySide = 1936286821,
-	kCMPackingType_OverUnder  = 1870030194,
+	None       = 1852796517,
+	SideBySide = 1936286821,
+	OverUnder  = 1870030194,
 }
 
 TagCollectionError :: enum cffi.int {
-	kCMTagCollectionError_ParamErr   = -15740,
-	kCMTagCollectionError_AllocationFailed = -15741,
-	kCMTagCollectionError_InternalError = -15742,
-	kCMTagCollectionError_InvalidTag = -15743,
-	kCMTagCollectionError_InvalidTagCollectionDictionary = -15744,
-	kCMTagCollectionError_InvalidTagCollectionData = -15745,
-	kCMTagCollectionError_TagNotFound = -15746,
-	kCMTagCollectionError_InvalidTagCollectionDataVersion = -15747,
-	kCMTagCollectionError_ExhaustedBufferSize = -15748,
-	kCMTagCollectionError_NotYetImplemented = -15749,
+	ParamErr                        = -15740,
+	AllocationFailed                = -15741,
+	InternalError                   = -15742,
+	InvalidTag                      = -15743,
+	InvalidTagCollectionDictionary  = -15744,
+	InvalidTagCollectionData        = -15745,
+	TagNotFound                     = -15746,
+	InvalidTagCollectionDataVersion = -15747,
+	ExhaustedBufferSize             = -15748,
+	NotYetImplemented               = -15749,
 }
 
 TaggedBufferGroupError :: enum cffi.int {
-	kCMTaggedBufferGroupError_ParamErr = -15780,
-	kCMTaggedBufferGroupError_AllocationFailed = -15781,
-	kCMTaggedBufferGroupError_InternalError = -15782,
+	ParamErr         = -15780,
+	AllocationFailed = -15781,
+	InternalError    = -15782,
 }
 
 Time :: struct #align (4) {

@@ -218,8 +218,8 @@ VoxelIndex :: distinct [4]cffi.int
 
 when ODIN_PLATFORM_SUBTARGET == .Default {
 	LabelDomain :: enum cffi.uint {
-		kMDLabelUserDomain  = 0,
-		kMDLabelLocalDomain = 1,
+		UserDomain  = 0,
+		LocalDomain = 1,
 	}
 }
 

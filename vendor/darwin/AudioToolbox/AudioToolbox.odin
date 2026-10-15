@@ -4711,7 +4711,7 @@ AUAudioMixRenderingStyle :: enum cffi.uint {
 }
 
 ConverterOption :: enum cffi.uint {
-	kAudioConverterOption_Unbuffered = 16,
+	Unbuffered = 16,
 }
 
 ConverterOptions :: bit_set[ConverterOption; cffi.uint]
@@ -4738,7 +4738,7 @@ FileRegionFlag :: enum cffi.uint {
 FileRegionFlags :: bit_set[FileRegionFlag; cffi.uint]
 
 BytePacketTranslationFlag :: enum cffi.uint {
-	kBytePacketTranslationFlag_IsEstimate = 0,
+	IsEstimate = 0,
 }
 
 BytePacketTranslationFlags :: bit_set[BytePacketTranslationFlag; cffi.uint]
@@ -4751,13 +4751,13 @@ FileStreamPropertyFlag :: enum cffi.uint {
 FileStreamPropertyFlags :: bit_set[FileStreamPropertyFlag; cffi.uint]
 
 FileStreamParseFlag :: enum cffi.uint {
-	kAudioFileStreamParseFlag_Discontinuity = 0,
+	Discontinuity = 0,
 }
 
 FileStreamParseFlags :: bit_set[FileStreamParseFlag; cffi.uint]
 
 FileStreamSeekFlag :: enum cffi.uint {
-	kAudioFileStreamSeekFlag_OffsetIsEstimated = 0,
+	OffsetIsEstimated = 0,
 }
 
 FileStreamSeekFlags :: bit_set[FileStreamSeekFlag; cffi.uint]

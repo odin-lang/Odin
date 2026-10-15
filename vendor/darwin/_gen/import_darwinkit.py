@@ -205,8 +205,19 @@ FLAG_ELEMENT_NAMES = {
 	"xpc_listener_create_flags_t": "xpc_listener_create_flag_t",
 }
 
+# Plain enums which csgen emits as bit_sets: `SSLSessionOption` holds option indices 0-9, not bits.
+# The bit_set is turned back into its element enum, with the values its members and combination
+# constants stand for, plus the members csgen dropped for being 0.
+# framework -> {bit_set: {dropped member: value}}
+NOT_FLAG_ENUMS = {
+	"Security": {
+		"SSLSessionOptions": {"kSSLSessionOptionBreakOnServerAuth": 0},
+	},
+}
+
 # Enum members mangled by csgen's prefix removal, which cuts into a word when every member happens to
 # share its first letters, or leaves part of the prefix on some members.
+# Enums whose members all keep a C-style `k` prefix are handled by `strip_c_member_prefixes`.
 # framework -> {enum: (prefix stripped from every member, {member: new name, or None to remove it})}
 ENUM_MEMBER_FIXES = {
 	"AppKit": {
@@ -223,6 +234,11 @@ ENUM_MEMBER_FIXES = {
 	"Security": {
 		"SecKeyUsage":              ("kSecKeyUsage", {}),
 		"SecTrustSettingsKeyUsage": ("kSecTrustSettingsKeyUse", {}),
+		# curve names keep `Sec`, as in `secp256r1`
+		"SecKeySizes":              ("kSec", {"kSecp192r1": "Secp192r1", "kSecp256r1": "Secp256r1", "kSecp384r1": "Secp384r1", "kSecp521r1": "Secp521r1"}),
+		"CE_GeneralNameType":              ("GNT_", {}),
+		"CE_CrlDistributionPointNameType": ("DNT_", {}),
+		"CE_DataType":                     ("DT_", {}),
 	},
 	"AudioToolbox": {
 		"AUSpatialMixerPersonalizedHRTFMode": ("", {"to": "Auto"}),
@@ -766,6 +782,8 @@ def apply_enum_member_fixes(pkg):
 						continue
 				elif prefix and member.startswith(prefix) and len(member) > len(prefix):
 					new = member[len(prefix):]
+					if new[0].isdigit():
+						new = "_" + new
 				fixed.append((indent, new, rest))
 			if unused:
 				pkg.report["enum member fix no longer applies"].append(f"{name}: {', '.join(sorted(unused))}")
@@ -779,6 +797,182 @@ def apply_enum_member_fixes(pkg):
 			k = j
 	for name in sorted(wanted):
 		pkg.report["enum for member fix not found"].append(name)
+
+
+RE_ENUM_DECL   = re.compile(r"^(\s*)(\w+) :: enum ([\w.]+) \{\s*$")
+RE_ENUM_MEMBER = re.compile(r"^(\s*)(\w+)\s*=\s*(.*)$")
+
+
+def read_enum(lines, k):
+	"""The members of the enum declared at `lines[k]`, as [(indent, name, value)], and the index of its `}`."""
+	j = k+1
+	members = []
+	while not re.match(r"^\s*\}", lines[j]):
+		mm = RE_ENUM_MEMBER.match(lines[j])
+		if mm:
+			members.append(mm.groups())
+		j += 1
+	return members, j
+
+
+def unflag_enums(pkg):
+	"""Turns the bit_sets in `NOT_FLAG_ENUMS` back into plain enums."""
+	for set_name, dropped in NOT_FLAG_ENUMS.get(pkg.name, {}).items():
+		set_at = None
+		for fname, lines in pkg.files.items():
+			for k, line in enumerate(lines):
+				m = re.match(rf"^\s*{set_name} :: bit_set\[(\w+); ([\w.]+)\]\s*$", line)
+				if m:
+					set_at = (fname, k, m.group(1), m.group(2))
+		if set_at is None:
+			pkg.report["bit_set to turn back into an enum not found"].append(set_name)
+			continue
+		fname, set_k, elem, backing = set_at
+
+		# element members are bit indices; the combination constants are sets of them
+		values = dict(dropped)
+		elem_at = None
+		for f, lines in pkg.files.items():
+			for k, line in enumerate(lines):
+				m = RE_ENUM_DECL.match(line)
+				if m and m.group(2) == elem:
+					elem_at = (f, k)
+					members, _ = read_enum(lines, k)
+					for _, name, value in members:
+						values[name] = 1 << int(value.rstrip(",").strip())
+		consts = []
+		for f, lines in pkg.files.items():
+			for k, line in enumerate(lines):
+				m = re.match(rf"^\s*{set_name}_(\w+) :: {set_name} \{{(.*)\}}\s*$", line)
+				if m:
+					bits = [b.strip().lstrip(".") for b in m.group(2).split(",") if b.strip()]
+					value = 0
+					for b in bits:
+						value |= values[b]
+					values[m.group(1)] = value
+					consts.append((f, k))
+		if elem_at is None:
+			raise SystemExit(f"{pkg.name}: element enum {elem} of {set_name} not found")
+
+		# remove the bit_set and its constants, last line first
+		for rf, rk in sorted([(fname, set_k)] + consts, key=lambda x: (x[0], -x[1])):
+			rl = pkg.files[rf]
+			del rl[rk]
+			if 0 < rk < len(rl) and not rl[rk].strip() and not rl[rk-1].strip():
+				del rl[rk]
+
+		lines = pkg.files[elem_at[0]]
+		k = next(k for k, line in enumerate(lines) if RE_ENUM_DECL.match(line) and RE_ENUM_DECL.match(line).group(2) == elem)
+		indent = RE_ENUM_DECL.match(lines[k]).group(1)
+		_, end = read_enum(lines, k)
+		ordered = sorted(values.items(), key=lambda x: (x[1], x[0]))
+		width = max(len(n) for n, _ in ordered)
+		lines[k:end+1] = [f"{indent}{elem} :: enum {backing} {{"] + [f"{indent}\t{n.ljust(width)} = {v}," for n, v in ordered] + [f"{indent}}}"]
+		for f2, lines2 in pkg.files.items():
+			for i, line in enumerate(lines2):
+				if re.search(rf"\b{set_name}\b", line):
+					lines2[i] = re.sub(rf"\b{set_name}\b", elem, line)
+					pkg.report["bit_set references changed to the enum"].append(f"{f2}: {lines2[i].strip()}")
+		pkg.report["bit_sets turned back into enums"].append(f"{set_name} -> {elem}: " + ", ".join(f"{n} = {v}" for n, v in ordered))
+
+
+def c_prefix_word_start(name, n):
+	return len(name) > n and (name[n].isupper() or name[n].isdigit() or name[n] == "_")
+
+
+def c_prefix_finish(rest):
+	rest = rest.lstrip("_")
+	return "_" + rest if rest[0].isdigit() else rest
+
+
+def c_prefix_length(enum_name, members):
+	"""How much of each member is the C prefix: `kSecPaddingNone` in `SecPadding` -> len("kSecPadding")."""
+	if len(members) == 1:
+		body = members[0][1:]
+		key = enum_name[:-1] if enum_name.endswith("s") else enum_name
+		# the enum's name anywhere after a framework prefix: `kAudioFileStreamParseFlag_Discontinuity`
+		at = body.find(key)
+		if at >= 0 and (at == 0 or body[at].isupper()):
+			n = at + len(key)
+			if body[n:n+1] == "s":
+				n += 1
+			if c_prefix_word_start(body, n):
+				return 1 + n
+		# the enum's first words: `kSecItemPemArmour` in `SecItemImportExportFlags`
+		n = len(os.path.commonprefix([body, enum_name]))
+		while n > 0 and not (c_prefix_word_start(body, n) and c_prefix_word_start(enum_name, n)):
+			n -= 1
+		return 1 + n
+	p = os.path.commonprefix(members)
+	n = len(p)
+	while n > 1 and not all(c_prefix_word_start(m, n) for m in members):
+		n -= 1
+	# don't strip past the enum's own name: `kEAGLRenderingAPIOpenGLES1` -> `OpenGLES1`
+	for cand in (enum_name + "s_", enum_name + "_", enum_name + "s", enum_name):
+		at = p[:n].find(cand)
+		if at > 0:
+			cut = at + len(cand)
+			if cut < n and all(c_prefix_word_start(m, cut) for m in members):
+				n = cut
+			break
+	return max(n, 1)
+
+
+def strip_c_member_prefixes(pkg):
+	"""
+	csgen strips the type's prefix from enum members, but not a C-style `k` prefix:
+	`kSecPaddingNone` becomes `None`, `kCGLPFADoubleBuffer` becomes `DoubleBuffer`.
+	"""
+	renames = {}   # old member -> new member, for references such as `.kCMTimeFlags_Valid`
+	prefixes = {}  # enum -> length of its members' prefix, for csgen's combination constants
+	for fname, lines in pkg.files.items():
+		for k, line in enumerate(lines):
+			m = RE_ENUM_DECL.match(line)
+			if not m or m.group(2).islower():
+				continue
+			members, end = read_enum(lines, k)
+			names = [n for _, n, _ in members]
+			if not names or not all(re.match(r"k[A-Z0-9]", n) for n in names):
+				continue
+			n = c_prefix_length(m.group(2), names)
+			new_names = [c_prefix_finish(x[n:]) for x in names]
+			if len(set(new_names)) != len(new_names):
+				pkg.report["C prefixes kept (names would clash)"].append(m.group(2))
+				continue
+			width = max(len(x) for x in new_names)
+			lines[k+1:end] = [f"{indent}{new.ljust(width)} = {value}" for (indent, _, value), new in zip(members, new_names)]
+			renames.update(zip(names, new_names))
+			prefixes[m.group(2)] = n
+			pkg.report["C prefixes stripped from enum members"].append(f"{m.group(2)}: {names[0][:n]}")
+	if not renames:
+		return
+
+	# csgen's combination constants of bit_sets: `TimeFlags_kCMTimeFlags_ImpliedValueFlagsMask`
+	elem_of = {}
+	for lines in pkg.files.values():
+		for line in lines:
+			m = re.match(r"^\s*(\w+) :: bit_set\[(\w+);", line)
+			if m:
+				elem_of[m.group(1)] = m.group(2)
+	const_renames = {}
+	for lines in pkg.files.values():
+		for line in lines:
+			m = re.match(r"^\s*((\w+?)_(k[A-Z0-9]\w*)) ::", line)
+			if m and m.group(2) in elem_of and elem_of[m.group(2)] in prefixes:
+				n = prefixes[elem_of[m.group(2)]]
+				if c_prefix_word_start(m.group(3), n):
+					const_renames[m.group(1)] = f"{m.group(2)}_{c_prefix_finish(m.group(3)[n:])}"
+
+	member_ref = re.compile(r"\.(k[A-Z0-9]\w*)\b")
+	const_ref = re.compile(r"\b(" + "|".join(map(re.escape, sorted(const_renames, key=len, reverse=True))) + r")\b") if const_renames else None
+	for lines in pkg.files.values():
+		for i, line in enumerate(lines):
+			new = member_ref.sub(lambda mm: "." + renames.get(mm.group(1), mm.group(1)), line)
+			if const_ref:
+				new = const_ref.sub(lambda mm: const_renames[mm.group(1)], new)
+			lines[i] = new
+	for a, b in const_renames.items():
+		pkg.report["bit_set constants renamed"].append(f"{a} -> {b}")
 
 
 def apply_flag_enums(pkg):
@@ -1365,7 +1559,9 @@ def main():
 
 		rewrite_imports(pkg, framework_of_path)
 		apply_alias_fixes(pkg)
+		unflag_enums(pkg)
 		apply_enum_member_fixes(pkg)
+		strip_c_member_prefixes(pkg)
 		apply_flag_enums(pkg)
 		pkg.scan()
 		apply_known_fixes(pkg)

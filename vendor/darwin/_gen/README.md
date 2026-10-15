@@ -52,6 +52,12 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
   enumerated fields are left as they are, see `mixed_flag_enums.md`.
 - Enum members mangled by csgen's prefix removal are renamed (`ENUM_MEMBER_FIXES`), e.g.
   `AVFoundation.CaptureSystemPressureFactors` has `SystemTemperature` rather than `ystemTemperature`.
+- Enum members which keep a C-style `k` prefix lose it, as csgen does for the rest: `kSecPaddingNone`
+  becomes `Sec.SecPadding.None` and `kCGLPFADoubleBuffer` becomes `.DoubleBuffer`. Stripping stops
+  at the end of the enum's own name (`kEAGLRenderingAPIOpenGLES1` becomes `.OpenGLES1`), and a name
+  which would start with a digit gets a leading `_` (`kColorSync8BitInteger` becomes `._8BitInteger`).
+- Plain enums which csgen emits as bit_sets (`NOT_FLAG_ENUMS`) become enums again, e.g.
+  `Security.SSLSessionOption`, whose members are option indices 0 to 9.
 - Known problems in the generated output are patched (`KNOWN_FIXES`, `ALIAS_FIXES`).
 - AppKit's `Foundation.Exports.odin`, which csgen generates so that `import NS "vendor:darwin/AppKit"`
   provides all of Foundation, also gets aliases for Foundation's hand-written top-level declarations
