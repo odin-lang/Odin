@@ -95,9 +95,13 @@ darwin_foundation_helpers :: proc(t: ^testing.T) {
 	array := NS.Array.arrayWithObject(NS.AT("x"))
 	testing.expect_value(t, array->objectAs(0, ^NS.String)->odinString(), "x")
 	count := 0
-	for item in array->objectEnumerator()->iterator(^NS.String) {
+	enumerator := array->objectEnumerator()
+	for item in enumerator->iterator(^NS.String) {
 		testing.expect_value(t, item->odinString(), "x")
 		count += 1
+		if count > 1 {
+			break // fail rather than loop forever
+		}
 	}
 	testing.expect_value(t, count, 1)
 

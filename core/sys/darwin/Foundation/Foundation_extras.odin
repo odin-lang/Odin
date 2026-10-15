@@ -126,6 +126,8 @@ Array_objectAs :: proc "c" (self: ^Array, index: UInteger, $T: typeid) -> T wher
 
 
 // Iterates the remaining objects of an enumerator: `for str in enumerator->iterator(^NS.String) {}`
+// Keep the enumerator in a variable: the expression after `in` is evaluated on every iteration, so
+// `array->objectEnumerator()->iterator(...)` would start a new enumerator each time and never end.
 @(objc_type=Enumerator, objc_name="iterator")
 Enumerator_iterator :: proc "c" (self: ^Enumerator, $T: typeid) -> (obj: T, ok: bool) where intrinsics.type_is_pointer(T), intrinsics.type_is_subtype_of(T, ^Object) {
 	obj = (T)(self->nextObject())
