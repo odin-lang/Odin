@@ -4,16 +4,7 @@ import "base:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
 import "core:io"
-/*
-Type definition for a procedure that flushes a Builder
 
-Inputs:
-- b: A pointer to the Builder
-
-Returns:
-A boolean indicating whether the Builder should be reset
-*/
-Builder_Flush_Proc :: #type proc(b: ^Builder) -> (do_reset: bool)
 /*
 A dynamic byte buffer / string builder with helper procedures
 The dynamic array is wrapped inside the struct to be more opaque
