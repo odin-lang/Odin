@@ -44,7 +44,10 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
   overload groups refer to the wrapper. When a wrapper would collide with another method of the same
   name or signature (usually a deprecated variant without `error:`), only the raw method is
   provided.
-- Known problems in the generated output are patched (`KNOWN_FIXES`).
+- Enums which are flag sets in the SDK but which csgen emitted as plain enums (`FLAG_ENUMS`) become a
+  `bit_set` of the same name over an element enum of bit indices, e.g. `MTL.TextureUsage` is
+  `bit_set[MTL.TextureUsageFlag]`. Members equal to 0 are dropped, use `{}` instead.
+- Known problems in the generated output are patched (`KNOWN_FIXES`, `ALIAS_FIXES`).
 
 ## Hand-written files
 
@@ -57,6 +60,12 @@ Every generated file starts with:
 The script only overwrites or deletes files that start with that line, and refuses to overwrite a
 hand-written file of the same name. Odin-specific helpers belong in separate files next to the
 generated ones (e.g. `Foundation_extras.odin`) so that they survive a re-import.
+
+A hand-written procedure named `<generated procedure>_slice` is added to the overload group of that
+generated procedure by the script, turning a single generated method into a group whose original
+method is renamed with a trailing `_`. This is how `Metal_extras.odin` lets
+`encoder->setViewports(viewports[:])` sit alongside `encoder->setViewports(&viewport, 1)`. Since the
+script looks for these procedures in the destination package, run it again after adding one.
 
 ## License
 

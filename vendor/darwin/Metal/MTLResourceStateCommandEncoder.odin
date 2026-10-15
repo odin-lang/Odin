@@ -12,8 +12,8 @@ ResourceStateCommandEncoder :: struct {
 }
 
 foreign lib {
-	@(objc_type=ResourceStateCommandEncoder, objc_selector="updateTextureMappings:mode:regions:mipLevels:slices:numRegions:", objc_name="updateTextureMappings")
-	ResourceStateCommandEncoder_updateTextureMappings :: proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, regions: ^Region, mipLevels: ^NS.UInteger, slices: ^NS.UInteger, numRegions: NS.UInteger) ---
+	@(objc_type=ResourceStateCommandEncoder, objc_selector="updateTextureMappings:mode:regions:mipLevels:slices:numRegions:", objc_name="updateTextureMappings_")
+	ResourceStateCommandEncoder_updateTextureMappings_ :: proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, regions: ^Region, mipLevels: ^NS.UInteger, slices: ^NS.UInteger, numRegions: NS.UInteger) ---
 
 	@(objc_type=ResourceStateCommandEncoder, objc_selector="updateTextureMapping:mode:region:mipLevel:slice:", objc_name="updateTextureMapping_mode_region_mipLevel_slice")
 	ResourceStateCommandEncoder_updateTextureMapping_mode_region_mipLevel_slice :: proc(self: ^ResourceStateCommandEncoder, texture: ^Texture, mode: SparseTextureMappingMode, region: Region, mipLevel: NS.UInteger, slice: NS.UInteger) ---
@@ -37,4 +37,13 @@ foreign lib {
 ResourceStateCommandEncoder_updateTextureMapping :: proc {
 	ResourceStateCommandEncoder_updateTextureMapping_mode_region_mipLevel_slice,
 	ResourceStateCommandEncoder_updateTextureMapping_mode_indirectBuffer_indirectBufferOffset,
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=ResourceStateCommandEncoder, objc_name="updateTextureMappings")
+ResourceStateCommandEncoder_updateTextureMappings :: proc {
+	ResourceStateCommandEncoder_updateTextureMappings_,
+	ResourceStateCommandEncoder_updateTextureMappings_slice,
 }

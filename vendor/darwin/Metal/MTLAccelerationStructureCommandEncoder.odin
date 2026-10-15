@@ -42,14 +42,14 @@ foreign lib {
 	@(objc_type=AccelerationStructureCommandEncoder, objc_selector="useResource:usage:", objc_name="useResource")
 	AccelerationStructureCommandEncoder_useResource :: proc(self: ^AccelerationStructureCommandEncoder, resource: ^Resource, usage: ResourceUsage) ---
 
-	@(objc_type=AccelerationStructureCommandEncoder, objc_selector="useResources:count:usage:", objc_name="useResources")
-	AccelerationStructureCommandEncoder_useResources :: proc(self: ^AccelerationStructureCommandEncoder, resources: ^^Resource, count: NS.UInteger, usage: ResourceUsage) ---
+	@(objc_type=AccelerationStructureCommandEncoder, objc_selector="useResources:count:usage:", objc_name="useResources_")
+	AccelerationStructureCommandEncoder_useResources_ :: proc(self: ^AccelerationStructureCommandEncoder, resources: ^^Resource, count: NS.UInteger, usage: ResourceUsage) ---
 
 	@(objc_type=AccelerationStructureCommandEncoder, objc_selector="useHeap:", objc_name="useHeap")
 	AccelerationStructureCommandEncoder_useHeap :: proc(self: ^AccelerationStructureCommandEncoder, heap: ^Heap) ---
 
-	@(objc_type=AccelerationStructureCommandEncoder, objc_selector="useHeaps:count:", objc_name="useHeaps")
-	AccelerationStructureCommandEncoder_useHeaps :: proc(self: ^AccelerationStructureCommandEncoder, heaps: ^^Heap, count: NS.UInteger) ---
+	@(objc_type=AccelerationStructureCommandEncoder, objc_selector="useHeaps:count:", objc_name="useHeaps_")
+	AccelerationStructureCommandEncoder_useHeaps_ :: proc(self: ^AccelerationStructureCommandEncoder, heaps: ^^Heap, count: NS.UInteger) ---
 
 	@(objc_type=AccelerationStructureCommandEncoder, objc_selector="sampleCountersInBuffer:atSampleIndex:withBarrier:", objc_name="sampleCountersInBuffer")
 	AccelerationStructureCommandEncoder_sampleCountersInBuffer :: proc(self: ^AccelerationStructureCommandEncoder, sampleBuffer: ^CounterSampleBuffer, sampleIndex: NS.UInteger, barrier: bool) ---
@@ -67,4 +67,19 @@ AccelerationStructureCommandEncoder_refitAccelerationStructure :: proc {
 AccelerationStructureCommandEncoder_writeCompactedAccelerationStructureSize :: proc {
 	AccelerationStructureCommandEncoder_writeCompactedAccelerationStructureSize_toBuffer_offset,
 	AccelerationStructureCommandEncoder_writeCompactedAccelerationStructureSize_toBuffer_offset_sizeDataType,
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=AccelerationStructureCommandEncoder, objc_name="useHeaps")
+AccelerationStructureCommandEncoder_useHeaps :: proc {
+	AccelerationStructureCommandEncoder_useHeaps_,
+	AccelerationStructureCommandEncoder_useHeaps_slice,
+}
+
+@(objc_type=AccelerationStructureCommandEncoder, objc_name="useResources")
+AccelerationStructureCommandEncoder_useResources :: proc {
+	AccelerationStructureCommandEncoder_useResources_,
+	AccelerationStructureCommandEncoder_useResources_slice,
 }

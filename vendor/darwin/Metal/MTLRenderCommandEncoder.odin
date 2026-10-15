@@ -43,8 +43,8 @@ foreign lib {
 	@(objc_type=RenderCommandEncoder, objc_selector="setVertexTexture:atIndex:", objc_name="setVertexTexture")
 	RenderCommandEncoder_setVertexTexture :: proc(self: ^RenderCommandEncoder, texture: ^Texture, index: NS.UInteger) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setVertexTextures:withRange:", objc_name="setVertexTextures")
-	RenderCommandEncoder_setVertexTextures :: proc(self: ^RenderCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setVertexTextures:withRange:", objc_name="setVertexTextures_")
+	RenderCommandEncoder_setVertexTextures_ :: proc(self: ^RenderCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setVertexSamplerState:atIndex:", objc_name="setVertexSamplerState_atIndex")
 	RenderCommandEncoder_setVertexSamplerState_atIndex :: proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) ---
@@ -76,14 +76,14 @@ foreign lib {
 	@(objc_type=RenderCommandEncoder, objc_selector="setViewport:", objc_name="setViewport")
 	RenderCommandEncoder_setViewport :: proc(self: ^RenderCommandEncoder, viewport: Viewport) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setViewports:count:", objc_name="setViewports")
-	RenderCommandEncoder_setViewports :: proc(self: ^RenderCommandEncoder, viewports: ^Viewport, count: NS.UInteger) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setViewports:count:", objc_name="setViewports_")
+	RenderCommandEncoder_setViewports_ :: proc(self: ^RenderCommandEncoder, viewports: ^Viewport, count: NS.UInteger) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setFrontFacingWinding:", objc_name="setFrontFacingWinding")
 	RenderCommandEncoder_setFrontFacingWinding :: proc(self: ^RenderCommandEncoder, frontFacingWinding: Winding) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setVertexAmplificationCount:viewMappings:", objc_name="setVertexAmplificationCount")
-	RenderCommandEncoder_setVertexAmplificationCount :: proc(self: ^RenderCommandEncoder, count: NS.UInteger, viewMappings: ^VertexAmplificationViewMapping) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setVertexAmplificationCount:viewMappings:", objc_name="setVertexAmplificationCount_")
+	RenderCommandEncoder_setVertexAmplificationCount_ :: proc(self: ^RenderCommandEncoder, count: NS.UInteger, viewMappings: ^VertexAmplificationViewMapping) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setCullMode:", objc_name="setCullMode")
 	RenderCommandEncoder_setCullMode :: proc(self: ^RenderCommandEncoder, cullMode: CullMode) ---
@@ -100,14 +100,14 @@ foreign lib {
 	@(objc_type=RenderCommandEncoder, objc_selector="setScissorRect:", objc_name="setScissorRect")
 	RenderCommandEncoder_setScissorRect :: proc(self: ^RenderCommandEncoder, rect: ScissorRect) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setScissorRects:count:", objc_name="setScissorRects")
-	RenderCommandEncoder_setScissorRects :: proc(self: ^RenderCommandEncoder, scissorRects: ^ScissorRect, count: NS.UInteger) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setScissorRects:count:", objc_name="setScissorRects_")
+	RenderCommandEncoder_setScissorRects_ :: proc(self: ^RenderCommandEncoder, scissorRects: ^ScissorRect, count: NS.UInteger) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setTriangleFillMode:", objc_name="setTriangleFillMode")
 	RenderCommandEncoder_setTriangleFillMode :: proc(self: ^RenderCommandEncoder, fillMode: TriangleFillMode) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentBytes:length:atIndex:", objc_name="setFragmentBytes")
-	RenderCommandEncoder_setFragmentBytes :: proc(self: ^RenderCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentBytes:length:atIndex:", objc_name="setFragmentBytes_")
+	RenderCommandEncoder_setFragmentBytes_ :: proc(self: ^RenderCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentBuffer:offset:atIndex:", objc_name="setFragmentBuffer")
 	RenderCommandEncoder_setFragmentBuffer :: proc(self: ^RenderCommandEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) ---
@@ -115,14 +115,14 @@ foreign lib {
 	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentBufferOffset:atIndex:", objc_name="setFragmentBufferOffset")
 	RenderCommandEncoder_setFragmentBufferOffset :: proc(self: ^RenderCommandEncoder, offset: NS.UInteger, index: NS.UInteger) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentBuffers:offsets:withRange:", objc_name="setFragmentBuffers")
-	RenderCommandEncoder_setFragmentBuffers :: proc(self: ^RenderCommandEncoder, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentBuffers:offsets:withRange:", objc_name="setFragmentBuffers_")
+	RenderCommandEncoder_setFragmentBuffers_ :: proc(self: ^RenderCommandEncoder, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentTexture:atIndex:", objc_name="setFragmentTexture")
 	RenderCommandEncoder_setFragmentTexture :: proc(self: ^RenderCommandEncoder, texture: ^Texture, index: NS.UInteger) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentTextures:withRange:", objc_name="setFragmentTextures")
-	RenderCommandEncoder_setFragmentTextures :: proc(self: ^RenderCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentTextures:withRange:", objc_name="setFragmentTextures_")
+	RenderCommandEncoder_setFragmentTextures_ :: proc(self: ^RenderCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setFragmentSamplerState:atIndex:", objc_name="setFragmentSamplerState_atIndex")
 	RenderCommandEncoder_setFragmentSamplerState_atIndex :: proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) ---
@@ -307,8 +307,8 @@ foreign lib {
 	@(objc_type=RenderCommandEncoder, objc_selector="drawIndexedPatches:patchIndexBuffer:patchIndexBufferOffset:controlPointIndexBuffer:controlPointIndexBufferOffset:indirectBuffer:indirectBufferOffset:", objc_name="drawIndexedPatches_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_indirectBuffer_indirectBufferOffset")
 	RenderCommandEncoder_drawIndexedPatches_patchIndexBuffer_patchIndexBufferOffset_controlPointIndexBuffer_controlPointIndexBufferOffset_indirectBuffer_indirectBufferOffset :: proc(self: ^RenderCommandEncoder, numberOfPatchControlPoints: NS.UInteger, patchIndexBuffer: ^Buffer, patchIndexBufferOffset: NS.UInteger, controlPointIndexBuffer: ^Buffer, controlPointIndexBufferOffset: NS.UInteger, indirectBuffer: ^Buffer, indirectBufferOffset: NS.UInteger) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setTileBytes:length:atIndex:", objc_name="setTileBytes")
-	RenderCommandEncoder_setTileBytes :: proc(self: ^RenderCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setTileBytes:length:atIndex:", objc_name="setTileBytes_")
+	RenderCommandEncoder_setTileBytes_ :: proc(self: ^RenderCommandEncoder, bytes: rawptr, length: NS.UInteger, index: NS.UInteger) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setTileBuffer:offset:atIndex:", objc_name="setTileBuffer")
 	RenderCommandEncoder_setTileBuffer :: proc(self: ^RenderCommandEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) ---
@@ -316,14 +316,14 @@ foreign lib {
 	@(objc_type=RenderCommandEncoder, objc_selector="setTileBufferOffset:atIndex:", objc_name="setTileBufferOffset")
 	RenderCommandEncoder_setTileBufferOffset :: proc(self: ^RenderCommandEncoder, offset: NS.UInteger, index: NS.UInteger) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setTileBuffers:offsets:withRange:", objc_name="setTileBuffers")
-	RenderCommandEncoder_setTileBuffers :: proc(self: ^RenderCommandEncoder, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setTileBuffers:offsets:withRange:", objc_name="setTileBuffers_")
+	RenderCommandEncoder_setTileBuffers_ :: proc(self: ^RenderCommandEncoder, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setTileTexture:atIndex:", objc_name="setTileTexture")
 	RenderCommandEncoder_setTileTexture :: proc(self: ^RenderCommandEncoder, texture: ^Texture, index: NS.UInteger) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="setTileTextures:withRange:", objc_name="setTileTextures")
-	RenderCommandEncoder_setTileTextures :: proc(self: ^RenderCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="setTileTextures:withRange:", objc_name="setTileTextures_")
+	RenderCommandEncoder_setTileTextures_ :: proc(self: ^RenderCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="setTileSamplerState:atIndex:", objc_name="setTileSamplerState_atIndex")
 	RenderCommandEncoder_setTileSamplerState_atIndex :: proc(self: ^RenderCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) ---
@@ -391,8 +391,8 @@ foreign lib {
 	@(objc_type=RenderCommandEncoder, objc_selector="memoryBarrierWithScope:afterStages:beforeStages:", objc_name="memoryBarrierWithScope")
 	RenderCommandEncoder_memoryBarrierWithScope :: proc(self: ^RenderCommandEncoder, scope: BarrierScope, after: RenderStages, before: RenderStages) ---
 
-	@(objc_type=RenderCommandEncoder, objc_selector="memoryBarrierWithResources:count:afterStages:beforeStages:", objc_name="memoryBarrierWithResources")
-	RenderCommandEncoder_memoryBarrierWithResources :: proc(self: ^RenderCommandEncoder, resources: ^^Resource, count: NS.UInteger, after: RenderStages, before: RenderStages) ---
+	@(objc_type=RenderCommandEncoder, objc_selector="memoryBarrierWithResources:count:afterStages:beforeStages:", objc_name="memoryBarrierWithResources_")
+	RenderCommandEncoder_memoryBarrierWithResources_ :: proc(self: ^RenderCommandEncoder, resources: ^^Resource, count: NS.UInteger, after: RenderStages, before: RenderStages) ---
 
 	@(objc_type=RenderCommandEncoder, objc_selector="sampleCountersInBuffer:atSampleIndex:withBarrier:", objc_name="sampleCountersInBuffer")
 	RenderCommandEncoder_sampleCountersInBuffer :: proc(self: ^RenderCommandEncoder, sampleBuffer: ^CounterSampleBuffer, sampleIndex: NS.UInteger, barrier: bool) ---
@@ -419,6 +419,7 @@ RenderCommandEncoder_setVertexBuffer :: proc {
 RenderCommandEncoder_setVertexBuffers :: proc {
 	RenderCommandEncoder_setVertexBuffers_offsets_withRange,
 	RenderCommandEncoder_setVertexBuffers_offsets_attributeStrides_withRange,
+	RenderCommandEncoder_setVertexBuffers_slice,
 }
 
 @(objc_type=RenderCommandEncoder, objc_name="setVertexBufferOffset")
@@ -431,6 +432,7 @@ RenderCommandEncoder_setVertexBufferOffset :: proc {
 RenderCommandEncoder_setVertexBytes :: proc {
 	RenderCommandEncoder_setVertexBytes_length_atIndex,
 	RenderCommandEncoder_setVertexBytes_length_attributeStride_atIndex,
+	RenderCommandEncoder_setVertexBytes_slice,
 }
 
 @(objc_type=RenderCommandEncoder, objc_name="setVertexSamplerState")
@@ -531,6 +533,7 @@ RenderCommandEncoder_useResource :: proc {
 RenderCommandEncoder_useResources :: proc {
 	RenderCommandEncoder_useResources_count_usage,
 	RenderCommandEncoder_useResources_count_usage_stages,
+	RenderCommandEncoder_useResources_slice,
 }
 
 @(objc_type=RenderCommandEncoder, objc_name="useHeap")
@@ -543,10 +546,80 @@ RenderCommandEncoder_useHeap :: proc {
 RenderCommandEncoder_useHeaps :: proc {
 	RenderCommandEncoder_useHeaps_count,
 	RenderCommandEncoder_useHeaps_count_stages,
+	RenderCommandEncoder_useHeaps_slice,
 }
 
 @(objc_type=RenderCommandEncoder, objc_name="executeCommandsInBuffer")
 RenderCommandEncoder_executeCommandsInBuffer :: proc {
 	RenderCommandEncoder_executeCommandsInBuffer_withRange,
 	RenderCommandEncoder_executeCommandsInBuffer_indirectBuffer_indirectBufferOffset,
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=RenderCommandEncoder, objc_name="memoryBarrierWithResources")
+RenderCommandEncoder_memoryBarrierWithResources :: proc {
+	RenderCommandEncoder_memoryBarrierWithResources_,
+	RenderCommandEncoder_memoryBarrierWithResources_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setFragmentBuffers")
+RenderCommandEncoder_setFragmentBuffers :: proc {
+	RenderCommandEncoder_setFragmentBuffers_,
+	RenderCommandEncoder_setFragmentBuffers_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setFragmentBytes")
+RenderCommandEncoder_setFragmentBytes :: proc {
+	RenderCommandEncoder_setFragmentBytes_,
+	RenderCommandEncoder_setFragmentBytes_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setFragmentTextures")
+RenderCommandEncoder_setFragmentTextures :: proc {
+	RenderCommandEncoder_setFragmentTextures_,
+	RenderCommandEncoder_setFragmentTextures_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setScissorRects")
+RenderCommandEncoder_setScissorRects :: proc {
+	RenderCommandEncoder_setScissorRects_,
+	RenderCommandEncoder_setScissorRects_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setTileBuffers")
+RenderCommandEncoder_setTileBuffers :: proc {
+	RenderCommandEncoder_setTileBuffers_,
+	RenderCommandEncoder_setTileBuffers_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setTileBytes")
+RenderCommandEncoder_setTileBytes :: proc {
+	RenderCommandEncoder_setTileBytes_,
+	RenderCommandEncoder_setTileBytes_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setTileTextures")
+RenderCommandEncoder_setTileTextures :: proc {
+	RenderCommandEncoder_setTileTextures_,
+	RenderCommandEncoder_setTileTextures_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setVertexAmplificationCount")
+RenderCommandEncoder_setVertexAmplificationCount :: proc {
+	RenderCommandEncoder_setVertexAmplificationCount_,
+	RenderCommandEncoder_setVertexAmplificationCount_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setVertexTextures")
+RenderCommandEncoder_setVertexTextures :: proc {
+	RenderCommandEncoder_setVertexTextures_,
+	RenderCommandEncoder_setVertexTextures_slice,
+}
+
+@(objc_type=RenderCommandEncoder, objc_name="setViewports")
+RenderCommandEncoder_setViewports :: proc {
+	RenderCommandEncoder_setViewports_,
+	RenderCommandEncoder_setViewports_slice,
 }

@@ -3095,15 +3095,15 @@ EventButtonMaskFlag :: enum cffi.ulong {
 }
 EventButtonMask :: bit_set[EventButtonMaskFlag; cffi.ulong]
 
-EventPhase :: enum cffi.ulong {
-	None       = 0,
-	Began      = 1,
-	Stationary = 2,
-	Changed    = 4,
-	Ended      = 8,
-	Cancelled  = 16,
-	MayBegin   = 32,
+EventPhaseFlag :: enum cffi.ulong {
+	Began      = 0,
+	Stationary = 1,
+	Changed    = 2,
+	Ended      = 3,
+	Cancelled  = 4,
+	MayBegin   = 5,
 }
+EventPhase :: bit_set[EventPhaseFlag; cffi.ulong]
 
 EventGestureAxis :: enum cffi.long {
 	None       = 0,
@@ -3404,12 +3404,12 @@ ControlSize :: enum cffi.ulong {
 	ExtraLarge = 4,
 }
 
-CellHitResult :: enum cffi.ulong {
-	None             = 0,
-	ContentArea      = 1,
-	EditableTextArea = 2,
-	TrackableArea    = 4,
+CellHitResultFlag :: enum cffi.ulong {
+	ContentArea      = 0,
+	EditableTextArea = 1,
+	TrackableArea    = 2,
 }
+CellHitResult :: bit_set[CellHitResultFlag; cffi.ulong]
 
 BackgroundStyle :: enum cffi.long {
 	Normal     = 0,
@@ -3429,14 +3429,15 @@ MenuSelectionMode :: enum cffi.long {
 	SelectAny = 2,
 }
 
-MenuProperties :: enum cffi.ulong {
-	PropertyItemTitle                = 1,
-	PropertyItemAttributedTitle      = 2,
-	PropertyItemKeyEquivalent        = 4,
-	PropertyItemImage                = 8,
-	PropertyItemEnabled              = 16,
-	PropertyItemAccessibilityDescription = 32,
+MenuProperty :: enum cffi.ulong {
+	PropertyItemTitle                    = 0,
+	PropertyItemAttributedTitle          = 1,
+	PropertyItemKeyEquivalent            = 2,
+	PropertyItemImage                    = 3,
+	PropertyItemEnabled                  = 4,
+	PropertyItemAccessibilityDescription = 5,
 }
+MenuProperties :: bit_set[MenuProperty; cffi.ulong]
 
 PrinterTableStatus :: enum cffi.ulong {
 	OK       = 0,
@@ -3536,12 +3537,12 @@ ApplicationPrintReply :: enum cffi.ulong {
 	Failure   = 3,
 }
 
-RemoteNotificationType :: enum cffi.ulong {
-	None  = 0,
-	Badge = 1,
-	Sound = 2,
-	Alert = 4,
+RemoteNotificationTypeFlag :: enum cffi.ulong {
+	Badge = 0,
+	Sound = 1,
+	Alert = 2,
 }
+RemoteNotificationType :: bit_set[RemoteNotificationTypeFlag; cffi.ulong]
 
 ColorType :: enum cffi.long {
 	ComponentBased = 0,
@@ -3672,19 +3673,19 @@ CollectionViewItemHighlightState :: enum cffi.long {
 	AsDropTarget   = 3,
 }
 
-CollectionViewScrollPosition :: enum cffi.ulong {
-	None                  = 0,
-	Top                   = 1,
-	CenteredVertically    = 2,
-	Bottom                = 4,
-	NearestHorizontalEdge = 512,
-	Left                  = 8,
-	CenteredHorizontally  = 16,
-	Right                 = 32,
-	LeadingEdge           = 64,
-	TrailingEdge          = 128,
-	NearestVerticalEdge   = 256,
+CollectionViewScrollPositionFlag :: enum cffi.ulong {
+	Top                   = 0,
+	CenteredVertically    = 1,
+	Bottom                = 2,
+	NearestHorizontalEdge = 9,
+	Left                  = 3,
+	CenteredHorizontally  = 4,
+	Right                 = 5,
+	LeadingEdge           = 6,
+	TrailingEdge          = 7,
+	NearestVerticalEdge   = 8,
 }
+CollectionViewScrollPosition :: bit_set[CollectionViewScrollPositionFlag; cffi.ulong]
 
 CollectionElementCategory :: enum cffi.long {
 	Item              = 0,
@@ -3789,11 +3790,12 @@ FontAssetRequestOption :: enum cffi.ulong {
 }
 FontAssetRequestOptions :: bit_set[FontAssetRequestOption; cffi.ulong]
 
-FontCollectionVisibility :: enum cffi.ulong {
-	Process  = 1,
-	User     = 2,
-	Computer = 4,
+FontCollectionVisibilityFlag :: enum cffi.ulong {
+	Process  = 0,
+	User     = 1,
+	Computer = 2,
 }
+FontCollectionVisibility :: bit_set[FontCollectionVisibilityFlag; cffi.ulong]
 
 FontTraitMaskFlag :: enum cffi.ulong {
 	ItalicFontMask                  = 0,
@@ -3848,24 +3850,24 @@ WindowSharingType :: enum cffi.ulong {
 	ReadOnly = 1,
 }
 
-WindowCollectionBehavior :: enum cffi.ulong {
-	Default                   = 0,
-	CanJoinAllSpaces          = 1,
-	MoveToActiveSpace         = 2,
-	Managed                   = 4,
-	Transient                 = 8,
-	Stationary                = 16,
-	ParticipatesInCycle       = 32,
-	IgnoresCycle              = 64,
-	FullScreenPrimary         = 128,
-	FullScreenAuxiliary       = 256,
-	FullScreenNone            = 512,
-	FullScreenAllowsTiling    = 2048,
-	FullScreenDisallowsTiling = 4096,
-	Primary                   = 65536,
-	Auxiliary                 = 131072,
-	CanJoinAllApplications    = 262144,
+WindowCollectionBehaviorFlag :: enum cffi.ulong {
+	CanJoinAllSpaces          = 0,
+	MoveToActiveSpace         = 1,
+	Managed                   = 2,
+	Transient                 = 3,
+	Stationary                = 4,
+	ParticipatesInCycle       = 5,
+	IgnoresCycle              = 6,
+	FullScreenPrimary         = 7,
+	FullScreenAuxiliary       = 8,
+	FullScreenNone            = 9,
+	FullScreenAllowsTiling    = 11,
+	FullScreenDisallowsTiling = 12,
+	Primary                   = 16,
+	Auxiliary                 = 17,
+	CanJoinAllApplications    = 18,
 }
+WindowCollectionBehavior :: bit_set[WindowCollectionBehaviorFlag; cffi.ulong]
 
 WindowAnimationBehavior :: enum cffi.long {
 	Default        = 0,
@@ -4015,15 +4017,16 @@ ImageRepLoadStatus :: enum cffi.long {
 	Completed       = -6,
 }
 
-BitmapFormat :: enum cffi.ulong {
-	AlphaFirst               = 1,
-	AlphaNonpremultiplied    = 2,
-	FloatingPointSamples     = 4,
-	SixteenBitLittleEndian   = 256,
-	ThirtyTwoBitLittleEndian = 512,
-	SixteenBitBigEndian      = 1024,
-	ThirtyTwoBitBigEndian    = 2048,
+BitmapFormatFlag :: enum cffi.ulong {
+	AlphaFirst               = 0,
+	AlphaNonpremultiplied    = 1,
+	FloatingPointSamples     = 2,
+	SixteenBitLittleEndian   = 8,
+	ThirtyTwoBitLittleEndian = 9,
+	SixteenBitBigEndian      = 10,
+	ThirtyTwoBitBigEndian    = 11,
 }
+BitmapFormat :: bit_set[BitmapFormatFlag; cffi.ulong]
 
 BrowserColumnResizingType :: enum cffi.ulong {
 	NoColumnResizing   = 0,
@@ -4325,11 +4328,12 @@ PDFPanelOption :: enum cffi.long {
 }
 PDFPanelOptions :: bit_set[PDFPanelOption; cffi.long]
 
-MediaLibrary :: enum cffi.ulong {
-	Audio = 1,
-	Image = 2,
-	Movie = 4,
+MediaLibraryFlag :: enum cffi.ulong {
+	Audio = 0,
+	Image = 1,
+	Movie = 2,
 }
+MediaLibrary :: bit_set[MediaLibraryFlag; cffi.ulong]
 
 UsableScrollerParts :: enum cffi.ulong {
 	NoScrollerParts    = 0,
@@ -4571,21 +4575,23 @@ TextLayoutOrientation :: enum cffi.long {
 	Vertical   = 1,
 }
 
-GlyphProperty :: enum cffi.long {
-	Null             = 1,
-	ControlCharacter = 2,
-	Elastic          = 4,
-	NonBaseCharacter = 8,
+GlyphPropertyFlag :: enum cffi.long {
+	Null             = 0,
+	ControlCharacter = 1,
+	Elastic          = 2,
+	NonBaseCharacter = 3,
 }
+GlyphProperty :: bit_set[GlyphPropertyFlag; cffi.long]
 
-ControlCharacterAction :: enum cffi.long {
-	ZeroAdvancement = 1,
-	Whitespace      = 2,
-	HorizontalTab   = 4,
-	LineBreak       = 8,
-	ParagraphBreak  = 16,
-	ContainerBreak  = 32,
+ControlCharacterActionFlag :: enum cffi.long {
+	ZeroAdvancement = 0,
+	Whitespace      = 1,
+	HorizontalTab   = 2,
+	LineBreak       = 3,
+	ParagraphBreak  = 4,
+	ContainerBreak  = 5,
 }
+ControlCharacterAction :: bit_set[ControlCharacterActionFlag; cffi.long]
 
 TypesetterBehavior :: enum cffi.long {
 	LatestBehavior          = -1,
@@ -4715,12 +4721,12 @@ TableViewColumnAutoresizingStyle :: enum cffi.ulong {
 	FirstColumnOnlyAutoresizingStyle = 5,
 }
 
-TableViewGridLineStyle :: enum cffi.ulong {
-	None                         = 0,
-	SolidVerticalGridLineMask    = 1,
-	SolidHorizontalGridLineMask  = 2,
-	DashedHorizontalGridLineMask = 8,
+TableViewGridLineStyleFlag :: enum cffi.ulong {
+	SolidVerticalGridLineMask    = 0,
+	SolidHorizontalGridLineMask  = 1,
+	DashedHorizontalGridLineMask = 3,
 }
+TableViewGridLineStyle :: bit_set[TableViewGridLineStyleFlag; cffi.ulong]
 
 TableViewRowSizeStyle :: enum cffi.long {
 	Default = -1,
@@ -4928,14 +4934,15 @@ CharacterCollection :: enum cffi.ulong {
 	AdobeKorea1CharacterCollection   = 5,
 }
 
-TypesetterControlCharacterAction :: enum cffi.ulong {
-	ZeroAdvancementAction = 1,
-	WhitespaceAction      = 2,
-	HorizontalTabAction   = 4,
-	LineBreakAction       = 8,
-	ParagraphBreakAction  = 16,
-	ContainerBreakAction  = 32,
+TypesetterControlCharacterActionFlag :: enum cffi.ulong {
+	ZeroAdvancementAction = 0,
+	WhitespaceAction      = 1,
+	HorizontalTabAction   = 2,
+	LineBreakAction       = 3,
+	ParagraphBreakAction  = 4,
+	ContainerBreakAction  = 5,
 }
+TypesetterControlCharacterAction :: bit_set[TypesetterControlCharacterActionFlag; cffi.ulong]
 
 TextListOption :: enum cffi.ulong {
 	PrependEnclosingMarker = 0,
@@ -5136,11 +5143,12 @@ TextSelectionNavigationDestination :: enum cffi.long {
 	Document  = 6,
 }
 
-TextSelectionNavigationModifier :: enum cffi.ulong {
-	Extend   = 1,
-	Visual   = 2,
-	Multiple = 4,
+TextSelectionNavigationModifierFlag :: enum cffi.ulong {
+	Extend   = 0,
+	Visual   = 1,
+	Multiple = 2,
 }
+TextSelectionNavigationModifier :: bit_set[TextSelectionNavigationModifierFlag; cffi.ulong]
 
 TextSelectionNavigationWritingDirection :: enum cffi.long {
 	LeftToRight = 0,

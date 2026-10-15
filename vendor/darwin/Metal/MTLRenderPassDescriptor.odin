@@ -14,11 +14,11 @@ foreign lib {
 	@(objc_type=RenderPassDescriptor, objc_selector="renderPassDescriptor", objc_name="renderPassDescriptor", objc_is_class_method=true)
 	RenderPassDescriptor_renderPassDescriptor :: proc() -> ^RenderPassDescriptor ---
 
-	@(objc_type=RenderPassDescriptor, objc_selector="setSamplePositions:count:", objc_name="setSamplePositions")
-	RenderPassDescriptor_setSamplePositions :: proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: NS.UInteger) ---
+	@(objc_type=RenderPassDescriptor, objc_selector="setSamplePositions:count:", objc_name="setSamplePositions_")
+	RenderPassDescriptor_setSamplePositions_ :: proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: NS.UInteger) ---
 
-	@(objc_type=RenderPassDescriptor, objc_selector="getSamplePositions:count:", objc_name="getSamplePositions")
-	RenderPassDescriptor_getSamplePositions :: proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: NS.UInteger) -> NS.UInteger ---
+	@(objc_type=RenderPassDescriptor, objc_selector="getSamplePositions:count:", objc_name="getSamplePositions_")
+	RenderPassDescriptor_getSamplePositions_ :: proc(self: ^RenderPassDescriptor, positions: ^SamplePosition, count: NS.UInteger) -> NS.UInteger ---
 
 	@(objc_type=RenderPassDescriptor, objc_selector="colorAttachments", objc_name="colorAttachments")
 	RenderPassDescriptor_colorAttachments :: proc(self: ^RenderPassDescriptor) -> ^RenderPassColorAttachmentDescriptorArray ---
@@ -109,4 +109,19 @@ foreign lib {
 
 	@(objc_type=RenderPassDescriptor, objc_selector="setSupportColorAttachmentMapping:", objc_name="setSupportColorAttachmentMapping")
 	RenderPassDescriptor_setSupportColorAttachmentMapping :: proc(self: ^RenderPassDescriptor, supportColorAttachmentMapping: bool) ---
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=RenderPassDescriptor, objc_name="getSamplePositions")
+RenderPassDescriptor_getSamplePositions :: proc {
+	RenderPassDescriptor_getSamplePositions_,
+	RenderPassDescriptor_getSamplePositions_slice,
+}
+
+@(objc_type=RenderPassDescriptor, objc_name="setSamplePositions")
+RenderPassDescriptor_setSamplePositions :: proc {
+	RenderPassDescriptor_setSamplePositions_,
+	RenderPassDescriptor_setSamplePositions_slice,
 }

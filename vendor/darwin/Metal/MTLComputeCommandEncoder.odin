@@ -43,14 +43,14 @@ foreign lib {
 	@(objc_type=ComputeCommandEncoder, objc_selector="setVisibleFunctionTable:atBufferIndex:", objc_name="setVisibleFunctionTable")
 	ComputeCommandEncoder_setVisibleFunctionTable :: proc(self: ^ComputeCommandEncoder, visibleFunctionTable: ^VisibleFunctionTable, bufferIndex: NS.UInteger) ---
 
-	@(objc_type=ComputeCommandEncoder, objc_selector="setVisibleFunctionTables:withBufferRange:", objc_name="setVisibleFunctionTables")
-	ComputeCommandEncoder_setVisibleFunctionTables :: proc(self: ^ComputeCommandEncoder, visibleFunctionTables: ^^VisibleFunctionTable, range: NS._NSRange) ---
+	@(objc_type=ComputeCommandEncoder, objc_selector="setVisibleFunctionTables:withBufferRange:", objc_name="setVisibleFunctionTables_")
+	ComputeCommandEncoder_setVisibleFunctionTables_ :: proc(self: ^ComputeCommandEncoder, visibleFunctionTables: ^^VisibleFunctionTable, range: NS._NSRange) ---
 
 	@(objc_type=ComputeCommandEncoder, objc_selector="setIntersectionFunctionTable:atBufferIndex:", objc_name="setIntersectionFunctionTable")
 	ComputeCommandEncoder_setIntersectionFunctionTable :: proc(self: ^ComputeCommandEncoder, intersectionFunctionTable: ^IntersectionFunctionTable, bufferIndex: NS.UInteger) ---
 
-	@(objc_type=ComputeCommandEncoder, objc_selector="setIntersectionFunctionTables:withBufferRange:", objc_name="setIntersectionFunctionTables")
-	ComputeCommandEncoder_setIntersectionFunctionTables :: proc(self: ^ComputeCommandEncoder, intersectionFunctionTables: ^^IntersectionFunctionTable, range: NS._NSRange) ---
+	@(objc_type=ComputeCommandEncoder, objc_selector="setIntersectionFunctionTables:withBufferRange:", objc_name="setIntersectionFunctionTables_")
+	ComputeCommandEncoder_setIntersectionFunctionTables_ :: proc(self: ^ComputeCommandEncoder, intersectionFunctionTables: ^^IntersectionFunctionTable, range: NS._NSRange) ---
 
 	@(objc_type=ComputeCommandEncoder, objc_selector="setAccelerationStructure:atBufferIndex:", objc_name="setAccelerationStructure")
 	ComputeCommandEncoder_setAccelerationStructure :: proc(self: ^ComputeCommandEncoder, accelerationStructure: ^AccelerationStructure, bufferIndex: NS.UInteger) ---
@@ -58,8 +58,8 @@ foreign lib {
 	@(objc_type=ComputeCommandEncoder, objc_selector="setTexture:atIndex:", objc_name="setTexture")
 	ComputeCommandEncoder_setTexture :: proc(self: ^ComputeCommandEncoder, texture: ^Texture, index: NS.UInteger) ---
 
-	@(objc_type=ComputeCommandEncoder, objc_selector="setTextures:withRange:", objc_name="setTextures")
-	ComputeCommandEncoder_setTextures :: proc(self: ^ComputeCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
+	@(objc_type=ComputeCommandEncoder, objc_selector="setTextures:withRange:", objc_name="setTextures_")
+	ComputeCommandEncoder_setTextures_ :: proc(self: ^ComputeCommandEncoder, textures: ^^Texture, range: NS._NSRange) ---
 
 	@(objc_type=ComputeCommandEncoder, objc_selector="setSamplerState:atIndex:", objc_name="setSamplerState_atIndex")
 	ComputeCommandEncoder_setSamplerState_atIndex :: proc(self: ^ComputeCommandEncoder, sampler: ^SamplerState, index: NS.UInteger) ---
@@ -103,14 +103,14 @@ foreign lib {
 	@(objc_type=ComputeCommandEncoder, objc_selector="useResource:usage:", objc_name="useResource")
 	ComputeCommandEncoder_useResource :: proc(self: ^ComputeCommandEncoder, resource: ^Resource, usage: ResourceUsage) ---
 
-	@(objc_type=ComputeCommandEncoder, objc_selector="useResources:count:usage:", objc_name="useResources")
-	ComputeCommandEncoder_useResources :: proc(self: ^ComputeCommandEncoder, resources: ^^Resource, count: NS.UInteger, usage: ResourceUsage) ---
+	@(objc_type=ComputeCommandEncoder, objc_selector="useResources:count:usage:", objc_name="useResources_")
+	ComputeCommandEncoder_useResources_ :: proc(self: ^ComputeCommandEncoder, resources: ^^Resource, count: NS.UInteger, usage: ResourceUsage) ---
 
 	@(objc_type=ComputeCommandEncoder, objc_selector="useHeap:", objc_name="useHeap")
 	ComputeCommandEncoder_useHeap :: proc(self: ^ComputeCommandEncoder, heap: ^Heap) ---
 
-	@(objc_type=ComputeCommandEncoder, objc_selector="useHeaps:count:", objc_name="useHeaps")
-	ComputeCommandEncoder_useHeaps :: proc(self: ^ComputeCommandEncoder, heaps: ^^Heap, count: NS.UInteger) ---
+	@(objc_type=ComputeCommandEncoder, objc_selector="useHeaps:count:", objc_name="useHeaps_")
+	ComputeCommandEncoder_useHeaps_ :: proc(self: ^ComputeCommandEncoder, heaps: ^^Heap, count: NS.UInteger) ---
 
 	@(objc_type=ComputeCommandEncoder, objc_selector="executeCommandsInBuffer:withRange:", objc_name="executeCommandsInBuffer_withRange")
 	ComputeCommandEncoder_executeCommandsInBuffer_withRange :: proc(self: ^ComputeCommandEncoder, indirectCommandBuffer: ^IndirectCommandBuffer, executionRange: NS._NSRange) ---
@@ -121,8 +121,8 @@ foreign lib {
 	@(objc_type=ComputeCommandEncoder, objc_selector="memoryBarrierWithScope:", objc_name="memoryBarrierWithScope")
 	ComputeCommandEncoder_memoryBarrierWithScope :: proc(self: ^ComputeCommandEncoder, scope: BarrierScope) ---
 
-	@(objc_type=ComputeCommandEncoder, objc_selector="memoryBarrierWithResources:count:", objc_name="memoryBarrierWithResources")
-	ComputeCommandEncoder_memoryBarrierWithResources :: proc(self: ^ComputeCommandEncoder, resources: ^^Resource, count: NS.UInteger) ---
+	@(objc_type=ComputeCommandEncoder, objc_selector="memoryBarrierWithResources:count:", objc_name="memoryBarrierWithResources_")
+	ComputeCommandEncoder_memoryBarrierWithResources_ :: proc(self: ^ComputeCommandEncoder, resources: ^^Resource, count: NS.UInteger) ---
 
 	@(objc_type=ComputeCommandEncoder, objc_selector="sampleCountersInBuffer:atSampleIndex:withBarrier:", objc_name="sampleCountersInBuffer")
 	ComputeCommandEncoder_sampleCountersInBuffer :: proc(self: ^ComputeCommandEncoder, sampleBuffer: ^CounterSampleBuffer, sampleIndex: NS.UInteger, barrier: bool) ---
@@ -143,6 +143,7 @@ ComputeCommandEncoder_setBuffer :: proc {
 ComputeCommandEncoder_setBuffers :: proc {
 	ComputeCommandEncoder_setBuffers_offsets_withRange,
 	ComputeCommandEncoder_setBuffers_offsets_attributeStrides_withRange,
+	ComputeCommandEncoder_setBuffers_slice,
 }
 
 @(objc_type=ComputeCommandEncoder, objc_name="setBufferOffset")
@@ -155,6 +156,7 @@ ComputeCommandEncoder_setBufferOffset :: proc {
 ComputeCommandEncoder_setBytes :: proc {
 	ComputeCommandEncoder_setBytes_length_atIndex,
 	ComputeCommandEncoder_setBytes_length_attributeStride_atIndex,
+	ComputeCommandEncoder_setBytes_slice,
 }
 
 @(objc_type=ComputeCommandEncoder, objc_name="setSamplerState")
@@ -173,4 +175,43 @@ ComputeCommandEncoder_setSamplerStates :: proc {
 ComputeCommandEncoder_executeCommandsInBuffer :: proc {
 	ComputeCommandEncoder_executeCommandsInBuffer_withRange,
 	ComputeCommandEncoder_executeCommandsInBuffer_indirectBuffer_indirectBufferOffset,
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=ComputeCommandEncoder, objc_name="memoryBarrierWithResources")
+ComputeCommandEncoder_memoryBarrierWithResources :: proc {
+	ComputeCommandEncoder_memoryBarrierWithResources_,
+	ComputeCommandEncoder_memoryBarrierWithResources_slice,
+}
+
+@(objc_type=ComputeCommandEncoder, objc_name="setIntersectionFunctionTables")
+ComputeCommandEncoder_setIntersectionFunctionTables :: proc {
+	ComputeCommandEncoder_setIntersectionFunctionTables_,
+	ComputeCommandEncoder_setIntersectionFunctionTables_slice,
+}
+
+@(objc_type=ComputeCommandEncoder, objc_name="setTextures")
+ComputeCommandEncoder_setTextures :: proc {
+	ComputeCommandEncoder_setTextures_,
+	ComputeCommandEncoder_setTextures_slice,
+}
+
+@(objc_type=ComputeCommandEncoder, objc_name="setVisibleFunctionTables")
+ComputeCommandEncoder_setVisibleFunctionTables :: proc {
+	ComputeCommandEncoder_setVisibleFunctionTables_,
+	ComputeCommandEncoder_setVisibleFunctionTables_slice,
+}
+
+@(objc_type=ComputeCommandEncoder, objc_name="useHeaps")
+ComputeCommandEncoder_useHeaps :: proc {
+	ComputeCommandEncoder_useHeaps_,
+	ComputeCommandEncoder_useHeaps_slice,
+}
+
+@(objc_type=ComputeCommandEncoder, objc_name="useResources")
+ComputeCommandEncoder_useResources :: proc {
+	ComputeCommandEncoder_useResources_,
+	ComputeCommandEncoder_useResources_slice,
 }

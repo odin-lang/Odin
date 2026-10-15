@@ -109,6 +109,38 @@ ALIAS_FIXES = {
 }
 
 
+# Enums which are flag sets (`NS_OPTIONS`) in the SDK but which csgen emitted as plain enums of masks.
+# Each becomes `<element> :: enum` of bit indices plus `<name> :: bit_set[<element>; T]`, keeping
+# `<name>` so every method using it takes the bit_set. Members equal to 0 are dropped (use `{}`).
+FLAG_ENUMS = {
+	"AppKit": [
+		"BitmapFormat", "CellHitResult", "CollectionViewScrollPosition", "ControlCharacterAction",
+		"EventPhase", "FontCollectionVisibility", "GlyphProperty", "MediaLibrary", "MenuProperties",
+		"RemoteNotificationType", "TableViewGridLineStyle", "TextSelectionNavigationModifier",
+		"TypesetterControlCharacterAction", "WindowCollectionBehavior",
+	],
+	"Foundation": [
+		"BinarySearchingOptions", "CalendarOptions", "ComparisonPredicateOptions", "DataBase64EncodingOptions",
+		"DataReadingOptions", "DirectoryEnumerationOptions", "FileCoordinatorReadingOptions",
+		"FileCoordinatorWritingOptions", "JSONReadingOptions", "JSONWritingOptions", "KeyValueObservingOptions",
+		"LinguisticTaggerOptions", "MatchingOptions", "MeasurementFormatterUnitOptions",
+		"OrderedCollectionDifferenceCalculationOptions", "RegularExpressionOptions", "StringCompareOptions",
+		"URLBookmarkCreationOptions", "URLBookmarkResolutionOptions",
+	],
+	"Metal": [
+		"AccelerationStructureUsage", "BarrierScope", "IndirectCommandType", "IntersectionFunctionSignature",
+		"ResourceUsage", "TensorUsage", "TextureUsage",
+	],
+}
+
+# Element enum names which do not follow `flag_element_name`
+FLAG_ELEMENT_NAMES = {}
+
+# A hand-written procedure named `<generated proc>` + one of these suffixes is added to the overload
+# group `<generated proc>`; a single generated method becomes a group, with the method renamed `<name>_`.
+OVERLOAD_SUFFIXES = ("_slice",)
+
+
 RE_IMPORT        = re.compile(r'^import\s+(\w+)\s+"([^"]+)"\s*$')
 RE_METHOD_ATTR   = re.compile(r'^(\s*)@\(objc_type=(\w+), objc_selector="([^"]+)", objc_name="(\w+)"(, objc_is_class_method=true)?\)\s*$')
 RE_PROC_DECL     = re.compile(r'^(\s*)(\w+) :: proc\(')
@@ -518,6 +550,64 @@ def fix_class_method_groups(pkg):
 			pkg.report["mixed instance/class groups"].append(g.name)
 
 
+def flag_element_name(name):
+	if name in FLAG_ELEMENT_NAMES:
+		return FLAG_ELEMENT_NAMES[name]
+	if name.endswith("ies"):
+		return name[:-3] + "y"
+	if name.endswith("s"):
+		return name[:-1]
+	return name + "Flag"
+
+
+def apply_flag_enums(pkg):
+	wanted = set(FLAG_ENUMS.get(pkg.name, []))
+	if not wanted:
+		return
+	names = pkg.all_decl_names()
+	for fname, lines in pkg.files.items():
+		k = 0
+		while k < len(lines):
+			m = re.match(r"^(\w+) :: enum ([\w.]+) \{\s*$", lines[k])
+			if not m or m.group(1) not in wanted:
+				k += 1
+				continue
+			name, backing = m.group(1), m.group(2)
+			wanted.discard(name)
+
+			members = []
+			j = k+1
+			while lines[j].strip() != "}":
+				mm = re.match(r"^\s*(\w+)\s*=\s*(-?\w+),\s*$", lines[j])
+				if not mm:
+					raise SystemExit(f"{pkg.name}/{fname}: cannot parse member of flag enum {name}: {lines[j]!r}")
+				members.append((mm.group(1), int(mm.group(2), 0)))
+				j += 1
+
+			elem = flag_element_name(name)
+			if elem in names:
+				elem = name + "Flag"
+			if elem in names:
+				raise SystemExit(f"{pkg.name}/{fname}: no free element name for flag enum {name}")
+			names.add(elem)
+
+			flags     = [(n, v) for n, v in members if v > 0 and v & (v-1) == 0]
+			composite = [(n, v) for n, v in members if v > 0 and v & (v-1) != 0]
+			dropped   = [n for n, v in members if v == 0]
+			width = max(len(n) for n, _ in flags)
+			out = [f"{elem} :: enum {backing} {{"]
+			out += [f"\t{n.ljust(width)} = {v.bit_length()-1}," for n, v in flags]
+			out += ["}", f"{name} :: bit_set[{elem}; {backing}]"]
+			for n, v in composite:
+				bits = ", ".join(f".{fn}" for fn, fv in flags if v & fv)
+				out.append(f"{name}_{n} :: {name}{{{bits}}}")
+			lines[k:j+1] = out
+			pkg.report["flag enums converted"].append(f"{name} -> bit_set[{elem}]" + (f" (dropped {', '.join(dropped)})" if dropped else ""))
+			k += len(out)
+	for name in sorted(wanted):
+		pkg.report["flag enum not found"].append(name)
+
+
 def apply_alias_fixes(pkg):
 	if pkg.name not in ALIAS_FIXES:
 		return
@@ -538,6 +628,96 @@ def apply_alias_fixes(pkg):
 		pkg.report["alias fix no longer applies"].append(name)
 	for name in sorted(found):
 		pkg.report["alias fixes applied"].append(f"{name} :: {table[name]}")
+
+
+def find_handwritten_procs(dest):
+	names = set()
+	if os.path.isdir(dest):
+		for f in sorted(os.listdir(dest)):
+			p = os.path.join(dest, f)
+			if f.endswith(".odin") and not is_generated(p):
+				for line in read_lines(p):
+					m = re.match(r"^(\w+)\s*::\s*(?:#force_inline\s+)?proc\b", line)
+					if m:
+						names.add(m.group(1))
+	return names
+
+
+def apply_extra_overloads(pkg, handwritten):
+	targets = defaultdict(list)
+	for n in sorted(handwritten):
+		for suffix in OVERLOAD_SUFFIXES:
+			if n.endswith(suffix):
+				targets[n[:-len(suffix)]].append(n)
+	if not targets:
+		return
+
+	pkg.scan()
+	groups  = {g.name: g for g in pkg.groups}
+	methods = {m.name: m for m in pkg.methods}
+	names   = pkg.all_decl_names() | handwritten
+	objc_names = defaultdict(set)
+	for m in pkg.methods:
+		objc_names[(m.objc_type, m.is_class)].add(m.objc_name)
+
+	insertions = defaultdict(list)                    # file -> [(line index, lines)]
+	appends    = defaultdict(lambda: defaultdict(list)) # file -> conds -> [lines]
+	renamed    = {}
+	for target, members in sorted(targets.items()):
+		if target in groups:
+			g = groups[target]
+			lines = pkg.files[g.file]
+			indent = RE_GROUP_MEMBER.match(lines[g.decl_idx+1]).group(1)
+			insertions[g.file].append((g.end_idx, [f"{indent}{n}," for n in members]))
+			pkg.report["hand-written overloads added to groups"].append(f"{target}: {', '.join(members)}")
+		elif target in methods:
+			m = methods[target]
+			raw, raw_objc = target + "_", m.objc_name + "_"
+			if raw in names or raw_objc in objc_names[(m.objc_type, m.is_class)]:
+				pkg.report["hand-written overloads skipped (name taken)"].append(target)
+				continue
+			lines = pkg.files[m.file]
+			lines[m.attr_idx] = lines[m.attr_idx].replace(f'objc_name="{m.objc_name}"', f'objc_name="{raw_objc}"')
+			lines[m.decl_idx] = re.sub(rf"^(\s*){re.escape(m.name)} ::", rf"\g<1>{raw} ::", lines[m.decl_idx])
+			renamed[target] = raw
+			class_attr = ", objc_is_class_method=true" if m.is_class else ""
+			appends[m.file][m.conds].append(
+				[f'@(objc_type={m.objc_type}, objc_name="{m.objc_name}"{class_attr})', f"{target} :: proc {{", f"\t{raw},"] +
+				[f"\t{n}," for n in members] + ["}"])
+			pkg.report["methods made into groups with hand-written overloads"].append(f"{target}: {', '.join(members)}")
+		else:
+			pkg.report["hand-written overload target not found"].append(target)
+
+	# other groups which referred to a renamed method
+	for g in pkg.groups:
+		lines = pkg.files[g.file]
+		for k in range(g.decl_idx+1, g.end_idx):
+			mm = RE_GROUP_MEMBER.match(lines[k])
+			if mm and mm.group(2) in renamed:
+				lines[k] = f"{mm.group(1)}{renamed[mm.group(2)]},"
+
+	for fname, by_cond in appends.items():
+		lines = pkg.files[fname]
+		while lines and lines[-1].strip() == "":
+			lines.pop()
+		lines += ["", "", "// Overload groups which include hand-written overloads"]
+		for conds, decls in by_cond.items():
+			indent = ""
+			for c in conds:
+				lines += ["", f"{indent}when {c} {{"]
+				indent += "\t"
+			for decl in decls:
+				lines.append("")
+				lines.extend(indent+l for l in decl)
+			for _ in conds:
+				indent = indent[:-1]
+				lines.append(f"{indent}}}")
+		lines.append("")
+
+	for fname, items in insertions.items():
+		lines = pkg.files[fname]
+		for at, new_lines in sorted(items, key=lambda x: -x[0]):
+			lines[at:at] = new_lines
 
 
 def guard_conditional_imports(pkg):
@@ -641,12 +821,14 @@ def main():
 
 		rewrite_imports(pkg, framework_of_path)
 		apply_alias_fixes(pkg)
+		apply_flag_enums(pkg)
 		pkg.scan()
 		apply_known_fixes(pkg)
 		pkg.scan() # known fixes may remove lines
 		plan_error_wrappers(pkg)
 		apply_error_wrappers(pkg)
 		fix_class_method_groups(pkg)
+		apply_extra_overloads(pkg, find_handwritten_procs(dest_of[fw]))
 		guard_conditional_imports(pkg) # last, as it shifts lines
 		total_wrappers += len(pkg.wrappers)
 

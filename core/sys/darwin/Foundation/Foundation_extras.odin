@@ -26,6 +26,13 @@ when ODIN_PLATFORM_SUBTARGET_IOS {
 	Rect :: CG.Rect
 }
 
+MinX :: proc "contextless" (r: Rect) -> Float { return r.origin.x }
+MinY :: proc "contextless" (r: Rect) -> Float { return r.origin.y }
+MidX :: proc "contextless" (r: Rect) -> Float { return r.origin.x + r.size.width*0.5 }
+MidY :: proc "contextless" (r: Rect) -> Float { return r.origin.y + r.size.height*0.5 }
+MaxX :: proc "contextless" (r: Rect) -> Float { return r.origin.x + r.size.width }
+MaxY :: proc "contextless" (r: Rect) -> Float { return r.origin.y + r.size.height }
+
 // Creates a constant `NSString` from a string literal; it is never deallocated.
 AT :: MakeConstantString
 

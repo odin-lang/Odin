@@ -15,14 +15,14 @@ foreign lib {
 	@(objc_type=IntersectionFunctionTable, objc_selector="setBuffer:offset:atIndex:", objc_name="setBuffer")
 	IntersectionFunctionTable_setBuffer :: proc(self: ^IntersectionFunctionTable, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) ---
 
-	@(objc_type=IntersectionFunctionTable, objc_selector="setBuffers:offsets:withRange:", objc_name="setBuffers")
-	IntersectionFunctionTable_setBuffers :: proc(self: ^IntersectionFunctionTable, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
+	@(objc_type=IntersectionFunctionTable, objc_selector="setBuffers:offsets:withRange:", objc_name="setBuffers_")
+	IntersectionFunctionTable_setBuffers_ :: proc(self: ^IntersectionFunctionTable, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
 
 	@(objc_type=IntersectionFunctionTable, objc_selector="setFunction:atIndex:", objc_name="setFunction")
 	IntersectionFunctionTable_setFunction :: proc(self: ^IntersectionFunctionTable, function: ^FunctionHandle, index: NS.UInteger) ---
 
-	@(objc_type=IntersectionFunctionTable, objc_selector="setFunctions:withRange:", objc_name="setFunctions")
-	IntersectionFunctionTable_setFunctions :: proc(self: ^IntersectionFunctionTable, functions: ^^FunctionHandle, range: NS._NSRange) ---
+	@(objc_type=IntersectionFunctionTable, objc_selector="setFunctions:withRange:", objc_name="setFunctions_")
+	IntersectionFunctionTable_setFunctions_ :: proc(self: ^IntersectionFunctionTable, functions: ^^FunctionHandle, range: NS._NSRange) ---
 
 	@(objc_type=IntersectionFunctionTable, objc_selector="setOpaqueTriangleIntersectionFunctionWithSignature:atIndex:", objc_name="setOpaqueTriangleIntersectionFunctionWithSignature_atIndex")
 	IntersectionFunctionTable_setOpaqueTriangleIntersectionFunctionWithSignature_atIndex :: proc(self: ^IntersectionFunctionTable, signature: IntersectionFunctionSignature, index: NS.UInteger) ---
@@ -39,8 +39,8 @@ foreign lib {
 	@(objc_type=IntersectionFunctionTable, objc_selector="setVisibleFunctionTable:atBufferIndex:", objc_name="setVisibleFunctionTable")
 	IntersectionFunctionTable_setVisibleFunctionTable :: proc(self: ^IntersectionFunctionTable, functionTable: ^VisibleFunctionTable, bufferIndex: NS.UInteger) ---
 
-	@(objc_type=IntersectionFunctionTable, objc_selector="setVisibleFunctionTables:withBufferRange:", objc_name="setVisibleFunctionTables")
-	IntersectionFunctionTable_setVisibleFunctionTables :: proc(self: ^IntersectionFunctionTable, functionTables: ^^VisibleFunctionTable, bufferRange: NS._NSRange) ---
+	@(objc_type=IntersectionFunctionTable, objc_selector="setVisibleFunctionTables:withBufferRange:", objc_name="setVisibleFunctionTables_")
+	IntersectionFunctionTable_setVisibleFunctionTables_ :: proc(self: ^IntersectionFunctionTable, functionTables: ^^VisibleFunctionTable, bufferRange: NS._NSRange) ---
 
 	@(objc_type=IntersectionFunctionTable, objc_selector="gpuResourceID", objc_name="gpuResourceID")
 	IntersectionFunctionTable_gpuResourceID :: proc(self: ^IntersectionFunctionTable) -> ResourceID ---
@@ -58,4 +58,25 @@ IntersectionFunctionTable_setOpaqueTriangleIntersectionFunctionWithSignature :: 
 IntersectionFunctionTable_setOpaqueCurveIntersectionFunctionWithSignature :: proc {
 	IntersectionFunctionTable_setOpaqueCurveIntersectionFunctionWithSignature_atIndex,
 	IntersectionFunctionTable_setOpaqueCurveIntersectionFunctionWithSignature_withRange,
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=IntersectionFunctionTable, objc_name="setBuffers")
+IntersectionFunctionTable_setBuffers :: proc {
+	IntersectionFunctionTable_setBuffers_,
+	IntersectionFunctionTable_setBuffers_slice,
+}
+
+@(objc_type=IntersectionFunctionTable, objc_name="setFunctions")
+IntersectionFunctionTable_setFunctions :: proc {
+	IntersectionFunctionTable_setFunctions_,
+	IntersectionFunctionTable_setFunctions_slice,
+}
+
+@(objc_type=IntersectionFunctionTable, objc_name="setVisibleFunctionTables")
+IntersectionFunctionTable_setVisibleFunctionTables :: proc {
+	IntersectionFunctionTable_setVisibleFunctionTables_,
+	IntersectionFunctionTable_setVisibleFunctionTables_slice,
 }

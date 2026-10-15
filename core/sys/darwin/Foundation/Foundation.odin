@@ -3442,17 +3442,19 @@ CollectionChangeType :: enum cffi.long {
 	Remove = 1,
 }
 
-OrderedCollectionDifferenceCalculationOptions :: enum cffi.ulong {
-	OmitInsertedObjects = 1,
-	OmitRemovedObjects  = 2,
-	InferMoves          = 4,
+OrderedCollectionDifferenceCalculationOption :: enum cffi.ulong {
+	OmitInsertedObjects = 0,
+	OmitRemovedObjects  = 1,
+	InferMoves          = 2,
 }
+OrderedCollectionDifferenceCalculationOptions :: bit_set[OrderedCollectionDifferenceCalculationOption; cffi.ulong]
 
-BinarySearchingOptions :: enum cffi.ulong {
-	FirstEqual     = 256,
-	LastEqual      = 512,
-	InsertionIndex = 1024,
+BinarySearchingOption :: enum cffi.ulong {
+	FirstEqual     = 8,
+	LastEqual      = 9,
+	InsertionIndex = 10,
 }
+BinarySearchingOptions :: bit_set[BinarySearchingOption; cffi.ulong]
 
 ItemProviderRepresentationVisibility :: enum cffi.long {
 	All        = 0,
@@ -3472,17 +3474,18 @@ ItemProviderErrorCode :: enum cffi.long {
 	UnavailableCoercionError  = -1200,
 }
 
-StringCompareOptions :: enum cffi.ulong {
-	CaseInsensitiveSearch      = 1,
-	LiteralSearch              = 2,
-	BackwardsSearch            = 4,
-	AnchoredSearch             = 8,
-	NumericSearch              = 64,
-	DiacriticInsensitiveSearch = 128,
-	WidthInsensitiveSearch     = 256,
-	ForcedOrderingSearch       = 512,
-	RegularExpressionSearch    = 1024,
+StringCompareOption :: enum cffi.ulong {
+	CaseInsensitiveSearch      = 0,
+	LiteralSearch              = 1,
+	BackwardsSearch            = 2,
+	AnchoredSearch             = 3,
+	NumericSearch              = 6,
+	DiacriticInsensitiveSearch = 7,
+	WidthInsensitiveSearch     = 8,
+	ForcedOrderingSearch       = 9,
+	RegularExpressionSearch    = 10,
 }
+StringCompareOptions :: bit_set[StringCompareOption; cffi.ulong]
 
 StringEncodingConversionOptions :: enum cffi.ulong {
 	AllowLossy             = 1,
@@ -3540,30 +3543,32 @@ CalendarUnit :: enum cffi.ulong {
 	TimeZoneCalendarUnit          = 2097152,
 }
 
-CalendarOptions :: enum cffi.ulong {
-	WrapComponents                   = 1,
-	MatchStrictly                    = 2,
-	SearchBackwards                  = 4,
-	MatchPreviousTimePreservingSmallerUnits = 256,
-	MatchNextTimePreservingSmallerUnits = 512,
-	MatchNextTime                    = 1024,
-	MatchFirst                       = 4096,
-	MatchLast                        = 8192,
+CalendarOption :: enum cffi.ulong {
+	WrapComponents                          = 0,
+	MatchStrictly                           = 1,
+	SearchBackwards                         = 2,
+	MatchPreviousTimePreservingSmallerUnits = 8,
+	MatchNextTimePreservingSmallerUnits     = 9,
+	MatchNextTime                           = 10,
+	MatchFirst                              = 12,
+	MatchLast                               = 13,
 }
+CalendarOptions :: bit_set[CalendarOption; cffi.ulong]
 
 DecodingFailurePolicy :: enum cffi.long {
 	RaiseException    = 0,
 	SetErrorAndReturn = 1,
 }
 
-DataReadingOptions :: enum cffi.ulong {
-	MappedIfSafe = 1,
-	Uncached     = 2,
-	MappedAlways = 8,
-	Mapped       = 1,
-	MappedRead   = 1,
-	UncachedRead = 2,
+DataReadingOption :: enum cffi.ulong {
+	MappedIfSafe = 0,
+	Uncached     = 1,
+	MappedAlways = 3,
+	Mapped       = 0,
+	MappedRead   = 0,
+	UncachedRead = 1,
 }
+DataReadingOptions :: bit_set[DataReadingOption; cffi.ulong]
 
 DataWritingOptions :: enum cffi.ulong {
 	Atomic                           = 1,
@@ -3582,12 +3587,13 @@ DataSearchOptions :: enum cffi.ulong {
 	Anchored  = 2,
 }
 
-DataBase64EncodingOptions :: enum cffi.ulong {
-	_64CharacterLineLength    = 1,
-	_76CharacterLineLength    = 2,
-	EndLineWithCarriageReturn = 16,
-	EndLineWithLineFeed       = 32,
+DataBase64EncodingOption :: enum cffi.ulong {
+	_64CharacterLineLength    = 0,
+	_76CharacterLineLength    = 1,
+	EndLineWithCarriageReturn = 4,
+	EndLineWithLineFeed       = 5,
 }
+DataBase64EncodingOptions :: bit_set[DataBase64EncodingOption; cffi.ulong]
 
 DataBase64DecodingOptions :: enum cffi.ulong {
 	IgnoreUnknownCharacters = 1,
@@ -3791,11 +3797,12 @@ LocaleLanguageDirection :: enum cffi.ulong {
 	BottomToTop = 4,
 }
 
-MeasurementFormatterUnitOptions :: enum cffi.ulong {
-	ProvidedUnit           = 1,
-	NaturalScale           = 2,
-	TemperatureWithoutUnit = 4,
+MeasurementFormatterUnitOption :: enum cffi.ulong {
+	ProvidedUnit           = 0,
+	NaturalScale           = 1,
+	TemperatureWithoutUnit = 2,
 }
+MeasurementFormatterUnitOptions :: bit_set[MeasurementFormatterUnitOption; cffi.ulong]
 
 PersonNameComponentsFormatterStyle :: enum cffi.long {
 	Default     = 0,
@@ -3884,34 +3891,37 @@ when ODIN_PLATFORM_SUBTARGET == .Default {
 	}
 }
 
-URLBookmarkCreationOptions :: enum cffi.ulong {
-	PreferFileIDResolution           = 256,
-	MinimalBookmark                  = 512,
-	SuitableForBookmarkFile          = 1024,
-	WithSecurityScope                = 2048,
-	SecurityScopeAllowOnlyReadAccess = 4096,
-	WithoutImplicitSecurityScope     = 536870912,
+URLBookmarkCreationOption :: enum cffi.ulong {
+	PreferFileIDResolution           = 8,
+	MinimalBookmark                  = 9,
+	SuitableForBookmarkFile          = 10,
+	WithSecurityScope                = 11,
+	SecurityScopeAllowOnlyReadAccess = 12,
+	WithoutImplicitSecurityScope     = 29,
 }
+URLBookmarkCreationOptions :: bit_set[URLBookmarkCreationOption; cffi.ulong]
 
-URLBookmarkResolutionOptions :: enum cffi.ulong {
-	WithoutUI                     = 256,
-	WithoutMounting               = 512,
-	WithSecurityScope             = 1024,
-	WithoutImplicitStartAccessing = 32768,
+URLBookmarkResolutionOption :: enum cffi.ulong {
+	WithoutUI                     = 8,
+	WithoutMounting               = 9,
+	WithSecurityScope             = 10,
+	WithoutImplicitStartAccessing = 15,
 }
+URLBookmarkResolutionOptions :: bit_set[URLBookmarkResolutionOption; cffi.ulong]
 
 VolumeEnumerationOptions :: enum cffi.ulong {
 	SkipHiddenVolumes        = 2,
 	ProduceFileReferenceURLs = 4,
 }
 
-DirectoryEnumerationOptions :: enum cffi.ulong {
-	SkipsSubdirectoryDescendants = 1,
-	SkipsPackageDescendants      = 2,
-	SkipsHiddenFiles             = 4,
-	IncludesDirectoriesPostOrder = 8,
-	ProducesRelativePathURLs     = 16,
+DirectoryEnumerationOption :: enum cffi.ulong {
+	SkipsSubdirectoryDescendants = 0,
+	SkipsPackageDescendants      = 1,
+	SkipsHiddenFiles             = 2,
+	IncludesDirectoriesPostOrder = 3,
+	ProducesRelativePathURLs     = 4,
 }
+DirectoryEnumerationOptions :: bit_set[DirectoryEnumerationOption; cffi.ulong]
 
 FileManagerItemReplacementOptions :: enum cffi.ulong {
 	UsingNewMetadataOnly      = 1,
@@ -3967,28 +3977,31 @@ HTTPCookieAcceptPolicy :: enum cffi.ulong {
 	OnlyFromMainDocumentDomain = 2,
 }
 
-JSONReadingOptions :: enum cffi.ulong {
-	MutableContainers         = 1,
-	MutableLeaves             = 2,
-	FragmentsAllowed          = 4,
-	JSON5Allowed              = 8,
-	TopLevelDictionaryAssumed = 16,
-	AllowFragments            = 4,
+JSONReadingOption :: enum cffi.ulong {
+	MutableContainers         = 0,
+	MutableLeaves             = 1,
+	FragmentsAllowed          = 2,
+	JSON5Allowed              = 3,
+	TopLevelDictionaryAssumed = 4,
+	AllowFragments            = 2,
 }
+JSONReadingOptions :: bit_set[JSONReadingOption; cffi.ulong]
 
-JSONWritingOptions :: enum cffi.ulong {
-	PrettyPrinted          = 1,
-	SortedKeys             = 2,
-	FragmentsAllowed       = 4,
-	WithoutEscapingSlashes = 8,
+JSONWritingOption :: enum cffi.ulong {
+	PrettyPrinted          = 0,
+	SortedKeys             = 1,
+	FragmentsAllowed       = 2,
+	WithoutEscapingSlashes = 3,
 }
+JSONWritingOptions :: bit_set[JSONWritingOption; cffi.ulong]
 
-KeyValueObservingOptions :: enum cffi.ulong {
-	OptionNew     = 1,
-	OptionOld     = 2,
-	OptionInitial = 4,
-	OptionPrior   = 8,
+KeyValueObservingOption :: enum cffi.ulong {
+	OptionNew     = 0,
+	OptionOld     = 1,
+	OptionInitial = 2,
+	OptionPrior   = 3,
 }
+KeyValueObservingOptions :: bit_set[KeyValueObservingOption; cffi.ulong]
 
 KeyValueChange :: enum cffi.ulong {
 	Setting     = 1,
@@ -4196,23 +4209,25 @@ TextCheckingType :: enum cffi.ulonglong {
 	TransitInformation = 4096,
 }
 
-RegularExpressionOptions :: enum cffi.ulong {
-	CaseInsensitive            = 1,
-	AllowCommentsAndWhitespace = 2,
-	IgnoreMetacharacters       = 4,
-	DotMatchesLineSeparators   = 8,
-	AnchorsMatchLines          = 16,
-	UseUnixLineSeparators      = 32,
-	UseUnicodeWordBoundaries   = 64,
+RegularExpressionOption :: enum cffi.ulong {
+	CaseInsensitive            = 0,
+	AllowCommentsAndWhitespace = 1,
+	IgnoreMetacharacters       = 2,
+	DotMatchesLineSeparators   = 3,
+	AnchorsMatchLines          = 4,
+	UseUnixLineSeparators      = 5,
+	UseUnicodeWordBoundaries   = 6,
 }
+RegularExpressionOptions :: bit_set[RegularExpressionOption; cffi.ulong]
 
-MatchingOptions :: enum cffi.ulong {
-	ReportProgress         = 1,
-	ReportCompletion       = 2,
-	Anchored               = 4,
-	WithTransparentBounds  = 8,
-	WithoutAnchoringBounds = 16,
+MatchingOption :: enum cffi.ulong {
+	ReportProgress         = 0,
+	ReportCompletion       = 1,
+	Anchored               = 2,
+	WithTransparentBounds  = 3,
+	WithoutAnchoringBounds = 4,
 }
+MatchingOptions :: bit_set[MatchingOption; cffi.ulong]
 
 MatchingFlag :: enum cffi.ulong {
 	Progress      = 0,
@@ -4428,11 +4443,12 @@ ByteCountFormatterCountStyle :: enum cffi.long {
 	Binary  = 3,
 }
 
-ComparisonPredicateOptions :: enum cffi.ulong {
-	CaseInsensitivePredicateOption   = 1,
-	DiacriticInsensitivePredicateOption = 2,
-	NormalizedPredicateOption        = 4,
+ComparisonPredicateOption :: enum cffi.ulong {
+	CaseInsensitivePredicateOption      = 0,
+	DiacriticInsensitivePredicateOption = 1,
+	NormalizedPredicateOption           = 2,
 }
+ComparisonPredicateOptions :: bit_set[ComparisonPredicateOption; cffi.ulong]
 
 ComparisonPredicateModifier :: enum cffi.ulong {
 	DirectPredicateModifier = 0,
@@ -4498,20 +4514,22 @@ ExpressionType :: enum cffi.ulong {
 	ConditionalExpressionType     = 20,
 }
 
-FileCoordinatorReadingOptions :: enum cffi.ulong {
-	WithoutChanges                   = 1,
-	ResolvesSymbolicLink             = 2,
-	ImmediatelyAvailableMetadataOnly = 4,
-	ForUploading                     = 8,
+FileCoordinatorReadingOption :: enum cffi.ulong {
+	WithoutChanges                   = 0,
+	ResolvesSymbolicLink             = 1,
+	ImmediatelyAvailableMetadataOnly = 2,
+	ForUploading                     = 3,
 }
+FileCoordinatorReadingOptions :: bit_set[FileCoordinatorReadingOption; cffi.ulong]
 
-FileCoordinatorWritingOptions :: enum cffi.ulong {
-	ForDeleting                    = 1,
-	ForMoving                      = 2,
-	ForMerging                     = 4,
-	ForReplacing                   = 8,
-	ContentIndependentMetadataOnly = 16,
+FileCoordinatorWritingOption :: enum cffi.ulong {
+	ForDeleting                    = 0,
+	ForMoving                      = 1,
+	ForMerging                     = 2,
+	ForReplacing                   = 3,
+	ContentIndependentMetadataOnly = 4,
 }
+FileCoordinatorWritingOptions :: bit_set[FileCoordinatorWritingOption; cffi.ulong]
 
 FileVersionAddingOptions :: enum cffi.ulong {
 	ByMoving = 1,
@@ -4538,13 +4556,14 @@ LinguisticTaggerUnit :: enum cffi.long {
 	Document  = 3,
 }
 
-LinguisticTaggerOptions :: enum cffi.ulong {
-	OmitWords       = 1,
-	OmitPunctuation = 2,
-	OmitWhitespace  = 4,
-	OmitOther       = 8,
-	JoinNames       = 16,
+LinguisticTaggerOption :: enum cffi.ulong {
+	OmitWords       = 0,
+	OmitPunctuation = 1,
+	OmitWhitespace  = 2,
+	OmitOther       = 3,
+	JoinNames       = 4,
 }
+LinguisticTaggerOptions :: bit_set[LinguisticTaggerOption; cffi.ulong]
 
 NetServicesError :: enum cffi.long {
 	UnknownError                     = -72000,

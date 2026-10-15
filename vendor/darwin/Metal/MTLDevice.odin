@@ -39,11 +39,11 @@ foreign lib {
 	@(objc_type=Device, objc_selector="newBufferWithLength:options:", objc_name="newBufferWithLength_options")
 	Device_newBufferWithLength_options :: proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Buffer ---
 
-	@(objc_type=Device, objc_selector="newBufferWithBytes:length:options:", objc_name="newBufferWithBytes")
-	Device_newBufferWithBytes :: proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions) -> ^Buffer ---
+	@(objc_type=Device, objc_selector="newBufferWithBytes:length:options:", objc_name="newBufferWithBytes_")
+	Device_newBufferWithBytes_ :: proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions) -> ^Buffer ---
 
-	@(objc_type=Device, objc_selector="newBufferWithBytesNoCopy:length:options:deallocator:", objc_name="newBufferWithBytesNoCopy")
-	Device_newBufferWithBytesNoCopy :: proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions, deallocator: ^Objc_Block(proc "c" ( pointer: rawptr, length: NS.UInteger ))) -> ^Buffer ---
+	@(objc_type=Device, objc_selector="newBufferWithBytesNoCopy:length:options:deallocator:", objc_name="newBufferWithBytesNoCopy_")
+	Device_newBufferWithBytesNoCopy_ :: proc(self: ^Device, pointer: rawptr, length: NS.UInteger, options: ResourceOptions, deallocator: ^Objc_Block(proc "c" ( pointer: rawptr, length: NS.UInteger ))) -> ^Buffer ---
 
 	@(objc_type=Device, objc_selector="newDepthStencilStateWithDescriptor:", objc_name="newDepthStencilStateWithDescriptor")
 	Device_newDepthStencilStateWithDescriptor :: proc(self: ^Device, descriptor: ^DepthStencilDescriptor) -> ^DepthStencilState ---
@@ -150,8 +150,8 @@ foreign lib {
 	@(objc_type=Device, objc_selector="newRenderPipelineStateWithMeshDescriptor:options:completionHandler:", objc_name="newRenderPipelineStateWithMeshDescriptor_options_completionHandler")
 	Device_newRenderPipelineStateWithMeshDescriptor_options_completionHandler :: proc(self: ^Device, descriptor: ^MeshRenderPipelineDescriptor, options: PipelineOptions, completionHandler: NewRenderPipelineStateWithReflectionCompletionHandler) ---
 
-	@(objc_type=Device, objc_selector="getDefaultSamplePositions:count:", objc_name="getDefaultSamplePositions")
-	Device_getDefaultSamplePositions :: proc(self: ^Device, positions: ^SamplePosition, count: NS.UInteger) ---
+	@(objc_type=Device, objc_selector="getDefaultSamplePositions:count:", objc_name="getDefaultSamplePositions_")
+	Device_getDefaultSamplePositions_ :: proc(self: ^Device, positions: ^SamplePosition, count: NS.UInteger) ---
 
 	@(objc_type=Device, objc_selector="newArgumentEncoderWithArguments:", objc_name="newArgumentEncoderWithArguments")
 	Device_newArgumentEncoderWithArguments :: proc(self: ^Device, arguments: ^NS.Array) -> ^ArgumentEncoder ---
@@ -710,4 +710,25 @@ Device_newArchiveWithURL :: #force_inline proc "c" (self: ^Device, url: ^NS.URL)
 Device_newCounterHeapWithDescriptor :: #force_inline proc "c" (self: ^Device, descriptor: ^MTL4CounterHeapDescriptor) -> (res: ^MTL4CounterHeap, err: ^NS.Error) {
 	res = Device_newCounterHeapWithDescriptor_error(self, descriptor, &err)
 	return
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=Device, objc_name="getDefaultSamplePositions")
+Device_getDefaultSamplePositions :: proc {
+	Device_getDefaultSamplePositions_,
+	Device_getDefaultSamplePositions_slice,
+}
+
+@(objc_type=Device, objc_name="newBufferWithBytes")
+Device_newBufferWithBytes :: proc {
+	Device_newBufferWithBytes_,
+	Device_newBufferWithBytes_slice,
+}
+
+@(objc_type=Device, objc_name="newBufferWithBytesNoCopy")
+Device_newBufferWithBytesNoCopy :: proc {
+	Device_newBufferWithBytesNoCopy_,
+	Device_newBufferWithBytesNoCopy_slice,
 }

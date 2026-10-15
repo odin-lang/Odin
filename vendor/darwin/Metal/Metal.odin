@@ -189,17 +189,19 @@ IOCompressionContext :: distinct rawptr
 ResourceOptions_StorageModeMemoryless :: ResourceOptions { .StorageModeManaged, .StorageModePrivate, }
 ColorWriteMasks_All :: ColorWriteMasks { .Alpha, .Blue, .Green, .Red, }
 
-ResourceUsage :: enum cffi.ulong {
-	Read   = 1,
-	Write  = 2,
-	Sample = 4,
+ResourceUsageFlag :: enum cffi.ulong {
+	Read   = 0,
+	Write  = 1,
+	Sample = 2,
 }
+ResourceUsage :: bit_set[ResourceUsageFlag; cffi.ulong]
 
-BarrierScope :: enum cffi.ulong {
-	Buffers       = 1,
-	Textures      = 2,
-	RenderTargets = 4,
+BarrierScopeFlag :: enum cffi.ulong {
+	Buffers       = 0,
+	Textures      = 1,
+	RenderTargets = 2,
 }
+BarrierScope :: bit_set[BarrierScopeFlag; cffi.ulong]
 
 Stages :: enum cffi.ulong {
 	StageVertex                = 1,
@@ -532,11 +534,12 @@ TensorError :: enum cffi.long {
 	InvalidDescriptor = 2,
 }
 
-TensorUsage :: enum cffi.ulong {
-	Compute         = 1,
-	Render          = 2,
-	MachineLearning = 4,
+TensorUsageFlag :: enum cffi.ulong {
+	Compute         = 0,
+	Render          = 1,
+	MachineLearning = 2,
 }
+TensorUsage :: bit_set[TensorUsageFlag; cffi.ulong]
 
 TextureType :: enum cffi.ulong {
 	_1D                 = 0,
@@ -560,14 +563,14 @@ TextureSwizzle :: enum cffi.uchar {
 	Alpha = 5,
 }
 
-TextureUsage :: enum cffi.ulong {
-	Unknown         = 0,
-	ShaderRead      = 1,
-	ShaderWrite     = 2,
-	RenderTarget    = 4,
-	PixelFormatView = 16,
-	ShaderAtomic    = 32,
+TextureUsageFlag :: enum cffi.ulong {
+	ShaderRead      = 0,
+	ShaderWrite     = 1,
+	RenderTarget    = 2,
+	PixelFormatView = 4,
+	ShaderAtomic    = 5,
 }
+TextureUsage :: bit_set[TextureUsageFlag; cffi.ulong]
 
 TextureCompressionType :: enum cffi.long {
 	Lossless = 0,
@@ -1246,14 +1249,14 @@ AccelerationStructureRefitOption :: enum cffi.ulong {
 
 AccelerationStructureRefitOptions :: bit_set[AccelerationStructureRefitOption; cffi.ulong]
 
-AccelerationStructureUsage :: enum cffi.ulong {
-	None                   = 0,
-	Refit                  = 1,
-	PreferFastBuild        = 2,
-	ExtendedLimits         = 4,
-	PreferFastIntersection = 16,
-	MinimizeMemory         = 32,
+AccelerationStructureUsageFlag :: enum cffi.ulong {
+	Refit                  = 0,
+	PreferFastBuild        = 1,
+	ExtendedLimits         = 2,
+	PreferFastIntersection = 4,
+	MinimizeMemory         = 5,
 }
+AccelerationStructureUsage :: bit_set[AccelerationStructureUsageFlag; cffi.ulong]
 
 AccelerationStructureInstanceOption :: enum cffi.uint {
 	DisableTriangleCulling           = 0,
@@ -1346,16 +1349,17 @@ CaptureDestination :: enum cffi.long {
 	GPUTraceDocument = 2,
 }
 
-IndirectCommandType :: enum cffi.ulong {
-	Draw                      = 1,
-	DrawIndexed               = 2,
-	DrawPatches               = 4,
-	DrawIndexedPatches        = 8,
-	ConcurrentDispatch        = 32,
-	ConcurrentDispatchThreads = 64,
-	DrawMeshThreadgroups      = 128,
-	DrawMeshThreads           = 256,
+IndirectCommandTypeFlag :: enum cffi.ulong {
+	Draw                      = 0,
+	DrawIndexed               = 1,
+	DrawPatches               = 2,
+	DrawIndexedPatches        = 3,
+	ConcurrentDispatch        = 5,
+	ConcurrentDispatchThreads = 6,
+	DrawMeshThreadgroups      = 7,
+	DrawMeshThreads           = 8,
 }
+IndirectCommandType :: bit_set[IndirectCommandTypeFlag; cffi.ulong]
 
 FunctionLogType :: enum cffi.ulong {
 	Validation = 0,
@@ -1392,19 +1396,19 @@ BinaryArchiveError :: enum cffi.ulong {
 	InternalError      = 4,
 }
 
-IntersectionFunctionSignature :: enum cffi.ulong {
-	None                       = 0,
-	Instancing                 = 1,
-	TriangleData               = 2,
-	WorldSpaceData             = 4,
-	InstanceMotion             = 8,
-	PrimitiveMotion            = 16,
-	ExtendedLimits             = 32,
-	MaxLevels                  = 64,
-	CurveData                  = 128,
-	IntersectionFunctionBuffer = 256,
-	UserData                   = 512,
+IntersectionFunctionSignatureFlag :: enum cffi.ulong {
+	Instancing                 = 0,
+	TriangleData               = 1,
+	WorldSpaceData             = 2,
+	InstanceMotion             = 3,
+	PrimitiveMotion            = 4,
+	ExtendedLimits             = 5,
+	MaxLevels                  = 6,
+	CurveData                  = 7,
+	IntersectionFunctionBuffer = 8,
+	UserData                   = 9,
 }
+IntersectionFunctionSignature :: bit_set[IntersectionFunctionSignatureFlag; cffi.ulong]
 
 StitchedLibraryOption :: enum cffi.ulong {
 	FailOnBinaryArchiveMiss          = 0,

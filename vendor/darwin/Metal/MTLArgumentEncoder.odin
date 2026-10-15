@@ -21,20 +21,20 @@ foreign lib {
 	@(objc_type=ArgumentEncoder, objc_selector="setBuffer:offset:atIndex:", objc_name="setBuffer")
 	ArgumentEncoder_setBuffer :: proc(self: ^ArgumentEncoder, buffer: ^Buffer, offset: NS.UInteger, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setBuffers:offsets:withRange:", objc_name="setBuffers")
-	ArgumentEncoder_setBuffers :: proc(self: ^ArgumentEncoder, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setBuffers:offsets:withRange:", objc_name="setBuffers_")
+	ArgumentEncoder_setBuffers_ :: proc(self: ^ArgumentEncoder, buffers: ^^Buffer, offsets: ^NS.UInteger, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="setTexture:atIndex:", objc_name="setTexture")
 	ArgumentEncoder_setTexture :: proc(self: ^ArgumentEncoder, texture: ^Texture, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setTextures:withRange:", objc_name="setTextures")
-	ArgumentEncoder_setTextures :: proc(self: ^ArgumentEncoder, textures: ^^Texture, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setTextures:withRange:", objc_name="setTextures_")
+	ArgumentEncoder_setTextures_ :: proc(self: ^ArgumentEncoder, textures: ^^Texture, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="setSamplerState:atIndex:", objc_name="setSamplerState")
 	ArgumentEncoder_setSamplerState :: proc(self: ^ArgumentEncoder, sampler: ^SamplerState, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setSamplerStates:withRange:", objc_name="setSamplerStates")
-	ArgumentEncoder_setSamplerStates :: proc(self: ^ArgumentEncoder, samplers: ^^SamplerState, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setSamplerStates:withRange:", objc_name="setSamplerStates_")
+	ArgumentEncoder_setSamplerStates_ :: proc(self: ^ArgumentEncoder, samplers: ^^SamplerState, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="constantDataAtIndex:", objc_name="constantDataAtIndex")
 	ArgumentEncoder_constantDataAtIndex :: proc(self: ^ArgumentEncoder, index: NS.UInteger) -> rawptr ---
@@ -42,20 +42,20 @@ foreign lib {
 	@(objc_type=ArgumentEncoder, objc_selector="setRenderPipelineState:atIndex:", objc_name="setRenderPipelineState")
 	ArgumentEncoder_setRenderPipelineState :: proc(self: ^ArgumentEncoder, pipeline: ^RenderPipelineState, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setRenderPipelineStates:withRange:", objc_name="setRenderPipelineStates")
-	ArgumentEncoder_setRenderPipelineStates :: proc(self: ^ArgumentEncoder, pipelines: ^^RenderPipelineState, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setRenderPipelineStates:withRange:", objc_name="setRenderPipelineStates_")
+	ArgumentEncoder_setRenderPipelineStates_ :: proc(self: ^ArgumentEncoder, pipelines: ^^RenderPipelineState, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="setComputePipelineState:atIndex:", objc_name="setComputePipelineState")
 	ArgumentEncoder_setComputePipelineState :: proc(self: ^ArgumentEncoder, pipeline: ^ComputePipelineState, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setComputePipelineStates:withRange:", objc_name="setComputePipelineStates")
-	ArgumentEncoder_setComputePipelineStates :: proc(self: ^ArgumentEncoder, pipelines: ^^ComputePipelineState, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setComputePipelineStates:withRange:", objc_name="setComputePipelineStates_")
+	ArgumentEncoder_setComputePipelineStates_ :: proc(self: ^ArgumentEncoder, pipelines: ^^ComputePipelineState, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="setIndirectCommandBuffer:atIndex:", objc_name="setIndirectCommandBuffer")
 	ArgumentEncoder_setIndirectCommandBuffer :: proc(self: ^ArgumentEncoder, indirectCommandBuffer: ^IndirectCommandBuffer, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setIndirectCommandBuffers:withRange:", objc_name="setIndirectCommandBuffers")
-	ArgumentEncoder_setIndirectCommandBuffers :: proc(self: ^ArgumentEncoder, buffers: ^^IndirectCommandBuffer, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setIndirectCommandBuffers:withRange:", objc_name="setIndirectCommandBuffers_")
+	ArgumentEncoder_setIndirectCommandBuffers_ :: proc(self: ^ArgumentEncoder, buffers: ^^IndirectCommandBuffer, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="setAccelerationStructure:atIndex:", objc_name="setAccelerationStructure")
 	ArgumentEncoder_setAccelerationStructure :: proc(self: ^ArgumentEncoder, accelerationStructure: ^AccelerationStructure, index: NS.UInteger) ---
@@ -66,14 +66,14 @@ foreign lib {
 	@(objc_type=ArgumentEncoder, objc_selector="setVisibleFunctionTable:atIndex:", objc_name="setVisibleFunctionTable")
 	ArgumentEncoder_setVisibleFunctionTable :: proc(self: ^ArgumentEncoder, visibleFunctionTable: ^VisibleFunctionTable, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setVisibleFunctionTables:withRange:", objc_name="setVisibleFunctionTables")
-	ArgumentEncoder_setVisibleFunctionTables :: proc(self: ^ArgumentEncoder, visibleFunctionTables: ^^VisibleFunctionTable, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setVisibleFunctionTables:withRange:", objc_name="setVisibleFunctionTables_")
+	ArgumentEncoder_setVisibleFunctionTables_ :: proc(self: ^ArgumentEncoder, visibleFunctionTables: ^^VisibleFunctionTable, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="setIntersectionFunctionTable:atIndex:", objc_name="setIntersectionFunctionTable")
 	ArgumentEncoder_setIntersectionFunctionTable :: proc(self: ^ArgumentEncoder, intersectionFunctionTable: ^IntersectionFunctionTable, index: NS.UInteger) ---
 
-	@(objc_type=ArgumentEncoder, objc_selector="setIntersectionFunctionTables:withRange:", objc_name="setIntersectionFunctionTables")
-	ArgumentEncoder_setIntersectionFunctionTables :: proc(self: ^ArgumentEncoder, intersectionFunctionTables: ^^IntersectionFunctionTable, range: NS._NSRange) ---
+	@(objc_type=ArgumentEncoder, objc_selector="setIntersectionFunctionTables:withRange:", objc_name="setIntersectionFunctionTables_")
+	ArgumentEncoder_setIntersectionFunctionTables_ :: proc(self: ^ArgumentEncoder, intersectionFunctionTables: ^^IntersectionFunctionTable, range: NS._NSRange) ---
 
 	@(objc_type=ArgumentEncoder, objc_selector="setDepthStencilState:atIndex:", objc_name="setDepthStencilState")
 	ArgumentEncoder_setDepthStencilState :: proc(self: ^ArgumentEncoder, depthStencilState: ^DepthStencilState, index: NS.UInteger) ---
@@ -103,4 +103,55 @@ foreign lib {
 ArgumentEncoder_setArgumentBuffer :: proc {
 	ArgumentEncoder_setArgumentBuffer_offset,
 	ArgumentEncoder_setArgumentBuffer_startOffset_arrayElement,
+}
+
+
+// Overload groups which include hand-written overloads
+
+@(objc_type=ArgumentEncoder, objc_name="setBuffers")
+ArgumentEncoder_setBuffers :: proc {
+	ArgumentEncoder_setBuffers_,
+	ArgumentEncoder_setBuffers_slice,
+}
+
+@(objc_type=ArgumentEncoder, objc_name="setComputePipelineStates")
+ArgumentEncoder_setComputePipelineStates :: proc {
+	ArgumentEncoder_setComputePipelineStates_,
+	ArgumentEncoder_setComputePipelineStates_slice,
+}
+
+@(objc_type=ArgumentEncoder, objc_name="setIndirectCommandBuffers")
+ArgumentEncoder_setIndirectCommandBuffers :: proc {
+	ArgumentEncoder_setIndirectCommandBuffers_,
+	ArgumentEncoder_setIndirectCommandBuffers_slice,
+}
+
+@(objc_type=ArgumentEncoder, objc_name="setIntersectionFunctionTables")
+ArgumentEncoder_setIntersectionFunctionTables :: proc {
+	ArgumentEncoder_setIntersectionFunctionTables_,
+	ArgumentEncoder_setIntersectionFunctionTables_slice,
+}
+
+@(objc_type=ArgumentEncoder, objc_name="setRenderPipelineStates")
+ArgumentEncoder_setRenderPipelineStates :: proc {
+	ArgumentEncoder_setRenderPipelineStates_,
+	ArgumentEncoder_setRenderPipelineStates_slice,
+}
+
+@(objc_type=ArgumentEncoder, objc_name="setSamplerStates")
+ArgumentEncoder_setSamplerStates :: proc {
+	ArgumentEncoder_setSamplerStates_,
+	ArgumentEncoder_setSamplerStates_slice,
+}
+
+@(objc_type=ArgumentEncoder, objc_name="setTextures")
+ArgumentEncoder_setTextures :: proc {
+	ArgumentEncoder_setTextures_,
+	ArgumentEncoder_setTextures_slice,
+}
+
+@(objc_type=ArgumentEncoder, objc_name="setVisibleFunctionTables")
+ArgumentEncoder_setVisibleFunctionTables :: proc {
+	ArgumentEncoder_setVisibleFunctionTables_,
+	ArgumentEncoder_setVisibleFunctionTables_slice,
 }
