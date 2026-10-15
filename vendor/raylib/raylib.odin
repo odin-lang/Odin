@@ -108,6 +108,21 @@ when ODIN_OS == .Windows {
 		"system:User32.lib",
 		"system:Shell32.lib",
 	}
+} else when ODIN_PLATFORM_SUBTARGET == .Android {
+	// NOTE: raylib's Android backend defines `__wrap_fopen` (reads assets from the APK)
+	// and calls `__real_fopen`, so the linker has to be told to wrap `fopen`.
+	// The library is built with PLATFORM=PLATFORM_ANDROID, ANDROID_ARCH=arm64 and ANDROID_API_VERSION=29.
+	@(extra_linker_flags="-Wl,--wrap=fopen")
+	foreign import lib {
+		"android/arm64-v8a/libraylib.a",
+		"system:android",
+		"system:log",
+		"system:EGL",
+		"system:GLESv2",
+		"system:OpenSLES",
+		"system:dl",
+		"system:m",
+	}
 } else when ODIN_OS == .Linux  {
 	when ODIN_ARCH == .arm64 {
 		foreign import lib {
