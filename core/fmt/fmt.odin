@@ -1117,6 +1117,8 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		prec = fi.width
 		if neg || fi.plus {
 			// There needs to be space for the "sign"
+			// TODO xxxx clamp?
+			// TODO xxxx this value is not used. Pretty sure this has to do with bill's whitespace padding change
 			prec -= 1
 		}
 	}

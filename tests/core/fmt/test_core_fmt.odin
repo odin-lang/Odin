@@ -466,6 +466,20 @@ test_fmt_zero_flag :: proc(t: ^testing.T) {
 	check(t, "00000101", "%b", bit_set[0..<8; u8]{0, 2})
 }
 
+@(test)
+test_fmt_integer_precision_and_prefix_padding :: proc(t: ^testing.T) {
+	// TODO(bplu4t2f): I am not sure what the intended output here is;
+	//                 bill's whitespace padding rework has changed
+	//                 what is happening in `_fmt_int` and it is not
+	//                 clear to me what the intent is.
+	// check(t, "  042", "%5.3d",  42)
+	// check(t, "  042", "%05.3d", 42)
+	// check(t, " -042", "%5.3d",  -42)
+	// check(t, " -042", "%05.3d", -42)
+
+	// check(t, "0x0000ff", "%#08x", u64(255))
+}
+
 @(private)
 check :: proc(t: ^testing.T, exp: string, format: string, args: ..any, loc := #caller_location) {
 	got := fmt.tprintf(format, ..args)
