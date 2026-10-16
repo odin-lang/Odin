@@ -586,10 +586,33 @@ Output:
 
 */
 write_string :: proc(b: ^Builder, s: string, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	n0 := len(b.buf)
-	append(&b.buf, s, loc) or_return
-	n1 := len(b.buf)
-	return n1-n0, nil
+	return append(&b.buf, s, loc=loc)
+}
+
+
+/*
+Appends UTF-16 encoded string `str` to the Builder `b`, and returns the number of bytes written.
+
+**Inputs:**
+- `b`:    A pointer to the Builder.
+- `s`:    The string to be appended.
+
+**Returns:**
+- `n`:    The number of bytes written.
+- `err`:  An allocator error if one occured, `nil` otherwise.
+
+**Remarks:**
+
+The UTF-16 input string is encoded as UTF-8 in the output.
+
+Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+distinguish malformed sequences from literal replacement characters, so both are written identically.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
+*/
+write_string16 :: proc(b: ^Builder, str: string16, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	result := strconv.write_string16_dynamic_array(&b.buf, str, loc=loc) or_return
+	return len(result), nil
 }
 
 
@@ -682,6 +705,39 @@ Output:
 */
 write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"', options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
 	result := strconv.quote_string_dynamic_array(&b.buf, str, quote, options = options, loc = loc) or_return
+	return len(result), nil
+}
+
+
+/*
+Appends UTF-16 encoded string `str` to the Builder `b`, and returns the number of bytes written.
+
+Runes in the string are escaped when appropriate, and surrounded with the specified `quote`.
+
+**Inputs:**
+- `b`:        A pointer to the Builder.
+- `str`:      The string to be quoted and appended.
+- `quote`:    The quote character. Default is double quotes (`"`).
+- `options`:  Controls how characters in the string are escaped.
+
+**Returns:**
+- `n`:        The number of bytes written
+- `err`:      An allocator error if one occured, `nil` otherwise
+
+**Remarks:**
+
+The UTF-16 input string is encoded as UTF-8 in the output.
+
+Runes are escaped according to Odin string syntax rules. If double-quotes (`"`) are used, then the string is quoted and escaped such that
+it would parse back as the same string in an Odin string literal.
+
+Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+distinguish malformed sequences from literal replacement characters, so both are written identically.
+
+The backing dynamic array may be fixed in capacity or fail to resize; `n` states the number actually written.
+*/
+write_quoted_string16 :: proc(b: ^Builder, str: string16, quote: byte = '"', options: strconv.Rune_Escaping_Options = nil, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
+	result := strconv.quote_string16_dynamic_array(&b.buf, str, quote, options = options, loc = loc) or_return
 	return len(result), nil
 }
 
