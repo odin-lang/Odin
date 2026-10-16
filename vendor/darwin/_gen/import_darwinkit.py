@@ -207,8 +207,10 @@ FLAG_ELEMENT_NAMES = {
 
 # Flag enums which also hold multi-bit fields, e.g. `UIKit.ViewAnimationOptions` keeps its animation curve
 # in bits 16-17. They are converted like `FLAG_ENUMS`, except that members within the field bits become
-# constants rather than flags: `ViewAnimationOptions_CurveEaseIn :: transmute(ViewAnimationOptions)cffi.ulong(0x10000)`.
-# A field is read back with its mask: `opts & DataWritingOptions_FileProtectionMask == DataWritingOptions_FileProtectionComplete`.
+# constants rather than flags. Every bit of a field, or of a mask, gets an element `_Bit<n>`, so that
+# the constants are ordinary sets: `ViewAnimationOptions_CurveEaseIn :: ViewAnimationOptions{._Bit16}`.
+# A field is read back with its mask, `opts & DataWritingOptions_FileProtectionMask == DataWritingOptions_FileProtectionComplete`,
+# and set with `opts &~ Mask | Value`.
 # framework -> {enum: bits of its fields}
 FLAG_ENUM_FIELDS = {
 	"AppKit": {
@@ -1041,7 +1043,22 @@ def apply_flag_enums(pkg):
 			named_bits = 0
 			for _, v in flags:
 				named_bits |= v
-			width = max(len(n) for n, _ in flags)
+			if fields:
+				# every bit of a field, or of a constant, gets an element `_Bit<n>`, so that the constants
+				# lie within the bit_set and `opts & ~Mask` clears the same bits as `opts &~ Mask`
+				used = fields
+				for n, v in constants:
+					if v < 0:
+						raise SystemExit(f"{pkg.name}/{fname}: negative member {n} of flag enum {name}")
+					used |= v
+				extra = used & ~named_bits
+				bit_names = [(f"_Bit{i}", 1 << i) for i in range(extra.bit_length()) if extra >> i & 1]
+				for n, _ in bit_names:
+					if any(n == fn for fn, _ in flags):
+						raise SystemExit(f"{pkg.name}/{fname}: flag enum {name} already has a member {n}")
+				flags += bit_names
+				named_bits |= extra
+			width = max((len(n) for n, _ in flags), default=0)
 			out = [f"{elem} :: enum {backing} {{"]
 			out += [f"\t{n.ljust(width)} = {v.bit_length()-1}," for n, v in flags]
 			out += ["}", f"{name} :: bit_set[{elem}; {backing}]"]

@@ -3770,20 +3770,24 @@ FontDescriptorSymbolicTrait :: enum cffi.uint {
 	TraitTightLeading = 15,
 	TraitLooseLeading = 16,
 	TraitEmphasized   = 1,
+	_Bit28            = 28,
+	_Bit29            = 29,
+	_Bit30            = 30,
+	_Bit31            = 31,
 }
 FontDescriptorSymbolicTraits :: bit_set[FontDescriptorSymbolicTrait; cffi.uint]
-FontDescriptorSymbolicTraits_ClassMask :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xf0000000)
+FontDescriptorSymbolicTraits_ClassMask :: FontDescriptorSymbolicTraits{._Bit28, ._Bit29, ._Bit30, ._Bit31}
 FontDescriptorSymbolicTraits_ClassUnknown :: FontDescriptorSymbolicTraits{}
-FontDescriptorSymbolicTraits_ClassOldStyleSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x10000000)
-FontDescriptorSymbolicTraits_ClassTransitionalSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x20000000)
-FontDescriptorSymbolicTraits_ClassModernSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x30000000)
-FontDescriptorSymbolicTraits_ClassClarendonSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x40000000)
-FontDescriptorSymbolicTraits_ClassSlabSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x50000000)
-FontDescriptorSymbolicTraits_ClassFreeformSerifs :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x70000000)
-FontDescriptorSymbolicTraits_ClassSansSerif :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x80000000)
-FontDescriptorSymbolicTraits_ClassOrnamentals :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0x90000000)
-FontDescriptorSymbolicTraits_ClassScripts :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xa0000000)
-FontDescriptorSymbolicTraits_ClassSymbolic :: transmute(FontDescriptorSymbolicTraits)cffi.uint(0xc0000000)
+FontDescriptorSymbolicTraits_ClassOldStyleSerifs :: FontDescriptorSymbolicTraits{._Bit28}
+FontDescriptorSymbolicTraits_ClassTransitionalSerifs :: FontDescriptorSymbolicTraits{._Bit29}
+FontDescriptorSymbolicTraits_ClassModernSerifs :: FontDescriptorSymbolicTraits{._Bit28, ._Bit29}
+FontDescriptorSymbolicTraits_ClassClarendonSerifs :: FontDescriptorSymbolicTraits{._Bit30}
+FontDescriptorSymbolicTraits_ClassSlabSerifs :: FontDescriptorSymbolicTraits{._Bit28, ._Bit30}
+FontDescriptorSymbolicTraits_ClassFreeformSerifs :: FontDescriptorSymbolicTraits{._Bit28, ._Bit29, ._Bit30}
+FontDescriptorSymbolicTraits_ClassSansSerif :: FontDescriptorSymbolicTraits{._Bit31}
+FontDescriptorSymbolicTraits_ClassOrnamentals :: FontDescriptorSymbolicTraits{._Bit28, ._Bit31}
+FontDescriptorSymbolicTraits_ClassScripts :: FontDescriptorSymbolicTraits{._Bit29, ._Bit31}
+FontDescriptorSymbolicTraits_ClassSymbolic :: FontDescriptorSymbolicTraits{._Bit30, ._Bit31}
 
 FontRenderingMode :: enum cffi.ulong {
 	DefaultRenderingMode             = 0,
