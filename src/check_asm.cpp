@@ -2272,15 +2272,23 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			return;
 		}
 
-		if (found->kind != Entity_Constant) {
+		// NOTE(bill): resolved like any other identifier, as the constant may not have been checked yet,
+		// e.g. one declared later in the same block, or one in a lazy file
+		found = resolve_alias_entity(ctx, found, nullptr);
+		if (found->kind == Entity_Constant) {
+			GB_ASSERT(ctx->scope == param_scope->parent);
+			check_ident(ctx, operand, expr, nullptr, nullptr, false);
+			if (operand->mode == Addressing_Invalid) {
+				// NOTE(bill): already reported, e.g. an illegal declaration cycle
+				return;
+			}
+		}
+		if (operand->mode != Addressing_Constant) {
 			error(expr, "Only asm parameters or constants are allowed to be used within an 'asm' template");
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
 			return;
 		}
-
-		add_entity_use(ctx, expr, entity);
-		operand->mode  = Addressing_Constant;
-		operand->value = found->Constant.value;
-		operand->type  = found->type;
 
 		add_type_and_value(ctx, expr, operand->mode, operand->type, operand->value);
 		return;
