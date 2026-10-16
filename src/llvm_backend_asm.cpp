@@ -1815,6 +1815,8 @@ struct lbAsmGenerate_arm64 : lbAsmGenerate {
 };
 
 gb_internal lbValue lb_emit_asm_template_call(lbProcedure *p, Entity *entity, Array<lbValue> const &args) {
+	GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "the body of the asm template '%.*s' was never checked", LIT(entity->token.string));
+
 	lbAsmGenerate_amd64   generator_amd64   = {};
 	lbAsmGenerate_arm64   generator_arm64 = {};
 	lbAsmGenerate_riscv64 generator_riscv64 = {};

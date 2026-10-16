@@ -366,6 +366,7 @@ struct Entity {
 		} Label;
 		struct {
 			Ast *node;
+			Type *proc_type; // of its signature, as an asm group can make the entity's type invalid before its body is checked
 			bool is_volatile;
 			bool is_align_stack;
 			bool is_pure;

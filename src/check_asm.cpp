@@ -600,6 +600,26 @@ gb_internal bool check_asm_is_immediate_param(Entity *tmpl_entity, Operand const
 	return false;
 }
 
+// NOTE(bill): a template opting in to a feature with @(require_target_feature) or @(enable_target_feature)
+// must not be rejected because the global build did not enable it
+gb_internal bool check_asm_template_feature_is_enabled(Entity *tmpl_entity, String const &feature) {
+	if (check_target_feature_is_enabled(feature, nullptr)) {
+		return true;
+	}
+	Type *pt = tmpl_entity->AsmTemplate.proc_type;
+	GB_ASSERT(pt->kind == Type_Proc);
+	String req = pt->Proc.require_target_feature;
+	String en  = pt->Proc.enable_target_feature;
+
+	if (req.len != 0 && check_target_feature_is_superset_of(req, feature, nullptr)) {
+		return true;
+	}
+	if (en.len != 0 && check_target_feature_is_superset_of(en, feature, nullptr)) {
+		return true;
+	}
+	return false;
+}
+
 
 template <typename AsmCtx>
 gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *scope, Slice<Ast *> const &specs, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
@@ -1681,31 +1701,14 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 		{
-			// Feature gate: the matched form may require a target feature (crc32b needs
-			// +crc, LSE atomics need +lse, ...). The form carries its Feature. It is
-			// satisfied if the feature is globally enabled for the target, OR if this
-			// template's own signature declares it via #require_target_feature /
-			// #enable_target_feature — a template opting in to a feature shouldn't be
-			// rejected just because the global build didn't enable it.
+			// NOTE(bill): Feature Gating
+			// The matched form may require a target feature (crc32b needs +crc, LSE atomics need +lse, ...).
+			// The form carries its Feature. It is satisfied if the feature is globally enabled for the target,
+			// OR if this template's own signature declares it via @(require_target_feature) / @(enable_target_feature)
+			// see `check_asm_template_feature_is_enabled`
 			String feat = asm_ctx->feature_name_from_form(forms[valid_form_index]);
 			if (feat.len != 0) {
-				bool ok = check_target_feature_is_enabled(feat, nullptr);
-
-				if (!ok) {
-					// The proc type may declare the feature itself.
-					Type *pt = base_type(tmpl_entity->type);
-					GB_ASSERT(pt->kind == Type_Proc);
-					String req = pt->Proc.require_target_feature;
-					String en  = pt->Proc.enable_target_feature;
-					// These are comma-lists; `feat` is a single bare name. is_superset_of
-					// checks whether the declared list contains it.
-					if (req.len != 0 && check_target_feature_is_superset_of(req, feat, nullptr)) {
-						ok = true;
-					}
-					if (!ok && en.len != 0 && check_target_feature_is_superset_of(en, feat, nullptr)) {
-						ok = true;
-					}
-				}
+				bool ok = check_asm_template_feature_is_enabled(tmpl_entity, feat);
 
 				if (!ok) {
 					error(instr->name,
@@ -2272,15 +2275,23 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 			return;
 		}
 
-		if (found->kind != Entity_Constant) {
+		// NOTE(bill): resolved like any other identifier, as the constant may not have been checked yet,
+		// e.g. one declared later in the same block, or one in a lazy file
+		found = resolve_alias_entity(ctx, found, nullptr);
+		if (found->kind == Entity_Constant) {
+			GB_ASSERT(ctx->scope == param_scope->parent);
+			check_ident(ctx, operand, expr, nullptr, nullptr, false);
+			if (operand->mode == Addressing_Invalid) {
+				// NOTE(bill): already reported, e.g. an illegal declaration cycle
+				return;
+			}
+		}
+		if (operand->mode != Addressing_Constant) {
 			error(expr, "Only asm parameters or constants are allowed to be used within an 'asm' template");
+			operand->mode = Addressing_Invalid;
+			operand->type = t_invalid;
 			return;
 		}
-
-		add_entity_use(ctx, expr, entity);
-		operand->mode  = Addressing_Constant;
-		operand->value = found->Constant.value;
-		operand->type  = found->type;
 
 		add_type_and_value(ctx, expr, operand->mode, operand->type, operand->value);
 		return;
@@ -2867,8 +2878,8 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 }
 
 
-template <typename AsmCtx>
-gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, DeclInfo *d) {
+// NOTE(bill): the signature is everything needed to call an asm template, the rest is checked by `check_asm_template_body`
+gb_internal bool check_asm_template_signature(CheckerContext *ctx, Entity *entity, DeclInfo *d) {
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
 	auto *ate = &entity->AsmTemplate;
 
@@ -2880,7 +2891,8 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	GB_ASSERT(at->signature != nullptr);
 	if (at->signature->kind != Ast_ProcType) {
 		error(at->signature, "Expected a valid signature, got %.*s", LIT(ast_strings[at->signature->kind]));
-		return;
+		entity->type = t_invalid;
+		return false;
 	}
 	AstProcType *pt = &at->signature->ProcType;
 
@@ -2898,13 +2910,27 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		// always require the results of `asm` templates
 		type->Proc.require_results = true;
 	}
-	entity->type = type;
+	entity->type   = type;
+	ate->proc_type = type;
 
 	AttributeContext ac = make_attribute_context({}, {});
 	if (d != nullptr) {
 		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
 	}
 	check_target_feature_attributes(ac, entity, type);
+	return true;
+}
+
+// NOTE(bill): the specification block, the clobbers, and the instructions
+template <typename AsmCtx>
+gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, DeclInfo *d) {
+	GB_ASSERT(entity->kind == Entity_AsmTemplate);
+	auto *ate = &entity->AsmTemplate;
+
+	ast_node(at, AsmTemplate, d->init_expr);
+
+	Type *type = ate->proc_type;
+	GB_ASSERT(type != nullptr && type->kind == Type_Proc);
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
 
@@ -3286,7 +3312,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		if (is_type_simd_vector(ed.entity->type)) {
 			i32 vw = cast(i32)(type_size_of(ed.entity->type) * 8);
 			String feat = asm_ctx->required_vector_feature(vw);
-			if (feat.len != 0 && !check_target_feature_is_enabled(feat, nullptr)) {
+			if (feat.len != 0 && !check_asm_template_feature_is_enabled(entity, feat)) {
 				error(ed.entity->token,
 				      "'asm' vector operand '%.*s' is %d-bit, which requires the '%.*s' target feature",
 				      LIT(ed.entity->token.string), vw, LIT(feat));
@@ -3391,7 +3417,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	}
 
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
-	if (results->Tuple.variables.count == 0 && !entity->AsmTemplate.is_volatile &&
+	if (type->Proc.result_count == 0 && !entity->AsmTemplate.is_volatile &&
 	    !entity->AsmTemplate.clobber_memory &&
 	    entity->AsmTemplate.has_observable_side_effect) {
 		warning(entity->token,
@@ -3434,13 +3460,47 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 }
 
 gb_internal void check_asm_template_from_entity(CheckerContext *c, Entity *e, DeclInfo *d) {
-	if (build_context.metrics.arch == TargetArch_amd64) {
-		check_asm_template(&g_asm_amd64, c, e, d);
-	} else if (build_context.metrics.arch == TargetArch_riscv64) {
-		check_asm_template(&g_asm_riscv, c, e, d);
-	} else if (build_context.metrics.arch == TargetArch_arm64) {
-		check_asm_template(&g_asm_arm64, c, e, d);
-	} else {
-		error(e->token, "asm templates are not currently supported for this target");
+	GB_ASSERT(e->decl_info == d);
+	if (!check_asm_template_signature(c, e, d)) {
+		return;
 	}
+	switch (build_context.metrics.arch) {
+	case TargetArch_amd64:
+	case TargetArch_riscv64:
+	case TargetArch_arm64:
+		check_asm_template_body_later(c, e);
+		break;
+	default:
+		error(e->token, "asm templates are not currently supported for this target");
+		break;
+	}
+}
+
+gb_internal void check_asm_template_body_from_entity(CheckerContext *c, Entity *e) {
+	GB_ASSERT(e->kind == Entity_AsmTemplate);
+	DeclInfo *d = e->decl_info;
+	GB_ASSERT(d != nullptr);
+
+	Entity *anonymous_entity = e->AsmTemplate.node->AsmTemplate.anonymous_entity;
+	if (anonymous_entity != nullptr && anonymous_entity != e) {
+		// NOTE(bill): the call it is in was checked again and only the entity it made last is used
+		return;
+	}
+
+	CheckerContext ctx = *c;
+	ctx.scope = d->scope;
+	ctx.decl  = d;
+
+	if (build_context.metrics.arch == TargetArch_amd64) {
+		check_asm_template_body(&g_asm_amd64, &ctx, e, d);
+	} else if (build_context.metrics.arch == TargetArch_riscv64) {
+		check_asm_template_body(&g_asm_riscv, &ctx, e, d);
+	} else if (build_context.metrics.arch == TargetArch_arm64) {
+		check_asm_template_body(&g_asm_arm64, &ctx, e, d);
+	} else {
+		GB_PANIC("asm templates are not supported for this target");
+	}
+
+	add_deps_from_child_to_parent(d);
+	e->flags |= EntityFlag_ProcBodyChecked;
 }
