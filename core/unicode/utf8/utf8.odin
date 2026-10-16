@@ -86,6 +86,7 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) #no_bounds_check {
 	if i > 0x0010ffff ||
 	   (0xd800 <= i && i <= 0xdfff) {
 		r = RUNE_ERROR
+		i = u32(r)
 	}
 
 	if i <= 1<<16-1 {
