@@ -13593,16 +13593,23 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_end;
 
 	case_ast_node(oe, OrElseExpr, node);
-		return check_or_else_expr(c, o, node, type_hint);
+		kind = check_or_else_expr(c, o, node, type_hint);
+		node->viral_state_flags |= oe->x->viral_state_flags;
+		node->viral_state_flags |= oe->y->viral_state_flags;
+		return kind;
 	case_end;
 
 	case_ast_node(re, OrReturnExpr, node);
 		node->viral_state_flags |= ViralStateFlag_ContainsOrReturn;
-		return check_or_return_expr(c, o, node, type_hint);
+		kind = check_or_return_expr(c, o, node, type_hint);
+		node->viral_state_flags |= re->expr->viral_state_flags;
+		return kind;
 	case_end;
 
-	case_ast_node(re, OrBranchExpr, node);
-		return check_or_branch_expr(c, o, node, type_hint);
+	case_ast_node(be, OrBranchExpr, node);
+		kind = check_or_branch_expr(c, o, node, type_hint);
+		node->viral_state_flags |= be->expr->viral_state_flags;
+		return kind;
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
