@@ -600,6 +600,26 @@ gb_internal bool check_asm_is_immediate_param(Entity *tmpl_entity, Operand const
 	return false;
 }
 
+// NOTE(bill): a template opting in to a feature with @(require_target_feature) or @(enable_target_feature)
+// must not be rejected because the global build did not enable it
+gb_internal bool check_asm_template_feature_is_enabled(Entity *tmpl_entity, String const &feature) {
+	if (check_target_feature_is_enabled(feature, nullptr)) {
+		return true;
+	}
+	Type *pt = tmpl_entity->AsmTemplate.proc_type;
+	GB_ASSERT(pt->kind == Type_Proc);
+	String req = pt->Proc.require_target_feature;
+	String en  = pt->Proc.enable_target_feature;
+
+	if (req.len != 0 && check_target_feature_is_superset_of(req, feature, nullptr)) {
+		return true;
+	}
+	if (en.len != 0 && check_target_feature_is_superset_of(en, feature, nullptr)) {
+		return true;
+	}
+	return false;
+}
+
 
 template <typename AsmCtx>
 gb_internal void check_asm_specs(AsmCtx *asm_ctx, CheckerContext *ctx, Scope *scope, Slice<Ast *> const &specs, Array<AsmTemplateEntityDecl> *asm_template_entity_decls) {
@@ -1681,31 +1701,14 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 			}
 		}
 		{
-			// Feature gate: the matched form may require a target feature (crc32b needs
-			// +crc, LSE atomics need +lse, ...). The form carries its Feature. It is
-			// satisfied if the feature is globally enabled for the target, OR if this
-			// template's own signature declares it via #require_target_feature /
-			// #enable_target_feature — a template opting in to a feature shouldn't be
-			// rejected just because the global build didn't enable it.
+			// NOTE(bill): Feature Gating
+			// The matched form may require a target feature (crc32b needs +crc, LSE atomics need +lse, ...).
+			// The form carries its Feature. It is satisfied if the feature is globally enabled for the target,
+			// OR if this template's own signature declares it via @(require_target_feature) / @(enable_target_feature)
+			// see `check_asm_template_feature_is_enabled`
 			String feat = asm_ctx->feature_name_from_form(forms[valid_form_index]);
 			if (feat.len != 0) {
-				bool ok = check_target_feature_is_enabled(feat, nullptr);
-
-				if (!ok) {
-					// The proc type may declare the feature itself.
-					Type *pt = tmpl_entity->AsmTemplate.proc_type;
-					GB_ASSERT(pt->kind == Type_Proc);
-					String req = pt->Proc.require_target_feature;
-					String en  = pt->Proc.enable_target_feature;
-					// These are comma-lists; `feat` is a single bare name. is_superset_of
-					// checks whether the declared list contains it.
-					if (req.len != 0 && check_target_feature_is_superset_of(req, feat, nullptr)) {
-						ok = true;
-					}
-					if (!ok && en.len != 0 && check_target_feature_is_superset_of(en, feat, nullptr)) {
-						ok = true;
-					}
-				}
+				bool ok = check_asm_template_feature_is_enabled(tmpl_entity, feat);
 
 				if (!ok) {
 					error(instr->name,
@@ -3309,7 +3312,7 @@ gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, E
 		if (is_type_simd_vector(ed.entity->type)) {
 			i32 vw = cast(i32)(type_size_of(ed.entity->type) * 8);
 			String feat = asm_ctx->required_vector_feature(vw);
-			if (feat.len != 0 && !check_target_feature_is_enabled(feat, nullptr)) {
+			if (feat.len != 0 && !check_asm_template_feature_is_enabled(entity, feat)) {
 				error(ed.entity->token,
 				      "'asm' vector operand '%.*s' is %d-bit, which requires the '%.*s' target feature",
 				      LIT(ed.entity->token.string), vw, LIT(feat));
