@@ -945,6 +945,9 @@ struct CheckerContext {
 #define MAX_INLINE_FOR_DEPTH 1024ll
 	i64 inline_for_depth;
 
+#define MAX_POLYMORPHIC_RECORD_DEPTH 16
+	i32 polymorphic_record_depth; // nested polymorphic record instantiations
+
 	u32        stmt_flags;
 	bool       in_enum_type;
 	bool       in_proc_group;

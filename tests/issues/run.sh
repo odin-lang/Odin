@@ -130,6 +130,13 @@ else
 	exit 1
 fi
 
+if [[ $($ODIN check ../test_issue_7901 $COMMON_CHECK 2>&1 >/dev/null | grep -c "exceeds the maximum nesting depth") -eq 2 ]]; then
+	echo "SUCCESSFUL 1/1"
+else
+	echo "SUCCESSFUL 0/1"
+	exit 1
+fi
+
 if [[ $($ODIN check ../test_issue_7304 -no-entry-point $COMMON_CHECK 2>&1 >/dev/null | grep -c "9223372036854775808 is not representable by int") -eq 1 ]]; then
 	echo "SUCCESSFUL 1/1"
 else
