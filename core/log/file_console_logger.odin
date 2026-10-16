@@ -10,6 +10,8 @@ import "core:os"
 import "core:terminal"
 import "core:terminal/ansi"
 import "core:time"
+import "core:time/datetime"
+import "core:time/timezone"
 
 // Strings to output when `.Level` is included in the logger options.
 Level_Headers := [?]string{
@@ -66,6 +68,7 @@ Default_File_Logger_Opts :: Options{
 File_Console_Logger_Data :: struct {
 	file_handle: ^os.File,
 	ident: string,
+	time_zone: ^datetime.TZ_Region,
 }
 
 @(private) global_subtract_stdout_options: Options
@@ -109,11 +112,13 @@ Inputs:
 - `opt`: Specifies additional data present in the log output (default is `log.Default_File_Logger_Opts`)
 - `ident`: Identifier to include in the output (default is `""`)
 - `allocator`: Allocator to use for data backing the logger (default is `context.allocator`)
+- `time_zone`: Time zone of the date and time in the output (default is `nil`, which gets UTC), it must stay alive/allocated as long as it is used
 */
-create_file_logger :: proc(f: ^os.File, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
+create_file_logger :: proc(f: ^os.File, lowest := Level.Debug, opt := Default_File_Logger_Opts, ident := "", allocator := context.allocator, time_zone: ^datetime.TZ_Region = nil) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
 	data.file_handle = f
 	data.ident = ident
+	data.time_zone = time_zone
 	return Logger{file_logger_proc, data, lowest, opt}
 }
 
@@ -144,11 +149,13 @@ Inputs:
 - `opt`: Specifies additional data present in the log output (default is `log.Default_Console_Logger_Opts`)
 - `ident`: Identifier to include in the output (default is `""`)
 - `allocator`: Allocator to use for data backing the logger (default is `context.allocator`)
+- `time_zone`: Time zone of the date and time in the output (default is `nil`, which gets UTC), it must stay alive/allocated as long as it is used
 */
-create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "", allocator := context.allocator) -> Logger {
+create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logger_Opts, ident := "", allocator := context.allocator, time_zone: ^datetime.TZ_Region = nil) -> Logger {
 	data := new(File_Console_Logger_Data, allocator)
 	data.file_handle = nil
 	data.ident = ident
+	data.time_zone = time_zone
 	return Logger{console_logger_proc, data, lowest, opt}
 }
 
@@ -164,14 +171,20 @@ destroy_console_logger :: proc(log: Logger, allocator := context.allocator) {
 }
 
 @(private)
-_file_console_logger_proc :: proc(h: ^os.File, ident: string, level: Level, text: string, options: Options, location: runtime.Source_Code_Location) {
+_file_console_logger_proc :: proc(h: ^os.File, ident: string, time_zone: ^datetime.TZ_Region, level: Level, text: string, options: Options, location: runtime.Source_Code_Location) {
 	backing: [1024]byte //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
 	buf := strings.builder_from_bytes(backing[:])
 
 	do_level_header(options, &buf, level)
 
 	when time.IS_SUPPORTED {
-		do_time_header(options, &buf, time.now())
+		now := time.now()
+		if time_zone != nil {
+			utc, _ := time.time_to_datetime(now)
+			local  := timezone.datetime_to_tz(utc, time_zone)
+			now     = time.datetime_to_time(local) or_else now
+		}
+		do_time_header(options, &buf, now)
 	}
 
 	do_location_header(options, &buf, location)
@@ -190,7 +203,7 @@ _file_console_logger_proc :: proc(h: ^os.File, ident: string, level: Level, text
 
 file_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
 	data := cast(^File_Console_Logger_Data)logger_data
-	_file_console_logger_proc(data.file_handle, data.ident, level, text, options, location)
+	_file_console_logger_proc(data.file_handle, data.ident, data.time_zone, level, text, options, location)
 }
 
 console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
@@ -204,7 +217,7 @@ console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string, opt
 		h = os.stderr
 		options -= global_subtract_stderr_options
 	}
-	_file_console_logger_proc(h, data.ident, level, text, options, location)
+	_file_console_logger_proc(h, data.ident, data.time_zone, level, text, options, location)
 }
 
 // Helper used to build the part of the message including the log level.
