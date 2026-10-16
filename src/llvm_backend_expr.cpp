@@ -186,13 +186,12 @@ gb_internal lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x,
 		lbValue cmp = {};
 		cmp.type = x.type;
 		if (is_type_bit_set(x.type)) {
+			// NOTE: `mask &~ x` rather than `x ~ mask`, so that bits outside of the set are cleared,
+			// as they are for a constant `~x`
 			ExactValue ev_mask = exact_bit_set_all_set_mask(x.type);
 			lbValue mask = lb_const_value(p->module, x.type, ev_mask);
-			if (is_type_array(bit_set_to_int(x.type))) {
-				lbValue res = lb_emit_arith(p, Token_Xor, x, mask, x.type);
-				return lb_emit_conv(p, res, type);
-			}
-			cmp.value = LLVMBuildXor(p->builder, x.value, mask.value, "");
+			lbValue res = lb_emit_arith(p, Token_AndNot, mask, x, x.type);
+			return lb_emit_conv(p, res, type);
 		} else {
 			cmp.value = LLVMBuildNot(p->builder, x.value, "");
 		}
