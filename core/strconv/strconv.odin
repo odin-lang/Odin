@@ -4,6 +4,7 @@ package strconv
 import "base:runtime"
 import "core:unicode"
 import "core:unicode/utf8"
+import "core:unicode/utf16"
 import "decimal"
 /*
 Parses a boolean value from the input string
@@ -1667,6 +1668,142 @@ _write_hex_code :: proc(buf: []byte, i: ^int, r: u32, w: int) -> bool {
 }
 
 
+/*
+	Writes string `str` to byte buffer `buf`, and returns the written bytes as a string.
+
+	**Inputs**
+	- `buf`:      The byte slice to which the quoted string will be written.
+	- `str`:      The input string to be quoted.
+
+	**Returns**
+	- `result`:   The resulting string after writing it to the buffer.
+	              May be clipped if `buf` was not large enough.
+	- `ok`:       `true` on success; `false` if `buf` was not large enough.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [20]byte
+			result := strconv.quote_string_buf(buf[:], "hello")
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		"hello" [34, 104, 101, 108, 108, 111, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+*/
+write_string :: proc(buf: []byte, str: string) -> (result: string, ok: bool) #optional_ok {
+	n := copy(buf, str)
+	result = transmute(string)buf[:n]
+	ok = (n == len(str))
+	return
+}
+
+
+write_string16 :: proc { write_string16_buf, write_string16_dynamic_array }
+
+
+/*
+	Writes UTF-16 encoded string `str`, converted to UTF-8 to byte buffer `buf`, and returns the written bytes as a string.
+
+	**Inputs**
+	- `buf`:      The byte slice to which the quoted string will be written.
+	- `str`:      The input string to be quoted.
+
+	**Returns**
+	- `result`:   The resulting string after writing it to the buffer.
+	              May be clipped if `buf` was not large enough.
+	- `ok`:       `true` on success; `false` if `buf` was not large enough.
+
+	**Remarks**
+
+	Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+	distinguish malformed sequences from literal replacement characters, so both are written identically.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [20]byte
+			result := strconv.quote_string_buf(buf[:], "hello")
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		"hello" [34, 104, 101, 108, 108, 111, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+*/
+write_string16_buf :: proc(buf: []byte, str: string16) -> (result: string, ok: bool) #optional_ok {
+	n := 0
+	ok = true
+	s := str
+	for len(s) > 0 {
+		r, decoded_width := utf16.decode_rune_in_string(s)
+		assert(decoded_width > 0)
+		encoded_bytes, encoded_width := utf8.encode_rune(r)
+		num_copied := copy(buf[n:], encoded_bytes[:encoded_width])
+		n += num_copied
+		if num_copied != encoded_width {
+			// Buffer not large enough.
+			ok = false
+			break
+		}
+		s = s[decoded_width:]
+	}
+	result = transmute(string)buf[:n]
+	return
+}
+
+
+/*
+	Appends UTF-16 encoded string `str`, converted to UTF-8, to the end of `buf`, and returns appended bytes as a string.
+
+	**Inputs**
+	- `buf`:      The byte slice to which the quoted string will be written.
+	- `str`:      The input string to be quoted.
+
+	**Returns**
+	- `result`:   The resulting string after writing it to the buffer.
+	              May be clipped if `buf` was not large enough.
+	- `err`:      Allocator error if one occurred, otherwise `nil`.
+
+	**Remarks**
+
+	Unpaired UTF-16 surrogates are encoded as the Unicode replacement character. The UTF-16 decoder does not
+	distinguish malformed sequences from literal replacement characters, so both are written identically.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [20]byte
+			result := strconv.quote_string_buf(buf[:], "hello")
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		"hello" [34, 104, 101, 108, 108, 111, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+*/
+write_string16_dynamic_array :: proc(buf: ^[dynamic]byte, str: string16, loc := #caller_location) -> (result: string, err: runtime.Allocator_Error) #optional_allocator_error {
+	n := 0
+	s := str
+	for len(s) > 0 {
+		r, decoded_width := utf16.decode_rune_in_string(s)
+		assert(decoded_width > 0)
+		encoded_bytes, encoded_width := utf8.encode_rune(r)
+		n += append(buf, ..encoded_bytes[:encoded_width], loc=loc) or_return
+		s = s[decoded_width:]
+	}
+	result = transmute(string)buf[len(buf)-n:]
+	return
+}
+
+
 @(deprecated="This will almost certainly not do what you are expecting. If you actually meant to call this, call `quote_weird` instead. Otherwise, you are probably looking for `quote_string`.")
 quote :: proc(buf: []byte, str: string) -> string {
 	return quote_weird(buf, str)
@@ -1883,6 +2020,136 @@ quote_string_dynamic_array :: proc(
 			assert(encode_rune_ok == true, "encode_rune should have worked - 10 bytes should be enough to accomodate for any encoded rune representation (max. = \"\\U########\").")
 			n += append(buf, encoded_rune, loc=loc) or_return
 		}
+		// Advance input cursor to the next codepoint.
+		s = s[width:]
+	}
+
+	n += append(buf, quote, loc=loc) or_return
+	result = transmute(string)buf[len(buf)-n:]
+	return
+}
+
+
+/*
+	Writes a quoted string representation of the UTF-16 input string, converted to UTF-8, to a given byte buffer, and returns the result as a string.
+
+	The string is formatted such that it would parse back as the same string in Odin syntax.
+*/
+quote_string16 :: proc { quote_string16_buf, quote_string16_dynamic_array }
+
+
+/*
+	Writes a quoted string representation of the UTF-16 input string to byte buffer `buf`, and returns the result as a string.
+
+	The string is formatted such that it would parse back as the same string in Odin syntax.
+
+	**Note:** The output string is encoded as UTF-8.
+
+	**Inputs**
+	- `buf`:      The byte slice to which the quoted string will be written.
+	- `str`:      The input string to be quoted.
+	- `quote`:    The quote character used to surround the string. This character is also escaped
+	              when it is encountered in the string.
+	- `options`:  Controls how characters in the string are escaped.
+
+	**Returns**
+	- `result`:   The resulting string after writing the quoted string representation.
+	- `ok`:       `true` on success; `false` if `buf` was not large enough.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [20]byte
+			result := strconv.quote_string_buf(buf[:], "hello")
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		"hello" [34, 104, 101, 108, 108, 111, 34, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+*/
+quote_string16_buf :: proc(
+	buf:      []byte,
+	str:      string16,
+	quote:    byte = '"',
+	options:  Rune_Escaping_Options = nil,
+) -> (result: string, ok: bool) #optional_ok {
+	i := 0
+
+	_write_byte(buf, &i, quote) or_return
+
+	s := str
+
+	for len(s) > 0 {
+		r, width := utf16.decode_rune_in_string(s)
+		assert(width > 0)
+		encoded := encode_and_escape_rune(buf[i:], r, quote, options = options) or_return
+		i += len(encoded)
+		// Advance input cursor to the next codepoint.
+		s = s[width:]
+	}
+
+	_write_byte(buf, &i, quote) or_return
+	result = transmute(string)buf[:i]
+	ok = true
+	return
+}
+
+
+/*
+	Appends a quoted string representation of the UTF-16 input string to the end of `buf`, and returns the appended part as a string.
+
+	The string is formatted such that it would parse back as the same string in Odin syntax.
+
+	**Note:** The output string is encoded as UTF-8.
+
+	**Inputs**
+	- `buf`:      The dynamic array to which the quoted string will be appended.
+	- `str`:      The input string to be quoted.
+	- `quote`:    The quote character used to surround the string. This character is also escaped
+	              when it is encountered in the string.
+	- `options`:  Controls how characters in the string are escaped.
+
+	**Returns**
+	- `result`:   The resulting string after writing the quoted string representation.
+	- `err`:      Allocator error if one occurred, otherwise `nil`.
+
+	Example:
+
+		import "core:fmt"
+		import "core:strconv"
+		quote_example :: proc() {
+			buf: [dynamic]byte
+			result := strconv.quote_string_dynamic_array(&buf, "hello")
+			fmt.println(result, buf)
+		}
+
+	Output:
+
+		"hello" [34, 104, 101, 108, 108, 111, 34]
+*/
+quote_string16_dynamic_array :: proc(
+	buf:      ^[dynamic]byte,
+	str:      string16,
+	quote:    byte = '"',
+	options:  Rune_Escaping_Options = nil,
+	loc := #caller_location,
+) -> (result: string, err: runtime.Allocator_Error) #optional_allocator_error {
+	n := 0
+	n += append(buf, quote, loc=loc) or_return
+
+	s := str
+
+	for len(s) > 0 {
+		r, width := utf16.decode_rune_in_string(s)
+		assert(width > 0)
+		// CONSIDER: ensure ESCAPED_RUNE_MAX_NEEDED_BYTES bytes free capacity in buf, and put it there directly?
+		encoded_rune_buf: [ESCAPED_RUNE_MAX_NEEDED_BYTES]byte
+		encoded_rune, encode_rune_ok := encode_and_escape_rune(encoded_rune_buf[:], r, quote, options = options)
+		assert(encode_rune_ok == true, "encode_rune should have worked - 10 bytes should be enough to accomodate for any encoded rune representation (max. = \"\\U########\").")
+		n += append(buf, encoded_rune, loc=loc) or_return
 		// Advance input cursor to the next codepoint.
 		s = s[width:]
 	}
