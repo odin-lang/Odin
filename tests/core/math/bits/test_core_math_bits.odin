@@ -188,10 +188,13 @@ test_div_u32 :: proc(t: ^testing.T) {
 	testing.expect_value(t, rem, max(u32) - 1)
 }
 
-@test
-test_div_u32_overflow :: proc(t: ^testing.T) {
-	// 5 * 2^32 / 3 does not fit in 32 bits
-	testing.expect_assert(t, "overflow error")
-	quo, rem := bits.div_u32(5, 0, 3)
-	testing.expectf(t, false, "an overflowing division gave %v rem %v", quo, rem)
+// AddressSanitizer on Windows ends the process on the panic trap before the test runner can catch it.
+when !(ODIN_OS == .Windows && .Address in ODIN_SANITIZER_FLAGS) {
+	@test
+	test_div_u32_overflow :: proc(t: ^testing.T) {
+		// 5 * 2^32 / 3 does not fit in 32 bits
+		testing.expect_assert(t, "overflow error")
+		quo, rem := bits.div_u32(5, 0, 3)
+		testing.expectf(t, false, "an overflowing division gave %v rem %v", quo, rem)
+	}
 }
