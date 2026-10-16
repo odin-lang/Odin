@@ -447,6 +447,37 @@ invalid_utf8_in_string_is_replaced :: proc(t: ^testing.T) {
 	}
 }
 
+@(test)
+marshal_invalid_utf8_as_valid_json :: proc(t: ^testing.T) {
+	input := "A\xffZ"
+
+	encoded, err := json.marshal(input)
+	defer delete(encoded)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, transmute(string)encoded, "\"A\ufffdZ\"") // "A�Z"
+}
+
+@(test)
+unmarshal_replacement_character :: proc(t: ^testing.T) {
+	encoded := `"A\ufffdZ"`
+	parsed, parse_err := json.parse_string(encoded)
+	defer json.destroy_value(parsed)
+	testing.expect_value(t, parse_err, nil)
+	result, ok := parsed.(json.String)
+	testing.expect_value(t, ok, true)
+	testing.expect_value(t, result, "A\ufffdZ") // A�Z
+}
+
+@(test)
+marshal_invalid_rune_as_replacement :: proc(t: ^testing.T) {
+	input := rune(-1)
+
+	encoded, err := json.marshal(input)
+	defer delete(encoded)
+	testing.expect_value(t, err, nil)
+	testing.expect_value(t, transmute(string)encoded, "\"\ufffd\"") // "�"
+}
+
 @test
 struct_with_ignore_tags :: proc(t: ^testing.T) {
 	My_Struct :: struct {
