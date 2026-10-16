@@ -1587,11 +1587,20 @@ _write_string :: #force_inline proc(buf: []byte, i: ^int, s: string) -> bool {
 	Returns `true` on success, `false` if `buf` was not large enough.
 
 	NOTE: The maximum number of bytes written to `buf` is 10 (`ESCAPED_RUNE_MAX_NEEDED_BYTES`).
+
+	If the input rune is invalid, this will write a Unicode replacement character instead.
 */
 _write_rune :: proc(buf: []byte, i: ^int, r: rune, quote_char: byte, options: Rune_Escaping_Options) -> bool {
 
 	if len(buf) <= i^ {
 		return false
+	}
+
+	r := r
+
+	if r < 0 || r > utf8.MAX_RUNE || (utf8.SURROGATE_MIN <= r && r <= utf8.SURROGATE_MAX) {
+		// Invalid input.
+		r = unicode.REPLACEMENT_CHAR
 	}
 
 	if r == '\\' || (r == cast(rune)quote_char && quote_char != 0) {
@@ -2215,16 +2224,13 @@ quote_rune :: proc(
 	r: rune,
 	options: Rune_Escaping_Options = nil,
 ) -> (result: string, ok: bool) #optional_ok {
-	if buf == nil || r < 0 {
+	if buf == nil {
 		return "", false
 	}
 
 	i := 0
 	_write_byte(buf, &i, '\'') or_return
-
-	encoded := encode_and_escape_rune(buf[i:], r, '\'', options = options) or_return
-	i += len(encoded)
-
+	_write_rune(buf, &i, r, quote_char = '\'', options = options) or_return
 	_write_byte(buf, &i, '\'') or_return
 
 	return string(buf[:i]), true
@@ -2275,9 +2281,11 @@ Rune_Escaping_Options :: bit_set[Rune_Escaping_Option]
 
 	This includes, but may not be limited to, control characters, invisible characters, and characters which
 	would likely cause display issues such as combining marks (see: `unicode.is_printable`).
+
+	Invalid code points, including surrogate values, are encoded as the replacement character.
 */
 encode_and_escape_rune :: proc(buf: []byte, r: rune, quote_char: byte, options: Rune_Escaping_Options = nil) -> (result: string, ok: bool) #optional_ok {
-	if buf == nil || r < 0 {
+	if buf == nil {
 		return "", false
 	}
 
