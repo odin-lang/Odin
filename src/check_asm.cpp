@@ -1791,7 +1791,15 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
  			if (pe != nullptr && pe->kind == Entity_Variable) {
  				i32 di = -1;
  				check_asm_find_group(pe, ate->decls, &di);
- 				pinned_param_writes |= asm_decl_resolve_pin_bit(asm_ctx, ate->decls, di);
+				u16 pin_bit = asm_decl_resolve_pin_bit(asm_ctx, ate->decls, di);
+ 				pinned_param_writes |= pin_bit;
+
+				// NOTE(bill): A write through a pinned parameter defines its register at the operand's width
+				i32 idx = asm_reg_index_from_bit(pin_bit);
+				i32 w   = check_asm_operand_bit_width(operands[i].type);
+				if (idx >= 0 && w > 0) {
+					facts->gen_reg_w.e[idx] = cast(u8)gb_max(cast(i32)facts->gen_reg_w.e[idx], w);
+				}
  			}
 		}
 
@@ -1870,6 +1878,17 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 				}
 				if (cast(u16)clobber.written & (1u << tslot)) {
 					facts->gen_reg_w.e [idx] = cast(u8)w;
+				}
+			}
+		}
+
+		{
+			// NOTE(bill): A written register with no operand width, e.g. an implicit write such as RDTSC -> EDX:EAX,
+			// is treated as a full-width definition, matching asm_full_kill_mask
+			u8 full = cast(u8)(build_context.metrics.ptr_size*8);
+			for (i32 idx = 0; idx < ASM_WIDTH_REG_COUNT; idx++) {
+				if ((facts->gen_regs & (1u << idx)) != 0 && facts->gen_reg_w.e[idx] == 0) {
+					facts->gen_reg_w.e[idx] = full;
 				}
 			}
 		}
@@ -3328,6 +3347,10 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			if (instruction_->kind == Ast_AsmInstruction) {
 				for (Ast *op : instruction_->AsmInstruction.operands) {
 					check_asm_collect_refs(asm_ctx, &refs, op, &touched_regs);
+				}
+				// NOTE(bill): An implicit read (e.g. CQO reads RAX, CPUID reads EAX/ECX) uses the pinned register too
+				if (AsmInstructionFacts *facts = instruction_->AsmInstruction.facts) {
+					touched_regs |= facts->read_regs;
 				}
 			} else if (instruction_->kind == Ast_AsmDirective) {
 				for (Ast *op : instruction_->AsmDirective.operands) {
