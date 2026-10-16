@@ -894,14 +894,12 @@ Returns:
 - err: An allocator error if one occured, `nil` otherwise.
 */
 write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f, fmt, prec, bit_size)
-	// If the result starts with a `+` then unless we always want signed results,
-	// we skip it unless it's followed by an `I` (because of +Inf).
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
-		s = s[1:]
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f, fmt, prec, bit_size, flags)
 	return write_string(b, s, loc=loc)
 }
 /*
@@ -920,12 +918,12 @@ Returns:
 - err: An allocator error if one occured, `nil` otherwise.
 */
 write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
-		s = s[1:]
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
 	return write_string(b, s, loc=loc)
 }
 /*
@@ -962,12 +960,12 @@ Output:
 
 */
 write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
-		s = s[1:]
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
 	return write_string(b, s, loc=loc)
 }
 /*
@@ -986,12 +984,12 @@ Returns:
 - err: An allocator error if one occured, `nil` otherwise.
 */
 write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false, loc := #caller_location) -> (n: int, err: runtime.Allocator_Error) #optional_allocator_error {
-	buf: [384]byte
-	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
-	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
-		// xxxx this functionality is also needed by fmt and maybe io - I think strconv should be able to do this because it's super awkward to stay on top of this.
-		s = s[1:]
+	flags: strconv.Float_Flags
+	if always_signed {
+		flags |= { .Plus }
 	}
+	buf: [384]byte
+	s := strconv.write_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f), flags)
 	return write_string(b, s, loc=loc)
 }
 /*

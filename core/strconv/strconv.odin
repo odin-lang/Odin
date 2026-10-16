@@ -1506,7 +1506,9 @@ Writes a float64 value as a string to the given buffer with the specified format
 - f: The float64 value to be written
 - fmt: The byte specifying the format to use for the conversion
 - prec: The precision to use for the conversion
-- bit_size: The size of the float in bits (32 or 64)
+- bit_size: The size of the float in bits (16, 32, or 64)
+- flags: Additional formatting options.
+         The default value adds a '+' sign for positive finite values, for compatibility reasons.
 
 Example:
 
@@ -1522,11 +1524,13 @@ Output:
 
 	+3.14 [43, 51, 46, 49, 52, 0, 0, 0]
 
+Pass `nil` for `flags` to format the same value as `3.14`.
+
 **Returns**
 - The resulting string after writing the float
 */
-write_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
-	return string(generic_ftoa(buf, f, fmt, prec, bit_size))
+write_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int, flags: Float_Flags = { .Plus }) -> string {
+	return string(generic_ftoa(buf, f, fmt, prec, bit_size, flags))
 }
 // Accepts '0'..='9', otherwise returns ok = false
 digit_to_int :: proc(r: rune) -> (value: int, ok: bool) {

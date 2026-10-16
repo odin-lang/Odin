@@ -1270,19 +1270,16 @@ _fmt_memory :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, units: st
 		amt = -amt
 	}
 
+	flags: strconv.Float_Flags
+	if fi.plus {
+		flags |= { .Plus }
+	}
 	buf: [256]byte
-	str := strconv.write_float(buf[:], amt, 'f', prec, 64)
+	str := strconv.write_float(buf[:], amt, 'f', prec, 64, flags)
 
 	// Add the unit at the end.
 	copy(buf[len(str):], units[off:off+unit_len])
 	str = string(buf[:len(str)+unit_len])
-
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
-	}
 
 	_pad(fi, str)
 }
@@ -1412,26 +1409,22 @@ _pad :: proc(fi: ^Info, s: string) {
 // - bit_size: The size of the floating-point number in bits (16, 32, or 64).
 // - verb: The format specifier character.
 // - float_fmt: The byte format used for formatting the float (either 'f' or 'e').
+// - default_prec: Precision used if `fi` does not specify anything.
 //
-// NOTE: Can return "NaN", "+Inf", "-Inf", "+<value>", or "-<value>".
+// NOTE: Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", or "-<value>".
 //
-_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, prec: int) {
-	prec := prec
-	if fi.prec_set {
-		prec = fi.prec
+_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte, default_prec: int) {
+	prec := fi.prec if fi.prec_set else default_prec
+
+	flags: strconv.Float_Flags
+	if fi.plus {
+		flags |= { .Plus }
 	}
 
 	buf: [386]byte
 
-	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
-	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size)
-
-	if !fi.plus {
-		// Strip sign from "+<value>" but not "+Inf".
-		if str[0] == '+' && str[1] != 'I' {
-			str = str[1:]
-		}
-	}
+	// Can return "NaN", "+Inf", "-Inf", "<value>", "+<value>", "-<value>".
+	str := strconv.write_float(buf[:], v, float_fmt, prec, bit_size, flags)
 
 	_pad(fi, str)
 }
