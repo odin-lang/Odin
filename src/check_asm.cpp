@@ -2875,8 +2875,8 @@ gb_internal void check_asm_instruction_operand(AsmCtx *asm_ctx, CheckerContext *
 }
 
 
-template <typename AsmCtx>
-gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, DeclInfo *d) {
+// NOTE(bill): the signature is everything needed to call an asm template, the rest is checked by `check_asm_template_body`
+gb_internal bool check_asm_template_signature(CheckerContext *ctx, Entity *entity, DeclInfo *d) {
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
 	auto *ate = &entity->AsmTemplate;
 
@@ -2888,7 +2888,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	GB_ASSERT(at->signature != nullptr);
 	if (at->signature->kind != Ast_ProcType) {
 		error(at->signature, "Expected a valid signature, got %.*s", LIT(ast_strings[at->signature->kind]));
-		return;
+		return false;
 	}
 	AstProcType *pt = &at->signature->ProcType;
 
@@ -2913,6 +2913,19 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 		check_decl_attributes(ctx, d->attributes, proc_decl_attribute, &ac);
 	}
 	check_target_feature_attributes(ac, entity, type);
+	return true;
+}
+
+// NOTE(bill): the specification block, the clobbers, and the instructions
+template <typename AsmCtx>
+gb_internal void check_asm_template_body(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, DeclInfo *d) {
+	GB_ASSERT(entity->kind == Entity_AsmTemplate);
+	auto *ate = &entity->AsmTemplate;
+
+	ast_node(at, AsmTemplate, d->init_expr);
+
+	Type *type = entity->type;
+	GB_ASSERT(type != nullptr && type->kind == Type_Proc);
 
 	check_asm_specs(asm_ctx, ctx, ate->param_scope, at->specs, &ate->decls);
 
@@ -3399,7 +3412,7 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 	}
 
 	GB_ASSERT(entity->kind == Entity_AsmTemplate);
-	if (results->Tuple.variables.count == 0 && !entity->AsmTemplate.is_volatile &&
+	if (type->Proc.result_count == 0 && !entity->AsmTemplate.is_volatile &&
 	    !entity->AsmTemplate.clobber_memory &&
 	    entity->AsmTemplate.has_observable_side_effect) {
 		warning(entity->token,
@@ -3438,6 +3451,13 @@ gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity
 			Token tok = node ? ast_token(node): entity->token;
 			error(tok, "'asm' template is marked #pure but it is not pure: %s", why);
 		}
+	}
+}
+
+template <typename AsmCtx>
+gb_internal void check_asm_template(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *entity, DeclInfo *d) {
+	if (check_asm_template_signature(ctx, entity, d)) {
+		check_asm_template_body(asm_ctx, ctx, entity, d);
 	}
 }
 
