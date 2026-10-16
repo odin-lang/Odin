@@ -9729,6 +9729,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				DeclInfo *d = make_decl_info(c->scope, c->decl);
 				Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, unnested_proc);
 				d->init_expr = unnested_proc;
+				e->decl_info = d;
+				e->file = c->file;
 				at->anonymous_entity = e;
 
 				check_asm_template_from_entity(c, e, d);

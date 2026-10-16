@@ -2206,9 +2206,9 @@ gb_internal void check_asm_group_decl(CheckerContext *ctx, Entity *asm_entity, D
 	check_objc_methods(ctx, asm_entity, ac);
 }
 
-#include "check_asm.cpp"
-
 gb_internal void add_deps_from_child_to_parent(DeclInfo *decl);
+
+#include "check_asm.cpp"
 
 gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
@@ -2512,6 +2512,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		return false;
 	}
 
+	ctx->asm_templates_to_check = &decl->proc->asm_templates_to_check;
+
 	check_open_scope(ctx, body);
 	{
 		ctx->scope->decl_info = decl;
@@ -2569,6 +2571,13 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	}
 	check_close_scope(ctx);
+
+	// NOTE(bill): with every name in the body now known, see `check_asm_template_body_later`
+	ctx->asm_templates_to_check = nullptr;
+	for (Entity *e : decl->proc->asm_templates_to_check) {
+		check_asm_template_body_from_entity(ctx, e);
+	}
+	array_clear(&decl->proc->asm_templates_to_check);
 
 	check_scope_usage(ctx->checker, ctx->scope, check_vet_flags(body));
 
