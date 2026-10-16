@@ -383,6 +383,19 @@ if [[ "$(uname -m)" == "x86_64" || "$(uname -m)" == "amd64" ]]; then
 		echo "SUCCESSFUL 0/1"
 		exit 1
 	fi
+	if [[ $($ODIN check ../test_issue_asm_deferred_errors $COMMON_CHECK 2>&1 >/dev/null | grep -c "Unknown mnemonic") -eq 5 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+	if [[ $($ODIN check ../test_issue_asm_target_features $COMMON_CHECK 2>&1 >/dev/null | grep -c "Error:") -eq 3 &&
+	      $($ODIN check ../test_issue_asm_target_features $COMMON_CHECK 2>&1 >/dev/null | grep -c "enables target feature 'avx'") -eq 3 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
 fi
 
 $ODIN test ../test_lifetime_markers $COMMON -o:size -lifetime-markers
