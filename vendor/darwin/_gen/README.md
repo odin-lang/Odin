@@ -57,8 +57,12 @@ maintained by hand. `vendor:darwin/CoreVideo` is hand-written as well.
   opts := UI.ViewAnimationOptions{.Repeat, .Autoreverse} | UI.ViewAnimationOptions_CurveEaseIn
   ```
 
-  A field is read back through its mask, where the SDK has one:
-  `writing & NS.DataWritingOptions_FileProtectionMask == NS.DataWritingOptions_FileProtectionComplete`.
+  Every bit of a field or of a mask gets an element `_Bit<n>`, so that the constants are ordinary
+  sets (`UI.ViewAnimationOptions_CurveLinear` is `{._Bit16, ._Bit17}`) and `opts & ~Mask` clears the
+  same bits as `opts &~ Mask`. A field is read back through its mask, where the SDK has one, and
+  replaced by clearing the mask first:
+  `writing & NS.DataWritingOptions_FileProtectionMask == NS.DataWritingOptions_FileProtectionComplete`,
+  `writing = writing &~ NS.DataWritingOptions_FileProtectionMask | NS.DataWritingOptions_FileProtectionNone`.
   `NS.SaveOptions` (exclusive values) and `CF.SocketCallBackType` (a callback gets one type) stay enums.
 - Enum members mangled by csgen's prefix removal are renamed (`ENUM_MEMBER_FIXES`), e.g.
   `AVFoundation.CaptureSystemPressureFactors` has `SystemTemperature` rather than `ystemTemperature`.

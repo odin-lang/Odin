@@ -218,6 +218,7 @@ gb_internal void init_decl_info_proc(DeclInfo *d, Ast *proc_lit) {
 	if (d->proc == nullptr) {
 		ProcDeclInfo *p = permanent_alloc_item<ProcDeclInfo>();
 		p->nested_to_check.allocator = heap_allocator();
+		p->asm_templates_to_check.allocator = heap_allocator();
 		p->labels.allocator = heap_allocator();
 		p->variadic_reuses.allocator = heap_allocator();
 		p->variadic_reuse_max_align = 1;
@@ -1906,6 +1907,7 @@ gb_internal void init_checker(Checker *c) {
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
+	array_init(&c->asm_templates_to_check, heap_allocator());
 
 	per_thread_array_init(&c->global_untyped_queue, global_thread_pool.threads.count);
 	mpsc_init(&c->soa_types_to_complete, a); // , 1<<20);
@@ -1928,6 +1930,7 @@ gb_internal void destroy_checker(Checker *c) {
 	destroy_checker_context(&c->builtin_ctx);
 
 	array_free(&c->procs_to_check);
+	array_free(&c->asm_templates_to_check);
 	per_thread_array_destroy(&c->global_untyped_queue);
 	mpsc_destroy(&c->soa_types_to_complete);
 }
@@ -2829,6 +2832,24 @@ gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, D
 	info->tags  = tags;
 	info->poly_parent = global_error_context.instantiations.proc;
 	check_procedure_later(c, info);
+}
+
+gb_internal WORKER_TASK_PROC(check_asm_template_body_worker_proc);
+
+// NOTE(bill): like a procedure literal, only the signature of an asm template is needed to use it, so the rest of it
+// is checked once all of the procedure body it is within has been (as the names in that body are not all known
+// before then), otherwise with the procedure bodies
+gb_internal void check_asm_template_body_later(CheckerContext *c, Entity *e) {
+	GB_ASSERT(e->kind == Entity_AsmTemplate);
+	if (c->asm_templates_to_check != nullptr) {
+		array_add(c->asm_templates_to_check, e);
+	} else if (global_procedure_body_in_worker_queue.load()) {
+		thread_pool_add_task(check_asm_template_body_worker_proc, e);
+	} else {
+		mutex_lock(&c->checker->asm_templates_to_check_mutex);
+		array_add(&c->checker->asm_templates_to_check, e);
+		mutex_unlock(&c->checker->asm_templates_to_check_mutex);
+	}
 }
 
 
@@ -7231,6 +7252,27 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 	return 1;
 }
 
+// NOTE(bill): the body of an asm template which is not within a procedure body, see `check_asm_template_body_later`
+gb_internal void check_queued_asm_template_body(Checker *c, Entity *e, UntypedExprInfoMap *untyped) {
+	GB_ASSERT(e->file != nullptr);
+	map_clear(untyped);
+
+	CheckerContext ctx = {};
+	init_checker_context(&ctx, c);
+	defer (destroy_checker_context(&ctx));
+	reset_checker_context(&ctx, e->file, untyped);
+
+	check_asm_template_body_from_entity(&ctx, e);
+
+	add_untyped_expressions(&c->info, ctx.untyped);
+}
+
+gb_internal WORKER_TASK_PROC(check_asm_template_body_worker_proc) {
+	auto *wd = &check_procedure_bodies_worker_data[current_thread_index()];
+	check_queued_asm_template_body(wd->c, cast(Entity *)data, &wd->untyped);
+	return 0;
+}
+
 gb_internal void check_init_worker_data(Checker *c) {
 	u32 thread_count = cast(u32)global_thread_pool.threads.count;
 
@@ -7252,10 +7294,18 @@ gb_internal void check_procedure_bodies(Checker *c) {
 
 	if (thread_count == 1) {
 		UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[0].untyped;
-		for_array(i, c->procs_to_check) {
-			consume_proc_info(c, c->procs_to_check[i], untyped);
+		// NOTE(bill): either can queue the other, e.g. a procedure body which uses an asm template of a lazy file
+		while (c->procs_to_check.count != 0 || c->asm_templates_to_check.count != 0) {
+			for_array(i, c->procs_to_check) {
+				consume_proc_info(c, c->procs_to_check[i], untyped);
+			}
+			array_clear(&c->procs_to_check);
+
+			for_array(i, c->asm_templates_to_check) {
+				check_queued_asm_template_body(c, c->asm_templates_to_check[i], untyped);
+			}
+			array_clear(&c->asm_templates_to_check);
 		}
-		array_clear(&c->procs_to_check);
 
 		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 		return;
@@ -7269,6 +7319,13 @@ gb_internal void check_procedure_bodies(Checker *c) {
 	}
 	GB_ASSERT(prev_procs_to_check_count == c->procs_to_check.count);
 	array_clear(&c->procs_to_check);
+
+	isize prev_asm_templates_to_check_count = c->asm_templates_to_check.count;
+	for_array(i, c->asm_templates_to_check) {
+		thread_pool_add_task(check_asm_template_body_worker_proc, c->asm_templates_to_check[i]);
+	}
+	GB_ASSERT(prev_asm_templates_to_check_count == c->asm_templates_to_check.count);
+	array_clear(&c->asm_templates_to_check);
 
 	thread_pool_wait();
 
@@ -8253,6 +8310,7 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	thread_pool_wait();
 	GB_ASSERT(c->procs_to_check.count == 0);
+	GB_ASSERT(c->asm_templates_to_check.count == 0);
 
 	if (DEBUG_CHECK_ALL_PROCEDURES) {
 		TIME_SECTION("check unchecked (safety measure)");

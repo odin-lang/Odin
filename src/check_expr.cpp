@@ -9729,6 +9729,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				DeclInfo *d = make_decl_info(c->scope, c->decl);
 				Entity *e = alloc_entity_asm_template(d->scope, token, nullptr, unnested_proc);
 				d->init_expr = unnested_proc;
+				e->decl_info = d;
+				e->file = c->file;
 				at->anonymous_entity = e;
 
 				check_asm_template_from_entity(c, e, d);
@@ -9987,8 +9989,35 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				error(call, "Called %s enables target feature '%.*s' which is invalid for the build target", kind, LIT(invalid));
 			}
 
-			// NOTE: Due to restrictions in LLVM you can not inline calls with a superset of features.
-			if (is_call_inlined) {
+			if (pt->Proc.calling_convention == ProcCC_InlineAsm) {
+				// NOTE(bill): an asm template is always inlined, so its instructions are assembled with the features
+				// of the procedure calling it, which must then have every feature the template enables
+				String scope_enable  = {};
+				String scope_require = {};
+				if (c->curr_proc_sig != nullptr && c->curr_proc_sig->kind == Type_Proc) {
+					scope_enable  = c->curr_proc_sig->Proc.enable_target_feature;
+					scope_require = c->curr_proc_sig->Proc.require_target_feature;
+				}
+				String_Iterator it = {pt->Proc.enable_target_feature, 0};
+				String feature = {};
+				while (string_split_iterator_next(&it, ',', &feature)) {
+					if (check_target_feature_is_enabled(feature, nullptr) ||
+					    check_target_feature_is_superset_of(scope_enable,  feature, nullptr) ||
+					    check_target_feature_is_superset_of(scope_require, feature, nullptr)) {
+						continue;
+					}
+					ERROR_BLOCK();
+					if (c->curr_proc_sig == nullptr) {
+						error(call, "Called %s enables target feature '%.*s', which must be enabled globally to call it at file scope", kind, LIT(feature));
+						error_line("\tSuggested Example: -target-features:\"%.*s\"\n", LIT(feature));
+					} else {
+						error(call, "Called %s enables target feature '%.*s', this requires the calling procedure to at least enable the same feature, as the template is inlined into it", kind, LIT(feature));
+						error_line("\tSuggested Example: @(enable_target_feature=\"%.*s\")\n", LIT(feature));
+					}
+					break;
+				}
+			} else if (is_call_inlined) {
+				// NOTE: Due to restrictions in LLVM you can not inline calls with a superset of features.
 				if (c->curr_proc_decl == nullptr) {
 					error(call, "Calling a '#force_inline' %s that enables target features is not allowed at file scope", kind);
 				} else {

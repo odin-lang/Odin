@@ -63,7 +63,8 @@ desc->release()
   Members which are 0 or a combination of flags are constants named `<type>_<member>`, e.g.
   `MTL.TextureUsage_Unknown` (`{}`) or `MTL.Stages_All`. So are the values of multi-bit fields within
   options, e.g. `UI.ViewAnimationOptions{.Repeat} | UI.ViewAnimationOptions_CurveEaseIn`; such a field
-  is read back through its mask, as in `opts & NS.DataWritingOptions_FileProtectionMask`.
+  is read back through its mask, as in `opts & NS.DataWritingOptions_FileProtectionMask`, and replaced
+  with `opts &~ Mask | Value`.
 - **Strings.** `NS.AT("literal")` makes a constant `NSString`, `NS.String.alloc()->initWithOdinString(str)`
   wraps an Odin string without copying it, and `ns_str->odinString()` returns a string which refers
   to the `NSString`'s storage.

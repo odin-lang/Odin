@@ -1905,29 +1905,589 @@ _mm256_maskstore_epi64 :: #force_inline proc "c" (mem_addr: ^i64, mask: __m256i,
 	simd.masked_store(mem_addr, a, m)
 }
 
+// Gather 32-bit integers from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm_i32gather_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_pgatherdd(
+		simd.i32x4(0),
+		slice,
+		transmute(simd.i32x4)offsets,
+		simd.i32x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 32-bit integers from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i32gather_epi32 :: #force_inline proc "c" (src: __m128i, slice: ^i32, offsets: __m128i, mask: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_pgatherdd(
+		transmute(simd.i32x4)src,
+		slice,
+		transmute(simd.i32x4)offsets,
+		transmute(simd.i32x4)mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 32-bit integers from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_i32gather_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m256i, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m256i)llvm_vpgatherdd(
+		simd.i32x8(0),
+		slice,
+		transmute(simd.i32x8)offsets,
+		simd.i32x8(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 32-bit integers from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i32gather_epi32 :: #force_inline proc "c" (src: __m256i, slice: ^i32, offsets: __m256i, mask: __m256i, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m256i)llvm_vpgatherdd(
+		transmute(simd.i32x8)src,
+		slice,
+		transmute(simd.i32x8)offsets,
+		transmute(simd.i32x8)mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm_i32gather_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherdq(
+		simd.i64x2(0),
+		slice,
+		transmute(simd.i32x4)offsets,
+		simd.i64x2(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i32gather_epi64 :: #force_inline proc "c" (src: __m128i, slice: ^i64, offsets: __m128i, mask: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherdq(
+		src,
+		slice,
+		transmute(simd.i32x4)offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_i32gather_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m128i, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdq(
+		simd.i64x4(0),
+		slice,
+		transmute(simd.i32x4)offsets,
+		simd.i64x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i32gather_epi64 :: #force_inline proc "c" (src: __m256i, slice: ^i64, offsets: __m128i, mask: __m256i, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdq(
+		src,
+		slice,
+		transmute(simd.i32x4)offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm_i32gather_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m128i, $SCALE: i32) -> __m128d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherdpd(
+		simd.f64x2(0),
+		slice,
+		transmute(simd.i32x4)offsets,
+		simd.f64x2(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i32gather_pd :: #force_inline proc "c" (src: __m128d, slice: ^f64, offsets: __m128i, mask: __m128d, $SCALE: i32) -> __m128d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherdpd(
+		src,
+		slice,
+		transmute(simd.i32x4)offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm256_i32gather_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m128i, $SCALE: i32) -> __m256d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdpd(
+		simd.f64x4(0),
+		slice,
+		transmute(simd.i32x4)offsets,
+		simd.f64x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 32-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i32gather_pd :: #force_inline proc "c" (src: __m256d, slice: ^f64, offsets: __m128i, mask: __m256d, $SCALE: i32) -> __m256d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdpd(
+		src,
+		slice,
+		transmute(simd.i32x4)offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i32gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm_i32gather_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m128i, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherdps(
+		simd.f32x4(0),
+		slice,
+		transmute(simd.i32x4)offsets,
+		simd.f32x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i32gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i32gather_ps :: #force_inline proc "c" (src: __m128, slice: ^f32, offsets: __m128i, mask: __m128, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherdps(
+		src,
+		slice,
+		transmute(simd.i32x4)offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i32gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm256_i32gather_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m256i, $SCALE: i32) -> __m256 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdps(
+		simd.f32x8(0),
+		slice,
+		transmute(simd.i32x8)offsets,
+		simd.f32x8(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 32-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 32-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i32gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i32gather_ps :: #force_inline proc "c" (src: __m256, slice: ^f32, offsets: __m256i, mask: __m256, $SCALE: i32) -> __m256 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherdps(
+		src,
+		slice,
+		transmute(simd.i32x8)offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm_i64gather_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_pgatherqd(
+		simd.i32x4(0),
+		slice,
+		offsets,
+		simd.i32x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i64gather_epi32 :: #force_inline proc "c" (src: __m128i, slice: ^i32, offsets: __m128i, mask: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_pgatherqd(
+		transmute(simd.i32x4)src,
+		slice,
+		offsets,
+		transmute(simd.i32x4)mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_i64gather_epi32 :: #force_inline proc "c" (slice: ^i32, offsets: __m256i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_vpgatherqd(
+		simd.i32x4(0),
+		slice,
+		offsets,
+		simd.i32x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 32-bit integers from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64gather_epi32)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i64gather_epi32 :: #force_inline proc "c" (src: __m128i, slice: ^i32, offsets: __m256i, mask: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return transmute(__m128i)llvm_vpgatherqd(
+		transmute(simd.i32x4)src,
+		slice,
+		offsets,
+		transmute(simd.i32x4)mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm_i64gather_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherqq(
+		simd.i64x2(0),
+		slice,
+		offsets,
+		simd.i64x2(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i64gather_epi64 :: #force_inline proc "c" (src: __m128i, slice: ^i64, offsets: __m128i, mask: __m128i, $SCALE: i32) -> __m128i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherqq(
+		src,
+		slice,
+		offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_i64gather_epi64 :: #force_inline proc "c" (slice: ^i64, offsets: __m256i, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqq(
+		simd.i64x4(0),
+		slice,
+		offsets,
+		simd.i64x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather 64-bit integers from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets`
+// (each index is scaled by the factor in `scale`). Gathered elements are merged into
+// `dst` using `mask` (elements are copied from `src` when the highest bit is not set
+// in the corresponding element). `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64gather_epi64)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i64gather_epi64 :: #force_inline proc "c" (src: __m256i, slice: ^i64, offsets: __m256i, mask: __m256i, $SCALE: i32) -> __m256i where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqq(
+		src,
+		slice,
+		offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm_i64gather_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m128i, $SCALE: i32) -> __m128d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherqpd(
+		simd.f64x2(0),
+		slice,
+		offsets,
+		simd.f64x2(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i64gather_pd :: #force_inline proc "c" (src: __m128d, slice: ^f64, offsets: __m128i, mask: __m128d, $SCALE: i32) -> __m128d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherqpd(
+		src,
+		slice,
+		offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm256_i64gather_pd :: #force_inline proc "c" (slice: ^f64, offsets: __m256i, $SCALE: i32) -> __m256d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqpd(
+		simd.f64x4(0),
+		slice,
+		offsets,
+		simd.f64x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather double-precision (64-bit) floating-point elements from memory using 64-bit indices. 64-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64gather_pd)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i64gather_pd :: #force_inline proc "c" (src: __m256d, slice: ^f64, offsets: __m256i, mask: __m256d, $SCALE: i32) -> __m256d where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqpd(
+		src,
+		slice,
+		offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_i64gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm_i64gather_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m128i, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherqps(
+		simd.f32x4(0),
+		slice,
+		offsets,
+		simd.f32x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_mask_i64gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm_mask_i64gather_ps :: #force_inline proc "c" (src: __m128, slice: ^f32, offsets: __m128i, mask: __m128, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_pgatherqps(
+		src,
+		slice,
+		offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst.scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_i64gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm256_i64gather_ps :: #force_inline proc "c" (slice: ^f32, offsets: __m256i, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqps(
+		simd.f32x4(0),
+		slice,
+		offsets,
+		simd.f32x4(-1),
+		cast(i8)SCALE,
+	)
+}
+
+// Gather single-precision (32-bit) floating-point elements from memory using 64-bit indices. 32-bit elements are loaded
+// from addresses starting at `slice` and offset by each 64-bit element in `offsets` (each index is scaled by the factor in `scale`).
+// Gathered elements are merged into `dst` using `mask` (elements are copied from src when the highest bit is not set in the corresponding element).
+// `scale` should be 1, 2, 4 or 8.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mask_i64gather_ps)
+@(require_results, enable_target_feature="avx2")
+_mm256_mask_i64gather_ps :: #force_inline proc "c" (src: __m128, slice: ^f32, offsets: __m256i, mask: __m128, $SCALE: i32) -> __m128 where 1 <= SCALE, SCALE <= 8, simd.count_ones(SCALE) == 1 {
+	return llvm_vpgatherqps(
+		src,
+		slice,
+		offsets,
+		mask,
+		cast(i8)SCALE,
+	)
+}
+
 @(private, default_calling_convention="none")
 foreign _ {
-	@(link_name="llvm.x86.avx2.psign.b")     llvm_psignb    :: proc(a: simd.i8x32, b: simd.i8x32) -> simd.i8x32 ---
-	@(link_name="llvm.x86.avx2.psign.w")     llvm_psignw    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psign.d")     llvm_psignd    :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.pmul.hr.sw")  llvm_pmulhrsw  :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.packsswb")    llvm_packsswb  :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i8x32 ---
-	@(link_name="llvm.x86.avx2.packssdw")    llvm_packssdw  :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.packuswb")    llvm_packuswb  :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.u8x32 ---
-	@(link_name="llvm.x86.avx2.packusdw")    llvm_packusdw  :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.u16x16 ---
-	@(link_name="llvm.x86.avx2.psad.bw")     llvm_psadbw    :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u64x4 ---
-	@(link_name="llvm.x86.avx2.pshuf.b")     llvm_pshufb    :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u8x32 ---
-	@(link_name="llvm.x86.avx2.psll.w")      llvm_psllw     :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psll.d")      llvm_pslld     :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.psll.q")      llvm_psllq     :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
-	@(link_name="llvm.x86.avx2.psrl.w")      llvm_psrlw     :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psrl.d")      llvm_psrld     :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.psrl.q")      llvm_psrlq     :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
-	@(link_name="llvm.x86.avx2.psra.w")      llvm_psraw     :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.psra.d")      llvm_psrad     :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.pmadd.wd")    llvm_pmaddwd   :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i32x8 ---
-	@(link_name="llvm.x86.avx2.pmadd.ub.sw") llvm_pmaddubsw :: proc(a: simd.u8x32, b: simd.i8x32) -> simd.i16x16 ---
-	@(link_name="llvm.x86.avx2.mpsadbw")     llvm_mpsadbw   :: proc(a: simd.u8x32, b: simd.u8x32, imm8: i8) -> simd.u16x16 ---
-	@(link_name="llvm.x86.avx2.permd")       llvm_permd     :: proc(a: simd.u32x8, b: simd.u32x8) -> simd.u32x8 ---
-	@(link_name="llvm.x86.avx2.permps")      llvm_permps    :: proc(a: simd.f32x8, b: simd.i32x8) -> simd.f32x8 ---
+	@(link_name="llvm.x86.avx2.psign.b")         llvm_psignb      :: proc(a: simd.i8x32, b: simd.i8x32) -> simd.i8x32 ---
+	@(link_name="llvm.x86.avx2.psign.w")         llvm_psignw      :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psign.d")         llvm_psignd      :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.pmul.hr.sw")      llvm_pmulhrsw    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.packsswb")        llvm_packsswb    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i8x32 ---
+	@(link_name="llvm.x86.avx2.packssdw")        llvm_packssdw    :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.packuswb")        llvm_packuswb    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.u8x32 ---
+	@(link_name="llvm.x86.avx2.packusdw")        llvm_packusdw    :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.u16x16 ---
+	@(link_name="llvm.x86.avx2.psad.bw")         llvm_psadbw      :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u64x4 ---
+	@(link_name="llvm.x86.avx2.pshuf.b")         llvm_pshufb      :: proc(a: simd.u8x32, b: simd.u8x32) -> simd.u8x32 ---
+	@(link_name="llvm.x86.avx2.psll.w")          llvm_psllw       :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psll.d")          llvm_pslld       :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.psll.q")          llvm_psllq       :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
+	@(link_name="llvm.x86.avx2.psrl.w")          llvm_psrlw       :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psrl.d")          llvm_psrld       :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.psrl.q")          llvm_psrlq       :: proc(a: simd.i64x4, count: simd.i64x2) -> simd.i64x4 ---
+	@(link_name="llvm.x86.avx2.psra.w")          llvm_psraw       :: proc(a: simd.i16x16, count: simd.i16x8) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.psra.d")          llvm_psrad       :: proc(a: simd.i32x8, count: simd.i32x4) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.pmadd.wd")        llvm_pmaddwd     :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.pmadd.ub.sw")     llvm_pmaddubsw   :: proc(a: simd.u8x32, b: simd.i8x32) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.mpsadbw")         llvm_mpsadbw     :: proc(a: simd.u8x32, b: simd.u8x32, imm8: i8) -> simd.u16x16 ---
+	@(link_name="llvm.x86.avx2.permd")           llvm_permd       :: proc(a: simd.u32x8, b: simd.u32x8) -> simd.u32x8 ---
+	@(link_name="llvm.x86.avx2.permps")          llvm_permps      :: proc(a: simd.f32x8, b: simd.i32x8) -> simd.f32x8 ---
+	@(link_name="llvm.x86.avx2.gather.d.d")      llvm_pgatherdd   :: proc(src: simd.i32x4, slice: rawptr, offsets: simd.i32x4, mask: simd.i32x4, scale: i8) -> simd.i32x4 ---
+	@(link_name="llvm.x86.avx2.gather.d.d.256")  llvm_vpgatherdd  :: proc(src: simd.i32x8, slice: rawptr, offsets: simd.i32x8, mask: simd.i32x8, scale: i8) -> simd.i32x8 ---
+	@(link_name="llvm.x86.avx2.gather.d.q")      llvm_pgatherdq   :: proc(src: simd.i64x2, slice: rawptr, offsets: simd.i32x4, mask: simd.i64x2, scale: i8) -> simd.i64x2 ---
+	@(link_name="llvm.x86.avx2.gather.d.q.256")  llvm_vpgatherdq  :: proc(src: simd.i64x4, slice: rawptr, offsets: simd.i32x4, mask: simd.i64x4, scale: i8) -> simd.i64x4 ---
+	@(link_name="llvm.x86.avx2.gather.q.d")      llvm_pgatherqd   :: proc(src: simd.i32x4, slice: rawptr, offsets: simd.i64x2, mask: simd.i32x4, scale: i8) -> simd.i32x4 ---
+	@(link_name="llvm.x86.avx2.gather.q.d.256")  llvm_vpgatherqd  :: proc(src: simd.i32x4, slice: rawptr, offsets: simd.i64x4, mask: simd.i32x4, scale: i8) -> simd.i32x4 ---
+	@(link_name="llvm.x86.avx2.gather.q.q")      llvm_pgatherqq   :: proc(src: simd.i64x2, slice: rawptr, offsets: simd.i64x2, mask: simd.i64x2, scale: i8) -> simd.i64x2 ---
+	@(link_name="llvm.x86.avx2.gather.q.q.256")  llvm_vpgatherqq  :: proc(src: simd.i64x4, slice: rawptr, offsets: simd.i64x4, mask: simd.i64x4, scale: i8) -> simd.i64x4 ---
+	@(link_name="llvm.x86.avx2.gather.d.pd")     llvm_pgatherdpd  :: proc(src: simd.f64x2, slice: rawptr, offsets: simd.i32x4, mask: simd.f64x2, scale: i8) -> simd.f64x2 ---
+	@(link_name="llvm.x86.avx2.gather.d.pd.256") llvm_vpgatherdpd :: proc(src: simd.f64x4, slice: rawptr, offsets: simd.i32x4, mask: simd.f64x4, scale: i8) -> simd.f64x4 ---
+	@(link_name="llvm.x86.avx2.gather.q.pd")     llvm_pgatherqpd  :: proc(src: simd.f64x2, slice: rawptr, offsets: simd.i64x2, mask: simd.f64x2, scale: i8) -> simd.f64x2 ---
+	@(link_name="llvm.x86.avx2.gather.q.pd.256") llvm_vpgatherqpd :: proc(src: simd.f64x4, slice: rawptr, offsets: simd.i64x4, mask: simd.f64x4, scale: i8) -> simd.f64x4 ---
+	@(link_name="llvm.x86.avx2.gather.d.ps")     llvm_pgatherdps  :: proc(src: simd.f32x4, slice: rawptr, offsets: simd.i32x4, mask: simd.f32x4, scale: i8) -> simd.f32x4 ---
+	@(link_name="llvm.x86.avx2.gather.d.ps.256") llvm_vpgatherdps :: proc(src: simd.f32x8, slice: rawptr, offsets: simd.i32x8, mask: simd.f32x8, scale: i8) -> simd.f32x8 ---
+	@(link_name="llvm.x86.avx2.gather.q.ps")     llvm_pgatherqps  :: proc(src: simd.f32x4, slice: rawptr, offsets: simd.i64x2, mask: simd.f32x4, scale: i8) -> simd.f32x4 ---
+	@(link_name="llvm.x86.avx2.gather.q.ps.256") llvm_vpgatherqps :: proc(src: simd.f32x4, slice: rawptr, offsets: simd.i64x4, mask: simd.f32x4, scale: i8) -> simd.f32x4 ---
 }
