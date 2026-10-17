@@ -4,7 +4,7 @@ set -eu
 mkdir -p build
 pushd build
 ODIN=../../../odin
-COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native"
+COMMON="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -microarch:native -define:ODIN_TEST_LOG_STATE_CHANGES=true"
 COMMON_CHECK="-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings"
 
 set -x

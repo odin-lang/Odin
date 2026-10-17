@@ -4,7 +4,7 @@ setlocal EnableDelayedExpansion
 if not exist "build\" mkdir build
 pushd build
 
-set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings
+set COMMON=-define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -show-timings -define:ODIN_TEST_LOG_STATE_CHANGES=true
 set ODIN=..\..\..\odin
 
 @echo on
