@@ -298,6 +298,9 @@ fi
 # "odin run" tests:
 #
 
+# 7442 is Windows only. TODO: Being in run.sh doesn't necessarily mean we're not on Windows.
+#$ODIN run ../test_issue_7442 $COMMON
+#$ODIN run ../test_issue_7442 $COMMON -no-crt -no-thread-local
 $ODIN run ../test_issue_7482 $COMMON
 # 7562 is Windows only. TODO: Being in run.sh doesn't necessarily mean we're not on Windows.
 #$ODIN run ../test_issue_7562 $COMMON -no-crt -no-thread-local

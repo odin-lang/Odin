@@ -721,23 +721,120 @@ _get_process_user :: proc(process_handle: win32.HANDLE, allocator: runtime.Alloc
 	return strings.concatenate({domain, "\\", username}, allocator)
 }
 
+// `runtime.args__` is the `argv` of the C runtime, in the ANSI code page, and is empty without it.
+@(private="package")
+_get_args :: proc(allocator: runtime.Allocator) -> []string {
+	argv, _ := _split_command_line(win32.GetCommandLineW(), allocator)
+	return argv
+}
+
 _parse_command_line :: proc(cmd_line_w: cstring16, allocator: runtime.Allocator) -> (argv: []string, err: Error) {
-	argc: i32
-	argv_w := win32.CommandLineToArgvW(cmd_line_w, &argc)
-	if argv_w == nil {
-		return nil, _get_platform_error()
-	}
-	argv = make([]string, argc, allocator) or_return
+	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
+	split := _split_command_line(cmd_line_w, temp_allocator) or_return
+	argv = make([]string, len(split), allocator) or_return
 	defer if err != nil {
 		for arg in argv {
 			delete(arg, allocator)
 		}
 		delete(argv, allocator)
 	}
-	for arg_w, i in argv_w[:argc] {
-		argv[i] = win32_wstring_to_utf8(arg_w, allocator) or_return
+	for arg, i in split {
+		argv[i] = strings.clone(arg, allocator) or_return
 	}
 	return
+}
+
+/*
+Splits a command line into NUL-terminated UTF-8 arguments. A single allocation, which starts
+at the returned slice, holds the slice and the text.
+*/
+_split_command_line :: proc(cmd_line_w: cstring16, allocator: runtime.Allocator) -> (argv: []string, err: runtime.Allocator_Error) {
+	cmd_line := transmute([]u16)string16(cmd_line_w)
+	argc := _split_arguments(cmd_line, nil)
+	text_len := int(win32.WideCharToMultiByte(win32.CP_UTF8, 0, cmd_line_w, i32(len(cmd_line)), nil, 0, nil, nil))
+	// The last argument needs one more byte for its NUL.
+	data := runtime.mem_alloc_non_zeroed(argc*size_of(string) + text_len + 1, align_of(string), allocator) or_return
+	text := data[argc*size_of(string):]
+	win32.WideCharToMultiByte(win32.CP_UTF8, 0, cmd_line_w, i32(len(cmd_line)), raw_data(text), i32(text_len), nil, nil)
+	_split_arguments(text[:text_len], text)
+
+	argv = ([^]string)(raw_data(data))[:argc]
+	rest := string(text)
+	for &arg in argv {
+		arg, _ = strings.split_iterator(&rest, "\x00")
+	}
+	return
+}
+
+/*
+Splits a command line with the rules of the C runtime, which only look at ASCII, so UTF-16 and
+UTF-8 split the same way: https://learn.microsoft.com/cpp/c-language/parsing-c-command-line-arguments
+
+Writes each argument and a NUL to `dst` unless it is nil, and returns how many there are. `dst`
+needs one more element than `src` and can be `src`, since no write passes the reads.
+*/
+_split_arguments :: proc(src: []$T, dst: []T) -> (argc: int) {
+	put :: #force_inline proc(dst: []$E, n: ^int, c: E) {
+		if dst != nil {
+			dst[n^] = c
+		}
+		n^ += 1
+	}
+
+	i, n := 0, 0
+	// The program name ends at the first space or tab outside quotes, and backslashes are literal.
+	in_quotes := false
+	for i < len(src) && (in_quotes || (src[i] != ' ' && src[i] != '\t')) {
+		if src[i] == '"' {
+			in_quotes = !in_quotes
+		} else {
+			put(dst, &n, src[i])
+		}
+		i += 1
+	}
+	argc = 1
+	for {
+		// Skipping the separators first keeps the NUL from overwriting them when `dst` is `src`.
+		for i < len(src) && (src[i] == ' ' || src[i] == '\t') {
+			i += 1
+		}
+		put(dst, &n, 0)
+		if i == len(src) {
+			return
+		}
+		argc += 1
+		for i < len(src) {
+			// 2N backslashes and a quote are N backslashes and a delimiter, 2N+1 are N backslashes and a quote.
+			backslashes := 0
+			for i < len(src) && src[i] == '\\' {
+				backslashes += 1
+				i += 1
+			}
+			literal := true
+			if i < len(src) && src[i] == '"' {
+				if backslashes % 2 == 0 {
+					if in_quotes && i+1 < len(src) && src[i+1] == '"' {
+						// Two quotes within quotes are one quote.
+						i += 1
+					} else {
+						literal = false
+						in_quotes = !in_quotes
+					}
+				}
+				backslashes /= 2
+			}
+			for _ in 0..<backslashes {
+				put(dst, &n, '\\')
+			}
+			if i == len(src) || (!in_quotes && (src[i] == ' ' || src[i] == '\t')) {
+				break
+			}
+			if literal {
+				put(dst, &n, src[i])
+			}
+			i += 1
+		}
+	}
 }
 
 _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> string {
