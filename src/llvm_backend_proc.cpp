@@ -1795,13 +1795,21 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 				if (is_masked) {
 					// C logic
 					LLVMValueRef shift = LLVMBuildAnd(p->builder, arg1.value, bits, "");
+					shift = LLVMBuildIntCast2(p->builder, shift, lb_type(m, arg0.type), false, "");
 					res.value = LLVMBuildBinOp(p->builder, op_code, arg0.value, shift, "");
 				} else {
 					// Odin logic
-					LLVMValueRef zero = lb_const_nil(m, arg1.type).value;
+					LLVMValueRef overflow;
+					if (op_code == LLVMAShr) {
+						LLVMValueRef max_shift = llvm_splat_int(count, lb_type(m, elem), sz*8 - 1);
+						overflow = LLVMBuildBinOp(p->builder, LLVMAShr, arg0.value, max_shift, "");
+					} else {
+						overflow = lb_const_nil(m, arg0.type).value;
+					}
 					LLVMValueRef mask = LLVMBuildICmp(p->builder, LLVMIntULE, arg1.value, bits, "");
-					LLVMValueRef shift = LLVMBuildBinOp(p->builder, op_code, arg0.value, arg1.value, "");
-					res.value = LLVMBuildSelect(p->builder, mask, shift, zero, "");
+					LLVMValueRef rhs = LLVMBuildIntCast2(p->builder, arg1.value, lb_type(m, arg0.type), false, "");
+					LLVMValueRef shift = LLVMBuildBinOp(p->builder, op_code, arg0.value, rhs, "");
+					res.value = LLVMBuildSelect(p->builder, mask, shift, overflow, "");
 				}
 				return res;
 			}
