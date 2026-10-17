@@ -1,11 +1,40 @@
-// A reader for the Windows `PE` executable format for debug purposes.
+/*
+Types for the Windows `PE` image and `COFF` object formats
+*/
 package debug_pe
 
 PE_SIGNATURE_OFFSET_INDEX_POS :: 0x3c
 PE_SIGNATURE :: u32le(0x0000_4550) // "PE\x00\x00"
 PE_SIGNATURE_STRING :: "PE\x00\x00"
 
+DOS_MAGIC :: u16le(0x5a4d) // "MZ"
+
+DOS_Header :: struct #packed {
+	e_magic:    u16le,
+	e_cblp:     u16le,
+	e_cp:       u16le,
+	e_crlc:     u16le,
+	e_cparhdr:  u16le,
+	e_minalloc: u16le,
+	e_maxalloc: u16le,
+	e_ss:       u16le,
+	e_sp:       u16le,
+	e_csum:     u16le,
+	e_ip:       u16le,
+	e_cs:       u16le,
+	e_lfarlc:   u16le,
+	e_ovno:     u16le,
+	e_res:      [4]u16le,
+	e_oemid:    u16le,
+	e_oeminfo:  u16le,
+	e_res2:     [10]u16le,
+	e_lfanew:   u32le, // file offset of the PE signature
+}
+#assert(size_of(DOS_Header) == 64)
+#assert(offset_of(DOS_Header, e_lfanew) == PE_SIGNATURE_OFFSET_INDEX_POS)
+
 OPTIONAL_HEADER_MAGIC :: enum u16le {
+	ROM       = 0x0107,
 	PE32      = 0x010b,
 	PE32_PLUS = 0x020b,
 }
@@ -60,7 +89,7 @@ Optional_Header32 :: struct #packed {
 	size_of_heap_commit:            u32le,
 	loader_flags:                   u32le,
 	number_of_rva_and_sizes:        u32le,
-	data_directory:                 [16]Data_Directory,
+	data_directory:                 [IMAGE_DIRECTORY_ENTRY]Data_Directory,
 }
 
 Optional_Header64 :: struct #packed {
@@ -86,11 +115,16 @@ Optional_Header64 :: struct #packed {
 	size_of_heap_commit:            u64le,
 	loader_flags:                   u32le,
 	number_of_rva_and_sizes:        u32le,
-	data_directory:                 [16]Data_Directory,
+	data_directory:                 [IMAGE_DIRECTORY_ENTRY]Data_Directory,
 }
 
-// .debug section
-Debug_Directory_Entry :: struct {
+#assert(size_of(Optional_Header_Base) == 24)
+#assert(size_of(File_Header)          == 20)
+#assert(size_of(Data_Directory)       == 8)
+#assert(size_of(Optional_Header32)    == 224)
+#assert(size_of(Optional_Header64)    == 240)
+
+Debug_Directory_Entry :: struct #packed {
 	characteristics:     u32le,
 	time_date_stamp:     u32le,
 	major_version:       u16le,
@@ -100,15 +134,54 @@ Debug_Directory_Entry :: struct {
 	address_of_raw_data: u32le,
 	pointer_to_raw_data: u32le,
 }
+#assert(size_of(Debug_Directory_Entry) == 28)
+
+PE_CODE_VIEW_SIGNATURE_RSDS :: u32le(0x5344_5352) // "RSDS"
+
+// The data of a CODEVIEW debug directory entry
+CV_Info_PDB70 :: struct #packed {
+	signature: u32le, // PE_CODE_VIEW_SIGNATURE_RSDS
+	guid:      [16]u8,
+	age:       u32le,
+	// Followed by the NUL-terminated UTF-8 path of the PDB
+}
+#assert(size_of(CV_Info_PDB70) == 24)
+
+// The TLS directory of a PE32 image
+TLS_Directory32 :: struct #packed {
+	start_address_of_raw_data: u32le,
+	end_address_of_raw_data:   u32le,
+	address_of_index:          u32le,
+	address_of_callbacks:      u32le,
+	size_of_zero_fill:         u32le,
+	characteristics:           u32le,
+}
+#assert(size_of(TLS_Directory32) == 24)
+
+// The TLS directory of a PE32+ image
+TLS_Directory64 :: struct #packed {
+	start_address_of_raw_data: u64le,
+	end_address_of_raw_data:   u64le,
+	address_of_index:          u64le,
+	address_of_callbacks:      u64le,
+	size_of_zero_fill:         u32le,
+	characteristics:           u32le,
+}
+#assert(size_of(TLS_Directory64) == 40)
 
 
 IMAGE_FILE_MACHINE :: enum u16le {
 	UNKNOWN     = 0x0,
+	ALPHA       = 0x184,
+	ALPHA64     = 0x284,
 	AM33        = 0x1d3,
 	AMD64       = 0x8664,
 	ARM         = 0x1c0,
-	ARMNT       = 0x1c4,
 	ARM64       = 0xaa64,
+	ARM64EC     = 0xa641,
+	ARM64X      = 0xa64e,
+	ARMNT       = 0x1c4,
+	CHPE_X86    = 0x3a64,
 	EBC         = 0xebc,
 	I386        = 0x14c,
 	IA64        = 0x200,
@@ -121,6 +194,9 @@ IMAGE_FILE_MACHINE :: enum u16le {
 	POWERPC     = 0x1f0,
 	POWERPCFP   = 0x1f1,
 	R4000       = 0x166,
+	RISCV32     = 0x5032,
+	RISCV64     = 0x5064,
+	RISCV128    = 0x5128,
 	SH3         = 0x1a2,
 	SH3DSP      = 0x1a3,
 	SH4         = 0x1a6,
@@ -135,7 +211,7 @@ IMAGE_DIRECTORY_ENTRY :: enum u8 {
 	IMPORT         = 1,
 	RESOURCE       = 2,
 	EXCEPTION      = 3,
-	SECURITY       = 4,
+	SECURITY       = 4, // file offset, not an RVA
 	BASERELOC      = 5,
 	DEBUG          = 6,
 	ARCHITECTURE   = 7, // reserved
@@ -145,7 +221,7 @@ IMAGE_DIRECTORY_ENTRY :: enum u8 {
 	BOUND_IMPORT   = 11,
 	IAT            = 12,
 	DELAY_IMPORT   = 13,
-	COM_DESCRIPTOR = 14, // DLR Runtime headers
+	COM_DESCRIPTOR = 14, // CLR runtime headers
 	_RESERVED      = 15,
 }
 #assert(len(IMAGE_DIRECTORY_ENTRY) == 16)
@@ -157,7 +233,7 @@ IMAGE_FILE_CHARACTERISTIC :: enum u16le {
 	EXECUTABLE_IMAGE        = 1,
 	LINE_NUMS_STRIPPED      = 2,
 	LOCAL_SYMS_STRIPPED     = 3,
-	AGGRESIVE_WS_TRIM       = 4,
+	AGGRESIVE_WS_TRIM       = 4, // sic, as in winnt.h
 	LARGE_ADDRESS_AWARE     = 5,
 
 	BYTES_REVERSED_LO       = 7,
@@ -186,6 +262,7 @@ IMAGE_SUBSYSTEM :: enum u16le {
 	EFI_ROM                  = 13,
 	XBOX                     = 14,
 	WINDOWS_BOOT_APPLICATION = 16,
+	XBOX_CODE_CATALOG        = 17,
 }
 
 IMAGE_DLLCHARACTERISTICS :: distinct bit_set[IMAGE_DLLCHARACTERISTIC; u16le]
@@ -216,7 +293,13 @@ IMAGE_DEBUG_TYPE :: enum u32le {
 	BORLAND               = 9,  // Reserved for Borland.
 	RESERVED10            = 10, // Reserved.
 	CLSID                 = 11, // Reserved.
+	VC_FEATURE            = 12, // Visual C++ feature counts.
+	POGO                  = 13, // Profile guided optimization data.
+	ILTCG                 = 14, // The image was built with link-time code generation.
+	MPX                   = 15, // Intel MPX.
 	REPRO                 = 16, // PE determinism or reproducibility.
+	EMBEDDED_PORTABLE_PDB = 17, // An embedded Portable PDB (.NET).
+	SPGO                  = 18, // Sample profile guided optimization data.
+	PDBCHECKSUM           = 19, // The checksum of the PDB.
 	EX_DLLCHARACTERISTICS = 20, // Extended DLL characteristics bits.
 }
-
