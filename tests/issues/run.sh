@@ -337,6 +337,16 @@ if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	fi
 fi
 
+if [[ -z ${ODIN_TESTS_NO_CLANG+x} && "$(uname)" != "NetBSD" ]]; then
+	$ODIN build ../test_issue_7783 -debug -sanitize:address $COMMON
+	if [[ $(./test_issue_7783 2>&1 | grep -c "ERROR: AddressSanitizer: global-buffer-overflow") -eq 1 ]]; then
+		echo "SUCCESSFUL 1/1"
+	else
+		echo "SUCCESSFUL 0/1"
+		exit 1
+	fi
+fi
+
 if [[ -z ${ODIN_TESTS_NO_CLANG+x} ]]; then
 	clang -c ../test_issue_6809_6816/test_issue_6809_6816.c -o test_issue_6809_6816_c.o -O3
 	$ODIN test ../test_issue_6809_6816 -o:speed $COMMON
