@@ -434,6 +434,7 @@ process_exec :: proc(
 		buf: [1024]u8 = ---
 		
 		stdout_done, stderr_done, has_data: bool
+		last_read := time.tick_now()
 		for err == nil && (!stdout_done || !stderr_done) {
 			n := 0
 
@@ -441,6 +442,7 @@ process_exec :: proc(
 				has_data, err = pipe_has_data(stdout_r)
 				if has_data {
 					n, err = read(stdout_r, buf[:])
+					last_read = time.tick_now()
 				}
 
 				switch err {
@@ -457,6 +459,7 @@ process_exec :: proc(
 				has_data, err = pipe_has_data(stderr_r)
 				if has_data {
 					n, err = read(stderr_r, buf[:])
+					last_read = time.tick_now()
 				}
 
 				switch err {
@@ -466,6 +469,14 @@ process_exec :: proc(
 					stderr_done = true
 					err = nil
 				}
+			}
+
+			// A child that has just written is likely to write again soon, so
+			// the pipes are polled again right away. Once both have been empty
+			// for a while, sleep between polls instead of keeping a core busy
+			// until the child writes or exits.
+			if err == nil && (!stdout_done || !stderr_done) && time.tick_since(last_read) >= time.Millisecond {
+				time.sleep(time.Millisecond)
 			}
 		}
 
