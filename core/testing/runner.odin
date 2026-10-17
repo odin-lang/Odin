@@ -104,11 +104,15 @@ end_t :: proc(t: ^T) {
 	t.cleanups = {}
 }
 
+// NOTE: Each task slot owns the temp allocator its tests use, rather than the
+// thread-local one, as a task stopped by a signal has its thread terminated
+// without that thread's cleanup ever running.
 when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 	Task_Data :: struct {
 		it: Internal_Test,
 		t: T,
 		allocator_index: int,
+		temp_allocator: runtime.Default_Temp_Allocator,
 		tracking_allocator: ^mem.Tracking_Allocator,
 	}
 } else {
@@ -116,6 +120,7 @@ when TRACKING_MEMORY && FAIL_ON_BAD_MEMORY {
 		it: Internal_Test,
 		t: T,
 		allocator_index: int,
+		temp_allocator: runtime.Default_Temp_Allocator,
 	}
 }
 
@@ -159,6 +164,7 @@ run_test_task :: proc(task: thread.Task) {
 	}
 	rand.reset(data.t.seed)
 
+	context.temp_allocator = runtime.default_temp_allocator(&data.temp_allocator)
 	free_all(context.temp_allocator)
 
 	data.it.p(&data.t)
@@ -451,6 +457,9 @@ runner :: proc(internal_tests: []Internal_Test) -> bool {
 	task_data_slots, alloc_error = make([]Task_Data, thread_count)
 	fmt.assertf(alloc_error == nil, "Error allocating memory for task data slots: %v", alloc_error)
 	defer delete(task_data_slots)
+	defer for &data in task_data_slots {
+		runtime.default_temp_allocator_destroy(&data.temp_allocator)
+	}
 
 	// Tests rotate through these allocators as they finish.
 	task_allocators: []mem.Rollback_Stack = ---
