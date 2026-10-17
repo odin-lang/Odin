@@ -789,7 +789,12 @@ Returns:
 */
 @(require_results)
 div_u32 :: proc "odin" (hi, lo, y: u32) -> (quo, rem: u32) {
-	assert(y != 0 && y <= hi)
+	if y == 0 {
+		panic("divide error")
+	}
+	if y <= hi {
+		panic("overflow error")
+	}
 	z := u64(hi)<<32 | u64(lo)
 	quo, rem = u32(z/u64(y)), u32(z%u64(y))
 	return
