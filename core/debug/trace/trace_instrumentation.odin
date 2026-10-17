@@ -47,18 +47,19 @@ _capture :: #force_no_inline proc(buf: Capture, skip: int) -> (n: int) {
 }
 
 @(private="package")
-_locations_destroy :: proc(locations: []Location, allocator: runtime.Allocator) {
+_locations_destroy :: proc(locations: []Resolved_Location, allocator: runtime.Allocator) {
 	delete(locations, allocator)
 }
 
 @(private="package")
-_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (out: []Location, err: Resolve_Error) {
-	clone, mem_err := make(Capture, len(bt), allocator)
-	if mem_err != nil { return nil, .Allocator_Error }
+_resolve :: proc(bt: Capture, allocator, temp_allocator: runtime.Allocator) -> (out: []Resolved_Location, err: runtime.Allocator_Error) {
+	out = make([]Resolved_Location, len(bt), allocator) or_return
 	for entry, i in bt {
-		clone[i] = entry
+		out[i] = Resolved_Location {
+			location = Location(entry),
+		}
 	}
-	return transmute([]Location)clone, nil
+	return
 }
 
 Frame :: struct {
