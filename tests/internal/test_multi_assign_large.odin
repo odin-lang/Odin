@@ -112,3 +112,95 @@ multi_assign_large_other_targets :: proc(t: ^testing.T) {
 	testing.expect_value(t, large_tagged(s[0]), 15)
 	testing.expect_value(t, large_tagged(s[1]), 14)
 }
+
+@(private="file")
+Large_Distinct :: distinct Large
+
+@(test)
+multi_assign_large_value_kinds :: proc(t: ^testing.T) {
+	a, b := large(16), large(17)
+	a, b = large(18), large(19)
+	testing.expect_value(t, large_tagged(a), 18)
+	testing.expect_value(t, large_tagged(b), 19)
+
+	pick := large_tagged(a) == 18
+	a, b = pick ? b : a, a
+	testing.expect_value(t, large_tagged(a), 19)
+	testing.expect_value(t, large_tagged(b), 18)
+
+	a, b = Large{values = b.values, tag = b.tag}, a
+	testing.expect_value(t, large_tagged(a), 18)
+	testing.expect_value(t, large_tagged(b), 19)
+
+	d := Large_Distinct(large(20))
+	a, d = Large(d), Large_Distinct(a)
+	testing.expect_value(t, large_tagged(a), 20)
+	testing.expect_value(t, large_tagged(Large(d)), 18)
+
+	m := make(map[int]Large)
+	defer delete(m)
+	m[0] = large(21)
+	ok: bool
+	a, ok = m[0]
+	testing.expect_value(t, large_tagged(a), 21)
+	testing.expect(t, ok)
+	a, b = m[1] or_else b, a
+	testing.expect_value(t, large_tagged(a), 19)
+	testing.expect_value(t, large_tagged(b), 21)
+
+	maybe: Maybe(Large) = large(22)
+	a, ok = maybe.?
+	testing.expect_value(t, large_tagged(a), 22)
+	testing.expect(t, ok)
+
+	u: union {Large, int} = large(23)
+	a, ok = u.(Large)
+	testing.expect_value(t, large_tagged(a), 23)
+	testing.expect(t, ok)
+
+	backing := [2]Large{large(24), large(25)}
+	s := backing[:]
+	s[0], s[1] = s[1], s[0]
+	testing.expect_value(t, large_tagged(s[0]), 25)
+	testing.expect_value(t, large_tagged(s[1]), 24)
+}
+
+@(private="file")
+large_bump_if :: proc(l: ^Large, bump: bool) -> bool {
+	if bump {
+		l^ = large(l.tag + 100)
+	}
+	return bump
+}
+
+@(test)
+multi_assign_large_reads_before_later_branches :: proc(t: ^testing.T) {
+	x := large(26)
+	a, b: Large
+	a, b = x, large_bump_if(&x, true) ? x : large(0)
+	testing.expect_value(t, large_tagged(a), 26)
+	testing.expect_value(t, large_tagged(b), 126)
+}
+
+@(private="file")
+Settings :: struct {
+	names:  [4][8][64]u8,
+	counts: [4]int,
+	count:  int,
+}
+
+@(test)
+multi_assign_large_restores_backups :: proc(t: ^testing.T) {
+	s := new(Settings)
+	defer free(s)
+	s.names[1][2][3] = 'x'
+	s.counts[1] = 5
+	s.count = 2
+
+	names, counts, count := s.names, s.counts, s.count
+	s.names, s.counts, s.count = {}, {}, 0
+	s.names, s.counts, s.count = names, counts, count
+	testing.expect_value(t, s.names[1][2][3], 'x')
+	testing.expect_value(t, s.counts[1], 5)
+	testing.expect_value(t, s.count, 2)
+}
