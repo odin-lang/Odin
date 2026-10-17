@@ -67,6 +67,8 @@ package all
 @(require) import "core:debug/pe"
 @(require) import "core:debug/trace"
 
+@(require) import "core:diff"
+
 @(require) import "core:dynlib"
 @(require) import "core:net"
 
