@@ -1851,7 +1851,7 @@ MemAllocatorProc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		data = mem.byte_slice(ptr, size)
 		return
 
-	case .Free_All, .Query_Features, .Query_Info:
+	case .Free_All, .Query_Features, .Query_Info, .Thread_Attach, .Thread_Detach:
 		return nil, .Mode_Not_Implemented
 	}
 	return nil, .Mode_Not_Implemented
