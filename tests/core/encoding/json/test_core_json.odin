@@ -1,6 +1,7 @@
 package test_core_json
 
 import "core:encoding/json"
+import "core:math"
 import "core:testing"
 import "core:unicode/utf8"
 import "core:mem/virtual"
@@ -420,6 +421,30 @@ surrogate :: proc(t: ^testing.T) {
 	defer delete(back)
 	testing.expectf(t, uerr == nil,   "Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr)
 	testing.expectf(t, back == input, "Expected `json.unmarshal(%q)` to return %q, got %v", string(out), input, uerr)
+}
+
+@test
+marshal_floats_shortest_round_trip :: proc(t: ^testing.T) {
+	// Floats used to be written with a fixed 16 (f64), 8 (f32) or 4 (f16) decimals, which padded
+	// every value, spelled 1e300 out in full, and flushed anything smaller than that precision to 0.
+	Floats :: struct {
+		a, b, c, d, e, f, g, h: f64,
+		i: f32,
+		j: f16,
+		k: complex64,
+	}
+	input := Floats{1.5, 0.1, 1, -0.0, 1e300, 5e-324, 123456789.125, 1e-7, 0.1, 0.5, complex(0.1, 2)}
+
+	out, err := json.marshal(input)
+	defer delete(out)
+	testing.expectf(t, err == nil, "Expected `json.marshal` to return a nil error, got %v", err)
+	testing.expect_value(t, string(out), `{"a":1.5,"b":0.1,"c":1.0,"d":-0.0,"e":1e+300,"f":5e-324,"g":123456789.125,"h":1e-07,"i":0.1,"j":0.5,"k":[0.1, 2.0]}`)
+
+	back: Floats
+	uerr := json.unmarshal(out, &back)
+	testing.expectf(t, uerr == nil, "Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr)
+	testing.expectf(t, back == input, "Expected %v to round-trip, got %v", input, back)
+	testing.expect(t, math.sign_bit(back.d), "Expected -0.0 to keep its sign")
 }
 
 @test
