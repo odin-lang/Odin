@@ -299,6 +299,22 @@ foreign kernel32 {
 		lpStartupInfo: LPSTARTUPINFOW,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
+	InitializeProcThreadAttributeList :: proc(
+		lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
+		dwAttributeCount: DWORD,
+		dwFlags: DWORD,
+		lpSize: PSIZE_T,
+	) -> BOOL ---
+	UpdateProcThreadAttribute :: proc(
+		lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST,
+		dwFlags: DWORD,
+		Attribute: DWORD_PTR,
+		lpValue: PVOID,
+		cbSize: SIZE_T,
+		lpPreviousValue: PVOID,
+		lpReturnSize: PSIZE_T,
+	) -> BOOL ---
+	DeleteProcThreadAttributeList :: proc(lpAttributeList: LPPROC_THREAD_ATTRIBUTE_LIST) ---
 	GetStartupInfoW :: proc(lpStartupInfo: LPSTARTUPINFOW) ---
 	GetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPWSTR, nsize: DWORD) -> DWORD ---
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
@@ -674,6 +690,8 @@ PROFILE_USER                     :: 0x10000000
 PROFILE_KERNEL                   :: 0x20000000
 PROFILE_SERVER                   :: 0x40000000
 CREATE_IGNORE_SYSTEM_DEFAULT     :: 0x80000000
+
+PROC_THREAD_ATTRIBUTE_HANDLE_LIST :: 0x00020002
 
 THREAD_BASE_PRIORITY_LOWRT :: 15    // value that gets a thread to LowRealtime-1
 THREAD_BASE_PRIORITY_MAX   :: 2     // maximum thread base priority boost

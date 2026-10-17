@@ -456,51 +456,80 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 	environment_block   := _build_environment_block(environment, temp_allocator)
 	environment_block_w := win32_utf8_to_utf16(environment_block, temp_allocator) or_return
 
-	stderr_handle: win32.HANDLE	
-	stdout_handle: win32.HANDLE	
-	stdin_handle:  win32.HANDLE	
-
 	null_handle: win32.HANDLE
-	if desc.stdout == nil || desc.stderr == nil || desc.stdin == nil {
-		null_handle = win32.CreateFileW(
-			win32.L("NUL"),
-			win32.GENERIC_READ|win32.GENERIC_WRITE,
-			win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE,
-			&win32.SECURITY_ATTRIBUTES{
-				nLength        = size_of(win32.SECURITY_ATTRIBUTES),
-				bInheritHandle = true,
-			},
-			win32.OPEN_EXISTING,
-			win32.FILE_ATTRIBUTE_NORMAL,
-			nil,
-		)
-		// Opening NUL should always succeed.
-		assert(null_handle != nil)
-	}
 	// NOTE(laytan): I believe it is fine to close this handle right after CreateProcess,
 	// and we don't have to hold onto this until the process exits.
 	defer if null_handle != nil {
 		win32.CloseHandle(null_handle)
 	}
 
-	if desc.stdout == nil {
-		stdout_handle = null_handle
-	} else {
-		stdout_handle = win32.HANDLE((^File_Impl)(desc.stdout.impl).fd)
+	// The child inherits its standard handles and no other handle of this
+	// process: `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` keeps the other inheritable
+	// handles, such as the pipes of children started at the same time by
+	// other threads, out of the child. The list takes only inheritable
+	// handles, each one once, so each stream gets an inheritable duplicate.
+	std_files := [3]^File{desc.stdin, desc.stdout, desc.stderr}
+	std_handles: [3]win32.HANDLE
+	defer for handle in std_handles {
+		if handle != nil {
+			win32.CloseHandle(handle)
+		}
+	}
+	current_process := win32.GetCurrentProcess()
+	for file, i in std_files {
+		handle: win32.HANDLE
+		if file != nil {
+			handle = win32.HANDLE((^File_Impl)(file.impl).fd)
+		}
+		if handle == nil || handle == win32.INVALID_HANDLE_VALUE {
+			if null_handle == nil {
+				null_handle = win32.CreateFileW(
+					win32.L("NUL"),
+					win32.GENERIC_READ|win32.GENERIC_WRITE,
+					win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE,
+					nil,
+					win32.OPEN_EXISTING,
+					win32.FILE_ATTRIBUTE_NORMAL,
+					nil,
+				)
+				if null_handle == win32.INVALID_HANDLE_VALUE {
+					null_handle = nil
+					err = _get_platform_error()
+					return
+				}
+			}
+			handle = null_handle
+		}
+		if !win32.DuplicateHandle(current_process, handle, current_process, &std_handles[i], 0, true, win32.DUPLICATE_SAME_ACCESS) {
+			err = _get_platform_error()
+			return
+		}
 	}
 
-	if desc.stderr == nil {
-		stderr_handle = null_handle
-	} else {
-		stderr_handle = win32.HANDLE((^File_Impl)(desc.stderr.impl).fd)
+	attribute_list_size: win32.SIZE_T
+	win32.InitializeProcThreadAttributeList(nil, 1, 0, &attribute_list_size)
+	attribute_list_memory := runtime.make_aligned([]byte, int(attribute_list_size), align_of(rawptr), temp_allocator) or_return
+	attribute_list := win32.LPPROC_THREAD_ATTRIBUTE_LIST(raw_data(attribute_list_memory))
+	if !win32.InitializeProcThreadAttributeList(attribute_list, 1, 0, &attribute_list_size) {
+		err = _get_platform_error()
+		return
+	}
+	defer win32.DeleteProcThreadAttributeList(attribute_list)
+	if !win32.UpdateProcThreadAttribute(attribute_list, 0, win32.PROC_THREAD_ATTRIBUTE_HANDLE_LIST, &std_handles, size_of(std_handles), nil, nil) {
+		err = _get_platform_error()
+		return
 	}
 
-	if desc.stdin == nil {
-		stdin_handle = null_handle
-	} else {
-		stdin_handle = win32.HANDLE((^File_Impl)(desc.stdin.impl).fd)
+	startup_info := win32.STARTUPINFOEXW{
+		StartupInfo = {
+			cb         = size_of(win32.STARTUPINFOEXW),
+			hStdError  = std_handles[2],
+			hStdOutput = std_handles[1],
+			hStdInput  = std_handles[0],
+			dwFlags    = win32.STARTF_USESTDHANDLES,
+		},
+		lpAttributeList = attribute_list,
 	}
-
 	working_dir_w := (win32_utf8_to_wstring(desc.working_dir, temp_allocator) or_else nil) if len(desc.working_dir) > 0 else nil
 	process_info: win32.PROCESS_INFORMATION
 	ok := win32.CreateProcessW(
@@ -509,22 +538,17 @@ _process_start :: proc(desc: Process_Desc) -> (process: Process, err: Error) {
 		nil,
 		nil,
 		true,
-		win32.CREATE_UNICODE_ENVIRONMENT|win32.NORMAL_PRIORITY_CLASS,
+		win32.CREATE_UNICODE_ENVIRONMENT|win32.NORMAL_PRIORITY_CLASS|win32.EXTENDED_STARTUPINFO_PRESENT,
 		raw_data(environment_block_w),
 		working_dir_w,
-		&win32.STARTUPINFOW{
-			cb = size_of(win32.STARTUPINFOW),
-			hStdError  = stderr_handle,
-			hStdOutput = stdout_handle,
-			hStdInput  = stdin_handle,
-			dwFlags = win32.STARTF_USESTDHANDLES,
-		},
+		&startup_info.StartupInfo,
 		&process_info,
 	)
 	if !ok {
 		err = _get_platform_error()
 		return
 	}
+	win32.CloseHandle(process_info.hThread)
 	process = {pid = int(process_info.dwProcessId), handle = uintptr(process_info.hProcess)}
 	return
 }
