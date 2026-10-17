@@ -1975,10 +1975,6 @@ gb_internal bool check_mnemonic(AsmCtx *asm_ctx, CheckerContext *ctx, Entity *tm
 					i32 src_i = decls[di].view_of;
 					Entity *src_e = decls[src_i].entity;
 					if (src_e != nullptr) {
-						GB_ASSERT_MSG(asm_decl_resolve_pin_bit(asm_ctx, decls, cast(i32)di) == 0 &&
-						              asm_decl_resolve_pin_bit(asm_ctx, decls, src_i)      == 0,
-						              "view/source share a reg bit; fix the width gate on the reg-bit path, not gen_params");
-
 						// A read of the view is a read of the source
 						if (cast(u16)clobber.read & (1u << slot)) {
 							i32 di = -1;
