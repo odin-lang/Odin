@@ -115,7 +115,7 @@ Permissions_All :: Permissions_Read_All + Permissions_Write_All + Permissions_Ex
 
 Permissions_Default_File      :: Permissions_Read_All + Permissions_Write_All
 Permissions_Default_Directory :: Permissions_Read_All + Permissions_Write_All + Permissions_Execute_All
-Permissions_Default           :: Permissions_Default_Directory
+Permissions_Default           :: Permissions_Default_File
 
 perm :: proc{
 	perm_number,
