@@ -4264,6 +4264,12 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(op->expr, "Invalid expression to '%.*s', got %s", LIT(builtin_name), s);
 				gb_string_free(s);
 			}
+			if (is_type_polymorphic(op->type)) {
+				gbString type_str = type_to_string(op->type);
+				error(op->expr, "Expected a non-polymorphic type to '%.*s', got %s", LIT(builtin_name), type_str);
+				gb_string_free(type_str);
+			}
+
 			if (is_type_tuple(op->type)) {
 				value_count += op->type->Tuple.variables.count;
 			} else {
