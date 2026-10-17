@@ -298,6 +298,10 @@ _seek :: proc(f: ^File_Impl, offset: i64, whence: io.Seek_From) -> (ret: i64, er
 
 	sync.guard(&f.rw_mutex)
 
+	return _seek_unsafe(handle, offset, whence)
+}
+
+_seek_unsafe :: proc(handle: win32.HANDLE, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	w: u32
 	switch whence {
 	case .Start:   w = win32.FILE_BEGIN
@@ -417,8 +421,6 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, 0, .Current) or_return
-		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
 			OffsetHigh = u32(offset>>32),
@@ -448,7 +450,19 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 		return
 	}
 
+	handle := _handle(&f.file)
+	if handle == win32.INVALID_HANDLE {
+		return 0, .Invalid_File
+	}
+
+	if f.kind != .File {
+		return 0, .Invalid_File
+	}
+
 	sync.guard(&f.p_mutex)
+
+	curr_offset := _seek_unsafe(handle, 0, .Current) or_return
+	defer _seek_unsafe(handle, curr_offset, .Start)
 
 	p, offset := p, offset
 	for len(p) > 0 {
@@ -497,8 +511,6 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 			buf = buf[:MAX_RW]
 
 		}
-		curr_offset := _seek(f, 0, .Current) or_return
-		defer _seek(f, curr_offset, .Start)
 
 		o := win32.OVERLAPPED{
 			OffsetHigh = u32(offset>>32),
@@ -524,7 +536,20 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 		return
 	}
 
+	handle := _handle(&f.file)
+	if handle == win32.INVALID_HANDLE {
+		return 0, .Invalid_File
+	}
+
+	if f.kind != .File {
+		return 0, .Invalid_File
+	}
+
 	sync.guard(&f.p_mutex)
+
+	curr_offset := _seek_unsafe(handle, 0, .Current) or_return
+	defer _seek_unsafe(handle, curr_offset, .Start)
+
 	p, offset := p, offset
 	for len(p) > 0 {
 		m := pwrite(f, p, offset) or_return
