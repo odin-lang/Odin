@@ -432,8 +432,19 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 		if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 			err = _get_platform_error()
 			done = 0
+		} else if done == 0 {
+			err = .EOF
 		}
 		n = i64(done)
+		return
+	}
+
+	if len(p) <= 0 {
+		return
+	}
+
+	if offset < 0 {
+		err = .Invalid_Offset
 		return
 	}
 
@@ -504,10 +515,23 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 		return
 	}
 
+	if len(p) <= 0 {
+		return
+	}
+
+	if offset < 0 {
+		err = .Invalid_Offset
+		return
+	}
+
 	sync.guard(&f.p_mutex)
 	p, offset := p, offset
 	for len(p) > 0 {
 		m := pwrite(f, p, offset) or_return
+		if m == 0 {
+			err = .Short_Write
+			return
+		}
 		n += m
 		p = p[m:]
 		offset += i64(m)
