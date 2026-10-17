@@ -10174,7 +10174,15 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 
 	case Type_Slice:
 		o->type = t->Slice.elem;
-		if (o->mode != Addressing_Constant) {
+		if (o->mode == Addressing_Constant) {
+			if (o->value.kind == ExactValue_String) {
+				// NOTE: a slice from '#load' holds its bytes as a string
+				i64 elem_size = type_size_of(t->Slice.elem);
+				if (elem_size > 0) {
+					*max_count = o->value.value_string.len / elem_size;
+				}
+			}
+		} else {
 			o->mode = Addressing_Variable;
 		}
 		return true;
@@ -13154,6 +13162,10 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 			o->mode = Addressing_Invalid;
 			o->expr = node;
 			return kind;
+		} else if (ok && is_type_slice(t) && o->value.kind == ExactValue_String && type_size_of(o->type) != 1) {
+			// NOTE: an element of a '#load'ed slice wider than a byte is not folded into a
+			// constant, it is read from the loaded data instead
+			o->mode = Addressing_Value;
 		} else if (ok && !is_type_matrix(t)) {
 			TypeAndValue tav = type_and_value_of_expr(ie->expr);
 			ExactValue value = tav.value;
