@@ -205,6 +205,7 @@ struct TypeProc {
 	String   enable_target_feature;
 	// TODO(bill): Make this a flag set rather than bools
 	bool     variadic;
+	bool     variadic_pack;
 	bool     require_results;
 	bool     c_vararg;
 	bool     is_polymorphic;
@@ -1283,10 +1284,10 @@ gb_internal Type *alloc_type_tuple() {
 	return t;
 }
 
-gb_internal Type *alloc_type_proc(Scope *scope, Type *params, isize param_count, Type *results, isize result_count, bool variadic, ProcCallingConvention calling_convention) {
+gb_internal Type *alloc_type_proc(Scope *scope, Type *params, isize param_count, Type *results, isize result_count, bool variadic, ProcCallingConvention calling_convention, bool variadic_pack = false) {
 	Type *t = alloc_type(Type_Proc);
 
-	if (variadic) {
+	if (variadic && !variadic_pack) {
 		if (param_count == 0) {
 			GB_PANIC("variadic procedure must have at least one parameter");
 		}
@@ -1304,6 +1305,7 @@ gb_internal Type *alloc_type_proc(Scope *scope, Type *params, isize param_count,
 	t->Proc.results      = results;
 	t->Proc.result_count = cast(i32)result_count;
 	t->Proc.variadic     = variadic;
+	t->Proc.variadic_pack = variadic_pack;
 	t->Proc.calling_convention = calling_convention;
 	return t;
 }

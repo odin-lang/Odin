@@ -983,7 +983,12 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	final_proc_type->Proc.is_poly_specialized = true;
 	final_proc_type->Proc.is_polymorphic = true;
 
-	final_proc_type->Proc.variadic               = src->Proc.variadic;
+	if (src->Proc.variadic_pack) {
+		final_proc_type->Proc.variadic      = false;
+		final_proc_type->Proc.variadic_pack = false;
+	} else {
+		final_proc_type->Proc.variadic      = src->Proc.variadic;
+	}
 	final_proc_type->Proc.require_results        = src->Proc.require_results;
 	final_proc_type->Proc.c_vararg               = src->Proc.c_vararg;
 	final_proc_type->Proc.has_named_results      = src->Proc.has_named_results;
@@ -7577,8 +7582,22 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 	} else {
 		if (pt->is_polymorphic && !pt->is_poly_specialized && err == CallArgumentError_None) {
+			Array<Operand> full_operands = {};
+			Array<Operand> const *operands_to_pass = &ordered_operands;
+			bool was_variadic_pack = pt->variadic_pack;
+			if (pt->variadic_pack) {
+				full_operands = array_make<Operand>(temporary_allocator(), 0, pt->variadic_index + variadic_operands.count);
+				for (isize i = 0; i < pt->variadic_index; i++) {
+					array_add(&full_operands, ordered_operands[i]);
+				}
+				for_array(i, variadic_operands) {
+					array_add(&full_operands, variadic_operands[i]);
+				}
+				operands_to_pass = &full_operands;
+			}
+
 			PolyProcData poly_proc_data = {};
-			if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
+			if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, operands_to_pass, call, &poly_proc_data)) {
 				gen_entity = poly_proc_data.gen_entity;
 				bound_by_later_arg = poly_proc_data.bound_by_later_arg;
 				Type *gept = base_type(proc_entity_full_type(gen_entity));
@@ -7586,6 +7605,10 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				final_proc_type = proc_entity_full_type(gen_entity);
 				pt = &gept->Proc;
 
+				if (was_variadic_pack) {
+					ordered_operands = full_operands;
+					variadic = false;
+				}
 			} else {
 				err = CallArgumentError_WrongTypes;
 			}
@@ -13049,11 +13072,18 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	ast_node(ie, IndexExpr, node);
-	check_expr(c, o, ie->expr);
+	check_multi_expr(c, o, ie->expr);
 	node->viral_state_flags |= ie->expr->viral_state_flags;
 	if (o->mode == Addressing_Invalid) {
 		o->expr = node;
 		return kind;
+	}
+	if (o->type != nullptr && o->type->kind != Type_Tuple) {
+		check_not_tuple(c, o);
+		if (o->mode == Addressing_Invalid) {
+			o->expr = node;
+			return kind;
+		}
 	}
 
 	Type *t = base_type(type_deref(o->type));
@@ -13079,6 +13109,39 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 
 		add_map_get_dependencies(c);
 		add_map_set_dependencies(c);
+		return Expr_Expr;
+	}
+
+	if (t->kind == Type_Tuple) {
+		Operand index_operand = {};
+		check_expr(c, &index_operand, ie->index);
+		if (index_operand.mode != Addressing_Constant || !is_type_integer(index_operand.type)) {
+			error(ie->index, "Expected a constant integer index for tuple / pack indexing");
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			o->expr = node;
+			return kind;
+		}
+		ExactValue v = exact_value_to_integer(index_operand.value);
+		i64 idx = exact_value_to_i64(v);
+		if (idx < 0 || idx >= t->Tuple.variables.count) {
+			error(ie->index, "Index %lld is out of bounds for pack of %td elements", cast(long long)idx, t->Tuple.variables.count);
+			o->mode = Addressing_Invalid;
+			o->type = t_invalid;
+			o->expr = node;
+			return kind;
+		}
+		Entity *elem = t->Tuple.variables[idx];
+		Ast *ident_node = ast_ident(c->file, elem->token);
+		node->kind = Ast_Ident;
+		node->Ident.token = ident_node->Ident.token;
+		node->Ident.hash = ident_node->Ident.hash;
+		node->Ident.interned = ident_node->Ident.interned;
+		node->Ident.entity.store(elem);
+		o->mode = Addressing_Variable;
+		o->type = elem->type;
+		o->expr = node;
+		add_entity_use(c, node, elem);
 		return Expr_Expr;
 	}
 

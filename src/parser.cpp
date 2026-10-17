@@ -3131,6 +3131,9 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
+			if (f->curr_token.kind == Token_CloseParen || f->curr_token.kind == Token_Comma || f->curr_token.kind == Token_Eq) {
+				return ast_helper_type(f, token, nullptr);
+			}
 			return ast_helper_type(f, token, parse_type(f));
 		} else if ( name.string == "simd") {
 			Ast *tag = ast_basic_directive(f, token, name);
@@ -6073,6 +6076,7 @@ gb_internal Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	}
 	return ast_unroll_range_stmt(f, unroll_token, init, slice_from_array(args), for_token, val0, val1, in_token, expr, body);
 }
+
 
 gb_internal Ast *parse_stmt(AstFile *f) {
 	Ast *s = nullptr;

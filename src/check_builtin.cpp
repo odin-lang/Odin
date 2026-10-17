@@ -3183,8 +3183,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc_cap:
 	{
 		// len :: proc(Type) -> int
-		// cap :: proc(Type) -> int
-		check_expr_or_type(c, operand, ce->args[0]);
+		check_expr_base(c, operand, ce->args[0], nullptr);
+		if (operand->type != nullptr && operand->type->kind != Type_Tuple) {
+			check_not_tuple(c, operand);
+		}
+		error_operand_no_value(operand);
 		if (operand->mode == Addressing_Invalid) {
 			return false;
 		}
@@ -3225,6 +3228,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					add_package_dependency(c, "runtime", "cstring16_len");
 				}
 			}
+		} else if (op_type->kind == Type_Tuple && id == BuiltinProc_len) {
+			mode = Addressing_Constant;
+			value = exact_value_i64(op_type->Tuple.variables.count);
+			type = t_untyped_integer;
 		} else if (is_type_array(op_type)) {
 			Type *at = core_type(op_type);
 			mode = Addressing_Constant;

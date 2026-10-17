@@ -930,8 +930,91 @@ gb_internal void error_var_decl_identifier(Ast *name) {
 	}
 }
 
+gb_internal void unroll_compile_time_pack_loop(CheckerContext *ctx, Ast *node, Type *tuple_type, Ast *val0, Ast *val1, Ast *body, u32 mod_flags) {
+	isize count = tuple_type->Tuple.variables.count;
+	if (count == 0) {
+		Token token = ast_token(node);
+		node->kind = Ast_EmptyStmt;
+		node->EmptyStmt.token = token;
+		return;
+	}
+
+	AstFile *f = ctx->file;
+	auto unrolled_blocks = array_make<Ast *>(ast_allocator(f), 0, count);
+
+	for (isize i = 0; i < count; i++) {
+		Entity *elem_entity = tuple_type->Tuple.variables[i];
+		auto stmts = array_make<Ast *>(ast_allocator(f));
+
+		if (val1 != nullptr && !is_blank_ident(val1)) {
+			Token idx_token = {Token_Integer};
+			idx_token.string = copy_string(permanent_allocator(), make_string_c(gb_bprintf("%td", i)));
+			idx_token.pos = ast_token(val1).pos;
+			idx_token.flags = TokenFlag_Synthesized;
+			Ast *idx_lit = alloc_ast_node(f, Ast_BasicLit);
+			idx_lit->BasicLit.token = idx_token;
+			idx_lit->tav.mode = Addressing_Constant;
+			idx_lit->tav.type = t_untyped_integer;
+			idx_lit->tav.set_value(exact_value_i64(i));
+
+			auto idx_names = array_make<Ast *>(ast_allocator(f), 1);
+			idx_names[0] = clone_ast(val1);
+			auto idx_values = array_make<Ast *>(ast_allocator(f), 1);
+			idx_values[0] = idx_lit;
+			Ast *idx_decl = ast_value_decl(f, idx_names, nullptr, idx_values, true, nullptr, nullptr);
+			array_add(&stmts, idx_decl);
+		}
+
+		if (val0 != nullptr && !is_blank_ident(val0)) {
+			Ast *elem_ident = ast_ident(f, elem_entity->token);
+			auto elem_names = array_make<Ast *>(ast_allocator(f), 1);
+			elem_names[0] = clone_ast(val0);
+			auto elem_values = array_make<Ast *>(ast_allocator(f), 1);
+			elem_values[0] = elem_ident;
+			Ast *elem_decl = ast_value_decl(f, elem_names, nullptr, elem_values, true, nullptr, nullptr);
+			array_add(&stmts, elem_decl);
+		}
+
+		Ast *cloned_body = clone_ast(body);
+		if (cloned_body->kind == Ast_BlockStmt) {
+			for_array(s_idx, cloned_body->BlockStmt.stmts) {
+				array_add(&stmts, cloned_body->BlockStmt.stmts[s_idx]);
+			}
+		} else {
+			array_add(&stmts, cloned_body);
+		}
+
+		Token open = ast_token(body);
+		Token close = ast_end_token(body);
+		Ast *block = ast_block_stmt(f, stmts, open, close);
+		array_add(&unrolled_blocks, block);
+	}
+
+	Token open = ast_token(node);
+	Token close = ast_end_token(node);
+	node->kind = Ast_BlockStmt;
+	node->BlockStmt.scope = nullptr;
+	node->BlockStmt.stmts = slice_from_array(unrolled_blocks);
+	node->BlockStmt.label = nullptr;
+	node->BlockStmt.open = open;
+	node->BlockStmt.close = close;
+
+	check_stmt(ctx, node, mod_flags);
+}
+
 gb_internal void check_unroll_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(irs, UnrollRangeStmt, node);
+
+	Ast *raw_expr = unparen_expr(irs->expr);
+	if (!is_ast_range(raw_expr)) {
+		Operand op = {};
+		check_expr_base(ctx, &op, irs->expr, nullptr);
+		if (op.mode != Addressing_Invalid && op.type != nullptr && op.type->kind == Type_Tuple) {
+			unroll_compile_time_pack_loop(ctx, node, op.type, irs->val0, irs->val1, irs->body, mod_flags);
+			return;
+		}
+	}
+
 	check_open_scope(ctx, node);
 	defer (check_close_scope(ctx));
 

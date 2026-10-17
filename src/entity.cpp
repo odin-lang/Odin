@@ -77,6 +77,7 @@ enum EntityFlag : u64 {
 	EntityFlag_Subtype       = 1ull<<32,
 	EntityFlag_Fini          = 1ull<<33,
 	EntityFlag_PolyConstArg  = 1ull<<34, // passed to a `$` parameter, so a local procedure may be called outside its parent
+	EntityFlag_CompileTimePack = 1ull<<35,
 
 	EntityFlag_CustomLinkName = 1ull<<40,
 	EntityFlag_CustomLinkage_Internal = 1ull<<41,

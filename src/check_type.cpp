@@ -1,7 +1,7 @@
 gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
 gb_internal Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand);
 gb_internal bool subst_check_specialization(CheckerContext *ctx, Type *specialization, Type *type, bool modify_type);
-gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands);
+gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands, bool *is_variadic_pack_ = nullptr);
 gb_internal void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t, isize level);
 
 gb_internal void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
@@ -3220,7 +3220,7 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 }
 
 
-gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands) {
+gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands, bool *is_variadic_pack_) {
 	if (_params == nullptr) {
 		return nullptr;
 	}
@@ -3242,6 +3242,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			variable_count += gb_max(f->names.count, 1);
 		}
 	}
+	if (operands != nullptr && operands->count > variable_count) {
+		variable_count = operands->count;
+	}
 	isize min_variable_count = variable_count;
 	for (isize i = params.count-1; i >= 0; i--) {
 		Ast *field = params[i];
@@ -3258,6 +3261,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 	bool is_variadic = false;
 	isize variadic_index = -1;
 	bool is_c_vararg = false;
+	bool is_variadic_pack_found = false;
 	auto variables = array_make<Entity *>(permanent_allocator(), 0, variable_count);
 	i32 field_group_index = -1;
 
@@ -3280,6 +3284,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		bool is_type_param = false;
 		bool is_type_polymorphic_type = false;
 		bool detemine_type_from_operand = false;
+		bool is_variadic_pack = false;
 		Type *specialization = nullptr;
 
 		bool is_using = (p->flags&FieldFlag_using) != 0;
@@ -3298,7 +3303,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		} else {
 			Ast *original_type_expr = type_expr;
 			if (type_expr->kind == Ast_Ellipsis) {
-				type_expr = type_expr->Ellipsis.expr;
+				Ast *ellipsis_inner = type_expr->Ellipsis.expr;
+				if (ellipsis_inner != nullptr && ellipsis_inner->kind == Ast_HelperType && ellipsis_inner->HelperType.type == nullptr) {
+					is_variadic_pack = true;
+					is_variadic_pack_found = true;
+				}
+				type_expr = ellipsis_inner;
 				is_variadic = true;
 				variadic_index = variables.count;
 				if (p->names.count != 1) {
@@ -3312,7 +3322,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				}
 
 				GB_ASSERT(original_type_expr->kind == Ast_Ellipsis);
-				type_expr = ast_array_type(type_expr->file(), original_type_expr->Ellipsis.token, nullptr, type_expr);
+				if (!is_variadic_pack) {
+					type_expr = ast_array_type(type_expr->file(), original_type_expr->Ellipsis.token, nullptr, type_expr);
+				}
 			}
 			if (type_expr->kind == Ast_TypeidType)  {
 				ast_node(tt, TypeidType, type_expr);
@@ -3434,6 +3446,59 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			}
 			if (!ast_node_expect(name, Ast_Ident)) {
 				continue;
+			}
+
+			if (is_variadic_pack) {
+				if (operands != nullptr) {
+					isize base_param_index = variables.count;
+					isize remaining_operands = gb_max(cast(isize)0, operands->count - base_param_index);
+					auto pack_vars = array_make<Entity *>(permanent_allocator(), 0, remaining_operands);
+					for (isize k = 0; k < remaining_operands; k++) {
+						Operand const &op = (*operands)[base_param_index + k];
+						Type *op_type = default_type(op.type);
+						if (op_type == nullptr || is_type_untyped(op_type)) {
+							op_type = t_int;
+						}
+						String elem_name = copy_string(permanent_allocator(), make_string_c(gb_bprintf("%.*s$%td", LIT(name->Ident.token.string), k)));
+						Token elem_token = make_token_ident(elem_name);
+						elem_token.pos = name->Ident.token.pos;
+
+						Entity *elem_param = alloc_entity_variable(scope, elem_token, op_type, EntityState_Resolved);
+						elem_param->flags |= EntityFlag_Used | EntityFlag_Param | EntityFlag_Value;
+						elem_param->Variable.field_group_index = field_group_index;
+						elem_param->Variable.type_expr = type_expr;
+
+						add_entity(ctx, scope, elem_param->identifier, elem_param);
+						array_add(&variables, elem_param);
+						array_add(&pack_vars, elem_param);
+					}
+
+					Type *pack_tuple = alloc_type_tuple();
+					pack_tuple->Tuple.variables = slice_from_array(pack_vars);
+					Entity *pack_entity = alloc_entity_variable(scope, name->Ident.token, pack_tuple, EntityState_Resolved);
+					pack_entity->flags |= EntityFlag_CompileTimePack | EntityFlag_Used | EntityFlag_Value;
+					add_entity(ctx, scope, name, pack_entity);
+
+					is_variadic = false;
+					variadic_index = -1;
+					continue;
+				} else {
+					type = alloc_type_generic(ctx->scope, 0, string_interner_insert(str_lit("..#type")), nullptr);
+					is_type_polymorphic_type = true;
+
+					Entity *param = &entities_to_use[entities_to_use_index++];
+					INTERNAL_ENTITY_INIT(param, Entity_Variable, scope, name->Ident.token, type);
+					param->state = EntityState_Resolved;
+					param->flags |= EntityFlag_Used | EntityFlag_Param | EntityFlag_Value | EntityFlag_Ellipsis | EntityFlag_CompileTimePack;
+					param->interned_name.store(name->Ident.interned);
+					param->interned_name_hash.store(name->Ident.hash);
+					param->Variable.field_group_index = field_group_index;
+					param->Variable.type_expr = type_expr;
+
+					add_entity(ctx, scope, name, param);
+					array_add(&variables, param);
+					continue;
+				}
 			}
 
 			if (is_poly_name) {
@@ -3801,6 +3866,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 	if (specialization_count_) *specialization_count_ = specialization_count;
 	if (is_variadic_) *is_variadic_ = is_variadic;
 	if (variadic_index_) *variadic_index_ = variadic_index;
+	if (is_variadic_pack_) *is_variadic_pack_ = is_variadic_pack_found;
 
 	return tuple;
 }
@@ -4072,9 +4138,10 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 
 	bool variadic = false;
 	isize variadic_index = -1;
+	bool is_variadic_pack = false;
 	bool success = true;
 	isize specialization_count = 0;
-	Type *params  = check_get_params(c, c->scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands);
+	Type *params  = check_get_params(c, c->scope, pt->params, &variadic, &variadic_index, &success, &specialization_count, operands, &is_variadic_pack);
 
 	bool no_poly_return = c->disallow_polymorphic_return_types;
 	c->disallow_polymorphic_return_types = c->scope == c->polymorphic_scope;
@@ -4134,6 +4201,7 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 	type->Proc.result_count         = cast(i32)result_count;
 	type->Proc.variadic             = variadic;
 	type->Proc.variadic_index       = cast(i32)variadic_index;
+	type->Proc.variadic_pack        = is_variadic_pack;
 	type->Proc.calling_convention   = cc;
 	type->Proc.is_polymorphic       = pt->generic;
 	type->Proc.specialization_count = specialization_count;
@@ -4177,6 +4245,9 @@ gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc
 			is_polymorphic = true;
 			break;
 		}
+	}
+	if (is_variadic_pack && operands == nullptr) {
+		is_polymorphic = true;
 	}
 	type->Proc.is_polymorphic = is_polymorphic;
 

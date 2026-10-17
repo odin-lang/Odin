@@ -577,6 +577,9 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return true
 
 	case ^ast.Helper_Type:
+		if n.type == nil {
+			return false
+		}
 		return is_semicolon_optional_for_node(p, n.type)
 	case ^ast.Distinct_Type:
 		return is_semicolon_optional_for_node(p, n.type)
@@ -2503,6 +2506,12 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		name := expect_token(p, .Ident)
 		switch name.text {
 		case "type":
+			if p.curr_tok.kind == .Close_Paren || p.curr_tok.kind == .Comma || p.curr_tok.kind == .Eq {
+				hp := ast.new(ast.Helper_Type, tok.pos, end_pos(name))
+				hp.tok  = tok.kind
+				hp.type = nil
+				return hp
+			}
 			type := parse_type(p)
 			hp := ast.new(ast.Helper_Type, tok.pos, type)
 			hp.tok  = tok.kind
