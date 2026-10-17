@@ -599,14 +599,25 @@ when ODIN_OS == .Darwin {
 
 	pthread_key_t :: distinct c.uint
 
-	pthread_cond_t :: struct {
-		__size: [40]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
-		__align: c.long,
-	}
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// Bionic's, 64-bit: 4 byte aligned int32 arrays, not glibc's long aligned unions.
+		pthread_cond_t :: struct {
+			__private: [12]i32,
+		}
 
-	pthread_mutex_t :: struct {
-		__size: [32]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
-		__align: c.long,
+		pthread_mutex_t :: struct {
+			__private: [10]i32,
+		}
+	} else {
+		pthread_cond_t :: struct {
+			__size: [40]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+			__align: c.long,
+		}
+
+		pthread_mutex_t :: struct {
+			__size: [32]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+			__align: c.long,
+		}
 	}
 
 	sched_param :: struct {
