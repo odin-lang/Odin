@@ -323,7 +323,7 @@ _get_executable_path :: proc(allocator: runtime.Allocator) -> (path: string, err
 
 
 @(require_results)
-_fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> (fixed: []u16, err: runtime.Allocator_Error) {
+_fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> (fixed: []u16, err: Error) {
 	wide := win32_utf8_to_utf16(path, allocator) or_return
 	fixed, err = _fix_long_path_wide(path, wide, allocator)
 	if err != nil || raw_data(fixed) != raw_data(wide) {
@@ -333,7 +333,7 @@ _fix_long_path_slice :: proc(path: string, allocator: runtime.Allocator) -> (fix
 }
 
 @(require_results)
-_fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (win32.wstring, runtime.Allocator_Error) {
+_fix_long_path :: proc(path: string, allocator: runtime.Allocator) -> (win32.wstring, Error) {
 	fixed, err := _fix_long_path_slice(path, allocator)
 	return cstring16(raw_data(fixed)), err
 }

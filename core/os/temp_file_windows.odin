@@ -4,7 +4,7 @@ package os
 import "base:runtime"
 import win32 "core:sys/windows"
 
-_temp_dir :: proc(allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
+_temp_dir :: proc(allocator: runtime.Allocator) -> (res: string, err: Error) {
 	n := win32.GetTempPathW(0, nil)
 	if n == 0 {
 		return "", nil
