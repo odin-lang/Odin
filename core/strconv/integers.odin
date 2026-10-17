@@ -1,7 +1,16 @@
 package strconv
 
 Int_Flag :: enum {
+	// Prefixes the integer depending on the base:
+	// - `0b`: base 2
+	// - `0o`: base 8
+	// - `0z`: base 12
+	// - `0x`: base 16
+	//
+	// NOTE: A base 10 integer receives no prefix, even if this flag is specified.
 	Prefix,
+
+	// Prepend a `+` sign before positive integers.
 	Plus,
 }
 Int_Flags :: bit_set[Int_Flag]

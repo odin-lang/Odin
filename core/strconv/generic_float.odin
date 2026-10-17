@@ -2,6 +2,12 @@ package strconv
 
 import "decimal"
 
+Float_Flag :: enum {
+	Plus,
+}
+
+Float_Flags :: bit_set[Float_Flag]
+
 Decimal_Slice :: struct {
 	digits:        []byte,
 	count:         int,
@@ -30,6 +36,7 @@ val: The floating-point value to be converted
 fmt: The formatting byte, accepted values are 'e', 'E', 'f', 'F', 'g', 'G'
 precision: The number of decimal places to round to
 bit_size: The size of the floating-point number in bits, valid values are 16, 32, 64
+flags: Additional formatting options; `.Plus` prefixes non-negative finite values with `+`
 
 Example:
 
@@ -43,7 +50,7 @@ Example:
 **Returns**
 - A byte slice containing the formatted string
 */
-generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int) -> []byte {
+generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int, flags: Float_Flags) -> []byte {
 	bits: u64
 	flt: ^Float_Info
 	switch bit_size {
@@ -68,10 +75,12 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 	case 1<<flt.expbits - 1:
 		s: string
 		if mant != 0 {
+			// NOTE: This is never prefixed with '+', even if flags specify `.Plus`.
 			s = "NaN"
 		} else if neg {
 			s = "-Inf"
 		} else {
+			// NOTE: This is always prefixed with '+', even if flags does not specify `.Plus`.
 			s = "+Inf"
 		}
 		n := copy(buf, s)
@@ -116,7 +125,7 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 
 		digs = Decimal_Slice{digits = d.digits[:], count = d.count, decimal_point = d.decimal_point}
 	}
-	return format_digits(buf, shortest, neg, digs, prec, fmt)
+	return format_digits(buf, shortest, neg, digs, prec, fmt, flags)
 }
 
 /*
@@ -129,11 +138,12 @@ Converts a decimal floating-point number into a byte buffer with the given forma
 - digs: The decimal number to be formatted
 - precision: The number of digits after the decimal point
 - fmt: The format specifier (accepted values: 'f', 'F', 'e', 'E', 'g', 'G')
+- flags: Additional formatting options
 
 **Returns**
 - A byte slice containing the formatted decimal floating-point number
 */
-format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte) -> []byte {
+format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte, flags: Float_Flags) -> []byte {
 	Buffer :: struct {
 		b: []byte,
 		n: int,
@@ -151,7 +161,11 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 
 	switch fmt {
 	case 'f', 'F':
-		add_bytes(&b, '-' if neg else '+')
+		if neg {
+			add_bytes(&b, '-')
+		} else if .Plus in flags {
+			add_bytes(&b, '+')
+		}
 
 		// integer, padded with zeros when needed
 		if digs.decimal_point > 0 {
@@ -179,7 +193,11 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		return to_bytes(b)
 
 	case 'e', 'E':
-		add_bytes(&b, '-' if neg else '+')
+		if neg {
+			add_bytes(&b, '-')
+		} else if .Plus in flags {
+			add_bytes(&b, '+')
+		}
 
 		ch := byte('0')
 		if digs.count != 0 {
@@ -237,14 +255,14 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 			if prec > digs.count {
 				prec = digs.count
 			}
-			return format_digits(buf, shortest, neg, digs, prec-1, fmt+'e'-'g') // keep the same case
+			return format_digits(buf, shortest, neg, digs, prec-1, fmt+'e'-'g', flags) // keep the same case
 		}
 
 		if prec > digs.decimal_point {
 			prec = digs.count
 		}
 
-		return format_digits(buf, shortest, neg, digs, max(prec-digs.decimal_point, 0), 'f')
+		return format_digits(buf, shortest, neg, digs, max(prec-digs.decimal_point, 0), 'f', flags)
 
 	case:
 		add_bytes(&b, '%', fmt)
