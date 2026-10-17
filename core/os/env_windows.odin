@@ -79,8 +79,8 @@ _set_env :: proc(key, value: string) -> Error {
 
 _unset_env :: proc(key: string) -> bool {
 	temp_allocator := TEMP_ALLOCATOR_GUARD({})
-	k, allocator_error := win32_utf8_to_wstring(key, temp_allocator)
-	if allocator_error != nil {
+	k, err := win32_utf8_to_wstring(key, temp_allocator)
+	if err != nil {
 		return false
 	}
 	return bool(win32.SetEnvironmentVariableW(k, nil))
