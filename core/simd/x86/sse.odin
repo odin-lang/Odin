@@ -1044,10 +1044,10 @@ when ODIN_ARCH == .amd64 {
 	// boundary or a general-protection exception may be generated.
 	//
 	// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_stream_ps)
-	@(enable_target_feature="sse")
-	_mm_stream_ps :: asm (mem_addr: ^f32, a: __m128) {
-		movntps [mem_addr], a
-	}
+	// @(enable_target_feature="sse")
+	// _mm_stream_ps :: asm (mem_addr: ^f32, a: __m128) {
+	// 	movntps [mem_addr], a
+	// }
 
 	// Convert the lower single-precision (32-bit) floating-point element in `a` to a 64-bit integer,
 	// and store the result in `dst`.
