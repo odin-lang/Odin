@@ -752,7 +752,9 @@ _build_command_line :: proc(command: []string, allocator: runtime.Allocator) -> 
 			strings.write_byte(&builder, ' ')
 		}
 		j := 0
-		if strings.contains_any(arg, "()[]{}^=;!'+,`~\" ") {
+		// Without quotes, `CommandLineToArgvW` and the C runtime drop an empty
+		// argument and split one at its spaces or tabs.
+		if len(arg) == 0 || strings.contains_any(arg, "()[]{}^=;!'+,`~\" \t") {
 			strings.write_byte(&builder, '"')
 			for j < len(arg) {
 				backslashes := 0
