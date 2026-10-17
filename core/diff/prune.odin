@@ -110,13 +110,17 @@ prune :: proc(a, b: []i32, id_count: int, changes: Changes, s: ^Scratch, opts: O
 		k := kept_lo
 		for i < hi {
 			i += _bit_run(bits, i, hi, true)
+
 			run := _bit_run(bits, i, hi, false)
 			for t := 0; t < run; /**/ {
 				t += _bit_run(kept, k + t, k + run, false)
+
 				changed := _bit_run(kept, k + t, k + run, true)
 				_set_bit_range(bits, i + t, i + t + changed)
+
 				t += changed
 			}
+
 			i += run
 			k += run
 		}

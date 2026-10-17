@@ -238,11 +238,11 @@ write_unified :: proc(
 			if style.hunk_header != "" {
 				io.write_string(w, style.hunk_header) or_return
 			}
-			io.write_string(w, "@@ -") or_return
+			io.write_string(w, "@@ -")                     or_return
 			write_range(w, line.hunk.a_lo, line.hunk.a_hi) or_return
-			io.write_string(w, " +") or_return
+			io.write_string(w, " +")                       or_return
 			write_range(w, line.hunk.b_lo, line.hunk.b_hi) or_return
-			io.write_string(w, " @@") or_return
+			io.write_string(w, " @@")                      or_return
 			if style.hunk_header != "" {
 				io.write_string(w, style.reset) or_return
 			}

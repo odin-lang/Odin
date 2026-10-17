@@ -301,12 +301,12 @@ myers_split :: proc(md: ^Myers, box: Box, max_cost: int) -> (lo, hi: Box) {
 				x := int(fwd[k])
 				y := x - k
 				v := (x - a_lo) + (y - b_lo) - abs(k - fwd_start)
-				if v > MYERS_HEURISTIC_FACTOR*d      &&
-				   v > best                          &&
-				   a_lo + MYERS_SNAKE_LEN <= x       &&
-				   x < a_hi                          &&
-				   b_lo + MYERS_SNAKE_LEN <= y       &&
-				   y < b_hi                          &&
+				if v > MYERS_HEURISTIC_FACTOR*d &&
+				   v > best                     &&
+				   a_lo + MYERS_SNAKE_LEN <= x  &&
+				   x < a_hi                     &&
+				   b_lo + MYERS_SNAKE_LEN <= y  &&
+				   y < b_hi                     &&
 				   equal_run(a, b, x - MYERS_SNAKE_LEN, y - MYERS_SNAKE_LEN) {
 					best   = v
 					best_x = x
@@ -321,12 +321,12 @@ myers_split :: proc(md: ^Myers, box: Box, max_cost: int) -> (lo, hi: Box) {
 				x := int(bwd[k])
 				y := x - k
 				v := (a_hi - x) + (b_hi - y) - abs(k - bwd_start)
-				if v > MYERS_HEURISTIC_FACTOR*d      &&
-				   v > best                          &&
-				   a_lo < x                          &&
-				   x <= a_hi - MYERS_SNAKE_LEN       &&
-				   b_lo < y                          &&
-				   y <= b_hi - MYERS_SNAKE_LEN       &&
+				if v > MYERS_HEURISTIC_FACTOR*d &&
+				   v > best                     &&
+				   a_lo < x                     &&
+				   x <= a_hi - MYERS_SNAKE_LEN  &&
+				   b_lo < y                     &&
+				   y <= b_hi - MYERS_SNAKE_LEN  &&
 				   equal_run(a, b, x, y) {
 					best   = v
 					best_x = x

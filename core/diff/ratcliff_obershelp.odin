@@ -96,10 +96,8 @@ ratcliff_obershelp :: proc(a, b: []i32, id_count: int, changes: Changes, s: ^Scr
 		switch {
 		case box.a_lo == box.a_hi:
 			_mark_inserted(changes, box.b_lo, box.b_hi)
-
 		case box.b_lo == box.b_hi:
 			_mark_deleted(changes, box.a_lo, box.a_hi)
-
 		case:
 			i, j, k, searched := ratcliff_obershelp_longest_block(&ro, box)
 			switch {

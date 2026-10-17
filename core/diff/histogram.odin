@@ -123,7 +123,7 @@ histogram_best_run :: proc(h: ^Histogram, box: Box) -> (run: Box, found: Histogr
 	}
 
 	best_count := HISTOGRAM_MAX_OCCURRENCES + 1
-	best_span  := 0 // the best run's length in `a`, minus one
+	best_span  := 0 // the best run's length in `a` minus one
 	has_common := false
 	has_run    := false
 	for j := box.b_lo; j < box.b_hi; /**/ {
@@ -132,10 +132,8 @@ histogram_best_run :: proc(h: ^Histogram, box: Box) -> (run: Box, found: Histogr
 		switch {
 		case c == 0:
 			// Not in the region of `a`
-
 		case c > best_count:
 			has_common = true
-
 		case:
 			has_common = true
 			for i := int(first[b[j]]); i != HISTOGRAM_NONE; /**/ {

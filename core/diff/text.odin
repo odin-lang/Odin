@@ -106,6 +106,7 @@ diff_text_buffer :: proc(
 
 
 	n, m := changes.n, changes.m
+
 	assert(len(a) < int(max(i32)), "text too long to diff", loc)
 	assert(len(b) < int(max(i32)), "text too long to diff", loc)
 	assert(n + m < int(max(i32)), "too many tokens to intern", loc)
@@ -120,25 +121,27 @@ diff_text_buffer :: proc(
 	}
 
 	interning_start := s.pos
-	src := Text_Source{
-		a        = a,
-		b        = b,
-		a_starts = scratch_take(&s, i32, n + 1, loc),
-		b_starts = scratch_take(&s, i32, m + 1, loc),
-	}
-	_token_starts(a, token, src.a_starts, loc)
-	_token_starts(b, token, src.b_starts, loc)
-	for &indent, k in indents {
-		indent = line_indent(text_source_token(src, k))
+	a_tokens := Text_Tokens{a, scratch_take(&s, i32, n + 1, loc)}
+	b_tokens := Text_Tokens{b, scratch_take(&s, i32, m + 1, loc)}
+
+	_token_starts(a, token, a_tokens.starts, loc)
+	_token_starts(b, token, b_tokens.starts, loc)
+	if indents != nil {
+		for k in 0..<n {
+			indents[k] = line_indent(token_at(a_tokens, k))
+		}
+		for k in 0..<m {
+			indents[n + k] = line_indent(token_at(b_tokens, k))
+		}
 	}
 	table := scratch_take(&s, Intern_Slot, intern_table_len(n + m), loc)
 
 	flags := flags
 	id_count: int
 	if flags == {} {
-		id_count = intern(src, string, text_equal_exact, text_hash_exact, nil, ids, table)
+		id_count = intern(a_tokens, b_tokens, string, text_equal_exact, text_hash_exact, nil, ids, table)
 	} else {
-		id_count = intern(src, string, _text_equal, _text_hash, &flags, ids, table)
+		id_count = intern(a_tokens, b_tokens, string, _text_equal, _text_hash, &flags, ids, table)
 	}
 	s.pos = interning_start
 
@@ -353,7 +356,7 @@ text_reader_make :: proc(s: string, flags: Text_Flags) -> (r: Text_Reader) {
 	if .Ignore_CR in flags && r.newline && r.end > 0 && s[r.end - 1] == '\r' {
 		r.end -= 1
 	}
-	if flags & {.Ignore_Trailing_Space, .Ignore_All_Space} != {} {
+	if flags & {.Ignore_Trailing_Space, .Ignore_All_Space} != nil {
 		for r.end > 0 {
 			c, width := utf8.decode_last_rune_in_string(s[:r.end])
 			if !unicode.is_space(c) {

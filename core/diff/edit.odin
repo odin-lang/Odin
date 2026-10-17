@@ -63,8 +63,9 @@ edit_iterator_make_hunk :: proc "contextless" (c: Changes, h: Hunk) -> Edit_Iter
 */
 @(require_results)
 edit_iterate :: proc "contextless" (it: ^Edit_Iterator) -> (e: Edit, ok: bool) {
-	c    := it.changes
+	c := it.changes
 	i, j := it.i, it.j
+
 	switch {
 	case i < it.a_hi && is_deleted(c, i):
 		e = {.Delete, i, i + _deleted_run(c, i, it.a_hi), j, j}
@@ -94,8 +95,8 @@ edit_count :: proc "contextless" (c: Changes) -> (count: int) {
 // Fills `buf` with every edit in `c` and returns the filled part. `buf` must hold at least `edit_count(c)` edits.
 @(require_results)
 edits_fill :: proc(c: Changes, buf: []Edit, loc := #caller_location) -> []Edit {
-	it := edit_iterator_make(c)
 	n := 0
+	it := edit_iterator_make(c)
 	for e in edit_iterate(&it) {
 		assert(n < len(buf), "buffer too small for the edits", loc)
 		buf[n] = e

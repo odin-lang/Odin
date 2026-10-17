@@ -23,7 +23,10 @@ scratch_take :: proc(s: ^Scratch, $T: typeid, count: int, loc := #caller_locatio
 	base  := uintptr(raw_data(s.buf))
 	start := int((base + uintptr(s.pos) + (SCRATCH_ALIGN-1)) &~ (SCRATCH_ALIGN-1) - base)
 	end   := start + scratch_bytes(T, count)
+
 	assert(end <= len(s.buf), "scratch buffer too small", loc)
+
 	s.pos = end
+
 	return ([^]T)(rawptr(base + uintptr(start)))[:count]
 }

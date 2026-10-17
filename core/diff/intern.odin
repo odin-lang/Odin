@@ -30,56 +30,62 @@ intern_scratch_size :: proc "contextless" (tokens: int) -> int {
 	return scratch_bytes(Intern_Slot, intern_table_len(tokens))
 }
 
-// The tokens of `a` then `b` as one sequence.
-Slice_Source :: struct($T: typeid) {
-	a, b: []T,
-}
-
-// The tokens of two strings, without a slice of them. Each `starts` holds where every token starts, then the length.
-Text_Source :: struct {
-	a, b:               string,
-	a_starts, b_starts: []i32,
+// One string's tokens, without a slice of them. `starts` holds where each token starts, then the string's length.
+Text_Tokens :: struct {
+	text:   string,
+	starts: []i32,
 }
 
 @(require_results)
-slice_source_len :: #force_inline proc "contextless" (src: Slice_Source($T)) -> int {
-	return len(src.a) + len(src.b)
+slice_tokens_len :: #force_inline proc "contextless" (s: []$T) -> int {
+	return len(s)
 }
 
 @(require_results)
-slice_source_token :: #force_inline proc "contextless" (src: Slice_Source($T), k: int) -> T {
-	return k < len(src.a) ? src.a[k] : src.b[k - len(src.a)]
+text_tokens_len :: #force_inline proc "contextless" (s: Text_Tokens) -> int {
+	return len(s.starts) - 1
 }
 
 @(require_results)
-text_source_len :: #force_inline proc "contextless" (src: Text_Source) -> int {
-	return len(src.a_starts) - 1 + len(src.b_starts) - 1
+slice_token_at :: #force_inline proc "contextless" (s: []$T, k: int) -> T {
+	return s[k]
 }
 
 @(require_results)
-text_source_token :: #force_inline proc "contextless" (src: Text_Source, k: int) -> string {
-	n := len(src.a_starts) - 1
-	if k < n {
-		return src.a[src.a_starts[k]:src.a_starts[k + 1]]
-	}
-	return src.b[src.b_starts[k - n]:src.b_starts[k - n + 1]]
+text_token_at :: #force_inline proc "contextless" (s: Text_Tokens, k: int) -> string {
+	return s.text[s.starts[k]:s.starts[k+1]]
 }
 
-source_len :: proc{slice_source_len, text_source_len}
+tokens_len :: proc{
+	slice_tokens_len,
+	text_tokens_len,
+}
 
-source_token :: proc{slice_source_token, text_source_token}
+token_at :: proc{
+	slice_token_at,
+	text_token_at,
+}
 
-// Fills `ids` with the ID of each token of `src`, and returns how many distinct IDs there are.
+// Fills `ids` with the ID of each token of `a`, then of `b`, and returns how many distinct IDs there are.
 @(require_results)
 intern :: proc(
-	src:       $S,
+	a, b:      $S, // `[]T` or `Text_Tokens`
 	$T:        typeid,
 	equal:     proc(x, y: T, user_data: rawptr) -> bool,
-	hash:      proc(x: T, user_data: rawptr) -> u64,
+	hash:      proc(x: T,    user_data: rawptr) -> u64,
 	user_data: rawptr,
 	ids:       []i32,
 	table:     []Intern_Slot,
 ) -> (id_count: int) {
+	// Token `k` of `a`, then of `b`, where `a` has `n`
+	@(require_results)
+	token :: #force_inline proc "contextless" (a, b: S, n, k: int) -> T {
+		if k < n {
+			return token_at(a, k)
+		}
+		return token_at(b, k - n)
+	}
+
 
 	for &slot in table {
 		slot = {}
@@ -89,8 +95,9 @@ intern :: proc(
 	shift := 64 - uint(intrinsics.count_trailing_zeros(u64(len(table))))
 	mask  := len(table) - 1
 
-	for k in 0..<source_len(src) {
-		x   := source_token(src, k)
+	n := tokens_len(a)
+	for k in 0..<n + tokens_len(b) {
+		x   := token(a, b, n, k)
 		h   := hash(x, user_data)
 		pos := int((h * 0x9e3779b97f4a7c15) >> shift)
 		tag := u32(h)
@@ -106,7 +113,7 @@ intern :: proc(
 
 			if slot.hash == tag {
 				first := int(slot.token - 1)
-				if equal(x, source_token(src, first), user_data) {
+				if equal(x, token(a, b, n, first), user_data) {
 					ids[k] = ids[first]
 					break
 				}

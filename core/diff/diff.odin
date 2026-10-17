@@ -165,7 +165,7 @@ diff_by_buffer :: proc(
 
 	table_start := s.pos
 	table := scratch_take(&s, Intern_Slot, intern_table_len(n + m), loc)
-	id_count := intern(Slice_Source(T){a, b}, T, equal, hash, user_data, ids, table)
+	id_count := intern(a, b, T, equal, hash, user_data, ids, table)
 	s.pos = table_start
 
 	diff_interned_scratch(ids[:n], ids[n:], nil, id_count, changes, &s, opts, loc)
@@ -302,6 +302,7 @@ diff_interned_scratch :: proc(
 	assert(changes.m == len(b), "changes sized for different inputs", loc)
 	assert(len(changes.bits) >= changes_size(changes.n, changes.m), "buffer too small for the changes", loc)
 	assert(id_count >= 0, "negative id_count", loc)
+
 	if .Indent_Heuristic in opts.flags {
 		assert(.Compact in opts.flags, ".Indent_Heuristic only applies with .Compact", loc)
 		assert(indents != nil, ".Indent_Heuristic needs a line diff of text", loc)
@@ -386,26 +387,16 @@ _mark_inserted :: proc "contextless" (c: Changes, lo, hi: int) {
 }
 
 _set_bit_range :: proc "contextless" (bits: []u64, lo, hi: int) {
-	bit_put :: #force_inline proc "contextless" (bits: []u64, i: int, set: bool) {
-		mask := u64(1) << uint(i & 63)
-		if set {
-			bits[i >> 6] |= mask
-		} else {
-			bits[i >> 6] &~= mask
-		}
-	}
-
-
 	for i in lo..<hi {
-		bit_put(bits, i, true)
+		mask := u64(1) << uint(i & 63)
+		bits[i >> 6] |= mask
 	}
 }
 
 // Returns how many bits from `lo` up to `hi` are all set, or all clear when `set` is false.
 @(require_results)
 _bit_run :: proc "contextless" (bits: []u64, lo, hi: int, set: bool) -> int {
-	i := lo
-	for i < hi {
+	for i := lo; i < hi; /**/ {
 		w := bits[i >> 6]
 		if !set {
 			w = ~w
