@@ -879,13 +879,13 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: File_Stream_Mode, p: []byte
 
 
 @(private="package", require_results)
-win32_utf8_to_wstring :: proc(s: string, allocator: runtime.Allocator) -> (ws: cstring16, err: runtime.Allocator_Error) {
+win32_utf8_to_wstring :: proc(s: string, allocator: runtime.Allocator) -> (ws: cstring16, err: Error) {
 	ws = cstring16(raw_data(win32_utf8_to_utf16(s, allocator) or_return))
 	return
 }
 
 @(private="package", require_results)
-win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u16, err: runtime.Allocator_Error) {
+win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u16, err: Error) {
 	if len(s) < 1 {
 		return
 	}
@@ -894,13 +894,15 @@ win32_utf8_to_utf16 :: proc(s: string, allocator: runtime.Allocator) -> (ws: []u
 	cstr := raw_data(b)
 	n := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), nil, 0)
 	if n == 0 {
-		return nil, nil
+		err = _get_platform_error()
+		return
 	}
 
 	text := make([]u16, n+1, allocator) or_return
 
 	n1 := win32.MultiByteToWideChar(win32.CP_UTF8, win32.MB_ERR_INVALID_CHARS, cstr, i32(len(s)), raw_data(text), n)
 	if n1 == 0 {
+		err = _get_platform_error()
 		delete(text, allocator)
 		return
 	}
@@ -947,7 +949,7 @@ win32_utf8_to_pczzwstr :: proc(s: string, allocator: runtime.Allocator) -> (ws: 
 }
 
 @(private="package", require_results)
-win32_wstring_to_utf8 :: proc(s: cstring16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+win32_wstring_to_utf8 :: proc(s: cstring16, allocator: runtime.Allocator) -> (res: string, err: Error) {
 	if s == nil || s == "" {
 		return "", nil
 	}
@@ -961,13 +963,14 @@ win32_utf16_to_utf8 :: proc{
 }
 
 @(private="package", require_results)
-win32_utf16_string16_to_utf8 :: proc(s: string16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+win32_utf16_string16_to_utf8 :: proc(s: string16, allocator: runtime.Allocator) -> (res: string, err: Error) {
 	if len(s) == 0 {
 		return
 	}
 
 	n := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), nil, 0, nil, nil)
 	if n == 0 {
+		err = _get_platform_error()
 		return
 	}
 
@@ -980,6 +983,7 @@ win32_utf16_string16_to_utf8 :: proc(s: string16, allocator: runtime.Allocator) 
 
 	n1 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), raw_data(text), n, nil, nil)
 	if n1 == 0 {
+		err = _get_platform_error()
 		delete(text, allocator)
 		return
 	}
@@ -995,13 +999,14 @@ win32_utf16_string16_to_utf8 :: proc(s: string16, allocator: runtime.Allocator) 
 }
 
 @(private="package", require_results)
-win32_utf16_u16_to_utf8 :: proc(s: []u16, allocator: runtime.Allocator) -> (res: string, err: runtime.Allocator_Error) {
+win32_utf16_u16_to_utf8 :: proc(s: []u16, allocator: runtime.Allocator) -> (res: string, err: Error) {
 	if len(s) == 0 {
 		return
 	}
 
 	n := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), nil, 0, nil, nil)
 	if n == 0 {
+		err = _get_platform_error()
 		return
 	}
 
@@ -1014,6 +1019,7 @@ win32_utf16_u16_to_utf8 :: proc(s: []u16, allocator: runtime.Allocator) -> (res:
 
 	n1 := win32.WideCharToMultiByte(win32.CP_UTF8, win32.WC_ERR_INVALID_CHARS, cstring16(raw_data(s)), i32(len(s)), raw_data(text), n, nil, nil)
 	if n1 == 0 {
+		err = _get_platform_error()
 		delete(text, allocator)
 		return
 	}

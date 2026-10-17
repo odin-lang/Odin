@@ -162,7 +162,7 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 	return _cleanpath_strip_prefix(buf[:n]), nil
 }
 
-_cleanpath_from_buf :: proc(buf: string16, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
+_cleanpath_from_buf :: proc(buf: string16, allocator: runtime.Allocator) -> (res: string, err: Error) {
 	buf := transmute([]u16)buf
 	buf = _cleanpath_strip_prefix(buf)
 	return win32_utf16_to_utf8(buf, allocator)
