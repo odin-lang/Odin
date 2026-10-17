@@ -50,6 +50,6 @@ _mm_shuffle_epi32 :: #force_inline proc "c" (a: simd.u8x16, $IMM8: u32) -> simd.
 }
 
 @(private, require_results, enable_target_feature = TARGET_FEATURES)
-_mm_shuffle_ps :: #force_inline proc "c" (a, b: simd.u8x16, $MASK: u32) -> simd.u8x16 {
-	return transmute(simd.u8x16)(x86._mm_shuffle_ps(transmute(x86.__m128)(a), transmute(x86.__m128)(b), MASK))
+_mm_shuffle_ps :: #force_inline proc "c" (a, b: simd.u8x16, $IMM8: i32) -> simd.u8x16 where 0 <= IMM8, IMM8 < 256 {
+	return transmute(simd.u8x16)(x86._mm_shuffle_ps(transmute(x86.__m128)(a), transmute(x86.__m128)(b), IMM8))
 }
