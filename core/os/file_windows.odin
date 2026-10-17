@@ -37,8 +37,7 @@ File_Impl :: struct {
 	w_n:   int,
 	max_consecutive_empty_writes: int,
 
-	rw_mutex: sync.RW_Mutex, // read write calls
-	p_mutex:  sync.Mutex, // pread pwrite calls
+	rw_mutex: sync.RW_Mutex,
 }
 
 @(init)
@@ -386,22 +385,20 @@ _read_internal :: proc(f: ^File_Impl, p: []byte) -> (n: i64, err: Error) {
 
 	sync.shared_guard(&f.rw_mutex) // multiple readers
 
-	if sync.guard(&f.p_mutex) {
-		to_read := win32.DWORD(min(length, MAX_RW))
-		switch f.kind {
-		case .Console:
-			// NOTE(laytan): at least for now, just use ReadFile, it seems to work fine,
-			// but, there may be issues with certain situations that we need to get reproductions for.
-			// total_read, err = read_console(handle, p[total_read:][:to_read])
-			fallthrough
-		case .Pipe, .File:
-			single_read_length: win32.DWORD
-			ok := win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
-			if ok {
-				total_read += int(single_read_length)
-			} else {
-				err = _get_platform_error()
-			}
+	to_read := win32.DWORD(min(length, MAX_RW))
+	switch f.kind {
+	case .Console:
+		// NOTE(laytan): at least for now, just use ReadFile, it seems to work fine,
+		// but, there may be issues with certain situations that we need to get reproductions for.
+		// total_read, err = read_console(handle, p[total_read:][:to_read])
+		fallthrough
+	case .Pipe, .File:
+		single_read_length: win32.DWORD
+		ok := win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
+		if ok {
+			total_read += int(single_read_length)
+		} else {
+			err = _get_platform_error()
 		}
 	}
 
@@ -459,7 +456,7 @@ _read_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error) 
 		return 0, .Invalid_File
 	}
 
-	sync.guard(&f.p_mutex)
+	sync.guard(&f.rw_mutex)
 
 	curr_offset := _seek_unsafe(handle, 0, .Current) or_return
 	defer _seek_unsafe(handle, curr_offset, .Start)
@@ -545,7 +542,7 @@ _write_at :: proc(f: ^File_Impl, p: []byte, offset: i64) -> (n: i64, err: Error)
 		return 0, .Invalid_File
 	}
 
-	sync.guard(&f.p_mutex)
+	sync.guard(&f.rw_mutex)
 
 	curr_offset := _seek_unsafe(handle, 0, .Current) or_return
 	defer _seek_unsafe(handle, curr_offset, .Start)
