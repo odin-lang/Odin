@@ -16,7 +16,7 @@ find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW, al
 	}
 
 	temp_allocator := TEMP_ALLOCATOR_GUARD({ allocator })
-	filename := win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_else ""
+	filename := win32_wstring_to_utf8(cstring16(raw_data(d.cFileName[:])), temp_allocator) or_return
 
 	pieces: []string
 	if len(base_path) > 0 && is_path_separator(base_path[len(base_path) - 1]) {
