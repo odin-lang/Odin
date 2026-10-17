@@ -595,6 +595,7 @@ foreign kernel32 {
 	GenerateConsoleCtrlEvent     :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
 	FreeConsole                  :: proc() -> BOOL ---
 	GetConsoleWindow             :: proc() -> HWND ---
+	GetConsoleProcessList        :: proc(lpdwProcessList: LPDWORD, dwProcessCount: DWORD) -> DWORD ---
 	GetConsoleScreenBufferInfo   :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfo: PCONSOLE_SCREEN_BUFFER_INFO) -> BOOL ---
 	GetConsoleScreenBufferInfoEx :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfoEx: PCONSOLE_SCREEN_BUFFER_INFOEX) -> BOOL ---
 	SetConsoleScreenBufferSize   :: proc(hConsoleOutput: HANDLE, dwSize: COORD) -> BOOL ---
