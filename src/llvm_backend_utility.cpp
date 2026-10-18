@@ -1832,7 +1832,7 @@ gb_internal lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lb
 
 	LLVMTypeRef type = lb_type(p->module, mt);
 	lbValue res = {};
-	if (lb_is_const(s)) {
+	if (lb_is_const(s) && LLVMIsConstant(index)) {
 		res.value = LLVMConstGEP2(type, s.value, indices, gb_count_of(indices));
 	} else {
 		res.value = LLVMBuildGEP2(p->builder, type, s.value, indices, gb_count_of(indices), "");
