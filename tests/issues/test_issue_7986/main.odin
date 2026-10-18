@@ -5,9 +5,12 @@ import common "common"
 import dynlib "core:dynlib"
 import testing "core:testing"
 
+// Windows finds the library next to the executable, while elsewhere a relative path is needed
+LIB_PATH :: "test_issue_7986_lib.dll" when ODIN_OS == .Windows else "./test_issue_7986_lib." + dynlib.LIBRARY_FILE_EXTENSION
+
 @(test)
 test_issue_7986 :: proc(t: ^testing.T) {
-	lib, ok := dynlib.load_library("./test_issue_7986_lib." + dynlib.LIBRARY_FILE_EXTENSION)
+	lib, ok := dynlib.load_library(LIB_PATH)
 	if !testing.expect(t, ok, "could not load test_issue_7986_lib") {
 		return
 	}
