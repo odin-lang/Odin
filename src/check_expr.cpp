@@ -5984,6 +5984,11 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					}
 
 				}
+
+				// Use the zero value if it is not found
+				if (success_) *success_ = true;
+				if (finish_) *finish_ = true;
+				return empty_exact_value;
 			}
 		} else {
 			i32 count = (i32)cl->elems.count;
@@ -6160,6 +6165,30 @@ gb_internal ExactValue get_constant_soa_field(Type *soa, ExactValue value, Selec
 
 	if (success_) *success_ = true;
 	return result->tav.value();
+}
+
+// NOTE: elements omitted from a constant compound literal are reported as an invalid value; for simple types, use
+// the zero value of the type so that it can be used in further constant evaluation
+gb_internal ExactValue constant_zero_value_if_omitted(ExactValue value, Type *type) {
+	if (value.kind != ExactValue_Invalid || type == nullptr) {
+		return value;
+	}
+	if (is_type_boolean(type)) {
+		return exact_value_bool(false);
+	} else if (is_type_integer(type) || is_type_rune(type) || is_type_enum(type)) {
+		return exact_value_i64(0);
+	} else if (is_type_float(type)) {
+		return exact_value_float(0);
+	} else if (is_type_complex(type)) {
+		return exact_value_complex(0, 0);
+	} else if (is_type_quaternion(type)) {
+		return exact_value_quaternion(0, 0, 0, 0);
+	} else if (is_type_string16(type)) {
+		return exact_value_string16({});
+	} else if (is_type_string(type) && !is_type_cstring(type) && !is_type_cstring16(type)) {
+		return exact_value_string({});
+	}
+	return value;
 }
 
 gb_internal ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selection sel, bool *success_) {
@@ -6701,6 +6730,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		bool success = false;
 		ExactValue field_value = get_constant_field(c, operand, sel, &success);
 		if (success) {
+			field_value = constant_zero_value_if_omitted(field_value, entity->type);
 			operand->mode = Addressing_Constant;
 			operand->expr = node;
 			operand->value = field_value;
@@ -6726,6 +6756,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		bool success = false;
 		ExactValue field_value = get_constant_field(c, operand, sel, &success);
 		if (success) {
+			field_value = constant_zero_value_if_omitted(field_value, entity->type);
 			operand->mode = Addressing_Constant;
 			operand->expr = node;
 			operand->value = field_value;
@@ -13173,6 +13204,7 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 				o->expr = node;
 				return kind;
 			}
+			o->value = constant_zero_value_if_omitted(o->value, o->type);
 		}
 	}
 
