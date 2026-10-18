@@ -696,6 +696,9 @@ when MAP_ENABLED {
 	// Note: Prefer the procedure group `reserve`
 	@builtin
 	reserve_map :: proc(m: ^$T/map[$K]$V, #any_int capacity: int, loc := #caller_location) -> Allocator_Error {
+		if capacity < 0 {
+			return .Invalid_Argument
+		}
 		return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc)
 	}
 
@@ -1387,6 +1390,9 @@ _reserve_dynamic_array :: #force_no_inline proc(#no_alias a: ^Raw_Dynamic_Array,
 	}
 
 	if capacity <= a.cap {
+		if capacity < 0 {
+			return .Invalid_Argument
+		}
 		return nil
 	}
 
