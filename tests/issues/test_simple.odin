@@ -40,6 +40,7 @@ package tests_issues
 @(require) import "test_issue_7477_7506"
 @(require) import "test_issue_7490"
 @(require) import "test_issue_7547"
+@(require) import "test_issue_7560"
 @(require) import "test_issue_7566"
 @(require) import "test_issue_7587"
 @(require) import "test_issue_7598"
