@@ -172,3 +172,34 @@ test_pr_7848_export :: proc(t: ^testing.T) {
 	testing.expect(t, inactive, "the untaken `when` branch should be inactive")
 	testing.expect_value(t, len(tf.find_idents(b.uses, untaken)), 0)
 }
+
+@(test)
+test_pr_7848_attributes :: proc(t: ^testing.T) {
+	s := load(t, "pr_7848.cbor")
+
+	// as written and in order, `private` included
+	plus, _ := find_entity(s, "plus", .Procedure)
+	expected := []tf.Attribute{{"private", `"file"`}, {"require_results", ""}, {"deprecated", `"use add_int"`}}
+	if testing.expect_value(t, len(plus.attributes), len(expected)) {
+		for a, i in expected {
+			testing.expect_value(t, plus.attributes[i], a)
+		}
+	}
+
+	// the entities without a `DeclInfo`, and a generic with the copies made by each instantiation
+	for x in ([]struct{name: string, kind: tf.Entity_Kind, attribute: tf.Attribute}{
+		{"calls",    .Variable,  {"static", ""}},
+		{"str",      .Import,    {"require", ""}},
+		{"tool_lib", .Library,   {"priority_index", "2"}},
+		{"twice",    .Procedure, {"require_results", ""}},
+	}) {
+		e, count := find_entity(s, x.name, x.kind)
+		testing.expectf(t, count == 1, "%s should be one entity, got %d", x.name, count)
+		if testing.expectf(t, len(e.attributes) == 1, "%s should have one attribute, got %v", x.name, e.attributes) {
+			testing.expect_value(t, e.attributes[0], x.attribute)
+		}
+	}
+
+	point, _ := find_entity(s, "Point", .Type)
+	testing.expect_value(t, len(point.attributes), 0)
+}

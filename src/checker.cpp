@@ -1765,6 +1765,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	per_thread_array_init(&i->definition_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->semantic_ident_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->semantic_when_queue,  global_thread_pool.threads.count);
+	per_thread_array_init(&i->semantic_attributes_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_bodies_queue, global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_calls_queue,  global_thread_pool.threads.count);
 	per_thread_array_init(&i->checked_atomics_queue,   global_thread_pool.threads.count);
@@ -1805,6 +1806,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	per_thread_array_destroy(&i->definition_queue);
 	per_thread_array_destroy(&i->semantic_ident_queue);
 	per_thread_array_destroy(&i->semantic_when_queue);
+	per_thread_array_destroy(&i->semantic_attributes_queue);
 	per_thread_array_destroy(&i->checked_bodies_queue);
 	per_thread_array_destroy(&i->checked_calls_queue);
 	per_thread_array_destroy(&i->checked_atomics_queue);
@@ -2202,6 +2204,12 @@ gb_internal void add_semantic_ident(CheckerInfo *i, Token const &token, Entity *
 
 gb_internal void add_semantic_ident(CheckerInfo *i, Ast *identifier, Entity *entity, bool definition) {
 	add_semantic_ident(i, identifier->Ident.token, entity, definition);
+}
+
+gb_internal void add_semantic_attributes(CheckerInfo *i, Entity *entity, Array<Ast *> const &attributes) {
+	if (build_context.export_semantics_format != SemanticsFormat_Invalid && attributes.count > 0) {
+		per_thread_array_add(&i->semantic_attributes_queue, SemanticAttributes{entity, &attributes});
+	}
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -4241,6 +4249,9 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_group_attribute) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
+		return true;
 	} else if (name == "objc_name") {
 		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
@@ -4294,6 +4305,9 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 		if (ev.kind != ExactValue_String) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
+		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	} else if (name == "test") {
 		if (value != nullptr) {
@@ -4789,6 +4803,9 @@ gb_internal DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		if (ev.kind != ExactValue_String) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
+		return true;
+	} else if (name == "private") {
+		// NOTE(bill): Handled elsewhere `check_collect_value_decl`
 		return true;
 	} else if (name == "static") {
 		if (value != nullptr) {
@@ -5385,9 +5402,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
-		auto *elems = &attr->Attribute.elems;
-		for (isize j = 0; j < elems->count; j++) {
-			Ast *elem = (*elems)[j];
+		// 'private' stays in the attributes for `-export-semantics`. The attribute procedures skip it.
+		for (Ast *elem : attr->Attribute.elems) {
 			String name = {};
 			Ast *value = nullptr;
 			switch (elem->kind) {
@@ -5436,8 +5452,6 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				} else {
 					entity_visibility_kind = kind;
 				}
-				slice_unordered_remove(elems, j);
-				j -= 1;
 			} else if (name == "test") {
 				is_test = true;
 			} else if (name == "init") {
@@ -6216,6 +6230,7 @@ gb_internal void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 
 		add_entity(ctx, parent_scope, nullptr, e);
 		add_semantic_ident(ctx->info, id->import_name, e, true);
+		add_semantic_attributes(ctx->info, e, id->attributes);
 		if (force_use) {
 			add_entity_use(ctx, nullptr, e);
 		}
@@ -6440,6 +6455,7 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	add_entity_flags_from_file(ctx, e, parent_scope);
 	add_entity(ctx, scope, nullptr, e);
 	add_semantic_ident(ctx->info, fl->library_name, e, true);
+	add_semantic_attributes(ctx->info, e, fl->attributes);
 
 	mpsc_enqueue(&ctx->info->foreign_imports_to_check_fullpaths, e);
 

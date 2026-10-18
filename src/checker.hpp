@@ -691,7 +691,7 @@ struct UntypedExprInfo {
 	ExprInfo *info;
 };
 
-typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
+typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap;
 
 enum ObjcMsgKind : u32 {
 	ObjcMsg_normal,
@@ -808,6 +808,11 @@ struct SemanticWhen {
 	bool         taken;
 };
 
+struct SemanticAttributes {
+	Entity *             entity;
+	Array<Ast *> const * attributes;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -864,8 +869,9 @@ struct CheckerInfo {
 	PerThreadArray<Entity *> entity_queue;
 
 	// `-export-semantics` related stuff
-	PerThreadArray<SemanticIdent> semantic_ident_queue;
-	PerThreadArray<SemanticWhen>  semantic_when_queue;
+	PerThreadArray<SemanticIdent>      semantic_ident_queue;
+	PerThreadArray<SemanticWhen>       semantic_when_queue;
+	PerThreadArray<SemanticAttributes> semantic_attributes_queue;
 
 	bool                     entities_by_file; // until gathered, see `check_add_entities_from_files`
 	std::atomic<u64>         entities_without_file; // for their `order_in_src`
