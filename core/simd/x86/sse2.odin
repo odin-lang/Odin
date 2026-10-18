@@ -4,6 +4,15 @@ package simd_x86
 import "base:intrinsics"
 import "core:simd"
 
+// Load unaligned 64-bit integer from memory into the first element of `dst`.
+//
+// [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm_loadu_si64)
+@(require_results, enable_target_feature="sse2")
+_mm_loadu_si64 :: #force_inline proc "c" (mem_addr: rawptr) -> __m128i {
+	a := intrinsics.unaligned_load((^i64)(mem_addr))
+	return __m128i {a, 0}
+}
+
 @(enable_target_feature="sse2")
 _mm_pause :: #force_inline proc "c" () {
 	pause()
