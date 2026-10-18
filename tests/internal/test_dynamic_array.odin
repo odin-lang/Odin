@@ -6,6 +6,7 @@ import "base:runtime"
 @test
 dynamic_array_reserve :: proc(t: ^testing.T) {
 	d: [dynamic]int
+	defer delete(d)
 	err_reserve := reserve_dynamic_array(&d, 10)
 
 	testing.expect_value(t, err_reserve, nil)
@@ -16,6 +17,7 @@ dynamic_array_reserve :: proc(t: ^testing.T) {
 @test
 dynamic_array_reserve_negative :: proc(t: ^testing.T) {
 	d: [dynamic]int
+	defer delete(d)
 	err_reserve := reserve_dynamic_array(&d, -10)
 
 	testing.expect_value(t, err_reserve, runtime.Allocator_Error.Invalid_Argument)
@@ -26,6 +28,7 @@ dynamic_array_reserve_negative :: proc(t: ^testing.T) {
 @test
 soa_dynamic_array_reserve :: proc(t: ^testing.T) {
 	d: #soa[dynamic]([2]int)
+	defer delete(d)
 	err_reserve := reserve_soa(&d, 10)
 
 	testing.expect_value(t, err_reserve, nil)
@@ -36,6 +39,7 @@ soa_dynamic_array_reserve :: proc(t: ^testing.T) {
 @test
 soa_dynamic_array_reserve_negative :: proc(t: ^testing.T) {
 	d: #soa[dynamic]([2]int)
+	defer delete(d)
 	err_reserve := reserve_soa(&d, -10)
 
 	testing.expect_value(t, err_reserve, runtime.Allocator_Error.Invalid_Argument)
