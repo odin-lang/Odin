@@ -313,6 +313,7 @@ enum grapheme_cluster_sequence {
 
 typedef struct {
 	ucg_grapheme* graphemes;
+	i32 grapheme_capacity;
 	i32 rune_count;
 	i32 grapheme_count;
 	i32 width;
@@ -350,10 +351,15 @@ void _ucg_decode_grapheme_clusters_deferred_step(
 		state->width += ucg_normalized_east_asian_width(this_rune);
 
 		/* if (allocator != NULL) { */
-			state->graphemes = (ucg_grapheme*)gb_resize(allocator,
-				state->graphemes,
-				sizeof(ucg_grapheme) * (state->grapheme_count),
-				sizeof(ucg_grapheme) * (1 + state->grapheme_count));
+			// Grow geometrically, as growing by one grapheme at a time is quadratic on long lines.
+			if (state->grapheme_count > state->grapheme_capacity) {
+				i32 new_capacity = gb_max(state->grapheme_count, gb_max(16, 2 * state->grapheme_capacity));
+				state->graphemes = (ucg_grapheme*)gb_resize(allocator,
+					state->graphemes,
+					sizeof(ucg_grapheme) * (state->grapheme_capacity),
+					sizeof(ucg_grapheme) * (new_capacity));
+				state->grapheme_capacity = new_capacity;
+			}
 
 			ucg_grapheme append = {
 				byte_index,
