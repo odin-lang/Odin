@@ -367,6 +367,9 @@ $ODIN test ../test_issue_7547 $COMMON -debug
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -microarch:native
 $ODIN test ../test_issue_split_globals -define:ODIN_TEST_FANCY=false -vet -strict-style -ignore-unused-defineables -debug -microarch:native
 
+$ODIN build ../test_issue_7986/lib -build-mode:shared -out:test_issue_7986_lib $COMMON
+$ODIN test ../test_issue_7986 $COMMON
+
 $ODIN test ../test_issue_fast_isel_lowering $COMMON -o:none
 
 if [[ $($ODIN test ../test_issue_equal_proc_dependencies $COMMON -build-mode:obj 2>&1 | grep -ci "missing procedure") -eq 0 ]]; then
