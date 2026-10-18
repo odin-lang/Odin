@@ -8,7 +8,6 @@ when ODIN_OS == .Darwin {
 } else when ODIN_OS == .FreeBSD {
 	foreign import lib "system:dl"
 } else when ODIN_OS == .NetBSD {
-	// NetBSD provides the dynamic linking functions in libc and has no libdl
 	foreign import lib "system:c"
 } else {
 	foreign import lib {
