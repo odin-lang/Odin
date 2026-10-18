@@ -9641,7 +9641,10 @@ gb_internal void check_objc_call_expr(CheckerContext *c, Operand *operand, Ast *
 		self_type    = t_objc_Class;
 		params_start = 0;
 	} else {
-		GB_ASSERT(ce->args.count > 0);
+		if (ce->args.count == 0) {
+			// Argument checking already reports the missing receiver.
+			return;
+		}
 		GB_ASSERT(is_type_objc_ptr_to_object(params[0]->type));
 
 		if (ce->args[0]->kind == Ast_CallExpr && ce->args[0]->CallExpr.objc_super_target) {

@@ -63,6 +63,7 @@ set ODIN=..\..\..\odin
 @rem Objective-C tests target darwin, which can be checked and built for from any host
 %ODIN% check "..\test_issue_objc_import_missing_selector" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "is required for imported Objective-C methods" | findstr /x "1" || exit /b
 %ODIN% check "..\test_issue_objc_deferred_import" -no-entry-point -target:darwin_arm64 %COMMON% 2>&1 | find /c "cannot be used as a deferred_out procedure" | findstr /x "1" || exit /b
+%ODIN% check "..\test_issue_7980" -target:darwin_arm64 %COMMON% 2>&1 | find /c "Error:" | findstr /x "2" || exit /b
 
 @rem #########################################################################################################
 
