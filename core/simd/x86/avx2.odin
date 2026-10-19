@@ -550,10 +550,7 @@ _mm256_mul_epu32 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mulhi_epi16)
 @(require_results, enable_target_feature="avx2")
 _mm256_mulhi_epi16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
-	c := cast(simd.i32x16)(transmute(simd.i16x16)a)
-	d := cast(simd.i32x16)(transmute(simd.i16x16)b)
-	e := simd.shr(simd.mul(c, d), simd.u32x16(16))
-	return transmute(__m256i)(cast(simd.i16x16)e)
+	return transmute(__m256i)llvm_pmulhw(transmute(simd.i16x16)a, transmute(simd.i16x16)b)
 }
 
 // Multiply the packed unsigned 16-bit integers in `a` and `b`, producing intermediate 32-bit integers,
@@ -562,10 +559,7 @@ _mm256_mulhi_epi16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
 // [Intel's documentation](https://www.intel.com/content/www/us/en/docs/intrinsics-guide/index.html#text=_mm256_mulhi_epu16)
 @(require_results, enable_target_feature="avx2")
 _mm256_mulhi_epu16 :: #force_inline proc "c" (a, b: __m256i) -> __m256i {
-	c := cast(simd.u32x16)(transmute(simd.u16x16)a)
-	d := cast(simd.u32x16)(transmute(simd.u16x16)b)
-	e := simd.shr(simd.mul(c, d), simd.u32x16(16))
-	return transmute(__m256i)(cast(simd.u16x16)e)
+	return transmute(__m256i)llvm_pmulhuw(transmute(simd.u16x16)a, transmute(simd.u16x16)b)
 }
 
 // Multiply packed signed 16-bit integers in `a` and `b`, producing intermediate signed 32-bit integers.
@@ -2455,6 +2449,8 @@ foreign _ {
 	@(link_name="llvm.x86.avx2.psign.w")         llvm_psignw      :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
 	@(link_name="llvm.x86.avx2.psign.d")         llvm_psignd      :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i32x8 ---
 	@(link_name="llvm.x86.avx2.pmul.hr.sw")      llvm_pmulhrsw    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.pmulh.w")         llvm_pmulhw      :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i16x16 ---
+	@(link_name="llvm.x86.avx2.pmulhu.w")        llvm_pmulhuw     :: proc(a: simd.u16x16, b: simd.u16x16) -> simd.u16x16 ---
 	@(link_name="llvm.x86.avx2.packsswb")        llvm_packsswb    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.i8x32 ---
 	@(link_name="llvm.x86.avx2.packssdw")        llvm_packssdw    :: proc(a: simd.i32x8, b: simd.i32x8) -> simd.i16x16 ---
 	@(link_name="llvm.x86.avx2.packuswb")        llvm_packuswb    :: proc(a: simd.i16x16, b: simd.i16x16) -> simd.u8x32 ---
