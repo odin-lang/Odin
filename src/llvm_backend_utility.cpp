@@ -360,7 +360,9 @@ gb_internal lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	} else if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
-		return lb_emit_load(p, d);
+		// s is only guaranteed type_align_of(src) alignment
+		res.value = OdinLLVMBuildLoadAligned(p, lb_type(m, t), d.value, type_align_of(src));
+		return res;
 	}
 
 	res.value = OdinLLVMBuildTransmute(p, value.value, lb_type(m, res.type));
