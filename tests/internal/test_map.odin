@@ -449,3 +449,10 @@ map_utf16_string_keys :: proc(t: ^testing.T) {
 	testing.expect_value(t, mc[c], 1)
 	testing.expect_value(t, mc[d], 2)
 }
+
+@test
+map_reserve_negative :: proc(t: ^testing.T) {
+	m: map[int]int
+	err_reserve := reserve_map(&m, -10)
+	testing.expect_value(t, err_reserve, runtime.Allocator_Error.Invalid_Argument)
+}
