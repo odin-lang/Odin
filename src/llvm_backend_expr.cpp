@@ -3008,7 +3008,14 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 					}
 				}
 
-				return lb_emit_deep_field_ev(p, value, sel);
+				// NOTE: a pointer to the field is only wanted when the selection goes through a 'using' pointer field,
+				// in which case it points into the referenced value rather than the local copy
+				lbValue ptr = lb_address_from_load_or_generate_local(p, value);
+				lbValue res = lb_emit_deep_field_gep(p, ptr, sel);
+				if (!are_types_identical(res.type, dt)) {
+					res = lb_emit_load(p, res);
+				}
+				return res;
 
 			}
 		}
