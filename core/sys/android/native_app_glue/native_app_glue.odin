@@ -427,6 +427,9 @@ ANativeActivity_onCreate :: proc "c" (activity: ^android.ANativeActivity, savedS
 		}
 	}
 
+	// For `android.jni_env` and the `vendor:android/java` wrappers.
+	android.jni_set_vm(activity.vm)
+
 	app := new(android_app, runtime.heap_allocator())
 	app.activity = activity
 

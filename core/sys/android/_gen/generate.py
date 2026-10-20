@@ -1197,6 +1197,47 @@ def emit_record(ctx, rec, indent):
 	return "\n".join(lines)
 
 
+def dispatch_table(model, name, t):
+	"""
+	Whether typedef `name` points at a table of functions that take it back as their first
+	parameter, so it can be modelled for Odin's `x->f(...)` (`x.f(x, ...)`):
+
+	- "env": `typedef const struct JNINativeInterface* JNIEnv`, whose functions take `JNIEnv*`.
+	  Emitted as `struct { using functions: ^JNINativeInterface }`, as C++'s `jni.h` does.
+	- "itf": `typedef const struct SLObjectItf_* const* SLObjectItf`, whose functions take `SLObjectItf`.
+	  Emitted as `^struct { using itf: ^SLObjectItf_ }`.
+
+	Both have the C layout. Returns (shape, Odin record name) or None.
+	"""
+	t = strip_const(t)
+	if t[0] != "ptr":
+		return None
+	inner = strip_const(t[1])
+	if inner[0] == "ptr":
+		shape, record_type, self_type = "itf", strip_const(inner[1]), ("named", name)
+	else:
+		shape, record_type, self_type = "env", inner, ("ptr", ("named", name))
+	if record_type[0] != "tag":
+		return None
+
+	key  = f"{record_type[1]} {record_type[2]}"
+	odin = model.tag_names.get(key)
+	rec  = next((r for r in model.records.values() if r.name == odin), None)
+	if rec is None or rec.opaque:
+		return None
+
+	functions = 0
+	for _, ftype, _, _ in rec.fields:
+		ftype = strip_const(ftype)
+		if ftype[0] != "ptr" or strip_const(ftype[1])[0] != "func":
+			continue
+		params = strip_const(ftype[1])[2]
+		if not params or strip_const(params[0]) != self_type and not (self_type[0] == "ptr" and strip_const(params[0])[0] == "ptr" and strip_const(strip_const(params[0])[1]) == self_type[1]):
+			return None
+		functions += 1
+	return (shape, odin) if functions else None
+
+
 def emit_file(model, out_file, values, strings, ndk):
 	ctx = Ctx(model, out_file)
 	items = model.files[out_file]
@@ -1243,7 +1284,14 @@ def emit_file(model, out_file, values, strings, ndk):
 		elif kind == "typedef":
 			_, name, t, node, header = item
 			names = source_param_names(model, node, header, t)
-			if strip_const(t)[0] == "func":
+			table = dispatch_table(model, name, t)
+			if table:
+				shape, record = table
+				if shape == "env":
+					blocks.append(f"{name} :: struct {{\n\tusing functions: ^{record},\n}}")
+				else:
+					one_liner(name, f"^struct {{ using itf: ^{record} }}")
+			elif strip_const(t)[0] == "func":
 				one_liner(name, odin_proc_type(ctx, strip_const(t), names))
 			else:
 				one_liner(name, odin_type(ctx, t, "typedef", names))

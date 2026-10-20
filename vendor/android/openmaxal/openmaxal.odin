@@ -33,7 +33,7 @@ XAInterfaceID_ :: struct {
 }
 
 XAInterfaceID    :: ^XAInterfaceID_
-XAObjectItf      :: ^^XAObjectItf_
+XAObjectItf      :: ^struct { using itf: ^XAObjectItf_ }
 xaObjectCallback :: proc "c" (caller: XAObjectItf, pContext: rawptr, event: XAuint32, result: XAresult, param: XAuint32, pInterface: rawptr)
 
 XAObjectItf_ :: struct {
@@ -49,14 +49,14 @@ XAObjectItf_ :: struct {
 	SetLossOfControlInterfaces: proc "c" (self: XAObjectItf, numInterfaces: XAint16, pInterfaceIDs: ^XAInterfaceID, enabled: XAboolean) -> XAresult,
 }
 
-XAConfigExtensionsItf :: ^^XAConfigExtensionsItf_
+XAConfigExtensionsItf :: ^struct { using itf: ^XAConfigExtensionsItf_ }
 
 XAConfigExtensionsItf_ :: struct {
 	SetConfiguration: proc "c" (self: XAConfigExtensionsItf, configKey: ^XAchar, valueSize: XAuint32, pConfigValue: rawptr) -> XAresult,
 	GetConfiguration: proc "c" (self: XAConfigExtensionsItf, configKey: ^XAchar, pValueSize: ^XAuint32, pConfigValue: rawptr) -> XAresult,
 }
 
-XADynamicInterfaceManagementItf      :: ^^XADynamicInterfaceManagementItf_
+XADynamicInterfaceManagementItf      :: ^struct { using itf: ^XADynamicInterfaceManagementItf_ }
 xaDynamicInterfaceManagementCallback :: proc "c" (caller: XADynamicInterfaceManagementItf, pContext: rawptr, event: XAuint32, result: XAresult, iid: XAInterfaceID)
 
 XADynamicInterfaceManagementItf_ :: struct {
@@ -149,7 +149,7 @@ XAVibraDescriptor :: struct {
 	maxFrequency:      XAmilliHertz,
 }
 
-XAEngineItf :: ^^XAEngineItf_
+XAEngineItf :: ^struct { using itf: ^XAEngineItf_ }
 
 XAEngineItf_ :: struct {
 	CreateCameraDevice:          proc "c" (self: XAEngineItf, pDevice: ^XAObjectItf, deviceID: XAuint32, numInterfaces: XAuint32, pInterfaceIds: ^XAInterfaceID, pInterfaceRequired: ^XAboolean) -> XAresult,
@@ -172,14 +172,14 @@ XAEngineItf_ :: struct {
 	QueryVibraCapabilities:      proc "c" (self: XAEngineItf, pIndex: ^XAuint32, pVibraDeviceID: ^XAuint32, pDescriptor: ^XAVibraDescriptor) -> XAresult,
 }
 
-XAThreadSyncItf :: ^^XAThreadSyncItf_
+XAThreadSyncItf :: ^struct { using itf: ^XAThreadSyncItf_ }
 
 XAThreadSyncItf_ :: struct {
 	EnterCriticalSection: proc "c" (self: XAThreadSyncItf) -> XAresult,
 	ExitCriticalSection:  proc "c" (self: XAThreadSyncItf) -> XAresult,
 }
 
-XAPlayItf      :: ^^XAPlayItf_
+XAPlayItf      :: ^struct { using itf: ^XAPlayItf_ }
 xaPlayCallback :: proc "c" (caller: XAPlayItf, pContext: rawptr, event: XAuint32)
 
 XAPlayItf_ :: struct {
@@ -197,7 +197,7 @@ XAPlayItf_ :: struct {
 	GetPositionUpdatePeriod: proc "c" (self: XAPlayItf, pMsec: ^XAmillisecond) -> XAresult,
 }
 
-XAPlaybackRateItf :: ^^XAPlaybackRateItf_
+XAPlaybackRateItf :: ^struct { using itf: ^XAPlaybackRateItf_ }
 
 XAPlaybackRateItf_ :: struct {
 	SetRate:                proc "c" (self: XAPlaybackRateItf, rate: XApermille) -> XAresult,
@@ -208,7 +208,7 @@ XAPlaybackRateItf_ :: struct {
 	GetRateRange:           proc "c" (self: XAPlaybackRateItf, index: XAuint8, pMinRate: ^XApermille, pMaxRate: ^XApermille, pStepSize: ^XApermille, pCapabilities: ^XAuint32) -> XAresult,
 }
 
-XAPrefetchStatusItf :: ^^XAPrefetchStatusItf_
+XAPrefetchStatusItf :: ^struct { using itf: ^XAPrefetchStatusItf_ }
 xaPrefetchCallback  :: proc "c" (caller: XAPrefetchStatusItf, pContext: rawptr, event: XAuint32)
 
 XAPrefetchStatusItf_ :: struct {
@@ -221,7 +221,7 @@ XAPrefetchStatusItf_ :: struct {
 	GetFillUpdatePeriod:   proc "c" (self: XAPrefetchStatusItf, pPeriod: ^XApermille) -> XAresult,
 }
 
-XASeekItf :: ^^XASeekItf_
+XASeekItf :: ^struct { using itf: ^XASeekItf_ }
 
 XASeekItf_ :: struct {
 	SetPosition: proc "c" (self: XASeekItf, pos: XAmillisecond, seekMode: XAuint32) -> XAresult,
@@ -229,7 +229,7 @@ XASeekItf_ :: struct {
 	GetLoop:     proc "c" (self: XASeekItf, pLoopEnabled: ^XAboolean, pStartPos: ^XAmillisecond, pEndPos: ^XAmillisecond) -> XAresult,
 }
 
-XAVolumeItf :: ^^XAVolumeItf_
+XAVolumeItf :: ^struct { using itf: ^XAVolumeItf_ }
 
 XAVolumeItf_ :: struct {
 	SetVolumeLevel:          proc "c" (self: XAVolumeItf, level: XAmillibel) -> XAresult,
@@ -243,7 +243,7 @@ XAVolumeItf_ :: struct {
 	GetStereoPosition:       proc "c" (self: XAVolumeItf, pStereoPosition: ^XApermille) -> XAresult,
 }
 
-XAImageControlsItf :: ^^XAImageControlsItf_
+XAImageControlsItf :: ^struct { using itf: ^XAImageControlsItf_ }
 
 XAImageControlsItf_ :: struct {
 	SetBrightness:             proc "c" (self: XAImageControlsItf, brightness: XAuint32) -> XAresult,
@@ -255,7 +255,7 @@ XAImageControlsItf_ :: struct {
 	GetSupportedGammaSettings: proc "c" (self: XAImageControlsItf, pMinValue: ^XApermille, pMaxValue: ^XApermille, pNumSettings: ^XAuint32, ppSettings: ^^XApermille) -> XAresult,
 }
 
-XAImageEffectsItf :: ^^XAImageEffectsItf_
+XAImageEffectsItf :: ^struct { using itf: ^XAImageEffectsItf_ }
 
 XAImageEffectsItf_ :: struct {
 	QuerySupportedImageEffects: proc "c" (self: XAImageEffectsItf, index: XAuint32, pImageEffectId: ^XAuint32) -> XAresult,
@@ -271,7 +271,7 @@ XARectangle :: struct {
 	height: XAuint32,
 }
 
-XAVideoPostProcessingItf :: ^^XAVideoPostProcessingItf_
+XAVideoPostProcessingItf :: ^struct { using itf: ^XAVideoPostProcessingItf_ }
 
 XAVideoPostProcessingItf_ :: struct {
 	SetRotation:                  proc "c" (self: XAVideoPostProcessingItf, rotation: XAmillidegree) -> XAresult,
@@ -283,7 +283,7 @@ XAVideoPostProcessingItf_ :: struct {
 	Commit:                       proc "c" (self: XAVideoPostProcessingItf) -> XAresult,
 }
 
-XARecordItf      :: ^^XARecordItf_
+XARecordItf      :: ^struct { using itf: ^XARecordItf_ }
 xaRecordCallback :: proc "c" (caller: XARecordItf, pContext: rawptr, event: XAuint32)
 
 XARecordItf_ :: struct {
@@ -301,7 +301,7 @@ XARecordItf_ :: struct {
 	GetPositionUpdatePeriod: proc "c" (self: XARecordItf, pMsec: ^XAmillisecond) -> XAresult,
 }
 
-XASnapshotItf               :: ^^XASnapshotItf_
+XASnapshotItf               :: ^struct { using itf: ^XASnapshotItf_ }
 xaSnapshotInitiatedCallback :: proc "c" (caller: XASnapshotItf, context_: rawptr)
 xaSnapshotTakenCallback     :: proc "c" (caller: XASnapshotItf, context_: rawptr, numberOfPicsTaken: XAuint32, image: ^XADataSink)
 
@@ -323,7 +323,7 @@ XAMetadataInfo :: struct {
 	data:        [1]XAuint8,
 }
 
-XAMetadataExtractionItf :: ^^XAMetadataExtractionItf_
+XAMetadataExtractionItf :: ^struct { using itf: ^XAMetadataExtractionItf_ }
 
 XAMetadataExtractionItf_ :: struct {
 	GetItemCount:   proc "c" (self: XAMetadataExtractionItf, pItemCount: ^XAuint32) -> XAresult,
@@ -335,7 +335,7 @@ XAMetadataExtractionItf_ :: struct {
 	ClearKeyFilter: proc "c" (self: XAMetadataExtractionItf) -> XAresult,
 }
 
-XAMetadataInsertionItf      :: ^^XAMetadataInsertionItf_
+XAMetadataInsertionItf      :: ^struct { using itf: ^XAMetadataInsertionItf_ }
 xaMetadataInsertionCallback :: proc "c" (caller: XAMetadataInsertionItf, pContext: rawptr, pKey: ^XAMetadataInfo, pValue: ^XAMetadataInfo, nodeID: XAint32, result: XAboolean)
 
 XAMetadataInsertionItf_ :: struct {
@@ -348,7 +348,7 @@ XAMetadataInsertionItf_ :: struct {
 	RegisterCallback:      proc "c" (self: XAMetadataInsertionItf, callback: xaMetadataInsertionCallback, pContext: rawptr) -> XAresult,
 }
 
-XAMetadataTraversalItf :: ^^XAMetadataTraversalItf_
+XAMetadataTraversalItf :: ^struct { using itf: ^XAMetadataTraversalItf_ }
 
 XAMetadataTraversalItf_ :: struct {
 	SetMode:              proc "c" (self: XAMetadataTraversalItf, mode: XAuint32) -> XAresult,
@@ -358,7 +358,7 @@ XAMetadataTraversalItf_ :: struct {
 	SetActiveNode:        proc "c" (self: XAMetadataTraversalItf, index: XAuint32) -> XAresult,
 }
 
-XADynamicSourceItf :: ^^XADynamicSourceItf_
+XADynamicSourceItf :: ^struct { using itf: ^XADynamicSourceItf_ }
 
 XADynamicSourceItf_ :: struct {
 	SetSource: proc "c" (self: XADynamicSourceItf, pDataSource: ^XADataSource) -> XAresult,
@@ -384,7 +384,7 @@ XACameraDescriptor :: struct {
 	whiteBalanceModesSupported: XAuint32,
 }
 
-XACameraCapabilitiesItf :: ^^XACameraCapabilitiesItf_
+XACameraCapabilitiesItf :: ^struct { using itf: ^XACameraCapabilitiesItf_ }
 
 XACameraCapabilitiesItf_ :: struct {
 	GetCameraCapabilities:                  proc "c" (self: XACameraCapabilitiesItf, pIndex: ^XAuint32, pCameraDeviceID: ^XAuint32, pDescriptor: ^XACameraDescriptor) -> XAresult,
@@ -398,7 +398,7 @@ XACameraCapabilitiesItf_ :: struct {
 	GetSupportedZoomSettings:               proc "c" (self: XACameraCapabilitiesItf, cameraDeviceID: XAuint32, digitalEnabled: XAboolean, macroEnabled: XAboolean, pMaxValue: ^XApermille, pNumSettings: ^XAuint32, ppSettings: ^^XApermille, pSpeedSupported: ^XAboolean) -> XAresult,
 }
 
-XACameraItf      :: ^^XACameraItf_
+XACameraItf      :: ^struct { using itf: ^XACameraItf_ }
 xaCameraCallback :: proc "c" (caller: XACameraItf, pContext: rawptr, eventId: XAuint32, eventData: XAuint32)
 
 XACameraItf_ :: struct {
@@ -458,7 +458,7 @@ XAAudioOutputDescriptor :: struct {
 	maxChannels:                 XAint16,
 }
 
-XAAudioIODeviceCapabilitiesItf         :: ^^XAAudioIODeviceCapabilitiesItf_
+XAAudioIODeviceCapabilitiesItf         :: ^struct { using itf: ^XAAudioIODeviceCapabilitiesItf_ }
 xaAvailableAudioInputsChangedCallback  :: proc "c" (caller: XAAudioIODeviceCapabilitiesItf, pContext: rawptr, deviceID: XAuint32, numInputs: XAint32, isNew: XAboolean)
 xaAvailableAudioOutputsChangedCallback :: proc "c" (caller: XAAudioIODeviceCapabilitiesItf, pContext: rawptr, deviceID: XAuint32, numOutputs: XAint32, isNew: XAboolean)
 xaDefaultDeviceIDMapChangedCallback    :: proc "c" (caller: XAAudioIODeviceCapabilitiesItf, pContext: rawptr, isOutput: XAboolean, numDevices: XAint32)
@@ -477,7 +477,7 @@ XAAudioIODeviceCapabilitiesItf_ :: struct {
 	QuerySampleFormatsSupported:                  proc "c" (self: XAAudioIODeviceCapabilitiesItf, deviceID: XAuint32, samplingRate: XAmilliHertz, pSampleFormats: ^XAint32, pNumOfSampleFormats: ^XAint32) -> XAresult,
 }
 
-XADeviceVolumeItf :: ^^XADeviceVolumeItf_
+XADeviceVolumeItf :: ^struct { using itf: ^XADeviceVolumeItf_ }
 
 XADeviceVolumeItf_ :: struct {
 	GetVolumeScale: proc "c" (self: XADeviceVolumeItf, deviceID: XAuint32, pMinValue: ^XAint32, pMaxValue: ^XAint32, pIsMillibelScale: ^XAboolean) -> XAresult,
@@ -485,7 +485,7 @@ XADeviceVolumeItf_ :: struct {
 	GetVolume:      proc "c" (self: XADeviceVolumeItf, deviceID: XAuint32, pVolume: ^XAint32) -> XAresult,
 }
 
-XAEqualizerItf :: ^^XAEqualizerItf_
+XAEqualizerItf :: ^struct { using itf: ^XAEqualizerItf_ }
 
 XAEqualizerItf_ :: struct {
 	SetEnabled:         proc "c" (self: XAEqualizerItf, enabled: XAboolean) -> XAresult,
@@ -503,7 +503,7 @@ XAEqualizerItf_ :: struct {
 	GetPresetName:      proc "c" (self: XAEqualizerItf, index: XAuint16, ppName: ^^XAchar) -> XAresult,
 }
 
-XAOutputMixItf            :: ^^XAOutputMixItf_
+XAOutputMixItf            :: ^struct { using itf: ^XAOutputMixItf_ }
 xaMixDeviceChangeCallback :: proc "c" (caller: XAOutputMixItf, pContext: rawptr)
 
 XAOutputMixItf_ :: struct {
@@ -512,7 +512,7 @@ XAOutputMixItf_ :: struct {
 	ReRoute:                       proc "c" (self: XAOutputMixItf, numOutputDevices: XAint32, pOutputDeviceIDs: ^XAuint32) -> XAresult,
 }
 
-XARadioItf      :: ^^XARadioItf_
+XARadioItf      :: ^struct { using itf: ^XARadioItf_ }
 xaRadioCallback :: proc "c" (caller: XARadioItf, pContext: rawptr, event: XAuint32, eventIntData: XAuint32, eventBooleanData: XAboolean)
 
 XARadioItf_ :: struct {
@@ -536,7 +536,7 @@ XARadioItf_ :: struct {
 	RegisterRadioCallback:  proc "c" (self: XARadioItf, callback: xaRadioCallback, pContext: rawptr) -> XAresult,
 }
 
-XARDSItf              :: ^^XARDSItf_
+XARDSItf              :: ^struct { using itf: ^XARDSItf_ }
 xaGetODAGroupCallback :: proc "c" (caller: XARadioItf, pContext: rawptr, success: XAboolean, group: XAint16, message: XAuint16)
 xaNewODADataCallback  :: proc "c" (caller: XARDSItf, pContext: rawptr, group: XAint16, data: XAuint64)
 xaRDSCallback         :: proc "c" (caller: XARDSItf, pContext: rawptr, event: XAuint16, eventData: XAuint8)
@@ -567,7 +567,7 @@ XARDSItf_ :: struct {
 	RegisterODADataCallback:         proc "c" (self: XARDSItf, callback: xaNewODADataCallback, pContext: rawptr) -> XAresult,
 }
 
-XAVibraItf :: ^^XAVibraItf_
+XAVibraItf :: ^struct { using itf: ^XAVibraItf_ }
 
 XAVibraItf_ :: struct {
 	Vibrate:      proc "c" (self: XAVibraItf, vibrate: XAboolean) -> XAresult,
@@ -584,7 +584,7 @@ XAHSL :: struct {
 	lightness:  XApermille,
 }
 
-XALEDArrayItf :: ^^XALEDArrayItf_
+XALEDArrayItf :: ^struct { using itf: ^XALEDArrayItf_ }
 
 XALEDArrayItf_ :: struct {
 	ActivateLEDArray:    proc "c" (self: XALEDArrayItf, lightMask: XAuint32) -> XAresult,
@@ -627,21 +627,21 @@ XAAudioEncoderSettings :: struct {
 	blockAlignment: XAuint32,
 }
 
-XAAudioDecoderCapabilitiesItf :: ^^XAAudioDecoderCapabilitiesItf_
+XAAudioDecoderCapabilitiesItf :: ^struct { using itf: ^XAAudioDecoderCapabilitiesItf_ }
 
 XAAudioDecoderCapabilitiesItf_ :: struct {
 	GetAudioDecoders:            proc "c" (self: XAAudioDecoderCapabilitiesItf, pNumDecoders: ^XAuint32, pDecoderIds: ^XAuint32) -> XAresult,
 	GetAudioDecoderCapabilities: proc "c" (self: XAAudioDecoderCapabilitiesItf, decoderId: XAuint32, pIndex: ^XAuint32, pDescriptor: ^XAAudioCodecDescriptor) -> XAresult,
 }
 
-XAAudioEncoderItf :: ^^XAAudioEncoderItf_
+XAAudioEncoderItf :: ^struct { using itf: ^XAAudioEncoderItf_ }
 
 XAAudioEncoderItf_ :: struct {
 	SetEncoderSettings: proc "c" (self: XAAudioEncoderItf, pSettings: ^XAAudioEncoderSettings) -> XAresult,
 	GetEncoderSettings: proc "c" (self: XAAudioEncoderItf, pSettings: ^XAAudioEncoderSettings) -> XAresult,
 }
 
-XAAudioEncoderCapabilitiesItf :: ^^XAAudioEncoderCapabilitiesItf_
+XAAudioEncoderCapabilitiesItf :: ^struct { using itf: ^XAAudioEncoderCapabilitiesItf_ }
 
 XAAudioEncoderCapabilitiesItf_ :: struct {
 	GetAudioEncoders:            proc "c" (self: XAAudioEncoderCapabilitiesItf, pNumEncoders: ^XAuint32, pEncoderIds: ^XAuint32) -> XAresult,
@@ -662,21 +662,21 @@ XAImageSettings :: struct {
 	colorFormat:      XAuint32,
 }
 
-XAImageEncoderCapabilitiesItf :: ^^XAImageEncoderCapabilitiesItf_
+XAImageEncoderCapabilitiesItf :: ^struct { using itf: ^XAImageEncoderCapabilitiesItf_ }
 
 XAImageEncoderCapabilitiesItf_ :: struct {
 	GetImageEncoderCapabilities: proc "c" (self: XAImageEncoderCapabilitiesItf, pEncoderId: ^XAuint32, pDescriptor: ^XAImageCodecDescriptor) -> XAresult,
 	QueryColorFormats:           proc "c" (self: XAImageEncoderCapabilitiesItf, pIndex: ^XAuint32, pColorFormat: ^XAuint32) -> XAresult,
 }
 
-XAImageDecoderCapabilitiesItf :: ^^XAImageDecoderCapabilitiesItf_
+XAImageDecoderCapabilitiesItf :: ^struct { using itf: ^XAImageDecoderCapabilitiesItf_ }
 
 XAImageDecoderCapabilitiesItf_ :: struct {
 	GetImageDecoderCapabilities: proc "c" (self: XAImageDecoderCapabilitiesItf, pDecoderId: ^XAuint32, pDescriptor: ^XAImageCodecDescriptor) -> XAresult,
 	QueryColorFormats:           proc "c" (self: XAImageDecoderCapabilitiesItf, pIndex: ^XAuint32, pColorFormat: ^XAuint32) -> XAresult,
 }
 
-XAImageEncoderItf :: ^^XAImageEncoderItf_
+XAImageEncoderItf :: ^struct { using itf: ^XAImageEncoderItf_ }
 
 XAImageEncoderItf_ :: struct {
 	SetImageSettings: proc "c" (self: XAImageEncoderItf, pSettings: ^XAImageSettings) -> XAresult,
@@ -707,21 +707,21 @@ XAVideoSettings :: struct {
 	keyFrameInterval: XAuint32,
 }
 
-XAVideoDecoderCapabilitiesItf :: ^^XAVideoDecoderCapabilitiesItf_
+XAVideoDecoderCapabilitiesItf :: ^struct { using itf: ^XAVideoDecoderCapabilitiesItf_ }
 
 XAVideoDecoderCapabilitiesItf_ :: struct {
 	GetVideoDecoders:            proc "c" (self: XAVideoDecoderCapabilitiesItf, pNumDecoders: ^XAuint32, pDecoderIds: ^XAuint32) -> XAresult,
 	GetVideoDecoderCapabilities: proc "c" (self: XAVideoDecoderCapabilitiesItf, decoderId: XAuint32, pIndex: ^XAuint32, pDescriptor: ^XAVideoCodecDescriptor) -> XAresult,
 }
 
-XAVideoEncoderCapabilitiesItf :: ^^XAVideoEncoderCapabilitiesItf_
+XAVideoEncoderCapabilitiesItf :: ^struct { using itf: ^XAVideoEncoderCapabilitiesItf_ }
 
 XAVideoEncoderCapabilitiesItf_ :: struct {
 	GetVideoEncoders:            proc "c" (self: XAVideoEncoderCapabilitiesItf, pNumEncoders: ^XAuint32, pEncoderIds: ^XAuint32) -> XAresult,
 	GetVideoEncoderCapabilities: proc "c" (self: XAVideoEncoderCapabilitiesItf, encoderId: XAuint32, pIndex: ^XAuint32, pDescriptor: ^XAVideoCodecDescriptor) -> XAresult,
 }
 
-XAVideoEncoderItf :: ^^XAVideoEncoderItf_
+XAVideoEncoderItf :: ^struct { using itf: ^XAVideoEncoderItf_ }
 
 XAVideoEncoderItf_ :: struct {
 	SetVideoSettings: proc "c" (self: XAVideoEncoderItf, pSettings: ^XAVideoSettings) -> XAresult,
@@ -782,7 +782,7 @@ XAVendorStreamInformation :: struct {
 	VendorStreamInfo: rawptr,
 }
 
-XAStreamInformationItf      :: ^^XAStreamInformationItf_
+XAStreamInformationItf      :: ^struct { using itf: ^XAStreamInformationItf_ }
 xaStreamEventChangeCallback :: proc "c" (caller: XAStreamInformationItf, eventId: XAuint32, streamIndex: XAuint32, pEventData: rawptr, pContext: rawptr)
 
 XAStreamInformationItf_ :: struct {

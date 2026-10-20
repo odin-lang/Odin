@@ -21,7 +21,7 @@ SLAndroidDataFormat_PCM_EX :: struct {
 	representation: SLuint32,
 }
 
-SLAndroidEffectItf :: ^^SLAndroidEffectItf_
+SLAndroidEffectItf :: ^struct { using itf: ^SLAndroidEffectItf_ }
 
 SLAndroidEffectItf_ :: struct {
 	CreateEffect:  proc "c" (self: SLAndroidEffectItf, effectImplementationId: SLInterfaceID) -> SLresult,
@@ -31,7 +31,7 @@ SLAndroidEffectItf_ :: struct {
 	SendCommand:   proc "c" (self: SLAndroidEffectItf, effectImplementationId: SLInterfaceID, command: SLuint32, commandSize: SLuint32, pCommandData: rawptr, replySize: ^SLuint32, pReplyData: rawptr) -> SLresult,
 }
 
-SLAndroidEffectSendItf :: ^^SLAndroidEffectSendItf_
+SLAndroidEffectSendItf :: ^struct { using itf: ^SLAndroidEffectSendItf_ }
 
 SLAndroidEffectSendItf_ :: struct {
 	EnableEffectSend: proc "c" (self: SLAndroidEffectSendItf, effectImplementationId: SLInterfaceID, enable: SLboolean, initialLevel: SLmillibel) -> SLresult,
@@ -42,14 +42,14 @@ SLAndroidEffectSendItf_ :: struct {
 	GetSendLevel:     proc "c" (self: SLAndroidEffectSendItf, effectImplementationId: SLInterfaceID, pSendLevel: ^SLmillibel) -> SLresult,
 }
 
-SLAndroidEffectCapabilitiesItf :: ^^SLAndroidEffectCapabilitiesItf_
+SLAndroidEffectCapabilitiesItf :: ^struct { using itf: ^SLAndroidEffectCapabilitiesItf_ }
 
 SLAndroidEffectCapabilitiesItf_ :: struct {
 	QueryNumEffects: proc "c" (self: SLAndroidEffectCapabilitiesItf, pNumSupportedEffects: ^SLuint32) -> SLresult,
 	QueryEffect:     proc "c" (self: SLAndroidEffectCapabilitiesItf, index: SLuint32, pEffectType: ^SLInterfaceID, pEffectImplementation: ^SLInterfaceID, pName: ^SLchar, pNameSize: ^SLuint16) -> SLresult,
 }
 
-SLAndroidConfigurationItf :: ^^SLAndroidConfigurationItf_
+SLAndroidConfigurationItf :: ^struct { using itf: ^SLAndroidConfigurationItf_ }
 
 SLAndroidConfigurationItf_ :: struct {
 	SetConfiguration: proc "c" (self: SLAndroidConfigurationItf, configKey: ^SLchar, pConfigValue: rawptr, valueSize: SLuint32) -> SLresult,
@@ -58,7 +58,7 @@ SLAndroidConfigurationItf_ :: struct {
 	ReleaseJavaProxy: proc "c" (self: SLAndroidConfigurationItf, proxyType: SLuint32) -> SLresult,
 }
 
-SLAndroidSimpleBufferQueueItf      :: ^^SLAndroidSimpleBufferQueueItf_
+SLAndroidSimpleBufferQueueItf      :: ^struct { using itf: ^SLAndroidSimpleBufferQueueItf_ }
 slAndroidSimpleBufferQueueCallback :: proc "c" (caller: SLAndroidSimpleBufferQueueItf, pContext: rawptr)
 
 SLAndroidSimpleBufferQueueState :: struct {
@@ -73,7 +73,7 @@ SLAndroidSimpleBufferQueueItf_ :: struct {
 	RegisterCallback: proc "c" (self: SLAndroidSimpleBufferQueueItf, callback: slAndroidSimpleBufferQueueCallback, pContext: rawptr) -> SLresult,
 }
 
-SLAndroidBufferQueueItf :: ^^SLAndroidBufferQueueItf_
+SLAndroidBufferQueueItf :: ^struct { using itf: ^SLAndroidBufferQueueItf_ }
 
 SLAndroidBufferItem :: struct {
 	itemKey:  SLuint32,
@@ -114,21 +114,21 @@ SLDataLocator_AndroidBufferQueue :: struct {
 	numBuffers:  SLuint32,
 }
 
-SLAndroidAcousticEchoCancellationItf :: ^^SLAndroidAcousticEchoCancellationItf_
+SLAndroidAcousticEchoCancellationItf :: ^struct { using itf: ^SLAndroidAcousticEchoCancellationItf_ }
 
 SLAndroidAcousticEchoCancellationItf_ :: struct {
 	SetEnabled: proc "c" (self: SLAndroidAcousticEchoCancellationItf, enabled: SLboolean) -> SLresult,
 	IsEnabled:  proc "c" (self: SLAndroidAcousticEchoCancellationItf, pEnabled: ^SLboolean) -> SLresult,
 }
 
-SLAndroidAutomaticGainControlItf :: ^^SLAndroidAutomaticGainControlItf_
+SLAndroidAutomaticGainControlItf :: ^struct { using itf: ^SLAndroidAutomaticGainControlItf_ }
 
 SLAndroidAutomaticGainControlItf_ :: struct {
 	SetEnabled: proc "c" (self: SLAndroidAutomaticGainControlItf, enabled: SLboolean) -> SLresult,
 	IsEnabled:  proc "c" (self: SLAndroidAutomaticGainControlItf, pEnabled: ^SLboolean) -> SLresult,
 }
 
-SLAndroidNoiseSuppressionItf :: ^^SLAndroidNoiseSuppressionItf_
+SLAndroidNoiseSuppressionItf :: ^struct { using itf: ^SLAndroidNoiseSuppressionItf_ }
 
 SLAndroidNoiseSuppressionItf_ :: struct {
 	SetEnabled: proc "c" (self: SLAndroidNoiseSuppressionItf, enabled: SLboolean) -> SLresult,

@@ -1718,10 +1718,6 @@ gb_internal void init_android_values(bool with_sdk) {
 			gb_printf_err("Error: ODIN_ANDROID_SDK not set, which is required for -build-mode:executable for -subtarget:android");
 			gb_exit(1);
 		}
-		if (bc->android_keystore.len == 0) {
-			gb_printf_err("Error: -android-keystore:<string> has not been set\n");
-			gb_exit(1);
-		}
 	}
 }
 

@@ -62,8 +62,14 @@ JNINativeMethod :: struct {
 }
 
 C_JNIEnv :: ^JNINativeInterface
-JNIEnv   :: ^JNINativeInterface
-JavaVM   :: ^JNIInvokeInterface
+
+JNIEnv :: struct {
+	using functions: ^JNINativeInterface,
+}
+
+JavaVM :: struct {
+	using functions: ^JNIInvokeInterface,
+}
 
 JNINativeInterface :: struct {
 	reserved0:                     rawptr,

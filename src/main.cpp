@@ -680,7 +680,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
-	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test | Command_doc | Command_bundle_android);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
@@ -2964,6 +2964,15 @@ gb_internal int print_show_help(String const arg0, String command, String option
 		print_usage_line(1, "bundle <platform>   Bundles a directory in a specific layout for that platform");
 		print_usage_line(2, "Supported platforms:");
 		print_usage_line(3, "android");
+		print_usage_line(0, "");
+		print_usage_line(2, "odin bundle android <dir> makes an .apk, or an Android App Bundle with -out:<name>.aab, from:");
+		print_usage_line(3, "<dir>/AndroidManifest.xml");
+		print_usage_line(3, "<dir>/res/      (optional) resources, compiled with aapt2");
+		print_usage_line(3, "<dir>/assets/   (optional)");
+		print_usage_line(3, "<dir>/lib/<abi>/*.so, e.g. lib/arm64-v8a/libmain.so");
+		print_usage_line(2, "It adds Odin's classes.dex, with the activity org.odin_lang.OdinActivity, and signs the result.");
+		print_usage_line(2, "Needs ODIN_ANDROID_SDK (build-tools and a platform), a JDK (JAVA_HOME or PATH),");
+		print_usage_line(2, "and for an .aab, ODIN_ANDROID_BUNDLETOOL set to bundletool's .jar.");
 	} else if (command == "report") {
 		print_usage_header_once();
 		print_usage_line(1, "report  Prints information useful to reporting a bug.");
@@ -3753,16 +3762,23 @@ gb_internal int print_show_help(String const arg0, String command, String option
 	}
 
 	if (bundle) {
+		if (print_flag("-out:<filepath>")) {
+			print_usage_line(2, "Sets the file name of the .apk or .aab.");
+			print_usage_line(2, "The default is the directory's name with .apk.");
+			print_usage_line(2, "Example: -out:game.aab");
+		}
+
 		print_usage_line(0, "");
 		print_usage_line(1, "Android-specific flags");
 		print_usage_line(0, "");
 		if (print_flag("-android-keystore:<string>")) {
-			print_usage_line(2, "Specifies the keystore file to use to sign the apk.");
+			print_usage_line(2, "Specifies the keystore file to use to sign the apk or aab.");
+			print_usage_line(2, "The default is the debug keystore, ~/.android/debug.keystore.");
 		}
 
 		if (print_flag("-android-keystore-alias:<string>")) {
-			print_usage_line(2, "Specifies the key alias to use when signing the apk");
-			print_usage_line(2, "Can be omitted if the keystore only contains one key");
+			print_usage_line(2, "Specifies the key alias to use when signing the apk or aab");
+			print_usage_line(2, "Can be omitted for an apk if the keystore only contains one key");
 		}
 
 		if (print_flag("-android-keystore-password:<string>")) {

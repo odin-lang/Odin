@@ -31,7 +31,7 @@ SLInterfaceID_ :: struct {
 }
 
 SLInterfaceID :: ^SLInterfaceID_
-SLObjectItf   :: ^^SLObjectItf_
+SLObjectItf   :: ^struct { using itf: ^SLObjectItf_ }
 
 SLDataLocator_URI :: struct {
 	locatorType: SLuint32,
@@ -136,7 +136,7 @@ SLAudioOutputDescriptor :: struct {
 	maxChannels:                 SLint16,
 }
 
-SLAudioIODeviceCapabilitiesItf         :: ^^SLAudioIODeviceCapabilitiesItf_
+SLAudioIODeviceCapabilitiesItf         :: ^struct { using itf: ^SLAudioIODeviceCapabilitiesItf_ }
 slAvailableAudioInputsChangedCallback  :: proc "c" (caller: SLAudioIODeviceCapabilitiesItf, pContext: rawptr, deviceID: SLuint32, numInputs: SLint32, isNew: SLboolean)
 slAvailableAudioOutputsChangedCallback :: proc "c" (caller: SLAudioIODeviceCapabilitiesItf, pContext: rawptr, deviceID: SLuint32, numOutputs: SLint32, isNew: SLboolean)
 slDefaultDeviceIDMapChangedCallback    :: proc "c" (caller: SLAudioIODeviceCapabilitiesItf, pContext: rawptr, isOutput: SLboolean, numDevices: SLint32)
@@ -167,7 +167,7 @@ SLHSL :: struct {
 	lightness:  SLpermille,
 }
 
-SLLEDArrayItf :: ^^SLLEDArrayItf_
+SLLEDArrayItf :: ^struct { using itf: ^SLLEDArrayItf_ }
 
 SLLEDArrayItf_ :: struct {
 	ActivateLEDArray:    proc "c" (self: SLLEDArrayItf, lightMask: SLuint32) -> SLresult,
@@ -183,7 +183,7 @@ SLVibraDescriptor :: struct {
 	maxFrequency:      SLmilliHertz,
 }
 
-SLVibraItf :: ^^SLVibraItf_
+SLVibraItf :: ^struct { using itf: ^SLVibraItf_ }
 
 SLVibraItf_ :: struct {
 	Vibrate:      proc "c" (self: SLVibraItf, vibrate: SLboolean) -> SLresult,
@@ -201,7 +201,7 @@ SLMetadataInfo :: struct {
 	data:        [1]SLuint8,
 }
 
-SLMetadataExtractionItf :: ^^SLMetadataExtractionItf_
+SLMetadataExtractionItf :: ^struct { using itf: ^SLMetadataExtractionItf_ }
 
 SLMetadataExtractionItf_ :: struct {
 	GetItemCount:   proc "c" (self: SLMetadataExtractionItf, pItemCount: ^SLuint32) -> SLresult,
@@ -213,7 +213,7 @@ SLMetadataExtractionItf_ :: struct {
 	ClearKeyFilter: proc "c" (self: SLMetadataExtractionItf) -> SLresult,
 }
 
-SLMetadataTraversalItf :: ^^SLMetadataTraversalItf_
+SLMetadataTraversalItf :: ^struct { using itf: ^SLMetadataTraversalItf_ }
 
 SLMetadataTraversalItf_ :: struct {
 	SetMode:              proc "c" (self: SLMetadataTraversalItf, mode: SLuint32) -> SLresult,
@@ -223,13 +223,13 @@ SLMetadataTraversalItf_ :: struct {
 	SetActiveNode:        proc "c" (self: SLMetadataTraversalItf, index: SLuint32) -> SLresult,
 }
 
-SLDynamicSourceItf :: ^^SLDynamicSourceItf_
+SLDynamicSourceItf :: ^struct { using itf: ^SLDynamicSourceItf_ }
 
 SLDynamicSourceItf_ :: struct {
 	SetSource: proc "c" (self: SLDynamicSourceItf, pDataSource: ^SLDataSource) -> SLresult,
 }
 
-SLOutputMixItf            :: ^^SLOutputMixItf_
+SLOutputMixItf            :: ^struct { using itf: ^SLOutputMixItf_ }
 slMixDeviceChangeCallback :: proc "c" (caller: SLOutputMixItf, pContext: rawptr)
 
 SLOutputMixItf_ :: struct {
@@ -238,7 +238,7 @@ SLOutputMixItf_ :: struct {
 	ReRoute:                       proc "c" (self: SLOutputMixItf, numOutputDevices: SLint32, pOutputDeviceIDs: ^SLuint32) -> SLresult,
 }
 
-SLPlayItf      :: ^^SLPlayItf_
+SLPlayItf      :: ^struct { using itf: ^SLPlayItf_ }
 slPlayCallback :: proc "c" (caller: SLPlayItf, pContext: rawptr, event: SLuint32)
 
 SLPlayItf_ :: struct {
@@ -256,7 +256,7 @@ SLPlayItf_ :: struct {
 	GetPositionUpdatePeriod: proc "c" (self: SLPlayItf, pMsec: ^SLmillisecond) -> SLresult,
 }
 
-SLPrefetchStatusItf :: ^^SLPrefetchStatusItf_
+SLPrefetchStatusItf :: ^struct { using itf: ^SLPrefetchStatusItf_ }
 slPrefetchCallback  :: proc "c" (caller: SLPrefetchStatusItf, pContext: rawptr, event: SLuint32)
 
 SLPrefetchStatusItf_ :: struct {
@@ -269,7 +269,7 @@ SLPrefetchStatusItf_ :: struct {
 	GetFillUpdatePeriod:   proc "c" (self: SLPrefetchStatusItf, pPeriod: ^SLpermille) -> SLresult,
 }
 
-SLPlaybackRateItf :: ^^SLPlaybackRateItf_
+SLPlaybackRateItf :: ^struct { using itf: ^SLPlaybackRateItf_ }
 
 SLPlaybackRateItf_ :: struct {
 	SetRate:                proc "c" (self: SLPlaybackRateItf, rate: SLpermille) -> SLresult,
@@ -280,7 +280,7 @@ SLPlaybackRateItf_ :: struct {
 	GetRateRange:           proc "c" (self: SLPlaybackRateItf, index: SLuint8, pMinRate: ^SLpermille, pMaxRate: ^SLpermille, pStepSize: ^SLpermille, pCapabilities: ^SLuint32) -> SLresult,
 }
 
-SLSeekItf :: ^^SLSeekItf_
+SLSeekItf :: ^struct { using itf: ^SLSeekItf_ }
 
 SLSeekItf_ :: struct {
 	SetPosition: proc "c" (self: SLSeekItf, pos: SLmillisecond, seekMode: SLuint32) -> SLresult,
@@ -288,7 +288,7 @@ SLSeekItf_ :: struct {
 	GetLoop:     proc "c" (self: SLSeekItf, pLoopEnabled: ^SLboolean, pStartPos: ^SLmillisecond, pEndPos: ^SLmillisecond) -> SLresult,
 }
 
-SLRecordItf      :: ^^SLRecordItf_
+SLRecordItf      :: ^struct { using itf: ^SLRecordItf_ }
 slRecordCallback :: proc "c" (caller: SLRecordItf, pContext: rawptr, event: SLuint32)
 
 SLRecordItf_ :: struct {
@@ -306,7 +306,7 @@ SLRecordItf_ :: struct {
 	GetPositionUpdatePeriod: proc "c" (self: SLRecordItf, pMsec: ^SLmillisecond) -> SLresult,
 }
 
-SLEqualizerItf :: ^^SLEqualizerItf_
+SLEqualizerItf :: ^struct { using itf: ^SLEqualizerItf_ }
 
 SLEqualizerItf_ :: struct {
 	SetEnabled:         proc "c" (self: SLEqualizerItf, enabled: SLboolean) -> SLresult,
@@ -324,7 +324,7 @@ SLEqualizerItf_ :: struct {
 	GetPresetName:      proc "c" (self: SLEqualizerItf, index: SLuint16, ppName: ^^SLchar) -> SLresult,
 }
 
-SLVolumeItf :: ^^SLVolumeItf_
+SLVolumeItf :: ^struct { using itf: ^SLVolumeItf_ }
 
 SLVolumeItf_ :: struct {
 	SetVolumeLevel:          proc "c" (self: SLVolumeItf, level: SLmillibel) -> SLresult,
@@ -338,7 +338,7 @@ SLVolumeItf_ :: struct {
 	GetStereoPosition:       proc "c" (self: SLVolumeItf, pStereoPosition: ^SLpermille) -> SLresult,
 }
 
-SLDeviceVolumeItf :: ^^SLDeviceVolumeItf_
+SLDeviceVolumeItf :: ^struct { using itf: ^SLDeviceVolumeItf_ }
 
 SLDeviceVolumeItf_ :: struct {
 	GetVolumeScale: proc "c" (self: SLDeviceVolumeItf, deviceID: SLuint32, pMinValue: ^SLint32, pMaxValue: ^SLint32, pIsMillibelScale: ^SLboolean) -> SLresult,
@@ -346,7 +346,7 @@ SLDeviceVolumeItf_ :: struct {
 	GetVolume:      proc "c" (self: SLDeviceVolumeItf, deviceID: SLuint32, pVolume: ^SLint32) -> SLresult,
 }
 
-SLBufferQueueItf      :: ^^SLBufferQueueItf_
+SLBufferQueueItf      :: ^struct { using itf: ^SLBufferQueueItf_ }
 slBufferQueueCallback :: proc "c" (caller: SLBufferQueueItf, pContext: rawptr)
 
 SLBufferQueueState :: struct {
@@ -361,7 +361,7 @@ SLBufferQueueItf_ :: struct {
 	RegisterCallback: proc "c" (self: SLBufferQueueItf, callback: slBufferQueueCallback, pContext: rawptr) -> SLresult,
 }
 
-SLPresetReverbItf :: ^^SLPresetReverbItf_
+SLPresetReverbItf :: ^struct { using itf: ^SLPresetReverbItf_ }
 
 SLPresetReverbItf_ :: struct {
 	SetPreset: proc "c" (self: SLPresetReverbItf, preset: SLuint16) -> SLresult,
@@ -381,7 +381,7 @@ SLEnvironmentalReverbSettings :: struct {
 	density:          SLpermille,
 }
 
-SLEnvironmentalReverbItf :: ^^SLEnvironmentalReverbItf_
+SLEnvironmentalReverbItf :: ^struct { using itf: ^SLEnvironmentalReverbItf_ }
 
 SLEnvironmentalReverbItf_ :: struct {
 	SetRoomLevel:                     proc "c" (self: SLEnvironmentalReverbItf, room: SLmillibel) -> SLresult,
@@ -408,7 +408,7 @@ SLEnvironmentalReverbItf_ :: struct {
 	GetEnvironmentalReverbProperties: proc "c" (self: SLEnvironmentalReverbItf, pProperties: ^SLEnvironmentalReverbSettings) -> SLresult,
 }
 
-SLEffectSendItf :: ^^SLEffectSendItf_
+SLEffectSendItf :: ^struct { using itf: ^SLEffectSendItf_ }
 
 SLEffectSendItf_ :: struct {
 	EnableEffectSend: proc "c" (self: SLEffectSendItf, pAuxEffect: rawptr, enable: SLboolean, initialLevel: SLmillibel) -> SLresult,
@@ -419,14 +419,14 @@ SLEffectSendItf_ :: struct {
 	GetSendLevel:     proc "c" (self: SLEffectSendItf, pAuxEffect: rawptr, pSendLevel: ^SLmillibel) -> SLresult,
 }
 
-SL3DGroupingItf :: ^^SL3DGroupingItf_
+SL3DGroupingItf :: ^struct { using itf: ^SL3DGroupingItf_ }
 
 SL3DGroupingItf_ :: struct {
 	Set3DGroup: proc "c" (self: SL3DGroupingItf, group: SLObjectItf) -> SLresult,
 	Get3DGroup: proc "c" (self: SL3DGroupingItf, pGroup: ^SLObjectItf) -> SLresult,
 }
 
-SL3DCommitItf :: ^^SL3DCommitItf_
+SL3DCommitItf :: ^struct { using itf: ^SL3DCommitItf_ }
 
 SL3DCommitItf_ :: struct {
 	Commit:      proc "c" (self: SL3DCommitItf) -> SLresult,
@@ -439,7 +439,7 @@ SLVec3D :: struct {
 	z: SLint32,
 }
 
-SL3DLocationItf :: ^^SL3DLocationItf_
+SL3DLocationItf :: ^struct { using itf: ^SL3DLocationItf_ }
 
 SL3DLocationItf_ :: struct {
 	SetLocationCartesian:  proc "c" (self: SL3DLocationItf, pLocation: ^SLVec3D) -> SLresult,
@@ -452,7 +452,7 @@ SL3DLocationItf_ :: struct {
 	GetOrientationVectors: proc "c" (self: SL3DLocationItf, pFront: ^SLVec3D, pUp: ^SLVec3D) -> SLresult,
 }
 
-SL3DDopplerItf :: ^^SL3DDopplerItf_
+SL3DDopplerItf :: ^struct { using itf: ^SL3DDopplerItf_ }
 
 SL3DDopplerItf_ :: struct {
 	SetVelocityCartesian: proc "c" (self: SL3DDopplerItf, pVelocity: ^SLVec3D) -> SLresult,
@@ -462,7 +462,7 @@ SL3DDopplerItf_ :: struct {
 	GetDopplerFactor:     proc "c" (self: SL3DDopplerItf, pDopplerFactor: ^SLpermille) -> SLresult,
 }
 
-SL3DSourceItf :: ^^SL3DSourceItf_
+SL3DSourceItf :: ^struct { using itf: ^SL3DSourceItf_ }
 
 SL3DSourceItf_ :: struct {
 	SetHeadRelative:           proc "c" (self: SL3DSourceItf, headRelative: SLboolean) -> SLresult,
@@ -481,7 +481,7 @@ SL3DSourceItf_ :: struct {
 	GetCone:                   proc "c" (self: SL3DSourceItf, pInnerAngle: ^SLmillidegree, pOuterAngle: ^SLmillidegree, pOuterLevel: ^SLmillibel) -> SLresult,
 }
 
-SL3DMacroscopicItf :: ^^SL3DMacroscopicItf_
+SL3DMacroscopicItf :: ^struct { using itf: ^SL3DMacroscopicItf_ }
 
 SL3DMacroscopicItf_ :: struct {
 	SetSize:               proc "c" (self: SL3DMacroscopicItf, width: SLmillimeter, height: SLmillimeter, depth: SLmillimeter) -> SLresult,
@@ -492,7 +492,7 @@ SL3DMacroscopicItf_ :: struct {
 	GetOrientationVectors: proc "c" (self: SL3DMacroscopicItf, pFront: ^SLVec3D, pUp: ^SLVec3D) -> SLresult,
 }
 
-SLMuteSoloItf :: ^^SLMuteSoloItf_
+SLMuteSoloItf :: ^struct { using itf: ^SLMuteSoloItf_ }
 
 SLMuteSoloItf_ :: struct {
 	SetChannelMute: proc "c" (self: SLMuteSoloItf, chan: SLuint8, mute: SLboolean) -> SLresult,
@@ -502,7 +502,7 @@ SLMuteSoloItf_ :: struct {
 	GetNumChannels: proc "c" (self: SLMuteSoloItf, pNumChannels: ^SLuint8) -> SLresult,
 }
 
-SLDynamicInterfaceManagementItf      :: ^^SLDynamicInterfaceManagementItf_
+SLDynamicInterfaceManagementItf      :: ^struct { using itf: ^SLDynamicInterfaceManagementItf_ }
 slDynamicInterfaceManagementCallback :: proc "c" (caller: SLDynamicInterfaceManagementItf, pContext: rawptr, event: SLuint32, result: SLresult, iid: SLInterfaceID)
 
 SLDynamicInterfaceManagementItf_ :: struct {
@@ -512,7 +512,7 @@ SLDynamicInterfaceManagementItf_ :: struct {
 	RegisterCallback: proc "c" (self: SLDynamicInterfaceManagementItf, callback: slDynamicInterfaceManagementCallback, pContext: rawptr) -> SLresult,
 }
 
-SLMIDIMessageItf      :: ^^SLMIDIMessageItf_
+SLMIDIMessageItf      :: ^struct { using itf: ^SLMIDIMessageItf_ }
 slMetaEventCallback   :: proc "c" (caller: SLMIDIMessageItf, pContext: rawptr, type: SLuint8, length: SLuint32, pData: ^SLuint8, tick: SLuint32, track: SLuint16)
 slMIDIMessageCallback :: proc "c" (caller: SLMIDIMessageItf, pContext: rawptr, statusByte: SLuint8, length: SLuint32, pData: ^SLuint8, tick: SLuint32, track: SLuint16)
 
@@ -524,7 +524,7 @@ SLMIDIMessageItf_ :: struct {
 	ClearMIDIMessageCallbackFilter: proc "c" (self: SLMIDIMessageItf) -> SLresult,
 }
 
-SLMIDIMuteSoloItf :: ^^SLMIDIMuteSoloItf_
+SLMIDIMuteSoloItf :: ^struct { using itf: ^SLMIDIMuteSoloItf_ }
 
 SLMIDIMuteSoloItf_ :: struct {
 	SetChannelMute: proc "c" (self: SLMIDIMuteSoloItf, channel: SLuint8, mute: SLboolean) -> SLresult,
@@ -538,7 +538,7 @@ SLMIDIMuteSoloItf_ :: struct {
 	GetTrackSolo:   proc "c" (self: SLMIDIMuteSoloItf, track: SLuint16, pSolo: ^SLboolean) -> SLresult,
 }
 
-SLMIDITempoItf :: ^^SLMIDITempoItf_
+SLMIDITempoItf :: ^struct { using itf: ^SLMIDITempoItf_ }
 
 SLMIDITempoItf_ :: struct {
 	SetTicksPerQuarterNote:        proc "c" (self: SLMIDITempoItf, tpqn: SLuint32) -> SLresult,
@@ -547,7 +547,7 @@ SLMIDITempoItf_ :: struct {
 	GetMicrosecondsPerQuarterNote: proc "c" (self: SLMIDITempoItf, uspqn: ^SLmicrosecond) -> SLresult,
 }
 
-SLMIDITimeItf :: ^^SLMIDITimeItf_
+SLMIDITimeItf :: ^struct { using itf: ^SLMIDITimeItf_ }
 
 SLMIDITimeItf_ :: struct {
 	GetDuration:   proc "c" (self: SLMIDITimeItf, pDuration: ^SLuint32) -> SLresult,
@@ -580,7 +580,7 @@ SLAudioCodecProfileMode :: struct {
 	modeSetting:    SLuint32,
 }
 
-SLAudioDecoderCapabilitiesItf :: ^^SLAudioDecoderCapabilitiesItf_
+SLAudioDecoderCapabilitiesItf :: ^struct { using itf: ^SLAudioDecoderCapabilitiesItf_ }
 
 SLAudioDecoderCapabilitiesItf_ :: struct {
 	GetAudioDecoders:            proc "c" (self: SLAudioDecoderCapabilitiesItf, pNumDecoders: ^SLuint32, pDecoderIds: ^SLuint32) -> SLresult,
@@ -603,21 +603,21 @@ SLAudioEncoderSettings :: struct {
 	blockAlignment: SLuint32,
 }
 
-SLAudioEncoderCapabilitiesItf :: ^^SLAudioEncoderCapabilitiesItf_
+SLAudioEncoderCapabilitiesItf :: ^struct { using itf: ^SLAudioEncoderCapabilitiesItf_ }
 
 SLAudioEncoderCapabilitiesItf_ :: struct {
 	GetAudioEncoders:            proc "c" (self: SLAudioEncoderCapabilitiesItf, pNumEncoders: ^SLuint32, pEncoderIds: ^SLuint32) -> SLresult,
 	GetAudioEncoderCapabilities: proc "c" (self: SLAudioEncoderCapabilitiesItf, encoderId: SLuint32, pIndex: ^SLuint32, pDescriptor: ^SLAudioCodecDescriptor) -> SLresult,
 }
 
-SLAudioEncoderItf :: ^^SLAudioEncoderItf_
+SLAudioEncoderItf :: ^struct { using itf: ^SLAudioEncoderItf_ }
 
 SLAudioEncoderItf_ :: struct {
 	SetEncoderSettings: proc "c" (self: SLAudioEncoderItf, pSettings: ^SLAudioEncoderSettings) -> SLresult,
 	GetEncoderSettings: proc "c" (self: SLAudioEncoderItf, pSettings: ^SLAudioEncoderSettings) -> SLresult,
 }
 
-SLBassBoostItf :: ^^SLBassBoostItf_
+SLBassBoostItf :: ^struct { using itf: ^SLBassBoostItf_ }
 
 SLBassBoostItf_ :: struct {
 	SetEnabled:          proc "c" (self: SLBassBoostItf, enabled: SLboolean) -> SLresult,
@@ -627,7 +627,7 @@ SLBassBoostItf_ :: struct {
 	IsStrengthSupported: proc "c" (self: SLBassBoostItf, pSupported: ^SLboolean) -> SLresult,
 }
 
-SLPitchItf :: ^^SLPitchItf_
+SLPitchItf :: ^struct { using itf: ^SLPitchItf_ }
 
 SLPitchItf_ :: struct {
 	SetPitch:             proc "c" (self: SLPitchItf, pitch: SLpermille) -> SLresult,
@@ -635,7 +635,7 @@ SLPitchItf_ :: struct {
 	GetPitchCapabilities: proc "c" (self: SLPitchItf, pMinPitch: ^SLpermille, pMaxPitch: ^SLpermille) -> SLresult,
 }
 
-SLRatePitchItf :: ^^SLRatePitchItf_
+SLRatePitchItf :: ^struct { using itf: ^SLRatePitchItf_ }
 
 SLRatePitchItf_ :: struct {
 	SetRate:                  proc "c" (self: SLRatePitchItf, rate: SLpermille) -> SLresult,
@@ -643,7 +643,7 @@ SLRatePitchItf_ :: struct {
 	GetRatePitchCapabilities: proc "c" (self: SLRatePitchItf, pMinRate: ^SLpermille, pMaxRate: ^SLpermille) -> SLresult,
 }
 
-SLVirtualizerItf :: ^^SLVirtualizerItf_
+SLVirtualizerItf :: ^struct { using itf: ^SLVirtualizerItf_ }
 
 SLVirtualizerItf_ :: struct {
 	SetEnabled:          proc "c" (self: SLVirtualizerItf, enabled: SLboolean) -> SLresult,
@@ -653,7 +653,7 @@ SLVirtualizerItf_ :: struct {
 	IsStrengthSupported: proc "c" (self: SLVirtualizerItf, pSupported: ^SLboolean) -> SLresult,
 }
 
-SLVisualizationItf      :: ^^SLVisualizationItf_
+SLVisualizationItf      :: ^struct { using itf: ^SLVisualizationItf_ }
 slVisualizationCallback :: proc "c" (rawptr, ^SLuint8, ^SLuint8, SLmilliHertz)
 
 SLVisualizationItf_ :: struct {
@@ -661,7 +661,7 @@ SLVisualizationItf_ :: struct {
 	GetMaxRate:                    proc "c" (self: SLVisualizationItf, pRate: ^SLmilliHertz) -> SLresult,
 }
 
-SLEngineItf :: ^^SLEngineItf_
+SLEngineItf :: ^struct { using itf: ^SLEngineItf_ }
 
 SLEngineItf_ :: struct {
 	CreateLEDDevice:             proc "c" (self: SLEngineItf, pDevice: ^SLObjectItf, deviceID: SLuint32, numInterfaces: SLuint32, pInterfaceIds: ^SLInterfaceID, pInterfaceRequired: ^SLboolean) -> SLresult,
@@ -681,7 +681,7 @@ SLEngineItf_ :: struct {
 	IsExtensionSupported:        proc "c" (self: SLEngineItf, pExtensionName: ^SLchar, pSupported: ^SLboolean) -> SLresult,
 }
 
-SLEngineCapabilitiesItf :: ^^SLEngineCapabilitiesItf_
+SLEngineCapabilitiesItf :: ^struct { using itf: ^SLEngineCapabilitiesItf_ }
 
 SLEngineCapabilitiesItf_ :: struct {
 	QuerySupportedProfiles:        proc "c" (self: SLEngineCapabilitiesItf, pProfilesSupported: ^SLuint16) -> SLresult,
@@ -693,7 +693,7 @@ SLEngineCapabilitiesItf_ :: struct {
 	IsThreadSafe:                  proc "c" (self: SLEngineCapabilitiesItf, pIsThreadSafe: ^SLboolean) -> SLresult,
 }
 
-SLThreadSyncItf :: ^^SLThreadSyncItf_
+SLThreadSyncItf :: ^struct { using itf: ^SLThreadSyncItf_ }
 
 SLThreadSyncItf_ :: struct {
 	EnterCriticalSection: proc "c" (self: SLThreadSyncItf) -> SLresult,

@@ -23,6 +23,9 @@ Last generated from NDK r30 (30.0.16248370).
 - Types from `core` or a target in `uses` refer to that package (`android.ANativeWindow`, `android_media.media_status_t`).
 - Records only forward-declared in a bound header (`struct timespec`) map to `core:sys/posix` through `EXTERNAL_RECORDS`.
 - Parameter names of function-pointer types come from the header source, when every parameter has one.
+- A pointer to a table of function pointers becomes a struct with a `using` field, so `->` calls through it.
+  - `JNIEnv :: struct { using functions: ^JNINativeInterface }`, so `env->FindClass(name)` works on a `^JNIEnv`. `JavaVM` is the same.
+  - OpenSL ES and OpenMAX AL interfaces, e.g. `SLObjectItf :: ^struct { using itf: ^SLObjectItf_ }`, so `object->Realize(SL_BOOLEAN_FALSE)` works.
 - Every generated file starts with a marker line. Only marked files are overwritten or deleted.
 
 Not generated:
@@ -33,8 +36,10 @@ Not generated:
 | `inline` functions           | No library exports them. They are hand-written in the package's `inlines.odin`.       |
 | `android.odin`               | The package documentation and `va_list_arg`.                                          |
 | `native_app_glue`            | Hand-written Odin, not a binding.                                                     |
+| `jni_env.odin`               | The implicit `JNIEnv` (`jni_set_vm`, `jni_env`) is hand-written.                      |
 | EGL, GLES, Vulkan, zlib      | `vendor:egl`, `vendor:OpenGL` (`load_gles_up_to`), `vendor:vulkan` and `vendor:zlib`. |
 | GLES 1.x (libGLESv1_CM)      | Fixed-function OpenGL ES. Not bound.                                                  |
+| The Java APIs                | `vendor:android/java`, generated from the SDK's `android.jar` by its own `_gen`.      |
 
 ## Targets
 

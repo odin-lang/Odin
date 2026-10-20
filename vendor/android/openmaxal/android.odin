@@ -7,7 +7,7 @@ foreign import libOpenMAXAL "system:OpenMAXAL"
 
 XAAint64                :: xa_int64_t
 XAAuint64               :: xa_uint64_t
-XAAndroidBufferQueueItf :: ^^XAAndroidBufferQueueItf_
+XAAndroidBufferQueueItf :: ^struct { using itf: ^XAAndroidBufferQueueItf_ }
 
 XAAndroidBufferItem :: struct {
 	itemKey:  XAuint32,
