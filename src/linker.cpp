@@ -811,7 +811,24 @@ try_cross_linking:;
 							//                available at runtime wherever the executable is run, so we make require those to be
 							//                local to the executable (unless the system collection is used, in which case we search
 							//                the system library paths for the library file).
-							if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o")) || string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."))) {
+							bool is_static = string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"));
+							bool is_shared = string_ends_with(lib, str_lit(".so")) || string_contains_string(lib, str_lit(".so."));
+						#if defined(GB_SYSTEM_WINDOWS)
+							// NOTE(bill): `-l:` with a full path relies on the `-L/` added above, which Windows hosts
+							// (cross-linking for Linux or Android) do not have. Archives are passed by path. Shared
+							// libraries keep `-l:` with their own directory, so `DT_NEEDED` stays a bare file name.
+							if (is_static) {
+								lib_str = gb_string_append_fmt(lib_str, " \"%.*s\" ", LIT(lib));
+								continue;
+							}
+							if (is_shared) {
+								String dir  = directory_from_path(lib);
+								String name = filename_without_directory(lib);
+								lib_str = gb_string_append_fmt(lib_str, " -L\"%.*s\" -l:\"%.*s\" ", LIT(dir), LIT(name));
+								continue;
+							}
+						#endif
+							if (is_static || is_shared) {
 								lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
 							} else {
 								// dynamic or static system lib, just link regularly searching system library paths

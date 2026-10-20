@@ -113,8 +113,14 @@ when ODIN_OS == .Linux {
 	once_flag           :: distinct int
 	thrd_t              :: distinct ulong
 	tss_t               :: distinct uint
-	cnd_t               :: struct #raw_union { _: [12]int, _: [12 * size_of(int) / size_of(rawptr)]rawptr, }
-	mtx_t               :: struct #raw_union { _: [10 when size_of(long) == 8 else 6]int, _: [5 when size_of(long) == 8 else 6]rawptr, }
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// Bionic's `pthread_cond_t` and `pthread_mutex_t`.
+		cnd_t           :: struct { _: [12 when size_of(rawptr) == 8 else 1]i32, }
+		mtx_t           :: struct { _: [10 when size_of(rawptr) == 8 else 1]i32, }
+	} else {
+		cnd_t           :: struct #raw_union { _: [12]int, _: [12 * size_of(int) / size_of(rawptr)]rawptr, }
+		mtx_t           :: struct #raw_union { _: [10 when size_of(long) == 8 else 6]int, _: [5 when size_of(long) == 8 else 6]rawptr, }
+	}
 
 	@(default_calling_convention="c")
 	foreign libc {

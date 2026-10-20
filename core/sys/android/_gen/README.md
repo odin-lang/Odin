@@ -1,6 +1,6 @@
-# core:sys/android generator
+# Android NDK generator
 
-Most of `core:sys/android` is generated from the Android NDK's C headers by `generate.py`:
+Most of `core:sys/android` and the `vendor:android/*` packages are generated from the Android NDK's C headers by `generate.py`:
 
 ```
 python core/sys/android/_gen/generate.py --ndk <path/to/ndk> --verify
@@ -31,7 +31,16 @@ Not generated:
 | `android.odin`               | The package documentation and `va_list_arg`.                      |
 | `native_app_glue`            | Hand-written Odin, not a binding.                                 |
 
-A header whose functions live outside the libraries in `LIBRARIES` is an error. Those belong in `vendor:android/<library>`.
+## Targets
+
+| Target   | Package                 | Package name     | Libraries                                                         |
+|----------|-------------------------|------------------|-------------------------------------------------------------------|
+| `core`   | `core:sys/android`      | `android`        | libandroid, libnativewindow, liblog, libnativehelper, libc, libdl |
+| `aaudio` | `vendor:android/aaudio` | `android_aaudio` | libaaudio                                                         |
+
+`--target <name>` generates one of them. The `core` model is always built, since the other packages use its types (`android.ANativeWindow`).
+
+A header whose functions live outside its target's libraries is an error. Such a header belongs to another target.
 
 ## Verification
 

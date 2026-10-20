@@ -592,7 +592,10 @@ when ODIN_OS == .Darwin {
 
 	pthread_t :: distinct c.ulong
 
-	when ODIN_ARCH == .arm64 {
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		@(private)
+		__SIZEOF_PTHREAD_ATTR_T :: 56 when size_of(rawptr) == 8 else 24
+	} else when ODIN_ARCH == .arm64 {
 		@(private)
 		__SIZEOF_PTHREAD_ATTR_T :: 64
 	} else {
@@ -607,14 +610,25 @@ when ODIN_OS == .Darwin {
 
 	pthread_key_t :: distinct c.uint
 
-	pthread_cond_t :: struct {
-		__size: [40]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
-		__align: c.long,
-	}
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// NOTE(bill): bionic's are arrays of `int32_t`, so only 4-byte aligned. Only one `int32_t` each on 32-bit.
+		pthread_cond_t :: struct {
+			__private: [12 when size_of(rawptr) == 8 else 1]i32,
+		}
 
-	pthread_mutex_t :: struct {
-		__size: [32]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
-		__align: c.long,
+		pthread_mutex_t :: struct {
+			__private: [10 when size_of(rawptr) == 8 else 1]i32,
+		}
+	} else {
+		pthread_cond_t :: struct {
+			__size: [40]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+			__align: c.long,
+		}
+
+		pthread_mutex_t :: struct {
+			__size: [32]c.char, // NOTE: may be smaller depending on libc or arch, but never larger.
+			__align: c.long,
+		}
 	}
 
 	sched_param :: struct {
