@@ -483,18 +483,32 @@ when ODIN_OS == .Darwin {
 	_speed_t  :: distinct c.uint
 	tcflag_t  :: distinct c.uint
 
-	termios :: struct {
-		c_iflag:  CInput_Flags,               /* [XBD] input flags */
-		c_oflag:  COutput_Flags,              /* [XBD] output flags */
-		c_cflag:  CControl_Flags,             /* [XBD] control flags */
-		c_lflag:  CLocal_Flags,               /* [XBD] local flag */
-		c_line:   cc_t,                       /* control characters */
-		c_cc:     #sparse [Control_Char]cc_t, /* [XBD] control chars */
-		c_ispeed: speed_t,                    /* input speed */
-		c_ospeed: speed_t,                    /* output speed */
-	}
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// Bionic uses the kernel's `struct termios`, which has no speed fields.
+		termios :: struct {
+			c_iflag: CInput_Flags,               /* [XBD] input flags */
+			c_oflag: COutput_Flags,              /* [XBD] output flags */
+			c_cflag: CControl_Flags,             /* [XBD] control flags */
+			c_lflag: CLocal_Flags,               /* [XBD] local flag */
+			c_line:  cc_t,                       /* control characters */
+			c_cc:    #sparse [Control_Char]cc_t, /* [XBD] control chars */
+		}
 
-	NCCS :: 32
+		NCCS :: 19
+	} else {
+		termios :: struct {
+			c_iflag:  CInput_Flags,               /* [XBD] input flags */
+			c_oflag:  COutput_Flags,              /* [XBD] output flags */
+			c_cflag:  CControl_Flags,             /* [XBD] control flags */
+			c_lflag:  CLocal_Flags,               /* [XBD] local flag */
+			c_line:   cc_t,                       /* control characters */
+			c_cc:     #sparse [Control_Char]cc_t, /* [XBD] control chars */
+			c_ispeed: speed_t,                    /* input speed */
+			c_ospeed: speed_t,                    /* output speed */
+		}
+
+		NCCS :: 32
+	}
 
 	VINTR  :: 0
 	VQUIT  :: 1
@@ -586,7 +600,7 @@ when ODIN_OS == .Darwin {
 	ICANON :: 0x00000002
 	IEXTEN :: 0x00008000
 	ISIG   :: 0x00000001
-	NOFLSH :: 0x80000080
+	NOFLSH :: 0x00000080
 	TOSTOP :: 0x00000100
 
 	TCIFLUSH  :: 0

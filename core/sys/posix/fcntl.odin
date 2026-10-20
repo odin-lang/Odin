@@ -436,9 +436,16 @@ when ODIN_OS == .Darwin {
 	O_EXCL      :: 0o0_000_200
 	O_NOCTTY    :: 0o0_000_400
 	O_TRUNC     :: 0o0_001_000
-	O_DIRECTORY :: 0o0_200_000
-	O_NOFOLLOW  :: 0o0_400_000
 	O_CLOEXEC   :: 0o2_000_000
+
+	// ARM swaps these with `O_DIRECT` and `O_LARGEFILE`.
+	when ODIN_ARCH == .arm64 || ODIN_ARCH == .arm32 {
+		O_DIRECTORY :: 0o0_040_000
+		O_NOFOLLOW  :: 0o0_100_000
+	} else {
+		O_DIRECTORY :: 0o0_200_000
+		O_NOFOLLOW  :: 0o0_400_000
+	}
 
 	_O_TTY_INIT :: 0
 	O_TTY_INIT  :: O_Flags{}

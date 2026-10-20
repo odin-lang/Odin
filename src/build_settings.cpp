@@ -20,7 +20,7 @@ enum TargetOsKind : u16 {
 	TargetOs_freebsd,
 	TargetOs_openbsd,
 	TargetOs_netbsd,
-	
+
 	TargetOs_wasi,
 	TargetOs_js,
 	TargetOs_orca,
@@ -172,7 +172,7 @@ enum Subtarget : u32 {
 	Subtarget_iPhoneSimulator,
 	Subtarget_Android,
 	Subtarget_Playdate,
-	
+
 	Subtarget_COUNT,
 	Subtarget_Invalid,    // NOTE(harold): Must appear after _COUNT as this is not a real subtarget
 };
@@ -216,7 +216,7 @@ enum CommandKind : u64 {
 	Command_doc             = 1<<3,
 	Command_version         = 1<<4,
 	Command_test            = 1<<5,
-	
+
 	Command_strip_semicolon = 1<<6,
 	Command_bug_report      = 1<<7,
 
@@ -1028,7 +1028,7 @@ gb_internal TargetOsKind get_target_os_from_string(String str, Subtarget *subtar
 
 			if (str_eq_ignore_case(subtarget, "generic") || str_eq_ignore_case(subtarget, "default")) {
 				*subtarget_ = Subtarget_Default;
-				
+
 			} else {
 				for (isize i = 1; i < Subtarget_COUNT; i++) {
 					if (str_eq_ignore_case(subtarget_strings[i], subtarget)) {
@@ -1637,8 +1637,14 @@ gb_internal void init_android_values(bool with_sdk) {
 
 		i64 new_level = big_int_to_i64(&level);
 
-		if (new_level >= 21) {
+		if (new_level >= 29) {
 			bc->ODIN_ANDROID_API_LEVEL = cast(int)new_level;
+		} else if (new_level >= 21) {
+			// NOTE(bill): Android's runtime uses `@(thread_local)`
+			// LLVM-C cannot select emulated TLS, and Android only loads ELF TLS from API level 29 (Android 10).
+			gb_printf_err("Error: -subtarget:android requires -minimum-os-version:29 or higher, got %.*s\n", LIT(bc->minimum_os_version_string));
+			gb_printf_err("\tOdin uses ELF thread-local storage, which Android supports from API level 29\n");
+			gb_exit(1);
 		} else {
 			gb_printf_err("Warning: Invalid -minimum-os-version:%.*s for -subtarget:Android, defaulting to %.*s\n", LIT(bc->minimum_os_version_string), LIT(default_level));
 			bc->ODIN_ANDROID_API_LEVEL = atoi(cast(char const *)default_level.text);
@@ -1772,7 +1778,7 @@ gb_internal String normalize_minimum_os_version_string(String version) {
 
 gb_internal void init_build_context_error_pos_style() {
 	build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
-	
+
 	char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
 	if (found) {
 		ErrorPosStyle kind = ErrorPosStyle_Default;
@@ -2265,15 +2271,15 @@ gb_internal bool check_target_feature_is_enabled(String const &feature, String *
 
 		String plus_str  = concatenate_strings(temporary_allocator(), make_string_c("+"), feature_str);
 		String minus_str = concatenate_strings(temporary_allocator(), make_string_c("-"), feature_str);
-		
+
 		bool has_raw   = string_set_exists(&build_context.target_features_set, feature_str);
 		bool has_plus  = string_set_exists(&build_context.target_features_set, plus_str);
 		bool has_minus = string_set_exists(&build_context.target_features_set, minus_str);
-		
+
 		// NOTE(jakubtomsu): this way "feature" and "+feature" is ALWAYS equivalent,
 		// and also allows the minus sign to do a final override.
 		bool is_enabled = (has_plus || has_raw) && !has_minus;
-		
+
 		if (want_enabled != is_enabled) {
 			if (not_enabled) *not_enabled = str;
 			return false;
@@ -2569,8 +2575,8 @@ gb_internal bool init_build_paths(String init_filename) {
 				output_path.name = copy_string(ha, output_path.name);
 				// The old basename is wrong. Delete it
 				gb_free(ha, old_basename.text);
-				
-				
+
+
 			}
 
 			// Replace extension.

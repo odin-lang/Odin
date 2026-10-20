@@ -1476,7 +1476,10 @@ gb_internal void init_universal(void) {
 	{
 		int minimum_os_version = 0;
 		if (build_context.minimum_os_version_string != "") {
-			int major, minor, revision = 0;
+			int major    = 0;
+			int minor    = 0;
+			int revision = 0;
+
 		#if defined(GB_SYSTEM_WINDOWS)
 			sscanf_s(cast(const char *)(build_context.minimum_os_version_string.text), "%d.%d.%d", &major, &minor, &revision);
 		#else

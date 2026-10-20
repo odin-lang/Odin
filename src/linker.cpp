@@ -624,17 +624,17 @@ try_cross_linking:;
 			#if !defined(GB_SYSTEM_WINDOWS)
 				lib_str = gb_string_appendc(lib_str, "-L/ ");
 			#endif
-			
+
 			StringSet asm_files = {};
 			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
-			
+
 			StringSet min_libs_set = {};
 			string_set_init(&min_libs_set, 64);
 			defer (string_set_destroy(&min_libs_set));
 
 			String prev_lib = {};
-			
+
 			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				// NOTE(bill): Add these before the linking values
@@ -755,7 +755,7 @@ try_cross_linking:;
 								LIT(obj_format),
 								LIT(obj_file),
 								LIT(build_context.extra_assembler_flags)
-							);						
+							);
 							if (result) {
 								gb_printf_err("executing `nasm` to assemble foreing import of %.*s failed.\n\tSuggestion: `nasm` does not ship with the compiler and should be installed with your system's package manager.\n", LIT(asm_file));
 								return result;
@@ -1059,7 +1059,7 @@ try_cross_linking:;
 
 				// Only specify this flag if the user has given a minimum version to target.
 				// This will cause warnings to show up for mismatched libraries.
-				// NOTE(harold): For device subtargets we have to explicitly set the default version to 
+				// NOTE(harold): For device subtargets we have to explicitly set the default version to
 				//               avoid the same warning since we configure our own minimum version when compiling for devices.
 				if (build_context.minimum_os_version_string_given || selected_subtarget != Subtarget_Default) {
 					link_settings = gb_string_append_fmt(link_settings, "-m%s-version-min=%.*s ", darwin_min_version_id, LIT(build_context.minimum_os_version_string));
@@ -1116,6 +1116,11 @@ try_cross_linking:;
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
 
 				link_settings = gb_string_appendc(link_settings, "-u ANativeActivity_onCreate ");
+
+				// NOTE(bill): To match the NDK's own build systems.
+				// A symbol missing at the target API level is a link error rather than a failure when the device loads the library.
+				// `-extra-linker-flags:"-Wl,-z,undefs"` turns this off.
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-Wl,--no-undefined ");
 			}
 
 			if (!build_context.no_rpath) {

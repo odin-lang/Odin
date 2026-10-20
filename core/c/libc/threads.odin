@@ -82,9 +82,14 @@ when ODIN_OS == .Windows {
 
 // GLIBC and MUSL compatible constants and types.
 when ODIN_OS == .Linux {
-	foreign import libc {
-		"system:c",
-		"system:pthread",
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		// Bionic keeps pthreads in libc.
+		foreign import libc "system:c"
+	} else {
+		foreign import libc {
+			"system:c",
+			"system:pthread",
+		}
 	}
 
 	thrd_success        :: 0
@@ -93,9 +98,15 @@ when ODIN_OS == .Linux {
 	thrd_nomem          :: 3
 	thrd_timedout       :: 4
 
-	mtx_plain           :: 0
-	mtx_recursive       :: 1
-	mtx_timed           :: 2
+	when ODIN_PLATFORM_SUBTARGET == .Android {
+		mtx_plain       :: 1
+		mtx_recursive   :: 2
+		mtx_timed       :: 4
+	} else {
+		mtx_plain       :: 0
+		mtx_recursive   :: 1
+		mtx_timed       :: 2
+	}
 
 	TSS_DTOR_ITERATIONS :: 4
 
