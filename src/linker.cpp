@@ -603,7 +603,6 @@ try_cross_linking:;
 
 			int const ODIN_ANDROID_API_LEVEL = build_context.ODIN_ANDROID_API_LEVEL;
 
-			String ODIN_ANDROID_NDK                     = build_context.ODIN_ANDROID_NDK;
 			String ODIN_ANDROID_NDK_TOOLCHAIN           = build_context.ODIN_ANDROID_NDK_TOOLCHAIN;
 			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB       = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB;
 			String ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL = build_context.ODIN_ANDROID_NDK_TOOLCHAIN_LIB_LEVEL;
@@ -827,82 +826,8 @@ try_cross_linking:;
 			defer (gb_string_free(object_files));
 
 
-			if (is_android) { // NOTE(bill): glue code needed for Android
-				TIME_SECTION("Android Native App Glue Compile");
-
-				String android_glue_object = {};
-				String android_glue_static_lib = {};
-
-				char hash_buf[64] = {};
-				gb_snprintf(hash_buf, gb_size_of(hash_buf), "%p", &hash_buf);
-				String hash = make_string_c(hash_buf);
-
-				String temp_dir = normalize_path(temporary_allocator(), temporary_directory(temporary_allocator()), NIX_SEPARATOR_STRING);
-				android_glue_object = concatenate4_strings(temporary_allocator(), temp_dir, str_lit("android_native_app_glue-"), hash, str_lit(".o"));
-				android_glue_static_lib = concatenate4_strings(permanent_allocator(), temp_dir, str_lit("libandroid_native_app_glue-"), hash, str_lit(".a"));
-
-				gbString glue = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				defer (gb_string_free(glue));
-
-				glue = gb_string_append_fmt(glue, "bin/clang");
-				glue = gb_string_append_fmt(glue, " --target=%.*s%d ", LIT(build_context.metrics.target_triplet), ODIN_ANDROID_API_LEVEL);
-				glue = gb_string_appendc(glue, "-c \"");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK.text, ODIN_ANDROID_NDK.len);
-				glue = gb_string_appendc(glue, "sources/android/native_app_glue/android_native_app_glue.c");
-				glue = gb_string_appendc(glue, "\" ");
-				glue = gb_string_appendc(glue, "-o \"");
-				glue = gb_string_append_length(glue, android_glue_object.text, android_glue_object.len);
-				glue = gb_string_appendc(glue, "\" ");
-
-				glue = gb_string_appendc(glue, "--sysroot \"");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot");
-				glue = gb_string_appendc(glue, "\" ");
-
-				glue = gb_string_appendc(glue, "\"-I");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot/usr/include/");
-				glue = gb_string_appendc(glue, "\" ");
-
-				glue = gb_string_appendc(glue, "\"-I");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				glue = gb_string_appendc(glue, "sysroot/usr/include/");
-				glue = gb_string_append_length(glue, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.text, ODIN_ANDROID_NDK_TOOLCHAIN_LIB.len);
-				glue = gb_string_appendc(glue, "/\" ");
-
-
-				glue = gb_string_appendc(glue, "-Wno-macro-redefined ");
-
-				result = system_exec_command_line_app("android-native-app-glue-compile", glue);
-				if (result) {
-					return result;
-				}
-
-				TIME_SECTION("Android Native App Glue ar");
-
-				gbString ar = gb_string_make_length(heap_allocator(), ODIN_ANDROID_NDK_TOOLCHAIN.text, ODIN_ANDROID_NDK_TOOLCHAIN.len);
-				defer (gb_string_free(ar));
-
-				ar = gb_string_appendc(ar, "bin/llvm-ar");
-
-				ar = gb_string_appendc(ar, " rcs ");
-
-				ar = gb_string_appendc(ar, "\"");
-				ar = gb_string_append_length(ar, android_glue_static_lib.text, android_glue_static_lib.len);
-				ar = gb_string_appendc(ar, "\" ");
-
-				ar = gb_string_appendc(ar, "\"");
-				ar = gb_string_append_length(ar, android_glue_object.text, android_glue_object.len);
-				ar = gb_string_appendc(ar, "\" ");
-
-				result = system_exec_command_line_app("android-native-app-glue-ar", ar);
-				if (result) {
-					return result;
-				}
-
-				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(android_glue_static_lib));
-			}
-
+			// NOTE(bill): Android's `ANativeActivity_onCreate` now comes from `core:sys/android/native_app_glue`, and only
+			// when a program imports it. Programs using SDL, raylib or their own activity no longer get the NDK's C glue.
 
 			for (String object_path : gen->output_object_paths) {
 				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
@@ -1114,8 +1039,6 @@ try_cross_linking:;
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\"--sysroot=");
 				platform_lib_str = gb_string_append_length(platform_lib_str, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.text, ODIN_ANDROID_NDK_TOOLCHAIN_SYSROOT.len);
 				platform_lib_str = gb_string_appendc(platform_lib_str, "\" ");
-
-				link_settings = gb_string_appendc(link_settings, "-u ANativeActivity_onCreate ");
 
 				// NOTE(bill): To match the NDK's own build systems.
 				// A symbol missing at the target API level is a link error rather than a failure when the device loads the library.
