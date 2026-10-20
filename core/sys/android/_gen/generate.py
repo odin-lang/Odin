@@ -89,6 +89,8 @@ CORE_HEADERS = [
 	("android/thermal.h",                        "thermal"),
 	("android/trace.h",                          "trace"),
 	("android/window.h",                         "window"),
+	("android/npumanager/buffer.h",              "npumanager"),
+	("android/npumanager/buffer_fd.h",           "npumanager"),
 	("sys/system_properties.h",                  "system_properties"),
 ]
 
@@ -105,27 +107,101 @@ CORE_LIBRARIES = {
 
 
 class Target:
-	def __init__(self, name, package, import_path, headers, libraries):
+	def __init__(self, name, package, import_path, headers, libraries, uses=()):
 		self.name        = name
 		self.package     = package
 		self.import_path = import_path
 		self.out_dir     = os.path.join(ODIN_ROOT, *import_path.replace(":", "/").split("/"))
 		self.headers     = headers
 		self.libraries   = libraries
+		self.uses        = list(uses)  # other targets whose types this one refers to (besides `core`)
 
 
 CORE = Target("core", "android", "core:sys/android", CORE_HEADERS, CORE_LIBRARIES)
 
-# Every package this script generates. `core` must come first: the others refer to its types.
+
+def vendor_target(name, headers, libraries, uses=()):
+	"""A `vendor:android/<name>` package called `android_<name>`. `libraries` are stub names without `lib` and `.so`."""
+	libs = {f"lib{l}.so": (f"lib{l}", f"system:{l}") for l in libraries}
+	return Target(name, f"android_{name}", f"vendor:android/{name}", headers, libs, uses)
+
+
+# Every package this script generates. `core` must come first, and a target after the ones in its `uses`.
 TARGETS = [
 	CORE,
-	Target(
-		"aaudio",
-		"android_aaudio",
-		"vendor:android/aaudio",
-		[("aaudio/AAudio.h", "aaudio")],
-		{"libaaudio.so": ("libaaudio", "system:aaudio")},
-	),
+	vendor_target("aaudio", [
+		("aaudio/AAudio.h", "aaudio"),
+	], ["aaudio"]),
+	vendor_target("camera", [
+		("camera/NdkCameraError.h",          "error"),
+		("camera/NdkCameraMetadataTags.h",   "metadata_tags"),
+		("camera/NdkCameraMetadata.h",       "metadata"),
+		("camera/NdkCameraWindowType.h",     "window_type"),
+		("camera/NdkCaptureRequest.h",       "capture_request"),
+		("camera/NdkCameraCaptureSession.h", "capture_session"),
+		("camera/NdkCameraDevice.h",         "device"),
+		("camera/NdkCameraManager.h",        "manager"),
+	], ["camera2ndk"]),
+	vendor_target("media", [
+		("media/NdkMediaError.h",       "error"),
+		("media/NdkMediaFormat.h",      "format"),
+		("media/NdkMediaCrypto.h",      "crypto"),
+		("media/NdkMediaCodec.h",       "codec"),
+		("media/NdkMediaCodecInfo.h",   "codec_info"),
+		("media/NdkMediaCodecStore.h",  "codec_store"),
+		("media/NdkMediaDataSource.h",  "data_source"),
+		("media/NdkMediaDrm.h",         "drm"),
+		("media/NdkMediaExtractor.h",   "extractor"),
+		("media/NdkMediaMuxer.h",       "muxer"),
+		("media/NdkImage.h",            "image"),
+		("media/NdkImageReader.h",      "image_reader"),
+	], ["mediandk"]),
+	vendor_target("amidi", [
+		("amidi/AMidi.h", "amidi"),
+	], ["amidi"], uses=["media"]),
+	vendor_target("jnigraphics", [
+		("android/bitmap.h",       "bitmap"),
+		("android/imagedecoder.h", "imagedecoder"),
+	], ["jnigraphics"]),
+	# The binder-based parts of libandroid and libnativewindow live here too.
+	vendor_target("binder", [
+		("android/binder_status.h",        "status"),
+		("android/binder_ibinder.h",       "ibinder"),
+		("android/binder_ibinder_jni.h",   "ibinder_jni"),
+		("android/binder_parcel.h",        "parcel"),
+		("android/binder_parcel_jni.h",    "parcel_jni"),
+		("android/persistable_bundle.h",   "persistable_bundle"),
+		("android/native_service.h",       "native_service"),
+		("android/hardware_buffer_aidl.h", "hardware_buffer_aidl"),
+		("android/native_window_aidl.h",   "native_window_aidl"),
+	], ["binder_ndk", "android", "nativewindow"]),
+	vendor_target("sync", [
+		("linux/sync_file.h", "sync_file"),
+		("android/sync.h",    "sync"),
+	], ["sync"]),
+	vendor_target("neuralnetworks", [
+		("android/NeuralNetworksTypes.h", "types"),
+		("android/NeuralNetworks.h",      "neuralnetworks"),
+	], ["neuralnetworks"]),
+	vendor_target("icu", [
+		(f"unicode/{h}.h", h) for h in [
+			"umachine", "utypes", "uversion", "uvernum", "uconfig", "platform", "ptypes", "putil", "parseerr",
+			"uenum", "uchar", "ucpmap", "uscript", "ustring", "utext", "ubrk", "ubidi", "ucol", "uloc",
+			"ulocdata", "uldnames", "udisplaycontext", "unorm2", "urep", "utrans", "stringoptions",
+		]
+	], ["icu"]),
+	vendor_target("opensles", [
+		("SLES/OpenSLES_Platform.h",              "platform"),
+		("SLES/OpenSLES.h",                       "opensles"),
+		("SLES/OpenSLES_Android.h",               "android"),
+		("SLES/OpenSLES_AndroidConfiguration.h",  "android_configuration"),
+		("SLES/OpenSLES_AndroidMetadata.h",       "android_metadata"),
+	], ["OpenSLES"]),
+	vendor_target("openmaxal", [
+		("OMXAL/OpenMAXAL_Platform.h", "platform"),
+		("OMXAL/OpenMAXAL.h",          "openmaxal"),
+		("OMXAL/OpenMAXAL_Android.h",  "android"),
+	], ["OpenMAXAL"]),
 ]
 
 # Odin targets (with `-subtarget:android`) and the matching clang triples.
@@ -160,6 +236,16 @@ EXTERNAL_TYPES = {
 	"clockid_t":         "c.int",
 	"socklen_t":         "c.int",
 	"bool":              "bool",
+	"char16_t":          "u16",
+	"char32_t":          "rune",
+	"__s8":              "i8",
+	"__u8":              "u8",
+	"__s16":             "i16",
+	"__u16":             "u16",
+	"__s32":             "i32",
+	"__u32":             "u32",
+	"__s64":             "i64",
+	"__u64":             "u64",
 	"va_list":           "va_list_arg",
 	"__builtin_va_list": "va_list_arg",
 	"__gnuc_va_list":    "va_list_arg",
@@ -364,10 +450,13 @@ DROPPED_QUALIFIERS = {"volatile", "restrict", "__restrict", "_Nonnull", "_Nullab
 BUILTIN_WORDS = {"void", "char", "short", "int", "long", "signed", "unsigned", "float", "double", "_Bool", "bool", "__int128"}
 ANON_RE = re.compile(r"(?:(?:struct|union|enum)\s+)?(?:[A-Za-z_]\w*::)*\((?:unnamed|anonymous)[^)]*\)")
 ATTR_RE = re.compile(r"__attribute__\(\((?:[^()]|\([^()]*\))*\)\)")
+# clang prints an attribute written through a macro by the macro's name: `__INTRODUCED_IN(36) const char *`.
+MACRO_ATTR_RE = re.compile(r"\b__[A-Z][A-Z0-9_]*\s*\([^()]*\)")
 
 
 def tokenize(s):
 	s = ATTR_RE.sub("", s)
+	s = MACRO_ATTR_RE.sub("", s)
 	s = ANON_RE.sub("struct __ANON__", s)
 	tokens, i = [], 0
 	while i < len(s):
@@ -523,13 +612,14 @@ class Record:
 		self.fields = []  # (name or None, type tree, nested Record or None, FieldDecl node)
 		self.opaque = not node.get("completeDefinition", False)
 		self.packed = any(a.get("kind") == "PackedAttr" for a in node.get("inner", []))
+		self.note   = None  # a comment emitted above the record
 
 
 class Model:
-	def __init__(self, ndk, target, base):
+	def __init__(self, ndk, target, bases):
 		self.ndk          = ndk
 		self.target       = target
-		self.base         = base                # the `core:sys/android` model, for other targets
+		self.bases        = list(bases)         # models of `core` and the target's `uses`, whose types it refers to
 		self.files        = defaultdict(list)  # output file -> [("type"|"const_group"|"func"|"var", ...)]
 		self.records      = {}                  # record node id -> Record
 		self.tag_names    = {}                  # "struct X" -> Odin name
@@ -551,9 +641,9 @@ class Model:
 		return self._headers[header]
 
 
-def build_model(ndk, ast, macros_text, exports, first_level, other_exports, target, base=None):
+def build_model(ndk, ast, macros_text, exports, first_level, other_exports, target, bases=()):
 	header_file = {h: f for h, f in target.headers}
-	model = Model(ndk, target, base)
+	model = Model(ndk, target, bases)
 
 	tracker = FileTracker()
 	tracker.walk(ast, None)
@@ -569,7 +659,7 @@ def build_model(ndk, ast, macros_text, exports, first_level, other_exports, targ
 	# Records only forward-declared in the bound headers but defined elsewhere (e.g. `struct
 	# timespec`) are external types and must be in EXTERNAL_RECORDS.
 	# The same goes for records `core:sys/android` already has (e.g. `struct AHardwareBuffer`).
-	defined_elsewhere = set(base.tag_names) if base else set()
+	defined_elsewhere = {tag for b in bases for tag in b.tag_names}
 	for node in ast.get("inner", []):
 		if node.get("kind") == "RecordDecl" and node.get("completeDefinition") and node.get("name"):
 			if header_of(ndk, node.get("_file")) not in header_file:
@@ -587,16 +677,20 @@ def build_model(ndk, ast, macros_text, exports, first_level, other_exports, targ
 			if ref is not None and ref in by_id:
 				target = by_id[ref]
 				if target["kind"] in ("RecordDecl", "EnumDecl"):
+					# The first typedef names an anonymous record, a same-named one any record.
 					tag = target.get("name")
-					if not tag or tag == node["name"] or target["id"] not in typedef_target:
+					if target["id"] not in typedef_target or tag == node["name"]:
 						typedef_target[target["id"]] = node["name"]
 
 	for header, node in decls:
 		if node["kind"] in ("RecordDecl", "EnumDecl"):
 			name = typedef_target.get(node["id"]) or node.get("name")
+			kw = "enum" if node["kind"] == "EnumDecl" else node.get("tagUsed", "struct")
 			if node.get("name"):
-				kw = "enum" if node["kind"] == "EnumDecl" else node.get("tagUsed", "struct")
 				model.tag_names[f"{kw} {node['name']}"] = name
+			elif name:
+				# clang spells `typedef struct {...} X;` as `struct X` in places.
+				model.tag_names.setdefault(f"{kw} {name}", name)
 
 	# Constants: enum constants and object-like macros, valued by clang later. The source
 	# text of an initializer only decides how the value is spelled.
@@ -681,6 +775,23 @@ def build_model(ndk, ast, macros_text, exports, first_level, other_exports, targ
 				continue
 			model.files[out].append(("var", node, lib))
 
+	# C keeps struct tags apart from functions, Odin does not (`struct sync_file_info` and `sync_file_info()`).
+	# The record gets `_t`, as in `core:sys/posix` (`stat_t`).
+	procs = {item[1]["name"] for items in model.files.values() for item in items if item[0] in ("func", "var")}
+	for items in model.files.values():
+		for item in items:
+			if item[0] == "record" and item[1].name in procs:
+				rec = item[1]
+				old, new = rec.name, rec.name + "_t"
+				rec.name = new
+				rec.note = f"NOTE(bill): `{old}` is also a procedure. The type has `_t` added."
+				model.type_names.discard(old)
+				model.type_names.add(new)
+				model.c_spelling[new] = model.c_spelling.pop(old)
+				for key, value in model.tag_names.items():
+					if value == old:
+						model.tag_names[key] = new
+
 	return model
 
 
@@ -701,7 +812,8 @@ def find_decl_ref(node):
 		if not isinstance(n, dict):
 			return None
 		kind = n.get("kind", "")
-		if kind in ("PointerType", "FunctionProtoType", "ConstantArrayType", "IncompleteArrayType"):
+		# `typedef A B;` names `A`, not the record behind it.
+		if kind in ("PointerType", "FunctionProtoType", "ConstantArrayType", "IncompleteArrayType", "TypedefType"):
 			return None
 		if kind in ("RecordType", "EnumType") and "decl" in n:
 			return n["decl"]["id"]
@@ -772,7 +884,7 @@ def parse_macros(ndk, text, header_file):
 INT_LITERAL_RE = re.compile(r"^\(?\s*(-?\s*(?:0[xX][0-9a-fA-F]+|\d+))[uUlL]*\s*\)?$")
 STRING_RE = re.compile(r'^"(?:[^"\\]|\\.)*"$')
 FLOAT_RE = re.compile(r"\d\.\d*|\d[eE][-+]?\d|\.\d")
-FLOAT_LITERAL_RE = re.compile(r"^\(?\s*(-?\d+\.\d*(?:[eE][-+]?\d+)?)[fFlL]?\s*\)?$")
+FLOAT_LITERAL_RE = re.compile(r"^\(?\s*(?:\((?:double|float)\)\s*)?(-?\d+\.\d*(?:[eE][-+]?\d+)?)[fFlL]?\s*\)?$")
 
 
 def evaluate_constants(ndk, triple, level, model, includes, tmp):
@@ -786,7 +898,8 @@ def evaluate_constants(ndk, triple, level, model, includes, tmp):
 		elif src[0] == "macro" and FLOAT_RE.search(src[1]):
 			m = FLOAT_LITERAL_RE.match(src[1])
 			if m:
-				strings[name] = m.group(1)
+				literal = m.group(1)
+				strings[name] = literal + "0" if literal.endswith(".") else literal
 			else:
 				model.skipped.append((name, f"floating-point macro {src[1]!r}"))
 		else:
@@ -854,12 +967,10 @@ def resolve_typedef(model, t):
 	seen = set()
 	while t[0] == "named" and t[1] not in seen:
 		seen.add(t[1])
-		if t[1] in model.typedefs:
-			t = model.typedefs[t[1]]
-		elif model.base and t[1] in model.base.typedefs:
-			t = model.base.typedefs[t[1]]
-		else:
+		owner = next((m for m in [model, *model.bases] if t[1] in m.typedefs), None)
+		if owner is None:
 			break
+		t = owner.typedefs[t[1]]
 	return t
 
 
@@ -881,16 +992,17 @@ def odin_type(ctx, t, where, names=None):
 		name = t[1]
 		if name in model.type_names:
 			return name
-		if model.base and name in model.base.type_names:
-			model.imports[ctx.out_file].add(CORE.import_path)
-			return f"{CORE.package}.{name}"
+		for base in model.bases:
+			if name in base.type_names:
+				model.imports[ctx.out_file].add(base.target.import_path)
+				return f"{base.target.package}.{name}"
 		if name in EXTERNAL_TYPES:
 			mapped = EXTERNAL_TYPES[name]
 			if mapped.startswith("c."):
 				model.imports[ctx.out_file].add("core:c")
 			if mapped == "va_list_arg":
 				model.uses_va_list.add(ctx.out_file)
-				if model.base:
+				if model.target is not CORE:
 					model.imports[ctx.out_file].add(CORE.import_path)
 					return f"{CORE.package}.va_list_arg"
 			return mapped
@@ -899,9 +1011,10 @@ def odin_type(ctx, t, where, names=None):
 		key = f"{t[1]} {t[2]}"
 		if key in model.tag_names:
 			return model.tag_names[key]
-		if model.base and key in model.base.tag_names:
-			model.imports[ctx.out_file].add(CORE.import_path)
-			return f"{CORE.package}.{model.base.tag_names[key]}"
+		for base in model.bases:
+			if key in base.tag_names:
+				model.imports[ctx.out_file].add(base.target.import_path)
+				return f"{base.target.package}.{base.tag_names[key]}"
 		if key in EXTERNAL_RECORDS:
 			imp, mapped = EXTERNAL_RECORDS[key]
 			model.imports[ctx.out_file].add(imp)
@@ -1120,7 +1233,9 @@ def emit_file(model, out_file, values, strings, ndk):
 		if kind == "record":
 			rec = item[1]
 			body = emit_record(ctx, rec, "")
-			if "\n" in body:
+			if rec.note:
+				blocks.append(f"// {rec.note}\n{rec.name} :: {body}")
+			elif "\n" in body:
 				blocks.append(f"{rec.name} :: {body}")
 			else:
 				one_liner(rec.name, body)
@@ -1183,6 +1298,9 @@ def emit_file(model, out_file, values, strings, ndk):
 		lines.append("}")
 		blocks.append("\n".join(lines))
 
+	if not blocks:
+		return None  # e.g. a header of only function-like macros
+
 	headers = [h for h, f in model.target.headers if f == out_file]
 	text = [GENERATED_MARKER]
 	text.append(f"// Source: {', '.join(f'<{h}>' for h in headers)} (NDK {ndk.release}, {ndk.revision})")
@@ -1191,8 +1309,14 @@ def emit_file(model, out_file, values, strings, ndk):
 	text.append("")
 	imports = sorted(model.imports[out_file])
 	if imports:
+		packages = {t.import_path: t.package for t in TARGETS}
 		for imp in imports:
-			text.append(f"import \"{imp}\"")
+			# An import is named after its path's last element, not its package (`vendor:android/media` is `media`).
+			pkg = packages.get(imp)
+			if pkg and pkg != imp.rsplit("/", 1)[-1]:
+				text.append(f"import {pkg} \"{imp}\"")
+			else:
+				text.append(f"import \"{imp}\"")
 		text.append("")
 	for lib in libs:
 		name, path = libraries[lib]
@@ -1226,6 +1350,17 @@ def verify(ndk, model, values, includes, odin, tmp):
 	pkg = model.target.package
 	imp = model.target.import_path
 
+	def is_opaque(t):
+		"""Whether a typedef names an opaque record (C cannot size those), here or in a base package."""
+		t = strip_const(resolve_typedef(model, t))
+		names = set()
+		for m in [model, *model.bases]:
+			if t[0] == "tag" and f"{t[1]} {t[2]}" in m.tag_names:
+				names.add(m.tag_names[f"{t[1]} {t[2]}"])
+			elif t[0] == "named":
+				names.add(t[1])
+		return any(r.name in names and r.opaque for m in [model, *model.bases] for r in m.records.values())
+
 	types = []   # (name, [field names])
 	for out_file in model.files:
 		for item in model.files[out_file]:
@@ -1234,7 +1369,7 @@ def verify(ndk, model, values, includes, odin, tmp):
 				types.append((item[1].name, fields, f"{'union' if item[1].union else 'struct'}"))
 			elif item[0] == "typedef":
 				t = resolve_typedef(model, ("named", item[1]))
-				if strip_const(t)[0] not in ("func",) and not (t[0] == "tag" and t[2] in ("__ANON__",)):
+				if strip_const(t)[0] not in ("func",) and not (t[0] == "tag" and t[2] in ("__ANON__",)) and not is_opaque(t):
 					types.append((item[1], [], None))
 			elif item[0] == "enum" and item[2]:
 				types.append((item[2], [], None))
@@ -1347,22 +1482,33 @@ def main():
 		triple = ABIS[0][1]
 		core_includes = [h for h, _ in CORE.headers]
 
-		with tempfile.TemporaryDirectory(prefix="odin_android_gen_") as tmp:
-			base = None
-			for target in TARGETS:
-				wanted = args.target in (None, target.name)
-				if not wanted and target is not CORE:
-					continue
+		by_name = {t.name: t for t in TARGETS}
 
-				# Every target sees the core headers, so its types resolve to `core:sys/android`.
-				includes = core_includes if target is CORE else core_includes + [h for h, _ in target.headers]
+		# The targets to generate, and every target whose types they use.
+		needed = {CORE.name}
+		pending = [t.name for t in TARGETS if args.target in (None, t.name)]
+		while pending:
+			name = pending.pop()
+			if name not in needed:
+				needed.add(name)
+				pending += by_name[name].uses
+
+		with tempfile.TemporaryDirectory(prefix="odin_android_gen_") as tmp:
+			models = {}
+			for target in TARGETS:
+				if target.name not in needed:
+					continue
+				wanted = args.target in (None, target.name)
+
+				# A target sees the headers of `core` and its `uses`, so their types resolve to those packages.
+				bases    = [models[CORE.name]] + [models[u] for u in target.uses] if target is not CORE else []
+				includes = list(dict.fromkeys(core_includes + [h for b in bases for h, _ in b.target.headers] + [h for h, _ in target.headers]))
 
 				exports, first_level, other_exports, newest = read_exports(ndk, triple, target.libraries)
 				ast    = dump_ast(ndk, triple, newest, includes, tmp)
 				macros = dump_macros(ndk, triple, newest, tmp)
-				model  = build_model(ndk, ast, macros, exports, first_level, other_exports, target, base)
-				if target is CORE:
-					base = model
+				model  = build_model(ndk, ast, macros, exports, first_level, other_exports, target, bases)
+				models[target.name] = model
 				if not wanted:
 					continue
 
@@ -1372,7 +1518,9 @@ def main():
 
 				outputs = {}
 				for out_file in dict.fromkeys(f for _, f in target.headers):
-					outputs[out_file] = emit_file(model, out_file, values, strings, ndk)
+					text = emit_file(model, out_file, values, strings, ndk)
+					if text is not None:
+						outputs[out_file] = text
 
 				# Only overwrite or delete generated files.
 				os.makedirs(target.out_dir, exist_ok=True)

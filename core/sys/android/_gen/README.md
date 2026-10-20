@@ -13,38 +13,55 @@ Last generated from NDK r30 (30.0.16248370).
 
 ## What it does
 
-- Every header in `HEADERS` becomes one Odin file. Small related headers share one.
+- Every header in a target's list becomes one Odin file. Small related headers share one.
+  - A header with nothing to bind (only function-like macros) produces no file.
 - Names stay exactly as in C (`ALooper_pollOnce`, `AKEYCODE_BACK`, `JNIEnv`).
+  - A record that shares its name with a procedure gets `_t`, as in `core:sys/posix` (`sync_file_info_t`).
 - clang evaluates every enum constant and object-like macro. The source spelling is kept when it is a plain literal.
 - The NDK's stub libraries decide each function's `foreign import` and the API level it appeared in.
   - Functions newer than Odin's minimum API level (29) get an `// API level N` comment.
+- Types from `core` or a target in `uses` refer to that package (`android.ANativeWindow`, `android_media.media_status_t`).
 - Records only forward-declared in a bound header (`struct timespec`) map to `core:sys/posix` through `EXTERNAL_RECORDS`.
 - Parameter names of function-pointer types come from the header source, when every parameter has one.
 - Every generated file starts with a marker line. Only marked files are overwritten or deleted.
 
 Not generated:
 
-| What                         | Why                                                               |
-|------------------------------|-------------------------------------------------------------------|
-| `JNI_OnLoad`, `JNI_OnUnload` | Callbacks the app exports, not functions it calls.                |
-| `inline` functions           | No library exports them. They are hand-written in `inlines.odin`. |
-| `android.odin`               | The package documentation and `va_list_arg`.                      |
-| `native_app_glue`            | Hand-written Odin, not a binding.                                 |
+| What                         | Why                                                                                   |
+|------------------------------|---------------------------------------------------------------------------------------|
+| `JNI_OnLoad`, `JNI_OnUnload` | Callbacks the app exports, not functions it calls.                                    |
+| `inline` functions           | No library exports them. They are hand-written in the package's `inlines.odin`.       |
+| `android.odin`               | The package documentation and `va_list_arg`.                                          |
+| `native_app_glue`            | Hand-written Odin, not a binding.                                                     |
+| EGL, GLES, Vulkan, zlib      | `vendor:egl`, `vendor:OpenGL` (`load_gles_up_to`), `vendor:vulkan` and `vendor:zlib`. |
+| GLES 1.x (libGLESv1_CM)      | Fixed-function OpenGL ES. Not bound.                                                  |
 
 ## Targets
 
-| Target   | Package                 | Package name     | Libraries                                                         |
-|----------|-------------------------|------------------|-------------------------------------------------------------------|
-| `core`   | `core:sys/android`      | `android`        | libandroid, libnativewindow, liblog, libnativehelper, libc, libdl |
-| `aaudio` | `vendor:android/aaudio` | `android_aaudio` | libaaudio                                                         |
+| Target           | Package                         | Libraries                                                         | Notes                                                          |
+|------------------|---------------------------------|-------------------------------------------------------------------|----------------------------------------------------------------|
+| `core`           | `core:sys/android`              | libandroid, libnativewindow, liblog, libnativehelper, libc, libdl |                                                                |
+| `aaudio`         | `vendor:android/aaudio`         | libaaudio                                                         |                                                                |
+| `camera`         | `vendor:android/camera`         | libcamera2ndk                                                     |                                                                |
+| `media`          | `vendor:android/media`          | libmediandk                                                       |                                                                |
+| `amidi`          | `vendor:android/amidi`          | libamidi                                                          | Uses `media`.                                                  |
+| `jnigraphics`    | `vendor:android/jnigraphics`    | libjnigraphics                                                    | `bitmap.h`, `imagedecoder.h`.                                  |
+| `binder`         | `vendor:android/binder`         | libbinder_ndk, libandroid, libnativewindow                        | With the binder-based parts of libandroid and libnativewindow. |
+| `sync`           | `vendor:android/sync`           | libsync                                                           |                                                                |
+| `neuralnetworks` | `vendor:android/neuralnetworks` | libneuralnetworks                                                 | Deprecated in API level 35.                                    |
+| `icu`            | `vendor:android/icu`            | libicu                                                            | API level 31.                                                  |
+| `opensles`       | `vendor:android/opensles`       | libOpenSLES                                                       | Deprecated. Use AAudio.                                        |
+| `openmaxal`      | `vendor:android/openmaxal`      | libOpenMAXAL                                                      | Deprecated.                                                    |
 
-`--target <name>` generates one of them. The `core` model is always built, since the other packages use its types (`android.ANativeWindow`).
+A vendor package is called `android_<target>`, but an import is named after its path: `import "vendor:android/camera"` gives `camera`.
+
+`--target <name>` generates one of them. The models of `core` and the target's `uses` are always built, since their types are referred to.
 
 A header whose functions live outside its target's libraries is an error. Such a header belongs to another target.
 
 ## Verification
 
-`--verify` checks the generated package against clang on all four Android ABIs (arm64, x86_64, armv7, x86):
+`--verify` checks every generated package against clang on all four Android ABIs (arm64, x86_64, armv7, x86):
 
 - the size and alignment of every type, the offset of every field, and the value of every constant;
 - that every procedure and variable links against the newest stub libraries.
