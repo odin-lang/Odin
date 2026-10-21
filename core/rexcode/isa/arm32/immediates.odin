@@ -295,32 +295,49 @@ encode_neon_modimm :: proc(value: u32) -> (form: NEON_Imm_Form, ok: bool) {
 }
 
 // Decode the 8-bit abcdefgh + cmode + op back into a 32-bit constant.
-decode_neon_modimm :: proc "contextless" (abcdefgh: u32, cmode: u32, op: u32) -> u32 {
-	a := abcdefgh & 0xFF
+decode_neon_modimm :: proc "contextless" (abcdefgh: u32, cmode: u32, op: u32) -> u64 {
+	a := u64(abcdefgh & 0xFF)
+	// The odd cmodes below 1100 are VORR and VBIC's, and expand the way the
+	// even one below them does; only bit 0 of cmode tells them apart, and the
+	// form already knows which it is.
+	switch cmode >> 1 {
+	case 0b000: return a
+	case 0b001: return a << 8
+	case 0b010: return a << 16
+	case 0b011: return a << 24
+	case 0b100: return a
+	case 0b101: return a << 8
+	}
 	switch cmode {
-	case 0b0000: return a
-	case 0b0010: return a << 8
-	case 0b0100: return a << 16
-	case 0b0110: return a << 24
-	case 0b1000: return a
-	case 0b1010: return a << 8
 	case 0b1100: return (a << 8) | 0xFF
 	case 0b1101: return (a << 16) | 0xFFFF
 	case 0b1110:
 		if op == 0 {
 			return a | (a << 8) | (a << 16) | (a << 24)
 		}
-		// .I64 bit-expand: each bit -> 0x00 or 0xFF byte
-		result: u32 = 0
-		for k in u32(0)..<4 {
+		// .I64: each of the eight bits becomes a whole byte.
+		result: u64 = 0
+		for k in u64(0) ..< 8 {
 			if (a >> k) & 1 != 0 {
 				result |= 0xFF << (k * 8)
 			}
 		}
 		return result
-	case 0b1111: return decode_vfp_imm8_f32(a)
+	case 0b1111: return u64(decode_vfp_imm8_f32(u32(a)))
 	}
 	return 0
+}
+
+// The abcdefgh that expands to `value` under a given cmode and op, which is
+// what an encoder needs: a form fixes its cmode, so searching every cmode for
+// one that fits would pick bits the form does not have.
+encode_neon_modimm_for :: proc "contextless" (value: u64, cmode: u32, op: u32) -> (abcdefgh: u8, ok: bool) {
+	for candidate in u32(0) ..< 256 {
+		if decode_neon_modimm(candidate, cmode, op) == value {
+			return u8(candidate), true
+		}
+	}
+	return 0, false
 }
 
 // Pack the NEON_Imm_Form into the bits the encoder ORs into the instruction

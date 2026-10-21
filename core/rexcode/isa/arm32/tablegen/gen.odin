@@ -6,8 +6,9 @@ package rexcode_arm32_tablegen
 // AArch32 TABLE GENERATOR  (Stage A)
 // =============================================================================
 //
-// Reads the single-source-of-truth ENCODING_TABLE (encoding_table.odin, this
-// package) and emits human-readable, type-checked Odin into ./generated/:
+// Reads the single-source-of-truth tables -- ENCODING_TABLE (encoding_table.odin)
+// and THUMB_TABLE (thumb_table.odin), both in this package -- and emits
+// human-readable, type-checked Odin into ./generated/:
 //
 //   generated/encode_tables.odin   ENCODE_FORMS + ENCODE_RUNS (flattened encode)
 //   generated/decode_tables.odin   DECODE_ENTRIES + DECODE_FORM_IDX +
@@ -19,7 +20,7 @@ package rexcode_arm32_tablegen
 //   odin run arm32/tablegen/generated  # Stage B
 //
 // AArch32 is fixed-width-per-mode (A32 = 4 bytes, T16 = 2 bytes, T32 = 4 bytes
-// packed as low_halfword | high_halfword << 16). Three primary dispatch tables
+// packed as first_halfword << 16 | second_halfword). Three primary dispatch tables
 // (one per mode/size) with a secondary T32 sub-bucket; the decode bucketing
 // below is ported verbatim from the old tools/gen_decode_tables.odin.
 
@@ -69,10 +70,85 @@ Entry :: struct {
 	is_thumb32: bool,
 	key:        u16,   // primary dispatch key (8 bits A32, 7 bits T32, 6 bits T16)
 	ilen:       u8,
-	form_idx:   u16,   // index of this form within ENCODING_TABLE[mnemonic]
+	form_idx:   u16,   // index of this form within forms_of(mnemonic)
 }
 
 Range :: struct { start: u16, count: u16 }
+
+// The Thumb form of an A32 coprocessor, VFP or Advanced SIMD form, which is
+// the same instruction in a word the Thumb decoder can reach:
+//
+//   cond 110x / cond 1110   coprocessor, VFP   the condition fixed at 1110 --
+//                                               Thumb takes it from IT instead
+//   1111 110x / 1111 1110   unconditional      unchanged
+//   1111 001U               Advanced SIMD      111U 1111: U moves to bit 28
+//   1111 0100 ...0          SIMD load/store    1111 1001
+//
+// Nothing else in A32 has a Thumb form that follows from it.
+thumb_form_of :: proc(form: Encoding) -> (thumb: Encoding, ok: bool) {
+	if form.mode != .A32 {
+		return
+	}
+	thumb = form
+	thumb.mode = .T32
+	thumb.flags.cond_in_28 = false
+	conditional := form.mask >> 28 == 0
+	top  := (form.bits >> 24) & 0xF
+	switch {
+	case conditional && (top & 0xE == 0xC || top == 0xE):
+		thumb.bits = (form.bits & 0x0FFF_FFFF) | 0xE000_0000
+		thumb.mask = form.mask | 0xF000_0000
+	case !conditional && form.bits >> 28 == 0xF && (top & 0xE == 0xC || top == 0xE):
+		// already a Thumb word
+	case !conditional && form.bits >> 28 == 0xF && top & 0xE == 0x2:
+		u := (form.bits >> 24) & 1
+		u_fixed := (form.mask >> 24) & 1
+		thumb.bits = (form.bits & 0x00FF_FFFF) | 0xEF00_0000 | u << 28
+		thumb.mask = (form.mask & 0x00FF_FFFF) | 0xEF00_0000 | u_fixed << 28
+	case !conditional && form.bits >> 28 == 0xF && top == 0x4 && form.mask & (1 << 20) != 0 && form.bits & (1 << 20) == 0:
+		thumb.bits = (form.bits & 0x00FF_FFFF) | 0xF900_0000
+		thumb.mask = (form.mask & 0x00FF_FFFF) | 0xFF00_0000
+	case:
+		return
+	}
+	thumb.flags.thumb32 = true
+	// M-profile cores give the generic coprocessor space to CDE.
+	GENERIC_COPROCESSOR :: []Mnemonic{
+		.CDP, .CDP2, .MCR, .MCR2, .MRC, .MRC2, .MCRR, .MCRR2, .MRRC, .MRRC2,
+		.LDC, .LDCL, .LDC2, .LDC2L, .STC, .STCL, .STC2, .STC2L,
+	}
+	if slice.contains(GENERIC_COPROCESSOR, form.mnemonic) {
+		thumb.flags.a_profile_only = true
+	}
+	ok = true
+	return
+}
+
+// Every form of a mnemonic: its ENCODING_TABLE rows, then its THUMB_TABLE
+// rows, then the Thumb forms derived from its A32 coprocessor, VFP and
+// Advanced SIMD rows. Built once; the index of a form in this list is its
+// form id.
+forms_of :: proc(m: Mnemonic) -> []Encoding {
+	@(static) merged: [Mnemonic][dynamic]Encoding
+	@(static) built: bool
+	if !built {
+		for mnemonic in Mnemonic {
+			append(&merged[mnemonic], ..ENCODING_TABLE[mnemonic])
+		}
+		for form in THUMB_TABLE {
+			append(&merged[form.mnemonic], form)
+		}
+		for mnemonic in Mnemonic {
+			for form in ENCODING_TABLE[mnemonic] {
+				if derived, ok := thumb_form_of(form); ok {
+					append(&merged[mnemonic], derived)
+				}
+			}
+		}
+		built = true
+	}
+	return merged[m][:]
+}
 
 main :: proc() {
 	n := emit_encode_tables()
@@ -93,12 +169,12 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "// Flattened encode forms + per-mnemonic run index (source: ENCODING_TABLE).\n\n")
 	strings.write_string(&sb, "import lib \"../..\"\n\n")
 
-	for m in Mnemonic { total += len(ENCODING_TABLE[m]) }
+	for m in Mnemonic { total += len(forms_of(m)) }
 
 	strings.write_string(&sb, "@(rodata)\n")
 	fmt.sbprintfln(&sb, "ENCODE_FORMS := [%d]lib.Encoding{{", total)
 	for m in Mnemonic {
-		forms := ENCODING_TABLE[m]
+		forms := forms_of(m)
 		if len(forms) == 0 { continue }
 		fmt.sbprintfln(&sb, "\t// .%v", m)
 		for f in forms {
@@ -112,7 +188,7 @@ emit_encode_tables :: proc() -> (total: int) {
 	strings.write_string(&sb, "ENCODE_RUNS := [lib.Mnemonic]lib.Encode_Run{\n")
 	start := 0
 	for m in Mnemonic {
-		c := len(ENCODING_TABLE[m])
+		c := len(forms_of(m))
 		name := reflect.enum_string(m)
 		fmt.sbprintf(&sb, "\t.%s", name)
 		for _ in 0..<run_w-len(name) { strings.write_byte(&sb, ' ') }
@@ -160,7 +236,7 @@ emit_decode_tables :: proc() -> (total: int) {
 	defer delete(all)
 
 	for mn in Mnemonic {
-		for f, fi in ENCODING_TABLE[mn] {
+		for f, fi in forms_of(mn) {
 			ilen := lib.inst_size_from_bits(f.bits, f.mode)
 			e := Entry{
 				mnemonic   = mn,
@@ -251,8 +327,11 @@ emit_decode_tables :: proc() -> (total: int) {
 		defer delete(sortable)
 		for p in pairs^ {
 			e := all[p.entry_idx]
+			// Most specific first; a preferred form ahead of all of them; then
+			// mnemonic, then table order, so equal forms keep a fixed order.
 			pop := u64(bits.count_ones(e.mask))
-			key := (u64(p.bucket) << 48) | ((255 - pop) << 32) | u64(e.mnemonic)
+			if e.flags.preferred { pop += 32 }
+			key := (u64(p.bucket) << 48) | ((255 - pop) << 40) | (u64(e.mnemonic) << 16) | u64(p.entry_idx)
 			append(&sortable, Sort_Pair{
 				sort_key = key, entry_idx = p.entry_idx, bucket = p.bucket,
 			})
@@ -372,6 +451,10 @@ flags_lit :: proc(f: lib.Encoding_Flags) -> string {
 	if f.thumb32     { append(&parts, "thumb32=true")     }
 	if f.deprecated  { append(&parts, "deprecated=true")  }
 	if f.cond_in_21  { append(&parts, "cond_in_21=true")  }
+	if f.flags_outside_it { append(&parts, "flags_outside_it=true") }
+	if f.thumb_condition  { append(&parts, "thumb_condition=true")  }
+	if f.preferred        { append(&parts, "preferred=true")        }
+	if f.a_profile_only   { append(&parts, "a_profile_only=true")   }
 	// Every flag has to be named here: this is what re-emits the table, so a
 	// flag left out is a flag silently dropped on the next regeneration.
 	return strings.join(parts[:], ", ", context.temp_allocator)
@@ -418,10 +501,10 @@ Decode_Entry :: struct #packed {
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
 	mode:     Mode,                // 1
-	flags:    Encoding_Flags,      // 1
+	flags:    Encoding_Flags,      // 2
 	dt:       Data_Types,          // 2 -- see Data_Type in encoding_types.odin
 }
-#assert(size_of(Decode_Entry) == 27)
+#assert(size_of(Decode_Entry) == 28)
 
 Decode_Index :: struct #packed {
 	start: u16,

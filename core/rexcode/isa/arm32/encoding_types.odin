@@ -66,6 +66,45 @@ Mode :: enum u8 {
 	T32 = 1,            // Thumb (16-bit or 32-bit T2)
 }
 
+// ---- Profile ----------------------------------------------------------------
+
+// Which architecture profile a Thumb stream was written for. The application
+// (and real-time) profile and the microcontroller profile disagree about part
+// of the 32-bit Thumb encoding space: M-profile Vector Extension instructions
+// sit in words that are Advanced SIMD on an A-profile core, and the ARMv8.1-M
+// additions (conditional select, the low-overhead loops) reuse should-be-zero
+// bits of older instructions. The decoder can only pick one reading.
+Profile :: enum u8 {
+	A_PROFILE,    // A and R profiles: Advanced SIMD, crypto, banked registers
+	M_PROFILE,    // M profile: MVE, v8-M security, v8.1-M loops and selects
+}
+
+// Whether a form belongs to a profile. Most do to both.
+@(require_results)
+feature_in_profile :: #force_inline proc "contextless" (feature: Feature, profile: Profile) -> bool {
+	switch feature {
+	case .BASE, .THUMB, .V5T, .V5TE:
+		return true
+	case .V5TEJ:
+		return profile == .A_PROFILE
+	case .V6, .V6K, .V6T2, .V7:
+		return true
+	case .V7VE:
+		return profile == .A_PROFILE
+	case .V8, .DIV, .VFPV2, .VFPV3, .VFPV4, .HALF_FP:
+		return true
+	case .NEON, .NEON_HALF_FP, .CRYPTO:
+		return profile == .A_PROFILE
+	case .CRC32:
+		return true
+	case .DOT, .BF16, .FCMA, .FHM:
+		return profile == .A_PROFILE
+	case .V8M, .V8M_SE, .V81M, .MVE_INT, .MVE_FP, .CDE:
+		return profile == .M_PROFILE
+	}
+	return false
+}
+
 // VFP and NEON instructions have a regular A32<->T32 transformation:
 //   A32 form: top 4 bits of the 32-bit word are `cond` (1110=AL/uncond, 1111=NV).
 //   T32 form: top 4 bits are 1110 1111 / 1110 1110 (Thumb-2 32-bit class). The
@@ -95,6 +134,20 @@ is_neon_or_vfp_opcode :: #force_inline proc "contextless" (bits: u32) -> bool {
 		if cp == 0xA || cp == 0xB { return true }
 	}
 	return false
+}
+
+// Advanced SIMD data processing in Thumb: 111U 1111. The U bit sits at 24 in
+// A32 and at 28 here, and an operand field that reaches it (the `a` of a
+// modified immediate) has to be read and written there.
+@(require_results)
+is_thumb_simd :: #force_inline proc "contextless" (bits: u32) -> bool {
+	return bits & 0xEF00_0000 == 0xEF00_0000
+}
+
+// The A32 layout of a Thumb Advanced SIMD word, for the operand unpackers.
+@(require_results)
+thumb_simd_as_a32 :: #force_inline proc "contextless" (word: u32) -> u32 {
+	return (word & 0x00FF_FFFF) | 0xF200_0000 | ((word >> 28) & 1) << 24
 }
 
 // Transform an A32 NEON/VFP encoding word to its T32 equivalent (or vice
@@ -142,7 +195,7 @@ Feature :: enum u8 {
 
 // ---- Encoding flags --------------------------------------------------------
 
-Encoding_Flags :: bit_field u8 {
+Encoding_Flags :: bit_field u16 {
 	sets_flags:  bool | 1,   // sets APSR.NZCV (S=1)
 	cond_in_28:  bool | 1,   // INFORMATIONAL. A32 cond field at bits 31:28 is
 							 // operand-supplied. The encoder/decoder don't rely
@@ -159,6 +212,25 @@ Encoding_Flags :: bit_field u8 {
 	// VSEL and friends are unconditional words that still name a condition,
 	// in bits 21:20 rather than 31:28, and spell it on the mnemonic.
 	cond_in_21:  bool | 1,
+	// Most 16-bit Thumb data processing sets the flags outside an IT block
+	// and leaves them alone inside one -- the same bits are `adds` in one
+	// place and `add` in the other. Whether the S is there depends on where
+	// the instruction sits, not on the word.
+	flags_outside_it: bool | 1,
+	// A Thumb conditional branch is the one Thumb instruction that carries its
+	// own condition: bits 11:8 of the 16-bit form, 25:22 of the 32-bit one.
+	// Everything else takes its condition from an IT block.
+	thumb_condition:  bool | 1,
+	// Decode tries this form before any more specific one that also matches.
+	// The literal loads need it: Rn = PC makes a load PC-relative whatever
+	// the rest of the word says, but their masks are no more specific than
+	// the immediate and register forms they displace.
+	preferred:        bool | 1,
+	// Not part of the M profile, though its feature is: HLT, SETEND, SETPAN,
+	// SEVL, the 32-bit CPS, SRS and RFE, SMC, and the generic coprocessor
+	// instructions, whose coprocessor space M-profile cores give to CDE.
+	a_profile_only:   bool | 1,
+	_:                u8   | 4,
 }
 
 // ---- Operand types ----------------------------------------------------------
@@ -177,6 +249,7 @@ Operand_Type :: enum u8 {
 	GPR_SHIFTED,          // Rm + shift type + immediate shift amount
 	GPR_RSR,              // Rm + shift type + Rs register-shifted-register
 	GPR_LIST,             // Register list (LDM/STM/PUSH/POP); bitmask 16 GPRs
+	GPR_ZR,               // R0..R14, or ZR where the field holds 1111 (v8.1-M CSEL)
 
 	// ---- Floating point / SIMD ----
 	SPR,                  // S0..S31
@@ -275,6 +348,84 @@ Operand_Encoding :: enum u8 {
 	RN_T16_LO,             // bits 5-3 (alias)
 	RD_T16_HI,             // hi-reg form: rd[3] at bit 7, rd[2:0] at bits 2-0
 	RM_T16_HI,             // rm at bits 6-3 (4-bit hi-reg)
+	RM_T16_8_6,            // bits 8-6: the third register of ADD/SUB, the index of [Rn, Rm]
+	RD_T16_10_8,           // bits 10-8: Rd/Rt/Rn of the forms with an 8-bit immediate below
+	// MULS names its destination twice -- `muls r0, r1, r0` -- and one field
+	// holds it. The second mention encodes nothing and decodes as the first.
+	RD_T16_LO_AGAIN,
+	RD_T16_HI_AGAIN,       // the same, for `add r0, sp, r0`
+
+	// ---- T16 immediates ----
+	IMM3_T16,              // bits 8-6 (ADD/SUB Rd, Rn, #imm3)
+	IMM8_T16,              // bits 7-0
+	IMM5_T16_SHIFT,        // bits 10-6, LSL #0..31
+	IMM5_T16_SHIFT_32,     // bits 10-6, LSR/ASR #1..32: a zero field is 32
+	IMM7_T16_SCALED4,      // bits 6-0 counting words (ADD/SUB SP, SP, #imm)
+	IMM8_T16_SCALED4,      // bits 7-0 counting words (ADD Rd, SP, #imm)
+	IMM6_T16,              // bits 5-0 (HLT)
+	IMM4_T16_HINT,         // bits 7-4 (HINT #imm, the hints without a name)
+	IT_FIRSTCOND,          // bits 7-4: the condition an IT block starts with
+	IT_MASK_FIELD,         // bits 3-0: the then/else pattern and the block's length
+	SETEND_ENDIAN_T16,     // LE or BE, by bit 3
+	SETPAN_IMM_T16,        // bit 3
+	CPS_IFLAGS_T16,        // A, I and F at bits 2-0
+
+	// ---- T16 memory, lists and PC-relative ----
+	MEM_T16_IMM5_W,        // [Rn, #imm5 * 4]: Rn at 5-3, imm5 at 10-6
+	MEM_T16_IMM5_B,        // [Rn, #imm5]
+	MEM_T16_IMM5_H,        // [Rn, #imm5 * 2]
+	MEM_T16_REG,           // [Rn, Rm]: Rn at 5-3, Rm at 8-6
+	MEM_T16_SP_IMM8,       // [SP, #imm8 * 4]
+	MEM_T16_LITERAL,       // PC-relative load: Align(PC, 4) + imm8 * 4
+	REL_T16_ADR,           // ADR: Align(PC, 4) + imm8 * 4
+	T16_REG_LIST,          // bits 7-0: R0..R7
+	T16_REG_LIST_LR,       // bits 7-0, and LR by bit 8 (PUSH)
+	T16_REG_LIST_PC,       // bits 7-0, and PC by bit 8 (POP)
+
+	// ---- T32 (packed first_halfword << 16 | second) ----
+	RM_T32_ROTATED,        // Rm at 3-0, rotated right by 8 * bits 5-4 (the extends)
+	RM_T32_TWICE,          // Rm at 3-0 and again at 19-16 (REV, RBIT, CLZ)
+	RN_T32_SAT,            // SSAT/USAT's Rn at 19-16, LSL or ASR (bit 21) by imm3:imm2
+	T32_IMM12,             // i:imm3:imm8, as is (ADDW, SUBW)
+	T32_IMM16,             // imm4:i:imm3:imm8 (MOVW, MOVT)
+	T32_IMM_SHIFT,         // imm3:imm2, LSL/ROR #0..31
+	T32_IMM_SHIFT_32,      // imm3:imm2, LSR/ASR #1..32: a zero field is 32
+	SAT16_IMM4_T32,        // SSAT16's width, bits 3-0, less one
+	SAT16_IMM4_U_T32,      // USAT16's width, bits 3-0
+	BFI_MSB_T32,           // BFI/BFC's top bit, bits 4-0
+	BFX_WIDTH_T32,         // SBFX/UBFX's width, bits 4-0, less one
+	T32_IMM4_IMM12,        // imm4 at 19-16 and imm12 at 11-0 (HVC, UDF.W)
+	T32_IMM4_SMC,          // bits 19-16
+	T32_IMM8,              // bits 7-0 (SUBS PC, LR)
+	CPS_IFLAGS_T32,        // A, I and F at bits 7-5
+	CPS_MODE_T32,          // bits 4-0
+	MRS_SPEC_REG_T32,      // APSR or SPSR, by bit 20
+	MSR_FIELDS_T32,        // APSR/CPSR/SPSR and its fields: R at bit 20, mask at 11-8
+	SYSM_T32,              // an M-profile special register, SYSm at 7-0
+	MSR_SYSM_T32,          // the same, with MSR's APSR fields at 11-10
+	MEM_T32_IMM12,         // [Rn, #imm12]
+	MEM_T32_IMM8_NEG,      // [Rn, #-imm8]
+	MEM_T32_IMM8_PRE,      // [Rn, #+/-imm8]!     U at bit 9
+	MEM_T32_IMM8_POST,     // [Rn], #+/-imm8      U at bit 9
+	MEM_T32_IMM8_POS,      // [Rn, #imm8]         (the unprivileged loads and stores)
+	MEM_T32_REG,           // [Rn, Rm{, lsl #imm2}], imm2 at 5-4
+	MEM_T32_LITERAL,       // Align(PC, 4) +/- imm12, U at bit 23
+	MEM_T32_LITERAL_DUAL,  // Align(PC, 4) +/- imm8 * 4, U at bit 23 (LDRD)
+	MEM_T32_EXCLUSIVE,     // [Rn, #imm8 * 4] (LDREX, STREX)
+	MEM_T32_TABLE_B,       // [Rn, Rm] (TBB)
+	MEM_T32_TABLE_H,       // [Rn, Rm, lsl #1] (TBH)
+	RD_T32_STATUS,         // the status result of a store-exclusive, bits 3-0
+	T32_REG_LIST,          // bits 15-0
+	REL_T32_ADR_ADD,       // ADR: Align(PC, 4) + i:imm3:imm8
+	REL_T32_ADR_SUB,       // ADR: Align(PC, 4) - i:imm3:imm8
+	BRANCH_BLX_T32,        // BLX to A32: Align(PC, 4) + S:I1:I2:imm10H:imm10L:00
+	RN_T32_ZR,             // Rn at 19-16, where 1111 is ZR (CSEL and friends)
+	RM_T32_ZR,             // Rm at 3-0, where 1111 is ZR
+	COND_T32_FCOND,        // a condition at 7-4, written as one (CSEL and friends)
+	BANKED_MRS_T32,        // a banked register: R at 20, m1 at 19-16, m at 4
+	BANKED_MSR_T32,        // the same with m1 at 11-8
+	LOB_FORWARD,           // WLS: PC + imml:immh:'0' -- imml at 10-1, immh at 11
+	LOB_BACKWARD,          // LE: PC - imml:immh:'0'
 
 	// ---- Modified immediate ----
 	A32_IMM_MOD,           // bits 11-0 carry rotate(11:8) + value(7:0)
@@ -331,6 +482,9 @@ Operand_Encoding :: enum u8 {
 	VFP_SPEC_REG,          // VMRS/VMSR system register, bits 19:16
 	SETEND_ENDIAN,         // LE or BE, by the E bit
 	IMPL_SP,               // an SP the syntax names but no field encodes
+	IMPL_PC,               // the same, for PC (SUBS PC, LR, #imm)
+	IMPL_LR,               // the same, for LR
+	IMPL_R12,              // the same, for R12 (PAC, AUT)
 	MODE_IMM5,             // processor mode, bits 4:0 (SRS)
 	RN_A32_WB,             // base register whose writeback rides in bit 21
 	NEON_LANE_VN_32,       // Vn:N with the 32-bit lane index in bit 21              // VFP immediate (VMOV.F32/F64 #imm)
@@ -341,6 +495,10 @@ Operand_Encoding :: enum u8 {
 	// ---- VFP / NEON list ----
 	VFP_S_LIST,            // VLDM/VSTM single-prec list (8-bit count, start in Vd_S)
 	VFP_D_LIST,            // VLDM/VSTM double-prec list (8-bit count, start in Vd_D)
+	VFP_DX_LIST,           // FLDMX/FSTMX: the same, with an odd count one past the list
+	VD_S_AGAIN,            // the fixed-point VCVTs name Sd twice and encode it once
+	VD_D_AGAIN,            // the same for Dd
+	RT_VMRS,               // VMRS's Rt, where 1111 is APSR_nzcv
 
 	// VTBL/VTBX read their table from a run of one to four D registers
 	// starting at Vn. Which run length applies is the `len` field, which is
@@ -395,7 +553,8 @@ Operand_Encoding :: enum u8 {
 	MEM_IMM8_OFFSET,
 	MEM_IMM8_SCALED4,      // VFP load/store: imm8 in words, U at bit 23
 	MEM_IMM8_SCALED4_PRE,  // same, pre-indexed
-	MEM_IMM8_SCALED4_POST, // same, post-indexed       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
+	MEM_IMM8_SCALED4_POST, // same, post-indexed
+	MEM_IMM8_SCALED2,      // the half-precision VLDR/VSTR: imm8 in halfwords       // [Rn, #±imm8] (LDRH/STRH/LDRSB/STRD)
 	MEM_REG_OFFSET,        // [Rn, ±Rm{, shift}]
 	MEM_PRE_INDEX,         // [Rn, #imm]! / [Rn, ±Rm]!
 	MEM_POST_INDEX,        // [Rn], #imm / [Rn], ±Rm
@@ -429,7 +588,6 @@ Operand_Encoding :: enum u8 {
 	PSR_FIELD_MASK,        // APSR fields_mask at bits 19-16 (MSR)
 	SYSM_FIELD,            // SYSm at bits 7-0 (MRS_BANKED)
 	BARRIER_TYPE,          // bits 3-0 for DMB/DSB/ISB
-	IT_MASK,               // bits 7-0 for IT block (mask + cond)
 	CPS_IFLAGS,            // imod + iflags + mode for CPS
 	HINT_FIELD,            // hint imm
 
@@ -460,11 +618,16 @@ Operand_Encoding :: enum u8 {
 	//      in bit 22 = L bit for 64-bit shifts) ----
 	NEON_SHIFT_IMM6,       // 6-bit shift amount at bits 21:16 (NEON VSHR/VSRA/...)
 	NEON_SHIFT_IMM3,       // 3-bit shift at bits 18:16 (.I8 form, top 3 bits zero)
+	NEON_SHIFT_IMM4,       // 4-bit shift at bits 19:16 (.16 forms)
+	NEON_SHIFT_IMM5,       // 5-bit shift at bits 20:16 (.32 forms)
 
 	// ---- ARMv8-M / MVE / CDE ----
 	QD_MVE,                // MVE Qd: bit 22 fixed 0, bits 15:13 = Qd[2:0]
 	QN_MVE,                // MVE Qn: bit 7, bits 19:17 = Qn[2:0]
 	QM_MVE,                // MVE Qm: bit 5, bits 3:1 = Qm[2:0]
+	MVE_RDA_EVEN,          // an even accumulator, Rda / 2 at bits 15:13 (VADDV, VMLADAV)
+	MVE_RDALO,             // a long accumulator's low half, RdaLo / 2 at bits 15:13
+	MVE_RDAHI,             // its high half, RdaHi / 2 at bits 22:20 (RdaHi is odd)
 	MVE_SIZE_FIELD,        // 2-bit size in bits 21:20 (B/H/W/D)
 	MVE_VPT_MASK_FIELD,    // VPT mask in bits 3:0 of second halfword
 	MVE_LOOP_IMM,          // low-overhead-loop immediate
@@ -508,10 +671,10 @@ Encoding :: struct #packed {
 	mask:     u32,                 // 4 -- which bits are static
 	feature:  Feature,             // 1
 	mode:     Mode,                // 1
-	flags:    Encoding_Flags,      // 1
+	flags:    Encoding_Flags,      // 2
 	dt:       Data_Types,          // 2
 }
-#assert(size_of(Encoding) == 27)
+#assert(size_of(Encoding) == 28)
 
 // ---- Length introspection --------------------------------------------------
 //

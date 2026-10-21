@@ -41,6 +41,20 @@ REG_ENDIAN :: u16(0x9000)
 // A coprocessor number is written `p15`, not as a plain number, and it is a
 // different thing from the CRn/CRm registers REG_COPROC names.
 REG_COPROC_NUM :: u16(0xA000)
+// CPS names the interrupt masks it changes as letters, `aif`, and the three
+// of them ride in the hardware number as the bits A, I and F (2, 1, 0).
+REG_IFLAGS :: u16(0xB000)
+// MSR names the status register and the fields it writes as one token --
+// `apsr_nzcvq`, `cpsr_fc`, `spsr_fsxc`. The hardware number holds the field
+// mask in bits 3:0 (f, s, x, c) and SPSR-not-CPSR in bit 4.
+REG_PSR_FIELDS :: u16(0xC000)
+// An M-profile special register (`primask`, `basepri`, `msp`, ...): SYSm in
+// bits 7:0, and for MSR to one of the APSRs, its field mask in bits 9:8.
+REG_SYSM :: u16(0xD000)
+// The zero register v8.1-M's CSEL family reads where Rn or Rm is 1111.
+REG_ZR :: u16(0xE000)
+// A condition named as an operand rather than as a suffix -- CSEL's fourth.
+REG_COND :: u16(0xF000)
 
 REG_CLASS_MASK :: u16(0xF000)
 REG_HW_MASK    :: u16(0x0FFF)
@@ -62,6 +76,11 @@ R12 :: Register(REG_GPR | 12)
 R13 :: Register(REG_GPR | 13)
 R14 :: Register(REG_GPR | 14)
 R15 :: Register(REG_GPR | 15)
+
+ZR  :: Register(REG_ZR)
+
+// VMRS writes the FPSCR flags to the APSR when its Rt is 1111.
+APSR_NZCV :: Register(REG_SREG | 3)
 
 // Conventional aliases
 SB  :: R9                      // static base (PCS)
@@ -198,4 +217,46 @@ is_fp_scalar :: #force_inline proc "contextless" (r: Register) -> bool {
 @(require_results)
 is_simd   :: #force_inline proc "contextless" (r: Register) -> bool {
 	c := reg_class(r); return c == REG_SPR || c == REG_DPR || c == REG_QPR
+}
+
+// The banked registers MRS and MSR can name, by R:SYSm. Those it does not
+// name are UNPREDICTABLE, and decode as nothing.
+@(require_results)
+banked_name :: proc "contextless" (number: u16) -> string {
+	switch number {
+	case 0x00: return "r8_usr"
+	case 0x01: return "r9_usr"
+	case 0x02: return "r10_usr"
+	case 0x03: return "r11_usr"
+	case 0x04: return "r12_usr"
+	case 0x05: return "sp_usr"
+	case 0x06: return "lr_usr"
+	case 0x08: return "r8_fiq"
+	case 0x09: return "r9_fiq"
+	case 0x0A: return "r10_fiq"
+	case 0x0B: return "r11_fiq"
+	case 0x0C: return "r12_fiq"
+	case 0x0D: return "sp_fiq"
+	case 0x0E: return "lr_fiq"
+	case 0x10: return "lr_irq"
+	case 0x11: return "sp_irq"
+	case 0x12: return "lr_svc"
+	case 0x13: return "sp_svc"
+	case 0x14: return "lr_abt"
+	case 0x15: return "sp_abt"
+	case 0x16: return "lr_und"
+	case 0x17: return "sp_und"
+	case 0x1C: return "lr_mon"
+	case 0x1D: return "sp_mon"
+	case 0x1E: return "elr_hyp"
+	case 0x1F: return "sp_hyp"
+	case 0x2E: return "spsr_fiq"
+	case 0x30: return "spsr_irq"
+	case 0x32: return "spsr_svc"
+	case 0x34: return "spsr_abt"
+	case 0x36: return "spsr_und"
+	case 0x3C: return "spsr_mon"
+	case 0x3E: return "spsr_hyp"
+	}
+	return ""
 }

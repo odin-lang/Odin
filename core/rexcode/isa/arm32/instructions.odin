@@ -29,9 +29,9 @@ Instruction :: struct #align(64) {
 	// written `mcr p15, #0, r0, c0, c0, #0`, and dropping the last two
 	// operands does not merely print short -- an opc2 that is not zero
 	// encodes as zero, which is the wrong instruction. Six operands cannot
-	// fit alongside the rest in 64 bytes (Operand is 11, and Memory cannot
+	// fit alongside the rest in 64 bytes (Operand is 12, and Memory cannot
 	// go below 8), so this straddles two cache lines rather than one.
-	ops:           [6]Operand `fmt:"v,operand_count"`, // 6 * 11 = 66
+	ops:           [6]Operand `fmt:"v,operand_count"`, // 6 * 12 = 72
 	mnemonic:      Mnemonic,                           // 2
 	// cond, operand_count, mode, length and the two flag bits share one
 	// 16-bit word -- together they need 13 bits, and spending six bytes on
@@ -48,7 +48,11 @@ Instruction :: struct #align(64) {
 		// LDM/STM write the updated base back when this is set, which the
 		// syntax shows as a `!` after the base register.
 		writeback:     bool | 1,
-		// 2 bits spare
+		// A Thumb instruction inside an IT block. Its condition says which
+		// condition, but not whether it is in a block at all: `it al` gives
+		// AL to instructions that are, and that changes how they encode.
+		in_it_block:   bool | 1,
+		// 1 bit spare
 	},
 	// Form-id hint: when non-zero, this is (1 + the index into
 	// ENCODING_TABLE[mnemonic]) of the form the decoder produced. The encoder
@@ -64,7 +68,7 @@ Instruction :: struct #align(64) {
 	dt:            Data_Types,
 	// Spare, and free: the operands leave the tail of the second cache line
 	// unused either way. New fields land here without changing the layout.
-	_:             [54]u8,
+	_:             [48]u8,
 }
 #assert(size_of(Instruction)  == 128)
 #assert(align_of(Instruction) == 64)

@@ -84,8 +84,22 @@ sbprint :: proc(
 	isa.label_display_init(&display, label_defs, label_names)
 	defer isa.label_display_destroy(&display)
 
+	// ITSTATE, followed the way the decoder follows it, so that `.w` can be
+	// decided for instructions built by hand as well as decoded ones.
+	it_state: u8 = 0
+
 	for i in 0..<len(instructions) {
 		inst := &instructions[i]
+		in_it_block := inst.mode == .T32 && (it_state & 0xF != 0 || inst.in_it_block)
+		if inst.mnemonic == .IT {
+			it_state = u8(inst.ops[0].immediate & 0xF) << 4 | u8(inst.ops[1].immediate & 0xF)
+		} else if it_state & 0xF != 0 {
+			if it_state & 0x7 == 0 {
+				it_state = 0
+			} else {
+				it_state = (it_state & 0xE0) | ((it_state << 1) & 0x1F)
+			}
+		}
 		offset := u32(i) * 4
 		if i < len(inst_info) {
 			offset = inst_info[i].offset
@@ -126,11 +140,35 @@ sbprint :: proc(
 		// syntax. If a form needs a suffix, the table is where it says so.
 
 
+		// IT spells its block on the mnemonic -- `itte eq` -- and the
+		// condition is its operand, not a suffix.
+		if inst.mnemonic == .IT {
+			write_it(sb, inst, opts.uppercase)
+			strings.write_string(sb, "\n")
+			continue
+		}
+
 		write_mnemonic(sb, inst.mnemonic, inst.cond, inst.sets_flags, opts.uppercase)
 		if dt[0] != .NONE {
 			write_data_type(sb, dt, opts.uppercase)
 		} else if dt_suffix != "" {
 			strings.write_string(sb, dt_suffix)
+		}
+		// A 32-bit Thumb instruction that a 16-bit form could also encode
+		// says so with `.w`; an assembler otherwise picks the narrow one.
+		// Where none could, the suffix is left off -- assemblers reject it on
+		// some instructions that have no narrow form at all. A condition on
+		// anything but a branch also means the instruction is in an IT block.
+		//
+		// MOV with an immediate is the one 32-bit form that needs `.w` even
+		// with nothing narrow in reach: assemblers read `mov r0, #648` as
+		// MOVW whenever the value fits sixteen bits.
+		if inst.mode == .T32 && inst.length == 4 {
+			in_block := in_it_block || (inst.cond != 14 && !is_thumb_conditional_branch(inst))
+			mov_immediate := inst.mnemonic == .MOV && inst.ops[1].kind != .REGISTER
+			if mov_immediate || has_narrow_encoding(inst, in_block) {
+				strings.write_string(sb, opts.uppercase ? ".W" : ".w")
+			}
 		}
 
 		if inst.operand_count > 0 {
@@ -140,7 +178,7 @@ sbprint :: proc(
 				write_operand(sb, &inst.ops[k], inst, offset, &display, opts)
 				// LDM/STM write the updated base back, and the syntax marks
 				// that with a `!` on the base register itself.
-				if k == 0 && inst.writeback { strings.write_byte(sb, '!') }
+				if k == 0 && inst.writeback && inst.ops[0].kind == .REGISTER { strings.write_byte(sb, '!') }
 			}
 		}
 		strings.write_string(sb, "\n")
@@ -397,6 +435,151 @@ wprintln :: proc(
 // SHIFT_NAMES only holds LSL..RRX, so the register-shifted variants have to be
 // folded back onto it. Indexing it with the raw enum value ran off the end --
 // LSL_REG is 6 against a 5-entry table -- and crashed the printer outright.
+// `it`, then a `t` or an `e` for each further instruction in the block, then
+// the condition. The block's length is where the mask's lowest set bit is, and
+// an instruction is a `t` when its mask bit matches the first condition's
+// low bit.
+@(private="file")
+write_it :: proc(sb: ^strings.Builder, inst: ^Instruction, uppercase: bool) {
+	first_condition := u8(inst.ops[0].immediate) & 0xF
+	mask := u8(inst.ops[1].immediate) & 0xF
+	strings.write_string(sb, uppercase ? "IT" : "it")
+	for bit := u8(3); bit > 0 && mask & ((1 << bit) - 1) != 0; bit -= 1 {
+		then := (mask >> bit) & 1 == first_condition & 1
+		if uppercase {
+			strings.write_byte(sb, then ? 'T' : 'E')
+		} else {
+			strings.write_byte(sb, then ? 't' : 'e')
+		}
+	}
+	strings.write_byte(sb, ' ')
+	strings.write_string(sb, first_condition == 14 ? "al" : COND_SUFFIX[first_condition])
+}
+
+// `apsr_nzcvq`, `cpsr_fc`, `spsr_fsxc`: the mask bits are f, s, x and c from
+// the top. APSR is CPSR seen from the application level, and it only has the
+// two fields an application can write -- nzcvq (f) and g (s) -- so the CPSR
+// forms that fit that are written as APSR.
+@(private="file")
+write_psr_fields :: proc(sb: ^strings.Builder, hw: u16) {
+	mask := hw & 0xF
+	if hw & 0x10 == 0 && mask & 0x3 == 0 && mask != 0 {
+		strings.write_string(sb, "apsr_")
+		if mask & 0x8 != 0 { strings.write_string(sb, "nzcvq") }
+		if mask & 0x4 != 0 { strings.write_string(sb, "g") }
+		return
+	}
+	strings.write_string(sb, hw & 0x10 != 0 ? "spsr_" : "cpsr_")
+	if mask & 0x8 != 0 { strings.write_byte(sb, 'f') }
+	if mask & 0x4 != 0 { strings.write_byte(sb, 's') }
+	if mask & 0x2 != 0 { strings.write_byte(sb, 'x') }
+	if mask & 0x1 != 0 { strings.write_byte(sb, 'c') }
+}
+
+// An M-profile special register by its SYSm number; an MSR to one of the
+// APSRs also names the fields it writes.
+@(private="file")
+write_sysm :: proc(sb: ^strings.Builder, hw: u16) {
+	sysm := hw & 0xFF
+	name := ""
+	switch sysm {
+	case 0x00: name = "apsr"
+	case 0x01: name = "iapsr"
+	case 0x02: name = "eapsr"
+	case 0x03: name = "xpsr"
+	case 0x05: name = "ipsr"
+	case 0x06: name = "epsr"
+	case 0x07: name = "iepsr"
+	case 0x08: name = "msp"
+	case 0x09: name = "psp"
+	case 0x0A: name = "msplim"
+	case 0x0B: name = "psplim"
+	case 0x10: name = "primask"
+	case 0x11: name = "basepri"
+	case 0x12: name = "basepri_max"
+	case 0x13: name = "faultmask"
+	case 0x14: name = "control"
+	case 0x20: name = "pac_key_p_0"
+	case 0x21: name = "pac_key_p_1"
+	case 0x22: name = "pac_key_p_2"
+	case 0x23: name = "pac_key_p_3"
+	case 0x24: name = "pac_key_u_0"
+	case 0x25: name = "pac_key_u_1"
+	case 0x26: name = "pac_key_u_2"
+	case 0x27: name = "pac_key_u_3"
+	case 0x88: name = "msp_ns"
+	case 0x89: name = "psp_ns"
+	case 0x8A: name = "msplim_ns"
+	case 0x8B: name = "psplim_ns"
+	case 0x90: name = "primask_ns"
+	case 0x91: name = "basepri_ns"
+	case 0x93: name = "faultmask_ns"
+	case 0x94: name = "control_ns"
+	case 0x98: name = "sp_ns"
+	case 0xA0: name = "pac_key_p_0_ns"
+	case 0xA1: name = "pac_key_p_1_ns"
+	case 0xA2: name = "pac_key_p_2_ns"
+	case 0xA3: name = "pac_key_p_3_ns"
+	case 0xA4: name = "pac_key_u_0_ns"
+	case 0xA5: name = "pac_key_u_1_ns"
+	case 0xA6: name = "pac_key_u_2_ns"
+	case 0xA7: name = "pac_key_u_3_ns"
+	case:
+		fmt.sbprintf(sb, "sysm%d", sysm)
+		return
+	}
+	strings.write_string(sb, name)
+	// MSR's mask: nzcvq is 10, g is 01. Only the APSR forms carry one.
+	if sysm <= 3 {
+		switch (hw >> 8) & 0x3 {
+		case 1: strings.write_string(sb, "_g")
+		case 2: strings.write_string(sb, "_nzcvq")
+		case 3: strings.write_string(sb, "_nzcvqg")
+		}
+	}
+}
+
+// DMB and DSB name their option -- `dmb ish` -- and ISB has the one name, SY.
+// The values the architecture leaves unnamed are written as numbers.
+@(private="file")
+barrier_option_name :: proc(mnemonic: Mnemonic, option: i64) -> string {
+	if mnemonic == .ISB {
+		return option == 0xF ? "sy" : ""
+	}
+	if mnemonic != .DMB && mnemonic != .DSB {
+		return ""
+	}
+	switch option {
+	case 0x1: return "oshld"
+	case 0x2: return "oshst"
+	case 0x3: return "osh"
+	case 0x5: return "nshld"
+	case 0x6: return "nshst"
+	case 0x7: return "nsh"
+	case 0x9: return "ishld"
+	case 0xA: return "ishst"
+	case 0xB: return "ish"
+	case 0xD: return "ld"
+	case 0xE: return "st"
+	case 0xF: return "sy"
+	}
+	return ""
+}
+
+// A B<c> carries its own condition; every other conditional Thumb
+// instruction has it from an IT block.
+@(private="file")
+is_thumb_conditional_branch :: proc(inst: ^Instruction) -> bool {
+	if inst.mnemonic != .B || inst.form_id == 0 {
+		return false
+	}
+	forms := encoding_forms(inst.mnemonic)
+	if int(inst.form_id) - 1 >= len(forms) {
+		return false
+	}
+	return forms[inst.form_id - 1].flags.thumb_condition
+}
+
 @(private="file")
 write_shift :: proc(sb: ^strings.Builder, st: Shift_Type, amt: u8) {
 	switch st {
@@ -490,14 +673,26 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool = fals
 		case 0: strings.write_string(sb, "apsr")
 		case 1: strings.write_string(sb, "cpsr")
 		case 2: strings.write_string(sb, "spsr")
+		case 3: strings.write_string(sb, "apsr_nzcv")
 		case:   fmt.sbprintf(sb, "psr%d", hw)
 		}
 	case REG_FPSC:
+		// The VMRS/VMSR system registers by their reg field.
 		switch hw {
-		case 0: strings.write_string(sb, "fpsid")
-		case 1: strings.write_string(sb, "fpscr")
-		case 8: strings.write_string(sb, "fpexc")
-		case:   fmt.sbprintf(sb, "fpsc%d", hw)
+		case 0x0: strings.write_string(sb, "fpsid")
+		case 0x1: strings.write_string(sb, "fpscr")
+		case 0x2: strings.write_string(sb, "fpscr_nzcvqc")
+		case 0x5: strings.write_string(sb, "mvfr2")
+		case 0x6: strings.write_string(sb, "mvfr1")
+		case 0x7: strings.write_string(sb, "mvfr0")
+		case 0x8: strings.write_string(sb, "fpexc")
+		case 0x9: strings.write_string(sb, "fpinst")
+		case 0xA: strings.write_string(sb, "fpinst2")
+		case 0xC: strings.write_string(sb, "vpr")
+		case 0xD: strings.write_string(sb, "p0")
+		case 0xE: strings.write_string(sb, "fpcxtns")
+		case 0xF: strings.write_string(sb, "fpcxts")
+		case:     fmt.sbprintf(sb, "fpsc%d", hw)
 		}
 	case REG_COPROC:
 		fmt.sbprintf(sb, "c%d", hw)
@@ -505,6 +700,21 @@ write_register :: proc(sb: ^strings.Builder, r: Register, uppercase: bool = fals
 		fmt.sbprintf(sb, "p%d", hw)
 	case REG_ENDIAN:
 		strings.write_string(sb, hw == 0 ? "le" : "be")
+	case REG_BANKED:
+		strings.write_string(sb, banked_name(hw))
+	case REG_ZR:
+		strings.write_string(sb, "zr")
+	case REG_COND:
+		strings.write_string(sb, hw == 14 ? "al" : COND_SUFFIX[hw & 0xF])
+	case REG_PSR_FIELDS:
+		write_psr_fields(sb, hw)
+	case REG_SYSM:
+		write_sysm(sb, hw)
+	case REG_IFLAGS:
+		if hw & 4 != 0 { strings.write_byte(sb, 'a') }
+		if hw & 2 != 0 { strings.write_byte(sb, 'i') }
+		if hw & 1 != 0 { strings.write_byte(sb, 'f') }
+		if hw & 7 == 0 { strings.write_string(sb, "none") }
 	case:
 		fmt.sbprintf(sb, "?%d", hw)
 	}
@@ -548,16 +758,20 @@ write_operand :: proc(
 			fmt.sbprintf(sb, "[%d]", op.lane)
 		}
 	case .IMMEDIATE:
+		if name := barrier_option_name(inst.mnemonic, op.immediate); name != "" {
+			strings.write_string(sb, name)
+			return
+		}
 		fmt.sbprintf(sb, "#%d", op.immediate)
 	case .HEX_IMMEDIATE:
-		fmt.sbprintf(sb, "#0x%x", op.immediate)
+		fmt.sbprintf(sb, "#0x%x", u64(op.immediate))
 	case .FLOAT_IMMEDIATE:
 		fmt.sbprintf(sb, "#%e", f64(transmute(f32)u32(op.immediate)))
 	case .MEMORY:
 		write_memory(sb, op.mem)
 	case .RELATIVE:
-		// Resolve to label if possible
-		target := u32(i64(offset) + op.relative)
+		// A decoded target is an absolute offset; name it if a label is there.
+		target := u32(op.relative)
 		if isa.label_display_at(display, target) {
 			isa.label_display_write(display, sb, target, opts.label_prefix)
 		} else {

@@ -31,10 +31,10 @@ Decode_Entry :: struct #packed {
 	mask:     u32,                 // 4
 	feature:  Feature,             // 1
 	mode:     Mode,                // 1
-	flags:    Encoding_Flags,      // 1
+	flags:    Encoding_Flags,      // 2
 	dt:       Data_Types,          // 2 -- see Data_Type in encoding_types.odin
 }
-#assert(size_of(Decode_Entry) == 27)
+#assert(size_of(Decode_Entry) == 28)
 
 Decode_Index :: struct #packed {
 	start: u16,

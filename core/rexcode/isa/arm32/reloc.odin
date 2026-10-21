@@ -31,6 +31,7 @@ Relocation_Type :: enum u8 {
 	// T32 branches
 	BRANCH_T32_25,         // T32 B unconditional (J1/J2 + imm10 + imm11)
 	BRANCH_T32_21,         // T32 B<cond> (S + cond + imm6 + J1/J2 + imm11)
+	BLX_T32,               // T32 BLX to A32 (J1/J2 + imm10H + imm10L, word-aligned target)
 
 	// T16 branches
 	BRANCH_T16_11,         // T16 B unconditional (signed 11-bit << 1)
@@ -49,6 +50,7 @@ Relocation_Type :: enum u8 {
 	LDR_LITERAL_A32,       // signed 12-bit (U bit + imm12)
 	LDR_LITERAL_T32,       // signed 12-bit (U bit + imm12) Thumb-2
 	LDR_LITERAL_T16,       // unsigned 8-bit << 2 (Thumb-1 PC-rel)
+	LDRD_LITERAL_T32,      // signed 8-bit << 2 (U bit + imm8) Thumb-2 LDRD
 	ADR_A32,               // ADR encoded as ADD/SUB to PC
 	ADR_T32,
 	ADR_T16,               // Thumb-1 ADR (imm8 << 2)

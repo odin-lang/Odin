@@ -40,6 +40,8 @@ decode :: proc(
 	label_defs:   ^[dynamic]Label_Definition,
 	errors:       ^[dynamic]Error,
 	mode:         Mode = .A32,
+	// Only matters for Thumb: which reading of the words the profiles share.
+	profile:      Profile = .A_PROFILE,
 ) -> (byte_count: u32, ok: bool) {
 	n_bytes := u32(len(data))
 	if mode == .T32 { n_bytes = n_bytes & ~u32(1) }
@@ -49,6 +51,12 @@ decode :: proc(
 
 	pending_branches: [dynamic]isa.Branch_Target
 	defer delete(pending_branches)
+
+	// ITSTATE, as the architecture keeps it: the block's first condition in
+	// bits 7:4 and the then/else mask in 3:0. Each instruction in the block
+	// takes its condition from bits 7:4, and the mask shifts up one per
+	// instruction until it is empty. Zero is "not in a block".
+	it_state: u8 = 0
 
 	for byte_count < n_bytes {
 		word: u32
@@ -64,7 +72,7 @@ decode :: proc(
 			if top5 == 0x1D || top5 == 0x1E || top5 == 0x1F {
 				if byte_count + 4 > n_bytes { break }
 				hword_lo := read_u16_le(data, byte_count + 2)
-				// Pack: bits = low_halfword | (high_halfword << 16)
+				// Pack: bits = first halfword << 16 | second halfword
 				word = u32(hword_lo) | (u32(hword_hi) << 16)
 				ilen = 4
 			} else {
@@ -77,16 +85,14 @@ decode :: proc(
 		info: Instruction_Info
 		info.offset = byte_count
 
-		if !find_and_decode(word, mode, ilen, &inst, &info) {
+		in_it_block := it_state & 0xF != 0
+		if !find_and_decode(word, mode, ilen, byte_count, it_state, profile, &inst, &info) {
 			append(errors, Error{inst_idx = byte_count, code = .INVALID_OPCODE})
 			inst = Instruction{mnemonic = .INVALID, length = u8(ilen), mode = mode}
 		} else {
 			inst.length = u8(ilen)
 			inst.mode   = mode
-			// Pull condition out of bits 31:28 for conditional A32 entries.
-			// The find_and_decode helper has already set inst.cond using the
-			// mask-based test (mask bits 31:28 == 0 ⇒ conditional). See
-			// encoding_types.odin for the rationale.
+			inst.in_it_block = in_it_block
 			inst_idx := u32(len(instructions))
 			for slot in 0..<inst.operand_count {
 				op := &inst.ops[slot]
@@ -97,6 +103,17 @@ decode :: proc(
 						target   = u32(op.relative),
 					})
 				}
+			}
+		}
+
+		// Advance ITSTATE past this instruction, or start a new block.
+		if inst.mnemonic == .IT {
+			it_state = u8(word & 0xFF)
+		} else if in_it_block {
+			if it_state & 0x7 == 0 {
+				it_state = 0
+			} else {
+				it_state = (it_state & 0xE0) | ((it_state << 1) & 0x1F)
 			}
 		}
 
@@ -115,7 +132,8 @@ decode :: proc(
 // =============================================================================
 
 @(private="file")
-find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, info: ^Instruction_Info) -> bool {
+find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, pc: u32, it_state: u8, profile: Profile, inst: ^Instruction, info: ^Instruction_Info) -> bool {
+	in_it_block := it_state & 0xF != 0
 	range: Decode_Index
 	if mode == .A32 {
 		range = DECODE_INDEX_A32[(word >> 20) & 0xFF]
@@ -143,6 +161,8 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		// `bits` as a "canonical" form (e.g. U=1 for positive-offset memory),
 		// and the variable bits in `bits` must not affect the match decision.
 		if (word & e.mask) != (e.bits & e.mask) { continue }
+		if !feature_in_profile(e.feature, profile) { continue }
+		if profile == .M_PROFILE && e.flags.a_profile_only { continue }
 
 		// Match -- decode this entry
 		inst.mnemonic      = e.mnemonic
@@ -162,26 +182,53 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 			inst.cond = VSEL_CONDITIONS[(word >> 20) & 3]
 		} else if mode == .A32 && (e.mask >> 28) == 0 {
 			inst.cond = u8((word >> 28) & 0xF)
+		} else if e.flags.thumb_condition {
+			inst.cond = u8(ilen == 2 ? (word >> 8) & 0xF : (word >> 22) & 0xF)
+		} else if in_it_block {
+			inst.cond = it_state >> 4
 		} else {
 			inst.cond = 14    // AL / unconditional
 		}
-		if e.flags.sets_flags {
+		if e.flags.sets_flags || (e.flags.flags_outside_it && !in_it_block) {
 			inst.sets_flags = true
 		}
 		// LDM/STM carry the writeback in bit 21; nothing else in the operand
 		// model records it, and without it the two forms print identically.
 		for k in 0 ..< len(e.enc) {
-			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .RN_A32_WB || e.enc[k] == .IMPL_SP {
+			if e.enc[k] == .A32_REG_LIST || e.enc[k] == .T32_REG_LIST || e.enc[k] == .RN_A32_WB || e.enc[k] == .IMPL_SP {
 				inst.writeback = (word >> 21) & 1 != 0
 				break
 			}
 		}
 
+		// Operands of Thumb Advanced SIMD read the A32 layout; see
+		// is_thumb_simd.
+		operand_word := word
+		if mode == .T32 && is_thumb_simd(e.bits) {
+			operand_word = thumb_simd_as_a32(word)
+		}
 		for _, k in e.enc {
 			if e.enc[k] == .NONE { continue }
-			op := unpack_operand(word, e.enc[k], e.ops[k])
+			op := unpack_operand(operand_word, e.enc[k], e.ops[k], pc, mode)
 			inst.ops[k] = op
 			inst.operand_count = u8(k + 1)
+		}
+		// A Thumb register list that names no register is not an
+		// instruction, nor is a banked register the architecture does not
+		// name, nor a Q register whose D-register field is odd; try the next
+		// candidate.
+		if !thumb_list_valid(e, inst) || !banked_valid(inst) || !q_registers_even(word, e) {
+			continue
+		}
+		// The 16-bit STM always writes the base back. The 16-bit LDM does
+		// unless it loads the base itself, and the syntax shows which.
+		if e.enc[1] == .T16_REG_LIST {
+			if e.mnemonic == .STM {
+				inst.writeback = true
+			} else {
+				base := (word >> 8) & 7
+				inst.writeback = (word >> base) & 1 == 0
+			}
 		}
 		// For slots where the form declares an Operand_Type but the wire
 		// encoding is .NONE (e.g. MOVW's imm16, SVC's imm24, T16 LDR's imm5),
@@ -198,6 +245,42 @@ find_and_decode :: proc(word: u32, mode: Mode, ilen: u32, inst: ^Instruction, in
 		return true
 	}
 	return false
+}
+
+@(private="file")
+thumb_list_valid :: proc "contextless" (e: ^Decode_Entry, inst: ^Instruction) -> bool {
+	if e.mode != .T32 {
+		return true
+	}
+	for k in 0 ..< int(inst.operand_count) {
+		if inst.ops[k].kind == .REG_LIST && inst.ops[k].immediate == 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// A Q register is a pair of D registers, named by the even one; a Q-register
+// field holding an odd D number is UNDEFINED.
+@(private="file")
+q_registers_even :: proc "contextless" (word: u32, e: ^Decode_Entry) -> bool {
+	for enc in e.enc {
+		if enc == .VD_Q && (word >> 12) & 1 != 0 { return false }
+		if enc == .VN_Q && (word >> 16) & 1 != 0 { return false }
+		if enc == .VM_Q && word & 1 != 0 { return false }
+	}
+	return true
+}
+
+@(private="file")
+banked_valid :: proc "contextless" (inst: ^Instruction) -> bool {
+	for k in 0 ..< int(inst.operand_count) {
+		op := &inst.ops[k]
+		if op.kind == .REGISTER && reg_class(op.reg) == REG_BANKED && banked_name(reg_hw(op.reg)) == "" {
+			return false
+		}
+	}
+	return true
 }
 
 // Produce a zero-valued operand of the kind implied by an Operand_Type. Used
@@ -234,8 +317,14 @@ default_operand_for :: proc(ot: Operand_Type) -> Operand {
 // Operand un-packers (inverse of pack_operand in encoder.odin)
 // =============================================================================
 
+//
+// A PC-relative operand decodes to the absolute offset of its target. PC reads
+// as the instruction's own address plus 8 in A32 and plus 4 in Thumb, and the
+// Thumb literal loads and ADR measure from that rounded down to a word.
 @(private="file")
-unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Operand {
+unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type, pc: u32, mode: Mode) -> Operand {
+	pc_value := i64(pc) + (mode == .A32 ? 8 : 4)
+	pc_aligned := pc_value & ~i64(3)
 	switch enc {
 	case .NONE, .IMPL:
 		return op_imm(0)
@@ -290,7 +379,19 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		if ot == .MEM { return op_mem(mem_imm(reg, 0)) }
 		return op_reg(reg)
 	case .RM_T32:
-		return op_reg(Register(REG_GPR | u16(word & 0xF)))
+		reg := Register(REG_GPR | u16(word & 0xF))
+		if ot == .GPR_SHIFTED {
+			// The amount is imm3:imm2, split around Rd; the type is bits 5:4.
+			// Zero amounts mean what they mean in A32: no shift for LSL,
+			// 32 for LSR and ASR, and RRX for ROR.
+			shift := Shift_Type((word >> 4) & 0x3)
+			amount := u8(((word >> 12) & 0x7) << 2 | (word >> 6) & 0x3)
+			if shift == .ROR && amount == 0 { return op_reg_shifted(reg, .RRX, 0) }
+			if shift == .LSL && amount == 0 { return op_reg(reg) }
+			if (shift == .LSR || shift == .ASR) && amount == 0 { return op_reg_shifted(reg, shift, 32) }
+			return op_reg_shifted(reg, shift, amount)
+		}
+		return op_reg(reg)
 	case .RT_T32, .RA_T32:
 		return op_reg(Register(REG_GPR | u16((word >> 12) & 0xF)))
 	case .RT2_T32:
@@ -305,6 +406,162 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		return op_reg(Register(REG_GPR | u16(rd)))
 	case .RM_T16_HI:
 		return op_reg(Register(REG_GPR | u16((word >> 3) & 0xF)))
+	case .RM_T16_8_6:
+		return op_reg(Register(REG_GPR | u16((word >> 6) & 0x7)))
+	case .RD_T16_10_8:
+		return op_reg(Register(REG_GPR | u16((word >> 8) & 0x7)))
+	case .RD_T16_LO_AGAIN:
+		return op_reg(Register(REG_GPR | u16(word & 0x7)))
+	case .RD_T16_HI_AGAIN:
+		return op_reg(Register(REG_GPR | u16((word & 0x7) | ((word >> 7) & 1) << 3)))
+
+	// ---- T16 immediates ----
+	case .IMM3_T16:          return op_imm(i64((word >> 6) & 0x7))
+	case .IMM8_T16:          return op_imm(i64(word & 0xFF))
+	case .IMM5_T16_SHIFT:    return op_imm(i64((word >> 6) & 0x1F))
+	case .IMM5_T16_SHIFT_32:
+		amount := (word >> 6) & 0x1F
+		return op_imm(i64(amount == 0 ? 32 : amount))
+	case .IMM7_T16_SCALED4:  return op_imm(i64(word & 0x7F) * 4)
+	case .IMM8_T16_SCALED4:  return op_imm(i64(word & 0xFF) * 4)
+	case .IMM6_T16:          return op_imm(i64(word & 0x3F))
+	case .IMM4_T16_HINT:     return op_imm(i64((word >> 4) & 0xF))
+	case .IT_FIRSTCOND:      return op_imm(i64((word >> 4) & 0xF))
+	case .IT_MASK_FIELD:     return op_imm(i64(word & 0xF))
+	case .SETEND_ENDIAN_T16: return op_reg(Register(REG_ENDIAN | u16((word >> 3) & 1)))
+	case .SETPAN_IMM_T16:    return op_imm(i64((word >> 3) & 1))
+	case .CPS_IFLAGS_T16:    return op_reg(Register(REG_IFLAGS | u16(word & 0x7)))
+
+	// ---- T16 memory, lists and PC-relative ----
+	case .MEM_T16_IMM5_W:
+		return op_mem(mem_imm(Register(REG_GPR | u16((word >> 3) & 0x7)), i32((word >> 6) & 0x1F) * 4))
+	case .MEM_T16_IMM5_B:
+		return op_mem(mem_imm(Register(REG_GPR | u16((word >> 3) & 0x7)), i32((word >> 6) & 0x1F)))
+	case .MEM_T16_IMM5_H:
+		return op_mem(mem_imm(Register(REG_GPR | u16((word >> 3) & 0x7)), i32((word >> 6) & 0x1F) * 2))
+	case .MEM_T16_REG:
+		return op_mem(mem_reg(Register(REG_GPR | u16((word >> 3) & 0x7)), Register(REG_GPR | u16((word >> 6) & 0x7))))
+	case .MEM_T16_SP_IMM8:
+		return op_mem(mem_imm(SP, i32(word & 0xFF) * 4))
+	case .MEM_T16_LITERAL, .REL_T16_ADR:
+		return op_rel_offset(pc_aligned + i64(word & 0xFF) * 4)
+	case .T16_REG_LIST:
+		return op_reg_list(u16(word & 0xFF))
+	case .T16_REG_LIST_LR:
+		return op_reg_list(u16(word & 0xFF) | u16((word >> 8) & 1) << 14)
+	case .T16_REG_LIST_PC:
+		return op_reg_list(u16(word & 0xFF) | u16((word >> 8) & 1) << 15)
+
+	// ---- T32 ----
+	case .RM_T32_TWICE:
+		return op_reg(Register(REG_GPR | u16(word & 0xF)))
+	case .RM_T32_ROTATED:
+		reg := Register(REG_GPR | u16(word & 0xF))
+		rotation := u8((word >> 4) & 0x3) * 8
+		if rotation == 0 { return op_reg(reg) }
+		return op_reg_shifted(reg, .ROR, rotation)
+	case .RN_T32_SAT:
+		reg := Register(REG_GPR | u16((word >> 16) & 0xF))
+		amount := u8(t32_shift_amount(word))
+		if (word >> 21) & 1 == 0 {
+			if amount == 0 { return op_reg(reg) }
+			return op_reg_shifted(reg, .LSL, amount)
+		}
+		return op_reg_shifted(reg, .ASR, amount == 0 ? 32 : amount)
+	case .T32_IMM12:
+		return op_imm(i64(((word >> 26) & 1) << 11 | ((word >> 12) & 0x7) << 8 | (word & 0xFF)))
+	case .T32_IMM16:
+		return op_imm(i64(((word >> 16) & 0xF) << 12 | ((word >> 26) & 1) << 11 | ((word >> 12) & 0x7) << 8 | (word & 0xFF)))
+	case .T32_IMM_SHIFT:
+		return op_imm(i64(t32_shift_amount(word)))
+	case .T32_IMM_SHIFT_32:
+		amount := t32_shift_amount(word)
+		return op_imm(i64(amount == 0 ? 32 : amount))
+	case .T32_IMM4_IMM12:
+		return op_imm(i64(((word >> 16) & 0xF) << 12 | (word & 0xFFF)))
+	case .T32_IMM4_SMC:    return op_imm(i64((word >> 16) & 0xF))
+	case .T32_IMM8:        return op_imm(i64(word & 0xFF))
+	case .CPS_IFLAGS_T32:  return op_reg(Register(REG_IFLAGS | u16((word >> 5) & 0x7)))
+	case .CPS_MODE_T32:    return op_imm(i64(word & 0x1F))
+	case .MRS_SPEC_REG_T32:
+		return op_reg(Register(REG_SREG | u16(((word >> 20) & 1) * 2)))
+	case .MSR_FIELDS_T32:
+		return op_reg(Register(REG_PSR_FIELDS | u16(((word >> 20) & 1) << 4 | (word >> 8) & 0xF)))
+	case .SYSM_T32:
+		return op_reg(Register(REG_SYSM | u16(word & 0xFF)))
+	case .MSR_SYSM_T32:
+		return op_reg(Register(REG_SYSM | u16(((word >> 10) & 0x3) << 8 | (word & 0xFF))))
+	case .MEM_T32_IMM12:
+		return op_mem(mem_imm(Register(REG_GPR | u16((word >> 16) & 0xF)), i32(word & 0xFFF)))
+	case .MEM_T32_IMM8_NEG:
+		m := mem_imm(Register(REG_GPR | u16((word >> 16) & 0xF)), -i32(word & 0xFF))
+		m.sign = -1
+		return op_mem(m)
+	case .MEM_T32_IMM8_PRE, .MEM_T32_IMM8_POST:
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		disp := i32(word & 0xFF)
+		up := (word >> 9) & 1 != 0
+		if !up { disp = -disp }
+		m := enc == .MEM_T32_IMM8_PRE ? mem_imm_pre(base, disp) : mem_imm_post(base, disp)
+		if !up { m.sign = -1 }
+		return op_mem(m)
+	case .MEM_T32_IMM8_POS:
+		return op_mem(mem_imm(Register(REG_GPR | u16((word >> 16) & 0xF)), i32(word & 0xFF)))
+	case .MEM_T32_REG:
+		base  := Register(REG_GPR | u16((word >> 16) & 0xF))
+		index := Register(REG_GPR | u16(word & 0xF))
+		amount := u8((word >> 4) & 0x3)
+		if amount == 0 { return op_mem(mem_reg(base, index)) }
+		return op_mem(mem_reg_shift(base, index, .LSL, amount))
+	case .MEM_T32_LITERAL:
+		disp := i64(word & 0xFFF)
+		if (word >> 23) & 1 == 0 { disp = -disp }
+		return op_rel_offset(pc_aligned + disp)
+	case .MEM_T32_LITERAL_DUAL:
+		disp := i64(word & 0xFF) * 4
+		if (word >> 23) & 1 == 0 { disp = -disp }
+		return op_rel_offset(pc_aligned + disp)
+	case .MEM_T32_EXCLUSIVE:
+		return op_mem(mem_imm(Register(REG_GPR | u16((word >> 16) & 0xF)), i32(word & 0xFF) * 4))
+	case .MEM_T32_TABLE_B:
+		return op_mem(mem_reg(Register(REG_GPR | u16((word >> 16) & 0xF)), Register(REG_GPR | u16(word & 0xF))))
+	case .MEM_T32_TABLE_H:
+		return op_mem(mem_reg_shift(Register(REG_GPR | u16((word >> 16) & 0xF)), Register(REG_GPR | u16(word & 0xF)), .LSL, 1))
+	case .RD_T32_STATUS:
+		return op_reg(Register(REG_GPR | u16(word & 0xF)))
+	case .T32_REG_LIST:
+		return op_reg_list(u16(word & 0xFFFF))
+	case .REL_T32_ADR_ADD:
+		return op_rel_offset(pc_aligned + i64(t32_imm12(word)))
+	case .REL_T32_ADR_SUB:
+		return op_rel_offset(pc_aligned - i64(t32_imm12(word)))
+	case .RN_T32_ZR:
+		n := (word >> 16) & 0xF
+		return op_reg(n == 15 ? ZR : Register(REG_GPR | u16(n)))
+	case .RM_T32_ZR:
+		n := word & 0xF
+		return op_reg(n == 15 ? ZR : Register(REG_GPR | u16(n)))
+	case .COND_T32_FCOND:
+		return op_reg(Register(REG_COND | u16((word >> 4) & 0xF)))
+	case .BANKED_MRS_T32:
+		return op_reg(Register(REG_BANKED | u16(banked_number((word >> 20) & 1, (word >> 4) & 1, (word >> 16) & 0xF))))
+	case .BANKED_MSR_T32:
+		return op_reg(Register(REG_BANKED | u16(banked_number((word >> 20) & 1, (word >> 4) & 1, (word >> 8) & 0xF))))
+	case .LOB_FORWARD:
+		return op_rel_offset(pc_value + i64(lob_offset(word)))
+	case .LOB_BACKWARD:
+		return op_rel_offset(pc_value - i64(lob_offset(word)))
+	case .BRANCH_BLX_T32:
+		s     := (word >> 26) & 1
+		j1    := (word >> 13) & 1
+		j2    := (word >> 11) & 1
+		imm10 := (word >> 16) & 0x3FF
+		low   := (word >> 1) & 0x3FF
+		i1 := j1 ~ (s ~ 1)
+		i2 := j2 ~ (s ~ 1)
+		v := (s << 22) | (i1 << 21) | (i2 << 20) | (imm10 << 10) | low
+		if v & (1 << 22) != 0 { v |= ~u32(0x7FFFFF) }
+		return op_rel_offset(pc_aligned + i64(i32(v) << 2))
 
 	// ---- Modified immediates (decoded to their effective 32-bit value) ----
 	case .A32_IMM_MOD, .A32_IMM12_ROT:
@@ -334,7 +591,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		}
 		v := i32(word & 0xFFFFFF)
 		if v & 0x800000 != 0 { v |= -0x1000000 }
-		return op_rel_offset(i64(v << 2))
+		return op_rel_offset(pc_value + i64(v << 2))
 	case .A32_IMM4:      return op_imm(i64(word & 0xF))
 	case .A32_IMM4_ROTATE: return op_imm(i64((word >> 8) & 0xF))
 	case .A32_IMM5_LSB:  return op_imm(i64((word >> 7) & 0x1F))
@@ -403,6 +660,13 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		mm := mem_imm(base, disp)
 		if u_bit == 0 { mm.sign = -1 }
 		return op_mem(mm)
+	case .MEM_IMM8_SCALED2:
+		base := Register(REG_GPR | u16((word >> 16) & 0xF))
+		disp := i32(word & 0xFF) * 2
+		up := (word >> 23) & 1 != 0
+		mm := mem_imm(base, up ? disp : -disp)
+		if !up { mm.sign = -1 }
+		return op_mem(mm)
 	case .MEM_IMM8_SCALED4, .MEM_IMM8_SCALED4_PRE, .MEM_IMM8_SCALED4_POST:
 		// The VFP and coprocessor loads count the offset in words, so the
 		// eight bits reach +/-1020 rather than +/-255.
@@ -436,7 +700,6 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	// ---- Misc ----
 	case .BARRIER_TYPE: return op_imm(i64(word & 0xF))
 	case .HINT_FIELD:   return op_imm(i64(word & 0xFF))
-	case .IT_MASK:      return op_imm(i64(word & 0xFF))
 	case .CPS_IFLAGS:   return op_imm(i64(word & 0x1FF))
 	case .PSR_FIELD_MASK: return op_imm(i64(decode_psr_field(word)))
 	case .SYSM_FIELD:   return op_imm(i64(word & 0xFF))
@@ -457,14 +720,18 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		cmode := (word >> 8) & 0xF
 		op := (word >> 5) & 1
 		v := decode_neon_modimm(a, cmode, op)
-		// Only cmode 1111 expands to a float; the rest are bit patterns.
-		if cmode == 0b1111 { return op_float_imm(v) }
-		return op_hex_imm(v)
+		// Only cmode 1111 expands to a float; the rest are bit patterns,
+		// sixty-four bits wide for the .i64 form.
+		if cmode == 0b1111 { return op_float_imm(u32(v)) }
+		return Operand{immediate = i64(v), kind = .HEX_IMMEDIATE, size = 8}
 	case .DBG_OPTION:    return op_imm(i64(word & 0xF))
 	case .MRS_SPEC_REG:  return op_reg(Register(REG_SREG | u16(((word >> 22) & 1) * 2)))
 	case .VFP_SPEC_REG:  return op_reg(Register(REG_FPSC | u16((word >> 16) & 0xF)))
 	case .SETEND_ENDIAN: return op_reg(Register(REG_ENDIAN | u16((word >> 9) & 1)))
 	case .IMPL_SP:       return op_reg(SP)
+	case .IMPL_PC:       return op_reg(PC)
+	case .IMPL_LR:       return op_reg(LR)
+	case .IMPL_R12:      return op_reg(R12)
 	case .MODE_IMM5:     return op_imm(i64(word & 0x1F))
 	case .RN_A32_WB:     return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
 	case .VM_S_PLUS1:
@@ -529,19 +796,22 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .VFP_S_LIST:
 		// {S<Vd>, ...} -- imm8 counts the registers, and the run starts at Vd.
 		// Both halves matter: keeping only the count printed the wrong bank
-		// and the wrong registers.
+		// and the wrong registers. A count that runs past s31 is
+		// UNPREDICTABLE; the list stops at the last register, as every
+		// disassembler prints it.
 		n := ((word >> 12) & 0xF) << 1 | ((word >> 22) & 1)
-		return op_reg_run(Register(REG_SPR | u16(n)), max(u8(word & 0xFF), 1))
-	case .VFP_D_LIST:
-		// {D<Vd>, ...} -- imm8 counts half-words here, two per D register.
+		return op_reg_run(Register(REG_SPR | u16(n)), u8(clamp(word & 0xFF, 1, 32 - n)))
+	case .VFP_D_LIST, .VFP_DX_LIST:
+		// {D<Vd>, ...} -- imm8 counts words, two per D register; the FLDMX
+		// and FSTMX forms add one more, so their count is odd.
 		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
-		return op_reg_run(Register(REG_DPR | u16(n)), max(u8((word & 0xFF) / 2), 1))
+		return op_reg_run(Register(REG_DPR | u16(n)), u8(clamp((word & 0xFF) / 2, 1, 32 - n)))
 
 	// ---- Branch fields (decoded into RELATIVE) ----
 	case .BRANCH_24:
 		v := i32(word & 0xFFFFFF)
 		if v & 0x800000 != 0 { v |= -0x1000000 }
-		return op_rel_offset(i64(v << 2))
+		return op_rel_offset(pc_value + i64(v << 2))
 	case .BRANCH_24_T32:
 		// T32 25-bit signed scattered: S | I1 | I2 | imm10 | imm11
 		s    := (word >> 26) & 1
@@ -553,7 +823,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		i2 := j2 ~ (s ~ 1)
 		v := (s << 23) | (i1 << 22) | (i2 << 21) | (imm10 << 11) | imm11
 		if v & (1 << 23) != 0 { v |= ~u32(0xFFFFFF) }
-		return op_rel_offset(i64(i32(v) << 1))
+		return op_rel_offset(pc_value + i64(i32(v) << 1))
 	case .BRANCH_20_T32:
 		// T32 21-bit signed for B<cond>
 		s     := (word >> 26) & 1
@@ -561,31 +831,32 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		j2    := (word >> 11) & 1
 		imm6  := (word >> 16) & 0x3F
 		imm11 :=  word        & 0x7FF
-		v := (s << 19) | (j1 << 18) | (j2 << 17) | (imm6 << 11) | imm11
+		// S:J2:J1:imm6:imm11 -- J2 above J1, though J1 sits higher in the word.
+		v := (s << 19) | (j2 << 18) | (j1 << 17) | (imm6 << 11) | imm11
 		if v & (1 << 19) != 0 { v |= ~u32(0xFFFFF) }
-		return op_rel_offset(i64(i32(v) << 1))
+		return op_rel_offset(pc_value + i64(i32(v) << 1))
 	case .BRANCH_11_T16:
 		v := word & 0x7FF
 		if v & 0x400 != 0 { v |= ~u32(0x7FF) }
-		return op_rel_offset(i64(i32(v) << 1))
+		return op_rel_offset(pc_value + i64(i32(v) << 1))
 	case .BRANCH_8_T16:
 		v := word & 0xFF
 		if v & 0x80 != 0 { v |= ~u32(0xFF) }
-		return op_rel_offset(i64(i32(v) << 1))
+		return op_rel_offset(pc_value + i64(i32(v) << 1))
 	case .BRANCH_CBZ:
 		i_bit := (word >> 9) & 1
 		imm5  := (word >> 3) & 0x1F
 		v := (i_bit << 6) | (imm5 << 1)
-		return op_rel_offset(i64(v))
+		return op_rel_offset(pc_value + i64(v))
 	// ---- ARMv8.1-M Branch Future ----
 	case .BF_BOFF:
 		imm4 := (word >> 23) & 0xF          // hw0[10:7]
-		return op_rel_offset(i64(imm4) << 1)
+		return op_rel_offset(pc_value + i64(imm4) << 1)
 	case .BF_BLOC:
 		j     := (word >> 11) & 1           // hw1[11]
 		imm10 := (word >> 1)  & 0x3FF       // hw1[10:1]
 		val   := (imm10 << 1) | j
-		return op_rel_offset(i64(val) << 1)
+		return op_rel_offset(pc_value + i64(val) << 1)
 	case .BF_RM:
 		return op_reg(Register(REG_GPR | u16((word >> 16) & 0xF)))
 	case .BFCSEL_COND:
@@ -600,28 +871,53 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .NEON_ROT_4_HI: return op_imm(i64(((word >> 23) & 3) * 90))
 	case .VFP_FBITS:
 		// The fixed-point width is 16 or 32 by the sx bit, and the fraction
-		// is that less imm4:i -- so the widest fraction encodes as zero.
-		width: u32 = ((word >> 7) & 1) != 0 ? 32 : 16
-		return op_imm(i64(width - (((word & 0xF) << 1) | ((word >> 5) & 1))))
-	case .SAT_IMM5, .SAT_IMM5_T32:
+		// is that less imm4:i -- so the widest fraction encodes as zero. A
+		// 16-bit form whose field exceeds 16 is UNPREDICTABLE, and comes out
+		// negative rather than wrapping.
+		width: i64 = ((word >> 7) & 1) != 0 ? 32 : 16
+		return op_imm(width - i64(((word & 0xF) << 1) | ((word >> 5) & 1)))
+	case .VD_S_AGAIN:
+		n := ((word >> 12) & 0xF) << 1 | ((word >> 22) & 1)
+		return op_reg(Register(REG_SPR | u16(n)))
+	case .VD_D_AGAIN:
+		n := ((word >> 22) & 1) << 4 | ((word >> 12) & 0xF)
+		return op_reg(Register(REG_DPR | u16(n)))
+	case .RT_VMRS:
+		rt := (word >> 12) & 0xF
+		return op_reg(rt == 15 ? APSR_NZCV : Register(REG_GPR | u16(rt)))
+	case .SAT_IMM5:
 		// SSAT and SSAT16 saturate to a signed width of one to 32, and the
 		// field holds one less than that. USAT and USAT16 saturate to an
 		// unsigned width of zero to 31, which the field holds as it stands.
 		return op_imm(i64(((word >> 16) & 0x1F) + 1))
-	case .SAT_IMM5_U, .SAT_IMM5_U_T32:
+	case .SAT_IMM5_U:
 		return op_imm(i64((word >> 16) & 0x1F))
+	case .SAT_IMM5_T32:      return op_imm(i64((word & 0x1F) + 1))
+	case .SAT_IMM5_U_T32:    return op_imm(i64(word & 0x1F))
+	case .SAT16_IMM4_T32:    return op_imm(i64((word & 0xF) + 1))
+	case .SAT16_IMM4_U_T32:  return op_imm(i64(word & 0xF))
 	case .BFX_WIDTH:
 		// One less than the width.
 		return op_imm(i64(((word >> 16) & 0x1F) + 1))
 	case .BFI_MSB:
 		// The top bit's position; the syntax wants the width.
 		return op_imm(i64(((word >> 16) & 0x1F) - ((word >> 7) & 0x1F) + 1))
-	case .BFI_LSB, .BFI_LSB_T32:
+	case .BFI_LSB:
 		return op_imm(i64((word >> 7) & 0x1F))
+	case .BFI_LSB_T32:
+		return op_imm(i64(t32_shift_amount(word)))
+	case .BFI_MSB_T32:
+		return op_imm(i64((word & 0x1F) - t32_shift_amount(word) + 1))
+	case .BFX_WIDTH_T32:
+		return op_imm(i64((word & 0x1F) + 1))
 	case .NEON_SHIFT_IMM6:
 		return op_imm(i64((word >> 16) & 0x3F))
 	case .NEON_SHIFT_IMM3:
 		return op_imm(i64((word >> 16) & 0x7))
+	case .NEON_SHIFT_IMM4:
+		return op_imm(i64((word >> 16) & 0xF))
+	case .NEON_SHIFT_IMM5:
+		return op_imm(i64((word >> 16) & 0x1F))
 
 	// ---- A32 RS shift (Rs register in bits 11:8) ----
 	case .A32_RS_SHIFT:
@@ -637,6 +933,10 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 	case .QN_MVE:
 		n := ((word >> 17) & 0x7) | (((word >> 7) & 1) << 3)
 		return op_reg(Register(REG_QPR | u16(n & 0x7)))
+	case .MVE_RDA_EVEN, .MVE_RDALO:
+		return op_reg(Register(REG_GPR | u16(((word >> 13) & 0x7) * 2)))
+	case .MVE_RDAHI:
+		return op_reg(Register(REG_GPR | u16(((word >> 20) & 0x7) * 2 + 1)))
 	case .QM_MVE:
 		n := (word >> 1) & 0x7
 		return op_reg(Register(REG_QPR | u16(n)))
@@ -646,7 +946,7 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		// ARMv8.1-M loop-branch imm11 sign-extended
 		v := (word >> 1) & 0x7FF
 		if v & 0x400 != 0 { v |= ~u32(0x7FF) }
-		return op_rel_offset(i64(i32(v) << 1))
+		return op_rel_offset(pc_value + i64(i32(v) << 1))
 
 	case .CDE_COPROC_FIELD:    return op_imm(i64((word >> 8) & 0x7))
 	case .CDE_IMM_FIELD:       return op_imm(i64(word & 0x7F))
@@ -698,11 +998,9 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 		u_bit := (word >> 23) & 1
 		disp := i32(word & 0xFFF)
 		if u_bit == 0 { disp = -disp }
-		return op_rel_offset(i64(disp))
-
-	case:
-		return op_imm(0)
+		return op_rel_offset(pc_aligned + i64(disp))
 	}
+	return op_imm(0)
 }
 
 
@@ -715,6 +1013,31 @@ unpack_operand :: proc(word: u32, enc: Operand_Encoding, ot: Operand_Type) -> Op
 @(require_results)
 decode_max_instruction_count :: #force_inline proc "contextless" (data: []u8) -> int {
 	return len(data) / 2
+}
+
+// The imm3:imm2 field Thumb-2 splits around Rd: bits 14:12 and 7:6.
+@(private="file", require_results)
+t32_shift_amount :: #force_inline proc "contextless" (word: u32) -> u32 {
+	return ((word >> 12) & 0x7) << 2 | (word >> 6) & 0x3
+}
+
+// The low-overhead loops' offset: imml:immh:'0', imml at 10:1 and immh at 11.
+@(private="file", require_results)
+lob_offset :: #force_inline proc "contextless" (word: u32) -> u32 {
+	return ((word >> 1) & 0x3FF) << 2 | ((word >> 11) & 1) << 1
+}
+
+// A banked register's number: R (SPSR rather than a core register) above
+// SYSm, which is m:m1.
+@(private="file", require_results)
+banked_number :: #force_inline proc "contextless" (r, m, m1: u32) -> u32 {
+	return r << 5 | m << 4 | m1
+}
+
+// i:imm3:imm8, the plain 12-bit immediate of ADDW, SUBW and ADR.
+@(private="file", require_results)
+t32_imm12 :: #force_inline proc "contextless" (word: u32) -> u32 {
+	return ((word >> 26) & 1) << 11 | ((word >> 12) & 0x7) << 8 | (word & 0xFF)
 }
 
 // How many D registers a VTBL/VTBX table spans.

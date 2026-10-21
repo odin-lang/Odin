@@ -38,6 +38,9 @@ Mnemonic :: enum u16 {
 	// -------------------------------------------------------------------------
 	AND,  EOR,  SUB,  RSB,  ADD,  ADC,  SBC,  RSC,
 	TST,  TEQ,  CMP,  CMN,  ORR,  MOV,  BIC,  MVN,
+	// Thumb-2 only: OR with the complement, and ADD/SUB with a plain 12-bit
+	// immediate, which UAL spells with a W to tell it from the modified one.
+	ORN,  ADDW, SUBW,
 
 	// Shift mnemonics (in A32 these are MOV aliases with shift, but in Thumb
 	// they are first-class encodings, so they have their own Mnemonic entries)
@@ -125,7 +128,10 @@ Mnemonic :: enum u16 {
 	// Status register access / hint instructions
 	// -------------------------------------------------------------------------
 	MSR,   MRS,
-	CPS,                                   // change processor state
+	CPS,                                   // change processor state: the mode alone
+	// Which way CPS changes the interrupt masks is part of the mnemonic, the
+	// way LDM's addressing mode is: `cpsie i`, `cpsid aif`.
+	CPSIE,  CPSID,
 	SETEND,                                // set endianness (deprecated in v8)
 
 	NOP,    YIELD,   WFE,    WFI,    SEV,
@@ -146,6 +152,7 @@ Mnemonic :: enum u16 {
 	PSB_CSYNC,                             // profile sync barrier (HINT #17)
 	TSB_CSYNC,                             // trace sync barrier (HINT #18)
 	CSDB,                                  // consumption of speculative data barrier (HINT #20)
+	SSBB,   PSSBB,                         // speculative store bypass barriers (DSB #0, DSB #4)
 	SB,                                    // synchronization barrier (ARMv8.5, dedicated encoding)
 
 	// ARMv8.1 PAN (Privileged Access Never) bit toggle
@@ -252,6 +259,9 @@ Mnemonic :: enum u16 {
 	// The addressing mode is part of the name, as it is for LDM and STM.
 	VLDMIA, VLDMDB, VSTMIA, VSTMDB,
 	VPUSH,  VPOP,
+	// The deprecated FLDMX/FSTMX: VLDM/VSTM of D registers with an odd word
+	// count, which is how they are told apart.
+	FLDMIAX, FLDMDBX, FSTMIAX, FSTMDBX,
 
 	VSEL,                                  // ARMv8 conditional select
 	VMAXNM, VMINNM,                        // ARMv8 IEEE 754-2008 min/max
@@ -386,6 +396,8 @@ Mnemonic :: enum u16 {
 	PACBTI,                                // PACBTI R12, LR, SP (combined PAC + BTI marker)
 	AUT,                                   // AUT R12, LR, SP
 	AUTG,                                  // AUTG Rd, Rn, Rm (general form)
+	PACG,                                  // PACG Rd, Rn, Rm
+	BXAUT,                                 // BXAUT Rd, Rn, Rm: authenticate, then BX
 	BTI,                                   // M-profile branch target identification
 
 	// -------------------------------------------------------------------------
@@ -398,6 +410,10 @@ Mnemonic :: enum u16 {
 	LE,                                    // loop end
 	LETP,                                  // loop end with tail predication
 	LCTP,                                  // loop clear tail predication
+
+	// v8.1-M conditional select; the aliases (CSET, CINC, ...) are not
+	// separate encodings and print as the instruction they alias.
+	CSEL,   CSINC,  CSINV,  CSNEG,
 
 	// Branch Future (ARMv8.1-M). T32, encoded via REL_BF + BF_BOFF/BF_BLOC/BF_RM
 	// operand encodings and BF_BOFF_T32/BF_BLOC_T32 relocations (see encoder.odin).

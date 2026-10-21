@@ -91,7 +91,13 @@ run_sweep_tests :: proc() {
 			errors: [dynamic]a.Error
 			defer { delete(insts); delete(info); delete(label_defs); delete(errors) }
 
-			a.decode(buf[:n], relocs, &insts, &info, &label_defs, &errors, f.mode)
+			// Decode under the profile the form belongs to: the M-profile
+			// forms share words with A-profile ones.
+			profile := a.Profile.A_PROFILE
+			if !a.feature_in_profile(f.feature, .A_PROFILE) {
+				profile = .M_PROFILE
+			}
+			a.decode(buf[:n], relocs, &insts, &info, &label_defs, &errors, f.mode, profile)
 
 			if len(insts) == 0 || insts[0].mnemonic == .INVALID {
 				stats.fail_decode += 1
@@ -133,11 +139,14 @@ run_sweep_tests :: proc() {
 			} else {
 				word2 = u32(out[0]) | u32(out[1]) << 8
 			}
-			if (word2 & f.mask) != (word & f.mask) {
+			// The whole word, not just the fixed bits: an operand field the
+			// decoder misreads or the encoder misplaces only shows up in the
+			// bits the mask leaves free.
+			if word2 != word {
 				if mnem_alias { stats.fail_mnemonic += 1 } else { stats.fail_reencode += 1 }
 				if failed_examples < max_fail_print && (only_print_kind == "" || only_print_kind == "reenc!=") {
 					fmt.printf("  [reenc!= ] %v[%d] in %08X out %08X mask %08X (xor %08X)\n",
-						mn, idx, word, word2, f.mask, (word ~ word2) & f.mask)
+						mn, idx, word, word2, f.mask, word ~ word2)
 					failed_examples += 1
 				}
 				continue
@@ -225,8 +234,10 @@ sweep_safe_fill :: proc(enc: a.Operand_Encoding) -> u32 {
 		return u32(1) << 23
 
 	// ---- Register lists ----
-	case .VFP_S_LIST, .VFP_D_LIST: return 4
+	case .VFP_S_LIST, .VFP_D_LIST, .VFP_DX_LIST: return 4
 	case .A32_REG_LIST:            return 0x0030
+	case .T16_REG_LIST, .T16_REG_LIST_LR, .T16_REG_LIST_PC: return 0x0030
+	case .T32_REG_LIST:            return 0x0030
 
 	// ---- Coprocessor ----
 	case .COPROC_NUM_FIELD:    return u32(15) << 8

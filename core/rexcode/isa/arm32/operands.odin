@@ -141,12 +141,16 @@ Operand :: struct #packed {
 	list: List_Shape,
 }
 
-List_Shape :: bit_field u8 {
-	count:     u8   | 3,   // 0 = not a list, else 1..4
+// Sixteen bits rather than eight: a VLDM, VSTM, VPUSH or VPOP list runs to
+// 32 registers, and a three-bit count silently cut `vpush {d8-d15}` down to
+// nothing. The extra byte comes out of Instruction's spare tail.
+List_Shape :: bit_field u16 {
+	count:     u8   | 6,   // 0 = not a list, else 1..32
 	stride:    u8   | 3,   // 1 for {d2, d3}, 2 for {d2, d4}
 	all_lanes: bool | 1,   // `{d2[]}` -- loaded to every lane
+	_:         u8   | 6,
 }
-#assert(size_of(Operand) == 11)
+#assert(size_of(Operand) == 12)
 
 // ---- Operand builders ------------------------------------------------------
 

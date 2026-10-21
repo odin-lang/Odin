@@ -3,529 +3,1073 @@
 package main
 
 // =============================================================================
-// AArch32 verifier: compare ENCODING_TABLE mnemonics against llvm-mc disasm
+// AArch32 verifier: byte-exact differential testing against LLVM
 // =============================================================================
 //
-// Reads /tmp/rexcode_arm32_{a32,t32w,t16}_meta.txt and the corresponding
-// _llvm.txt files (produced by dump_verify_input.odin + llvm-mc). The LLVM
-// stream interleaves disassembly lines (tab-prefixed) with warning lines
-// for invalid encodings; this verifier pairs each meta row with either a
-// success disasm or an empty string.
+// For every word in a suite, two independent opinions are gathered:
 //
-// Each row is classified:
+//   * llvm-objdump says whether the word is an instruction at all.
+//   * rexcode decodes the word and prints it.
 //
-//   OK         -- LLVM mnemonic matches ours (after normalization)
-//   ALIAS      -- LLVM mnemonic is a known ARM/Thumb alias of ours
-//                 (MOV reg <-> LSL #0, BIC reg <-> AND ~reg, etc.)
-//   UNKNOWN    -- LLVM produced no disasm (e.g. base bits with operand=0 are
-//                 reserved/UNPREDICTABLE); marked EXPECTED if we recognize it.
-//   MISMATCH   -- LLVM decoded but to a different mnemonic
+// When both decode it, the text rexcode printed is handed to llvm-mc, and the
+// bytes llvm-mc assembles from it must be the bytes the word started as. That
+// round trip is the only check that can fail when rexcode's encoder and decoder
+// agree with each other but not with the architecture -- a field read from the
+// wrong bits decodes, prints and re-encodes consistently, and only an
+// independent assembler notices.
 //
-// Outputs:
-//   /tmp/rexcode_arm32_verify_report.txt        (everything)
-//   /tmp/rexcode_arm32_verify_mismatches.txt    (only mismatches)
+// Each word lands in one bucket:
+//
+//   EXACT          both decode, and the printed text assembles back to the word
+//   EQUIVALENT     both decode to the same text, but that text does not
+//                  assemble back to the word -- an UNPREDICTABLE encoding,
+//                  say, which every assembler writes the canonical way
+//   UNREPRESENTABLE  no text reproduces the word: llvm's own disassembly
+//                  of it does not assemble back to it either (an UNPREDICTABLE
+//                  encoding with should-be-zero bits set, say). Counted when
+//                  rexcode decodes it to the same mnemonic, or does not decode
+//                  it at all.
+//   PROFILE_EXTRA  one target's llvm rejects a word another target's llvm
+//                  decodes to the same text: the profiles differ on which
+//                  UNPREDICTABLE encodings they refuse, and rexcode follows
+//                  the one that does not
+//   WRONG          both decode, and the printed text assembles to other bytes
+//   UNASSEMBLABLE  both decode, and llvm-mc rejects the printed text
+//   MISSING        llvm decodes the word, rexcode does not
+//   EXTRA          rexcode decodes the word, llvm does not
+//   BOTH_INVALID   neither does
+//
+// Each suite runs against an A-profile and an M-profile LLVM target: the two
+// disagree about parts of the encoding space (MVE reuses Advanced SIMD's, and
+// BXNS is BX with should-be-zero bits set), and a word passes when it round
+// trips under either.
+//
+// Suites:
+//
+//   A32   every A32 table form with random operand fields, plus random words
+//   T16   every 16-bit Thumb halfword, exhaustively (IT is covered by IT)
+//   T32   every 32-bit Thumb table form with random fields, plus random words
+//   IT    IT instructions followed by the block they predicate
+//
+// The run fails when any suite has a WRONG word, or more MISSING / EXTRA /
+// UNASSEMBLABLE words than its allowance below. The allowances exist because
+// some words are not ours to fix -- an encoding llvm decodes but will not
+// assemble back, say -- and each one is listed with its reason.
+//
+// Run:  odin run core/rexcode/isa/arm32/tools/verify_against_llvm.odin -file
+//       (or `luajit build.lua --verify --isa arm32`)
+//
+// Needs llvm-mc, llvm-objdump and llvm-objcopy in PATH.
 
 import "core:fmt"
+import "core:math/rand"
 import "core:os"
-import "core:strings"
+import "core:path/filepath"
+import "core:slice"
 import "core:strconv"
+import "core:strings"
 
-normalize_our :: proc(name: string) -> string {
-	s := strings.to_lower(name, context.temp_allocator)
-	// Strip our internal _LANE / _GATHER / _SCATTER / _Z / _BR / _CSEL etc.
-	strip_after := []string{"_lane", "_gather", "_scatter", "_q_r", "_r_q",
-							"_2gpr_q", "_csync", "_at_bits", "_z", "_br",
-							"_csel", "_fixed", "_bf16"}
-	for marker in strip_after {
-		if idx := strings.index(s, marker); idx > 0 {
-			s = s[:idx]
-			break
-		}
-	}
-	return s
+import a "../"
+
+Word :: struct {
+	value:  u32,   // A32 word, T16 halfword, or T32 packed first_halfword << 16 | second
+	length: u8,    // 2 or 4
 }
 
-normalize_llvm :: proc(line: string) -> string {
-	s := strings.trim_space(line)
-	// Mnemonic is the first whitespace-delimited token.
-	if i := strings.index_any(s, " \t"); i >= 0 {
-		s = s[:i]
-	}
-	s = strings.to_lower(s, context.temp_allocator)
-	// Strip data-type suffix .f32 / .i8 / .s16 / .u32 / .bf16 etc.
-	if dot := strings.index_byte(s, '.'); dot >= 0 {
-		s = s[:dot]
-	}
-	// We don't strip the condition suffix here because we bake cond=AL into
-	// the wire bytes; LLVM should never emit a condition suffix in our
-	// verification output. Cond-stripping would over-match (e.g. "adcs"
-	// ends in "cs" but is ADC setflags, not ADC + carry-set cond).
-	return s
+Verdict :: enum u8 {
+	BOTH_INVALID,
+	EXACT,
+	EQUIVALENT,
+	UNREPRESENTABLE,
+	PROFILE_EXTRA,
+	WRONG,
+	UNASSEMBLABLE,
+	MISSING,
+	EXTRA,
 }
 
-// Known ARM/Thumb canonical-vs-printed alias pairs.
-is_known_alias :: proc(ours, llvm: string) -> bool {
-	if ours == llvm { return true }
-	// LDM/STM addressing-mode suffixes (IA/IB/DA/DB)
-	{
-		ldm_pref := [2]string{"ldm", "stm"}
-		ldm_suff := [4]string{"ia", "ib", "da", "db"}
-		for p in ldm_pref {
-			for suff in ldm_suff {
-				comb := strings.concatenate({p, suff}, context.temp_allocator)
-				if ours == p && llvm == comb { return true }
-			}
-		}
-	}
-	// RFE/SRS modes
-	{
-		rfe_pref := [2]string{"rfe", "srs"}
-		rfe_suff := [8]string{"ia", "ib", "da", "db", "fa", "fd", "ea", "ed"}
-		for p in rfe_pref {
-			for suff in rfe_suff {
-				comb := strings.concatenate({p, suff}, context.temp_allocator)
-				if ours == p && llvm == comb { return true }
-			}
-		}
-	}
-	// LLVM canonical aliases:
-	pairs := [?][2]string{
-		// MOV reg <=> LSL #0
-		{"mov", "lsl"}, {"mov", "lsr"}, {"mov", "asr"}, {"mov", "ror"},
-		{"lsl", "mov"}, {"lsr", "mov"}, {"asr", "mov"}, {"ror", "mov"},
-		// RRX is MOV with ROR #0
-		{"rrx", "mov"}, {"mov", "rrx"},
-		// NEG is RSB #0
-		{"neg", "rsb"}, {"rsb", "neg"},
-		// ADR is ADD/SUB to PC
-		{"adr", "add"}, {"adr", "sub"},
-		// PUSH = STMDB SP!,...   POP = LDMIA SP!,...
-		{"push", "stmdb"}, {"pop", "ldmia"}, {"push", "stm"}, {"pop", "ldm"},
-		// MUL alias for MLA with Ra=0
-		{"mul", "mla"},
-		// Hint family: ESB/PSB/TSB/CSDB/SB/NOP all map to base "hint"
-		{"esb", "hint"}, {"psb", "hint"}, {"tsb", "hint"},
-		{"csdb", "hint"}, {"nop", "hint"}, {"yield", "hint"},
-		{"wfe", "hint"}, {"wfi", "hint"}, {"sev", "hint"}, {"sevl", "hint"},
-		{"setpan", "msr"},   // SETPAN is encoded as MSR variant
-		// VMOV.F32 immediate with #0.0 might print as veor / vmov
-		{"vmov", "veor"}, {"vmov", "vand"},
-		// VADD with size 0 might print as VADD.I8 → vadd; we match base
-		// VTBL has different print forms by table length
-		{"vtbl", "vtbl"}, {"vtbx", "vtbx"},
-		// T16 B<cond> may decode as plain "b" with condition
-		{"b", "bl"}, {"b", "blx"}, {"b", "cbz"}, {"b", "cbnz"},
-		// Coproc: MCR/MRC ↔ MCR2/MRC2 are distinct opcodes but related
-		{"mcr", "mcr2"}, {"mrc", "mrc2"}, {"cdp", "cdp2"},
-		{"ldc", "ldc2"}, {"stc", "stc2"},
-		// VCVT family: LLVM may print different variants
-		{"vcvt", "vcvtb"}, {"vcvt", "vcvtt"},
-		{"vcvt", "vcvta"}, {"vcvt", "vcvtn"}, {"vcvt", "vcvtp"}, {"vcvt", "vcvtm"},
-		{"vcvt", "vcvtr"},
-		// BFC = BFI with Rn=R15
-		{"bfc", "bfi"},
-		// CPS variants: CPSIE / CPSID / CPS<flags>
-		{"cps", "cpsie"}, {"cps", "cpsid"},
-		// CRC32 family is all "crc32" with B/H/W variant in suffix
-		{"crc32b", "crc32"}, {"crc32h", "crc32"}, {"crc32w", "crc32"},
-		{"crc32cb", "crc32c"}, {"crc32ch", "crc32c"}, {"crc32cw", "crc32c"},
-		// DCPS1/2/3 -> dcps
-		{"dcps1", "dcps"}, {"dcps2", "dcps"}, {"dcps3", "dcps"},
-		// LDA/STL acquire-release: may print as ldra/stlra
-		{"lda", "ldra"}, {"stl", "stlra"},
-		// VFP scalar VMRS may print special FPSCR access
-		{"vmrs", "vmrs"}, {"vmsr", "vmsr"},
-		// PSR access: MSR/MRS conditional
-		{"msr", "msr"}, {"mrs", "mrs"},
-		// T16: ADD/SUB SP imm7 may print as add sp, #imm
-		{"add", "addw"}, {"sub", "subw"},   // T32 wide add/sub variants
-		{"addw", "add"}, {"subw", "sub"},
-		// MOV imm16 wide ↔ movw
-		{"mov", "movw"}, {"movw", "mov"},
-		// Saturate: SSAT/USAT variants
-		{"ssat", "ssat16"}, {"usat", "usat16"},
-		// ARMv8-M Security: SG decodes as "sg" or possibly nop on older LLVM
-		{"sg", "nop"},
-		// VPST/VPT predication: just "vpt" or "vpst"
-		{"vpt", "vpst"}, {"vpst", "vpt"},
-		// VSEL conditional variants
-		{"vsel", "vseleq"}, {"vsel", "vselne"}, {"vsel", "vselvs"}, {"vsel", "vselvc"},
-		{"vsel", "vselge"}, {"vsel", "vsellt"}, {"vsel", "vselgt"}, {"vsel", "vselle"},
-		// CDP2/MCR2/MRC2 are coproc variants of CDP/MCR/MRC
-		{"cdp", "cdp2"}, {"mcr", "mcr2"}, {"mrc", "mrc2"},
-		{"mcrr", "mcrr2"}, {"mrrc", "mrrc2"}, {"ldc", "ldc2"}, {"stc", "stc2"},
-		// T16 NEG/LSL aliases
-		{"neg", "rsbs"}, {"lsl", "movs"}, {"lsr", "movs"}, {"asr", "movs"},
-		{"lsl", "lsls"}, {"lsr", "lsrs"}, {"asr", "asrs"}, {"ror", "rors"},
-		// T16 IT with empty mask is effectively a NOP
-		{"it", "nop"},
-		// VPT/VPSEL alias to vcmp/vptttt patterns
-		{"vpt", "vcmp"}, {"vpsel", "vptttt"}, {"vpsel", "vpttt"},
-		// MVE MAC reductions normalized: VMLADAV is VMLAV is VMLALDAV is alias family
-		{"vmladav", "vmlav"}, {"vmladav", "vrmlalvh"}, {"vmladava", "vmlava"},
-		{"vmladava", "vrmlalvha"}, {"vmladavx", "vrmlaldavhx"},
-		{"vmladavax", "vrmlaldavhax"},
-		{"vmlaldav", "vrmlalvh"}, {"vmlaldava", "vrmlalvha"},
-		{"vmlaldavx", "vrmlaldavhx"}, {"vmlaldavax", "vrmlaldavhax"},
-		// VFMA_LANE without FCMA may print as VMLA by LLVM (no FCMA fused-MAC distinction)
-		{"vfma", "vmla"}, {"vfms", "vmls"},
-		// VFMA_BF16 forms: LLVM uses vfmat/vfmab for the two variants
-		{"vfma", "vfmat"}, {"vfma", "vfmab"},
-		// BF/BFI_BR/BFL/BFLX/BFCSEL → unknown LLVM mnemonics for the speculative encodings
-		// (intentionally not aliased)
-		// CDE encodes in CDP opcode space; without +cdecp0 LLVM prints as CDP/CDP2.
-		{"cx1", "cdp"}, {"cx2", "cdp"}, {"cx3", "cdp"},
-		{"cx1d", "cdp"}, {"cx2d", "cdp"}, {"cx3d", "cdp"},
-		{"cx1a", "cdp2"}, {"cx2a", "cdp2"}, {"cx3a", "cdp2"},
-		{"cx1da", "cdp2"}, {"cx2da", "cdp2"}, {"cx3da", "cdp2"},
-		// VCX encodes in CDP space too, but the second-operand form often
-		// decodes as a different VCX variant when LLVM uses CDE.
-		{"vcx1", "vcx2"}, {"vcx2", "vcx1"}, {"vcx1a", "vcx2a"}, {"vcx2a", "vcx1a"},
-		{"vcx3", "vcx1"}, {"vcx3a", "vcx1a"},
-		// ROR / RRX alias (ROR Rd, Rm with shift=0 disassembles as RRX Rd, Rm)
-		{"ror", "rrx"},
-		// V81M LOB / PACBTI on v8a triple: LLVM falls back to base mnemonic
-		{"wls", "lsls"}, {"dls", "lsls"}, {"le", "lsls"}, {"letp", "lsls"},
-		{"dlstp", "lsls"}, {"wlstp", "lsls"}, {"lctp", "lsls"},
-		{"autg", "smmul"}, {"bti", "dbg"},
-		// MVE MAC reductions: VMLSLDAV/VRMLALDAVH/VRMLSLDAVH alias to vabav
-		// when LLVM doesn't have full mve.fp feature visibility
-		{"vmlsldav", "vabav"}, {"vmlsldavx", "vabav"},
-		{"vrmlsldavh", "vabav"}, {"vrmlsldavhx", "vabav"},
-		{"vrmlaldavh", "vrmlalvh"}, {"vrmlaldavha", "vrmlalvha"},
-		// SB → strb when triple doesn't support FEAT_SB
-		{"sb", "strb"},
-		// B.W → beq alias (conditional branch with cond=AL printed as B)
-		{"b", "beq"}, {"b", "bne"}, {"b", "bcs"}, {"b", "bcc"},
-		{"b", "bmi"}, {"b", "bpl"}, {"b", "bvs"}, {"b", "bvc"},
-		{"b", "bhi"}, {"b", "bls"}, {"b", "bge"}, {"b", "blt"},
-		{"b", "bgt"}, {"b", "ble"}, {"b", "bal"},
-		// MSR T32 → lsls when feature not enabled (encoding overlap)
-		{"msr", "lsls"},
-		// Bit-pattern ambiguities: same encoding decoded different ways:
-		{"vmullb", "vqdmladh"}, {"vmullt", "vqdmladhx"},
-		{"vshllb", "vqshrnb"}, {"vshllt", "vqshrnt"},
-		{"vbrsr", "vmul"}, {"vbrsr", "vmuls"},
-		{"vmlav", "vrmlalvh"}, {"vmlava", "vrmlalvha"},
-		// VMLAL/VMLSL B/T: my speculative encoding conflicts with LLVM's
-		// movs/asrs literal — leave as MISMATCH for now (placeholder bits)
-		// VLD2R/3R/4R: A32 syntax has post-index `, r0` that my entry doesn't
-		// include — disasm differs in trailing operand only.
-		{"vld2r", "vld2"}, {"vld3r", "vld3"}, {"vld4r", "vld4"},
-		// CDP2 → vseleq when VFPv4+ enabled with same bit pattern
-		{"cdp2", "vseleq"}, {"cdp2", "vselne"}, {"cdp2", "vselge"}, {"cdp2", "vselgt"},
-		// VSUDOT_LANE → vusdot per LLVM (same encoding, different order)
-		{"vsudot", "vusdot"},
-		// MVE families where bit-pattern decode tools choose alternative mnemonic
-		{"vstrb", "lsls"}, {"vstrh", "str"}, {"vstrw", "mov"}, {"vstrd", "bvs"},
-		{"vaddlv", "lsls"}, {"vaddlva", "movs"},
-		{"vmlsdav", "lsls"}, {"vmlsdava", "movs"},
-		{"vmlsdavx", "lsls"}, {"vmlsdavax", "movs"},
-		{"vmlsldava", "movs"}, {"vmlsldavax", "movs"},
-		{"vrmlsldavha", "movs"}, {"vrmlsldavhax", "movs"},
-		{"vmlalb", "movs"}, {"vmlalt", "movs"},
-		{"vmlslb", "asrs"}, {"vmlslt", "asrs"},
-		{"vshlc", "stm"}, {"vshrnb", "stm"}, {"vshrnt", "stm"},
-		{"vrshrnb", "stm"}, {"vrshrnt", "stm"},
-		{"vmov", "lsls"},   // VMOV_2GPR_Q decode fallback
-		{"vldrd", "strh"}, {"vstrd", "strh"},
-		// PLDW / PLI / PLD share base "pld"
-		{"pldw", "pld"}, {"pli", "pld"},
-		// Coproc 10/11 aliases (CDP/LDC/STC -> VFP forms when coproc=10 or 11)
-		{"cdp", "vmla"}, {"cdp", "vmls"}, {"cdp", "vfma"}, {"cdp", "vfms"},
-		{"cdp", "vadd"}, {"cdp", "vsub"}, {"cdp", "vmul"}, {"cdp", "vdiv"},
-		{"cdp", "vneg"}, {"cdp", "vabs"}, {"cdp", "vsqrt"}, {"cdp", "vcmp"},
-		{"cdp", "vnmla"}, {"cdp", "vnmls"}, {"cdp", "vnmul"},
-		{"cdp", "vmov"}, {"cdp", "vfnms"}, {"cdp", "vfnma"},
-		{"ldc", "vldmia"}, {"ldc", "vldmdb"},
-		{"stc", "vstmia"}, {"stc", "vstmdb"},
-		{"ldc", "vldr"}, {"stc", "vstr"},
-		// MCRR/MRRC coproc 10/11
-		{"mcrr", "vmov"}, {"mrrc", "vmov"},
-		{"mcr", "vmsr"}, {"mrc", "vmrs"},
-		// MOV/LSL/LSR/ASR/ROR/RRX aliases (with and without S)
-		{"lsls", "movs"}, {"lsrs", "movs"}, {"asrs", "movs"}, {"rors", "movs"},
-		{"mov", "lsls"}, {"mov", "lsrs"}, {"mov", "asrs"}, {"mov", "rors"},
-		{"mov", "rrxs"}, {"rrx", "rrxs"}, {"mov", "rrx"},
-		// BIC <-> AND with NOT operand
-		{"bic", "and"},  {"bics", "ands"},
-		// Wide forms with .w suffix already stripped via .-stripping
-		// Branch variants
-		{"b", "bx"}, {"bl", "blx"},
-		// VLDM/VSTM IA/DB suffixes
-		{"vldm", "vldmia"}, {"vldm", "vldmdb"},
-		{"vstm", "vstmia"}, {"vstm", "vstmdb"},
-		// T16 PUSH/POP <-> STM/LDM SP
-		{"push", "stmdb"}, {"push", "str"},
-		{"pop", "ldm"}, {"pop", "ldr"},
-		// Compare-with-zero NEON ops
-		{"vceq", "vceqz"}, {"vcgt", "vcgtz"}, {"vcge", "vcgez"},
-		{"vcle", "vclez"}, {"vclt", "vcltz"},
-		// T16 LDR PC-rel maybe printed as LDR with literal
-		{"ldr", "adr"},
-		// T16 IT and friends
-		{"it", "ite"}, {"it", "itt"}, {"it", "itee"}, {"it", "itet"},
-		{"it", "itte"}, {"it", "ittt"},
-	}
-	for p in pairs {
-		if ours == p[0] && llvm == p[1] { return true }
-		if ours == p[1] && llvm == p[0] { return true }
-	}
-	return false
+Target :: struct {
+	triple:  string,
+	mattr:   string,
+	profile: a.Profile,
 }
 
-// Parse the LLVM output assuming 1:1 alignment with input lines. The wrapper
-// `tools/llvm_per_line.sh` invokes llvm-mc once per stdin line so each output
-// line is either a single disasm or an empty line (for rejected inputs).
-parse_llvm :: proc(output: string, n_inputs: int) -> []string {
-	disasm := make([]string, n_inputs)
-	lines := strings.split_lines(output)
-	n := len(lines)
-	if n > 0 && lines[n-1] == "" { n -= 1 }
-	for i in 0..<n_inputs {
-		if i < n {
-			disasm[i] = strings.clone(strings.trim_space(lines[i]))
-		}
-	}
-	return disasm
+Suite :: struct {
+	name:    string,
+	mode:    a.Mode,
+	targets: []Target,
+	words:   [dynamic]Word,
+	// IT blocks are verified as whole sequences: one entry per block, each
+	// a run of words that must be decoded, printed and reassembled together.
+	blocks: [dynamic][]Word,
+	allowance: Allowance,
 }
 
-Group_Result :: struct {
-	name:     string,
-	n_ok:     int,
-	n_alias:  int,
-	n_unknown:int,
-	n_mismatch: int,
+Result :: struct {
+	verdict:     Verdict,
+	word:        Word,
+	ours:        string,
+	llvm:        string,
+	assembled:   string,   // what llvm-mc made of our text, as hex
+	diagnostic:  string,   // llvm-mc's complaint, for UNASSEMBLABLE
+	target:      string,   // the target the kept outcome came from
 }
 
-// Dual-triple version: takes two LLVM output files (e.g. v8a + v8.1m.main)
-// and for each meta row, picks whichever produces the best classification
-// (OK > ALIAS > UNKNOWN > MISMATCH). Allows us to verify both A-profile
-// extensions (LDREXD/STREXD, A-profile MSR, etc.) AND M-profile extensions
-// (MVE, CDE, LOB, PACBTI) without LLVM rejecting either as wrong-triple.
-verify_group_dual :: proc(meta_path, llvm1_path, llvm2_path, label: string,
-						  report_buf, mismatch_buf: ^strings.Builder) -> Group_Result {
-	g: Group_Result
-	g.name = label
-
-	meta_bytes, err1 := os.read_entire_file_from_path(meta_path, context.allocator)
-	if err1 != nil {
-		fmt.eprintf("WARN: cannot read %s: %v -- skipping %s group\n", meta_path, err1, label)
-		return g
-	}
-	llvm1_bytes, err2 := os.read_entire_file_from_path(llvm1_path, context.allocator)
-	if err2 != nil { return g }
-	llvm2_bytes, err3 := os.read_entire_file_from_path(llvm2_path, context.allocator)
-	if err3 != nil { return g }
-
-	meta := strings.split_lines(string(meta_bytes))
-	if len(meta) > 0 && meta[len(meta)-1] == "" { meta = meta[:len(meta)-1] }
-	disasm1 := parse_llvm(string(llvm1_bytes), len(meta))
-	disasm2 := parse_llvm(string(llvm2_bytes), len(meta))
-
-	fmt.sbprintf(report_buf, "\n===== %s (dual-triple) =====\n", label)
-
-	for i in 0..<len(meta) {
-		meta_line := meta[i]
-		fields := strings.split(meta_line, "\t", context.temp_allocator)
-		if len(fields) < 4 { continue }
-		our_name := fields[0]
-		bits_hex := fields[1]
-		mask_hex := fields[2]
-		feature  := fields[3]
-		our_norm := normalize_our(our_name)
-
-		classify :: proc(our_norm, llvm_line: string) -> (status: string, rank: int, llvm_norm: string) {
-			llvm_norm = normalize_llvm(llvm_line)
-			llvm_no_s := llvm_norm
-			if len(llvm_no_s) > 1 && llvm_no_s[len(llvm_no_s)-1] == 's' {
-				cand := llvm_no_s[:len(llvm_no_s)-1]
-				if cand == our_norm { llvm_no_s = cand }
-			}
-			our_with_s := strings.concatenate({our_norm, "s"}, context.temp_allocator)
-			if llvm_norm == "" {
-				// Some instructions are valid encodings that LLVM rejects on
-				// our verification triples (e.g. CDP/MCR2/etc. require pre-v8.6
-				// ARM features; LDC2/STC2 same; SWP/SWPB deprecated since v8;
-				// VFMAL/VFMSL need +fp16fml which isn't always enabled).
-				expected_unknown := []string{
-					"cdp", "cdp2", "mcr", "mcr2", "mrc", "mrc2",
-					"mcrr", "mcrr2", "mrrc", "mrrc2",
-					"ldc", "ldc2", "stc", "stc2",
-					"swp", "swpb", "setpan",
-					"vudot", "vusdot", "vsudot",
-					"vdup",   // scalar form requires specific imm4
-				}
-				for u in expected_unknown {
-					if our_norm == u { return "ALIAS", 1, llvm_norm }
-				}
-				return "UNKNOWN", 2, llvm_norm
-			}
-			if our_norm == llvm_norm || our_norm == llvm_no_s || our_with_s == llvm_norm {
-				return "OK", 0, llvm_norm
-			}
-			if is_known_alias(our_norm, llvm_norm) || is_known_alias(our_norm, llvm_no_s) {
-				return "ALIAS", 1, llvm_norm
-			}
-			return "MISMATCH", 3, llvm_norm
-		}
-
-		status1, rank1, llvm1_norm := classify(our_norm, disasm1[i])
-		status2, rank2, llvm2_norm := classify(our_norm, disasm2[i])
-
-		// Pick the best (lowest rank)
-		status: string
-		llvm_line: string
-		if rank1 <= rank2 { status = status1; llvm_line = disasm1[i] } else { status = status2; llvm_line = disasm2[i] }
-		_ = llvm1_norm; _ = llvm2_norm
-
-		switch status {
-		case "OK":       g.n_ok += 1
-		case "ALIAS":    g.n_alias += 1
-		case "UNKNOWN":  g.n_unknown += 1
-		case "MISMATCH":
-			g.n_mismatch += 1
-			fmt.sbprintf(mismatch_buf, "[%s] %-22s bits=%s mask=%s feat=%-14s  llvm=%q | %q\n",
-						 label, our_name, bits_hex, mask_hex, feature, disasm1[i], disasm2[i])
-		}
-		fmt.sbprintf(report_buf, "[%-8s] %-22s bits=%s mask=%s feat=%-14s  llvm=%q\n",
-					 status, our_name, bits_hex, mask_hex, feature, llvm_line)
-	}
-	return g
+// Allowed counts per suite. Every one of these should name what it excuses.
+Allowance :: struct {
+	missing:       int,
+	extra:         int,
+	unassemblable: int,
 }
 
-verify_group :: proc(meta_path, llvm_path, label: string,
-					 report_buf, mismatch_buf: ^strings.Builder) -> Group_Result {
-	g: Group_Result
-	g.name = label
-
-	meta_bytes, err1 := os.read_entire_file_from_path(meta_path, context.allocator)
-	if err1 != nil {
-		fmt.eprintf("WARN: cannot read %s: %v -- skipping %s group\n", meta_path, err1, label)
-		return g
-	}
-	llvm_bytes, err2 := os.read_entire_file_from_path(llvm_path, context.allocator)
-	if err2 != nil {
-		fmt.eprintf("WARN: cannot read %s: %v -- skipping %s group\n", llvm_path, err2, label)
-		return g
-	}
-
-	meta := strings.split_lines(string(meta_bytes))
-	if len(meta) > 0 && meta[len(meta)-1] == "" { meta = meta[:len(meta)-1] }
-
-	disasm := parse_llvm(string(llvm_bytes), len(meta))
-
-	fmt.sbprintf(report_buf, "\n===== %s =====\n", label)
-
-	for i in 0..<len(meta) {
-		meta_line := meta[i]
-		llvm_line := disasm[i]
-		fields := strings.split(meta_line, "\t", context.temp_allocator)
-		if len(fields) < 4 { continue }
-		our_name := fields[0]
-		bits_hex := fields[1]
-		mask_hex := fields[2]
-		feature  := fields[3]
-
-		our_norm  := normalize_our(our_name)
-		llvm_norm := normalize_llvm(llvm_line)
-
-		status: string
-		// Strip trailing 's' (set-flags variant) if it reveals a match.
-		llvm_no_s := llvm_norm
-		if len(llvm_no_s) > 1 && llvm_no_s[len(llvm_no_s)-1] == 's' {
-			candidate := llvm_no_s[:len(llvm_no_s)-1]
-			if candidate == our_norm { llvm_no_s = candidate }
-		}
-		// Also try the inverse: our name + 's' == llvm
-		our_with_s := strings.concatenate({our_norm, "s"}, context.temp_allocator)
-
-		expected_unknown := []string{
-			"cdp", "cdp2", "mcr", "mcr2", "mrc", "mrc2",
-			"mcrr", "mcrr2", "mrrc", "mrrc2",
-			"ldc", "ldc2", "stc", "stc2",
-			"swp", "swpb", "setpan",
-			"vudot", "vusdot", "vsudot", "vdup",
-		}
-		is_expected_unk := false
-		for u in expected_unknown {
-			if our_norm == u { is_expected_unk = true; break }
-		}
-		if llvm_norm == "" {
-			if is_expected_unk {
-				status = "ALIAS"; g.n_alias += 1
-			} else {
-				status = "UNKNOWN"; g.n_unknown += 1
-			}
-		} else if our_norm == llvm_norm || our_norm == llvm_no_s || our_with_s == llvm_norm {
-			status = "OK"
-			g.n_ok += 1
-		} else if is_known_alias(our_norm, llvm_norm) || is_known_alias(our_norm, llvm_no_s) {
-			status = "ALIAS"
-			g.n_alias += 1
-		} else {
-			status = "MISMATCH"
-			g.n_mismatch += 1
-			fmt.sbprintf(mismatch_buf, "[%s] %-22s bits=%s mask=%s feat=%-14s  llvm=%q\n",
-						 label, our_name, bits_hex, mask_hex, feature, llvm_line)
-		}
-		fmt.sbprintf(report_buf, "[%-8s] %-22s bits=%s mask=%s feat=%-14s  llvm=%q\n",
-					 status, our_name, bits_hex, mask_hex, feature, llvm_line)
-	}
-
-	return g
-}
+// Words generated per table form, and random words per suite. Both are fixed
+// by the seed so a failure reproduces.
+FILLS_PER_FORM :: 6
+RANDOM_WORDS   :: 30000
+SEED           :: 0x5EED_A32
 
 main :: proc() {
-	report:    strings.Builder
-	mismatch:  strings.Builder
-	strings.builder_init(&report)
-	strings.builder_init(&mismatch)
-	defer strings.builder_destroy(&report)
-	defer strings.builder_destroy(&mismatch)
-
-	a32 := verify_group("/tmp/rexcode_arm32_a32_meta.txt",
-						"/tmp/rexcode_arm32_a32_llvm.txt",
-						"A32", &report, &mismatch)
-	t32 := verify_group_dual("/tmp/rexcode_arm32_t32w_meta.txt",
-							 "/tmp/rexcode_arm32_t32w_llvm.txt",
-							 "/tmp/rexcode_arm32_t32w_llvm_v81m.txt",
-							 "T32-wide", &report, &mismatch)
-	t16 := verify_group("/tmp/rexcode_arm32_t16_meta.txt",
-						"/tmp/rexcode_arm32_t16_llvm.txt",
-						"T16", &report, &mismatch)
-
-	_ = os.write_entire_file("/tmp/rexcode_arm32_verify_report.txt",     report.buf[:])
-	_ = os.write_entire_file("/tmp/rexcode_arm32_verify_mismatches.txt", mismatch.buf[:])
-
-	fmt.println()
-	fmt.println("=========================================================")
-	fmt.println("AArch32 LLVM verification report")
-	fmt.println("=========================================================")
-	groups := [3]Group_Result{a32, t32, t16}
-	for g in groups {
-		total := g.n_ok + g.n_alias + g.n_unknown + g.n_mismatch
-		if total == 0 { continue }
-		fmt.printf("\n[%s] %d rows\n", g.name, total)
-		fmt.printf("    OK:       %4d  (%.1f%%)\n", g.n_ok,       100.0*f64(g.n_ok)/f64(total))
-		fmt.printf("    ALIAS:    %4d  (%.1f%%)\n", g.n_alias,    100.0*f64(g.n_alias)/f64(total))
-		fmt.printf("    UNKNOWN:  %4d  (%.1f%%)\n", g.n_unknown,  100.0*f64(g.n_unknown)/f64(total))
-		fmt.printf("    MISMATCH: %4d  (%.1f%%)\n", g.n_mismatch, 100.0*f64(g.n_mismatch)/f64(total))
+	work_dir, temp_error := os.make_directory_temp("", "rexcode_arm32_verify_*", context.allocator)
+	if temp_error != nil {
+		fmt.eprintln("verify: cannot create a temporary directory:", temp_error)
+		os.exit(2)
 	}
 
-	grand_ok    := a32.n_ok    + t32.n_ok    + t16.n_ok
-	grand_alias := a32.n_alias + t32.n_alias + t16.n_alias
-	grand_unk   := a32.n_unknown + t32.n_unknown + t16.n_unknown
-	grand_mis   := a32.n_mismatch + t32.n_mismatch + t16.n_mismatch
-	grand_total := grand_ok + grand_alias + grand_unk + grand_mis
-	fmt.println()
-	fmt.printf("[TOTAL] %d rows\n", grand_total)
-	fmt.printf("    OK:       %4d  (%.1f%%)\n", grand_ok,    100.0*f64(grand_ok)/f64(grand_total))
-	fmt.printf("    ALIAS:    %4d  (%.1f%%)\n", grand_alias, 100.0*f64(grand_alias)/f64(grand_total))
-	fmt.printf("    UNKNOWN:  %4d  (%.1f%%)\n", grand_unk,   100.0*f64(grand_unk)/f64(grand_total))
-	fmt.printf("    MISMATCH: %4d  (%.1f%%)\n", grand_mis,   100.0*f64(grand_mis)/f64(grand_total))
-	fmt.println()
-	fmt.println("Reports:")
-	fmt.println("  /tmp/rexcode_arm32_verify_report.txt     (all rows)")
-	fmt.println("  /tmp/rexcode_arm32_verify_mismatches.txt (mismatches only)")
+	random_state := rand.create(SEED)
+	random := rand.default_random_generator(&random_state)
+
+	// ARMv7-A is there for what ARMv8-A dropped: the generic coprocessor
+	// instructions, which v8 keeps only for p14 and p15.
+	a32_targets := []Target{
+		{"armv8.6a", A_PROFILE_FEATURES, .A_PROFILE},
+		{"armv7a", ARMV7_FEATURES, .A_PROFILE},
+	}
+	thumb_targets := []Target{
+		{"thumbv8.6a", A_PROFILE_FEATURES, .A_PROFILE},
+		{"thumbv7a", ARMV7_FEATURES, .A_PROFILE},
+		{"thumbv8.1m.main", M_PROFILE_FEATURES, .M_PROFILE},
+	}
+	suites := [?]Suite{
+		{name = "A32", mode = .A32, targets = a32_targets},
+		{name = "T16", mode = .T32, targets = thumb_targets},
+		{name = "T32", mode = .T32, targets = thumb_targets},
+		{name = "IT",  mode = .T32, targets = thumb_targets},
+	}
+	build_a32_words(&suites[0], random)
+	build_t16_words(&suites[1])
+	build_t32_words(&suites[2], random)
+	build_it_blocks(&suites[3], random)
+
+	// Object files named on the command line are verified as corpora too:
+	// `path` is taken as A-profile code, `path:m` as M-profile.
+	corpora: [dynamic]Suite
+	for argument in os.args[1:] {
+		path := argument
+		profile := a.Profile.A_PROFILE
+		if strings.has_suffix(argument, ":m") {
+			path = argument[:len(argument) - 2]
+			profile = .M_PROFILE
+		}
+		targets := thumb_targets[:2]
+		if profile == .M_PROFILE {
+			targets = thumb_targets[2:]
+		}
+		corpus := Suite{name = filepath.base(path), mode = .T32, targets = targets}
+		build_corpus(&corpus, path)
+		append(&corpora, corpus)
+	}
+
+	failed := false
+	report: strings.Builder
+	strings.builder_init(&report)
+	for &suite in suites {
+		results := verify_suite(&suite, work_dir)
+		if !summarize(&suite, results, &report) {
+			failed = true
+		}
+	}
+	for &suite in corpora {
+		words := verify_suite(&suite, work_dir)
+		blocks := verify_blocks(&suite, work_dir)
+		results := make([]Result, len(words) + len(blocks))
+		copy(results, words)
+		copy(results[len(words):], blocks)
+		if !summarize(&suite, results, &report) {
+			failed = true
+		}
+	}
+
+	report_path := fmt.tprintf("%s/report.txt", work_dir)
+	_ = os.write_entire_file(report_path, report.buf[:])
+	fmt.printfln("\nfull report: %s", report_path)
+	if failed {
+		fmt.println("verify: FAILED")
+		os.exit(1)
+	}
+	fmt.println("verify: ok")
+}
+
+A_PROFILE_FEATURES :: "+neon,+crypto,+fullfp16,+fp16fml,+dotprod,+bf16,+i8mm,+crc,+mp,+virtualization,+trustzone,+ras,+sb"
+ARMV7_FEATURES     :: "+neon,+vfp4,+d32,+fp16,+mp,+virtualization,+trustzone"
+M_PROFILE_FEATURES :: "+mve.fp,+fp64,+fullfp16,+lob,+8msecext,+pacbti,+ras,+dsp,+cdecp0,+cdecp1,+cdecp2,+cdecp3,+cdecp4,+cdecp5,+cdecp6,+cdecp7"
+
+// -----------------------------------------------------------------------------
+// Word sources
+// -----------------------------------------------------------------------------
+
+// Every table form, with its operand fields filled at random.
+build_a32_words :: proc(suite: ^Suite, random: rand.Generator) {
+	for mnemonic in a.Mnemonic {
+		run := a.ENCODE_RUNS[mnemonic]
+		for &form in a.ENCODE_FORMS[run.start:][:run.count] {
+			if form.mode != .A32 {
+				continue
+			}
+			for _ in 0 ..< FILLS_PER_FORM {
+				word := (form.bits & form.mask) | (rand.uint32(random) & ~form.mask)
+				// A free condition field never takes 1111, which is the
+				// unconditional space and a different instruction entirely.
+				if form.mask >> 28 == 0 {
+					word = (word & 0x0FFF_FFFF) | (u32(rand.int_max(15, random)) << 28)
+				}
+				append(&suite.words, Word{value = word, length = 4})
+			}
+		}
+	}
+	for _ in 0 ..< RANDOM_WORDS {
+		word := rand.uint32(random)
+		if word >> 28 == 0xF {
+			word &= 0xEFFF_FFFF
+		}
+		append(&suite.words, Word{value = word, length = 4})
+	}
+}
+
+// All of them. IT is left to the IT suite, since it changes what follows it.
+build_t16_words :: proc(suite: ^Suite) {
+	for halfword in 0 ..< u32(0x10000) {
+		if is_t32_prefix(halfword) {
+			continue
+		}
+		if is_it(halfword) {
+			continue
+		}
+		append(&suite.words, Word{value = halfword, length = 2})
+	}
+}
+
+build_t32_words :: proc(suite: ^Suite, random: rand.Generator) {
+	for mnemonic in a.Mnemonic {
+		run := a.ENCODE_RUNS[mnemonic]
+		for &form in a.ENCODE_FORMS[run.start:][:run.count] {
+			if form.mode != .T32 || a.inst_size_from_bits(form.bits, form.mode) != 4 {
+				continue
+			}
+			for _ in 0 ..< FILLS_PER_FORM {
+				word := (form.bits & form.mask) | (rand.uint32(random) & ~form.mask)
+				if !is_t32_prefix(word >> 16) {
+					continue
+				}
+				append(&suite.words, Word{value = word, length = 4})
+			}
+		}
+	}
+	for _ in 0 ..< RANDOM_WORDS {
+		word := rand.uint32(random)
+		// Force a 32-bit prefix: 111 followed by anything but 00.
+		word = (word & 0x07FF_FFFF) | (0b111 << 29)
+		if (word >> 27) & 3 == 0 {
+			word |= 1 << 27
+		}
+		append(&suite.words, Word{value = word, length = 4})
+	}
+}
+
+// Every IT, each followed by the instructions it predicates. The block holds
+// 16-bit instructions whose flag-setting depends on being inside it, and a
+// 32-bit one, so both the condition and the `s` suffix are exercised.
+build_it_blocks :: proc(suite: ^Suite, random: rand.Generator) {
+	// Instructions that are legal anywhere in an IT block: data processing,
+	// a load and a wide add. Branches are left out -- only the last
+	// instruction of a block may be one.
+	BODY := [?]Word{
+		{0x1888, 2},        // adds r0, r1, r2   (add r0, r1, r2 inside a block)
+		{0x2005, 2},        // movs r0, #5
+		{0x4048, 2},        // eors r0, r1
+		{0x6808, 2},        // ldr r0, [r1]
+		{0x4608, 2},        // mov r0, r1
+		{0xEB01_0002, 4},   // add.w r0, r1, r2
+	}
+	for first_condition in u32(0) ..< 15 {
+		for mask in u32(1) ..< 16 {
+			// AL takes no else-slots; those masks are not instructions.
+			if first_condition == 14 && mask & 0x7 != 0 && mask != 8 {
+				continue
+			}
+			it := 0xBF00 | first_condition << 4 | mask
+			count := 4 - int(trailing_zeros4(mask))
+			block := make([]Word, 1 + count)
+			block[0] = {it, 2}
+			for k in 0 ..< count {
+				block[1 + k] = BODY[rand.int_max(len(BODY), random)]
+			}
+			append(&suite.blocks, block)
+		}
+	}
+}
+
+// The Thumb instructions of a compiled object, as llvm-objdump finds them --
+// it reads the mapping symbols, so literal pools stay data. An IT and the
+// instructions it predicates become one block; everything else is a word.
+build_corpus :: proc(suite: ^Suite, path: string) {
+	target := suite.targets[0]
+	output := must_run({"llvm-objdump", "-d", fmt.tprintf("--triple=%s", target.triple),
+	                    fmt.tprintf("--mattr=%s", target.mattr), path})
+	pending: [dynamic]Word
+	remaining := 0
+	for line in strings.split_lines_iterator(&output) {
+		// `      1a: f8d1 0004    <tab>ldr.w<tab>r0, [r1, #4]`
+		fields := strings.split(line, "\t", context.temp_allocator)
+		if len(fields) < 2 {
+			continue
+		}
+		colon := strings.index_byte(fields[0], ':')
+		if colon < 0 {
+			continue
+		}
+		halves := strings.fields(strings.trim_space(fields[0][colon + 1:]), context.temp_allocator)
+		mnemonic := strings.trim_space(fields[1])
+		if strings.has_prefix(mnemonic, ".") || mnemonic == "<unknown>" {
+			continue
+		}
+		word: Word
+		switch len(halves) {
+		case 1:
+			if len(halves[0]) != 4 { continue }
+			value, _ := strconv.parse_u64_of_base(halves[0], 16)
+			word = Word{u32(value), 2}
+		case 2:
+			first, _ := strconv.parse_u64_of_base(halves[0], 16)
+			second, _ := strconv.parse_u64_of_base(halves[1], 16)
+			word = Word{u32(first) << 16 | u32(second), 4}
+		case:
+			continue
+		}
+		if remaining > 0 {
+			append(&pending, word)
+			remaining -= 1
+			if remaining == 0 {
+				append(&suite.blocks, pending[:])
+				pending = {}
+			}
+			continue
+		}
+		if word.length == 2 && is_it(word.value) {
+			remaining = 4 - int(trailing_zeros4(word.value & 0xF))
+			append(&pending, word)
+			continue
+		}
+		append(&suite.words, word)
+	}
+}
+
+trailing_zeros4 :: proc(mask: u32) -> u32 {
+	n: u32 = 0
+	for n < 4 && (mask >> n) & 1 == 0 {
+		n += 1
+	}
+	return n
+}
+
+is_t32_prefix :: proc(halfword: u32) -> bool {
+	top := (halfword >> 11) & 0x1F
+	return top == 0x1D || top == 0x1E || top == 0x1F
+}
+
+is_it :: proc(halfword: u32) -> bool {
+	return halfword & 0xFF00 == 0xBF00 && halfword & 0xF != 0
+}
+
+// -----------------------------------------------------------------------------
+// One suite
+// -----------------------------------------------------------------------------
+
+verify_suite :: proc(suite: ^Suite, work_dir: string) -> []Result {
+	if len(suite.words) == 0 {
+		return verify_blocks(suite, work_dir)
+	}
+	// MVE's VPT and VPST open a predication block the way IT does, and
+	// change how llvm reads and prints what follows them; random words have
+	// no business opening one. Find them and take them out first.
+	{
+		kept: [dynamic]Word
+		for target, t in suite.targets {
+			texts := llvm_disassemble(suite, target, t, suite.words[:], work_dir)
+			for text, i in texts {
+				if strings.has_prefix(text, "vpt") || strings.has_prefix(text, "vpst") {
+					suite.words[i].length = 0
+				}
+			}
+		}
+		for word in suite.words {
+			if word.length != 0 {
+				append(&kept, word)
+			}
+		}
+		suite.words = kept
+	}
+	words := suite.words[:]
+	results := make([]Result, len(words))
+	for word, i in words {
+		results[i].word = word
+		results[i].verdict = .BOTH_INVALID
+	}
+
+	// Each target is held to its own standard: the word decoded with the
+	// target's profile must agree with that target's llvm. A word passes only
+	// if it passes under every target; the worst outcome is the one kept.
+	outcomes := make([][]Result, len(suite.targets))
+	for target, t in suite.targets {
+		llvm := llvm_disassemble(suite, target, t, words, work_dir)
+		verdicts := make([]Verdict, len(words))
+		ours := make([]string, len(words))
+		assembled_hex := make([]string, len(words))
+		diagnostic := make([]string, len(words))
+		lines := make([]string, len(words))
+		for word, i in words {
+			valid: bool
+			ours[i], valid = rexcode_text(suite.mode, []Word{word}, target.profile)
+			llvm_valid := llvm[i] != ""
+			switch {
+			case valid && llvm_valid:
+				lines[i] = ours[i]
+				verdicts[i] = .UNASSEMBLABLE    // settled by the assembly below
+			case valid:
+				verdicts[i] = .EXTRA
+			case llvm_valid:
+				verdicts[i] = .MISSING
+			case:
+				verdicts[i] = .BOTH_INVALID
+			}
+		}
+		assembled, diagnostics := llvm_assemble(suite, target, t, lines, work_dir)
+		for i in 0 ..< len(words) {
+			if lines[i] == "" {
+				continue
+			}
+			encoded := word_bytes(suite.mode, words[i])
+			verdicts[i] = judge(encoded[:words[i].length], assembled[i], ours[i], llvm[i])
+			assembled_hex[i] = hex_string(assembled[i])
+			diagnostic[i] = diagnostics[i]
+		}
+
+		// For what is failing, ask whether llvm's own text for the word
+		// reproduces it. Where it does not, no text does.
+		retry := make([]string, len(words))
+		for i in 0 ..< len(words) {
+			verdict := verdicts[i]
+			if verdict != .WRONG && verdict != .UNASSEMBLABLE && verdict != .MISSING {
+				continue
+			}
+			// An address in the text is a branch target llvm has resolved
+			// against its own layout, which this one does not share.
+			if llvm[i] == "" || strings.contains(llvm[i], "0x") {
+				continue
+			}
+			if verdict != .MISSING && mnemonic_of(ours[i]) != mnemonic_of(llvm[i]) {
+				continue
+			}
+			retry[i] = strip_comment(llvm[i])
+		}
+		llvm_assembled, _ := llvm_assemble(suite, target, t + 100, retry, work_dir)
+		for i in 0 ..< len(words) {
+			if retry[i] == "" {
+				continue
+			}
+			encoded := word_bytes(suite.mode, words[i])
+			original := encoded[:words[i].length]
+			got := llvm_assembled[i]
+			if got == nil || len(got) < len(original) || !slice.equal(got[:len(original)], original) {
+				verdicts[i] = .UNREPRESENTABLE
+			}
+		}
+
+		outcomes[t] = make([]Result, len(words))
+		for i in 0 ..< len(words) {
+			outcomes[t][i] = Result{
+				verdict    = verdicts[i],
+				word       = words[i],
+				ours       = ours[i],
+				llvm       = llvm[i],
+				assembled  = assembled_hex[i],
+				diagnostic = diagnostic[i],
+				target     = target.triple,
+			}
+		}
+	}
+
+	// Targets of one profile are versions of one architecture, and where a
+	// later version redefined a word (HINT #5 became SEVL, the generic
+	// coprocessor space went away) the decoder follows the later one -- so
+	// within a profile the best outcome counts. Across profiles the decoders
+	// are different, and the worst counts, with one exception: the profiles'
+	// llvm decoders disagree about which UNPREDICTABLE encodings to reject,
+	// so a word one profile rejects is not extra when the other takes it,
+	// with this same text, as an instruction.
+	for i in 0 ..< len(words) {
+		best: [a.Profile]Result
+		seen: [a.Profile]bool
+		for target, t in suite.targets {
+			outcome := outcomes[t][i]
+			if !seen[target.profile] || outcome.verdict < best[target.profile].verdict {
+				best[target.profile] = outcome
+				seen[target.profile] = true
+			}
+		}
+		first := true
+		for profile in a.Profile {
+			if !seen[profile] {
+				continue
+			}
+			outcome := best[profile]
+			if outcome.verdict == .EXTRA {
+				for other in a.Profile {
+					o := best[other]
+					passed := o.verdict == .EXACT || o.verdict == .EQUIVALENT || o.verdict == .UNREPRESENTABLE
+					if other != profile && seen[other] && passed && normalize(o.ours) == normalize(outcome.ours) {
+						outcome.verdict = .PROFILE_EXTRA
+						break
+					}
+				}
+			}
+			if first || outcome.verdict > results[i].verdict {
+				results[i] = outcome
+				first = false
+			}
+		}
+	}
+	return results
+}
+
+strip_comment :: proc(text: string) -> string {
+	line := text
+	if at := strings.index(line, " @ "); at >= 0 {
+		line = line[:at]
+	}
+	if at := strings.index(line, " <"); at >= 0 {
+		line = line[:at]
+	}
+	return line
+}
+
+// `bhs.w` -> `bcs.w`, `vcmplo.f16` -> `vcmpcc.f16`: the condition sits at the
+// end of the mnemonic, before any `.dt` or `.w`.
+respell_condition :: proc(token: string) -> string {
+	dot := strings.index_byte(token, '.')
+	base := dot < 0 ? token : token[:dot]
+	rest := dot < 0 ? "" : token[dot:]
+	if len(base) > 2 && strings.has_suffix(base, "hs") {
+		return strings.concatenate({base[:len(base) - 2], "cs", rest}, context.temp_allocator)
+	}
+	if len(base) > 2 && strings.has_suffix(base, "lo") {
+		return strings.concatenate({base[:len(base) - 2], "cc", rest}, context.temp_allocator)
+	}
+	return token
+}
+
+mnemonic_of :: proc(text: string) -> string {
+	line := text
+	if strings.has_prefix(line, ".set ") {
+		if at := strings.index(line, "; "); at >= 0 {
+			line = line[at + 2:]
+		}
+	}
+	return first_token(normalize(line))
+}
+
+// How one assembly of our text went. The verdicts are ordered best first,
+// which is what lets a suite keep the best across targets.
+judge :: proc(original: []u8, assembled: []u8, ours, llvm: string) -> Verdict {
+	if assembled != nil && len(assembled) >= len(original) && slice.equal(assembled[:len(original)], original) {
+		return .EXACT
+	}
+	if normalize(ours) == normalize(llvm) {
+		return .EQUIVALENT
+	}
+	if assembled == nil {
+		return .UNASSEMBLABLE
+	}
+	return .WRONG
+}
+
+// Text with the differences that do not matter taken out: llvm's trailing
+// comment and symbolized address, and the alternative register names.
+normalize :: proc(text: string) -> string {
+	line := strip_comment(text)
+	builder := strings.builder_make(context.temp_allocator)
+	for field, n in strings.fields(strings.to_lower(line, context.temp_allocator), context.temp_allocator) {
+		if n > 0 {
+			strings.write_byte(&builder, ' ')
+		}
+		token := field
+		suffix := ""
+		if strings.has_suffix(token, ",") {
+			token = token[:len(token) - 1]
+			suffix = ","
+		}
+		switch token {
+		case "r11": token = "fp"
+		case "r12": token = "ip"
+		}
+		// The width suffix: the byte comparison has already settled width.
+		if n == 0 && strings.has_suffix(token, ".w") {
+			token = token[:len(token) - 2]
+		}
+		// HS and LO are CS and CC by their other names; llvm uses these.
+		if n == 0 {
+			token = respell_condition(token)
+		}
+		strings.write_string(&builder, token)
+		strings.write_string(&builder, suffix)
+	}
+	return strings.to_string(builder)
+}
+
+// An IT block is one unit: decode the run, print it, assemble the text, and
+// compare the whole run of bytes.
+verify_blocks :: proc(suite: ^Suite, work_dir: string) -> []Result {
+	results := make([]Result, len(suite.blocks))
+	for target, t in suite.targets {
+		lines := make([]string, len(suite.blocks))
+		for block, i in suite.blocks {
+			results[i].word = block[0]
+			text, valid := rexcode_text(suite.mode, block, target.profile)
+			results[i].ours = text
+			if !valid {
+				results[i].verdict = .MISSING
+				results[i].target = target.triple
+				continue
+			}
+			// One line per block: llvm-mc takes `;` as a statement separator.
+			lines[i], _ = strings.replace_all(strings.trim_space(text), "\n", "; ")
+		}
+		assembled, diagnostics := llvm_assemble(suite, target, t, lines, work_dir, slot_size = 32)
+		for block, i in suite.blocks {
+			if lines[i] == "" {
+				continue
+			}
+			original: [dynamic]u8
+			for word in block {
+				bytes := word_bytes(suite.mode, word)
+				append(&original, ..bytes[:word.length])
+			}
+			// A block passes only if it passes under every target.
+			outcome := judge(original[:], assembled[i], "", "-")
+			if t == 0 || outcome > results[i].verdict {
+				results[i].verdict = outcome
+				results[i].assembled = hex_string(assembled[i])
+				results[i].diagnostic = diagnostics[i]
+				results[i].target = target.triple
+			}
+		}
+	}
+	return results
+}
+
+symbol_counter := 0
+
+// BL or BLX, possibly conditional -- `bleq` is BL, but `ble` and `bls` are B.
+is_branch_with_link :: proc(mnemonic: string) -> bool {
+	CONDITIONS :: []string{"eq", "ne", "cs", "cc", "hs", "lo", "mi", "pl", "vs", "vc", "hi", "ls", "ge", "lt", "gt", "le", "al"}
+	m := strings.trim_suffix(mnemonic, ".w")
+	if m == "bl" || m == "blx" {
+		return true
+	}
+	if len(m) == 4 && strings.has_prefix(m, "bl") && slice.contains(CONDITIONS, m[2:]) {
+		return true
+	}
+	return len(m) == 5 && strings.has_prefix(m, "blx") && slice.contains(CONDITIONS, m[3:])
+}
+
+// Decode a run of words as one stream and print it. Branch targets come out
+// of the printer as absolute offsets from the start of the run; they are
+// rewritten as offsets from the instruction itself, which is where llvm-mc
+// will place it.
+rexcode_text :: proc(mode: a.Mode, words: []Word, profile: a.Profile) -> (text: string, valid: bool) {
+	bytes: [dynamic]u8
+	for word in words {
+		encoded := word_bytes(mode, word)
+		append(&bytes, ..encoded[:word.length])
+	}
+	instructions: [dynamic]a.Instruction
+	info:         [dynamic]a.Instruction_Info
+	labels:       [dynamic]a.Label_Definition
+	errors:       [dynamic]a.Error
+	a.decode(bytes[:], nil, &instructions, &info, &labels, &errors, mode, profile)
+	if len(errors) > 0 || len(instructions) != len(words) {
+		return "", false
+	}
+
+	builder := strings.builder_make()
+	for i in 0 ..< len(instructions) {
+		line_builder := strings.builder_make(context.temp_allocator)
+		// Print without the label table, so every target is a plain offset.
+		a.sbprint(&line_builder, instructions[i:i + 1], info[i:i + 1], nil)
+		line := strings.trim_space(strings.to_string(line_builder))
+		inst := &instructions[i]
+		for k in 0 ..< int(inst.operand_count) {
+			operand := inst.ops[k]
+			if operand.kind != .RELATIVE {
+				continue
+			}
+			offset := i64(info[i].offset)
+			target := fmt.tprintf("0x%x", u32(operand.relative))
+			at := strings.last_index(line, target)
+			if at < 0 {
+				continue
+			}
+			// BL and BLX keep a relocation even against a local symbol, so
+			// the object would not hold the offset; their `#imm` syntax is the
+			// offset from PC itself. Slots are word-aligned, so PC is the
+			// slot plus 4 for both.
+			if is_branch_with_link(first_token(line)) {
+				pc_bias: i64 = mode == .A32 ? 8 : 4
+				line = fmt.tprintf("%s#%d%s", line[:at], operand.relative - offset - pc_bias, line[at + len(target):])
+				continue
+			}
+			// llvm-mc range-checks a branch to `. + n` while parsing, before
+			// it knows where the branch lands, and rejects some that fit; a
+			// symbol defers the check to layout.
+			symbol_counter += 1
+			symbol := fmt.tprintf("target_%d", symbol_counter)
+			line = fmt.tprintf(".set %s, . + %d; %s%s%s", symbol, operand.relative - offset, line[:at], symbol, line[at + len(target):])
+		}
+		if i > 0 {
+			strings.write_byte(&builder, '\n')
+		}
+		strings.write_string(&builder, line)
+	}
+	return strings.to_string(builder), true
+}
+
+word_bytes :: proc(mode: a.Mode, word: Word) -> [4]u8 {
+	switch {
+	case word.length == 2:
+		return {u8(word.value), u8(word.value >> 8), 0, 0}
+	case mode == .T32:
+		first := word.value >> 16
+		second := word.value & 0xFFFF
+		return {u8(first), u8(first >> 8), u8(second), u8(second >> 8)}
+	case:
+		return {u8(word.value), u8(word.value >> 8), u8(word.value >> 16), u8(word.value >> 24)}
+	}
+}
+
+hex_string :: proc(bytes: []u8) -> string {
+	builder := strings.builder_make()
+	for b in bytes {
+		fmt.sbprintf(&builder, "%02x", b)
+	}
+	return strings.to_string(builder)
+}
+
+// -----------------------------------------------------------------------------
+// LLVM
+// -----------------------------------------------------------------------------
+
+header :: proc(suite: ^Suite) -> string {
+	if suite.mode == .T32 {
+		return ".syntax unified\n.thumb\n.text\n"
+	}
+	return ".syntax unified\n.arm\n.text\n"
+}
+
+// llvm-objdump's text for each word, or "" where it has none.
+llvm_disassemble :: proc(suite: ^Suite, target: Target, target_index: int, words: []Word, work_dir: string) -> []string {
+	source := strings.builder_make()
+	strings.write_string(&source, header(suite))
+	for word in words {
+		switch {
+		case suite.mode == .A32:
+			fmt.sbprintfln(&source, ".inst 0x%08x", word.value)
+		case word.length == 2:
+			fmt.sbprintfln(&source, ".inst.n 0x%04x", word.value)
+		case:
+			fmt.sbprintfln(&source, ".inst.w 0x%08x", word.value)
+		}
+	}
+	source_path := fmt.tprintf("%s/%s_%d_words.s", work_dir, suite.name, target_index)
+	object_path := fmt.tprintf("%s/%s_%d_words.o", work_dir, suite.name, target_index)
+	must_write(source_path, strings.to_string(source))
+	must_run({"llvm-mc", fmt.tprintf("-triple=%s", target.triple), fmt.tprintf("-mattr=%s", target.mattr),
+	          "-filetype=obj", source_path, "-o", object_path})
+	output := must_run({"llvm-objdump", "-d", "--no-show-raw-insn", "--no-print-imm-hex",
+	                    fmt.tprintf("--triple=%s", target.triple), fmt.tprintf("--mattr=%s", target.mattr),
+	                    object_path})
+
+	// Lines look like `     2a:  \tmovs\tr0, r0`; key them by address.
+	by_address := make(map[u32]string)
+	for line in strings.split_lines_iterator(&output) {
+		colon := strings.index_byte(line, ':')
+		if colon < 0 {
+			continue
+		}
+		address, ok := strconv.parse_u64_of_base(strings.trim_space(line[:colon]), 16)
+		if !ok {
+			continue
+		}
+		rest := strings.trim_space(line[colon + 1:])
+		if rest == "<unknown>" {
+			continue
+		}
+		by_address[u32(address)] = strings.join(strings.fields(rest), " ")
+	}
+
+	texts := make([]string, len(words))
+	address: u32 = 0
+	for word, i in words {
+		texts[i] = by_address[address] or_else ""
+		address += u32(word.length)
+	}
+	return texts
+}
+
+// Assemble each line into its own fixed-size slot and return the bytes per
+// line (nil where llvm-mc rejected it). The slots are aligned so that a
+// PC-relative operand sees the same alignment it was decoded at.
+llvm_assemble :: proc(suite: ^Suite, target: Target, target_index: int, lines: []string, work_dir: string, slot_size := 4) -> (bytes: [][]u8, diagnostics: []string) {
+	bytes = make([][]u8, len(lines))
+	diagnostics = make([]string, len(lines))
+
+	// Pass 1: which lines does llvm-mc accept at all? Each is a statement of
+	// its own, so its line number in the source names it.
+	accepted := make([]bool, len(lines))
+	{
+		source := strings.builder_make()
+		strings.write_string(&source, header(suite))
+		header_lines := strings.count(header(suite), "\n")
+		line_of := make(map[int]int)
+		source_line := header_lines
+		for line, i in lines {
+			if line == "" {
+				continue
+			}
+			strings.write_string(&source, line)
+			strings.write_byte(&source, '\n')
+			source_line += 1
+			line_of[source_line] = i
+			accepted[i] = true
+		}
+		source_path := fmt.tprintf("%s/%s_%d_text.s", work_dir, suite.name, target_index)
+		must_write(source_path, strings.to_string(source))
+		_, stderr := run({"llvm-mc", fmt.tprintf("-triple=%s", target.triple), fmt.tprintf("-mattr=%s", target.mattr),
+		                  "-show-encoding", source_path})
+		for message in strings.split_lines_iterator(&stderr) {
+			if !strings.has_prefix(message, source_path) {
+				continue
+			}
+			fields := strings.split_n(message[len(source_path) + 1:], ":", 3, context.temp_allocator)
+			if len(fields) < 3 {
+				continue
+			}
+			number, ok := strconv.parse_int(fields[0])
+			if !ok {
+				continue
+			}
+			// A warning (`deprecated`, say) is not a rejection.
+			if !strings.has_prefix(strings.trim_space(fields[2]), "error") {
+				continue
+			}
+			if i, found := line_of[number]; found {
+				// Keep the first complaint; later ones are notes about it.
+				if accepted[i] {
+					diagnostics[i] = strings.trim_space(fields[2])
+				}
+				accepted[i] = false
+			}
+		}
+	}
+
+	// Pass 2: assemble the accepted lines for real, so that branch fixups
+	// are resolved, one slot each. A line can still fail here -- a branch
+	// whose target is out of its range -- and those come back out.
+	for attempt in 0 ..< 4 {
+		source := strings.builder_make()
+		strings.write_string(&source, header(suite))
+		header_lines := strings.count(header(suite), "\n")
+		line_of := make(map[int]int)
+		source_line := header_lines
+		order: [dynamic]int
+		for line, i in lines {
+			if !accepted[i] {
+				continue
+			}
+			fmt.sbprintfln(&source, ".p2align %d", slot_size == 4 ? 2 : 5)
+			fmt.sbprintfln(&source, "%s", line)
+			source_line += 2
+			line_of[source_line] = i
+			append(&order, i)
+		}
+		source_path := fmt.tprintf("%s/%s_%d_slots.s", work_dir, suite.name, target_index)
+		object_path := fmt.tprintf("%s/%s_%d_slots.o", work_dir, suite.name, target_index)
+		binary_path := fmt.tprintf("%s/%s_%d_slots.bin", work_dir, suite.name, target_index)
+		must_write(source_path, strings.to_string(source))
+		_ = os.remove(object_path)
+		_, stderr := run({"llvm-mc", fmt.tprintf("-triple=%s", target.triple), fmt.tprintf("-mattr=%s", target.mattr),
+		                  "-filetype=obj", source_path, "-o", object_path})
+		retry := false
+		for message in strings.split_lines_iterator(&stderr) {
+			if !strings.has_prefix(message, source_path) {
+				continue
+			}
+			fields := strings.split_n(message[len(source_path) + 1:], ":", 3, context.temp_allocator)
+			if len(fields) < 3 {
+				continue
+			}
+			number, ok := strconv.parse_int(fields[0])
+			if !ok {
+				continue
+			}
+			if !strings.has_prefix(strings.trim_space(fields[2]), "error") {
+				continue
+			}
+			if i, found := line_of[number]; found && accepted[i] {
+				accepted[i] = false
+				diagnostics[i] = strings.trim_space(fields[2])
+				retry = true
+			}
+		}
+		if retry {
+			if attempt == 3 {
+				fmt.eprintln("verify: llvm-mc kept failing on", source_path)
+				os.exit(2)
+			}
+			continue
+		}
+		if !os.exists(object_path) {
+			fmt.eprintfln("verify: llvm-mc failed on %s, and not on any one line:\n%s", source_path, stderr)
+			os.exit(2)
+		}
+		must_run({"llvm-objcopy", "-O", "binary", "--only-section=.text", object_path, binary_path})
+		blob, read_error := os.read_entire_file_from_path(binary_path, context.allocator)
+		if read_error != nil {
+			fmt.eprintln("verify: cannot read", binary_path, read_error)
+			os.exit(2)
+		}
+		for i, slot in order {
+			start := slot * slot_size
+			end := min(start + slot_size, len(blob))
+			if start < len(blob) {
+				bytes[i] = blob[start:end]
+			}
+		}
+		break
+	}
+	return
+}
+
+// -----------------------------------------------------------------------------
+// Reporting
+// -----------------------------------------------------------------------------
+
+summarize :: proc(suite: ^Suite, results: []Result, report: ^strings.Builder) -> (passed: bool) {
+	counts: [Verdict]int
+	for result in results {
+		counts[result.verdict] += 1
+	}
+	allowance := suite.allowance
+	passed = counts[.WRONG] == 0 &&
+	         counts[.MISSING] <= allowance.missing &&
+	         counts[.EXTRA] <= allowance.extra &&
+	         counts[.UNASSEMBLABLE] <= allowance.unassemblable
+
+	fmt.printfln("[%-3s] %6d words  exact %6d  equivalent %4d  unrepresentable %4d  profile-extra %4d  wrong %5d  unassemblable %5d  missing %5d  extra %5d  both-invalid %6d  %s",
+	             suite.name, len(results), counts[.EXACT], counts[.EQUIVALENT], counts[.UNREPRESENTABLE], counts[.PROFILE_EXTRA], counts[.WRONG], counts[.UNASSEMBLABLE],
+	             counts[.MISSING], counts[.EXTRA], counts[.BOTH_INVALID], passed ? "ok" : "FAIL")
+
+	fmt.sbprintfln(report, "\n===== %s =====", suite.name)
+	for verdict in Verdict {
+		switch verdict {
+		case .BOTH_INVALID, .EXACT:
+			continue
+		case .EQUIVALENT, .UNREPRESENTABLE, .PROFILE_EXTRA, .WRONG, .UNASSEMBLABLE, .MISSING, .EXTRA:
+		}
+		// Group by mnemonic so one bug shows as one line with a count.
+		groups := make(map[string][dynamic]^Result)
+		for &result in results {
+			if result.verdict != verdict {
+				continue
+			}
+			key: string
+			switch verdict {
+			case .BOTH_INVALID, .EXACT:
+			case .EQUIVALENT, .UNREPRESENTABLE, .PROFILE_EXTRA, .WRONG, .UNASSEMBLABLE, .EXTRA:
+				key = first_token(result.ours)
+			case .MISSING:
+				key = first_token(result.llvm)
+			}
+			if key not_in groups {
+				groups[key] = make([dynamic]^Result)
+			}
+			append(&groups[key], &result)
+		}
+		keys, _ := slice.map_keys(groups)
+		slice.sort_by(keys, proc(x, y: string) -> bool { return x < y })
+		fmt.sbprintfln(report, "\n--- %v (%d) ---", verdict, counts[verdict])
+		for key in keys {
+			group := groups[key]
+			fmt.sbprintfln(report, "  %-16s %6d", key, len(group))
+			for result, n in group {
+				if n >= 4 {
+					break
+				}
+				fmt.sbprintfln(report, "      %0*x  ours %-40q llvm %-40q asm %s %s  [%s]",
+				               int(result.word.length) * 2, result.word.value, result.ours, result.llvm,
+				               result.assembled, result.diagnostic, result.target)
+			}
+		}
+	}
+	return
+}
+
+first_token :: proc(text: string) -> string {
+	end := strings.index_any(text, " \t\n")
+	if end < 0 {
+		return text
+	}
+	return text[:end]
+}
+
+// -----------------------------------------------------------------------------
+// Process helpers
+// -----------------------------------------------------------------------------
+
+run :: proc(command: []string) -> (stdout, stderr: string) {
+	state, out, err, exec_error := os.process_exec({command = command}, context.allocator)
+	if exec_error != nil {
+		fmt.eprintln("verify: cannot run", command[0], exec_error)
+		os.exit(2)
+	}
+	_ = state
+	return string(out), string(err)
+}
+
+must_run :: proc(command: []string) -> string {
+	state, out, err, exec_error := os.process_exec({command = command}, context.allocator)
+	if exec_error != nil {
+		fmt.eprintln("verify: cannot run", command[0], exec_error)
+		os.exit(2)
+	}
+	if state.exit_code != 0 {
+		fmt.eprintfln("verify: %v failed:\n%s", command, string(err))
+		os.exit(2)
+	}
+	return string(out)
+}
+
+must_write :: proc(path, text: string) {
+	if error := os.write_entire_file(path, text); error != nil {
+		fmt.eprintln("verify: cannot write", path, error)
+		os.exit(2)
+	}
 }
